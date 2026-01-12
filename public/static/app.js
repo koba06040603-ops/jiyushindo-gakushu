@@ -3925,15 +3925,48 @@ function showUnitGeneratorModal() {
             <!-- 教科書会社 -->
             <div>
               <label class="block text-sm font-bold text-gray-700 mb-2">教科書会社 *</label>
-              <input type="text" id="genTextbook" placeholder="例: 東京書籍" 
-                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
+              <select id="genTextbook" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
+                <option value="">選択してください</option>
+                <option value="東京書籍">東京書籍</option>
+                <option value="啓林館">啓林館</option>
+                <option value="大日本図書">大日本図書</option>
+                <option value="学校図書">学校図書</option>
+                <option value="教育出版">教育出版</option>
+                <option value="日本文教出版">日本文教出版</option>
+                <option value="光村図書">光村図書</option>
+                <option value="帝国書院">帝国書院</option>
+                <option value="その他">その他</option>
+              </select>
             </div>
 
             <!-- 単元名 -->
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2">単元名 *</label>
-              <input type="text" id="genUnitName" placeholder="例: かけ算の筆算" 
+            <div class="md:col-span-2">
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-sm font-bold text-gray-700">単元名 *</label>
+                <button 
+                  id="suggestUnitsBtn" 
+                  onclick="suggestUnitNames()"
+                  class="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200 transition disabled:opacity-50"
+                  disabled>
+                  <i class="fas fa-lightbulb mr-1"></i>
+                  AIで単元候補を表示
+                </button>
+              </div>
+              <input type="text" id="genUnitName" placeholder="例: かけ算の筆算（または上のボタンで候補から選択）" 
                      class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
+              <!-- 単元候補表示エリア -->
+              <div id="unitSuggestions" class="mt-2 hidden">
+                <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <p class="text-sm font-bold text-purple-800">
+                      <i class="fas fa-robot mr-1"></i>
+                      AI推奨の単元候補
+                    </p>
+                    <span class="text-xs text-purple-600">クリックで選択</span>
+                  </div>
+                  <div id="unitSuggestionList" class="space-y-1"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -4045,6 +4078,24 @@ function showUnitGeneratorModal() {
     </div>
   `
   document.body.appendChild(modal)
+  
+  // 学年・教科・教科書会社が選択されたら単元候補ボタンを有効化
+  const updateSuggestButton = () => {
+    const grade = document.getElementById('genGrade').value
+    const subject = document.getElementById('genSubject').value
+    const textbook = document.getElementById('genTextbook').value
+    const suggestBtn = document.getElementById('suggestUnitsBtn')
+    
+    if (grade && subject && textbook) {
+      suggestBtn.disabled = false
+    } else {
+      suggestBtn.disabled = true
+    }
+  }
+  
+  document.getElementById('genGrade').addEventListener('change', updateSuggestButton)
+  document.getElementById('genSubject').addEventListener('change', updateSuggestButton)
+  document.getElementById('genTextbook').addEventListener('change', updateSuggestButton)
 }
 
 // モーダルを閉じる
@@ -4056,6 +4107,87 @@ function closeUnitGeneratorModal() {
 }
 
 // AI単元生成を開始
+// AIで単元名候補を取得
+async function suggestUnitNames() {
+  const grade = document.getElementById('genGrade').value
+  const subject = document.getElementById('genSubject').value
+  const textbook = document.getElementById('genTextbook').value
+  
+  if (!grade || !subject || !textbook) {
+    alert('学年・教科・教科書会社を選択してください')
+    return
+  }
+  
+  const suggestBtn = document.getElementById('suggestUnitsBtn')
+  const suggestionArea = document.getElementById('unitSuggestions')
+  const suggestionList = document.getElementById('unitSuggestionList')
+  
+  // ローディング表示
+  suggestBtn.disabled = true
+  suggestBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> 生成中...'
+  suggestionList.innerHTML = '<div class="text-center text-gray-500 py-2"><i class="fas fa-spinner fa-spin mr-2"></i>AIが単元候補を生成しています...</div>'
+  suggestionArea.classList.remove('hidden')
+  
+  try {
+    // Gemini APIで単元候補を取得
+    const response = await axios.post('/api/ai/suggest-units', {
+      grade,
+      subject,
+      textbook
+    })
+    
+    if (response.data.error) {
+      throw new Error(response.data.error)
+    }
+    
+    const units = response.data.units || []
+    
+    if (units.length === 0) {
+      suggestionList.innerHTML = '<p class="text-sm text-gray-600">候補が見つかりませんでした。手動で入力してください。</p>'
+      return
+    }
+    
+    // 単元候補を表示
+    suggestionList.innerHTML = units.map((unit, index) => `
+      <button 
+        onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
+        class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
+        <span class="text-sm text-gray-800">
+          <span class="font-bold text-purple-600 mr-2">${index + 1}.</span>
+          ${unit}
+        </span>
+        <i class="fas fa-chevron-right text-purple-400 opacity-0 group-hover:opacity-100 transition"></i>
+      </button>
+    `).join('')
+    
+    suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> 再生成'
+    suggestBtn.disabled = false
+    
+  } catch (error) {
+    console.error('単元候補取得エラー:', error)
+    suggestionList.innerHTML = '<p class="text-sm text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i> エラーが発生しました。手動で入力してください。</p>'
+    suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> AIで単元候補を表示'
+    suggestBtn.disabled = false
+  }
+}
+
+// 候補から単元を選択
+function selectSuggestedUnit(unitName, index) {
+  document.getElementById('genUnitName').value = unitName
+  
+  // 選択した候補を強調表示
+  const buttons = document.getElementById('unitSuggestionList').querySelectorAll('button')
+  buttons.forEach((btn, i) => {
+    if (i === index - 1) {
+      btn.classList.add('bg-purple-200', 'border-purple-400')
+      btn.classList.remove('bg-white', 'hover:bg-purple-100')
+    } else {
+      btn.classList.remove('bg-purple-200', 'border-purple-400')
+      btn.classList.add('bg-white', 'hover:bg-purple-100')
+    }
+  })
+}
+
 async function startUnitGeneration() {
   const grade = document.getElementById('genGrade').value
   const subject = document.getElementById('genSubject').value

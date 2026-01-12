@@ -1685,6 +1685,119 @@ ${helpCards.results.map((h: any) =>
 // Phase 7: AI単元自動生成システム
 // ============================================
 
+// APIルート：単元名候補をAIで生成
+app.post('/api/ai/suggest-units', async (c) => {
+  const { env } = c
+  const { grade, subject, textbook } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({
+      error: '単元候補生成機能は現在利用できません。',
+      units: []
+    })
+  }
+  
+  try {
+    const prompt = `あなたは小中学校の教育専門家です。以下の情報に基づいて、学習指導要領に沿った主要な単元名を10個提案してください。
+
+学年: ${grade}
+教科: ${subject}
+教科書会社: ${textbook}
+
+【出力形式】
+- 単元名のみをリスト形式で出力してください
+- 各単元名は1行に1つ
+- 番号や記号は不要
+- 学習指導要領に基づいた正確な単元名を使用
+- 学年に適した順序で並べる
+- 説明文は不要
+
+例:
+かけ算の筆算
+わり算の筆算
+小数のかけ算
+分数のたし算とひき算`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000
+          }
+        })
+      }
+    )
+
+    if (!response.ok) {
+      // フォールバック: Gemini 2.5 Flash
+      const fallbackResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1000
+            }
+          })
+        }
+      )
+      
+      if (!fallbackResponse.ok) {
+        throw new Error('単元候補の生成に失敗しました')
+      }
+      
+      const data = await fallbackResponse.json()
+      const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      
+      // レスポンスから単元名を抽出
+      const units = aiResponse
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.match(/^[\d\.\-\*]+/) && line.length > 2 && line.length < 50)
+        .slice(0, 10)
+      
+      return c.json({
+        success: true,
+        units,
+        model_used: 'gemini-2.5-flash'
+      })
+    }
+
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // レスポンスから単元名を抽出
+    const units = aiResponse
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line && !line.match(/^[\d\.\-\*]+/) && line.length > 2 && line.length < 50)
+      .slice(0, 10)
+    
+    return c.json({
+      success: true,
+      units,
+      model_used: 'gemini-3-flash-preview'
+    })
+    
+  } catch (error) {
+    console.error('単元候補生成エラー:', error)
+    return c.json({
+      error: '単元候補の生成に失敗しました。',
+      units: []
+    })
+  }
+})
+
 // APIルート：AI単元生成
 app.post('/api/ai/generate-unit', async (c) => {
   const { env } = c
