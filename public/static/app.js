@@ -3962,6 +3962,33 @@ function showUnitGeneratorModal() {
                         placeholder="例: 読み書きが苦手なので、文章は短く。感覚過敏があるので穏やかな表現で。"
                         class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"></textarea>
             </div>
+            
+            <!-- AI品質モード -->
+            <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
+              <label class="block text-sm font-bold text-gray-700 mb-3">
+                <i class="fas fa-brain mr-1"></i>
+                AI生成品質モード
+              </label>
+              <div class="space-y-3">
+                <label class="flex items-start cursor-pointer hover:bg-purple-100 p-3 rounded-lg transition">
+                  <input type="radio" name="qualityMode" value="standard" checked class="mt-1 mr-3">
+                  <div>
+                    <div class="font-bold text-gray-800">⚡ 標準モード（推奨）</div>
+                    <div class="text-sm text-gray-600">Gemini 3 Flash - 高速生成（約10秒）</div>
+                  </div>
+                </label>
+                <label class="flex items-start cursor-pointer hover:bg-purple-100 p-3 rounded-lg transition">
+                  <input type="radio" name="qualityMode" value="high" class="mt-1 mr-3">
+                  <div>
+                    <div class="font-bold text-gray-800">🌟 高品質モード</div>
+                    <div class="text-sm text-gray-600">Gemini 3 Pro - より詳細で丁寧（約30秒）</div>
+                    <div class="text-xs text-purple-600 mt-1">
+                      ※ 複雑な単元や不登校支援に最適
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -4013,12 +4040,15 @@ async function startUnitGeneration() {
     learningStyle: document.getElementById('genLearningStyle').value,
     specialSupport: document.getElementById('genSpecialSupport').value
   }
+  
+  // 品質モード
+  const qualityMode = document.querySelector('input[name="qualityMode"]:checked')?.value || 'standard'
 
   // モーダルを閉じる
   closeUnitGeneratorModal()
 
   // 生成プロセス画面を表示
-  showGenerationProgress(grade, subject, unitName)
+  showGenerationProgress(grade, subject, unitName, qualityMode)
 
   try {
     // AI単元生成API呼び出し
@@ -4027,7 +4057,8 @@ async function startUnitGeneration() {
       subject,
       textbook,
       unitName,
-      customization
+      customization,
+      qualityMode
     })
 
     if (response.data.error) {
@@ -4066,7 +4097,10 @@ async function startUnitGeneration() {
 }
 
 // 生成プロセス表示
-function showGenerationProgress(grade, subject, unitName) {
+function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
+  const modeLabel = qualityMode === 'high' ? '高品質モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
+  const estimatedTime = qualityMode === 'high' ? '約30秒' : '約10秒'
+  
   const app = document.getElementById('app')
   app.innerHTML = `
     <div class="container mx-auto px-4 py-8">
@@ -4081,6 +4115,9 @@ function showGenerationProgress(grade, subject, unitName) {
             ${grade} ${subject}「${unitName}」
           </h2>
           <p class="text-gray-600">AIが学習コンテンツを作成しています...</p>
+          <div class="mt-2 inline-block bg-purple-100 text-purple-700 px-4 py-1 rounded-full text-sm">
+            ${modeLabel} - ${estimatedTime}
+          </div>
         </div>
 
         <!-- プログレスバー -->

@@ -1688,7 +1688,7 @@ ${helpCards.results.map((h: any) =>
 // APIルート：AI単元生成
 app.post('/api/ai/generate-unit', async (c) => {
   const { env } = c
-  const { grade, subject, textbook, unitName, customization } = await c.req.json()
+  const { grade, subject, textbook, unitName, customization, qualityMode } = await c.req.json()
   
   const apiKey = env.GEMINI_API_KEY
   
@@ -1700,6 +1700,11 @@ app.post('/api/ai/generate-unit', async (c) => {
   }
   
   try {
+    // 品質モードに応じてモデルを選択
+    // 'standard' (デフォルト): Gemini 3 Flash - 高速
+    // 'high': Gemini 3 Pro - 高品質・詳細
+    const useHighQuality = qualityMode === 'high'
+    
     // カスタマイズ情報を整形
     const customInfo = customization ? `
 
@@ -1798,8 +1803,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
-    // Gemini 3 Flash Previewを使用（実験的）
-    let modelName = 'gemini-3-flash-preview'
+    // 品質モードに応じてモデルを選択
+    let modelName = useHighQuality ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview'
     let response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
       {
@@ -1817,7 +1822,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     
     // フォールバック: Gemini 2.5 Flashを使用
     if (!response.ok) {
-      console.log('Gemini 3 Preview failed, falling back to 2.5 Flash')
+      console.log(`${modelName} failed, falling back to 2.5 Flash`)
       modelName = 'gemini-2.5-flash'
       response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
