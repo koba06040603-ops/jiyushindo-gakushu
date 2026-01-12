@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "webapp",
+  "name": "jiyushindo-gakushu",
   "compatibility_date": "2026-01-12",
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
@@ -9,8 +9,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "webapp-production",
-      "database_id": "local-dev"
+      "database_name": "jiyushindo-gakushu-production",
+      "database_id": "508ed099-e916-468a-acec-ae7025ad9569"
     }
   ]
   // "vars": {
