@@ -282,6 +282,199 @@ ${body.question}
   }
 })
 
+// APIルート：学習計画取得
+app.get('/api/plans/:studentId/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const plans = await env.DB.prepare(`
+      SELECT * FROM learning_plans
+      WHERE student_id = ? AND curriculum_id = ?
+      ORDER BY planned_date
+    `).bind(studentId, curriculumId).all()
+    
+    return c.json(plans.results)
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習計画保存
+app.post('/api/plans', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO learning_plans 
+        (student_id, curriculum_id, planned_date, learning_card_id, 
+         reflection_good, reflection_bad, reflection_learned)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.student_id,
+      body.curriculum_id,
+      body.planned_date,
+      body.learning_card_id || null,
+      body.reflection_good || null,
+      body.reflection_bad || null,
+      body.reflection_learned || null
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習計画更新
+app.put('/api/plans/:id', async (c) => {
+  const { env } = c
+  const planId = c.req.param('id')
+  const body = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE learning_plans 
+      SET actual_date = ?,
+          learning_card_id = ?,
+          reflection_good = ?,
+          reflection_bad = ?,
+          reflection_learned = ?,
+          ai_feedback = ?
+      WHERE id = ?
+    `).bind(
+      body.actual_date || null,
+      body.learning_card_id || null,
+      body.reflection_good || null,
+      body.reflection_bad || null,
+      body.reflection_learned || null,
+      body.ai_feedback || null,
+      planId
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：振り返りAIフィードバック
+app.post('/api/ai/reflect', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({ 
+      feedback: 'がんばりましたね！次回も楽しく学習しましょう。' 
+    })
+  }
+  
+  try {
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `あなたは小学生の学習を応援するAI先生です。子どもの振り返りを読んで、励ましとアドバイスをしてください。
+
+【振り返り内容】
+良かったこと: ${body.reflection_good || 'なし'}
+難しかったこと: ${body.reflection_bad || 'なし'}
+わかったこと: ${body.reflection_learned || 'なし'}
+
+【フィードバックのルール】
+1. 必ず励ましの言葉から始める
+2. 良かったことを具体的に褒める
+3. 難しかったことには共感し、次へのヒントを出す
+4. わかったことの素晴らしさを伝える
+5. 次の学習への意欲が湧く言葉で締める
+6. 小学生にわかりやすい言葉で
+7. 150文字以内で簡潔に
+
+フィードバックしてください。`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 200,
+          }
+        })
+      }
+    )
+    
+    const geminiData = await geminiResponse.json()
+    
+    if (!geminiResponse.ok) {
+      throw new Error('Gemini API error')
+    }
+    
+    const feedback = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 
+                     'よくがんばりました！次回も楽しく学習しましょう。'
+    
+    return c.json({ feedback })
+    
+  } catch (error) {
+    console.error('AI reflection error:', error)
+    return c.json({ 
+      feedback: 'すばらしい振り返りですね！これからも一緒にがんばりましょう！' 
+    })
+  }
+})
+
+// APIルート：全解答取得（解答タブ用）
+app.get('/api/answers/curriculum/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    // コースと学習カードの解答
+    const cardAnswers = await env.DB.prepare(`
+      SELECT 
+        c.course_display_name,
+        c.course_level,
+        lc.card_number,
+        lc.card_title,
+        lc.card_type,
+        a.answer_content,
+        a.explanation
+      FROM courses c
+      JOIN learning_cards lc ON c.id = lc.course_id
+      LEFT JOIN answers a ON lc.id = a.learning_card_id
+      WHERE c.curriculum_id = ?
+      ORDER BY c.course_level, lc.card_number
+    `).bind(curriculumId).all()
+    
+    // 選択問題の解答
+    const optionalAnswers = await env.DB.prepare(`
+      SELECT 
+        op.problem_number,
+        op.problem_title,
+        a.answer_content,
+        a.explanation
+      FROM optional_problems op
+      LEFT JOIN answers a ON op.id = a.optional_problem_id
+      WHERE op.curriculum_id = ?
+      ORDER BY op.problem_number
+    `).bind(curriculumId).all()
+    
+    return c.json({
+      cardAnswers: cardAnswers.results,
+      optionalAnswers: optionalAnswers.results
+    })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
 // トップページ
 app.get('/', (c) => {
   return c.html(`

@@ -255,6 +255,25 @@ async function loadGuidePage(curriculumId) {
           </div>
         </div>
 
+        <!-- ツールバー -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <button onclick="loadLearningPlan(${curriculum.id})" 
+                  class="bg-green-600 text-white py-4 px-6 rounded-lg font-bold hover:bg-green-700 transition flex items-center justify-center">
+            <i class="fas fa-calendar-alt mr-2"></i>
+            学習計画表
+          </button>
+          <button onclick="loadAnswersTab(${curriculum.id})" 
+                  class="bg-blue-600 text-white py-4 px-6 rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center">
+            <i class="fas fa-book-open mr-2"></i>
+            解答を見る
+          </button>
+          <button onclick="alert('進捗ボードは次のステップで実装します')" 
+                  class="bg-purple-600 text-white py-4 px-6 rounded-lg font-bold hover:bg-purple-700 transition flex items-center justify-center">
+            <i class="fas fa-chart-bar mr-2"></i>
+            進捗ボード
+          </button>
+        </div>
+
         <!-- 単元の目標 -->
         <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6 mb-6">
           <h2 class="text-xl font-bold text-blue-800 mb-3">
@@ -963,6 +982,572 @@ window.askFriend = askFriend
 window.setUnderstanding = setUnderstanding
 window.showAnswer = showAnswer
 window.saveProgress = saveProgress
+window.loadLearningPlan = loadLearningPlan
+window.loadAnswersTab = loadAnswersTab
+window.savePlanReflection = savePlanReflection
+window.requestAIFeedback = requestAIFeedback
+
+// ============================================
+// 学習計画表ページ
+// ============================================
+async function loadLearningPlan(curriculumId) {
+  state.currentView = 'plan'
+  
+  try {
+    // カリキュラム情報取得
+    const currResponse = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum, courses } = currResponse.data
+    
+    // 既存の計画を取得
+    const plansResponse = await axios.get(`/api/plans/${state.student.id}/${curriculumId}`)
+    const existingPlans = plansResponse.data
+    
+    // 学習カードリストを取得（選択したコース用）
+    let cards = []
+    if (state.selectedCourse) {
+      const cardsResponse = await axios.get(`/api/courses/${state.selectedCourse}/cards`)
+      cards = cardsResponse.data
+    }
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <!-- ヘッダー -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <button onclick="loadGuidePage(${curriculumId})" class="text-indigo-600 hover:text-indigo-800 mb-4">
+            <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
+          </button>
+          <h1 class="text-3xl font-bold text-green-600 mb-2">
+            <i class="fas fa-calendar-alt mr-2"></i>
+            学習計画表
+          </h1>
+          <p class="text-xl text-gray-800">
+            ${curriculum.grade}年 ${curriculum.subject} - ${curriculum.unit_name}
+          </p>
+        </div>
+
+        <!-- 単元情報 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
+            <h3 class="text-lg font-bold text-blue-800 mb-2">
+              <i class="fas fa-bullseye mr-2"></i>単元の目標
+            </h3>
+            <p class="text-gray-800 text-sm">${curriculum.unit_goal}</p>
+          </div>
+          <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-6">
+            <h3 class="text-lg font-bold text-green-800 mb-2">
+              <i class="fas fa-heart mr-2"></i>心の成長目標
+            </h3>
+            <p class="text-gray-800 text-sm">${curriculum.non_cognitive_goal}</p>
+          </div>
+        </div>
+
+        <!-- 単元時数 -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+          <p class="text-gray-700 font-bold">
+            <i class="fas fa-clock mr-2"></i>
+            授業時間：全${curriculum.total_hours}時間
+          </p>
+        </div>
+
+        <!-- 学習計画テーブル -->
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div class="bg-gradient-to-r from-green-600 to-green-500 p-6">
+            <h2 class="text-2xl font-bold text-white">
+              <i class="fas fa-tasks mr-2"></i>
+              学習の計画と振り返り
+            </h2>
+          </div>
+          
+          <div class="p-6">
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="bg-gray-100">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-sm font-bold text-gray-700">時間</th>
+                    <th class="px-4 py-3 text-left text-sm font-bold text-gray-700">予定日</th>
+                    <th class="px-4 py-3 text-left text-sm font-bold text-gray-700">実施日</th>
+                    <th class="px-4 py-3 text-left text-sm font-bold text-gray-700">学習内容</th>
+                    <th class="px-4 py-3 text-left text-sm font-bold text-gray-700">振り返り</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                  ${generatePlanRows(curriculum.total_hours, existingPlans, cards)}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 単元全体の振り返り -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4">
+            <i class="fas fa-flag-checkered mr-2"></i>
+            単元全体の振り返り
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">この単元で学んだこと</label>
+              <textarea id="unitReflection" 
+                        rows="4" 
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                        placeholder="この単元で学んだことを書きましょう..."></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">次に学びたいこと</label>
+              <textarea id="nextGoal" 
+                        rows="3" 
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                        placeholder="次に学びたいことを書きましょう..."></textarea>
+            </div>
+            <button onclick="saveUnitReflection()" 
+                    class="w-full bg-green-600 text-white py-3 px-6 rounded-lg font-bold hover:bg-green-700 transition">
+              <i class="fas fa-save mr-2"></i>
+              単元の振り返りを保存
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    console.error('学習計画表読み込みエラー:', error)
+    alert('データの読み込みに失敗しました')
+  }
+}
+
+function generatePlanRows(totalHours, existingPlans, cards) {
+  let rows = ''
+  
+  // 1時間目：オリエンテーション（固定）
+  rows += `
+    <tr class="bg-yellow-50">
+      <td class="px-4 py-3 font-bold">1</td>
+      <td class="px-4 py-3 text-sm">-</td>
+      <td class="px-4 py-3 text-sm">-</td>
+      <td class="px-4 py-3 text-sm font-bold">オリエンテーション</td>
+      <td class="px-4 py-3 text-sm text-gray-500">学習の進め方を確認</td>
+    </tr>
+  `
+  
+  // 2〜最終時間-1：自由進度学習
+  for (let i = 2; i < totalHours; i++) {
+    const plan = existingPlans.find(p => p.planned_date && new Date(p.planned_date).getHours() === i) || {}
+    const cardId = plan.learning_card_id || ''
+    const card = cards.find(c => c.id == cardId)
+    
+    rows += `
+      <tr class="hover:bg-gray-50" id="plan-row-${i}">
+        <td class="px-4 py-3 font-bold">${i}</td>
+        <td class="px-4 py-3">
+          <input type="date" 
+                 id="plan-date-${i}" 
+                 value="${plan.planned_date || ''}"
+                 class="w-full p-2 border rounded text-sm">
+        </td>
+        <td class="px-4 py-3">
+          <input type="date" 
+                 id="actual-date-${i}" 
+                 value="${plan.actual_date || ''}"
+                 class="w-full p-2 border rounded text-sm">
+        </td>
+        <td class="px-4 py-3">
+          <select id="card-select-${i}" class="w-full p-2 border rounded text-sm">
+            <option value="">選択してください</option>
+            ${cards.map(c => `
+              <option value="${c.id}" ${c.id == cardId ? 'selected' : ''}>
+                カード${c.card_number}: ${c.card_title}
+              </option>
+            `).join('')}
+          </select>
+        </td>
+        <td class="px-4 py-3">
+          <button onclick="openReflectionModal(${i}, ${plan.id || 'null'})" 
+                  class="text-blue-600 hover:text-blue-800 text-sm font-bold">
+            <i class="fas fa-edit mr-1"></i>
+            ${plan.reflection_good ? '編集' : '記入'}
+          </button>
+        </td>
+      </tr>
+    `
+  }
+  
+  // 最終時間：まとめ（固定）
+  rows += `
+    <tr class="bg-yellow-50">
+      <td class="px-4 py-3 font-bold">${totalHours}</td>
+      <td class="px-4 py-3 text-sm">-</td>
+      <td class="px-4 py-3 text-sm">-</td>
+      <td class="px-4 py-3 text-sm font-bold">まとめ</td>
+      <td class="px-4 py-3 text-sm text-gray-500">単元全体を振り返る</td>
+    </tr>
+  `
+  
+  return rows
+}
+
+// 振り返りモーダル表示
+function openReflectionModal(hour, planId) {
+  const modal = document.createElement('div')
+  modal.id = 'reflectionModal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="bg-gradient-to-r from-green-600 to-green-500 p-6">
+        <h3 class="text-2xl font-bold text-white">
+          <i class="fas fa-pencil-alt mr-2"></i>
+          ${hour}時間目の振り返り
+        </h3>
+      </div>
+      
+      <div class="p-6 space-y-6">
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-2">
+            <i class="fas fa-smile text-green-500 mr-2"></i>
+            良かったこと
+          </label>
+          <textarea id="reflection-good" 
+                    rows="3" 
+                    class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                    placeholder="うまくいったことや楽しかったことを書きましょう..."></textarea>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-2">
+            <i class="fas fa-frown text-orange-500 mr-2"></i>
+            難しかったこと
+          </label>
+          <textarea id="reflection-bad" 
+                    rows="3" 
+                    class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                    placeholder="難しかったことや困ったことを書きましょう..."></textarea>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-2">
+            <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+            わかったこと
+          </label>
+          <textarea id="reflection-learned" 
+                    rows="3" 
+                    class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                    placeholder="新しくわかったことや発見したことを書きましょう..."></textarea>
+        </div>
+        
+        <div id="ai-feedback-area" class="hidden bg-blue-50 border-l-4 border-blue-500 rounded-lg p-4">
+          <h4 class="font-bold text-blue-800 mb-2">
+            <i class="fas fa-robot mr-2"></i>AI先生からのメッセージ
+          </h4>
+          <p id="ai-feedback-text" class="text-gray-800 text-sm"></p>
+        </div>
+        
+        <div class="flex gap-3">
+          <button onclick="requestAIFeedback()" 
+                  class="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-bold hover:bg-blue-700 transition">
+            <i class="fas fa-robot mr-2"></i>
+            AI先生にコメントをもらう
+          </button>
+          <button onclick="savePlanReflection(${hour}, ${planId})" 
+                  class="flex-1 bg-green-600 text-white py-3 px-6 rounded-lg font-bold hover:bg-green-700 transition">
+            <i class="fas fa-save mr-2"></i>
+            保存
+          </button>
+        </div>
+        
+        <button onclick="closeReflectionModal()" 
+                class="w-full bg-gray-300 text-gray-700 py-3 px-6 rounded-lg font-bold hover:bg-gray-400 transition">
+          閉じる
+        </button>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+// 振り返りモーダルを閉じる
+function closeReflectionModal() {
+  const modal = document.getElementById('reflectionModal')
+  if (modal) modal.remove()
+}
+
+// AI振り返りフィードバック取得
+async function requestAIFeedback() {
+  const good = document.getElementById('reflection-good').value
+  const bad = document.getElementById('reflection-bad').value
+  const learned = document.getElementById('reflection-learned').value
+  
+  if (!good && !bad && !learned) {
+    alert('振り返りを書いてからAI先生に聞いてみましょう！')
+    return
+  }
+  
+  const feedbackArea = document.getElementById('ai-feedback-area')
+  const feedbackText = document.getElementById('ai-feedback-text')
+  
+  feedbackText.textContent = '考え中...'
+  feedbackArea.classList.remove('hidden')
+  
+  try {
+    const response = await axios.post('/api/ai/reflect', {
+      reflection_good: good,
+      reflection_bad: bad,
+      reflection_learned: learned
+    })
+    
+    feedbackText.textContent = response.data.feedback
+  } catch (error) {
+    console.error('AI振り返りエラー:', error)
+    feedbackText.textContent = 'よくがんばりました！すばらしい振り返りですね。'
+  }
+}
+
+// 振り返り保存
+async function savePlanReflection(hour, planId) {
+  const good = document.getElementById('reflection-good').value
+  const bad = document.getElementById('reflection-bad').value
+  const learned = document.getElementById('reflection-learned').value
+  const aiFeedback = document.getElementById('ai-feedback-text').textContent
+  
+  const planDate = document.getElementById(`plan-date-${hour}`).value
+  const actualDate = document.getElementById(`actual-date-${hour}`).value
+  const cardId = document.getElementById(`card-select-${hour}`).value
+  
+  try {
+    if (planId && planId !== 'null') {
+      // 更新
+      await axios.put(`/api/plans/${planId}`, {
+        actual_date: actualDate,
+        learning_card_id: cardId,
+        reflection_good: good,
+        reflection_bad: bad,
+        reflection_learned: learned,
+        ai_feedback: aiFeedback !== '考え中...' ? aiFeedback : null
+      })
+    } else {
+      // 新規作成
+      await axios.post('/api/plans', {
+        student_id: state.student.id,
+        curriculum_id: state.selectedCurriculum.id,
+        planned_date: planDate,
+        learning_card_id: cardId,
+        reflection_good: good,
+        reflection_bad: bad,
+        reflection_learned: learned
+      })
+    }
+    
+    alert('振り返りを保存しました！')
+    closeReflectionModal()
+    loadLearningPlan(state.selectedCurriculum.id)
+  } catch (error) {
+    console.error('振り返り保存エラー:', error)
+    alert('保存に失敗しました')
+  }
+}
+
+// 単元全体の振り返り保存
+function saveUnitReflection() {
+  const reflection = document.getElementById('unitReflection').value
+  const nextGoal = document.getElementById('nextGoal').value
+  
+  if (!reflection && !nextGoal) {
+    alert('振り返りを書いてから保存してください。')
+    return
+  }
+  
+  alert('単元の振り返りを保存しました！\n\n※実際のシステムでは、ここでデータベースに保存されます。')
+}
+
+window.closeReflectionModal = closeReflectionModal
+
+// ============================================
+// 解答タブページ
+// ============================================
+async function loadAnswersTab(curriculumId) {
+  state.currentView = 'answers'
+  
+  try {
+    // カリキュラム情報取得
+    const currResponse = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum } = currResponse.data
+    
+    // 解答データ取得
+    const answersResponse = await axios.get(`/api/answers/curriculum/${curriculumId}`)
+    const { cardAnswers, optionalAnswers } = answersResponse.data
+    
+    // コース別にグループ化
+    const groupedAnswers = {}
+    cardAnswers.forEach(answer => {
+      const key = answer.course_display_name
+      if (!groupedAnswers[key]) {
+        groupedAnswers[key] = []
+      }
+      groupedAnswers[key].push(answer)
+    })
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <!-- ヘッダー -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <button onclick="loadGuidePage(${curriculumId})" class="text-indigo-600 hover:text-indigo-800 mb-4">
+            <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
+          </button>
+          <h1 class="text-3xl font-bold text-blue-600 mb-2">
+            <i class="fas fa-book-open mr-2"></i>
+            解答と解説
+          </h1>
+          <p class="text-xl text-gray-800">
+            ${curriculum.grade}年 ${curriculum.subject} - ${curriculum.unit_name}
+          </p>
+        </div>
+
+        <!-- 注意書き -->
+        <div class="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6 mb-6">
+          <h3 class="text-lg font-bold text-yellow-800 mb-2">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            解答を見る前に
+          </h3>
+          <p class="text-gray-800">
+            まずは自分で考えてみましょう！わからないときはヒントやAI先生に聞いてみてね。<br>
+            解答はあくまで参考です。自分の答えと比べて、どこが違うか考えてみましょう。
+          </p>
+        </div>
+
+        <!-- コース別解答 -->
+        ${Object.keys(groupedAnswers).map((courseName, index) => `
+          <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
+            <div class="bg-gradient-to-r ${
+              index === 0 ? 'from-green-600 to-green-500' :
+              index === 1 ? 'from-blue-600 to-blue-500' :
+              'from-purple-600 to-purple-500'
+            } p-6">
+              <h2 class="text-2xl font-bold text-white">
+                <i class="fas fa-layer-group mr-2"></i>
+                ${courseName}
+              </h2>
+            </div>
+            
+            <div class="p-6 space-y-6">
+              ${groupedAnswers[courseName].map(answer => `
+                <div class="border-2 border-gray-200 rounded-lg p-6">
+                  <h3 class="text-lg font-bold text-gray-800 mb-4">
+                    <span class="inline-block w-10 h-10 rounded-full ${
+                      index === 0 ? 'bg-green-100 text-green-600' :
+                      index === 1 ? 'bg-blue-100 text-blue-600' :
+                      'bg-purple-100 text-purple-600'
+                    } flex items-center justify-center font-bold mr-3">
+                      ${answer.card_number}
+                    </span>
+                    ${answer.card_title}
+                  </h3>
+                  
+                  ${answer.answer_content ? `
+                    <div class="bg-green-50 border-l-4 border-green-500 rounded p-4 mb-4">
+                      <h4 class="font-bold text-green-800 mb-2">
+                        <i class="fas fa-check-circle mr-2"></i>解答
+                      </h4>
+                      <pre class="text-gray-800 whitespace-pre-wrap font-sans text-sm">${answer.answer_content}</pre>
+                    </div>
+                  ` : ''}
+                  
+                  ${answer.explanation ? `
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded p-4">
+                      <h4 class="font-bold text-blue-800 mb-2">
+                        <i class="fas fa-info-circle mr-2"></i>解説
+                      </h4>
+                      <pre class="text-gray-800 whitespace-pre-wrap font-sans text-sm">${answer.explanation}</pre>
+                    </div>
+                  ` : ''}
+                  
+                  ${!answer.answer_content && !answer.explanation ? `
+                    <p class="text-gray-500 text-sm">解答は準備中です</p>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+
+        <!-- 選択問題の解答 -->
+        ${optionalAnswers.length > 0 ? `
+          <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-yellow-600 to-orange-500 p-6">
+              <h2 class="text-2xl font-bold text-white">
+                <i class="fas fa-star mr-2"></i>
+                選択問題の解答
+              </h2>
+            </div>
+            
+            <div class="p-6 space-y-6">
+              ${optionalAnswers.map(answer => `
+                <div class="border-2 border-gray-200 rounded-lg p-6">
+                  <h3 class="text-lg font-bold text-gray-800 mb-4">
+                    <span class="inline-block w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center font-bold mr-3">
+                      ${answer.problem_number}
+                    </span>
+                    ${answer.problem_title}
+                  </h3>
+                  
+                  ${answer.answer_content ? `
+                    <div class="bg-green-50 border-l-4 border-green-500 rounded p-4 mb-4">
+                      <h4 class="font-bold text-green-800 mb-2">
+                        <i class="fas fa-check-circle mr-2"></i>解答例
+                      </h4>
+                      <pre class="text-gray-800 whitespace-pre-wrap font-sans text-sm">${answer.answer_content}</pre>
+                    </div>
+                  ` : ''}
+                  
+                  ${answer.explanation ? `
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded p-4">
+                      <h4 class="font-bold text-blue-800 mb-2">
+                        <i class="fas fa-info-circle mr-2"></i>解説・ポイント
+                      </h4>
+                      <pre class="text-gray-800 whitespace-pre-wrap font-sans text-sm">${answer.explanation}</pre>
+                    </div>
+                  ` : ''}
+                  
+                  ${!answer.answer_content && !answer.explanation ? `
+                    <p class="text-gray-500 text-sm">選択問題は自由な取り組みです。正解は一つではありません。</p>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- ヒント -->
+        <div class="bg-indigo-50 rounded-lg p-6 mt-6">
+          <h3 class="text-lg font-bold text-indigo-800 mb-3">
+            <i class="fas fa-lightbulb mr-2"></i>
+            解答を活用するコツ
+          </h3>
+          <ul class="text-sm text-gray-700 space-y-2">
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <span>自分の答えと比べて、どこが違うか確認しよう</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <span>間違えたところは、なぜ間違えたのか考えよう</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <span>わからないところは、もう一度学習カードに戻ってみよう</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <span>友達と答えを見せ合って、説明し合うのもいいね</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    console.error('解答タブ読み込みエラー:', error)
+    alert('データの読み込みに失敗しました')
+  }
+}
 
 // ============================================
 // 進捗ボードページ（次回実装）
