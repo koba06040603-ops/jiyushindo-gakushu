@@ -267,7 +267,7 @@ async function loadGuidePage(curriculumId) {
             <i class="fas fa-book-open mr-2"></i>
             解答を見る
           </button>
-          <button onclick="alert('進捗ボードは次のステップで実装します')" 
+          <button onclick="loadProgressBoard(${curriculum.id})" 
                   class="bg-purple-600 text-white py-4 px-6 rounded-lg font-bold hover:bg-purple-700 transition flex items-center justify-center">
             <i class="fas fa-chart-bar mr-2"></i>
             進捗ボード
@@ -1550,9 +1550,424 @@ async function loadAnswersTab(curriculumId) {
 }
 
 // ============================================
-// 進捗ボードページ（次回実装）
+// 進捗ボードページ
 // ============================================
-function loadProgressBoard() {
-  alert('進捗ボードは次のステップで実装します！')
-  // 次のステップで実装予定
+async function loadProgressBoard(curriculumId) {
+  state.currentView = 'progress'
+  
+  try {
+    // カリキュラム情報取得
+    const currResponse = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum, courses } = currResponse.data
+    
+    // 進捗データ取得
+    const progressResponse = await axios.get(`/api/progress/curriculum/${curriculumId}/class/${state.student.classCode}`)
+    const studentProgress = progressResponse.data
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <!-- ヘッダー -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <button onclick="loadGuidePage(${curriculumId})" class="text-indigo-600 hover:text-indigo-800 mb-4">
+            <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
+          </button>
+          <h1 class="text-3xl font-bold text-purple-600 mb-2">
+            <i class="fas fa-chart-bar mr-2"></i>
+            進捗ボード
+          </h1>
+          <p class="text-xl text-gray-800">
+            ${curriculum.grade}年 ${curriculum.subject} - ${curriculum.unit_name}
+          </p>
+        </div>
+
+        <!-- コース凡例 -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <h3 class="text-lg font-bold text-gray-800 mb-4">
+            <i class="fas fa-palette mr-2"></i>
+            コースの色分け
+          </h3>
+          <div class="flex flex-wrap gap-4">
+            <div class="flex items-center">
+              <div class="w-6 h-6 bg-green-500 rounded mr-2"></div>
+              <span class="font-bold">じっくりコース</span>
+              <span class="text-sm text-gray-600 ml-2">(基礎)</span>
+            </div>
+            <div class="flex items-center">
+              <div class="w-6 h-6 bg-blue-500 rounded mr-2"></div>
+              <span class="font-bold">しっかりコース</span>
+              <span class="text-sm text-gray-600 ml-2">(標準)</span>
+            </div>
+            <div class="flex items-center">
+              <div class="w-6 h-6 bg-purple-500 rounded mr-2"></div>
+              <span class="font-bold">ぐんぐんコース</span>
+              <span class="text-sm text-gray-600 ml-2">(発展)</span>
+            </div>
+            <div class="flex items-center ml-8">
+              <i class="fas fa-hand-paper text-orange-500 mr-2"></i>
+              <span class="font-bold text-orange-600">助けを求めています</span>
+            </div>
+            <div class="flex items-center">
+              <i class="fas fa-pause-circle text-red-500 mr-2"></i>
+              <span class="font-bold text-red-600">停滞中（10分以上）</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 進捗グラフ -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-6">
+            <i class="fas fa-users mr-2"></i>
+            クラス全体の進捗状況
+          </h3>
+          
+          <div class="space-y-4">
+            ${generateProgressBars(studentProgress, courses.results)}
+          </div>
+        </div>
+
+        <!-- 助け要請・停滞一覧 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- 助け要請 -->
+          <div class="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-6">
+            <h3 class="text-lg font-bold text-orange-800 mb-4">
+              <i class="fas fa-hand-paper mr-2"></i>
+              助けを求めている児童
+            </h3>
+            <div class="space-y-3">
+              ${generateHelpRequests(studentProgress)}
+            </div>
+          </div>
+
+          <!-- 停滞中 -->
+          <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-6">
+            <h3 class="text-lg font-bold text-red-800 mb-4">
+              <i class="fas fa-pause-circle mr-2"></i>
+              停滞している児童
+            </h3>
+            <div class="space-y-3">
+              ${generateStuckStudents(studentProgress)}
+            </div>
+          </div>
+        </div>
+
+        <!-- 助け要請の統計 -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-6">
+            <i class="fas fa-chart-pie mr-2"></i>
+            助けの種類別統計
+          </h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            ${generateHelpStats(studentProgress)}
+          </div>
+        </div>
+
+        <!-- 理解度の分布 -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-6">
+            <i class="fas fa-smile mr-2"></i>
+            理解度の分布
+          </h3>
+          <div class="grid grid-cols-5 gap-4">
+            ${generateUnderstandingDistribution(studentProgress)}
+          </div>
+        </div>
+
+        <!-- 教師用メモ -->
+        <div class="bg-indigo-50 rounded-lg p-6 mt-6">
+          <h3 class="text-lg font-bold text-indigo-800 mb-3">
+            <i class="fas fa-lightbulb mr-2"></i>
+            指導のポイント
+          </h3>
+          <ul class="text-sm text-gray-700 space-y-2">
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <span>オレンジ色のマークがついている児童には優先的に声をかけましょう</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <span>停滞している児童には、ヒントカードを勧めるか、友達との学び合いを促しましょう</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <span>理解度が低い児童には、個別指導の時間を設けましょう</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <span>進度が早い児童には、選択問題や発展課題を勧めましょう</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    console.error('進捗ボード読み込みエラー:', error)
+    alert('データの読み込みに失敗しました')
+  }
+}
+
+// 進捗バー生成
+function generateProgressBars(studentProgress, courses) {
+  let html = ''
+  
+  Object.values(studentProgress).forEach(({ student, progress, allProgress }) => {
+    const courseColor = getProgressColor(progress?.course_level)
+    const progressPercent = calculateProgressPercent(allProgress, 6) // 6枚のカード想定
+    const isStuck = isStudentStuck(progress)
+    const needsHelp = progress?.help_requested_from === 'teacher'
+    
+    html += `
+      <div class="border-2 border-gray-200 rounded-lg p-4 hover:border-indigo-300 transition">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center">
+            <span class="text-lg font-bold text-gray-800 mr-3">
+              ${student.student_number}. ${student.name}
+            </span>
+            ${needsHelp ? '<i class="fas fa-hand-paper text-orange-500 text-xl mr-2" title="助けを求めています"></i>' : ''}
+            ${isStuck ? '<i class="fas fa-pause-circle text-red-500 text-xl" title="停滞中"></i>' : ''}
+          </div>
+          <div class="text-right">
+            <p class="text-sm text-gray-600">
+              ${progress ? `${progress.course_display_name}` : 'コース未選択'}
+            </p>
+            <p class="text-xs text-gray-500">
+              ${progress ? `カード ${progress.card_number || '-'}` : '未開始'}
+            </p>
+          </div>
+        </div>
+        
+        <div class="relative">
+          <div class="w-full bg-gray-200 rounded-full h-8">
+            <div class="${courseColor} h-8 rounded-full flex items-center justify-center text-white font-bold text-sm transition-all duration-500" 
+                 style="width: ${progressPercent}%">
+              ${progressPercent > 10 ? `${progressPercent}%` : ''}
+            </div>
+          </div>
+          ${progressPercent <= 10 && progressPercent > 0 ? `
+            <span class="absolute right-2 top-1 text-xs font-bold text-gray-700">${progressPercent}%</span>
+          ` : ''}
+        </div>
+        
+        ${progress ? `
+          <div class="mt-3 flex items-center justify-between text-xs text-gray-600">
+            <span>
+              <i class="fas fa-heart mr-1"></i>
+              理解度: ${getUnderstandingEmoji(progress.understanding_level)}
+            </span>
+            <span>
+              <i class="fas fa-question-circle mr-1"></i>
+              助け: ${progress.help_count || 0}回
+            </span>
+            <span>
+              ${progress.help_requested_from ? `<i class="fas fa-info-circle mr-1"></i>${getHelpTypeLabel(progress.help_requested_from)}` : ''}
+            </span>
+          </div>
+        ` : ''}
+      </div>
+    `
+  })
+  
+  return html || '<p class="text-gray-500">まだ学習データがありません</p>'
+}
+
+// 進捗色取得
+function getProgressColor(courseLevel) {
+  switch (courseLevel) {
+    case 'basic': return 'bg-green-500'
+    case 'standard': return 'bg-blue-500'
+    case 'advanced': return 'bg-purple-500'
+    default: return 'bg-gray-400'
+  }
+}
+
+// 進捗パーセント計算
+function calculateProgressPercent(allProgress, totalCards) {
+  if (!allProgress || allProgress.length === 0) return 0
+  
+  const completedCards = new Set(allProgress.map(p => p.learning_card_id)).size
+  return Math.round((completedCards / totalCards) * 100)
+}
+
+// 停滞判定（10分以上経過）
+function isStudentStuck(progress) {
+  if (!progress || !progress.created_at) return false
+  
+  const now = new Date()
+  const lastUpdate = new Date(progress.created_at)
+  const minutesElapsed = (now - lastUpdate) / 1000 / 60
+  
+  return minutesElapsed > 10 && progress.status !== 'completed'
+}
+
+// 助け要請リスト生成
+function generateHelpRequests(studentProgress) {
+  const helpRequests = []
+  
+  Object.values(studentProgress).forEach(({ student, progress }) => {
+    if (progress && progress.help_requested_from === 'teacher') {
+      helpRequests.push({
+        student,
+        progress
+      })
+    }
+  })
+  
+  if (helpRequests.length === 0) {
+    return '<p class="text-gray-500 text-sm">現在、助けを求めている児童はいません</p>'
+  }
+  
+  let html = ''
+  helpRequests.forEach(({ student, progress }) => {
+    html += `
+      <div class="bg-white rounded-lg p-3 shadow">
+        <p class="font-bold text-gray-800">${student.name}</p>
+        <p class="text-sm text-gray-600">カード ${progress.card_number}: ${progress.card_title}</p>
+        <p class="text-xs text-gray-500 mt-1">
+          <i class="fas fa-clock mr-1"></i>
+          ${formatTimestamp(progress.created_at)}
+        </p>
+      </div>
+    `
+  })
+  
+  return html
+}
+
+// 停滞中の児童リスト生成
+function generateStuckStudents(studentProgress) {
+  const stuckStudents = []
+  
+  Object.values(studentProgress).forEach(({ student, progress }) => {
+    if (isStudentStuck(progress)) {
+      stuckStudents.push({
+        student,
+        progress
+      })
+    }
+  })
+  
+  if (stuckStudents.length === 0) {
+    return '<p class="text-gray-500 text-sm">停滞している児童はいません</p>'
+  }
+  
+  let html = ''
+  stuckStudents.forEach(({ student, progress }) => {
+    const minutesElapsed = Math.round((new Date() - new Date(progress.created_at)) / 1000 / 60)
+    html += `
+      <div class="bg-white rounded-lg p-3 shadow">
+        <p class="font-bold text-gray-800">${student.name}</p>
+        <p class="text-sm text-gray-600">カード ${progress.card_number}: ${progress.card_title}</p>
+        <p class="text-xs text-red-600 mt-1 font-bold">
+          <i class="fas fa-clock mr-1"></i>
+          ${minutesElapsed}分間停滞中
+        </p>
+      </div>
+    `
+  })
+  
+  return html
+}
+
+// 助けの統計生成
+function generateHelpStats(studentProgress) {
+  const stats = {
+    hint: 0,
+    ai: 0,
+    teacher: 0,
+    friend: 0
+  }
+  
+  Object.values(studentProgress).forEach(({ allProgress }) => {
+    allProgress.forEach(p => {
+      if (p.help_requested_from) {
+        stats[p.help_requested_from] = (stats[p.help_requested_from] || 0) + 1
+      }
+    })
+  })
+  
+  return `
+    <div class="bg-yellow-50 rounded-lg p-4 text-center">
+      <i class="fas fa-lightbulb text-yellow-600 text-3xl mb-2"></i>
+      <p class="text-2xl font-bold text-gray-800">${stats.hint || 0}</p>
+      <p class="text-sm text-gray-600">ヒント</p>
+    </div>
+    <div class="bg-blue-50 rounded-lg p-4 text-center">
+      <i class="fas fa-robot text-blue-600 text-3xl mb-2"></i>
+      <p class="text-2xl font-bold text-gray-800">${stats.ai || 0}</p>
+      <p class="text-sm text-gray-600">AI先生</p>
+    </div>
+    <div class="bg-green-50 rounded-lg p-4 text-center">
+      <i class="fas fa-chalkboard-teacher text-green-600 text-3xl mb-2"></i>
+      <p class="text-2xl font-bold text-gray-800">${stats.teacher || 0}</p>
+      <p class="text-sm text-gray-600">先生</p>
+    </div>
+    <div class="bg-purple-50 rounded-lg p-4 text-center">
+      <i class="fas fa-user-friends text-purple-600 text-3xl mb-2"></i>
+      <p class="text-2xl font-bold text-gray-800">${stats.friend || 0}</p>
+      <p class="text-sm text-gray-600">友達</p>
+    </div>
+  `
+}
+
+// 理解度分布生成
+function generateUnderstandingDistribution(studentProgress) {
+  const distribution = [0, 0, 0, 0, 0]
+  let total = 0
+  
+  Object.values(studentProgress).forEach(({ progress }) => {
+    if (progress && progress.understanding_level) {
+      distribution[progress.understanding_level - 1]++
+      total++
+    }
+  })
+  
+  const emojis = ['😢', '😕', '😊', '😄', '🤩']
+  const labels = ['わからない', '少し難しい', 'だいたいOK', 'よくわかる', '完璧！']
+  
+  let html = ''
+  for (let i = 0; i < 5; i++) {
+    const count = distribution[i]
+    const percent = total > 0 ? Math.round((count / total) * 100) : 0
+    html += `
+      <div class="bg-gray-50 rounded-lg p-4 text-center">
+        <div class="text-4xl mb-2">${emojis[i]}</div>
+        <p class="text-2xl font-bold text-gray-800">${count}</p>
+        <p class="text-xs text-gray-600">${labels[i]}</p>
+        ${total > 0 ? `<p class="text-xs text-gray-500 mt-1">${percent}%</p>` : ''}
+      </div>
+    `
+  }
+  
+  return html
+}
+
+// ヘルパー関数
+function getUnderstandingEmoji(level) {
+  const emojis = ['😢', '😕', '😊', '😄', '🤩']
+  return level ? emojis[level - 1] : '-'
+}
+
+function getHelpTypeLabel(type) {
+  const labels = {
+    hint: 'ヒント',
+    ai: 'AI先生',
+    teacher: '先生',
+    friend: '友達'
+  }
+  return labels[type] || type
+}
+
+function formatTimestamp(timestamp) {
+  if (!timestamp) return '-'
+  
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.round(diffMs / 1000 / 60)
+  
+  if (diffMins < 1) return 'たった今'
+  if (diffMins < 60) return `${diffMins}分前`
+  
+  const diffHours = Math.round(diffMins / 60)
+  return `${diffHours}時間前`
 }

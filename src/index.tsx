@@ -191,6 +191,9 @@ app.get('/api/progress/class/:classCode', async (c) => {
         p.learning_card_id,
         p.status,
         p.understanding_level,
+        p.help_requested_from,
+        p.help_count,
+        p.created_at,
         c.course_level,
         c.course_display_name
       FROM student_progress p
@@ -202,6 +205,64 @@ app.get('/api/progress/class/:classCode', async (c) => {
     
     return c.json(progress.results)
   } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：カリキュラム別の詳細進捗取得（進捗ボード用）
+app.get('/api/progress/curriculum/:curriculumId/class/:classCode', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  const classCode = c.req.param('classCode')
+  
+  try {
+    // 全生徒のリスト
+    const students = await env.DB.prepare(`
+      SELECT id, name, student_number 
+      FROM users 
+      WHERE class_code = ? AND role = 'student'
+      ORDER BY student_number
+    `).bind(classCode).all()
+    
+    // 各生徒の最新進捗
+    const progressData = await env.DB.prepare(`
+      SELECT 
+        p.student_id,
+        p.course_id,
+        p.learning_card_id,
+        p.status,
+        p.understanding_level,
+        p.help_requested_from,
+        p.help_count,
+        p.created_at,
+        c.course_level,
+        c.course_display_name,
+        lc.card_number,
+        lc.card_title
+      FROM student_progress p
+      LEFT JOIN courses c ON p.course_id = c.id
+      LEFT JOIN learning_cards lc ON p.learning_card_id = lc.id
+      WHERE p.curriculum_id = ?
+      AND p.student_id IN (
+        SELECT id FROM users WHERE class_code = ? AND role = 'student'
+      )
+      ORDER BY p.student_id, p.created_at DESC
+    `).bind(curriculumId, classCode).all()
+    
+    // 生徒ごとにグループ化
+    const studentProgress = {}
+    students.results.forEach(student => {
+      const latestProgress = progressData.results.find(p => p.student_id === student.id)
+      studentProgress[student.id] = {
+        student,
+        progress: latestProgress || null,
+        allProgress: progressData.results.filter(p => p.student_id === student.id)
+      }
+    })
+    
+    return c.json(studentProgress)
+  } catch (error) {
+    console.error('Progress error:', error)
     return c.json({ error: 'Database error' }, 500)
   }
 })
