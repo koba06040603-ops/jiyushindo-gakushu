@@ -1267,4 +1267,418 @@ app.get('/', (c) => {
   `)
 })
 
+// ============================================
+// Phase 6: AI機能フル実装
+// ============================================
+
+// APIルート：AI学習診断
+app.post('/api/ai/diagnosis', async (c) => {
+  const { env } = c
+  const { studentId, curriculumId } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({
+      diagnosis: '学習診断機能は現在利用できません。',
+      recommendations: [],
+      strengths: [],
+      areas_for_improvement: []
+    })
+  }
+  
+  try {
+    // 学習進捗データを取得
+    const progress = await env.DB.prepare(`
+      SELECT 
+        sp.*,
+        lc.card_title,
+        lc.card_type,
+        lc.card_number
+      FROM student_progress sp
+      JOIN learning_cards lc ON sp.learning_card_id = lc.id
+      WHERE sp.student_id = ? AND sp.curriculum_id = ?
+      ORDER BY sp.updated_at DESC
+      LIMIT 20
+    `).bind(studentId, curriculumId).all()
+    
+    // 助け要請データを取得
+    const helpRequests = await env.DB.prepare(`
+      SELECT help_type, COUNT(*) as count
+      FROM student_progress
+      WHERE student_id = ? AND curriculum_id = ?
+      GROUP BY help_type
+    `).bind(studentId, curriculumId).all()
+    
+    // 理解度データを集計
+    const understandingStats = progress.results.reduce((acc: any, item: any) => {
+      if (item.understanding_level) {
+        acc.total++
+        acc.sum += item.understanding_level
+        if (item.understanding_level >= 4) acc.high++
+        if (item.understanding_level <= 2) acc.low++
+      }
+      return acc
+    }, { total: 0, sum: 0, high: 0, low: 0 })
+    
+    const avgUnderstanding = understandingStats.total > 0 
+      ? (understandingStats.sum / understandingStats.total).toFixed(1) 
+      : '0'
+    
+    // Gemini APIに診断を依頼
+    const prompt = `あなたは小学生の学習を支援する優しいAI先生です。
+以下の学習データから、この児童の学習状況を分析して、具体的なアドバイスをしてください。
+
+【学習データ】
+- 学習カード総数: ${progress.results.length}枚
+- 平均理解度: ${avgUnderstanding}/5
+- 高理解度カード: ${understandingStats.high}枚
+- 低理解度カード: ${understandingStats.low}枚
+- 助け要請: ${JSON.stringify(helpRequests.results)}
+
+【最近の学習カード】
+${progress.results.slice(0, 5).map((p: any) => 
+  `- ${p.card_title} (理解度: ${p.understanding_level || '未評価'}/5)`
+).join('\n')}
+
+以下のJSON形式で診断結果を出力してください：
+{
+  "overall_assessment": "全体的な学習状況の評価（100文字以内）",
+  "strengths": ["強み1", "強み2", "強み3"],
+  "areas_for_improvement": ["改善点1", "改善点2"],
+  "recommendations": [
+    {"title": "おすすめアクション1", "description": "具体的な説明"},
+    {"title": "おすすめアクション2", "description": "具体的な説明"}
+  ],
+  "encouragement": "児童への励ましメッセージ（50文字以内）"
+}`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000
+          }
+        })
+      }
+    )
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    
+    // JSONを抽出（```json ... ``` の中身を取得）
+    const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      aiResponse.match(/\{[\s\S]*\}/)
+    const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : '{}'
+    const diagnosis = JSON.parse(jsonStr)
+    
+    return c.json(diagnosis)
+    
+  } catch (error) {
+    console.error('AI診断エラー:', error)
+    return c.json({
+      overall_assessment: '学習診断を実行できませんでした。',
+      strengths: ['頑張って学習を続けています'],
+      areas_for_improvement: [],
+      recommendations: [],
+      encouragement: 'これからも一緒に頑張りましょう！'
+    })
+  }
+})
+
+// APIルート：AI問題生成
+app.post('/api/ai/generate-problem', async (c) => {
+  const { env } = c
+  const { cardId, difficulty } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({
+      problem: '問題生成機能は現在利用できません。',
+      answer: '',
+      hint: ''
+    })
+  }
+  
+  try {
+    // 学習カード情報を取得
+    const card = await env.DB.prepare(`
+      SELECT * FROM learning_cards WHERE id = ?
+    `).bind(cardId).first()
+    
+    if (!card) {
+      return c.json({ error: 'カードが見つかりません' }, 404)
+    }
+    
+    const difficultyText = difficulty === 'easy' ? 'やさしい' : 
+                          difficulty === 'hard' ? '難しい' : '標準的な'
+    
+    const prompt = `あなたは小学生向けの問題を作る先生です。
+以下の学習カードの内容に基づいて、${difficultyText}レベルの類似問題を1つ作成してください。
+
+【元の学習カード】
+タイトル: ${card.card_title}
+問題: ${card.problem_description}
+例題: ${card.example_problem}
+
+以下のJSON形式で問題を出力してください：
+{
+  "problem": "新しい問題文（数値や状況を変えて）",
+  "answer": "正解",
+  "hint": "ヒント（困ったときのアドバイス）",
+  "explanation": "解き方の説明"
+}`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 500
+          }
+        })
+      }
+    )
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    
+    const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      aiResponse.match(/\{[\s\S]*\}/)
+    const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : '{}'
+    const generatedProblem = JSON.parse(jsonStr)
+    
+    return c.json(generatedProblem)
+    
+  } catch (error) {
+    console.error('問題生成エラー:', error)
+    return c.json({
+      problem: '問題を生成できませんでした。',
+      answer: '',
+      hint: '先生に聞いてみましょう',
+      explanation: ''
+    })
+  }
+})
+
+// APIルート：AI学習計画提案
+app.post('/api/ai/suggest-plan', async (c) => {
+  const { env } = c
+  const { studentId, curriculumId } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({
+      suggestion: '学習計画提案機能は現在利用できません。',
+      daily_goals: [],
+      weekly_goals: []
+    })
+  }
+  
+  try {
+    // 進捗データを取得
+    const progress = await env.DB.prepare(`
+      SELECT sp.*, lc.card_title, lc.card_number, lc.card_type
+      FROM student_progress sp
+      JOIN learning_cards lc ON sp.learning_card_id = lc.id
+      WHERE sp.student_id = ? AND sp.curriculum_id = ?
+      ORDER BY sp.updated_at DESC
+    `).bind(studentId, curriculumId).all()
+    
+    // 学習計画を取得
+    const plans = await env.DB.prepare(`
+      SELECT * FROM learning_plans
+      WHERE student_id = ? AND curriculum_id = ?
+      ORDER BY planned_date DESC
+      LIMIT 7
+    `).bind(studentId, curriculumId).all()
+    
+    const completedCards = progress.results.filter((p: any) => p.is_completed).length
+    const totalCards = progress.results.length
+    
+    const prompt = `あなたは小学生の学習をサポートするAI先生です。
+以下のデータから、今後の学習計画を提案してください。
+
+【現在の状況】
+- 完了カード: ${completedCards}/${totalCards}枚
+- 最近の学習: ${plans.results.length}日分のデータ
+- 平均理解度: ${progress.results.filter((p: any) => p.understanding_level).length > 0 
+  ? (progress.results.reduce((sum: number, p: any) => sum + (p.understanding_level || 0), 0) / 
+     progress.results.filter((p: any) => p.understanding_level).length).toFixed(1) 
+  : '未評価'}
+
+以下のJSON形式で学習計画を提案してください：
+{
+  "overall_suggestion": "全体的な学習計画の提案（100文字以内）",
+  "daily_goals": [
+    {"day": "今日", "goal": "具体的な目標", "cards": 2},
+    {"day": "明日", "goal": "具体的な目標", "cards": 2}
+  ],
+  "weekly_goals": [
+    {"goal": "今週の目標1", "importance": "high"},
+    {"goal": "今週の目標2", "importance": "medium"}
+  ],
+  "tips": ["学習のコツ1", "学習のコツ2"]
+}`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 800
+          }
+        })
+      }
+    )
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    
+    const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      aiResponse.match(/\{[\s\S]*\}/)
+    const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : '{}'
+    const plan = JSON.parse(jsonStr)
+    
+    return c.json(plan)
+    
+  } catch (error) {
+    console.error('計画提案エラー:', error)
+    return c.json({
+      overall_suggestion: '学習計画を提案できませんでした。',
+      daily_goals: [],
+      weekly_goals: [],
+      tips: ['自分のペースで頑張りましょう']
+    })
+  }
+})
+
+// APIルート：AI誤答分析
+app.post('/api/ai/analyze-errors', async (c) => {
+  const { env } = c
+  const { studentId, curriculumId } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({
+      analysis: '誤答分析機能は現在利用できません。',
+      error_patterns: [],
+      suggestions_for_teacher: []
+    })
+  }
+  
+  try {
+    // 理解度が低いカードを取得
+    const weakCards = await env.DB.prepare(`
+      SELECT sp.*, lc.card_title, lc.problem_description, lc.card_type
+      FROM student_progress sp
+      JOIN learning_cards lc ON sp.learning_card_id = lc.id
+      WHERE sp.student_id = ? 
+        AND sp.curriculum_id = ?
+        AND sp.understanding_level <= 2
+      ORDER BY sp.updated_at DESC
+      LIMIT 10
+    `).bind(studentId, curriculumId).all()
+    
+    // 助け要請が多いカードを取得
+    const helpCards = await env.DB.prepare(`
+      SELECT sp.*, lc.card_title, sp.help_type
+      FROM student_progress sp
+      JOIN learning_cards lc ON sp.learning_card_id = lc.id
+      WHERE sp.student_id = ? 
+        AND sp.curriculum_id = ?
+        AND sp.help_type IS NOT NULL
+      ORDER BY sp.updated_at DESC
+      LIMIT 10
+    `).bind(studentId, curriculumId).all()
+    
+    if (weakCards.results.length === 0 && helpCards.results.length === 0) {
+      return c.json({
+        analysis: 'この児童は順調に学習を進めています。特につまずきは見られません。',
+        error_patterns: [],
+        suggestions_for_teacher: ['引き続き見守りながら、チャレンジ問題を提案してみてください。']
+      })
+    }
+    
+    const prompt = `あなたは教育専門のAI分析エージェントです。
+以下のデータから、児童のつまずきパターンを分析し、指導アドバイスを提供してください。
+
+【理解度が低いカード】
+${weakCards.results.map((c: any) => 
+  `- ${c.card_title} (理解度: ${c.understanding_level}/5)`
+).join('\n')}
+
+【助けを求めたカード】
+${helpCards.results.map((h: any) => 
+  `- ${h.card_title} (助け: ${h.help_type})`
+).join('\n')}
+
+以下のJSON形式で分析結果を出力してください：
+{
+  "overall_analysis": "全体的な分析（150文字以内）",
+  "error_patterns": [
+    {"pattern": "つまずきパターン1", "frequency": "よく見られる"},
+    {"pattern": "つまずきパターン2", "frequency": "時々見られる"}
+  ],
+  "root_causes": ["根本原因1", "根本原因2"],
+  "suggestions_for_teacher": [
+    {"suggestion": "指導アドバイス1", "priority": "high"},
+    {"suggestion": "指導アドバイス2", "priority": "medium"}
+  ],
+  "support_strategies": ["サポート方法1", "サポート方法2"]
+}`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.6,
+            maxOutputTokens: 1000
+          }
+        })
+      }
+    )
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    
+    const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      aiResponse.match(/\{[\s\S]*\}/)
+    const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : '{}'
+    const analysis = JSON.parse(jsonStr)
+    
+    return c.json(analysis)
+    
+  } catch (error) {
+    console.error('誤答分析エラー:', error)
+    return c.json({
+      overall_analysis: '分析を実行できませんでした。',
+      error_patterns: [],
+      root_causes: [],
+      suggestions_for_teacher: [],
+      support_strategies: []
+    })
+  }
+})
+
 export default app

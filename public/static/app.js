@@ -278,7 +278,7 @@ async function loadGuidePage(curriculumId) {
         <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-lg p-4 mb-6">
           <h3 class="text-white font-bold mb-3 flex items-center">
             <i class="fas fa-chalkboard-teacher mr-2"></i>
-            教師用ツール（Phase 5）
+            教師用ツール（Phase 5 & 6）
           </h3>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <button onclick="toggleTeacherMode()" 
@@ -300,6 +300,41 @@ async function loadGuidePage(curriculumId) {
                     class="bg-white text-orange-600 py-3 px-4 rounded-lg font-bold hover:bg-orange-50 transition flex items-center justify-center">
               <i class="fas fa-edit mr-2"></i>
               問題編集
+            </button>
+            <button onclick="loadAIErrorAnalysis()" 
+                    class="bg-white text-red-600 py-3 px-4 rounded-lg font-bold hover:bg-red-50 transition flex items-center justify-center">
+              <i class="fas fa-microscope mr-2"></i>
+              AI誤答分析
+              <span class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">NEW</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 児童向けAIツールバー（Phase 6） -->
+        <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-lg p-4 mb-6">
+          <h3 class="text-white font-bold mb-3 flex items-center">
+            <i class="fas fa-robot mr-2"></i>
+            AI学習サポート（Phase 6）
+            <span class="ml-2 text-xs bg-white text-purple-600 px-2 py-1 rounded-full animate-pulse">✨ NEW</span>
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button onclick="loadAIDiagnosisPage()" 
+                    class="bg-white text-purple-600 py-4 px-4 rounded-lg font-bold hover:bg-purple-50 transition flex flex-col items-center justify-center">
+              <i class="fas fa-chart-line text-2xl mb-2"></i>
+              <span>AI学習診断</span>
+              <span class="text-xs text-gray-500 mt-1">あなたの強みと改善点</span>
+            </button>
+            <button onclick="loadAIProblemGenerator()" 
+                    class="bg-white text-pink-600 py-4 px-4 rounded-lg font-bold hover:bg-pink-50 transition flex flex-col items-center justify-center">
+              <i class="fas fa-magic text-2xl mb-2"></i>
+              <span>AI問題生成</span>
+              <span class="text-xs text-gray-500 mt-1">無限に練習できる</span>
+            </button>
+            <button onclick="loadAIPlanSuggestion()" 
+                    class="bg-white text-indigo-600 py-4 px-4 rounded-lg font-bold hover:bg-indigo-50 transition flex flex-col items-center justify-center">
+              <i class="fas fa-calendar-alt text-2xl mb-2"></i>
+              <span>AI学習計画</span>
+              <span class="text-xs text-gray-500 mt-1">最適な計画を提案</span>
             </button>
           </div>
         </div>
@@ -1727,6 +1762,16 @@ async function loadProgressBoard(curriculumId) {
               <span>進度が早い児童には、選択問題や発展課題を勧めましょう</span>
             </li>
           </ul>
+          
+          <!-- AI誤答分析ボタン（Phase 6） -->
+          <div class="mt-4 pt-4 border-t border-indigo-200">
+            <button onclick="loadAIErrorAnalysis()" 
+                    class="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center shadow-lg">
+              <i class="fas fa-microscope mr-2"></i>
+              AI誤答分析で詳しく見る
+              <span class="ml-2 text-xs bg-white text-red-600 px-2 py-0.5 rounded animate-pulse">NEW</span>
+            </button>
+          </div>
         </div>
       </div>
     `
@@ -2997,6 +3042,726 @@ function closeCourseSelectModal() {
   }
 }
 
+// コース選択モーダルを閉じる
+function closeCourseSelectModal() {
+  const modal = document.getElementById('courseSelectModal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+// ============================================
+// Phase 6: AI機能フル実装 - フロントエンド
+// ============================================
+
+// AI学習診断ページを読み込む
+async function loadAIDiagnosisPage() {
+  state.currentView = 'ai-diagnosis'
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="max-w-6xl mx-auto p-6">
+      <!-- ヘッダー -->
+      <div class="flex justify-between items-center mb-6">
+        <button onclick="loadGuidePage(${state.selectedCurriculum.id})" 
+                class="text-blue-600 hover:text-blue-800 flex items-center">
+          <i class="fas fa-arrow-left mr-2"></i>
+          戻る
+        </button>
+        <h1 class="text-3xl font-bold text-gray-800">
+          <i class="fas fa-chart-line mr-2"></i>
+          AI学習診断
+        </h1>
+        <div></div>
+      </div>
+
+      <!-- ローディング -->
+      <div id="diagnosisLoading" class="text-center py-12">
+        <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+        <p class="text-gray-600">AIが学習状況を分析しています...</p>
+      </div>
+
+      <!-- 診断結果エリア -->
+      <div id="diagnosisResult" class="hidden space-y-6"></div>
+    </div>
+  `
+  
+  // AI診断を実行
+  try {
+    const response = await axios.post('/api/ai/diagnosis', {
+      studentId: state.student.id,
+      curriculumId: state.selectedCurriculum.id
+    })
+    
+    const diagnosis = response.data
+    
+    // ローディングを隠して結果を表示
+    document.getElementById('diagnosisLoading').classList.add('hidden')
+    const resultArea = document.getElementById('diagnosisResult')
+    resultArea.classList.remove('hidden')
+    
+    resultArea.innerHTML = `
+      <!-- 全体評価 -->
+      <div class="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl p-6 text-white shadow-lg">
+        <h2 class="text-2xl font-bold mb-3">
+          <i class="fas fa-star mr-2"></i>
+          総合評価
+        </h2>
+        <p class="text-lg leading-relaxed">${diagnosis.overall_assessment || '評価を表示できません'}</p>
+      </div>
+
+      <!-- 励ましメッセージ -->
+      ${diagnosis.encouragement ? `
+      <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+        <p class="text-yellow-800 font-semibold">
+          <i class="fas fa-smile mr-2"></i>
+          ${diagnosis.encouragement}
+        </p>
+      </div>
+      ` : ''}
+
+      <!-- 3カラムレイアウト -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- 強み -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-green-600 mb-4">
+            <i class="fas fa-thumbs-up mr-2"></i>
+            あなたの強み
+          </h3>
+          <ul class="space-y-2">
+            ${(diagnosis.strengths || []).map(strength => `
+              <li class="flex items-start">
+                <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                <span class="text-gray-700">${strength}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+
+        <!-- 改善点 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-orange-600 mb-4">
+            <i class="fas fa-lightbulb mr-2"></i>
+            もっと伸ばせるところ
+          </h3>
+          <ul class="space-y-2">
+            ${(diagnosis.areas_for_improvement || []).map(area => `
+              <li class="flex items-start">
+                <i class="fas fa-arrow-up text-orange-500 mt-1 mr-2"></i>
+                <span class="text-gray-700">${area}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+
+        <!-- おすすめアクション -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-blue-600 mb-4">
+            <i class="fas fa-rocket mr-2"></i>
+            次にやること
+          </h3>
+          <div class="space-y-3">
+            ${(diagnosis.recommendations || []).map(rec => `
+              <div class="border-l-4 border-blue-400 pl-3 py-2">
+                <p class="font-semibold text-gray-800">${rec.title}</p>
+                <p class="text-sm text-gray-600 mt-1">${rec.description}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- アクションボタン -->
+      <div class="flex justify-center space-x-4">
+        <button onclick="loadAIProblemGenerator()" 
+                class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">
+          <i class="fas fa-magic mr-2"></i>
+          AI問題を生成する
+        </button>
+        <button onclick="loadAIPlanSuggestion()" 
+                class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">
+          <i class="fas fa-calendar-alt mr-2"></i>
+          学習計画を提案してもらう
+        </button>
+      </div>
+    `
+  } catch (error) {
+    console.error('AI診断エラー:', error)
+    document.getElementById('diagnosisLoading').innerHTML = `
+      <div class="text-center text-red-600">
+        <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+        <p>診断を実行できませんでした。もう一度お試しください。</p>
+      </div>
+    `
+  }
+}
+
+// AI問題生成ページを読み込む
+async function loadAIProblemGenerator() {
+  state.currentView = 'ai-problem-generator'
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="max-w-4xl mx-auto p-6">
+      <!-- ヘッダー -->
+      <div class="flex justify-between items-center mb-6">
+        <button onclick="loadGuidePage(${state.selectedCurriculum.id})" 
+                class="text-blue-600 hover:text-blue-800 flex items-center">
+          <i class="fas fa-arrow-left mr-2"></i>
+          戻る
+        </button>
+        <h1 class="text-3xl font-bold text-gray-800">
+          <i class="fas fa-magic mr-2"></i>
+          AI問題生成
+        </h1>
+        <div></div>
+      </div>
+
+      <!-- カード選択 -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-tasks mr-2"></i>
+          学習カードを選んでね
+        </h2>
+        <div id="cardSelector" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- カード一覧をここに表示 -->
+        </div>
+      </div>
+
+      <!-- 難易度選択 -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-sliders-h mr-2"></i>
+          難易度を選んでね
+        </h2>
+        <div class="flex space-x-4">
+          <button onclick="setDifficulty('easy')" 
+                  class="difficulty-btn flex-1 bg-green-100 hover:bg-green-200 text-green-800 font-bold py-3 px-4 rounded-lg border-2 border-transparent transition"
+                  data-difficulty="easy">
+            <i class="fas fa-smile mr-2"></i>
+            やさしい
+          </button>
+          <button onclick="setDifficulty('normal')" 
+                  class="difficulty-btn flex-1 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold py-3 px-4 rounded-lg border-2 border-blue-500 transition"
+                  data-difficulty="normal">
+            <i class="fas fa-meh mr-2"></i>
+            ふつう
+          </button>
+          <button onclick="setDifficulty('hard')" 
+                  class="difficulty-btn flex-1 bg-red-100 hover:bg-red-200 text-red-800 font-bold py-3 px-4 rounded-lg border-2 border-transparent transition"
+                  data-difficulty="hard">
+            <i class="fas fa-fire mr-2"></i>
+            難しい
+          </button>
+        </div>
+      </div>
+
+      <!-- 生成ボタン -->
+      <div class="text-center mb-6">
+        <button onclick="generateProblem()" 
+                id="generateBtn"
+                class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg text-xl transition disabled:opacity-50 disabled:cursor-not-allowed">
+          <i class="fas fa-wand-magic-sparkles mr-2"></i>
+          問題を生成する
+        </button>
+      </div>
+
+      <!-- 生成された問題 -->
+      <div id="generatedProblem" class="hidden"></div>
+    </div>
+  `
+  
+  // カード一覧を読み込む
+  loadCardsForGenerator()
+  
+  // デフォルト難易度を設定
+  state.selectedDifficulty = 'normal'
+}
+
+// カード一覧を読み込む（問題生成用）
+async function loadCardsForGenerator() {
+  try {
+    const response = await axios.get(`/api/curriculum/${state.selectedCurriculum.id}`)
+    const data = response.data
+    
+    const cardSelector = document.getElementById('cardSelector')
+    
+    // すべてのカードを表示
+    const allCards = []
+    data.courses.forEach(course => {
+      course.cards.forEach(card => {
+        allCards.push({ ...card, courseName: course.course_name })
+      })
+    })
+    
+    cardSelector.innerHTML = allCards.map(card => `
+      <button onclick="selectCardForGeneration(${card.id})" 
+              class="card-selector-btn text-left p-4 rounded-lg border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition"
+              data-card-id="${card.id}">
+        <div class="flex items-start">
+          <span class="bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-1 rounded mr-2 mt-1">
+            ${card.card_number}
+          </span>
+          <div>
+            <p class="font-bold text-gray-800">${card.card_title}</p>
+            <p class="text-xs text-gray-500 mt-1">${card.courseName}</p>
+          </div>
+        </div>
+      </button>
+    `).join('')
+    
+  } catch (error) {
+    console.error('カード読み込みエラー:', error)
+  }
+}
+
+// カードを選択（問題生成用）
+function selectCardForGeneration(cardId) {
+  state.selectedCardForGeneration = cardId
+  
+  // すべてのカードボタンをリセット
+  document.querySelectorAll('.card-selector-btn').forEach(btn => {
+    btn.classList.remove('border-purple-500', 'bg-purple-50')
+    btn.classList.add('border-gray-200')
+  })
+  
+  // 選択したカードをハイライト
+  const selectedBtn = document.querySelector(`[data-card-id="${cardId}"]`)
+  if (selectedBtn) {
+    selectedBtn.classList.add('border-purple-500', 'bg-purple-50')
+    selectedBtn.classList.remove('border-gray-200')
+  }
+}
+
+// 難易度を設定
+function setDifficulty(difficulty) {
+  state.selectedDifficulty = difficulty
+  
+  // すべての難易度ボタンをリセット
+  document.querySelectorAll('.difficulty-btn').forEach(btn => {
+    btn.classList.remove('border-blue-500', 'border-green-500', 'border-red-500')
+    btn.classList.add('border-transparent')
+  })
+  
+  // 選択した難易度をハイライト
+  const selectedBtn = document.querySelector(`[data-difficulty="${difficulty}"]`)
+  if (selectedBtn) {
+    const color = difficulty === 'easy' ? 'green' : difficulty === 'hard' ? 'red' : 'blue'
+    selectedBtn.classList.add(`border-${color}-500`)
+    selectedBtn.classList.remove('border-transparent')
+  }
+}
+
+// 問題を生成
+async function generateProblem() {
+  if (!state.selectedCardForGeneration) {
+    alert('学習カードを選んでください')
+    return
+  }
+  
+  const generateBtn = document.getElementById('generateBtn')
+  generateBtn.disabled = true
+  generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>AIが問題を作っています...'
+  
+  try {
+    const response = await axios.post('/api/ai/generate-problem', {
+      cardId: state.selectedCardForGeneration,
+      difficulty: state.selectedDifficulty || 'normal'
+    })
+    
+    const problem = response.data
+    
+    // 生成された問題を表示
+    const problemArea = document.getElementById('generatedProblem')
+    problemArea.classList.remove('hidden')
+    problemArea.innerHTML = `
+      <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-lg p-6 text-white mb-4">
+        <h2 class="text-2xl font-bold mb-4">
+          <i class="fas fa-star mr-2"></i>
+          AIが作った問題
+        </h2>
+        <div class="bg-white text-gray-800 rounded-lg p-6 mb-4">
+          <p class="text-lg font-semibold mb-2">問題：</p>
+          <p class="text-xl leading-relaxed">${problem.problem}</p>
+        </div>
+        
+        <!-- 答えを表示/非表示 -->
+        <div id="answerSection" class="hidden bg-white text-gray-800 rounded-lg p-6 mb-4">
+          <p class="text-lg font-semibold text-green-600 mb-2">正解：</p>
+          <p class="text-xl">${problem.answer}</p>
+          ${problem.explanation ? `
+            <div class="mt-4 border-t pt-4">
+              <p class="text-sm font-semibold text-gray-600 mb-2">解き方：</p>
+              <p class="text-sm text-gray-700">${problem.explanation}</p>
+            </div>
+          ` : ''}
+        </div>
+        
+        <!-- ヒント表示 -->
+        ${problem.hint ? `
+        <div class="bg-yellow-100 text-yellow-800 rounded-lg p-4 mb-4">
+          <p class="font-semibold mb-1">
+            <i class="fas fa-lightbulb mr-2"></i>
+            ヒント：
+          </p>
+          <p>${problem.hint}</p>
+        </div>
+        ` : ''}
+        
+        <!-- アクションボタン -->
+        <div class="flex space-x-4">
+          <button onclick="toggleAnswer()" 
+                  class="bg-white text-purple-600 hover:bg-gray-100 font-bold py-2 px-4 rounded-lg transition">
+            <i class="fas fa-eye mr-2"></i>
+            答えを見る
+          </button>
+          <button onclick="generateProblem()" 
+                  class="bg-white text-purple-600 hover:bg-gray-100 font-bold py-2 px-4 rounded-lg transition">
+            <i class="fas fa-redo mr-2"></i>
+            もう一問
+          </button>
+        </div>
+      </div>
+    `
+    
+    // ボタンを元に戻す
+    generateBtn.disabled = false
+    generateBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles mr-2"></i>問題を生成する'
+    
+  } catch (error) {
+    console.error('問題生成エラー:', error)
+    alert('問題を生成できませんでした')
+    generateBtn.disabled = false
+    generateBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles mr-2"></i>問題を生成する'
+  }
+}
+
+// 答えを表示/非表示
+function toggleAnswer() {
+  const answerSection = document.getElementById('answerSection')
+  answerSection.classList.toggle('hidden')
+}
+
+// AI学習計画提案ページを読み込む
+async function loadAIPlanSuggestion() {
+  state.currentView = 'ai-plan-suggestion'
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="max-w-6xl mx-auto p-6">
+      <!-- ヘッダー -->
+      <div class="flex justify-between items-center mb-6">
+        <button onclick="loadGuidePage(${state.selectedCurriculum.id})" 
+                class="text-blue-600 hover:text-blue-800 flex items-center">
+          <i class="fas fa-arrow-left mr-2"></i>
+          戻る
+        </button>
+        <h1 class="text-3xl font-bold text-gray-800">
+          <i class="fas fa-calendar-alt mr-2"></i>
+          AI学習計画提案
+        </h1>
+        <div></div>
+      </div>
+
+      <!-- ローディング -->
+      <div id="planLoading" class="text-center py-12">
+        <i class="fas fa-spinner fa-spin text-4xl text-green-500 mb-4"></i>
+        <p class="text-gray-600">AIがあなたに最適な学習計画を考えています...</p>
+      </div>
+
+      <!-- 提案結果エリア -->
+      <div id="planResult" class="hidden space-y-6"></div>
+    </div>
+  `
+  
+  // AI計画提案を実行
+  try {
+    const response = await axios.post('/api/ai/suggest-plan', {
+      studentId: state.student.id,
+      curriculumId: state.selectedCurriculum.id
+    })
+    
+    const plan = response.data
+    
+    // ローディングを隠して結果を表示
+    document.getElementById('planLoading').classList.add('hidden')
+    const resultArea = document.getElementById('planResult')
+    resultArea.classList.remove('hidden')
+    
+    resultArea.innerHTML = `
+      <!-- 全体提案 -->
+      <div class="bg-gradient-to-r from-green-500 to-teal-500 rounded-xl p-6 text-white shadow-lg">
+        <h2 class="text-2xl font-bold mb-3">
+          <i class="fas fa-lightbulb mr-2"></i>
+          おすすめの学習計画
+        </h2>
+        <p class="text-lg leading-relaxed">${plan.overall_suggestion || '提案を表示できません'}</p>
+      </div>
+
+      <!-- 2カラムレイアウト -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- 日ごとの目標 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-blue-600 mb-4">
+            <i class="fas fa-calendar-day mr-2"></i>
+            日ごとの目標
+          </h3>
+          <div class="space-y-4">
+            ${(plan.daily_goals || []).map(goal => `
+              <div class="border-l-4 border-blue-400 pl-4 py-3 bg-blue-50 rounded-r">
+                <p class="font-bold text-gray-800">${goal.day}</p>
+                <p class="text-gray-700 mt-1">${goal.goal}</p>
+                <p class="text-sm text-gray-500 mt-2">
+                  <i class="fas fa-book-open mr-1"></i>
+                  目安：${goal.cards}枚
+                </p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 週ごとの目標 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-purple-600 mb-4">
+            <i class="fas fa-calendar-week mr-2"></i>
+            今週の目標
+          </h3>
+          <div class="space-y-3">
+            ${(plan.weekly_goals || []).map(goal => {
+              const priorityColor = goal.importance === 'high' ? 'red' : 
+                                   goal.importance === 'medium' ? 'yellow' : 'green'
+              const priorityLabel = goal.importance === 'high' ? '重要' : 
+                                   goal.importance === 'medium' ? '普通' : '低'
+              return `
+                <div class="border rounded-lg p-4 hover:shadow-md transition">
+                  <div class="flex items-start justify-between">
+                    <p class="text-gray-800 flex-1">${goal.goal}</p>
+                    <span class="bg-${priorityColor}-100 text-${priorityColor}-800 text-xs font-semibold px-2 py-1 rounded ml-2">
+                      ${priorityLabel}
+                    </span>
+                  </div>
+                </div>
+              `
+            }).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- 学習のコツ -->
+      ${(plan.tips && plan.tips.length > 0) ? `
+      <div class="bg-yellow-50 rounded-lg shadow-md p-6">
+        <h3 class="text-xl font-bold text-yellow-700 mb-4">
+          <i class="fas fa-star mr-2"></i>
+          学習のコツ
+        </h3>
+        <ul class="space-y-2">
+          ${plan.tips.map(tip => `
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-yellow-500 mt-1 mr-2"></i>
+              <span class="text-gray-700">${tip}</span>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+      ` : ''}
+
+      <!-- アクションボタン -->
+      <div class="flex justify-center space-x-4">
+        <button onclick="loadLearningPlanPage()" 
+                class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">
+          <i class="fas fa-table mr-2"></i>
+          学習計画表を見る
+        </button>
+        <button onclick="loadAIDiagnosisPage()" 
+                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">
+          <i class="fas fa-chart-line mr-2"></i>
+          学習診断を見る
+        </button>
+      </div>
+    `
+  } catch (error) {
+    console.error('計画提案エラー:', error)
+    document.getElementById('planLoading').innerHTML = `
+      <div class="text-center text-red-600">
+        <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+        <p>計画を提案できませんでした。もう一度お試しください。</p>
+      </div>
+    `
+  }
+}
+
+// AI誤答分析ページを読み込む（先生用）
+async function loadAIErrorAnalysis() {
+  state.currentView = 'ai-error-analysis'
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="max-w-6xl mx-auto p-6">
+      <!-- ヘッダー -->
+      <div class="flex justify-between items-center mb-6">
+        <button onclick="loadProgressBoard(${state.selectedCurriculum.id})" 
+                class="text-blue-600 hover:text-blue-800 flex items-center">
+          <i class="fas fa-arrow-left mr-2"></i>
+          進捗ボードに戻る
+        </button>
+        <h1 class="text-3xl font-bold text-gray-800">
+          <i class="fas fa-microscope mr-2"></i>
+          AI誤答分析（先生用）
+        </h1>
+        <div></div>
+      </div>
+
+      <!-- 生徒選択 -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-user-graduate mr-2"></i>
+          分析する生徒を選んでください
+        </h2>
+        <div id="studentSelector" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <!-- 生徒一覧をここに表示 -->
+        </div>
+      </div>
+
+      <!-- 分析結果エリア -->
+      <div id="analysisResult" class="hidden space-y-6"></div>
+    </div>
+  `
+  
+  // 生徒一覧を読み込む
+  loadStudentsForAnalysis()
+}
+
+// 生徒一覧を読み込む（分析用）
+async function loadStudentsForAnalysis() {
+  try {
+    const response = await axios.get('/api/progress/curriculum/' + state.selectedCurriculum.id)
+    const students = response.data.students
+    
+    const studentSelector = document.getElementById('studentSelector')
+    studentSelector.innerHTML = students.map(student => `
+      <button onclick="analyzeStudent(${student.id}, '${student.name}')" 
+              class="p-4 rounded-lg border-2 border-gray-200 hover:border-orange-500 hover:bg-orange-50 transition text-center">
+        <i class="fas fa-user-circle text-4xl text-gray-400 mb-2"></i>
+        <p class="font-bold text-gray-800">${student.name}</p>
+      </button>
+    `).join('')
+  } catch (error) {
+    console.error('生徒読み込みエラー:', error)
+  }
+}
+
+// 生徒を分析
+async function analyzeStudent(studentId, studentName) {
+  const analysisResult = document.getElementById('analysisResult')
+  analysisResult.classList.remove('hidden')
+  analysisResult.innerHTML = `
+    <div class="text-center py-12">
+      <i class="fas fa-spinner fa-spin text-4xl text-orange-500 mb-4"></i>
+      <p class="text-gray-600">${studentName}さんの学習データをAIが分析しています...</p>
+    </div>
+  `
+  
+  try {
+    const response = await axios.post('/api/ai/analyze-errors', {
+      studentId: studentId,
+      curriculumId: state.selectedCurriculum.id
+    })
+    
+    const analysis = response.data
+    
+    analysisResult.innerHTML = `
+      <!-- 生徒名 -->
+      <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white shadow-lg">
+        <h2 class="text-2xl font-bold mb-3">
+          <i class="fas fa-user-circle mr-2"></i>
+          ${studentName}さんの学習分析
+        </h2>
+        <p class="text-lg leading-relaxed">${analysis.overall_analysis || '分析を表示できません'}</p>
+      </div>
+
+      <!-- 3カラムレイアウト -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- つまずきパターン -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-red-600 mb-4">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            つまずきパターン
+          </h3>
+          <div class="space-y-3">
+            ${(analysis.error_patterns || []).map(pattern => `
+              <div class="border-l-4 border-red-400 pl-3 py-2">
+                <p class="font-semibold text-gray-800">${pattern.pattern}</p>
+                <p class="text-sm text-gray-600">${pattern.frequency}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 根本原因 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-yellow-600 mb-4">
+            <i class="fas fa-search mr-2"></i>
+            根本原因
+          </h3>
+          <ul class="space-y-2">
+            ${(analysis.root_causes || []).map(cause => `
+              <li class="flex items-start">
+                <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
+                <span class="text-gray-700">${cause}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+
+        <!-- 指導アドバイス -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-blue-600 mb-4">
+            <i class="fas fa-chalkboard-teacher mr-2"></i>
+            指導アドバイス
+          </h3>
+          <div class="space-y-3">
+            ${(analysis.suggestions_for_teacher || []).map(suggestion => {
+              const priorityColor = suggestion.priority === 'high' ? 'red' : 
+                                   suggestion.priority === 'medium' ? 'yellow' : 'green'
+              return `
+                <div class="border rounded-lg p-3 bg-${priorityColor}-50">
+                  <p class="text-gray-800 text-sm">${suggestion.suggestion}</p>
+                </div>
+              `
+            }).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- サポート方法 -->
+      ${(analysis.support_strategies && analysis.support_strategies.length > 0) ? `
+      <div class="bg-green-50 rounded-lg shadow-md p-6">
+        <h3 class="text-xl font-bold text-green-700 mb-4">
+          <i class="fas fa-hands-helping mr-2"></i>
+          具体的なサポート方法
+        </h3>
+        <ul class="space-y-2">
+          ${analysis.support_strategies.map(strategy => `
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+              <span class="text-gray-700">${strategy}</span>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+      ` : ''}
+    `
+  } catch (error) {
+    console.error('分析エラー:', error)
+    analysisResult.innerHTML = `
+      <div class="text-center text-red-600 py-12">
+        <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+        <p>分析を実行できませんでした。もう一度お試しください。</p>
+      </div>
+    `
+  }
+}
+
 // グローバル関数として公開
 window.loadCardEditPage = loadCardEditPage
 window.loadCardManagementPage = loadCardManagementPage
@@ -3008,4 +3773,15 @@ window.deleteCard = deleteCard
 window.addNewCard = addNewCard
 window.showCourseSelectForEdit = showCourseSelectForEdit
 window.closeCourseSelectModal = closeCourseSelectModal
+
+// Phase 6: AI機能のグローバル関数
+window.loadAIDiagnosisPage = loadAIDiagnosisPage
+window.loadAIProblemGenerator = loadAIProblemGenerator
+window.loadAIPlanSuggestion = loadAIPlanSuggestion
+window.loadAIErrorAnalysis = loadAIErrorAnalysis
+window.selectCardForGeneration = selectCardForGeneration
+window.setDifficulty = setDifficulty
+window.generateProblem = generateProblem
+window.toggleAnswer = toggleAnswer
+window.analyzeStudent = analyzeStudent
 
