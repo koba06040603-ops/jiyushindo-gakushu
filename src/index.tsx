@@ -2073,7 +2073,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 8000
+            maxOutputTokens: 16000  // 8000から16000に増量
           }
         })
       }
@@ -2092,7 +2092,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.8,
-              maxOutputTokens: 8000
+              maxOutputTokens: 16000  // フォールバックも16000に
             }
           })
         }
