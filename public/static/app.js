@@ -4860,6 +4860,7 @@ window.showPrintPreview = showPrintPreview
 function showTeacherOverview(unitData) {
   const curriculum = unitData.curriculum
   const courses = unitData.courses || []
+  const optionalProblems = unitData.optional_problems || []
   
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -4878,6 +4879,48 @@ function showTeacherOverview(unitData) {
         </p>
       </div>
 
+      <!-- 目次（クイックナビゲーション） -->
+      <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-list mr-2"></i>
+          目次（クリックでジャンプ）
+        </h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <a href="#unit-info" class="bg-blue-50 hover:bg-blue-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-info-circle text-blue-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-blue-800">単元情報</p>
+          </a>
+          <a href="#learning-guide" class="bg-green-50 hover:bg-green-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-book text-green-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-green-800">学習のてびき</p>
+          </a>
+          <a href="#courses" class="bg-purple-50 hover:bg-purple-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-layer-group text-purple-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-purple-800">全コース・カード</p>
+          </a>
+          <a href="#answers" class="bg-orange-50 hover:bg-orange-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-file-alt text-orange-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-orange-800">全解答・解説</p>
+          </a>
+          <a href="#check-test" class="bg-red-50 hover:bg-red-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-check-circle text-red-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-red-800">チェックテスト</p>
+          </a>
+          <a href="#optional-problems" class="bg-pink-50 hover:bg-pink-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-star text-pink-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-pink-800">選択課題</p>
+          </a>
+          <a href="#hints" class="bg-yellow-50 hover:bg-yellow-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-lightbulb text-yellow-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-yellow-800">全ヒント一覧</p>
+          </a>
+          <a href="#summary" class="bg-gray-50 hover:bg-gray-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-chart-bar text-gray-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-gray-800">統計サマリー</p>
+          </a>
+        </div>
+      </div>
+
       <!-- 使い方ガイド -->
       <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
         <h3 class="font-bold text-blue-800 mb-2">
@@ -4886,13 +4929,43 @@ function showTeacherOverview(unitData) {
         </h3>
         <ul class="text-sm text-blue-900 space-y-1">
           <li>✅ AIが生成した全てのコンテンツを一覧で確認できます</li>
+          <li>✅ 学習のてびき、チェックテスト、選択課題、解答・解説も含まれます</li>
           <li>✅ 各カードの「編集」ボタンで内容を修正できます</li>
           <li>✅ 問題がなければ「この単元を保存して使用する」をクリック</li>
         </ul>
       </div>
 
+      <!-- 統計サマリー -->
+      <div id="summary" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-chart-bar mr-2"></i>
+          統計サマリー
+        </h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-blue-50 p-4 rounded-lg text-center">
+            <p class="text-3xl font-bold text-blue-600">${courses.length}</p>
+            <p class="text-sm text-gray-600">コース数</p>
+          </div>
+          <div class="bg-green-50 p-4 rounded-lg text-center">
+            <p class="text-3xl font-bold text-green-600">${courses.reduce((sum, c) => sum + (c.cards?.length || 0), 0)}</p>
+            <p class="text-sm text-gray-600">学習カード</p>
+          </div>
+          <div class="bg-yellow-50 p-4 rounded-lg text-center">
+            <p class="text-3xl font-bold text-yellow-600">${courses.reduce((sum, c) => sum + (c.cards || []).reduce((s, card) => s + (card.hints?.length || 0), 0), 0)}</p>
+            <p class="text-sm text-gray-600">ヒント総数</p>
+          </div>
+          <div class="bg-pink-50 p-4 rounded-lg text-center">
+            <p class="text-3xl font-bold text-pink-600">${optionalProblems.length}</p>
+            <p class="text-sm text-gray-600">選択課題</p>
+          </div>
+        </div>
+      </div>
+          <li>✅ 問題がなければ「この単元を保存して使用する」をクリック</li>
+        </ul>
+      </div>
+
       <!-- 単元情報 -->
-      <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <div id="unit-info" class="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 class="text-2xl font-bold text-gray-800 mb-4">
           <i class="fas fa-bullseye mr-2"></i>
           単元情報
@@ -4927,7 +5000,63 @@ function showTeacherOverview(unitData) {
         </div>
       </div>
 
+      <!-- 学習のてびき -->
+      <div id="learning-guide" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-book mr-2"></i>
+          学習のてびき
+        </h2>
+        
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-4">
+          <h3 class="font-bold text-green-800 mb-2">📖 学習の進め方</h3>
+          <ol class="text-sm text-green-900 space-y-2 ml-4 list-decimal">
+            <li>まず、単元の目標を読んで、何を学ぶのか確認しましょう</li>
+            <li>自分に合ったコース（じっくり・しっかり・ぐんぐん）を選びます</li>
+            <li>学習カードを1枚ずつ進めます（わからない時はヒントやAI先生を使おう）</li>
+            <li>全てのカードが終わったら、チェックテストに挑戦！</li>
+            <li>チェックテストに合格したら、選択課題で発展的な学習ができます</li>
+          </ol>
+        </div>
+
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+          <h3 class="font-bold text-blue-800 mb-2">🎯 コースの選び方</h3>
+          <div class="space-y-3">
+            <div class="bg-white p-3 rounded-lg">
+              <p class="font-bold text-green-800 mb-1">🟢 じっくりコース</p>
+              <p class="text-sm text-gray-700">基礎からしっかり学びたい人向け。丁寧な説明とたくさんのヒントがあります。</p>
+            </div>
+            <div class="bg-white p-3 rounded-lg">
+              <p class="font-bold text-blue-800 mb-1">🔵 しっかりコース</p>
+              <p class="text-sm text-gray-700">標準的な学習ペース。バランスよく学べます。</p>
+            </div>
+            <div class="bg-white p-3 rounded-lg">
+              <p class="font-bold text-purple-800 mb-1">🟣 ぐんぐんコース</p>
+              <p class="text-sm text-gray-700">発展的な内容に挑戦したい人向け。応用問題も含まれます。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4">
+          <h3 class="font-bold text-yellow-800 mb-2">💡 困ったときは</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="bg-white p-3 rounded-lg">
+              <p class="font-bold text-blue-600 mb-1">🤖 AI先生</p>
+              <p class="text-xs text-gray-600">すぐに質問できます</p>
+            </div>
+            <div class="bg-white p-3 rounded-lg">
+              <p class="font-bold text-green-600 mb-1">👨‍🏫 先生に聞く</p>
+              <p class="text-xs text-gray-600">先生を呼べます</p>
+            </div>
+            <div class="bg-white p-3 rounded-lg">
+              <p class="font-bold text-purple-600 mb-1">👥 友達に聞く</p>
+              <p class="text-xs text-gray-600">できている友達を確認</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 全コース・全カード一覧 -->
+      <div id="courses"></div>
       ${courses.map((course, courseIndex) => `
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div class="flex items-center justify-between mb-4">
@@ -4996,6 +5125,138 @@ function showTeacherOverview(unitData) {
           </div>
         </div>
       `).join('')}
+
+      <!-- 全解答・解説 -->
+      <div id="answers" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-file-alt mr-2"></i>
+          全解答・解説
+        </h2>
+        ${courses.map((course, courseIndex) => `
+          <div class="mb-6">
+            <h3 class="text-xl font-bold text-${course.color_code}-800 mb-3">
+              ${course.course_name}
+            </h3>
+            ${(course.cards || []).map((card, cardIndex) => `
+              <div class="bg-gray-50 border-l-4 border-${course.color_code}-500 p-4 mb-3">
+                <p class="font-bold text-gray-800 mb-2">
+                  カード ${card.card_number}: ${card.card_title}
+                </p>
+                <div class="bg-white p-3 rounded-lg">
+                  <p class="text-sm font-bold text-orange-800 mb-2">📝 解答</p>
+                  <p class="text-gray-700">${card.example_solution || '解答例は例題の解き方を参照してください'}</p>
+                </div>
+                ${card.real_world_connection ? `
+                  <div class="bg-white p-3 rounded-lg mt-2">
+                    <p class="text-sm font-bold text-blue-800 mb-2">💡 解説</p>
+                    <p class="text-gray-700">${card.real_world_connection}</p>
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- チェックテスト -->
+      <div id="check-test" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-check-circle mr-2"></i>
+          チェックテスト
+        </h2>
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+          <p class="text-sm text-red-900">
+            <i class="fas fa-info-circle mr-2"></i>
+            チェックテストは各コース終了後に自動的に表示されます。
+            学習カード6枚の内容を理解しているか確認するテストです。
+          </p>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-lg">
+          <p class="font-bold text-gray-800 mb-2">📋 テスト形式</p>
+          <ul class="text-sm text-gray-700 space-y-1 ml-4 list-disc">
+            <li>学習した内容から3-5問出題</li>
+            <li>正答率70%以上で合格</li>
+            <li>合格すると選択課題に進めます</li>
+            <li>不合格の場合は学習カードに戻って復習</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 選択課題 -->
+      <div id="optional-problems" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-star mr-2"></i>
+          選択課題（発展問題）
+        </h2>
+        ${optionalProblems.length > 0 ? `
+          <div class="space-y-4">
+            ${optionalProblems.map((problem, index) => `
+              <div class="bg-pink-50 border-l-4 border-pink-500 p-4">
+                <div class="flex items-start justify-between mb-2">
+                  <h3 class="font-bold text-gray-800">
+                    <span class="bg-pink-200 text-pink-800 px-3 py-1 rounded-full text-sm mr-2">
+                      問題 ${index + 1}
+                    </span>
+                    ${problem.problem_title}
+                  </h3>
+                  <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
+                    難易度: ${problem.difficulty_level || '標準'}
+                  </span>
+                </div>
+                <div class="bg-white p-3 rounded-lg mb-3">
+                  <p class="text-sm font-bold text-pink-800 mb-1">📝 問題</p>
+                  <p class="text-gray-700">${problem.problem_description}</p>
+                </div>
+                ${problem.hint_text ? `
+                  <div class="bg-yellow-50 p-3 rounded-lg">
+                    <p class="text-sm font-bold text-yellow-800 mb-1">💡 ヒント</p>
+                    <p class="text-gray-700">${problem.hint_text}</p>
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <div class="bg-gray-50 p-4 rounded-lg text-center">
+            <p class="text-gray-600">
+              <i class="fas fa-info-circle mr-2"></i>
+              選択課題は保存後、教師が追加できます
+            </p>
+          </div>
+        `}
+      </div>
+
+      <!-- 全ヒント一覧 -->
+      <div id="hints" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-lightbulb mr-2"></i>
+          全ヒント一覧
+        </h2>
+        ${courses.map((course, courseIndex) => `
+          <div class="mb-6">
+            <h3 class="text-xl font-bold text-${course.color_code}-800 mb-3">
+              ${course.course_name}
+            </h3>
+            ${(course.cards || []).map((card, cardIndex) => `
+              <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-3">
+                <p class="font-bold text-gray-800 mb-3">
+                  カード ${card.card_number}: ${card.card_title}
+                </p>
+                ${(card.hints || []).map((hint, hintIndex) => `
+                  <div class="bg-white p-3 rounded-lg mb-2">
+                    <p class="text-sm font-bold text-yellow-800 mb-1">
+                      💡 ヒント ${hintIndex + 1}
+                      ${hint.thinking_tool_suggestion ? `<span class="text-xs text-gray-600 ml-2">(思考ツール: ${hint.thinking_tool_suggestion})</span>` : ''}
+                    </p>
+                    <p class="text-gray-700">${hint.hint_text || hint.hint_content || ''}</p>
+                  </div>
+                `).join('')}
+                ${(!card.hints || card.hints.length === 0) ? '<p class="text-gray-500 text-sm">ヒントなし</p>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
+      </div>
 
       <!-- アクションボタン -->
       <div class="bg-white rounded-lg shadow-lg p-6 space-y-4">
