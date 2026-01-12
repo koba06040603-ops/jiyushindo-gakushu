@@ -280,7 +280,7 @@ async function loadGuidePage(curriculumId) {
             <i class="fas fa-chalkboard-teacher mr-2"></i>
             教師用ツール（Phase 5）
           </h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             <button onclick="toggleTeacherMode()" 
                     class="bg-white text-indigo-600 py-3 px-4 rounded-lg font-bold hover:bg-indigo-50 transition flex items-center justify-center">
               <i class="fas fa-user-cog mr-2"></i>
@@ -295,6 +295,11 @@ async function loadGuidePage(curriculumId) {
                     class="bg-white text-pink-600 py-3 px-4 rounded-lg font-bold hover:bg-pink-50 transition flex items-center justify-center">
               <i class="fas fa-palette mr-2"></i>
               学習環境デザイン
+            </button>
+            <button onclick="showCourseSelectForEdit(${curriculum.id})" 
+                    class="bg-white text-orange-600 py-3 px-4 rounded-lg font-bold hover:bg-orange-50 transition flex items-center justify-center">
+              <i class="fas fa-edit mr-2"></i>
+              問題編集
             </button>
           </div>
         </div>
@@ -2498,4 +2503,509 @@ window.loadEvaluationPage = loadEvaluationPage
 window.loadStudentEvaluation = loadStudentEvaluation
 window.saveThreePointEvaluation = saveThreePointEvaluation
 window.saveNonCognitiveEvaluation = saveNonCognitiveEvaluation
+
+// ==================== 問題編集機能 ====================
+
+// 学習カード編集ページ
+async function loadCardEditPage(cardId) {
+  state.currentView = 'card_edit'
+  
+  try {
+    // カード詳細取得
+    const cardResponse = await axios.get(`/api/cards/${cardId}`)
+    const { card, hints } = cardResponse.data
+    
+    document.getElementById('app').innerHTML = `
+      <!-- ヘッダー -->
+      <div class="bg-white shadow-md p-4 mb-6">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+          <div class="flex items-center space-x-4">
+            <button onclick="history.back()" class="text-blue-600 hover:text-blue-800">
+              <i class="fas fa-arrow-left mr-2"></i>戻る
+            </button>
+            <h1 class="text-2xl font-bold text-gray-800">
+              <i class="fas fa-edit mr-2"></i>学習カード編集
+            </h1>
+          </div>
+          <button onclick="previewCard(${cardId})" 
+            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+            <i class="fas fa-eye mr-2"></i>プレビュー
+          </button>
+        </div>
+      </div>
+
+      <div class="max-w-7xl mx-auto p-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- 編集フォーム -->
+          <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+              <i class="fas fa-file-alt mr-2"></i>学習カード内容
+            </h2>
+            
+            <form id="cardEditForm">
+              <!-- カードタイトル -->
+              <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-2">
+                  カードタイトル
+                </label>
+                <input type="text" id="card_title" 
+                  value="${card.card_title || ''}"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="例: 10のまとまりでかける">
+              </div>
+
+              <!-- 新出語句・キーワード -->
+              <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-2">
+                  新出語句・キーワード
+                </label>
+                <textarea id="new_terms" rows="3"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="新出語句をカンマ区切りで入力"
+                >${card.new_terms || ''}</textarea>
+                <p class="text-xs text-gray-500 mt-1">例: 10のまとまり, 位, 筆算</p>
+              </div>
+
+              <!-- 例題 -->
+              <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-2">
+                  例題
+                </label>
+                <textarea id="example_problem" rows="2"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="例題を入力"
+                >${card.example_problem || ''}</textarea>
+              </div>
+
+              <!-- 例題の解き方 -->
+              <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-2">
+                  例題の解き方
+                </label>
+                <textarea id="example_solution" rows="3"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="解き方を入力"
+                >${card.example_solution || ''}</textarea>
+              </div>
+
+              <!-- 問題文 -->
+              <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-2">
+                  問題文
+                </label>
+                <textarea id="problem_description" rows="4"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="取り組む問題を入力"
+                >${card.problem_description || ''}</textarea>
+              </div>
+
+              <!-- 実社会との関連 -->
+              <div class="mb-4">
+                <label class="block text-sm font-bold text-gray-700 mb-2">
+                  実社会との関連
+                </label>
+                <textarea id="real_world_connection" rows="2"
+                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="実社会でどう使われるか"
+                >${card.real_world_connection || ''}</textarea>
+              </div>
+
+              <!-- 保存ボタン -->
+              <div class="flex justify-end space-x-4">
+                <button type="button" onclick="history.back()" 
+                  class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+                  キャンセル
+                </button>
+                <button type="submit" 
+                  class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                  <i class="fas fa-save mr-2"></i>保存
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- ヒントカード編集 -->
+          <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+              <i class="fas fa-lightbulb mr-2"></i>ヒントカード（3段階）
+            </h2>
+            
+            <div id="hintsEditor">
+              ${renderHintsEditor(hints)}
+            </div>
+
+            <div class="flex justify-end mt-4">
+              <button onclick="saveAllHints(${cardId})" 
+                class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                <i class="fas fa-save mr-2"></i>ヒント保存
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    
+    // フォーム送信イベント
+    document.getElementById('cardEditForm').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      await saveCard(cardId)
+    })
+    
+  } catch (error) {
+    console.error('Error loading card edit page:', error)
+    alert('カード編集ページの読み込みに失敗しました')
+  }
+}
+
+// ヒントエディタレンダリング
+function renderHintsEditor(hints) {
+  const hintLevels = ['ヒント1（軽いヒント）', 'ヒント2（もう少し詳しく）', 'ヒント3（ほぼ答え）']
+  const hintDescriptions = [
+    '考える方向を示すヒント',
+    '具体的な手順を示すヒント',
+    '9割方答えられるヒント'
+  ]
+  
+  let html = ''
+  for (let i = 1; i <= 3; i++) {
+    const hint = hints.find(h => h.hint_level === i) || {}
+    html += `
+      <div class="mb-6 pb-6 border-b border-gray-200">
+        <h3 class="text-lg font-bold text-gray-700 mb-2">${hintLevels[i-1]}</h3>
+        <p class="text-xs text-gray-500 mb-2">${hintDescriptions[i-1]}</p>
+        
+        <div class="mb-3">
+          <label class="block text-sm font-bold text-gray-600 mb-1">ヒント内容</label>
+          <textarea id="hint_${i}_text" rows="3"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+            placeholder="ヒント内容を入力"
+          >${hint.hint_text || ''}</textarea>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-bold text-gray-600 mb-1">思考ツールの提案</label>
+          <input type="text" id="hint_${i}_tool"
+            value="${hint.thinking_tool_suggestion || ''}"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+            placeholder="例: 図に描いてみよう、表を作ってみよう">
+        </div>
+        
+        <input type="hidden" id="hint_${i}_id" value="${hint.id || ''}">
+      </div>
+    `
+  }
+  
+  return html
+}
+
+// カード保存
+async function saveCard(cardId) {
+  const formData = {
+    card_title: document.getElementById('card_title').value,
+    new_terms: document.getElementById('new_terms').value,
+    example_problem: document.getElementById('example_problem').value,
+    example_solution: document.getElementById('example_solution').value,
+    problem_description: document.getElementById('problem_description').value,
+    real_world_connection: document.getElementById('real_world_connection').value
+  }
+  
+  try {
+    await axios.put(`/api/cards/${cardId}`, formData)
+    alert('学習カードを保存しました！')
+  } catch (error) {
+    console.error('Error saving card:', error)
+    alert('保存に失敗しました')
+  }
+}
+
+// 全ヒント保存
+async function saveAllHints(cardId) {
+  try {
+    for (let i = 1; i <= 3; i++) {
+      const hintId = document.getElementById(`hint_${i}_id`).value
+      const hintData = {
+        learning_card_id: cardId,
+        hint_level: i,
+        hint_text: document.getElementById(`hint_${i}_text`).value,
+        thinking_tool_suggestion: document.getElementById(`hint_${i}_tool`).value
+      }
+      
+      if (hintId) {
+        // 更新
+        await axios.put(`/api/hints/${hintId}`, hintData)
+      } else {
+        // 新規作成
+        await axios.post('/api/hints', hintData)
+      }
+    }
+    
+    alert('ヒントカードを保存しました！')
+  } catch (error) {
+    console.error('Error saving hints:', error)
+    alert('ヒントの保存に失敗しました')
+  }
+}
+
+// プレビュー機能
+async function previewCard(cardId) {
+  // プレビューは新しいウィンドウまたはモーダルで表示
+  const modalHtml = `
+    <div id="previewModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-screen overflow-y-auto m-4">
+        <div class="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+          <h2 class="text-xl font-bold text-gray-800">
+            <i class="fas fa-eye mr-2"></i>プレビュー
+          </h2>
+          <button onclick="closePreview()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        <div id="previewContent" class="p-6">
+          読み込み中...
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+  
+  // カード詳細を取得してプレビュー表示
+  try {
+    const response = await axios.get(`/api/cards/${cardId}`)
+    const { card, hints } = response.data
+    
+    document.getElementById('previewContent').innerHTML = `
+      <!-- 新出語句 -->
+      ${card.new_terms ? `
+        <div class="bg-yellow-50 rounded-lg p-4 mb-4">
+          <h3 class="font-bold text-gray-800 mb-2">
+            <i class="fas fa-book mr-2"></i>新出語句・キーワード
+          </h3>
+          <p class="text-gray-700">${card.new_terms}</p>
+        </div>
+      ` : ''}
+
+      <!-- 例題 -->
+      ${card.example_problem ? `
+        <div class="bg-blue-50 rounded-lg p-4 mb-4">
+          <h3 class="font-bold text-gray-800 mb-2">
+            <i class="fas fa-lightbulb mr-2"></i>例題
+          </h3>
+          <p class="text-gray-700 mb-2">${card.example_problem}</p>
+          ${card.example_solution ? `
+            <div class="bg-white rounded p-3 mt-2">
+              <p class="text-sm font-bold text-blue-600 mb-1">解き方：</p>
+              <p class="text-gray-700">${card.example_solution}</p>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      <!-- 問題文 -->
+      <div class="bg-white border-2 border-blue-400 rounded-lg p-4 mb-4">
+        <h3 class="font-bold text-gray-800 mb-2">
+          <i class="fas fa-pencil-alt mr-2"></i>${card.card_title}
+        </h3>
+        <p class="text-gray-700 whitespace-pre-wrap">${card.problem_description || '問題文が設定されていません'}</p>
+      </div>
+
+      <!-- 実社会との関連 -->
+      ${card.real_world_connection ? `
+        <div class="bg-green-50 rounded-lg p-4 mb-4">
+          <h3 class="font-bold text-gray-800 mb-2">
+            <i class="fas fa-globe mr-2"></i>実社会との関連
+          </h3>
+          <p class="text-gray-700">${card.real_world_connection}</p>
+        </div>
+      ` : ''}
+
+      <!-- ヒントカード -->
+      <div class="bg-purple-50 rounded-lg p-4">
+        <h3 class="font-bold text-gray-800 mb-3">
+          <i class="fas fa-life-ring mr-2"></i>ヒントカード
+        </h3>
+        ${hints.map(hint => `
+          <div class="bg-white rounded-lg p-3 mb-2">
+            <p class="text-sm font-bold text-purple-600 mb-1">ヒント${hint.hint_level}:</p>
+            <p class="text-gray-700 text-sm">${hint.hint_text || 'ヒントが設定されていません'}</p>
+            ${hint.thinking_tool_suggestion ? `
+              <p class="text-xs text-gray-500 mt-1">
+                <i class="fas fa-tools mr-1"></i>${hint.thinking_tool_suggestion}
+              </p>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `
+  } catch (error) {
+    console.error('Error loading preview:', error)
+    document.getElementById('previewContent').innerHTML = '<p class="text-red-600">プレビューの読み込みに失敗しました</p>'
+  }
+}
+
+// プレビューを閉じる
+function closePreview() {
+  const modal = document.getElementById('previewModal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+// 学習カード管理ページ（コース別のカード一覧と編集）
+async function loadCardManagementPage(courseId) {
+  state.currentView = 'card_management'
+  
+  try {
+    // コースの学習カード取得
+    const response = await axios.get(`/api/courses/${courseId}/cards`)
+    const cards = response.data
+    
+    document.getElementById('app').innerHTML = `
+      <!-- ヘッダー -->
+      <div class="bg-white shadow-md p-4 mb-6">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+          <div class="flex items-center space-x-4">
+            <button onclick="loadGuidePage(${state.selectedCurriculum.id})" class="text-blue-600 hover:text-blue-800">
+              <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
+            </button>
+            <h1 class="text-2xl font-bold text-gray-800">
+              <i class="fas fa-tasks mr-2"></i>学習カード管理
+            </h1>
+          </div>
+          <button onclick="addNewCard(${courseId})" 
+            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+            <i class="fas fa-plus mr-2"></i>新しいカードを追加
+          </button>
+        </div>
+      </div>
+
+      <div class="max-w-7xl mx-auto p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          ${cards.map(card => `
+            <div class="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition">
+              <div class="flex justify-between items-start mb-3">
+                <h3 class="font-bold text-gray-800">
+                  ${card.card_number}. ${card.card_title}
+                </h3>
+                <span class="text-xs px-2 py-1 rounded ${
+                  card.card_type === 'basic' ? 'bg-green-100 text-green-800' :
+                  card.card_type === 'advanced' ? 'bg-purple-100 text-purple-800' :
+                  'bg-blue-100 text-blue-800'
+                }">
+                  ${card.card_type}
+                </span>
+              </div>
+              
+              <p class="text-sm text-gray-600 mb-4 line-clamp-2">
+                ${card.problem_description || '問題文なし'}
+              </p>
+              
+              <div class="flex space-x-2">
+                <button onclick="loadCardEditPage(${card.id})" 
+                  class="flex-1 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                  <i class="fas fa-edit mr-1"></i>編集
+                </button>
+                <button onclick="previewCard(${card.id})" 
+                  class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button onclick="deleteCard(${card.id}, ${courseId})" 
+                  class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `
+  } catch (error) {
+    console.error('Error loading card management page:', error)
+    alert('カード管理ページの読み込みに失敗しました')
+  }
+}
+
+// カード削除
+async function deleteCard(cardId, courseId) {
+  if (!confirm('このカードを削除してもよろしいですか？')) {
+    return
+  }
+  
+  try {
+    await axios.delete(`/api/cards/${cardId}`)
+    alert('カードを削除しました')
+    loadCardManagementPage(courseId)
+  } catch (error) {
+    console.error('Error deleting card:', error)
+    alert('削除に失敗しました')
+  }
+}
+
+// 新規カード追加（プレースホルダー）
+function addNewCard(courseId) {
+  alert('新規カード追加機能は準備中です。\n現在は既存のカードの編集のみ対応しています。')
+}
+
+// コース選択（問題編集用）
+async function showCourseSelectForEdit(curriculumId) {
+  try {
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { courses } = response.data
+    
+    const modalHtml = `
+      <div id="courseSelectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md m-4">
+          <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-t-lg">
+            <h2 class="text-xl font-bold">
+              <i class="fas fa-edit mr-2"></i>編集するコースを選択
+            </h2>
+          </div>
+          <div class="p-6">
+            <div class="space-y-3">
+              ${courses.map(course => `
+                <button onclick="closeCourseSelectModal(); loadCardManagementPage(${course.id})" 
+                  class="w-full px-6 py-4 rounded-lg font-bold text-left transition ${
+                    course.course_level === 'basic' ? 'bg-green-100 hover:bg-green-200 text-green-800' :
+                    course.course_level === 'advanced' ? 'bg-purple-100 hover:bg-purple-200 text-purple-800' :
+                    'bg-blue-100 hover:bg-blue-200 text-blue-800'
+                  }">
+                  <i class="fas fa-folder mr-2"></i>${course.course_display_name}
+                </button>
+              `).join('')}
+            </div>
+            <button onclick="closeCourseSelectModal()" 
+              class="w-full mt-4 px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+              キャンセル
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml)
+  } catch (error) {
+    console.error('Error showing course select:', error)
+    alert('コース情報の読み込みに失敗しました')
+  }
+}
+
+// コース選択モーダルを閉じる
+function closeCourseSelectModal() {
+  const modal = document.getElementById('courseSelectModal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+// グローバル関数として公開
+window.loadCardEditPage = loadCardEditPage
+window.loadCardManagementPage = loadCardManagementPage
+window.previewCard = previewCard
+window.closePreview = closePreview
+window.saveCard = saveCard
+window.saveAllHints = saveAllHints
+window.deleteCard = deleteCard
+window.addNewCard = addNewCard
+window.showCourseSelectForEdit = showCourseSelectForEdit
+window.closeCourseSelectModal = closeCourseSelectModal
 

@@ -1089,6 +1089,160 @@ app.get('/api/narratives/student/:studentId/curriculum/:curriculumId', async (c)
   }
 })
 
+// ==================== 問題編集機能 API ====================
+
+// APIルート：学習カード更新
+app.put('/api/cards/:cardId', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  const body = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE learning_cards SET
+        card_title = ?,
+        problem_description = ?,
+        new_terms = ?,
+        example_problem = ?,
+        example_solution = ?,
+        diagram_url = ?,
+        real_world_connection = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      body.card_title || '',
+      body.problem_description || '',
+      body.new_terms || '',
+      body.example_problem || '',
+      body.example_solution || '',
+      body.diagram_url || '',
+      body.real_world_connection || '',
+      cardId
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習カード追加
+app.post('/api/cards', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO learning_cards (
+        course_id, card_number, card_title, card_type,
+        problem_description, new_terms, example_problem,
+        example_solution, diagram_url, real_world_connection
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.course_id,
+      body.card_number,
+      body.card_title || '',
+      body.card_type || 'main',
+      body.problem_description || '',
+      body.new_terms || '',
+      body.example_problem || '',
+      body.example_solution || '',
+      body.diagram_url || '',
+      body.real_world_connection || ''
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習カード削除
+app.delete('/api/cards/:cardId', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  
+  try {
+    // 関連するヒントカードも削除
+    await env.DB.prepare(`
+      DELETE FROM hint_cards WHERE learning_card_id = ?
+    `).bind(cardId).run()
+    
+    // 学習カード削除
+    await env.DB.prepare(`
+      DELETE FROM learning_cards WHERE id = ?
+    `).bind(cardId).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：ヒントカード更新
+app.put('/api/hints/:hintId', async (c) => {
+  const { env } = c
+  const hintId = c.req.param('hintId')
+  const body = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE hint_cards SET
+        hint_text = ?,
+        thinking_tool_suggestion = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      body.hint_text || '',
+      body.thinking_tool_suggestion || '',
+      hintId
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：ヒントカード追加
+app.post('/api/hints', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO hint_cards (
+        learning_card_id, hint_level, hint_text, thinking_tool_suggestion
+      ) VALUES (?, ?, ?, ?)
+    `).bind(
+      body.learning_card_id,
+      body.hint_level,
+      body.hint_text || '',
+      body.thinking_tool_suggestion || ''
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：ヒントカード削除
+app.delete('/api/hints/:hintId', async (c) => {
+  const { env } = c
+  const hintId = c.req.param('hintId')
+  
+  try {
+    await env.DB.prepare(`
+      DELETE FROM hint_cards WHERE id = ?
+    `).bind(hintId).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
 // トップページ
 app.get('/', (c) => {
   return c.html(`
