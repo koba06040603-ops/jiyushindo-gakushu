@@ -1798,8 +1798,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
-    // Gemini 2.0 Flash Thinkingを使用（推奨）
-    let modelName = 'gemini-2.0-flash-thinking-exp-01-21'
+    // Gemini 2.0 Flash Expを使用（推奨）
+    let modelName = 'gemini-2.0-flash-exp'
     let response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
       {
