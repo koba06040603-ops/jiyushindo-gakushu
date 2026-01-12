@@ -274,7 +274,7 @@ app.post('/api/ai/ask', async (c) => {
   
   const apiKey = env.GEMINI_API_KEY
   
-  if (!apiKey) {
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
     return c.json({ 
       answer: '申し訳ありません。AI先生は現在利用できません。ヒントカードや先生に聞いてみましょう。' 
     })
@@ -286,9 +286,9 @@ app.post('/api/ai/ask', async (c) => {
       SELECT * FROM learning_cards WHERE id = ?
     `).bind(body.cardId).first()
     
-    // Gemini APIにリクエスト
+    // Gemini APIにリクエスト（最新のv1エンドポイント）
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -300,8 +300,8 @@ app.post('/api/ai/ask', async (c) => {
               text: `あなたは小学生の学習を支援するAI先生です。ソクラテス対話の手法を使い、子どもが自分で考えられるように導いてください。
 
 【学習カード情報】
-タイトル: ${card?.card_title}
-問題: ${body.context}
+タイトル: ${card?.card_title || ''}
+問題: ${body.context || ''}
 
 【生徒の質問】
 ${body.question}
@@ -324,11 +324,13 @@ ${body.question}
       }
     )
     
-    const geminiData = await geminiResponse.json()
-    
     if (!geminiResponse.ok) {
-      throw new Error('Gemini API error')
+      const errorData = await geminiResponse.json()
+      console.error('Gemini API error:', errorData)
+      throw new Error(`Gemini API error: ${geminiResponse.status}`)
     }
+    
+    const geminiData = await geminiResponse.json()
     
     const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 
                    '考えるヒントを用意できませんでした。もう一度質問してみてください。'
@@ -436,7 +438,7 @@ app.post('/api/ai/reflect', async (c) => {
   
   try {
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
