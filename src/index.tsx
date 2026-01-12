@@ -4,6 +4,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 
 type Bindings = {
   DB: D1Database
+  GEMINI_API_KEY?: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -202,6 +203,82 @@ app.get('/api/progress/class/:classCode', async (c) => {
     return c.json(progress.results)
   } catch (error) {
     return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：AI先生（Gemini API）
+app.post('/api/ai/ask', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({ 
+      answer: '申し訳ありません。AI先生は現在利用できません。ヒントカードや先生に聞いてみましょう。' 
+    })
+  }
+  
+  try {
+    // 学習カード情報を取得
+    const card = await env.DB.prepare(`
+      SELECT * FROM learning_cards WHERE id = ?
+    `).bind(body.cardId).first()
+    
+    // Gemini APIにリクエスト
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `あなたは小学生の学習を支援するAI先生です。ソクラテス対話の手法を使い、子どもが自分で考えられるように導いてください。
+
+【学習カード情報】
+タイトル: ${card?.card_title}
+問題: ${body.context}
+
+【生徒の質問】
+${body.question}
+
+【回答のルール】
+1. 答えを直接教えず、考えるヒントを出す
+2. 小学生にわかりやすい言葉で
+3. 励ましの言葉を入れる
+4. 質問で返して考えを引き出す
+5. 150文字以内で簡潔に
+
+回答してください。`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 200,
+          }
+        })
+      }
+    )
+    
+    const geminiData = await geminiResponse.json()
+    
+    if (!geminiResponse.ok) {
+      throw new Error('Gemini API error')
+    }
+    
+    const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 
+                   '考えるヒントを用意できませんでした。もう一度質問してみてください。'
+    
+    return c.json({ answer })
+    
+  } catch (error) {
+    console.error('AI error:', error)
+    return c.json({ 
+      answer: 'ごめんなさい、今は答えられません。ヒントカードを見てみましょう！' 
+    })
   }
 })
 

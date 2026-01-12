@@ -454,12 +454,515 @@ window.loadCardPage = loadCardPage
 window.loadProgressBoard = loadProgressBoard
 
 // ============================================
-// 学習カードページ（次回実装）
+// 学習カードページ
 // ============================================
-function loadCardPage(cardId) {
-  alert('学習カードページは次のステップで実装します！')
-  // 次のステップで実装予定
+async function loadCardPage(cardId) {
+  state.currentView = 'card'
+  state.selectedCard = cardId
+  
+  try {
+    const response = await axios.get(`/api/cards/${cardId}`)
+    const { card, hints, answer } = response.data
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <!-- ヘッダー -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <button onclick="selectCourse(${state.selectedCourse})" class="text-indigo-600 hover:text-indigo-800 mb-4">
+            <i class="fas fa-arrow-left mr-2"></i>学習カード一覧に戻る
+          </button>
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-3xl font-bold text-indigo-600 mb-2">
+                学習カード ${card.card_number}
+              </h1>
+              <h2 class="text-xl text-gray-800">${card.card_title}</h2>
+            </div>
+            <div class="text-right">
+              <div class="inline-block px-4 py-2 rounded-lg ${
+                card.difficulty_level === 'minimum' ? 'bg-green-100 text-green-700' :
+                card.difficulty_level === 'standard' ? 'bg-blue-100 text-blue-700' :
+                'bg-purple-100 text-purple-700'
+              }">
+                <i class="fas fa-signal mr-2"></i>
+                ${card.difficulty_level === 'minimum' ? '基本' : card.difficulty_level === 'standard' ? '標準' : '発展'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 助けを求めるボタン（右上固定） -->
+        <div class="fixed top-20 right-4 z-50 space-y-2">
+          <button onclick="showHelpMenu()" 
+                  class="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-500 text-white rounded-full shadow-lg hover:shadow-xl transition flex items-center justify-center">
+            <i class="fas fa-hand-paper text-2xl"></i>
+          </button>
+        </div>
+
+        <!-- ヘルプメニュー（モーダル） -->
+        <div id="helpMenu" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6">
+              <i class="fas fa-question-circle mr-2 text-indigo-600"></i>
+              助けを求める
+            </h3>
+            <div class="space-y-4">
+              <button onclick="showHints(); closeHelpMenu()" 
+                      class="w-full bg-yellow-500 text-white py-4 px-6 rounded-lg font-bold hover:bg-yellow-600 transition flex items-center justify-center">
+                <i class="fas fa-lightbulb mr-3 text-xl"></i>
+                ヒントカード
+              </button>
+              <button onclick="showAITeacher(); closeHelpMenu()" 
+                      class="w-full bg-blue-500 text-white py-4 px-6 rounded-lg font-bold hover:bg-blue-600 transition flex items-center justify-center">
+                <i class="fas fa-robot mr-3 text-xl"></i>
+                AI先生に聞く
+              </button>
+              <button onclick="callTeacher(); closeHelpMenu()" 
+                      class="w-full bg-green-500 text-white py-4 px-6 rounded-lg font-bold hover:bg-green-600 transition flex items-center justify-center">
+                <i class="fas fa-chalkboard-teacher mr-3 text-xl"></i>
+                先生を呼ぶ
+              </button>
+              <button onclick="askFriend(); closeHelpMenu()" 
+                      class="w-full bg-purple-500 text-white py-4 px-6 rounded-lg font-bold hover:bg-purple-600 transition flex items-center justify-center">
+                <i class="fas fa-user-friends mr-3 text-xl"></i>
+                友達に聞く
+              </button>
+              <button onclick="closeHelpMenu()" 
+                      class="w-full bg-gray-300 text-gray-700 py-3 px-6 rounded-lg font-bold hover:bg-gray-400 transition">
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- メインコンテンツ（左側・中央） -->
+          <div class="lg:col-span-2 space-y-6">
+            <!-- 新出語句・キーワード -->
+            ${card.new_terms ? `
+              <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
+                <h3 class="text-lg font-bold text-blue-800 mb-3">
+                  <i class="fas fa-book mr-2"></i>新しく学ぶこと
+                </h3>
+                <pre class="text-gray-800 whitespace-pre-wrap font-sans">${card.new_terms}</pre>
+              </div>
+            ` : ''}
+
+            <!-- 例題 -->
+            ${card.example_problem ? `
+              <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">
+                  <i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題
+                </h3>
+                <div class="bg-yellow-50 rounded-lg p-4 mb-4">
+                  <pre class="text-gray-800 whitespace-pre-wrap font-sans font-bold">${card.example_problem}</pre>
+                </div>
+                ${card.example_solution ? `
+                  <div class="bg-green-50 rounded-lg p-4">
+                    <h4 class="font-bold text-green-800 mb-2">
+                      <i class="fas fa-check-circle mr-2"></i>解き方
+                    </h4>
+                    <pre class="text-gray-800 whitespace-pre-wrap font-sans">${card.example_solution}</pre>
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
+
+            <!-- 問題 -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+              <h3 class="text-lg font-bold text-gray-800 mb-4">
+                <i class="fas fa-pencil-alt mr-2 text-indigo-600"></i>問題
+              </h3>
+              ${card.real_world_context ? `
+                <div class="bg-indigo-50 rounded-lg p-3 mb-4 flex items-start">
+                  <i class="fas fa-globe mr-2 text-indigo-600 mt-1"></i>
+                  <p class="text-sm text-indigo-800">${card.real_world_context}</p>
+                </div>
+              ` : ''}
+              <div class="bg-gray-50 rounded-lg p-6">
+                <pre class="text-gray-800 whitespace-pre-wrap font-sans text-lg leading-relaxed">${card.problem_content}</pre>
+              </div>
+              
+              <!-- 回答欄 -->
+              <div class="mt-6">
+                <label class="block text-sm font-bold text-gray-700 mb-2">あなたの答えを書きましょう</label>
+                <textarea id="answerInput" 
+                          rows="6" 
+                          class="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none"
+                          placeholder="ここに答えを書いてください..."></textarea>
+              </div>
+
+              <!-- 分かった度 -->
+              <div class="mt-6">
+                <label class="block text-sm font-bold text-gray-700 mb-3">今の分かった度</label>
+                <div class="flex justify-around">
+                  <button onclick="setUnderstanding(1)" 
+                          class="understanding-btn flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition"
+                          data-level="1">
+                    <span class="text-4xl">😢</span>
+                    <span class="text-xs mt-2">わからない</span>
+                  </button>
+                  <button onclick="setUnderstanding(2)" 
+                          class="understanding-btn flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition"
+                          data-level="2">
+                    <span class="text-4xl">😕</span>
+                    <span class="text-xs mt-2">少し難しい</span>
+                  </button>
+                  <button onclick="setUnderstanding(3)" 
+                          class="understanding-btn flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition"
+                          data-level="3">
+                    <span class="text-4xl">😊</span>
+                    <span class="text-xs mt-2">だいたいOK</span>
+                  </button>
+                  <button onclick="setUnderstanding(4)" 
+                          class="understanding-btn flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition"
+                          data-level="4">
+                    <span class="text-4xl">😄</span>
+                    <span class="text-xs mt-2">よくわかる</span>
+                  </button>
+                  <button onclick="setUnderstanding(5)" 
+                          class="understanding-btn flex flex-col items-center p-3 rounded-lg hover:bg-gray-100 transition"
+                          data-level="5">
+                    <span class="text-4xl">🤩</span>
+                    <span class="text-xs mt-2">完璧！</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- アクションボタン -->
+              <div class="mt-6 flex gap-4">
+                <button onclick="saveProgress()" 
+                        class="flex-1 bg-indigo-600 text-white py-3 px-6 rounded-lg font-bold hover:bg-indigo-700 transition">
+                  <i class="fas fa-save mr-2"></i>
+                  保存して次へ
+                </button>
+                <button onclick="showAnswer()" 
+                        class="flex-1 bg-gray-500 text-white py-3 px-6 rounded-lg font-bold hover:bg-gray-600 transition">
+                  <i class="fas fa-eye mr-2"></i>
+                  解答を見る
+                </button>
+              </div>
+            </div>
+
+            <!-- 解答表示エリア（非表示） -->
+            ${answer ? `
+              <div id="answerSection" class="hidden bg-green-50 border-l-4 border-green-500 rounded-lg p-6">
+                <h3 class="text-lg font-bold text-green-800 mb-4">
+                  <i class="fas fa-check-circle mr-2"></i>解答
+                </h3>
+                <div class="bg-white rounded-lg p-4 mb-4">
+                  <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer.answer_content}</pre>
+                </div>
+                ${answer.explanation ? `
+                  <div class="bg-white rounded-lg p-4">
+                    <h4 class="font-bold text-gray-800 mb-2">
+                      <i class="fas fa-info-circle mr-2"></i>解説
+                    </h4>
+                    <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer.explanation}</pre>
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- サイドバー（右側） -->
+          <div class="lg:col-span-1 space-y-6">
+            <!-- ヒントカードエリア -->
+            <div id="hintsArea" class="hidden bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6">
+              <h3 class="text-lg font-bold text-yellow-800 mb-4">
+                <i class="fas fa-lightbulb mr-2"></i>ヒント
+              </h3>
+              <div class="space-y-3">
+                ${hints.map((hint, index) => `
+                  <div class="bg-white rounded-lg p-4">
+                    <button onclick="toggleHint(${index})" 
+                            class="w-full text-left font-bold text-gray-800 hover:text-indigo-600 transition flex items-center justify-between">
+                      <span>ヒント ${hint.hint_number}</span>
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div id="hint-${index}" class="hidden mt-3 pt-3 border-t">
+                      <pre class="text-gray-700 whitespace-pre-wrap font-sans text-sm">${hint.hint_content}</pre>
+                      ${hint.thinking_tool_suggestion ? `
+                        <div class="mt-3 bg-blue-50 rounded p-3">
+                          <p class="text-xs font-bold text-blue-800 mb-1">
+                            <i class="fas fa-tools mr-1"></i>思考ツール
+                          </p>
+                          <p class="text-xs text-blue-700">${hint.thinking_tool_suggestion}</p>
+                        </div>
+                      ` : ''}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- AI先生エリア -->
+            <div id="aiTeacherArea" class="hidden bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
+              <h3 class="text-lg font-bold text-blue-800 mb-4">
+                <i class="fas fa-robot mr-2"></i>AI先生
+              </h3>
+              <div id="aiChat" class="space-y-3 mb-4 max-h-96 overflow-y-auto">
+                <!-- チャットメッセージがここに表示されます -->
+              </div>
+              <div class="flex gap-2">
+                <input type="text" 
+                       id="aiQuestionInput" 
+                       placeholder="質問を入力..." 
+                       class="flex-1 p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                       onkeypress="if(event.key==='Enter') askAI()">
+                <button onclick="askAI()" 
+                        class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition">
+                  <i class="fas fa-paper-plane"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- 学習のポイント -->
+            <div class="bg-indigo-50 rounded-lg p-6">
+              <h3 class="text-lg font-bold text-indigo-800 mb-3">
+                <i class="fas fa-star mr-2"></i>学習のポイント
+              </h3>
+              <ul class="text-sm text-gray-700 space-y-2">
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+                  <span>まずは自分で考えてみよう</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+                  <span>わからないときは助けを求めよう</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+                  <span>間違いは学びのチャンス！</span>
+                </li>
+              </ul>
+            </div>
+
+            <!-- 進捗情報 -->
+            <div class="bg-white rounded-lg shadow p-6">
+              <h3 class="text-lg font-bold text-gray-800 mb-3">
+                <i class="fas fa-chart-line mr-2"></i>あなたの進捗
+              </h3>
+              <div class="text-sm text-gray-600">
+                <p>カード ${card.card_number} / 6</p>
+                <div class="w-full bg-gray-200 rounded-full h-3 mt-2">
+                  <div class="bg-indigo-600 h-3 rounded-full" style="width: ${(card.card_number / 6) * 100}%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+
+    // 分かった度の状態管理用変数を初期化
+    window.currentUnderstandingLevel = 3 // デフォルトは「だいたいOK」
+    window.currentHelpType = null
+    window.helpCount = 0
+    window.currentCardData = { card, hints, answer }
+
+  } catch (error) {
+    console.error('学習カード読み込みエラー:', error)
+    alert('データの読み込みに失敗しました')
+  }
 }
+
+// ヘルプメニュー表示
+function showHelpMenu() {
+  document.getElementById('helpMenu').classList.remove('hidden')
+}
+
+// ヘルプメニュー非表示
+function closeHelpMenu() {
+  document.getElementById('helpMenu').classList.add('hidden')
+}
+
+// ヒントカード表示
+function showHints() {
+  const hintsArea = document.getElementById('hintsArea')
+  hintsArea.classList.remove('hidden')
+  hintsArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  window.currentHelpType = 'hint'
+  window.helpCount++
+}
+
+// ヒント開閉トグル
+function toggleHint(index) {
+  const hintContent = document.getElementById(`hint-${index}`)
+  const isHidden = hintContent.classList.contains('hidden')
+  hintContent.classList.toggle('hidden')
+  
+  // アイコンの向きを変更
+  const button = hintContent.previousElementSibling
+  const icon = button.querySelector('i')
+  if (isHidden) {
+    icon.classList.remove('fa-chevron-down')
+    icon.classList.add('fa-chevron-up')
+  } else {
+    icon.classList.remove('fa-chevron-up')
+    icon.classList.add('fa-chevron-down')
+  }
+}
+
+// AI先生表示
+function showAITeacher() {
+  const aiArea = document.getElementById('aiTeacherArea')
+  aiArea.classList.remove('hidden')
+  aiArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  window.currentHelpType = 'ai'
+  window.helpCount++
+  
+  // 初回メッセージ
+  const aiChat = document.getElementById('aiChat')
+  if (aiChat.children.length === 0) {
+    addAIMessage('こんにちは！AI先生です。何か質問はありますか？一緒に考えましょう！', 'ai')
+  }
+}
+
+// AI先生に質問
+async function askAI() {
+  const input = document.getElementById('aiQuestionInput')
+  const question = input.value.trim()
+  
+  if (!question) return
+  
+  // ユーザーメッセージを追加
+  addAIMessage(question, 'user')
+  input.value = ''
+  
+  // ローディング表示
+  addAIMessage('考え中...', 'ai', true)
+  
+  try {
+    // Gemini APIを呼び出す（バックエンド経由）
+    const response = await axios.post('/api/ai/ask', {
+      cardId: state.selectedCard,
+      question: question,
+      context: window.currentCardData.card.problem_content
+    })
+    
+    // ローディングメッセージを削除
+    const aiChat = document.getElementById('aiChat')
+    const loadingMsg = aiChat.querySelector('.loading-message')
+    if (loadingMsg) loadingMsg.remove()
+    
+    // AI の回答を追加
+    addAIMessage(response.data.answer, 'ai')
+    
+  } catch (error) {
+    console.error('AI質問エラー:', error)
+    const aiChat = document.getElementById('aiChat')
+    const loadingMsg = aiChat.querySelector('.loading-message')
+    if (loadingMsg) loadingMsg.remove()
+    addAIMessage('申し訳ありません。今は答えられません。先生やヒントカードを試してみてください。', 'ai')
+  }
+}
+
+// AIチャットメッセージ追加
+function addAIMessage(message, sender, isLoading = false) {
+  const aiChat = document.getElementById('aiChat')
+  const messageDiv = document.createElement('div')
+  messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} ${isLoading ? 'loading-message' : ''}`
+  
+  messageDiv.innerHTML = `
+    <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800'} rounded-lg p-3 max-w-[80%] shadow">
+      <p class="text-sm whitespace-pre-wrap">${message}</p>
+    </div>
+  `
+  
+  aiChat.appendChild(messageDiv)
+  aiChat.scrollTop = aiChat.scrollHeight
+}
+
+// 先生を呼ぶ
+function callTeacher() {
+  window.currentHelpType = 'teacher'
+  window.helpCount++
+  
+  // 進捗に記録（先生呼び出しフラグ）
+  saveProgress(true)
+  
+  alert('先生に助けを求めました。先生が来るまで他の問題に取り組んでもOKです。')
+}
+
+// 友達に聞く
+function askFriend() {
+  window.currentHelpType = 'friend'
+  window.helpCount++
+  
+  alert('この学習カードをクリアした友達に聞いてみましょう！\n\n※実際のクラスでは、進捗ボードで誰ができているか確認できます。')
+}
+
+// 分かった度設定
+function setUnderstanding(level) {
+  window.currentUnderstandingLevel = level
+  
+  // すべてのボタンのスタイルをリセット
+  document.querySelectorAll('.understanding-btn').forEach(btn => {
+    btn.classList.remove('bg-indigo-100', 'border-2', 'border-indigo-600')
+  })
+  
+  // 選択されたボタンをハイライト
+  const selectedBtn = document.querySelector(`[data-level="${level}"]`)
+  selectedBtn.classList.add('bg-indigo-100', 'border-2', 'border-indigo-600')
+}
+
+// 解答表示
+function showAnswer() {
+  const answerSection = document.getElementById('answerSection')
+  if (answerSection) {
+    answerSection.classList.toggle('hidden')
+    if (!answerSection.classList.contains('hidden')) {
+      answerSection.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+}
+
+// 学習進捗保存
+async function saveProgress(teacherCall = false) {
+  const answerInput = document.getElementById('answerInput').value
+  
+  if (!answerInput && !teacherCall) {
+    alert('答えを書いてから保存してください。')
+    return
+  }
+  
+  try {
+    await axios.post('/api/progress', {
+      student_id: state.student.id,
+      curriculum_id: state.selectedCurriculum.id,
+      course_id: state.selectedCourse,
+      learning_card_id: state.selectedCard,
+      status: 'completed',
+      understanding_level: window.currentUnderstandingLevel,
+      help_requested_from: window.currentHelpType,
+      help_count: window.helpCount
+    })
+    
+    if (!teacherCall) {
+      alert('保存しました！次のカードに進みましょう。')
+      // 次のカードに進む（今は学習カード一覧に戻る）
+      selectCourse(state.selectedCourse)
+    }
+  } catch (error) {
+    console.error('進捗保存エラー:', error)
+    alert('保存に失敗しました')
+  }
+}
+
+// グローバルスコープに関数を登録
+window.showHelpMenu = showHelpMenu
+window.closeHelpMenu = closeHelpMenu
+window.showHints = showHints
+window.toggleHint = toggleHint
+window.showAITeacher = showAITeacher
+window.askAI = askAI
+window.callTeacher = callTeacher
+window.askFriend = askFriend
+window.setUnderstanding = setUnderstanding
+window.showAnswer = showAnswer
+window.saveProgress = saveProgress
 
 // ============================================
 // 進捗ボードページ（次回実装）
