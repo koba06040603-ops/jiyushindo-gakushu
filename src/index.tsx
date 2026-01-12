@@ -2111,10 +2111,21 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     try {
       unitData = JSON.parse(jsonStr)
     } catch (parseError) {
-      // JSON解析エラーの場合、再試行
+      // JSON解析エラーの場合、詳細を返す
       console.error('JSON parse error:', parseError)
+      console.error('AI Response:', aiResponse.substring(0, 500))
       return c.json({
-        error: '単元の生成に失敗しました。もう一度お試しください。',
+        error: '単元の生成に失敗しました。AIの応答がJSON形式ではありませんでした。',
+        details: aiResponse.substring(0, 200),
+        curriculum: null
+      })
+    }
+    
+    // データ構造を検証
+    if (!unitData.curriculum || !unitData.courses || !Array.isArray(unitData.courses)) {
+      console.error('Invalid unit data structure:', JSON.stringify(unitData).substring(0, 500))
+      return c.json({
+        error: '単元データの構造が正しくありません。',
         curriculum: null
       })
     }
@@ -2129,6 +2140,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     console.error('単元生成エラー:', error)
     return c.json({
       error: '単元を生成できませんでした。',
+      details: error instanceof Error ? error.message : String(error),
       curriculum: null
     })
   }
