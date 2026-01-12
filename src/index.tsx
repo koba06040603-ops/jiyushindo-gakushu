@@ -83,6 +83,18 @@ app.get('/api/curriculum/:id', async (c) => {
         END
     `).bind(id).all()
     
+    // コースごとの学習カードを取得
+    const coursesWithCards = await Promise.all(
+      (courses.results || []).map(async (course: any) => {
+        const cards = await env.DB.prepare(`
+          SELECT * FROM learning_cards 
+          WHERE course_id = ?
+          ORDER BY card_number
+        `).bind(course.id).all()
+        return { ...course, cards: cards.results }
+      })
+    )
+    
     // 選択問題
     const optionalProblems = await env.DB.prepare(`
       SELECT * FROM optional_problems 
@@ -92,11 +104,41 @@ app.get('/api/curriculum/:id', async (c) => {
     
     return c.json({
       curriculum,
-      courses: courses.results,
+      courses: coursesWithCards,
       optionalProblems: optionalProblems.results
     })
   } catch (error) {
     return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：カリキュラムメタデータ取得（コース選択問題とチェックテスト）
+app.get('/api/curriculum/:id/metadata', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  
+  try {
+    const metadata = await env.DB.prepare(`
+      SELECT metadata_key, metadata_value 
+      FROM curriculum_metadata 
+      WHERE curriculum_id = ?
+    `).bind(id).all()
+    
+    const result: any = {}
+    for (const row of metadata.results || []) {
+      try {
+        result[row.metadata_key] = JSON.parse(row.metadata_value)
+      } catch {
+        result[row.metadata_key] = row.metadata_value
+      }
+    }
+    
+    return c.json(result)
+  } catch (error) {
+    return c.json({ 
+      course_selection_problems: [],
+      check_tests: []
+    })
   }
 })
 
@@ -1829,7 +1871,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 ` : ''
     
     const prompt = `あなたは経験豊富な教育カリキュラムデザイナーです。
-以下の情報に基づいて、自由進度学習に最適な単元を設計してください。
+子どもたちがワクワクしながら主体的に学べる単元を設計してください。
 
 【基本情報】
 - 学年: ${grade}
@@ -1846,19 +1888,41 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     "textbook_company": "${textbook}",
     "unit_name": "${unitName}",
     "total_hours": 8,
-    "unit_goal": "この単元で達成すべき学習目標（100文字程度）",
+    "unit_goal": "この単元で達成すべき学習目標（子どもが理解できる言葉で100文字程度、漢字にはふりがなを付ける）",
     "non_cognitive_goal": "非認知能力の目標（意欲、粘り強さ、協調性など）（80文字程度）"
   },
+  "course_selection_problems": [
+    {
+      "problem_number": 1,
+      "problem_title": "コース選択問題1のタイトル（ワクワクする、心躍るタイトル）",
+      "problem_description": "この単元の学びへの期待を高める問題。学習を積み重ねていくとわかるような問いや、探究心をくすぐる内容",
+      "course_level": "基礎"
+    },
+    {
+      "problem_number": 2,
+      "problem_title": "コース選択問題2のタイトル",
+      "problem_description": "問題の説明",
+      "course_level": "標準"
+    },
+    {
+      "problem_number": 3,
+      "problem_title": "コース選択問題3のタイトル",
+      "problem_description": "問題の説明",
+      "course_level": "発展"
+    }
+  ],
   "courses": [
     {
-      "course_name": "じっくりコース",
-      "description": "基礎をしっかり学びたい人向け",
+      "course_name": "ゆっくりコース",
+      "course_label": "じっくり考えながら進むコース",
+      "description": "ひとつひとつていねいに学びたい人におすすめ",
       "color_code": "green",
       "cards": [
         {
           "card_number": 1,
           "card_title": "学習カードのタイトル",
           "card_type": "main",
+          "textbook_page": "教科書のページ（例: p.24-25）",
           "problem_description": "問題文・課題の説明",
           "new_terms": "新しく出てくる言葉や用語",
           "example_problem": "例題",
@@ -1884,35 +1948,117 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     },
     {
       "course_name": "しっかりコース",
-      "description": "標準的なペースで学びたい人向け",
+      "course_label": "自分のペースで学ぶコース",
+      "description": "いろいろな方法で学びたい人におすすめ",
       "color_code": "blue",
       "cards": []
     },
     {
-      "course_name": "ぐんぐんコース",
-      "description": "発展的な内容にチャレンジしたい人向け",
+      "course_name": "どんどんコース",
+      "course_label": "いろいろなことにちょうせんするコース",
+      "description": "自分で考えを深めたい人におすすめ",
       "color_code": "purple",
       "cards": []
     }
   ],
+  "check_tests": [
+    {
+      "course_name": "ゆっくりコース",
+      "test_description": "ゆっくりコースのチェックテスト（基礎確認問題3〜5題）",
+      "problems_count": 3
+    },
+    {
+      "course_name": "しっかりコース",
+      "test_description": "しっかりコースのチェックテスト（標準問題3〜5題）",
+      "problems_count": 4
+    },
+    {
+      "course_name": "どんどんコース",
+      "test_description": "どんどんコースのチェックテスト（発展問題3〜5題）",
+      "problems_count": 5
+    }
+  ],
   "optional_problems": [
     {
-      "problem_title": "選択問題のタイトル",
-      "problem_description": "発展的な問題や実践的な課題",
-      "difficulty_level": "hard",
-      "hint_text": "この問題のヒント"
+      "problem_number": 1,
+      "problem_title": "選択問題1のタイトル（子どもの興味関心をひくタイトル）",
+      "problem_description": "教科の見方・考え方が深まる問題、または学習したことを生かす実践的な課題（100文字程度）",
+      "learning_meaning": "この問題を解くことで、どんな力がつくか、何がわかるようになるか（50文字程度）",
+      "difficulty_level": "medium"
+    },
+    {
+      "problem_number": 2,
+      "problem_title": "選択問題2のタイトル",
+      "problem_description": "問題の説明",
+      "learning_meaning": "この学習の意味と必要感",
+      "difficulty_level": "medium"
+    },
+    {
+      "problem_number": 3,
+      "problem_title": "選択問題3のタイトル（実生活につながる問題）",
+      "problem_description": "問題の説明",
+      "learning_meaning": "この学習の意味と必要感",
+      "difficulty_level": "hard"
+    },
+    {
+      "problem_number": 4,
+      "problem_title": "選択問題4のタイトル（他教科への発展）",
+      "problem_description": "問題の説明",
+      "learning_meaning": "この学習の意味と必要感",
+      "difficulty_level": "hard"
+    },
+    {
+      "problem_number": 5,
+      "problem_title": "選択問題5のタイトル（教科の本質に触れる）",
+      "problem_description": "問題の説明",
+      "learning_meaning": "この学習の意味と必要感",
+      "difficulty_level": "very_hard"
+    },
+    {
+      "problem_number": 6,
+      "problem_title": "選択問題6のタイトル（探究的な問題）",
+      "problem_description": "問題の説明",
+      "learning_meaning": "この学習の意味と必要感",
+      "difficulty_level": "very_hard"
     }
   ]
 }
 
 【重要な設計指針】
-1. じっくりコース: 6枚（基礎重視）
-2. しっかりコース: 6枚（標準的）
-3. ぐんぐんコース: 6枚（発展的）
-4. 各カードには必ず3段階のヒントを用意
-5. 実社会とのつながりを重視
-6. 子どもが自分で考え、試行錯誤できる内容
-7. ${customization?.studentNeeds ? 'カスタマイズ要望を最優先に反映' : ''}
+
+1. コース設計（各コース6枚のカード）:
+   - ゆっくりコース: 基礎をしっかり。丁寧な説明と十分な練習
+   - しっかりコース: 標準的な内容。バランスよく
+   - どんどんコース: 発展的な内容。思考を深める
+
+2. コース選択問題3題:
+   - 子どもたちが「やってみたい！」「わかりたい！」と思える問題
+   - 学習への期待感を高める導入として機能
+   - 各コースの特徴がわかる問題
+   - 学習を積み重ねていくとわかるような深い問いを含む
+
+3. 選択問題6題（必須）:
+   - 子どもの興味関心をひく実践的な内容
+   - 教科の見方・考え方が深まるもの
+   - 教科単元の本質に触れるもの
+   - 学習したことを生かせるもの
+   - 他教科への発展を含む
+   - 「この勉強には意味がある」と子どもが実感できる内容
+   - 各問題に「learning_meaning」（学習の意味・必要感）を必ず記載
+
+4. 学習カード設計:
+   - 各カードには必ず3段階のヒントを用意
+   - 実社会とのつながりを重視
+   - 教科書ページを明示（textbook_page）
+   - 子どもが自分で考え、試行錯誤できる内容
+
+5. 言葉遣い:
+   - 子どもが理解できる平易な言葉
+   - 漢字にはふりがな（ルビ）を付ける想定
+   - ポジティブで前向きな表現
+   - 「〜できるようになる」「〜がわかる」など成長実感を持てる表現
+
+6. ${customization?.studentNeeds ? 'カスタマイズ要望を最優先に反映' : ''}
 
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
@@ -1991,7 +2137,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 // APIルート：生成した単元を保存
 app.post('/api/curriculum/save-generated', async (c) => {
   const { env } = c
-  const { curriculum, courses, optionalProblems } = await c.req.json()
+  const { curriculum, courses, optionalProblems, courseSelectionProblems, checkTests } = await c.req.json()
   
   try {
     // カリキュラムを保存
@@ -2017,13 +2163,14 @@ app.post('/api/curriculum/save-generated', async (c) => {
     for (const course of courses) {
       const courseResult = await env.DB.prepare(`
         INSERT INTO courses (
-          curriculum_id, course_name, description, color_code
-        ) VALUES (?, ?, ?, ?)
+          curriculum_id, course_name, description, color_code, course_label
+        ) VALUES (?, ?, ?, ?, ?)
       `).bind(
         curriculumId,
         course.course_name,
         course.description,
-        course.color_code
+        course.color_code,
+        course.course_label || ''
       ).run()
       
       const courseId = courseResult.meta.last_row_id
@@ -2034,8 +2181,8 @@ app.post('/api/curriculum/save-generated', async (c) => {
           INSERT INTO learning_cards (
             course_id, card_number, card_title, card_type,
             problem_description, new_terms, example_problem,
-            example_solution, real_world_connection
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            example_solution, real_world_connection, textbook_page
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           courseId,
           card.card_number,
@@ -2045,7 +2192,8 @@ app.post('/api/curriculum/save-generated', async (c) => {
           card.new_terms || '',
           card.example_problem || '',
           card.example_solution || '',
-          card.real_world_connection || ''
+          card.real_world_connection || '',
+          card.textbook_page || ''
         ).run()
         
         const cardId = cardResult.meta.last_row_id
@@ -2070,15 +2218,44 @@ app.post('/api/curriculum/save-generated', async (c) => {
     for (const problem of optionalProblems || []) {
       await env.DB.prepare(`
         INSERT INTO optional_problems (
-          curriculum_id, problem_title, problem_description,
-          difficulty_level, hint_text
-        ) VALUES (?, ?, ?, ?, ?)
+          curriculum_id, problem_number, problem_title, problem_description,
+          difficulty_level, learning_meaning
+        ) VALUES (?, ?, ?, ?, ?, ?)
       `).bind(
         curriculumId,
+        problem.problem_number || 1,
         problem.problem_title,
         problem.problem_description,
         problem.difficulty_level || 'medium',
-        problem.hint_text || ''
+        problem.learning_meaning || ''
+      ).run()
+    }
+    
+    // コース選択問題を保存（カリキュラムメタデータとして）
+    if (courseSelectionProblems && courseSelectionProblems.length > 0) {
+      const courseSelectionJSON = JSON.stringify(courseSelectionProblems)
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO curriculum_metadata (
+          curriculum_id, metadata_key, metadata_value
+        ) VALUES (?, ?, ?)
+      `).bind(
+        curriculumId,
+        'course_selection_problems',
+        courseSelectionJSON
+      ).run()
+    }
+    
+    // チェックテストを保存（カリキュラムメタデータとして）
+    if (checkTests && checkTests.length > 0) {
+      const checkTestsJSON = JSON.stringify(checkTests)
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO curriculum_metadata (
+          curriculum_id, metadata_key, metadata_value
+        ) VALUES (?, ?, ?)
+      `).bind(
+        curriculumId,
+        'check_tests',
+        checkTestsJSON
       ).run()
     }
     

@@ -280,226 +280,290 @@ async function loadGuidePage(curriculumId) {
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
     const { curriculum, courses, optionalProblems } = response.data
     
+    //コース選択問題とチェックテストをメタデータから取得
+    let courseSelectionProblems = []
+    let checkTests = []
+    try {
+      const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+      courseSelectionProblems = metaResponse.data.course_selection_problems || []
+      checkTests = metaResponse.data.check_tests || []
+    } catch (metaError) {
+      console.log('メタデータなし、デフォルト表示')
+    }
+    
     state.selectedCurriculum = curriculum
+    state.courses = courses
 
     const app = document.getElementById('app')
     app.innerHTML = `
-      <div class="container mx-auto px-4 py-8">
-        <!-- ヘッダー -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <button onclick="renderTopPage()" class="text-indigo-600 hover:text-indigo-800 mb-4">
-            <i class="fas fa-arrow-left mr-2"></i>トップページに戻る
-          </button>
-          <h1 class="text-3xl font-bold text-indigo-600 mb-2">
-            学習のてびき
-          </h1>
-          <p class="text-xl font-bold text-gray-800">
-            ${curriculum.grade}年 ${curriculum.subject} - ${curriculum.unit_name}
-          </p>
-        </div>
-
-        <!-- 学習情報入力 -->
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2">学年</label>
-              <input type="text" value="${curriculum.grade}年" readonly class="w-full p-2 bg-gray-100 rounded">
+      <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
+        <div class="container mx-auto px-4">
+          <!-- ヘッダー -->
+          <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8">
+            <button onclick="renderTopPage()" class="text-indigo-600 hover:text-indigo-800 mb-6 flex items-center text-lg font-semibold transition">
+              <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
+            </button>
+            <div class="text-center mb-6">
+              <h1 class="text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-4">
+                学習のてびき
+              </h1>
+              <p class="text-3xl font-bold text-gray-800">
+                ${curriculum.unit_name}
+              </p>
             </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2">組</label>
-              <input type="text" value="1組" readonly class="w-full p-2 bg-gray-100 rounded">
-            </div>
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2">名前</label>
-              <input type="text" value="${state.student.name}" readonly class="w-full p-2 bg-gray-100 rounded">
-            </div>
-          </div>
-        </div>
 
-        <!-- ツールバー -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <button onclick="loadLearningPlan(${curriculum.id})" 
-                  class="bg-green-600 text-white py-4 px-6 rounded-lg font-bold hover:bg-green-700 transition flex items-center justify-center">
-            <i class="fas fa-calendar-alt mr-2"></i>
-            学習計画表
-          </button>
-          <button onclick="loadAnswersTab(${curriculum.id})" 
-                  class="bg-blue-600 text-white py-4 px-6 rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center">
-            <i class="fas fa-book-open mr-2"></i>
-            解答を見る
-          </button>
-          <button onclick="loadProgressBoard(${curriculum.id})" 
-                  class="bg-purple-600 text-white py-4 px-6 rounded-lg font-bold hover:bg-purple-700 transition flex items-center justify-center">
-            <i class="fas fa-chart-bar mr-2"></i>
-            進捗ボード
-          </button>
-        </div>
-
-        <!-- 教師用ツールバー -->
-        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-lg p-4 mb-6">
-          <h3 class="text-white font-bold mb-3 flex items-center">
-            <i class="fas fa-chalkboard-teacher mr-2"></i>
-            教師用ツール（Phase 5 & 6）
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <button onclick="toggleTeacherMode()" 
-                    class="bg-white text-indigo-600 py-3 px-4 rounded-lg font-bold hover:bg-indigo-50 transition flex items-center justify-center">
-              <i class="fas fa-user-cog mr-2"></i>
-              先生モード切替
-            </button>
-            <button onclick="loadEvaluationPage(${curriculum.id})" 
-                    class="bg-white text-purple-600 py-3 px-4 rounded-lg font-bold hover:bg-purple-50 transition flex items-center justify-center">
-              <i class="fas fa-clipboard-check mr-2"></i>
-              指導・評価
-            </button>
-            <button onclick="loadEnvironmentDesignPage(${curriculum.id})" 
-                    class="bg-white text-pink-600 py-3 px-4 rounded-lg font-bold hover:bg-pink-50 transition flex items-center justify-center">
-              <i class="fas fa-palette mr-2"></i>
-              学習環境デザイン
-            </button>
-            <button onclick="showCourseSelectForEdit(${curriculum.id})" 
-                    class="bg-white text-orange-600 py-3 px-4 rounded-lg font-bold hover:bg-orange-50 transition flex items-center justify-center">
-              <i class="fas fa-edit mr-2"></i>
-              問題編集
-            </button>
-            <button onclick="loadAIErrorAnalysis()" 
-                    class="bg-white text-red-600 py-3 px-4 rounded-lg font-bold hover:bg-red-50 transition flex items-center justify-center">
-              <i class="fas fa-microscope mr-2"></i>
-              AI誤答分析
-              <span class="ml-2 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">NEW</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 児童向けAIツールバー（Phase 6） -->
-        <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-lg p-4 mb-6">
-          <h3 class="text-white font-bold mb-3 flex items-center">
-            <i class="fas fa-robot mr-2"></i>
-            AI学習サポート（Phase 6）
-            <span class="ml-2 text-xs bg-white text-purple-600 px-2 py-1 rounded-full animate-pulse">✨ NEW</span>
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <button onclick="loadAIDiagnosisPage()" 
-                    class="bg-white text-purple-600 py-4 px-4 rounded-lg font-bold hover:bg-purple-50 transition flex flex-col items-center justify-center">
-              <i class="fas fa-chart-line text-2xl mb-2"></i>
-              <span>AI学習診断</span>
-              <span class="text-xs text-gray-500 mt-1">あなたの強みと改善点</span>
-            </button>
-            <button onclick="loadAIProblemGenerator()" 
-                    class="bg-white text-pink-600 py-4 px-4 rounded-lg font-bold hover:bg-pink-50 transition flex flex-col items-center justify-center">
-              <i class="fas fa-magic text-2xl mb-2"></i>
-              <span>AI問題生成</span>
-              <span class="text-xs text-gray-500 mt-1">無限に練習できる</span>
-            </button>
-            <button onclick="loadAIPlanSuggestion()" 
-                    class="bg-white text-indigo-600 py-4 px-4 rounded-lg font-bold hover:bg-indigo-50 transition flex flex-col items-center justify-center">
-              <i class="fas fa-calendar-alt text-2xl mb-2"></i>
-              <span>AI学習計画</span>
-              <span class="text-xs text-gray-500 mt-1">最適な計画を提案</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 単元の目標 -->
-        <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6 mb-6">
-          <h2 class="text-xl font-bold text-blue-800 mb-3">
-            <i class="fas fa-bullseye mr-2"></i>単元の目標
-          </h2>
-          <p class="text-gray-800 leading-relaxed">${curriculum.unit_goal}</p>
-        </div>
-
-        <!-- 非認知能力の目標 -->
-        <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-6 mb-6">
-          <h2 class="text-xl font-bold text-green-800 mb-3">
-            <i class="fas fa-heart mr-2"></i>心の成長目標
-          </h2>
-          <p class="text-gray-800 leading-relaxed">${curriculum.non_cognitive_goal}</p>
-        </div>
-
-        <!-- 単元時数 -->
-        <div class="bg-white rounded-lg shadow p-4 mb-6">
-          <p class="text-gray-700">
-            <i class="fas fa-clock mr-2"></i>
-            <strong>授業時間：</strong> 全${curriculum.total_hours}時間
-          </p>
-        </div>
-
-        <!-- コース選択問題 -->
-        <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
-          <h2 class="text-2xl font-bold text-gray-800 mb-6">
-            <i class="fas fa-route mr-2"></i>
-            あなたに合った学習コースを選びましょう
-          </h2>
-          <p class="text-gray-600 mb-6">
-            次の3つの問題を見て、自分に合ったコースを1つ選んでください。<br>
-            どのコースを選んでも、この単元で大切なことが学べます！
-          </p>
-
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            ${courses.map((course, index) => `
-              <div class="border-4 border-gray-200 rounded-lg p-6 hover:border-indigo-500 transition cursor-pointer" 
-                   onclick="selectCourse(${course.id})">
-                <div class="flex items-center justify-between mb-4">
-                  <h3 class="text-xl font-bold text-gray-800">
-                    ${course.course_display_name}
-                  </h3>
-                  <div class="w-12 h-12 rounded-full ${
-                    index === 0 ? 'bg-green-100 text-green-600' :
-                    index === 1 ? 'bg-blue-100 text-blue-600' :
-                    'bg-purple-100 text-purple-600'
-                  } flex items-center justify-center font-bold text-xl">
-                    ${index + 1}
-                  </div>
+            <!-- 学習者情報 -->
+            <div class="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-2xl p-6">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div>
+                  <p class="text-gray-600 font-semibold mb-1">学年</p>
+                  <p class="text-2xl font-bold text-indigo-700">${curriculum.grade}年</p>
                 </div>
-                <div class="bg-gray-50 rounded p-4 mb-4">
-                  <p class="font-bold text-gray-700 mb-2">${course.selection_question_title}</p>
-                  <pre class="text-sm text-gray-800 whitespace-pre-wrap font-sans">${course.selection_question_content}</pre>
+                <div>
+                  <p class="text-gray-600 font-semibold mb-1">組</p>
+                  <p class="text-2xl font-bold text-purple-700">1組</p>
                 </div>
-                <button class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg font-bold hover:bg-indigo-700 transition">
-                  このコースで学習する
-                </button>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <!-- チェックテスト説明 -->
-        <div class="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6 mb-6">
-          <h2 class="text-xl font-bold text-yellow-800 mb-3">
-            <i class="fas fa-check-circle mr-2"></i>チェックテスト
-          </h2>
-          <p class="text-gray-800">
-            学習カードを終えたら、チェックテストに挑戦しましょう。<br>
-            チェックテストに合格すると、さらに楽しい選択問題に進めます！
-          </p>
-        </div>
-
-        <!-- 選択問題（発展学習）一覧 -->
-        <div class="bg-white rounded-lg shadow-lg p-8">
-          <h2 class="text-2xl font-bold text-gray-800 mb-6">
-            <i class="fas fa-star mr-2 text-yellow-500"></i>
-            選択問題（やってみたい問題を選ぼう！）
-          </h2>
-          <p class="text-gray-600 mb-6">
-            チェックテスト合格後に、好きな問題に挑戦できます。全部やってもいいし、興味のあるものだけでもOK！
-          </p>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            ${optionalProblems.map((problem, index) => `
-              <div class="border-2 border-gray-200 rounded-lg p-6 hover:shadow-lg transition">
-                <div class="flex items-start mb-3">
-                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center font-bold mr-3 flex-shrink-0">
-                    ${problem.problem_number}
-                  </div>
-                  <h3 class="text-lg font-bold text-gray-800">${problem.problem_title}</h3>
-                </div>
-                <p class="text-gray-600 text-sm mb-4">${problem.problem_description}</p>
-                <div class="flex items-center text-sm text-gray-500">
-                  <i class="fas fa-tag mr-2"></i>
-                  <span>${getCategoryLabel(problem.problem_category)}</span>
+                <div>
+                  <p class="text-gray-600 font-semibold mb-1">名前</p>
+                  <p class="text-2xl font-bold text-pink-700">${state.student.name}</p>
                 </div>
               </div>
-            `).join('')}
+            </div>
+          </div>
+
+          <!-- 単元の目標セクション -->
+          <div class="bg-white rounded-3xl shadow-xl p-8 mb-8">
+            <div class="flex items-center mb-6">
+              <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mr-4">
+                <i class="fas fa-bullseye text-3xl text-white"></i>
+              </div>
+              <h2 class="text-3xl font-bold text-gray-800">たんげんのもくひょう</h2>
+            </div>
+            <div class="bg-blue-50 rounded-2xl p-6 mb-4">
+              <p class="text-xl text-gray-800 leading-relaxed">${curriculum.unit_goal}</p>
+            </div>
+            
+            <div class="flex items-center mb-4 mt-6">
+              <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mr-4">
+                <i class="fas fa-heart text-3xl text-white"></i>
+              </div>
+              <h2 class="text-3xl font-bold text-gray-800">こころのせいちょうもくひょう</h2>
+            </div>
+            <div class="bg-green-50 rounded-2xl p-6 mb-4">
+              <p class="text-xl text-gray-800 leading-relaxed">${curriculum.non_cognitive_goal}</p>
+            </div>
+
+            <div class="flex items-center justify-center mt-6 text-gray-700">
+              <i class="fas fa-clock text-2xl mr-3 text-indigo-600"></i>
+              <span class="text-xl font-bold">ぜんぶで <span class="text-3xl text-indigo-600">${curriculum.total_hours}</span> じかん</span>
+            </div>
+          </div>
+
+          <!-- コース選択問題セクション -->
+          <div class="bg-white rounded-3xl shadow-xl p-8 mb-8">
+            <div class="text-center mb-8">
+              <h2 class="text-4xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-route mr-3 text-purple-600"></i>
+                コースをえらぼう！
+              </h2>
+              <p class="text-xl text-gray-600">
+                下の3つのもんだいをみて、自分にあったコースをえらんでね。<br>
+                どのコースをえらんでも、大じなことが学べるよ！ 🌟
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              ${courses.map((course, index) => {
+                const selectionProblem = courseSelectionProblems[index] || {
+                  problem_title: `${course.course_name}の もんだい`,
+                  problem_description: course.description
+                }
+                return `
+                  <div class="border-4 border-transparent hover:border-gradient-to-br from-indigo-500 to-purple-500 rounded-2xl bg-white shadow-lg p-6 transition-all duration-300 hover:scale-105 cursor-pointer" 
+                       onclick="selectCourse(${course.id})">
+                    <div class="text-center mb-4">
+                      <div class="w-20 h-20 mx-auto mb-3 rounded-full ${
+                        index === 0 ? 'bg-gradient-to-br from-green-400 to-emerald-600' :
+                        index === 1 ? 'bg-gradient-to-br from-blue-400 to-indigo-600' :
+                        'bg-gradient-to-br from-purple-400 to-pink-600'
+                      } flex items-center justify-center shadow-lg">
+                        <span class="text-4xl text-white font-bold">${index + 1}</span>
+                      </div>
+                      <h3 class="text-2xl font-bold text-gray-800 mb-1">
+                        ${course.course_name}
+                      </h3>
+                      <p class="text-sm text-gray-600">${course.course_label || course.description}</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br ${
+                      index === 0 ? 'from-green-50 to-emerald-50' :
+                      index === 1 ? 'from-blue-50 to-indigo-50' :
+                      'from-purple-50 to-pink-50'
+                    } rounded-xl p-4 mb-4 min-h-[180px]">
+                      <p class="font-bold text-gray-800 mb-2 text-lg">✨ ${selectionProblem.problem_title}</p>
+                      <p class="text-gray-700 whitespace-pre-wrap leading-relaxed">${selectionProblem.problem_description}</p>
+                    </div>
+
+                    <button class="w-full bg-gradient-to-r ${
+                      index === 0 ? 'from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700' :
+                      index === 1 ? 'from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700' :
+                      'from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700'
+                    } text-white py-3 px-4 rounded-xl font-bold transition shadow-md hover:shadow-xl">
+                      このコースで学しゅうする
+                    </button>
+                  </div>
+                `
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- 各コースの学習内容 -->
+          <div class="bg-white rounded-3xl shadow-xl p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">
+              <i class="fas fa-book-open mr-3 text-indigo-600"></i>
+              3つのコースの学しゅう内よう
+            </h2>
+            
+            <div class="space-y-6">
+              ${courses.map((course, courseIndex) => `
+                <div class="border-2 ${
+                  courseIndex === 0 ? 'border-green-200 bg-green-50' :
+                  courseIndex === 1 ? 'border-blue-200 bg-blue-50' :
+                  'border-purple-200 bg-purple-50'
+                } rounded-2xl p-6">
+                  <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 rounded-full ${
+                      courseIndex === 0 ? 'bg-green-500' :
+                      courseIndex === 1 ? 'bg-blue-500' :
+                      'bg-purple-500'
+                    } text-white flex items-center justify-center font-bold text-xl mr-3">
+                      ${courseIndex + 1}
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-800">${course.course_name}</h3>
+                  </div>
+                  
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    ${(course.cards || []).map((card, cardIndex) => `
+                      <div class="bg-white rounded-lg p-4 shadow">
+                        <div class="flex items-center mb-2">
+                          <span class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center font-bold text-sm mr-2">
+                            ${cardIndex + 1}
+                          </span>
+                          <p class="font-bold text-gray-800 text-sm">${card.card_title}</p>
+                        </div>
+                        ${card.textbook_page ? `
+                          <p class="text-xs text-gray-600">
+                            <i class="fas fa-book mr-1"></i>きょうかしょ ${card.textbook_page}
+                          </p>
+                        ` : ''}
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- チェックテスト説明 -->
+          <div class="bg-white rounded-3xl shadow-xl p-8 mb-8">
+            <div class="text-center mb-6">
+              <div class="inline-block w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mb-4">
+                <i class="fas fa-check-circle text-4xl text-white"></i>
+              </div>
+              <h2 class="text-3xl font-bold text-gray-800 mb-4">チェックテスト</h2>
+              <p class="text-xl text-gray-700">
+                学しゅうカードがおわったら、チェックテストにちょうせんしよう！<br>
+                ごうかくすると、もっとたのしいもんだいに進めるよ 🎉
+              </p>
+            </div>
+
+            ${checkTests.length > 0 ? `
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                ${checkTests.map((test, index) => `
+                  <div class="border-2 border-yellow-200 bg-yellow-50 rounded-xl p-4">
+                    <h4 class="font-bold text-gray-800 mb-2">${test.course_name}</h4>
+                    <p class="text-sm text-gray-700">${test.test_description}</p>
+                    <p class="text-xs text-gray-600 mt-2">
+                      <i class="fas fa-list-ol mr-1"></i>もんだい数: ${test.problems_count}もん
+                    </p>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- 選択問題セクション -->
+          <div class="bg-white rounded-3xl shadow-xl p-8">
+            <div class="text-center mb-8">
+              <div class="inline-block w-20 h-20 bg-gradient-to-br from-pink-400 to-purple-600 rounded-full flex items-center justify-center mb-4">
+                <i class="fas fa-star text-4xl text-white"></i>
+              </div>
+              <h2 class="text-4xl font-bold text-gray-800 mb-4">
+                えらべるもんだい
+              </h2>
+              <p class="text-xl text-gray-700">
+                チェックテストごうかくご、すきなもんだいにちょうせんできるよ！<br>
+                ぜんぶやってもいいし、きょうみがあるものだけでもOK！ 🌈
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              ${optionalProblems.map((problem, index) => `
+                <div class="border-3 border-transparent hover:border-gradient-to-br from-pink-500 to-purple-600 rounded-2xl bg-gradient-to-br from-white to-purple-50 p-6 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105">
+                  <div class="flex items-start mb-4">
+                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold text-2xl mr-4 flex-shrink-0 shadow-lg">
+                      ${problem.problem_number}
+                    </div>
+                    <div class="flex-1">
+                      <h3 class="text-xl font-bold text-gray-800 mb-2">${problem.problem_title}</h3>
+                      <p class="text-gray-700 leading-relaxed mb-3">${problem.problem_description}</p>
+                      
+                      ${problem.learning_meaning ? `
+                        <div class="bg-yellow-100 border-l-4 border-yellow-500 rounded-lg p-3 mb-3">
+                          <p class="text-sm font-semibold text-gray-800 mb-1">
+                            <i class="fas fa-lightbulb mr-2 text-yellow-600"></i>この もんだいで なにが できるようになる？
+                          </p>
+                          <p class="text-sm text-gray-700">${problem.learning_meaning}</p>
+                        </div>
+                      ` : ''}
+
+                      <div class="flex items-center text-sm">
+                        <span class="px-3 py-1 rounded-full ${
+                          problem.difficulty_level === 'medium' ? 'bg-blue-100 text-blue-700' :
+                          problem.difficulty_level === 'hard' ? 'bg-orange-100 text-orange-700' :
+                          problem.difficulty_level === 'very_hard' ? 'bg-red-100 text-red-700' :
+                          'bg-green-100 text-green-700'
+                        }">
+                          ${problem.difficulty_level === 'medium' ? '★★ ふつう' :
+                            problem.difficulty_level === 'hard' ? '★★★ むずかしい' :
+                            problem.difficulty_level === 'very_hard' ? '★★★★ とてもむずかしい' :
+                            '★ かんたん'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- ツールバー（最下部） -->
+          <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button onclick="loadLearningPlan(${curriculum.id})" 
+                    class="bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 px-6 rounded-2xl font-bold hover:from-green-600 hover:to-emerald-700 transition shadow-lg hover:shadow-xl flex items-center justify-center">
+              <i class="fas fa-calendar-alt mr-2 text-xl"></i>
+              学しゅうけいかくひょう
+            </button>
+            <button onclick="loadAnswersTab(${curriculum.id})" 
+                    class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-4 px-6 rounded-2xl font-bold hover:from-blue-600 hover:to-indigo-700 transition shadow-lg hover:shadow-xl flex items-center justify-center">
+              <i class="fas fa-book-open mr-2 text-xl"></i>
+              こたえを見る
+            </button>
+            <button onclick="loadProgressBoard(${curriculum.id})" 
+                    class="bg-gradient-to-r from-purple-500 to-pink-600 text-white py-4 px-6 rounded-2xl font-bold hover:from-purple-600 hover:to-pink-700 transition shadow-lg hover:shadow-xl flex items-center justify-center">
+              <i class="fas fa-chart-bar mr-2 text-xl"></i>
+              しんちょくボード
+            </button>
           </div>
         </div>
       </div>
