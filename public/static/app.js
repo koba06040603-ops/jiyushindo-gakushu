@@ -4320,14 +4320,23 @@ function showUnitPreview(unitData, modelUsed) {
                 </summary>
                 <div class="mt-3 space-y-2 pl-4">
                   ${(course.cards || []).map(card => `
-                    <div class="border-l-4 border-${course.color_code}-300 pl-3 py-2 bg-gray-50 rounded">
-                      <p class="font-semibold text-gray-800">
-                        <span class="text-${course.color_code}-600">${card.card_number}.</span>
-                        ${card.card_title}
-                      </p>
-                      <p class="text-xs text-gray-500 mt-1">
-                        ヒント ${card.hints?.length || 0}段階
-                      </p>
+                    <div class="border-l-4 border-${course.color_code}-300 pl-3 py-2 bg-gray-50 rounded hover:bg-gray-100 transition">
+                      <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                          <p class="font-semibold text-gray-800">
+                            <span class="text-${course.color_code}-600">${card.card_number}.</span>
+                            ${card.card_title}
+                          </p>
+                          <p class="text-xs text-gray-500 mt-1">
+                            ヒント ${card.hints?.length || 0}段階
+                          </p>
+                        </div>
+                        <button onclick='showCardDetail(${JSON.stringify(card).replace(/'/g, "\\'")})'
+                                class="ml-3 bg-${course.color_code}-500 hover:bg-${course.color_code}-600 text-white px-3 py-1 rounded text-sm font-semibold transition">
+                          <i class="fas fa-eye mr-1"></i>
+                          詳細
+                        </button>
+                      </div>
                     </div>
                   `).join('')}
                 </div>
@@ -4381,4 +4390,139 @@ window.showUnitGeneratorModal = showUnitGeneratorModal
 window.closeUnitGeneratorModal = closeUnitGeneratorModal
 window.startUnitGeneration = startUnitGeneration
 window.saveGeneratedUnit = saveGeneratedUnit
+
+// 学習カード詳細表示モーダル
+function showCardDetail(card) {
+  // モーダルHTML
+  const modalHTML = `
+    <div id="cardDetailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeCardDetail(event)">
+      <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+        <!-- ヘッダー -->
+        <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm opacity-75 mb-1">カード ${card.card_number}</div>
+              <h2 class="text-2xl font-bold">${card.card_title}</h2>
+              <div class="mt-2 inline-block bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">
+                ${card.card_type === 'main' ? '📘 メインカード' : card.card_type === 'practice' ? '✏️ 練習カード' : '🚀 チャレンジカード'}
+              </div>
+            </div>
+            <button onclick="closeCardDetail()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- コンテンツ -->
+        <div class="p-6 space-y-6">
+          <!-- 問題説明 -->
+          <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+            <h3 class="font-bold text-blue-800 mb-2 flex items-center">
+              <i class="fas fa-tasks mr-2"></i>
+              問題・課題
+            </h3>
+            <p class="text-gray-800 whitespace-pre-wrap">${card.problem_description || 'なし'}</p>
+          </div>
+
+          <!-- 新出用語 -->
+          ${card.new_terms ? `
+            <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
+              <h3 class="font-bold text-green-800 mb-2 flex items-center">
+                <i class="fas fa-book mr-2"></i>
+                新しく出てくる言葉
+              </h3>
+              <p class="text-gray-800">${card.new_terms}</p>
+            </div>
+          ` : ''}
+
+          <!-- 例題 -->
+          ${card.example_problem ? `
+            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
+              <h3 class="font-bold text-yellow-800 mb-2 flex items-center">
+                <i class="fas fa-pencil-alt mr-2"></i>
+                例題
+              </h3>
+              <p class="text-gray-800 mb-3">${card.example_problem}</p>
+              ${card.example_solution ? `
+                <div class="bg-white p-3 rounded border-2 border-yellow-200">
+                  <p class="text-sm font-semibold text-yellow-700 mb-1">解き方・考え方</p>
+                  <p class="text-gray-800">${card.example_solution}</p>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+
+          <!-- 実社会とのつながり -->
+          ${card.real_world_connection ? `
+            <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-lg">
+              <h3 class="font-bold text-purple-800 mb-2 flex items-center">
+                <i class="fas fa-globe mr-2"></i>
+                実社会とのつながり
+              </h3>
+              <p class="text-gray-800">${card.real_world_connection}</p>
+            </div>
+          ` : ''}
+
+          <!-- 3段階のヒント -->
+          ${card.hints && card.hints.length > 0 ? `
+            <div class="bg-pink-50 border-l-4 border-pink-500 p-4 rounded-r-lg">
+              <h3 class="font-bold text-pink-800 mb-4 flex items-center">
+                <i class="fas fa-lightbulb mr-2"></i>
+                3段階のヒント
+              </h3>
+              <div class="space-y-3">
+                ${card.hints.map((hint, index) => `
+                  <div class="bg-white p-4 rounded-lg border-2 border-pink-200">
+                    <div class="flex items-center mb-2">
+                      <span class="bg-pink-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-2">
+                        ${hint.hint_level}
+                      </span>
+                      <span class="font-semibold text-gray-700">
+                        ${hint.hint_level === 1 ? 'まず考えてほしいこと' : hint.hint_level === 2 ? '中間ヒント' : '答えに近いヒント'}
+                      </span>
+                    </div>
+                    <p class="text-gray-800 ml-10">${hint.hint_text}</p>
+                    ${hint.thinking_tool_suggestion ? `
+                      <div class="ml-10 mt-2 text-sm text-pink-600">
+                        <i class="fas fa-tools mr-1"></i>
+                        使える思考ツール: ${hint.thinking_tool_suggestion}
+                      </div>
+                    ` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- フッター -->
+        <div class="sticky bottom-0 bg-gray-50 p-4 rounded-b-lg border-t">
+          <button onclick="closeCardDetail()" 
+                  class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition">
+            <i class="fas fa-check mr-2"></i>
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+
+  // モーダルを表示
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+}
+
+// カード詳細モーダルを閉じる
+function closeCardDetail(event) {
+  // 背景クリックまたは閉じるボタンの場合のみ閉じる
+  if (!event || event.target.id === 'cardDetailModal' || event.type === 'click') {
+    const modal = document.getElementById('cardDetailModal')
+    if (modal) {
+      modal.remove()
+    }
+  }
+}
+
+// グローバル関数として公開
+window.showCardDetail = showCardDetail
+window.closeCardDetail = closeCardDetail
 
