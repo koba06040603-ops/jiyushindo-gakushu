@@ -4347,17 +4347,24 @@ function showUnitPreview(unitData, modelUsed) {
       </div>
 
       <!-- アクションボタン -->
-      <div class="flex space-x-4">
-        <button onclick="renderTopPage()" 
-                class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-4 px-6 rounded-lg transition">
-          <i class="fas fa-times mr-2"></i>
-          破棄してトップへ
+      <div class="flex flex-col space-y-3">
+        <button onclick="showPrintPreview(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
+                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
+          <i class="fas fa-print mr-2"></i>
+          印刷用プレビュー（回答欄付き）
         </button>
-        <button onclick="saveGeneratedUnit(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
-                class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
-          <i class="fas fa-save mr-2"></i>
-          この単元を保存して使用する
-        </button>
+        <div class="flex space-x-4">
+          <button onclick="renderTopPage()" 
+                  class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-4 px-6 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>
+            破棄してトップへ
+          </button>
+          <button onclick="saveGeneratedUnit(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
+                  class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>
+            この単元を保存して使用する
+          </button>
+        </div>
       </div>
     </div>
   `
@@ -4377,11 +4384,13 @@ async function saveGeneratedUnit(unitData) {
       // 学習のてびきページへ
       loadGuidePage(curriculumId)
     } else {
-      throw new Error('保存に失敗しました')
+      const errorMsg = response.data.details || response.data.error || '保存に失敗しました'
+      throw new Error(errorMsg)
     }
   } catch (error) {
     console.error('単元保存エラー:', error)
-    alert('❌ 単元の保存に失敗しました。もう一度お試しください。')
+    const errorDetails = error.response?.data?.details || error.message || '不明なエラー'
+    alert(`❌ 単元の保存に失敗しました。\n\nエラー: ${errorDetails}\n\nもう一度お試しください。`)
   }
 }
 
@@ -4525,4 +4534,170 @@ function closeCardDetail(event) {
 // グローバル関数として公開
 window.showCardDetail = showCardDetail
 window.closeCardDetail = closeCardDetail
+
+// 印刷用プレビュー表示
+function showPrintPreview(unitData) {
+  const curriculum = unitData.curriculum
+  const courses = unitData.courses || []
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="container mx-auto px-4 py-8 print:p-0">
+      <!-- 印刷ボタン（印刷時は非表示） -->
+      <div class="no-print mb-6 flex justify-between items-center">
+        <button onclick="window.history.back()" 
+                class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg">
+          <i class="fas fa-arrow-left mr-2"></i>
+          戻る
+        </button>
+        <button onclick="window.print()" 
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
+          <i class="fas fa-print mr-2"></i>
+          印刷する
+        </button>
+      </div>
+
+      <!-- 印刷用コンテンツ -->
+      <div class="bg-white">
+        <!-- ヘッダー -->
+        <div class="border-b-4 border-blue-600 pb-4 mb-6">
+          <h1 class="text-3xl font-bold text-gray-800 mb-2">
+            ${curriculum.unit_name}
+          </h1>
+          <p class="text-lg text-gray-600">
+            ${curriculum.grade} ${curriculum.subject} / ${curriculum.textbook_company}
+          </p>
+          <div class="mt-3 text-sm text-gray-500">
+            総学習時間: ${curriculum.total_hours}時間
+          </div>
+        </div>
+
+        <!-- 単元の目標 -->
+        <div class="mb-8 p-4 bg-blue-50 border-l-4 border-blue-600 rounded print:break-inside-avoid">
+          <h2 class="text-xl font-bold text-blue-800 mb-2">📚 単元の目標</h2>
+          <p class="text-gray-800">${curriculum.unit_goal}</p>
+        </div>
+
+        <!-- 各コースのカード一覧 -->
+        ${courses.map((course, courseIndex) => `
+          <div class="mb-12 print:break-before-page">
+            <div class="bg-${course.color_code}-100 border-l-4 border-${course.color_code}-600 p-4 mb-6">
+              <h2 class="text-2xl font-bold text-${course.color_code}-800">
+                ${course.course_name}
+              </h2>
+              <p class="text-${course.color_code}-700 mt-1">${course.description}</p>
+            </div>
+
+            <!-- カード一覧 -->
+            <div class="space-y-8">
+              ${(course.cards || []).map((card, cardIndex) => `
+                <div class="border-2 border-gray-300 rounded-lg p-6 print:break-inside-avoid">
+                  <!-- カードヘッダー -->
+                  <div class="flex items-center justify-between mb-4 pb-3 border-b-2 border-gray-200">
+                    <h3 class="text-xl font-bold text-gray-800">
+                      <span class="bg-${course.color_code}-500 text-white px-3 py-1 rounded-full mr-2">
+                        ${card.card_number}
+                      </span>
+                      ${card.card_title}
+                    </h3>
+                  </div>
+
+                  <!-- 問題説明 -->
+                  <div class="mb-4">
+                    <h4 class="font-bold text-blue-700 mb-2">📝 問題・課題</h4>
+                    <p class="text-gray-800 whitespace-pre-wrap">${card.problem_description || ''}</p>
+                  </div>
+
+                  <!-- 回答欄 -->
+                  <div class="mb-4 bg-yellow-50 border-2 border-yellow-300 rounded p-4">
+                    <h4 class="font-bold text-yellow-700 mb-3">✏️ あなたの答え</h4>
+                    <div class="space-y-2">
+                      <div class="border-b-2 border-gray-300 h-10"></div>
+                      <div class="border-b-2 border-gray-300 h-10"></div>
+                      <div class="border-b-2 border-gray-300 h-10"></div>
+                      <div class="border-b-2 border-gray-300 h-10"></div>
+                    </div>
+                  </div>
+
+                  <!-- 新出用語 -->
+                  ${card.new_terms ? `
+                    <div class="mb-4 bg-green-50 border-l-4 border-green-500 p-3 rounded-r">
+                      <h4 class="font-bold text-green-700 mb-1">📖 新しく出てくる言葉</h4>
+                      <p class="text-gray-800">${card.new_terms}</p>
+                    </div>
+                  ` : ''}
+
+                  <!-- 例題 -->
+                  ${card.example_problem ? `
+                    <div class="mb-4 bg-purple-50 border-l-4 border-purple-500 p-3 rounded-r">
+                      <h4 class="font-bold text-purple-700 mb-2">🎯 例題</h4>
+                      <p class="text-gray-800 mb-2">${card.example_problem}</p>
+                      ${card.example_solution ? `
+                        <div class="bg-white p-2 rounded border border-purple-200 mt-2">
+                          <p class="text-sm font-semibold text-purple-600 mb-1">解き方</p>
+                          <p class="text-gray-700">${card.example_solution}</p>
+                        </div>
+                      ` : ''}
+                    </div>
+                  ` : ''}
+
+                  <!-- 実社会とのつながり -->
+                  ${card.real_world_connection ? `
+                    <div class="mb-4 bg-orange-50 border-l-4 border-orange-500 p-3 rounded-r">
+                      <h4 class="font-bold text-orange-700 mb-1">🌐 実社会とのつながり</h4>
+                      <p class="text-gray-800">${card.real_world_connection}</p>
+                    </div>
+                  ` : ''}
+
+                  <!-- ヒント -->
+                  ${card.hints && card.hints.length > 0 ? `
+                    <div class="bg-pink-50 border-l-4 border-pink-500 p-3 rounded-r">
+                      <h4 class="font-bold text-pink-700 mb-3">💡 ヒント（困ったら見てね）</h4>
+                      <div class="space-y-2">
+                        ${card.hints.map(hint => `
+                          <div class="bg-white p-2 rounded border border-pink-200">
+                            <span class="inline-block bg-pink-500 text-white px-2 py-1 rounded-full text-sm font-bold mr-2">
+                              ${hint.hint_level}
+                            </span>
+                            <span class="text-gray-800">${hint.hint_text}</span>
+                            ${hint.thinking_tool_suggestion ? `
+                              <span class="block ml-8 mt-1 text-sm text-pink-600">
+                                💭 使える思考ツール: ${hint.thinking_tool_suggestion}
+                              </span>
+                            ` : ''}
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <style>
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        body {
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+        }
+        .print\\:break-before-page {
+          page-break-before: always;
+        }
+        .print\\:break-inside-avoid {
+          page-break-inside: avoid;
+        }
+      }
+    </style>
+  `
+}
+
+// グローバル関数として公開
+window.showPrintPreview = showPrintPreview
 

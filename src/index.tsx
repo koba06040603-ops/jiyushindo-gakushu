@@ -1976,7 +1976,11 @@ app.post('/api/curriculum/save-generated', async (c) => {
     
   } catch (error) {
     console.error('単元保存エラー:', error)
-    return c.json({ error: 'Database error' }, 500)
+    return c.json({ 
+      success: false,
+      error: 'Database error',
+      details: error instanceof Error ? error.message : String(error)
+    }, 500)
   }
 })
 
