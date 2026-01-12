@@ -536,6 +536,559 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
   }
 })
 
+// APIルート：カスタムコンテンツ保存
+app.post('/api/custom/content', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO custom_content 
+        (teacher_id, original_learning_card_id, original_optional_problem_id, 
+         content_type, custom_data)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(
+      body.teacher_id,
+      body.original_learning_card_id || null,
+      body.original_optional_problem_id || null,
+      body.content_type,
+      JSON.stringify(body.custom_data)
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：カスタムコンテンツ取得
+app.get('/api/custom/content/:teacherId', async (c) => {
+  const { env } = c
+  const teacherId = c.req.param('teacherId')
+  
+  try {
+    const customContent = await env.DB.prepare(`
+      SELECT * FROM custom_content
+      WHERE teacher_id = ?
+      ORDER BY created_at DESC
+    `).bind(teacherId).all()
+    
+    // JSON文字列をパース
+    const parsed = customContent.results.map(item => ({
+      ...item,
+      custom_data: JSON.parse(item.custom_data)
+    }))
+    
+    return c.json(parsed)
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：評価保存
+app.post('/api/evaluations', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO evaluations 
+        (student_id, curriculum_id, knowledge_skill, 
+         thinking_judgment_expression, attitude_toward_learning, 
+         non_cognitive_evaluation, teacher_comment)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.student_id,
+      body.curriculum_id,
+      body.knowledge_skill,
+      body.thinking_judgment_expression,
+      body.attitude_toward_learning,
+      body.non_cognitive_evaluation,
+      body.teacher_comment
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：評価取得
+app.get('/api/evaluations/student/:studentId/curriculum/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const evaluation = await env.DB.prepare(`
+      SELECT e.*, u.name as student_name
+      FROM evaluations e
+      JOIN users u ON e.student_id = u.id
+      WHERE e.student_id = ? AND e.curriculum_id = ?
+      ORDER BY e.created_at DESC
+      LIMIT 1
+    `).bind(studentId, curriculumId).first()
+    
+    return c.json(evaluation)
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習環境デザイン取得
+app.get('/api/environment/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const environments = await env.DB.prepare(`
+      SELECT * FROM learning_environment
+      WHERE curriculum_id = ?
+      ORDER BY category, id
+    `).bind(curriculumId).all()
+    
+    return c.json(environments.results)
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// ==================== Phase 5: 先生カスタマイズモード API ====================
+
+// APIルート：3観点評価取得
+app.get('/api/evaluations/three-point/student/:studentId/curriculum/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const evaluation = await env.DB.prepare(`
+      SELECT e.*, u.name as student_name
+      FROM three_point_evaluations e
+      JOIN users u ON e.student_id = u.id
+      WHERE e.student_id = ? AND e.curriculum_id = ?
+      ORDER BY e.created_at DESC
+      LIMIT 1
+    `).bind(studentId, curriculumId).first()
+    
+    return c.json(evaluation || {})
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：3観点評価保存
+app.post('/api/evaluations/three-point', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO three_point_evaluations (
+        student_id, curriculum_id,
+        knowledge_skill, knowledge_skill_comment,
+        thinking_judgment, thinking_judgment_comment,
+        attitude, attitude_comment,
+        overall_comment
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.student_id,
+      body.curriculum_id,
+      body.knowledge_skill || '',
+      body.knowledge_skill_comment || '',
+      body.thinking_judgment || '',
+      body.thinking_judgment_comment || '',
+      body.attitude || '',
+      body.attitude_comment || '',
+      body.overall_comment || ''
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：3観点評価更新
+app.put('/api/evaluations/three-point/:id', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE three_point_evaluations SET
+        knowledge_skill = ?,
+        knowledge_skill_comment = ?,
+        thinking_judgment = ?,
+        thinking_judgment_comment = ?,
+        attitude = ?,
+        attitude_comment = ?,
+        overall_comment = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      body.knowledge_skill || '',
+      body.knowledge_skill_comment || '',
+      body.thinking_judgment || '',
+      body.thinking_judgment_comment || '',
+      body.attitude || '',
+      body.attitude_comment || '',
+      body.overall_comment || '',
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：非認知能力評価取得
+app.get('/api/evaluations/non-cognitive/student/:studentId/curriculum/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const evaluation = await env.DB.prepare(`
+      SELECT e.*, u.name as student_name
+      FROM non_cognitive_evaluations e
+      JOIN users u ON e.student_id = u.id
+      WHERE e.student_id = ? AND e.curriculum_id = ?
+      ORDER BY e.created_at DESC
+      LIMIT 1
+    `).bind(studentId, curriculumId).first()
+    
+    return c.json(evaluation || {})
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：非認知能力評価保存
+app.post('/api/evaluations/non-cognitive', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO non_cognitive_evaluations (
+        student_id, curriculum_id,
+        self_regulation, self_regulation_comment,
+        motivation, motivation_comment,
+        collaboration, collaboration_comment,
+        metacognition, metacognition_comment,
+        creativity, creativity_comment,
+        curiosity, curiosity_comment,
+        self_esteem, self_esteem_comment
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.student_id,
+      body.curriculum_id,
+      body.self_regulation || 0,
+      body.self_regulation_comment || '',
+      body.motivation || 0,
+      body.motivation_comment || '',
+      body.collaboration || 0,
+      body.collaboration_comment || '',
+      body.metacognition || 0,
+      body.metacognition_comment || '',
+      body.creativity || 0,
+      body.creativity_comment || '',
+      body.curiosity || 0,
+      body.curiosity_comment || '',
+      body.self_esteem || 0,
+      body.self_esteem_comment || ''
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：非認知能力評価更新
+app.put('/api/evaluations/non-cognitive/:id', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE non_cognitive_evaluations SET
+        self_regulation = ?,
+        self_regulation_comment = ?,
+        motivation = ?,
+        motivation_comment = ?,
+        collaboration = ?,
+        collaboration_comment = ?,
+        metacognition = ?,
+        metacognition_comment = ?,
+        creativity = ?,
+        creativity_comment = ?,
+        curiosity = ?,
+        curiosity_comment = ?,
+        self_esteem = ?,
+        self_esteem_comment = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      body.self_regulation || 0,
+      body.self_regulation_comment || '',
+      body.motivation || 0,
+      body.motivation_comment || '',
+      body.collaboration || 0,
+      body.collaboration_comment || '',
+      body.metacognition || 0,
+      body.metacognition_comment || '',
+      body.creativity || 0,
+      body.creativity_comment || '',
+      body.curiosity || 0,
+      body.curiosity_comment || '',
+      body.self_esteem || 0,
+      body.self_esteem_comment || '',
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習環境デザイン取得
+app.get('/api/environment/design/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const design = await env.DB.prepare(`
+      SELECT * FROM learning_environment_designs
+      WHERE curriculum_id = ?
+      LIMIT 1
+    `).bind(curriculumId).first()
+    
+    return c.json(design || {})
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習環境デザイン保存
+app.post('/api/environment/design', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO learning_environment_designs (
+        curriculum_id,
+        expression_creative, expression_creative_enabled,
+        research_fieldwork, research_fieldwork_enabled,
+        critical_thinking, critical_thinking_enabled,
+        social_contribution, social_contribution_enabled,
+        metacognition_reflection, metacognition_reflection_enabled,
+        question_generation, question_generation_enabled
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.curriculum_id,
+      body.expression_creative || '',
+      body.expression_creative_enabled ? 1 : 0,
+      body.research_fieldwork || '',
+      body.research_fieldwork_enabled ? 1 : 0,
+      body.critical_thinking || '',
+      body.critical_thinking_enabled ? 1 : 0,
+      body.social_contribution || '',
+      body.social_contribution_enabled ? 1 : 0,
+      body.metacognition_reflection || '',
+      body.metacognition_reflection_enabled ? 1 : 0,
+      body.question_generation || '',
+      body.question_generation_enabled ? 1 : 0
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習環境デザイン更新
+app.put('/api/environment/design/:id', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE learning_environment_designs SET
+        expression_creative = ?,
+        expression_creative_enabled = ?,
+        research_fieldwork = ?,
+        research_fieldwork_enabled = ?,
+        critical_thinking = ?,
+        critical_thinking_enabled = ?,
+        social_contribution = ?,
+        social_contribution_enabled = ?,
+        metacognition_reflection = ?,
+        metacognition_reflection_enabled = ?,
+        question_generation = ?,
+        question_generation_enabled = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      body.expression_creative || '',
+      body.expression_creative_enabled ? 1 : 0,
+      body.research_fieldwork || '',
+      body.research_fieldwork_enabled ? 1 : 0,
+      body.critical_thinking || '',
+      body.critical_thinking_enabled ? 1 : 0,
+      body.social_contribution || '',
+      body.social_contribution_enabled ? 1 : 0,
+      body.metacognition_reflection || '',
+      body.metacognition_reflection_enabled ? 1 : 0,
+      body.question_generation || '',
+      body.question_generation_enabled ? 1 : 0,
+      id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：先生カスタマイズ設定取得
+app.get('/api/teacher/customization/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const customization = await env.DB.prepare(`
+      SELECT * FROM teacher_customization
+      WHERE curriculum_id = ?
+      LIMIT 1
+    `).bind(curriculumId).first()
+    
+    return c.json(customization || {})
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：先生カスタマイズ設定保存・更新
+app.post('/api/teacher/customization', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    // まず既存のデータがあるかチェック
+    const existing = await env.DB.prepare(`
+      SELECT id FROM teacher_customization
+      WHERE curriculum_id = ?
+    `).bind(body.curriculum_id).first()
+    
+    if (existing) {
+      // 更新
+      await env.DB.prepare(`
+        UPDATE teacher_customization SET
+          teacher_id = ?,
+          teaching_philosophy = ?,
+          custom_unit_goal = ?,
+          custom_non_cognitive_goal = ?,
+          teaching_notes = ?,
+          gamification_enabled = ?,
+          badge_system_enabled = ?,
+          narrative_enabled = ?,
+          story_theme = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE curriculum_id = ?
+      `).bind(
+        body.teacher_id || 1,
+        body.teaching_philosophy || '',
+        body.custom_unit_goal || '',
+        body.custom_non_cognitive_goal || '',
+        body.teaching_notes || '',
+        body.gamification_enabled ? 1 : 0,
+        body.badge_system_enabled ? 1 : 0,
+        body.narrative_enabled ? 1 : 0,
+        body.story_theme || '',
+        body.curriculum_id
+      ).run()
+      
+      return c.json({ success: true, id: existing.id })
+    } else {
+      // 新規作成
+      const result = await env.DB.prepare(`
+        INSERT INTO teacher_customization (
+          curriculum_id, teacher_id,
+          teaching_philosophy,
+          custom_unit_goal,
+          custom_non_cognitive_goal,
+          teaching_notes,
+          gamification_enabled,
+          badge_system_enabled,
+          narrative_enabled,
+          story_theme
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        body.curriculum_id,
+        body.teacher_id || 1,
+        body.teaching_philosophy || '',
+        body.custom_unit_goal || '',
+        body.custom_non_cognitive_goal || '',
+        body.teaching_notes || '',
+        body.gamification_enabled ? 1 : 0,
+        body.badge_system_enabled ? 1 : 0,
+        body.narrative_enabled ? 1 : 0,
+        body.story_theme || ''
+      ).run()
+      
+      return c.json({ success: true, id: result.meta.last_row_id })
+    }
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：生徒のバッジ取得
+app.get('/api/badges/student/:studentId/curriculum/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const badges = await env.DB.prepare(`
+      SELECT * FROM student_badges
+      WHERE student_id = ? AND curriculum_id = ?
+      ORDER BY earned_at DESC
+    `).bind(studentId, curriculumId).all()
+    
+    return c.json(badges.results)
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習ナラティブ取得
+app.get('/api/narratives/student/:studentId/curriculum/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const narratives = await env.DB.prepare(`
+      SELECT * FROM learning_narratives
+      WHERE student_id = ? AND curriculum_id = ?
+      ORDER BY chapter_number
+    `).bind(studentId, curriculumId).all()
+    
+    return c.json(narratives.results)
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
 // トップページ
 app.get('/', (c) => {
   return c.html(`

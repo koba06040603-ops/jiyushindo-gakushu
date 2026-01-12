@@ -274,6 +274,31 @@ async function loadGuidePage(curriculumId) {
           </button>
         </div>
 
+        <!-- 教師用ツールバー -->
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-lg p-4 mb-6">
+          <h3 class="text-white font-bold mb-3 flex items-center">
+            <i class="fas fa-chalkboard-teacher mr-2"></i>
+            教師用ツール（Phase 5）
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button onclick="toggleTeacherMode()" 
+                    class="bg-white text-indigo-600 py-3 px-4 rounded-lg font-bold hover:bg-indigo-50 transition flex items-center justify-center">
+              <i class="fas fa-user-cog mr-2"></i>
+              先生モード切替
+            </button>
+            <button onclick="loadEvaluationPage(${curriculum.id})" 
+                    class="bg-white text-purple-600 py-3 px-4 rounded-lg font-bold hover:bg-purple-50 transition flex items-center justify-center">
+              <i class="fas fa-clipboard-check mr-2"></i>
+              指導・評価
+            </button>
+            <button onclick="loadEnvironmentDesignPage(${curriculum.id})" 
+                    class="bg-white text-pink-600 py-3 px-4 rounded-lg font-bold hover:bg-pink-50 transition flex items-center justify-center">
+              <i class="fas fa-palette mr-2"></i>
+              学習環境デザイン
+            </button>
+          </div>
+        </div>
+
         <!-- 単元の目標 -->
         <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6 mb-6">
           <h2 class="text-xl font-bold text-blue-800 mb-3">
@@ -1971,3 +1996,506 @@ function formatTimestamp(timestamp) {
   const diffHours = Math.round(diffMins / 60)
   return `${diffHours}時間前`
 }
+
+// ==================== Phase 5: 先生カスタマイズモード ====================
+
+// 先生モードの状態管理
+let teacherMode = false
+
+// 先生モード切替
+function toggleTeacherMode() {
+  teacherMode = !teacherMode
+  
+  if (teacherMode) {
+    alert('先生カスタマイズモードに切り替えました！\n\n・学習環境デザイン\n・指導・評価タブ\n・問題編集機能\n\nが利用できます。')
+  }
+  
+  // 現在のページをリロード
+  if (state.currentView === 'guide') {
+    loadGuidePage(state.selectedCurriculum.id)
+  }
+}
+
+// 学習環境デザインタブ
+async function loadEnvironmentDesignPage(curriculumId) {
+  state.currentView = 'environment'
+  
+  try {
+    // 環境デザイン取得
+    const designResponse = await axios.get(`/api/environment/design/${curriculumId}`)
+    const design = designResponse.data || {}
+    
+    // カリキュラム情報取得
+    const currResponse = await axios.get(`/api/curriculum/${curriculumId}`)
+    const curriculum = currResponse.data
+    
+    document.getElementById('app').innerHTML = `
+      <!-- ヘッダー -->
+      <div class="bg-white shadow-md p-4 mb-6">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+          <div class="flex items-center space-x-4">
+            <button onclick="loadGuidePage(${curriculumId})" class="text-blue-600 hover:text-blue-800">
+              <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
+            </button>
+            <h1 class="text-2xl font-bold text-gray-800">
+              <i class="fas fa-palette mr-2"></i>学習環境デザイン
+            </h1>
+          </div>
+          <div class="text-sm text-gray-600">
+            ${curriculum.curriculum.grade}年 ${curriculum.curriculum.subject} 「${curriculum.curriculum.unit_name}」
+          </div>
+        </div>
+      </div>
+
+      <div class="max-w-7xl mx-auto p-6">
+        <!-- 説明 -->
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+          <p class="text-blue-800">
+            <i class="fas fa-info-circle mr-2"></i>
+            <strong>学習環境デザイン</strong>とは、子どもたちの学びを深め、広げるための様々な活動です。
+            チェックを入れた活動が、学習のてびきや学習カードに反映されます。
+          </p>
+        </div>
+
+        <form id="envDesignForm">
+          <!-- 6観点 -->
+          ${renderEnvironmentCategory('表現・クリエイティブ', 'expression_creative', design, 
+            '自分の考えを絵・図・作品で表現する活動')}
+          ${renderEnvironmentCategory('調査・フィールドワーク', 'research_fieldwork', design,
+            '身の回りや地域を調べる活動')}
+          ${renderEnvironmentCategory('多角的考察・クリティカルシンキング', 'critical_thinking', design,
+            '多面的に考え、批判的に検討する活動')}
+          ${renderEnvironmentCategory('社会貢献・デザイン思考', 'social_contribution', design,
+            '他者のために役立つものを考える活動')}
+          ${renderEnvironmentCategory('メタ認知・振り返り', 'metacognition_reflection', design,
+            '自分の学び方を振り返る活動')}
+          ${renderEnvironmentCategory('問いの生成', 'question_generation', design,
+            '次の学びへの問いを作る活動')}
+
+          <!-- 保存ボタン -->
+          <div class="flex justify-end space-x-4 mt-8">
+            <button type="button" onclick="loadGuidePage(${curriculumId})" 
+              class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+              キャンセル
+            </button>
+            <button type="submit" 
+              class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-save mr-2"></i>保存する
+            </button>
+          </div>
+        </form>
+      </div>
+    `
+    
+    // フォーム送信
+    document.getElementById('envDesignForm').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      await saveEnvironmentDesign(curriculumId, design.id)
+    })
+    
+  } catch (error) {
+    console.error('Error loading environment design:', error)
+    alert('環境デザインの読み込みに失敗しました')
+  }
+}
+
+// 環境カテゴリーレンダリング
+function renderEnvironmentCategory(title, key, design, description) {
+  const enabled = design[`${key}_enabled`] || false
+  const content = design[key] || ''
+  
+  return `
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex items-start space-x-4">
+        <input type="checkbox" id="${key}_enabled" name="${key}_enabled" 
+          ${enabled ? 'checked' : ''}
+          class="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
+        <div class="flex-1">
+          <label for="${key}_enabled" class="text-lg font-bold text-gray-800 cursor-pointer">
+            ${title}
+          </label>
+          <p class="text-sm text-gray-600 mt-1 mb-3">${description}</p>
+          <textarea id="${key}" name="${key}" rows="3" 
+            placeholder="具体的な活動内容を記入してください（例：〇〇を作る、〇〇を調べる、など）"
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >${content}</textarea>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// 環境デザイン保存
+async function saveEnvironmentDesign(curriculumId, designId) {
+  const formData = {
+    curriculum_id: curriculumId,
+    expression_creative: document.getElementById('expression_creative').value,
+    expression_creative_enabled: document.getElementById('expression_creative_enabled').checked,
+    research_fieldwork: document.getElementById('research_fieldwork').value,
+    research_fieldwork_enabled: document.getElementById('research_fieldwork_enabled').checked,
+    critical_thinking: document.getElementById('critical_thinking').value,
+    critical_thinking_enabled: document.getElementById('critical_thinking_enabled').checked,
+    social_contribution: document.getElementById('social_contribution').value,
+    social_contribution_enabled: document.getElementById('social_contribution_enabled').checked,
+    metacognition_reflection: document.getElementById('metacognition_reflection').value,
+    metacognition_reflection_enabled: document.getElementById('metacognition_reflection_enabled').checked,
+    question_generation: document.getElementById('question_generation').value,
+    question_generation_enabled: document.getElementById('question_generation_enabled').checked
+  }
+  
+  try {
+    if (designId) {
+      await axios.put(`/api/environment/design/${designId}`, formData)
+    } else {
+      await axios.post('/api/environment/design', formData)
+    }
+    
+    alert('学習環境デザインを保存しました！')
+    loadGuidePage(curriculumId)
+  } catch (error) {
+    console.error('Error saving environment design:', error)
+    alert('保存に失敗しました')
+  }
+}
+
+// 指導・評価タブ
+async function loadEvaluationPage(curriculumId) {
+  state.currentView = 'evaluation'
+  
+  try {
+    // カリキュラム情報取得
+    const currResponse = await axios.get(`/api/curriculum/${curriculumId}`)
+    const curriculum = currResponse.data
+    
+    // クラス情報取得（進捗ボードから流用）
+    const classCode = state.student?.class_code || 'CLASS2024A'
+    const progressResponse = await axios.get(`/api/progress/curriculum/${curriculumId}/class/${classCode}`)
+    const students = progressResponse.data
+    
+    document.getElementById('app').innerHTML = `
+      <!-- ヘッダー -->
+      <div class="bg-white shadow-md p-4 mb-6">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+          <div class="flex items-center space-x-4">
+            <button onclick="loadGuidePage(${curriculumId})" class="text-blue-600 hover:text-blue-800">
+              <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
+            </button>
+            <h1 class="text-2xl font-bold text-gray-800">
+              <i class="fas fa-clipboard-check mr-2"></i>指導・評価
+            </h1>
+          </div>
+          <div class="text-sm text-gray-600">
+            ${curriculum.curriculum.grade}年 ${curriculum.curriculum.subject} 「${curriculum.curriculum.unit_name}」
+          </div>
+        </div>
+      </div>
+
+      <div class="max-w-7xl mx-auto p-6">
+        <!-- 生徒選択 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+          <label class="block text-lg font-bold text-gray-800 mb-3">
+            <i class="fas fa-user mr-2"></i>生徒を選択
+          </label>
+          <select id="studentSelect" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            <option value="">-- 生徒を選択してください --</option>
+            ${Object.values(students).map(s => `
+              <option value="${s.id}">${s.name} (出席番号: ${s.student_number})</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <!-- 評価フォーム（生徒選択後に表示） -->
+        <div id="evaluationForm"></div>
+      </div>
+    `
+    
+    // 生徒選択イベント
+    document.getElementById('studentSelect').addEventListener('change', async (e) => {
+      const studentId = e.target.value
+      if (studentId) {
+        await loadStudentEvaluation(studentId, curriculumId)
+      } else {
+        document.getElementById('evaluationForm').innerHTML = ''
+      }
+    })
+    
+  } catch (error) {
+    console.error('Error loading evaluation page:', error)
+    alert('指導・評価ページの読み込みに失敗しました')
+  }
+}
+
+// 生徒の評価データ読み込み
+async function loadStudentEvaluation(studentId, curriculumId) {
+  try {
+    // 3観点評価取得
+    const threePointRes = await axios.get(`/api/evaluations/three-point/student/${studentId}/curriculum/${curriculumId}`)
+    const threePoint = threePointRes.data || {}
+    
+    // 非認知能力評価取得
+    const nonCognitiveRes = await axios.get(`/api/evaluations/non-cognitive/student/${studentId}/curriculum/${curriculumId}`)
+    const nonCognitive = nonCognitiveRes.data || {}
+    
+    // バッジ取得
+    const badgesRes = await axios.get(`/api/badges/student/${studentId}/curriculum/${curriculumId}`)
+    const badges = badgesRes.data || []
+    
+    // ナラティブ取得
+    const narrativesRes = await axios.get(`/api/narratives/student/${studentId}/curriculum/${curriculumId}`)
+    const narratives = narrativesRes.data || []
+    
+    document.getElementById('evaluationForm').innerHTML = `
+      <!-- 3観点評価 -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-check-circle mr-2"></i>学習指導要領3観点評価（ABC評価）
+        </h2>
+        
+        ${renderThreePointEvaluation('知識・技能', 'knowledge_skill', threePoint)}
+        ${renderThreePointEvaluation('思考・判断・表現', 'thinking_judgment', threePoint)}
+        ${renderThreePointEvaluation('主体的に学習に取り組む態度', 'attitude', threePoint)}
+        
+        <div class="mt-6">
+          <label class="block text-sm font-bold text-gray-700 mb-2">総合所見</label>
+          <textarea id="overall_comment" rows="3" 
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            placeholder="単元全体を通しての総合的な評価を記入してください"
+          >${threePoint.overall_comment || ''}</textarea>
+        </div>
+        
+        <div class="flex justify-end mt-4">
+          <button onclick="saveThreePointEvaluation(${studentId}, ${curriculumId}, ${threePoint.id || 'null'})"
+            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <i class="fas fa-save mr-2"></i>保存
+          </button>
+        </div>
+      </div>
+
+      <!-- 非認知能力評価 -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-heart mr-2"></i>非認知能力評価（1-5段階）
+        </h2>
+        
+        <div class="mb-6">
+          <canvas id="radarChart" width="400" height="400"></canvas>
+        </div>
+        
+        ${renderNonCognitiveEvaluation('自己調整能力', 'self_regulation', nonCognitive, '計画を立てて自分で学習を進める力')}
+        ${renderNonCognitiveEvaluation('意欲・粘り強さ', 'motivation', nonCognitive, '難しい問題にも諦めずに取り組む力')}
+        ${renderNonCognitiveEvaluation('協働性', 'collaboration', nonCognitive, '友達と協力して学ぶ力')}
+        ${renderNonCognitiveEvaluation('メタ認知', 'metacognition', nonCognitive, '自分の学び方を振り返る力')}
+        ${renderNonCognitiveEvaluation('創造性', 'creativity', nonCognitive, 'オリジナルのアイデアを出す力')}
+        ${renderNonCognitiveEvaluation('好奇心', 'curiosity', nonCognitive, '次の学びへの問いを持つ力')}
+        ${renderNonCognitiveEvaluation('自己肯定感', 'self_esteem', nonCognitive, '自分に自信を持って学習に取り組む姿勢')}
+        
+        <div class="flex justify-end mt-4">
+          <button onclick="saveNonCognitiveEvaluation(${studentId}, ${curriculumId}, ${nonCognitive.id || 'null'})"
+            class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+            <i class="fas fa-save mr-2"></i>保存
+          </button>
+        </div>
+      </div>
+
+      <!-- ゲーミフィケーション：バッジ -->
+      <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-trophy mr-2"></i>獲得バッジ
+        </h2>
+        ${badges.length > 0 ? `
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            ${badges.map(badge => `
+              <div class="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 text-center">
+                <i class="fas fa-medal text-yellow-600 text-4xl mb-2"></i>
+                <h3 class="font-bold text-gray-800">${badge.badge_name}</h3>
+                <p class="text-sm text-gray-600 mt-1">${badge.badge_description}</p>
+                <p class="text-xs text-gray-500 mt-2">${new Date(badge.earned_at).toLocaleDateString('ja-JP')}</p>
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <p class="text-gray-500 text-center py-8">まだバッジを獲得していません</p>
+        `}
+      </div>
+
+      <!-- ナラティブ：学習ストーリー -->
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-book-open mr-2"></i>学習ストーリー
+        </h2>
+        ${narratives.length > 0 ? `
+          <div class="space-y-4">
+            ${narratives.map(narrative => `
+              <div class="border-l-4 border-blue-500 pl-4 py-2">
+                <h3 class="font-bold text-gray-800">
+                  第${narrative.chapter_number}章: ${narrative.chapter_title}
+                  ${narrative.milestone_reached ? '<i class="fas fa-flag-checkered text-green-600 ml-2"></i>' : ''}
+                </h3>
+                <p class="text-gray-700 mt-2">${narrative.story_content}</p>
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <p class="text-gray-500 text-center py-8">学習ストーリーはまだありません</p>
+        `}
+      </div>
+    `
+    
+    // レーダーチャート描画（Chart.jsを使う場合のプレースホルダー）
+    // 実際の実装ではChart.jsのCDNを読み込んで描画
+    drawRadarChart(nonCognitive)
+    
+  } catch (error) {
+    console.error('Error loading student evaluation:', error)
+    alert('生徒の評価データの読み込みに失敗しました')
+  }
+}
+
+// 3観点評価レンダリング
+function renderThreePointEvaluation(label, key, data) {
+  const value = data[key] || ''
+  const comment = data[`${key}_comment`] || ''
+  
+  return `
+    <div class="mb-6 pb-6 border-b border-gray-200">
+      <label class="block text-sm font-bold text-gray-700 mb-2">${label}</label>
+      <div class="flex items-center space-x-4 mb-2">
+        <label class="flex items-center">
+          <input type="radio" name="${key}" value="A" ${value === 'A' ? 'checked' : ''}
+            class="mr-2 w-5 h-5 text-green-600">
+          <span class="text-lg font-bold text-green-600">A</span>
+          <span class="text-sm text-gray-600 ml-1">（十分満足できる）</span>
+        </label>
+        <label class="flex items-center">
+          <input type="radio" name="${key}" value="B" ${value === 'B' ? 'checked' : ''}
+            class="mr-2 w-5 h-5 text-blue-600">
+          <span class="text-lg font-bold text-blue-600">B</span>
+          <span class="text-sm text-gray-600 ml-1">（おおむね満足できる）</span>
+        </label>
+        <label class="flex items-center">
+          <input type="radio" name="${key}" value="C" ${value === 'C' ? 'checked' : ''}
+            class="mr-2 w-5 h-5 text-red-600">
+          <span class="text-lg font-bold text-red-600">C</span>
+          <span class="text-sm text-gray-600 ml-1">（努力を要する）</span>
+        </label>
+      </div>
+      <textarea id="${key}_comment" rows="2" 
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        placeholder="具体的な評価コメントを記入してください"
+      >${comment}</textarea>
+    </div>
+  `
+}
+
+// 非認知能力評価レンダリング
+function renderNonCognitiveEvaluation(label, key, data, description) {
+  const value = data[key] || 0
+  const comment = data[`${key}_comment`] || ''
+  
+  return `
+    <div class="mb-6 pb-6 border-b border-gray-200">
+      <label class="block text-sm font-bold text-gray-700 mb-1">${label}</label>
+      <p class="text-xs text-gray-500 mb-2">${description}</p>
+      <div class="flex items-center space-x-2 mb-2">
+        ${[1, 2, 3, 4, 5].map(level => `
+          <label class="flex flex-col items-center cursor-pointer">
+            <input type="radio" name="${key}" value="${level}" ${value == level ? 'checked' : ''}
+              class="mb-1 w-5 h-5">
+            <span class="text-2xl">${['😢', '😕', '😊', '😄', '🤩'][level - 1]}</span>
+            <span class="text-xs text-gray-600">${level}</span>
+          </label>
+        `).join('')}
+      </div>
+      <textarea id="${key}_comment" rows="2" 
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+        placeholder="具体的な様子や成長を記入してください"
+      >${comment}</textarea>
+    </div>
+  `
+}
+
+// レーダーチャート描画（簡易版）
+function drawRadarChart(data) {
+  // 実際の実装ではChart.jsを使用
+  // ここでは簡易的なテキスト表示
+  const canvas = document.getElementById('radarChart')
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  ctx.font = '14px Arial'
+  ctx.textAlign = 'center'
+  ctx.fillText('レーダーチャートはChart.jsで実装予定', canvas.width / 2, canvas.height / 2)
+}
+
+// 3観点評価保存
+async function saveThreePointEvaluation(studentId, curriculumId, evaluationId) {
+  const formData = {
+    student_id: studentId,
+    curriculum_id: curriculumId,
+    knowledge_skill: document.querySelector('input[name="knowledge_skill"]:checked')?.value || '',
+    knowledge_skill_comment: document.getElementById('knowledge_skill_comment').value,
+    thinking_judgment: document.querySelector('input[name="thinking_judgment"]:checked')?.value || '',
+    thinking_judgment_comment: document.getElementById('thinking_judgment_comment').value,
+    attitude: document.querySelector('input[name="attitude"]:checked')?.value || '',
+    attitude_comment: document.getElementById('attitude_comment').value,
+    overall_comment: document.getElementById('overall_comment').value
+  }
+  
+  try {
+    if (evaluationId && evaluationId !== 'null') {
+      await axios.put(`/api/evaluations/three-point/${evaluationId}`, formData)
+    } else {
+      await axios.post('/api/evaluations/three-point', formData)
+    }
+    
+    alert('3観点評価を保存しました！')
+  } catch (error) {
+    console.error('Error saving three-point evaluation:', error)
+    alert('保存に失敗しました')
+  }
+}
+
+// 非認知能力評価保存
+async function saveNonCognitiveEvaluation(studentId, curriculumId, evaluationId) {
+  const formData = {
+    student_id: studentId,
+    curriculum_id: curriculumId,
+    self_regulation: parseInt(document.querySelector('input[name="self_regulation"]:checked')?.value || 0),
+    self_regulation_comment: document.getElementById('self_regulation_comment').value,
+    motivation: parseInt(document.querySelector('input[name="motivation"]:checked')?.value || 0),
+    motivation_comment: document.getElementById('motivation_comment').value,
+    collaboration: parseInt(document.querySelector('input[name="collaboration"]:checked')?.value || 0),
+    collaboration_comment: document.getElementById('collaboration_comment').value,
+    metacognition: parseInt(document.querySelector('input[name="metacognition"]:checked')?.value || 0),
+    metacognition_comment: document.getElementById('metacognition_comment').value,
+    creativity: parseInt(document.querySelector('input[name="creativity"]:checked')?.value || 0),
+    creativity_comment: document.getElementById('creativity_comment').value,
+    curiosity: parseInt(document.querySelector('input[name="curiosity"]:checked')?.value || 0),
+    curiosity_comment: document.getElementById('curiosity_comment').value,
+    self_esteem: parseInt(document.querySelector('input[name="self_esteem"]:checked')?.value || 0),
+    self_esteem_comment: document.getElementById('self_esteem_comment').value
+  }
+  
+  try {
+    if (evaluationId && evaluationId !== 'null') {
+      await axios.put(`/api/evaluations/non-cognitive/${evaluationId}`, formData)
+    } else {
+      await axios.post('/api/evaluations/non-cognitive', formData)
+    }
+    
+    alert('非認知能力評価を保存しました！')
+  } catch (error) {
+    console.error('Error saving non-cognitive evaluation:', error)
+    alert('保存に失敗しました')
+  }
+}
+
+// グローバル関数として公開
+window.toggleTeacherMode = toggleTeacherMode
+window.loadEnvironmentDesignPage = loadEnvironmentDesignPage
+window.saveEnvironmentDesign = saveEnvironmentDesign
+window.loadEvaluationPage = loadEvaluationPage
+window.loadStudentEvaluation = loadStudentEvaluation
+window.saveThreePointEvaluation = saveThreePointEvaluation
+window.saveNonCognitiveEvaluation = saveNonCognitiveEvaluation
+
