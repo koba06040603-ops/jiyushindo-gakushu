@@ -1681,4 +1681,298 @@ ${helpCards.results.map((h: any) =>
   }
 })
 
+// ============================================
+// Phase 7: AI単元自動生成システム
+// ============================================
+
+// APIルート：AI単元生成
+app.post('/api/ai/generate-unit', async (c) => {
+  const { env } = c
+  const { grade, subject, textbook, unitName, customization } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({
+      error: '単元生成機能は現在利用できません。',
+      curriculum: null
+    })
+  }
+  
+  try {
+    // カスタマイズ情報を整形
+    const customInfo = customization ? `
+
+【特別な配慮・カスタマイズ】
+${customization.studentNeeds ? `生徒の状況: ${customization.studentNeeds}` : ''}
+${customization.teacherGoals ? `先生の願い: ${customization.teacherGoals}` : ''}
+${customization.learningStyle ? `学習スタイル: ${customization.learningStyle}` : ''}
+${customization.specialSupport ? `特別支援: ${customization.specialSupport}` : ''}
+` : ''
+    
+    const prompt = `あなたは経験豊富な教育カリキュラムデザイナーです。
+以下の情報に基づいて、自由進度学習に最適な単元を設計してください。
+
+【基本情報】
+- 学年: ${grade}
+- 教科: ${subject}
+- 教科書: ${textbook}
+- 単元名: ${unitName}${customInfo}
+
+以下のJSON形式で、完全な単元を出力してください：
+
+{
+  "curriculum": {
+    "grade": "${grade}",
+    "subject": "${subject}",
+    "textbook_company": "${textbook}",
+    "unit_name": "${unitName}",
+    "total_hours": 8,
+    "unit_goal": "この単元で達成すべき学習目標（100文字程度）",
+    "non_cognitive_goal": "非認知能力の目標（意欲、粘り強さ、協調性など）（80文字程度）"
+  },
+  "courses": [
+    {
+      "course_name": "じっくりコース",
+      "description": "基礎をしっかり学びたい人向け",
+      "color_code": "green",
+      "cards": [
+        {
+          "card_number": 1,
+          "card_title": "学習カードのタイトル",
+          "card_type": "main",
+          "problem_description": "問題文・課題の説明",
+          "new_terms": "新しく出てくる言葉や用語",
+          "example_problem": "例題",
+          "example_solution": "例題の解き方・考え方",
+          "real_world_connection": "実社会とのつながり・生活での活用",
+          "hints": [
+            {
+              "hint_level": 1,
+              "hint_text": "ヒント1（まず考えてほしいこと）",
+              "thinking_tool_suggestion": "使える思考ツール（図・表・絵など）"
+            },
+            {
+              "hint_level": 2,
+              "hint_text": "ヒント2（もう少し詳しく）"
+            },
+            {
+              "hint_level": 3,
+              "hint_text": "ヒント3（ほぼ答えに近いヒント）"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "course_name": "しっかりコース",
+      "description": "標準的なペースで学びたい人向け",
+      "color_code": "blue",
+      "cards": []
+    },
+    {
+      "course_name": "ぐんぐんコース",
+      "description": "発展的な内容にチャレンジしたい人向け",
+      "color_code": "purple",
+      "cards": []
+    }
+  ],
+  "optional_problems": [
+    {
+      "problem_title": "選択問題のタイトル",
+      "problem_description": "発展的な問題や実践的な課題",
+      "difficulty_level": "hard",
+      "hint_text": "この問題のヒント"
+    }
+  ]
+}
+
+【重要な設計指針】
+1. じっくりコース: 6枚（基礎重視）
+2. しっかりコース: 6枚（標準的）
+3. ぐんぐんコース: 6枚（発展的）
+4. 各カードには必ず3段階のヒントを用意
+5. 実社会とのつながりを重視
+6. 子どもが自分で考え、試行錯誤できる内容
+7. ${customization?.studentNeeds ? 'カスタマイズ要望を最優先に反映' : ''}
+
+必ず完全なJSONのみを出力してください。説明文は不要です。`
+
+    // Gemini 2.0 Flash Thinkingを使用（推奨）
+    let modelName = 'gemini-2.0-flash-thinking-exp-01-21'
+    let response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 8000
+          }
+        })
+      }
+    )
+    
+    // フォールバック: Gemini 2.5 Flashを使用
+    if (!response.ok) {
+      console.log('Gemini 2.0 failed, falling back to 2.5 Flash')
+      modelName = 'gemini-2.5-flash'
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.8,
+              maxOutputTokens: 8000
+            }
+          })
+        }
+      )
+    }
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    
+    // JSONを抽出
+    const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      aiResponse.match(/\{[\s\S]*\}/)
+    const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : '{}'
+    
+    let unitData
+    try {
+      unitData = JSON.parse(jsonStr)
+    } catch (parseError) {
+      // JSON解析エラーの場合、再試行
+      console.error('JSON parse error:', parseError)
+      return c.json({
+        error: '単元の生成に失敗しました。もう一度お試しください。',
+        curriculum: null
+      })
+    }
+    
+    return c.json({
+      success: true,
+      model_used: modelName,
+      data: unitData
+    })
+    
+  } catch (error) {
+    console.error('単元生成エラー:', error)
+    return c.json({
+      error: '単元を生成できませんでした。',
+      curriculum: null
+    })
+  }
+})
+
+// APIルート：生成した単元を保存
+app.post('/api/curriculum/save-generated', async (c) => {
+  const { env } = c
+  const { curriculum, courses, optionalProblems } = await c.req.json()
+  
+  try {
+    // カリキュラムを保存
+    const curriculumResult = await env.DB.prepare(`
+      INSERT INTO curriculum (
+        grade, subject, textbook_company, unit_name, 
+        unit_order, total_hours, unit_goal, non_cognitive_goal
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      curriculum.grade,
+      curriculum.subject,
+      curriculum.textbook_company,
+      curriculum.unit_name,
+      99, // 生成された単元は最後に追加
+      curriculum.total_hours,
+      curriculum.unit_goal,
+      curriculum.non_cognitive_goal
+    ).run()
+    
+    const curriculumId = curriculumResult.meta.last_row_id
+    
+    // コースを保存
+    for (const course of courses) {
+      const courseResult = await env.DB.prepare(`
+        INSERT INTO courses (
+          curriculum_id, course_name, description, color_code
+        ) VALUES (?, ?, ?, ?)
+      `).bind(
+        curriculumId,
+        course.course_name,
+        course.description,
+        course.color_code
+      ).run()
+      
+      const courseId = courseResult.meta.last_row_id
+      
+      // 学習カードを保存
+      for (const card of course.cards || []) {
+        const cardResult = await env.DB.prepare(`
+          INSERT INTO learning_cards (
+            course_id, card_number, card_title, card_type,
+            problem_description, new_terms, example_problem,
+            example_solution, real_world_connection
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          courseId,
+          card.card_number,
+          card.card_title,
+          card.card_type || 'main',
+          card.problem_description,
+          card.new_terms || '',
+          card.example_problem || '',
+          card.example_solution || '',
+          card.real_world_connection || ''
+        ).run()
+        
+        const cardId = cardResult.meta.last_row_id
+        
+        // ヒントカードを保存
+        for (const hint of card.hints || []) {
+          await env.DB.prepare(`
+            INSERT INTO hint_cards (
+              learning_card_id, hint_level, hint_text, thinking_tool_suggestion
+            ) VALUES (?, ?, ?, ?)
+          `).bind(
+            cardId,
+            hint.hint_level,
+            hint.hint_text,
+            hint.thinking_tool_suggestion || ''
+          ).run()
+        }
+      }
+    }
+    
+    // 選択問題を保存
+    for (const problem of optionalProblems || []) {
+      await env.DB.prepare(`
+        INSERT INTO optional_problems (
+          curriculum_id, problem_title, problem_description,
+          difficulty_level, hint_text
+        ) VALUES (?, ?, ?, ?, ?)
+      `).bind(
+        curriculumId,
+        problem.problem_title,
+        problem.problem_description,
+        problem.difficulty_level || 'medium',
+        problem.hint_text || ''
+      ).run()
+    }
+    
+    return c.json({
+      success: true,
+      curriculum_id: curriculumId
+    })
+    
+  } catch (error) {
+    console.error('単元保存エラー:', error)
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
 export default app

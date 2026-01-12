@@ -105,6 +105,32 @@ async function renderTopPage() {
         </div>
       </div>
 
+      <!-- Phase 7: AI単元自動生成 -->
+      <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-lg p-8 mt-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-2xl font-bold text-white mb-2">
+              <i class="fas fa-magic mr-2"></i>
+              新しい単元をAIで作成
+            </h2>
+            <p class="text-white text-sm opacity-90">
+              学年・教科・単元名を入力するだけで、AIが自動的に学習コンテンツを生成します
+            </p>
+          </div>
+          <span class="bg-white text-purple-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
+            ✨ Phase 7 NEW
+          </span>
+        </div>
+        
+        <button 
+          onclick="showUnitGeneratorModal()"
+          class="w-full bg-white text-purple-600 hover:bg-purple-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center">
+          <i class="fas fa-wand-magic-sparkles mr-2"></i>
+          AI単元生成を開始
+          <i class="fas fa-arrow-right ml-2"></i>
+        </button>
+      </div>
+
       <!-- 学習履歴（今後実装） -->
       <div class="bg-white rounded-lg shadow p-6 mt-6">
         <h3 class="text-lg font-bold text-gray-800 mb-3">
@@ -3784,4 +3810,538 @@ window.setDifficulty = setDifficulty
 window.generateProblem = generateProblem
 window.toggleAnswer = toggleAnswer
 window.analyzeStudent = analyzeStudent
+
+// ============================================
+// Phase 7: AI単元自動生成システム
+// ============================================
+
+// AI単元生成モーダルを表示
+function showUnitGeneratorModal() {
+  const modal = document.createElement('div')
+  modal.id = 'unitGeneratorModal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-purple-600 to-pink-600 p-6 text-white sticky top-0 z-10">
+        <div class="flex justify-between items-center">
+          <h2 class="text-3xl font-bold">
+            <i class="fas fa-magic mr-2"></i>
+            AI単元自動生成
+          </h2>
+          <button onclick="closeUnitGeneratorModal()" class="text-white hover:text-gray-200">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        <p class="text-sm mt-2 opacity-90">
+          AIが学習コンテンツを自動生成します（約30秒〜1分）
+        </p>
+      </div>
+
+      <!-- フォーム -->
+      <div class="p-8 space-y-6">
+        <!-- 基本情報 -->
+        <div class="bg-blue-50 rounded-lg p-6">
+          <h3 class="text-xl font-bold text-blue-800 mb-4">
+            <i class="fas fa-info-circle mr-2"></i>
+            基本情報
+          </h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- 学年 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">学年 *</label>
+              <select id="genGrade" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
+                <option value="">選択してください</option>
+                <option value="小学1年">小学1年</option>
+                <option value="小学2年">小学2年</option>
+                <option value="小学3年">小学3年</option>
+                <option value="小学4年">小学4年</option>
+                <option value="小学5年">小学5年</option>
+                <option value="小学6年">小学6年</option>
+                <option value="中学1年">中学1年</option>
+                <option value="中学2年">中学2年</option>
+                <option value="中学3年">中学3年</option>
+              </select>
+            </div>
+
+            <!-- 教科 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">教科 *</label>
+              <select id="genSubject" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
+                <option value="">選択してください</option>
+                <option value="算数">算数</option>
+                <option value="数学">数学</option>
+                <option value="国語">国語</option>
+                <option value="理科">理科</option>
+                <option value="社会">社会</option>
+                <option value="英語">英語</option>
+                <option value="生活">生活</option>
+                <option value="音楽">音楽</option>
+                <option value="図工">図工・美術</option>
+                <option value="体育">体育</option>
+                <option value="家庭科">家庭科</option>
+                <option value="技術">技術</option>
+                <option value="総合">総合的な学習</option>
+                <option value="道徳">道徳</option>
+              </select>
+            </div>
+
+            <!-- 教科書会社 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">教科書会社 *</label>
+              <input type="text" id="genTextbook" placeholder="例: 東京書籍" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
+            </div>
+
+            <!-- 単元名 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">単元名 *</label>
+              <input type="text" id="genUnitName" placeholder="例: かけ算の筆算" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
+            </div>
+          </div>
+        </div>
+
+        <!-- カスタマイズ（不登校・個別支援対応） -->
+        <div class="bg-green-50 rounded-lg p-6">
+          <h3 class="text-xl font-bold text-green-800 mb-4">
+            <i class="fas fa-heart mr-2"></i>
+            カスタマイズ（任意）
+          </h3>
+          <p class="text-sm text-gray-600 mb-4">
+            子どもの状況や先生の願いを入力すると、より個別最適化された内容を生成します
+          </p>
+
+          <div class="space-y-4">
+            <!-- 生徒の状況 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-child mr-1"></i>
+                子どもの様子・特性
+              </label>
+              <textarea id="genStudentNeeds" rows="3" 
+                        placeholder="例: 不登校で自宅学習中。ゆっくりペースで学びたい。図や絵があると理解しやすい。"
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"></textarea>
+            </div>
+
+            <!-- 先生の願い -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-bullseye mr-1"></i>
+                先生の願い・重視したいこと
+              </label>
+              <textarea id="genTeacherGoals" rows="3" 
+                        placeholder="例: 自信を持って学習に取り組めるようにしたい。実生活とのつながりを重視したい。"
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"></textarea>
+            </div>
+
+            <!-- 学習スタイル -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-palette mr-1"></i>
+                学習スタイル
+              </label>
+              <select id="genLearningStyle" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                <option value="">標準</option>
+                <option value="視覚優位">視覚優位（図・絵が多い方が良い）</option>
+                <option value="聴覚優位">聴覚優位（言葉での説明が良い）</option>
+                <option value="体験重視">体験重視（実際に触れて学びたい）</option>
+                <option value="ゆっくり">ゆっくりペース</option>
+                <option value="発展的">発展的な内容にチャレンジ</option>
+              </select>
+            </div>
+
+            <!-- 特別支援 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-hands-helping mr-1"></i>
+                特別な配慮
+              </label>
+              <textarea id="genSpecialSupport" rows="2" 
+                        placeholder="例: 読み書きが苦手なので、文章は短く。感覚過敏があるので穏やかな表現で。"
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- 生成ボタン -->
+        <div class="flex space-x-4">
+          <button onclick="closeUnitGeneratorModal()" 
+                  class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-4 px-6 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>
+            キャンセル
+          </button>
+          <button onclick="startUnitGeneration()" 
+                  id="generateUnitBtn"
+                  class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition">
+            <i class="fas fa-wand-magic-sparkles mr-2"></i>
+            AIで生成開始
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// モーダルを閉じる
+function closeUnitGeneratorModal() {
+  const modal = document.getElementById('unitGeneratorModal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+// AI単元生成を開始
+async function startUnitGeneration() {
+  const grade = document.getElementById('genGrade').value
+  const subject = document.getElementById('genSubject').value
+  const textbook = document.getElementById('genTextbook').value
+  const unitName = document.getElementById('genUnitName').value
+
+  // 必須項目チェック
+  if (!grade || !subject || !textbook || !unitName) {
+    alert('学年、教科、教科書会社、単元名は必須です')
+    return
+  }
+
+  // カスタマイズ情報
+  const customization = {
+    studentNeeds: document.getElementById('genStudentNeeds').value,
+    teacherGoals: document.getElementById('genTeacherGoals').value,
+    learningStyle: document.getElementById('genLearningStyle').value,
+    specialSupport: document.getElementById('genSpecialSupport').value
+  }
+
+  // モーダルを閉じる
+  closeUnitGeneratorModal()
+
+  // 生成プロセス画面を表示
+  showGenerationProgress(grade, subject, unitName)
+
+  try {
+    // AI単元生成API呼び出し
+    const response = await axios.post('/api/ai/generate-unit', {
+      grade,
+      subject,
+      textbook,
+      unitName,
+      customization
+    })
+
+    if (response.data.error) {
+      throw new Error(response.data.error)
+    }
+
+    // 生成成功
+    const unitData = response.data.data
+    const modelUsed = response.data.model_used
+
+    // プレビュー画面を表示
+    showUnitPreview(unitData, modelUsed)
+
+  } catch (error) {
+    console.error('単元生成エラー:', error)
+    
+    // エラー表示
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow-lg p-8 text-center">
+          <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+          <h2 class="text-2xl font-bold text-gray-800 mb-4">単元生成エラー</h2>
+          <p class="text-gray-600 mb-6">
+            単元の生成に失敗しました。もう一度お試しください。
+          </p>
+          <button onclick="renderTopPage()" 
+                  class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg">
+            <i class="fas fa-home mr-2"></i>
+            トップページに戻る
+          </button>
+        </div>
+      </div>
+    `
+  }
+}
+
+// 生成プロセス表示
+function showGenerationProgress(grade, subject, unitName) {
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="container mx-auto px-4 py-8">
+      <div class="bg-white rounded-lg shadow-lg p-8">
+        <!-- ヘッダー -->
+        <div class="text-center mb-8">
+          <div class="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-full mb-4">
+            <i class="fas fa-magic mr-2"></i>
+            AI単元生成中
+          </div>
+          <h2 class="text-3xl font-bold text-gray-800 mb-2">
+            ${grade} ${subject}「${unitName}」
+          </h2>
+          <p class="text-gray-600">AIが学習コンテンツを作成しています...</p>
+        </div>
+
+        <!-- プログレスバー -->
+        <div class="max-w-2xl mx-auto mb-8">
+          <div class="bg-gray-200 rounded-full h-6 overflow-hidden">
+            <div id="progressBar" class="bg-gradient-to-r from-purple-600 to-pink-600 h-full transition-all duration-1000"
+                 style="width: 10%"></div>
+          </div>
+          <p id="progressText" class="text-center text-sm text-gray-600 mt-2">処理を開始しています...</p>
+        </div>
+
+        <!-- 生成ステップ -->
+        <div class="max-w-2xl mx-auto space-y-4">
+          <div id="step1" class="flex items-center p-4 bg-gray-50 rounded-lg opacity-50">
+            <i class="fas fa-circle-notch fa-spin text-purple-600 text-2xl mr-4"></i>
+            <div>
+              <p class="font-bold text-gray-800">ステップ 1</p>
+              <p class="text-sm text-gray-600">単元の目標を設計中...</p>
+            </div>
+          </div>
+          
+          <div id="step2" class="flex items-center p-4 bg-gray-50 rounded-lg opacity-50">
+            <i class="fas fa-circle-notch fa-spin text-purple-600 text-2xl mr-4"></i>
+            <div>
+              <p class="font-bold text-gray-800">ステップ 2</p>
+              <p class="text-sm text-gray-600">学習コースを作成中...</p>
+            </div>
+          </div>
+          
+          <div id="step3" class="flex items-center p-4 bg-gray-50 rounded-lg opacity-50">
+            <i class="fas fa-circle-notch fa-spin text-purple-600 text-2xl mr-4"></i>
+            <div>
+              <p class="font-bold text-gray-800">ステップ 3</p>
+              <p class="text-sm text-gray-600">学習カードを生成中...</p>
+            </div>
+          </div>
+          
+          <div id="step4" class="flex items-center p-4 bg-gray-50 rounded-lg opacity-50">
+            <i class="fas fa-circle-notch fa-spin text-purple-600 text-2xl mr-4"></i>
+            <div>
+              <p class="font-bold text-gray-800">ステップ 4</p>
+              <p class="text-sm text-gray-600">ヒントカードを作成中...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- アニメーション -->
+        <div class="text-center mt-8">
+          <i class="fas fa-robot text-6xl text-purple-500 animate-bounce"></i>
+        </div>
+      </div>
+    </div>
+  `
+
+  // プログレスアニメーション
+  animateProgress()
+}
+
+// プログレス アニメーション
+function animateProgress() {
+  let progress = 10
+  const interval = setInterval(() => {
+    progress += Math.random() * 15
+    if (progress > 90) progress = 90
+    
+    const bar = document.getElementById('progressBar')
+    if (bar) {
+      bar.style.width = progress + '%'
+    }
+    
+    // ステップ更新
+    if (progress > 25) {
+      updateStep('step1', '完了', true)
+    }
+    if (progress > 50) {
+      updateStep('step2', '完了', true)
+    }
+    if (progress > 75) {
+      updateStep('step3', '完了', true)
+    }
+  }, 500)
+
+  // タイムアウト（60秒）
+  setTimeout(() => {
+    clearInterval(interval)
+  }, 60000)
+}
+
+// ステップ更新
+function updateStep(stepId, status, completed) {
+  const step = document.getElementById(stepId)
+  if (step && completed) {
+    step.classList.remove('opacity-50')
+    step.classList.add('bg-green-50')
+    const icon = step.querySelector('i')
+    icon.className = 'fas fa-check-circle text-green-600 text-2xl mr-4'
+    const statusText = step.querySelector('.text-sm')
+    statusText.textContent = status
+  }
+}
+
+// 単元プレビュー表示
+function showUnitPreview(unitData, modelUsed) {
+  const curriculum = unitData.curriculum
+  const courses = unitData.courses || []
+  const optionalProblems = unitData.optional_problems || []
+
+  const totalCards = courses.reduce((sum, course) => sum + (course.cards?.length || 0), 0)
+  const totalHints = courses.reduce((sum, course) => {
+    return sum + (course.cards || []).reduce((hintSum, card) => {
+      return hintSum + (card.hints?.length || 0)
+    }, 0)
+  }, 0)
+
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="container mx-auto px-4 py-8">
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg shadow-lg p-8 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <div class="inline-block bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm mb-2">
+              <i class="fas fa-check-circle mr-1"></i>
+              生成完了
+            </div>
+            <h1 class="text-4xl font-bold mb-2">
+              ${curriculum.unit_name}
+            </h1>
+            <p class="text-lg opacity-90">
+              ${curriculum.grade} ${curriculum.subject} / ${curriculum.textbook_company}
+            </p>
+          </div>
+          <div class="text-right">
+            <p class="text-sm opacity-75">使用モデル</p>
+            <p class="font-bold">${modelUsed}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- サマリー -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div class="bg-white rounded-lg shadow p-6 text-center">
+          <i class="fas fa-layer-group text-4xl text-blue-500 mb-2"></i>
+          <p class="text-3xl font-bold text-gray-800">${courses.length}</p>
+          <p class="text-gray-600">コース</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 text-center">
+          <i class="fas fa-book text-4xl text-green-500 mb-2"></i>
+          <p class="text-3xl font-bold text-gray-800">${totalCards}</p>
+          <p class="text-gray-600">学習カード</p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 text-center">
+          <i class="fas fa-lightbulb text-4xl text-yellow-500 mb-2"></i>
+          <p class="text-3xl font-bold text-gray-800">${totalHints}</p>
+          <p class="text-gray-600">ヒントカード</p>
+        </div>
+      </div>
+
+      <!-- 単元の目標 -->
+      <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-bullseye mr-2"></i>
+          単元の目標
+        </h2>
+        <div class="space-y-4">
+          <div class="bg-blue-50 p-4 rounded-lg">
+            <p class="text-sm font-bold text-blue-800 mb-2">学習目標</p>
+            <p class="text-gray-800">${curriculum.unit_goal}</p>
+          </div>
+          <div class="bg-green-50 p-4 rounded-lg">
+            <p class="text-sm font-bold text-green-800 mb-2">心の成長目標（非認知能力）</p>
+            <p class="text-gray-800">${curriculum.non_cognitive_goal}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- コース一覧 -->
+      <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-route mr-2"></i>
+          学習コース
+        </h2>
+        <div class="space-y-4">
+          ${courses.map((course, index) => `
+            <div class="border-2 border-${course.color_code}-300 rounded-lg p-4">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xl font-bold text-${course.color_code}-800">
+                  ${course.course_name}
+                </h3>
+                <span class="bg-${course.color_code}-100 text-${course.color_code}-800 px-3 py-1 rounded-full text-sm font-bold">
+                  ${course.cards?.length || 0}枚
+                </span>
+              </div>
+              <p class="text-gray-600 mb-3">${course.description}</p>
+              
+              <!-- カード一覧（折りたたみ） -->
+              <details class="mt-3">
+                <summary class="cursor-pointer text-sm text-${course.color_code}-600 hover:text-${course.color_code}-800 font-semibold">
+                  カード一覧を表示 ▼
+                </summary>
+                <div class="mt-3 space-y-2 pl-4">
+                  ${(course.cards || []).map(card => `
+                    <div class="border-l-4 border-${course.color_code}-300 pl-3 py-2 bg-gray-50 rounded">
+                      <p class="font-semibold text-gray-800">
+                        <span class="text-${course.color_code}-600">${card.card_number}.</span>
+                        ${card.card_title}
+                      </p>
+                      <p class="text-xs text-gray-500 mt-1">
+                        ヒント ${card.hints?.length || 0}段階
+                      </p>
+                    </div>
+                  `).join('')}
+                </div>
+              </details>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- アクションボタン -->
+      <div class="flex space-x-4">
+        <button onclick="renderTopPage()" 
+                class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-4 px-6 rounded-lg transition">
+          <i class="fas fa-times mr-2"></i>
+          破棄してトップへ
+        </button>
+        <button onclick="saveGeneratedUnit(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
+                class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
+          <i class="fas fa-save mr-2"></i>
+          この単元を保存して使用する
+        </button>
+      </div>
+    </div>
+  `
+}
+
+// 生成した単元を保存
+async function saveGeneratedUnit(unitData) {
+  try {
+    const response = await axios.post('/api/curriculum/save-generated', unitData)
+    
+    if (response.data.success) {
+      const curriculumId = response.data.curriculum_id
+      
+      // 保存成功メッセージ
+      alert('✅ 単元を保存しました！\n\nこれから学習を始めます。')
+      
+      // 学習のてびきページへ
+      loadGuidePage(curriculumId)
+    } else {
+      throw new Error('保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('単元保存エラー:', error)
+    alert('❌ 単元の保存に失敗しました。もう一度お試しください。')
+  }
+}
+
+// Phase 7: グローバル関数
+window.showUnitGeneratorModal = showUnitGeneratorModal
+window.closeUnitGeneratorModal = closeUnitGeneratorModal
+window.startUnitGeneration = startUnitGeneration
+window.saveGeneratedUnit = saveGeneratedUnit
 
