@@ -26,16 +26,17 @@ async function renderTopPage() {
   app.innerHTML = `
     <div class="container mx-auto px-4 py-8">
       <!-- ヘッダー -->
-      <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-        <h1 class="text-4xl font-bold text-indigo-600 mb-2">
+      <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-xl p-8 mb-8 text-center">
+        <h1 class="text-5xl font-bold text-white mb-3">
           <i class="fas fa-graduation-cap mr-3"></i>
           自由進度学習支援システム
         </h1>
-        <p class="text-gray-600">学びのハンドルは、あなたの手の中に</p>
+        <p class="text-white text-xl opacity-90">AIで学習カードを自動生成</p>
+        <p class="text-white text-sm opacity-75 mt-2">学年・教科・単元名を入力するだけ</p>
       </div>
 
       <!-- ユーザー情報 -->
-      <div class="bg-white rounded-lg shadow p-4 mb-6">
+      <div class="bg-white rounded-lg shadow p-4 mb-8">
         <div class="flex items-center">
           <i class="fas fa-user-circle text-3xl text-indigo-500 mr-3"></i>
           <div>
@@ -45,104 +46,138 @@ async function renderTopPage() {
         </div>
       </div>
 
-      <!-- 学習選択カード -->
-      <div class="bg-white rounded-lg shadow-lg p-8">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">
-          <i class="fas fa-book-open mr-2"></i>
-          学習する単元を選びましょう
-        </h2>
-
-        <!-- 選択フォーム -->
-        <div class="space-y-6">
-          <!-- 学年選択 -->
-          <div>
-            <label class="block text-sm font-bold text-gray-700 mb-2">
-              <i class="fas fa-layer-group mr-2"></i>学年
-            </label>
-            <select id="gradeSelect" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
-              <option value="">選択してください</option>
-            </select>
+      <!-- メインアクション：AI単元生成 -->
+      <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-2xl p-10 mb-8">
+        <div class="text-center mb-6">
+          <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
+            ✨ AIが約40秒で18枚の学習カードを生成
           </div>
-
-          <!-- 教科選択 -->
-          <div>
-            <label class="block text-sm font-bold text-gray-700 mb-2">
-              <i class="fas fa-calculator mr-2"></i>教科
-            </label>
-            <select id="subjectSelect" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
-              <option value="">選択してください</option>
-            </select>
-          </div>
-
-          <!-- 教科書会社選択 -->
-          <div>
-            <label class="block text-sm font-bold text-gray-700 mb-2">
-              <i class="fas fa-building mr-2"></i>教科書会社
-            </label>
-            <select id="textbookSelect" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
-              <option value="">選択してください</option>
-            </select>
-          </div>
-
-          <!-- 単元選択 -->
-          <div>
-            <label class="block text-sm font-bold text-gray-700 mb-2">
-              <i class="fas fa-list mr-2"></i>単元
-            </label>
-            <select id="unitSelect" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
-              <option value="">選択してください</option>
-            </select>
-          </div>
-
-          <!-- 開始ボタン -->
-          <button 
-            id="startButton" 
-            disabled
-            class="w-full bg-indigo-600 text-white py-4 px-6 rounded-lg font-bold text-lg hover:bg-indigo-700 transition disabled:bg-gray-300 disabled:cursor-not-allowed">
-            <i class="fas fa-rocket mr-2"></i>
-            学習を始める
-          </button>
-        </div>
-      </div>
-
-      <!-- Phase 7: AI単元自動生成 -->
-      <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-lg p-8 mt-6">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 class="text-2xl font-bold text-white mb-2">
-              <i class="fas fa-magic mr-2"></i>
-              新しい単元をAIで作成
-            </h2>
-            <p class="text-white text-sm opacity-90">
-              学年・教科・単元名を入力するだけで、AIが自動的に学習コンテンツを生成します
-            </p>
-          </div>
-          <span class="bg-white text-purple-600 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-            ✨ Phase 7 NEW
-          </span>
+          <h2 class="text-3xl font-bold text-white mb-3">
+            <i class="fas fa-wand-magic-sparkles mr-2"></i>
+            新しい単元を作成
+          </h2>
+          <p class="text-white text-lg opacity-90 mb-2">
+            学年・教科・単元名を入力するだけで完成！
+          </p>
+          <p class="text-white text-sm opacity-75">
+            3つのコース（じっくり・しっかり・ぐんぐん） × 各6枚 = 18枚の学習カード
+          </p>
         </div>
         
         <button 
           onclick="showUnitGeneratorModal()"
-          class="w-full bg-white text-purple-600 hover:bg-purple-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center">
-          <i class="fas fa-wand-magic-sparkles mr-2"></i>
-          AI単元生成を開始
-          <i class="fas fa-arrow-right ml-2"></i>
+          class="w-full bg-white text-purple-600 hover:bg-purple-50 py-6 px-8 rounded-lg font-bold text-2xl transition shadow-xl flex items-center justify-center group">
+          <i class="fas fa-magic mr-3 text-3xl group-hover:animate-bounce"></i>
+          AIで学習カードを作成する
+          <i class="fas fa-arrow-right ml-3 group-hover:translate-x-2 transition-transform"></i>
         </button>
+
+        <!-- 機能紹介 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
+            <i class="fas fa-clock text-3xl text-white mb-2"></i>
+            <p class="text-white font-bold">約40秒</p>
+            <p class="text-white text-sm opacity-75">高速生成</p>
+          </div>
+          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
+            <i class="fas fa-book text-3xl text-white mb-2"></i>
+            <p class="text-white font-bold">18枚のカード</p>
+            <p class="text-white text-sm opacity-75">3コース×6枚</p>
+          </div>
+          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
+            <i class="fas fa-lightbulb text-3xl text-white mb-2"></i>
+            <p class="text-white font-bold">54個のヒント</p>
+            <p class="text-white text-sm opacity-75">3段階で自律学習</p>
+          </div>
+        </div>
       </div>
 
-      <!-- 学習履歴（今後実装） -->
-      <div class="bg-white rounded-lg shadow p-6 mt-6">
-        <h3 class="text-lg font-bold text-gray-800 mb-3">
-          <i class="fas fa-history mr-2"></i>最近の学習
-        </h3>
-        <p class="text-gray-500 text-sm">学習履歴がここに表示されます</p>
+      <!-- 使い方ガイド -->
+      <div class="bg-white rounded-lg shadow-lg p-8">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+          <i class="fas fa-question-circle mr-2 text-indigo-600"></i>
+          使い方ガイド
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <!-- Step 1 -->
+          <div class="text-center">
+            <div class="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span class="text-3xl font-bold text-indigo-600">1</span>
+            </div>
+            <h3 class="font-bold text-gray-800 mb-2">学習内容を入力</h3>
+            <p class="text-gray-600 text-sm">学年・教科・教科書会社・単元名を入力</p>
+          </div>
+          
+          <!-- Step 2 -->
+          <div class="text-center">
+            <div class="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span class="text-3xl font-bold text-purple-600">2</span>
+            </div>
+            <h3 class="font-bold text-gray-800 mb-2">AIが自動生成</h3>
+            <p class="text-gray-600 text-sm">Gemini 3が約40秒で18枚のカードを作成</p>
+          </div>
+          
+          <!-- Step 3 -->
+          <div class="text-center">
+            <div class="bg-pink-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span class="text-3xl font-bold text-pink-600">3</span>
+            </div>
+            <h3 class="font-bold text-gray-800 mb-2">内容を確認</h3>
+            <p class="text-gray-600 text-sm">詳細を確認し、必要に応じて調整</p>
+          </div>
+          
+          <!-- Step 4 -->
+          <div class="text-center">
+            <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span class="text-3xl font-bold text-green-600">4</span>
+            </div>
+            <h3 class="font-bold text-gray-800 mb-2">学習を開始</h3>
+            <p class="text-gray-600 text-sm">自分のペースで学習を進める</p>
+          </div>
+        </div>
+        
+        <!-- 特徴一覧 -->
+        <div class="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6">
+          <h3 class="font-bold text-gray-800 mb-4 text-center">
+            <i class="fas fa-star mr-2 text-yellow-500"></i>
+            このシステムの特徴
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <div>
+                <p class="font-bold text-gray-800">3段階のヒント</p>
+                <p class="text-gray-600 text-sm">つまずいても安心して進められる</p>
+              </div>
+            </div>
+            <div class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <div>
+                <p class="font-bold text-gray-800">実社会とのつながり</p>
+                <p class="text-gray-600 text-sm">学びを生活に活かせる</p>
+              </div>
+            </div>
+            <div class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <div>
+                <p class="font-bold text-gray-800">自分のペースで学習</p>
+                <p class="text-gray-600 text-sm">3つのコースから選べる</p>
+              </div>
+            </div>
+            <div class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+              <div>
+                <p class="font-bold text-gray-800">印刷対応</p>
+                <p class="text-gray-600 text-sm">紙で学習したい場合も対応</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
     </div>
   `
-
-  // データ読み込みとイベント設定
-  await loadTopPageData()
 }
 
 async function loadTopPageData() {
@@ -4545,7 +4580,7 @@ function showPrintPreview(unitData) {
     <div class="container mx-auto px-4 py-8 print:p-0">
       <!-- 印刷ボタン（印刷時は非表示） -->
       <div class="no-print mb-6 flex justify-between items-center">
-        <button onclick="window.history.back()" 
+        <button onclick='showUnitPreview(${JSON.stringify(unitData).replace(/'/g, "\\'")})'
                 class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg">
           <i class="fas fa-arrow-left mr-2"></i>
           戻る
