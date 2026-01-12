@@ -1894,21 +1894,27 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
   "course_selection_problems": [
     {
       "problem_number": 1,
-      "problem_title": "コース選択問題1のタイトル（ワクワクする、心躍るタイトル）",
-      "problem_description": "この単元の学びへの期待を高める問題。学習を積み重ねていくとわかるような問いや、探究心をくすぐる内容",
-      "course_level": "基礎"
+      "problem_title": "ゆっくりコースの入り口問題（ワクワクする、心躍るタイトル）",
+      "problem_description": "このコースで最初に出会う魅力的な問題。基礎的だけど「やってみたい！」と思える具体的な問題文を書く（例：お店で買い物をするとき、おつりはいくら？など、実生活に密着した問題）",
+      "problem_content": "具体的な問題文をここに書く（数字や状況を含む、子どもが実際に解きたくなる問題）",
+      "course_level": "基礎",
+      "connection_to_cards": "この問題は学習カード1-2で学ぶ内容につながる"
     },
     {
       "problem_number": 2,
-      "problem_title": "コース選択問題2のタイトル",
-      "problem_description": "問題の説明",
-      "course_level": "標準"
+      "problem_title": "しっかりコースの入り口問題（探究心をくすぐるタイトル）",
+      "problem_description": "このコースの特徴が伝わる魅力的な問題。標準的だけど工夫が必要で「考えてみたい！」と思える問題",
+      "problem_content": "具体的な問題文（子どもが自分で考え方を選べるような問題）",
+      "course_level": "標準",
+      "connection_to_cards": "この問題は学習カード1-3で学ぶ内容につながる"
     },
     {
       "problem_number": 3,
-      "problem_title": "コース選択問題3のタイトル",
-      "problem_description": "問題の説明",
-      "course_level": "発展"
+      "problem_title": "どんどんコースの入り口問題（チャレンジ精神がわくタイトル）",
+      "problem_description": "このコースの発展性が伝わる魅力的な問題。「これが解けたらすごい！」「挑戦してみたい！」と思える問題",
+      "problem_content": "具体的な問題文（発展的で、深く考える必要があるが、学習すれば必ず解ける問題）",
+      "course_level": "発展",
+      "connection_to_cards": "この問題は学習カード1-4や選択問題1-2につながる"
     }
   ],
   "courses": [
@@ -1964,18 +1970,72 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
   "check_tests": [
     {
       "course_name": "ゆっくりコース",
-      "test_description": "ゆっくりコースのチェックテスト（基礎確認問題3〜5題）",
-      "problems_count": 3
+      "test_description": "ゆっくりコースのチェックテスト",
+      "problems_count": 3,
+      "sample_problems": [
+        {
+          "problem_text": "具体的な問題文1（基礎確認問題）",
+          "answer": "解答例"
+        },
+        {
+          "problem_text": "具体的な問題文2（基礎確認問題）",
+          "answer": "解答例"
+        },
+        {
+          "problem_text": "具体的な問題文3（基礎確認問題）",
+          "answer": "解答例"
+        }
+      ]
     },
     {
       "course_name": "しっかりコース",
-      "test_description": "しっかりコースのチェックテスト（標準問題3〜5題）",
-      "problems_count": 4
+      "test_description": "しっかりコースのチェックテスト",
+      "problems_count": 4,
+      "sample_problems": [
+        {
+          "problem_text": "具体的な問題文1（標準問題）",
+          "answer": "解答例"
+        },
+        {
+          "problem_text": "具体的な問題文2（標準問題）",
+          "answer": "解答例"
+        },
+        {
+          "problem_text": "具体的な問題文3（標準問題）",
+          "answer": "解答例"
+        },
+        {
+          "problem_text": "具体的な問題文4（標準問題）",
+          "answer": "解答例"
+        }
+      ]
     },
     {
       "course_name": "どんどんコース",
-      "test_description": "どんどんコースのチェックテスト（発展問題3〜5題）",
-      "problems_count": 5
+      "test_description": "どんどんコースのチェックテスト",
+      "problems_count": 5,
+      "sample_problems": [
+        {
+          "problem_text": "具体的な問題文1（発展問題）",
+          "answer": "解答例"
+        },
+        {
+          "problem_text": "具体的な問題文2（発展問題）",
+          "answer": "解答例"
+        },
+        {
+          "problem_text": "具体的な問題文3（発展問題）",
+          "answer": "解答例"
+        },
+        {
+          "problem_text": "具体的な問題文4（発展問題）",
+          "answer": "解答例"
+        },
+        {
+          "problem_text": "具体的な問題文5（発展問題）",
+          "answer": "解答例"
+        }
+      ]
     }
   ],
   "optional_problems": [
@@ -2031,13 +2091,21 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
    - しっかりコース: 標準的な内容。バランスよく
    - どんどんコース: 発展的な内容。思考を深める
 
-2. コース選択問題3題:
-   - 子どもたちが「やってみたい！」「わかりたい！」と思える問題
-   - 学習への期待感を高める導入として機能
-   - 各コースの特徴がわかる問題
-   - 学習を積み重ねていくとわかるような深い問いを含む
+2. コース選択問題3題（最重要）:
+   - **各コースの入り口となる魅力的で具体的な問題を作成**
+   - **問題文は具体的な数字や状況を含む、実際に解ける問題にする**
+   - **「やってみたい！」「これなら自分にもできそう！」と思える内容**
+   - problem_contentに具体的な問題文を必ず書く
+   - この問題が学習カードのどの内容につながるかを connection_to_cards に書く
+   - 選択問題1-2題はこのコース選択問題の発展版になるようにする
+   
+3. チェックテスト（具体的な問題を含む）:
+   - 各コースごとに3〜5題の具体的な問題文を sample_problems に書く
+   - 問題文は実際に子どもが解ける形式で、数字や状況を含む
+   - 基礎→標準→発展の順に難易度を上げる
+   - 各問題に簡潔な解答例を付ける
 
-3. 選択問題6題（必須）:
+4. 選択問題6題（必須）:
    - 子どもの興味関心をひく実践的な内容
    - 教科の見方・考え方が深まるもの
    - 教科単元の本質に触れるもの
@@ -2045,20 +2113,27 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
    - 他教科への発展を含む
    - 「この勉強には意味がある」と子どもが実感できる内容
    - 各問題に「learning_meaning」（学習の意味・必要感）を必ず記載
+   - コース選択問題とのつながりを意識する
 
-4. 学習カード設計:
+5. 学習カード設計:
    - 各カードには必ず3段階のヒントを用意
    - 実社会とのつながりを重視
    - 教科書ページを明示（textbook_page）
    - 子どもが自分で考え、試行錯誤できる内容
+   - コース選択問題で提示した内容を深める構成
 
-5. 言葉遣い:
+6. 言葉遣い:
    - 子どもが理解できる平易な言葉
    - 漢字にはふりがな（ルビ）を付ける想定
    - ポジティブで前向きな表現
    - 「〜できるようになる」「〜がわかる」など成長実感を持てる表現
 
-6. ${customization?.studentNeeds ? 'カスタマイズ要望を最優先に反映' : ''}
+7. 全体の一貫性:
+   - コース選択問題 → 学習カード → チェックテスト → 選択問題の流れを意識
+   - 学習のてびき1枚で単元全体を把握できる設計
+   - 子どもが「この勉強をやりたい！」と思える魅力的な内容
+
+8. ${customization?.studentNeeds ? 'カスタマイズ要望を最優先に反映' : ''}
 
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 

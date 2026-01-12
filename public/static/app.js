@@ -297,7 +297,203 @@ async function loadGuidePage(curriculumId) {
     const app = document.getElementById('app')
     app.innerHTML = `
       <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
-        <div class="container mx-auto px-4">
+        <div class="container mx-auto px-4 max-w-5xl">
+          
+          <!-- 戻るボタン -->
+          <button onclick="renderTopPage()" class="mb-4 text-indigo-600 hover:text-indigo-800 flex items-center text-lg font-semibold transition">
+            <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
+          </button>
+
+          <!-- 学習のてびき1枚完結版 -->
+          <div class="bg-white rounded-2xl shadow-2xl p-8 print:shadow-none">
+            
+            <!-- タイトルセクション -->
+            <div class="text-center mb-6 border-b-4 border-indigo-600 pb-6">
+              <h1 class="text-4xl font-bold text-indigo-700 mb-3">学習のてびき</h1>
+              <div class="grid grid-cols-3 gap-4 text-sm mb-4">
+                <div class="text-left">
+                  <span class="font-bold">学年：</span>${curriculum.grade}年
+                </div>
+                <div class="text-center">
+                  <span class="font-bold">組：</span>____ 組
+                </div>
+                <div class="text-right">
+                  <span class="font-bold">名前：</span>____________________
+                </div>
+              </div>
+              <h2 class="text-3xl font-bold text-gray-800">${curriculum.unit_name}</h2>
+            </div>
+
+            <!-- 単元の目標 -->
+            <div class="mb-6">
+              <div class="bg-blue-100 border-l-4 border-blue-600 p-4 rounded-r-lg mb-3">
+                <h3 class="text-xl font-bold text-blue-800 mb-2 flex items-center">
+                  <i class="fas fa-bullseye mr-2"></i>たんげんのもくひょう
+                </h3>
+                <p class="text-gray-800 leading-relaxed">${curriculum.unit_goal}</p>
+              </div>
+              
+              <div class="grid grid-cols-2 gap-4">
+                <div class="bg-green-100 border-l-4 border-green-600 p-3 rounded-r-lg">
+                  <h4 class="text-sm font-bold text-green-800 mb-1">
+                    <i class="fas fa-heart mr-1"></i>こころのせいちょう
+                  </h4>
+                  <p class="text-sm text-gray-700">${curriculum.non_cognitive_goal}</p>
+                </div>
+                <div class="bg-purple-100 border-l-4 border-purple-600 p-3 rounded-r-lg">
+                  <h4 class="text-sm font-bold text-purple-800 mb-1">
+                    <i class="fas fa-clock mr-1"></i>じゅぎょうじかん
+                  </h4>
+                  <p class="text-2xl font-bold text-purple-700">ぜんぶで ${curriculum.total_hours} じかん</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- コース選択問題（横3列） -->
+            <div class="mb-6">
+              <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                <i class="fas fa-route mr-2 text-indigo-600"></i>
+                コースをえらぼう！（3つのコースから1つえらんでね）
+              </h3>
+              <div class="grid grid-cols-3 gap-4">
+                ${courses.map((course, index) => {
+                  const problem = courseSelectionProblems[index] || {
+                    problem_title: `${course.course_name}の問題`,
+                    problem_content: course.description
+                  }
+                  const colorClasses = index === 0 ? 'border-green-500 bg-green-50' :
+                                     index === 1 ? 'border-blue-500 bg-blue-50' :
+                                     'border-purple-500 bg-purple-50'
+                  const badgeClasses = index === 0 ? 'bg-green-500' :
+                                      index === 1 ? 'bg-blue-500' :
+                                      'bg-purple-500'
+                  return `
+                    <div class="border-4 ${colorClasses} rounded-xl p-4 hover:shadow-lg transition cursor-pointer" 
+                         onclick="selectCourse(${course.id})">
+                      <div class="text-center mb-3">
+                        <div class="inline-block px-3 py-1 ${badgeClasses} text-white rounded-full font-bold mb-2">
+                          ${index + 1}
+                        </div>
+                        <h4 class="text-lg font-bold text-gray-800">${course.course_name}</h4>
+                        <p class="text-xs text-gray-600">${course.course_label || course.description}</p>
+                      </div>
+                      <div class="bg-white rounded-lg p-3 min-h-[120px]">
+                        <p class="text-sm font-bold text-gray-800 mb-1">✨ ${problem.problem_title}</p>
+                        <p class="text-xs text-gray-700 leading-relaxed">${problem.problem_content || problem.problem_description}</p>
+                      </div>
+                      <button class="w-full mt-2 py-2 ${badgeClasses} text-white rounded-lg font-bold text-sm hover:opacity-90">
+                        このコースで学しゅうする
+                      </button>
+                    </div>
+                  `
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- チェックテスト -->
+            <div class="mb-6">
+              <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                <i class="fas fa-check-circle mr-2 text-yellow-600"></i>
+                チェックテスト（学しゅうカードがおわったら、ちょうせんしよう！）
+              </h3>
+              <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-4">
+                <p class="text-center text-gray-700 mb-3">
+                  どのコースも、学しゅうカードをぜんぶおわらせたら、チェックテストにちょうせんできます。<br>
+                  ごうかくすると、下の「えらべるもんだい」にすすめるよ！ 🎉
+                </p>
+                ${checkTests.length > 0 ? `
+                  <div class="grid grid-cols-3 gap-3">
+                    ${checkTests.map((test, index) => {
+                      const bgClass = index === 0 ? 'bg-green-100' :
+                                    index === 1 ? 'bg-blue-100' :
+                                    'bg-purple-100'
+                      return `
+                        <div class="${bgClass} rounded-lg p-3">
+                          <h4 class="font-bold text-gray-800 text-sm mb-2">${test.course_name}</h4>
+                          <p class="text-xs text-gray-700 mb-2">もんだい数: ${test.problems_count}もん</p>
+                          ${test.sample_problems && test.sample_problems.length > 0 ? `
+                            <div class="text-xs text-gray-600">
+                              <p class="font-semibold mb-1">れい:</p>
+                              <p class="bg-white rounded p-2">${test.sample_problems[0].problem_text}</p>
+                            </div>
+                          ` : ''}
+                        </div>
+                      `
+                    }).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- 選択問題（2列×3行 = 6題） -->
+            <div class="mb-6">
+              <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                <i class="fas fa-star mr-2 text-pink-600"></i>
+                えらべるもんだい（チェックテストごうかく後、やりたいもんだいをえらぼう！）
+              </h3>
+              <div class="grid grid-cols-2 gap-4">
+                ${optionalProblems.map((problem, index) => `
+                  <div class="border-2 border-pink-200 bg-gradient-to-br from-white to-pink-50 rounded-xl p-4 hover:shadow-lg transition">
+                    <div class="flex items-start mb-2">
+                      <div class="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold mr-3 flex-shrink-0">
+                        ${problem.problem_number}
+                      </div>
+                      <h4 class="text-base font-bold text-gray-800 flex-1">${problem.problem_title}</h4>
+                    </div>
+                    <p class="text-sm text-gray-700 mb-2 leading-relaxed">${problem.problem_description}</p>
+                    
+                    ${problem.learning_meaning ? `
+                      <div class="bg-yellow-100 border-l-4 border-yellow-500 rounded-r-lg p-2 mb-2">
+                        <p class="text-xs font-semibold text-gray-800 mb-1">
+                          <i class="fas fa-lightbulb mr-1 text-yellow-600"></i>この もんだいで なにが できるようになる？
+                        </p>
+                        <p class="text-xs text-gray-700">${problem.learning_meaning}</p>
+                      </div>
+                    ` : ''}
+
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="px-2 py-1 rounded-full ${
+                        problem.difficulty_level === 'medium' ? 'bg-blue-100 text-blue-700' :
+                        problem.difficulty_level === 'hard' ? 'bg-orange-100 text-orange-700' :
+                        problem.difficulty_level === 'very_hard' ? 'bg-red-100 text-red-700' :
+                        'bg-green-100 text-green-700'
+                      }">
+                        ${problem.difficulty_level === 'medium' ? '★★ ふつう' :
+                          problem.difficulty_level === 'hard' ? '★★★ むずかしい' :
+                          problem.difficulty_level === 'very_hard' ? '★★★★ とてもむずかしい' :
+                          '★ かんたん'}
+                      </span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- 印刷・ツールボタン -->
+            <div class="border-t-2 border-gray-300 pt-6 print:hidden">
+              <div class="grid grid-cols-2 gap-4">
+                <button onclick="window.print()" 
+                        class="bg-gradient-to-r from-gray-600 to-gray-700 text-white py-3 px-4 rounded-xl font-bold hover:from-gray-700 hover:to-gray-800 transition shadow-lg flex items-center justify-center">
+                  <i class="fas fa-print mr-2"></i>
+                  いんさつする
+                </button>
+                <button onclick="loadAnswersTab(${curriculum.id})" 
+                        class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:from-blue-600 hover:to-indigo-700 transition shadow-lg flex items-center justify-center">
+                  <i class="fas fa-book-open mr-2"></i>
+                  こたえを見る
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    console.error('学習のてびき読み込みエラー:', error)
+    alert('データの読み込みに失敗しました')
+  }
+}
           <!-- ヘッダー -->
           <div class="bg-white rounded-3xl shadow-2xl p-8 mb-8">
             <button onclick="renderTopPage()" class="text-indigo-600 hover:text-indigo-800 mb-6 flex items-center text-lg font-semibold transition">
@@ -4954,6 +5150,10 @@ function showTeacherOverview(unitData) {
             <i class="fas fa-info-circle text-blue-600 text-xl mb-1"></i>
             <p class="text-sm font-bold text-blue-800">単元情報</p>
           </a>
+          <a href="#learning-plan" class="bg-teal-50 hover:bg-teal-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-calendar-alt text-teal-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-teal-800">学習計画表</p>
+          </a>
           <a href="#learning-guide" class="bg-green-50 hover:bg-green-100 p-3 rounded-lg text-center transition">
             <i class="fas fa-book text-green-600 text-xl mb-1"></i>
             <p class="text-sm font-bold text-green-800">学習のてびき</p>
@@ -4978,10 +5178,6 @@ function showTeacherOverview(unitData) {
             <i class="fas fa-lightbulb text-yellow-600 text-xl mb-1"></i>
             <p class="text-sm font-bold text-yellow-800">全ヒント一覧</p>
           </a>
-          <a href="#summary" class="bg-gray-50 hover:bg-gray-100 p-3 rounded-lg text-center transition">
-            <i class="fas fa-chart-bar text-gray-600 text-xl mb-1"></i>
-            <p class="text-sm font-bold text-gray-800">統計サマリー</p>
-          </a>
         </div>
       </div>
 
@@ -4993,6 +5189,7 @@ function showTeacherOverview(unitData) {
         </h3>
         <ul class="text-sm text-blue-900 space-y-1">
           <li>✅ AIが生成した全てのコンテンツを一覧で確認できます</li>
+          <li>✅ 学習計画表で時数の調整・カードの並び替えができます</li>
           <li>✅ 学習のてびき、チェックテスト、選択課題、解答・解説も含まれます</li>
           <li>✅ 各カードの「編集」ボタンで内容を修正できます</li>
           <li>✅ 問題がなければ「この単元を保存して使用する」をクリック</li>
@@ -5061,6 +5258,120 @@ function showTeacherOverview(unitData) {
         <div class="bg-green-50 p-4 rounded-lg">
           <p class="text-sm font-bold text-green-800 mb-2">💖 非認知能力の目標</p>
           <p class="text-gray-800">${curriculum.non_cognitive_goal}</p>
+        </div>
+      </div>
+
+      <!-- 学習計画表 -->
+      <div id="learning-plan" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-calendar-alt mr-2"></i>
+          学習計画表（時数調整・カード順序変更）
+        </h2>
+        
+        <div class="bg-teal-50 border-l-4 border-teal-500 p-4 mb-4">
+          <h3 class="font-bold text-teal-800 mb-2">
+            <i class="fas fa-info-circle mr-2"></i>
+            学習計画表の使い方
+          </h3>
+          <ul class="text-sm text-teal-900 space-y-1">
+            <li>✅ 各学習カードの時数を調整できます（＋/－ボタン）</li>
+            <li>✅ カードの順序を並び替えられます（ドラッグ＆ドロップまたは↑↓ボタン）</li>
+            <li>✅ 総時数が単元の予定時数（${curriculum.total_hours}時間）と一致するように調整してください</li>
+            <li>✅ 変更は「保存」ボタンをクリックすると反映されます</li>
+          </ul>
+        </div>
+
+        ${courses.map((course, courseIndex) => `
+          <div class="mb-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-3 pb-2 border-b-2">
+              ${course.course_name} 
+              <span class="text-sm font-normal text-gray-600">（カード数: ${course.cards?.length || 0}枚）</span>
+            </h3>
+            
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-100">
+                  <tr>
+                    <th class="p-2 text-left w-12">順序</th>
+                    <th class="p-2 text-left w-16">カード番号</th>
+                    <th class="p-2 text-left">学習内容</th>
+                    <th class="p-2 text-center w-24">教科書ページ</th>
+                    <th class="p-2 text-center w-32">時数（時間）</th>
+                    <th class="p-2 text-center w-24">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(course.cards || []).map((card, cardIndex) => `
+                    <tr class="border-b hover:bg-gray-50">
+                      <td class="p-2">${cardIndex + 1}</td>
+                      <td class="p-2 font-bold">カード${card.card_number}</td>
+                      <td class="p-2">${card.card_title}</td>
+                      <td class="p-2 text-center text-gray-600">${card.textbook_page || '-'}</td>
+                      <td class="p-2">
+                        <div class="flex items-center justify-center gap-1">
+                          <button onclick="adjustCardTime(${courseIndex}, ${cardIndex}, -1)" 
+                                  class="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold">
+                            －
+                          </button>
+                          <span class="w-8 text-center font-bold" id="time-${courseIndex}-${cardIndex}">1</span>
+                          <button onclick="adjustCardTime(${courseIndex}, ${cardIndex}, 1)" 
+                                  class="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded text-gray-700 font-bold">
+                            ＋
+                          </button>
+                        </div>
+                      </td>
+                      <td class="p-2">
+                        <div class="flex items-center justify-center gap-1">
+                          ${cardIndex > 0 ? `
+                            <button onclick="moveCard(${courseIndex}, ${cardIndex}, -1)" 
+                                    class="w-6 h-6 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 text-xs">
+                              ↑
+                            </button>
+                          ` : ''}
+                          ${cardIndex < (course.cards?.length || 0) - 1 ? `
+                            <button onclick="moveCard(${courseIndex}, ${cardIndex}, 1)" 
+                                    class="w-6 h-6 bg-blue-100 hover:bg-blue-200 rounded text-blue-700 text-xs">
+                              ↓
+                            </button>
+                          ` : ''}
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('')}
+                  <tr class="bg-gray-100 font-bold">
+                    <td colspan="4" class="p-2 text-right">コース合計時数：</td>
+                    <td class="p-2 text-center">
+                      <span id="course-total-${courseIndex}">${course.cards?.length || 0}</span> 時間
+                    </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `).join('')}
+
+        <div class="bg-gray-100 border-2 border-gray-400 rounded-lg p-4 mb-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xl font-bold text-gray-800">単元全体の総時数：</span>
+            <div>
+              <span id="total-hours" class="text-3xl font-bold text-indigo-600">
+                ${courses.reduce((sum, course) => sum + (course.cards?.length || 0), 0)}
+              </span>
+              <span class="text-lg text-gray-600"> / ${curriculum.total_hours} 時間</span>
+            </div>
+          </div>
+          <div id="time-warning" class="hidden mt-2 text-red-600 font-bold">
+            ⚠️ 総時数が目標時数と一致していません。調整してください。
+          </div>
+        </div>
+
+        <div class="flex justify-center">
+          <button onclick="saveLearningPlan()" 
+                  class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg">
+            <i class="fas fa-save mr-2"></i>
+            学習計画を保存
+          </button>
         </div>
       </div>
 
@@ -5349,4 +5660,69 @@ function editCardContent(courseIndex, cardIndex) {
 // グローバル関数として公開
 window.showTeacherOverview = showTeacherOverview
 window.editCardContent = editCardContent
+
+// 学習計画表の時数調整
+let learningPlanData = { courses: [] }
+
+function adjustCardTime(courseIndex, cardIndex, delta) {
+  const timeElement = document.getElementById(`time-${courseIndex}-${cardIndex}`)
+  let currentTime = parseInt(timeElement.textContent)
+  currentTime = Math.max(0, currentTime + delta)
+  timeElement.textContent = currentTime
+  
+  // コース合計を更新
+  updateCourseTotals()
+}
+
+function updateCourseTotals() {
+  const allCourses = document.querySelectorAll('[id^="course-total-"]')
+  let grandTotal = 0
+  
+  allCourses.forEach((courseElement, courseIndex) => {
+    let courseTotal = 0
+    const timeElements = document.querySelectorAll(`[id^="time-${courseIndex}-"]`)
+    timeElements.forEach(elem => {
+      courseTotal += parseInt(elem.textContent)
+    })
+    courseElement.textContent = courseTotal
+    grandTotal += courseTotal
+  })
+  
+  // 総時数を更新
+  document.getElementById('total-hours').textContent = grandTotal
+  
+  // 警告表示
+  const targetHours = parseInt(document.getElementById('total-hours').parentElement.querySelector('.text-gray-600').textContent.match(/\d+/)[0])
+  const warning = document.getElementById('time-warning')
+  if (grandTotal !== targetHours) {
+    warning.classList.remove('hidden')
+  } else {
+    warning.classList.add('hidden')
+  }
+}
+
+function moveCard(courseIndex, cardIndex, direction) {
+  alert(`カード移動機能\\n\\nコース ${courseIndex + 1} のカード ${cardIndex + 1} を${direction > 0 ? '下' : '上'}に移動します。\\n\\n※この機能は次の更新で実装予定です。`)
+}
+
+function saveLearningPlan() {
+  const courses = []
+  document.querySelectorAll('[id^="course-total-"]').forEach((elem, courseIndex) => {
+    const cards = []
+    document.querySelectorAll(`[id^="time-${courseIndex}-"]`).forEach((timeElem, cardIndex) => {
+      cards.push({
+        cardIndex: cardIndex,
+        allocatedHours: parseInt(timeElem.textContent)
+      })
+    })
+    courses.push({ courseIndex, cards })
+  })
+  
+  learningPlanData = { courses }
+  alert('✅ 学習計画表を保存しました！\\n\\n単元保存時に反映されます。')
+}
+
+window.adjustCardTime = adjustCardTime
+window.moveCard = moveCard
+window.saveLearningPlan = saveLearningPlan
 
