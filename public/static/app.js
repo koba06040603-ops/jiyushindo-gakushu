@@ -624,7 +624,27 @@ async function loadCardPage(cardId) {
               </h1>
               <h2 class="text-xl text-gray-800">${card.card_title}</h2>
             </div>
-            <div class="text-right">
+            <div class="flex items-center gap-3">
+              <!-- ヘルプボタン3つ -->
+              <button onclick="showAITeacher()" 
+                      class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg flex flex-col items-center justify-center min-w-[100px]"
+                      title="AI先生に質問">
+                <i class="fas fa-robot text-xl mb-1"></i>
+                <span class="text-xs">AI先生</span>
+              </button>
+              <button onclick="callTeacher()" 
+                      class="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg flex flex-col items-center justify-center min-w-[100px]"
+                      title="先生にヘルプを要求">
+                <i class="fas fa-chalkboard-teacher text-xl mb-1"></i>
+                <span class="text-xs">先生にヘルプ</span>
+              </button>
+              <button onclick="askFriend()" 
+                      class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg flex flex-col items-center justify-center min-w-[100px]"
+                      title="できている友達を確認">
+                <i class="fas fa-user-friends text-xl mb-1"></i>
+                <span class="text-xs">友達に聞く</span>
+              </button>
+              <!-- 難易度バッジ -->
               <div class="inline-block px-4 py-2 rounded-lg ${
                 card.difficulty_level === 'minimum' ? 'bg-green-100 text-green-700' :
                 card.difficulty_level === 'standard' ? 'bg-blue-100 text-blue-700' :
@@ -637,48 +657,7 @@ async function loadCardPage(cardId) {
           </div>
         </div>
 
-        <!-- 助けを求めるボタン（右上固定） -->
-        <div class="fixed top-20 right-4 z-50 space-y-2">
-          <button onclick="showHelpMenu()" 
-                  class="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-500 text-white rounded-full shadow-lg hover:shadow-xl transition flex items-center justify-center">
-            <i class="fas fa-hand-paper text-2xl"></i>
-          </button>
-        </div>
-
-        <!-- ヘルプメニュー（モーダル） -->
-        <div id="helpMenu" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
-            <h3 class="text-2xl font-bold text-gray-800 mb-6">
-              <i class="fas fa-question-circle mr-2 text-indigo-600"></i>
-              助けを求める
-            </h3>
-            <div class="space-y-4">
-              <button onclick="showHints(); closeHelpMenu()" 
-                      class="w-full bg-yellow-500 text-white py-4 px-6 rounded-lg font-bold hover:bg-yellow-600 transition flex items-center justify-center">
-                <i class="fas fa-lightbulb mr-3 text-xl"></i>
-                ヒントカード
-              </button>
-              <button onclick="showAITeacher(); closeHelpMenu()" 
-                      class="w-full bg-blue-500 text-white py-4 px-6 rounded-lg font-bold hover:bg-blue-600 transition flex items-center justify-center">
-                <i class="fas fa-robot mr-3 text-xl"></i>
-                AI先生に聞く
-              </button>
-              <button onclick="callTeacher(); closeHelpMenu()" 
-                      class="w-full bg-green-500 text-white py-4 px-6 rounded-lg font-bold hover:bg-green-600 transition flex items-center justify-center">
-                <i class="fas fa-chalkboard-teacher mr-3 text-xl"></i>
-                先生を呼ぶ
-              </button>
-              <button onclick="askFriend(); closeHelpMenu()" 
-                      class="w-full bg-purple-500 text-white py-4 px-6 rounded-lg font-bold hover:bg-purple-600 transition flex items-center justify-center">
-                <i class="fas fa-user-friends mr-3 text-xl"></i>
-                友達に聞く
-              </button>
-              <button onclick="closeHelpMenu()" 
-                      class="w-full bg-gray-300 text-gray-700 py-3 px-6 rounded-lg font-bold hover:bg-gray-400 transition">
-                閉じる
-              </button>
-            </div>
-          </div>
+        <!-- 旧ヘルプメニューを削除し、ヒントは別途表示 -->
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -4515,6 +4494,12 @@ function showUnitPreview(unitData, modelUsed) {
 
       <!-- アクションボタン -->
       <div class="flex flex-col space-y-3">
+        <!-- 教師用：全体確認・編集ボタン -->
+        <button onclick="showTeacherOverview(${JSON.stringify(unitData).replace(/"/g, '&quot;')})"
+                class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
+          <i class="fas fa-edit mr-2"></i>
+          👨‍🏫 教師用：全体を確認・編集する
+        </button>
         <button onclick="showPrintPreview(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
                 class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
           <i class="fas fa-print mr-2"></i>
@@ -4867,4 +4852,176 @@ function showPrintPreview(unitData) {
 
 // グローバル関数として公開
 window.showPrintPreview = showPrintPreview
+
+// ============================================
+// 教師用全体概観＆編集機能
+// ============================================
+
+function showTeacherOverview(unitData) {
+  const curriculum = unitData.curriculum
+  const courses = unitData.courses || []
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="container mx-auto px-4 py-8">
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg shadow-lg p-6 mb-6">
+        <button onclick="showUnitPreview(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" class="text-white hover:text-gray-200 mb-4">
+          <i class="fas fa-arrow-left mr-2"></i>プレビューに戻る
+        </button>
+        <h1 class="text-3xl font-bold mb-2">
+          <i class="fas fa-chalkboard-teacher mr-2"></i>
+          教師用：全体確認・編集
+        </h1>
+        <p class="text-lg opacity-90">
+          ${curriculum.unit_name} - ${curriculum.grade} ${curriculum.subject}
+        </p>
+      </div>
+
+      <!-- 使い方ガイド -->
+      <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <h3 class="font-bold text-blue-800 mb-2">
+          <i class="fas fa-info-circle mr-2"></i>
+          使い方
+        </h3>
+        <ul class="text-sm text-blue-900 space-y-1">
+          <li>✅ AIが生成した全てのコンテンツを一覧で確認できます</li>
+          <li>✅ 各カードの「編集」ボタンで内容を修正できます</li>
+          <li>✅ 問題がなければ「この単元を保存して使用する」をクリック</li>
+        </ul>
+      </div>
+
+      <!-- 単元情報 -->
+      <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-bullseye mr-2"></i>
+          単元情報
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <p class="text-sm text-gray-600 mb-1">学年・教科</p>
+            <p class="font-bold text-gray-800">${curriculum.grade} ${curriculum.subject}</p>
+          </div>
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <p class="text-sm text-gray-600 mb-1">教科書会社</p>
+            <p class="font-bold text-gray-800">${curriculum.textbook_company}</p>
+          </div>
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <p class="text-sm text-gray-600 mb-1">総学習時間</p>
+            <p class="font-bold text-gray-800">${curriculum.total_hours}時間</p>
+          </div>
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <p class="text-sm text-gray-600 mb-1">コース数</p>
+            <p class="font-bold text-gray-800">${courses.length}コース</p>
+          </div>
+        </div>
+        
+        <div class="bg-blue-50 p-4 rounded-lg mb-3">
+          <p class="text-sm font-bold text-blue-800 mb-2">📚 学習目標</p>
+          <p class="text-gray-800">${curriculum.unit_goal}</p>
+        </div>
+        
+        <div class="bg-green-50 p-4 rounded-lg">
+          <p class="text-sm font-bold text-green-800 mb-2">💖 非認知能力の目標</p>
+          <p class="text-gray-800">${curriculum.non_cognitive_goal}</p>
+        </div>
+      </div>
+
+      <!-- 全コース・全カード一覧 -->
+      ${courses.map((course, courseIndex) => `
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-2xl font-bold text-${course.color_code}-800">
+              <i class="fas fa-layer-group mr-2"></i>
+              ${course.course_name}
+            </h2>
+            <span class="bg-${course.color_code}-100 text-${course.color_code}-800 px-4 py-2 rounded-full font-bold">
+              ${course.cards?.length || 0}枚
+            </span>
+          </div>
+          <p class="text-gray-600 mb-4">${course.description}</p>
+          
+          <!-- カード一覧 -->
+          <div class="space-y-4">
+            ${(course.cards || []).map((card, cardIndex) => `
+              <div class="border-2 border-gray-200 rounded-lg p-4 hover:border-${course.color_code}-300 transition">
+                <div class="flex items-start justify-between mb-3">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="bg-${course.color_code}-100 text-${course.color_code}-800 px-3 py-1 rounded-full text-sm font-bold">
+                        カード ${card.card_number}
+                      </span>
+                      <span class="text-sm text-gray-500">${card.card_type || 'main'}</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">
+                      ${card.card_title}
+                    </h3>
+                  </div>
+                  <button onclick="editCardContent(${courseIndex}, ${cardIndex})"
+                          class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold transition">
+                    <i class="fas fa-edit mr-1"></i>
+                    編集
+                  </button>
+                </div>
+                
+                <!-- カード内容プレビュー -->
+                <div class="bg-gray-50 p-4 rounded-lg space-y-3 text-sm">
+                  <div>
+                    <p class="font-bold text-gray-700 mb-1">📝 問題・課題</p>
+                    <p class="text-gray-600">${card.problem_description?.substring(0, 100) || '(なし)'}${card.problem_description?.length > 100 ? '...' : ''}</p>
+                  </div>
+                  
+                  <div>
+                    <p class="font-bold text-gray-700 mb-1">📚 新出用語</p>
+                    <p class="text-gray-600">${card.new_terms || '(なし)'}</p>
+                  </div>
+                  
+                  <div>
+                    <p class="font-bold text-gray-700 mb-1">💡 例題</p>
+                    <p class="text-gray-600">${card.example_problem?.substring(0, 80) || '(なし)'}${card.example_problem?.length > 80 ? '...' : ''}</p>
+                  </div>
+                  
+                  <div>
+                    <p class="font-bold text-gray-700 mb-1">🌍 実社会とのつながり</p>
+                    <p class="text-gray-600">${card.real_world_connection?.substring(0, 80) || '(なし)'}${card.real_world_connection?.length > 80 ? '...' : ''}</p>
+                  </div>
+                  
+                  <div>
+                    <p class="font-bold text-gray-700 mb-1">💡 ヒント</p>
+                    <p class="text-gray-600">${card.hints?.length || 0}段階のヒントを用意</p>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')}
+
+      <!-- アクションボタン -->
+      <div class="bg-white rounded-lg shadow-lg p-6 space-y-4">
+        <div class="flex space-x-4">
+          <button onclick="showUnitPreview(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
+                  class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-4 px-6 rounded-lg transition">
+            <i class="fas fa-arrow-left mr-2"></i>
+            プレビューに戻る
+          </button>
+          <button onclick="saveGeneratedUnit(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
+                  class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>
+            ✅ 確認完了：この単元を保存して使用する
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// カード内容編集モーダル（簡易版）
+function editCardContent(courseIndex, cardIndex) {
+  alert(`カード編集機能\n\nコース ${courseIndex + 1}、カード ${cardIndex + 1} の編集画面を開きます。\n\n※現在は既存の問題編集機能を使用してください。\n学習のてびきページ > 教師用ツール > 問題編集`)
+}
+
+// グローバル関数として公開
+window.showTeacherOverview = showTeacherOverview
+window.editCardContent = editCardContent
 
