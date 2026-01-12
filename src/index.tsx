@@ -469,14 +469,53 @@ app.put('/api/plans/:id', async (c) => {
 app.post('/api/ai/reflect', async (c) => {
   const { env } = c
   const body = await c.req.json()
+  const { reflections, type } = body  // type: 'hourly' or 'unit'
   
   const apiKey = env.GEMINI_API_KEY
   
   if (!apiKey) {
     return c.json({ 
-      feedback: 'がんばりましたね！次回も楽しく学習しましょう。' 
+      feedback: type === 'unit' 
+        ? '単元を最後まで学習できましたね！次の単元も楽しみです。'
+        : 'がんばりましたね！次回も楽しく学習しましょう。' 
     })
   }
+  
+  const promptText = type === 'unit' 
+    ? `あなたは小学生の学習を応援するAI先生です。子どもの単元全体の振り返りを読んで、成長を認め、次の学習への意欲を高めるメッセージを送ってください。
+
+【単元全体の振り返り】
+良かったこと: ${reflections.good || 'なし'}
+直したいこと: ${reflections.bad || 'なし'}
+わかったこと: ${reflections.learned || 'なし'}
+
+【フィードバックのルール】
+1. 単元全体を通しての成長を認める
+2. 良かったことを具体的に褒める
+3. 直したいことは次の目標として前向きに受け止める
+4. わかったことの価値を伝え、学びの喜びを共感する
+5. 次の単元への期待感を持たせる
+6. 小学生にわかりやすい言葉で
+7. 200文字以内で
+
+温かく励ますメッセージを書いてください。`
+    : `あなたは小学生の学習を応援するAI先生です。子どもの1時間の学習の振り返りを読んで、励ましとアドバイスをしてください。
+
+【振り返り内容】
+良かったこと: ${reflections.good || 'なし'}
+難しかったこと: ${reflections.bad || 'なし'}
+わかったこと: ${reflections.learned || 'なし'}
+
+【フィードバックのルール】
+1. 必ず励ましの言葉から始める
+2. 良かったことを具体的に褒める
+3. 難しかったことには共感し、次へのヒントを出す
+4. わかったことの素晴らしさを伝える
+5. 次の学習への意欲が湧く言葉で締める
+6. 小学生にわかりやすい言葉で
+7. 150文字以内で簡潔に
+
+フィードバックしてください。`
   
   try {
     const geminiResponse = await fetch(
@@ -489,28 +528,12 @@ app.post('/api/ai/reflect', async (c) => {
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `あなたは小学生の学習を応援するAI先生です。子どもの振り返りを読んで、励ましとアドバイスをしてください。
-
-【振り返り内容】
-良かったこと: ${body.reflection_good || 'なし'}
-難しかったこと: ${body.reflection_bad || 'なし'}
-わかったこと: ${body.reflection_learned || 'なし'}
-
-【フィードバックのルール】
-1. 必ず励ましの言葉から始める
-2. 良かったことを具体的に褒める
-3. 難しかったことには共感し、次へのヒントを出す
-4. わかったことの素晴らしさを伝える
-5. 次の学習への意欲が湧く言葉で締める
-6. 小学生にわかりやすい言葉で
-7. 150文字以内で簡潔に
-
-フィードバックしてください。`
+              text: promptText
             }]
           }],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 200,
+            maxOutputTokens: type === 'unit' ? 300 : 200,
           }
         })
       }
@@ -523,7 +546,9 @@ app.post('/api/ai/reflect', async (c) => {
     }
     
     const feedback = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 
-                     'よくがんばりました！次回も楽しく学習しましょう。'
+                     (type === 'unit' 
+                       ? '単元をしっかり学習できました！次の単元も楽しみです！'
+                       : 'よくがんばりました！次回も楽しく学習しましょう。')
     
     return c.json({ feedback })
     
@@ -676,6 +701,100 @@ app.get('/api/evaluations/student/:studentId/curriculum/:curriculumId', async (c
     return c.json(evaluation)
   } catch (error) {
     return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習計画取得
+app.get('/api/learning-plan/:studentId/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const plans = await env.DB.prepare(`
+      SELECT * FROM learning_plans
+      WHERE student_id = ? AND curriculum_id = ?
+      ORDER BY planned_date ASC
+    `).bind(studentId, curriculumId).all()
+    
+    return c.json({ plans: plans.results })
+  } catch (error) {
+    console.error('学習計画取得エラー:', error)
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習計画保存
+app.post('/api/learning-plan/save', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  const { student_id, curriculum_id, total_hours, plans, unit_reflection } = body
+  
+  try {
+    // 既存の計画を削除
+    await env.DB.prepare(`
+      DELETE FROM learning_plans 
+      WHERE student_id = ? AND curriculum_id = ?
+    `).bind(student_id, curriculum_id).run()
+    
+    // 既存の単元振り返りを削除
+    await env.DB.prepare(`
+      DELETE FROM unit_reflections 
+      WHERE student_id = ? AND curriculum_id = ?
+    `).bind(student_id, curriculum_id).run()
+    
+    // 新しい計画を保存
+    for (const plan of plans) {
+      await env.DB.prepare(`
+        INSERT INTO learning_plans (
+          student_id, 
+          curriculum_id,
+          hour_number,
+          subject,
+          planned_date,
+          learning_content,
+          reflection_good, 
+          reflection_bad, 
+          reflection_learned,
+          ai_feedback
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        student_id,
+        curriculum_id,
+        plan.hour_number,
+        plan.subject,
+        plan.planned_date || null,
+        plan.learning_content || '',
+        plan.reflection_good || '',
+        plan.reflection_bad || '',
+        plan.reflection_learned || '',
+        plan.ai_feedback || null
+      ).run()
+    }
+    
+    // 単元全体の振り返りを保存
+    if (unit_reflection && (unit_reflection.good || unit_reflection.bad || unit_reflection.learned)) {
+      await env.DB.prepare(`
+        INSERT INTO unit_reflections (
+          student_id, 
+          curriculum_id,
+          reflection_good, 
+          reflection_bad, 
+          reflection_learned
+        ) VALUES (?, ?, ?, ?, ?)
+      `).bind(
+        student_id,
+        curriculum_id,
+        unit_reflection.good || '',
+        unit_reflection.bad || '',
+        unit_reflection.learned || ''
+      ).run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('学習計画保存エラー:', error)
+    return c.json({ error: 'Database error', details: error.message }, 500)
   }
 })
 

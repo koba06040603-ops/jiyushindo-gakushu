@@ -471,7 +471,12 @@ async function loadGuidePage(curriculumId) {
 
             <!-- 印刷・ツールボタン -->
             <div class="border-t-2 border-gray-300 pt-6 print:hidden">
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-3 gap-4">
+                <button onclick="loadLearningPlanPage(${curriculum.id})" 
+                        class="bg-gradient-to-r from-green-500 to-teal-600 text-white py-3 px-4 rounded-xl font-bold hover:from-green-600 hover:to-teal-700 transition shadow-lg flex items-center justify-center">
+                  <i class="fas fa-calendar-alt mr-2"></i>
+                  学習計画表を作る
+                </button>
                 <button onclick="window.print()" 
                         class="bg-gradient-to-r from-gray-600 to-gray-700 text-white py-3 px-4 rounded-xl font-bold hover:from-gray-700 hover:to-gray-800 transition shadow-lg flex items-center justify-center">
                   <i class="fas fa-print mr-2"></i>
@@ -494,6 +499,419 @@ async function loadGuidePage(curriculumId) {
     alert('データの読み込みに失敗しました')
   }
 }
+
+// 学習計画表ページ
+async function loadLearningPlanPage(curriculumId) {
+  state.currentView = 'learning_plan'
+  
+  try {
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum, courses } = response.data
+    
+    // 既存の学習計画を取得
+    let existingPlans = []
+    try {
+      const planResponse = await axios.get(`/api/learning-plan/${state.student.id}/${curriculumId}`)
+      existingPlans = planResponse.data.plans || []
+    } catch (error) {
+      console.log('既存の計画なし、新規作成')
+    }
+    
+    state.selectedCurriculum = curriculum
+    state.courses = courses
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 py-8">
+        <div class="container mx-auto px-4 max-w-6xl">
+          
+          <button onclick="loadGuidePage(${curriculumId})" 
+                  class="mb-4 text-green-600 hover:text-green-800 flex items-center text-lg font-semibold transition">
+            <i class="fas fa-arrow-left mr-2"></i>学習のてびきにもどる
+          </button>
+
+          <div class="bg-white rounded-2xl shadow-2xl p-8">
+            
+            <div class="text-center mb-6 border-b-4 border-green-600 pb-6">
+              <h1 class="text-4xl font-bold text-green-700 mb-3">
+                <i class="fas fa-calendar-alt mr-3"></i>学習計画表
+              </h1>
+              <h2 class="text-2xl font-bold text-gray-800">${curriculum.unit_name}</h2>
+              <div class="grid grid-cols-3 gap-4 text-sm mt-4">
+                <div class="text-left">
+                  <span class="font-bold">学年：</span>${curriculum.grade}年
+                </div>
+                <div class="text-center">
+                  <span class="font-bold">組：</span>____ 組
+                </div>
+                <div class="text-right">
+                  <span class="font-bold">名前：</span>${state.student.name}
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-green-100 to-blue-100 rounded-xl p-6 mb-6">
+              <h3 class="text-xl font-bold text-green-800 mb-3 flex items-center">
+                <i class="fas fa-target mr-2"></i>単元の学習目標
+              </h3>
+              <p class="text-gray-800 leading-relaxed">${curriculum.unit_goal}</p>
+            </div>
+
+            <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-6 mb-6">
+              <h3 class="text-xl font-bold text-purple-800 mb-3 flex items-center">
+                <i class="fas fa-heart mr-2"></i>こころの成長目標
+              </h3>
+              <p class="text-gray-800 leading-relaxed">${curriculum.non_cognitive_goal}</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6 mb-6">
+              <div class="bg-blue-50 rounded-xl p-4">
+                <label class="block text-sm font-bold text-blue-800 mb-2">
+                  <i class="fas fa-clock mr-2"></i>ぜんぶの学習時間
+                </label>
+                <div class="flex items-center gap-2">
+                  <input type="number" 
+                         id="totalHours" 
+                         value="${curriculum.total_hours}" 
+                         min="1" 
+                         max="30" 
+                         class="w-24 px-3 py-2 border-2 border-blue-300 rounded-lg font-bold text-xl text-center">
+                  <span class="text-lg font-bold text-blue-700">じかん</span>
+                </div>
+              </div>
+              
+              <div class="bg-orange-50 rounded-xl p-4">
+                <label class="block text-sm font-bold text-orange-800 mb-2">
+                  <i class="fas fa-book mr-2"></i>学習する教科
+                </label>
+                <select id="subjectSelect" 
+                        class="w-full px-3 py-2 border-2 border-orange-300 rounded-lg font-bold text-lg"
+                        onchange="toggleSubject2()">
+                  <option value="1">1教科のみ</option>
+                  <option value="2">2教科同時学習</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="subject2Options" class="bg-yellow-50 rounded-xl p-4 mb-6 hidden">
+              <h3 class="text-lg font-bold text-yellow-800 mb-3">
+                <i class="fas fa-plus-circle mr-2"></i>2教科目を選ぶ
+              </h3>
+              <div class="grid grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">教科</label>
+                  <select id="subject2Name" class="w-full px-3 py-2 border-2 border-yellow-300 rounded-lg">
+                    <option>算数</option>
+                    <option>国語</option>
+                    <option>理科</option>
+                    <option>社会</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">単元名</label>
+                  <input type="text" id="subject2Unit" 
+                         placeholder="たとえば：物語を読もう"
+                         class="w-full px-3 py-2 border-2 border-yellow-300 rounded-lg">
+                </div>
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">時間数</label>
+                  <input type="number" id="subject2Hours" value="8" min="1" max="20"
+                         class="w-full px-3 py-2 border-2 border-yellow-300 rounded-lg">
+                </div>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto mb-6">
+              <table class="w-full border-collapse border-2 border-gray-300">
+                <thead>
+                  <tr class="bg-gradient-to-r from-green-200 to-blue-200">
+                    <th class="border-2 border-gray-300 px-3 py-2 text-sm font-bold">時間目</th>
+                    <th class="border-2 border-gray-300 px-3 py-2 text-sm font-bold">教科</th>
+                    <th class="border-2 border-gray-300 px-3 py-2 text-sm font-bold">学習予定日</th>
+                    <th class="border-2 border-gray-300 px-3 py-2 text-sm font-bold">学習内容</th>
+                    <th class="border-2 border-gray-300 px-3 py-2 text-sm font-bold">よかったこと</th>
+                    <th class="border-2 border-gray-300 px-3 py-2 text-sm font-bold">なおしたいこと</th>
+                    <th class="border-2 border-gray-300 px-3 py-2 text-sm font-bold">わかったこと</th>
+                    <th class="border-2 border-gray-300 px-3 py-2 text-sm font-bold">AIのアドバイス</th>
+                  </tr>
+                </thead>
+                <tbody id="learningPlanTable">
+                  ${generateLearningPlanRows(curriculum.total_hours, existingPlans, curriculum)}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-6 mb-6">
+              <h3 class="text-xl font-bold text-purple-800 mb-4 flex items-center">
+                <i class="fas fa-comments mr-2"></i>単元ぜんたいの振り返り
+              </h3>
+              <div class="grid grid-cols-3 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-bold text-purple-700 mb-2">よかったこと</label>
+                  <textarea id="unitReflectionGood" 
+                            rows="3" 
+                            class="w-full px-3 py-2 border-2 border-purple-300 rounded-lg resize-none"
+                            placeholder="単元全体でよかったことを書こう"></textarea>
+                </div>
+                <div>
+                  <label class="block text-sm font-bold text-purple-700 mb-2">なおしたいこと</label>
+                  <textarea id="unitReflectionBad" 
+                            rows="3" 
+                            class="w-full px-3 py-2 border-2 border-purple-300 rounded-lg resize-none"
+                            placeholder="次の単元で改善したいことを書こう"></textarea>
+                </div>
+                <div>
+                  <label class="block text-sm font-bold text-purple-700 mb-2">わかったこと</label>
+                  <textarea id="unitReflectionLearned" 
+                            rows="3" 
+                            class="w-full px-3 py-2 border-2 border-purple-300 rounded-lg resize-none"
+                            placeholder="新しく学んだこと・発見したことを書こう"></textarea>
+                </div>
+              </div>
+              <button onclick="getUnitReflectionAI()" 
+                      class="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-6 rounded-xl font-bold hover:from-purple-600 hover:to-pink-700 transition shadow-lg">
+                <i class="fas fa-robot mr-2"></i>たんげんのふり返りAIアドバイスをもらう
+              </button>
+              <div id="unitAIFeedback" class="mt-4 hidden">
+                <div class="bg-white rounded-lg p-4 border-2 border-purple-300">
+                  <p class="text-sm font-bold text-purple-700 mb-2">
+                    <i class="fas fa-sparkles mr-2"></i>AIからのメッセージ
+                  </p>
+                  <p id="unitAIFeedbackText" class="text-gray-800"></p>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex gap-4 justify-end">
+              <button onclick="saveLearningPlan(${curriculumId})" 
+                      class="bg-gradient-to-r from-green-500 to-blue-600 text-white py-3 px-8 rounded-xl font-bold hover:from-green-600 hover:to-blue-700 transition shadow-lg">
+                <i class="fas fa-save mr-2"></i>学習計画を保存する
+              </button>
+              <button onclick="window.print()" 
+                      class="bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-8 rounded-xl font-bold hover:from-purple-600 hover:to-pink-700 transition shadow-lg">
+                <i class="fas fa-print mr-2"></i>いんさつする
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    console.error('学習計画表読み込みエラー:', error)
+    alert('データの読み込みに失敗しました')
+  }
+}
+
+function generateLearningPlanRows(totalHours, existingPlans, curriculum) {
+  let rows = ''
+  const subject1Name = curriculum.subject || '算数'
+  
+  for (let i = 1; i <= totalHours; i++) {
+    const existingPlan = existingPlans.find(p => p.hour_number === i)
+    const isFixed = i === 1 || i === totalHours
+    const bgClass = isFixed ? 'bg-gray-100' : 'bg-white'
+    const content = i === 1 ? 'オリエンテーション（単元の目標とコースを決める）' 
+                   : i === totalHours ? 'まとめ（単元のふり返りと発表）' 
+                   : existingPlan?.learning_content || ''
+    
+    rows += `
+      <tr class="${bgClass}">
+        <td class="border-2 border-gray-300 px-3 py-2 text-center font-bold">${i}</td>
+        <td class="border-2 border-gray-300 px-3 py-2 text-center">
+          ${isFixed ? subject1Name : `
+            <select class="subject-select w-full px-2 py-1 border border-gray-300 rounded text-sm" 
+                    data-hour="${i}">
+              <option value="${subject1Name}" selected>${subject1Name}</option>
+            </select>
+          `}
+        </td>
+        <td class="border-2 border-gray-300 px-3 py-2">
+          <input type="date" 
+                 class="planned-date w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                 data-hour="${i}"
+                 value="${existingPlan?.planned_date || ''}"
+                 ${isFixed ? 'readonly' : ''}>
+        </td>
+        <td class="border-2 border-gray-300 px-3 py-2">
+          <input type="text" 
+                 class="learning-content w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                 data-hour="${i}"
+                 value="${content}"
+                 placeholder="${isFixed ? '' : '学習カード1-2など'}"
+                 ${isFixed ? 'readonly' : ''}>
+        </td>
+        <td class="border-2 border-gray-300 px-3 py-2">
+          <textarea class="reflection-good w-full px-2 py-1 border border-gray-300 rounded text-xs resize-none"
+                    rows="2"
+                    data-hour="${i}"
+                    placeholder="よかったこと"
+                    ${isFixed ? 'readonly' : ''}>${existingPlan?.reflection_good || ''}</textarea>
+        </td>
+        <td class="border-2 border-gray-300 px-3 py-2">
+          <textarea class="reflection-bad w-full px-2 py-1 border border-gray-300 rounded text-xs resize-none"
+                    rows="2"
+                    data-hour="${i}"
+                    placeholder="なおしたいこと"
+                    ${isFixed ? 'readonly' : ''}>${existingPlan?.reflection_bad || ''}</textarea>
+        </td>
+        <td class="border-2 border-gray-300 px-3 py-2">
+          <textarea class="reflection-learned w-full px-2 py-1 border border-gray-300 rounded text-xs resize-none"
+                    rows="2"
+                    data-hour="${i}"
+                    placeholder="わかったこと"
+                    ${isFixed ? 'readonly' : ''}>${existingPlan?.reflection_learned || ''}</textarea>
+        </td>
+        <td class="border-2 border-gray-300 px-3 py-2">
+          ${isFixed ? '<span class="text-xs text-gray-400">-</span>' : `
+            <button onclick="getReflectionAI(${i})" 
+                    class="ai-feedback-btn w-full bg-blue-500 text-white py-1 px-2 rounded text-xs hover:bg-blue-600 transition">
+              <i class="fas fa-robot mr-1"></i>AIアドバイス
+            </button>
+            <div id="aiFeedback${i}" class="mt-1 text-xs text-gray-700 hidden"></div>
+          `}
+        </td>
+      </tr>
+    `
+  }
+  
+  return rows
+}
+
+function toggleSubject2() {
+  const select = document.getElementById('subjectSelect')
+  const subject2Options = document.getElementById('subject2Options')
+  
+  if (select.value === '2') {
+    subject2Options.classList.remove('hidden')
+    const subjectSelects = document.querySelectorAll('.subject-select')
+    const subject2Name = document.getElementById('subject2Name').value
+    subjectSelects.forEach(select => {
+      if (select.options.length === 1) {
+        const option = document.createElement('option')
+        option.value = subject2Name
+        option.textContent = subject2Name
+        select.appendChild(option)
+      }
+    })
+  } else {
+    subject2Options.classList.add('hidden')
+    const subjectSelects = document.querySelectorAll('.subject-select')
+    subjectSelects.forEach(select => {
+      if (select.options.length > 1) {
+        select.remove(1)
+      }
+    })
+  }
+}
+
+async function getReflectionAI(hourNumber) {
+  const good = document.querySelector(`.reflection-good[data-hour="${hourNumber}"]`).value
+  const bad = document.querySelector(`.reflection-bad[data-hour="${hourNumber}"]`).value
+  const learned = document.querySelector(`.reflection-learned[data-hour="${hourNumber}"]`).value
+  
+  if (!good && !bad && !learned) {
+    alert('振り返りを書いてからAIアドバイスをもらおう！')
+    return
+  }
+  
+  const feedbackDiv = document.getElementById(`aiFeedback${hourNumber}`)
+  feedbackDiv.textContent = 'AIが考えています...'
+  feedbackDiv.classList.remove('hidden')
+  
+  try {
+    const response = await axios.post('/api/ai/reflect', {
+      reflections: { good, bad, learned },
+      type: 'hourly'
+    })
+    
+    feedbackDiv.textContent = response.data.feedback || '応援しています！次もがんばろう！'
+    feedbackDiv.className = 'mt-1 text-xs text-blue-700 bg-blue-50 p-2 rounded'
+  } catch (error) {
+    console.error('AIアドバイス取得エラー:', error)
+    feedbackDiv.textContent = '素晴らしい振り返りだね！この調子で頑張ろう！'
+    feedbackDiv.className = 'mt-1 text-xs text-green-700 bg-green-50 p-2 rounded'
+  }
+}
+
+async function getUnitReflectionAI() {
+  const good = document.getElementById('unitReflectionGood').value
+  const bad = document.getElementById('unitReflectionBad').value
+  const learned = document.getElementById('unitReflectionLearned').value
+  
+  if (!good && !bad && !learned) {
+    alert('単元全体の振り返りを書いてからAIアドバイスをもらおう！')
+    return
+  }
+  
+  const feedbackDiv = document.getElementById('unitAIFeedback')
+  const feedbackText = document.getElementById('unitAIFeedbackText')
+  feedbackText.textContent = 'AIが考えています...'
+  feedbackDiv.classList.remove('hidden')
+  
+  try {
+    const response = await axios.post('/api/ai/reflect', {
+      reflections: { good, bad, learned },
+      type: 'unit'
+    })
+    
+    feedbackText.textContent = response.data.feedback || '単元をしっかり学習できましたね！次の単元も楽しみです！'
+  } catch (error) {
+    console.error('単元AIアドバイス取得エラー:', error)
+    feedbackText.textContent = '単元全体の振り返りができました！この経験を次に活かしましょう！'
+  }
+}
+
+async function saveLearningPlan(curriculumId) {
+  const totalHours = parseInt(document.getElementById('totalHours').value)
+  const plans = []
+  
+  for (let i = 1; i <= totalHours; i++) {
+    const subject = document.querySelector(`.subject-select[data-hour="${i}"]`)?.value 
+                    || state.selectedCurriculum.subject
+    const plannedDate = document.querySelector(`.planned-date[data-hour="${i}"]`).value
+    const learningContent = document.querySelector(`.learning-content[data-hour="${i}"]`).value
+    const reflectionGood = document.querySelector(`.reflection-good[data-hour="${i}"]`).value
+    const reflectionBad = document.querySelector(`.reflection-bad[data-hour="${i}"]`).value
+    const reflectionLearned = document.querySelector(`.reflection-learned[data-hour="${i}"]`).value
+    
+    plans.push({
+      hour_number: i,
+      subject: subject,
+      planned_date: plannedDate,
+      learning_content: learningContent,
+      reflection_good: reflectionGood,
+      reflection_bad: reflectionBad,
+      reflection_learned: reflectionLearned
+    })
+  }
+  
+  const unitReflection = {
+    good: document.getElementById('unitReflectionGood').value,
+    bad: document.getElementById('unitReflectionBad').value,
+    learned: document.getElementById('unitReflectionLearned').value
+  }
+  
+  try {
+    const response = await axios.post('/api/learning-plan/save', {
+      student_id: state.student.id,
+      curriculum_id: curriculumId,
+      total_hours: totalHours,
+      plans: plans,
+      unit_reflection: unitReflection
+    })
+    
+    if (response.data.success) {
+      alert('✅ 学習計画を保存しました！')
+    } else {
+      alert('保存に失敗しました。もう一度試してください。')
+    }
+  } catch (error) {
+    console.error('学習計画保存エラー:', error)
+    alert('保存中にエラーが発生しました')
+  }
+}
+
 function getCategoryLabel(category) {
   const labels = {
     'creative': '表現・クリエイティブ',
@@ -578,6 +996,11 @@ async function selectCourse(courseId) {
 // グローバルスコープに関数を登録
 window.renderTopPage = renderTopPage
 window.loadGuidePage = loadGuidePage
+window.loadLearningPlanPage = loadLearningPlanPage
+window.toggleSubject2 = toggleSubject2
+window.getReflectionAI = getReflectionAI
+window.getUnitReflectionAI = getUnitReflectionAI
+window.saveLearningPlan = saveLearningPlan
 window.selectCourse = selectCourse
 window.loadCardPage = loadCardPage
 window.loadProgressBoard = loadProgressBoard
