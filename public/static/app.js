@@ -5009,22 +5009,56 @@ async function startUnitGeneration() {
 
   } catch (error) {
     console.error('単元生成エラー:', error)
+    console.error('エラー詳細:', error.response?.data)
+    
+    // エラー詳細を取得
+    const errorDetails = error.response?.data?.details || error.message || '不明なエラー'
+    const errorMessage = error.response?.data?.error || '単元の生成に失敗しました'
     
     // エラー表示
     const app = document.getElementById('app')
     app.innerHTML = `
       <div class="container mx-auto px-4 py-8">
-        <div class="bg-white rounded-lg shadow-lg p-8 text-center">
-          <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
-          <h2 class="text-2xl font-bold text-gray-800 mb-4">単元生成エラー</h2>
-          <p class="text-gray-600 mb-6">
-            単元の生成に失敗しました。もう一度お試しください。
-          </p>
-          <button onclick="renderTopPage()" 
-                  class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg">
-            <i class="fas fa-home mr-2"></i>
-            トップページに戻る
-          </button>
+        <div class="bg-white rounded-lg shadow-lg p-8">
+          <div class="text-center mb-6">
+            <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">単元生成エラー</h2>
+            <p class="text-gray-600 mb-4">
+              ${errorMessage}
+            </p>
+          </div>
+          
+          <div class="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-6">
+            <h3 class="font-bold text-red-800 mb-2">
+              <i class="fas fa-info-circle mr-2"></i>エラー詳細
+            </h3>
+            <p class="text-sm text-red-700 whitespace-pre-wrap">${errorDetails}</p>
+          </div>
+          
+          <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6">
+            <h3 class="font-bold text-blue-800 mb-2">
+              <i class="fas fa-lightbulb mr-2"></i>対処方法
+            </h3>
+            <ul class="text-sm text-blue-700 list-disc list-inside space-y-1">
+              <li>もう一度お試しください（一時的なエラーの可能性があります）</li>
+              <li>単元名を変えてみてください</li>
+              <li>カスタマイズ内容を簡潔にしてください</li>
+              <li>標準モードで試してみてください</li>
+            </ul>
+          </div>
+          
+          <div class="flex gap-4">
+            <button onclick="renderTopPage()" 
+                    class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg">
+              <i class="fas fa-home mr-2"></i>
+              トップページに戻る
+            </button>
+            <button onclick="showUnitGeneratorModal()" 
+                    class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg">
+              <i class="fas fa-redo mr-2"></i>
+              もう一度生成する
+            </button>
+          </div>
         </div>
       </div>
     `
