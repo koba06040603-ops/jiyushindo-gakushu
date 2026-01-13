@@ -5391,7 +5391,7 @@ function showCardDetail(card) {
     <div id="cardDetailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeCardDetail(event)">
       <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
         <!-- ヘッダー -->
-        <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg">
+        <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg z-10">
           <div class="flex items-center justify-between">
             <div>
               <div class="text-sm opacity-75 mb-1">カード ${card.card_number}</div>
@@ -5400,9 +5400,14 @@ function showCardDetail(card) {
                 ${card.card_type === 'main' ? '📘 メインカード' : card.card_type === 'practice' ? '✏️ 練習カード' : '🚀 チャレンジカード'}
               </div>
             </div>
-            <button onclick="closeCardDetail()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
-              <i class="fas fa-times text-2xl"></i>
-            </button>
+            <div class="flex gap-2">
+              <button onclick="scrollToHints()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg transition">
+                <i class="fas fa-lightbulb mr-2"></i>ヒントを見る
+              </button>
+              <button onclick="closeCardDetail()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+                <i class="fas fa-times text-2xl"></i>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -5458,7 +5463,7 @@ function showCardDetail(card) {
 
           <!-- 3段階のヒント -->
           ${card.hints && card.hints.length > 0 ? `
-            <div class="bg-pink-50 border-l-4 border-pink-500 p-4 rounded-r-lg">
+            <div id="hintsSection" class="bg-pink-50 border-l-4 border-pink-500 p-4 rounded-r-lg">
               <h3 class="font-bold text-pink-800 mb-4 flex items-center">
                 <i class="fas fa-lightbulb mr-2"></i>
                 3段階のヒント
@@ -5515,6 +5520,38 @@ function closeCardDetail(event) {
   }
 }
 
+// ヒントセクションにスクロール
+function scrollToHints() {
+  const hintsSection = document.getElementById('hintsSection')
+  if (hintsSection) {
+    hintsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+// 印刷処理（ローディング表示付き）
+function handlePrint() {
+  const printButton = document.getElementById('printButton')
+  if (!printButton) return
+  
+  const originalHTML = printButton.innerHTML
+  printButton.disabled = true
+  printButton.innerHTML = `
+    <i class="fas fa-spinner fa-spin mr-2"></i>
+    印刷準備中...
+  `
+  
+  // 少し待ってから印刷
+  setTimeout(() => {
+    window.print()
+    
+    // 印刷後、ボタンを元に戻す
+    setTimeout(() => {
+      printButton.disabled = false
+      printButton.innerHTML = originalHTML
+    }, 1000)
+  }, 500)
+}
+
 // グローバル関数として公開
 window.showCardDetail = showCardDetail
 window.closeCardDetail = closeCardDetail
@@ -5534,7 +5571,7 @@ function showPrintPreview(unitData) {
           <i class="fas fa-arrow-left mr-2"></i>
           戻る
         </button>
-        <button onclick="window.print()" 
+        <button id="printButton" onclick="handlePrint()" 
                 class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
           <i class="fas fa-print mr-2"></i>
           印刷する
@@ -5922,21 +5959,6 @@ function showTeacherOverview(unitData) {
             </div>
           </div>
         `).join('')}
-
-        <div class="bg-gray-100 border-2 border-gray-400 rounded-lg p-4 mb-4">
-          <div class="flex items-center justify-between">
-            <span class="text-xl font-bold text-gray-800">単元全体の総時数：</span>
-            <div>
-              <span id="total-hours" class="text-3xl font-bold text-indigo-600">
-                ${courses.reduce((sum, course) => sum + (course.cards?.length || 0), 0)}
-              </span>
-              <span class="text-lg text-gray-600"> / ${curriculum.total_hours} 時間</span>
-            </div>
-          </div>
-          <div id="time-warning" class="hidden mt-2 text-red-600 font-bold">
-            ⚠️ 総時数が目標時数と一致していません。調整してください。
-          </div>
-        </div>
 
         <div class="flex justify-center">
           <button onclick="saveLearningPlan()" 
