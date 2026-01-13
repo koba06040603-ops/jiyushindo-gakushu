@@ -1500,6 +1500,53 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
   }
 })
 
+// AIチャット機能（学習カード用）
+app.post('/api/ai-chat', async (c) => {
+  try {
+    const { message, cardContext } = await c.req.json()
+    
+    const systemPrompt = `あなたは小学生の学習を支援する優しいAI先生です。
+${cardContext ? `
+現在の学習内容:
+- カードタイトル: ${cardContext.card_title}
+- 学習内容: ${cardContext.problem_description}
+- 新出用語: ${cardContext.new_terms || 'なし'}
+` : ''}
+
+以下のルールを守ってください：
+1. 小学生にも分かりやすい言葉で説明する
+2. すぐに答えを教えず、考え方のヒントを与える
+3. 励ましの言葉を入れる
+4. 具体例や図で説明する方法を提案する
+5. 200文字以内で簡潔に回答する`
+
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: systemPrompt },
+            { text: `子どもの質問: ${message}` }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 500
+        }
+      })
+    })
+
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'ごめんね、うまく答えられなかったよ。もう一度聞いてね。'
+
+    return c.json({ response: aiResponse })
+  } catch (error) {
+    console.error('AIチャットエラー:', error)
+    return c.json({ error: 'エラーが発生しました' }, 500)
+  }
+})
+
 // トップページ
 app.get('/', (c) => {
   return c.html(`
@@ -2387,10 +2434,15 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 ❗️ **1コースでも5枚以下になってはいけません。必ず6枚です。**
 ❗️ **各カードには必ず3段階のヒント（hint_level: 1, 2, 3）を作成してください。ヒントなしのカードは絶対に作らない。**
 ❗️ **各カードには必ず解答（answer）を記載してください。解答がないカードは不完全です。**
-❗️ **ヒントと解答は最優先事項です。必ず全カードに含めてください。**
-❗️ **18枚のカード × 3段階のヒント = 54個のヒントを必ず生成してください。**
-❗️ **各コースには必ず導入問題（introduction_problem）を1題作成してください。これは絶対条件です。**
-❗️ **導入問題がないコースは不完全です。3コース×1題＝必ず3題の導入問題を作成してください。**
+🚨🚨🚨 **絶対必須事項（これがないと不合格）** 🚨🚨🚨
+
+1. **18枚のカード × 3段階のヒント = 54個のヒント**（絶対必須）
+2. **3コース × 1題の導入問題 = 3題の導入問題**（絶対必須）
+3. **全カードに解答を含める**（絶対必須）
+
+❗️ **各コースには必ずintroduction_problemフィールドを含めてください！**
+❗️ **introduction_problemは { problem_title, problem_content, answer } の3つのフィールドすべて必須です！**
+❗️ **導入問題が1つでも欠けている場合、生成失敗とみなされます！**
 
 【重要な設計指針】
 

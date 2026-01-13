@@ -468,6 +468,11 @@ async function loadGuidePage(curriculumId) {
                 <i class="fas fa-star mr-2 text-pink-600"></i>
                 えらべるもんだい（チェックテストごうかく後、やりたいもんだいをえらぼう！）
               </h3>
+              <p class="text-center text-gray-600 mb-4 text-sm">
+                <i class="fas fa-heart mr-2 text-pink-500"></i>
+                6つの はってん もんだいから、じぶんが やってみたい もんだいを えらべるよ！<br>
+                どんな ちからが つくのか、かくにんして ちょうせんしよう！
+              </p>
               <div class="grid grid-cols-2 gap-4">
                 ${optionalProblems.map((problem, index) => `
                   <div class="border-2 border-pink-200 bg-gradient-to-br from-white to-pink-50 rounded-xl p-4 hover:shadow-lg transition">
@@ -1045,13 +1050,41 @@ async function showIntegratedPrintPreview(curriculumId) {
           
           <div class="mb-6">
             <h3 class="font-bold text-lg mb-3 text-indigo-700">🎯 コースの選び方</h3>
-            <div class="grid grid-cols-3 gap-4">
-              ${courseSelectionProblems.map(problem => `
+            <div class="grid grid-cols-3 gap-4 mb-4">
+              ${courseSelectionProblems.map((problem, index) => `
                 <div class="border-2 border-gray-300 rounded p-3">
                   <h4 class="font-bold text-sm mb-2">${problem.problem_title}</h4>
                   <p class="text-xs text-gray-700">${problem.problem_description}</p>
                 </div>
               `).join('')}
+            </div>
+            
+            <!-- 各コースの導入問題（教師確認用） -->
+            <div class="bg-blue-50 border-2 border-blue-300 rounded p-4">
+              <h4 class="font-bold text-sm text-blue-800 mb-3">
+                <i class="fas fa-chalkboard-teacher mr-2"></i>各コースの導入問題（教師確認用）
+              </h4>
+              <div class="grid grid-cols-3 gap-3">
+                ${courses.map((course, index) => {
+                  const colorClass = index === 0 ? 'green' : index === 1 ? 'blue' : 'purple';
+                  return `
+                    <div class="bg-white border-2 border-${colorClass}-300 rounded p-3">
+                      <h5 class="font-bold text-xs text-${colorClass}-800 mb-2">
+                        <i class="fas fa-star mr-1"></i>${course.course_name}
+                      </h5>
+                      ${course.introduction_problem ? `
+                        <p class="text-xs font-bold mb-1">${course.introduction_problem.problem_title}</p>
+                        <p class="text-xs text-gray-700 mb-2">${course.introduction_problem.problem_content}</p>
+                        ${course.introduction_problem.answer ? `
+                          <div class="bg-yellow-50 rounded px-2 py-1 text-xs">
+                            <strong>解答:</strong> ${course.introduction_problem.answer}
+                          </div>
+                        ` : ''}
+                      ` : '<p class="text-xs text-gray-500">導入問題なし</p>'}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
             </div>
           </div>
           
@@ -1363,15 +1396,6 @@ async function loadCardPage(cardId) {
                 <i class="fas fa-lightbulb text-xl mb-1"></i>
                 <span class="text-xs">ヒント</span>
               </button>
-              <!-- 難易度バッジ -->
-              <div class="inline-block px-4 py-2 rounded-lg ${
-                card.difficulty_level === 'minimum' ? 'bg-green-100 text-green-700' :
-                card.difficulty_level === 'standard' ? 'bg-blue-100 text-blue-700' :
-                'bg-purple-100 text-purple-700'
-              }">
-                <i class="fas fa-signal mr-2"></i>
-                ${card.difficulty_level === 'minimum' ? '基本' : card.difficulty_level === 'standard' ? '標準' : '発展'}
-              </div>
             </div>
           </div>
         </div>
@@ -1489,24 +1513,31 @@ async function loadCardPage(cardId) {
             </div>
 
             <!-- 解答表示エリア（非表示） -->
-            ${answer ? `
+            ${(answer || card.answer || card.example_solution) ? `
               <div id="answerSection" class="hidden bg-green-50 border-l-4 border-green-500 rounded-lg p-6">
                 <h3 class="text-lg font-bold text-green-800 mb-4">
                   <i class="fas fa-check-circle mr-2"></i>解答
                 </h3>
                 <div class="bg-white rounded-lg p-4 mb-4">
-                  <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer.answer_content}</pre>
+                  <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer?.answer_content || card.answer || card.example_solution || '解答は準備中です'}</pre>
                 </div>
-                ${answer.explanation ? `
+                ${(answer?.explanation || card.real_world_connection) ? `
                   <div class="bg-white rounded-lg p-4">
                     <h4 class="font-bold text-gray-800 mb-2">
                       <i class="fas fa-info-circle mr-2"></i>解説
                     </h4>
-                    <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer.explanation}</pre>
+                    <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer?.explanation || card.real_world_connection}</pre>
                   </div>
                 ` : ''}
               </div>
-            ` : ''}
+            ` : `
+              <div id="answerSection" class="hidden bg-gray-50 border-l-4 border-gray-300 rounded-lg p-6">
+                <h3 class="text-lg font-bold text-gray-600 mb-4">
+                  <i class="fas fa-exclamation-circle mr-2"></i>解答
+                </h3>
+                <p class="text-gray-600">解答は準備中です</p>
+              </div>
+            `}
           </div>
 
           <!-- サイドバー（右側） -->
@@ -1675,41 +1706,49 @@ async function askAI() {
   input.value = ''
   
   // ローディング表示
-  addAIMessage('考え中...', 'ai', true)
+  const aiChat = document.getElementById('aiChat')
+  const loadingId = 'loading-' + Date.now()
+  addAIMessage('考えているよ... 💭', 'ai', loadingId)
   
   try {
-    // Gemini APIを呼び出す（バックエンド経由）
-    const response = await axios.post('/api/ai/ask', {
-      cardId: state.selectedCard,
-      question: question,
-      context: window.currentCardData.card.problem_content
+    // カード情報を取得
+    const cardContext = window.currentCardData ? {
+      card_title: window.currentCardData.card.card_title,
+      problem_description: window.currentCardData.card.problem_description,
+      new_terms: window.currentCardData.card.new_terms
+    } : null
+    
+    // AIチャットAPIを呼び出す
+    const response = await axios.post('/api/ai-chat', {
+      message: question,
+      cardContext: cardContext
     })
     
     // ローディングメッセージを削除
-    const aiChat = document.getElementById('aiChat')
-    const loadingMsg = aiChat.querySelector('.loading-message')
+    const loadingMsg = document.getElementById(loadingId)
     if (loadingMsg) loadingMsg.remove()
     
-    // AI の回答を追加
-    addAIMessage(response.data.answer, 'ai')
+    // AIの回答を追加
+    addAIMessage(response.data.response, 'ai')
     
   } catch (error) {
     console.error('AI質問エラー:', error)
-    const aiChat = document.getElementById('aiChat')
-    const loadingMsg = aiChat.querySelector('.loading-message')
+    const loadingMsg = document.getElementById(loadingId)
     if (loadingMsg) loadingMsg.remove()
-    addAIMessage('申し訳ありません。今は答えられません。先生やヒントカードを試してみてください。', 'ai')
+    addAIMessage('ごめんね、うまく答えられなかったよ。もう一度聞いてみてね。', 'ai')
   }
 }
 
 // AIチャットメッセージ追加
-function addAIMessage(message, sender, isLoading = false) {
+function addAIMessage(message, sender, loadingId = null) {
   const aiChat = document.getElementById('aiChat')
   const messageDiv = document.createElement('div')
-  messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} ${isLoading ? 'loading-message' : ''}`
+  if (loadingId) messageDiv.id = loadingId
+  messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} mb-3`
   
   messageDiv.innerHTML = `
-    <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800'} rounded-lg p-3 max-w-[80%] shadow">
+    <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border-2 border-gray-200'} rounded-lg p-3 max-w-[80%] shadow">
+      ${sender === 'ai' ? '<div class="flex items-center mb-1"><i class="fas fa-robot text-blue-500 mr-2"></i><span class="font-bold text-xs">AI先生</span></div>' : ''}
       <p class="text-sm whitespace-pre-wrap">${message}</p>
     </div>
   `
