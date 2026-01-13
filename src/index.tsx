@@ -2170,27 +2170,27 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
   "course_selection_problems": [
     {
       "problem_number": 1,
-      "problem_title": "ゆっくりコースの入り口問題（ワクワクする、心躍るタイトル）",
-      "problem_description": "このコースで最初に出会う魅力的な問題。基礎的だけど「やってみたい！」と思える具体的な問題文を書く（例：お店で買い物をするとき、おつりはいくら？など、実生活に密着した問題）",
-      "problem_content": "具体的な問題文をここに書く（数字や状況を含む、子どもが実際に解きたくなる問題）",
+      "problem_title": "ゆっくりコースの入り口問題（例：お店で買い物してみよう）",
+      "problem_description": "このコースで最初に出会う魅力的な問題。基礎的だけど「やってみたい！」と思える具体的な問題文を書く",
+      "problem_content": "【必須・具体例】たろうくんは、100円を持ってお店に行きました。50円のえんぴつと30円の消しゴムを買いました。おつりはいくらでしょうか？（このような具体的な数字と状況を含む問題を必ず書く）",
       "course_level": "基礎",
-      "connection_to_cards": "この問題は学習カード1-2で学ぶ内容につながる"
+      "connection_to_cards": "この問題は学習カード1-2で学ぶ内容につながります"
     },
     {
       "problem_number": 2,
-      "problem_title": "しっかりコースの入り口問題（探究心をくすぐるタイトル）",
+      "problem_title": "しっかりコースの入り口問題（例：いろいろな方法で考えよう）",
       "problem_description": "このコースの特徴が伝わる魅力的な問題。標準的だけど工夫が必要で「考えてみたい！」と思える問題",
-      "problem_content": "具体的な問題文（子どもが自分で考え方を選べるような問題）",
+      "problem_content": "【必須・具体例】花子さんは、クッキーを友だちに配ります。1人に3枚ずつ配ると、4枚あまります。1人に4枚ずつ配ると、8枚足りません。友だちは何人いますか？（このような具体的な数字と状況を含む問題を必ず書く）",
       "course_level": "標準",
-      "connection_to_cards": "この問題は学習カード1-3で学ぶ内容につながる"
+      "connection_to_cards": "この問題は学習カード1-3で学ぶ内容につながります"
     },
     {
       "problem_number": 3,
-      "problem_title": "どんどんコースの入り口問題（チャレンジ精神がわくタイトル）",
+      "problem_title": "どんどんコースの入り口問題（例：深く考えてチャレンジ）",
       "problem_description": "このコースの発展性が伝わる魅力的な問題。「これが解けたらすごい！」「挑戦してみたい！」と思える問題",
-      "problem_content": "具体的な問題文（発展的で、深く考える必要があるが、学習すれば必ず解ける問題）",
+      "problem_content": "【必須・具体例】学校の花だんに、赤い花と白い花をうえました。赤い花は白い花より12本多く、赤い花と白い花を合わせると40本です。赤い花と白い花は、それぞれ何本ずつですか？（このような具体的な数字と状況を含む、深く考える問題を必ず書く）",
       "course_level": "発展",
-      "connection_to_cards": "この問題は学習カード1-4や選択問題1-2につながる"
+      "connection_to_cards": "この問題は学習カード1-4や選択問題1-2につながります"
     }
   ],
   "courses": [
@@ -2404,45 +2404,57 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
   "optional_problems": [
     {
       "problem_number": 1,
-      "problem_title": "選択問題1のタイトル（子どもの興味関心をひくタイトル）",
-      "problem_description": "教科の見方・考え方が深まる問題、または学習したことを生かす実践的な課題（100文字程度）",
-      "learning_meaning": "この問題を解くことで、どんな力がつくか、何がわかるようになるか（50文字程度）",
-      "difficulty_level": "medium"
+      "problem_title": "【必須】選択問題1：実生活に生かせる問題（魅力的なタイトルをつける）",
+      "problem_description": "【必須・具体例】学習したことを実際の生活で使える問題。例：お店の商品の値段を比べて、どっちがお得か考えよう。このような具体的な数字と状況を含む問題を書く。",
+      "learning_meaning": "【必須】この問題を解くことで、算数が実際の生活で役に立つことがわかります。買い物で損をしない力がつきます。",
+      "difficulty_level": "medium",
+      "answer": "【必須】解答と解説をここに書く",
+      "explanation": "【必須】考え方の説明をここに書く"
     },
     {
       "problem_number": 2,
-      "problem_title": "選択問題2のタイトル",
-      "problem_description": "問題の説明",
-      "learning_meaning": "この学習の意味と必要感",
-      "difficulty_level": "medium"
+      "problem_title": "【必須】選択問題2：教科の見方・考え方が深まる問題",
+      "problem_description": "【必須・具体例】学習した内容を深く理解できる問題。図や表を使って考えよう。このような具体的な数字と状況を含む問題を書く。",
+      "learning_meaning": "【必須】この問題を解くことで、なぜこの方法で解けるのか、深く理解できます。",
+      "difficulty_level": "medium",
+      "answer": "【必須】解答と解説",
+      "explanation": "【必須】考え方の説明"
     },
     {
       "problem_number": 3,
-      "problem_title": "選択問題3のタイトル（実生活につながる問題）",
-      "problem_description": "問題の説明",
-      "learning_meaning": "この学習の意味と必要感",
-      "difficulty_level": "hard"
+      "problem_title": "【必須】選択問題3：他教科とつながる問題",
+      "problem_description": "【必須・具体例】算数と理科や社会、体育などがつながる問題。このような具体的な数字と状況を含む問題を書く。",
+      "learning_meaning": "【必須】この問題を解くことで、算数が他の教科でも使えることがわかります。",
+      "difficulty_level": "hard",
+      "answer": "【必須】解答と解説",
+      "explanation": "【必須】考え方の説明"
     },
     {
       "problem_number": 4,
-      "problem_title": "選択問題4のタイトル（他教科への発展）",
-      "problem_description": "問題の説明",
-      "learning_meaning": "この学習の意味と必要感",
-      "difficulty_level": "hard"
+      "problem_title": "【必須】選択問題4：発展的な問題",
+      "problem_description": "【必須・具体例】学習したことを応用して解く、少し難しい問題。このような具体的な数字と状況を含む問題を書く。",
+      "learning_meaning": "【必須】この問題を解くことで、今まで学んだことを組み合わせて考える力がつきます。",
+      "difficulty_level": "hard",
+      "answer": "【必須】解答と解説",
+      "explanation": "【必須】考え方の説明"
     },
     {
       "problem_number": 5,
-      "problem_title": "選択問題5のタイトル（教科の本質に触れる）",
-      "problem_description": "問題の説明",
-      "learning_meaning": "この学習の意味と必要感",
-      "difficulty_level": "very_hard"
+      "problem_title": "【必須】選択問題5：教科の本質に触れる探究的な問題",
+      "problem_description": "【必須・具体例】「なぜそうなるのか？」を深く考える問題。自分で予想して、確かめてみよう。このような具体的な数字と状況を含む問題を書く。",
+      "learning_meaning": "【必須】この問題を解くことで、算数の面白さや不思議さに気づき、もっと学びたくなります。",
+      "difficulty_level": "very_hard",
+      "answer": "【必須】解答と解説",
+      "explanation": "【必須】考え方の説明"
     },
     {
       "problem_number": 6,
-      "problem_title": "選択問題6のタイトル（探究的な問題）",
-      "problem_description": "問題の説明",
-      "learning_meaning": "この学習の意味と必要感",
-      "difficulty_level": "very_hard"
+      "problem_title": "【必須】選択問題6：創造的・総合的な問題",
+      "problem_description": "【必須・具体例】自分で問題を作ったり、新しい方法を考えたりする問題。このような具体的な数字と状況を含む問題を書く。",
+      "learning_meaning": "【必須】この問題を解くことで、自分で考えを作り出す力がつきます。算数を使って新しいことを発見できます。",
+      "difficulty_level": "very_hard",
+      "answer": "【必須】解答と解説",
+      "explanation": "【必須】考え方の説明"
     }
   ]
 }
@@ -2455,14 +2467,21 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 ❗️ **各カードには必ず解答（answer）を記載してください。解答がないカードは不完全です。**
 🚨🚨🚨 **絶対必須事項（これがないと不合格）** 🚨🚨🚨
 
-1. **18枚のカード × 3段階のヒント = 54個のヒント**（絶対必須）
+1. **コース選択問題3題（course_selection_problems）**（絶対必須・最優先・1題でも欠けたら不合格）
 2. **3コース × 1題の導入問題 = 3題の導入問題**（絶対必須）
-3. **全カードに解答を含める**（絶対必須）
-4. **選択問題6題（optional_problems）**（絶対必須・1題でも欠けたら不合格）
+3. **18枚のカード × 3段階のヒント = 54個のヒント**（絶対必須）
+4. **全カードに解答を含める**（絶対必須）
+5. **選択問題6題（optional_problems）**（絶対必須・1題でも欠けたら不合格）
+
+❗️❗️❗️ **course_selection_problemsは必ず3題（problem_number: 1, 2, 3）を含めてください！** ❗️❗️❗️
+❗️ **各コース選択問題には problem_title, problem_description, problem_content, connection_to_cards をすべて含めてください！**
+❗️ **problem_contentには具体的な数字や状況を含む、実際に解ける問題文を書いてください！**
+❗️ **「やってみたい！」と子どもが思える魅力的な問題にしてください！**
 
 ❗️ **各コースには必ずintroduction_problemフィールドを含めてください！**
 ❗️ **introduction_problemは { problem_title, problem_content, answer } の3つのフィールドすべて必須です！**
 ❗️ **導入問題が1つでも欠けている場合、生成失敗とみなされます！**
+
 ❗️ **optional_problemsは必ず6題（problem_number: 1, 2, 3, 4, 5, 6）を含めてください！**
 ❗️ **各選択問題には必ずlearning_meaningフィールドを記載してください！**
 
