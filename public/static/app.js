@@ -280,13 +280,13 @@ async function loadGuidePage(curriculumId) {
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
     const { curriculum, courses, optionalProblems } = response.data
     
-    //コース選択問題とチェックテストをメタデータから取得
+    //コース選択問題と共通チェックテストをメタデータから取得
     let courseSelectionProblems = []
-    let checkTests = []
+    let commonCheckTest = null
     try {
       const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
       courseSelectionProblems = metaResponse.data.course_selection_problems || []
-      checkTests = metaResponse.data.check_tests || []
+      commonCheckTest = metaResponse.data.common_check_test || null
     } catch (metaError) {
       console.log('メタデータなし、デフォルト表示')
     }
@@ -390,36 +390,43 @@ async function loadGuidePage(curriculumId) {
               </div>
             </div>
 
-            <!-- チェックテスト -->
+            <!-- チェックテスト（全コース共通） -->
             <div class="mb-6">
               <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
                 <i class="fas fa-check-circle mr-2 text-yellow-600"></i>
                 チェックテスト（学しゅうカードがおわったら、ちょうせんしよう！）
               </h3>
               <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-4">
-                <p class="text-center text-gray-700 mb-3">
-                  どのコースも、学しゅうカードをぜんぶおわらせたら、チェックテストにちょうせんできます。<br>
+                <p class="text-center text-gray-700 mb-3 font-bold">
+                  ⭐ どのコースも共通の基礎基本チェックテスト ⭐<br>
+                  学しゅうカードをぜんぶおわらせたら、チェックテストにちょうせんできます。<br>
                   ごうかくすると、下の「えらべるもんだい」にすすめるよ！ 🎉
                 </p>
-                ${checkTests.length > 0 ? `
-                  <div class="grid grid-cols-3 gap-3">
-                    ${checkTests.map((test, index) => {
-                      const bgClass = index === 0 ? 'bg-green-100' :
-                                    index === 1 ? 'bg-blue-100' :
-                                    'bg-purple-100'
-                      return `
-                        <div class="${bgClass} rounded-lg p-3">
-                          <h4 class="font-bold text-gray-800 text-sm mb-2">${test.course_name}</h4>
-                          <p class="text-xs text-gray-700 mb-2">もんだい数: ${test.problems_count}もん</p>
-                          ${test.sample_problems && test.sample_problems.length > 0 ? `
-                            <div class="text-xs text-gray-600">
-                              <p class="font-semibold mb-1">れい:</p>
-                              <p class="bg-white rounded p-2">${test.sample_problems[0].problem_text}</p>
+                ${commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0 ? `
+                  <div class="bg-white rounded-xl p-4 mb-3">
+                    <h4 class="font-bold text-gray-800 text-center mb-3">
+                      📝 ${commonCheckTest.test_description}
+                    </h4>
+                    <p class="text-sm text-gray-600 text-center mb-4">
+                      ${commonCheckTest.test_note}
+                    </p>
+                    <div class="space-y-3">
+                      ${commonCheckTest.sample_problems.map((problem, index) => `
+                        <div class="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-white rounded-lg p-3">
+                          <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 text-white flex items-center justify-center font-bold flex-shrink-0">
+                              ${problem.problem_number}
                             </div>
-                          ` : ''}
+                            <div class="flex-1">
+                              <p class="text-sm text-gray-800 mb-2">${problem.problem_text}</p>
+                              <div class="bg-yellow-100 rounded px-3 py-1 text-xs text-gray-600">
+                                💡 こたえ: ${problem.answer}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      `
-                    }).join('')}
+                      `).join('')}
+                    </div>
                   </div>
                 ` : ''}
               </div>
@@ -944,11 +951,11 @@ async function showIntegratedPrintPreview(curriculumId) {
     
     // メタデータ取得
     let courseSelectionProblems = []
-    let checkTests = []
+    let commonCheckTest = null
     try {
       const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
       courseSelectionProblems = metaResponse.data.course_selection_problems || []
-      checkTests = metaResponse.data.check_tests || []
+      commonCheckTest = metaResponse.data.common_check_test || null
     } catch (error) {
       console.log('メタデータなし')
     }
@@ -1035,6 +1042,33 @@ async function showIntegratedPrintPreview(curriculumId) {
                 ` : ''}
               </div>
             `).join('')}
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="font-bold text-lg mb-3 text-yellow-700">
+              <i class="fas fa-check-circle mr-2"></i>チェックテスト（全コース共通）
+            </h3>
+            ${commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0 ? `
+              <div class="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
+                <p class="text-xs font-bold text-center mb-2">${commonCheckTest.test_description}</p>
+                <p class="text-xs text-center mb-3">${commonCheckTest.test_note}</p>
+                <div class="space-y-2">
+                  ${commonCheckTest.sample_problems.map(problem => `
+                    <div class="border-2 border-yellow-200 bg-white rounded p-2">
+                      <div class="flex items-start gap-2">
+                        <div class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+                          ${problem.problem_number}
+                        </div>
+                        <div class="flex-1">
+                          <p class="text-xs mb-1">${problem.problem_text}</p>
+                          <div class="bg-yellow-100 rounded px-2 py-1 text-xs">💡 ${problem.answer}</div>
+                        </div>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : '<p class="text-xs text-gray-500">チェックテストなし</p>'}
           </div>
         </div>
 

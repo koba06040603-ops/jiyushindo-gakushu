@@ -2189,77 +2189,49 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       ]
     }
   ],
-  "check_tests": [
-    {
-      "course_name": "ゆっくりコース",
-      "test_description": "ゆっくりコースのチェックテスト",
-      "problems_count": 3,
-      "sample_problems": [
-        {
-          "problem_text": "具体的な問題文1（基礎確認問題）",
-          "answer": "解答例"
-        },
-        {
-          "problem_text": "具体的な問題文2（基礎確認問題）",
-          "answer": "解答例"
-        },
-        {
-          "problem_text": "具体的な問題文3（基礎確認問題）",
-          "answer": "解答例"
-        }
-      ]
-    },
-    {
-      "course_name": "しっかりコース",
-      "test_description": "しっかりコースのチェックテスト",
-      "problems_count": 4,
-      "sample_problems": [
-        {
-          "problem_text": "具体的な問題文1（標準問題）",
-          "answer": "解答例"
-        },
-        {
-          "problem_text": "具体的な問題文2（標準問題）",
-          "answer": "解答例"
-        },
-        {
-          "problem_text": "具体的な問題文3（標準問題）",
-          "answer": "解答例"
-        },
-        {
-          "problem_text": "具体的な問題文4（標準問題）",
-          "answer": "解答例"
-        }
-      ]
-    },
-    {
-      "course_name": "どんどんコース",
-      "test_description": "どんどんコースのチェックテスト",
-      "problems_count": 5,
-      "sample_problems": [
-        {
-          "problem_text": "具体的な問題文1（発展問題）",
-          "answer": "解答例"
-        },
-        {
-          "problem_text": "具体的な問題文2（発展問題）",
-          "answer": "解答例"
-        },
-        {
-          "problem_text": "具体的な問題文3（発展問題）",
-          "answer": "解答例"
-        },
-        {
-          "problem_text": "具体的な問題文4（発展問題）",
-          "answer": "解答例"
-        },
-        {
-          "problem_text": "具体的な問題文5（発展問題）",
-          "answer": "解答例"
-        }
-      ]
-    }
-  ],
+  "common_check_test": {
+    "test_description": "全コース共通の基礎基本チェックテスト（知識理解の最低保証）",
+    "test_note": "どのコースを選んでも、同じチェックテストを受けます。単元の基礎基本が身についているかを確認します。",
+    "problems_count": 6,
+    "sample_problems": [
+      {
+        "problem_number": 1,
+        "problem_text": "具体的な基礎問題文1（数字や状況を含む、実際に解ける問題）",
+        "answer": "簡潔な解答例",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 2,
+        "problem_text": "具体的な基礎問題文2",
+        "answer": "簡潔な解答例",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 3,
+        "problem_text": "具体的な基礎問題文3",
+        "answer": "簡潔な解答例",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 4,
+        "problem_text": "具体的な基礎問題文4",
+        "answer": "簡潔な解答例",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 5,
+        "problem_text": "具体的な基礎問題文5",
+        "answer": "簡潔な解答例",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 6,
+        "problem_text": "具体的な基礎問題文6",
+        "answer": "簡潔な解答例",
+        "difficulty": "basic"
+      }
+    ]
+  },
   "optional_problems": [
     {
       "problem_number": 1,
@@ -2346,14 +2318,18 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
    - 各コースのJSONに introduction_problem フィールドを追加
    - 形式は problem_title, problem_content, problem_description, answer を含む
    
-4. チェックテスト（具体的な問題を含む）:
-   - 各コースごとに3〜5題の具体的な問題文を sample_problems に書く
-   - 問題文は実際に子どもが解ける形式で、数字や状況を含む
-   - 基礎→標準→発展の順に難易度を上げる
-   - 各問題に簡潔な解答例を付ける
+4. チェックテスト（全コース共通・最重要）:
+   - **どのコースも共通で、基礎基本問題6題を作成**
+   - **単元の知識理解の最低保証となる重要な問題**
+   - **教師が全体確認で確認できるよう、詳細な問題を作成**
+   - 問題文は実際に子どもが解ける形式で、具体的な数字や状況を含む
+   - すべて基礎レベル（difficulty: "basic"）
+   - 各問題に問題番号（1〜6）と簡潔な解答例を付ける
+   - common_check_test フィールドに記載
 
-4. 選択問題6題（必須）:
-   - 子どもの興味関心をひく実践的な内容
+5. 選択問題6題（発展課題・必須）:
+   - **チェックテストとは別の、発展的な選択課題**
+   - **子どもの興味関心をひく実践的な内容で、より深い学びを促す**
    - 教科の見方・考え方が深まるもの
    - 教科単元の本質に触れるもの
    - 学習したことを生かせるもの
@@ -2361,8 +2337,9 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
    - 「この勉強には意味がある」と子どもが実感できる内容
    - 各問題に「learning_meaning」（学習の意味・必要感）を必ず記載
    - コース選択問題とのつながりを意識する
+   - optional_problems フィールドに記載（6題必須）
 
-5. 学習カード設計（最重要）:
+6. 学習カード設計（最重要）:
    - **各カードには必ず3段階のヒント（hint_level: 1, 2, 3）を用意**
    - **各カードには必ず解答（answer）を記載**
    - **ヒントなし・解答なしのカードは絶対に作らない**
@@ -2371,18 +2348,19 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
    - 子どもが自分で考え、試行錯誤できる内容
    - コース選択問題で提示した内容を深める構成
 
-6. 言葉遣い:
+7. 言葉遣い:
    - 子どもが理解できる平易な言葉
    - 漢字にはふりがな（ルビ）を付ける想定
    - ポジティブで前向きな表現
    - 「〜できるようになる」「〜がわかる」など成長実感を持てる表現
 
-7. 全体の一貫性:
-   - コース選択問題 → 学習カード → チェックテスト → 選択問題の流れを意識
+8. 全体の一貫性:
+   - コース選択問題 → 導入問題 → 学習カード → チェックテスト（共通6題） → 選択問題（発展6題）の流れを意識
    - 学習のてびき1枚で単元全体を把握できる設計
    - 子どもが「この勉強をやりたい！」と思える魅力的な内容
+   - 教師が全体確認でチェックテストの内容を確認できる詳細な問題作成
 
-8. ${customization?.studentNeeds ? 'カスタマイズ要望を最優先に反映' : ''}
+9. ${customization?.studentNeeds ? 'カスタマイズ要望を最優先に反映' : ''}
 
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
@@ -2473,7 +2451,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 // APIルート：生成した単元を保存
 app.post('/api/curriculum/save-generated', async (c) => {
   const { env } = c
-  const { curriculum, courses, optionalProblems, courseSelectionProblems, checkTests } = await c.req.json()
+  const { curriculum, courses, optionalProblems, courseSelectionProblems, commonCheckTest } = await c.req.json()
   
   try {
     // カリキュラムを保存
@@ -2595,17 +2573,17 @@ app.post('/api/curriculum/save-generated', async (c) => {
       ).run()
     }
     
-    // チェックテストを保存（カリキュラムメタデータとして）
-    if (checkTests && checkTests.length > 0) {
-      const checkTestsJSON = JSON.stringify(checkTests)
+    // 共通チェックテストを保存（カリキュラムメタデータとして）
+    if (commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0) {
+      const checkTestJSON = JSON.stringify(commonCheckTest)
       await env.DB.prepare(`
         INSERT OR REPLACE INTO curriculum_metadata (
           curriculum_id, metadata_key, metadata_value
         ) VALUES (?, ?, ?)
       `).bind(
         curriculumId,
-        'check_tests',
-        checkTestsJSON
+        'common_check_test',
+        checkTestJSON
       ).run()
     }
     
