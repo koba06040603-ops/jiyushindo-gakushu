@@ -2502,19 +2502,19 @@ app.post('/api/curriculum/save-generated', async (c) => {
         const cardResult = await env.DB.prepare(`
           INSERT INTO learning_cards (
             course_id, card_number, card_title, card_type,
-            problem_description, new_terms, example_problem,
-            example_solution, real_world_connection, textbook_page
+            problem_content, new_terms, example_problem,
+            example_solution, real_world_context, textbook_page
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           courseId,
           card.card_number,
           card.card_title,
           card.card_type || 'main',
-          card.problem_description,
+          card.problem_description || card.problem_content || '',
           card.new_terms || '',
           card.example_problem || '',
           card.example_solution || '',
-          card.real_world_connection || '',
+          card.real_world_connection || card.real_world_context || '',
           card.textbook_page || ''
         ).run()
         
