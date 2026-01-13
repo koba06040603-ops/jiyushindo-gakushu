@@ -432,6 +432,64 @@ async function loadGuidePage(curriculumId) {
               </div>
             </div>
 
+            <!-- 各コースの学習内容（導入問題） -->
+            <div class="mb-6">
+              <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                <i class="fas fa-book-open mr-2 text-indigo-600"></i>
+                それぞれのコースで どんなことを がくしゅうするの？
+              </h3>
+              <p class="text-center text-gray-600 mb-4 text-sm">
+                コースごとの とくちょうが わかる もんだいを 1もんずつ しょうかいするよ！
+              </p>
+              <div class="grid grid-cols-3 gap-4">
+                ${courses.map((course, index) => {
+                  const colorClasses = index === 0 ? 'border-green-500 bg-gradient-to-br from-green-50 to-white' :
+                                     index === 1 ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-white' :
+                                     'border-purple-500 bg-gradient-to-br from-purple-50 to-white'
+                  const badgeClasses = index === 0 ? 'bg-green-500' :
+                                      index === 1 ? 'bg-blue-500' :
+                                      'bg-purple-500'
+                  const iconClasses = index === 0 ? 'text-green-600' :
+                                     index === 1 ? 'text-blue-600' :
+                                     'text-purple-600'
+                  return `
+                    <div class="border-4 ${colorClasses} rounded-xl p-5 shadow-lg hover:shadow-2xl transition">
+                      <div class="text-center mb-4">
+                        <div class="inline-block px-4 py-1 ${badgeClasses} text-white rounded-full font-bold mb-2 text-lg">
+                          ${course.course_name}
+                        </div>
+                        <p class="text-sm text-gray-600 font-medium">${course.course_label || course.description}</p>
+                      </div>
+                      ${course.introduction_problem ? `
+                        <div class="bg-white rounded-xl p-4 border-2 ${index === 0 ? 'border-green-300' : index === 1 ? 'border-blue-300' : 'border-purple-300'} shadow-md">
+                          <div class="flex items-center mb-3">
+                            <i class="fas fa-star ${iconClasses} text-xl mr-2"></i>
+                            <h4 class="text-base font-bold text-gray-800">${course.introduction_problem.problem_title}</h4>
+                          </div>
+                          <div class="bg-gray-50 rounded-lg p-3 mb-3 border-l-4 ${index === 0 ? 'border-green-500' : index === 1 ? 'border-blue-500' : 'border-purple-500'}">
+                            <p class="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">${course.introduction_problem.problem_content}</p>
+                          </div>
+                          ${course.introduction_problem.answer ? `
+                            <div class="bg-yellow-50 rounded-lg p-2 border-l-4 border-yellow-400">
+                              <p class="text-xs font-bold text-yellow-700 mb-1">
+                                <i class="fas fa-lightbulb mr-1"></i>こたえのヒント
+                              </p>
+                              <p class="text-xs text-gray-700">${course.introduction_problem.answer}</p>
+                            </div>
+                          ` : ''}
+                        </div>
+                      ` : `
+                        <div class="bg-white rounded-xl p-4 border-2 border-gray-200 text-center">
+                          <i class="fas fa-book text-4xl text-gray-300 mb-2"></i>
+                          <p class="text-sm text-gray-500">どうにゅうもんだい じゅんびちゅう</p>
+                        </div>
+                      `}
+                    </div>
+                  `
+                }).join('')}
+              </div>
+            </div>
+
             <!-- 選択問題（2列×3行 = 6題） -->
             <div class="mb-6">
               <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
@@ -5432,9 +5490,9 @@ function showCardDetail(card) {
   // モーダルHTML
   const modalHTML = `
     <div id="cardDetailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeCardDetail(event)">
-      <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
         <!-- ヘッダー -->
-        <div class="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg z-10">
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
           <div class="flex items-center justify-between">
             <div>
               <div class="text-sm opacity-75 mb-1">カード ${card.card_number}</div>
@@ -5443,103 +5501,182 @@ function showCardDetail(card) {
                 ${card.card_type === 'main' ? '📘 メインカード' : card.card_type === 'practice' ? '✏️ 練習カード' : '🚀 チャレンジカード'}
               </div>
             </div>
-            <div class="flex gap-2">
-              <button onclick="scrollToHints()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg transition">
-                <i class="fas fa-lightbulb mr-2"></i>ヒントを見る
-              </button>
-              <button onclick="closeCardDetail()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
-                <i class="fas fa-times text-2xl"></i>
-              </button>
-            </div>
+            <button onclick="closeCardDetail()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
           </div>
         </div>
 
-        <!-- コンテンツ -->
-        <div class="p-6 space-y-6">
+        <!-- タブナビゲーション -->
+        <div class="bg-gray-100 border-b border-gray-300 flex">
+          <button onclick="switchCardTab('problem')" id="tab-problem" 
+                  class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-blue-600 bg-white text-blue-600">
+            <i class="fas fa-tasks mr-2"></i>問題
+          </button>
+          <button onclick="switchCardTab('hints')" id="tab-hints" 
+                  class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
+            <i class="fas fa-lightbulb mr-2"></i>ヒント
+          </button>
+          <button onclick="switchCardTab('answer')" id="tab-answer" 
+                  class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
+            <i class="fas fa-check-circle mr-2"></i>解答
+          </button>
+          <button onclick="switchCardTab('explanation')" id="tab-explanation" 
+                  class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
+            <i class="fas fa-book-open mr-2"></i>解説
+          </button>
+        </div>
+
+        <!-- タブコンテンツ -->
+        <div class="flex-1 overflow-y-auto p-6">
+          <!-- 問題タブ -->
+          <div id="content-problem" class="tab-content space-y-6">
           <!-- 問題説明 -->
           <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
             <h3 class="font-bold text-blue-800 mb-2 flex items-center">
               <i class="fas fa-tasks mr-2"></i>
               問題・課題
             </h3>
-            <p class="text-gray-800 whitespace-pre-wrap">${card.problem_description || 'なし'}</p>
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+              <h3 class="font-bold text-blue-800 mb-2 flex items-center">
+                <i class="fas fa-tasks mr-2"></i>
+                問題・課題
+              </h3>
+              <p class="text-gray-800 whitespace-pre-wrap text-lg">${card.problem_description || 'なし'}</p>
+            </div>
+
+            <!-- 新出用語 -->
+            ${card.new_terms ? `
+              <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
+                <h3 class="font-bold text-green-800 mb-2 flex items-center">
+                  <i class="fas fa-book mr-2"></i>
+                  新しく出てくる言葉
+                </h3>
+                <p class="text-gray-800">${card.new_terms}</p>
+              </div>
+            ` : ''}
+
+            <!-- 例題 -->
+            ${card.example_problem ? `
+              <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
+                <h3 class="font-bold text-yellow-800 mb-2 flex items-center">
+                  <i class="fas fa-pencil-alt mr-2"></i>
+                  例題
+                </h3>
+                <p class="text-gray-800 mb-3">${card.example_problem}</p>
+              </div>
+            ` : ''}
+
+            <!-- 実社会とのつながり -->
+            ${card.real_world_connection ? `
+              <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-lg">
+                <h3 class="font-bold text-purple-800 mb-2 flex items-center">
+                  <i class="fas fa-globe mr-2"></i>
+                  実社会とのつながり
+                </h3>
+                <p class="text-gray-800">${card.real_world_connection}</p>
+              </div>
+            ` : ''}
           </div>
 
-          <!-- 新出用語 -->
-          ${card.new_terms ? `
-            <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
-              <h3 class="font-bold text-green-800 mb-2 flex items-center">
-                <i class="fas fa-book mr-2"></i>
-                新しく出てくる言葉
-              </h3>
-              <p class="text-gray-800">${card.new_terms}</p>
-            </div>
-          ` : ''}
-
-          <!-- 例題 -->
-          ${card.example_problem ? `
-            <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
-              <h3 class="font-bold text-yellow-800 mb-2 flex items-center">
-                <i class="fas fa-pencil-alt mr-2"></i>
-                例題
-              </h3>
-              <p class="text-gray-800 mb-3">${card.example_problem}</p>
-              ${card.example_solution ? `
-                <div class="bg-white p-3 rounded border-2 border-yellow-200">
-                  <p class="text-sm font-semibold text-yellow-700 mb-1">解き方・考え方</p>
-                  <p class="text-gray-800">${card.example_solution}</p>
-                </div>
-              ` : ''}
-            </div>
-          ` : ''}
-
-          <!-- 実社会とのつながり -->
-          ${card.real_world_connection ? `
-            <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-lg">
-              <h3 class="font-bold text-purple-800 mb-2 flex items-center">
-                <i class="fas fa-globe mr-2"></i>
-                実社会とのつながり
-              </h3>
-              <p class="text-gray-800">${card.real_world_connection}</p>
-            </div>
-          ` : ''}
-
-          <!-- 3段階のヒント -->
-          ${card.hints && card.hints.length > 0 ? `
-            <div id="hintsSection" class="bg-pink-50 border-l-4 border-pink-500 p-4 rounded-r-lg">
-              <h3 class="font-bold text-pink-800 mb-4 flex items-center">
-                <i class="fas fa-lightbulb mr-2"></i>
-                3段階のヒント
-              </h3>
-              <div class="space-y-3">
+          <!-- ヒントタブ -->
+          <div id="content-hints" class="tab-content space-y-4 hidden">
+            ${card.hints && card.hints.length > 0 ? `
+              <div class="space-y-4">
                 ${card.hints.map((hint, index) => `
-                  <div class="bg-white p-4 rounded-lg border-2 border-pink-200">
-                    <div class="flex items-center mb-2">
-                      <span class="bg-pink-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold mr-2">
+                  <div class="bg-gradient-to-r from-pink-50 to-yellow-50 p-6 rounded-xl border-2 border-pink-200 shadow-md">
+                    <div class="flex items-center mb-3">
+                      <span class="bg-gradient-to-r from-pink-500 to-yellow-500 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl mr-3">
                         ${hint.hint_level}
                       </span>
-                      <span class="font-semibold text-gray-700">
-                        ${hint.hint_level === 1 ? 'まず考えてほしいこと' : hint.hint_level === 2 ? '中間ヒント' : '答えに近いヒント'}
+                      <span class="font-bold text-lg text-gray-800">
+                        ${hint.hint_level === 1 ? '🤔 まず考えてほしいこと' : hint.hint_level === 2 ? '💡 中間ヒント' : '✨ 答えに近いヒント'}
                       </span>
                     </div>
-                    <p class="text-gray-800 ml-10">${hint.hint_text}</p>
+                    <p class="text-gray-800 text-lg ml-15 mb-3">${hint.hint_text}</p>
                     ${hint.thinking_tool_suggestion ? `
-                      <div class="ml-10 mt-2 text-sm text-pink-600">
-                        <i class="fas fa-tools mr-1"></i>
-                        使える思考ツール: ${hint.thinking_tool_suggestion}
+                      <div class="ml-15 bg-white p-3 rounded-lg border-2 border-yellow-300">
+                        <p class="text-sm font-bold text-yellow-700 mb-1">
+                          <i class="fas fa-tools mr-1"></i>使える思考ツール
+                        </p>
+                        <p class="text-gray-700">${hint.thinking_tool_suggestion}</p>
                       </div>
                     ` : ''}
                   </div>
                 `).join('')}
               </div>
-            </div>
-          ` : ''}
+            ` : `
+              <div class="text-center py-12 text-gray-500">
+                <i class="fas fa-lightbulb text-6xl mb-4 opacity-30"></i>
+                <p class="text-lg">ヒントはありません</p>
+              </div>
+            `}
+          </div>
+
+          <!-- 解答タブ -->
+          <div id="content-answer" class="tab-content space-y-4 hidden">
+            ${card.answer || card.example_solution ? `
+              <div class="bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-400 p-6 rounded-xl shadow-lg">
+                <h3 class="font-bold text-green-800 mb-4 flex items-center text-xl">
+                  <i class="fas fa-check-circle mr-2 text-2xl"></i>
+                  解答
+                </h3>
+                <div class="bg-white p-6 rounded-lg border-2 border-green-200">
+                  <p class="text-gray-800 text-lg whitespace-pre-wrap">${card.answer || card.example_solution}</p>
+                </div>
+              </div>
+            ` : `
+              <div class="text-center py-12 text-gray-500">
+                <i class="fas fa-times-circle text-6xl mb-4 opacity-30"></i>
+                <p class="text-lg">解答は準備中です</p>
+              </div>
+            `}
+          </div>
+
+          <!-- 解説タブ -->
+          <div id="content-explanation" class="tab-content space-y-4 hidden">
+            ${card.example_solution ? `
+              <div class="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-400 p-6 rounded-xl shadow-lg">
+                <h3 class="font-bold text-blue-800 mb-4 flex items-center text-xl">
+                  <i class="fas fa-book-open mr-2 text-2xl"></i>
+                  解き方・考え方
+                </h3>
+                <div class="bg-white p-6 rounded-lg border-2 border-blue-200">
+                  <p class="text-gray-800 text-lg whitespace-pre-wrap">${card.example_solution}</p>
+                </div>
+              </div>
+            ` : ''}
+            
+            ${card.real_world_connection ? `
+              <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-400 p-6 rounded-xl shadow-lg">
+                <h3 class="font-bold text-purple-800 mb-4 flex items-center text-xl">
+                  <i class="fas fa-globe mr-2 text-2xl"></i>
+                  実社会とのつながり
+                </h3>
+                <div class="bg-white p-6 rounded-lg border-2 border-purple-200">
+                  <p class="text-gray-800 text-lg whitespace-pre-wrap">${card.real_world_connection}</p>
+                </div>
+              </div>
+            ` : ''}
+            
+            ${!card.example_solution && !card.real_world_connection ? `
+              <div class="text-center py-12 text-gray-500">
+                <i class="fas fa-book-open text-6xl mb-4 opacity-30"></i>
+                <p class="text-lg">解説は準備中です</p>
+              </div>
+            ` : ''}
+          </div>
         </div>
 
         <!-- フッター -->
-        <div class="sticky bottom-0 bg-gray-50 p-4 rounded-b-lg border-t">
+        <div class="bg-gray-50 p-4 border-t flex gap-3">
+          <button onclick="generateSimilarProblem(${card.id})" 
+                  class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-redo mr-2"></i>
+            もう1問練習する
+          </button>
           <button onclick="closeCardDetail()" 
-                  class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition">
+                  class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition">
             <i class="fas fa-check mr-2"></i>
             閉じる
           </button>
@@ -5550,7 +5687,68 @@ function showCardDetail(card) {
 
   // モーダルを表示
   document.body.insertAdjacentHTML('beforeend', modalHTML)
+  document.body.style.overflow = 'hidden'
 }
+
+// タブ切り替え関数
+function switchCardTab(tabName) {
+  // すべてのタブボタンを非アクティブに
+  document.querySelectorAll('#cardDetailModal button[id^="tab-"]').forEach(btn => {
+    btn.className = 'flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600'
+  })
+  
+  // アクティブタブのボタンをハイライト
+  const activeTab = document.getElementById(`tab-${tabName}`)
+  if (activeTab) {
+    const colors = {
+      problem: 'border-blue-600 bg-white text-blue-600',
+      hints: 'border-yellow-600 bg-white text-yellow-600',
+      answer: 'border-green-600 bg-white text-green-600',
+      explanation: 'border-purple-600 bg-white text-purple-600'
+    }
+    activeTab.className = `flex-1 px-6 py-4 font-bold text-center transition border-b-4 ${colors[tabName]}`
+  }
+  
+  // すべてのタブコンテンツを非表示
+  document.querySelectorAll('#cardDetailModal .tab-content').forEach(content => {
+    content.classList.add('hidden')
+  })
+  
+  // 選択されたタブのコンテンツを表示
+  const activeContent = document.getElementById(`content-${tabName}`)
+  if (activeContent) {
+    activeContent.classList.remove('hidden')
+  }
+}
+
+// 類似問題生成関数（仮実装）
+async function generateSimilarProblem(cardId) {
+  const button = event.target
+  const originalHTML = button.innerHTML
+  button.disabled = true
+  button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>生成中...'
+  
+  try {
+    const response = await axios.post(`/api/cards/${cardId}/generate-similar`)
+    if (response.data.success) {
+      // 新しい問題を表示（タブを問題に切り替え）
+      alert('✨ 新しい問題を生成しました！\n\n' + response.data.problem.problem_text)
+      // TODO: モーダルを更新して新しい問題を表示
+    } else {
+      throw new Error(response.data.error || '生成に失敗しました')
+    }
+  } catch (error) {
+    console.error('類似問題生成エラー:', error)
+    alert('❌ 問題の生成に失敗しました。もう一度お試しください。')
+  } finally {
+    button.disabled = false
+    button.innerHTML = originalHTML
+  }
+}
+
+// グローバル関数として登録
+window.switchCardTab = switchCardTab
+window.generateSimilarProblem = generateSimilarProblem
 
 // カード詳細モーダルを閉じる
 function closeCardDetail(event) {
@@ -5559,6 +5757,7 @@ function closeCardDetail(event) {
     const modal = document.getElementById('cardDetailModal')
     if (modal) {
       modal.remove()
+      document.body.style.overflow = ''
     }
   }
 }
@@ -5773,6 +5972,7 @@ function showTeacherOverview(unitData) {
   const curriculum = unitData.curriculum
   const courses = unitData.courses || []
   const optionalProblems = unitData.optional_problems || []
+  const commonCheckTest = unitData.common_check_test || null
   
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -6174,24 +6374,61 @@ function showTeacherOverview(unitData) {
       <div id="check-test" class="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 class="text-2xl font-bold text-gray-800 mb-4">
           <i class="fas fa-check-circle mr-2"></i>
-          チェックテスト
+          チェックテスト（全コース共通）
         </h2>
-        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-          <p class="text-sm text-red-900">
+        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
+          <p class="text-sm text-yellow-900">
             <i class="fas fa-info-circle mr-2"></i>
-            チェックテストは各コース終了後に自動的に表示されます。
-            学習カード6枚の内容を理解しているか確認するテストです。
+            <strong>どのコースも共通の基礎基本チェックテスト6題です。</strong>単元の知識理解の最低保証として機能します。
           </p>
         </div>
-        <div class="bg-gray-50 p-4 rounded-lg">
-          <p class="font-bold text-gray-800 mb-2">📋 テスト形式</p>
-          <ul class="text-sm text-gray-700 space-y-1 ml-4 list-disc">
-            <li>学習した内容から3-5問出題</li>
-            <li>正答率70%以上で合格</li>
-            <li>合格すると選択課題に進めます</li>
-            <li>不合格の場合は学習カードに戻って復習</li>
-          </ul>
-        </div>
+        ${commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0 ? `
+          <div class="bg-gradient-to-br from-yellow-50 to-white border-2 border-yellow-300 rounded-xl p-6 mb-4">
+            <h3 class="font-bold text-yellow-800 mb-2 text-xl">
+              📝 ${commonCheckTest.test_description}
+            </h3>
+            <p class="text-sm text-gray-700 mb-4">${commonCheckTest.test_note}</p>
+            <div class="bg-white rounded-lg p-4">
+              <p class="font-bold text-gray-800 mb-2">
+                問題数: ${commonCheckTest.problems_count}題
+              </p>
+            </div>
+          </div>
+          
+          <div class="space-y-4">
+            ${commonCheckTest.sample_problems.map((problem, index) => `
+              <div class="bg-gradient-to-r from-yellow-50 to-white border-l-4 border-yellow-500 p-5 rounded-lg shadow-md">
+                <div class="flex items-start mb-3">
+                  <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 text-white flex items-center justify-center font-bold text-lg mr-4 flex-shrink-0">
+                    ${problem.problem_number}
+                  </div>
+                  <div class="flex-1">
+                    <span class="text-xs bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full font-bold">
+                      難易度: ${problem.difficulty || 'basic'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="bg-white p-4 rounded-lg mb-3 border-2 border-yellow-200">
+                  <p class="text-sm font-bold text-yellow-800 mb-2">📝 問題</p>
+                  <p class="text-gray-800 text-lg leading-relaxed">${problem.problem_text}</p>
+                </div>
+                
+                <div class="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+                  <p class="text-sm font-bold text-green-800 mb-2">
+                    <i class="fas fa-check-circle mr-1"></i>解答
+                  </p>
+                  <p class="text-gray-800">${problem.answer}</p>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <div class="bg-gray-50 p-4 rounded-lg text-center">
+            <i class="fas fa-times-circle text-6xl text-gray-300 mb-4"></i>
+            <p class="text-gray-600">チェックテストが生成されていません</p>
+          </div>
+        `}
       </div>
 
       <!-- 選択課題 -->

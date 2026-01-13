@@ -1406,6 +1406,98 @@ app.delete('/api/hints/:hintId', async (c) => {
   }
 })
 
+// APIルート：類似問題生成
+app.post('/api/cards/:cardId/generate-similar', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  
+  try {
+    // カード情報を取得
+    const card = await env.DB.prepare(`
+      SELECT lc.*, c.course_name, curr.grade, curr.subject, curr.unit_name
+      FROM learning_cards lc
+      JOIN courses c ON lc.course_id = c.id
+      JOIN curriculum curr ON c.curriculum_id = curr.id
+      WHERE lc.id = ?
+    `).bind(cardId).first()
+    
+    if (!card) {
+      return c.json({ error: 'Card not found' }, 404)
+    }
+    
+    // Gemini Flashで類似問題を生成
+    const apiKey = env.GEMINI_API_KEY
+    if (!apiKey) {
+      return c.json({ error: 'API key not configured' }, 500)
+    }
+    
+    const prompt = `あなたは小学校の優秀な教師です。以下の学習カードの問題に基づいて、類似問題を1問生成してください。
+
+【元の学習カード情報】
+- 学年: ${card.grade}
+- 教科: ${card.subject}
+- 単元: ${card.unit_name}
+- コース: ${card.course_name}
+- カードタイトル: ${card.card_title}
+- 元の問題: ${card.problem_content}
+- 解答例: ${card.answer || card.example_solution || ''}
+
+【類似問題の条件】
+1. 元の問題と**同じ学習内容**を練習できる問題にする
+2. **数字や状況を変えた**バリエーションを作成
+3. 難易度は元の問題と同程度
+4. 具体的で子どもが解ける形式
+5. 必ず解答例を付ける
+
+以下のJSON形式で出力してください。説明文は不要です：
+{
+  "problem_text": "新しい類似問題の問題文",
+  "answer": "解答例",
+  "hint_1": "ヒント1（まず考えてほしいこと）",
+  "hint_2": "ヒント2（中間ヒント）",
+  "hint_3": "ヒント3（答えに近いヒント）"
+}`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 2048
+          }
+        })
+      }
+    )
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSONを抽出
+    const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('AI response is not valid JSON')
+    }
+    
+    const similarProblem = JSON.parse(jsonMatch[0])
+    
+    return c.json({
+      success: true,
+      problem: similarProblem
+    })
+    
+  } catch (error) {
+    console.error('類似問題生成エラー:', error)
+    return c.json({ 
+      error: '類似問題の生成に失敗しました',
+      details: error instanceof Error ? error.message : String(error)
+    }, 500)
+  }
+})
+
 // トップページ
 app.get('/', (c) => {
   return c.html(`
@@ -2308,15 +2400,36 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
    - この問題が学習カードのどの内容につながるかを connection_to_cards に書く
    - 選択問題1-2題はこのコース選択問題の発展版になるようにする
 
-3. 各コースの導入問題（新規・最重要）:
-   - **各コースに1題ずつ、合計3題の導入問題を作成**
-   - **コース選択問題とは別物：コース選択後、学習を始める前に解く問題**
-   - **「このコースで学ぶ内容の入門編」となる魅力的な問題**
-   - **ゆっくりコース導入問題**: 基礎的で親しみやすい問題
-   - **しっかりコース導入問題**: 標準的で適度な挑戦のある問題
-   - **どんどんコース導入問題**: 発展的で知的好奇心を刺激する問題
+3. 各コースの導入問題（新規・最重要・子どもがコース選択する際の重要な判断材料）:
+   - **各コースに1題ずつ、合計3題の魅力的な導入問題を作成**
+   - **目的：子どもが各コースの学習内容を具体的にイメージできるようにする**
+   - **コース選択問題とは別物：コースを選ぶための具体例となる問題**
+   
+   **重要：単なる難易度の違いではなく、学習内容の違いを示す**
+   - ❌NG例：「ゆっくり=2+3」「しっかり=12+35」「どんどん=123+456」
+   - ✅Good例：それぞれのコースで扱う学習テーマ・アプローチの違いを示す
+   
+   **ゆっくりコース導入問題：**
+   - 基礎的で親しみやすく、じっくり理解できる問題
+   - 具体物や図を使って考える問題
+   - 「これなら自分にもできそう！」と思える内容
+   - 丁寧な説明と十分な練習時間を想定
+   
+   **しっかりコース導入問題：**
+   - 標準的で、いろいろな方法で解ける問題
+   - 複数のアプローチを試せる問題
+   - 「自分なりの方法で解いてみたい！」と思える内容
+   - バランスの取れた学習を想定
+   
+   **どんどんコース導入問題：**
+   - 発展的で、深く考える問題
+   - 応用や発展につながる問題
+   - 「もっと知りたい！挑戦したい！」と思える内容
+   - 自分で考えを深められる学習を想定
+   
    - 各コースのJSONに introduction_problem フィールドを追加
-   - 形式は problem_title, problem_content, problem_description, answer を含む
+   - 形式：problem_title（魅力的なタイトル）, problem_content（具体的な問題文）, answer（解答のヒント）を必ず含む
+   - 問題文は具体的な数字や状況を含み、実際に解ける問題にする
    
 4. チェックテスト（全コース共通・最重要）:
    - **どのコースも共通で、基礎基本問題6題を作成**
