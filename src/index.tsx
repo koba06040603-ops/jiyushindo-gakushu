@@ -2577,9 +2577,10 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     // 品質モードに応じてモデルを選択
-    // gemini-2.0-flash-thinking-exp: 出力トークン上限 65536 (最大)
-    let modelName = useHighQuality ? 'gemini-2.0-flash-thinking-exp' : 'gemini-2.0-flash-thinking-exp'
-    console.log('🤖 使用モデル:', modelName, '| 出力トークン上限: 65536')
+    // gemini-exp-1206: Gemini 2.0 Flash experimental (出力トークン上限: 8192)
+    // gemini-2.0-flash-exp: Gemini 2.0 Flash experimental (出力トークン上限: 8192)
+    let modelName = useHighQuality ? 'gemini-exp-1206' : 'gemini-2.0-flash-exp'
+    console.log('🤖 使用モデル:', modelName, '| 出力トークン上限: 8192')
     
     let response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
@@ -2590,16 +2591,16 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 65536  // 16000から65536に大幅増量
+            maxOutputTokens: 8192
           }
         })
       }
     )
     
-    // フォールバック: Gemini 2.0 Flash Expを使用
+    // フォールバック: Gemini 1.5 Proを使用
     if (!response.ok) {
-      console.log(`${modelName} failed, falling back to 2.0 Flash Exp`)
-      modelName = 'gemini-2.0-flash-exp'
+      console.log(`${modelName} failed, falling back to 1.5 Pro`)
+      modelName = 'gemini-1.5-pro'
       response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
         {
@@ -2609,7 +2610,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.8,
-              maxOutputTokens: 16000  // フォールバックは16000
+              maxOutputTokens: 8192
             }
           })
         }

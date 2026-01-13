@@ -5623,65 +5623,72 @@ async function saveGeneratedUnit(unitData) {
       console.log('✅ 単元を保存しました。curriculum_id:', curriculumId)
       console.log('📊 保存されたデータ:', response.data.saved_data)
       
-      // データの完全性を確認
-      const savedData = response.data.saved_data || {}
-      const missingData = []
+      // 保存完了表示を維持
+      saveButton.innerHTML = `
+        <i class="fas fa-check-circle mr-2"></i>
+        保存完了！
+      `
       
-      if (!savedData.optional_problems_count || savedData.optional_problems_count < 6) {
-        missingData.push(`選択問題: ${savedData.optional_problems_count || 0}/6`)
-      }
-      if (!savedData.course_selection_count || savedData.course_selection_count < 3) {
-        missingData.push(`コース選択問題: ${savedData.course_selection_count || 0}/3`)
-      }
-      if (!savedData.common_check_test) {
-        missingData.push('チェックテスト: なし')
-      }
+      console.log('✅ 単元を保存しました。curriculum_id:', curriculumId)
+      console.log('📊 保存されたデータ:', response.data.saved_data)
       
-      // 初期生成データの導入問題を確認
-      const coursesWithIntro = unitData.courses.filter(c => c.introduction_problem).length
-      let needsIntroGeneration = false
-      if (coursesWithIntro < 3) {
-        missingData.push(`導入問題: ${coursesWithIntro}/3`)
-        needsIntroGeneration = true
-      }
+      // 追加問題を並列生成（必須）
+      saveButton.innerHTML = `
+        <i class="fas fa-spinner fa-spin mr-2"></i>
+        追加問題を生成中... (0/3)
+      `
       
-      // 導入問題が不足している場合、軽量APIで生成
-      if (needsIntroGeneration) {
-        console.log('🔄 導入問題を追加生成します...')
-        saveButton.innerHTML = `
-          <i class="fas fa-spinner fa-spin mr-2"></i>
-          導入問題を生成中...
-        `
+      console.log('🔄 追加問題生成を開始...')
+      
+      try {
+        // 3つのAPIを並列実行
+        const [courseProblems, assessmentProblems, introProblems] = await Promise.allSettled([
+          axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`),
+          axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`),
+          axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
+        ])
         
-        try {
-          const introResponse = await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
-          if (introResponse.data.success) {
-            console.log('✅ 導入問題を追加生成しました:', introResponse.data.details)
-            // missingDataから導入問題を削除
-            const introIndex = missingData.findIndex(m => m.includes('導入問題'))
-            if (introIndex >= 0) {
-              missingData.splice(introIndex, 1)
-            }
-          }
-        } catch (introError) {
-          console.error('❌ 導入問題の追加生成に失敗:', introError)
+        const courseSuccess = courseProblems.status === 'fulfilled'
+        const assessmentSuccess = assessmentProblems.status === 'fulfilled'
+        const introSuccess = introProblems.status === 'fulfilled'
+        
+        console.log('✅ コース選択問題:', courseSuccess ? '成功' : '失敗')
+        console.log('✅ 評価問題:', assessmentSuccess ? '成功' : '失敗')
+        console.log('✅ 導入問題:', introSuccess ? '成功' : '失敗')
+        
+        if (courseSuccess && assessmentSuccess && introSuccess) {
+          saveButton.innerHTML = `
+            <i class="fas fa-check-circle mr-2"></i>
+            すべて完了！
+          `
+          console.log('🎉 すべての追加問題が正常に生成されました')
+        } else {
+          const failed = []
+          if (!courseSuccess) failed.push('コース選択問題')
+          if (!assessmentSuccess) failed.push('選択問題・チェックテスト')
+          if (!introSuccess) failed.push('導入問題')
+          
+          saveButton.innerHTML = `
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            一部未生成
+          `
+          console.warn('⚠️ 一部の追加問題生成に失敗:', failed)
+          alert('⚠️ 一部の問題生成に失敗しました:\n\n' + failed.join('\n') + 
+                '\n\nもう一度新しい単元を生成してください。')
         }
-      }
-      
-      if (missingData.length > 0) {
-        console.warn('⚠️ 不完全なデータ:', missingData)
-        alert('⚠️ 一部のデータが不完全です:\n\n' + missingData.join('\n') + 
-              '\n\nこれはAI生成の制限によるものです。\n学習のてびきで一部の問題が表示されない場合があります。')
+      } catch (additionalError) {
+        console.error('❌ 追加問題生成エラー:', additionalError)
+        saveButton.innerHTML = `
+          <i class="fas fa-exclamation-triangle mr-2"></i>
+          追加問題未生成
+        `
+        alert('❌ 追加問題の生成に失敗しました。\n\nもう一度新しい単元を生成してください。')
       }
       
       // 学習のてびきページへ遷移
-      saveButton.innerHTML = `
-        <i class="fas fa-check-circle mr-2"></i>
-        完了！学習のてびきへ
-      `
       setTimeout(() => {
         loadGuidePage(curriculumId)
-      }, 1000)
+      }, 1500)
     } else {
       const errorMsg = response.data.details || response.data.error || '保存に失敗しました'
       throw new Error(errorMsg)
