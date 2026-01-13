@@ -477,10 +477,10 @@ async function loadGuidePage(curriculumId) {
                   <i class="fas fa-calendar-alt mr-2"></i>
                   学習計画表を作る
                 </button>
-                <button onclick="window.print()" 
-                        class="bg-gradient-to-r from-gray-600 to-gray-700 text-white py-3 px-4 rounded-xl font-bold hover:from-gray-700 hover:to-gray-800 transition shadow-lg flex items-center justify-center">
+                <button onclick="showIntegratedPrintPreview(${curriculum.id})" 
+                        class="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-4 rounded-xl font-bold hover:from-purple-700 hover:to-pink-700 transition shadow-lg flex items-center justify-center">
                   <i class="fas fa-print mr-2"></i>
-                  いんさつする
+                  いんさつする（全部）
                 </button>
                 <button onclick="loadAnswersTab(${curriculum.id})" 
                         class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:from-blue-600 hover:to-indigo-700 transition shadow-lg flex items-center justify-center">
