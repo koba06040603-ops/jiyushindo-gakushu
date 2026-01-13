@@ -626,6 +626,19 @@ async function loadLearningPlanPage(curriculumId) {
               </div>
             </div>
 
+            <!-- 学習計画表の使い方説明 -->
+            <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-4">
+              <h3 class="text-lg font-bold text-blue-800 mb-2">
+                <i class="fas fa-info-circle mr-2"></i>学習計画表の使い方
+              </h3>
+              <ul class="text-sm text-gray-700 space-y-1">
+                <li>💡 <strong>学習内容欄</strong>には、その時間に学習するカード番号を書きましょう</li>
+                <li>📝 例：「カード2と3」「カード4-6」など、1時間で複数のカードに取り組めます</li>
+                <li>🎯 オリエンテーション（1時間目）とまとめ（最終時間）は固定です</li>
+                <li>✏️ 計画は途中で修正できます。自分のペースで進めましょう</li>
+              </ul>
+            </div>
+
             <div class="overflow-x-auto mb-6">
               <table class="w-full border-collapse border-2 border-gray-300">
                 <thead>
@@ -743,7 +756,7 @@ function generateLearningPlanRows(totalHours, existingPlans, curriculum) {
                  class="learning-content w-full px-2 py-1 border border-gray-300 rounded text-sm"
                  data-hour="${i}"
                  value="${content}"
-                 placeholder="${isFixed ? '' : '学習カード1-2など'}"
+                 placeholder="${isFixed ? '' : '例：カード2と3、カード4-6など'}"
                  ${isFixed ? 'readonly' : ''}>
         </td>
         <td class="border-2 border-gray-300 px-3 py-2">
@@ -4636,20 +4649,23 @@ function showUnitGeneratorModal() {
                 AI生成品質モード
               </label>
               <div class="space-y-3">
-                <label class="flex items-start cursor-pointer hover:bg-purple-100 p-3 rounded-lg transition">
+                <label class="flex items-start cursor-pointer hover:bg-blue-50 p-3 rounded-lg transition border-2 border-blue-200">
                   <input type="radio" name="qualityMode" value="standard" checked class="mt-1 mr-3">
                   <div>
-                    <div class="font-bold text-gray-800">⚡ 標準モード（推奨）</div>
-                    <div class="text-sm text-gray-600">Gemini 3 Flash - 高速生成（約10秒）</div>
+                    <div class="font-bold text-blue-800">⚡ 標準モード（推奨）</div>
+                    <div class="text-sm text-gray-700">Gemini 3 Flash - バランス重視</div>
+                    <div class="text-xs text-blue-600 mt-1">
+                      生成時間：約40秒〜1分30秒 | 3コース×6枚＝18枚のカード確実生成
+                    </div>
                   </div>
                 </label>
-                <label class="flex items-start cursor-pointer hover:bg-purple-100 p-3 rounded-lg transition">
+                <label class="flex items-start cursor-pointer hover:bg-purple-50 p-3 rounded-lg transition border-2 border-purple-200">
                   <input type="radio" name="qualityMode" value="high" class="mt-1 mr-3">
                   <div>
-                    <div class="font-bold text-gray-800">🌟 高品質モード</div>
-                    <div class="text-sm text-gray-600">Gemini 3 Pro - より詳細で丁寧（約30秒）</div>
+                    <div class="font-bold text-purple-800">🌟 確実モード（高品質）</div>
+                    <div class="text-sm text-gray-700">Gemini 3 Pro - 最高品質・詳細説明</div>
                     <div class="text-xs text-purple-600 mt-1">
-                      ※ 複雑な単元や不登校支援に最適
+                      生成時間：約2〜3分 | 複雑な単元・不登校支援・特別支援に最適
                     </div>
                   </div>
                 </label>
@@ -4863,8 +4879,8 @@ async function startUnitGeneration() {
 
 // 生成プロセス表示
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
-  const modeLabel = qualityMode === 'high' ? '高品質モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
-  const estimatedTime = qualityMode === 'high' ? '約30秒' : '約10秒'
+  const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
+  const estimatedTime = qualityMode === 'high' ? '約2〜3分' : '約40秒〜1分30秒'
   
   const app = document.getElementById('app')
   app.innerHTML = `
