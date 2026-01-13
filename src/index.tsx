@@ -2469,12 +2469,26 @@ app.post('/api/curriculum/save-generated', async (c) => {
     
     // コースを保存
     for (const course of courses) {
+      // course_levelを決定（course_nameから推測）
+      let courseLevel = 'standard'
+      if (course.course_name?.includes('ゆっくり') || course.course_name?.includes('じっくり')) {
+        courseLevel = 'basic'
+      } else if (course.course_name?.includes('どんどん') || course.course_name?.includes('ぐんぐん')) {
+        courseLevel = 'advanced'
+      }
+      
       const courseResult = await env.DB.prepare(`
         INSERT INTO courses (
-          curriculum_id, course_name, description, color_code, course_label
-        ) VALUES (?, ?, ?, ?, ?)
+          curriculum_id, course_level, course_display_name, 
+          selection_question_title, selection_question_content,
+          course_name, description, color_code, course_label
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         curriculumId,
+        courseLevel,
+        course.course_name || course.course_label || 'コース',
+        course.course_name || 'コース選択問題',
+        course.description || '',
         course.course_name,
         course.description,
         course.color_code,
