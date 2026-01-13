@@ -1375,12 +1375,12 @@ app.post('/api/hints', async (c) => {
   try {
     const result = await env.DB.prepare(`
       INSERT INTO hint_cards (
-        learning_card_id, hint_level, hint_text, thinking_tool_suggestion
+        learning_card_id, hint_number, hint_content, thinking_tool_suggestion
       ) VALUES (?, ?, ?, ?)
     `).bind(
       body.learning_card_id,
-      body.hint_level,
-      body.hint_text || '',
+      body.hint_level || body.hint_number || 1,
+      body.hint_text || body.hint_content || '',
       body.thinking_tool_suggestion || ''
     ).run()
     
@@ -2524,12 +2524,12 @@ app.post('/api/curriculum/save-generated', async (c) => {
         for (const hint of card.hints || []) {
           await env.DB.prepare(`
             INSERT INTO hint_cards (
-              learning_card_id, hint_level, hint_text, thinking_tool_suggestion
+              learning_card_id, hint_number, hint_content, thinking_tool_suggestion
             ) VALUES (?, ?, ?, ?)
           `).bind(
             cardId,
-            hint.hint_level,
-            hint.hint_text,
+            hint.hint_level || hint.hint_number || 1,
+            hint.hint_text || hint.hint_content || '',
             hint.thinking_tool_suggestion || ''
           ).run()
         }
