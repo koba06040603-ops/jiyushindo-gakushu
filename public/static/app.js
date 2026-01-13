@@ -1342,9 +1342,29 @@ async function selectCourse(courseId) {
   }
 }
 
+// 教師用モードへ遷移
+async function loadTeacherOverview(curriculumId) {
+  try {
+    // カリキュラムとコースデータを取得
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum, courses } = response.data
+    
+    // 選択問題を取得
+    const optionalProblemsResponse = await axios.get(`/api/curriculum/${curriculumId}/optional-problems`)
+    const optionalProblems = optionalProblemsResponse.data.optional_problems || []
+    
+    // プレビュー画面を表示（教師用モード）
+    showUnitPreview({ curriculum, courses, optionalProblems }, 'teacher-mode')
+  } catch (error) {
+    console.error('教師用モード読み込みエラー:', error)
+    alert('教師用モードの読み込みに失敗しました。')
+  }
+}
+
 // グローバルスコープに関数を登録
 window.renderTopPage = renderTopPage
 window.loadGuidePage = loadGuidePage
+window.loadTeacherOverview = loadTeacherOverview
 window.loadLearningPlanPage = loadLearningPlanPage
 window.updatePlanHours = updatePlanHours
 window.toggleSubject2 = toggleSubject2
