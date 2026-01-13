@@ -573,11 +573,16 @@ async function loadLearningPlanPage(curriculumId) {
                   <input type="number" 
                          id="totalHours" 
                          value="${curriculum.total_hours}" 
-                         min="1" 
+                         min="3" 
                          max="30" 
-                         class="w-24 px-3 py-2 border-2 border-blue-300 rounded-lg font-bold text-xl text-center">
+                         class="w-24 px-3 py-2 border-2 border-blue-300 rounded-lg font-bold text-xl text-center"
+                         onchange="updatePlanHours()">
                   <span class="text-lg font-bold text-blue-700">じかん</span>
                 </div>
+                <p class="text-xs text-gray-600 mt-2">
+                  ※ 1時間目（オリエンテーション）と最後の時間（まとめ）は固定です。<br>
+                  自由に計画できるのは<strong id="planHours">${curriculum.total_hours - 2}</strong>時間です。
+                </p>
               </div>
               
               <div class="bg-orange-50 rounded-xl p-4">
@@ -687,9 +692,9 @@ async function loadLearningPlanPage(curriculumId) {
                       class="bg-gradient-to-r from-green-500 to-blue-600 text-white py-3 px-8 rounded-xl font-bold hover:from-green-600 hover:to-blue-700 transition shadow-lg">
                 <i class="fas fa-save mr-2"></i>学習計画を保存する
               </button>
-              <button onclick="window.print()" 
+              <button onclick="showIntegratedPrintPreview(${curriculumId})" 
                       class="bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-8 rounded-xl font-bold hover:from-purple-600 hover:to-pink-700 transition shadow-lg">
-                <i class="fas fa-print mr-2"></i>いんさつする
+                <i class="fas fa-print mr-2"></i>いんさつする（計画表・てびき・ヒントカード）
               </button>
             </div>
 
@@ -776,6 +781,12 @@ function generateLearningPlanRows(totalHours, existingPlans, curriculum) {
   }
   
   return rows
+}
+
+function updatePlanHours() {
+  const totalHours = parseInt(document.getElementById('totalHours').value)
+  const planHours = totalHours - 2
+  document.getElementById('planHours').textContent = planHours
 }
 
 function toggleSubject2() {
@@ -912,6 +923,213 @@ async function saveLearningPlan(curriculumId) {
   }
 }
 
+// 統合印刷プレビュー（学習計画表・学習のてびき・ヒントカード）
+async function showIntegratedPrintPreview(curriculumId) {
+  try {
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum, courses } = response.data
+    
+    // メタデータ取得
+    let courseSelectionProblems = []
+    let checkTests = []
+    try {
+      const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+      courseSelectionProblems = metaResponse.data.course_selection_problems || []
+      checkTests = metaResponse.data.check_tests || []
+    } catch (error) {
+      console.log('メタデータなし')
+    }
+    
+    // ヒントカード取得
+    const allHints = []
+    for (const course of courses) {
+      const cardsResponse = await axios.get(`/api/courses/${course.id}/cards`)
+      for (const card of cardsResponse.data) {
+        const cardDetailResponse = await axios.get(`/api/cards/${card.id}`)
+        const hints = cardDetailResponse.data.hints || []
+        if (hints.length > 0) {
+          allHints.push({
+            courseName: course.course_name,
+            cardTitle: card.card_title,
+            cardNumber: card.card_number,
+            hints: hints
+          })
+        }
+      }
+    }
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="print-container">
+        <!-- 印刷ボタン（印刷時は非表示） -->
+        <div class="no-print mb-6 flex justify-between items-center px-4 py-4 bg-gray-100">
+          <button onclick="loadLearningPlanPage(${curriculumId})" 
+                  class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-lg">
+            <i class="fas fa-arrow-left mr-2"></i>学習計画表にもどる
+          </button>
+          <button onclick="window.print()" 
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
+            <i class="fas fa-print mr-2"></i>印刷する
+          </button>
+        </div>
+
+        <!-- 1. 学習計画表 -->
+        <div class="print-page bg-white p-8 mb-8">
+          <h1 class="text-3xl font-bold text-center mb-6 border-b-4 border-green-600 pb-4">学習計画表</h1>
+          <h2 class="text-2xl font-bold text-center mb-4">${curriculum.unit_name}</h2>
+          <div class="grid grid-cols-3 gap-4 mb-6 text-sm">
+            <div><strong>学年：</strong>${curriculum.grade}年</div>
+            <div><strong>組：</strong>____ 組</div>
+            <div><strong>名前：</strong>____________________</div>
+          </div>
+          
+          <div class="mb-4 p-4 bg-green-50 rounded">
+            <h3 class="font-bold text-green-800 mb-2">📚 単元の目標</h3>
+            <p class="text-sm">${curriculum.unit_goal}</p>
+          </div>
+          
+          <div class="mb-4 p-4 bg-purple-50 rounded">
+            <h3 class="font-bold text-purple-800 mb-2">💖 こころの成長目標</h3>
+            <p class="text-sm">${curriculum.non_cognitive_goal}</p>
+          </div>
+          
+          <div class="mb-4 text-sm">
+            <strong>総時間数：</strong>${curriculum.total_hours}時間　
+            <strong>計画可能時間：</strong>${curriculum.total_hours - 2}時間
+          </div>
+          
+          <table class="w-full border-collapse border-2 border-gray-400 text-xs">
+            <thead>
+              <tr class="bg-gray-200">
+                <th class="border border-gray-400 px-2 py-1">時間目</th>
+                <th class="border border-gray-400 px-2 py-1">教科</th>
+                <th class="border border-gray-400 px-2 py-1">予定日</th>
+                <th class="border border-gray-400 px-2 py-1">学習内容</th>
+                <th class="border border-gray-400 px-2 py-1">よかったこと</th>
+                <th class="border border-gray-400 px-2 py-1">なおしたいこと</th>
+                <th class="border border-gray-400 px-2 py-1">わかったこと</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Array.from({length: curriculum.total_hours}, (_, i) => i + 1).map(hour => {
+                const isFixed = hour === 1 || hour === curriculum.total_hours
+                const content = hour === 1 ? 'オリエンテーション' 
+                              : hour === curriculum.total_hours ? 'まとめ' 
+                              : ''
+                return `
+                  <tr class="${isFixed ? 'bg-gray-100' : ''}">
+                    <td class="border border-gray-400 px-2 py-1 text-center font-bold">${hour}</td>
+                    <td class="border border-gray-400 px-2 py-1">${curriculum.subject}</td>
+                    <td class="border border-gray-400 px-2 py-1"></td>
+                    <td class="border border-gray-400 px-2 py-1">${content}</td>
+                    <td class="border border-gray-400 px-2 py-1"></td>
+                    <td class="border border-gray-400 px-2 py-1"></td>
+                    <td class="border border-gray-400 px-2 py-1"></td>
+                  </tr>
+                `
+              }).join('')}
+            </tbody>
+          </table>
+          
+          <div class="mt-6 p-4 border-2 border-purple-300 rounded">
+            <h3 class="font-bold text-purple-800 mb-3">単元全体のふり返り</h3>
+            <div class="grid grid-cols-3 gap-4">
+              <div>
+                <p class="text-xs font-bold mb-1">よかったこと</p>
+                <div class="border border-gray-300 rounded p-2 h-20"></div>
+              </div>
+              <div>
+                <p class="text-xs font-bold mb-1">なおしたいこと</p>
+                <div class="border border-gray-300 rounded p-2 h-20"></div>
+              </div>
+              <div>
+                <p class="text-xs font-bold mb-1">わかったこと</p>
+                <div class="border border-gray-300 rounded p-2 h-20"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 学習のてびき -->
+        <div class="print-page bg-white p-8 mb-8">
+          <h1 class="text-3xl font-bold text-center mb-6 border-b-4 border-indigo-600 pb-4">学習のてびき</h1>
+          <h2 class="text-2xl font-bold text-center mb-4">${curriculum.unit_name}</h2>
+          <div class="grid grid-cols-3 gap-4 mb-6 text-sm">
+            <div><strong>学年：</strong>${curriculum.grade}年</div>
+            <div><strong>組：</strong>____ 組</div>
+            <div><strong>名前：</strong>____________________</div>
+          </div>
+          
+          <div class="mb-6 p-4 bg-blue-50 rounded">
+            <h3 class="font-bold text-blue-800 mb-2">📚 単元の目標</h3>
+            <p class="text-sm">${curriculum.unit_goal}</p>
+          </div>
+          
+          <div class="mb-6 p-4 bg-purple-50 rounded">
+            <h3 class="font-bold text-purple-800 mb-2">💖 こころの成長目標</h3>
+            <p class="text-sm">${curriculum.non_cognitive_goal}</p>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="font-bold text-lg mb-3 text-indigo-700">🎯 コースの選び方</h3>
+            <div class="grid grid-cols-3 gap-4">
+              ${courseSelectionProblems.map(problem => `
+                <div class="border-2 border-gray-300 rounded p-3">
+                  <h4 class="font-bold text-sm mb-2">${problem.problem_title}</h4>
+                  <p class="text-xs text-gray-700">${problem.problem_description}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="font-bold text-lg mb-3">📝 各コースの学習内容</h3>
+            ${courses.map(course => `
+              <div class="mb-4 p-3 bg-${course.color_code}-50 border-l-4 border-${course.color_code}-600">
+                <h4 class="font-bold text-${course.color_code}-800">${course.course_name}</h4>
+                <p class="text-xs mt-1">${course.description}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 3. ヒントカード -->
+        ${allHints.map(hintCard => `
+          <div class="print-page bg-white p-6 mb-8">
+            <div class="border-4 border-blue-400 rounded-lg p-4">
+              <h2 class="text-xl font-bold text-blue-800 mb-2">${hintCard.courseName}</h2>
+              <h3 class="text-lg font-bold text-gray-800 mb-4">
+                カード${hintCard.cardNumber}：${hintCard.cardTitle}
+              </h3>
+              
+              ${hintCard.hints.map((hint, idx) => `
+                <div class="mb-4 p-3 bg-yellow-${50 * (idx + 1)} border-l-4 border-yellow-${400 + (idx * 100)} rounded">
+                  <h4 class="font-bold text-yellow-800 mb-1">💡 ヒント${hint.hint_level}</h4>
+                  <p class="text-sm">${hint.hint_text}</p>
+                  ${hint.thinking_tool_suggestion ? `
+                    <p class="text-xs text-gray-600 mt-2">🛠️ ${hint.thinking_tool_suggestion}</p>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      
+      <style>
+        @media print {
+          .no-print { display: none !important; }
+          .print-page { page-break-after: always; }
+          body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        }
+      </style>
+    `
+  } catch (error) {
+    console.error('印刷プレビュー生成エラー:', error)
+    alert('印刷プレビューの生成に失敗しました')
+  }
+}
+
 function getCategoryLabel(category) {
   const labels = {
     'creative': '表現・クリエイティブ',
@@ -997,10 +1215,12 @@ async function selectCourse(courseId) {
 window.renderTopPage = renderTopPage
 window.loadGuidePage = loadGuidePage
 window.loadLearningPlanPage = loadLearningPlanPage
+window.updatePlanHours = updatePlanHours
 window.toggleSubject2 = toggleSubject2
 window.getReflectionAI = getReflectionAI
 window.getUnitReflectionAI = getUnitReflectionAI
 window.saveLearningPlan = saveLearningPlan
+window.showIntegratedPrintPreview = showIntegratedPrintPreview
 window.selectCourse = selectCourse
 window.loadCardPage = loadCardPage
 window.loadProgressBoard = loadProgressBoard

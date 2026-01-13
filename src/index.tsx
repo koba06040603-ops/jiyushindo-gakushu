@@ -2045,7 +2045,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "cards": [
         {
           "card_number": 1,
-          "card_title": "学習カードのタイトル",
+          "card_title": "学習カード1のタイトル",
           "card_type": "main",
           "textbook_page": "教科書のページ（例: p.24-25）",
           "problem_description": "問題文・課題の説明",
@@ -2068,6 +2068,86 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
               "hint_text": "ヒント3（ほぼ答えに近いヒント）"
             }
           ]
+        },
+        {
+          "card_number": 2,
+          "card_title": "学習カード2のタイトル",
+          "card_type": "main",
+          "textbook_page": "p.26-27",
+          "problem_description": "問題文",
+          "new_terms": "新出用語",
+          "example_problem": "例題",
+          "example_solution": "解き方",
+          "real_world_connection": "つながり",
+          "hints": [
+            {"hint_level": 1, "hint_text": "ヒント1"},
+            {"hint_level": 2, "hint_text": "ヒント2"},
+            {"hint_level": 3, "hint_text": "ヒント3"}
+          ]
+        },
+        {
+          "card_number": 3,
+          "card_title": "学習カード3のタイトル",
+          "card_type": "main",
+          "textbook_page": "p.28-29",
+          "problem_description": "問題文",
+          "new_terms": "新出用語",
+          "example_problem": "例題",
+          "example_solution": "解き方",
+          "real_world_connection": "つながり",
+          "hints": [
+            {"hint_level": 1, "hint_text": "ヒント1"},
+            {"hint_level": 2, "hint_text": "ヒント2"},
+            {"hint_level": 3, "hint_text": "ヒント3"}
+          ]
+        },
+        {
+          "card_number": 4,
+          "card_title": "学習カード4のタイトル",
+          "card_type": "main",
+          "textbook_page": "p.30-31",
+          "problem_description": "問題文",
+          "new_terms": "新出用語",
+          "example_problem": "例題",
+          "example_solution": "解き方",
+          "real_world_connection": "つながり",
+          "hints": [
+            {"hint_level": 1, "hint_text": "ヒント1"},
+            {"hint_level": 2, "hint_text": "ヒント2"},
+            {"hint_level": 3, "hint_text": "ヒント3"}
+          ]
+        },
+        {
+          "card_number": 5,
+          "card_title": "学習カード5のタイトル",
+          "card_type": "main",
+          "textbook_page": "p.32-33",
+          "problem_description": "問題文",
+          "new_terms": "新出用語",
+          "example_problem": "例題",
+          "example_solution": "解き方",
+          "real_world_connection": "つながり",
+          "hints": [
+            {"hint_level": 1, "hint_text": "ヒント1"},
+            {"hint_level": 2, "hint_text": "ヒント2"},
+            {"hint_level": 3, "hint_text": "ヒント3"}
+          ]
+        },
+        {
+          "card_number": 6,
+          "card_title": "学習カード6のタイトル",
+          "card_type": "main",
+          "textbook_page": "p.34-35",
+          "problem_description": "問題文",
+          "new_terms": "新出用語",
+          "example_problem": "例題",
+          "example_solution": "解き方",
+          "real_world_connection": "つながり",
+          "hints": [
+            {"hint_level": 1, "hint_text": "ヒント1"},
+            {"hint_level": 2, "hint_text": "ヒント2"},
+            {"hint_level": 3, "hint_text": "ヒント3"}
+          ]
         }
       ]
     },
@@ -2076,14 +2156,28 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "course_label": "自分のペースで学ぶコース",
       "description": "いろいろな方法で学びたい人におすすめ",
       "color_code": "blue",
-      "cards": []
+      "cards": [
+        {"card_number": 1, "card_title": "カード1", "card_type": "main", "textbook_page": "p.24", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 2, "card_title": "カード2", "card_type": "main", "textbook_page": "p.26", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 3, "card_title": "カード3", "card_type": "main", "textbook_page": "p.28", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 4, "card_title": "カード4", "card_type": "main", "textbook_page": "p.30", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 5, "card_title": "カード5", "card_type": "main", "textbook_page": "p.32", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 6, "card_title": "カード6", "card_type": "main", "textbook_page": "p.34", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]}
+      ]
     },
     {
       "course_name": "どんどんコース",
       "course_label": "いろいろなことにちょうせんするコース",
       "description": "自分で考えを深めたい人におすすめ",
       "color_code": "purple",
-      "cards": []
+      "cards": [
+        {"card_number": 1, "card_title": "カード1", "card_type": "main", "textbook_page": "p.24", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 2, "card_title": "カード2", "card_type": "main", "textbook_page": "p.26", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 3, "card_title": "カード3", "card_type": "main", "textbook_page": "p.28", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 4, "card_title": "カード4", "card_type": "main", "textbook_page": "p.30", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 5, "card_title": "カード5", "card_type": "main", "textbook_page": "p.32", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
+        {"card_number": 6, "card_title": "カード6", "card_type": "main", "textbook_page": "p.34", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]}
+      ]
     }
   ],
   "check_tests": [
@@ -2203,12 +2297,20 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
   ]
 }
 
+【最重要：必須要件】
+❗️ **各コースは必ず6枚のカードを作成してください。これは絶対条件です。**
+❗️ **時間制限より優先して、3コース×6枚＝合計18枚のカードを確実に完成させてください。**
+❗️ **1コースでも5枚以下になってはいけません。必ず6枚です。**
+
 【重要な設計指針】
 
-1. コース設計（各コース6枚のカード）:
-   - ゆっくりコース: 基礎をしっかり。丁寧な説明と十分な練習
-   - しっかりコース: 標準的な内容。バランスよく
-   - どんどんコース: 発展的な内容。思考を深める
+1. コース設計（各コース必ず6枚のカード - 絶対要件）:
+   - **ゆっくりコース: 必ず6枚（card_number: 1, 2, 3, 4, 5, 6）**
+     - 基礎をしっかり。丁寧な説明と十分な練習
+   - **しっかりコース: 必ず6枚（card_number: 1, 2, 3, 4, 5, 6）**
+     - 標準的な内容。バランスよく
+   - **どんどんコース: 必ず6枚（card_number: 1, 2, 3, 4, 5, 6）**
+     - 発展的な内容。思考を深める
 
 2. コース選択問題3題（最重要）:
    - **各コースの入り口となる魅力的で具体的な問題を作成**
