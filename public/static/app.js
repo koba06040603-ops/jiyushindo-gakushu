@@ -1050,41 +1050,48 @@ async function showIntegratedPrintPreview(curriculumId) {
           
           <div class="mb-6">
             <h3 class="font-bold text-lg mb-3 text-indigo-700">🎯 コースの選び方</h3>
-            <div class="grid grid-cols-3 gap-4 mb-4">
-              ${courseSelectionProblems.map((problem, index) => `
-                <div class="border-2 border-gray-300 rounded p-3">
-                  <h4 class="font-bold text-sm mb-2">${problem.problem_title}</h4>
-                  <p class="text-xs text-gray-700">${problem.problem_description}</p>
-                </div>
-              `).join('')}
-            </div>
+            <p class="text-xs text-gray-600 mb-3">各コースの特徴と、どんな問題に取り組むかを確認しましょう</p>
             
-            <!-- 各コースの導入問題（教師確認用） -->
-            <div class="bg-blue-50 border-2 border-blue-300 rounded p-4">
-              <h4 class="font-bold text-sm text-blue-800 mb-3">
-                <i class="fas fa-chalkboard-teacher mr-2"></i>各コースの導入問題（教師確認用）
-              </h4>
-              <div class="grid grid-cols-3 gap-3">
-                ${courses.map((course, index) => {
-                  const colorClass = index === 0 ? 'green' : index === 1 ? 'blue' : 'purple';
-                  return `
-                    <div class="bg-white border-2 border-${colorClass}-300 rounded p-3">
-                      <h5 class="font-bold text-xs text-${colorClass}-800 mb-2">
-                        <i class="fas fa-star mr-1"></i>${course.course_name}
-                      </h5>
-                      ${course.introduction_problem ? `
+            <div class="grid grid-cols-3 gap-4">
+              ${courses.map((course, index) => {
+                const colorClass = index === 0 ? 'green' : index === 1 ? 'blue' : 'purple';
+                const problem = courseSelectionProblems[index];
+                return `
+                  <div class="border-2 border-${colorClass}-500 bg-${colorClass}-50 rounded p-3">
+                    <div class="flex items-center mb-2">
+                      <div class="w-6 h-6 rounded-full bg-${colorClass}-500 text-white flex items-center justify-center font-bold text-xs mr-2">
+                        ${index + 1}
+                      </div>
+                      <h4 class="font-bold text-sm text-${colorClass}-800">${course.course_name}</h4>
+                    </div>
+                    <p class="text-xs text-gray-700 mb-2">${course.description}</p>
+                    
+                    ${problem ? `
+                      <div class="bg-white rounded p-2 mb-2 border border-${colorClass}-200">
+                        <p class="text-xs font-bold text-${colorClass}-700 mb-1">
+                          <i class="fas fa-star mr-1"></i>${problem.problem_title}
+                        </p>
+                        <p class="text-xs text-gray-600">${problem.problem_description || problem.problem_content}</p>
+                      </div>
+                    ` : ''}
+                    
+                    ${course.introduction_problem ? `
+                      <div class="bg-white rounded p-2 border border-${colorClass}-300">
+                        <p class="text-xs font-bold text-${colorClass}-700 mb-1">
+                          <i class="fas fa-lightbulb mr-1"></i>導入問題
+                        </p>
                         <p class="text-xs font-bold mb-1">${course.introduction_problem.problem_title}</p>
-                        <p class="text-xs text-gray-700 mb-2">${course.introduction_problem.problem_content}</p>
+                        <p class="text-xs text-gray-700 mb-1">${course.introduction_problem.problem_content}</p>
                         ${course.introduction_problem.answer ? `
-                          <div class="bg-yellow-50 rounded px-2 py-1 text-xs">
-                            <strong>解答:</strong> ${course.introduction_problem.answer}
+                          <div class="bg-yellow-50 rounded px-2 py-1 text-xs mt-1">
+                            <strong>💡 ヒント:</strong> ${course.introduction_problem.answer}
                           </div>
                         ` : ''}
-                      ` : '<p class="text-xs text-gray-500">導入問題なし</p>'}
-                    </div>
-                  `;
-                }).join('')}
-              </div>
+                      </div>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('')}
             </div>
           </div>
           
