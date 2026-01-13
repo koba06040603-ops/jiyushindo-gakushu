@@ -5620,88 +5620,36 @@ async function saveGeneratedUnit(unitData) {
       `
       saveButton.className = 'flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
       
-      // 追加問題を並列生成（2つのAPIを同時実行）
-      saveButton.innerHTML = `
-        <i class="fas fa-spinner fa-spin mr-2"></i>
-        追加問題を生成中... (1/2)
-      `
+      console.log('✅ 単元を保存しました。curriculum_id:', curriculumId)
+      console.log('📊 保存されたデータ:', response.data.saved_data)
       
-      try {
-        // コース関連問題と評価問題を並列生成
-        console.log('🔄 追加問題生成を開始...')
-        const [courseProblems, assessmentProblems] = await Promise.allSettled([
-          axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`),
-          axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`)
-        ])
-        
-        // 結果を確認
-        const courseSuccess = courseProblems.status === 'fulfilled'
-        const assessmentSuccess = assessmentProblems.status === 'fulfilled'
-        
-        console.log('✅ コース問題生成:', courseSuccess ? '成功' : '失敗')
-        if (courseSuccess && courseProblems.value?.data) {
-          console.log('  詳細:', courseProblems.value.data)
-        } else if (!courseSuccess) {
-          console.error('  エラー:', courseProblems.reason)
-        }
-        
-        console.log('✅ 評価問題生成:', assessmentSuccess ? '成功' : '失敗')
-        if (assessmentSuccess && assessmentProblems.value?.data) {
-          console.log('  詳細:', assessmentProblems.value.data)
-        } else if (!assessmentSuccess) {
-          console.error('  エラー:', assessmentProblems.reason)
-        }
-        
-        if (courseSuccess && assessmentSuccess) {
-          saveButton.innerHTML = `
-            <i class="fas fa-check-circle mr-2"></i>
-            すべて完了！
-          `
-          console.log('🎉 すべての問題が正常に生成されました')
-          
-          // 生成数を確認
-          const courseDetails = courseProblems.value?.data?.details
-          const assessmentDetails = assessmentProblems.value?.data?.details
-          console.log('📊 生成結果:', {
-            コース選択問題: courseDetails?.course_selection_count || 0,
-            導入問題: courseDetails?.introduction_count || 0,
-            チェックテスト: assessmentDetails?.check_test_count || 0,
-            選択問題: assessmentDetails?.optional_count || 0
-          })
-          
-          // 期待数と一致しない場合は警告
-          if (courseDetails?.course_selection_count !== 3 || 
-              courseDetails?.introduction_count !== 3 ||
-              assessmentDetails?.check_test_count !== 6 ||
-              assessmentDetails?.optional_count !== 6) {
-            alert('⚠️ 一部の問題が生成されませんでした。\n\n期待:\n- コース選択問題: 3題\n- 導入問題: 3題\n- チェックテスト: 6題\n- 選択問題: 6題\n\n実際:\n' +
-              `- コース選択問題: ${courseDetails?.course_selection_count || 0}題\n` +
-              `- 導入問題: ${courseDetails?.introduction_count || 0}題\n` +
-              `- チェックテスト: ${assessmentDetails?.check_test_count || 0}題\n` +
-              `- 選択問題: ${assessmentDetails?.optional_count || 0}題\n\n` +
-              'もう一度新しい単元を生成してください。')
-          }
-        } else if (courseSuccess || assessmentSuccess) {
-          saveButton.innerHTML = `
-            <i class="fas fa-exclamation-triangle mr-2"></i>
-            保存完了（一部問題未生成）
-          `
-          console.warn('⚠️ 一部の追加問題生成に失敗:', { courseSuccess, assessmentSuccess })
-          alert('⚠️ 一部の追加問題の生成に失敗しました。\n\nもう一度新しい単元を生成してください。')
-        } else {
-          throw new Error('すべての追加問題生成に失敗')
-        }
-      } catch (additionalError) {
-        console.error('❌ 追加問題生成エラー:', additionalError)
-        // エラーでも続行（コア学習データは既に保存済み）
-        saveButton.innerHTML = `
-          <i class="fas fa-exclamation-triangle mr-2"></i>
-          保存完了（追加問題は未生成）
-        `
-        alert('❌ 追加問題の生成に失敗しました。\n\nコース選択問題、導入問題、チェックテスト、選択問題が生成されていません。\n\nもう一度新しい単元を生成してください。')
+      // データの完全性を確認
+      const savedData = response.data.saved_data || {}
+      const missingData = []
+      
+      if (!savedData.optional_problems_count || savedData.optional_problems_count < 6) {
+        missingData.push(`選択問題: ${savedData.optional_problems_count || 0}/6`)
+      }
+      if (!savedData.course_selection_count || savedData.course_selection_count < 3) {
+        missingData.push(`コース選択問題: ${savedData.course_selection_count || 0}/3`)
+      }
+      if (!savedData.common_check_test) {
+        missingData.push('チェックテスト: なし')
       }
       
-      // 1秒後に学習のてびきページへ
+      // 初期生成データの導入問題を確認
+      const coursesWithIntro = unitData.courses.filter(c => c.introduction_problem).length
+      if (coursesWithIntro < 3) {
+        missingData.push(`導入問題: ${coursesWithIntro}/3`)
+      }
+      
+      if (missingData.length > 0) {
+        console.warn('⚠️ 不完全なデータ:', missingData)
+        alert('⚠️ 一部のデータが不完全です:\n\n' + missingData.join('\n') + 
+              '\n\nこれはAI生成の制限によるものです。\n学習のてびきで一部の問題が表示されない場合があります。')
+      }
+      
+      // すぐに学習のてびきページへ遷移
       setTimeout(() => {
         loadGuidePage(curriculumId)
       }, 1000)

@@ -2835,9 +2835,23 @@ app.post('/api/curriculum/save-generated', async (c) => {
       ).run()
     }
     
+    console.log('✅ 単元保存完了:', {
+      curriculum_id: curriculumId,
+      courses: courses.length,
+      total_cards: courses.reduce((sum, c) => sum + (c.cards?.length || 0), 0),
+      optional_problems: optionalProblems?.length || 0,
+      course_selection_problems: courseSelectionProblems?.length || 0,
+      common_check_test: commonCheckTest ? '有' : '無'
+    })
+    
     return c.json({
       success: true,
-      curriculum_id: curriculumId
+      curriculum_id: curriculumId,
+      saved_data: {
+        optional_problems_count: optionalProblems?.length || 0,
+        course_selection_count: courseSelectionProblems?.length || 0,
+        common_check_test: !!commonCheckTest
+      }
     })
     
   } catch (error) {
