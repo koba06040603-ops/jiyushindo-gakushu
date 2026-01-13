@@ -278,7 +278,7 @@ async function loadGuidePage(curriculumId) {
   
   try {
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
-    const { curriculum, courses, optionalProblems } = response.data
+    const { curriculum, courses } = response.data
     
     //コース選択問題と共通チェックテストをメタデータから取得
     let courseSelectionProblems = []
@@ -287,8 +287,22 @@ async function loadGuidePage(curriculumId) {
       const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
       courseSelectionProblems = metaResponse.data.course_selection_problems || []
       commonCheckTest = metaResponse.data.common_check_test || null
+      console.log('✅ メタデータ取得:', {
+        courseSelectionCount: courseSelectionProblems.length,
+        hasCheckTest: !!commonCheckTest
+      })
     } catch (metaError) {
-      console.log('メタデータなし、デフォルト表示')
+      console.log('⚠️ メタデータなし、デフォルト表示')
+    }
+    
+    // 選択問題を取得
+    let optionalProblems = []
+    try {
+      const optionalResponse = await axios.get(`/api/curriculum/${curriculumId}/optional-problems`)
+      optionalProblems = optionalResponse.data.optional_problems || []
+      console.log('✅ 選択問題取得:', optionalProblems.length, '件')
+    } catch (optionalError) {
+      console.log('⚠️ 選択問題なし')
     }
     
     state.selectedCurriculum = curriculum
@@ -368,6 +382,14 @@ async function loadGuidePage(curriculumId) {
                   const problem = courseSelectionProblems[index] || {
                     problem_title: `${course.course_name}の問題`,
                     problem_content: course.description
+                  }
+                  if (index === 0) {
+                    console.log('📋 コース選択問題データ:', {
+                      total: courseSelectionProblems.length,
+                      problem0: courseSelectionProblems[0],
+                      problem1: courseSelectionProblems[1],
+                      problem2: courseSelectionProblems[2]
+                    })
                   }
                   const colorClasses = index === 0 ? 'border-green-500 bg-gradient-to-br from-green-50 to-white' :
                                      index === 1 ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-white' :
@@ -5591,6 +5613,7 @@ async function saveGeneratedUnit(unitData) {
       
       try {
         // コース関連問題と評価問題を並列生成
+        console.log('🔄 追加問題生成を開始...')
         const [courseProblems, assessmentProblems] = await Promise.allSettled([
           axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`),
           axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`)
@@ -5600,22 +5623,37 @@ async function saveGeneratedUnit(unitData) {
         const courseSuccess = courseProblems.status === 'fulfilled'
         const assessmentSuccess = assessmentProblems.status === 'fulfilled'
         
+        console.log('✅ コース問題生成:', courseSuccess ? '成功' : '失敗')
+        if (courseSuccess && courseProblems.value?.data) {
+          console.log('  詳細:', courseProblems.value.data)
+        } else if (!courseSuccess) {
+          console.error('  エラー:', courseProblems.reason)
+        }
+        
+        console.log('✅ 評価問題生成:', assessmentSuccess ? '成功' : '失敗')
+        if (assessmentSuccess && assessmentProblems.value?.data) {
+          console.log('  詳細:', assessmentProblems.value.data)
+        } else if (!assessmentSuccess) {
+          console.error('  エラー:', assessmentProblems.reason)
+        }
+        
         if (courseSuccess && assessmentSuccess) {
           saveButton.innerHTML = `
             <i class="fas fa-check-circle mr-2"></i>
             すべて完了！
           `
+          console.log('🎉 すべての問題が正常に生成されました')
         } else if (courseSuccess || assessmentSuccess) {
           saveButton.innerHTML = `
             <i class="fas fa-check-circle mr-2"></i>
             保存完了（一部問題生成済み）
           `
-          console.warn('一部の追加問題生成に失敗:', { courseSuccess, assessmentSuccess })
+          console.warn('⚠️ 一部の追加問題生成に失敗:', { courseSuccess, assessmentSuccess })
         } else {
           throw new Error('すべての追加問題生成に失敗')
         }
       } catch (additionalError) {
-        console.error('追加問題生成エラー:', additionalError)
+        console.error('❌ 追加問題生成エラー:', additionalError)
         // エラーでも続行（コア学習データは既に保存済み）
         saveButton.innerHTML = `
           <i class="fas fa-exclamation-triangle mr-2"></i>

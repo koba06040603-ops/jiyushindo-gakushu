@@ -91,7 +91,22 @@ app.get('/api/curriculum/:id', async (c) => {
           WHERE course_id = ?
           ORDER BY card_number
         `).bind(course.id).all()
-        return { ...course, cards: cards.results }
+        
+        // introduction_problemをパース
+        let introductionProblem = null
+        if (course.introduction_problem) {
+          try {
+            introductionProblem = JSON.parse(course.introduction_problem)
+          } catch (e) {
+            console.error('導入問題のパースエラー:', e)
+          }
+        }
+        
+        return { 
+          ...course, 
+          cards: cards.results,
+          introduction_problem: introductionProblem
+        }
       })
     )
     
@@ -1505,20 +1520,25 @@ app.post('/api/ai-chat', async (c) => {
   try {
     const { message, cardContext } = await c.req.json()
     
-    const systemPrompt = `あなたは小学生の学習を支援する優しいAI先生です。
+    const systemPrompt = `あなたは小学生の学習を優しくサポートするAI先生です。
 ${cardContext ? `
-現在の学習内容:
+【現在の学習内容】
 - カードタイトル: ${cardContext.card_title}
 - 学習内容: ${cardContext.problem_description}
 - 新出用語: ${cardContext.new_terms || 'なし'}
 ` : ''}
 
-以下のルールを守ってください：
-1. 小学生にも分かりやすい言葉で説明する
-2. すぐに答えを教えず、考え方のヒントを与える
-3. 励ましの言葉を入れる
-4. 具体例や図で説明する方法を提案する
-5. 200文字以内で簡潔に回答する`
+【回答ルール】
+1. 小学生が使う言葉で、具体的に説明する（難しい言葉は使わない）
+2. 答えは教えず、「まず〜を考えてみよう」のように段階的にヒントを出す
+3. 図や絵で考える方法を提案する（例：「図に書いてみるといいよ」）
+4. 「いいところに気づいたね！」など励ましを入れる
+5. 150文字程度で簡潔に（長すぎないこと）
+6. 子どもが理解できているか確認する質問を最後に入れる
+
+【回答例】
+質問「区切りってどういうこと？」
+→「区切りっていうのは、大きな数をわかりやすく分けることだよ。例えば、10000を「10と1000」に分けると計算しやすくなるよね。この問題では、どこで区切ると計算しやすいかな？」`
 
     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I', {
       method: 'POST',
@@ -2899,32 +2919,48 @@ JSONのみ出力してください。`
     }
     
     // JSONを抽出
+    console.log('AIレスポンス（コース問題）:', aiResponse)
     let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
     let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
     const problems = JSON.parse(jsonText)
+    console.log('パース結果（コース問題）:', JSON.stringify(problems, null, 2))
     
     // データベースに保存
     if (problems.course_selection_problems) {
+      console.log(`コース選択問題を保存: ${problems.course_selection_problems.length}件`)
       const courseSelectionJSON = JSON.stringify(problems.course_selection_problems)
       await env.DB.prepare(`
         INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
         VALUES (?, ?, ?)
       `).bind(curriculumId, 'course_selection_problems', courseSelectionJSON).run()
+    } else {
+      console.warn('course_selection_problemsが見つかりません')
     }
     
     if (problems.introduction_problems) {
+      console.log(`導入問題を保存: ${problems.introduction_problems.length}件`)
       const coursesList = courses.results
       for (let i = 0; i < problems.introduction_problems.length && i < coursesList.length; i++) {
         const introProblem = problems.introduction_problems[i]
         const course = coursesList[i]
         const introJSON = JSON.stringify(introProblem)
+        console.log(`コース${i+1}(ID:${course.id})に導入問題を保存:`, introProblem.problem_title)
         await env.DB.prepare(`
           UPDATE courses SET introduction_problem = ? WHERE id = ?
         `).bind(introJSON, course.id).run()
       }
+    } else {
+      console.warn('introduction_problemsが見つかりません')
     }
     
-    return c.json({ success: true, message: 'コース関連問題を生成・保存しました' })
+    return c.json({ 
+      success: true, 
+      message: 'コース関連問題を生成・保存しました',
+      details: {
+        course_selection_count: problems.course_selection_problems?.length || 0,
+        introduction_count: problems.introduction_problems?.length || 0
+      }
+    })
     
   } catch (error: any) {
     console.error('コース関連問題生成エラー:', error)
@@ -3005,21 +3041,29 @@ JSONのみ出力してください。`
     }
     
     // JSONを抽出
+    console.log('AIレスポンス（評価問題）:', aiResponse)
     let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
     let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
     const problems = JSON.parse(jsonText)
+    console.log('パース結果（評価問題）:', JSON.stringify(problems, null, 2))
     
     // データベースに保存
     if (problems.common_check_test) {
+      const sampleCount = problems.common_check_test.sample_problems?.length || 0
+      console.log(`チェックテスト問題を保存: ${sampleCount}件`)
       const checkTestJSON = JSON.stringify(problems.common_check_test)
       await env.DB.prepare(`
         INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
         VALUES (?, ?, ?)
       `).bind(curriculumId, 'common_check_test', checkTestJSON).run()
+    } else {
+      console.warn('common_check_testが見つかりません')
     }
     
     if (problems.optional_problems) {
+      console.log(`選択問題を保存: ${problems.optional_problems.length}件`)
       for (const problem of problems.optional_problems) {
+        console.log(`  - 問題${problem.problem_number}: ${problem.problem_title}`)
         await env.DB.prepare(`
           INSERT INTO optional_problems (
             curriculum_id, problem_number, problem_title, problem_description,
@@ -3034,13 +3078,50 @@ JSONのみ出力してください。`
           problem.learning_meaning || ''
         ).run()
       }
+    } else {
+      console.warn('optional_problemsが見つかりません')
     }
     
-    return c.json({ success: true, message: '評価問題を生成・保存しました' })
+    return c.json({ 
+      success: true, 
+      message: '評価問題を生成・保存しました',
+      details: {
+        check_test_count: problems.common_check_test?.sample_problems?.length || 0,
+        optional_count: problems.optional_problems?.length || 0
+      }
+    })
     
   } catch (error: any) {
     console.error('評価問題生成エラー:', error)
     return c.json({ error: '評価問題の生成に失敗しました', details: error.message }, 500)
+  }
+})
+
+// APIルート：選択問題を取得
+app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const problems = await env.DB.prepare(`
+      SELECT * FROM optional_problems 
+      WHERE curriculum_id = ? 
+      ORDER BY problem_number
+    `).bind(curriculumId).all()
+    
+    console.log(`選択問題取得: ${problems.results?.length || 0}件`)
+    
+    return c.json({ 
+      success: true,
+      optional_problems: problems.results || []
+    })
+  } catch (error: any) {
+    console.error('選択問題取得エラー:', error)
+    return c.json({ 
+      success: false,
+      error: '選択問題の取得に失敗しました',
+      optional_problems: []
+    }, 500)
   }
 })
 
