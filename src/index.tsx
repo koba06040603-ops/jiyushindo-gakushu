@@ -2577,9 +2577,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     // 品質モードに応じてモデルを選択
-    // gemini-exp-1206: Gemini 2.0 Flash experimental (出力トークン上限: 8192)
-    // gemini-2.0-flash-exp: Gemini 2.0 Flash experimental (出力トークン上限: 8192)
-    let modelName = useHighQuality ? 'gemini-exp-1206' : 'gemini-2.0-flash-exp'
+    // gemini-2.0-flash-exp: 確実に動作するモデル (出力トークン上限: 8192)
+    let modelName = 'gemini-2.0-flash-exp'
     console.log('🤖 使用モデル:', modelName, '| 出力トークン上限: 8192')
     
     let response = await fetch(
@@ -2597,10 +2596,10 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       }
     )
     
-    // フォールバック: Gemini 1.5 Proを使用
+    // フォールバック: Gemini 1.5 Flash
     if (!response.ok) {
-      console.log(`${modelName} failed, falling back to 1.5 Pro`)
-      modelName = 'gemini-1.5-pro'
+      console.log(`${modelName} failed (status: ${response.status}), falling back to 1.5 Flash`)
+      modelName = 'gemini-1.5-flash'
       response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
         {
@@ -2978,7 +2977,12 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
     
   } catch (error: any) {
     console.error('コース関連問題生成エラー:', error)
-    return c.json({ error: 'コース関連問題の生成に失敗しました', details: error.message }, 500)
+    console.error('エラースタック:', error.stack)
+    return c.json({ 
+      error: 'コース関連問題の生成に失敗しました', 
+      details: error.message,
+      stack: error.stack?.substring(0, 200)
+    }, 500)
   }
 })
 
@@ -3101,7 +3105,12 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
     
   } catch (error: any) {
     console.error('評価問題生成エラー:', error)
-    return c.json({ error: '評価問題の生成に失敗しました', details: error.message }, 500)
+    console.error('エラースタック:', error.stack)
+    return c.json({ 
+      error: '評価問題の生成に失敗しました', 
+      details: error.message,
+      stack: error.stack?.substring(0, 200)
+    }, 500)
   }
 })
 
@@ -3195,7 +3204,12 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
     
   } catch (error: any) {
     console.error('導入問題生成エラー:', error)
-    return c.json({ error: '導入問題の生成に失敗しました', details: error.message }, 500)
+    console.error('エラースタック:', error.stack)
+    return c.json({ 
+      error: '導入問題の生成に失敗しました', 
+      details: error.message,
+      stack: error.stack?.substring(0, 200)
+    }, 500)
   }
 })
 

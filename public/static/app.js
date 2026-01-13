@@ -5653,8 +5653,19 @@ async function saveGeneratedUnit(unitData) {
         const introSuccess = introProblems.status === 'fulfilled'
         
         console.log('✅ コース選択問題:', courseSuccess ? '成功' : '失敗')
+        if (!courseSuccess) {
+          console.error('  エラー詳細:', courseProblems.reason?.response?.data || courseProblems.reason?.message || courseProblems.reason)
+        }
+        
         console.log('✅ 評価問題:', assessmentSuccess ? '成功' : '失敗')
+        if (!assessmentSuccess) {
+          console.error('  エラー詳細:', assessmentProblems.reason?.response?.data || assessmentProblems.reason?.message || assessmentProblems.reason)
+        }
+        
         console.log('✅ 導入問題:', introSuccess ? '成功' : '失敗')
+        if (!introSuccess) {
+          console.error('  エラー詳細:', introProblems.reason?.response?.data || introProblems.reason?.message || introProblems.reason)
+        }
         
         if (courseSuccess && assessmentSuccess && introSuccess) {
           saveButton.innerHTML = `
