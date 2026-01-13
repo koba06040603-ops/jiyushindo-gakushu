@@ -299,10 +299,15 @@ async function loadGuidePage(curriculumId) {
       <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
         <div class="container mx-auto px-4 max-w-5xl">
           
-          <!-- 戻るボタン -->
-          <button onclick="renderTopPage()" class="mb-4 text-indigo-600 hover:text-indigo-800 flex items-center text-lg font-semibold transition">
-            <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
-          </button>
+          <!-- 戻るボタンと教師用ボタン -->
+          <div class="flex justify-between items-center mb-4">
+            <button onclick="renderTopPage()" class="text-indigo-600 hover:text-indigo-800 flex items-center text-lg font-semibold transition">
+              <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
+            </button>
+            <button onclick="loadTeacherOverview(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-2 rounded-lg font-bold transition shadow-lg">
+              <i class="fas fa-chalkboard-teacher mr-2"></i>教師用モードで確認
+            </button>
+          </div>
 
           <!-- 学習のてびき1枚完結版 -->
           <div class="bg-white rounded-2xl shadow-2xl p-8 print:shadow-none">
@@ -5557,6 +5562,27 @@ async function saveGeneratedUnit(unitData) {
         保存完了！
       `
       saveButton.className = 'flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
+      
+      // 追加問題を生成（バックグラウンドで）
+      saveButton.innerHTML = `
+        <i class="fas fa-spinner fa-spin mr-2"></i>
+        追加問題を生成中...
+      `
+      
+      try {
+        await axios.post(`/api/curriculum/${curriculumId}/generate-additional-problems`)
+        saveButton.innerHTML = `
+          <i class="fas fa-check-circle mr-2"></i>
+          すべて完了！
+        `
+      } catch (additionalError) {
+        console.error('追加問題生成エラー:', additionalError)
+        // エラーでも続行（コア学習データは既に保存済み）
+        saveButton.innerHTML = `
+          <i class="fas fa-check-circle mr-2"></i>
+          保存完了（一部問題は後で生成）
+        `
+      }
       
       // 1秒後に学習のてびきページへ
       setTimeout(() => {

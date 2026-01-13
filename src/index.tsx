@@ -2878,4 +2878,294 @@ app.post('/api/curriculum/save-generated', async (c) => {
   }
 })
 
+// APIルート：追加問題を生成（コース選択問題・導入問題・チェックテスト・選択問題）
+app.post('/api/curriculum/:curriculumId/generate-additional-problems', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  const apiKey = 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
+  
+  if (!apiKey) {
+    return c.json({ error: 'API key not configured' }, 500)
+  }
+  
+  try {
+    // カリキュラムと3コースの情報を取得
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first()
+    const courses = await env.DB.prepare('SELECT * FROM courses WHERE curriculum_id = ?').bind(curriculumId).all()
+    
+    if (!curriculum || !courses.results || courses.results.length === 0) {
+      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    }
+    
+    // AIプロンプト：追加問題のみ生成
+    const prompt = `あなたは小学校の教師です。以下の単元の追加問題を生成してください。
+
+【単元情報】
+- 学年: ${curriculum.grade}
+- 教科: ${curriculum.subject}
+- 教科書会社: ${curriculum.textbook_company}
+- 単元名: ${curriculum.unit_name}
+- 単元目標: ${curriculum.unit_goal}
+
+【3つのコース】
+${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.description}`).join('\n')}
+
+【生成する問題】
+1. **コース選択問題3題**（各コース1題ずつ、子どもがコースを選ぶための魅力的な問題）
+2. **導入問題3題**（各コース1題ずつ、学習内容をイメージできる問題）
+3. **チェックテスト6題**（全コース共通、基礎基本の確認問題）
+4. **選択問題6題**（発展的な課題、学習の意味を実感できる問題）
+
+【重要な要件】
+- すべての問題に具体的な数字と状況を含めること
+- 問題文は実際に解ける形式にすること
+- 子どもが「やってみたい！」と思える魅力的な内容にすること
+
+【JSON形式で出力】
+{
+  "course_selection_problems": [
+    {
+      "problem_number": 1,
+      "problem_title": "ゆっくりコースの問題タイトル",
+      "problem_description": "問題の説明",
+      "problem_content": "具体的な数字と状況を含む問題文",
+      "course_level": "基礎",
+      "connection_to_cards": "この問題は学習カード1-2で学ぶ内容につながります"
+    },
+    {
+      "problem_number": 2,
+      "problem_title": "しっかりコースの問題タイトル",
+      "problem_description": "問題の説明",
+      "problem_content": "具体的な数字と状況を含む問題文",
+      "course_level": "標準",
+      "connection_to_cards": "この問題は学習カード1-3で学ぶ内容につながります"
+    },
+    {
+      "problem_number": 3,
+      "problem_title": "どんどんコースの問題タイトル",
+      "problem_description": "問題の説明",
+      "problem_content": "具体的な数字と状況を含む問題文",
+      "course_level": "発展",
+      "connection_to_cards": "この問題は学習カード1-4につながります"
+    }
+  ],
+  "introduction_problems": [
+    {
+      "course_number": 1,
+      "problem_title": "ゆっくりコース導入問題のタイトル",
+      "problem_content": "具体的な数字と状況を含む問題文",
+      "answer": "解答のヒント"
+    },
+    {
+      "course_number": 2,
+      "problem_title": "しっかりコース導入問題のタイトル",
+      "problem_content": "具体的な数字と状況を含む問題文",
+      "answer": "解答のヒント"
+    },
+    {
+      "course_number": 3,
+      "problem_title": "どんどんコース導入問題のタイトル",
+      "problem_content": "具体的な数字と状況を含む問題文",
+      "answer": "解答のヒント"
+    }
+  ],
+  "common_check_test": {
+    "test_title": "基礎基本チェックテスト",
+    "test_description": "全コース共通の基礎基本チェックテスト（知識理解の最低保証）",
+    "sample_problems": [
+      {
+        "problem_number": 1,
+        "problem_text": "具体的な数字と状況を含む問題文",
+        "answer": "解答",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 2,
+        "problem_text": "具体的な数字と状況を含む問題文",
+        "answer": "解答",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 3,
+        "problem_text": "具体的な数字と状況を含む問題文",
+        "answer": "解答",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 4,
+        "problem_text": "具体的な数字と状況を含む問題文",
+        "answer": "解答",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 5,
+        "problem_text": "具体的な数字と状況を含む問題文",
+        "answer": "解答",
+        "difficulty": "basic"
+      },
+      {
+        "problem_number": 6,
+        "problem_text": "具体的な数字と状況を含む問題文",
+        "answer": "解答",
+        "difficulty": "basic"
+      }
+    ]
+  },
+  "optional_problems": [
+    {
+      "problem_number": 1,
+      "problem_title": "実生活に生かせる問題",
+      "problem_description": "具体的な数字と状況を含む問題文",
+      "learning_meaning": "この問題を解くことで、算数が実際の生活で役に立つことがわかります",
+      "difficulty_level": "medium",
+      "answer": "解答",
+      "explanation": "考え方の説明"
+    },
+    {
+      "problem_number": 2,
+      "problem_title": "教科の見方・考え方が深まる問題",
+      "problem_description": "具体的な数字と状況を含む問題文",
+      "learning_meaning": "この問題を解くことで、なぜこの方法で解けるのか深く理解できます",
+      "difficulty_level": "medium",
+      "answer": "解答",
+      "explanation": "考え方の説明"
+    },
+    {
+      "problem_number": 3,
+      "problem_title": "他教科とつながる問題",
+      "problem_description": "具体的な数字と状況を含む問題文",
+      "learning_meaning": "この問題を解くことで、算数が他の教科でも使えることがわかります",
+      "difficulty_level": "hard",
+      "answer": "解答",
+      "explanation": "考え方の説明"
+    },
+    {
+      "problem_number": 4,
+      "problem_title": "発展的な問題",
+      "problem_description": "具体的な数字と状況を含む問題文",
+      "learning_meaning": "この問題を解くことで、今まで学んだことを組み合わせて考える力がつきます",
+      "difficulty_level": "hard",
+      "answer": "解答",
+      "explanation": "考え方の説明"
+    },
+    {
+      "problem_number": 5,
+      "problem_title": "教科の本質に触れる探究的な問題",
+      "problem_description": "具体的な数字と状況を含む問題文",
+      "learning_meaning": "この問題を解くことで、算数の面白さや不思議さに気づき、もっと学びたくなります",
+      "difficulty_level": "very_hard",
+      "answer": "解答",
+      "explanation": "考え方の説明"
+    },
+    {
+      "problem_number": 6,
+      "problem_title": "創造的・総合的な問題",
+      "problem_description": "具体的な数字と状況を含む問題文",
+      "learning_meaning": "この問題を解くことで、自分で考えを作り出す力がつきます",
+      "difficulty_level": "very_hard",
+      "answer": "解答",
+      "explanation": "考え方の説明"
+    }
+  ]
+}
+
+必ず完全なJSONのみを出力してください。説明文は不要です。`
+
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=' + apiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 8000
+          }
+        })
+      }
+    )
+    
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
+    
+    if (!aiResponse) {
+      throw new Error('AI response is empty')
+    }
+    
+    // JSONを抽出
+    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
+    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
+    
+    const additionalProblems = JSON.parse(jsonText)
+    
+    // データベースに保存
+    // コース選択問題
+    if (additionalProblems.course_selection_problems) {
+      const courseSelectionJSON = JSON.stringify(additionalProblems.course_selection_problems)
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        VALUES (?, ?, ?)
+      `).bind(curriculumId, 'course_selection_problems', courseSelectionJSON).run()
+    }
+    
+    // 導入問題（各コースに保存）
+    if (additionalProblems.introduction_problems) {
+      const coursesList = courses.results
+      for (let i = 0; i < additionalProblems.introduction_problems.length && i < coursesList.length; i++) {
+        const introProblem = additionalProblems.introduction_problems[i]
+        const course = coursesList[i]
+        const introJSON = JSON.stringify(introProblem)
+        await env.DB.prepare(`
+          UPDATE courses SET introduction_problem = ? WHERE id = ?
+        `).bind(introJSON, course.id).run()
+      }
+    }
+    
+    // チェックテスト
+    if (additionalProblems.common_check_test) {
+      const checkTestJSON = JSON.stringify(additionalProblems.common_check_test)
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        VALUES (?, ?, ?)
+      `).bind(curriculumId, 'common_check_test', checkTestJSON).run()
+    }
+    
+    // 選択問題
+    if (additionalProblems.optional_problems) {
+      for (const problem of additionalProblems.optional_problems) {
+        await env.DB.prepare(`
+          INSERT INTO optional_problems (
+            curriculum_id, problem_number, problem_title, problem_description,
+            difficulty_level, learning_meaning
+          ) VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(
+          curriculumId,
+          problem.problem_number,
+          problem.problem_title,
+          problem.problem_description,
+          problem.difficulty_level || 'medium',
+          problem.learning_meaning || ''
+        ).run()
+      }
+    }
+    
+    return c.json({
+      success: true,
+      message: '追加問題を生成・保存しました'
+    })
+    
+  } catch (error: any) {
+    console.error('追加問題生成エラー:', error)
+    return c.json({
+      error: '追加問題の生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
 export default app
