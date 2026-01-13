@@ -2053,6 +2053,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
           "example_problem": "例題",
           "example_solution": "例題の解き方・考え方",
           "real_world_connection": "実社会とのつながり・生活での活用",
+          "answer": "この学習カードの解答・答え（必須）",
           "hints": [
             {
               "hint_level": 1,
@@ -2079,10 +2080,11 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
           "example_problem": "例題",
           "example_solution": "解き方",
           "real_world_connection": "つながり",
+          "answer": "カード2の解答（必須）",
           "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1"},
-            {"hint_level": 2, "hint_text": "ヒント2"},
-            {"hint_level": 3, "hint_text": "ヒント3"}
+            {"hint_level": 1, "hint_text": "ヒント1（必須）"},
+            {"hint_level": 2, "hint_text": "ヒント2（必須）"},
+            {"hint_level": 3, "hint_text": "ヒント3（必須）"}
           ]
         },
         {
@@ -2095,10 +2097,11 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
           "example_problem": "例題",
           "example_solution": "解き方",
           "real_world_connection": "つながり",
+          "answer": "カード3の解答（必須）",
           "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1"},
-            {"hint_level": 2, "hint_text": "ヒント2"},
-            {"hint_level": 3, "hint_text": "ヒント3"}
+            {"hint_level": 1, "hint_text": "ヒント1（必須）"},
+            {"hint_level": 2, "hint_text": "ヒント2（必須）"},
+            {"hint_level": 3, "hint_text": "ヒント3（必須）"}
           ]
         },
         {
@@ -2301,6 +2304,9 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 ❗️ **各コースは必ず6枚のカードを作成してください。これは絶対条件です。**
 ❗️ **時間制限より優先して、3コース×6枚＝合計18枚のカードを確実に完成させてください。**
 ❗️ **1コースでも5枚以下になってはいけません。必ず6枚です。**
+❗️ **各カードには必ず3段階のヒント（hint_level: 1, 2, 3）を作成してください。**
+❗️ **各カードには必ず解答（answer）を記載してください。解答がないカードは不完全です。**
+❗️ **ヒントと解答は最優先事項です。必ず全カードに含めてください。**
 
 【重要な設計指針】
 
@@ -2336,8 +2342,10 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
    - 各問題に「learning_meaning」（学習の意味・必要感）を必ず記載
    - コース選択問題とのつながりを意識する
 
-5. 学習カード設計:
-   - 各カードには必ず3段階のヒントを用意
+5. 学習カード設計（最重要）:
+   - **各カードには必ず3段階のヒント（hint_level: 1, 2, 3）を用意**
+   - **各カードには必ず解答（answer）を記載**
+   - **ヒントなし・解答なしのカードは絶対に作らない**
    - 実社会とのつながりを重視
    - 教科書ページを明示（textbook_page）
    - 子どもが自分で考え、試行錯誤できる内容

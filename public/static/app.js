@@ -5326,17 +5326,32 @@ function showUnitPreview(unitData, modelUsed) {
 
 // 生成した単元を保存
 async function saveGeneratedUnit(unitData) {
+  // ボタンを無効化してローディング表示
+  const saveButton = event.target
+  const originalHTML = saveButton.innerHTML
+  saveButton.disabled = true
+  saveButton.innerHTML = `
+    <i class="fas fa-spinner fa-spin mr-2"></i>
+    保存中...
+  `
+  
   try {
     const response = await axios.post('/api/curriculum/save-generated', unitData)
     
     if (response.data.success) {
       const curriculumId = response.data.curriculum_id
       
-      // 保存成功メッセージ
-      alert('✅ 単元を保存しました！\n\nこれから学習を始めます。')
+      // 保存成功表示
+      saveButton.innerHTML = `
+        <i class="fas fa-check-circle mr-2"></i>
+        保存完了！
+      `
+      saveButton.className = 'flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
       
-      // 学習のてびきページへ
-      loadGuidePage(curriculumId)
+      // 1秒後に学習のてびきページへ
+      setTimeout(() => {
+        loadGuidePage(curriculumId)
+      }, 1000)
     } else {
       const errorMsg = response.data.details || response.data.error || '保存に失敗しました'
       throw new Error(errorMsg)
@@ -5344,7 +5359,22 @@ async function saveGeneratedUnit(unitData) {
   } catch (error) {
     console.error('単元保存エラー:', error)
     const errorDetails = error.response?.data?.details || error.message || '不明なエラー'
+    
+    // エラー表示
+    saveButton.innerHTML = `
+      <i class="fas fa-exclamation-circle mr-2"></i>
+      保存失敗
+    `
+    saveButton.className = 'flex-1 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
+    
     alert(`❌ 単元の保存に失敗しました。\n\nエラー: ${errorDetails}\n\nもう一度お試しください。`)
+    
+    // 2秒後にボタンを元に戻す
+    setTimeout(() => {
+      saveButton.disabled = false
+      saveButton.innerHTML = originalHTML
+      saveButton.className = 'flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg'
+    }, 2000)
   }
 }
 
