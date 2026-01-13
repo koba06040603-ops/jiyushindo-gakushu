@@ -2581,6 +2581,27 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 
 9. ${customization?.studentNeeds ? 'カスタマイズ要望を最優先に反映' : ''}
 
+【最終チェックリスト - これを満たさないJSONは不合格】
+✅ course_selection_problems: 必ず3題（problem_number: 1, 2, 3）
+✅ 各コース選択問題に problem_content フィールドあり（具体的な数字と状況を含む問題文）
+✅ courses: 必ず3コース（ゆっくり、しっかり、どんどん）
+✅ 各コースに introduction_problem あり（problem_title, problem_content, answer）
+✅ 各コースに6枚のカード（card_number: 1, 2, 3, 4, 5, 6）
+✅ 各カードに3段階のヒント（hint_level: 1, 2, 3）
+✅ 各カードに answer フィールドあり
+✅ common_check_test: 必ず6題（problem_number: 1-6、すべて difficulty: "basic"）
+✅ optional_problems: 必ず6題（problem_number: 1-6、learning_meaning 必須）
+
+【重要：JSONの構造】
+必ず以下の構造でJSONを出力してください：
+{
+  "curriculum": { ... },
+  "course_selection_problems": [ 3題 ],
+  "courses": [ 3コース、各6枚のカード ],
+  "common_check_test": { sample_problems: [ 6題 ] },
+  "optional_problems": [ 6題 ]
+}
+
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     // 品質モードに応じてモデルを選択
@@ -2642,11 +2663,47 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       })
     }
     
-    // データ構造を検証
-    if (!unitData.curriculum || !unitData.courses || !Array.isArray(unitData.courses)) {
-      console.error('Invalid unit data structure:', JSON.stringify(unitData).substring(0, 500))
+    // データ構造を詳細に検証
+    const validationErrors = []
+    
+    if (!unitData.curriculum) validationErrors.push('curriculum が欠けています')
+    if (!unitData.courses || !Array.isArray(unitData.courses)) validationErrors.push('courses が欠けているか配列ではありません')
+    if (!unitData.course_selection_problems || !Array.isArray(unitData.course_selection_problems)) {
+      validationErrors.push('course_selection_problems が欠けているか配列ではありません')
+    }
+    if (unitData.course_selection_problems && unitData.course_selection_problems.length !== 3) {
+      validationErrors.push(`course_selection_problems は3題必須ですが、${unitData.course_selection_problems.length}題しかありません`)
+    }
+    if (!unitData.optional_problems || !Array.isArray(unitData.optional_problems)) {
+      validationErrors.push('optional_problems が欠けているか配列ではありません')
+    }
+    if (unitData.optional_problems && unitData.optional_problems.length !== 6) {
+      validationErrors.push(`optional_problems は6題必須ですが、${unitData.optional_problems.length}題しかありません`)
+    }
+    if (!unitData.common_check_test || !unitData.common_check_test.sample_problems) {
+      validationErrors.push('common_check_test または sample_problems が欠けています')
+    }
+    
+    // コースの検証
+    if (unitData.courses && Array.isArray(unitData.courses)) {
+      unitData.courses.forEach((course: any, index: number) => {
+        if (!course.introduction_problem) {
+          validationErrors.push(`コース${index + 1}に introduction_problem が欠けています`)
+        }
+        if (!course.cards || !Array.isArray(course.cards)) {
+          validationErrors.push(`コース${index + 1}の cards が欠けているか配列ではありません`)
+        } else if (course.cards.length !== 6) {
+          validationErrors.push(`コース${index + 1}は6枚のカードが必須ですが、${course.cards.length}枚しかありません`)
+        }
+      })
+    }
+    
+    if (validationErrors.length > 0) {
+      console.error('単元データ検証エラー:', validationErrors)
+      console.error('生成されたデータの一部:', JSON.stringify(unitData).substring(0, 1000))
       return c.json({
         error: '単元データの構造が正しくありません。',
+        validation_errors: validationErrors,
         curriculum: null
       })
     }

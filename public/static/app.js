@@ -5027,6 +5027,7 @@ async function startUnitGeneration() {
     // エラー詳細を取得
     const errorDetails = error.response?.data?.details || error.message || '不明なエラー'
     const errorMessage = error.response?.data?.error || '単元の生成に失敗しました'
+    const validationErrors = error.response?.data?.validation_errors || []
     
     // エラー表示
     const app = document.getElementById('app')
@@ -5046,6 +5047,14 @@ async function startUnitGeneration() {
               <i class="fas fa-info-circle mr-2"></i>エラー詳細
             </h3>
             <p class="text-sm text-red-700 whitespace-pre-wrap">${errorDetails}</p>
+            ${validationErrors.length > 0 ? `
+              <div class="mt-4">
+                <h4 class="font-bold text-red-800 mb-2">データ検証エラー:</h4>
+                <ul class="list-disc list-inside text-sm text-red-700">
+                  ${validationErrors.map(err => `<li>${err}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
           </div>
           
           <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6">
