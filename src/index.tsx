@@ -2870,30 +2870,26 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
     }
     
     // AIプロンプト：コース関連問題のみ
-    const prompt = `小学校${curriculum.grade}年・${curriculum.subject}・単元名：${curriculum.unit_name}
+    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の問題を生成。
 
-【生成する問題】
-1. コース選択問題3題（各コース1題、子どもが選びやすい魅力的な問題）
-2. 導入問題3題（各コース1題、学習内容をイメージできる問題）
+【必須：3つのコース】
+1. ${courses.results[0]?.course_name || 'ゆっくりコース'}
+2. ${courses.results[1]?.course_name || 'しっかりコース'}  
+3. ${courses.results[2]?.course_name || 'ぐんぐんコース'}
 
-【3つのコース】
-${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.description}`).join('\n')}
-
-【JSON形式】
+【必須：JSONのみ出力】
 {
   "course_selection_problems": [
-    {"problem_number": 1, "problem_title": "タイトル", "problem_content": "具体的な数字と状況を含む問題文", "course_level": "基礎"},
-    {"problem_number": 2, "problem_title": "タイトル", "problem_content": "具体的な数字と状況を含む問題文", "course_level": "標準"},
-    {"problem_number": 3, "problem_title": "タイトル", "problem_content": "具体的な数字と状況を含む問題文", "course_level": "発展"}
+    {"problem_number": 1, "problem_title": "コース1の魅力的なタイトル", "problem_content": "具体的な数字を含む問題文（50字以上）", "course_level": "基礎"},
+    {"problem_number": 2, "problem_title": "コース2の魅力的なタイトル", "problem_content": "具体的な数字を含む問題文（50字以上）", "course_level": "標準"},
+    {"problem_number": 3, "problem_title": "コース3の魅力的なタイトル", "problem_content": "具体的な数字を含む問題文（50字以上）", "course_level": "発展"}
   ],
   "introduction_problems": [
-    {"course_number": 1, "problem_title": "タイトル", "problem_content": "具体的な問題文", "answer": "解答"},
-    {"course_number": 2, "problem_title": "タイトル", "problem_content": "具体的な問題文", "answer": "解答"},
-    {"course_number": 3, "problem_title": "タイトル", "problem_content": "具体的な問題文", "answer": "解答"}
+    {"course_number": 1, "problem_title": "導入問題1", "problem_content": "具体的な数字を含む問題文（50字以上）", "answer": "解答と解説（30字以上）"},
+    {"course_number": 2, "problem_title": "導入問題2", "problem_content": "具体的な数字を含む問題文（50字以上）", "answer": "解答と解説（30字以上）"},
+    {"course_number": 3, "problem_title": "導入問題3", "problem_content": "具体的な数字を含む問題文（50字以上）", "answer": "解答と解説（30字以上）"}
   ]
-}
-
-JSONのみ出力してください。`
+}`
 
     const response = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey,
@@ -2986,36 +2982,30 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
     }
     
     // AIプロンプト：評価問題のみ
-    const prompt = `小学校${curriculum.grade}年・${curriculum.subject}・単元名：${curriculum.unit_name}
+    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の評価問題を生成。
 
-【生成する問題】
-1. チェックテスト6題（全コース共通、基礎基本の確認、具体的な数字を含む）
-2. 選択問題6題（発展課題、学習の意味を実感、具体的な数字を含む）
-
-【JSON形式】
+【必須：JSONのみ出力】
 {
   "common_check_test": {
     "test_title": "基礎基本チェックテスト",
     "sample_problems": [
-      {"problem_number": 1, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
-      {"problem_number": 2, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
-      {"problem_number": 3, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
-      {"problem_number": 4, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
-      {"problem_number": 5, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
-      {"problem_number": 6, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"}
+      {"problem_number": 1, "problem_text": "具体的な数字を含む問題文（30字以上）", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 2, "problem_text": "具体的な数字を含む問題文（30字以上）", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 3, "problem_text": "具体的な数字を含む問題文（30字以上）", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 4, "problem_text": "具体的な数字を含む問題文（30字以上）", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 5, "problem_text": "具体的な数字を含む問題文（30字以上）", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 6, "problem_text": "具体的な数字を含む問題文（30字以上）", "answer": "解答", "difficulty": "basic"}
     ]
   },
   "optional_problems": [
-    {"problem_number": 1, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "medium"},
-    {"problem_number": 2, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "medium"},
-    {"problem_number": 3, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "hard"},
-    {"problem_number": 4, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "hard"},
-    {"problem_number": 5, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "very_hard"},
-    {"problem_number": 6, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "very_hard"}
+    {"problem_number": 1, "problem_title": "実生活問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "実生活で役立つ力がつく（20字以上）", "difficulty_level": "medium"},
+    {"problem_number": 2, "problem_title": "考え方問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "深く理解できる（20字以上）", "difficulty_level": "medium"},
+    {"problem_number": 3, "problem_title": "他教科問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "他教科でも使える（20字以上）", "difficulty_level": "hard"},
+    {"problem_number": 4, "problem_title": "応用問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "組み合わせて考える力（20字以上）", "difficulty_level": "hard"},
+    {"problem_number": 5, "problem_title": "探究問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "不思議さに気づく（20字以上）", "difficulty_level": "very_hard"},
+    {"problem_number": 6, "problem_title": "創造問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "新しい方法を考える（20字以上）", "difficulty_level": "very_hard"}
   ]
-}
-
-JSONのみ出力してください。`
+}`
 
     const response = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey,

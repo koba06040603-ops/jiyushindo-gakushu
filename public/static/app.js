@@ -305,6 +305,21 @@ async function loadGuidePage(curriculumId) {
       console.log('⚠️ 選択問題なし')
     }
     
+    // データの完全性を確認
+    const hasAllData = courseSelectionProblems.length === 3 && 
+                       optionalProblems.length === 6 &&
+                       commonCheckTest && 
+                       commonCheckTest.sample_problems?.length === 6
+    
+    if (!hasAllData) {
+      console.warn('⚠️ データが不完全です:', {
+        コース選択問題: courseSelectionProblems.length + '/3',
+        導入問題: courses.filter(c => c.introduction_problem).length + '/3',
+        チェックテスト: commonCheckTest?.sample_problems?.length || 0 + '/6',
+        選択問題: optionalProblems.length + '/6'
+      })
+    }
+    
     state.selectedCurriculum = curriculum
     state.courses = courses
 
@@ -5643,12 +5658,36 @@ async function saveGeneratedUnit(unitData) {
             すべて完了！
           `
           console.log('🎉 すべての問題が正常に生成されました')
+          
+          // 生成数を確認
+          const courseDetails = courseProblems.value?.data?.details
+          const assessmentDetails = assessmentProblems.value?.data?.details
+          console.log('📊 生成結果:', {
+            コース選択問題: courseDetails?.course_selection_count || 0,
+            導入問題: courseDetails?.introduction_count || 0,
+            チェックテスト: assessmentDetails?.check_test_count || 0,
+            選択問題: assessmentDetails?.optional_count || 0
+          })
+          
+          // 期待数と一致しない場合は警告
+          if (courseDetails?.course_selection_count !== 3 || 
+              courseDetails?.introduction_count !== 3 ||
+              assessmentDetails?.check_test_count !== 6 ||
+              assessmentDetails?.optional_count !== 6) {
+            alert('⚠️ 一部の問題が生成されませんでした。\n\n期待:\n- コース選択問題: 3題\n- 導入問題: 3題\n- チェックテスト: 6題\n- 選択問題: 6題\n\n実際:\n' +
+              `- コース選択問題: ${courseDetails?.course_selection_count || 0}題\n` +
+              `- 導入問題: ${courseDetails?.introduction_count || 0}題\n` +
+              `- チェックテスト: ${assessmentDetails?.check_test_count || 0}題\n` +
+              `- 選択問題: ${assessmentDetails?.optional_count || 0}題\n\n` +
+              'もう一度新しい単元を生成してください。')
+          }
         } else if (courseSuccess || assessmentSuccess) {
           saveButton.innerHTML = `
-            <i class="fas fa-check-circle mr-2"></i>
-            保存完了（一部問題生成済み）
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            保存完了（一部問題未生成）
           `
           console.warn('⚠️ 一部の追加問題生成に失敗:', { courseSuccess, assessmentSuccess })
+          alert('⚠️ 一部の追加問題の生成に失敗しました。\n\nもう一度新しい単元を生成してください。')
         } else {
           throw new Error('すべての追加問題生成に失敗')
         }
@@ -5659,6 +5698,7 @@ async function saveGeneratedUnit(unitData) {
           <i class="fas fa-exclamation-triangle mr-2"></i>
           保存完了（追加問題は未生成）
         `
+        alert('❌ 追加問題の生成に失敗しました。\n\nコース選択問題、導入問題、チェックテスト、選択問題が生成されていません。\n\nもう一度新しい単元を生成してください。')
       }
       
       // 1秒後に学習のてびきページへ
