@@ -1697,7 +1697,9 @@ function showAITeacher() {
   // 初回メッセージ
   const aiChat = document.getElementById('aiChat')
   if (aiChat.children.length === 0) {
-    addAIMessage('こんにちは！AI先生です。何か質問はありますか？一緒に考えましょう！', 'ai')
+    const cardTitle = window.currentCardData?.card?.card_title || '学習カード'
+    const welcomeMsg = `こんにちは！AI先生です。\n\n今は「${cardTitle}」を学習していますね。\n\nわからないことや、もっと知りたいことがあったら、なんでも聞いてください！一緒に考えましょう！ 😊`
+    addAIMessage(welcomeMsg, 'ai')
   }
 }
 
@@ -1740,9 +1742,13 @@ async function askAI() {
     
   } catch (error) {
     console.error('AI質問エラー:', error)
+    console.error('エラー詳細:', error.response?.data || error.message)
     const loadingMsg = document.getElementById(loadingId)
     if (loadingMsg) loadingMsg.remove()
-    addAIMessage('ごめんね、うまく答えられなかったよ。もう一度聞いてみてね。', 'ai')
+    
+    // より具体的なエラーメッセージ
+    const errorMsg = error.response?.data?.error || error.message || 'エラーが発生しました'
+    addAIMessage(`ごめんね、うまく答えられなかったよ。\n\n【先生に聞いてみてね】\n${errorMsg}`, 'ai')
   }
 }
 

@@ -1537,13 +1537,29 @@ ${cardContext ? `
       })
     })
 
+    if (!response.ok) {
+      const errorData = await response.text()
+      console.error('Gemini APIエラー:', response.status, errorData)
+      throw new Error(`Gemini API returned ${response.status}`)
+    }
+
     const data = await response.json()
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || 'ごめんね、うまく答えられなかったよ。もう一度聞いてね。'
+    
+    if (!data.candidates || data.candidates.length === 0) {
+      console.error('Gemini API - 候補なし:', JSON.stringify(data, null, 2))
+      return c.json({ response: 'ごめんね、今は答えられないよ。先生に聞いてみてね！' })
+    }
+
+    const aiResponse = data.candidates[0]?.content?.parts?.[0]?.text || 'ごめんね、うまく答えられなかったよ。もう一度聞いてね。'
 
     return c.json({ response: aiResponse })
-  } catch (error) {
+  } catch (error: any) {
     console.error('AIチャットエラー:', error)
-    return c.json({ error: 'エラーが発生しました' }, 500)
+    console.error('エラー詳細:', error.message)
+    return c.json({ 
+      error: 'AIが今は答えられません。先生に聞いてみてね！',
+      details: error.message 
+    }, 500)
   }
 })
 
