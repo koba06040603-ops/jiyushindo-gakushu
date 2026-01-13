@@ -5583,24 +5583,43 @@ async function saveGeneratedUnit(unitData) {
       `
       saveButton.className = 'flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
       
-      // 追加問題を生成（バックグラウンドで）
+      // 追加問題を並列生成（2つのAPIを同時実行）
       saveButton.innerHTML = `
         <i class="fas fa-spinner fa-spin mr-2"></i>
-        追加問題を生成中...
+        追加問題を生成中... (1/2)
       `
       
       try {
-        await axios.post(`/api/curriculum/${curriculumId}/generate-additional-problems`)
-        saveButton.innerHTML = `
-          <i class="fas fa-check-circle mr-2"></i>
-          すべて完了！
-        `
+        // コース関連問題と評価問題を並列生成
+        const [courseProblems, assessmentProblems] = await Promise.allSettled([
+          axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`),
+          axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`)
+        ])
+        
+        // 結果を確認
+        const courseSuccess = courseProblems.status === 'fulfilled'
+        const assessmentSuccess = assessmentProblems.status === 'fulfilled'
+        
+        if (courseSuccess && assessmentSuccess) {
+          saveButton.innerHTML = `
+            <i class="fas fa-check-circle mr-2"></i>
+            すべて完了！
+          `
+        } else if (courseSuccess || assessmentSuccess) {
+          saveButton.innerHTML = `
+            <i class="fas fa-check-circle mr-2"></i>
+            保存完了（一部問題生成済み）
+          `
+          console.warn('一部の追加問題生成に失敗:', { courseSuccess, assessmentSuccess })
+        } else {
+          throw new Error('すべての追加問題生成に失敗')
+        }
       } catch (additionalError) {
         console.error('追加問題生成エラー:', additionalError)
         // エラーでも続行（コア学習データは既に保存済み）
         saveButton.innerHTML = `
-          <i class="fas fa-check-circle mr-2"></i>
-          保存完了（一部問題は後で生成）
+          <i class="fas fa-exclamation-triangle mr-2"></i>
+          保存完了（追加問題は未生成）
         `
       }
       

@@ -2830,7 +2830,221 @@ app.post('/api/curriculum/save-generated', async (c) => {
   }
 })
 
-// APIルート：追加問題を生成（コース選択問題・導入問題・チェックテスト・選択問題）
+// APIルート：コース関連問題を生成（コース選択問題・導入問題）
+app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  const apiKey = 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
+  
+  if (!apiKey) {
+    return c.json({ error: 'API key not configured' }, 500)
+  }
+  
+  try {
+    // カリキュラムと3コースの情報を取得
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first()
+    const courses = await env.DB.prepare('SELECT * FROM courses WHERE curriculum_id = ?').bind(curriculumId).all()
+    
+    if (!curriculum || !courses.results || courses.results.length === 0) {
+      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    }
+    
+    // AIプロンプト：コース関連問題のみ
+    const prompt = `小学校${curriculum.grade}年・${curriculum.subject}・単元名：${curriculum.unit_name}
+
+【生成する問題】
+1. コース選択問題3題（各コース1題、子どもが選びやすい魅力的な問題）
+2. 導入問題3題（各コース1題、学習内容をイメージできる問題）
+
+【3つのコース】
+${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.description}`).join('\n')}
+
+【JSON形式】
+{
+  "course_selection_problems": [
+    {"problem_number": 1, "problem_title": "タイトル", "problem_content": "具体的な数字と状況を含む問題文", "course_level": "基礎"},
+    {"problem_number": 2, "problem_title": "タイトル", "problem_content": "具体的な数字と状況を含む問題文", "course_level": "標準"},
+    {"problem_number": 3, "problem_title": "タイトル", "problem_content": "具体的な数字と状況を含む問題文", "course_level": "発展"}
+  ],
+  "introduction_problems": [
+    {"course_number": 1, "problem_title": "タイトル", "problem_content": "具体的な問題文", "answer": "解答"},
+    {"course_number": 2, "problem_title": "タイトル", "problem_content": "具体的な問題文", "answer": "解答"},
+    {"course_number": 3, "problem_title": "タイトル", "problem_content": "具体的な問題文", "answer": "解答"}
+  ]
+}
+
+JSONのみ出力してください。`
+
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
+        })
+      }
+    )
+    
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
+    
+    if (!aiResponse) {
+      throw new Error('AI response is empty')
+    }
+    
+    // JSONを抽出
+    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
+    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
+    const problems = JSON.parse(jsonText)
+    
+    // データベースに保存
+    if (problems.course_selection_problems) {
+      const courseSelectionJSON = JSON.stringify(problems.course_selection_problems)
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        VALUES (?, ?, ?)
+      `).bind(curriculumId, 'course_selection_problems', courseSelectionJSON).run()
+    }
+    
+    if (problems.introduction_problems) {
+      const coursesList = courses.results
+      for (let i = 0; i < problems.introduction_problems.length && i < coursesList.length; i++) {
+        const introProblem = problems.introduction_problems[i]
+        const course = coursesList[i]
+        const introJSON = JSON.stringify(introProblem)
+        await env.DB.prepare(`
+          UPDATE courses SET introduction_problem = ? WHERE id = ?
+        `).bind(introJSON, course.id).run()
+      }
+    }
+    
+    return c.json({ success: true, message: 'コース関連問題を生成・保存しました' })
+    
+  } catch (error: any) {
+    console.error('コース関連問題生成エラー:', error)
+    return c.json({ error: 'コース関連問題の生成に失敗しました', details: error.message }, 500)
+  }
+})
+
+// APIルート：評価問題を生成（チェックテスト・選択問題）
+app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  const apiKey = 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
+  
+  if (!apiKey) {
+    return c.json({ error: 'API key not configured' }, 500)
+  }
+  
+  try {
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first()
+    
+    if (!curriculum) {
+      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    }
+    
+    // AIプロンプト：評価問題のみ
+    const prompt = `小学校${curriculum.grade}年・${curriculum.subject}・単元名：${curriculum.unit_name}
+
+【生成する問題】
+1. チェックテスト6題（全コース共通、基礎基本の確認、具体的な数字を含む）
+2. 選択問題6題（発展課題、学習の意味を実感、具体的な数字を含む）
+
+【JSON形式】
+{
+  "common_check_test": {
+    "test_title": "基礎基本チェックテスト",
+    "sample_problems": [
+      {"problem_number": 1, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 2, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 3, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 4, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 5, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"},
+      {"problem_number": 6, "problem_text": "具体的な問題文", "answer": "解答", "difficulty": "basic"}
+    ]
+  },
+  "optional_problems": [
+    {"problem_number": 1, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "medium"},
+    {"problem_number": 2, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "medium"},
+    {"problem_number": 3, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "hard"},
+    {"problem_number": 4, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "hard"},
+    {"problem_number": 5, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "very_hard"},
+    {"problem_number": 6, "problem_title": "タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "very_hard"}
+  ]
+}
+
+JSONのみ出力してください。`
+
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
+        })
+      }
+    )
+    
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
+    
+    if (!aiResponse) {
+      throw new Error('AI response is empty')
+    }
+    
+    // JSONを抽出
+    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
+    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
+    const problems = JSON.parse(jsonText)
+    
+    // データベースに保存
+    if (problems.common_check_test) {
+      const checkTestJSON = JSON.stringify(problems.common_check_test)
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        VALUES (?, ?, ?)
+      `).bind(curriculumId, 'common_check_test', checkTestJSON).run()
+    }
+    
+    if (problems.optional_problems) {
+      for (const problem of problems.optional_problems) {
+        await env.DB.prepare(`
+          INSERT INTO optional_problems (
+            curriculum_id, problem_number, problem_title, problem_description,
+            difficulty_level, learning_meaning
+          ) VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(
+          curriculumId,
+          problem.problem_number,
+          problem.problem_title,
+          problem.problem_description,
+          problem.difficulty_level || 'medium',
+          problem.learning_meaning || ''
+        ).run()
+      }
+    }
+    
+    return c.json({ success: true, message: '評価問題を生成・保存しました' })
+    
+  } catch (error: any) {
+    console.error('評価問題生成エラー:', error)
+    return c.json({ error: '評価問題の生成に失敗しました', details: error.message }, 500)
+  }
+})
+
+// APIルート：追加問題を生成（旧エンドポイント - 互換性のため残す）
 app.post('/api/curriculum/:curriculumId/generate-additional-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
