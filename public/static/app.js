@@ -4655,7 +4655,7 @@ function showUnitGeneratorModal() {
                     <div class="font-bold text-blue-800">⚡ 標準モード（推奨）</div>
                     <div class="text-sm text-gray-700">Gemini 3 Flash - バランス重視</div>
                     <div class="text-xs text-blue-600 mt-1">
-                      生成時間：約40秒〜1分30秒 | 3コース×6枚＝18枚のカード確実生成
+                      生成時間：約40秒〜100秒 | 3コース×6枚＝18枚のカード確実生成
                     </div>
                   </div>
                 </label>
@@ -4665,7 +4665,7 @@ function showUnitGeneratorModal() {
                     <div class="font-bold text-purple-800">🌟 確実モード（高品質）</div>
                     <div class="text-sm text-gray-700">Gemini 3 Pro - 最高品質・詳細説明</div>
                     <div class="text-xs text-purple-600 mt-1">
-                      生成時間：約2〜3分 | 複雑な単元・不登校支援・特別支援に最適
+                      生成時間：約2分〜3分 | 複雑な単元・不登校支援・特別支援に最適
                     </div>
                   </div>
                 </label>
@@ -4880,84 +4880,251 @@ async function startUnitGeneration() {
 // 生成プロセス表示
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
-  const estimatedTime = qualityMode === 'high' ? '約2〜3分' : '約40秒〜1分30秒'
+  const estimatedTime = qualityMode === 'high' ? '約2〜3分' : '約40秒〜100秒'
+  const totalTime = qualityMode === 'high' ? 180 : 100 // 秒単位
   
   const app = document.getElementById('app')
   app.innerHTML = `
     <div class="container mx-auto px-4 py-8">
-      <div class="bg-white rounded-lg shadow-lg p-8">
+      <div class="bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 rounded-2xl shadow-2xl p-8">
+        
         <!-- ヘッダー -->
         <div class="text-center mb-8">
-          <div class="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-full mb-4">
+          <div class="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-full mb-4 shadow-lg animate-pulse">
             <i class="fas fa-magic mr-2"></i>
-            AI単元生成中
+            ✨ AI単元生成中 ✨
           </div>
-          <h2 class="text-3xl font-bold text-gray-800 mb-2">
-            ${grade} ${subject}「${unitName}」
+          <h2 class="text-4xl font-bold text-gray-800 mb-3">
+            ${grade} ${subject}
           </h2>
-          <p class="text-gray-600">AIが学習コンテンツを作成しています...</p>
-          <div class="mt-2 inline-block bg-purple-100 text-purple-700 px-4 py-1 rounded-full text-sm">
+          <h3 class="text-2xl font-bold text-indigo-700 mb-4">
+            「${unitName}」
+          </h3>
+          <div class="mt-3 inline-block bg-white border-2 border-purple-300 text-purple-700 px-6 py-2 rounded-full text-sm font-bold shadow">
             ${modeLabel} - ${estimatedTime}
           </div>
         </div>
 
+        <!-- 現在の作業表示 -->
+        <div class="max-w-3xl mx-auto mb-6">
+          <div class="bg-white rounded-xl shadow-lg p-6 border-2 border-indigo-200">
+            <div class="flex items-center mb-3">
+              <div class="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mr-4 animate-spin-slow">
+                <i id="currentIcon" class="fas fa-lightbulb text-white text-xl"></i>
+              </div>
+              <div class="flex-1">
+                <p class="text-sm text-gray-500 mb-1">いま作っているもの</p>
+                <p id="currentTask" class="text-xl font-bold text-indigo-700">単元の目標を設計中...</p>
+              </div>
+            </div>
+            <div id="taskComment" class="text-sm text-gray-600 bg-blue-50 rounded-lg p-3 border-l-4 border-blue-400">
+              💡 子どもたちがワクワクする単元目標を考えています
+            </div>
+          </div>
+        </div>
+
         <!-- プログレスバー -->
-        <div class="max-w-2xl mx-auto mb-8">
-          <div class="bg-gray-200 rounded-full h-6 overflow-hidden">
-            <div id="progressBar" class="bg-gradient-to-r from-purple-600 to-pink-600 h-full transition-all duration-1000"
-                 style="width: 10%"></div>
-          </div>
-          <p id="progressText" class="text-center text-sm text-gray-600 mt-2">処理を開始しています...</p>
-        </div>
-
-        <!-- 生成ステップ -->
-        <div class="max-w-2xl mx-auto space-y-4">
-          <div id="step1" class="flex items-center p-4 bg-gray-50 rounded-lg opacity-50">
-            <i class="fas fa-circle-notch fa-spin text-purple-600 text-2xl mr-4"></i>
-            <div>
-              <p class="font-bold text-gray-800">ステップ 1</p>
-              <p class="text-sm text-gray-600">単元の目標を設計中...</p>
+        <div class="max-w-3xl mx-auto mb-8">
+          <div class="bg-gray-200 rounded-full h-8 overflow-hidden shadow-inner">
+            <div id="progressBar" class="bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 h-full transition-all duration-300 flex items-center justify-end pr-3"
+                 style="width: 0%">
+              <span id="progressPercent" class="text-white font-bold text-sm"></span>
             </div>
           </div>
-          
-          <div id="step2" class="flex items-center p-4 bg-gray-50 rounded-lg opacity-50">
-            <i class="fas fa-circle-notch fa-spin text-purple-600 text-2xl mr-4"></i>
-            <div>
-              <p class="font-bold text-gray-800">ステップ 2</p>
-              <p class="text-sm text-gray-600">学習コースを作成中...</p>
-            </div>
-          </div>
-          
-          <div id="step3" class="flex items-center p-4 bg-gray-50 rounded-lg opacity-50">
-            <i class="fas fa-circle-notch fa-spin text-purple-600 text-2xl mr-4"></i>
-            <div>
-              <p class="font-bold text-gray-800">ステップ 3</p>
-              <p class="text-sm text-gray-600">学習カードを生成中...</p>
-            </div>
-          </div>
-          
-          <div id="step4" class="flex items-center p-4 bg-gray-50 rounded-lg opacity-50">
-            <i class="fas fa-circle-notch fa-spin text-purple-600 text-2xl mr-4"></i>
-            <div>
-              <p class="font-bold text-gray-800">ステップ 4</p>
-              <p class="text-sm text-gray-600">ヒントカードを作成中...</p>
-            </div>
+          <div class="flex justify-between mt-2 text-xs text-gray-600">
+            <span>開始</span>
+            <span id="elapsedTime">0秒経過</span>
+            <span>完成</span>
           </div>
         </div>
 
-        <!-- アニメーション -->
-        <div class="text-center mt-8">
-          <i class="fas fa-robot text-6xl text-purple-500 animate-bounce"></i>
+        <!-- 生成ステップ（横並び） -->
+        <div class="max-w-4xl mx-auto mb-8">
+          <div class="grid grid-cols-4 gap-3">
+            <div id="step1" class="step-card bg-white rounded-xl p-4 shadow text-center border-2 border-gray-200 transition-all">
+              <div class="text-3xl mb-2">🎯</div>
+              <p class="font-bold text-gray-800 text-sm mb-1">目標設計</p>
+              <p class="text-xs text-gray-500">単元目標</p>
+              <div class="step-status mt-2 text-xs text-gray-400">待機中</div>
+            </div>
+            
+            <div id="step2" class="step-card bg-white rounded-xl p-4 shadow text-center border-2 border-gray-200 transition-all">
+              <div class="text-3xl mb-2">🎨</div>
+              <p class="font-bold text-gray-800 text-sm mb-1">コース作成</p>
+              <p class="text-xs text-gray-500">3コース設計</p>
+              <div class="step-status mt-2 text-xs text-gray-400">待機中</div>
+            </div>
+            
+            <div id="step3" class="step-card bg-white rounded-xl p-4 shadow text-center border-2 border-gray-200 transition-all">
+              <div class="text-3xl mb-2">📚</div>
+              <p class="font-bold text-gray-800 text-sm mb-1">カード生成</p>
+              <p class="text-xs text-gray-500">18枚のカード</p>
+              <div class="step-status mt-2 text-xs text-gray-400">待機中</div>
+            </div>
+            
+            <div id="step4" class="step-card bg-white rounded-xl p-4 shadow text-center border-2 border-gray-200 transition-all">
+              <div class="text-3xl mb-2">💡</div>
+              <p class="font-bold text-gray-800 text-sm mb-1">ヒント作成</p>
+              <p class="text-xs text-gray-500">54個のヒント</p>
+              <div class="step-status mt-2 text-xs text-gray-400">待機中</div>
+            </div>
+          </div>
         </div>
+
+        <!-- 励ましメッセージ -->
+        <div class="max-w-3xl mx-auto">
+          <div class="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-xl p-6 border-2 border-yellow-300 shadow-lg">
+            <div class="flex items-start">
+              <div class="text-4xl mr-4 animate-bounce">🤖</div>
+              <div>
+                <p class="font-bold text-orange-800 mb-2">AI先生より</p>
+                <p id="encourageMessage" class="text-gray-700">
+                  子どもたちが楽しく学べる単元を作っています。もう少しお待ちください！
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
+    
+    <style>
+      @keyframes spin-slow {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin-slow {
+        animation: spin-slow 3s linear infinite;
+      }
+      .step-card.active {
+        border-color: #8b5cf6;
+        background: linear-gradient(to bottom, #faf5ff, #ffffff);
+        transform: scale(1.05);
+      }
+      .step-card.completed {
+        border-color: #10b981;
+        background: linear-gradient(to bottom, #d1fae5, #ffffff);
+      }
+    </style>
   `
 
-  // プログレスアニメーション
-  animateProgress()
+  // 実時間ベースのプログレスアニメーション
+  animateRealtimeProgress(totalTime, qualityMode)
 }
 
-// プログレス アニメーション
+// 実時間ベースのプログレスアニメーション
+function animateRealtimeProgress(totalTime, qualityMode) {
+  const startTime = Date.now()
+  
+  // ステップ定義（実時間配分）
+  const steps = [
+    {
+      id: 1,
+      startPercent: 0,
+      endPercent: 15,
+      icon: 'fa-lightbulb',
+      task: '単元の目標を設計中...',
+      comment: '💡 子どもたちがワクワクする単元目標を考えています',
+      emoji: '🎯'
+    },
+    {
+      id: 2,
+      startPercent: 15,
+      endPercent: 30,
+      icon: 'fa-route',
+      task: '3つのコースを作成中...',
+      comment: '🎨 ゆっくり・しっかり・どんどんコースを設計しています',
+      emoji: '🎨'
+    },
+    {
+      id: 3,
+      startPercent: 30,
+      endPercent: 75,
+      icon: 'fa-cards',
+      task: '18枚の学習カードを生成中...',
+      comment: '📚 各コース6枚ずつ、合計18枚のカードを作っています',
+      emoji: '📚'
+    },
+    {
+      id: 4,
+      startPercent: 75,
+      endPercent: 100,
+      icon: 'fa-comment-dots',
+      task: '54個のヒントカードを作成中...',
+      comment: '💡 各カードに3段階のヒントを用意しています',
+      emoji: '💡'
+    }
+  ]
+  
+  // 励ましメッセージ
+  const encourageMessages = [
+    '子どもたちが楽しく学べる単元を作っています。もう少しお待ちください！',
+    'AIが一生懸命、学習カードを作っています。完成まであと少し！',
+    '各コースに魅力的な問題を用意しています。ワクワクする内容になりますよ！',
+    'ヒントカードも充実させています。子どもたちが自分で考えられるように！'
+  ]
+  
+  let currentStepIndex = 0
+  
+  const interval = setInterval(() => {
+    const elapsed = (Date.now() - startTime) / 1000 // 秒
+    const progress = Math.min((elapsed / totalTime) * 100, 99) // 99%まで
+    
+    // プログレスバー更新
+    const progressBar = document.getElementById('progressBar')
+    const progressPercent = document.getElementById('progressPercent')
+    const elapsedTime = document.getElementById('elapsedTime')
+    
+    if (progressBar) {
+      progressBar.style.width = progress + '%'
+      progressPercent.textContent = Math.floor(progress) + '%'
+      elapsedTime.textContent = Math.floor(elapsed) + '秒経過'
+    }
+    
+    // 現在のステップを判定
+    const currentStep = steps.find((step, index) => {
+      return progress >= step.startPercent && progress < step.endPercent
+    })
+    
+    if (currentStep && currentStepIndex !== currentStep.id - 1) {
+      currentStepIndex = currentStep.id - 1
+      
+      // 現在のタスク表示更新
+      document.getElementById('currentIcon').className = `fas ${currentStep.icon} text-white text-xl`
+      document.getElementById('currentTask').textContent = currentStep.task
+      document.getElementById('taskComment').innerHTML = currentStep.comment
+      
+      // ステップカード更新
+      steps.forEach((step, index) => {
+        const stepCard = document.getElementById(`step${step.id}`)
+        const statusDiv = stepCard.querySelector('.step-status')
+        
+        if (index < currentStepIndex) {
+          stepCard.className = 'step-card bg-white rounded-xl p-4 shadow text-center border-2 transition-all completed'
+          statusDiv.textContent = '✅ 完了'
+          statusDiv.className = 'step-status mt-2 text-xs text-green-600 font-bold'
+        } else if (index === currentStepIndex) {
+          stepCard.className = 'step-card bg-white rounded-xl p-4 shadow text-center border-2 transition-all active'
+          statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 作業中'
+          statusDiv.className = 'step-status mt-2 text-xs text-purple-600 font-bold'
+        }
+      })
+      
+      // 励ましメッセージ更新
+      if (encourageMessages[currentStepIndex]) {
+        document.getElementById('encourageMessage').textContent = encourageMessages[currentStepIndex]
+      }
+    }
+    
+    // 100%到達したらクリア
+    if (progress >= 99) {
+      clearInterval(interval)
+    }
+  }, 100) // 100msごとに更新
+}
+
+// プログレス アニメーション（旧版 - 削除予定）
 function animateProgress() {
   let progress = 10
   const interval = setInterval(() => {
