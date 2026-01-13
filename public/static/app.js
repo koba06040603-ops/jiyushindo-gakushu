@@ -5639,8 +5639,33 @@ async function saveGeneratedUnit(unitData) {
       
       // 初期生成データの導入問題を確認
       const coursesWithIntro = unitData.courses.filter(c => c.introduction_problem).length
+      let needsIntroGeneration = false
       if (coursesWithIntro < 3) {
         missingData.push(`導入問題: ${coursesWithIntro}/3`)
+        needsIntroGeneration = true
+      }
+      
+      // 導入問題が不足している場合、軽量APIで生成
+      if (needsIntroGeneration) {
+        console.log('🔄 導入問題を追加生成します...')
+        saveButton.innerHTML = `
+          <i class="fas fa-spinner fa-spin mr-2"></i>
+          導入問題を生成中...
+        `
+        
+        try {
+          const introResponse = await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
+          if (introResponse.data.success) {
+            console.log('✅ 導入問題を追加生成しました:', introResponse.data.details)
+            // missingDataから導入問題を削除
+            const introIndex = missingData.findIndex(m => m.includes('導入問題'))
+            if (introIndex >= 0) {
+              missingData.splice(introIndex, 1)
+            }
+          }
+        } catch (introError) {
+          console.error('❌ 導入問題の追加生成に失敗:', introError)
+        }
       }
       
       if (missingData.length > 0) {
@@ -5649,7 +5674,11 @@ async function saveGeneratedUnit(unitData) {
               '\n\nこれはAI生成の制限によるものです。\n学習のてびきで一部の問題が表示されない場合があります。')
       }
       
-      // すぐに学習のてびきページへ遷移
+      // 学習のてびきページへ遷移
+      saveButton.innerHTML = `
+        <i class="fas fa-check-circle mr-2"></i>
+        完了！学習のてびきへ
+      `
       setTimeout(() => {
         loadGuidePage(curriculumId)
       }, 1000)

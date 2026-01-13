@@ -2577,7 +2577,10 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     // 品質モードに応じてモデルを選択
-    let modelName = useHighQuality ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview'
+    // gemini-2.0-flash-thinking-exp: 出力トークン上限 65536 (最大)
+    let modelName = useHighQuality ? 'gemini-2.0-flash-thinking-exp' : 'gemini-2.0-flash-thinking-exp'
+    console.log('🤖 使用モデル:', modelName, '| 出力トークン上限: 65536')
+    
     let response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
       {
@@ -2587,16 +2590,16 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 16000  // 8000から16000に増量
+            maxOutputTokens: 65536  // 16000から65536に大幅増量
           }
         })
       }
     )
     
-    // フォールバック: Gemini 2.5 Flashを使用
+    // フォールバック: Gemini 2.0 Flash Expを使用
     if (!response.ok) {
-      console.log(`${modelName} failed, falling back to 2.5 Flash`)
-      modelName = 'gemini-2.5-flash'
+      console.log(`${modelName} failed, falling back to 2.0 Flash Exp`)
+      modelName = 'gemini-2.0-flash-exp'
       response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
         {
@@ -2606,7 +2609,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.8,
-              maxOutputTokens: 16000  // フォールバックも16000に
+              maxOutputTokens: 16000  // フォールバックは16000
             }
           })
         }
@@ -3098,6 +3101,100 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
   } catch (error: any) {
     console.error('評価問題生成エラー:', error)
     return c.json({ error: '評価問題の生成に失敗しました', details: error.message }, 500)
+  }
+})
+
+// APIルート：導入問題のみを生成（軽量・高速）
+app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  const apiKey = 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
+  
+  if (!apiKey) {
+    return c.json({ error: 'API key not configured' }, 500)
+  }
+  
+  try {
+    // カリキュラムと3コースの情報を取得
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first()
+    const courses = await env.DB.prepare('SELECT * FROM courses WHERE curriculum_id = ?').bind(curriculumId).all()
+    
+    if (!curriculum || !courses.results || courses.results.length < 3) {
+      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    }
+    
+    // 軽量なプロンプト（導入問題3題のみ）
+    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の3つのコースの導入問題を生成。
+
+【3つのコース】
+1. ${courses.results[0]?.course_name || 'ゆっくりコース'}: ${courses.results[0]?.description || ''}
+2. ${courses.results[1]?.course_name || 'しっかりコース'}: ${courses.results[1]?.description || ''}
+3. ${courses.results[2]?.course_name || 'ぐんぐんコース'}: ${courses.results[2]?.description || ''}
+
+【JSON出力（導入問題3題のみ）】
+{
+  "introduction_problems": [
+    {"course_number": 1, "problem_title": "タイトル（20字以内）", "problem_content": "具体的な数字を含む問題文（80-150字）", "answer": "解答と解説（50-100字）"},
+    {"course_number": 2, "problem_title": "タイトル（20字以内）", "problem_content": "具体的な数字を含む問題文（80-150字）", "answer": "解答と解説（50-100字）"},
+    {"course_number": 3, "problem_title": "タイトル（20字以内）", "problem_content": "具体的な数字を含む問題文（80-150字）", "answer": "解答と解説（50-100字）"}
+  ]
+}`
+
+    const response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
+        })
+      }
+    )
+    
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
+    
+    if (!aiResponse) {
+      throw new Error('AI response is empty')
+    }
+    
+    // JSONを抽出
+    console.log('AIレスポンス（導入問題）:', aiResponse)
+    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
+    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
+    const problems = JSON.parse(jsonText)
+    console.log('パース結果（導入問題）:', JSON.stringify(problems, null, 2))
+    
+    // データベースに保存
+    if (problems.introduction_problems && problems.introduction_problems.length === 3) {
+      const coursesList = courses.results
+      for (let i = 0; i < 3; i++) {
+        const introProblem = problems.introduction_problems[i]
+        const course = coursesList[i]
+        const introJSON = JSON.stringify(introProblem)
+        console.log(`コース${i+1}(ID:${course.id})に導入問題を保存:`, introProblem.problem_title)
+        await env.DB.prepare(`
+          UPDATE courses SET introduction_problem = ? WHERE id = ?
+        `).bind(introJSON, course.id).run()
+      }
+      
+      return c.json({ 
+        success: true, 
+        message: '導入問題3題を生成・保存しました',
+        details: { introduction_count: 3 }
+      })
+    } else {
+      throw new Error('導入問題が3題生成されませんでした')
+    }
+    
+  } catch (error: any) {
+    console.error('導入問題生成エラー:', error)
+    return c.json({ error: '導入問題の生成に失敗しました', details: error.message }, 500)
   }
 })
 
