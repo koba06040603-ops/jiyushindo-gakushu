@@ -1021,9 +1021,18 @@ async function showIntegratedPrintPreview(curriculumId) {
           <div class="mb-6">
             <h3 class="font-bold text-lg mb-3">📝 各コースの学習内容</h3>
             ${courses.map(course => `
-              <div class="mb-4 p-3 bg-${course.color_code}-50 border-l-4 border-${course.color_code}-600">
-                <h4 class="font-bold text-${course.color_code}-800">${course.course_name}</h4>
-                <p class="text-xs mt-1">${course.description}</p>
+              <div class="mb-4 p-3 bg-${course.color_code}-50 border-l-4 border-${course.color_code}-600 rounded">
+                <h4 class="font-bold text-${course.color_code}-800 mb-2">${course.course_name}</h4>
+                <p class="text-xs mb-3">${course.description}</p>
+                
+                ${course.introduction_problem ? `
+                  <div class="bg-white rounded p-3 border-2 border-${course.color_code}-300 mt-2">
+                    <p class="text-xs font-bold text-${course.color_code}-700 mb-1">
+                      <i class="fas fa-star mr-1"></i>導入問題: ${course.introduction_problem.problem_title}
+                    </p>
+                    <p class="text-xs text-gray-700 whitespace-pre-wrap">${course.introduction_problem.problem_content}</p>
+                  </div>
+                ` : ''}
               </div>
             `).join('')}
           </div>
