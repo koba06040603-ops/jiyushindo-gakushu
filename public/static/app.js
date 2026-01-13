@@ -50,7 +50,7 @@ async function renderTopPage() {
       <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-2xl p-10 mb-8">
         <div class="text-center mb-6">
           <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
-            ✨ AIが約40秒で18枚の学習カードを生成
+            ✨ AIが約1分で18枚の学習カードを生成
           </div>
           <h2 class="text-3xl font-bold text-white mb-3">
             <i class="fas fa-wand-magic-sparkles mr-2"></i>
@@ -76,7 +76,7 @@ async function renderTopPage() {
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
           <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
             <i class="fas fa-clock text-3xl text-white mb-2"></i>
-            <p class="text-white font-bold">約40秒</p>
+            <p class="text-white font-bold">約1分</p>
             <p class="text-white text-sm opacity-75">高速生成</p>
           </div>
           <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
@@ -115,7 +115,7 @@ async function renderTopPage() {
               <span class="text-3xl font-bold text-purple-600">2</span>
             </div>
             <h3 class="font-bold text-gray-800 mb-2">AIが自動生成</h3>
-            <p class="text-gray-600 text-sm">Gemini 3が約40秒で18枚のカードを作成</p>
+            <p class="text-gray-600 text-sm">Gemini 3が約1分で18枚のカードを作成</p>
           </div>
           
           <!-- Step 3 -->
@@ -986,7 +986,50 @@ async function showIntegratedPrintPreview(curriculumId) {
           </button>
         </div>
 
-        <!-- 1. 学習計画表 -->
+        <!-- 1. 学習のてびき -->
+        <div class="print-page bg-white p-8 mb-8">
+          <h1 class="text-3xl font-bold text-center mb-6 border-b-4 border-indigo-600 pb-4">学習のてびき</h1>
+          <h2 class="text-2xl font-bold text-center mb-4">${curriculum.unit_name}</h2>
+          <div class="grid grid-cols-3 gap-4 mb-6 text-sm">
+            <div><strong>学年：</strong>${curriculum.grade}年</div>
+            <div><strong>組：</strong>____ 組</div>
+            <div><strong>名前：</strong>____________________</div>
+          </div>
+          
+          <div class="mb-6 p-4 bg-blue-50 rounded">
+            <h3 class="font-bold text-blue-800 mb-2">📚 単元の目標</h3>
+            <p class="text-sm">${curriculum.unit_goal}</p>
+          </div>
+          
+          <div class="mb-6 p-4 bg-purple-50 rounded">
+            <h3 class="font-bold text-purple-800 mb-2">💖 こころの成長目標</h3>
+            <p class="text-sm">${curriculum.non_cognitive_goal}</p>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="font-bold text-lg mb-3 text-indigo-700">🎯 コースの選び方</h3>
+            <div class="grid grid-cols-3 gap-4">
+              ${courseSelectionProblems.map(problem => `
+                <div class="border-2 border-gray-300 rounded p-3">
+                  <h4 class="font-bold text-sm mb-2">${problem.problem_title}</h4>
+                  <p class="text-xs text-gray-700">${problem.problem_description}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="font-bold text-lg mb-3">📝 各コースの学習内容</h3>
+            ${courses.map(course => `
+              <div class="mb-4 p-3 bg-${course.color_code}-50 border-l-4 border-${course.color_code}-600">
+                <h4 class="font-bold text-${course.color_code}-800">${course.course_name}</h4>
+                <p class="text-xs mt-1">${course.description}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- 2. 学習計画表 -->
         <div class="print-page bg-white p-8 mb-8">
           <h1 class="text-3xl font-bold text-center mb-6 border-b-4 border-green-600 pb-4">学習計画表</h1>
           <h2 class="text-2xl font-bold text-center mb-4">${curriculum.unit_name}</h2>
@@ -1060,49 +1103,6 @@ async function showIntegratedPrintPreview(curriculumId) {
                 <div class="border border-gray-300 rounded p-2 h-20"></div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- 2. 学習のてびき -->
-        <div class="print-page bg-white p-8 mb-8">
-          <h1 class="text-3xl font-bold text-center mb-6 border-b-4 border-indigo-600 pb-4">学習のてびき</h1>
-          <h2 class="text-2xl font-bold text-center mb-4">${curriculum.unit_name}</h2>
-          <div class="grid grid-cols-3 gap-4 mb-6 text-sm">
-            <div><strong>学年：</strong>${curriculum.grade}年</div>
-            <div><strong>組：</strong>____ 組</div>
-            <div><strong>名前：</strong>____________________</div>
-          </div>
-          
-          <div class="mb-6 p-4 bg-blue-50 rounded">
-            <h3 class="font-bold text-blue-800 mb-2">📚 単元の目標</h3>
-            <p class="text-sm">${curriculum.unit_goal}</p>
-          </div>
-          
-          <div class="mb-6 p-4 bg-purple-50 rounded">
-            <h3 class="font-bold text-purple-800 mb-2">💖 こころの成長目標</h3>
-            <p class="text-sm">${curriculum.non_cognitive_goal}</p>
-          </div>
-          
-          <div class="mb-6">
-            <h3 class="font-bold text-lg mb-3 text-indigo-700">🎯 コースの選び方</h3>
-            <div class="grid grid-cols-3 gap-4">
-              ${courseSelectionProblems.map(problem => `
-                <div class="border-2 border-gray-300 rounded p-3">
-                  <h4 class="font-bold text-sm mb-2">${problem.problem_title}</h4>
-                  <p class="text-xs text-gray-700">${problem.problem_description}</p>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-          
-          <div class="mb-6">
-            <h3 class="font-bold text-lg mb-3">📝 各コースの学習内容</h3>
-            ${courses.map(course => `
-              <div class="mb-4 p-3 bg-${course.color_code}-50 border-l-4 border-${course.color_code}-600">
-                <h4 class="font-bold text-${course.color_code}-800">${course.course_name}</h4>
-                <p class="text-xs mt-1">${course.description}</p>
-              </div>
-            `).join('')}
           </div>
         </div>
 
@@ -4655,7 +4655,7 @@ function showUnitGeneratorModal() {
                     <div class="font-bold text-blue-800">⚡ 標準モード（推奨）</div>
                     <div class="text-sm text-gray-700">Gemini 3 Flash - バランス重視</div>
                     <div class="text-xs text-blue-600 mt-1">
-                      生成時間：約40秒〜100秒 | 3コース×6枚＝18枚のカード確実生成
+                      生成時間：約1分〜2分 | 3コース×6枚＝18枚のカード確実生成
                     </div>
                   </div>
                 </label>
@@ -4880,7 +4880,7 @@ async function startUnitGeneration() {
 // 生成プロセス表示
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
-  const estimatedTime = qualityMode === 'high' ? '約2〜3分' : '約40秒〜100秒'
+  const estimatedTime = qualityMode === 'high' ? '約2〜3分' : '約1分〜2分'
   const totalTime = qualityMode === 'high' ? 180 : 100 // 秒単位
   
   const app = document.getElementById('app')
