@@ -349,39 +349,69 @@ async function loadGuidePage(curriculumId) {
               </div>
             </div>
 
-            <!-- コース選択問題（横3列） -->
+            <!-- コース選択問題（統合版：導入問題含む） -->
             <div class="mb-6">
               <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
                 <i class="fas fa-route mr-2 text-indigo-600"></i>
                 コースをえらぼう！（3つのコースから1つえらんでね）
               </h3>
+              <p class="text-center text-gray-600 mb-4 text-sm">
+                それぞれのコースの とくちょうが わかる もんだいを しょうかいするよ！
+              </p>
               <div class="grid grid-cols-3 gap-4">
                 ${courses.map((course, index) => {
                   const problem = courseSelectionProblems[index] || {
                     problem_title: `${course.course_name}の問題`,
                     problem_content: course.description
                   }
-                  const colorClasses = index === 0 ? 'border-green-500 bg-green-50' :
-                                     index === 1 ? 'border-blue-500 bg-blue-50' :
-                                     'border-purple-500 bg-purple-50'
+                  const colorClasses = index === 0 ? 'border-green-500 bg-gradient-to-br from-green-50 to-white' :
+                                     index === 1 ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-white' :
+                                     'border-purple-500 bg-gradient-to-br from-purple-50 to-white'
                   const badgeClasses = index === 0 ? 'bg-green-500' :
                                       index === 1 ? 'bg-blue-500' :
                                       'bg-purple-500'
+                  const iconClasses = index === 0 ? 'text-green-600' :
+                                     index === 1 ? 'text-blue-600' :
+                                     'text-purple-600'
                   return `
-                    <div class="border-4 ${colorClasses} rounded-xl p-4 hover:shadow-lg transition cursor-pointer" 
+                    <div class="border-4 ${colorClasses} rounded-xl p-5 hover:shadow-2xl transition cursor-pointer" 
                          onclick="selectCourse(${course.id})">
-                      <div class="text-center mb-3">
-                        <div class="inline-block px-3 py-1 ${badgeClasses} text-white rounded-full font-bold mb-2">
+                      <div class="text-center mb-4">
+                        <div class="inline-block px-4 py-1 ${badgeClasses} text-white rounded-full font-bold mb-2">
                           ${index + 1}
                         </div>
-                        <h4 class="text-lg font-bold text-gray-800">${course.course_name}</h4>
-                        <p class="text-xs text-gray-600">${course.course_label || course.description}</p>
+                        <h4 class="text-xl font-bold text-gray-800">${course.course_name}</h4>
+                        <p class="text-sm text-gray-600 font-medium">${course.course_label || course.description}</p>
                       </div>
-                      <div class="bg-white rounded-lg p-3 min-h-[120px]">
+                      
+                      <!-- コース選択問題 -->
+                      <div class="bg-white rounded-lg p-3 mb-3 border-2 ${index === 0 ? 'border-green-200' : index === 1 ? 'border-blue-200' : 'border-purple-200'}">
                         <p class="text-sm font-bold text-gray-800 mb-1">✨ ${problem.problem_title}</p>
                         <p class="text-xs text-gray-700 leading-relaxed">${problem.problem_content || problem.problem_description}</p>
                       </div>
-                      <button class="w-full mt-2 py-2 ${badgeClasses} text-white rounded-lg font-bold text-sm hover:opacity-90">
+                      
+                      <!-- 導入問題 -->
+                      ${course.introduction_problem ? `
+                        <div class="bg-white rounded-lg p-3 border-2 ${index === 0 ? 'border-green-300' : index === 1 ? 'border-blue-300' : 'border-purple-300'} mb-3">
+                          <div class="flex items-center mb-2">
+                            <i class="fas fa-star ${iconClasses} mr-2"></i>
+                            <p class="text-sm font-bold text-gray-800">${course.introduction_problem.problem_title}</p>
+                          </div>
+                          <div class="bg-gray-50 rounded p-2 mb-2 border-l-4 ${index === 0 ? 'border-green-500' : index === 1 ? 'border-blue-500' : 'border-purple-500'}">
+                            <p class="text-xs text-gray-800 leading-relaxed whitespace-pre-wrap">${course.introduction_problem.problem_content}</p>
+                          </div>
+                          ${course.introduction_problem.answer ? `
+                            <div class="bg-yellow-50 rounded p-2 border-l-4 border-yellow-400">
+                              <p class="text-xs font-bold text-yellow-700 mb-1">
+                                <i class="fas fa-lightbulb mr-1"></i>こたえのヒント
+                              </p>
+                              <p class="text-xs text-gray-700">${course.introduction_problem.answer}</p>
+                            </div>
+                          ` : ''}
+                        </div>
+                      ` : ''}
+                      
+                      <button class="w-full mt-2 py-2 ${badgeClasses} text-white rounded-lg font-bold text-sm hover:opacity-90 shadow-md">
                         このコースで学しゅうする
                       </button>
                     </div>
@@ -429,64 +459,6 @@ async function loadGuidePage(curriculumId) {
                     </div>
                   </div>
                 ` : ''}
-              </div>
-            </div>
-
-            <!-- 各コースの学習内容（導入問題） -->
-            <div class="mb-6">
-              <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
-                <i class="fas fa-book-open mr-2 text-indigo-600"></i>
-                それぞれのコースで どんなことを がくしゅうするの？
-              </h3>
-              <p class="text-center text-gray-600 mb-4 text-sm">
-                コースごとの とくちょうが わかる もんだいを 1もんずつ しょうかいするよ！
-              </p>
-              <div class="grid grid-cols-3 gap-4">
-                ${courses.map((course, index) => {
-                  const colorClasses = index === 0 ? 'border-green-500 bg-gradient-to-br from-green-50 to-white' :
-                                     index === 1 ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-white' :
-                                     'border-purple-500 bg-gradient-to-br from-purple-50 to-white'
-                  const badgeClasses = index === 0 ? 'bg-green-500' :
-                                      index === 1 ? 'bg-blue-500' :
-                                      'bg-purple-500'
-                  const iconClasses = index === 0 ? 'text-green-600' :
-                                     index === 1 ? 'text-blue-600' :
-                                     'text-purple-600'
-                  return `
-                    <div class="border-4 ${colorClasses} rounded-xl p-5 shadow-lg hover:shadow-2xl transition">
-                      <div class="text-center mb-4">
-                        <div class="inline-block px-4 py-1 ${badgeClasses} text-white rounded-full font-bold mb-2 text-lg">
-                          ${course.course_name}
-                        </div>
-                        <p class="text-sm text-gray-600 font-medium">${course.course_label || course.description}</p>
-                      </div>
-                      ${course.introduction_problem ? `
-                        <div class="bg-white rounded-xl p-4 border-2 ${index === 0 ? 'border-green-300' : index === 1 ? 'border-blue-300' : 'border-purple-300'} shadow-md">
-                          <div class="flex items-center mb-3">
-                            <i class="fas fa-star ${iconClasses} text-xl mr-2"></i>
-                            <h4 class="text-base font-bold text-gray-800">${course.introduction_problem.problem_title}</h4>
-                          </div>
-                          <div class="bg-gray-50 rounded-lg p-3 mb-3 border-l-4 ${index === 0 ? 'border-green-500' : index === 1 ? 'border-blue-500' : 'border-purple-500'}">
-                            <p class="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">${course.introduction_problem.problem_content}</p>
-                          </div>
-                          ${course.introduction_problem.answer ? `
-                            <div class="bg-yellow-50 rounded-lg p-2 border-l-4 border-yellow-400">
-                              <p class="text-xs font-bold text-yellow-700 mb-1">
-                                <i class="fas fa-lightbulb mr-1"></i>こたえのヒント
-                              </p>
-                              <p class="text-xs text-gray-700">${course.introduction_problem.answer}</p>
-                            </div>
-                          ` : ''}
-                        </div>
-                      ` : `
-                        <div class="bg-white rounded-xl p-4 border-2 border-gray-200 text-center">
-                          <i class="fas fa-book text-4xl text-gray-300 mb-2"></i>
-                          <p class="text-sm text-gray-500">どうにゅうもんだい じゅんびちゅう</p>
-                        </div>
-                      `}
-                    </div>
-                  `
-                }).join('')}
               </div>
             </div>
 
@@ -1366,7 +1338,7 @@ async function loadCardPage(cardId) {
               <h2 class="text-xl text-gray-800">${card.card_title}</h2>
             </div>
             <div class="flex items-center gap-3">
-              <!-- ヘルプボタン3つ -->
+              <!-- ヘルプボタン4つ -->
               <button onclick="showAITeacher()" 
                       class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg flex flex-col items-center justify-center min-w-[100px]"
                       title="AI先生に質問">
@@ -1384,6 +1356,12 @@ async function loadCardPage(cardId) {
                       title="できている友達を確認">
                 <i class="fas fa-user-friends text-xl mb-1"></i>
                 <span class="text-xs">友達に聞く</span>
+              </button>
+              <button onclick="toggleHintPanel()" 
+                      class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg flex flex-col items-center justify-center min-w-[100px]"
+                      title="ヒントを見る">
+                <i class="fas fa-lightbulb text-xl mb-1"></i>
+                <span class="text-xs">ヒント</span>
               </button>
               <!-- 難易度バッジ -->
               <div class="inline-block px-4 py-2 rounded-lg ${
@@ -1784,6 +1762,17 @@ function showAnswer() {
   }
 }
 
+// ヒントパネル表示/非表示切替
+function toggleHintPanel() {
+  const hintsArea = document.getElementById('hintsArea')
+  if (hintsArea) {
+    hintsArea.classList.toggle('hidden')
+    if (!hintsArea.classList.contains('hidden')) {
+      hintsArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }
+}
+
 // 学習進捗保存
 async function saveProgress(teacherCall = false) {
   const answerInput = document.getElementById('answerInput').value
@@ -1827,6 +1816,7 @@ window.callTeacher = callTeacher
 window.askFriend = askFriend
 window.setUnderstanding = setUnderstanding
 window.showAnswer = showAnswer
+window.toggleHintPanel = toggleHintPanel
 window.saveProgress = saveProgress
 window.loadLearningPlan = loadLearningPlan
 window.loadAnswersTab = loadAnswersTab
@@ -2318,43 +2308,67 @@ async function loadAnswersTab(curriculumId) {
         <!-- 選択問題の解答 -->
         ${optionalAnswers.length > 0 ? `
           <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div class="bg-gradient-to-r from-yellow-600 to-orange-500 p-6">
+            <div class="bg-gradient-to-r from-pink-600 to-purple-500 p-6">
               <h2 class="text-2xl font-bold text-white">
                 <i class="fas fa-star mr-2"></i>
-                選択問題の解答
+                選択問題（発展課題）の解答
               </h2>
             </div>
             
             <div class="p-6 space-y-6">
               ${optionalAnswers.map(answer => `
-                <div class="border-2 border-gray-200 rounded-lg p-6">
-                  <h3 class="text-lg font-bold text-gray-800 mb-4">
-                    <span class="inline-block w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center font-bold mr-3">
+                <div class="border-2 border-pink-200 rounded-lg p-6 bg-gradient-to-br from-white to-pink-50">
+                  <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                    <span class="inline-block w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold text-xl mr-3">
                       ${answer.problem_number}
                     </span>
                     ${answer.problem_title}
                   </h3>
+                  
+                  ${answer.problem_description ? `
+                    <div class="bg-white border-l-4 border-pink-400 rounded p-4 mb-4">
+                      <h4 class="font-bold text-pink-800 mb-2">
+                        <i class="fas fa-file-alt mr-2"></i>問題
+                      </h4>
+                      <p class="text-gray-800">${answer.problem_description}</p>
+                    </div>
+                  ` : ''}
                   
                   ${answer.answer_content ? `
                     <div class="bg-green-50 border-l-4 border-green-500 rounded p-4 mb-4">
                       <h4 class="font-bold text-green-800 mb-2">
                         <i class="fas fa-check-circle mr-2"></i>解答例
                       </h4>
-                      <pre class="text-gray-800 whitespace-pre-wrap font-sans text-sm">${answer.answer_content}</pre>
+                      <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer.answer_content}</pre>
                     </div>
-                  ` : ''}
+                  ` : `
+                    <div class="bg-gray-50 border-l-4 border-gray-400 rounded p-4 mb-4">
+                      <h4 class="font-bold text-gray-600 mb-2">
+                        <i class="fas fa-info-circle mr-2"></i>解答について
+                      </h4>
+                      <p class="text-gray-700 text-sm">
+                        選択問題は自由な取り組みです。正解は一つではありません。<br>
+                        自分なりの考えや方法で取り組んでみましょう。
+                      </p>
+                    </div>
+                  `}
                   
                   ${answer.explanation ? `
-                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded p-4">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded p-4 mb-4">
                       <h4 class="font-bold text-blue-800 mb-2">
-                        <i class="fas fa-info-circle mr-2"></i>解説・ポイント
+                        <i class="fas fa-lightbulb mr-2"></i>解説・考え方のポイント
                       </h4>
-                      <pre class="text-gray-800 whitespace-pre-wrap font-sans text-sm">${answer.explanation}</pre>
+                      <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer.explanation}</pre>
                     </div>
                   ` : ''}
                   
-                  ${!answer.answer_content && !answer.explanation ? `
-                    <p class="text-gray-500 text-sm">選択問題は自由な取り組みです。正解は一つではありません。</p>
+                  ${answer.learning_meaning ? `
+                    <div class="bg-yellow-50 border-l-4 border-yellow-500 rounded p-4">
+                      <h4 class="font-bold text-yellow-800 mb-2">
+                        <i class="fas fa-star mr-2"></i>この問題で学べること
+                      </h4>
+                      <p class="text-gray-800">${answer.learning_meaning}</p>
+                    </div>
                   ` : ''}
                 </div>
               `).join('')}

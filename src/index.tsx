@@ -588,6 +588,8 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
       SELECT 
         op.problem_number,
         op.problem_title,
+        op.problem_description,
+        op.learning_meaning,
         a.answer_content,
         a.explanation
       FROM optional_problems op
@@ -2135,10 +2137,9 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "description": "ひとつひとつていねいに学びたい人におすすめ",
       "color_code": "green",
       "introduction_problem": {
-        "problem_title": "ゆっくりコース導入問題のタイトル",
-        "problem_content": "具体的な問題文（実際に解ける問題）",
-        "problem_description": "この問題で学べること・問題の意図",
-        "answer": "解答"
+        "problem_title": "ゆっくりコース導入問題のタイトル（必須・魅力的なタイトル）",
+        "problem_content": "具体的な問題文（必須・実際に解ける問題、数字や状況を含む）",
+        "answer": "解答のヒント（必須・子どもが理解できる解答）"
       },
       "cards": [
         {
@@ -2257,6 +2258,11 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "course_label": "自分のペースで学ぶコース",
       "description": "いろいろな方法で学びたい人におすすめ",
       "color_code": "blue",
+      "introduction_problem": {
+        "problem_title": "しっかりコース導入問題のタイトル（必須・魅力的なタイトル）",
+        "problem_content": "具体的な問題文（必須・実際に解ける問題、数字や状況を含む）",
+        "answer": "解答のヒント（必須・子どもが理解できる解答）"
+      },
       "cards": [
         {"card_number": 1, "card_title": "カード1", "card_type": "main", "textbook_page": "p.24", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
         {"card_number": 2, "card_title": "カード2", "card_type": "main", "textbook_page": "p.26", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
@@ -2271,6 +2277,11 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "course_label": "いろいろなことにちょうせんするコース",
       "description": "自分で考えを深めたい人におすすめ",
       "color_code": "purple",
+      "introduction_problem": {
+        "problem_title": "どんどんコース導入問題のタイトル（必須・魅力的なタイトル）",
+        "problem_content": "具体的な問題文（必須・実際に解ける問題、数字や状況を含む）",
+        "answer": "解答のヒント（必須・子どもが理解できる解答）"
+      },
       "cards": [
         {"card_number": 1, "card_title": "カード1", "card_type": "main", "textbook_page": "p.24", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
         {"card_number": 2, "card_title": "カード2", "card_type": "main", "textbook_page": "p.26", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
@@ -2378,6 +2389,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 ❗️ **各カードには必ず解答（answer）を記載してください。解答がないカードは不完全です。**
 ❗️ **ヒントと解答は最優先事項です。必ず全カードに含めてください。**
 ❗️ **18枚のカード × 3段階のヒント = 54個のヒントを必ず生成してください。**
+❗️ **各コースには必ず導入問題（introduction_problem）を1題作成してください。これは絶対条件です。**
+❗️ **導入問題がないコースは不完全です。3コース×1題＝必ず3題の導入問題を作成してください。**
 
 【重要な設計指針】
 
