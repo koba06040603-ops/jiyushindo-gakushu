@@ -2824,7 +2824,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
         console.log(`  - 問題${problem.problem_number}: ${problem.problem_title}`)
         await env.DB.prepare(`
           INSERT INTO optional_problems (
-            curriculum_id, problem_number, problem_title, problem_description,
+            curriculum_id, problem_number, problem_title, problem_content,
             difficulty_level, learning_meaning
           ) VALUES (?, ?, ?, ?, ?, ?)
         `).bind(
@@ -3270,7 +3270,7 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
       for (const problem of additionalProblems.optional_problems) {
         await env.DB.prepare(`
           INSERT INTO optional_problems (
-            curriculum_id, problem_number, problem_title, problem_description,
+            curriculum_id, problem_number, problem_title, problem_content,
             difficulty_level, learning_meaning
           ) VALUES (?, ?, ?, ?, ?, ?)
         `).bind(
