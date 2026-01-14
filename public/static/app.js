@@ -362,10 +362,231 @@ async function deleteCurriculum(curriculumId, unitName) {
   }
 }
 
-// 単元を編集（簡易版：カード内容の表示と編集）
+// 単元を編集
 async function editCurriculum(curriculumId) {
-  alert('📝 単元編集機能は近日実装予定です。\n\n現在は削除機能のみ利用可能です。')
-  // TODO: 編集画面の実装
+  try {
+    // カリキュラムデータを取得
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum, courses } = response.data
+    
+    // 編集モーダルを表示
+    showEditCurriculumModal(curriculum, courses)
+    
+  } catch (error) {
+    console.error('編集データ取得エラー:', error)
+    alert(`❌ データの取得に失敗しました: ${error.message}`)
+  }
+}
+
+// 編集モーダルを表示
+function showEditCurriculumModal(curriculum, courses) {
+  const modal = document.createElement('div')
+  modal.id = 'editCurriculumModal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto my-8">
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white sticky top-0 z-10">
+        <div class="flex justify-between items-center">
+          <h2 class="text-3xl font-bold">
+            <i class="fas fa-edit mr-2"></i>
+            単元編集
+          </h2>
+          <button onclick="closeEditModal()" class="text-white hover:text-gray-200">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        <p class="text-sm mt-2 opacity-90">
+          単元の基本情報とカード内容を編集できます
+        </p>
+      </div>
+
+      <!-- フォーム -->
+      <div class="p-8 space-y-8">
+        <!-- 基本情報 -->
+        <div class="bg-blue-50 rounded-lg p-6">
+          <h3 class="text-xl font-bold text-blue-800 mb-4">
+            <i class="fas fa-info-circle mr-2"></i>
+            基本情報
+          </h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">学年</label>
+              <input type="text" id="editGrade" value="${curriculum.grade}" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">教科</label>
+              <input type="text" id="editSubject" value="${curriculum.subject}" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">教科書会社</label>
+              <input type="text" id="editTextbook" value="${curriculum.textbook_company}" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">単元名</label>
+              <input type="text" id="editUnitName" value="${curriculum.unit_name}" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-bold text-gray-700 mb-2">単元の目標</label>
+              <textarea id="editUnitGoal" rows="3" 
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">${curriculum.unit_goal}</textarea>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-bold text-gray-700 mb-2">非認知目標</label>
+              <textarea id="editNonCognitiveGoal" rows="2" 
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">${curriculum.non_cognitive_goal}</textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- コースとカードの編集 -->
+        ${courses.map((course, courseIndex) => `
+          <div class="bg-${course.color_code}-50 rounded-lg p-6">
+            <h3 class="text-xl font-bold text-${course.color_code}-800 mb-4">
+              <i class="fas fa-layer-group mr-2"></i>
+              ${course.course_name} - ${course.course_label}
+            </h3>
+            
+            <div class="space-y-4">
+              ${(course.cards || []).map((card, cardIndex) => `
+                <div class="bg-white rounded-lg p-4 border-2 border-${course.color_code}-200">
+                  <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-bold text-gray-800">
+                      <span class="bg-${course.color_code}-500 text-white px-3 py-1 rounded-full text-sm mr-2">
+                        カード ${card.card_number}
+                      </span>
+                      <input type="text" 
+                             id="card-title-${courseIndex}-${cardIndex}" 
+                             value="${card.card_title || ''}" 
+                             placeholder="カードタイトル"
+                             class="inline-block p-2 border border-gray-300 rounded focus:border-blue-500 focus:outline-none">
+                    </h4>
+                    <button onclick="toggleCardDetail(${courseIndex}, ${cardIndex})" 
+                            class="text-${course.color_code}-600 hover:text-${course.color_code}-800">
+                      <i class="fas fa-chevron-down" id="toggle-icon-${courseIndex}-${cardIndex}"></i>
+                    </button>
+                  </div>
+                  
+                  <div id="card-detail-${courseIndex}-${cardIndex}" class="hidden space-y-3">
+                    <div>
+                      <label class="block text-xs font-bold text-gray-600 mb-1">問題説明</label>
+                      <textarea id="card-problem-${courseIndex}-${cardIndex}" rows="2" 
+                                class="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none">${card.problem_description || ''}</textarea>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-gray-600 mb-1">例題</label>
+                      <textarea id="card-example-${courseIndex}-${cardIndex}" rows="2" 
+                                class="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none">${card.example_problem || ''}</textarea>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-bold text-gray-600 mb-1">解答（必須）</label>
+                      <textarea id="card-answer-${courseIndex}-${cardIndex}" rows="2" 
+                                class="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500 focus:outline-none bg-yellow-50">${card.answer || ''}</textarea>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+
+        <!-- 保存ボタン -->
+        <div class="flex gap-4">
+          <button onclick="saveEditedCurriculum(${curriculum.id})" 
+                  class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-4 px-8 rounded-lg font-bold text-xl transition shadow-xl">
+            <i class="fas fa-save mr-2"></i>
+            変更を保存
+          </button>
+          <button onclick="closeEditModal()" 
+                  class="bg-gray-300 hover:bg-gray-400 text-gray-800 py-4 px-8 rounded-lg font-bold text-xl transition">
+            <i class="fas fa-times mr-2"></i>
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  
+  // コースとカードデータを保存（保存時に使用）
+  window.editingCourses = courses
+}
+
+// カード詳細の開閉
+function toggleCardDetail(courseIndex, cardIndex) {
+  const detail = document.getElementById(`card-detail-${courseIndex}-${cardIndex}`)
+  const icon = document.getElementById(`toggle-icon-${courseIndex}-${cardIndex}`)
+  
+  if (detail.classList.contains('hidden')) {
+    detail.classList.remove('hidden')
+    icon.classList.remove('fa-chevron-down')
+    icon.classList.add('fa-chevron-up')
+  } else {
+    detail.classList.add('hidden')
+    icon.classList.remove('fa-chevron-up')
+    icon.classList.add('fa-chevron-down')
+  }
+}
+
+// 編集モーダルを閉じる
+function closeEditModal() {
+  const modal = document.getElementById('editCurriculumModal')
+  if (modal) {
+    modal.remove()
+  }
+  window.editingCourses = null
+}
+
+// 編集内容を保存
+async function saveEditedCurriculum(curriculumId) {
+  try {
+    // 基本情報を取得
+    const basicInfo = {
+      grade: document.getElementById('editGrade').value,
+      subject: document.getElementById('editSubject').value,
+      textbook_company: document.getElementById('editTextbook').value,
+      unit_name: document.getElementById('editUnitName').value,
+      unit_goal: document.getElementById('editUnitGoal').value,
+      non_cognitive_goal: document.getElementById('editNonCognitiveGoal').value
+    }
+    
+    // 各カードの変更を収集
+    const coursesData = window.editingCourses.map((course, courseIndex) => ({
+      id: course.id,
+      cards: (course.cards || []).map((card, cardIndex) => ({
+        id: card.id,
+        card_title: document.getElementById(`card-title-${courseIndex}-${cardIndex}`)?.value || card.card_title,
+        problem_description: document.getElementById(`card-problem-${courseIndex}-${cardIndex}`)?.value || card.problem_description,
+        example_problem: document.getElementById(`card-example-${courseIndex}-${cardIndex}`)?.value || card.example_problem,
+        answer: document.getElementById(`card-answer-${courseIndex}-${cardIndex}`)?.value || card.answer
+      }))
+    }))
+    
+    // APIに送信
+    const response = await axios.put(`/api/curriculum/${curriculumId}`, {
+      basicInfo,
+      courses: coursesData
+    })
+    
+    if (response.data.success) {
+      alert('✅ 変更を保存しました！')
+      closeEditModal()
+      // ページを再読み込み
+      loadGuidePage(curriculumId)
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+    
+  } catch (error) {
+    console.error('保存エラー:', error)
+    alert(`❌ 保存に失敗しました: ${error.response?.data?.error || error.message}`)
+  }
 }
 
 // ============================================
@@ -443,14 +664,25 @@ async function loadGuidePage(curriculumId) {
       <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
         <div class="container mx-auto px-4 max-w-5xl">
           
-          <!-- 戻るボタンと教師用ボタン -->
-          <div class="flex justify-between items-center mb-4">
+          <!-- 戻るボタンとアクションボタン -->
+          <div class="flex justify-between items-center mb-4 print:hidden">
             <button onclick="renderTopPage()" class="text-indigo-600 hover:text-indigo-800 flex items-center text-lg font-semibold transition">
               <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
             </button>
-            <button onclick="loadTeacherOverview(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-6 py-2 rounded-lg font-bold transition shadow-lg">
-              <i class="fas fa-chalkboard-teacher mr-2"></i>教師用モードで確認
-            </button>
+            <div class="flex gap-2">
+              <button onclick="printGuide()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-print mr-2"></i>印刷
+              </button>
+              <button onclick="downloadGuidePDF(${curriculumId})" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-file-pdf mr-2"></i>PDF出力
+              </button>
+              <button onclick="editCurriculum(${curriculumId})" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-edit mr-2"></i>編集
+              </button>
+              <button onclick="loadTeacherOverview(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-chalkboard-teacher mr-2"></i>教師用
+              </button>
+            </div>
           </div>
 
           <!-- 学習のてびき1枚完結版 -->
@@ -6973,7 +7205,71 @@ function saveLocalLearningPlan() {
   alert('✅ 学習計画表を保存しました！\\n\\n単元保存時に反映されます。')
 }
 
+// 印刷機能
+function printGuide() {
+  window.print()
+}
+
+// PDF出力機能
+async function downloadGuidePDF(curriculumId) {
+  try {
+    // PDF生成中メッセージ
+    const originalContent = document.getElementById('app').innerHTML
+    
+    // ローディング表示
+    const loadingMsg = document.createElement('div')
+    loadingMsg.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    loadingMsg.innerHTML = `
+      <div class="bg-white rounded-lg p-8 text-center">
+        <i class="fas fa-spinner fa-spin text-4xl text-purple-600 mb-4"></i>
+        <p class="text-xl font-bold text-gray-800">PDF生成中...</p>
+        <p class="text-sm text-gray-600 mt-2">しばらくお待ちください（約10〜30秒）</p>
+      </div>
+    `
+    document.body.appendChild(loadingMsg)
+    
+    // 印刷用の要素を取得
+    const element = document.querySelector('.bg-white.rounded-2xl')
+    
+    if (!element) {
+      throw new Error('印刷対象の要素が見つかりません')
+    }
+    
+    // PDF生成オプション
+    const opt = {
+      margin: 10,
+      filename: `学習のてびき_${state.selectedCurriculum?.unit_name || 'curriculum'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }
+    
+    // PDF生成
+    await html2pdf().set(opt).from(element).save()
+    
+    // ローディング削除
+    document.body.removeChild(loadingMsg)
+    
+    console.log('✅ PDF生成完了')
+    
+  } catch (error) {
+    console.error('PDF生成エラー:', error)
+    alert(`❌ PDF生成に失敗しました: ${error.message}\n\nブラウザの印刷機能（Ctrl+P）をご利用ください。`)
+    
+    // ローディング削除（エラー時）
+    const loading = document.querySelector('.fixed.inset-0')
+    if (loading) {
+      document.body.removeChild(loading)
+    }
+  }
+}
+
 window.adjustCardTime = adjustCardTime
 window.moveCard = moveCard
 window.saveLearningPlan = saveLearningPlan
+window.printGuide = printGuide
+window.downloadGuidePDF = downloadGuidePDF
+window.toggleCardDetail = toggleCardDetail
+window.closeEditModal = closeEditModal
+window.saveEditedCurriculum = saveEditedCurriculum
 

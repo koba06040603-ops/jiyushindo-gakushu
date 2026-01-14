@@ -1594,6 +1594,17 @@ app.get('/', (c) => {
         <title>自由進度学習支援システム</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        <style>
+          @media print {
+            body { background: white !important; }
+            .print\\:hidden { display: none !important; }
+            .print\\:shadow-none { box-shadow: none !important; }
+            .print\\:break-after-page { page-break-after: always; }
+            .print\\:break-inside-avoid { page-break-inside: avoid; }
+            @page { margin: 1cm; }
+          }
+        </style>
     </head>
     <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
         <div id="app"></div>
@@ -3345,6 +3356,66 @@ app.post('/api/ai/suggest-units', async (c) => {
       error: '単元候補の生成に失敗しました',
       details: error.message,
       units: []
+    }, 500)
+  }
+})
+
+// APIルート：単元の更新（編集）
+app.put('/api/curriculum/:id', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  const { basicInfo, courses } = await c.req.json()
+  
+  try {
+    console.log(`📝 単元更新開始: ID=${id}`)
+    
+    // 1. カリキュラム基本情報を更新
+    await env.DB.prepare(`
+      UPDATE curriculum
+      SET grade = ?, subject = ?, textbook_company = ?, 
+          unit_name = ?, unit_goal = ?, non_cognitive_goal = ?
+      WHERE id = ?
+    `).bind(
+      basicInfo.grade,
+      basicInfo.subject,
+      basicInfo.textbook_company,
+      basicInfo.unit_name,
+      basicInfo.unit_goal,
+      basicInfo.non_cognitive_goal,
+      id
+    ).run()
+    console.log(`  - カリキュラム基本情報更新完了`)
+    
+    // 2. 各コースのカードを更新
+    for (const course of courses) {
+      for (const card of course.cards) {
+        await env.DB.prepare(`
+          UPDATE learning_cards
+          SET card_title = ?, problem_description = ?, 
+              example_problem = ?, answer = ?
+          WHERE id = ?
+        `).bind(
+          card.card_title,
+          card.problem_description,
+          card.example_problem,
+          card.answer,
+          card.id
+        ).run()
+      }
+      console.log(`  - コース ${course.id} のカード更新完了`)
+    }
+    
+    return c.json({
+      success: true,
+      message: '単元を更新しました'
+    })
+    
+  } catch (error: any) {
+    console.error('単元更新エラー:', error)
+    return c.json({
+      success: false,
+      error: '単元の更新に失敗しました',
+      details: error.message
     }, 500)
   }
 })
