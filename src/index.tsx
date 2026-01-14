@@ -7621,6 +7621,384 @@ app.post('/api/ml/predict/:studentId', async (c) => {
 })
 
 // ==============================================
+// Phase 17-19: 深層学習・マルチモーダル・大規模展開
+// ==============================================
+
+// コーディネーター向け：複数校データ統合分析
+app.get('/api/coordinator/cross-school-analytics', async (c) => {
+  const { env } = c
+  const coordinatorId = c.req.query('coordinator_id')
+  const scope = c.req.query('scope') || 'municipality' // 'municipality', 'prefecture', 'national'
+  
+  try {
+    // コーディネーターの管理校を取得
+    const coordinator = await env.DB.prepare(`
+      SELECT managed_schools FROM teachers WHERE user_id = ?
+    `).bind(coordinatorId).first()
+    
+    if (!coordinator) {
+      return c.json({ success: false, error: 'コーディネーター情報が見つかりません' }, 404)
+    }
+    
+    const managedSchools = JSON.parse(coordinator.managed_schools as string || '[]')
+    
+    // 各学校のデータを集計
+    const schoolsData = []
+    
+    for (const schoolId of managedSchools) {
+      const schoolInfo = await env.DB.prepare(`
+        SELECT school_code, school_name FROM schools WHERE id = ?
+      `).bind(schoolId).first()
+      
+      // 学校ごとの生徒データ
+      const students = await env.DB.prepare(`
+        SELECT id FROM users 
+        WHERE role = 'student' 
+        AND class_code IN (
+          SELECT class_code FROM users WHERE role = 'teacher' AND id IN (
+            SELECT user_id FROM teachers WHERE school_id = ?
+          )
+        )
+      `).bind(schoolId).all()
+      
+      // 平均理解度
+      const avgUnderstanding = await env.DB.prepare(`
+        SELECT AVG(understanding_level) as avg_understanding
+        FROM student_progress
+        WHERE student_id IN (${(students.results || []).map((s: any) => s.id).join(',') || '0'})
+          AND status = 'completed'
+      `).first()
+      
+      // エンゲージメント
+      const engagement = await env.DB.prepare(`
+        SELECT 
+          COUNT(DISTINCT student_id) as active_students,
+          AVG(session_duration) as avg_session_duration
+        FROM learning_behavior_logs
+        WHERE student_id IN (${(students.results || []).map((s: any) => s.id).join(',') || '0'})
+          AND created_at >= datetime('now', '-7 days')
+      `).first()
+      
+      schoolsData.push({
+        school_id: schoolId,
+        school_code: schoolInfo?.school_code,
+        school_name: schoolInfo?.school_name,
+        total_students: (students.results || []).length,
+        avg_understanding: avgUnderstanding?.avg_understanding || 0,
+        active_students: engagement?.active_students || 0,
+        avg_session_duration: engagement?.avg_session_duration || 0
+      })
+    }
+    
+    // 全体統計
+    const totalStudents = schoolsData.reduce((sum, s) => sum + s.total_students, 0)
+    const overallAvgUnderstanding = schoolsData.reduce((sum, s) => sum + s.avg_understanding, 0) / schoolsData.length
+    
+    // トップパフォーマンス校
+    const topSchools = schoolsData
+      .sort((a, b) => b.avg_understanding - a.avg_understanding)
+      .slice(0, 3)
+      .map(s => s.school_code)
+    
+    // 支援が必要な学校
+    const strugglingSchools = schoolsData
+      .filter(s => s.avg_understanding < 3.0)
+      .map(s => s.school_code)
+    
+    // 結果を保存
+    await env.DB.prepare(`
+      INSERT INTO cross_school_analytics 
+      (analysis_type, scope_identifier, total_students, total_schools, 
+       avg_understanding, top_performing_schools, struggling_schools, 
+       recommendations, generated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      scope,
+      scope === 'municipality' ? 'village_001' : scope,
+      totalStudents,
+      managedSchools.length,
+      overallAvgUnderstanding,
+      JSON.stringify(topSchools),
+      JSON.stringify(strugglingSchools),
+      JSON.stringify({
+        focus_areas: strugglingSchools.length > 0 ? '支援が必要な学校があります' : '全体的に順調',
+        best_practices: topSchools.length > 0 ? 'トップ校の実践を共有しましょう' : ''
+      })
+    ).run()
+    
+    return c.json({
+      success: true,
+      summary: {
+        total_students: totalStudents,
+        total_schools: managedSchools.length,
+        avg_understanding: overallAvgUnderstanding,
+        top_schools: topSchools,
+        struggling_schools: strugglingSchools
+      },
+      schools_data: schoolsData,
+      recommendations: {
+        immediate_action: strugglingSchools.length > 0 
+          ? `${strugglingSchools.length}校が支援を必要としています` 
+          : '全校順調に進行中',
+        best_practices: topSchools.length > 0 
+          ? `${topSchools.join(', ')}の実践を他校と共有することを推奨します` 
+          : ''
+      }
+    })
+  } catch (error: any) {
+    console.error('クロススクール分析エラー:', error)
+    return c.json({ success: false, error: '分析に失敗しました' }, 500)
+  }
+})
+
+// データ共有許可の申請（コーディネーター → 担任教師）
+app.post('/api/coordinator/request-data-access', async (c) => {
+  const { env } = c
+  const { student_id, coordinator_id, teacher_id, purpose } = await c.req.json()
+  
+  try {
+    // 既存の許可をチェック
+    const existing = await env.DB.prepare(`
+      SELECT * FROM data_sharing_permissions
+      WHERE student_id = ? AND shared_with_user_id = ? AND is_active = 1
+    `).bind(student_id, coordinator_id).first()
+    
+    if (existing) {
+      return c.json({
+        success: true,
+        message: 'すでにアクセス権限があります',
+        permission_id: existing.id
+      })
+    }
+    
+    // 新規許可を作成（担任の承認が必要）
+    await env.DB.prepare(`
+      INSERT INTO data_sharing_permissions 
+      (student_id, shared_with_user_id, permission_type, granted_by_user_id, 
+       consent_date, is_active)
+      VALUES (?, ?, ?, ?, datetime('now'), 1)
+    `).bind(student_id, coordinator_id, 'analyze', teacher_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'データアクセス権限を付与しました',
+      purpose: purpose
+    })
+  } catch (error: any) {
+    console.error('データアクセス申請エラー:', error)
+    return c.json({ success: false, error: '申請に失敗しました' }, 500)
+  }
+})
+
+// 研究論文用データエクスポート（完全匿名化）
+app.get('/api/coordinator/research-export', async (c) => {
+  const { env } = c
+  const coordinatorId = c.req.query('coordinator_id')
+  const startDate = c.req.query('start_date')
+  const endDate = c.req.query('end_date')
+  const format = c.req.query('format') || 'json' // 'json', 'csv', 'spss'
+  
+  try {
+    // アクセス権限チェック
+    const permissions = await env.DB.prepare(`
+      SELECT student_id FROM data_sharing_permissions
+      WHERE shared_with_user_id = ? AND is_active = 1 AND permission_type = 'analyze'
+    `).bind(coordinatorId).all()
+    
+    const studentIds = (permissions.results || []).map((p: any) => p.student_id)
+    
+    if (studentIds.length === 0) {
+      return c.json({ success: false, error: 'アクセス可能なデータがありません' }, 403)
+    }
+    
+    // 完全匿名化データの取得
+    const researchData = []
+    
+    for (let i = 0; i < studentIds.length; i++) {
+      const studentId = studentIds[i]
+      
+      // 学習プロファイル
+      const profile = await env.DB.prepare(`
+        SELECT profile_data, overall_score, confidence_level
+        FROM learning_profiles
+        WHERE student_id = ?
+        ORDER BY updated_at DESC LIMIT 1
+      `).bind(studentId).first()
+      
+      // A/Bテスト割り当て
+      const abTest = await env.DB.prepare(`
+        SELECT variant_name FROM ab_test_assignments
+        WHERE student_id = ? LIMIT 1
+      `).bind(studentId).first()
+      
+      // 進捗データ
+      const progress = await env.DB.prepare(`
+        SELECT 
+          COUNT(*) as total_cards,
+          AVG(understanding_level) as avg_understanding,
+          AVG(completion_time_minutes) as avg_time,
+          AVG(hint_used_count) as avg_hints
+        FROM student_progress
+        WHERE student_id = ? 
+          AND status = 'completed'
+          AND completed_at BETWEEN ? AND ?
+      `).bind(studentId, startDate, endDate).first()
+      
+      if (profile) {
+        const profileData = JSON.parse(profile.profile_data as string)
+        
+        researchData.push({
+          // 完全匿名ID
+          participant_id: `P${String(i + 1).padStart(4, '0')}`,
+          
+          // 実験条件
+          condition: abTest?.variant_name || 'not_assigned',
+          
+          // 学習スタイル
+          learning_style_visual: profileData.patterns?.learning_style?.visual || 0,
+          learning_style_auditory: profileData.patterns?.learning_style?.auditory || 0,
+          learning_style_kinesthetic: profileData.patterns?.learning_style?.kinesthetic || 0,
+          dominant_style: profileData.patterns?.learning_style?.dominant_style,
+          
+          // パフォーマンス指標
+          avg_understanding: progress?.avg_understanding || 0,
+          total_cards_completed: progress?.total_cards || 0,
+          avg_completion_time: progress?.avg_time || 0,
+          avg_hints_used: progress?.avg_hints || 0,
+          
+          // 全体スコア
+          overall_score: profile.overall_score,
+          confidence_level: profile.confidence_level,
+          
+          // 時間的情報
+          data_collection_start: startDate,
+          data_collection_end: endDate
+        })
+      }
+    }
+    
+    if (format === 'csv') {
+      // CSV形式
+      const headers = Object.keys(researchData[0] || {})
+      const csvRows = [headers.join(',')]
+      
+      for (const row of researchData) {
+        csvRows.push(headers.map(h => row[h]).join(','))
+      }
+      
+      return c.text(csvRows.join('\n'), 200, {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="research_data_${Date.now()}.csv"`
+      })
+    }
+    
+    // JSON形式（デフォルト）
+    return c.json({
+      success: true,
+      metadata: {
+        total_participants: researchData.length,
+        data_collection_period: { start: startDate, end: endDate },
+        anonymization: 'full',
+        export_date: new Date().toISOString()
+      },
+      data: researchData
+    })
+  } catch (error: any) {
+    console.error('研究データエクスポートエラー:', error)
+    return c.json({ success: false, error: 'エクスポートに失敗しました' }, 500)
+  }
+})
+
+// 不登校児童サポート記録
+app.post('/api/coordinator/truancy-support', async (c) => {
+  const { env } = c
+  const { student_id, support_type, progress_notes, coordinator_id } = await c.req.json()
+  
+  try {
+    // 既存の記録を取得
+    const existing = await env.DB.prepare(`
+      SELECT * FROM truancy_support_records
+      WHERE student_id = ?
+      ORDER BY updated_at DESC LIMIT 1
+    `).bind(student_id).first()
+    
+    if (existing) {
+      // 更新
+      await env.DB.prepare(`
+        UPDATE truancy_support_records
+        SET support_type = ?,
+            progress_notes = ?,
+            support_coordinator_id = ?,
+            updated_at = datetime('now')
+        WHERE id = ?
+      `).bind(support_type, progress_notes, coordinator_id, existing.id).run()
+    } else {
+      // 新規作成
+      await env.DB.prepare(`
+        INSERT INTO truancy_support_records 
+        (student_id, support_type, progress_notes, support_coordinator_id, 
+         engagement_level, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'low', datetime('now'), datetime('now'))
+      `).bind(student_id, support_type, progress_notes, coordinator_id).run()
+    }
+    
+    // 学習履歴を確認
+    const recentActivity = await env.DB.prepare(`
+      SELECT COUNT(*) as activity_count
+      FROM learning_behavior_logs
+      WHERE student_id = ? AND created_at >= datetime('now', '-7 days')
+    `).bind(student_id).first()
+    
+    return c.json({
+      success: true,
+      message: 'サポート記録を更新しました',
+      engagement_status: {
+        recent_activity_count: recentActivity?.activity_count || 0,
+        engagement_level: (recentActivity?.activity_count || 0) > 5 ? 'improving' : 'needs_attention'
+      }
+    })
+  } catch (error: any) {
+    console.error('不登校サポート記録エラー:', error)
+    return c.json({ success: false, error: '記録に失敗しました' }, 500)
+  }
+})
+
+// 論文トラッキング
+app.post('/api/coordinator/research-publication', async (c) => {
+  const { env } = c
+  const { 
+    title, authors, publication_type, publication_venue, 
+    abstract, keywords, sample_size, key_findings 
+  } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO research_publications 
+      (title, authors, publication_type, publication_venue, abstract, keywords,
+       sample_size, key_findings, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `).bind(
+      title,
+      authors,
+      publication_type,
+      publication_venue,
+      abstract,
+      JSON.stringify(keywords),
+      sample_size,
+      key_findings
+    ).run()
+    
+    return c.json({
+      success: true,
+      message: '論文情報を登録しました'
+    })
+  } catch (error: any) {
+    console.error('論文登録エラー:', error)
+    return c.json({ success: false, error: '登録に失敗しました' }, 500)
+  }
+})
+
+// ==============================================
 // WebSocketエンドポイント
 // ==============================================
 

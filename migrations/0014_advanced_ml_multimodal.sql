@@ -1,81 +1,57 @@
--- ==========================================
--- Phase 17-19: 深層学習・マルチモーダル・大規模展開
--- ==========================================
+-- Migration 0014: 深層学習・マルチモーダル・大規模展開
+-- Phase 17-19: Advanced ML + Multimodal + Large Scale Deployment
 
--- ===========================================
+-- ==============================================
 -- Phase 17: 深層学習モデル
--- ===========================================
+-- ==============================================
 
 -- LSTM/GRU時系列予測モデル
 CREATE TABLE IF NOT EXISTS lstm_models (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER NOT NULL,
-  model_type TEXT NOT NULL, -- 'lstm', 'gru', 'bilstm'
-  sequence_length INTEGER DEFAULT 10,
-  hidden_units INTEGER DEFAULT 64,
-  model_params TEXT, -- JSON: weights, biases
-  training_accuracy REAL,
-  validation_accuracy REAL,
+  model_type TEXT NOT NULL, -- 'lstm', 'gru', 'bidirectional_lstm'
+  architecture TEXT NOT NULL, -- JSON: layer configurations
+  weights_data TEXT, -- JSON: model weights (compressed)
+  sequence_length INTEGER DEFAULT 10, -- 時系列の長さ
+  prediction_horizon INTEGER DEFAULT 5, -- 予測する未来の長さ
   training_samples INTEGER DEFAULT 0,
+  validation_loss REAL,
+  test_accuracy REAL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES users(id)
 );
 
--- 時系列学習データ
-CREATE TABLE IF NOT EXISTS time_series_data (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  student_id INTEGER NOT NULL,
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  understanding_level REAL,
-  completion_time REAL,
-  engagement_score REAL,
-  hint_count INTEGER DEFAULT 0,
-  emotion_state TEXT, -- 'focused', 'struggling', 'confident'
-  session_context TEXT, -- JSON
-  FOREIGN KEY (student_id) REFERENCES users(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_time_series_student ON time_series_data(student_id, timestamp);
-
--- Transformer自然言語理解
+-- Transformer自然言語理解モデル
 CREATE TABLE IF NOT EXISTS transformer_models (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  model_name TEXT UNIQUE NOT NULL,
-  model_type TEXT NOT NULL, -- 'bert', 'gpt', 'custom_transformer'
-  vocab_size INTEGER,
+  student_id INTEGER,
+  class_code TEXT,
+  model_type TEXT NOT NULL, -- 'bert_small', 'distilbert', 'student_qa'
+  vocabulary_size INTEGER DEFAULT 5000,
   embedding_dim INTEGER DEFAULT 128,
   num_heads INTEGER DEFAULT 4,
   num_layers INTEGER DEFAULT 2,
-  model_params TEXT, -- JSON: attention weights
-  training_accuracy REAL,
+  model_params TEXT, -- JSON: 完全なモデルパラメータ
+  trained_on_messages INTEGER DEFAULT 0,
+  perplexity REAL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- 学習テキスト解析結果
-CREATE TABLE IF NOT EXISTS text_analysis_results (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  student_id INTEGER NOT NULL,
-  text_input TEXT NOT NULL,
-  analysis_type TEXT NOT NULL, -- 'sentiment', 'comprehension', 'misconception'
-  analysis_result TEXT, -- JSON
-  confidence_score REAL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (student_id) REFERENCES users(id)
 );
 
 -- 強化学習エージェント
 CREATE TABLE IF NOT EXISTS rl_agents (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER NOT NULL,
-  agent_type TEXT NOT NULL, -- 'q_learning', 'dqn', 'policy_gradient'
-  state_space_dim INTEGER,
-  action_space_dim INTEGER,
-  q_table TEXT, -- JSON: state-action values
-  policy_params TEXT, -- JSON: policy network weights
+  agent_type TEXT NOT NULL, -- 'dqn', 'policy_gradient', 'actor_critic'
+  state_space_dim INTEGER NOT NULL,
+  action_space_dim INTEGER NOT NULL,
+  q_table TEXT, -- JSON: Q値テーブルまたはネットワーク重み
   total_episodes INTEGER DEFAULT 0,
-  average_reward REAL DEFAULT 0,
+  total_rewards REAL DEFAULT 0,
+  epsilon REAL DEFAULT 1.0, -- 探索率
+  learning_rate REAL DEFAULT 0.001,
+  discount_factor REAL DEFAULT 0.95,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES users(id)
@@ -86,91 +62,80 @@ CREATE TABLE IF NOT EXISTS rl_episodes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   agent_id INTEGER NOT NULL,
   episode_number INTEGER NOT NULL,
-  state_sequence TEXT, -- JSON: array of states
-  action_sequence TEXT, -- JSON: array of actions
-  reward_sequence TEXT, -- JSON: array of rewards
-  total_reward REAL,
-  episode_length INTEGER,
+  total_reward REAL NOT NULL,
+  steps_taken INTEGER NOT NULL,
+  final_understanding REAL,
+  actions_taken TEXT, -- JSON: 行動の系列
+  states_visited TEXT, -- JSON: 状態の系列
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (agent_id) REFERENCES rl_agents(id)
 );
 
--- ===========================================
+-- ==============================================
 -- Phase 18: マルチモーダル学習
--- ===========================================
+-- ==============================================
 
 -- 音声入力データ
 CREATE TABLE IF NOT EXISTS voice_inputs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER NOT NULL,
-  audio_url TEXT NOT NULL,
-  transcription TEXT,
+  card_id INTEGER,
+  audio_blob_url TEXT, -- Cloudflare R2 URL
+  audio_duration_seconds REAL,
+  transcription TEXT, -- 音声認識結果
   transcription_confidence REAL,
-  language TEXT DEFAULT 'ja',
-  duration_seconds REAL,
-  emotion_detected TEXT, -- 'happy', 'frustrated', 'neutral'
+  language_detected TEXT DEFAULT 'ja',
+  emotion_detected TEXT, -- 'happy', 'frustrated', 'confused', 'confident'
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (student_id) REFERENCES users(id)
+  FOREIGN KEY (student_id) REFERENCES users(id),
+  FOREIGN KEY (card_id) REFERENCES learning_cards(id)
 );
 
 -- 手書き認識データ
 CREATE TABLE IF NOT EXISTS handwriting_inputs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER NOT NULL,
-  curriculum_id INTEGER,
-  image_url TEXT NOT NULL,
+  card_id INTEGER,
+  image_blob_url TEXT, -- Cloudflare R2 URL
+  strokes_data TEXT, -- JSON: ストロークの座標データ
   recognized_text TEXT,
   recognition_confidence REAL,
-  stroke_data TEXT, -- JSON: array of strokes
-  is_correct BOOLEAN,
-  feedback TEXT,
+  writing_speed REAL, -- 文字/分
+  stroke_count INTEGER,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (student_id) REFERENCES users(id),
-  FOREIGN KEY (curriculum_id) REFERENCES curriculums(id)
+  FOREIGN KEY (card_id) REFERENCES learning_cards(id)
 );
 
--- 視線追跡データ（将来拡張用）
+-- 視線追跡データ（オプション）
 CREATE TABLE IF NOT EXISTS eye_tracking_data (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER NOT NULL,
+  card_id INTEGER,
   session_id TEXT NOT NULL,
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  gaze_x REAL,
-  gaze_y REAL,
-  fixation_duration_ms INTEGER,
-  element_focused TEXT, -- DOM element identifier
-  attention_level REAL, -- 0.0 - 1.0
-  FOREIGN KEY (student_id) REFERENCES users(id)
-);
-
--- マルチモーダル統合分析
-CREATE TABLE IF NOT EXISTS multimodal_analysis (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  student_id INTEGER NOT NULL,
-  session_id TEXT NOT NULL,
-  text_features TEXT, -- JSON
-  voice_features TEXT, -- JSON
-  handwriting_features TEXT, -- JSON
-  eye_tracking_features TEXT, -- JSON
-  combined_embedding TEXT, -- JSON: multimodal representation
-  engagement_score REAL,
-  understanding_level REAL,
-  intervention_needed BOOLEAN DEFAULT 0,
+  gaze_points TEXT, -- JSON: [{x, y, timestamp, duration}]
+  fixation_count INTEGER,
+  average_fixation_duration REAL,
+  saccade_count INTEGER,
+  attention_heatmap_url TEXT, -- ヒートマップ画像URL
+  cognitive_load_score REAL, -- 0-1: 認知負荷の推定
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (student_id) REFERENCES users(id)
+  FOREIGN KEY (student_id) REFERENCES users(id),
+  FOREIGN KEY (card_id) REFERENCES learning_cards(id)
 );
 
--- ===========================================
+-- ==============================================
 -- Phase 19: 大規模展開
--- ===========================================
+-- ==============================================
 
--- 学校情報
+-- 学校マスタ
 CREATE TABLE IF NOT EXISTS schools (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   school_code TEXT UNIQUE NOT NULL,
   school_name TEXT NOT NULL,
-  municipality_id INTEGER,
-  school_type TEXT, -- 'elementary', 'junior_high', 'combined'
+  school_type TEXT NOT NULL, -- 'elementary', 'junior_high', 'high'
+  prefecture TEXT NOT NULL,
+  municipality TEXT NOT NULL,
   address TEXT,
   principal_name TEXT,
   contact_email TEXT,
@@ -178,151 +143,145 @@ CREATE TABLE IF NOT EXISTS schools (
   total_students INTEGER DEFAULT 0,
   total_teachers INTEGER DEFAULT 0,
   is_active BOOLEAN DEFAULT 1,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (municipality_id) REFERENCES municipalities(id)
-);
-
--- 自治体情報
-CREATE TABLE IF NOT EXISTS municipalities (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  municipality_code TEXT UNIQUE NOT NULL,
-  municipality_name TEXT NOT NULL,
-  prefecture TEXT,
-  superintendent_name TEXT,
-  contact_email TEXT,
-  contact_phone TEXT,
-  total_schools INTEGER DEFAULT 0,
-  total_students INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT 1,
+  trial_start_date DATE,
+  contract_end_date DATE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- データ共有設定
-CREATE TABLE IF NOT EXISTS data_sharing_agreements (
+-- 自治体マスタ
+CREATE TABLE IF NOT EXISTS municipalities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  municipality_code TEXT UNIQUE NOT NULL,
+  municipality_name TEXT NOT NULL,
+  prefecture TEXT NOT NULL,
+  education_superintendent TEXT,
+  contact_email TEXT,
+  contact_phone TEXT,
+  total_schools INTEGER DEFAULT 0,
+  total_students INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 教師マスタ（拡張）
+CREATE TABLE IF NOT EXISTS teachers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER UNIQUE NOT NULL,
   school_id INTEGER NOT NULL,
-  data_coordinator_id INTEGER NOT NULL, -- あなた（教育改革担当者）
-  sharing_scope TEXT NOT NULL, -- 'anonymized_only', 'aggregate_only', 'full_with_consent'
-  consent_obtained BOOLEAN DEFAULT 0,
-  consent_document_url TEXT,
-  start_date DATE,
-  end_date DATE,
-  is_active BOOLEAN DEFAULT 1,
+  teacher_code TEXT UNIQUE NOT NULL,
+  full_name TEXT NOT NULL,
+  role TEXT NOT NULL, -- 'homeroom_teacher', 'coordinator', 'principal', 'vice_principal'
+  grade_level TEXT, -- '1', '2', '3', '4', '5', '6', 'all'
+  subjects TEXT, -- JSON: ['math', 'science', 'japanese']
+  is_coordinator BOOLEAN DEFAULT 0, -- あなたのような教育改革担当者
+  managed_schools TEXT, -- JSON: [school_id1, school_id2] コーディネーターが担当する学校
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (school_id) REFERENCES schools(id),
-  FOREIGN KEY (data_coordinator_id) REFERENCES users(id)
-);
-
--- 匿名化マッピング（プライバシー保護）
-CREATE TABLE IF NOT EXISTS anonymization_mapping (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  real_student_id INTEGER NOT NULL,
-  anonymous_id TEXT UNIQUE NOT NULL,
-  school_id INTEGER NOT NULL,
-  mapping_key TEXT NOT NULL, -- 暗号化キー（実際は環境変数で管理）
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (real_student_id) REFERENCES users(id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (school_id) REFERENCES schools(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_anon_mapping ON anonymization_mapping(anonymous_id);
-
--- クロススクール分析
-CREATE TABLE IF NOT EXISTS cross_school_analytics (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  analysis_date DATE NOT NULL,
-  municipality_id INTEGER,
-  school_ids TEXT, -- JSON: array of school IDs
-  total_students INTEGER,
-  average_understanding REAL,
-  average_completion_time REAL,
-  average_engagement REAL,
-  top_performing_schools TEXT, -- JSON
-  struggling_schools TEXT, -- JSON
-  recommendations TEXT, -- JSON
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (municipality_id) REFERENCES municipalities(id)
-);
-
--- 研究論文用データセット
-CREATE TABLE IF NOT EXISTS research_datasets (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  dataset_name TEXT UNIQUE NOT NULL,
-  researcher_id INTEGER NOT NULL,
-  description TEXT,
-  data_collection_start DATE,
-  data_collection_end DATE,
-  total_records INTEGER,
-  schools_included TEXT, -- JSON: array of school_codes
-  anonymization_level TEXT, -- 'full', 'partial', 'aggregated'
-  export_format TEXT, -- 'csv', 'json', 'parquet'
-  download_url TEXT,
-  citation_info TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (researcher_id) REFERENCES users(id)
-);
-
--- システム使用統計（全国規模）
-CREATE TABLE IF NOT EXISTS system_usage_stats (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  date DATE NOT NULL,
-  school_id INTEGER,
-  active_students INTEGER DEFAULT 0,
-  active_teachers INTEGER DEFAULT 0,
-  total_sessions INTEGER DEFAULT 0,
-  total_cards_completed INTEGER DEFAULT 0,
-  average_session_duration REAL,
-  system_uptime_percentage REAL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (school_id) REFERENCES schools(id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_usage_stats_date ON system_usage_stats(date, school_id);
-
--- 教育効果測定（標準化テスト連携）
-CREATE TABLE IF NOT EXISTS standardized_test_results (
+-- データ共有設定
+CREATE TABLE IF NOT EXISTS data_sharing_permissions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   student_id INTEGER NOT NULL,
-  test_name TEXT NOT NULL, -- '全国学力テスト', '県学力診断テスト'
-  test_date DATE,
-  subject TEXT, -- '国語', '算数', '理科'
-  score REAL,
-  percentile REAL,
-  national_average REAL,
-  school_average REAL,
+  shared_with_user_id INTEGER NOT NULL, -- コーディネーター等
+  permission_type TEXT NOT NULL, -- 'view', 'analyze', 'export'
+  granted_by_user_id INTEGER NOT NULL, -- 担任教師
+  consent_date DATETIME NOT NULL,
+  expiry_date DATETIME,
+  is_active BOOLEAN DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (student_id) REFERENCES users(id)
+  FOREIGN KEY (student_id) REFERENCES users(id),
+  FOREIGN KEY (shared_with_user_id) REFERENCES users(id),
+  FOREIGN KEY (granted_by_user_id) REFERENCES users(id)
 );
 
--- システム効果と標準化テストの相関分析
-CREATE TABLE IF NOT EXISTS effectiveness_analysis (
+-- クロススクール分析結果
+CREATE TABLE IF NOT EXISTS cross_school_analytics (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  analysis_date DATE NOT NULL,
-  school_id INTEGER NOT NULL,
-  subject TEXT,
-  system_usage_correlation REAL, -- システム使用時間と成績の相関
-  improvement_rate REAL, -- 前年比改善率
-  effect_size REAL, -- Cohen's d
-  statistical_significance REAL, -- p-value
-  analysis_details TEXT, -- JSON
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (school_id) REFERENCES schools(id)
+  analysis_type TEXT NOT NULL, -- 'municipality', 'prefecture', 'national'
+  scope_identifier TEXT NOT NULL, -- municipality_code, prefecture, 'national'
+  total_students INTEGER,
+  total_schools INTEGER,
+  avg_understanding REAL,
+  avg_engagement REAL,
+  top_performing_schools TEXT, -- JSON: [school_ids]
+  struggling_schools TEXT, -- JSON: [school_ids]
+  common_patterns TEXT, -- JSON: 共通する学習パターン
+  recommendations TEXT, -- JSON: 改善推奨事項
+  generated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- ===========================================
--- 初期データ投入
--- ===========================================
+-- 不登校児童サポート記録
+CREATE TABLE IF NOT EXISTS truancy_support_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id INTEGER NOT NULL,
+  support_type TEXT NOT NULL, -- 'home_learning', 'online_only', 'flexible_schedule'
+  last_school_attendance_date DATE,
+  online_learning_frequency TEXT, -- 'daily', 'weekly', 'irregular'
+  engagement_level TEXT, -- 'high', 'medium', 'low'
+  progress_notes TEXT,
+  support_coordinator_id INTEGER, -- あなたのようなサポート担当者
+  family_contact_frequency TEXT,
+  reintegration_plan TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (student_id) REFERENCES users(id),
+  FOREIGN KEY (support_coordinator_id) REFERENCES users(id)
+);
 
--- サンプル自治体（あなたの村）
-INSERT OR IGNORE INTO municipalities (municipality_code, municipality_name, prefecture, superintendent_name)
-VALUES ('VILLAGE_001', '○○村教育委員会', '○○県', '教育長名');
+-- グローバル展開（多言語・多文化対応）
+CREATE TABLE IF NOT EXISTS global_deployments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  country_code TEXT NOT NULL, -- 'JP', 'US', 'IN', etc.
+  region TEXT,
+  organization_name TEXT NOT NULL,
+  organization_type TEXT, -- 'school', 'ngo', 'government'
+  primary_language TEXT NOT NULL,
+  secondary_languages TEXT, -- JSON: ['en', 'es']
+  total_users INTEGER DEFAULT 0,
+  deployment_status TEXT DEFAULT 'pilot', -- 'pilot', 'active', 'suspended'
+  local_coordinator_email TEXT,
+  timezone TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
--- サンプル学校
-INSERT OR IGNORE INTO schools (school_code, school_name, municipality_id, school_type)
-VALUES ('SCHOOL_ELEM_001', '○○村立○○小学校', 1, 'elementary');
+-- 研究論文トラッキング
+CREATE TABLE IF NOT EXISTS research_publications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  authors TEXT NOT NULL, -- あなたの名前も含む
+  publication_type TEXT NOT NULL, -- 'journal', 'conference', 'report'
+  publication_venue TEXT,
+  publication_date DATE,
+  doi TEXT,
+  abstract TEXT,
+  keywords TEXT, -- JSON: ['personalized learning', 'AI', 'evidence-based']
+  data_collection_period_start DATE,
+  data_collection_period_end DATE,
+  sample_size INTEGER,
+  schools_involved TEXT, -- JSON: [school_ids]
+  key_findings TEXT,
+  citation_count INTEGER DEFAULT 0,
+  pdf_url TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
-INSERT OR IGNORE INTO schools (school_code, school_name, municipality_id, school_type)
-VALUES ('SCHOOL_JH_001', '○○村立○○中学校', 1, 'junior_high');
+-- インデックス作成
+CREATE INDEX IF NOT EXISTS idx_lstm_models_student ON lstm_models(student_id);
+CREATE INDEX IF NOT EXISTS idx_transformer_models_class ON transformer_models(class_code);
+CREATE INDEX IF NOT EXISTS idx_rl_agents_student ON rl_agents(student_id);
+CREATE INDEX IF NOT EXISTS idx_voice_inputs_student ON voice_inputs(student_id);
+CREATE INDEX IF NOT EXISTS idx_handwriting_inputs_student ON handwriting_inputs(student_id);
+CREATE INDEX IF NOT EXISTS idx_eye_tracking_student ON eye_tracking_data(student_id);
+CREATE INDEX IF NOT EXISTS idx_schools_municipality ON schools(municipality);
+CREATE INDEX IF NOT EXISTS idx_teachers_school ON teachers(school_id);
+CREATE INDEX IF NOT EXISTS idx_teachers_coordinator ON teachers(is_coordinator);
+CREATE INDEX IF NOT EXISTS idx_data_sharing_student ON data_sharing_permissions(student_id);
+CREATE INDEX IF NOT EXISTS idx_data_sharing_shared_with ON data_sharing_permissions(shared_with_user_id);
+CREATE INDEX IF NOT EXISTS idx_truancy_support_student ON truancy_support_records(student_id);
+CREATE INDEX IF NOT EXISTS idx_global_deployments_country ON global_deployments(country_code);
