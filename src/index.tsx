@@ -752,14 +752,19 @@ app.get('/api/reports/monthly/:classCode', async (c) => {
 app.post('/api/ai/ask', async (c) => {
   const { env } = c
   const body = await c.req.json()
+  const startTime = Date.now()
   
   const apiKey = env.GEMINI_API_KEY
   
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
     return c.json({ 
-      answer: '申し訳ありません。AI先生は現在利用できません。ヒントカードや先生に聞いてみましょう。' 
+      answer: '申し訳ありません。AI先生は現在利用できません。ヒントカードや先生に聞いてみましょう。',
+      error: 'API key not configured'
     })
   }
+  
+  // セッションIDの生成（対話履歴グループ化用）
+  const sessionId = body.sessionId || `session-${Date.now()}-${Math.random().toString(36).substring(7)}`
   
   try {
     // 学習カード情報を取得
@@ -767,9 +772,37 @@ app.post('/api/ai/ask', async (c) => {
       SELECT * FROM learning_cards WHERE id = ?
     `).bind(body.cardId).first()
     
-    // Gemini APIにリクエスト（最新のv1エンドポイント）
+    // 対話履歴を取得（コンテキスト保持）
+    const conversationHistory = await env.DB.prepare(`
+      SELECT message_type, message_text
+      FROM ai_conversations
+      WHERE session_id = ? AND student_id = ?
+      ORDER BY created_at DESC
+      LIMIT 5
+    `).bind(sessionId, body.studentId).all()
+    
+    // 対話履歴をGemini APIフォーマットに変換
+    const historyContext = conversationHistory.results?.reverse().map((msg: any) => 
+      `${msg.message_type === 'question' ? '生徒' : 'AI先生'}: ${msg.message_text}`
+    ).join('\n') || ''
+    
+    // 質問を履歴に保存
+    await env.DB.prepare(`
+      INSERT INTO ai_conversations (
+        student_id, curriculum_id, learning_card_id, session_id, message_type, message_text, context_data
+      ) VALUES (?, ?, ?, ?, 'question', ?, ?)
+    `).bind(
+      body.studentId,
+      body.curriculumId,
+      body.cardId,
+      sessionId,
+      body.question,
+      JSON.stringify({ cardTitle: card?.card_title })
+    ).run()
+    
+    // Gemini APIにリクエスト
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -784,6 +817,8 @@ app.post('/api/ai/ask', async (c) => {
 タイトル: ${card?.card_title || ''}
 問題: ${body.context || ''}
 
+${historyContext ? `【これまでの対話】\n${historyContext}\n` : ''}
+
 【生徒の質問】
 ${body.question}
 
@@ -793,6 +828,7 @@ ${body.question}
 3. 励ましの言葉を入れる
 4. 質問で返して考えを引き出す
 5. 150文字以内で簡潔に
+6. これまでの対話を踏まえて、段階的に導く
 
 回答してください。`
             }]
@@ -805,9 +841,26 @@ ${body.question}
       }
     )
     
+    const responseTime = Date.now() - startTime
+    
     if (!geminiResponse.ok) {
       const errorData = await geminiResponse.json()
       console.error('Gemini API error:', errorData)
+      
+      // エラーログを統計に記録
+      await env.DB.prepare(`
+        INSERT INTO ai_usage_stats (
+          student_id, curriculum_id, learning_card_id, feature_type, 
+          response_time_ms, success, error_message
+        ) VALUES (?, ?, ?, 'teacher', ?, 0, ?)
+      `).bind(
+        body.studentId,
+        body.curriculumId,
+        body.cardId,
+        responseTime,
+        `API Error: ${geminiResponse.status}`
+      ).run()
+      
       throw new Error(`Gemini API error: ${geminiResponse.status}`)
     }
     
@@ -816,13 +869,254 @@ ${body.question}
     const answer = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 
                    '考えるヒントを用意できませんでした。もう一度質問してみてください。'
     
-    return c.json({ answer })
+    // 回答を履歴に保存
+    await env.DB.prepare(`
+      INSERT INTO ai_conversations (
+        student_id, curriculum_id, learning_card_id, session_id, message_type, message_text
+      ) VALUES (?, ?, ?, ?, 'answer', ?)
+    `).bind(
+      body.studentId,
+      body.curriculumId,
+      body.cardId,
+      sessionId,
+      answer
+    ).run()
     
-  } catch (error) {
-    console.error('AI error:', error)
+    // 使用統計を記録
+    const tokensUsed = geminiData.usageMetadata?.totalTokenCount || 0
+    await env.DB.prepare(`
+      INSERT INTO ai_usage_stats (
+        student_id, curriculum_id, learning_card_id, feature_type,
+        tokens_used, response_time_ms, success
+      ) VALUES (?, ?, ?, 'teacher', ?, ?, 1)
+    `).bind(
+      body.studentId,
+      body.curriculumId,
+      body.cardId,
+      tokensUsed,
+      responseTime
+    ).run()
+    
     return c.json({ 
-      answer: 'ごめんなさい、今は答えられません。ヒントカードを見てみましょう！' 
+      answer,
+      sessionId,
+      tokensUsed,
+      responseTime
     })
+    
+  } catch (error: any) {
+    console.error('AI error:', error)
+    
+    // エラーログを統計に記録
+    try {
+      await env.DB.prepare(`
+        INSERT INTO ai_usage_stats (
+          student_id, curriculum_id, learning_card_id, feature_type,
+          response_time_ms, success, error_message
+        ) VALUES (?, ?, ?, 'teacher', ?, 0, ?)
+      `).bind(
+        body.studentId,
+        body.curriculumId,
+        body.cardId,
+        Date.now() - startTime,
+        error.message
+      ).run()
+    } catch (dbError) {
+      console.error('Failed to log error:', dbError)
+    }
+    
+    return c.json({ 
+      answer: 'ごめんなさい、今は答えられません。ヒントカードを見てみましょう！',
+      error: error.message
+    })
+  }
+})
+
+// APIルート：AI対話履歴取得
+app.get('/api/ai/conversations/:sessionId', async (c) => {
+  const { env } = c
+  const sessionId = c.req.param('sessionId')
+  
+  try {
+    const conversations = await env.DB.prepare(`
+      SELECT 
+        id, message_type, message_text, context_data, created_at,
+        learning_card_id, curriculum_id
+      FROM ai_conversations
+      WHERE session_id = ?
+      ORDER BY created_at ASC
+    `).bind(sessionId).all()
+    
+    return c.json({ 
+      conversations: conversations.results || [],
+      total: conversations.results?.length || 0
+    })
+  } catch (error: any) {
+    console.error('Failed to fetch conversations:', error)
+    return c.json({ 
+      error: '対話履歴の取得に失敗しました',
+      conversations: [],
+      total: 0
+    }, 500)
+  }
+})
+
+// APIルート：自動問題生成
+app.post('/api/ai/generate-problem', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  // Gemini APIキーの確認
+  const apiKey = env.GEMINI_API_KEY
+  if (!apiKey || apiKey === 'your-gemini-api-key') {
+    return c.json({ 
+      error: 'Gemini APIキーが設定されていません。環境変数を設定してください。'
+    }, 500)
+  }
+  
+  try {
+    const startTime = Date.now()
+    
+    // カリキュラム情報を取得
+    const curriculum = await env.DB.prepare(`
+      SELECT * FROM curriculum WHERE id = ?
+    `).bind(body.curriculumId).first()
+    
+    // 既存のコース問題を参考として取得
+    const existingProblems = await env.DB.prepare(`
+      SELECT problem_content, learning_meaning FROM learning_cards
+      WHERE course_id = ? LIMIT 3
+    `).bind(body.courseId).all()
+    
+    const examplesText = existingProblems.results?.map((p: any, i: number) => 
+      `例${i + 1}:\n問題: ${p.problem_content}\n学習の意味: ${p.learning_meaning}`
+    ).join('\n\n') || ''
+    
+    // Gemini APIにリクエスト
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `あなたは小学生向けの学習問題を作成するAI先生です。以下の情報を元に、学習カードの問題を生成してください。
+
+【カリキュラム情報】
+学年: ${curriculum?.grade || ''}
+教科: ${curriculum?.subject || ''}
+単元: ${curriculum?.unit_name || ''}
+単元目標: ${curriculum?.unit_goal || ''}
+難易度: ${body.difficultyLevel || 'しっかり'}
+
+${examplesText ? `【参考問題】\n${examplesText}\n` : ''}
+
+【生成条件】
+- 小学生が理解できる言葉で
+- 実社会と関連付ける
+- 思考力を育む内容
+- ${body.requirements || ''}
+
+以下のJSON形式で回答してください：
+{
+  "problem_description": "問題の簡単な説明（30文字以内）",
+  "problem_content": "問題文（150文字程度）",
+  "learning_meaning": "この問題で学べること（100文字程度）",
+  "answer": "解答例（必要に応じて）",
+  "difficulty_level": "${body.difficultyLevel || 'しっかり'}"
+}`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 500,
+          }
+        })
+      }
+    )
+    
+    const responseTime = Date.now() - startTime
+    
+    if (!geminiResponse.ok) {
+      const errorData = await geminiResponse.json()
+      console.error('Gemini API error:', errorData)
+      
+      // エラーログを統計に記録
+      await env.DB.prepare(`
+        INSERT INTO ai_usage_stats (
+          curriculum_id, feature_type, 
+          response_time_ms, success, error_message
+        ) VALUES (?, 'problem_generation', ?, 0, ?)
+      `).bind(
+        body.curriculumId,
+        responseTime,
+        `API Error: ${geminiResponse.status}`
+      ).run()
+      
+      throw new Error(`Gemini API error: ${geminiResponse.status}`)
+    }
+    
+    const geminiData = await geminiResponse.json()
+    const generatedText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSONを抽出
+    const jsonMatch = generatedText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('生成結果からJSONを抽出できませんでした')
+    }
+    
+    const problemData = JSON.parse(jsonMatch[0])
+    
+    // generated_problemsテーブルに保存
+    const result = await env.DB.prepare(`
+      INSERT INTO generated_problems (
+        curriculum_id, course_id, problem_description, problem_content,
+        learning_meaning, answer, difficulty_level, generated_by, 
+        generation_params, is_approved
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+    `).bind(
+      body.curriculumId,
+      body.courseId,
+      problemData.problem_description,
+      problemData.problem_content,
+      problemData.learning_meaning,
+      problemData.answer || null,
+      problemData.difficulty_level,
+      body.userId || 0,
+      JSON.stringify({ requirements: body.requirements, difficultyLevel: body.difficultyLevel })
+    ).run()
+    
+    // 使用統計を記録
+    const tokensUsed = geminiData.usageMetadata?.totalTokenCount || 0
+    await env.DB.prepare(`
+      INSERT INTO ai_usage_stats (
+        curriculum_id, feature_type, tokens_used, response_time_ms, success
+      ) VALUES (?, 'problem_generation', ?, ?, 1)
+    `).bind(
+      body.curriculumId,
+      tokensUsed,
+      responseTime
+    ).run()
+    
+    return c.json({ 
+      problem: {
+        id: result.meta.last_row_id,
+        ...problemData
+      },
+      tokensUsed,
+      responseTime
+    })
+    
+  } catch (error: any) {
+    console.error('Problem generation error:', error)
+    
+    return c.json({ 
+      error: '問題の生成に失敗しました',
+      details: error.message
+    }, 500)
   }
 })
 
@@ -4844,6 +5138,366 @@ app.get('/api/auth/me', requireAuth, async (c) => {
     success: true,
     user
   })
+})
+
+// ==============================================
+// AI拡張機能API
+// ==============================================
+
+// APIルート: AI対話履歴取得
+app.get('/api/ai/conversations/:studentId/:cardId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const cardId = c.req.param('cardId')
+  const sessionId = c.req.query('sessionId')
+  
+  try {
+    let query = `
+      SELECT * FROM ai_conversations
+      WHERE student_id = ? AND learning_card_id = ?
+    `
+    const params = [studentId, cardId]
+    
+    if (sessionId) {
+      query += ` AND session_id = ?`
+      params.push(sessionId)
+    }
+    
+    query += ` ORDER BY created_at DESC LIMIT 50`
+    
+    const conversations = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      conversations: conversations.results || []
+    })
+  } catch (error: any) {
+    console.error('対話履歴取得エラー:', error)
+    return c.json({
+      success: false,
+      error: '対話履歴の取得に失敗しました'
+    }, 500)
+  }
+})
+
+// APIルート: AI使用統計取得
+app.get('/api/ai/stats/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    const stats = await env.DB.prepare(`
+      SELECT 
+        feature_type,
+        COUNT(*) as usage_count,
+        SUM(tokens_used) as total_tokens,
+        AVG(response_time_ms) as avg_response_time,
+        SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count,
+        SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as error_count
+      FROM ai_usage_stats
+      WHERE student_id = ?
+      GROUP BY feature_type
+    `).bind(studentId).all()
+    
+    return c.json({
+      success: true,
+      stats: stats.results || []
+    })
+  } catch (error: any) {
+    console.error('AI統計取得エラー:', error)
+    return c.json({
+      success: false,
+      error: 'AI統計の取得に失敗しました'
+    }, 500)
+  }
+})
+
+// APIルート: 自動問題生成
+app.post('/api/ai/generate-problem', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  const startTime = Date.now()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    return c.json({ 
+      success: false,
+      error: 'AI問題生成機能は現在利用できません'
+    })
+  }
+  
+  try {
+    // カリキュラム情報を取得
+    const curriculum = await env.DB.prepare(`
+      SELECT * FROM curriculum WHERE id = ?
+    `).bind(body.curriculumId).first()
+    
+    if (!curriculum) {
+      return c.json({
+        success: false,
+        error: 'カリキュラムが見つかりません'
+      }, 404)
+    }
+    
+    // 問題生成プロンプト
+    const prompt = `あなたは教育コンテンツの専門家です。以下の情報を基に、${body.problemType === 'intro' ? '導入問題' : body.problemType === 'practice' ? '練習問題' : body.problemType === 'challenge' ? '発展問題' : body.problemType === 'check_test' ? 'チェックテスト問題' : '選択問題'}を生成してください。
+
+【カリキュラム情報】
+学年: ${curriculum.grade}
+教科: ${curriculum.subject}
+単元名: ${curriculum.unit_name}
+単元目標: ${curriculum.unit_goal}
+
+【問題の要件】
+難易度: ${body.difficultyLevel === 1 ? '★ かんたん' : body.difficultyLevel === 2 ? '★★ ふつう' : body.difficultyLevel === 3 ? '★★★ むずかしい' : '★★★★ とてもむずかしい'}
+問題タイプ: ${body.problemType}
+${body.specificRequirements ? `追加要件: ${body.specificRequirements}` : ''}
+
+【生成する内容】
+1. 問題タイトル: 簡潔で分かりやすいタイトル（15文字以内）
+2. 問題内容: 具体的な問題文（小学生にわかりやすく）
+3. 解答: 詳しい解答と解説
+
+以下のJSON形式で出力してください：
+{
+  "title": "問題タイトル",
+  "content": "問題内容",
+  "solution": "解答と解説"
+}`
+
+    // Gemini APIにリクエスト
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 1000,
+          }
+        })
+      }
+    )
+    
+    const responseTime = Date.now() - startTime
+    
+    if (!geminiResponse.ok) {
+      const errorData = await geminiResponse.json()
+      console.error('Gemini API error:', errorData)
+      
+      // エラーログを記録
+      await env.DB.prepare(`
+        INSERT INTO ai_usage_stats (
+          student_id, curriculum_id, feature_type, 
+          response_time_ms, success, error_message
+        ) VALUES (?, ?, 'problem_generation', ?, 0, ?)
+      `).bind(
+        body.userId || 1,
+        body.curriculumId,
+        responseTime,
+        `API Error: ${geminiResponse.status}`
+      ).run()
+      
+      throw new Error(`Gemini API error: ${geminiResponse.status}`)
+    }
+    
+    const geminiData = await geminiResponse.json()
+    const generatedText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSONを抽出（```json ... ``` の中身を取得）
+    let problemData
+    try {
+      const jsonMatch = generatedText.match(/```json\s*(\{[\s\S]*?\})\s*```/) || 
+                       generatedText.match(/(\{[\s\S]*?\})/)
+      if (jsonMatch) {
+        problemData = JSON.parse(jsonMatch[1])
+      } else {
+        // JSON形式でない場合は、テキストを分割して抽出
+        problemData = {
+          title: '自動生成問題',
+          content: generatedText,
+          solution: '解答は教師が後で追加してください'
+        }
+      }
+    } catch (parseError) {
+      problemData = {
+        title: '自動生成問題',
+        content: generatedText,
+        solution: '解答は教師が後で追加してください'
+      }
+    }
+    
+    // 生成された問題をデータベースに保存
+    const result = await env.DB.prepare(`
+      INSERT INTO ai_generated_problems (
+        curriculum_id, course_id, problem_type, problem_title,
+        problem_content, problem_solution, difficulty_level,
+        generation_prompt, is_approved
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+    `).bind(
+      body.curriculumId,
+      body.courseId || null,
+      body.problemType,
+      problemData.title,
+      problemData.content,
+      problemData.solution,
+      body.difficultyLevel || 2,
+      prompt
+    ).run()
+    
+    // 使用統計を記録
+    const tokensUsed = geminiData.usageMetadata?.totalTokenCount || 0
+    await env.DB.prepare(`
+      INSERT INTO ai_usage_stats (
+        student_id, curriculum_id, feature_type,
+        tokens_used, response_time_ms, success
+      ) VALUES (?, ?, 'problem_generation', ?, ?, 1)
+    `).bind(
+      body.userId || 1,
+      body.curriculumId,
+      tokensUsed,
+      responseTime
+    ).run()
+    
+    return c.json({
+      success: true,
+      problem: {
+        id: result.meta.last_row_id,
+        ...problemData,
+        difficultyLevel: body.difficultyLevel || 2,
+        problemType: body.problemType
+      },
+      tokensUsed,
+      responseTime
+    })
+    
+  } catch (error: any) {
+    console.error('問題生成エラー:', error)
+    
+    // エラーログを記録
+    try {
+      await env.DB.prepare(`
+        INSERT INTO ai_usage_stats (
+          student_id, curriculum_id, feature_type,
+          response_time_ms, success, error_message
+        ) VALUES (?, ?, 'problem_generation', ?, 0, ?)
+      `).bind(
+        body.userId || 1,
+        body.curriculumId,
+        Date.now() - startTime,
+        error.message
+      ).run()
+    } catch (dbError) {
+      console.error('Failed to log error:', dbError)
+    }
+    
+    return c.json({
+      success: false,
+      error: '問題生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート: 生成された問題一覧取得
+app.get('/api/ai/generated-problems/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  const problemType = c.req.query('problemType')
+  const approved = c.req.query('approved')
+  
+  try {
+    let query = `
+      SELECT * FROM ai_generated_problems
+      WHERE curriculum_id = ?
+    `
+    const params = [curriculumId]
+    
+    if (problemType) {
+      query += ` AND problem_type = ?`
+      params.push(problemType)
+    }
+    
+    if (approved !== undefined) {
+      query += ` AND is_approved = ?`
+      params.push(approved === 'true' ? '1' : '0')
+    }
+    
+    query += ` ORDER BY created_at DESC`
+    
+    const problems = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      problems: problems.results || []
+    })
+  } catch (error: any) {
+    console.error('生成問題取得エラー:', error)
+    return c.json({
+      success: false,
+      error: '生成問題の取得に失敗しました'
+    }, 500)
+  }
+})
+
+// APIルート: 生成問題の承認
+app.post('/api/ai/approve-problem/:problemId', async (c) => {
+  const { env } = c
+  const problemId = c.req.param('problemId')
+  const { userId, approved } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE ai_generated_problems
+      SET is_approved = ?, approved_by = ?, approved_at = datetime('now')
+      WHERE id = ?
+    `).bind(approved ? 1 : 0, userId, problemId).run()
+    
+    return c.json({
+      success: true,
+      message: approved ? '問題を承認しました' : '承認を取り消しました'
+    })
+  } catch (error: any) {
+    console.error('問題承認エラー:', error)
+    return c.json({
+      success: false,
+      error: '問題承認に失敗しました'
+    }, 500)
+  }
+})
+
+// APIルート: AI フィードバック評価
+app.post('/api/ai/feedback', async (c) => {
+  const { env } = c
+  const { studentId, conversationId, usageStatId, rating, comment } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO ai_feedback_ratings (
+        student_id, conversation_id, usage_stat_id, rating, feedback_comment
+      ) VALUES (?, ?, ?, ?, ?)
+    `).bind(studentId, conversationId || null, usageStatId || null, rating, comment || null).run()
+    
+    return c.json({
+      success: true,
+      message: 'フィードバックを送信しました'
+    })
+  } catch (error: any) {
+    console.error('フィードバック送信エラー:', error)
+    return c.json({
+      success: false,
+      error: 'フィードバック送信に失敗しました'
+    }, 500)
+  }
 })
 
 // ==============================================

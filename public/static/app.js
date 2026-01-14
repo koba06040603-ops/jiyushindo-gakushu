@@ -2383,6 +2383,36 @@ function showAITeacher() {
     const welcomeMsg = `こんにちは！AI先生です。\n\n今は「${cardTitle}」を学習していますね。\n\nわからないことや、もっと知りたいことがあったら、なんでも聞いてください！一緒に考えましょう！ 😊`
     addAIMessage(welcomeMsg, 'ai')
   }
+  
+  // 対話履歴を読み込む
+  if (window.aiSessionId) {
+    loadConversationHistory()
+  }
+}
+
+// 対話履歴を読み込む
+async function loadConversationHistory() {
+  if (!window.aiSessionId) return
+  
+  try {
+    const response = await axios.get(`/api/ai/conversations/${window.aiSessionId}`)
+    const conversations = response.data.conversations || []
+    
+    // 既存のチャットをクリア（ウェルカムメッセージは保持）
+    const aiChat = document.getElementById('aiChat')
+    const messages = aiChat.querySelectorAll('.message:not(.welcome)')
+    messages.forEach(msg => msg.remove())
+    
+    // 履歴を表示
+    conversations.forEach(conv => {
+      const type = conv.message_type === 'question' ? 'user' : 'ai'
+      addAIMessage(conv.message_text, type)
+    })
+    
+    console.log('対話履歴を読み込みました:', conversations.length, '件')
+  } catch (error) {
+    console.error('対話履歴の読み込みエラー:', error)
+  }
 }
 
 // AI先生に質問
@@ -2402,17 +2432,27 @@ async function askAI() {
   addAIMessage('考えているよ... 💭', 'ai', loadingId)
   
   try {
+    // セッションIDを生成または取得
+    if (!window.aiSessionId) {
+      window.aiSessionId = `session-${state.student.id}-${state.selectedCard}-${Date.now()}`
+    }
+    
     // カード情報を取得
-    const cardContext = window.currentCardData ? {
-      card_title: window.currentCardData.card.card_title,
-      problem_description: window.currentCardData.card.problem_description,
-      new_terms: window.currentCardData.card.new_terms
+    const card = window.currentCardData
+    const cardContext = card ? {
+      card_title: card.card_title,
+      problem_description: card.problem_description,
+      new_terms: card.new_terms
     } : null
     
-    // AIチャットAPIを呼び出す
-    const response = await axios.post('/api/ai-chat', {
-      message: question,
-      cardContext: cardContext
+    // AI先生APIを呼び出す
+    const response = await axios.post('/api/ai/ask', {
+      studentId: state.student.id,
+      curriculumId: state.selectedCurriculum.id,
+      cardId: state.selectedCard,
+      question: question,
+      context: cardContext ? JSON.stringify(cardContext) : '',
+      sessionId: window.aiSessionId
     })
     
     // ローディングメッセージを削除
@@ -2420,7 +2460,18 @@ async function askAI() {
     if (loadingMsg) loadingMsg.remove()
     
     // AIの回答を追加
-    addAIMessage(response.data.response, 'ai')
+    const answer = response.data.answer || 'ごめんね、うまく答えられなかったよ。先生に聞いてみてね。'
+    addAIMessage(answer, 'ai')
+    
+    // セッションIDを更新
+    if (response.data.sessionId) {
+      window.aiSessionId = response.data.sessionId
+    }
+    
+    // トークン使用量を表示（デバッグ用）
+    if (response.data.tokensUsed) {
+      console.log('AI Tokens used:', response.data.tokensUsed)
+    }
     
   } catch (error) {
     console.error('AI質問エラー:', error)
@@ -2428,8 +2479,8 @@ async function askAI() {
     const loadingMsg = document.getElementById(loadingId)
     if (loadingMsg) loadingMsg.remove()
     
-    // より具体的なエラーメッセージ
-    const errorMsg = error.response?.data?.error || error.message || 'エラーが発生しました'
+    // エラーメッセージ
+    const errorMsg = error.response?.data?.error || 'エラーが発生しました'
     addAIMessage(`ごめんね、うまく答えられなかったよ。\n\n【先生に聞いてみてね】\n${errorMsg}`, 'ai')
   }
 }
@@ -10399,4 +10450,247 @@ function sendActivity(studentId, cardId) {
     cardId
   })
 }
+
+// ============================================
+// AI問題生成機能
+// ============================================
+
+// 問題生成モーダル表示
+function showProblemGenerationModal(curriculumId) {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-t-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-magic mr-2"></i>AI問題自動生成
+            </h2>
+            <p class="text-sm mt-1">Gemini AIが問題を自動生成します</p>
+          </div>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="text-white hover:text-gray-200 text-3xl">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6">
+        <form id="problemGenerationForm" class="space-y-6">
+          <!-- 問題タイプ -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-list mr-2"></i>問題タイプ
+            </label>
+            <select id="problemType" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+              <option value="intro">導入問題</option>
+              <option value="practice">練習問題</option>
+              <option value="challenge">発展問題</option>
+              <option value="check_test">チェックテスト</option>
+              <option value="optional">選択問題</option>
+            </select>
+          </div>
+
+          <!-- 難易度 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-signal mr-2"></i>難易度
+            </label>
+            <select id="difficultyLevel" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+              <option value="1">★ かんたん</option>
+              <option value="2" selected>★★ ふつう</option>
+              <option value="3">★★★ むずかしい</option>
+              <option value="4">★★★★ とてもむずかしい</option>
+            </select>
+          </div>
+
+          <!-- 追加要件 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-pencil-alt mr-2"></i>追加要件（任意）
+            </label>
+            <textarea id="specificRequirements" rows="3"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="例: 日常生活に関連した問題にしてください"></textarea>
+          </div>
+
+          <!-- 生成ボタン -->
+          <div class="flex gap-3">
+            <button type="submit"
+                    class="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-lg font-bold hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg">
+              <i class="fas fa-magic mr-2"></i>問題を生成
+            </button>
+            <button type="button" onclick="this.closest('.fixed').remove()"
+                    class="px-6 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-all">
+              キャンセル
+            </button>
+          </div>
+        </form>
+
+        <!-- 生成結果エリア -->
+        <div id="generationResult" class="hidden mt-6 space-y-4">
+          <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div class="flex items-center mb-2">
+              <i class="fas fa-check-circle text-green-600 mr-2"></i>
+              <span class="font-bold text-green-800">問題生成完了！</span>
+            </div>
+            <div id="generatedProblemContent" class="mt-4 space-y-3">
+              <!-- 生成された問題がここに表示される -->
+            </div>
+          </div>
+
+          <div class="flex gap-3">
+            <button onclick="saveGeneratedProblem()"
+                    class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-bold transition-all">
+              <i class="fas fa-save mr-2"></i>問題を保存
+            </button>
+            <button onclick="regenerateProblem()"
+                    class="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-bold transition-all">
+              <i class="fas fa-redo mr-2"></i>再生成
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  
+  // フォーム送信処理
+  document.getElementById('problemGenerationForm').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    await generateProblem(curriculumId)
+  })
+}
+
+// 問題生成実行
+async function generateProblem(curriculumId) {
+  const problemType = document.getElementById('problemType').value
+  const difficultyLevel = parseInt(document.getElementById('difficultyLevel').value)
+  const specificRequirements = document.getElementById('specificRequirements').value
+  
+  showLoading('AI が問題を生成中...')
+  
+  try {
+    const response = await axios.post('/api/ai/generate-problem', {
+      userId: state.student.id,
+      curriculumId: curriculumId,
+      problemType: problemType,
+      difficultyLevel: difficultyLevel,
+      specificRequirements: specificRequirements
+    })
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      alert('問題生成に失敗しました: ' + response.data.error)
+      return
+    }
+    
+    // 生成された問題を保存
+    window.generatedProblem = response.data.problem
+    
+    // 結果を表示
+    const resultArea = document.getElementById('generationResult')
+    const contentArea = document.getElementById('generatedProblemContent')
+    
+    contentArea.innerHTML = `
+      <div class="space-y-3">
+        <div>
+          <div class="text-sm font-bold text-gray-600 mb-1">タイトル</div>
+          <div class="bg-white border border-gray-200 rounded p-3">
+            ${response.data.problem.title}
+          </div>
+        </div>
+        
+        <div>
+          <div class="text-sm font-bold text-gray-600 mb-1">問題内容</div>
+          <div class="bg-white border border-gray-200 rounded p-3 whitespace-pre-wrap">
+            ${response.data.problem.content}
+          </div>
+        </div>
+        
+        ${response.data.problem.solution ? `
+          <div>
+            <div class="text-sm font-bold text-gray-600 mb-1">解答・解説</div>
+            <div class="bg-white border border-gray-200 rounded p-3 whitespace-pre-wrap">
+              ${response.data.problem.solution}
+            </div>
+          </div>
+        ` : ''}
+        
+        <div class="flex items-center gap-4 text-sm text-gray-500">
+          <span><i class="fas fa-signal mr-1"></i>難易度: ${'★'.repeat(response.data.problem.difficultyLevel)}</span>
+          <span><i class="fas fa-clock mr-1"></i>${response.data.responseTime}ms</span>
+          ${response.data.tokensUsed ? `<span><i class="fas fa-coins mr-1"></i>${response.data.tokensUsed} tokens</span>` : ''}
+        </div>
+      </div>
+    `
+    
+    resultArea.classList.remove('hidden')
+    resultArea.scrollIntoView({ behavior: 'smooth' })
+    
+  } catch (error) {
+    hideLoading()
+    console.error('問題生成エラー:', error)
+    alert('問題生成に失敗しました: ' + (error.response?.data?.error || error.message))
+  }
+}
+
+// 問題を再生成
+function regenerateProblem() {
+  if (!state.selectedCurriculum) {
+    alert('カリキュラムが選択されていません')
+    return
+  }
+  
+  // 結果エリアを非表示
+  document.getElementById('generationResult').classList.add('hidden')
+  
+  // 再生成
+  generateProblem(state.selectedCurriculum.id)
+}
+
+// 生成された問題を保存
+async function saveGeneratedProblem() {
+  if (!window.generatedProblem) {
+    alert('保存する問題がありません')
+    return
+  }
+  
+  showLoading('問題を保存中...')
+  
+  try {
+    // 承認APIを呼び出し
+    await axios.post(`/api/ai/approve-problem/${window.generatedProblem.id}`, {
+      userId: state.student.id,
+      approved: true
+    })
+    
+    hideLoading()
+    alert('✅ 問題を保存しました！')
+    
+    // モーダルを閉じる
+    document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
+    
+    // 学習のてびきを再読み込み
+    if (state.selectedCurriculum) {
+      loadGuidePage(state.selectedCurriculum.id)
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('問題保存エラー:', error)
+    alert('問題の保存に失敗しました')
+  }
+}
+
+// グローバルスコープに関数を登録
+window.showProblemGenerationModal = showProblemGenerationModal
+window.generateProblem = generateProblem
+window.regenerateProblem = regenerateProblem
+window.saveGeneratedProblem = saveGeneratedProblem
 
