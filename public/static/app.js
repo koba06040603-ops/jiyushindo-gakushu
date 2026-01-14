@@ -6463,7 +6463,7 @@ function showTeacherOverview(unitData) {
         `).join('')}
 
         <div class="flex justify-center">
-          <button onclick="saveLearningPlan()" 
+          <button onclick="saveLocalLearningPlan()" 
                   class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg">
             <i class="fas fa-save mr-2"></i>
             学習計画を保存
@@ -6838,7 +6838,7 @@ function moveCard(courseIndex, cardIndex, direction) {
   alert(`カード移動機能\\n\\nコース ${courseIndex + 1} のカード ${cardIndex + 1} を${direction > 0 ? '下' : '上'}に移動します。\\n\\n※この機能は次の更新で実装予定です。`)
 }
 
-function saveLearningPlan() {
+function saveLocalLearningPlan() {
   const courses = []
   document.querySelectorAll('[id^="course-total-"]').forEach((elem, courseIndex) => {
     const cards = []
