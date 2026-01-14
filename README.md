@@ -815,16 +815,63 @@ npm run deploy:prod
 
 ## 環境変数設定
 
-### Gemini APIキー
+### Gemini APIキー（必須⭐⭐⭐）
 
-`.dev.vars` ファイルに設定：
+AI機能（AI先生、振り返りAI、自動問題生成）を使用するには、Gemini APIキーの設定が必要です。
 
+**詳細な設定手順**: [SETUP_GEMINI_API.md](./SETUP_GEMINI_API.md)
+
+#### 開発環境（ローカル）
+
+`.dev.vars` ファイルを作成してAPIキーを設定：
+
+```bash
+# .dev.varsファイルを作成
+cat > .dev.vars << 'EOF'
+GEMINI_API_KEY=取得したAPIキーをここに貼り付け
+EOF
 ```
-GEMINI_API_KEY=your-gemini-api-key-here
+
+**注意**: `.dev.vars`ファイルは`.gitignore`に含まれており、Gitにコミットされません。
+
+#### 本番環境（Cloudflare Pages）
+
+**方法1: Wrangler CLIを使用（推奨）**
+
+```bash
+# 環境変数を設定（対話的にAPIキーを入力）
+npx wrangler pages secret put GEMINI_API_KEY --project-name jiyushindo-gakushu
 ```
+
+**方法2: Cloudflare Dashboard（ブラウザ）**
+
+1. [Cloudflare Dashboard](https://dash.cloudflare.com) にログイン
+2. 「Workers & Pages」→「jiyushindo-gakushu」を選択
+3. 「Settings」→「Environment Variables」
+4. 「Production」環境で「Add variable」
+5. 変数名: `GEMINI_API_KEY`、値: APIキー
+6. 「Encrypt」をチェック、「Save」をクリック
+7. 再デプロイが必要: `npm run deploy:prod`
 
 **APIキーの取得:**
 https://makersuite.google.com/app/apikey
+
+#### 動作確認テスト
+
+Gemini APIが正しく設定されているか確認するには、テストスクリプトを使用します：
+
+```bash
+# 開発環境でテスト
+./test-gemini-api.sh dev
+
+# 本番環境でテスト
+./test-gemini-api.sh prod
+```
+
+テストスクリプトは以下を確認します：
+- AI先生APIの応答
+- 対話履歴取得API
+- 問題生成API（オプション）
 
 ## 今後の拡張可能な機能
 
