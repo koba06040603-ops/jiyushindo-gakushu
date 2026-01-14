@@ -12342,3 +12342,563 @@ window.exportABTestResults = exportABTestResults
 
 console.log('✅ Phase 15 & 16: 機械学習 + A/Bテスト機能 読み込み完了')
 
+// ==============================================
+// Phase 17-19: 深層学習・マルチモーダル・大規模展開
+// ==============================================
+
+// Phase 17: LSTM時系列予測クラス
+class LSTMPredictor {
+  constructor(studentId) {
+    this.studentId = studentId
+    this.model = null
+    this.sequenceLength = 10
+    this.isReady = false
+  }
+  
+  async initialize() {
+    if (typeof tf === 'undefined') {
+      console.warn('⚠️ TensorFlow.jsが読み込まれていません')
+      return false
+    }
+    
+    try {
+      // LSTMモデルの構築
+      this.model = tf.sequential({
+        layers: [
+          tf.layers.lstm({ 
+            units: 64, 
+            returnSequences: true,
+            inputShape: [this.sequenceLength, 5] // 5つの特徴量
+          }),
+          tf.layers.dropout({ rate: 0.2 }),
+          tf.layers.lstm({ units: 32 }),
+          tf.layers.dropout({ rate: 0.2 }),
+          tf.layers.dense({ units: 16, activation: 'relu' }),
+          tf.layers.dense({ units: 1, activation: 'linear' }) // 理解度予測
+        ]
+      })
+      
+      this.model.compile({
+        optimizer: tf.train.adam(0.001),
+        loss: 'meanSquaredError',
+        metrics: ['mae']
+      })
+      
+      this.isReady = true
+      console.log('✅ LSTMモデル初期化完了')
+      return true
+    } catch (error) {
+      console.error('❌ LSTMモデル初期化エラー:', error)
+      return false
+    }
+  }
+  
+  async predictNext(timeSeriesData) {
+    if (!this.isReady || !this.model) {
+      console.warn('モデルが初期化されていません')
+      return null
+    }
+    
+    try {
+      // 最新のsequenceLength件のデータを使用
+      const recentData = timeSeriesData.slice(-this.sequenceLength)
+      
+      if (recentData.length < this.sequenceLength) {
+        console.warn('データが不足しています')
+        return null
+      }
+      
+      // データの正規化と整形
+      const features = recentData.map(d => [
+        d.understanding_level / 5.0,
+        d.completion_time / 60.0,
+        d.engagement_score / 5.0,
+        d.hint_count / 10.0,
+        d.emotion_state === 'focused' ? 1 : (d.emotion_state === 'struggling' ? -1 : 0)
+      ])
+      
+      const xs = tf.tensor3d([features])
+      const prediction = this.model.predict(xs)
+      const value = await prediction.data()
+      
+      xs.dispose()
+      prediction.dispose()
+      
+      // 0-5の範囲にスケーリング
+      return Math.max(1, Math.min(5, value[0] * 5))
+    } catch (error) {
+      console.error('LSTM予測エラー:', error)
+      return null
+    }
+  }
+}
+
+// Phase 17: 強化学習エージェント
+class ReinforcementLearningAgent {
+  constructor(studentId) {
+    this.studentId = studentId
+    this.qTable = {}
+    this.epsilon = 0.1 // 探索率
+    this.alpha = 0.1 // 学習率
+    this.gamma = 0.9 // 割引率
+  }
+  
+  async initialize() {
+    // サーバーからQ-tableを読み込む（実装済みAPIを使用）
+    try {
+      const response = await axios.get(`/api/rl/agent/${this.studentId}`)
+      if (response.data.success && response.data.q_table) {
+        this.qTable = response.data.q_table
+        console.log('✅ RLエージェント初期化完了')
+      }
+    } catch (error) {
+      console.log('新規RLエージェント作成')
+      this.qTable = {}
+    }
+  }
+  
+  async selectAction(state) {
+    try {
+      const response = await axios.post('/api/rl/recommend-action', {
+        student_id: this.studentId,
+        current_state: state
+      })
+      
+      if (response.data.success) {
+        return {
+          action: response.data.recommended_action,
+          confidence: response.data.confidence || 0.5,
+          reason: response.data.reason
+        }
+      }
+    } catch (error) {
+      console.error('アクション選択エラー:', error)
+    }
+    
+    // デフォルト
+    return {
+      action: 'continue',
+      confidence: 0.5,
+      reason: 'デフォルトアクション'
+    }
+  }
+  
+  async updateWithReward(state, action, reward) {
+    try {
+      await axios.post('/api/rl/take-action', {
+        student_id: this.studentId,
+        state: state,
+        action: action,
+        reward: reward
+      })
+      console.log(`✅ RLエージェント更新: state=${JSON.stringify(state)}, action=${action}, reward=${reward}`)
+    } catch (error) {
+      console.error('RLエージェント更新エラー:', error)
+    }
+  }
+}
+
+// Phase 18: 音声入力ハンドラー
+class VoiceInputHandler {
+  constructor(studentId) {
+    this.studentId = studentId
+    this.recognition = null
+    this.isListening = false
+  }
+  
+  initialize() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      console.warn('⚠️ Web Speech APIがサポートされていません')
+      return false
+    }
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    this.recognition = new SpeechRecognition()
+    this.recognition.lang = 'ja-JP'
+    this.recognition.continuous = false
+    this.recognition.interimResults = false
+    
+    this.recognition.onresult = async (event) => {
+      const transcript = event.results[0][0].transcript
+      const confidence = event.results[0][0].confidence
+      
+      console.log('🎤 音声認識結果:', transcript, '信頼度:', confidence)
+      
+      // サーバーに保存
+      try {
+        await axios.post('/api/voice/save-transcription', {
+          student_id: this.studentId,
+          audio_url: '', // 実際のオーディオURLは別途アップロード
+          transcription: transcript,
+          confidence: confidence,
+          language: 'ja',
+          duration: 0,
+          emotion: 'neutral'
+        })
+        
+        // テキスト解析
+        await axios.post('/api/transformer/analyze-text', {
+          student_id: this.studentId,
+          text_input: transcript,
+          analysis_type: 'comprehension'
+        })
+      } catch (error) {
+        console.error('音声データ保存エラー:', error)
+      }
+      
+      this.onTranscript && this.onTranscript(transcript, confidence)
+    }
+    
+    this.recognition.onerror = (event) => {
+      console.error('音声認識エラー:', event.error)
+      this.isListening = false
+    }
+    
+    this.recognition.onend = () => {
+      this.isListening = false
+    }
+    
+    console.log('✅ 音声入力ハンドラー初期化完了')
+    return true
+  }
+  
+  startListening() {
+    if (this.recognition && !this.isListening) {
+      this.recognition.start()
+      this.isListening = true
+      console.log('🎤 音声入力開始')
+    }
+  }
+  
+  stopListening() {
+    if (this.recognition && this.isListening) {
+      this.recognition.stop()
+      console.log('🎤 音声入力停止')
+    }
+  }
+}
+
+// Phase 19: 大規模展開 - 自治体ダッシュボード
+async function showMunicipalityDashboard(municipalityId) {
+  try {
+    const response = await axios.get(`/api/cross-school/analytics/${municipalityId}`)
+    
+    if (!response.data.success) {
+      alert('自治体データの取得に失敗しました')
+      return
+    }
+    
+    const data = response.data
+    
+    const modalHtml = `
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+           onclick="this.remove()">
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+             onclick="event.stopPropagation()">
+          
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-gray-800">
+              🏫 自治体全体ダッシュボード
+            </h2>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+          
+          <!-- 全体サマリー -->
+          <div class="grid grid-cols-4 gap-4 mb-8">
+            <div class="bg-blue-50 p-4 rounded-lg">
+              <div class="text-sm text-gray-600">総生徒数</div>
+              <div class="text-3xl font-bold text-blue-600">
+                ${data.overview.total_students}人
+              </div>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+              <div class="text-sm text-gray-600">平均理解度</div>
+              <div class="text-3xl font-bold text-green-600">
+                ${data.overview.average_understanding.toFixed(2)}
+              </div>
+            </div>
+            <div class="bg-yellow-50 p-4 rounded-lg">
+              <div class="text-sm text-gray-600">平均完了時間</div>
+              <div class="text-3xl font-bold text-yellow-600">
+                ${data.overview.average_completion_time.toFixed(1)}分
+              </div>
+            </div>
+            <div class="bg-purple-50 p-4 rounded-lg">
+              <div class="text-sm text-gray-600">総カード完了数</div>
+              <div class="text-3xl font-bold text-purple-600">
+                ${data.overview.total_cards_completed}
+              </div>
+            </div>
+          </div>
+          
+          <!-- トップ校 -->
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3 text-green-700">
+              🏆 優秀校
+            </h3>
+            <div class="grid grid-cols-3 gap-4">
+              ${data.top_performing.slice(0, 3).map((school, index) => `
+                <div class="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+                  <div class="text-lg font-bold">${index + 1}位: ${school.school_name}</div>
+                  <div class="text-sm text-gray-600 mt-2">
+                    <div>理解度: ${(school.avg_understanding || 0).toFixed(2)}</div>
+                    <div>生徒数: ${school.total_students || 0}人</div>
+                    <div>完了カード: ${school.total_cards_completed || 0}枚</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <!-- 課題校 -->
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3 text-orange-700">
+              ⚠️ サポート推奨校
+            </h3>
+            <div class="grid grid-cols-3 gap-4">
+              ${data.struggling.slice(0, 3).map(school => `
+                <div class="bg-orange-50 p-4 rounded-lg border-2 border-orange-200">
+                  <div class="text-lg font-bold">${school.school_name}</div>
+                  <div class="text-sm text-gray-600 mt-2">
+                    <div>理解度: ${(school.avg_understanding || 0).toFixed(2)}</div>
+                    <div>生徒数: ${school.total_students || 0}人</div>
+                    <div>完了カード: ${school.total_cards_completed || 0}枚</div>
+                  </div>
+                  <div class="mt-2 text-sm text-orange-700">
+                    ➡️ 個別サポートが推奨されます
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <!-- 全学校一覧 -->
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3">📊 全学校データ</h3>
+            <div class="border rounded-lg overflow-hidden">
+              <table class="w-full">
+                <thead class="bg-gray-100">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-sm font-semibold">学校名</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold">生徒数</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold">理解度</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold">完了時間</th>
+                    <th class="px-4 py-3 text-center text-sm font-semibold">完了カード</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${data.schools.map((school, index) => `
+                    <tr class="border-t ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}">
+                      <td class="px-4 py-3">${school.school_name}</td>
+                      <td class="px-4 py-3 text-center">${school.total_students || 0}</td>
+                      <td class="px-4 py-3 text-center font-semibold ${(school.avg_understanding || 0) >= 4 ? 'text-green-600' : (school.avg_understanding || 0) < 3 ? 'text-red-600' : 'text-yellow-600'}">
+                        ${(school.avg_understanding || 0).toFixed(2)}
+                      </td>
+                      <td class="px-4 py-3 text-center">${(school.avg_completion_time || 0).toFixed(1)}分</td>
+                      <td class="px-4 py-3 text-center">${school.total_cards_completed || 0}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <!-- 推奨事項 -->
+          <div class="bg-blue-50 p-6 rounded-lg mb-6">
+            <h3 class="text-xl font-semibold mb-3 text-blue-800">💡 推奨事項</h3>
+            <ul class="space-y-2 text-gray-700">
+              <li>✅ ${data.recommendations.overall}</li>
+              <li>🏆 優秀校: ${data.recommendations.top_schools}</li>
+              <li>⚠️ 課題校: ${data.recommendations.struggling_schools}</li>
+            </ul>
+          </div>
+          
+          <div class="flex justify-end gap-3">
+            <button onclick="exportMunicipalityData(${municipalityId})"
+                    class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+              <i class="fas fa-download mr-2"></i>CSV出力
+            </button>
+            <button onclick="showResearchDatasetCreator(${municipalityId})"
+                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              <i class="fas fa-database mr-2"></i>研究データセット作成
+            </button>
+            <button onclick="this.closest('.fixed').remove()"
+                    class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml)
+    
+  } catch (error) {
+    console.error('自治体ダッシュボード表示エラー:', error)
+    alert('ダッシュボードの表示に失敗しました')
+  }
+}
+
+// Phase 19: 自治体データCSV出力
+async function exportMunicipalityData(municipalityId) {
+  try {
+    const response = await axios.get(`/api/cross-school/analytics/${municipalityId}`)
+    
+    if (!response.data.success) {
+      alert('データの取得に失敗しました')
+      return
+    }
+    
+    const data = response.data
+    
+    const csv = [
+      ['自治体全体分析レポート'],
+      [],
+      ['全体サマリー'],
+      ['総生徒数', data.overview.total_students],
+      ['平均理解度', data.overview.average_understanding.toFixed(2)],
+      ['平均完了時間（分）', data.overview.average_completion_time.toFixed(1)],
+      ['総カード完了数', data.overview.total_cards_completed],
+      [],
+      ['学校別データ'],
+      ['学校名', '生徒数', '平均理解度', '平均完了時間（分）', '完了カード数'],
+      ...data.schools.map(s => [
+        s.school_name,
+        s.total_students || 0,
+        (s.avg_understanding || 0).toFixed(2),
+        (s.avg_completion_time || 0).toFixed(1),
+        s.total_cards_completed || 0
+      ])
+    ].map(row => row.join(',')).join('\n')
+    
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `municipality_report_${municipalityId}_${Date.now()}.csv`
+    link.click()
+    
+    console.log('✅ 自治体データをCSV出力しました')
+  } catch (error) {
+    console.error('CSV出力エラー:', error)
+    alert('CSV出力に失敗しました')
+  }
+}
+
+// Phase 19: 研究データセット作成UI
+function showResearchDatasetCreator(municipalityId) {
+  const modalHtml = `
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+         onclick="this.remove()">
+      <div class="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full"
+           onclick="event.stopPropagation()">
+        
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">
+          📚 研究用データセット作成
+        </h2>
+        
+        <form id="datasetForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold mb-2">データセット名</label>
+            <input type="text" name="dataset_name" required
+                   class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                   placeholder="例: 2024年度個別最適化学習効果検証データ">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-semibold mb-2">説明</label>
+            <textarea name="description" rows="3" required
+                      class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500"
+                      placeholder="研究目的、対象期間、使用方法など"></textarea>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">開始日</label>
+              <input type="date" name="start_date" required
+                     class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-2">終了日</label>
+              <input type="date" name="end_date" required
+                     class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+            </div>
+          </div>
+          
+          <div>
+            <label class="block text-sm font-semibold mb-2">匿名化レベル</label>
+            <select name="anonymization_level" required
+                    class="w-full px-4 py-2 border rounded focus:ring-2 focus:ring-blue-500">
+              <option value="full">完全匿名化（推奨）</option>
+              <option value="partial">部分匿名化</option>
+              <option value="aggregated">集計済みデータのみ</option>
+            </select>
+          </div>
+          
+          <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+            <h3 class="font-semibold text-yellow-800 mb-2">⚠️ 倫理的配慮</h3>
+            <ul class="text-sm text-yellow-700 space-y-1">
+              <li>✓ 学校・保護者からのデータ共有同意を確認済み</li>
+              <li>✓ 個人を特定できる情報は含まれません</li>
+              <li>✓ 研究目的以外での使用は禁止されます</li>
+              <li>✓ 論文発表時には引用情報を記載してください</li>
+            </ul>
+          </div>
+          
+          <div class="flex justify-end gap-3 mt-6">
+            <button type="button" onclick="this.closest('.fixed').remove()"
+                    class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
+              キャンセル
+            </button>
+            <button type="submit"
+                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              <i class="fas fa-check mr-2"></i>データセット作成
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+  
+  // フォーム送信処理
+  document.getElementById('datasetForm').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    
+    const formData = new FormData(e.target)
+    
+    try {
+      const response = await axios.post('/api/research/create-dataset', {
+        dataset_name: formData.get('dataset_name'),
+        researcher_id: parseInt(localStorage.getItem('currentUserId')),
+        description: formData.get('description'),
+        data_collection_start: formData.get('start_date'),
+        data_collection_end: formData.get('end_date'),
+        school_codes: [], // 自治体の全学校を含む
+        anonymization_level: formData.get('anonymization_level')
+      })
+      
+      if (response.data.success) {
+        alert('✅ 研究用データセットを作成しました！\n\nデータセットID: ' + response.data.dataset_id + '\n\n研究データエクスポートAPIを使用してデータを取得できます。')
+        document.querySelector('.fixed').remove()
+      }
+    } catch (error) {
+      console.error('データセット作成エラー:', error)
+      alert('データセットの作成に失敗しました')
+    }
+  })
+}
+
+// グローバルスコープに登録
+window.LSTMPredictor = LSTMPredictor
+window.ReinforcementLearningAgent = ReinforcementLearningAgent
+window.VoiceInputHandler = VoiceInputHandler
+window.showMunicipalityDashboard = showMunicipalityDashboard
+window.exportMunicipalityData = exportMunicipalityData
+window.showResearchDatasetCreator = showResearchDatasetCreator
+
+console.log('✅ Phase 17-19: 深層学習・マルチモーダル・大規模展開 機能読み込み完了')
+

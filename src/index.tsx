@@ -6830,6 +6830,492 @@ app.get('/api/research/summary/:classCode', async (c) => {
 // Phase 15: 機械学習 + リアルタイム学習API
 // ==============================================
 
+// Phase 17: LSTM/GRU時系列予測 - データ収集
+app.post('/api/lstm/collect-data/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const { understanding_level, completion_time, engagement_score, hint_count, emotion_state, session_context } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO time_series_data 
+      (student_id, understanding_level, completion_time, engagement_score, hint_count, emotion_state, session_context, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      studentId,
+      understanding_level,
+      completion_time,
+      engagement_score,
+      hint_count || 0,
+      emotion_state || 'neutral',
+      JSON.stringify(session_context || {})
+    ).run()
+    
+    return c.json({ success: true, message: '時系列データを記録しました' })
+  } catch (error: any) {
+    console.error('時系列データ記録エラー:', error)
+    return c.json({ success: false, error: 'データ記録に失敗しました' }, 500)
+  }
+})
+
+// Phase 17: LSTM予測 - 時系列データ取得
+app.get('/api/lstm/time-series/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const limit = parseInt(c.req.query('limit') || '50')
+  
+  try {
+    const data = await env.DB.prepare(`
+      SELECT 
+        understanding_level,
+        completion_time,
+        engagement_score,
+        hint_count,
+        emotion_state,
+        timestamp
+      FROM time_series_data
+      WHERE student_id = ?
+      ORDER BY timestamp DESC
+      LIMIT ?
+    `).bind(studentId, limit).all()
+    
+    return c.json({
+      success: true,
+      data: data.results || [],
+      sequence_length: (data.results || []).length
+    })
+  } catch (error: any) {
+    console.error('時系列データ取得エラー:', error)
+    return c.json({ success: false, error: 'データ取得に失敗しました' }, 500)
+  }
+})
+
+// Phase 17: Transformer - テキスト解析
+app.post('/api/transformer/analyze-text', async (c) => {
+  const { env } = c
+  const { student_id, text_input, analysis_type } = await c.req.json()
+  
+  try {
+    // 簡易的な感情分析（実際のTransformerはクライアント側で実行）
+    let analysis_result: any = {}
+    let confidence_score = 0.8
+    
+    if (analysis_type === 'sentiment') {
+      // ポジティブ・ネガティブ判定
+      const positiveWords = ['楽しい', 'わかった', '理解できた', '好き', '面白い']
+      const negativeWords = ['難しい', 'わからない', '苦手', 'つまらない', '嫌い']
+      
+      const positive = positiveWords.some(word => text_input.includes(word))
+      const negative = negativeWords.some(word => text_input.includes(word))
+      
+      analysis_result = {
+        sentiment: positive ? 'positive' : (negative ? 'negative' : 'neutral'),
+        confidence: confidence_score,
+        keywords: text_input.split(' ').slice(0, 5)
+      }
+    } else if (analysis_type === 'comprehension') {
+      // 理解度判定
+      const understandingIndicators = ['わかった', '理解', 'できた', 'なるほど']
+      const struggles = ['わからない', '難しい', '???', '？？？']
+      
+      const understands = understandingIndicators.some(word => text_input.includes(word))
+      const struggling = struggles.some(word => text_input.includes(word))
+      
+      analysis_result = {
+        comprehension_level: understands ? 'high' : (struggling ? 'low' : 'medium'),
+        needs_help: struggling,
+        confidence: confidence_score
+      }
+    }
+    
+    await env.DB.prepare(`
+      INSERT INTO text_analysis_results 
+      (student_id, text_input, analysis_type, analysis_result, confidence_score, created_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      student_id,
+      text_input,
+      analysis_type,
+      JSON.stringify(analysis_result),
+      confidence_score
+    ).run()
+    
+    return c.json({
+      success: true,
+      analysis: analysis_result,
+      confidence: confidence_score
+    })
+  } catch (error: any) {
+    console.error('テキスト解析エラー:', error)
+    return c.json({ success: false, error: '解析に失敗しました' }, 500)
+  }
+})
+
+// Phase 17: 強化学習 - アクション実行と報酬記録
+app.post('/api/rl/take-action', async (c) => {
+  const { env } = c
+  const { student_id, state, action, reward } = await c.req.json()
+  
+  try {
+    // エージェントを取得または作成
+    let agent = await env.DB.prepare(`
+      SELECT * FROM rl_agents
+      WHERE student_id = ? AND agent_type = 'q_learning'
+      ORDER BY updated_at DESC LIMIT 1
+    `).bind(student_id).first()
+    
+    if (!agent) {
+      // 新規エージェント作成
+      const result = await env.DB.prepare(`
+        INSERT INTO rl_agents 
+        (student_id, agent_type, state_space_dim, action_space_dim, q_table, total_episodes, average_reward)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        student_id,
+        'q_learning',
+        10, // state dimension
+        5,  // action dimension
+        JSON.stringify({}), // empty Q-table
+        0,
+        0
+      ).run()
+      
+      agent = await env.DB.prepare(`
+        SELECT * FROM rl_agents WHERE id = ?
+      `).bind(result.meta.last_row_id).first()
+    }
+    
+    // Q値の更新（簡易版）
+    const q_table = JSON.parse(agent.q_table as string || '{}')
+    const state_key = JSON.stringify(state)
+    
+    if (!q_table[state_key]) {
+      q_table[state_key] = {}
+    }
+    
+    // Q-learning更新式: Q(s,a) = Q(s,a) + α * (r + γ * max(Q(s',a')) - Q(s,a))
+    const alpha = 0.1 // 学習率
+    const gamma = 0.9 // 割引率
+    const current_q = q_table[state_key][action] || 0
+    const new_q = current_q + alpha * (reward - current_q) // 簡易版
+    
+    q_table[state_key][action] = new_q
+    
+    // エージェントを更新
+    const new_total_episodes = (agent.total_episodes as number) + 1
+    const new_avg_reward = ((agent.average_reward as number) * (agent.total_episodes as number) + reward) / new_total_episodes
+    
+    await env.DB.prepare(`
+      UPDATE rl_agents
+      SET q_table = ?,
+          total_episodes = ?,
+          average_reward = ?,
+          updated_at = datetime('now')
+      WHERE id = ?
+    `).bind(
+      JSON.stringify(q_table),
+      new_total_episodes,
+      new_avg_reward,
+      agent.id
+    ).run()
+    
+    return c.json({
+      success: true,
+      new_q_value: new_q,
+      average_reward: new_avg_reward,
+      total_episodes: new_total_episodes
+    })
+  } catch (error: any) {
+    console.error('強化学習エラー:', error)
+    return c.json({ success: false, error: 'アクション実行に失敗しました' }, 500)
+  }
+})
+
+// Phase 17: 強化学習 - 最適アクション推薦
+app.post('/api/rl/recommend-action', async (c) => {
+  const { env } = c
+  const { student_id, current_state } = await c.req.json()
+  
+  try {
+    const agent = await env.DB.prepare(`
+      SELECT * FROM rl_agents
+      WHERE student_id = ? AND agent_type = 'q_learning'
+      ORDER BY updated_at DESC LIMIT 1
+    `).bind(student_id).first()
+    
+    if (!agent) {
+      return c.json({
+        success: true,
+        recommended_action: 'explore', // デフォルトは探索
+        confidence: 0,
+        reason: '学習データが不足しています'
+      })
+    }
+    
+    const q_table = JSON.parse(agent.q_table as string || '{}')
+    const state_key = JSON.stringify(current_state)
+    const state_actions = q_table[state_key] || {}
+    
+    // ε-greedy戦略
+    const epsilon = 0.1 // 探索率
+    
+    if (Math.random() < epsilon || Object.keys(state_actions).length === 0) {
+      // 探索
+      return c.json({
+        success: true,
+        recommended_action: 'explore',
+        confidence: 0.5,
+        reason: '新しいアクションを探索します'
+      })
+    } else {
+      // 最適アクション選択
+      let best_action = null
+      let best_q = -Infinity
+      
+      for (const [action, q_value] of Object.entries(state_actions)) {
+        if ((q_value as number) > best_q) {
+          best_q = q_value as number
+          best_action = action
+        }
+      }
+      
+      return c.json({
+        success: true,
+        recommended_action: best_action,
+        q_value: best_q,
+        confidence: Math.min(0.9, best_q / 10), // スケーリング
+        reason: '学習履歴に基づく最適アクションです'
+      })
+    }
+  } catch (error: any) {
+    console.error('アクション推薦エラー:', error)
+    return c.json({ success: false, error: '推薦に失敗しました' }, 500)
+  }
+})
+
+// Phase 18: 音声入力 - 文字起こし保存
+app.post('/api/voice/save-transcription', async (c) => {
+  const { env } = c
+  const { student_id, audio_url, transcription, confidence, language, duration, emotion } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO voice_inputs 
+      (student_id, audio_url, transcription, transcription_confidence, language, duration_seconds, emotion_detected, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      student_id,
+      audio_url,
+      transcription,
+      confidence || 0.9,
+      language || 'ja',
+      duration || 0,
+      emotion || 'neutral'
+    ).run()
+    
+    return c.json({ success: true, message: '音声入力を保存しました' })
+  } catch (error: any) {
+    console.error('音声入力保存エラー:', error)
+    return c.json({ success: false, error: '保存に失敗しました' }, 500)
+  }
+})
+
+// Phase 18: 手書き認識 - 認識結果保存
+app.post('/api/handwriting/save-recognition', async (c) => {
+  const { env } = c
+  const { student_id, curriculum_id, image_url, recognized_text, confidence, stroke_data, is_correct, feedback } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO handwriting_inputs 
+      (student_id, curriculum_id, image_url, recognized_text, recognition_confidence, stroke_data, is_correct, feedback, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      student_id,
+      curriculum_id || null,
+      image_url,
+      recognized_text,
+      confidence || 0.9,
+      JSON.stringify(stroke_data || []),
+      is_correct ? 1 : 0,
+      feedback || ''
+    ).run()
+    
+    return c.json({ success: true, message: '手書き認識結果を保存しました' })
+  } catch (error: any) {
+    console.error('手書き認識保存エラー:', error)
+    return c.json({ success: false, error: '保存に失敗しました' }, 500)
+  }
+})
+
+// Phase 19: 学校管理 - 学校一覧取得
+app.get('/api/schools', async (c) => {
+  const { env } = c
+  const municipality_id = c.req.query('municipality_id')
+  
+  try {
+    let query = `
+      SELECT s.*, m.municipality_name
+      FROM schools s
+      LEFT JOIN municipalities m ON s.municipality_id = m.id
+      WHERE s.is_active = 1
+    `
+    
+    const params: any[] = []
+    if (municipality_id) {
+      query += ` AND s.municipality_id = ?`
+      params.push(parseInt(municipality_id))
+    }
+    
+    query += ` ORDER BY s.school_name`
+    
+    const result = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      schools: result.results || []
+    })
+  } catch (error: any) {
+    console.error('学校一覧取得エラー:', error)
+    return c.json({ success: false, error: '取得に失敗しました' }, 500)
+  }
+})
+
+// Phase 19: クロススクール分析 - 自治体全体の統計
+app.get('/api/cross-school/analytics/:municipalityId', async (c) => {
+  const { env } = c
+  const municipalityId = parseInt(c.req.param('municipalityId'))
+  
+  try {
+    // 各学校の統計を集計
+    const schools = await env.DB.prepare(`
+      SELECT id, school_code, school_name
+      FROM schools
+      WHERE municipality_id = ? AND is_active = 1
+    `).bind(municipalityId).all()
+    
+    const schoolStats: any[] = []
+    
+    for (const school of (schools.results || [])) {
+      // 学校ごとの統計
+      const stats = await env.DB.prepare(`
+        SELECT 
+          COUNT(DISTINCT u.id) as total_students,
+          AVG(sp.understanding_level) as avg_understanding,
+          AVG(sp.completion_time_minutes) as avg_completion_time,
+          COUNT(sp.id) as total_cards_completed
+        FROM users u
+        LEFT JOIN student_progress sp ON u.id = sp.student_id AND sp.status = 'completed'
+        WHERE u.class_code LIKE ? AND u.role = 'student'
+      `).bind(`${school.school_code}%`).first()
+      
+      schoolStats.push({
+        school_code: school.school_code,
+        school_name: school.school_name,
+        ...stats
+      })
+    }
+    
+    // 自治体全体の統計
+    const overallStats = schoolStats.reduce((acc, school) => {
+      acc.total_students += school.total_students || 0
+      acc.total_understanding += (school.avg_understanding || 0) * (school.total_students || 0)
+      acc.total_completion_time += (school.avg_completion_time || 0) * (school.total_students || 0)
+      acc.total_cards += school.total_cards_completed || 0
+      return acc
+    }, { total_students: 0, total_understanding: 0, total_completion_time: 0, total_cards: 0 })
+    
+    const avgUnderstanding = overallStats.total_students > 0 
+      ? overallStats.total_understanding / overallStats.total_students 
+      : 0
+    const avgCompletionTime = overallStats.total_students > 0 
+      ? overallStats.total_completion_time / overallStats.total_students 
+      : 0
+    
+    // トップ校・課題校の判定
+    const sortedByUnderstanding = [...schoolStats].sort((a, b) => (b.avg_understanding || 0) - (a.avg_understanding || 0))
+    const topSchools = sortedByUnderstanding.slice(0, 3)
+    const strugglingSchools = sortedByUnderstanding.slice(-3).reverse()
+    
+    // 分析結果を保存
+    await env.DB.prepare(`
+      INSERT INTO cross_school_analytics 
+      (analysis_date, municipality_id, school_ids, total_students, average_understanding, average_completion_time, average_engagement, top_performing_schools, struggling_schools, recommendations, created_at)
+      VALUES (date('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      municipalityId,
+      JSON.stringify((schools.results || []).map((s: any) => s.id)),
+      overallStats.total_students,
+      avgUnderstanding,
+      avgCompletionTime,
+      0, // engagement計算は省略
+      JSON.stringify(topSchools),
+      JSON.stringify(strugglingSchools),
+      JSON.stringify({
+        overall: '自治体全体で個別最適化学習が機能しています',
+        top_schools: 'ベストプラクティスを他校と共有してください',
+        struggling_schools: '個別サポートと教師研修が推奨されます'
+      })
+    ).run()
+    
+    return c.json({
+      success: true,
+      municipality_id: municipalityId,
+      overview: {
+        total_students: overallStats.total_students,
+        average_understanding: avgUnderstanding,
+        average_completion_time: avgCompletionTime,
+        total_cards_completed: overallStats.total_cards
+      },
+      schools: schoolStats,
+      top_performing: topSchools,
+      struggling: strugglingSchools,
+      recommendations: {
+        overall: '自治体全体で個別最適化学習が機能しています',
+        top_schools: 'ベストプラクティスを他校と共有してください',
+        struggling_schools: '個別サポートと教師研修が推奨されます'
+      }
+    })
+  } catch (error: any) {
+    console.error('クロススクール分析エラー:', error)
+    return c.json({ success: false, error: '分析に失敗しました' }, 500)
+  }
+})
+
+// Phase 19: 研究データセット作成
+app.post('/api/research/create-dataset', async (c) => {
+  const { env } = c
+  const { dataset_name, researcher_id, description, data_collection_start, data_collection_end, school_codes, anonymization_level } = await c.req.json()
+  
+  try {
+    // データセット作成
+    const result = await env.DB.prepare(`
+      INSERT INTO research_datasets 
+      (dataset_name, researcher_id, description, data_collection_start, data_collection_end, schools_included, anonymization_level, export_format, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      dataset_name,
+      researcher_id,
+      description,
+      data_collection_start,
+      data_collection_end,
+      JSON.stringify(school_codes),
+      anonymization_level || 'full',
+      'csv'
+    ).run()
+    
+    return c.json({
+      success: true,
+      dataset_id: result.meta.last_row_id,
+      message: '研究用データセットを作成しました',
+      next_step: 'データエクスポートAPIを使用してデータを取得してください'
+    })
+  } catch (error: any) {
+    console.error('データセット作成エラー:', error)
+    return c.json({ success: false, error: '作成に失敗しました' }, 500)
+  }
+})
+
 // A/Bテスト実験への参加登録
 app.post('/api/ab-test/assign', async (c) => {
   const { env } = c
