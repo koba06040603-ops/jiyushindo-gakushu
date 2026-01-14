@@ -2581,11 +2581,11 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     // 品質モードに応じてモデルを選択
-    // 複数モデルでフォールバック
+    // 複数モデルでフォールバック（安定版を優先）
     const models = [
-      { name: 'gemini-2.0-flash-exp', maxTokens: 8192 },
-      { name: 'gemini-1.5-flash', maxTokens: 8192 },
-      { name: 'gemini-1.5-pro', maxTokens: 8192 }
+      { name: 'gemini-1.5-flash', maxTokens: 8192 },      // 最も安定
+      { name: 'gemini-1.5-pro', maxTokens: 8192 },        // 高品質
+      { name: 'gemini-2.0-flash-exp', maxTokens: 8192 }   // 実験版
     ]
     
     let response
@@ -2957,7 +2957,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
     let response
     let lastError
     
@@ -3099,7 +3099,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
     let response
     let lastError
     
@@ -3241,7 +3241,7 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
     let response
     let lastError
     
