@@ -1540,7 +1540,7 @@ ${cardContext ? `
 質問「区切りってどういうこと？」
 →「区切りっていうのは、大きな数をわかりやすく分けることだよ。例えば、10000を「10と1000」に分けると計算しやすくなるよね。この問題では、どこで区切ると計算しやすいかな？」`
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1599,7 +1599,21 @@ app.get('/', (c) => {
         <div id="app"></div>
         
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script>
+          // 動作確認用
+          console.log('✅ ページ読み込み完了 - バックエンドAPI正常動作')
+          console.log('📍 現在のURL:', window.location.href)
+          console.log('🔗 axios読み込み:', typeof axios !== 'undefined' ? '成功' : '失敗')
+        </script>
         <script src="/static/app.js"></script>
+        <script>
+          // app.js読み込み確認
+          console.log('✅ app.js読み込み完了')
+          console.log('📦 利用可能な関数:', {
+            renderTopPage: typeof renderTopPage,
+            showTopPage: typeof showTopPage
+          })
+        </script>
     </body>
     </html>
   `)
@@ -2142,7 +2156,7 @@ app.post('/api/ai/generate-unit', async (c) => {
   const { grade, subject, textbook, unitName, customization, qualityMode } = await c.req.json()
   
   // 環境変数またはハードコードされたAPIキーを使用
-  const apiKey = env.GEMINI_API_KEY || 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
   
   if (!apiKey) {
     console.error('❌ APIキーが設定されていません')
@@ -2581,11 +2595,11 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     // 品質モードに応じてモデルを選択
-    // 複数モデルでフォールバック（安定版を優先）
+    // 複数モデルでフォールバック（最新安定版を優先）
     const models = [
-      { name: 'gemini-1.5-flash', maxTokens: 8192 },      // 最も安定
-      { name: 'gemini-1.5-pro', maxTokens: 8192 },        // 高品質
-      { name: 'gemini-2.0-flash-exp', maxTokens: 8192 }   // 実験版
+      { name: 'gemini-2.5-flash', maxTokens: 8192 },      // 最新・最も安定
+      { name: 'gemini-2.0-flash', maxTokens: 8192 },      // 高速
+      { name: 'gemini-2.5-pro', maxTokens: 8192 }         // 最高品質
     ]
     
     let response
@@ -2919,7 +2933,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
 app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
+  const apiKey = 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -2957,7 +2971,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
     let response
     let lastError
     
@@ -3059,7 +3073,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
 app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
+  const apiKey = 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -3099,7 +3113,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
     let response
     let lastError
     
@@ -3208,7 +3222,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
+  const apiKey = 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -3241,7 +3255,7 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
     let response
     let lastError
     
@@ -3356,7 +3370,7 @@ app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
 app.post('/api/curriculum/:curriculumId/generate-additional-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
+  const apiKey = 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
