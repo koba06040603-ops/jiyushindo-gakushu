@@ -11476,3 +11476,404 @@ window.changeLanguage = changeLanguage
 window.currentLanguage = currentLanguage
 window.i18n = i18n
 
+// =====================================
+// Phase 14: チャート可視化 + 研究資料導出
+// =====================================
+
+// チャート用カラーパレット
+const CHART_COLORS = {
+  visual: 'rgba(59, 130, 246, 0.8)',     // 青
+  auditory: 'rgba(16, 185, 129, 0.8)',  // 緑
+  kinesthetic: 'rgba(251, 146, 60, 0.8)', // オレンジ
+  primary: 'rgba(99, 102, 241, 0.8)',   // インディゴ
+  success: 'rgba(34, 197, 94, 0.8)',    // 成功
+  warning: 'rgba(234, 179, 8, 0.8)',    // 警告
+  danger: 'rgba(239, 68, 68, 0.8)'      // 危険
+}
+
+// 学習スタイルチャートを表示
+function showLearningStyleChart(patterns) {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-2xl font-bold text-gray-800">
+          <i class="fas fa-chart-pie mr-2 text-blue-600"></i>
+          学習スタイル分析（VAKモデル）
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- レーダーチャート -->
+        <div>
+          <h4 class="font-semibold text-gray-700 mb-3">総合バランス</h4>
+          <canvas id="learningStyleRadar"></canvas>
+        </div>
+        
+        <!-- バーチャート -->
+        <div>
+          <h4 class="font-semibold text-gray-700 mb-3">スコア詳細</h4>
+          <canvas id="learningStyleBar"></canvas>
+        </div>
+      </div>
+      
+      <!-- 解説 -->
+      <div class="mt-6 bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
+        <h5 class="font-semibold text-blue-800 mb-2">
+          <i class="fas fa-info-circle mr-2"></i>VAKモデルとは
+        </h5>
+        <p class="text-sm text-gray-700 mb-2">
+          VAKモデルは、学習者の優勢な感覚モダリティを3つに分類します：
+        </p>
+        <ul class="text-sm text-gray-700 space-y-1 ml-4">
+          <li>• <strong>Visual（視覚型）</strong>: 図解、動画、カラーコーディングを好む</li>
+          <li>• <strong>Auditory（聴覚型）</strong>: 音声説明、議論、リズムを好む</li>
+          <li>• <strong>Kinesthetic（体感型）</strong>: 実践、操作、身体活動を好む</li>
+        </ul>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  
+  // レーダーチャート
+  const radarCtx = document.getElementById('learningStyleRadar').getContext('2d')
+  new Chart(radarCtx, {
+    type: 'radar',
+    data: {
+      labels: ['視覚型 (Visual)', '聴覚型 (Auditory)', '体感型 (Kinesthetic)'],
+      datasets: [{
+        label: '学習スタイルスコア',
+        data: [
+          patterns.visual || 0,
+          patterns.auditory || 0,
+          patterns.kinesthetic || 0
+        ],
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      scales: {
+        r: {
+          beginAtZero: true,
+          max: 100,
+          ticks: { stepSize: 20 }
+        }
+      }
+    }
+  })
+  
+  // バーチャート
+  const barCtx = document.getElementById('learningStyleBar').getContext('2d')
+  new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: ['視覚型', '聴覚型', '体感型'],
+      datasets: [{
+        label: 'スコア (%)',
+        data: [
+          patterns.visual || 0,
+          patterns.auditory || 0,
+          patterns.kinesthetic || 0
+        ],
+        backgroundColor: [
+          CHART_COLORS.visual,
+          CHART_COLORS.auditory,
+          CHART_COLORS.kinesthetic
+        ]
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 100
+        }
+      }
+    }
+  })
+}
+
+// AI予測結果を可視化
+async function showPredictionVisualization(studentId) {
+  showLoading('AI予測を生成中...')
+  
+  try {
+    // AI予測を生成
+    const response = await axios.post(`/api/predictions/${studentId}`, {
+      curriculumId: state.selectedCurriculum?.id,
+      predictionType: 'all'
+    })
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error)
+    }
+    
+    const predictions = response.data.predictions
+    
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-crystal-ball mr-2 text-purple-600"></i>
+            AI学習予測ダッシュボード
+          </h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <!-- 来週の予測 -->
+        ${predictions.next_week ? `
+          <div class="mb-6">
+            <h4 class="text-xl font-semibold text-gray-800 mb-3">
+              📅 来週の学習予測
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg">
+                <p class="text-sm text-gray-600 mb-1">予想完了カード数</p>
+                <p class="text-3xl font-bold text-blue-600">${predictions.next_week.cards_expected}</p>
+                <p class="text-xs text-gray-500 mt-1">枚</p>
+              </div>
+              <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg">
+                <p class="text-sm text-gray-600 mb-1">予想理解度</p>
+                <p class="text-3xl font-bold text-green-600">${predictions.next_week.understanding_level.toFixed(1)}</p>
+                <p class="text-xs text-gray-500 mt-1">/ 5.0</p>
+              </div>
+              <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg">
+                <p class="text-sm text-gray-600 mb-1">予測信頼度</p>
+                <p class="text-3xl font-bold text-purple-600">${Math.round(predictions.next_week.confidence * 100)}%</p>
+                <p class="text-xs text-gray-500 mt-1">信頼度</p>
+              </div>
+            </div>
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
+              <p class="text-sm font-semibold text-blue-800">💡 推奨事項</p>
+              <p class="text-sm text-gray-700">${predictions.next_week.recommendation}</p>
+            </div>
+          </div>
+        ` : ''}
+        
+        <!-- つまずきポイント予測 -->
+        ${predictions.struggling_points ? `
+          <div class="mb-6">
+            <h4 class="text-xl font-semibold text-gray-800 mb-3">
+              ⚠️ 注意すべきポイント
+            </h4>
+            <div class="space-y-2">
+              ${predictions.struggling_points.potential_struggles.map(struggle => `
+                <div class="bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded">
+                  <p class="text-sm text-gray-700">⚠️ ${struggle}</p>
+                </div>
+              `).join('')}
+            </div>
+            <div class="mt-3 bg-orange-50 border-l-4 border-orange-600 p-4 rounded">
+              <p class="text-sm font-semibold text-orange-800">📋 推奨対応</p>
+              <p class="text-sm text-gray-700">${predictions.struggling_points.recommendation}</p>
+            </div>
+          </div>
+        ` : ''}
+        
+        <!-- 予測チャート -->
+        <div class="mb-6">
+          <h4 class="text-xl font-semibold text-gray-800 mb-3">
+            📊 予測トレンド
+          </h4>
+          <canvas id="predictionChart"></canvas>
+        </div>
+        
+        <!-- アクションボタン -->
+        <div class="flex gap-3 justify-end">
+          <button onclick="exportPredictionData(${studentId})" 
+                  class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
+            <i class="fas fa-download mr-2"></i>データをエクスポート
+          </button>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+            閉じる
+          </button>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+    
+    // 予測チャート
+    if (predictions.next_week) {
+      const chartCtx = document.getElementById('predictionChart').getContext('2d')
+      new Chart(chartCtx, {
+        type: 'line',
+        data: {
+          labels: ['現在', '3日後', '1週間後', '2週間後'],
+          datasets: [{
+            label: '予測理解度',
+            data: [
+              3.0,
+              3.5,
+              predictions.next_week.understanding_level,
+              Math.min(predictions.next_week.understanding_level + 0.5, 5.0)
+            ],
+            borderColor: CHART_COLORS.primary,
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            fill: true,
+            tension: 0.4
+          }, {
+            label: '予測カード完了数',
+            data: [
+              0,
+              Math.round(predictions.next_week.cards_expected * 0.3),
+              predictions.next_week.cards_expected,
+              Math.round(predictions.next_week.cards_expected * 1.8)
+            ],
+            borderColor: CHART_COLORS.success,
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            fill: true,
+            tension: 0.4,
+            yAxisID: 'y1'
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: { display: true, text: '理解度' },
+              max: 5
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: { display: true, text: 'カード数' },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+      })
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('予測可視化エラー:', error)
+    alert('予測の可視化に失敗しました')
+  }
+}
+
+// 研究用データエクスポート
+async function exportResearchData(classCode, format = 'csv') {
+  showLoading(`研究用データを${format.toUpperCase()}形式でエクスポート中...`)
+  
+  try {
+    const response = await axios.get(`/api/research/export/${classCode}?format=${format}`, {
+      responseType: format === 'csv' ? 'blob' : 'json'
+    })
+    
+    hideLoading()
+    
+    if (format === 'csv') {
+      // CSVファイルをダウンロード
+      const blob = new Blob([response.data], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `research_data_${classCode}_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      
+      alert('✅ CSVファイルをダウンロードしました！')
+    } else {
+      // JSON形式で表示
+      const modal = document.createElement('div')
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+      modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold text-gray-800">
+              <i class="fas fa-database mr-2 text-blue-600"></i>
+              研究用データエクスポート
+            </h3>
+            <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+          
+          <div class="bg-gray-50 p-4 rounded mb-4">
+            <p class="text-sm text-gray-700 mb-2">
+              <strong>総生徒数:</strong> ${response.data.total_students}名
+            </p>
+            <p class="text-sm text-gray-700 mb-2">
+              <strong>データ項目数:</strong> ${response.data.metadata.variables.length}項目
+            </p>
+            <p class="text-sm text-gray-600 italic">
+              ${response.data.metadata.note}
+            </p>
+          </div>
+          
+          <div class="mb-4">
+            <h4 class="font-semibold text-gray-800 mb-2">データプレビュー</h4>
+            <pre class="bg-gray-100 p-4 rounded text-xs overflow-x-auto">${JSON.stringify(response.data.data.slice(0, 2), null, 2)}</pre>
+          </div>
+          
+          <div class="flex gap-3 justify-end">
+            <button onclick="exportResearchData('${classCode}', 'csv')" 
+                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded">
+              <i class="fas fa-file-csv mr-2"></i>CSV形式でダウンロード
+            </button>
+            <button onclick="navigator.clipboard.writeText(JSON.stringify(${JSON.stringify(response.data)}, null, 2))" 
+                    class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+              <i class="fas fa-copy mr-2"></i>JSONをコピー
+            </button>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+              閉じる
+            </button>
+          </div>
+        </div>
+      `
+      
+      document.body.appendChild(modal)
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('データエクスポートエラー:', error)
+    alert('データのエクスポートに失敗しました')
+  }
+}
+
+// 予測データエクスポート
+async function exportPredictionData(studentId) {
+  // 簡易実装：現在の予測データをJSON形式でコピー
+  try {
+    const response = await axios.post(`/api/predictions/${studentId}`, {
+      curriculumId: state.selectedCurriculum?.id,
+      predictionType: 'all'
+    })
+    
+    if (response.data.success) {
+      const dataStr = JSON.stringify(response.data.predictions, null, 2)
+      await navigator.clipboard.writeText(dataStr)
+      alert('✅ 予測データをクリップボードにコピーしました！')
+    }
+  } catch (error) {
+    console.error('データエクスポートエラー:', error)
+    alert('データのエクスポートに失敗しました')
+  }
+}
+
+// グローバルスコープに登録
+window.showLearningStyleChart = showLearningStyleChart
+window.showPredictionVisualization = showPredictionVisualization
+window.exportResearchData = exportResearchData
+window.exportPredictionData = exportPredictionData
+

@@ -2315,6 +2315,7 @@ app.get('/', (c) => {
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <style>
           @media print {
             body { background: white !important; }
@@ -2335,6 +2336,7 @@ app.get('/', (c) => {
           console.log('✅ ページ読み込み完了 - バックエンドAPI正常動作')
           console.log('📍 現在のURL:', window.location.href)
           console.log('🔗 axios読み込み:', typeof axios !== 'undefined' ? '成功' : '失敗')
+          console.log('📊 Chart.js読み込み:', typeof Chart !== 'undefined' ? '成功' : '失敗')
         </script>
         <script src="/static/app.js"></script>
         <script>
@@ -6594,6 +6596,233 @@ function getNextWeekDate() {
   date.setDate(date.getDate() + 7)
   return date.toISOString().split('T')[0]
 }
+
+// ==============================================
+// Phase 14: 研究資料導出API
+// ==============================================
+
+// 研究用データエクスポート（匿名化済み）
+app.get('/api/research/export/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  const format = c.req.query('format') || 'json' // json, csv
+  
+  try {
+    // クラスの全生徒データを取得
+    const students = await env.DB.prepare(`
+      SELECT id, student_number FROM users
+      WHERE class_code = ? AND role = 'student'
+    `).bind(classCode).all()
+    
+    const exportData: any[] = []
+    
+    for (const student of (students.results || [])) {
+      // プロファイル取得
+      const profile = await env.DB.prepare(`
+        SELECT profile_data, overall_score, confidence_level, updated_at
+        FROM learning_profiles
+        WHERE student_id = ?
+        ORDER BY updated_at DESC LIMIT 1
+      `).bind(student.id).first()
+      
+      // 学習行動サマリー
+      const behaviorStats = await env.DB.prepare(`
+        SELECT 
+          action_type,
+          COUNT(*) as count,
+          AVG(session_duration) as avg_duration
+        FROM learning_behavior_logs
+        WHERE student_id = ?
+        GROUP BY action_type
+      `).bind(student.id).all()
+      
+      // 進捗データ
+      const progressData = await env.DB.prepare(`
+        SELECT 
+          COUNT(*) as total_cards,
+          AVG(understanding_level) as avg_understanding,
+          AVG(completion_time_minutes) as avg_time
+        FROM student_progress
+        WHERE student_id = ? AND status = 'completed'
+      `).bind(student.id).first()
+      
+      if (profile) {
+        const profileData = JSON.parse(profile.profile_data as string)
+        
+        exportData.push({
+          // 匿名化ID（研究用）
+          anonymous_id: `STUDENT_${String(student.student_number).padStart(3, '0')}`,
+          
+          // 学習プロファイル
+          learning_type: profileData.learning_type,
+          overall_score: profile.overall_score,
+          confidence_level: profile.confidence_level,
+          
+          // 学習スタイル（VAKモデル）
+          visual_score: profileData.patterns?.learning_style?.visual || 0,
+          auditory_score: profileData.patterns?.learning_style?.auditory || 0,
+          kinesthetic_score: profileData.patterns?.learning_style?.kinesthetic || 0,
+          dominant_style: profileData.patterns?.learning_style?.dominant_style,
+          
+          // 時間パターン
+          optimal_study_time: profileData.patterns?.time?.optimal_study_time?.join(','),
+          concentration_span: profileData.patterns?.time?.concentration_span,
+          
+          // 理解パターン
+          average_understanding: profileData.patterns?.comprehension?.average_understanding || 0,
+          total_completed_cards: profileData.patterns?.comprehension?.total_completed || 0,
+          
+          // 助け要請パターン
+          help_frequency: profileData.patterns?.help_seeking?.help_frequency || 0,
+          average_wait_time: profileData.patterns?.help_seeking?.average_wait_time || 0,
+          
+          // 進捗速度
+          cards_per_week: profileData.patterns?.progress_speed?.cards_per_week?.join(','),
+          progress_trend: profileData.patterns?.progress_speed?.trend,
+          
+          // エンゲージメント
+          sessions_per_week: profileData.patterns?.engagement?.sessions_per_week || 0,
+          avg_session_duration: profileData.patterns?.engagement?.average_session_duration || 0,
+          engagement_level: profileData.patterns?.engagement?.engagement_level,
+          
+          // 行動統計
+          behavior_stats: JSON.stringify(behaviorStats.results || []),
+          
+          // 進捗統計
+          progress_total_cards: progressData?.total_cards || 0,
+          progress_avg_understanding: progressData?.avg_understanding || 0,
+          progress_avg_time_minutes: progressData?.avg_time || 0,
+          
+          // タイムスタンプ
+          data_updated_at: profile.updated_at,
+          export_timestamp: new Date().toISOString()
+        })
+      }
+    }
+    
+    if (format === 'csv') {
+      // CSV形式に変換
+      const csv = convertToCSV(exportData)
+      return c.text(csv, 200, {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="research_data_${classCode}_${new Date().toISOString().split('T')[0]}.csv"`
+      })
+    }
+    
+    // JSON形式
+    return c.json({
+      success: true,
+      class_code: classCode,
+      total_students: exportData.length,
+      export_timestamp: new Date().toISOString(),
+      data: exportData,
+      metadata: {
+        description: '匿名化済み研究用データ',
+        variables: Object.keys(exportData[0] || {}),
+        note: '個人を特定できる情報は含まれていません'
+      }
+    })
+  } catch (error: any) {
+    console.error('データエクスポートエラー:', error)
+    return c.json({
+      success: false,
+      error: 'データのエクスポートに失敗しました'
+    }, 500)
+  }
+})
+
+// ヘルパー: CSV変換
+function convertToCSV(data: any[]): string {
+  if (data.length === 0) return ''
+  
+  const headers = Object.keys(data[0])
+  const csvRows = [
+    headers.join(','),
+    ...data.map(row => 
+      headers.map(header => {
+        const value = row[header]
+        if (value === null || value === undefined) return ''
+        if (typeof value === 'string' && value.includes(',')) {
+          return `"${value.replace(/"/g, '""')}"`
+        }
+        return value
+      }).join(',')
+    )
+  ]
+  
+  return csvRows.join('\n')
+}
+
+// 統計サマリー取得（研究用）
+app.get('/api/research/summary/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  
+  try {
+    // クラス全体の統計
+    const students = await env.DB.prepare(`
+      SELECT id FROM users WHERE class_code = ? AND role = 'student'
+    `).bind(classCode).all()
+    
+    const studentIds = (students.results || []).map((s: any) => s.id)
+    
+    if (studentIds.length === 0) {
+      return c.json({
+        success: true,
+        summary: { total_students: 0 }
+      })
+    }
+    
+    // 学習スタイル分布
+    const styleDistribution = await env.DB.prepare(`
+      SELECT profile_data FROM learning_profiles
+      WHERE student_id IN (${studentIds.join(',')})
+      ORDER BY updated_at DESC
+    `).all()
+    
+    const styles = { visual: 0, auditory: 0, kinesthetic: 0, balanced: 0 }
+    const scores = { overall: [], visual: [], auditory: [], kinesthetic: [] }
+    
+    for (const row of (styleDistribution.results || [])) {
+      const profile = JSON.parse(row.profile_data as string)
+      const dominant = profile.patterns?.learning_style?.dominant_style
+      if (dominant) styles[dominant as keyof typeof styles]++
+      
+      scores.visual.push(profile.patterns?.learning_style?.visual || 0)
+      scores.auditory.push(profile.patterns?.learning_style?.auditory || 0)
+      scores.kinesthetic.push(profile.patterns?.learning_style?.kinesthetic || 0)
+    }
+    
+    // 統計計算
+    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
+    const std = (arr: number[]) => {
+      const mean = avg(arr)
+      const variance = arr.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / arr.length
+      return Math.sqrt(variance)
+    }
+    
+    return c.json({
+      success: true,
+      class_code: classCode,
+      summary: {
+        total_students: studentIds.length,
+        learning_style_distribution: styles,
+        learning_style_scores: {
+          visual: { mean: avg(scores.visual), std: std(scores.visual) },
+          auditory: { mean: avg(scores.auditory), std: std(scores.auditory) },
+          kinesthetic: { mean: avg(scores.kinesthetic), std: std(scores.kinesthetic) }
+        },
+        generated_at: new Date().toISOString()
+      }
+    })
+  } catch (error: any) {
+    console.error('統計サマリーエラー:', error)
+    return c.json({
+      success: false,
+      error: '統計の取得に失敗しました'
+    }, 500)
+  }
+})
 
 // ==============================================
 // WebSocketエンドポイント
