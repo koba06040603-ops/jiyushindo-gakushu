@@ -3284,18 +3284,9 @@ app.post('/api/ai/suggest-units', async (c) => {
   }
   
   try {
-    // 簡潔なプロンプト（単元名候補12個）
-    const prompt = `${grade}${subject}（${textbook}）の主要単元名12個をJSON形式で出力してください。
-
-出力例：
-{"units":["大きい数","わり算の筆算","角の大きさ","小数のしくみ","面積","式と計算のじゅんじょ","小数のたし算とひき算","2けたでわるわり算","がい数","分数","変わり方","小数のかけ算"]}
-
-【条件】
-- 完全なJSON（説明不要）
-- 教科書の目次形式
-- 12個必須
-
-JSON出力:`
+    const prompt = `${grade}${subject}（${textbook}）の単元名12個をJSONで。
+{"units":["単元1","単元2","単元3","単元4","単元5","単元6","単元7","単元8","単元9","単元10","単元11","単元12"]}
+教科書目次の形式で12個必須。JSON出力:`
 
     const models = ['gemini-2.5-flash', 'gemini-2.0-flash']
     let response
@@ -3310,7 +3301,7 @@ JSON出力:`
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+              generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
             })
           }
         )
