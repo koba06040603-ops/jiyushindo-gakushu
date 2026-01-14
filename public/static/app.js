@@ -10921,3 +10921,558 @@ if (originalLogin) {
 // グローバルスコープに登録
 window.BehaviorLogger = BehaviorLogger
 
+// =====================================
+// Phase 10: 教師・保護者ダッシュボードUI
+// =====================================
+
+// 学習分析ダッシュボードを表示（教師向け）
+async function showAnalysisDashboard() {
+  if (!state.teacher || !state.teacher.class_code) {
+    alert('教師アカウントでログインしてください')
+    return
+  }
+  
+  showLoading('クラスの学習分析データを読み込み中...')
+  
+  try {
+    const response = await axios.get(`/api/dashboard/class/${state.teacher.class_code}`)
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'データ取得に失敗しました')
+    }
+    
+    hideLoading()
+    renderAnalysisDashboard(response.data)
+  } catch (error) {
+    hideLoading()
+    console.error('ダッシュボード読み込みエラー:', error)
+    alert('ダッシュボードの読み込みに失敗しました')
+  }
+}
+
+// 分析ダッシュボードをレンダリング
+function renderAnalysisDashboard(data) {
+  const { students, summary, class_code } = data
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+      <!-- ヘッダー -->
+      <div class="max-w-7xl mx-auto mb-6">
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-3xl font-bold text-gray-800 mb-2">
+                <i class="fas fa-chart-line mr-2 text-blue-600"></i>
+                学習分析ダッシュボード
+              </h1>
+              <p class="text-gray-600">クラス: ${class_code}</p>
+            </div>
+            <button onclick="showProgressBoard()" 
+                    class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+              <i class="fas fa-arrow-left mr-2"></i>進捗ボードに戻る
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- サマリーカード -->
+      <div class="max-w-7xl mx-auto mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <!-- 総生徒数 -->
+          <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm">総生徒数</p>
+                <p class="text-3xl font-bold text-gray-800">${summary.total_students}</p>
+              </div>
+              <div class="bg-blue-100 rounded-full p-3">
+                <i class="fas fa-users text-blue-600 text-2xl"></i>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 分析済み -->
+          <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm">分析済み</p>
+                <p class="text-3xl font-bold text-green-600">${summary.with_profiles}</p>
+              </div>
+              <div class="bg-green-100 rounded-full p-3">
+                <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 平均スコア -->
+          <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm">平均スコア</p>
+                <p class="text-3xl font-bold text-purple-600">${summary.average_score}</p>
+              </div>
+              <div class="bg-purple-100 rounded-full p-3">
+                <i class="fas fa-star text-purple-600 text-2xl"></i>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 要支援 -->
+          <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-gray-500 text-sm">要支援</p>
+                <p class="text-3xl font-bold text-red-600">
+                  ${students.filter(s => s.overall_score > 0 && s.overall_score < 60).length}
+                </p>
+              </div>
+              <div class="bg-red-100 rounded-full p-3">
+                <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 生徒一覧 -->
+      <div class="max-w-7xl mx-auto">
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h2 class="text-2xl font-bold text-gray-800 mb-4">
+            <i class="fas fa-list mr-2"></i>生徒別学習プロファイル
+          </h2>
+          
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">番号</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">氏名</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">学習タイプ</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">推奨コース</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">スコア</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">信頼度</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200">
+                ${students.map(student => `
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm">${student.student_number || '-'}</td>
+                    <td class="px-4 py-3 text-sm font-medium">${student.student_name}</td>
+                    <td class="px-4 py-3 text-sm">
+                      ${student.learning_type 
+                        ? `<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">${student.learning_type}</span>`
+                        : '<span class="text-gray-400">未分析</span>'}
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      ${getCourseBadge(student.recommended_course)}
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      ${getScoreBadge(student.overall_score)}
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      ${getConfidenceBadge(student.confidence_level)}
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      <button onclick="showStudentDetail(${student.student_id})" 
+                              class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs">
+                        <i class="fas fa-eye mr-1"></i>詳細
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// コースバッジ
+function getCourseBadge(course) {
+  const badges = {
+    'じっくりコース': '<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">🐢 じっくり</span>',
+    'しっかりコース': '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">🚶 しっかり</span>',
+    'ぐんぐんコース': '<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs">🚀 ぐんぐん</span>'
+  }
+  return badges[course] || '<span class="text-gray-400">-</span>'
+}
+
+// スコアバッジ
+function getScoreBadge(score) {
+  if (score === 0) return '<span class="text-gray-400">-</span>'
+  if (score >= 80) return `<span class="text-green-600 font-bold">${score}</span>`
+  if (score >= 60) return `<span class="text-yellow-600 font-bold">${score}</span>`
+  return `<span class="text-red-600 font-bold">${score}</span>`
+}
+
+// 信頼度バッジ
+function getConfidenceBadge(level) {
+  const badges = {
+    'high': '<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">高</span>',
+    'medium': '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">中</span>',
+    'low': '<span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs">低</span>'
+  }
+  return badges[level] || badges['low']
+}
+
+// 生徒詳細を表示
+async function showStudentDetail(studentId) {
+  showLoading('生徒の詳細データを読み込み中...')
+  
+  try {
+    const response = await axios.get(`/api/dashboard/student/${studentId}`)
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'データ取得に失敗しました')
+    }
+    
+    hideLoading()
+    renderStudentDetail(response.data)
+  } catch (error) {
+    hideLoading()
+    console.error('生徒詳細読み込みエラー:', error)
+    alert('生徒詳細の読み込みに失敗しました')
+  }
+}
+
+// 生徒詳細をレンダリング
+function renderStudentDetail(data) {
+  const { student, profile, plan, recommendations } = data
+  
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <!-- ヘッダー -->
+      <div class="bg-blue-600 text-white p-6 sticky top-0">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-bold">${student.name} さんの学習プロファイル</h2>
+            <p class="text-blue-100">学籍番号: ${student.student_number || '-'} | クラス: ${student.class_code}</p>
+          </div>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="text-white hover:text-gray-200">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- 内容 -->
+      <div class="p-6">
+        ${profile ? `
+          <!-- プロファイルサマリー -->
+          <div class="mb-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-3">
+              <i class="fas fa-user-circle mr-2 text-blue-600"></i>学習プロファイル
+            </h3>
+            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
+              <p class="text-gray-700 mb-2">${profile.summary}</p>
+              <div class="flex gap-2 flex-wrap">
+                <span class="px-3 py-1 bg-blue-600 text-white rounded-full text-sm">
+                  ${profile.learning_type}
+                </span>
+                <span class="px-3 py-1 bg-purple-600 text-white rounded-full text-sm">
+                  スコア: ${profile.overall_score}
+                </span>
+                <span class="px-3 py-1 bg-green-600 text-white rounded-full text-sm">
+                  ${profile.recommended_course}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 強み・弱み -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <h4 class="text-lg font-bold text-green-600 mb-2">
+                <i class="fas fa-check-circle mr-2"></i>強み
+              </h4>
+              <ul class="space-y-1">
+                ${profile.strengths.map(s => `
+                  <li class="text-sm text-gray-700">✓ ${s}</li>
+                `).join('')}
+              </ul>
+            </div>
+            <div>
+              <h4 class="text-lg font-bold text-orange-600 mb-2">
+                <i class="fas fa-exclamation-circle mr-2"></i>課題
+              </h4>
+              <ul class="space-y-1">
+                ${profile.weaknesses.map(w => `
+                  <li class="text-sm text-gray-700">→ ${w}</li>
+                `).join('')}
+              </ul>
+            </div>
+          </div>
+          
+          <!-- 推奨事項 -->
+          ${profile.recommendations ? `
+            <div class="mb-6">
+              <h4 class="text-lg font-bold text-gray-800 mb-3">
+                <i class="fas fa-lightbulb mr-2 text-yellow-500"></i>推奨事項
+              </h4>
+              
+              ${profile.recommendations.for_teacher ? `
+                <div class="mb-3">
+                  <p class="text-sm font-semibold text-blue-600 mb-1">
+                    👨‍🏫 教師向け
+                  </p>
+                  <ul class="space-y-1">
+                    ${profile.recommendations.for_teacher.map(r => `
+                      <li class="text-sm text-gray-700 ml-4">• ${r}</li>
+                    `).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+              
+              ${profile.recommendations.for_parent ? `
+                <div class="mb-3">
+                  <p class="text-sm font-semibold text-green-600 mb-1">
+                    👨‍👩‍👦 保護者向け
+                  </p>
+                  <ul class="space-y-1">
+                    ${profile.recommendations.for_parent.map(r => `
+                      <li class="text-sm text-gray-700 ml-4">• ${r}</li>
+                    `).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+        ` : `
+          <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded mb-6">
+            <p class="text-gray-700">
+              <i class="fas fa-info-circle mr-2 text-yellow-500"></i>
+              この生徒の学習データが不足しているため、詳細な分析ができません。
+            </p>
+          </div>
+        `}
+        
+        <!-- アクションボタン -->
+        <div class="flex gap-3 justify-end mt-6">
+          <button onclick="generateStudentProfile(${student.id})" 
+                  class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+            <i class="fas fa-sync mr-2"></i>プロファイル再生成
+          </button>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded">
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+// プロファイル再生成
+async function generateStudentProfile(studentId) {
+  if (!confirm('この生徒のプロファイルを再生成しますか？\n（数秒かかります）')) {
+    return
+  }
+  
+  showLoading('AIが学習プロファイルを分析中...')
+  
+  try {
+    // まず分析実行
+    await axios.post(`/api/analysis/patterns/${studentId}`, {
+      curriculumId: state.selectedCurriculum?.id
+    })
+    
+    // 次にプロファイル生成
+    const response = await axios.post(`/api/analysis/profile/${studentId}`, {
+      curriculumId: state.selectedCurriculum?.id
+    })
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      alert('✅ プロファイルを生成しました！')
+      // モーダルを閉じて再表示
+      document.querySelectorAll('.fixed').forEach(modal => modal.remove())
+      await showStudentDetail(studentId)
+    } else {
+      throw new Error(response.data.error)
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('プロファイル生成エラー:', error)
+    alert('プロファイル生成に失敗しました: ' + (error.response?.data?.error || error.message))
+  }
+}
+
+// グローバルスコープに登録
+window.showAnalysisDashboard = showAnalysisDashboard
+window.showStudentDetail = showStudentDetail
+window.generateStudentProfile = generateStudentProfile
+
+// =====================================
+// Phase 13: 多言語対応システム
+// =====================================
+
+// 言語定義
+const i18n = {
+  ja: {
+    // トップページ
+    'app.title': '自由進度学習支援システム',
+    'login.title': 'ログイン',
+    'login.email': 'メールアドレス',
+    'login.password': 'パスワード',
+    'login.button': 'ログイン',
+    'login.demo.teacher': 'デモ教師',
+    'login.demo.student': 'デモ生徒',
+    
+    // ナビゲーション
+    'nav.top': 'トップ',
+    'nav.guide': '学習のてびき',
+    'nav.plan': '学習計画表',
+    'nav.answers': '解答タブ',
+    'nav.progress': '進捗ボード',
+    'nav.analysis': '学習分析',
+    'nav.logout': 'ログアウト',
+    
+    // コース
+    'course.slow': 'じっくりコース',
+    'course.normal': 'しっかりコース',
+    'course.fast': 'ぐんぐんコース',
+    
+    // 共通
+    'common.loading': '読み込み中...',
+    'common.save': '保存',
+    'common.cancel': 'キャンセル',
+    'common.close': '閉じる',
+    'common.delete': '削除',
+    'common.edit': '編集',
+    'common.detail': '詳細',
+    'common.yes': 'はい',
+    'common.no': 'いいえ',
+    
+    // 分析
+    'analysis.title': '学習分析ダッシュボード',
+    'analysis.profile': '学習プロファイル',
+    'analysis.strengths': '強み',
+    'analysis.weaknesses': '課題',
+    'analysis.recommendations': '推奨事項',
+  },
+  
+  en: {
+    // Top page
+    'app.title': 'Self-Paced Learning Support System',
+    'login.title': 'Login',
+    'login.email': 'Email',
+    'login.password': 'Password',
+    'login.button': 'Login',
+    'login.demo.teacher': 'Demo Teacher',
+    'login.demo.student': 'Demo Student',
+    
+    // Navigation
+    'nav.top': 'Home',
+    'nav.guide': 'Learning Guide',
+    'nav.plan': 'Learning Plan',
+    'nav.answers': 'Answers',
+    'nav.progress': 'Progress',
+    'nav.analysis': 'Analysis',
+    'nav.logout': 'Logout',
+    
+    // Course
+    'course.slow': 'Steady Course',
+    'course.normal': 'Regular Course',
+    'course.fast': 'Advanced Course',
+    
+    // Common
+    'common.loading': 'Loading...',
+    'common.save': 'Save',
+    'common.cancel': 'Cancel',
+    'common.close': 'Close',
+    'common.delete': 'Delete',
+    'common.edit': 'Edit',
+    'common.detail': 'Detail',
+    'common.yes': 'Yes',
+    'common.no': 'No',
+    
+    // Analysis
+    'analysis.title': 'Learning Analysis Dashboard',
+    'analysis.profile': 'Learning Profile',
+    'analysis.strengths': 'Strengths',
+    'analysis.weaknesses': 'Challenges',
+    'analysis.recommendations': 'Recommendations',
+  },
+  
+  zh: {
+    // 顶部页面
+    'app.title': '自主进度学习支援系统',
+    'login.title': '登录',
+    'login.email': '电子邮箱',
+    'login.password': '密码',
+    'login.button': '登录',
+    'login.demo.teacher': '演示教师',
+    'login.demo.student': '演示学生',
+    
+    // 导航
+    'nav.top': '首页',
+    'nav.guide': '学习指南',
+    'nav.plan': '学习计划',
+    'nav.answers': '答案',
+    'nav.progress': '进度',
+    'nav.analysis': '分析',
+    'nav.logout': '退出',
+    
+    // 课程
+    'course.slow': '稳步课程',
+    'course.normal': '标准课程',
+    'course.fast': '进阶课程',
+    
+    // 通用
+    'common.loading': '加载中...',
+    'common.save': '保存',
+    'common.cancel': '取消',
+    'common.close': '关闭',
+    'common.delete': '删除',
+    'common.edit': '编辑',
+    'common.detail': '详情',
+    'common.yes': '是',
+    'common.no': '否',
+    
+    // 分析
+    'analysis.title': '学习分析仪表板',
+    'analysis.profile': '学习档案',
+    'analysis.strengths': '优势',
+    'analysis.weaknesses': '挑战',
+    'analysis.recommendations': '建议',
+  }
+}
+
+// 現在の言語（デフォルトは日本語）
+let currentLanguage = localStorage.getItem('language') || 'ja'
+
+// 翻訳関数
+function t(key) {
+  const translation = i18n[currentLanguage]?.[key]
+  return translation || key
+}
+
+// 言語切替
+function changeLanguage(lang) {
+  if (!i18n[lang]) {
+    console.error(`Language ${lang} not supported`)
+    return
+  }
+  
+  currentLanguage = lang
+  localStorage.setItem('language', lang)
+  
+  // ページを再読み込み（簡易実装）
+  location.reload()
+}
+
+// グローバルスコープに登録
+window.t = t
+window.changeLanguage = changeLanguage
+window.currentLanguage = currentLanguage
+window.i18n = i18n
+

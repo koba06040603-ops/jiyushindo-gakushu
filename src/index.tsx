@@ -6134,6 +6134,468 @@ function generateAdaptiveStrategies(profileData: any) {
 }
 
 // ==============================================
+// Phase 10: 教師・保護者ダッシュボードAPI
+// ==============================================
+
+// クラス全体の学習プロファイル取得（教師向け）
+app.get('/api/dashboard/class/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  
+  try {
+    // クラスに所属する生徒を取得
+    const students = await env.DB.prepare(`
+      SELECT id, name, email, student_number
+      FROM users
+      WHERE class_code = ? AND role = 'student'
+      ORDER BY student_number
+    `).bind(classCode).all()
+    
+    if (!students.results || students.results.length === 0) {
+      return c.json({
+        success: true,
+        students: [],
+        summary: {
+          total_students: 0,
+          with_profiles: 0,
+          average_score: 0
+        }
+      })
+    }
+    
+    // 各生徒のプロファイルを取得
+    const studentProfiles = await Promise.all(
+      students.results.map(async (student: any) => {
+        const profile = await env.DB.prepare(`
+          SELECT profile_data, overall_score, confidence_level, updated_at
+          FROM learning_profiles
+          WHERE student_id = ?
+          ORDER BY updated_at DESC
+          LIMIT 1
+        `).bind(student.id).first()
+        
+        if (profile) {
+          const profileData = JSON.parse(profile.profile_data as string)
+          return {
+            student_id: student.id,
+            student_name: student.name,
+            student_number: student.student_number,
+            profile_summary: profileData.profile_summary || '',
+            learning_type: profileData.learning_type || '',
+            overall_score: profile.overall_score,
+            confidence_level: profile.confidence_level,
+            strengths: profileData.strengths || [],
+            weaknesses: profileData.weaknesses || [],
+            recommended_course: profileData.recommended_course || 'しっかりコース',
+            last_updated: profile.updated_at
+          }
+        }
+        
+        return {
+          student_id: student.id,
+          student_name: student.name,
+          student_number: student.student_number,
+          profile_summary: '分析データ不足',
+          learning_type: '未分析',
+          overall_score: 0,
+          confidence_level: 'low',
+          strengths: [],
+          weaknesses: ['学習データが不足しています'],
+          recommended_course: 'しっかりコース',
+          last_updated: null
+        }
+      })
+    )
+    
+    // サマリー統計
+    const withProfiles = studentProfiles.filter(p => p.overall_score > 0)
+    const summary = {
+      total_students: students.results.length,
+      with_profiles: withProfiles.length,
+      average_score: withProfiles.length > 0 
+        ? Math.round(withProfiles.reduce((sum, p) => sum + p.overall_score, 0) / withProfiles.length)
+        : 0,
+      by_learning_type: countByLearningType(withProfiles),
+      by_course: countByCourse(withProfiles)
+    }
+    
+    return c.json({
+      success: true,
+      class_code: classCode,
+      students: studentProfiles,
+      summary
+    })
+  } catch (error: any) {
+    console.error('クラスダッシュボード取得エラー:', error)
+    return c.json({
+      success: false,
+      error: 'ダッシュボードデータの取得に失敗しました'
+    }, 500)
+  }
+})
+
+// ヘルパー: 学習タイプ別カウント
+function countByLearningType(profiles: any[]) {
+  const counts: Record<string, number> = {}
+  profiles.forEach(p => {
+    const type = p.learning_type || '未分類'
+    counts[type] = (counts[type] || 0) + 1
+  })
+  return counts
+}
+
+// ヘルパー: コース別カウント
+function countByCourse(profiles: any[]) {
+  const counts: Record<string, number> = {
+    'じっくりコース': 0,
+    'しっかりコース': 0,
+    'ぐんぐんコース': 0
+  }
+  profiles.forEach(p => {
+    const course = p.recommended_course || 'しっかりコース'
+    if (counts[course] !== undefined) {
+      counts[course]++
+    }
+  })
+  return counts
+}
+
+// 個別生徒の詳細プロファイル取得（教師・保護者向け）
+app.get('/api/dashboard/student/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    // 生徒情報
+    const student = await env.DB.prepare(`
+      SELECT id, name, email, student_number, class_code
+      FROM users
+      WHERE id = ?
+    `).bind(studentId).first()
+    
+    if (!student) {
+      return c.json({
+        success: false,
+        error: '生徒が見つかりません'
+      }, 404)
+    }
+    
+    // 最新プロファイル
+    const profile = await env.DB.prepare(`
+      SELECT profile_data, overall_score, confidence_level, updated_at
+      FROM learning_profiles
+      WHERE student_id = ?
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `).bind(studentId).first()
+    
+    // 個別最適化プラン
+    const plan = await env.DB.prepare(`
+      SELECT plan_data, status, start_date, end_date, created_at
+      FROM personalized_plans
+      WHERE student_id = ? AND status = 'active'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `).bind(studentId).first()
+    
+    // 推奨事項
+    const recommendations = await env.DB.prepare(`
+      SELECT id, target_role, recommendation_type, priority, title, description, 
+             action_items, status, created_at, expires_at
+      FROM recommendations
+      WHERE student_id = ? AND status != 'dismissed'
+      ORDER BY priority DESC, created_at DESC
+      LIMIT 10
+    `).bind(studentId).all()
+    
+    // 最近の学習行動サマリー
+    const recentActivity = await env.DB.prepare(`
+      SELECT 
+        action_type,
+        COUNT(*) as count,
+        MAX(action_timestamp) as last_action
+      FROM learning_behavior_logs
+      WHERE student_id = ? AND action_timestamp >= datetime('now', '-7 days')
+      GROUP BY action_type
+      ORDER BY count DESC
+    `).bind(studentId).all()
+    
+    const profileData = profile ? JSON.parse(profile.profile_data as string) : null
+    const planData = plan ? JSON.parse(plan.plan_data as string) : null
+    
+    return c.json({
+      success: true,
+      student: {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        student_number: student.student_number,
+        class_code: student.class_code
+      },
+      profile: profileData ? {
+        summary: profileData.profile_summary,
+        learning_type: profileData.learning_type,
+        overall_score: profile?.overall_score,
+        confidence_level: profile?.confidence_level,
+        strengths: profileData.strengths,
+        weaknesses: profileData.weaknesses,
+        recommendations: profileData.recommendations,
+        recommended_course: profileData.recommended_course,
+        patterns: profileData.patterns,
+        last_updated: profile?.updated_at
+      } : null,
+      plan: planData,
+      recommendations: recommendations.results || [],
+      recent_activity: recentActivity.results || []
+    })
+  } catch (error: any) {
+    console.error('生徒詳細取得エラー:', error)
+    return c.json({
+      success: false,
+      error: '生徒詳細の取得に失敗しました'
+    }, 500)
+  }
+})
+
+// 推奨事項の作成（教師向け）
+app.post('/api/dashboard/recommendations', async (c) => {
+  const { env } = c
+  const { studentId, curriculumId, targetRole, type, priority, title, description, actionItems } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO recommendations (
+        student_id, curriculum_id, target_role, recommendation_type, priority,
+        title, description, action_items, status, expires_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now', '+30 days'))
+    `).bind(
+      studentId,
+      curriculumId || null,
+      targetRole,
+      type,
+      priority,
+      title,
+      description,
+      JSON.stringify(actionItems || [])
+    ).run()
+    
+    return c.json({
+      success: true,
+      message: '推奨事項を作成しました'
+    })
+  } catch (error: any) {
+    console.error('推奨事項作成エラー:', error)
+    return c.json({
+      success: false,
+      error: '推奨事項の作成に失敗しました'
+    }, 500)
+  }
+})
+
+// ==============================================
+// Phase 11: 学習カード自動適応API
+// ==============================================
+
+// 適応型学習カード取得
+app.get('/api/cards/:cardId/adapted/:studentId', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  const studentId = c.req.param('studentId')
+  
+  try {
+    // 元の学習カード取得
+    const card = await env.DB.prepare(`
+      SELECT * FROM learning_cards WHERE id = ?
+    `).bind(cardId).first()
+    
+    if (!card) {
+      return c.json({
+        success: false,
+        error: 'カードが見つかりません'
+      }, 404)
+    }
+    
+    // 学習スタイルプロファイル取得
+    const profile = await env.DB.prepare(`
+      SELECT profile_data FROM learning_profiles
+      WHERE student_id = ?
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `).bind(studentId).first()
+    
+    let adaptedCard = { ...card }
+    let learningStyle = 'balanced' // デフォルト
+    
+    if (profile) {
+      const profileData = JSON.parse(profile.profile_data as string)
+      const patterns = profileData.patterns
+      
+      // 優勢な学習スタイルを判定
+      if (patterns?.learning_style) {
+        learningStyle = patterns.learning_style.dominant_style || 'balanced'
+        
+        // 学習スタイルに応じてカードを適応
+        adaptedCard = adaptCardToStyle(card, learningStyle, patterns.learning_style)
+      }
+    }
+    
+    return c.json({
+      success: true,
+      card: adaptedCard,
+      learning_style: learningStyle,
+      adapted: !!profile
+    })
+  } catch (error: any) {
+    console.error('適応型カード取得エラー:', error)
+    return c.json({
+      success: false,
+      error: 'カードの取得に失敗しました'
+    }, 500)
+  }
+})
+
+// ヘルパー: カードを学習スタイルに適応
+function adaptCardToStyle(card: any, dominantStyle: string, styleScores: any) {
+  const adapted = { ...card }
+  
+  // メタデータを追加
+  adapted.adaptation_metadata = {
+    dominant_style: dominantStyle,
+    style_scores: styleScores,
+    adaptations_applied: []
+  }
+  
+  // 視覚型の適応
+  if (dominantStyle === 'visual' || styleScores.visual >= 60) {
+    adapted.adaptation_metadata.adaptations_applied.push('visual_enhanced')
+    adapted.visual_hints_priority = true
+    adapted.show_diagrams = true
+    adapted.color_coding = true
+  }
+  
+  // 聴覚型の適応
+  if (dominantStyle === 'auditory' || styleScores.auditory >= 60) {
+    adapted.adaptation_metadata.adaptations_applied.push('auditory_enhanced')
+    adapted.audio_guide_enabled = true
+    adapted.text_to_speech = true
+    adapted.step_by_step_audio = true
+  }
+  
+  // 体感型の適応
+  if (dominantStyle === 'kinesthetic' || styleScores.kinesthetic >= 60) {
+    adapted.adaptation_metadata.adaptations_applied.push('kinesthetic_enhanced')
+    adapted.interactive_elements = true
+    adapted.drag_drop_enabled = true
+    adapted.hands_on_activities = true
+  }
+  
+  return adapted
+}
+
+// ==============================================
+// Phase 12: AI予測機能強化API
+// ==============================================
+
+// 学習予測生成
+app.post('/api/predictions/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const { curriculumId, predictionType } = await c.req.json()
+  
+  try {
+    // 学習パターンを取得
+    const analysisResponse = await fetch(`${c.req.url.split('/api')[0]}/api/analysis/patterns/${studentId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ curriculumId })
+    })
+    
+    if (!analysisResponse.ok) {
+      throw new Error('パターン分析の取得に失敗しました')
+    }
+    
+    const analysisData = await analysisResponse.json()
+    const patterns = analysisData.analysis.patterns
+    
+    // 予測を生成
+    const predictions = generatePredictions(patterns, predictionType || 'all')
+    
+    // 予測結果を保存
+    for (const [type, data] of Object.entries(predictions)) {
+      await env.DB.prepare(`
+        INSERT INTO ai_predictions (
+          student_id, curriculum_id, prediction_type, prediction_data, 
+          confidence_level, prediction_date, target_date
+        ) VALUES (?, ?, ?, ?, ?, date('now'), ?)
+      `).bind(
+        studentId,
+        curriculumId,
+        type,
+        JSON.stringify(data),
+        (data as any).confidence || 0.7,
+        (data as any).target_date || null
+      ).run()
+    }
+    
+    return c.json({
+      success: true,
+      predictions
+    })
+  } catch (error: any) {
+    console.error('予測生成エラー:', error)
+    return c.json({
+      success: false,
+      error: '予測の生成に失敗しました'
+    }, 500)
+  }
+})
+
+// ヘルパー: 予測生成
+function generatePredictions(patterns: any, type: string) {
+  const predictions: any = {}
+  
+  if (type === 'all' || type === 'next_week') {
+    // 来週の予測
+    const cardsPerWeek = patterns.progress_speed?.cards_per_week?.[0] || 3
+    const trend = patterns.progress_speed?.trend || 'stable'
+    
+    let nextWeekCards = cardsPerWeek
+    if (trend === 'accelerating') nextWeekCards = Math.round(cardsPerWeek * 1.2)
+    if (trend === 'decelerating') nextWeekCards = Math.round(cardsPerWeek * 0.8)
+    
+    predictions.next_week = {
+      cards_expected: nextWeekCards,
+      understanding_level: Math.min((patterns.comprehension?.average_understanding || 3) + 0.3, 5),
+      confidence: 0.75,
+      target_date: getNextWeekDate(),
+      recommendation: nextWeekCards >= 5 ? '順調です' : '支援が必要かもしれません'
+    }
+  }
+  
+  if (type === 'all' || type === 'struggling_points') {
+    // つまずきポイント予測
+    predictions.struggling_points = {
+      potential_struggles: [
+        patterns.comprehension?.average_understanding < 3 ? '基礎理解の強化が必要' : null,
+        patterns.help_seeking?.help_frequency > 10 ? '自立学習の促進が必要' : null,
+        patterns.engagement?.engagement_level === 'low' ? 'モチベーション支援が必要' : null
+      ].filter(Boolean),
+      confidence: 0.65,
+      recommendation: '定期的な個別支援を推奨'
+    }
+  }
+  
+  return predictions
+}
+
+// ヘルパー: 来週の日付
+function getNextWeekDate() {
+  const date = new Date()
+  date.setDate(date.getDate() + 7)
+  return date.toISOString().split('T')[0]
+}
+
+// ==============================================
 // WebSocketエンドポイント
 // ==============================================
 
