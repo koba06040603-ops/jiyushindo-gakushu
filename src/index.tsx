@@ -2575,7 +2575,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
 app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -2715,7 +2715,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
 app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -2865,7 +2865,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -3013,7 +3013,7 @@ app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
 app.post('/api/curriculum/:curriculumId/generate-additional-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
