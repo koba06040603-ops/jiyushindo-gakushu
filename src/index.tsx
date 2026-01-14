@@ -2773,7 +2773,15 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
     if (problems.common_check_test) {
       const sampleCount = problems.common_check_test.sample_problems?.length || 0
       console.log(`チェックテスト問題を保存: ${sampleCount}件`)
-      const checkTestJSON = JSON.stringify(problems.common_check_test)
+      
+      // test_titleとtest_descriptionを追加
+      const checkTestWithMeta = {
+        test_title: problems.common_check_test.test_title || '全コース共通の基礎基本チェックテスト',
+        test_description: problems.common_check_test.test_description || 'どのコースを選んでも、同じチェックテストを受けます。単元の基礎基本が身についているかを確認します。',
+        sample_problems: problems.common_check_test.sample_problems || []
+      }
+      
+      const checkTestJSON = JSON.stringify(checkTestWithMeta)
       await env.DB.prepare(`
         INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
         VALUES (?, ?, ?)
