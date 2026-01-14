@@ -2908,20 +2908,41 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
   ]
 }`
 
-    const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
-        })
-      }
-    )
+    // フォールバック機能付きAPI呼び出し
+    const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    let response
+    let lastError
     
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`)
+    for (const model of models) {
+      try {
+        console.log(`🔄 モデル試行中: ${model}`)
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
+            })
+          }
+        )
+        
+        if (response.ok) {
+          console.log(`✅ モデル成功: ${model}`)
+          break
+        } else {
+          console.warn(`⚠️ モデル失敗: ${model} (status: ${response.status})`)
+          lastError = new Error(`${model} returned ${response.status}`)
+        }
+      } catch (error: any) {
+        console.warn(`⚠️ モデルエラー: ${model} - ${error.message}`)
+        lastError = error
+      }
+    }
+    
+    if (!response || !response.ok) {
+      throw lastError || new Error('すべてのモデルが失敗しました')
     }
     
     const data = await response.json()
@@ -3029,20 +3050,41 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
   ]
 }`
 
-    const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
-        })
-      }
-    )
+    // フォールバック機能付きAPI呼び出し
+    const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    let response
+    let lastError
     
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`)
+    for (const model of models) {
+      try {
+        console.log(`🔄 評価問題モデル試行中: ${model}`)
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
+            })
+          }
+        )
+        
+        if (response.ok) {
+          console.log(`✅ 評価問題モデル成功: ${model}`)
+          break
+        } else {
+          console.warn(`⚠️ 評価問題モデル失敗: ${model} (status: ${response.status})`)
+          lastError = new Error(`${model} returned ${response.status}`)
+        }
+      } catch (error: any) {
+        console.warn(`⚠️ 評価問題モデルエラー: ${model} - ${error.message}`)
+        lastError = error
+      }
+    }
+    
+    if (!response || !response.ok) {
+      throw lastError || new Error('すべてのモデルが失敗しました')
     }
     
     const data = await response.json()
@@ -3150,20 +3192,41 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
   ]
 }`
 
-    const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=' + apiKey,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
-        })
-      }
-    )
+    // フォールバック機能付きAPI呼び出し
+    const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    let response
+    let lastError
     
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`)
+    for (const model of models) {
+      try {
+        console.log(`🔄 導入問題モデル試行中: ${model}`)
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
+            })
+          }
+        )
+        
+        if (response.ok) {
+          console.log(`✅ 導入問題モデル成功: ${model}`)
+          break
+        } else {
+          console.warn(`⚠️ 導入問題モデル失敗: ${model} (status: ${response.status})`)
+          lastError = new Error(`${model} returned ${response.status}`)
+        }
+      } catch (error: any) {
+        console.warn(`⚠️ 導入問題モデルエラー: ${model} - ${error.message}`)
+        lastError = error
+      }
+    }
+    
+    if (!response || !response.ok) {
+      throw lastError || new Error('すべてのモデルが失敗しました')
     }
     
     const data = await response.json()
