@@ -2184,16 +2184,7 @@ ${customization.learningStyle ? `学習スタイル: ${customization.learningSty
 ${customization.specialSupport ? `特別支援: ${customization.specialSupport}` : ''}
 ` : ''
     
-    const prompt = `あなたは経験豊富な教育カリキュラムデザイナーです。
-以下の情報に基づいて、学習指導要領に沿った単元を設計してください。
-
-【基本情報】
-- 学年: ${grade}
-- 教科: ${subject}
-- 教科書: ${textbook}
-- 単元名: ${unitName}${customInfo}
-
-以下のJSON形式で出力してください：
+    const prompt = `${grade}${subject}「${unitName}」（${textbook}）の学習カリキュラムをJSON形式で作成してください。
 
 {
   "curriculum": {
@@ -2202,8 +2193,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     "textbook_company": "${textbook}",
     "unit_name": "${unitName}",
     "total_hours": 8,
-    "unit_goal": "この単元で達成すべき学習目標（子どもが理解できる言葉で100文字程度、漢字にはふりがなを付ける）",
-    "non_cognitive_goal": "非認知能力の目標（意欲、粘り強さ、協調性など）（80文字程度）"
+    "unit_goal": "学習目標（100文字、ふりがな付き）",
+    "non_cognitive_goal": "非認知目標（80文字）"
   },
   "courses": [
     {
@@ -2211,48 +2202,21 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "course_label": "じっくり考えながら進むコース",
       "description": "ひとつひとつていねいに学びたい人におすすめ",
       "color_code": "green",
-      "cards": [
-        {
-          "card_number": 1,
-          "card_title": "学習カード1のタイトル",
-          "card_type": "main",
-          "textbook_page": "教科書のページ（例: p.24-25）",
-          "problem_description": "問題文・課題の説明",
-          "new_terms": "新しく出てくる言葉や用語",
-          "example_problem": "例題",
-          "example_solution": "例題の解き方・考え方",
-          "real_world_connection": "実社会とのつながり・生活での活用",
-          "answer": "この学習カードの解答・答え（必須）",
-          "hints": [
-            {
-              "hint_level": 1,
-              "hint_text": "ヒント1（まず考えてほしいこと）",
-              "thinking_tool_suggestion": "使える思考ツール（図・表・絵など）"
-            },
-            {
-              "hint_level": 2,
-              "hint_text": "ヒント2（もう少し詳しく）"
-            },
-            {
-              "hint_level": 3,
-              "hint_text": "ヒント3（ほぼ答えに近いヒント）"
-            }
-          ]
-        },
-        // カード2〜6も同じ形式（全6枚必須）
-      ]
+      "cards": [{"card_number":1,"card_title":"タイトル","card_type":"main","textbook_page":"p.XX","problem_description":"問題","new_terms":"用語","example_problem":"例題","example_solution":"解法","real_world_connection":"つながり","answer":"解答（必須）","hints":[{"hint_level":1,"hint_text":"ヒント1"},{"hint_level":2,"hint_text":"ヒント2"},{"hint_level":3,"hint_text":"ヒント3"}]},
+        ... 全6枚]
     },
-    // 他2コース（しっかり・どんどん）も同じ形式
+    {"course_name":"しっかりコース","course_label":"自分のペースで学ぶコース","description":"しっかり考えて学びたい人","color_code":"blue","cards":[...全6枚]},
+    {"course_name":"どんどんコース","course_label":"いろいろなことにちょうせんするコース","description":"発展的に学びたい人","color_code":"purple","cards":[...全6枚]}
   ]
 }
 
-【重要な要件】
-- 各コースは6枚のカード（必須）
-- 全カードにanswerフィールド（必須）
+【重要】
+- 3コース×各6枚=合計18枚のカード
+- 全カードにanswer（必須）
 - 全カードにhints配列3つ（必須）
-- JSONコードブロックなし、完全なJSONのみを出力
+- JSONコードブロックなし、完全なJSONのみ
 
-必ず完全なJSONのみを出力してください。`
+完全なJSONのみ出力してください。`
     // 品質モードに応じてモデルを選択
     // 複数モデルでフォールバック（最新安定版を優先）
     const models = [
