@@ -1,3 +1,18 @@
+// グローバルエラーハンドラー
+window.addEventListener('error', (event) => {
+  console.error('🔴 Global Error:', {
+    message: event.message,
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+    error: event.error
+  })
+})
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('🔴 Unhandled Promise Rejection:', event.reason)
+})
+
 // グローバル状態管理
 const state = {
   currentView: 'top', // 'top', 'guide', 'card', 'progress'
