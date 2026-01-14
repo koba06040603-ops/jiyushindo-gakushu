@@ -5633,38 +5633,50 @@ async function saveGeneratedUnit(unitData) {
       console.log('📊 保存されたデータ:', response.data.saved_data)
       
       // 追加問題を並列生成（必須）
+      console.log('🔄 追加問題生成を開始... curriculum_id:', curriculumId)
+      
       saveButton.innerHTML = `
         <i class="fas fa-spinner fa-spin mr-2"></i>
         追加問題を生成中... (0/3)
       `
       
-      console.log('🔄 追加問題生成を開始...')
-      
       try {
+        console.log('🌐 API呼び出し準備完了')
+        
         // 3つのAPIを並列実行
-        const [courseProblems, assessmentProblems, introProblems] = await Promise.allSettled([
-          axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`),
-          axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`),
-          axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
-        ])
+        const apiCalls = [
+          axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`).catch(e => { console.error('🔴 API1エラー:', e); throw e; }),
+          axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`).catch(e => { console.error('🔴 API2エラー:', e); throw e; }),
+          axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`).catch(e => { console.error('🔴 API3エラー:', e); throw e; })
+        ]
+        
+        console.log('🚀 API並列実行開始...')
+        const [courseProblems, assessmentProblems, introProblems] = await Promise.allSettled(apiCalls)
+        console.log('✅ API並列実行完了')
         
         const courseSuccess = courseProblems.status === 'fulfilled'
         const assessmentSuccess = assessmentProblems.status === 'fulfilled'
         const introSuccess = introProblems.status === 'fulfilled'
         
         console.log('✅ コース選択問題:', courseSuccess ? '成功' : '失敗')
-        if (!courseSuccess) {
-          console.error('  エラー詳細:', courseProblems.reason?.response?.data || courseProblems.reason?.message || courseProblems.reason)
+        if (courseSuccess) {
+          console.log('   レスポンス:', courseProblems.value?.data)
+        } else {
+          console.error('   エラー詳細:', courseProblems.reason?.response?.data || courseProblems.reason?.message || courseProblems.reason)
         }
         
         console.log('✅ 評価問題:', assessmentSuccess ? '成功' : '失敗')
-        if (!assessmentSuccess) {
-          console.error('  エラー詳細:', assessmentProblems.reason?.response?.data || assessmentProblems.reason?.message || assessmentProblems.reason)
+        if (assessmentSuccess) {
+          console.log('   レスポンス:', assessmentProblems.value?.data)
+        } else {
+          console.error('   エラー詳細:', assessmentProblems.reason?.response?.data || assessmentProblems.reason?.message || assessmentProblems.reason)
         }
         
         console.log('✅ 導入問題:', introSuccess ? '成功' : '失敗')
-        if (!introSuccess) {
-          console.error('  エラー詳細:', introProblems.reason?.response?.data || introProblems.reason?.message || introProblems.reason)
+        if (introSuccess) {
+          console.log('   レスポンス:', introProblems.value?.data)
+        } else {
+          console.error('   エラー詳細:', introProblems.reason?.response?.data || introProblems.reason?.message || introProblems.reason)
         }
         
         if (courseSuccess && assessmentSuccess && introSuccess) {
