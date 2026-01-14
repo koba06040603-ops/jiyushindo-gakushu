@@ -665,6 +665,111 @@ app.post('/api/progress/activity', async (c) => {
   }
 })
 
+// APIルート：週次レポート
+app.get('/api/reports/weekly/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  const startDate = c.req.query('startDate') // YYYY-MM-DD
+  const endDate = c.req.query('endDate') // YYYY-MM-DD
+  
+  try {
+    // 期間内の進捗データを集計
+    const weeklyStats = await env.DB.prepare(`
+      SELECT 
+        u.name as student_name,
+        u.student_number,
+        COUNT(DISTINCT sp.learning_card_id) as completed_cards,
+        AVG(sp.understanding_level) as avg_understanding,
+        SUM(CASE WHEN sp.help_type = 'ai' THEN 1 ELSE 0 END) as ai_help_count,
+        SUM(CASE WHEN sp.help_type = 'teacher' THEN 1 ELSE 0 END) as teacher_help_count,
+        SUM(CASE WHEN sp.help_type = 'friend' THEN 1 ELSE 0 END) as friend_help_count,
+        SUM(CASE WHEN sp.help_type = 'hint' THEN 1 ELSE 0 END) as hint_help_count
+      FROM users u
+      LEFT JOIN student_progress sp ON u.id = sp.student_id
+        AND sp.status = 'completed'
+        AND DATE(sp.completed_at) BETWEEN ? AND ?
+      WHERE u.class_code = ? AND u.role = 'student'
+      GROUP BY u.id, u.name, u.student_number
+      ORDER BY u.student_number
+    `).bind(startDate, endDate, classCode).all()
+    
+    return c.json({
+      success: true,
+      period: { start: startDate, end: endDate },
+      class_code: classCode,
+      stats: weeklyStats.results
+    })
+  } catch (error) {
+    console.error('週次レポートエラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '週次レポートの生成に失敗しました',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// APIルート：月次レポート
+app.get('/api/reports/monthly/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  const year = c.req.query('year') // YYYY
+  const month = c.req.query('month') // MM
+  
+  try {
+    const startDate = `${year}-${month}-01`
+    const endDate = `${year}-${month}-31`
+    
+    // 月次統計
+    const monthlyStats = await env.DB.prepare(`
+      SELECT 
+        u.name as student_name,
+        u.student_number,
+        COUNT(DISTINCT sp.learning_card_id) as completed_cards,
+        AVG(sp.understanding_level) as avg_understanding,
+        COUNT(DISTINCT DATE(sp.created_at)) as active_days,
+        SUM(CASE WHEN sp.help_type IS NOT NULL THEN 1 ELSE 0 END) as total_help_count
+      FROM users u
+      LEFT JOIN student_progress sp ON u.id = sp.student_id
+        AND DATE(sp.created_at) BETWEEN ? AND ?
+      WHERE u.class_code = ? AND u.role = 'student'
+      GROUP BY u.id, u.name, u.student_number
+      ORDER BY u.student_number
+    `).bind(startDate, endDate, classCode).all()
+    
+    // カリキュラム別進捗
+    const curriculumProgress = await env.DB.prepare(`
+      SELECT 
+        cur.unit_name,
+        cur.subject,
+        COUNT(DISTINCT sp.student_id) as students_count,
+        COUNT(DISTINCT sp.learning_card_id) as completed_cards_total
+      FROM curriculum cur
+      LEFT JOIN student_progress sp ON cur.id = sp.curriculum_id
+        AND sp.status = 'completed'
+        AND DATE(sp.completed_at) BETWEEN ? AND ?
+      JOIN users u ON sp.student_id = u.id
+      WHERE u.class_code = ?
+      GROUP BY cur.id, cur.unit_name, cur.subject
+    `).bind(startDate, endDate, classCode).all()
+    
+    return c.json({
+      success: true,
+      period: { year, month, start: startDate, end: endDate },
+      class_code: classCode,
+      student_stats: monthlyStats.results,
+      curriculum_progress: curriculumProgress.results
+    })
+  } catch (error) {
+    console.error('月次レポートエラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '月次レポートの生成に失敗しました',
+      details: error.message 
+    }, 500)
+  }
+})
+
 // APIルート：AI先生（Gemini API）
 app.post('/api/ai/ask', async (c) => {
   const { env } = c

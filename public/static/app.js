@@ -3135,7 +3135,23 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
             </div>
             <div class="flex items-center gap-2">
               <span class="text-xs md:text-sm text-gray-600">クラス: ${state.student.classCode}</span>
-              <button onclick="location.reload()" 
+              
+              <!-- 自動更新トグル -->
+              <label class="inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="autoRefreshToggle" class="sr-only peer" 
+                       onchange="toggleAutoRefresh(${curriculumId})">
+                <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <span class="ms-2 text-xs md:text-sm font-medium text-gray-600">自動更新</span>
+              </label>
+              
+              <!-- PDF出力 -->
+              <button onclick="exportProgressToPDF()" 
+                      class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">
+                <i class="fas fa-file-pdf mr-1"></i>PDF
+              </button>
+              
+              <!-- 手動更新 -->
+              <button onclick="loadProgressBoard(${curriculumId})" 
                       class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
                 <i class="fas fa-sync-alt mr-1"></i>更新
               </button>
@@ -3243,6 +3259,20 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
             <li><i class="fas fa-check text-green-500 mr-2"></i>赤/黄背景: 停滞中（声掛け推奨）</li>
             <li><i class="fas fa-check text-green-500 mr-2"></i>ヘルプ統計でよく使われる支援方法を確認</li>
           </ul>
+          
+          <!-- レポート機能 -->
+          <div class="mt-4 pt-4 border-t border-blue-200">
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="showWeeklyReport()" 
+                      class="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg transition-all shadow text-xs md:text-sm font-bold">
+                <i class="fas fa-calendar-week mr-2"></i>週次レポート
+              </button>
+              <button onclick="showMonthlyReport()" 
+                      class="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-all shadow text-xs md:text-sm font-bold">
+                <i class="fas fa-calendar-alt mr-2"></i>月次レポート
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     `
@@ -7626,6 +7656,686 @@ window.saveOptionalProblem = saveOptionalProblem
 window.deleteOptionalProblem = deleteOptionalProblem
 window.addOptionalProblem = addOptionalProblem
 window.saveNewOptionalProblem = saveNewOptionalProblem
+window.showStudentDetail = showStudentDetail
+window.closeStudentDetail = closeStudentDetail
+window.exportProgressToPDF = exportProgressToPDF
+window.startAutoRefresh = startAutoRefresh
+window.stopAutoRefresh = stopAutoRefresh
+
+// ==============================================
+// 進捗ボード拡張機能
+// ==============================================
+
+// 自動更新タイマー
+let autoRefreshInterval = null
+
+// 自動更新開始
+function startAutoRefresh(curriculumId, intervalSeconds = 30) {
+  if (autoRefreshInterval) {
+    clearInterval(autoRefreshInterval)
+  }
+  
+  autoRefreshInterval = setInterval(() => {
+    console.log('🔄 進捗ボードを自動更新中...')
+    loadProgressBoard(curriculumId)
+  }, intervalSeconds * 1000)
+  
+  console.log(`✅ 自動更新を開始しました（${intervalSeconds}秒ごと）`)
+}
+
+// 自動更新停止
+function stopAutoRefresh() {
+  if (autoRefreshInterval) {
+    clearInterval(autoRefreshInterval)
+    autoRefreshInterval = null
+    console.log('⏸️ 自動更新を停止しました')
+  }
+}
+
+// 自動更新トグル
+function toggleAutoRefresh(curriculumId) {
+  const toggle = document.getElementById('autoRefreshToggle')
+  if (toggle && toggle.checked) {
+    startAutoRefresh(curriculumId, 30) // 30秒ごと
+    console.log('✅ 自動更新ON')
+  } else {
+    stopAutoRefresh()
+    console.log('⏸️ 自動更新OFF')
+  }
+}
+window.toggleAutoRefresh = toggleAutoRefresh
+
+// 児童詳細モーダル表示
+function showStudentDetail(studentData) {
+  const student = typeof studentData === 'string' ? JSON.parse(studentData) : studentData
+  const currProgress = student.curriculums[0] || {}
+  const cardProgress = currProgress.card_progress || []
+  const checkProgress = currProgress.check_test_progress || []
+  const optionalProgress = currProgress.optional_progress || []
+  const helpStats = currProgress.help_stats || []
+  const priority = currProgress.intervention_priority || 0
+  
+  // 学習時間の計算
+  const totalMinutes = cardProgress.reduce((sum, card) => sum + (card.time_spent || 0), 0)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  
+  // 平均理解度の計算
+  const avgUnderstanding = cardProgress.length > 0 
+    ? Math.round(cardProgress.reduce((sum, card) => sum + (card.understanding_level || 0), 0) / cardProgress.length)
+    : 0
+  
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.id = 'studentDetailModal'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white p-6 rounded-t-lg">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="bg-white text-blue-600 w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold">
+              ${student.student_number}
+            </div>
+            <div>
+              <h2 class="text-2xl font-bold">${student.student_name}</h2>
+              <p class="text-blue-100 mt-1">優先度スコア: ${priority}点</p>
+            </div>
+          </div>
+          <button onclick="closeStudentDetail()" 
+                  class="text-white hover:text-gray-200 text-3xl leading-none">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- コンテンツ -->
+      <div class="p-6">
+        <!-- サマリー -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-blue-50 rounded-lg p-4 text-center">
+            <div class="text-3xl font-bold text-blue-600">${cardProgress.filter(c => c.status === 'completed').length}</div>
+            <div class="text-sm text-gray-600 mt-1">完了カード</div>
+          </div>
+          <div class="bg-green-50 rounded-lg p-4 text-center">
+            <div class="text-3xl font-bold text-green-600">${avgUnderstanding}</div>
+            <div class="text-sm text-gray-600 mt-1">平均理解度</div>
+          </div>
+          <div class="bg-purple-50 rounded-lg p-4 text-center">
+            <div class="text-3xl font-bold text-purple-600">${hours}h ${minutes}m</div>
+            <div class="text-sm text-gray-600 mt-1">学習時間</div>
+          </div>
+          <div class="bg-orange-50 rounded-lg p-4 text-center">
+            <div class="text-3xl font-bold text-orange-600">${helpStats.reduce((sum, stat) => sum + stat.count, 0)}</div>
+            <div class="text-sm text-gray-600 mt-1">ヘルプ回数</div>
+          </div>
+        </div>
+
+        <!-- タブ -->
+        <div class="border-b border-gray-200 mb-6">
+          <nav class="flex space-x-4">
+            <button onclick="switchStudentTab('cards')" 
+                    class="student-tab-btn px-4 py-2 font-medium text-sm border-b-2 border-blue-500 text-blue-600"
+                    data-tab="cards">
+              学習カード
+            </button>
+            <button onclick="switchStudentTab('tests')" 
+                    class="student-tab-btn px-4 py-2 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700"
+                    data-tab="tests">
+              テスト
+            </button>
+            <button onclick="switchStudentTab('help')" 
+                    class="student-tab-btn px-4 py-2 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700"
+                    data-tab="help">
+              ヘルプ履歴
+            </button>
+          </nav>
+        </div>
+
+        <!-- 学習カードタブ -->
+        <div id="student-tab-cards" class="student-tab-content">
+          <h3 class="text-lg font-bold text-gray-800 mb-4">学習カード進捗</h3>
+          <div class="space-y-3">
+            ${cardProgress.length > 0 ? cardProgress.map(card => `
+              <div class="border rounded-lg p-4 hover:bg-gray-50">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full ${
+                      card.course_level === 'basic' ? 'bg-green-500' :
+                      card.course_level === 'standard' ? 'bg-blue-500' : 'bg-purple-500'
+                    } text-white flex items-center justify-center font-bold">
+                      ${card.card_number}
+                    </div>
+                    <div>
+                      <div class="font-bold text-gray-800">${card.card_title || '不明'}</div>
+                      <div class="text-xs text-gray-500">${
+                        card.course_level === 'basic' ? 'じっくりコース' :
+                        card.course_level === 'standard' ? 'しっかりコース' : 'ぐんぐんコース'
+                      }</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="text-center">
+                      <div class="text-2xl">${getUnderstandingEmoji(card.understanding_level)}</div>
+                      <div class="text-xs text-gray-500">理解度</div>
+                    </div>
+                    <div class="px-3 py-1 rounded-full text-xs font-bold ${
+                      card.status === 'completed' ? 'bg-green-100 text-green-700' :
+                      card.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-700'
+                    }">
+                      ${card.status === 'completed' ? '完了' :
+                        card.status === 'in_progress' ? '学習中' : '未着手'}
+                    </div>
+                  </div>
+                </div>
+                ${card.stagnant_minutes > 10 ? `
+                  <div class="mt-2 bg-yellow-50 border-l-4 border-yellow-500 p-2 text-xs">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                    ${card.stagnant_minutes}分間停滞中
+                  </div>
+                ` : ''}
+                ${card.help_requested_at && !card.help_resolved_at ? `
+                  <div class="mt-2 bg-orange-50 border-l-4 border-orange-500 p-2 text-xs">
+                    <i class="fas fa-hand-paper text-orange-600 mr-2"></i>
+                    ヘルプ要請中（${card.help_waiting_minutes}分待機）
+                  </div>
+                ` : ''}
+              </div>
+            `).join('') : '<div class="text-center text-gray-500 py-8">学習カードのデータがありません</div>'}
+          </div>
+        </div>
+
+        <!-- テストタブ -->
+        <div id="student-tab-tests" class="student-tab-content hidden">
+          <h3 class="text-lg font-bold text-gray-800 mb-4">テスト進捗</h3>
+          
+          <!-- チェックテスト -->
+          <div class="mb-6">
+            <h4 class="font-bold text-gray-700 mb-3">チェックテスト</h4>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+              ${[1,2,3,4,5,6].map(num => {
+                const test = checkProgress.find(t => t.problem_number === num)
+                const status = test ? test.status : 'not_started'
+                return `
+                  <div class="border rounded-lg p-3 text-center ${
+                    status === 'completed' ? 'bg-green-50 border-green-300' :
+                    status === 'failed' ? 'bg-red-50 border-red-300' :
+                    status === 'in_progress' ? 'bg-blue-50 border-blue-300' :
+                    'bg-gray-50 border-gray-300'
+                  }">
+                    <div class="text-2xl font-bold mb-1">問${num}</div>
+                    <div class="text-xs font-bold ${
+                      status === 'completed' ? 'text-green-600' :
+                      status === 'failed' ? 'text-red-600' :
+                      status === 'in_progress' ? 'text-blue-600' :
+                      'text-gray-600'
+                    }">
+                      ${status === 'completed' ? '✓ 合格' :
+                        status === 'failed' ? '✗ 不合格' :
+                        status === 'in_progress' ? '実施中' : '未実施'}
+                    </div>
+                    ${test && test.attempts > 0 ? `<div class="text-xs text-gray-500 mt-1">${test.attempts}回挑戦</div>` : ''}
+                  </div>
+                `
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- 選択問題 -->
+          <div>
+            <h4 class="font-bold text-gray-700 mb-3">選択問題</h4>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+              ${[1,2,3,4,5,6].map(num => {
+                const problem = optionalProgress.find(p => p.problem_number === num)
+                const status = problem ? problem.status : 'not_started'
+                return `
+                  <div class="border rounded-lg p-3 text-center ${
+                    status === 'completed' ? 'bg-blue-50 border-blue-300' :
+                    status === 'in_progress' ? 'bg-yellow-50 border-yellow-300' :
+                    'bg-gray-50 border-gray-300'
+                  }">
+                    <div class="text-2xl font-bold mb-1">問${num}</div>
+                    <div class="text-xs font-bold ${
+                      status === 'completed' ? 'text-blue-600' :
+                      status === 'in_progress' ? 'text-yellow-600' :
+                      'text-gray-600'
+                    }">
+                      ${status === 'completed' ? '✓ 完了' :
+                        status === 'in_progress' ? '取組中' : '未着手'}
+                    </div>
+                    ${problem && problem.problem_title ? `<div class="text-xs text-gray-500 mt-1">${problem.problem_title}</div>` : ''}
+                  </div>
+                `
+              }).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- ヘルプ履歴タブ -->
+        <div id="student-tab-help" class="student-tab-content hidden">
+          <h3 class="text-lg font-bold text-gray-800 mb-4">ヘルプ統計</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            ${['ai', 'teacher', 'friend', 'hint'].map(type => {
+              const stat = helpStats.find(s => s.help_type === type)
+              const count = stat ? stat.count : 0
+              const icons = {
+                ai: { icon: 'robot', label: 'AI先生', color: 'purple' },
+                teacher: { icon: 'user-tie', label: '先生', color: 'blue' },
+                friend: { icon: 'user-friends', label: '友達', color: 'green' },
+                hint: { icon: 'lightbulb', label: 'ヒント', color: 'yellow' }
+              }
+              const info = icons[type]
+              return `
+                <div class="bg-${info.color}-50 border border-${info.color}-200 rounded-lg p-4 text-center">
+                  <i class="fas fa-${info.icon} text-${info.color}-500 text-3xl mb-2"></i>
+                  <div class="text-2xl font-bold text-gray-800">${count}</div>
+                  <div class="text-sm text-gray-600">${info.label}</div>
+                </div>
+              `
+            }).join('')}
+          </div>
+
+          <div class="mt-6 bg-blue-50 rounded-lg p-4">
+            <h4 class="font-bold text-blue-800 mb-2">
+              <i class="fas fa-chart-line mr-2"></i>学習パターン分析
+            </h4>
+            <ul class="text-sm text-gray-700 space-y-2">
+              ${helpStats.length > 0 ? `
+                <li><i class="fas fa-check text-green-500 mr-2"></i>
+                  最もよく使う支援: ${
+                    helpStats.reduce((max, stat) => stat.count > max.count ? stat : max).help_type === 'ai' ? 'AI先生' :
+                    helpStats.reduce((max, stat) => stat.count > max.count ? stat : max).help_type === 'teacher' ? '先生' :
+                    helpStats.reduce((max, stat) => stat.count > max.count ? stat : max).help_type === 'friend' ? '友達' : 'ヒント'
+                  }
+                </li>
+              ` : ''}
+              <li><i class="fas fa-check text-green-500 mr-2"></i>
+                平均理解度: ${avgUnderstanding}点
+              </li>
+              <li><i class="fas fa-check text-green-500 mr-2"></i>
+                総学習時間: ${hours}時間${minutes}分
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- アクションボタン -->
+        <div class="mt-6 pt-6 border-t border-gray-200 flex gap-3">
+          <button onclick="exportStudentReport('${student.student_id}')" 
+                  class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md">
+            <i class="fas fa-file-pdf mr-2"></i>個人レポート出力
+          </button>
+          <button onclick="closeStudentDetail()" 
+                  class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+// タブ切り替え
+function switchStudentTab(tabName) {
+  // すべてのタブコンテンツを非表示
+  document.querySelectorAll('.student-tab-content').forEach(content => {
+    content.classList.add('hidden')
+  })
+  
+  // すべてのタブボタンを非アクティブ化
+  document.querySelectorAll('.student-tab-btn').forEach(btn => {
+    btn.classList.remove('border-blue-500', 'text-blue-600')
+    btn.classList.add('border-transparent', 'text-gray-500')
+  })
+  
+  // 選択されたタブを表示
+  document.getElementById(`student-tab-${tabName}`).classList.remove('hidden')
+  
+  // 選択されたタブボタンをアクティブ化
+  const activeBtn = document.querySelector(`[data-tab="${tabName}"]`)
+  activeBtn.classList.remove('border-transparent', 'text-gray-500')
+  activeBtn.classList.add('border-blue-500', 'text-blue-600')
+}
+window.switchStudentTab = switchStudentTab
+
+// 児童詳細モーダルを閉じる
+function closeStudentDetail() {
+  const modal = document.getElementById('studentDetailModal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+// 理解度の絵文字取得
+function getUnderstandingEmoji(level) {
+  if (level >= 80) return '🤩'
+  if (level >= 60) return '😄'
+  if (level >= 40) return '😊'
+  if (level >= 20) return '😕'
+  return '😢'
+}
+
+// PDF出力機能
+async function exportProgressToPDF() {
+  showLoading('PDFを生成中...')
+  
+  try {
+    const element = document.querySelector('.min-h-screen')
+    if (!element) {
+      throw new Error('出力対象の要素が見つかりません')
+    }
+
+    const opt = {
+      margin: 10,
+      filename: `進捗ボード_${new Date().toLocaleDateString('ja-JP')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    }
+
+    await html2pdf().set(opt).from(element).save()
+    
+    hideLoading()
+    console.log('✅ PDF生成完了')
+  } catch (error) {
+    hideLoading()
+    console.error('PDF生成エラー:', error)
+    alert('PDF生成に失敗しました。ブラウザの印刷機能をご利用ください。')
+  }
+}
+
+// 個人レポート出力（将来実装）
+async function exportStudentReport(studentId) {
+  alert('個人レポート機能は現在開発中です')
+}
+window.exportStudentReport = exportStudentReport
+
+// 週次レポート表示
+async function showWeeklyReport() {
+  showLoading('週次レポートを生成中...')
+  
+  try {
+    // 今週の日付範囲を計算
+    const today = new Date()
+    const dayOfWeek = today.getDay()
+    const startOfWeek = new Date(today)
+    startOfWeek.setDate(today.getDate() - dayOfWeek)
+    const endOfWeek = new Date(today)
+    endOfWeek.setDate(today.getDate() + (6 - dayOfWeek))
+    
+    const startDate = startOfWeek.toISOString().split('T')[0]
+    const endDate = endOfWeek.toISOString().split('T')[0]
+    
+    const response = await axios.get(
+      `/api/reports/weekly/${state.student.classCode}?startDate=${startDate}&endDate=${endDate}`
+    )
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      alert('週次レポートの取得に失敗しました')
+      return
+    }
+    
+    const stats = response.data.stats
+    
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-gradient-to-r from-green-500 to-blue-500 text-white p-6 rounded-t-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-2xl font-bold">週次レポート</h2>
+              <p class="text-sm mt-1">${startDate} 〜 ${endDate}</p>
+              <p class="text-sm">クラス: ${state.student.classCode}</p>
+            </div>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-white hover:text-gray-200 text-3xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">No.</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">氏名</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">完了カード数</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">平均理解度</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">AI</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">先生</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">友達</th>
+                  <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">ヒント</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${stats.map(student => `
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${student.student_number}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.student_name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                      <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full font-bold">
+                        ${student.completed_cards || 0}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                      <span class="px-2 py-1 ${
+                        (student.avg_understanding || 0) >= 80 ? 'bg-green-100 text-green-800' :
+                        (student.avg_understanding || 0) >= 60 ? 'bg-blue-100 text-blue-800' :
+                        (student.avg_understanding || 0) >= 40 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      } rounded-full font-bold">
+                        ${Math.round(student.avg_understanding || 0)}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
+                      ${student.ai_help_count || 0}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
+                      ${student.teacher_help_count || 0}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
+                      ${student.friend_help_count || 0}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center text-gray-500">
+                      ${student.hint_help_count || 0}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-6 flex gap-3">
+            <button onclick="exportReportToPDF('weekly', '${startDate}', '${endDate}')" 
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-all">
+              <i class="fas fa-file-pdf mr-2"></i>PDF出力
+            </button>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    hideLoading()
+    console.error('週次レポートエラー:', error)
+    alert('週次レポートの取得に失敗しました')
+  }
+}
+window.showWeeklyReport = showWeeklyReport
+
+// 月次レポート表示
+async function showMonthlyReport() {
+  showLoading('月次レポートを生成中...')
+  
+  try {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    
+    const response = await axios.get(
+      `/api/reports/monthly/${state.student.classCode}?year=${year}&month=${month}`
+    )
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      alert('月次レポートの取得に失敗しました')
+      return
+    }
+    
+    const studentStats = response.data.student_stats
+    const curriculumProgress = response.data.curriculum_progress
+    
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-t-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-2xl font-bold">月次レポート</h2>
+              <p class="text-sm mt-1">${year}年${month}月</p>
+              <p class="text-sm">クラス: ${state.student.classCode}</p>
+            </div>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-white hover:text-gray-200 text-3xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          <!-- 児童別統計 -->
+          <h3 class="text-lg font-bold text-gray-800 mb-4">児童別学習状況</h3>
+          <div class="overflow-x-auto mb-8">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">No.</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">氏名</th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">完了カード数</th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">平均理解度</th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">活動日数</th>
+                  <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ヘルプ回数</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                ${studentStats.map(student => `
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">${student.student_number}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.student_name}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-center">
+                      <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full font-bold">
+                        ${student.completed_cards || 0}
+                      </span>
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-center">
+                      <span class="px-2 py-1 ${
+                        (student.avg_understanding || 0) >= 80 ? 'bg-green-100 text-green-800' :
+                        (student.avg_understanding || 0) >= 60 ? 'bg-blue-100 text-blue-800' :
+                        (student.avg_understanding || 0) >= 40 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      } rounded-full font-bold">
+                        ${Math.round(student.avg_understanding || 0)}
+                      </span>
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-center text-gray-700">
+                      ${student.active_days || 0}日
+                    </td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm text-center text-gray-700">
+                      ${student.total_help_count || 0}回
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- カリキュラム別進捗 -->
+          <h3 class="text-lg font-bold text-gray-800 mb-4">カリキュラム別進捗</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            ${curriculumProgress.map(curr => `
+              <div class="border rounded-lg p-4 bg-gradient-to-r from-blue-50 to-purple-50">
+                <h4 class="font-bold text-gray-800 mb-2">${curr.subject} - ${curr.unit_name}</h4>
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-gray-600">取組人数:</span>
+                  <span class="font-bold text-blue-600">${curr.students_count || 0}名</span>
+                </div>
+                <div class="flex items-center justify-between text-sm mt-1">
+                  <span class="text-gray-600">完了カード:</span>
+                  <span class="font-bold text-green-600">${curr.completed_cards_total || 0}枚</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="mt-6 flex gap-3">
+            <button onclick="exportReportToPDF('monthly', '${year}', '${month}')" 
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-all">
+              <i class="fas fa-file-pdf mr-2"></i>PDF出力
+            </button>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    hideLoading()
+    console.error('月次レポートエラー:', error)
+    alert('月次レポートの取得に失敗しました')
+  }
+}
+window.showMonthlyReport = showMonthlyReport
+
+// レポートPDF出力
+async function exportReportToPDF(type, param1, param2) {
+  showLoading('PDFを生成中...')
+  
+  try {
+    const modal = document.querySelector('.fixed.inset-0')
+    if (!modal) {
+      throw new Error('レポートが見つかりません')
+    }
+
+    const opt = {
+      margin: 10,
+      filename: type === 'weekly' 
+        ? `週次レポート_${param1}_${param2}.pdf`
+        : `月次レポート_${param1}年${param2}月.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }
+
+    await html2pdf().set(opt).from(modal).save()
+    
+    hideLoading()
+    console.log('✅ レポートPDF生成完了')
+  } catch (error) {
+    hideLoading()
+    console.error('PDF生成エラー:', error)
+    alert('PDF生成に失敗しました')
+  }
+}
+window.exportReportToPDF = exportReportToPDF
 
 // ==============================================
 // 進捗ボード用ヘルパー関数（新）
@@ -7653,8 +8363,12 @@ function generateProgressBoardRows(students, curriculums) {
     return `
       <div class="grid grid-cols-[150px_1fr] gap-2 py-2 border-b hover:bg-gray-50 ${bgColor}">
         <!-- 児童名 -->
-        <div class="flex flex-col justify-center px-2">
-          <div class="font-bold text-sm">${student.student_name}</div>
+        <div class="flex flex-col justify-center px-2 cursor-pointer hover:bg-blue-50 rounded transition" 
+             onclick='showStudentDetail(${JSON.stringify(student).replace(/'/g, "&apos;")})'>
+          <div class="font-bold text-sm text-blue-600 hover:text-blue-800">
+            ${student.student_name}
+            <i class="fas fa-info-circle text-xs ml-1"></i>
+          </div>
           <div class="text-xs text-gray-500">No.${student.student_number}</div>
           ${hasHelp ? '<div class="text-xs text-orange-600 font-bold mt-1"><i class="fas fa-hand-paper mr-1"></i>ヘルプ</div>' : ''}
           ${priority >= 60 && !hasHelp ? '<div class="text-xs text-red-600 font-bold mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>停滞</div>' : ''}
