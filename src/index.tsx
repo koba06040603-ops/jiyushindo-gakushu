@@ -3748,6 +3748,297 @@ app.delete('/api/optional-problem/:id', async (c) => {
   }
 })
 
+// APIルート：選択問題の更新
+app.put('/api/optional-problem/:id', async (c) => {
+  const { env } = c
+  const problemId = c.req.param('id')
+  const { problem_title, problem_description, problem_content, difficulty_level, learning_meaning } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE optional_problems
+      SET problem_title = ?, problem_description = ?, 
+          problem_content = ?, difficulty_level = ?, learning_meaning = ?
+      WHERE id = ?
+    `).bind(
+      problem_title,
+      problem_description,
+      problem_content || '',
+      difficulty_level || 'medium',
+      learning_meaning || '',
+      problemId
+    ).run()
+    
+    return c.json({
+      success: true,
+      message: '選択問題を更新しました'
+    })
+  } catch (error: any) {
+    console.error('選択問題更新エラー:', error)
+    return c.json({
+      success: false,
+      error: '選択問題の更新に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：選択問題の新規追加
+app.post('/api/curriculum/:id/optional-problem', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('id')
+  const { problem_number, problem_title, problem_description, problem_content, difficulty_level, learning_meaning } = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO optional_problems (
+        curriculum_id, problem_number, problem_title, 
+        problem_description, problem_content, difficulty_level, learning_meaning
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      curriculumId,
+      problem_number,
+      problem_title,
+      problem_description,
+      problem_content || '',
+      difficulty_level || 'medium',
+      learning_meaning || ''
+    ).run()
+    
+    return c.json({
+      success: true,
+      message: '選択問題を追加しました',
+      problemId: result.meta.last_row_id
+    })
+  } catch (error: any) {
+    console.error('選択問題追加エラー:', error)
+    return c.json({
+      success: false,
+      error: '選択問題の追加に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：導入問題の更新
+app.put('/api/course/:id/introduction-problem', async (c) => {
+  const { env } = c
+  const courseId = c.req.param('id')
+  const { problem_title, problem_content, answer } = await c.req.json()
+  
+  try {
+    const introductionProblem = JSON.stringify({
+      problem_title,
+      problem_content,
+      answer
+    })
+    
+    await env.DB.prepare(`
+      UPDATE courses
+      SET introduction_problem = ?
+      WHERE id = ?
+    `).bind(introductionProblem, courseId).run()
+    
+    return c.json({
+      success: true,
+      message: '導入問題を更新しました'
+    })
+  } catch (error: any) {
+    console.error('導入問題更新エラー:', error)
+    return c.json({
+      success: false,
+      error: '導入問題の更新に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：導入問題の削除
+app.delete('/api/course/:id/introduction-problem', async (c) => {
+  const { env } = c
+  const courseId = c.req.param('id')
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE courses
+      SET introduction_problem = NULL
+      WHERE id = ?
+    `).bind(courseId).run()
+    
+    return c.json({
+      success: true,
+      message: '導入問題を削除しました'
+    })
+  } catch (error: any) {
+    console.error('導入問題削除エラー:', error)
+    return c.json({
+      success: false,
+      error: '導入問題の削除に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：チェックテスト問題の個別更新
+app.put('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('id')
+  const problemNumber = parseInt(c.req.param('problemNumber'))
+  const { problem_text, answer } = await c.req.json()
+  
+  try {
+    // 既存のチェックテストを取得
+    const metaRow: any = await env.DB.prepare(`
+      SELECT meta_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+    `).bind(curriculumId).first()
+    
+    if (!metaRow) {
+      return c.json({ error: 'チェックテストが見つかりません' }, 404)
+    }
+    
+    const checkTest = JSON.parse(metaRow.meta_value)
+    
+    // 指定された問題を更新
+    const problemIndex = checkTest.sample_problems.findIndex((p: any) => p.problem_number === problemNumber)
+    if (problemIndex === -1) {
+      return c.json({ error: '指定された問題が見つかりません' }, 404)
+    }
+    
+    checkTest.sample_problems[problemIndex].problem_text = problem_text
+    checkTest.sample_problems[problemIndex].answer = answer
+    
+    // データベースに保存
+    await env.DB.prepare(`
+      UPDATE curriculum_metadata
+      SET meta_value = ?
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+    `).bind(JSON.stringify(checkTest), curriculumId).run()
+    
+    return c.json({
+      success: true,
+      message: 'チェックテスト問題を更新しました'
+    })
+  } catch (error: any) {
+    console.error('チェックテスト更新エラー:', error)
+    return c.json({
+      success: false,
+      error: 'チェックテスト問題の更新に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：チェックテスト問題の個別削除
+app.delete('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('id')
+  const problemNumber = parseInt(c.req.param('problemNumber'))
+  
+  try {
+    // 既存のチェックテストを取得
+    const metaRow: any = await env.DB.prepare(`
+      SELECT meta_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+    `).bind(curriculumId).first()
+    
+    if (!metaRow) {
+      return c.json({ error: 'チェックテストが見つかりません' }, 404)
+    }
+    
+    const checkTest = JSON.parse(metaRow.meta_value)
+    
+    // 指定された問題を削除
+    checkTest.sample_problems = checkTest.sample_problems.filter((p: any) => p.problem_number !== problemNumber)
+    
+    // 問題番号を振り直し
+    checkTest.sample_problems.forEach((p: any, index: number) => {
+      p.problem_number = index + 1
+    })
+    
+    // データベースに保存
+    await env.DB.prepare(`
+      UPDATE curriculum_metadata
+      SET meta_value = ?
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+    `).bind(JSON.stringify(checkTest), curriculumId).run()
+    
+    return c.json({
+      success: true,
+      message: 'チェックテスト問題を削除しました'
+    })
+  } catch (error: any) {
+    console.error('チェックテスト削除エラー:', error)
+    return c.json({
+      success: false,
+      error: 'チェックテスト問題の削除に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：チェックテスト問題の新規追加
+app.post('/api/curriculum/:id/check-test/problem', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('id')
+  const { problem_text, answer } = await c.req.json()
+  
+  try {
+    // 既存のチェックテストを取得
+    const metaRow: any = await env.DB.prepare(`
+      SELECT meta_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+    `).bind(curriculumId).first()
+    
+    let checkTest
+    if (metaRow) {
+      checkTest = JSON.parse(metaRow.meta_value)
+    } else {
+      checkTest = {
+        test_title: '基礎基本チェックテスト',
+        test_description: '全コース共通の基礎基本チェックテスト（知識理解の最低保証）',
+        test_note: '6問中5問以上正解で合格です！',
+        sample_problems: []
+      }
+    }
+    
+    // 新しい問題を追加
+    const newProblemNumber = checkTest.sample_problems.length + 1
+    checkTest.sample_problems.push({
+      problem_number: newProblemNumber,
+      problem_text,
+      answer
+    })
+    
+    // データベースに保存
+    if (metaRow) {
+      await env.DB.prepare(`
+        UPDATE curriculum_metadata
+        SET meta_value = ?
+        WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+      `).bind(JSON.stringify(checkTest), curriculumId).run()
+    } else {
+      await env.DB.prepare(`
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
+        VALUES (?, 'common_check_test', ?)
+      `).bind(curriculumId, JSON.stringify(checkTest)).run()
+    }
+    
+    return c.json({
+      success: true,
+      message: 'チェックテスト問題を追加しました',
+      problemNumber: newProblemNumber
+    })
+  } catch (error: any) {
+    console.error('チェックテスト追加エラー:', error)
+    return c.json({
+      success: false,
+      error: 'チェックテスト問題の追加に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
 // APIルート：チェックテストの再生成
 app.post('/api/curriculum/:id/regenerate-check-test', async (c) => {
   const { env } = c

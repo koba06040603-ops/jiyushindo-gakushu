@@ -957,10 +957,24 @@ async function loadGuidePage(curriculumId) {
                       
                       <!-- 導入問題 -->
                       ${course.introduction_problem ? `
-                        <div class="bg-white rounded-lg p-3 border-2 ${index === 0 ? 'border-green-300' : index === 1 ? 'border-blue-300' : 'border-purple-300'} mb-3">
-                          <div class="flex items-center mb-2">
-                            <i class="fas fa-star ${iconClasses} mr-2"></i>
-                            <p class="text-sm font-bold text-gray-800">${course.introduction_problem.problem_title}</p>
+                        <div class="bg-white rounded-lg p-3 border-2 ${index === 0 ? 'border-green-300' : index === 1 ? 'border-blue-300' : 'border-purple-300'} mb-3 group relative">
+                          <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center flex-1">
+                              <i class="fas fa-star ${iconClasses} mr-2"></i>
+                              <p class="text-sm font-bold text-gray-800">${course.introduction_problem.problem_title}</p>
+                            </div>
+                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition print:hidden">
+                              <button onclick="editIntroductionProblem(${course.id}, ${index})" 
+                                      class="text-blue-600 hover:text-blue-800 px-2 py-1 text-xs"
+                                      title="編集">
+                                <i class="fas fa-edit"></i>
+                              </button>
+                              <button onclick="deleteIntroductionProblem(${course.id})" 
+                                      class="text-red-600 hover:text-red-800 px-2 py-1 text-xs"
+                                      title="削除">
+                                <i class="fas fa-trash"></i>
+                              </button>
+                            </div>
                           </div>
                           <div class="bg-gray-50 rounded p-2 mb-2 border-l-4 ${index === 0 ? 'border-green-500' : index === 1 ? 'border-blue-500' : 'border-purple-500'}">
                             <p class="text-xs text-gray-800 leading-relaxed whitespace-pre-wrap">${course.introduction_problem.problem_content}</p>
@@ -974,7 +988,15 @@ async function loadGuidePage(curriculumId) {
                             </div>
                           ` : ''}
                         </div>
-                      ` : ''}
+                      ` : `
+                        <div class="bg-gray-100 rounded-lg p-3 border-2 border-dashed border-gray-300 mb-3 text-center">
+                          <p class="text-xs text-gray-500 mb-2">導入問題がまだありません</p>
+                          <button onclick="addIntroductionProblem(${course.id}, ${index})" 
+                                  class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition">
+                            <i class="fas fa-plus mr-1"></i>導入問題を追加
+                          </button>
+                        </div>
+                      `}
                       
                       <button class="w-full mt-2 py-2 ${badgeClasses} text-white rounded-lg font-bold text-sm hover:opacity-90 shadow-md">
                         このコースで学しゅうする
@@ -1007,7 +1029,7 @@ async function loadGuidePage(curriculumId) {
                     </p>
                     <div class="space-y-3">
                       ${commonCheckTest.sample_problems.map((problem, index) => `
-                        <div class="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-white rounded-lg p-3">
+                        <div class="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-white rounded-lg p-3 group relative">
                           <div class="flex items-start gap-3">
                             <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 text-white flex items-center justify-center font-bold flex-shrink-0">
                               ${problem.problem_number}
@@ -1018,9 +1040,27 @@ async function loadGuidePage(curriculumId) {
                                 💡 こたえ: ${problem.answer}
                               </div>
                             </div>
+                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition print:hidden">
+                              <button onclick="editCheckTestProblem(${curriculum.id}, ${problem.problem_number})" 
+                                      class="text-blue-600 hover:text-blue-800 px-2 py-1 text-xs"
+                                      title="編集">
+                                <i class="fas fa-edit"></i>
+                              </button>
+                              <button onclick="deleteCheckTestProblem(${curriculum.id}, ${problem.problem_number})" 
+                                      class="text-red-600 hover:text-red-800 px-2 py-1 text-xs"
+                                      title="削除">
+                                <i class="fas fa-trash"></i>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       `).join('')}
+                    </div>
+                    <div class="mt-4 text-center print:hidden">
+                      <button onclick="addCheckTestProblem(${curriculum.id})" 
+                              class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                        <i class="fas fa-plus mr-2"></i>問題を追加
+                      </button>
                     </div>
                   </div>
                 ` : ''}
@@ -7581,4 +7621,685 @@ window.executeDuplicate = executeDuplicate
 window.generateQRCode = generateQRCode
 window.closeQRModal = closeQRModal
 window.downloadQR = downloadQR
+window.editIntroProblem = editIntroProblem
+window.saveIntroProblem = saveIntroProblem
+window.addNewIntroProblem = addNewIntroProblem
+window.saveNewIntroProblem = saveNewIntroProblem
+window.editCheckTest = editCheckTest
+window.saveCheckTest = saveCheckTest
+window.addCheckTestProblem = addCheckTestProblem
+window.deleteCheckTestProblem = deleteCheckTestProblem
+window.editOptionalProblem = editOptionalProblem
+window.saveOptionalProblem = saveOptionalProblem
+window.deleteOptionalProblem = deleteOptionalProblem
+window.addOptionalProblem = addOptionalProblem
+window.saveNewOptionalProblem = saveNewOptionalProblem
+
+// ==============================================
+// 問題管理機能
+// ==============================================
+
+// 導入問題編集
+async function editIntroProblem(courseId, courseIndex) {
+  try {
+    const response = await axios.get(`/api/course/${courseId}`)
+    const course = response.data.course
+    const introProblem = course.introduction_problem
+    
+    if (!introProblem) {
+      alert('導入問題が見つかりません')
+      return
+    }
+
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-800">
+              <i class="fas fa-edit mr-2"></i>導入問題を編集
+            </h3>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                タイトル
+              </label>
+              <input type="text" id="editIntroProblemTitle" 
+                     value="${introProblem.title || ''}"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                問題内容
+              </label>
+              <textarea id="editIntroProblemContent" rows="4"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${introProblem.content || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                ヒント・答え（任意）
+              </label>
+              <textarea id="editIntroProblemAnswer" rows="3"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${introProblem.answer || ''}</textarea>
+            </div>
+          </div>
+
+          <div class="flex gap-3 mt-6">
+            <button onclick="saveIntroProblem(${courseId}, ${courseIndex})"
+                    class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md">
+              <i class="fas fa-save mr-2"></i>保存する
+            </button>
+            <button onclick="this.closest('.fixed').remove()"
+                    class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+              キャンセル
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    console.error('導入問題読み込みエラー:', error)
+    alert('導入問題の読み込みに失敗しました')
+  }
+}
+
+// 導入問題保存
+async function saveIntroProblem(courseId, courseIndex) {
+  try {
+    showLoading('導入問題を保存中...')
+    
+    const title = document.getElementById('editIntroProblemTitle').value
+    const content = document.getElementById('editIntroProblemContent').value
+    const answer = document.getElementById('editIntroProblemAnswer').value
+
+    await axios.put(`/api/course/${courseId}/intro-problem`, {
+      title,
+      content,
+      answer
+    })
+
+    hideLoading()
+    alert('✅ 導入問題を保存しました')
+    
+    // モーダルを閉じてページを再読み込み
+    document.querySelector('.fixed.inset-0').remove()
+    if (state.selectedCurriculum) {
+      loadGuidePage(state.selectedCurriculum.id)
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('導入問題保存エラー:', error)
+    alert('導入問題の保存に失敗しました')
+  }
+}
+
+// 新規導入問題追加
+async function addNewIntroProblem(courseId) {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold text-gray-800">
+            <i class="fas fa-plus-circle mr-2"></i>導入問題を追加
+          </h3>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              タイトル
+            </label>
+            <input type="text" id="newIntroProblemTitle" 
+                   placeholder="例: 学習の目標"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              問題内容
+            </label>
+            <textarea id="newIntroProblemContent" rows="4" 
+                      placeholder="問題文を入力してください"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              ヒント・答え（任意）
+            </label>
+            <textarea id="newIntroProblemAnswer" rows="3"
+                      placeholder="ヒントや答えを入力してください"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-6">
+          <button onclick="saveNewIntroProblem(${courseId})"
+                  class="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md">
+            <i class="fas fa-plus mr-2"></i>追加する
+          </button>
+          <button onclick="this.closest('.fixed').remove()"
+                  class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+async function saveNewIntroProblem(courseId) {
+  try {
+    showLoading('導入問題を追加中...')
+    
+    const title = document.getElementById('newIntroProblemTitle').value
+    const content = document.getElementById('newIntroProblemContent').value
+    const answer = document.getElementById('newIntroProblemAnswer').value
+
+    if (!title || !content) {
+      alert('タイトルと問題内容は必須です')
+      hideLoading()
+      return
+    }
+
+    await axios.put(`/api/course/${courseId}/intro-problem`, {
+      title,
+      content,
+      answer
+    })
+
+    hideLoading()
+    alert('✅ 導入問題を追加しました')
+    
+    document.querySelector('.fixed.inset-0').remove()
+    if (state.selectedCurriculum) {
+      loadGuidePage(state.selectedCurriculum.id)
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('導入問題追加エラー:', error)
+    alert('導入問題の追加に失敗しました')
+  }
+}
+
+// チェックテスト編集
+async function editCheckTest(curriculumId) {
+  try {
+    const response = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+    const metadata = response.data
+    const checkTest = metadata.common_check_test
+    
+    if (!checkTest) {
+      alert('チェックテストが見つかりません')
+      return
+    }
+
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-800">
+              <i class="fas fa-edit mr-2"></i>チェックテストを編集
+            </h3>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+
+          <div class="space-y-4 mb-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                説明
+              </label>
+              <textarea id="editCheckTestDesc" rows="2"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${checkTest.test_description || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                注意事項
+              </label>
+              <textarea id="editCheckTestNote" rows="2"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${checkTest.test_note || ''}</textarea>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <div class="flex justify-between items-center mb-3">
+              <h4 class="text-lg font-bold text-gray-800">問題一覧</h4>
+              <button onclick="addCheckTestProblem(${curriculumId})"
+                      class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-all">
+                <i class="fas fa-plus mr-2"></i>問題を追加
+              </button>
+            </div>
+            
+            <div id="checkTestProblemsList" class="space-y-3">
+              ${(checkTest.sample_problems || []).map((problem, index) => `
+                <div class="border rounded-lg p-4 bg-gray-50">
+                  <div class="flex gap-4">
+                    <div class="flex-1">
+                      <label class="block text-xs text-gray-600 mb-1">問題 ${index + 1}</label>
+                      <input type="text" value="${problem.problem_text}"
+                             data-index="${index}" data-field="problem_text"
+                             class="check-test-input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="w-48">
+                      <label class="block text-xs text-gray-600 mb-1">答え</label>
+                      <input type="text" value="${problem.answer}"
+                             data-index="${index}" data-field="answer"
+                             class="check-test-input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="flex items-end">
+                      <button onclick="deleteCheckTestProblem(${curriculumId}, ${problem.problem_number})"
+                              class="bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 transition-all">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="flex gap-3 mt-6">
+            <button onclick="saveCheckTest(${curriculumId})"
+                    class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md">
+              <i class="fas fa-save mr-2"></i>保存する
+            </button>
+            <button onclick="this.closest('.fixed').remove()"
+                    class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+              キャンセル
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    console.error('チェックテスト読み込みエラー:', error)
+    alert('チェックテストの読み込みに失敗しました')
+  }
+}
+
+async function saveCheckTest(curriculumId) {
+  try {
+    showLoading('チェックテストを保存中...')
+    
+    const description = document.getElementById('editCheckTestDesc').value
+    const note = document.getElementById('editCheckTestNote').value
+    
+    const problems = []
+    document.querySelectorAll('.check-test-input[data-field="problem_text"]').forEach((input, index) => {
+      const answerInput = document.querySelector(`.check-test-input[data-index="${index}"][data-field="answer"]`)
+      problems.push({
+        problem_number: index + 1,
+        problem_text: input.value,
+        answer: answerInput.value
+      })
+    })
+
+    await axios.put(`/api/curriculum/${curriculumId}/check-test`, {
+      test_description: description,
+      test_note: note,
+      sample_problems: problems
+    })
+
+    hideLoading()
+    alert('✅ チェックテストを保存しました')
+    
+    document.querySelector('.fixed.inset-0').remove()
+    if (state.selectedCurriculum) {
+      loadGuidePage(state.selectedCurriculum.id)
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('チェックテスト保存エラー:', error)
+    alert('チェックテストの保存に失敗しました')
+  }
+}
+
+// チェックテスト問題追加
+function addCheckTestProblem(curriculumId) {
+  const list = document.getElementById('checkTestProblemsList')
+  const index = list.children.length
+  
+  const newProblem = document.createElement('div')
+  newProblem.className = 'border rounded-lg p-4 bg-gray-50'
+  newProblem.innerHTML = `
+    <div class="flex gap-4">
+      <div class="flex-1">
+        <label class="block text-xs text-gray-600 mb-1">問題 ${index + 1}</label>
+        <input type="text" placeholder="問題文を入力"
+               data-index="${index}" data-field="problem_text"
+               class="check-test-input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="w-48">
+        <label class="block text-xs text-gray-600 mb-1">答え</label>
+        <input type="text" placeholder="答えを入力"
+               data-index="${index}" data-field="answer"
+               class="check-test-input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="flex items-end">
+        <button onclick="this.closest('.border').remove()"
+                class="bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 transition-all">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    </div>
+  `
+  
+  list.appendChild(newProblem)
+}
+
+// チェックテスト問題削除
+async function deleteCheckTestProblem(curriculumId, problemNumber) {
+  if (!confirm('この問題を削除しますか？')) return
+  
+  try {
+    showLoading('問題を削除中...')
+    
+    await axios.delete(`/api/curriculum/${curriculumId}/check-test/${problemNumber}`)
+    
+    hideLoading()
+    alert('✅ 問題を削除しました')
+    
+    // モーダルを閉じて再度開く
+    document.querySelector('.fixed.inset-0').remove()
+    editCheckTest(curriculumId)
+  } catch (error) {
+    hideLoading()
+    console.error('問題削除エラー:', error)
+    alert('問題の削除に失敗しました')
+  }
+}
+
+// 選択問題編集
+async function editOptionalProblem(problemId) {
+  try {
+    const response = await axios.get(`/api/optional-problem/${problemId}`)
+    const problem = response.data.problem
+    
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold text-gray-800">
+              <i class="fas fa-edit mr-2"></i>選択問題を編集
+            </h3>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                タイトル
+              </label>
+              <input type="text" id="editOptionalProblemTitle" 
+                     value="${problem.problem_title || ''}"
+                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                説明
+              </label>
+              <textarea id="editOptionalProblemDesc" rows="3"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${problem.problem_description || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                問題内容
+              </label>
+              <textarea id="editOptionalProblemContent" rows="4"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${problem.problem_content || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                学習の意味
+              </label>
+              <textarea id="editOptionalProblemMeaning" rows="2"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${problem.learning_meaning || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                難易度
+              </label>
+              <select id="editOptionalProblemDifficulty"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="easy" ${problem.difficulty_level === 'easy' ? 'selected' : ''}>★ かんたん</option>
+                <option value="medium" ${problem.difficulty_level === 'medium' ? 'selected' : ''}>★★ ふつう</option>
+                <option value="hard" ${problem.difficulty_level === 'hard' ? 'selected' : ''}>★★★ むずかしい</option>
+                <option value="very_hard" ${problem.difficulty_level === 'very_hard' ? 'selected' : ''}>★★★★ とてもむずかしい</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex gap-3 mt-6">
+            <button onclick="saveOptionalProblem(${problemId})"
+                    class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-md">
+              <i class="fas fa-save mr-2"></i>保存する
+            </button>
+            <button onclick="this.closest('.fixed').remove()"
+                    class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+              キャンセル
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    console.error('選択問題読み込みエラー:', error)
+    alert('選択問題の読み込みに失敗しました')
+  }
+}
+
+async function saveOptionalProblem(problemId) {
+  try {
+    showLoading('選択問題を保存中...')
+    
+    const title = document.getElementById('editOptionalProblemTitle').value
+    const description = document.getElementById('editOptionalProblemDesc').value
+    const content = document.getElementById('editOptionalProblemContent').value
+    const meaning = document.getElementById('editOptionalProblemMeaning').value
+    const difficulty = document.getElementById('editOptionalProblemDifficulty').value
+
+    await axios.put(`/api/optional-problem/${problemId}`, {
+      problem_title: title,
+      problem_description: description,
+      problem_content: content,
+      learning_meaning: meaning,
+      difficulty_level: difficulty
+    })
+
+    hideLoading()
+    alert('✅ 選択問題を保存しました')
+    
+    document.querySelector('.fixed.inset-0').remove()
+    if (state.selectedCurriculum) {
+      loadGuidePage(state.selectedCurriculum.id)
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('選択問題保存エラー:', error)
+    alert('選択問題の保存に失敗しました')
+  }
+}
+
+// 選択問題削除
+async function deleteOptionalProblem(problemId) {
+  if (!confirm('この選択問題を削除しますか？')) return
+  
+  try {
+    showLoading('選択問題を削除中...')
+    
+    await axios.delete(`/api/optional-problem/${problemId}`)
+    
+    hideLoading()
+    alert('✅ 選択問題を削除しました')
+    
+    if (state.selectedCurriculum) {
+      loadGuidePage(state.selectedCurriculum.id)
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('選択問題削除エラー:', error)
+    alert('選択問題の削除に失敗しました')
+  }
+}
+
+// 選択問題追加
+async function addOptionalProblem(curriculumId) {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-xl font-bold text-gray-800">
+            <i class="fas fa-plus-circle mr-2"></i>選択問題を追加
+          </h3>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              タイトル
+            </label>
+            <input type="text" id="newOptionalProblemTitle" 
+                   placeholder="例: 発展問題"
+                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              説明
+            </label>
+            <textarea id="newOptionalProblemDesc" rows="3"
+                      placeholder="問題の説明を入力してください"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              問題内容
+            </label>
+            <textarea id="newOptionalProblemContent" rows="4"
+                      placeholder="問題文を入力してください"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              学習の意味（任意）
+            </label>
+            <textarea id="newOptionalProblemMeaning" rows="2"
+                      placeholder="この問題で何を学べるか"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              難易度
+            </label>
+            <select id="newOptionalProblemDifficulty"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+              <option value="easy">★ かんたん</option>
+              <option value="medium" selected>★★ ふつう</option>
+              <option value="hard">★★★ むずかしい</option>
+              <option value="very_hard">★★★★ とてもむずかしい</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-6">
+          <button onclick="saveNewOptionalProblem(${curriculumId})"
+                  class="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg hover:from-green-600 hover:to-green-700 transition-all shadow-md">
+            <i class="fas fa-plus mr-2"></i>追加する
+          </button>
+          <button onclick="this.closest('.fixed').remove()"
+                  class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+async function saveNewOptionalProblem(curriculumId) {
+  try {
+    showLoading('選択問題を追加中...')
+    
+    const title = document.getElementById('newOptionalProblemTitle').value
+    const description = document.getElementById('newOptionalProblemDesc').value
+    const content = document.getElementById('newOptionalProblemContent').value
+    const meaning = document.getElementById('newOptionalProblemMeaning').value
+    const difficulty = document.getElementById('newOptionalProblemDifficulty').value
+
+    if (!title || !content) {
+      alert('タイトルと問題内容は必須です')
+      hideLoading()
+      return
+    }
+
+    await axios.post(`/api/curriculum/${curriculumId}/optional-problem`, {
+      problem_title: title,
+      problem_description: description,
+      problem_content: content,
+      learning_meaning: meaning,
+      difficulty_level: difficulty
+    })
+
+    hideLoading()
+    alert('✅ 選択問題を追加しました')
+    
+    document.querySelector('.fixed.inset-0').remove()
+    if (state.selectedCurriculum) {
+      loadGuidePage(state.selectedCurriculum.id)
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('選択問題追加エラー:', error)
+    alert('選択問題の追加に失敗しました')
+  }
+}
 
