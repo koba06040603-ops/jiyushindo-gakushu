@@ -489,6 +489,182 @@ app.get('/api/progress/curriculum/:curriculumId/class/:classCode', async (c) => 
   }
 })
 
+// APIルート：進捗ボード拡張版（教師用）
+app.get('/api/progress-board/class/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  const curriculumIds = c.req.query('curriculumIds') // カンマ区切りで複数指定可能
+  
+  try {
+    const curriculumList = curriculumIds ? curriculumIds.split(',') : []
+    
+    // 生徒リスト取得
+    const students = await env.DB.prepare(`
+      SELECT id, name, student_number 
+      FROM users 
+      WHERE class_code = ? AND role = 'student'
+      ORDER BY student_number
+    `).bind(classCode).all()
+    
+    const progressBoard = []
+    
+    for (const student of students.results) {
+      const studentData = {
+        student_id: student.id,
+        student_name: student.name,
+        student_number: student.student_number,
+        curriculums: []
+      }
+      
+      // 各カリキュラムの進捗を取得
+      for (const curriculumId of curriculumList) {
+        // 学習カード進捗（ビューを使用）
+        const cardProgress = await env.DB.prepare(`
+          SELECT * FROM v_progress_board 
+          WHERE student_id = ? AND curriculum_id = ?
+          ORDER BY course_level, card_number
+        `).bind(student.id, curriculumId).all()
+        
+        // チェックテスト進捗
+        const checkTestProgress = await env.DB.prepare(`
+          SELECT * FROM check_test_progress
+          WHERE student_id = ? AND curriculum_id = ?
+          ORDER BY problem_number
+        `).bind(student.id, curriculumId).all()
+        
+        // 選択問題進捗
+        const optionalProgress = await env.DB.prepare(`
+          SELECT opp.*, op.problem_title, op.problem_number
+          FROM optional_problem_progress opp
+          JOIN optional_problems op ON opp.optional_problem_id = op.id
+          WHERE opp.student_id = ? AND opp.curriculum_id = ?
+          ORDER BY op.problem_number
+        `).bind(student.id, curriculumId).all()
+        
+        // ヘルプ統計
+        const helpStats = await env.DB.prepare(`
+          SELECT 
+            help_type,
+            COUNT(*) as count
+          FROM student_progress
+          WHERE student_id = ? AND curriculum_id = ? AND help_type IS NOT NULL
+          GROUP BY help_type
+        `).bind(student.id, curriculumId).all()
+        
+        // 最高優先度を取得
+        const maxPriority = cardProgress.results.length > 0 
+          ? Math.max(...cardProgress.results.map(p => p.intervention_priority || 0))
+          : 0
+        
+        // ヘルプ要請中かどうか
+        const hasHelpRequest = cardProgress.results.some(p => 
+          p.help_requested_at && !p.help_resolved_at
+        )
+        
+        studentData.curriculums.push({
+          curriculum_id: curriculumId,
+          card_progress: cardProgress.results,
+          check_test_progress: checkTestProgress.results,
+          optional_progress: optionalProgress.results,
+          help_stats: helpStats.results,
+          intervention_priority: maxPriority,
+          has_help_request: hasHelpRequest,
+          completed_cards: cardProgress.results.filter(p => p.status === 'completed').length,
+          total_cards: cardProgress.results.length
+        })
+      }
+      
+      progressBoard.push(studentData)
+    }
+    
+    // 優先度順にソート
+    progressBoard.sort((a, b) => {
+      const maxA = Math.max(...a.curriculums.map(c => c.intervention_priority))
+      const maxB = Math.max(...b.curriculums.map(c => c.intervention_priority))
+      return maxB - maxA
+    })
+    
+    return c.json({
+      success: true,
+      class_code: classCode,
+      students: progressBoard,
+      timestamp: new Date().toISOString()
+    })
+  } catch (error) {
+    console.error('進捗ボードエラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '進捗ボードの読み込みに失敗しました',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// APIルート：ヘルプ要請
+app.post('/api/progress/help-request', async (c) => {
+  const { env } = c
+  const { student_id, learning_card_id, curriculum_id } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE student_progress 
+      SET 
+        status = 'help_needed',
+        help_requested_at = CURRENT_TIMESTAMP,
+        help_resolved_at = NULL,
+        last_activity_at = CURRENT_TIMESTAMP
+      WHERE student_id = ? AND learning_card_id = ? AND curriculum_id = ?
+    `).bind(student_id, learning_card_id, curriculum_id).run()
+    
+    return c.json({ success: true, message: 'ヘルプ要請を送信しました' })
+  } catch (error) {
+    console.error('ヘルプ要請エラー:', error)
+    return c.json({ success: false, error: 'ヘルプ要請に失敗しました' }, 500)
+  }
+})
+
+// APIルート：ヘルプ解決
+app.post('/api/progress/help-resolve', async (c) => {
+  const { env } = c
+  const { student_id, learning_card_id, curriculum_id } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE student_progress 
+      SET 
+        status = 'in_progress',
+        help_resolved_at = CURRENT_TIMESTAMP,
+        last_activity_at = CURRENT_TIMESTAMP
+      WHERE student_id = ? AND learning_card_id = ? AND curriculum_id = ?
+    `).bind(student_id, learning_card_id, curriculum_id).run()
+    
+    return c.json({ success: true, message: 'ヘルプを解決しました' })
+  } catch (error) {
+    console.error('ヘルプ解決エラー:', error)
+    return c.json({ success: false, error: 'ヘルプ解決に失敗しました' }, 500)
+  }
+})
+
+// APIルート：活動記録更新
+app.post('/api/progress/activity', async (c) => {
+  const { env } = c
+  const { student_id, learning_card_id, curriculum_id } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE student_progress 
+      SET 
+        last_activity_at = CURRENT_TIMESTAMP
+      WHERE student_id = ? AND learning_card_id = ? AND curriculum_id = ?
+    `).bind(student_id, learning_card_id, curriculum_id).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('活動記録エラー:', error)
+    return c.json({ success: false }, 500)
+  }
+})
+
 // APIルート：AI先生（Gemini API）
 app.post('/api/ai/ask', async (c) => {
   const { env } = c

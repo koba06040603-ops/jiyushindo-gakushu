@@ -3097,167 +3097,159 @@ async function loadAnswersTab(curriculumId) {
 // ============================================
 // 進捗ボードページ
 // ============================================
-async function loadProgressBoard(curriculumId) {
+async function loadProgressBoard(curriculumId, curriculumId2 = null) {
   state.currentView = 'progress'
+  showLoading('進捗ボードを読み込み中...')
   
   try {
     // カリキュラム情報取得
-    const currResponse = await axios.get(`/api/curriculum/${curriculumId}`)
-    const { curriculum, courses } = currResponse.data
+    const curriculumIds = curriculumId2 ? `${curriculumId},${curriculumId2}` : curriculumId
+    const curriculums = []
     
-    // 進捗データ取得
-    const progressResponse = await axios.get(`/api/progress/curriculum/${curriculumId}/class/${state.student.classCode}`)
-    const studentProgress = progressResponse.data
+    for (const id of curriculumIds.split(',')) {
+      const response = await axios.get(`/api/curriculum/${id}`)
+      curriculums.push(response.data)
+    }
+    
+    // 進捗ボードデータ取得（新しいAPI）
+    const progressResponse = await axios.get(
+      `/api/progress-board/class/${state.student.classCode}?curriculumIds=${curriculumIds}`
+    )
+    const progressData = progressResponse.data
+    
+    hideLoading()
     
     const app = document.getElementById('app')
     app.innerHTML = `
-      <div class="container mx-auto px-4 py-8">
-        <!-- ヘッダー -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <button onclick="loadGuidePage(${curriculumId})" class="text-indigo-600 hover:text-indigo-800 mb-4">
-            <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
-          </button>
-          <h1 class="text-3xl font-bold text-purple-600 mb-2">
-            <i class="fas fa-chart-bar mr-2"></i>
-            進捗ボード
-          </h1>
-          <p class="text-xl text-gray-800">
-            ${curriculum.grade}年 ${curriculum.subject} - ${curriculum.unit_name}
-          </p>
+      <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-2 md:p-4">
+        <!-- ヘッダー（コンパクト） -->
+        <div class="bg-white rounded-lg shadow-md p-3 mb-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <button onclick="showTopPage()" class="text-indigo-600 hover:text-indigo-800 p-2">
+                <i class="fas fa-home text-lg"></i>
+              </button>
+              <h1 class="text-lg md:text-2xl font-bold text-purple-600">
+                <i class="fas fa-chart-bar mr-2"></i>進捗ボード
+              </h1>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs md:text-sm text-gray-600">クラス: ${state.student.classCode}</span>
+              <button onclick="location.reload()" 
+                      class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                <i class="fas fa-sync-alt mr-1"></i>更新
+              </button>
+            </div>
+          </div>
+          <div class="mt-2 text-sm md:text-base text-gray-700">
+            ${curriculums.map(c => `${c.curriculum.grade}年 ${c.curriculum.subject} - ${c.curriculum.unit_name}`).join(' / ')}
+          </div>
         </div>
 
-        <!-- コース凡例 -->
-        <div class="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 class="text-lg font-bold text-gray-800 mb-4">
-            <i class="fas fa-palette mr-2"></i>
-            コースの色分け
-          </h3>
-          <div class="flex flex-wrap gap-4">
-            <div class="flex items-center">
-              <div class="w-6 h-6 bg-green-500 rounded mr-2"></div>
-              <span class="font-bold">じっくりコース</span>
-              <span class="text-sm text-gray-600 ml-2">(基礎)</span>
+        <!-- コース凡例（コンパクト） -->
+        <div class="bg-white rounded-lg shadow p-2 mb-3">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs md:text-sm">
+            <div class="flex items-center gap-1">
+              <div class="w-4 h-4 bg-green-500 rounded"></div>
+              <span class="font-bold">じっくり</span>
             </div>
-            <div class="flex items-center">
-              <div class="w-6 h-6 bg-blue-500 rounded mr-2"></div>
-              <span class="font-bold">しっかりコース</span>
-              <span class="text-sm text-gray-600 ml-2">(標準)</span>
+            <div class="flex items-center gap-1">
+              <div class="w-4 h-4 bg-blue-500 rounded"></div>
+              <span class="font-bold">しっかり</span>
             </div>
-            <div class="flex items-center">
-              <div class="w-6 h-6 bg-purple-500 rounded mr-2"></div>
-              <span class="font-bold">ぐんぐんコース</span>
-              <span class="text-sm text-gray-600 ml-2">(発展)</span>
+            <div class="flex items-center gap-1">
+              <div class="w-4 h-4 bg-purple-500 rounded"></div>
+              <span class="font-bold">ぐんぐん</span>
             </div>
-            <div class="flex items-center ml-8">
-              <i class="fas fa-hand-paper text-orange-500 mr-2"></i>
-              <span class="font-bold text-orange-600">助けを求めています</span>
+            <div class="flex items-center gap-1">
+              <i class="fas fa-hand-paper text-orange-500"></i>
+              <span class="font-bold text-orange-600">ヘルプ</span>
             </div>
-            <div class="flex items-center">
-              <i class="fas fa-pause-circle text-red-500 mr-2"></i>
-              <span class="font-bold text-red-600">停滞中（10分以上）</span>
+            <div class="flex items-center gap-1">
+              <i class="fas fa-exclamation-triangle text-red-500"></i>
+              <span class="font-bold text-red-600">停滞</span>
             </div>
           </div>
         </div>
 
-        <!-- 進捗グラフ -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h3 class="text-xl font-bold text-gray-800 mb-6">
-            <i class="fas fa-users mr-2"></i>
-            クラス全体の進捗状況
-          </h3>
-          
-          <div class="space-y-4">
-            ${generateProgressBars(studentProgress, courses.results)}
+        <!-- メイン進捗ボード -->
+        <div class="bg-white rounded-lg shadow-md p-2 md:p-4 overflow-x-auto">
+          <div class="min-w-[1200px]">
+            <!-- ヘッダー行 -->
+            <div class="grid grid-cols-[150px_1fr] gap-2 mb-2 text-xs font-bold">
+              <div class="bg-gray-100 p-2 rounded text-center">児童名</div>
+              <div class="grid grid-cols-[2fr_1fr_2fr_80px] gap-2">
+                <div class="bg-gray-100 p-2 rounded text-center">学習カード進捗</div>
+                <div class="bg-yellow-100 p-2 rounded text-center">チェックテスト</div>
+                <div class="bg-blue-100 p-2 rounded text-center">選択問題</div>
+                <div class="bg-gray-100 p-2 rounded text-center">優先度</div>
+              </div>
+            </div>
+            
+            <!-- 生徒ごとの進捗行 -->
+            ${generateProgressBoardRows(progressData.students, curriculums)}
           </div>
         </div>
 
-        <!-- 助け要請・停滞一覧 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- 助け要請 -->
-          <div class="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-6">
-            <h3 class="text-lg font-bold text-orange-800 mb-4">
+        <!-- 指導介入優先リスト -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+          <!-- ヘルプ要請中 -->
+          <div class="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-3">
+            <h3 class="text-sm md:text-base font-bold text-orange-800 mb-2 flex items-center">
               <i class="fas fa-hand-paper mr-2"></i>
-              助けを求めている児童
+              ヘルプ要請中（${countHelpRequests(progressData.students)}名）
             </h3>
-            <div class="space-y-3">
-              ${generateHelpRequests(studentProgress)}
+            <div class="space-y-2 max-h-48 overflow-y-auto text-xs md:text-sm">
+              ${generateHelpRequestList(progressData.students)}
             </div>
           </div>
 
           <!-- 停滞中 -->
-          <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-6">
-            <h3 class="text-lg font-bold text-red-800 mb-4">
-              <i class="fas fa-pause-circle mr-2"></i>
-              停滞している児童
+          <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-3">
+            <h3 class="text-sm md:text-base font-bold text-red-800 mb-2 flex items-center">
+              <i class="fas fa-exclamation-triangle mr-2"></i>
+              停滞中（${countStagnant(progressData.students)}名）
             </h3>
-            <div class="space-y-3">
-              ${generateStuckStudents(studentProgress)}
+            <div class="space-y-2 max-h-48 overflow-y-auto text-xs md:text-sm">
+              ${generateStagnantList(progressData.students)}
             </div>
           </div>
         </div>
 
-        <!-- 助け要請の統計 -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
-          <h3 class="text-xl font-bold text-gray-800 mb-6">
+        <!-- ヘルプ統計 -->
+        <div class="bg-white rounded-lg shadow-md p-3 mt-3">
+          <h3 class="text-sm md:text-base font-bold text-gray-800 mb-3 flex items-center">
             <i class="fas fa-chart-pie mr-2"></i>
-            助けの種類別統計
+            ヘルプの種類別統計
           </h3>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            ${generateHelpStats(studentProgress)}
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs md:text-sm">
+            ${generateHelpStatsNew(progressData.students)}
           </div>
-        </div>
-
-        <!-- 理解度の分布 -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
-          <h3 class="text-xl font-bold text-gray-800 mb-6">
-            <i class="fas fa-smile mr-2"></i>
-            理解度の分布
-          </h3>
-          <div class="grid grid-cols-5 gap-4">
-            ${generateUnderstandingDistribution(studentProgress)}
-          </div>
-        </div>
-
-        <!-- 教師用メモ -->
-        <div class="bg-indigo-50 rounded-lg p-6 mt-6">
-          <h3 class="text-lg font-bold text-indigo-800 mb-3">
-            <i class="fas fa-lightbulb mr-2"></i>
-            指導のポイント
-          </h3>
-          <ul class="text-sm text-gray-700 space-y-2">
-            <li class="flex items-start">
-              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-              <span>オレンジ色のマークがついている児童には優先的に声をかけましょう</span>
-            </li>
-            <li class="flex items-start">
-              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-              <span>停滞している児童には、ヒントカードを勧めるか、友達との学び合いを促しましょう</span>
-            </li>
-            <li class="flex items-start">
-              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-              <span>理解度が低い児童には、個別指導の時間を設けましょう</span>
-            </li>
-            <li class="flex items-start">
-              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-              <span>進度が早い児童には、選択問題や発展課題を勧めましょう</span>
-            </li>
-          </ul>
-          
-          <!-- AI誤答分析ボタン（Phase 6） -->
-          <div class="mt-4 pt-4 border-t border-indigo-200">
-            <button onclick="loadAIErrorAnalysis()" 
-                    class="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center shadow-lg">
               <i class="fas fa-microscope mr-2"></i>
               AI誤答分析で詳しく見る
               <span class="ml-2 text-xs bg-white text-red-600 px-2 py-0.5 rounded animate-pulse">NEW</span>
             </button>
           </div>
         </div>
+
+        <!-- 指導のポイント（教師用） -->
+        <div class="bg-blue-50 rounded-lg p-3 mt-3">
+          <h3 class="text-sm md:text-base font-bold text-blue-800 mb-2">
+            <i class="fas fa-lightbulb mr-2"></i>指導のポイント
+          </h3>
+          <ul class="text-xs md:text-sm text-gray-700 space-y-1">
+            <li><i class="fas fa-check text-green-500 mr-2"></i>優先度スコア100以上: 即座に対応</li>
+            <li><i class="fas fa-check text-green-500 mr-2"></i>オレンジ背景: ヘルプ要請中</li>
+            <li><i class="fas fa-check text-green-500 mr-2"></i>赤/黄背景: 停滞中（声掛け推奨）</li>
+            <li><i class="fas fa-check text-green-500 mr-2"></i>ヘルプ統計でよく使われる支援方法を確認</li>
+          </ul>
+        </div>
       </div>
     `
   } catch (error) {
     console.error('進捗ボード読み込みエラー:', error)
-    alert('データの読み込みに失敗しました')
+    hideLoading()
+    alert('データの読み込みに失敗しました: ' + error.message)
   }
 }
 
@@ -7634,6 +7626,265 @@ window.saveOptionalProblem = saveOptionalProblem
 window.deleteOptionalProblem = deleteOptionalProblem
 window.addOptionalProblem = addOptionalProblem
 window.saveNewOptionalProblem = saveNewOptionalProblem
+
+// ==============================================
+// 進捗ボード用ヘルパー関数（新）
+// ==============================================
+
+function generateProgressBoardRows(students, curriculums) {
+  if (!students || students.length === 0) {
+    return '<div class="col-span-full text-center text-gray-500 py-8">進捗データがありません</div>'
+  }
+
+  return students.map(student => {
+    const currProgress = student.curriculums[0] || {}
+    const priority = currProgress.intervention_priority || 0
+    const hasHelp = currProgress.has_help_request || false
+    const cardProgress = currProgress.card_progress || []
+    const checkProgress = currProgress.check_test_progress || []
+    const optionalProgress = currProgress.optional_progress || []
+    const helpStats = currProgress.help_stats || []
+
+    // 優先度スコアによる背景色
+    const bgColor = hasHelp ? 'bg-orange-100' : 
+                    priority >= 100 ? 'bg-red-50' :
+                    priority >= 60 ? 'bg-yellow-50' : 'bg-white'
+
+    return `
+      <div class="grid grid-cols-[150px_1fr] gap-2 py-2 border-b hover:bg-gray-50 ${bgColor}">
+        <!-- 児童名 -->
+        <div class="flex flex-col justify-center px-2">
+          <div class="font-bold text-sm">${student.student_name}</div>
+          <div class="text-xs text-gray-500">No.${student.student_number}</div>
+          ${hasHelp ? '<div class="text-xs text-orange-600 font-bold mt-1"><i class="fas fa-hand-paper mr-1"></i>ヘルプ</div>' : ''}
+          ${priority >= 60 && !hasHelp ? '<div class="text-xs text-red-600 font-bold mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>停滞</div>' : ''}
+        </div>
+
+        <div class="grid grid-cols-[2fr_1fr_2fr_80px] gap-2">
+          <!-- 学習カード進捗 -->
+          <div class="relative">
+            ${generateCardProgressBar(cardProgress)}
+            <div class="text-xs text-gray-600 mt-1">
+              ${generateHelpTypeIndicators(helpStats)}
+            </div>
+          </div>
+
+          <!-- チェックテスト -->
+          <div class="flex items-center">
+            ${generateCheckTestIndicator(checkProgress)}
+          </div>
+
+          <!-- 選択問題 -->
+          <div class="flex items-center gap-1 flex-wrap">
+            ${generateOptionalProblemIndicators(optionalProgress)}
+          </div>
+
+          <!-- 優先度スコア -->
+          <div class="flex flex-col items-center justify-center">
+            <div class="text-lg font-bold ${getPriorityColor(priority)}">${priority}</div>
+            <div class="text-xs text-gray-500">優先度</div>
+          </div>
+        </div>
+      </div>
+    `
+  }).join('')
+}
+
+function generateCardProgressBar(cardProgress) {
+  if (!cardProgress || cardProgress.length === 0) {
+    return '<div class="bg-gray-200 h-8 rounded flex items-center justify-center text-xs text-gray-500">未開始</div>'
+  }
+
+  // コース別にカウント
+  const basicCards = cardProgress.filter(c => c.course_level === 'basic')
+  const standardCards = cardProgress.filter(c => c.course_level === 'standard')
+  const advancedCards = cardProgress.filter(c => c.course_level === 'advanced')
+
+  const basicCompleted = basicCards.filter(c => c.status === 'completed').length
+  const standardCompleted = standardCards.filter(c => c.status === 'completed').length
+  const advancedCompleted = advancedCards.filter(c => c.status === 'completed').length
+
+  const totalCards = 18 // 3コース × 6枚
+  const completed = basicCompleted + standardCompleted + advancedCompleted
+  const percentComplete = Math.round((completed / totalCards) * 100)
+
+  // 横棒グラフ（3色）
+  const basicPercent = (basicCompleted / totalCards) * 100
+  const standardPercent = (standardCompleted / totalCards) * 100
+  const advancedPercent = (advancedCompleted / totalCards) * 100
+
+  return `
+    <div class="relative bg-gray-200 h-8 rounded overflow-hidden flex">
+      ${basicPercent > 0 ? `<div class="bg-green-500 h-full" style="width: ${basicPercent}%"></div>` : ''}
+      ${standardPercent > 0 ? `<div class="bg-blue-500 h-full" style="width: ${standardPercent}%"></div>` : ''}
+      ${advancedPercent > 0 ? `<div class="bg-purple-500 h-full" style="width: ${advancedPercent}%"></div>` : ''}
+      <div class="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-800">
+        ${completed}/${totalCards}
+      </div>
+    </div>
+  `
+}
+
+function generateCheckTestIndicator(checkProgress) {
+  const total = 6 // チェックテスト6問想定
+  const completed = checkProgress.filter(p => p.status === 'completed').length
+  const failed = checkProgress.filter(p => p.status === 'failed').length
+
+  if (completed === 0 && failed === 0) {
+    return '<div class="bg-gray-200 w-full h-8 rounded flex items-center justify-center text-xs">未実施</div>'
+  }
+
+  const color = completed === total ? 'bg-green-500' : 
+                failed > 0 ? 'bg-red-400' : 'bg-yellow-400'
+
+  return `
+    <div class="${color} w-full h-8 rounded flex items-center justify-center text-white text-xs font-bold">
+      ${completed}/${total}
+      ${failed > 0 ? `<span class="ml-1 text-red-800">×${failed}</span>` : ''}
+    </div>
+  `
+}
+
+function generateOptionalProblemIndicators(optionalProgress) {
+  const total = 6 // 選択問題6題想定
+  const completed = optionalProgress.filter(p => p.status === 'completed').length
+
+  // 6つの丸を表示
+  let html = ''
+  for (let i = 1; i <= total; i++) {
+    const problem = optionalProgress.find(p => p.problem_number === i)
+    const status = problem ? problem.status : 'not_started'
+    const bgColor = status === 'completed' ? 'bg-blue-500' : 
+                    status === 'in_progress' ? 'bg-yellow-400' : 'bg-gray-300'
+    
+    html += `<div class="${bgColor} w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold">${i}</div>`
+  }
+
+  return html
+}
+
+function generateHelpTypeIndicators(helpStats) {
+  if (!helpStats || helpStats.length === 0) {
+    return '<span class="text-gray-400">助け: なし</span>'
+  }
+
+  const icons = {
+    'ai': '<i class="fas fa-robot text-purple-500" title="AI先生"></i>',
+    'teacher': '<i class="fas fa-user-tie text-blue-500" title="先生"></i>',
+    'friend': '<i class="fas fa-user-friends text-green-500" title="友達"></i>',
+    'hint': '<i class="fas fa-lightbulb text-yellow-500" title="ヒント"></i>'
+  }
+
+  return helpStats.map(stat => {
+    const icon = icons[stat.help_type] || ''
+    return `${icon} ${stat.count}`
+  }).join(' ')
+}
+
+function getPriorityColor(priority) {
+  if (priority >= 100) return 'text-red-600'
+  if (priority >= 80) return 'text-orange-600'
+  if (priority >= 60) return 'text-yellow-600'
+  if (priority >= 40) return 'text-blue-600'
+  return 'text-gray-600'
+}
+
+function countHelpRequests(students) {
+  return students.filter(s => 
+    s.curriculums.some(c => c.has_help_request)
+  ).length
+}
+
+function countStagnant(students) {
+  return students.filter(s => 
+    s.curriculums.some(c => c.intervention_priority >= 60 && !c.has_help_request)
+  ).length
+}
+
+function generateHelpRequestList(students) {
+  const helpRequests = students.filter(s => 
+    s.curriculums.some(c => c.has_help_request)
+  )
+
+  if (helpRequests.length === 0) {
+    return '<div class="text-gray-500 text-center py-2">なし</div>'
+  }
+
+  return helpRequests.map(student => {
+    const curr = student.curriculums.find(c => c.has_help_request)
+    const card = curr.card_progress.find(c => c.help_requested_at && !c.help_resolved_at)
+    const waitingMinutes = card ? card.help_waiting_minutes : 0
+
+    return `
+      <div class="bg-white rounded p-2 border-l-4 border-orange-500">
+        <div class="flex items-center justify-between">
+          <div class="font-bold">${student.student_name}</div>
+          <div class="text-xs text-orange-600">${waitingMinutes}分待機</div>
+        </div>
+        <div class="text-xs text-gray-600 mt-1">
+          ${card ? card.card_title : '不明'}
+        </div>
+      </div>
+    `
+  }).join('')
+}
+
+function generateStagnantList(students) {
+  const stagnant = students.filter(s => 
+    s.curriculums.some(c => c.intervention_priority >= 60 && !c.has_help_request)
+  )
+
+  if (stagnant.length === 0) {
+    return '<div class="text-gray-500 text-center py-2">なし</div>'
+  }
+
+  return stagnant.map(student => {
+    const curr = student.curriculums.find(c => c.intervention_priority >= 60)
+    const card = curr.card_progress.find(c => c.stagnant_minutes > 10)
+    const stagnantMinutes = card ? card.stagnant_minutes : 0
+
+    return `
+      <div class="bg-white rounded p-2 border-l-4 border-red-500">
+        <div class="flex items-center justify-between">
+          <div class="font-bold">${student.student_name}</div>
+          <div class="text-xs text-red-600">${stagnantMinutes}分停滞</div>
+        </div>
+        <div class="text-xs text-gray-600 mt-1">
+          ${card ? card.card_title : '不明'}
+        </div>
+      </div>
+    `
+  }).join('')
+}
+
+function generateHelpStatsNew(students) {
+  const allHelpStats = {}
+  students.forEach(student => {
+    student.curriculums.forEach(curr => {
+      curr.help_stats.forEach(stat => {
+        allHelpStats[stat.help_type] = (allHelpStats[stat.help_type] || 0) + stat.count
+      })
+    })
+  })
+
+  const helpTypes = [
+    { key: 'ai', label: 'AI先生', icon: 'robot', color: 'purple' },
+    { key: 'teacher', label: '先生', icon: 'user-tie', color: 'blue' },
+    { key: 'friend', label: '友達', icon: 'user-friends', color: 'green' },
+    { key: 'hint', label: 'ヒント', icon: 'lightbulb', color: 'yellow' }
+  ]
+
+  return helpTypes.map(type => {
+    const count = allHelpStats[type.key] || 0
+    return `
+      <div class="bg-${type.color}-50 border border-${type.color}-200 rounded p-2 text-center">
+        <i class="fas fa-${type.icon} text-${type.color}-500 text-lg"></i>
+        <div class="font-bold text-lg mt-1">${count}</div>
+        <div class="text-xs text-gray-600">${type.label}</div>
+      </div>
+    `
+  }).join('')
+}
 
 // ==============================================
 // 問題管理機能
