@@ -2238,38 +2238,11 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
               "hint_text": "ヒント3（ほぼ答えに近いヒント）"
             }
           ]
-        }
-        // ... カード2〜6も同じ形式で続ける（全6枚必須）
+        },
+        // カード2〜6も同じ形式（全6枚必須）
       ]
     },
-    {
-      "course_name": "しっかりコース",
-      "course_label": "自分のペースで学ぶコース",
-      "description": "いろいろな方法で学びたい人におすすめ",
-      "color_code": "blue",
-      "cards": [
-        {"card_number": 1, "card_title": "カード1", "card_type": "main", "textbook_page": "p.24", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード1の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 2, "card_title": "カード2", "card_type": "main", "textbook_page": "p.26", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード2の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 3, "card_title": "カード3", "card_type": "main", "textbook_page": "p.28", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード3の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 4, "card_title": "カード4", "card_type": "main", "textbook_page": "p.30", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード4の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 5, "card_title": "カード5", "card_type": "main", "textbook_page": "p.32", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード5の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 6, "card_title": "カード6", "card_type": "main", "textbook_page": "p.34", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード6の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]}
-      ]
-    },
-    {
-      "course_name": "どんどんコース",
-      "course_label": "いろいろなことにちょうせんするコース",
-      "description": "自分で考えを深めたい人におすすめ",
-      "color_code": "purple",
-      "cards": [
-        {"card_number": 1, "card_title": "カード1", "card_type": "main", "textbook_page": "p.24", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード1の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 2, "card_title": "カード2", "card_type": "main", "textbook_page": "p.26", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード2の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 3, "card_title": "カード3", "card_type": "main", "textbook_page": "p.28", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード3の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 4, "card_title": "カード4", "card_type": "main", "textbook_page": "p.30", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード4の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 5, "card_title": "カード5", "card_type": "main", "textbook_page": "p.32", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード5の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
-        {"card_number": 6, "card_title": "カード6", "card_type": "main", "textbook_page": "p.34", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード6の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]}
-      ]
-    }
+    // 他2コース（しっかり・どんどん）も同じ形式
   ]
 }
 
