@@ -2185,7 +2185,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 ` : ''
     
     const prompt = `あなたは経験豊富な教育カリキュラムデザイナーです。
-子どもたちがワクワクしながら主体的に学べる単元を設計してください。
+以下の情報に基づいて、学習指導要領に沿った単元を設計してください。
 
 【基本情報】
 - 学年: ${grade}
@@ -2193,7 +2193,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 - 教科書: ${textbook}
 - 単元名: ${unitName}${customInfo}
 
-以下のJSON形式で、完全な単元を出力してください：
+以下のJSON形式で出力してください：
 
 {
   "curriculum": {
@@ -2205,43 +2205,12 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     "unit_goal": "この単元で達成すべき学習目標（子どもが理解できる言葉で100文字程度、漢字にはふりがなを付ける）",
     "non_cognitive_goal": "非認知能力の目標（意欲、粘り強さ、協調性など）（80文字程度）"
   },
-  "course_selection_problems": [
-    {
-      "problem_number": 1,
-      "problem_title": "ゆっくりコースの問題タイトル",
-      "problem_description": "魅力的で具体的な問題",
-      "problem_content": "具体的な数字と状況を含む問題文（必須）",
-      "course_level": "基礎",
-      "connection_to_cards": "この問題は学習カード1-2で学ぶ内容につながります"
-    },
-    {
-      "problem_number": 2,
-      "problem_title": "しっかりコースの問題タイトル",
-      "problem_description": "標準的で工夫が必要な問題",
-      "problem_content": "具体的な数字と状況を含む問題文（必須）",
-      "course_level": "標準",
-      "connection_to_cards": "この問題は学習カード1-3で学ぶ内容につながります"
-    },
-    {
-      "problem_number": 3,
-      "problem_title": "どんどんコースの問題タイトル",
-      "problem_description": "発展的で深く考える問題",
-      "problem_content": "具体的な数字と状況を含む問題文（必須）",
-      "course_level": "発展",
-      "connection_to_cards": "この問題は学習カード1-4や選択問題1-2につながります"
-    }
-  ],
   "courses": [
     {
       "course_name": "ゆっくりコース",
       "course_label": "じっくり考えながら進むコース",
       "description": "ひとつひとつていねいに学びたい人におすすめ",
       "color_code": "green",
-      "introduction_problem": {
-        "problem_title": "導入問題タイトル",
-        "problem_content": "具体的な問題文（数字含む）",
-        "answer": "解答"
-      },
       "cards": [
         {
           "card_number": 1,
@@ -2269,92 +2238,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
               "hint_text": "ヒント3（ほぼ答えに近いヒント）"
             }
           ]
-        },
-        {
-          "card_number": 2,
-          "card_title": "学習カード2のタイトル",
-          "card_type": "main",
-          "textbook_page": "p.26-27",
-          "problem_description": "問題文",
-          "new_terms": "新出用語",
-          "example_problem": "例題",
-          "example_solution": "解き方",
-          "real_world_connection": "つながり",
-          "answer": "カード2の解答（必須）",
-          "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1（必須）"},
-            {"hint_level": 2, "hint_text": "ヒント2（必須）"},
-            {"hint_level": 3, "hint_text": "ヒント3（必須）"}
-          ]
-        },
-        {
-          "card_number": 3,
-          "card_title": "学習カード3のタイトル",
-          "card_type": "main",
-          "textbook_page": "p.28-29",
-          "problem_description": "問題文",
-          "new_terms": "新出用語",
-          "example_problem": "例題",
-          "example_solution": "解き方",
-          "real_world_connection": "つながり",
-          "answer": "カード3の解答（必須）",
-          "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1（必須）"},
-            {"hint_level": 2, "hint_text": "ヒント2（必須）"},
-            {"hint_level": 3, "hint_text": "ヒント3（必須）"}
-          ]
-        },
-        {
-          "card_number": 4,
-          "card_title": "学習カード4のタイトル",
-          "card_type": "main",
-          "textbook_page": "p.30-31",
-          "problem_description": "問題文",
-          "new_terms": "新出用語",
-          "example_problem": "例題",
-          "example_solution": "解き方",
-          "real_world_connection": "つながり",
-          "answer": "カード4の解答（必須）",
-          "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1（必須）"},
-            {"hint_level": 2, "hint_text": "ヒント2（必須）"},
-            {"hint_level": 3, "hint_text": "ヒント3（必須）"}
-          ]
-        },
-        {
-          "card_number": 5,
-          "card_title": "学習カード5のタイトル",
-          "card_type": "main",
-          "textbook_page": "p.32-33",
-          "problem_description": "問題文",
-          "new_terms": "新出用語",
-          "example_problem": "例題",
-          "example_solution": "解き方",
-          "real_world_connection": "つながり",
-          "answer": "カード5の解答（必須）",
-          "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1（必須）"},
-            {"hint_level": 2, "hint_text": "ヒント2（必須）"},
-            {"hint_level": 3, "hint_text": "ヒント3（必須）"}
-          ]
-        },
-        {
-          "card_number": 6,
-          "card_title": "学習カード6のタイトル",
-          "card_type": "main",
-          "textbook_page": "p.34-35",
-          "problem_description": "問題文",
-          "new_terms": "新出用語",
-          "example_problem": "例題",
-          "example_solution": "解き方",
-          "real_world_connection": "つながり",
-          "answer": "カード6の解答（必須）",
-          "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1（必須）"},
-            {"hint_level": 2, "hint_text": "ヒント2（必須）"},
-            {"hint_level": 3, "hint_text": "ヒント3（必須）"}
-          ]
         }
+        // ... カード2〜6も同じ形式で続ける（全6枚必須）
       ]
     },
     {
@@ -2362,11 +2247,6 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "course_label": "自分のペースで学ぶコース",
       "description": "いろいろな方法で学びたい人におすすめ",
       "color_code": "blue",
-      "introduction_problem": {
-        "problem_title": "しっかりコース導入問題のタイトル（必須・魅力的なタイトル）",
-        "problem_content": "具体的な問題文（必須・実際に解ける問題、数字や状況を含む）",
-        "answer": "解答のヒント（必須・子どもが理解できる解答）"
-      },
       "cards": [
         {"card_number": 1, "card_title": "カード1", "card_type": "main", "textbook_page": "p.24", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード1の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
         {"card_number": 2, "card_title": "カード2", "card_type": "main", "textbook_page": "p.26", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード2の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
@@ -2381,11 +2261,6 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "course_label": "いろいろなことにちょうせんするコース",
       "description": "自分で考えを深めたい人におすすめ",
       "color_code": "purple",
-      "introduction_problem": {
-        "problem_title": "どんどんコース導入問題のタイトル（必須・魅力的なタイトル）",
-        "problem_content": "具体的な問題文（必須・実際に解ける問題、数字や状況を含む）",
-        "answer": "解答のヒント（必須・子どもが理解できる解答）"
-      },
       "cards": [
         {"card_number": 1, "card_title": "カード1", "card_type": "main", "textbook_page": "p.24", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード1の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
         {"card_number": 2, "card_title": "カード2", "card_type": "main", "textbook_page": "p.26", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード2の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]},
@@ -2395,211 +2270,22 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
         {"card_number": 6, "card_title": "カード6", "card_type": "main", "textbook_page": "p.34", "problem_description": "問題", "new_terms": "用語", "example_problem": "例題", "example_solution": "解法", "real_world_connection": "つながり", "answer": "カード6の解答（必須）", "hints": [{"hint_level": 1, "hint_text": "ヒント1"}, {"hint_level": 2, "hint_text": "ヒント2"}, {"hint_level": 3, "hint_text": "ヒント3"}]}
       ]
     }
-  ],
-  "common_check_test": {
-    "test_description": "全コース共通の基礎基本チェックテスト（知識理解の最低保証）",
-    "test_note": "どのコースを選んでも、同じチェックテストを受けます。単元の基礎基本が身についているかを確認します。",
-    "problems_count": 6,
-    "sample_problems": [
-      {
-        "problem_number": 1,
-        "problem_text": "具体的な基礎問題文1（数字や状況を含む、実際に解ける問題）",
-        "answer": "簡潔な解答例",
-        "difficulty": "basic"
-      },
-      {
-        "problem_number": 2,
-        "problem_text": "具体的な基礎問題文2",
-        "answer": "簡潔な解答例",
-        "difficulty": "basic"
-      },
-      {
-        "problem_number": 3,
-        "problem_text": "具体的な基礎問題文3",
-        "answer": "簡潔な解答例",
-        "difficulty": "basic"
-      },
-      {
-        "problem_number": 4,
-        "problem_text": "具体的な基礎問題文4",
-        "answer": "簡潔な解答例",
-        "difficulty": "basic"
-      },
-      {
-        "problem_number": 5,
-        "problem_text": "具体的な基礎問題文5",
-        "answer": "簡潔な解答例",
-        "difficulty": "basic"
-      },
-      {
-        "problem_number": 6,
-        "problem_text": "具体的な基礎問題文6",
-        "answer": "簡潔な解答例",
-        "difficulty": "basic"
-      }
-    ]
-  },
-  "optional_problems": [
-    {"problem_number": 1, "problem_title": "選択問題1タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "medium", "answer": "解答", "explanation": "説明"},
-    {"problem_number": 2, "problem_title": "選択問題2タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "medium", "answer": "解答", "explanation": "説明"},
-    {"problem_number": 3, "problem_title": "選択問題3タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "hard", "answer": "解答", "explanation": "説明"},
-    {"problem_number": 4, "problem_title": "選択問題4タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "hard", "answer": "解答", "explanation": "説明"},
-    {"problem_number": 5, "problem_title": "選択問題5タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "very_hard", "answer": "解答", "explanation": "説明"},
-    {"problem_number": 6, "problem_title": "選択問題6タイトル", "problem_description": "具体的な問題文", "learning_meaning": "学習の意味", "difficulty_level": "very_hard", "answer": "解答", "explanation": "説明"}
   ]
 }
 
-【最重要：必須要件】
-❗️ **各コースは必ず6枚のカードを作成してください。これは絶対条件です。**
-❗️ **時間制限より優先して、3コース×6枚＝合計18枚のカードを確実に完成させてください。**
-❗️ **1コースでも5枚以下になってはいけません。必ず6枚です。**
-❗️ **各カードには必ず3段階のヒント（hint_level: 1, 2, 3）を作成してください。ヒントなしのカードは絶対に作らない。**
-❗️ **各カードには必ず解答（answer）を記載してください。解答がないカードは不完全です。**
-🚨🚨🚨 **絶対必須事項（これがないと不合格）** 🚨🚨🚨
+【重要な要件】
+- 各コースは6枚のカード（必須）
+- 全カードにanswerフィールド（必須）
+- 全カードにhints配列3つ（必須）
+- JSONコードブロックなし、完全なJSONのみを出力
 
-1. **コース選択問題3題（course_selection_problems）**（絶対必須・最優先・1題でも欠けたら不合格）
-2. **3コース × 1題の導入問題 = 3題の導入問題**（絶対必須）
-3. **18枚のカード × 3段階のヒント = 54個のヒント**（絶対必須）
-4. **全カードに解答を含める**（絶対必須）
-5. **選択問題6題（optional_problems）**（絶対必須・1題でも欠けたら不合格）
-
-❗️❗️❗️ **course_selection_problemsは必ず3題（problem_number: 1, 2, 3）を含めてください！** ❗️❗️❗️
-❗️ **各コース選択問題には problem_title, problem_description, problem_content, connection_to_cards をすべて含めてください！**
-❗️ **problem_contentには具体的な数字や状況を含む、実際に解ける問題文を書いてください！**
-❗️ **「やってみたい！」と子どもが思える魅力的な問題にしてください！**
-
-❗️ **各コースには必ずintroduction_problemフィールドを含めてください！**
-❗️ **introduction_problemは { problem_title, problem_content, answer } の3つのフィールドすべて必須です！**
-❗️ **導入問題が1つでも欠けている場合、生成失敗とみなされます！**
-
-❗️ **optional_problemsは必ず6題（problem_number: 1, 2, 3, 4, 5, 6）を含めてください！**
-❗️ **各選択問題には必ずlearning_meaningフィールドを記載してください！**
-
-【重要な設計指針】
-
-1. コース設計（各コース必ず6枚のカード - 絶対要件）:
-   - **ゆっくりコース: 必ず6枚（card_number: 1, 2, 3, 4, 5, 6）**
-     - 基礎をしっかり。丁寧な説明と十分な練習
-     - **コース導入問題を1題作成**（このコースを選ぶための魅力的な入門問題）
-   - **しっかりコース: 必ず6枚（card_number: 1, 2, 3, 4, 5, 6）**
-     - 標準的な内容。バランスよく
-     - **コース導入問題を1題作成**（このコースを選ぶための魅力的な入門問題）
-   - **どんどんコース: 必ず6枚（card_number: 1, 2, 3, 4, 5, 6）**
-     - 発展的な内容。思考を深める
-     - **コース導入問題を1題作成**（このコースを選ぶための魅力的な入門問題）
-
-2. コース選択問題3題（最重要）:
-   - **各コースの入り口となる魅力的で具体的な問題を作成**
-   - **問題文は具体的な数字や状況を含む、実際に解ける問題にする**
-   - **「やってみたい！」「これなら自分にもできそう！」と思える内容**
-   - problem_contentに具体的な問題文を必ず書く
-   - この問題が学習カードのどの内容につながるかを connection_to_cards に書く
-   - 選択問題1-2題はこのコース選択問題の発展版になるようにする
-
-3. 各コースの導入問題（新規・最重要・子どもがコース選択する際の重要な判断材料）:
-   - **各コースに1題ずつ、合計3題の魅力的な導入問題を作成**
-   - **目的：子どもが各コースの学習内容を具体的にイメージできるようにする**
-   - **コース選択問題とは別物：コースを選ぶための具体例となる問題**
-   
-   **重要：単なる難易度の違いではなく、学習内容の違いを示す**
-   - ❌NG例：「ゆっくり=2+3」「しっかり=12+35」「どんどん=123+456」
-   - ✅Good例：それぞれのコースで扱う学習テーマ・アプローチの違いを示す
-   
-   **ゆっくりコース導入問題：**
-   - 基礎的で親しみやすく、じっくり理解できる問題
-   - 具体物や図を使って考える問題
-   - 「これなら自分にもできそう！」と思える内容
-   - 丁寧な説明と十分な練習時間を想定
-   
-   **しっかりコース導入問題：**
-   - 標準的で、いろいろな方法で解ける問題
-   - 複数のアプローチを試せる問題
-   - 「自分なりの方法で解いてみたい！」と思える内容
-   - バランスの取れた学習を想定
-   
-   **どんどんコース導入問題：**
-   - 発展的で、深く考える問題
-   - 応用や発展につながる問題
-   - 「もっと知りたい！挑戦したい！」と思える内容
-   - 自分で考えを深められる学習を想定
-   
-   - 各コースのJSONに introduction_problem フィールドを追加
-   - 形式：problem_title（魅力的なタイトル）, problem_content（具体的な問題文）, answer（解答のヒント）を必ず含む
-   - 問題文は具体的な数字や状況を含み、実際に解ける問題にする
-   
-4. チェックテスト（全コース共通・最重要）:
-   - **どのコースも共通で、基礎基本問題6題を作成**
-   - **単元の知識理解の最低保証となる重要な問題**
-   - **教師が全体確認で確認できるよう、詳細な問題を作成**
-   - 問題文は実際に子どもが解ける形式で、具体的な数字や状況を含む
-   - すべて基礎レベル（difficulty: "basic"）
-   - 各問題に問題番号（1〜6）と簡潔な解答例を付ける
-   - common_check_test フィールドに記載
-
-5. 選択問題6題（発展課題・必須）:
-   - **チェックテストとは別の、発展的な選択課題**
-   - **子どもの興味関心をひく実践的な内容で、より深い学びを促す**
-   - 教科の見方・考え方が深まるもの
-   - 教科単元の本質に触れるもの
-   - 学習したことを生かせるもの
-   - 他教科への発展を含む
-   - 「この勉強には意味がある」と子どもが実感できる内容
-   - 各問題に「learning_meaning」（学習の意味・必要感）を必ず記載
-   - コース選択問題とのつながりを意識する
-   - optional_problems フィールドに記載（6題必須）
-
-6. 学習カード設計（最重要）:
-   - **各カードには必ず3段階のヒント（hint_level: 1, 2, 3）を用意**
-   - **各カードには必ず解答（answer）を記載**
-   - **ヒントなし・解答なしのカードは絶対に作らない**
-   - 実社会とのつながりを重視
-   - 教科書ページを明示（textbook_page）
-   - 子どもが自分で考え、試行錯誤できる内容
-   - コース選択問題で提示した内容を深める構成
-
-7. 言葉遣い:
-   - 子どもが理解できる平易な言葉
-   - 漢字にはふりがな（ルビ）を付ける想定
-   - ポジティブで前向きな表現
-   - 「〜できるようになる」「〜がわかる」など成長実感を持てる表現
-
-8. 全体の一貫性:
-   - コース選択問題 → 導入問題 → 学習カード → チェックテスト（共通6題） → 選択問題（発展6題）の流れを意識
-   - 学習のてびき1枚で単元全体を把握できる設計
-   - 子どもが「この勉強をやりたい！」と思える魅力的な内容
-   - 教師が全体確認でチェックテストの内容を確認できる詳細な問題作成
-
-9. ${customization?.studentNeeds ? 'カスタマイズ要望を最優先に反映' : ''}
-
-【最終チェックリスト - これを満たさないJSONは不合格】
-✅ course_selection_problems: 必ず3題（problem_number: 1, 2, 3）
-✅ 各コース選択問題に problem_content フィールドあり（具体的な数字と状況を含む問題文）
-✅ courses: 必ず3コース（ゆっくり、しっかり、どんどん）
-✅ 各コースに introduction_problem あり（problem_title, problem_content, answer）
-✅ 各コースに6枚のカード（card_number: 1, 2, 3, 4, 5, 6）
-✅ 各カードに3段階のヒント（hint_level: 1, 2, 3）
-✅ 各カードに answer フィールドあり
-✅ common_check_test: 必ず6題（problem_number: 1-6、すべて difficulty: "basic"）
-✅ optional_problems: 必ず6題（problem_number: 1-6、learning_meaning 必須）
-
-【重要：JSONの構造】
-必ず以下の構造でJSONを出力してください：
-{
-  "curriculum": { ... },
-  "course_selection_problems": [ 3題 ],
-  "courses": [ 3コース、各6枚のカード ],
-  "common_check_test": { sample_problems: [ 6題 ] },
-  "optional_problems": [ 6題 ]
-}
-
-必ず完全なJSONのみを出力してください。説明文は不要です。`
-
+必ず完全なJSONのみを出力してください。`
     // 品質モードに応じてモデルを選択
     // 複数モデルでフォールバック（最新安定版を優先）
     const models = [
-      { name: 'gemini-2.5-flash', maxTokens: 8192 },      // 最新・最も安定
-      { name: 'gemini-2.0-flash', maxTokens: 8192 },      // 高速
-      { name: 'gemini-2.5-pro', maxTokens: 8192 }         // 最高品質
+      { name: 'gemini-2.5-flash', maxTokens: 16384 },     // 最新・最も安定
+      { name: 'gemini-2.0-flash', maxTokens: 16384 },     // 高速
+      { name: 'gemini-2.5-pro', maxTokens: 16384 }        // 最高品質
     ]
     
     let response
