@@ -325,6 +325,12 @@ async function updateUnitList() {
             </div>
             <div class="flex gap-2">
               <button 
+                onclick="event.stopPropagation(); duplicateCurriculum(${item.id})" 
+                class="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
+                title="複製">
+                <i class="fas fa-copy"></i>
+              </button>
+              <button 
                 onclick="event.stopPropagation(); editCurriculum(${item.id})" 
                 class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
                 title="編集">
@@ -366,6 +372,119 @@ function selectUnit(curriculumId) {
 }
 
 // 単元を削除
+// 単元を複製
+async function duplicateCurriculum(curriculumId) {
+  try {
+    // カリキュラムデータを取得
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum } = response.data
+    
+    // 複製モーダルを表示
+    const modal = document.createElement('div')
+    modal.id = 'duplicateModal'
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full p-8">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">
+          <i class="fas fa-copy mr-2 text-green-600"></i>
+          単元を複製
+        </h2>
+        
+        <p class="text-gray-600 mb-6">
+          「${curriculum.unit_name}」を複製します。<br>
+          必要に応じて基本情報を変更してください。
+        </p>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">学年</label>
+            <input type="text" id="dupGrade" value="${curriculum.grade}" 
+                   class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">教科</label>
+            <input type="text" id="dupSubject" value="${curriculum.subject}" 
+                   class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">教科書会社</label>
+            <input type="text" id="dupTextbook" value="${curriculum.textbook_company}" 
+                   class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">単元名</label>
+            <input type="text" id="dupUnitName" value="${curriculum.unit_name}（コピー）" 
+                   class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+          </div>
+        </div>
+        
+        <div class="flex gap-4 mt-8">
+          <button onclick="executeDuplicate(${curriculumId})" 
+                  class="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white py-3 px-6 rounded-lg font-bold transition shadow-lg">
+            <i class="fas fa-check mr-2"></i>
+            複製する
+          </button>
+          <button onclick="closeDuplicateModal()" 
+                  class="bg-gray-300 hover:bg-gray-400 text-gray-800 py-3 px-6 rounded-lg font-bold transition">
+            <i class="fas fa-times mr-2"></i>
+            キャンセル
+          </button>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    console.error('複製モーダル表示エラー:', error)
+    alert(`❌ エラーが発生しました: ${error.message}`)
+  }
+}
+
+function closeDuplicateModal() {
+  const modal = document.getElementById('duplicateModal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+async function executeDuplicate(curriculumId) {
+  try {
+    const newGrade = document.getElementById('dupGrade').value
+    const newSubject = document.getElementById('dupSubject').value
+    const newTextbook = document.getElementById('dupTextbook').value
+    const newUnitName = document.getElementById('dupUnitName').value
+    
+    if (!newGrade || !newSubject || !newTextbook || !newUnitName) {
+      alert('すべての項目を入力してください')
+      return
+    }
+    
+    loadingManager.show('単元を複製中...')
+    
+    const response = await axios.post(`/api/curriculum/${curriculumId}/duplicate`, {
+      newGrade,
+      newSubject,
+      newTextbook,
+      newUnitName
+    })
+    
+    loadingManager.hide()
+    closeDuplicateModal()
+    
+    if (response.data.success) {
+      alert(`✅ 単元「${newUnitName}」を複製しました！`)
+      // 単元リストを更新
+      updateUnitList()
+    } else {
+      throw new Error(response.data.error || '複製に失敗しました')
+    }
+  } catch (error) {
+    loadingManager.hide()
+    console.error('単元複製エラー:', error)
+    alert(`❌ 単元の複製に失敗しました: ${error.message}`)
+  }
+}
+
 async function deleteCurriculum(curriculumId, unitName) {
   const confirmed = confirm(`本当に「${unitName}」を削除しますか？\n\nこの操作は取り消せません。\n- 単元の基本情報\n- すべてのコース\n- すべてのカード\n- すべての問題\nが削除されます。`)
   
@@ -474,14 +593,26 @@ function showEditCurriculumModal(curriculum, courses) {
         <!-- コースとカードの編集 -->
         ${courses.map((course, courseIndex) => `
           <div class="bg-${course.color_code}-50 rounded-lg p-6">
-            <h3 class="text-xl font-bold text-${course.color_code}-800 mb-4">
-              <i class="fas fa-layer-group mr-2"></i>
-              ${course.course_name} - ${course.course_label}
-            </h3>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-xl font-bold text-${course.color_code}-800">
+                <i class="fas fa-layer-group mr-2"></i>
+                ${course.course_name} - ${course.course_label}
+              </h3>
+              <button onclick="saveCardOrder(${course.id}, ${courseIndex})" 
+                      class="bg-${course.color_code}-500 hover:bg-${course.color_code}-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                <i class="fas fa-save mr-1"></i>
+                並び順を保存
+              </button>
+            </div>
             
-            <div class="space-y-4">
+            <p class="text-sm text-${course.color_code}-600 mb-3">
+              <i class="fas fa-hand-pointer mr-1"></i>
+              ドラッグ&ドロップでカードの順序を変更できます
+            </p>
+            
+            <div id="sortable-cards-${courseIndex}" class="space-y-4">
               ${(course.cards || []).map((card, cardIndex) => `
-                <div class="bg-white rounded-lg p-4 border-2 border-${course.color_code}-200">
+                <div class="bg-white rounded-lg p-4 border-2 border-${course.color_code}-200 cursor-move" data-card-id="${card.id}">
                   <div class="flex items-center justify-between mb-3">
                     <h4 class="font-bold text-gray-800">
                       <span class="bg-${course.color_code}-500 text-white px-3 py-1 rounded-full text-sm mr-2">
@@ -540,6 +671,23 @@ function showEditCurriculumModal(curriculum, courses) {
   `
   
   document.body.appendChild(modal)
+  
+  // SortableJSでドラッグ&ドロップを有効化
+  courses.forEach((course, courseIndex) => {
+    const sortableEl = document.getElementById(`sortable-cards-${courseIndex}`)
+    if (sortableEl && typeof Sortable !== 'undefined') {
+      new Sortable(sortableEl, {
+        animation: 150,
+        handle: '.cursor-move',
+        ghostClass: 'bg-blue-100',
+        chosenClass: 'bg-blue-200',
+        dragClass: 'opacity-50',
+        onEnd: function (evt) {
+          console.log(`カードを移動: ${evt.oldIndex} → ${evt.newIndex}`)
+        }
+      })
+    }
+  })
   
   // コースとカードデータを保存（保存時に使用）
   window.editingCourses = courses
@@ -930,7 +1078,7 @@ async function loadGuidePage(curriculumId) {
 
             <!-- 印刷・ツールボタン -->
             <div class="border-t-2 border-gray-300 pt-6 print:hidden">
-              <div class="grid grid-cols-3 gap-4">
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <button onclick="loadLearningPlanPage(${curriculum.id})" 
                         class="bg-gradient-to-r from-green-500 to-teal-600 text-white py-3 px-4 rounded-xl font-bold hover:from-green-600 hover:to-teal-700 transition shadow-lg flex items-center justify-center">
                   <i class="fas fa-calendar-alt mr-2"></i>
@@ -940,6 +1088,11 @@ async function loadGuidePage(curriculumId) {
                         class="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-4 rounded-xl font-bold hover:from-purple-700 hover:to-pink-700 transition shadow-lg flex items-center justify-center">
                   <i class="fas fa-print mr-2"></i>
                   いんさつする（全部）
+                </button>
+                <button onclick="generateQRCode(${curriculum.id})" 
+                        class="bg-gradient-to-r from-orange-500 to-red-600 text-white py-3 px-4 rounded-xl font-bold hover:from-orange-600 hover:to-red-700 transition shadow-lg flex items-center justify-center">
+                  <i class="fas fa-qrcode mr-2"></i>
+                  QRコード生成
                 </button>
                 <button onclick="loadAnswersTab(${curriculum.id})" 
                         class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:from-blue-600 hover:to-indigo-700 transition shadow-lg flex items-center justify-center">
@@ -7295,6 +7448,124 @@ async function downloadGuidePDF(curriculumId) {
   }
 }
 
+// カードの並び順を保存
+async function saveCardOrder(courseId, courseIndex) {
+  try {
+    const sortableEl = document.getElementById(`sortable-cards-${courseIndex}`)
+    if (!sortableEl) {
+      throw new Error('カードリストが見つかりません')
+    }
+    
+    // 現在の順序でカードIDを取得
+    const cardElements = sortableEl.querySelectorAll('[data-card-id]')
+    const cardIds = Array.from(cardElements).map(el => parseInt(el.dataset.cardId))
+    
+    console.log(`📋 カード並び替え保存: courseId=${courseId}, cards=${cardIds.length}`, cardIds)
+    
+    loadingManager.show('カードの順序を保存中...')
+    
+    const response = await axios.post(`/api/course/${courseId}/reorder-cards`, {
+      cardIds
+    })
+    
+    loadingManager.hide()
+    
+    if (response.data.success) {
+      alert('✅ カードの並び順を保存しました！')
+      console.log('✅ カード並び替え成功:', response.data)
+    } else {
+      throw new Error(response.data.error || '並び替えに失敗しました')
+    }
+  } catch (error) {
+    loadingManager.hide()
+    console.error('カード並び替えエラー:', error)
+    alert(`❌ カードの並び替えに失敗しました: ${error.message}`)
+  }
+}
+
+// QRコード生成
+function generateQRCode(curriculumId) {
+  const modal = document.createElement('div')
+  modal.id = 'qrModal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full p-8">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-800">
+          <i class="fas fa-qrcode mr-2 text-orange-600"></i>
+          QRコード生成
+        </h2>
+        <button onclick="closeQRModal()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      
+      <p class="text-gray-600 mb-6">
+        この単元へのアクセス用QRコードを生成します。<br>
+        スマートフォンやタブレットで読み取ると、学習のてびきページに直接アクセスできます。
+      </p>
+      
+      <div class="flex flex-col items-center">
+        <div id="qrcode-container" class="bg-white p-6 rounded-lg border-4 border-orange-200 mb-6"></div>
+        
+        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 w-full">
+          <p class="text-sm text-blue-800">
+            <i class="fas fa-info-circle mr-2"></i>
+            <strong>アクセスURL:</strong><br>
+            <code class="bg-white px-2 py-1 rounded text-xs">${window.location.origin}/?curriculum=${curriculumId}</code>
+          </p>
+        </div>
+        
+        <button onclick="downloadQR()" 
+                class="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white py-3 px-8 rounded-lg font-bold transition shadow-lg">
+          <i class="fas fa-download mr-2"></i>
+          QRコード画像をダウンロード
+        </button>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  
+  // QRコード生成
+  const qrUrl = `${window.location.origin}/?curriculum=${curriculumId}`
+  
+  if (typeof QRCode !== 'undefined') {
+    new QRCode(document.getElementById('qrcode-container'), {
+      text: qrUrl,
+      width: 256,
+      height: 256,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    })
+  } else {
+    document.getElementById('qrcode-container').innerHTML = `
+      <p class="text-red-600">QRコードライブラリの読み込みに失敗しました</p>
+    `
+  }
+}
+
+function closeQRModal() {
+  const modal = document.getElementById('qrModal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+function downloadQR() {
+  const canvas = document.querySelector('#qrcode-container canvas')
+  if (canvas) {
+    const link = document.createElement('a')
+    link.download = `qrcode-curriculum-${state.selectedCurriculum?.id || 'unknown'}.png`
+    link.href = canvas.toDataURL()
+    link.click()
+    console.log('✅ QRコード画像をダウンロード')
+  } else {
+    alert('❌ QRコード画像が見つかりません')
+  }
+}
+
 window.adjustCardTime = adjustCardTime
 window.moveCard = moveCard
 window.saveLearningPlan = saveLearningPlan
@@ -7303,4 +7574,11 @@ window.downloadGuidePDF = downloadGuidePDF
 window.toggleCardDetail = toggleCardDetail
 window.closeEditModal = closeEditModal
 window.saveEditedCurriculum = saveEditedCurriculum
+window.saveCardOrder = saveCardOrder
+window.duplicateCurriculum = duplicateCurriculum
+window.closeDuplicateModal = closeDuplicateModal
+window.executeDuplicate = executeDuplicate
+window.generateQRCode = generateQRCode
+window.closeQRModal = closeQRModal
+window.downloadQR = downloadQR
 

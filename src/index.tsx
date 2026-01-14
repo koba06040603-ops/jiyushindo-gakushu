@@ -9,6 +9,61 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>()
 
+/**
+ * 【将来の実装】ユーザー認証・マルチユーザー対応
+ * 
+ * 1. Cloudflare Workers KV + JWT認証
+ *    - KVにユーザー情報を保存
+ *    - JWTトークンで認証状態管理
+ *    - セッション有効期限の管理
+ * 
+ * 2. ロール管理
+ *    - teacher: カリキュラム作成・編集・削除
+ *    - student: 学習カード閲覧・進捗記録
+ *    - admin: システム全体の管理
+ * 
+ * 3. データ分離
+ *    - curriculum テーブルに created_by カラム追加
+ *    - 教師ごとに作成したカリキュラムを管理
+ *    - 生徒は割り当てられたカリキュラムのみ閲覧可能
+ * 
+ * 4. 実装例（参考）
+ *    - ミドルウェア: app.use('/api/*', authMiddleware)
+ *    - ログインAPI: POST /api/auth/login
+ *    - ログアウトAPI: POST /api/auth/logout
+ *    - ユーザー情報取得: GET /api/auth/me
+ *    - トークン更新: POST /api/auth/refresh
+ */
+
+// 履歴記録ヘルパー
+async function recordHistory(
+  db: D1Database,
+  table: 'curriculum_history' | 'card_history',
+  targetId: number,
+  action: string,
+  snapshot: any,
+  changedFields?: any
+) {
+  try {
+    const idField = table === 'curriculum_history' ? 'curriculum_id' : 'card_id'
+    
+    await db.prepare(`
+      INSERT INTO ${table} (${idField}, action, changed_fields, snapshot)
+      VALUES (?, ?, ?, ?)
+    `).bind(
+      targetId,
+      action,
+      changedFields ? JSON.stringify(changedFields) : null,
+      JSON.stringify(snapshot)
+    ).run()
+    
+    console.log(`📝 履歴記録: ${table}, action=${action}, id=${targetId}`)
+  } catch (error) {
+    console.error('履歴記録エラー:', error)
+    // 履歴記録失敗はメイン処理を止めない
+  }
+}
+
 // Gemini API呼び出しヘルパー（リトライ + 監視）
 interface GeminiCallOptions {
   model: string
@@ -1705,6 +1760,8 @@ app.get('/', (c) => {
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
         <style>
           @media print {
             body { background: white !important; }
@@ -3358,6 +3415,11 @@ app.put('/api/curriculum/:id', async (c) => {
   try {
     console.log(`📝 単元更新開始: ID=${id}`)
     
+    // 更新前のデータを取得（履歴記録用）
+    const oldCurriculum = await env.DB.prepare(`
+      SELECT * FROM curriculum WHERE id = ?
+    `).bind(id).first()
+    
     // 1. カリキュラム基本情報を更新
     await env.DB.prepare(`
       UPDATE curriculum
@@ -3374,6 +3436,15 @@ app.put('/api/curriculum/:id', async (c) => {
       id
     ).run()
     console.log(`  - カリキュラム基本情報更新完了`)
+    
+    // 履歴記録
+    await recordHistory(
+      env.DB,
+      'curriculum_history',
+      parseInt(id),
+      'update',
+      { old: oldCurriculum, new: basicInfo }
+    )
     
     // 2. 各コースのカードを更新
     for (const course of courses) {
@@ -3476,6 +3547,183 @@ app.delete('/api/curriculum/:id', async (c) => {
   }
 })
 
+// APIルート：単元の複製
+app.post('/api/curriculum/:id/duplicate', async (c) => {
+  const { env } = c
+  const sourceId = c.req.param('id')
+  const { newGrade, newSubject, newTextbook, newUnitName } = await c.req.json()
+  
+  try {
+    console.log(`📋 単元複製開始: sourceId=${sourceId}`)
+    
+    // 元のカリキュラムを取得
+    const sourceCurriculum: any = await env.DB.prepare(`
+      SELECT * FROM curriculum WHERE id = ?
+    `).bind(sourceId).first()
+    
+    if (!sourceCurriculum) {
+      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    }
+    
+    // 新しいカリキュラムを作成
+    const newCurriculum = await env.DB.prepare(`
+      INSERT INTO curriculum (
+        grade, subject, textbook_company, unit_name, 
+        unit_order, total_hours, unit_goal, non_cognitive_goal
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      newGrade || sourceCurriculum.grade,
+      newSubject || sourceCurriculum.subject,
+      newTextbook || sourceCurriculum.textbook_company,
+      newUnitName || `${sourceCurriculum.unit_name}（コピー）`,
+      sourceCurriculum.unit_order,
+      sourceCurriculum.total_hours,
+      sourceCurriculum.unit_goal,
+      sourceCurriculum.non_cognitive_goal
+    ).run()
+    
+    const newCurriculumId = newCurriculum.meta.last_row_id
+    
+    // コースをコピー
+    const courses = await env.DB.prepare(`
+      SELECT * FROM courses WHERE curriculum_id = ?
+    `).bind(sourceId).all()
+    
+    for (const course of courses.results) {
+      const newCourse = await env.DB.prepare(`
+        INSERT INTO courses (
+          curriculum_id, course_level, course_name, course_label, 
+          color_code, introduction_problem
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        newCurriculumId,
+        (course as any).course_level,
+        (course as any).course_name,
+        (course as any).course_label,
+        (course as any).color_code,
+        (course as any).introduction_problem
+      ).run()
+      
+      const newCourseId = newCourse.meta.last_row_id
+      
+      // 学習カードをコピー
+      const cards = await env.DB.prepare(`
+        SELECT * FROM learning_cards WHERE course_id = ?
+      `).bind((course as any).id).all()
+      
+      for (const card of cards.results) {
+        await env.DB.prepare(`
+          INSERT INTO learning_cards (
+            course_id, card_number, card_title, card_type, 
+            problem_description, new_terms, example_problem, 
+            example_solution, real_world_connection, answer, textbook_page
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          newCourseId,
+          (card as any).card_number,
+          (card as any).card_title,
+          (card as any).card_type,
+          (card as any).problem_description,
+          (card as any).new_terms,
+          (card as any).example_problem,
+          (card as any).example_solution,
+          (card as any).real_world_connection,
+          (card as any).answer,
+          (card as any).textbook_page
+        ).run()
+      }
+    }
+    
+    // メタデータをコピー
+    const metadata = await env.DB.prepare(`
+      SELECT * FROM curriculum_metadata WHERE curriculum_id = ?
+    `).bind(sourceId).all()
+    
+    for (const meta of metadata.results) {
+      await env.DB.prepare(`
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
+        VALUES (?, ?, ?)
+      `).bind(
+        newCurriculumId,
+        (meta as any).meta_key,
+        (meta as any).meta_value
+      ).run()
+    }
+    
+    // 選択問題をコピー
+    const optionalProblems = await env.DB.prepare(`
+      SELECT * FROM optional_problems WHERE curriculum_id = ?
+    `).bind(sourceId).all()
+    
+    for (const problem of optionalProblems.results) {
+      await env.DB.prepare(`
+        INSERT INTO optional_problems (
+          curriculum_id, problem_number, problem_title, 
+          problem_description, problem_content, difficulty_level, learning_meaning
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        newCurriculumId,
+        (problem as any).problem_number,
+        (problem as any).problem_title,
+        (problem as any).problem_description,
+        (problem as any).problem_content,
+        (problem as any).difficulty_level,
+        (problem as any).learning_meaning
+      ).run()
+    }
+    
+    console.log(`✅ 単元複製完了: newId=${newCurriculumId}`)
+    
+    return c.json({
+      success: true,
+      newCurriculumId,
+      message: '単元を複製しました'
+    })
+  } catch (error: any) {
+    console.error('単元複製エラー:', error)
+    return c.json({
+      success: false,
+      error: '単元の複製に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：カードの並び替え
+app.post('/api/course/:courseId/reorder-cards', async (c) => {
+  const { env } = c
+  const courseId = c.req.param('courseId')
+  const { cardIds } = await c.req.json() // [id1, id2, id3, ...]
+  
+  try {
+    console.log(`📋 カード並び替え開始: courseId=${courseId}, cards=${cardIds.length}`)
+    
+    // 各カードのcard_numberを更新
+    for (let i = 0; i < cardIds.length; i++) {
+      await env.DB.prepare(`
+        UPDATE learning_cards
+        SET card_number = ?
+        WHERE id = ? AND course_id = ?
+      `).bind(i + 1, cardIds[i], courseId).run()
+    }
+    
+    console.log(`✅ カード並び替え完了: ${cardIds.length}枚`)
+    
+    return c.json({
+      success: true,
+      message: 'カードの並び替えを保存しました',
+      count: cardIds.length
+    })
+  } catch (error: any) {
+    console.error('カード並び替えエラー:', error)
+    return c.json({
+      success: false,
+      error: 'カードの並び替えに失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
 // APIルート：選択問題の削除
 app.delete('/api/optional-problem/:id', async (c) => {
   const { env } = c
@@ -3568,6 +3816,34 @@ app.post('/api/curriculum/:id/regenerate-check-test', async (c) => {
     return c.json({
       success: false,
       error: 'チェックテストの再生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：単元の編集履歴取得
+app.get('/api/curriculum/:id/history', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('id')
+  
+  try {
+    const history = await env.DB.prepare(`
+      SELECT * FROM curriculum_history 
+      WHERE curriculum_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).bind(curriculumId).all()
+    
+    return c.json({
+      success: true,
+      history: history.results || [],
+      count: history.results?.length || 0
+    })
+  } catch (error: any) {
+    console.error('履歴取得エラー:', error)
+    return c.json({
+      success: false,
+      error: '履歴の取得に失敗しました',
       details: error.message
     }, 500)
   }
