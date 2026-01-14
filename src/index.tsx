@@ -1540,7 +1540,7 @@ ${cardContext ? `
 質問「区切りってどういうこと？」
 →「区切りっていうのは、大きな数をわかりやすく分けることだよ。例えば、10000を「10と1000」に分けると計算しやすくなるよね。この問題では、どこで区切ると計算しやすいかな？」`
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2156,7 +2156,7 @@ app.post('/api/ai/generate-unit', async (c) => {
   const { grade, subject, textbook, unitName, customization, qualityMode } = await c.req.json()
   
   // 環境変数またはハードコードされたAPIキーを使用
-  const apiKey = env.GEMINI_API_KEY || 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
   
   if (!apiKey) {
     console.error('❌ APIキーが設定されていません')
@@ -2575,7 +2575,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
 app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
+  const apiKey = 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -2715,7 +2715,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
 app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
+  const apiKey = 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -2865,7 +2865,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
+  const apiKey = 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -3013,7 +3013,7 @@ app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
 app.post('/api/curriculum/:curriculumId/generate-additional-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = 'AIzaSyDxqCzEH5qSEeDexSH_hTd0J8VFrcNECko'
+  const apiKey = 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
