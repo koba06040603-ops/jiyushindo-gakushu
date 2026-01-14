@@ -3272,4 +3272,103 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
   }
 })
 
+// APIルート：単元名候補の生成（AI検索機能）
+app.post('/api/ai/suggest-units', async (c) => {
+  const { env } = c
+  const { grade, subject, textbook } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  
+  if (!apiKey) {
+    return c.json({ error: 'API key not configured' }, 500)
+  }
+  
+  try {
+    // 簡潔なプロンプト（単元名候補10個のみ）
+    const prompt = `${grade}${subject}（${textbook}教科書）の主な単元名を10個、学習指導要領に沿ってJSON配列で出力してください。
+
+【JSON出力形式】
+{
+  "units": [
+    "単元名1",
+    "単元名2",
+    "単元名3",
+    "単元名4",
+    "単元名5",
+    "単元名6",
+    "単元名7",
+    "単元名8",
+    "単元名9",
+    "単元名10"
+  ]
+}
+
+【重要】
+- 完全なJSONのみを出力（説明不要）
+- 単元名は教科書の目次に記載される形式で
+- 学年・教科に適した内容のみ
+
+完全なJSONのみ出力してください。`
+
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash']
+    let response
+    
+    for (const model of models) {
+      try {
+        console.log(`🔄 単元候補生成モデル試行中: ${model}`)
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+            })
+          }
+        )
+        
+        if (response.ok) {
+          console.log(`✅ 単元候補生成成功: ${model}`)
+          break
+        } else {
+          console.warn(`⚠️ 単元候補生成失敗: ${model}`)
+        }
+      } catch (error) {
+        console.warn(`⚠️ 単元候補生成エラー: ${model}`)
+      }
+    }
+    
+    if (!response || !response.ok) {
+      throw new Error('All models failed')
+    }
+    
+    const data = await response.json()
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
+    
+    if (!aiResponse) {
+      throw new Error('AI response is empty')
+    }
+    
+    // JSONを抽出
+    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
+    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
+    
+    const result = JSON.parse(jsonText)
+    
+    return c.json({
+      success: true,
+      units: result.units || []
+    })
+    
+  } catch (error: any) {
+    console.error('単元候補生成エラー:', error)
+    return c.json({
+      error: '単元候補の生成に失敗しました',
+      details: error.message,
+      units: []
+    }, 500)
+  }
+})
+
 export default app

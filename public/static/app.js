@@ -4822,8 +4822,11 @@ function showUnitGeneratorModal() {
                   AIで単元候補を表示
                 </button>
               </div>
-              <input type="text" id="genUnitName" placeholder="例: かけ算の筆算（または上のボタンで候補から選択）" 
+              <input type="text" id="genUnitName" 
+                     placeholder="例: かけ算の筆算（または上のボタンで候補から選択）" 
+                     list="unitDatalist"
                      class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
+              <datalist id="unitDatalist"></datalist>
               <!-- 単元候補表示エリア -->
               <div id="unitSuggestions" class="mt-2 hidden">
                 <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-3">
