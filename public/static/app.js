@@ -1,17 +1,32 @@
-// グローバルエラーハンドラー
+// グローバルエラーハンドラー（詳細ログ付き）
 window.addEventListener('error', (event) => {
-  console.error('🔴 Global Error:', {
-    message: event.message,
-    filename: event.filename,
-    lineno: event.lineno,
-    colno: event.colno,
-    error: event.error
-  })
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.error('🔴 JavaScript Error Detected!')
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.error('Message:', event.message)
+  console.error('File:', event.filename)
+  console.error('Line:', event.lineno, 'Column:', event.colno)
+  console.error('Error Object:', event.error)
+  if (event.error && event.error.stack) {
+    console.error('Stack Trace:', event.error.stack)
+  }
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 })
 
 window.addEventListener('unhandledrejection', (event) => {
-  console.error('🔴 Unhandled Promise Rejection:', event.reason)
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.error('🔴 Unhandled Promise Rejection!')
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.error('Reason:', event.reason)
+  if (event.reason && event.reason.stack) {
+    console.error('Stack Trace:', event.reason.stack)
+  }
+  console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 })
+
+// 起動時に確認メッセージ
+console.log('✅ app.js loaded successfully')
+console.log('📦 Available functions:', typeof renderTopPage, typeof showTopPage)
 
 // グローバル状態管理
 const state = {
