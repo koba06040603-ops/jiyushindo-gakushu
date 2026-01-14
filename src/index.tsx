@@ -5,7 +5,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 type Bindings = {
   DB: D1Database
   GEMINI_API_KEY?: string
-  PROGRESS_WEBSOCKET: DurableObjectNamespace
+  PROGRESS_WEBSOCKET?: DurableObjectNamespace
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -5504,9 +5504,17 @@ app.post('/api/ai/feedback', async (c) => {
 // WebSocketエンドポイント
 // ==============================================
 
-// WebSocket接続エンドポイント
+// WebSocket接続エンドポイント（ローカル開発のみ）
 app.get('/api/ws', async (c) => {
   const { env } = c
+  
+  // Durable Objectsが利用不可の場合はエラーを返す
+  if (!env.PROGRESS_WEBSOCKET) {
+    return c.json({ 
+      error: 'WebSocket is not available in production. Use polling instead.',
+      message: 'WebSocket機能は開発環境でのみ利用可能です。'
+    }, 503)
+  }
   
   // クエリパラメータからクラスコードとユーザー情報を取得
   const classCode = c.req.query('classCode')
