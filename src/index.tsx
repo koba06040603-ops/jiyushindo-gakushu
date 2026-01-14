@@ -4400,9 +4400,13 @@ app.get('/api/curriculum/:id/history', async (c) => {
   
   try {
     const history = await env.DB.prepare(`
-      SELECT * FROM curriculum_history 
-      WHERE curriculum_id = ?
-      ORDER BY created_at DESC
+      SELECT 
+        h.*,
+        u.name as changed_by_name
+      FROM curriculum_history h
+      LEFT JOIN users u ON h.changed_by = u.id
+      WHERE h.curriculum_id = ?
+      ORDER BY h.created_at DESC
       LIMIT 50
     `).bind(curriculumId).all()
     
@@ -4416,6 +4420,86 @@ app.get('/api/curriculum/:id/history', async (c) => {
     return c.json({
       success: false,
       error: '履歴の取得に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：履歴ロールバック
+app.post('/api/curriculum/:id/rollback/:historyId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('id')
+  const historyId = c.req.param('historyId')
+  
+  try {
+    // 履歴データを取得
+    const historyRecord = await env.DB.prepare(`
+      SELECT * FROM curriculum_history 
+      WHERE id = ? AND curriculum_id = ?
+    `).bind(historyId, curriculumId).first()
+    
+    if (!historyRecord) {
+      return c.json({
+        success: false,
+        error: '履歴レコードが見つかりません'
+      }, 404)
+    }
+    
+    // 現在の状態を履歴に保存（ロールバック前）
+    const currentCurriculum = await env.DB.prepare(`
+      SELECT * FROM curriculum WHERE id = ?
+    `).bind(curriculumId).first()
+    
+    if (currentCurriculum) {
+      await recordHistory(env, 'curriculum_history', curriculumId, {
+        action: 'rollback_before',
+        changed_by: 1, // システムユーザー
+        data_before: JSON.stringify(currentCurriculum),
+        data_after: historyRecord.data_before
+      })
+    }
+    
+    // 履歴データをパース
+    const rollbackData = JSON.parse(historyRecord.data_before as string)
+    
+    // カリキュラムをロールバック
+    await env.DB.prepare(`
+      UPDATE curriculum SET
+        grade = ?,
+        subject = ?,
+        textbook_company = ?,
+        unit_name = ?,
+        unit_goal = ?,
+        non_cognitive_goal = ?
+      WHERE id = ?
+    `).bind(
+      rollbackData.grade,
+      rollbackData.subject,
+      rollbackData.textbook_company,
+      rollbackData.unit_name,
+      rollbackData.unit_goal,
+      rollbackData.non_cognitive_goal,
+      curriculumId
+    ).run()
+    
+    // ロールバック完了を履歴に記録
+    await recordHistory(env, 'curriculum_history', curriculumId, {
+      action: 'rollback_complete',
+      changed_by: 1,
+      data_before: JSON.stringify(currentCurriculum),
+      data_after: JSON.stringify(rollbackData)
+    })
+    
+    return c.json({
+      success: true,
+      message: 'ロールバックが完了しました',
+      rolled_back_to: historyRecord.created_at
+    })
+  } catch (error: any) {
+    console.error('ロールバックエラー:', error)
+    return c.json({
+      success: false,
+      error: 'ロールバックに失敗しました',
       details: error.message
     }, 500)
   }
@@ -4478,6 +4562,310 @@ app.get('/api/system/stats', async (c) => {
       details: error.message
     }, 500)
   }
+})
+
+// ==============================================
+// 認証API
+// ==============================================
+
+// ユーティリティ: パスワードハッシュ生成（Web Crypto API使用）
+async function hashPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(password)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// ユーティリティ: トークン生成
+function generateToken(length: number = 32): string {
+  const array = new Uint8Array(length)
+  crypto.getRandomValues(array)
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+// ミドルウェア: 認証チェック
+async function requireAuth(c: any, next: any) {
+  const { env } = c
+  const authHeader = c.req.header('Authorization')
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: '認証が必要です' }, 401)
+  }
+  
+  const token = authHeader.substring(7)
+  
+  try {
+    const session = await env.DB.prepare(`
+      SELECT s.*, u.id as user_id, u.name, u.email, u.role, u.class_code
+      FROM user_sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.session_token = ? AND s.expires_at > datetime('now') AND u.is_active = 1
+    `).bind(token).first()
+    
+    if (!session) {
+      return c.json({ error: 'セッションが無効です' }, 401)
+    }
+    
+    // コンテキストにユーザー情報を保存
+    c.set('user', {
+      id: session.user_id,
+      name: session.name,
+      email: session.email,
+      role: session.role,
+      class_code: session.class_code
+    })
+    
+    await next()
+  } catch (error) {
+    console.error('認証エラー:', error)
+    return c.json({ error: '認証に失敗しました' }, 500)
+  }
+}
+
+// ミドルウェア: 権限チェック
+function requirePermission(resource: string, action: string) {
+  return async (c: any, next: any) => {
+    const user = c.get('user')
+    if (!user) {
+      return c.json({ error: '認証が必要です' }, 401)
+    }
+    
+    const { env } = c
+    
+    try {
+      const permission = await env.DB.prepare(`
+        SELECT * FROM role_permissions
+        WHERE role = ? AND resource = ? AND action = ?
+      `).bind(user.role, resource, action).first()
+      
+      if (!permission) {
+        return c.json({ error: '権限がありません' }, 403)
+      }
+      
+      await next()
+    } catch (error) {
+      console.error('権限チェックエラー:', error)
+      return c.json({ error: '権限チェックに失敗しました' }, 500)
+    }
+  }
+}
+
+// APIルート: ユーザー登録
+app.post('/api/auth/register', async (c) => {
+  const { env } = c
+  const { name, email, password, role, class_code, student_number } = await c.req.json()
+  
+  try {
+    // メールアドレスの重複チェック
+    const existingUser = await env.DB.prepare(`
+      SELECT id FROM users WHERE email = ?
+    `).bind(email).first()
+    
+    if (existingUser) {
+      return c.json({ error: 'このメールアドレスは既に登録されています' }, 400)
+    }
+    
+    // パスワードハッシュ化
+    const passwordHash = await hashPassword(password)
+    
+    // ユーザー作成
+    const result = await env.DB.prepare(`
+      INSERT INTO users (name, email, password_hash, role, class_code, student_number, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+    `).bind(name, email, passwordHash, role || 'student', class_code, student_number).run()
+    
+    return c.json({
+      success: true,
+      user_id: result.meta.last_row_id,
+      message: 'ユーザー登録が完了しました'
+    })
+  } catch (error: any) {
+    console.error('ユーザー登録エラー:', error)
+    return c.json({
+      success: false,
+      error: 'ユーザー登録に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート: ログイン
+app.post('/api/auth/login', async (c) => {
+  const { env } = c
+  const { email, password } = await c.req.json()
+  
+  try {
+    // ユーザー検索
+    const user = await env.DB.prepare(`
+      SELECT * FROM users WHERE email = ? AND is_active = 1
+    `).bind(email).first()
+    
+    if (!user) {
+      return c.json({ error: 'メールアドレスまたはパスワードが正しくありません' }, 401)
+    }
+    
+    // アカウントロックチェック
+    if (user.locked_until && new Date(user.locked_until as string) > new Date()) {
+      return c.json({ 
+        error: 'アカウントがロックされています。しばらく待ってから再度お試しください' 
+      }, 403)
+    }
+    
+    // パスワード検証
+    const passwordHash = await hashPassword(password)
+    if (passwordHash !== user.password_hash) {
+      // ログイン失敗回数を増加
+      const attempts = (user.failed_login_attempts as number || 0) + 1
+      const lockUntil = attempts >= 5 
+        ? new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15分ロック
+        : null
+      
+      await env.DB.prepare(`
+        UPDATE users 
+        SET failed_login_attempts = ?, locked_until = ?
+        WHERE id = ?
+      `).bind(attempts, lockUntil, user.id).run()
+      
+      return c.json({ 
+        error: 'メールアドレスまたはパスワードが正しくありません',
+        attempts_remaining: 5 - attempts
+      }, 401)
+    }
+    
+    // セッショントークン生成
+    const sessionToken = generateToken(32)
+    const refreshToken = generateToken(32)
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24時間
+    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7日間
+    
+    // セッション作成
+    await env.DB.prepare(`
+      INSERT INTO user_sessions (user_id, session_token, refresh_token, expires_at, refresh_expires_at, ip_address, user_agent)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      user.id,
+      sessionToken,
+      refreshToken,
+      expiresAt,
+      refreshExpiresAt,
+      c.req.header('cf-connecting-ip') || 'unknown',
+      c.req.header('user-agent') || 'unknown'
+    ).run()
+    
+    // ログイン成功: 失敗回数をリセット、最終ログイン時刻を更新
+    await env.DB.prepare(`
+      UPDATE users 
+      SET failed_login_attempts = 0, locked_until = NULL, last_login_at = datetime('now')
+      WHERE id = ?
+    `).bind(user.id).run()
+    
+    return c.json({
+      success: true,
+      session_token: sessionToken,
+      refresh_token: refreshToken,
+      expires_at: expiresAt,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        class_code: user.class_code,
+        student_number: user.student_number
+      }
+    })
+  } catch (error: any) {
+    console.error('ログインエラー:', error)
+    return c.json({
+      success: false,
+      error: 'ログインに失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート: ログアウト
+app.post('/api/auth/logout', requireAuth, async (c) => {
+  const { env } = c
+  const authHeader = c.req.header('Authorization')
+  const token = authHeader!.substring(7)
+  
+  try {
+    // セッション削除
+    await env.DB.prepare(`
+      DELETE FROM user_sessions WHERE session_token = ?
+    `).bind(token).run()
+    
+    return c.json({
+      success: true,
+      message: 'ログアウトしました'
+    })
+  } catch (error: any) {
+    console.error('ログアウトエラー:', error)
+    return c.json({
+      success: false,
+      error: 'ログアウトに失敗しました'
+    }, 500)
+  }
+})
+
+// APIルート: セッション更新（リフレッシュトークン）
+app.post('/api/auth/refresh', async (c) => {
+  const { env } = c
+  const { refresh_token } = await c.req.json()
+  
+  try {
+    const session = await env.DB.prepare(`
+      SELECT s.*, u.id as user_id, u.name, u.email, u.role, u.class_code, u.student_number
+      FROM user_sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.refresh_token = ? AND s.refresh_expires_at > datetime('now') AND u.is_active = 1
+    `).bind(refresh_token).first()
+    
+    if (!session) {
+      return c.json({ error: 'リフレッシュトークンが無効です' }, 401)
+    }
+    
+    // 新しいセッショントークン生成
+    const newSessionToken = generateToken(32)
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    
+    // セッション更新
+    await env.DB.prepare(`
+      UPDATE user_sessions 
+      SET session_token = ?, expires_at = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).bind(newSessionToken, expiresAt, session.id).run()
+    
+    return c.json({
+      success: true,
+      session_token: newSessionToken,
+      expires_at: expiresAt,
+      user: {
+        id: session.user_id,
+        name: session.name,
+        email: session.email,
+        role: session.role,
+        class_code: session.class_code,
+        student_number: session.student_number
+      }
+    })
+  } catch (error: any) {
+    console.error('セッション更新エラー:', error)
+    return c.json({
+      success: false,
+      error: 'セッション更新に失敗しました'
+    }, 500)
+  }
+})
+
+// APIルート: 現在のユーザー情報取得
+app.get('/api/auth/me', requireAuth, async (c) => {
+  const user = c.get('user')
+  return c.json({
+    success: true,
+    user
+  })
 })
 
 export default app

@@ -30,7 +30,7 @@ console.log('📦 Available functions:', typeof renderTopPage, typeof showTopPag
 
 // グローバル状態管理
 const state = {
-  currentView: 'top', // 'top', 'guide', 'card', 'progress'
+  currentView: 'top', // 'top', 'guide', 'card', 'progress', 'login'
   selectedCurriculum: null,
   selectedCourse: null,
   selectedCard: null,
@@ -38,6 +38,12 @@ const state = {
     id: 1, // デモ用
     name: '山田太郎',
     classCode: 'CLASS2024A'
+  },
+  auth: {
+    isAuthenticated: false,
+    sessionToken: null,
+    refreshToken: null,
+    user: null
   }
 }
 
@@ -70,6 +76,29 @@ const loadingManager = {
 
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
+  // ローカルストレージから認証情報を復元
+  const savedSession = localStorage.getItem('session_token')
+  const savedUser = localStorage.getItem('user')
+  
+  if (savedSession && savedUser) {
+    state.auth.sessionToken = savedSession
+    state.auth.refreshToken = localStorage.getItem('refresh_token')
+    state.auth.user = JSON.parse(savedUser)
+    state.auth.isAuthenticated = true
+    
+    // ユーザー情報をstateに反映
+    state.student.id = state.auth.user.id
+    state.student.name = state.auth.user.name
+    state.student.classCode = state.auth.user.class_code
+    
+    // セッションの有効性を確認
+    verifySession()
+  } else {
+    // 未ログインの場合はログイン画面へ
+    renderLoginPage()
+    return
+  }
+  
   renderTopPage()
 })
 
@@ -94,12 +123,21 @@ async function renderTopPage() {
 
       <!-- ユーザー情報 -->
       <div class="bg-white rounded-lg shadow p-4 mb-8">
-        <div class="flex items-center">
-          <i class="fas fa-user-circle text-3xl text-indigo-500 mr-3"></i>
-          <div>
-            <p class="text-sm text-gray-500">ログイン中</p>
-            <p class="font-bold text-lg">${state.student.name}</p>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center">
+            <i class="fas fa-user-circle text-3xl text-indigo-500 mr-3"></i>
+            <div>
+              <p class="text-sm text-gray-500">ログイン中</p>
+              <p class="font-bold text-lg">${state.student.name}</p>
+              ${state.auth.user ? `<p class="text-xs text-gray-400">${state.auth.user.role === 'teacher' ? '教師' : state.auth.user.role === 'admin' ? '管理者' : '児童・生徒'} | クラス: ${state.student.classCode}</p>` : ''}
+            </div>
           </div>
+          <button
+            onclick="logout()"
+            class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+          >
+            <i class="fas fa-sign-out-alt mr-2"></i>ログアウト
+          </button>
         </div>
       </div>
 
@@ -1138,6 +1176,11 @@ async function loadGuidePage(curriculumId) {
                         class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:from-blue-600 hover:to-indigo-700 transition shadow-lg flex items-center justify-center">
                   <i class="fas fa-book-open mr-2"></i>
                   こたえを見る
+                </button>
+                <button onclick="loadHistoryTab(${curriculum.id})" 
+                        class="bg-gradient-to-r from-purple-500 to-pink-600 text-white py-3 px-4 rounded-xl font-bold hover:from-purple-600 hover:to-pink-700 transition shadow-lg flex items-center justify-center">
+                  <i class="fas fa-history mr-2"></i>
+                  編集履歴
                 </button>
               </div>
             </div>
@@ -8175,6 +8218,275 @@ async function showWeeklyReport() {
   }
 }
 window.showWeeklyReport = showWeeklyReport
+window.loadHistoryTab = loadHistoryTab
+window.showHistoryDiff = showHistoryDiff
+window.rollbackToHistory = rollbackToHistory
+
+// ==============================================
+// 編集履歴機能
+// ==============================================
+
+// 履歴タブ表示
+async function loadHistoryTab(curriculumId) {
+  showLoading('編集履歴を読み込み中...')
+  
+  try {
+    const response = await axios.get(`/api/curriculum/${curriculumId}/history`)
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      alert('編集履歴の取得に失敗しました')
+      return
+    }
+    
+    const history = response.data.history
+    
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-t-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-2xl font-bold">
+                <i class="fas fa-history mr-2"></i>編集履歴
+              </h2>
+              <p class="text-sm mt-1">変更履歴: ${history.length}件</p>
+            </div>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-white hover:text-gray-200 text-3xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          ${history.length > 0 ? `
+            <div class="space-y-4">
+              ${history.map((record, index) => {
+                const dataBefore = record.data_before ? JSON.parse(record.data_before) : null
+                const dataAfter = record.data_after ? JSON.parse(record.data_after) : null
+                const isRollback = record.action && record.action.includes('rollback')
+                
+                return `
+                  <div class="border rounded-lg p-4 hover:bg-gray-50 transition ${
+                    isRollback ? 'border-orange-300 bg-orange-50' : 'border-gray-200'
+                  }">
+                    <div class="flex items-start justify-between mb-3">
+                      <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                          <span class="px-3 py-1 rounded-full text-xs font-bold ${
+                            record.action === 'create' ? 'bg-green-100 text-green-700' :
+                            record.action === 'update' ? 'bg-blue-100 text-blue-700' :
+                            record.action === 'delete' ? 'bg-red-100 text-red-700' :
+                            isRollback ? 'bg-orange-100 text-orange-700' :
+                            'bg-gray-100 text-gray-700'
+                          }">
+                            ${record.action === 'create' ? '新規作成' :
+                              record.action === 'update' ? '更新' :
+                              record.action === 'delete' ? '削除' :
+                              isRollback ? 'ロールバック' :
+                              record.action || '変更'}
+                          </span>
+                          ${index === 0 ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">最新</span>' : ''}
+                        </div>
+                        <div class="text-sm text-gray-600">
+                          <i class="fas fa-clock mr-2"></i>
+                          ${new Date(record.created_at).toLocaleString('ja-JP')}
+                        </div>
+                        ${record.changed_by_name ? `
+                          <div class="text-sm text-gray-600 mt-1">
+                            <i class="fas fa-user mr-2"></i>
+                            変更者: ${record.changed_by_name}
+                          </div>
+                        ` : ''}
+                      </div>
+                      
+                      <div class="flex gap-2">
+                        ${dataBefore && dataAfter ? `
+                          <button onclick="showHistoryDiff(${record.id}, ${curriculumId})" 
+                                  class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                            <i class="fas fa-code-branch mr-1"></i>差分表示
+                          </button>
+                        ` : ''}
+                        ${index > 0 && !isRollback ? `
+                          <button onclick="rollbackToHistory(${record.id}, ${curriculumId})" 
+                                  class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-sm">
+                            <i class="fas fa-undo mr-1"></i>復元
+                          </button>
+                        ` : ''}
+                      </div>
+                    </div>
+                    
+                    ${dataBefore && dataAfter ? `
+                      <div class="mt-3 p-3 bg-gray-50 rounded text-xs">
+                        <div class="font-bold text-gray-700 mb-2">変更内容のプレビュー:</div>
+                        <div class="grid grid-cols-2 gap-4">
+                          <div>
+                            <div class="text-gray-500 mb-1">変更前:</div>
+                            <div class="text-gray-800">${dataBefore.unit_name || '不明'}</div>
+                          </div>
+                          <div>
+                            <div class="text-gray-500 mb-1">変更後:</div>
+                            <div class="text-gray-800 font-bold">${dataAfter.unit_name || '不明'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ` : ''}
+                  </div>
+                `
+              }).join('')}
+            </div>
+          ` : `
+            <div class="text-center py-12 text-gray-500">
+              <i class="fas fa-history text-6xl mb-4 text-gray-300"></i>
+              <p class="text-lg">編集履歴がありません</p>
+            </div>
+          `}
+
+          <div class="mt-6 flex justify-end">
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    hideLoading()
+    console.error('履歴読み込みエラー:', error)
+    alert('編集履歴の読み込みに失敗しました')
+  }
+}
+
+// 差分表示
+async function showHistoryDiff(historyId, curriculumId) {
+  showLoading('差分を計算中...')
+  
+  try {
+    const response = await axios.get(`/api/curriculum/${curriculumId}/history`)
+    const history = response.data.history
+    const record = history.find(h => h.id === historyId)
+    
+    hideLoading()
+    
+    if (!record) {
+      alert('履歴レコードが見つかりません')
+      return
+    }
+    
+    const dataBefore = JSON.parse(record.data_before)
+    const dataAfter = JSON.parse(record.data_after)
+    
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white p-6 rounded-t-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-2xl font-bold">
+                <i class="fas fa-code-branch mr-2"></i>変更差分
+              </h2>
+              <p class="text-sm mt-1">${new Date(record.created_at).toLocaleString('ja-JP')}</p>
+            </div>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-white hover:text-gray-200 text-3xl">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          <div class="space-y-4">
+            ${generateDiffView('学年', dataBefore.grade, dataAfter.grade)}
+            ${generateDiffView('教科', dataBefore.subject, dataAfter.subject)}
+            ${generateDiffView('教科書会社', dataBefore.textbook_company, dataAfter.textbook_company)}
+            ${generateDiffView('単元名', dataBefore.unit_name, dataAfter.unit_name)}
+            ${generateDiffView('単元目標', dataBefore.unit_goal, dataAfter.unit_goal)}
+            ${generateDiffView('非認知能力目標', dataBefore.non_cognitive_goal, dataAfter.non_cognitive_goal)}
+          </div>
+
+          <div class="mt-6 flex gap-3">
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    hideLoading()
+    console.error('差分表示エラー:', error)
+    alert('差分の表示に失敗しました')
+  }
+}
+
+// 差分ビュー生成
+function generateDiffView(label, before, after) {
+  const hasChange = before !== after
+  
+  return `
+    <div class="border rounded-lg p-4 ${hasChange ? 'bg-yellow-50 border-yellow-300' : 'bg-gray-50 border-gray-200'}">
+      <div class="font-bold text-gray-700 mb-3 flex items-center">
+        ${hasChange ? '<i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>' : '<i class="fas fa-check-circle text-green-600 mr-2"></i>'}
+        ${label}
+        ${hasChange ? '<span class="ml-2 text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded">変更あり</span>' : ''}
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <div class="text-xs text-gray-500 mb-1">変更前:</div>
+          <div class="p-2 bg-red-50 border border-red-200 rounded ${!hasChange ? 'text-gray-500' : 'text-gray-800'}">
+            ${before || '（なし）'}
+          </div>
+        </div>
+        <div>
+          <div class="text-xs text-gray-500 mb-1">変更後:</div>
+          <div class="p-2 bg-green-50 border border-green-200 rounded ${!hasChange ? 'text-gray-500' : 'font-bold text-gray-800'}">
+            ${after || '（なし）'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// ロールバック実行
+async function rollbackToHistory(historyId, curriculumId) {
+  if (!confirm('この履歴にロールバックしますか？\n現在の状態は失われます。')) {
+    return
+  }
+  
+  showLoading('ロールバック中...')
+  
+  try {
+    const response = await axios.post(`/api/curriculum/${curriculumId}/rollback/${historyId}`)
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      alert('ロールバックに失敗しました: ' + response.data.error)
+      return
+    }
+    
+    alert('✅ ロールバックが完了しました')
+    
+    // モーダルを閉じて学習のてびきを再読み込み
+    document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
+    loadGuidePage(curriculumId)
+  } catch (error) {
+    hideLoading()
+    console.error('ロールバックエラー:', error)
+    alert('ロールバックに失敗しました')
+  }
+}
 
 // 月次レポート表示
 async function showMonthlyReport() {
@@ -9266,5 +9578,456 @@ async function saveNewOptionalProblem(curriculumId) {
     console.error('選択問題追加エラー:', error)
     alert('選択問題の追加に失敗しました')
   }
+}
+
+// ============================================
+// 認証機能
+// ============================================
+
+// APIリクエストヘルパー（認証トークン付き）
+async function authFetch(url, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  }
+  
+  if (state.auth.sessionToken) {
+    headers['Authorization'] = `Bearer ${state.auth.sessionToken}`
+  }
+  
+  const response = await fetch(url, {
+    ...options,
+    headers
+  })
+  
+  // 401エラー（認証切れ）の場合、リフレッシュを試みる
+  if (response.status === 401 && state.auth.refreshToken) {
+    const refreshed = await refreshSession()
+    if (refreshed) {
+      // リトライ
+      headers['Authorization'] = `Bearer ${state.auth.sessionToken}`
+      return fetch(url, { ...options, headers })
+    } else {
+      // リフレッシュ失敗: ログアウト
+      logout()
+      return response
+    }
+  }
+  
+  return response
+}
+
+// セッション検証
+async function verifySession() {
+  try {
+    const response = await authFetch('/api/auth/me')
+    if (!response.ok) {
+      logout()
+    }
+  } catch (error) {
+    console.error('セッション検証エラー:', error)
+    logout()
+  }
+}
+
+// セッション更新
+async function refreshSession() {
+  try {
+    const response = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: state.auth.refreshToken })
+    })
+    
+    if (!response.ok) {
+      return false
+    }
+    
+    const data = await response.json()
+    state.auth.sessionToken = data.session_token
+    localStorage.setItem('session_token', data.session_token)
+    
+    return true
+  } catch (error) {
+    console.error('セッション更新エラー:', error)
+    return false
+  }
+}
+
+// ログイン画面表示
+function renderLoginPage() {
+  state.currentView = 'login'
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center px-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+        <!-- ヘッダー -->
+        <div class="text-center mb-8">
+          <i class="fas fa-graduation-cap text-6xl text-indigo-600 mb-4"></i>
+          <h1 class="text-3xl font-bold text-gray-800 mb-2">
+            自由進度学習支援システム
+          </h1>
+          <p class="text-gray-600">ログインしてください</p>
+        </div>
+        
+        <!-- ログインフォーム -->
+        <form id="loginForm" class="space-y-6">
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-envelope mr-2"></i>メールアドレス
+            </label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="example@school.jp"
+            />
+          </div>
+          
+          <div>
+            <label for="password" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-lock mr-2"></i>パスワード
+            </label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="パスワードを入力"
+            />
+          </div>
+          
+          <!-- エラーメッセージ -->
+          <div id="loginError" class="hidden bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            <span id="loginErrorMessage"></span>
+          </div>
+          
+          <!-- ログインボタン -->
+          <button
+            type="submit"
+            class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg"
+          >
+            <i class="fas fa-sign-in-alt mr-2"></i>ログイン
+          </button>
+        </form>
+        
+        <!-- 新規登録リンク -->
+        <div class="mt-6 text-center">
+          <p class="text-sm text-gray-600">
+            アカウントをお持ちでない場合は
+            <button onclick="renderRegisterPage()" class="text-indigo-600 hover:text-indigo-800 font-medium">
+              新規登録
+            </button>
+          </p>
+        </div>
+        
+        <!-- デモログイン -->
+        <div class="mt-4 text-center">
+          <button
+            onclick="demoLogin()"
+            class="text-sm text-gray-500 hover:text-gray-700 underline"
+          >
+            <i class="fas fa-user-secret mr-1"></i>デモアカウントでログイン
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  // ログインフォームの送信処理
+  document.getElementById('loginForm').addEventListener('submit', handleLogin)
+}
+
+// ログイン処理
+async function handleLogin(event) {
+  event.preventDefault()
+  
+  const email = document.getElementById('email').value
+  const password = document.getElementById('password').value
+  const errorDiv = document.getElementById('loginError')
+  const errorMessage = document.getElementById('loginErrorMessage')
+  
+  loadingManager.show('ログイン中...')
+  errorDiv.classList.add('hidden')
+  
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    })
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      loadingManager.hide()
+      errorMessage.textContent = data.error || 'ログインに失敗しました'
+      errorDiv.classList.remove('hidden')
+      return
+    }
+    
+    // 認証情報を保存
+    state.auth.isAuthenticated = true
+    state.auth.sessionToken = data.session_token
+    state.auth.refreshToken = data.refresh_token
+    state.auth.user = data.user
+    
+    localStorage.setItem('session_token', data.session_token)
+    localStorage.setItem('refresh_token', data.refresh_token)
+    localStorage.setItem('user', JSON.stringify(data.user))
+    
+    // ユーザー情報をstateに反映
+    state.student.id = data.user.id
+    state.student.name = data.user.name
+    state.student.classCode = data.user.class_code
+    
+    loadingManager.hide()
+    
+    // トップページへ遷移
+    renderTopPage()
+  } catch (error) {
+    loadingManager.hide()
+    console.error('ログインエラー:', error)
+    errorMessage.textContent = 'ログインに失敗しました。もう一度お試しください。'
+    errorDiv.classList.remove('hidden')
+  }
+}
+
+// 新規登録画面表示
+function renderRegisterPage() {
+  state.currentView = 'register'
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center px-4 py-8">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+        <!-- ヘッダー -->
+        <div class="text-center mb-8">
+          <i class="fas fa-user-plus text-6xl text-indigo-600 mb-4"></i>
+          <h1 class="text-3xl font-bold text-gray-800 mb-2">
+            新規登録
+          </h1>
+          <p class="text-gray-600">アカウントを作成してください</p>
+        </div>
+        
+        <!-- 登録フォーム -->
+        <form id="registerForm" class="space-y-4">
+          <div>
+            <label for="regName" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-user mr-2"></i>氏名
+            </label>
+            <input
+              type="text"
+              id="regName"
+              name="name"
+              required
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="山田 太郎"
+            />
+          </div>
+          
+          <div>
+            <label for="regEmail" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-envelope mr-2"></i>メールアドレス
+            </label>
+            <input
+              type="email"
+              id="regEmail"
+              name="email"
+              required
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="example@school.jp"
+            />
+          </div>
+          
+          <div>
+            <label for="regPassword" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-lock mr-2"></i>パスワード
+            </label>
+            <input
+              type="password"
+              id="regPassword"
+              name="password"
+              required
+              minlength="6"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="6文字以上"
+            />
+          </div>
+          
+          <div>
+            <label for="regRole" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-user-tag mr-2"></i>役割
+            </label>
+            <select
+              id="regRole"
+              name="role"
+              required
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="student">児童・生徒</option>
+              <option value="teacher">教師</option>
+              <option value="admin">管理者</option>
+            </select>
+          </div>
+          
+          <div>
+            <label for="regClassCode" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-school mr-2"></i>クラスコード
+            </label>
+            <input
+              type="text"
+              id="regClassCode"
+              name="class_code"
+              required
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="CLASS2024A"
+            />
+          </div>
+          
+          <div id="studentNumberDiv">
+            <label for="regStudentNumber" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-id-badge mr-2"></i>出席番号
+            </label>
+            <input
+              type="number"
+              id="regStudentNumber"
+              name="student_number"
+              min="1"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="1"
+            />
+          </div>
+          
+          <!-- エラーメッセージ -->
+          <div id="registerError" class="hidden bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            <span id="registerErrorMessage"></span>
+          </div>
+          
+          <!-- 登録ボタン -->
+          <button
+            type="submit"
+            class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg"
+          >
+            <i class="fas fa-user-plus mr-2"></i>登録する
+          </button>
+        </form>
+        
+        <!-- ログインリンク -->
+        <div class="mt-6 text-center">
+          <p class="text-sm text-gray-600">
+            すでにアカウントをお持ちの場合は
+            <button onclick="renderLoginPage()" class="text-indigo-600 hover:text-indigo-800 font-medium">
+              ログイン
+            </button>
+          </p>
+        </div>
+      </div>
+    </div>
+  `
+  
+  // 役割に応じて出席番号の表示を切り替え
+  document.getElementById('regRole').addEventListener('change', (e) => {
+    const studentNumberDiv = document.getElementById('studentNumberDiv')
+    if (e.target.value === 'student') {
+      studentNumberDiv.style.display = 'block'
+      document.getElementById('regStudentNumber').required = true
+    } else {
+      studentNumberDiv.style.display = 'none'
+      document.getElementById('regStudentNumber').required = false
+    }
+  })
+  
+  // 登録フォームの送信処理
+  document.getElementById('registerForm').addEventListener('submit', handleRegister)
+}
+
+// 新規登録処理
+async function handleRegister(event) {
+  event.preventDefault()
+  
+  const name = document.getElementById('regName').value
+  const email = document.getElementById('regEmail').value
+  const password = document.getElementById('regPassword').value
+  const role = document.getElementById('regRole').value
+  const classCode = document.getElementById('regClassCode').value
+  const studentNumber = role === 'student' ? document.getElementById('regStudentNumber').value : null
+  
+  const errorDiv = document.getElementById('registerError')
+  const errorMessage = document.getElementById('registerErrorMessage')
+  
+  loadingManager.show('登録中...')
+  errorDiv.classList.add('hidden')
+  
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        role,
+        class_code: classCode,
+        student_number: studentNumber
+      })
+    })
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      loadingManager.hide()
+      errorMessage.textContent = data.error || '登録に失敗しました'
+      errorDiv.classList.remove('hidden')
+      return
+    }
+    
+    loadingManager.hide()
+    alert('✅ 登録が完了しました！ログインしてください。')
+    renderLoginPage()
+  } catch (error) {
+    loadingManager.hide()
+    console.error('登録エラー:', error)
+    errorMessage.textContent = '登録に失敗しました。もう一度お試しください。'
+    errorDiv.classList.remove('hidden')
+  }
+}
+
+// ログアウト処理
+async function logout() {
+  try {
+    if (state.auth.sessionToken) {
+      await authFetch('/api/auth/logout', { method: 'POST' })
+    }
+  } catch (error) {
+    console.error('ログアウトエラー:', error)
+  }
+  
+  // ローカルストレージをクリア
+  localStorage.removeItem('session_token')
+  localStorage.removeItem('refresh_token')
+  localStorage.removeItem('user')
+  
+  // 状態をリセット
+  state.auth.isAuthenticated = false
+  state.auth.sessionToken = null
+  state.auth.refreshToken = null
+  state.auth.user = null
+  
+  // ログイン画面へ遷移
+  renderLoginPage()
+}
+
+// デモログイン
+function demoLogin() {
+  document.getElementById('email').value = 'demo@school.jp'
+  document.getElementById('password').value = 'demo123'
+  document.getElementById('loginForm').dispatchEvent(new Event('submit'))
 }
 
