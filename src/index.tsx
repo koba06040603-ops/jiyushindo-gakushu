@@ -2824,14 +2824,15 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
         console.log(`  - 問題${problem.problem_number}: ${problem.problem_title}`)
         await env.DB.prepare(`
           INSERT INTO optional_problems (
-            curriculum_id, problem_number, problem_title, problem_content,
+            curriculum_id, problem_number, problem_title, problem_content, problem_description,
             difficulty_level, learning_meaning
-          ) VALUES (?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
         `).bind(
           curriculumId,
           problem.problem_number,
           problem.problem_title,
-          problem.problem_description,
+          problem.problem_description,  // problem_content
+          problem.problem_description,  // problem_description
           problem.difficulty_level || 'medium',
           problem.learning_meaning || ''
         ).run()
@@ -3270,14 +3271,15 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
       for (const problem of additionalProblems.optional_problems) {
         await env.DB.prepare(`
           INSERT INTO optional_problems (
-            curriculum_id, problem_number, problem_title, problem_content,
+            curriculum_id, problem_number, problem_title, problem_content, problem_description,
             difficulty_level, learning_meaning
-          ) VALUES (?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
         `).bind(
           curriculumId,
           problem.problem_number,
           problem.problem_title,
-          problem.problem_description,
+          problem.problem_description,  // problem_content
+          problem.problem_description,  // problem_description
           problem.difficulty_level || 'medium',
           problem.learning_meaning || ''
         ).run()
