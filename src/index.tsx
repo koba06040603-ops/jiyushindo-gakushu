@@ -2577,63 +2577,107 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     // 品質モードに応じてモデルを選択
-    // gemini-2.0-flash-exp: 確実に動作するモデル (出力トークン上限: 8192)
-    let modelName = 'gemini-2.0-flash-exp'
-    console.log('🤖 使用モデル:', modelName, '| 出力トークン上限: 8192')
+    // 複数モデルでフォールバック
+    const models = [
+      { name: 'gemini-2.0-flash-exp', maxTokens: 8192 },
+      { name: 'gemini-1.5-flash', maxTokens: 8192 },
+      { name: 'gemini-1.5-pro', maxTokens: 8192 }
+    ]
     
-    let response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.8,
-            maxOutputTokens: 8192
+    let response
+    let modelName
+    let lastError
+    
+    for (const model of models) {
+      try {
+        console.log(`🔄 初期生成モデル試行中: ${model.name}`)
+        modelName = model.name
+        
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.8,
+                maxOutputTokens: model.maxTokens
+              }
+            })
           }
-        })
-      }
-    )
-    
-    // フォールバック: Gemini 1.5 Flash
-    if (!response.ok) {
-      console.log(`${modelName} failed (status: ${response.status}), falling back to 1.5 Flash`)
-      modelName = 'gemini-1.5-flash'
-      response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.8,
-              maxOutputTokens: 8192
-            }
-          })
+        )
+        
+        if (response.ok) {
+          console.log(`✅ 初期生成モデル成功: ${modelName}`)
+          break
+        } else {
+          const errorText = await response.text()
+          console.warn(`⚠️ 初期生成モデル失敗: ${modelName} (status: ${response.status})`)
+          console.warn(`   エラー詳細: ${errorText.substring(0, 200)}`)
+          lastError = new Error(`${modelName} returned ${response.status}: ${errorText.substring(0, 100)}`)
         }
-      )
+      } catch (error: any) {
+        console.warn(`⚠️ 初期生成モデルエラー: ${model.name} - ${error.message}`)
+        lastError = error
+      }
+    }
+    
+    if (!response || !response.ok) {
+      console.error('❌ すべてのモデルが失敗しました:', lastError?.message)
+      throw lastError || new Error('すべてのモデルが失敗しました')
     }
     
     const data = await response.json()
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    console.log('📦 API Response Status:', response.status)
+    console.log('📦 API Response Data Keys:', Object.keys(data))
     
-    // JSONを抽出
-    const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || 
-                      aiResponse.match(/\{[\s\S]*\}/)
-    const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : '{}'
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
+    
+    if (!aiResponse) {
+      console.error('❌ AIレスポンスが空です')
+      console.error('   完全なレスポンス:', JSON.stringify(data, null, 2).substring(0, 500))
+      return c.json({
+        error: '単元の生成に失敗しました。AIの応答が空でした。',
+        details: JSON.stringify(data).substring(0, 200),
+        curriculum: null
+      })
+    }
+    
+    console.log('📝 AIレスポンス（最初の300文字）:', aiResponse.substring(0, 300))
+    
+    // JSONを抽出（複数パターン対応）
+    let jsonStr
+    const jsonCodeBlock = aiResponse.match(/```json\s*([\s\S]*?)\s*```/)
+    const jsonObject = aiResponse.match(/\{[\s\S]*\}/)
+    
+    if (jsonCodeBlock) {
+      jsonStr = jsonCodeBlock[1]
+      console.log('✅ JSONコードブロックを検出')
+    } else if (jsonObject) {
+      jsonStr = jsonObject[0]
+      console.log('✅ JSON オブジェクトを検出')
+    } else {
+      console.error('❌ JSONが見つかりません')
+      console.error('   AIレスポンス全文:', aiResponse)
+      return c.json({
+        error: '単元の生成に失敗しました。AIの応答からJSONを抽出できませんでした。',
+        details: aiResponse.substring(0, 300),
+        curriculum: null
+      })
+    }
     
     let unitData
     try {
       unitData = JSON.parse(jsonStr)
-    } catch (parseError) {
-      // JSON解析エラーの場合、詳細を返す
-      console.error('JSON parse error:', parseError)
-      console.error('AI Response:', aiResponse.substring(0, 500))
+      console.log('✅ JSONパース成功')
+      console.log('📊 データ構造キー:', Object.keys(unitData))
+    } catch (parseError: any) {
+      console.error('❌ JSONパースエラー:', parseError.message)
+      console.error('   パース対象文字列（最初の500文字）:', jsonStr.substring(0, 500))
       return c.json({
         error: '単元の生成に失敗しました。AIの応答がJSON形式ではありませんでした。',
-        details: aiResponse.substring(0, 200),
+        details: `パースエラー: ${parseError.message} | 文字列: ${jsonStr.substring(0, 200)}`,
         curriculum: null
       })
     }
