@@ -91,6 +91,9 @@ document.addEventListener('DOMContentLoaded', () => {
     state.student.name = state.auth.user.name
     state.student.classCode = state.auth.user.class_code
     
+    // WebSocketに接続
+    websocket.connect()
+    
     // セッションの有効性を確認
     verifySession()
   } else {
@@ -2038,6 +2041,9 @@ async function loadCardPage(cardId) {
     const response = await axios.get(`/api/cards/${cardId}`)
     const { card, hints, answer } = response.data
     
+    // カードデータをグローバルに保存（ヘルプ要請時に使用）
+    window.currentCardData = card
+    
     const app = document.getElementById('app')
     app.innerHTML = `
       <div class="container mx-auto px-4 py-8">
@@ -2454,6 +2460,19 @@ function callTeacher() {
   // 進捗に記録（先生呼び出しフラグ）
   saveProgress(true)
   
+  // WebSocket通知を送信
+  if (state.selectedCard && state.selectedCurriculum) {
+    const card = window.currentCardData // グローバルに保存されたカードデータ
+    sendHelpRequest(
+      state.student.id,
+      state.student.name,
+      state.selectedCurriculum.id,
+      state.selectedCard,
+      card?.card_title || '学習カード',
+      'teacher'
+    )
+  }
+  
   alert('先生に助けを求めました。先生が来るまで他の問題に取り組んでもOKです。')
 }
 
@@ -2521,6 +2540,16 @@ async function saveProgress(teacherCall = false) {
       help_requested_from: window.currentHelpType,
       help_count: window.helpCount
     })
+    
+    // WebSocket通知を送信
+    sendProgressUpdate(
+      state.student.id,
+      state.selectedCurriculum.id,
+      state.selectedCourse,
+      state.selectedCard,
+      'completed',
+      window.currentUnderstandingLevel
+    )
     
     if (!teacherCall) {
       alert('保存しました！次のカードに進みましょう。')
@@ -9788,6 +9817,9 @@ async function handleLogin(event) {
     
     loadingManager.hide()
     
+    // WebSocketに接続
+    websocket.connect()
+    
     // トップページへ遷移
     renderTopPage()
   } catch (error) {
@@ -10009,6 +10041,9 @@ async function logout() {
     console.error('ログアウトエラー:', error)
   }
   
+  // WebSocketを切断
+  websocket.disconnect()
+  
   // ローカルストレージをクリア
   localStorage.removeItem('session_token')
   localStorage.removeItem('refresh_token')
@@ -10029,5 +10064,339 @@ function demoLogin() {
   document.getElementById('email').value = 'demo@school.jp'
   document.getElementById('password').value = 'demo123'
   document.getElementById('loginForm').dispatchEvent(new Event('submit'))
+}
+
+// ============================================
+// WebSocket リアルタイム通信
+// ============================================
+
+// WebSocket接続管理
+const websocket = {
+  ws: null,
+  reconnectTimer: null,
+  reconnectAttempts: 0,
+  maxReconnectAttempts: 5,
+  reconnectDelay: 3000,
+  
+  // 接続
+  connect: function() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already connected')
+      return
+    }
+    
+    if (!state.student.classCode) {
+      console.error('No class code available')
+      return
+    }
+    
+    // WebSocket URLを構築
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const host = window.location.host
+    const url = `${protocol}//${host}/api/ws?classCode=${state.student.classCode}&userId=${state.student.id}&role=${state.auth.user?.role || 'student'}`
+    
+    console.log('Connecting to WebSocket:', url)
+    
+    try {
+      this.ws = new WebSocket(url)
+      
+      this.ws.onopen = (event) => {
+        console.log('✅ WebSocket connected')
+        this.reconnectAttempts = 0
+        
+        // Ping/Pong for keep-alive (30秒ごと)
+        this.startPingInterval()
+      }
+      
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          this.handleMessage(data)
+        } catch (error) {
+          console.error('WebSocket message parse error:', error)
+        }
+      }
+      
+      this.ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+      }
+      
+      this.ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code, event.reason)
+        this.stopPingInterval()
+        
+        // 自動再接続
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.reconnectAttempts++
+          console.log(`Reconnecting... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+          
+          this.reconnectTimer = setTimeout(() => {
+            this.connect()
+          }, this.reconnectDelay)
+        } else {
+          console.error('Max reconnect attempts reached')
+        }
+      }
+    } catch (error) {
+      console.error('WebSocket connection error:', error)
+    }
+  },
+  
+  // 切断
+  disconnect: function() {
+    this.stopPingInterval()
+    
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    
+    if (this.ws) {
+      this.ws.close()
+      this.ws = null
+    }
+  },
+  
+  // メッセージ送信
+  send: function(data) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data))
+    } else {
+      console.error('WebSocket is not connected')
+    }
+  },
+  
+  // メッセージ処理
+  handleMessage: function(data) {
+    console.log('WebSocket message:', data)
+    
+    switch (data.type) {
+      case 'connected':
+        console.log(`Connected to class: ${data.classCode}, clients: ${data.clientCount}`)
+        break
+        
+      case 'pong':
+        // Keep-alive response
+        break
+        
+      case 'progress_updated':
+        // 進捗更新通知
+        this.onProgressUpdate(data)
+        break
+        
+      case 'help_requested':
+        // ヘルプ要請通知（教師のみ）
+        this.onHelpRequest(data)
+        break
+        
+      case 'help_resolved':
+        // ヘルプ解決通知
+        this.onHelpResolve(data)
+        break
+        
+      case 'activity_updated':
+        // 活動更新通知（教師のみ）
+        this.onActivityUpdate(data)
+        break
+        
+      case 'error':
+        console.error('WebSocket error:', data.message)
+        break
+        
+      default:
+        console.log('Unknown message type:', data.type)
+    }
+  },
+  
+  // 進捗更新ハンドラー
+  onProgressUpdate: function(data) {
+    console.log('Progress updated:', data)
+    
+    // 進捗ボードが表示されている場合は自動更新
+    if (state.currentView === 'progress') {
+      // 進捗ボードを再読み込み（デバウンス付き）
+      if (!this.progressUpdateTimer) {
+        this.progressUpdateTimer = setTimeout(() => {
+          if (state.selectedCurriculum) {
+            loadProgressBoard(state.selectedCurriculum.id)
+          }
+          this.progressUpdateTimer = null
+        }, 2000) // 2秒デバウンス
+      }
+    }
+    
+    // 通知表示
+    if (state.auth.user?.role === 'teacher') {
+      showToast(`📝 ${data.studentId}番の児童が進捗を更新しました`, 'info')
+    }
+  },
+  
+  // ヘルプ要請ハンドラー（教師用）
+  onHelpRequest: function(data) {
+    console.log('Help requested:', data)
+    
+    // 音声通知
+    playNotificationSound()
+    
+    // 目立つ通知表示
+    showToast(
+      `🆘 ${data.studentName}さんがヘルプを要請しています\n` +
+      `カード: ${data.cardTitle}\n` +
+      `種類: ${data.helpType}`,
+      'warning',
+      10000 // 10秒表示
+    )
+    
+    // 進捗ボードが表示されている場合は自動更新
+    if (state.currentView === 'progress') {
+      setTimeout(() => {
+        if (state.selectedCurriculum) {
+          loadProgressBoard(state.selectedCurriculum.id)
+        }
+      }, 1000)
+    }
+  },
+  
+  // ヘルプ解決ハンドラー
+  onHelpResolve: function(data) {
+    console.log('Help resolved:', data)
+    
+    if (state.auth.user?.role === 'teacher') {
+      showToast(`✅ ヘルプが解決されました`, 'success')
+      
+      // 進捗ボードを更新
+      if (state.currentView === 'progress' && state.selectedCurriculum) {
+        setTimeout(() => {
+          loadProgressBoard(state.selectedCurriculum.id)
+        }, 1000)
+      }
+    }
+  },
+  
+  // 活動更新ハンドラー（教師用）
+  onActivityUpdate: function(data) {
+    console.log('Activity updated:', data)
+    
+    // 進捗ボードを更新（デバウンス付き）
+    if (state.currentView === 'progress' && !this.activityUpdateTimer) {
+      this.activityUpdateTimer = setTimeout(() => {
+        if (state.selectedCurriculum) {
+          loadProgressBoard(state.selectedCurriculum.id)
+        }
+        this.activityUpdateTimer = null
+      }, 3000)
+    }
+  },
+  
+  // Ping/Pongインターバル
+  pingInterval: null,
+  startPingInterval: function() {
+    this.pingInterval = setInterval(() => {
+      this.send({ type: 'ping' })
+    }, 30000) // 30秒ごと
+  },
+  
+  stopPingInterval: function() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval)
+      this.pingInterval = null
+    }
+  }
+}
+
+// トースト通知表示
+function showToast(message, type = 'info', duration = 3000) {
+  const toast = document.createElement('div')
+  toast.className = `fixed top-4 right-4 z-50 max-w-sm p-4 rounded-lg shadow-lg transform transition-all duration-300 ${
+    type === 'success' ? 'bg-green-500 text-white' :
+    type === 'warning' ? 'bg-orange-500 text-white' :
+    type === 'error' ? 'bg-red-500 text-white' :
+    'bg-blue-500 text-white'
+  }`
+  
+  toast.innerHTML = `
+    <div class="flex items-start">
+      <div class="flex-1 whitespace-pre-line">${message}</div>
+      <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `
+  
+  document.body.appendChild(toast)
+  
+  // アニメーション
+  setTimeout(() => {
+    toast.style.opacity = '0'
+    toast.style.transform = 'translateX(100%)'
+    setTimeout(() => toast.remove(), 300)
+  }, duration)
+}
+
+// 通知音を再生
+function playNotificationSound() {
+  try {
+    // Web Audio APIで簡単なビープ音を生成
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    oscillator.frequency.value = 800
+    oscillator.type = 'sine'
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+    
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 0.5)
+  } catch (error) {
+    console.error('通知音の再生に失敗:', error)
+  }
+}
+
+// WebSocketヘルパー関数：進捗更新を送信
+function sendProgressUpdate(studentId, curriculumId, courseId, cardId, status, understandingLevel) {
+  websocket.send({
+    type: 'progress_update',
+    studentId,
+    curriculumId,
+    courseId,
+    cardId,
+    status,
+    understandingLevel
+  })
+}
+
+// WebSocketヘルパー関数：ヘルプ要請を送信
+function sendHelpRequest(studentId, studentName, curriculumId, cardId, cardTitle, helpType) {
+  websocket.send({
+    type: 'help_request',
+    studentId,
+    studentName,
+    curriculumId,
+    cardId,
+    cardTitle,
+    helpType
+  })
+}
+
+// WebSocketヘルパー関数：ヘルプ解決を送信
+function sendHelpResolve(studentId) {
+  websocket.send({
+    type: 'help_resolve',
+    studentId
+  })
+}
+
+// WebSocketヘルパー関数：活動記録を送信
+function sendActivity(studentId, cardId) {
+  websocket.send({
+    type: 'activity',
+    studentId,
+    cardId
+  })
 }
 

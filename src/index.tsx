@@ -5,35 +5,13 @@ import { serveStatic } from 'hono/cloudflare-workers'
 type Bindings = {
   DB: D1Database
   GEMINI_API_KEY?: string
+  PROGRESS_WEBSOCKET: DurableObjectNamespace
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
 
-/**
- * 【将来の実装】ユーザー認証・マルチユーザー対応
- * 
- * 1. Cloudflare Workers KV + JWT認証
- *    - KVにユーザー情報を保存
- *    - JWTトークンで認証状態管理
- *    - セッション有効期限の管理
- * 
- * 2. ロール管理
- *    - teacher: カリキュラム作成・編集・削除
- *    - student: 学習カード閲覧・進捗記録
- *    - admin: システム全体の管理
- * 
- * 3. データ分離
- *    - curriculum テーブルに created_by カラム追加
- *    - 教師ごとに作成したカリキュラムを管理
- *    - 生徒は割り当てられたカリキュラムのみ閲覧可能
- * 
- * 4. 実装例（参考）
- *    - ミドルウェア: app.use('/api/*', authMiddleware)
- *    - ログインAPI: POST /api/auth/login
- *    - ログアウトAPI: POST /api/auth/logout
- *    - ユーザー情報取得: GET /api/auth/me
- *    - トークン更新: POST /api/auth/refresh
- */
+// Durable Object（WebSocket）をエクスポート
+export { ProgressWebSocket } from './websocket'
 
 // 履歴記録ヘルパー
 async function recordHistory(
@@ -4866,6 +4844,37 @@ app.get('/api/auth/me', requireAuth, async (c) => {
     success: true,
     user
   })
+})
+
+// ==============================================
+// WebSocketエンドポイント
+// ==============================================
+
+// WebSocket接続エンドポイント
+app.get('/api/ws', async (c) => {
+  const { env } = c
+  
+  // クエリパラメータからクラスコードとユーザー情報を取得
+  const classCode = c.req.query('classCode')
+  const userId = c.req.query('userId')
+  const role = c.req.query('role')
+  
+  if (!classCode) {
+    return c.json({ error: 'classCode is required' }, 400)
+  }
+  
+  // Durable ObjectのIDを生成（クラスコードごとに1つのインスタンス）
+  const id = env.PROGRESS_WEBSOCKET.idFromName(classCode)
+  const stub = env.PROGRESS_WEBSOCKET.get(id)
+  
+  // リクエストをDurable Objectに転送
+  const url = new URL(c.req.url)
+  url.pathname = '/ws'
+  url.searchParams.set('classCode', classCode)
+  if (userId) url.searchParams.set('userId', userId)
+  if (role) url.searchParams.set('role', role)
+  
+  return stub.fetch(url.toString(), c.req.raw)
 })
 
 export default app
