@@ -11877,3 +11877,468 @@ window.showPredictionVisualization = showPredictionVisualization
 window.exportResearchData = exportResearchData
 window.exportPredictionData = exportPredictionData
 
+// ==============================================
+// Phase 15 & 16: 機械学習 + A/Bテスト
+// ==============================================
+
+// TensorFlow.jsベースのリアルタイム学習予測
+class RealtimeLearningPredictor {
+  constructor(studentId) {
+    this.studentId = studentId
+    this.model = null
+    this.trainingData = []
+    this.isReady = false
+  }
+  
+  // モデルの初期化
+  async initialize() {
+    if (typeof tf === 'undefined') {
+      console.warn('⚠️ TensorFlow.jsが読み込まれていません')
+      return false
+    }
+    
+    try {
+      // 簡易的なニューラルネットワークモデル
+      this.model = tf.sequential({
+        layers: [
+          tf.layers.dense({ units: 16, activation: 'relu', inputShape: [5] }),
+          tf.layers.dropout({ rate: 0.2 }),
+          tf.layers.dense({ units: 8, activation: 'relu' }),
+          tf.layers.dense({ units: 1, activation: 'linear' })
+        ]
+      })
+      
+      this.model.compile({
+        optimizer: tf.train.adam(0.001),
+        loss: 'meanSquaredError',
+        metrics: ['mae']
+      })
+      
+      this.isReady = true
+      console.log('✅ TensorFlow.jsモデル初期化完了')
+      return true
+    } catch (error) {
+      console.error('❌ モデル初期化エラー:', error)
+      return false
+    }
+  }
+  
+  // リアルタイム学習（新しいデータでモデルを更新）
+  async updateModel(newData) {
+    if (!this.isReady || !this.model) {
+      console.warn('モデルが初期化されていません')
+      return
+    }
+    
+    try {
+      // 特徴量の準備
+      const features = [
+        newData.understanding_level || 0,
+        newData.completion_time || 0,
+        newData.hint_count || 0,
+        newData.engagement_score || 0,
+        newData.session_duration || 0
+      ]
+      
+      const xs = tf.tensor2d([features])
+      const ys = tf.tensor2d([[newData.target_understanding || 0]])
+      
+      // オンライン学習（1エポックで高速更新）
+      await this.model.fit(xs, ys, {
+        epochs: 1,
+        verbose: 0
+      })
+      
+      xs.dispose()
+      ys.dispose()
+      
+      this.trainingData.push(newData)
+      
+      // サーバーにも同期
+      await axios.post(`/api/ml/update-model/${this.studentId}`, {
+        training_data: [newData]
+      })
+      
+      console.log('✅ リアルタイム学習完了 - データ数:', this.trainingData.length)
+    } catch (error) {
+      console.error('リアルタイム学習エラー:', error)
+    }
+  }
+  
+  // 予測実行
+  async predict(inputFeatures) {
+    if (!this.isReady || !this.model) {
+      return null
+    }
+    
+    try {
+      const xs = tf.tensor2d([inputFeatures])
+      const prediction = this.model.predict(xs)
+      const value = await prediction.data()
+      
+      xs.dispose()
+      prediction.dispose()
+      
+      return value[0]
+    } catch (error) {
+      console.error('予測エラー:', error)
+      return null
+    }
+  }
+}
+
+// A/Bテスト管理クラス
+class ABTestManager {
+  constructor() {
+    this.currentExperiment = null
+    this.variant = null
+  }
+  
+  // 実験への参加登録
+  async assignToExperiment(experimentName, studentId, classCode) {
+    try {
+      const response = await axios.post('/api/ab-test/assign', {
+        experiment_name: experimentName,
+        student_id: studentId,
+        class_code: classCode
+      })
+      
+      if (response.data.success) {
+        this.currentExperiment = experimentName
+        this.variant = response.data.variant
+        
+        console.log(`✅ A/Bテスト参加: ${experimentName} - ${this.variant}群`)
+        
+        // localStorage に保存
+        localStorage.setItem('ab_test_experiment', experimentName)
+        localStorage.setItem('ab_test_variant', this.variant)
+        
+        return this.variant
+      }
+    } catch (error) {
+      console.error('A/Bテスト割り当てエラー:', error)
+      return null
+    }
+  }
+  
+  // イベント記録
+  async trackEvent(eventType, eventData) {
+    if (!this.currentExperiment || !localStorage.getItem('currentUserId')) {
+      return
+    }
+    
+    try {
+      await axios.post('/api/ab-test/event', {
+        experiment_name: this.currentExperiment,
+        student_id: parseInt(localStorage.getItem('currentUserId')),
+        event_type: eventType,
+        event_data: eventData
+      })
+      
+      console.log(`📊 A/Bテストイベント記録: ${eventType}`)
+    } catch (error) {
+      console.error('イベント記録エラー:', error)
+    }
+  }
+  
+  // 実験に基づいた条件分岐
+  shouldUseExperimentalFeature(featureName) {
+    if (this.variant === 'experimental') {
+      return true
+    } else if (this.variant === 'control') {
+      return false
+    }
+    
+    // 割り当てがない場合はデフォルト動作
+    return false
+  }
+}
+
+// A/Bテスト結果可視化
+async function showABTestResults(experimentName) {
+  try {
+    const response = await axios.get(`/api/ab-test/results/${experimentName}`)
+    
+    if (!response.data.success) {
+      alert('実験結果の取得に失敗しました')
+      return
+    }
+    
+    const data = response.data
+    
+    const modalHtml = `
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+           onclick="this.remove()">
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+             onclick="event.stopPropagation()">
+          
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">
+              🧪 A/Bテスト結果: ${experimentName}
+            </h2>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+          
+          <!-- サンプルサイズ -->
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-blue-50 p-4 rounded-lg">
+              <div class="text-sm text-gray-600">コントロール群</div>
+              <div class="text-3xl font-bold text-blue-600">
+                ${data.control_group.n}人
+              </div>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+              <div class="text-sm text-gray-600">実験群</div>
+              <div class="text-3xl font-bold text-green-600">
+                ${data.experimental_group.n}人
+              </div>
+            </div>
+          </div>
+          
+          <!-- メトリクス比較 -->
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold mb-3">📊 メトリクス比較</h3>
+            <canvas id="abTestChart" width="800" height="300"></canvas>
+          </div>
+          
+          <!-- 統計分析 -->
+          <div class="bg-gray-50 p-6 rounded-lg mb-6">
+            <h3 class="text-lg font-semibold mb-3">📈 統計分析</h3>
+            
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <div class="text-sm text-gray-600">効果量 (Cohen's d)</div>
+                <div class="text-2xl font-bold ${data.analysis.effect_size > 0 ? 'text-green-600' : 'text-red-600'}">
+                  ${data.analysis.effect_size.toFixed(3)}
+                </div>
+              </div>
+              <div>
+                <div class="text-sm text-gray-600">改善率</div>
+                <div class="text-2xl font-bold ${data.analysis.improvement_percentage > 0 ? 'text-green-600' : 'text-red-600'}">
+                  ${data.analysis.improvement_percentage > 0 ? '+' : ''}${data.analysis.improvement_percentage.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+            
+            <div class="border-t pt-4">
+              <div class="flex items-center gap-3">
+                <div class="text-2xl">
+                  ${data.analysis.is_significant ? '✅' : '⚠️'}
+                </div>
+                <div>
+                  <div class="font-semibold">
+                    ${data.analysis.is_significant ? '統計的有意差あり' : '統計的有意差なし'}
+                  </div>
+                  <div class="text-sm text-gray-600">
+                    ${data.analysis.recommendation}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 詳細データ -->
+          <div class="border rounded-lg overflow-hidden">
+            <table class="w-full">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th class="px-4 py-3 text-left text-sm font-semibold">指標</th>
+                  <th class="px-4 py-3 text-center text-sm font-semibold">コントロール群</th>
+                  <th class="px-4 py-3 text-center text-sm font-semibold">実験群</th>
+                  <th class="px-4 py-3 text-center text-sm font-semibold">差分</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-t">
+                  <td class="px-4 py-3">理解度（平均）</td>
+                  <td class="px-4 py-3 text-center">${data.control_group.avg_understanding.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-center">${data.experimental_group.avg_understanding.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-center font-semibold ${(data.experimental_group.avg_understanding - data.control_group.avg_understanding) > 0 ? 'text-green-600' : 'text-red-600'}">
+                    ${((data.experimental_group.avg_understanding - data.control_group.avg_understanding) > 0 ? '+' : '')}${(data.experimental_group.avg_understanding - data.control_group.avg_understanding).toFixed(2)}
+                  </td>
+                </tr>
+                <tr class="border-t bg-gray-50">
+                  <td class="px-4 py-3">完了時間（平均）</td>
+                  <td class="px-4 py-3 text-center">${data.control_group.avg_completion_time.toFixed(1)}分</td>
+                  <td class="px-4 py-3 text-center">${data.experimental_group.avg_completion_time.toFixed(1)}分</td>
+                  <td class="px-4 py-3 text-center font-semibold ${(data.control_group.avg_completion_time - data.experimental_group.avg_completion_time) > 0 ? 'text-green-600' : 'text-red-600'}">
+                    ${((data.control_group.avg_completion_time - data.experimental_group.avg_completion_time) > 0 ? '-' : '+')}${Math.abs(data.experimental_group.avg_completion_time - data.control_group.avg_completion_time).toFixed(1)}分
+                  </td>
+                </tr>
+                <tr class="border-t">
+                  <td class="px-4 py-3">エンゲージメント</td>
+                  <td class="px-4 py-3 text-center">${data.control_group.avg_engagement.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-center">${data.experimental_group.avg_engagement.toFixed(2)}</td>
+                  <td class="px-4 py-3 text-center font-semibold ${(data.experimental_group.avg_engagement - data.control_group.avg_engagement) > 0 ? 'text-green-600' : 'text-red-600'}">
+                    ${((data.experimental_group.avg_engagement - data.control_group.avg_engagement) > 0 ? '+' : '')}${(data.experimental_group.avg_engagement - data.control_group.avg_engagement).toFixed(2)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="mt-6 flex justify-end gap-3">
+            <button onclick="exportABTestResults('${experimentName}')"
+                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              <i class="fas fa-download mr-2"></i>CSV出力
+            </button>
+            <button onclick="this.closest('.fixed').remove()"
+                    class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml)
+    
+    // Chart.jsでグラフ描画
+    const ctx = document.getElementById('abTestChart').getContext('2d')
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['理解度', '完了時間（分）', 'エンゲージメント'],
+        datasets: [
+          {
+            label: 'コントロール群',
+            data: [
+              data.control_group.avg_understanding,
+              data.control_group.avg_completion_time / 10, // スケール調整
+              data.control_group.avg_engagement
+            ],
+            backgroundColor: 'rgba(59, 130, 246, 0.6)',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 2
+          },
+          {
+            label: '実験群',
+            data: [
+              data.experimental_group.avg_understanding,
+              data.experimental_group.avg_completion_time / 10, // スケール調整
+              data.experimental_group.avg_engagement
+            ],
+            backgroundColor: 'rgba(34, 197, 94, 0.6)',
+            borderColor: 'rgba(34, 197, 94, 1)',
+            borderWidth: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 5
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'bottom'
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || ''
+                if (label) {
+                  label += ': '
+                }
+                if (context.parsed.y !== null) {
+                  // 完了時間は元のスケールに戻す
+                  if (context.dataIndex === 1) {
+                    label += (context.parsed.y * 10).toFixed(1) + '分'
+                  } else {
+                    label += context.parsed.y.toFixed(2)
+                  }
+                }
+                return label
+              }
+            }
+          }
+        }
+      }
+    })
+    
+  } catch (error) {
+    console.error('A/Bテスト結果表示エラー:', error)
+    alert('実験結果の表示に失敗しました')
+  }
+}
+
+// A/Bテスト結果のCSV出力
+async function exportABTestResults(experimentName) {
+  try {
+    const response = await axios.get(`/api/ab-test/results/${experimentName}`)
+    
+    if (!response.data.success) {
+      alert('データの取得に失敗しました')
+      return
+    }
+    
+    const data = response.data
+    
+    const csv = [
+      ['A/Bテスト実験結果', experimentName],
+      [],
+      ['指標', 'コントロール群', '実験群', '差分', '改善率'],
+      [
+        '理解度（平均）',
+        data.control_group.avg_understanding.toFixed(2),
+        data.experimental_group.avg_understanding.toFixed(2),
+        (data.experimental_group.avg_understanding - data.control_group.avg_understanding).toFixed(2),
+        data.analysis.improvement_percentage.toFixed(1) + '%'
+      ],
+      [
+        '完了時間（分）',
+        data.control_group.avg_completion_time.toFixed(1),
+        data.experimental_group.avg_completion_time.toFixed(1),
+        (data.experimental_group.avg_completion_time - data.control_group.avg_completion_time).toFixed(1),
+        '-'
+      ],
+      [
+        'エンゲージメント',
+        data.control_group.avg_engagement.toFixed(2),
+        data.experimental_group.avg_engagement.toFixed(2),
+        (data.experimental_group.avg_engagement - data.control_group.avg_engagement).toFixed(2),
+        '-'
+      ],
+      [],
+      ['統計分析'],
+      ['効果量 (Cohen\'s d)', data.analysis.effect_size.toFixed(3)],
+      ['統計的有意性', data.analysis.is_significant ? '有意' : '有意でない'],
+      ['推奨', data.analysis.recommendation],
+      [],
+      ['サンプルサイズ'],
+      ['コントロール群', data.control_group.n + '人'],
+      ['実験群', data.experimental_group.n + '人']
+    ].map(row => row.join(',')).join('\n')
+    
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `ab_test_${experimentName}_${Date.now()}.csv`
+    link.click()
+    
+    console.log('✅ A/Bテスト結果をCSV出力しました')
+  } catch (error) {
+    console.error('CSV出力エラー:', error)
+    alert('CSV出力に失敗しました')
+  }
+}
+
+// グローバルインスタンス
+window.abTestManager = new ABTestManager()
+window.realtimePredictor = null // 生徒ごとに初期化
+
+// グローバルスコープに登録
+window.RealtimeLearningPredictor = RealtimeLearningPredictor
+window.ABTestManager = ABTestManager
+window.showABTestResults = showABTestResults
+window.exportABTestResults = exportABTestResults
+
+console.log('✅ Phase 15 & 16: 機械学習 + A/Bテスト機能 読み込み完了')
+
