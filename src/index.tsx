@@ -2362,30 +2362,13 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     // データ構造を詳細に検証
     const validationErrors = []
     
+    // 必須フィールドのみ検証（追加問題は別APIで生成）
     if (!unitData.curriculum) validationErrors.push('curriculum が欠けています')
     if (!unitData.courses || !Array.isArray(unitData.courses)) validationErrors.push('courses が欠けているか配列ではありません')
-    if (!unitData.course_selection_problems || !Array.isArray(unitData.course_selection_problems)) {
-      validationErrors.push('course_selection_problems が欠けているか配列ではありません')
-    }
-    if (unitData.course_selection_problems && unitData.course_selection_problems.length !== 3) {
-      validationErrors.push(`course_selection_problems は3題必須ですが、${unitData.course_selection_problems.length}題しかありません`)
-    }
-    if (!unitData.optional_problems || !Array.isArray(unitData.optional_problems)) {
-      validationErrors.push('optional_problems が欠けているか配列ではありません')
-    }
-    if (unitData.optional_problems && unitData.optional_problems.length !== 6) {
-      validationErrors.push(`optional_problems は6題必須ですが、${unitData.optional_problems.length}題しかありません`)
-    }
-    if (!unitData.common_check_test || !unitData.common_check_test.sample_problems) {
-      validationErrors.push('common_check_test または sample_problems が欠けています')
-    }
     
     // コースの検証
     if (unitData.courses && Array.isArray(unitData.courses)) {
       unitData.courses.forEach((course: any, index: number) => {
-        if (!course.introduction_problem) {
-          validationErrors.push(`コース${index + 1}に introduction_problem が欠けています`)
-        }
         if (!course.cards || !Array.isArray(course.cards)) {
           validationErrors.push(`コース${index + 1}の cards が欠けているか配列ではありません`)
         } else if (course.cards.length !== 6) {
