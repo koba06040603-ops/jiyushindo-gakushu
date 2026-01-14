@@ -3349,4 +3349,71 @@ app.post('/api/ai/suggest-units', async (c) => {
   }
 })
 
+// APIルート：単元の削除（カスケード削除）
+app.delete('/api/curriculum/:id', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  
+  try {
+    console.log(`🗑️ 単元削除開始: ID=${id}`)
+    
+    // 1. カリキュラムに紐づくコースIDを取得
+    const courses = await env.DB.prepare(`
+      SELECT id FROM courses WHERE curriculum_id = ?
+    `).bind(id).all()
+    
+    const courseIds = (courses.results || []).map((c: any) => c.id)
+    console.log(`  - コース数: ${courseIds.length}`)
+    
+    // 2. 各コースの学習カードを削除
+    for (const courseId of courseIds) {
+      await env.DB.prepare(`
+        DELETE FROM learning_cards WHERE course_id = ?
+      `).bind(courseId).run()
+    }
+    console.log(`  - 学習カード削除完了`)
+    
+    // 3. コースを削除
+    await env.DB.prepare(`
+      DELETE FROM courses WHERE curriculum_id = ?
+    `).bind(id).run()
+    console.log(`  - コース削除完了`)
+    
+    // 4. メタデータを削除（コース選択問題、チェックテスト）
+    await env.DB.prepare(`
+      DELETE FROM curriculum_metadata WHERE curriculum_id = ?
+    `).bind(id).run()
+    console.log(`  - メタデータ削除完了`)
+    
+    // 5. 選択問題を削除
+    await env.DB.prepare(`
+      DELETE FROM optional_problems WHERE curriculum_id = ?
+    `).bind(id).run()
+    console.log(`  - 選択問題削除完了`)
+    
+    // 6. カリキュラム本体を削除
+    await env.DB.prepare(`
+      DELETE FROM curriculum WHERE id = ?
+    `).bind(id).run()
+    console.log(`  - カリキュラム本体削除完了`)
+    
+    return c.json({
+      success: true,
+      message: '単元を削除しました',
+      deleted: {
+        curriculum_id: id,
+        courses_count: courseIds.length
+      }
+    })
+    
+  } catch (error: any) {
+    console.error('単元削除エラー:', error)
+    return c.json({
+      success: false,
+      error: '単元の削除に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
 export default app

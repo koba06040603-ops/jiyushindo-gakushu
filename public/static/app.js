@@ -283,21 +283,89 @@ async function updateUnitList() {
         c.textbook_company === textbook
       )
 
-      curricula.forEach(item => {
-        const option = document.createElement('option')
-        option.value = item.id
-        option.textContent = `${item.unit_order}. ${item.unit_name}`
-        unitSelect.appendChild(option)
-      })
+      if (curricula.length > 0) {
+        // カード形式で表示
+        unitSelect.innerHTML = ''
+        unitSelect.className = 'space-y-2'
+        
+        curricula.forEach(item => {
+          const card = document.createElement('div')
+          card.className = 'bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-400 transition cursor-pointer flex items-center justify-between group'
+          card.innerHTML = `
+            <div class="flex-1" onclick="selectUnit(${item.id})">
+              <p class="font-bold text-gray-800">${item.unit_order}. ${item.unit_name}</p>
+              <p class="text-sm text-gray-500">${item.grade}年 ${item.subject} - ${item.textbook_company}</p>
+            </div>
+            <div class="flex gap-2">
+              <button 
+                onclick="event.stopPropagation(); editCurriculum(${item.id})" 
+                class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
+                title="編集">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button 
+                onclick="event.stopPropagation(); deleteCurriculum(${item.id}, '${item.unit_name}')" 
+                class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
+                title="削除">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          `
+          unitSelect.appendChild(card)
+        })
+        
+        startButton.disabled = false
+      } else {
+        unitSelect.innerHTML = '<option value="">該当する単元がありません</option>'
+        startButton.disabled = true
+      }
     } catch (error) {
       console.error('単元リスト読み込みエラー:', error)
     }
   }
 
-  // 単元選択時にボタン有効化
-  unitSelect.addEventListener('change', () => {
-    startButton.disabled = !unitSelect.value
-  })
+  // selectモードの場合のみイベントリスナー追加
+  if (unitSelect.tagName === 'SELECT') {
+    unitSelect.addEventListener('change', () => {
+      startButton.disabled = !unitSelect.value
+    })
+  }
+}
+
+// 単元を選択
+function selectUnit(curriculumId) {
+  state.selectedCurriculumId = curriculumId
+  loadGuidePage(curriculumId)
+}
+
+// 単元を削除
+async function deleteCurriculum(curriculumId, unitName) {
+  const confirmed = confirm(`本当に「${unitName}」を削除しますか？\n\nこの操作は取り消せません。\n- 単元の基本情報\n- すべてのコース\n- すべてのカード\n- すべての問題\nが削除されます。`)
+  
+  if (!confirmed) {
+    return
+  }
+  
+  try {
+    const response = await axios.delete(`/api/curriculum/${curriculumId}`)
+    
+    if (response.data.success) {
+      alert(`✅ 「${unitName}」を削除しました`)
+      // 単元リストを再読み込み
+      updateUnitList()
+    } else {
+      throw new Error(response.data.error || '削除に失敗しました')
+    }
+  } catch (error) {
+    console.error('削除エラー:', error)
+    alert(`❌ 削除に失敗しました: ${error.response?.data?.error || error.message}`)
+  }
+}
+
+// 単元を編集（簡易版：カード内容の表示と編集）
+async function editCurriculum(curriculumId) {
+  alert('📝 単元編集機能は近日実装予定です。\n\n現在は削除機能のみ利用可能です。')
+  // TODO: 編集画面の実装
 }
 
 // ============================================
@@ -335,11 +403,28 @@ async function loadGuidePage(curriculumId) {
       console.log('⚠️ 選択問題なし')
     }
     
+    // 導入問題の自動追補チェック
+    const missingIntroProblems = courses.filter(c => !c.introduction_problem)
+    if (missingIntroProblems.length > 0) {
+      console.warn(`⚠️ 導入問題が${missingIntroProblems.length}件欠落しています。自動生成を開始します...`)
+      try {
+        // 導入問題を自動生成
+        await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
+        console.log('✅ 導入問題の自動追補完了')
+        // データを再取得
+        const reloadResponse = await axios.get(`/api/curriculum/${curriculumId}`)
+        courses.splice(0, courses.length, ...reloadResponse.data.courses)
+      } catch (autoGenError) {
+        console.error('❌ 導入問題の自動生成に失敗:', autoGenError)
+      }
+    }
+    
     // データの完全性を確認
     const hasAllData = courseSelectionProblems.length === 3 && 
                        optionalProblems.length === 6 &&
                        commonCheckTest && 
-                       commonCheckTest.sample_problems?.length === 6
+                       commonCheckTest.sample_problems?.length === 6 &&
+                       courses.filter(c => c.introduction_problem).length === 3
     
     if (!hasAllData) {
       console.warn('⚠️ データが不完全です:', {
