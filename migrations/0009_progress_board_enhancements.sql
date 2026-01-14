@@ -4,8 +4,11 @@
 -- student_progressテーブルにヘルプ関連カラムを追加
 ALTER TABLE student_progress ADD COLUMN help_requested_at DATETIME;
 ALTER TABLE student_progress ADD COLUMN help_resolved_at DATETIME;
-ALTER TABLE student_progress ADD COLUMN last_activity_at DATETIME DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE student_progress ADD COLUMN last_activity_at DATETIME;
 ALTER TABLE student_progress ADD COLUMN help_type TEXT; -- ai, teacher, friend, hint
+
+-- last_activity_atのデフォルト値を設定（既存レコード）
+UPDATE student_progress SET last_activity_at = created_at WHERE last_activity_at IS NULL;
 
 -- インデックスを追加（パフォーマンス向上）
 CREATE INDEX IF NOT EXISTS idx_student_progress_help_requested 
