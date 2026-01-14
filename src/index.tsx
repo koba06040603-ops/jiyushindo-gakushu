@@ -2627,7 +2627,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
+              generationConfig: { temperature: 0.8, maxOutputTokens: 8192 }
             })
           }
         )
@@ -2769,7 +2769,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.8, maxOutputTokens: 4000 }
+              generationConfig: { temperature: 0.8, maxOutputTokens: 8192 }
             })
           }
         )
