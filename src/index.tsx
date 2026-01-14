@@ -9,6 +9,116 @@ type Bindings = {
 
 const app = new Hono<{ Bindings: Bindings }>()
 
+// Gemini API呼び出しヘルパー（リトライ + 監視）
+interface GeminiCallOptions {
+  model: string
+  prompt: string
+  apiKey: string
+  maxOutputTokens?: number
+  temperature?: number
+  retries?: number
+  retryDelay?: number
+}
+
+interface GeminiResponse {
+  success: boolean
+  content?: string
+  model?: string
+  error?: string
+  attempts?: number
+  totalTime?: number
+}
+
+async function callGeminiAPI(options: GeminiCallOptions): Promise<GeminiResponse> {
+  const {
+    model,
+    prompt,
+    apiKey,
+    maxOutputTokens = 8192,
+    temperature = 0.8,
+    retries = 3,
+    retryDelay = 2000
+  } = options
+
+  const startTime = Date.now()
+  let lastError = ''
+  
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`🔄 Gemini API呼び出し: ${model} (試行 ${attempt}/${retries})`)
+      
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature, maxOutputTokens }
+          })
+        }
+      )
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        lastError = `HTTP ${response.status}: ${errorText.substring(0, 200)}`
+        console.error(`❌ Gemini API エラー (${model}):`, lastError)
+        
+        // 429 (Rate Limit) や 5xx エラーの場合はリトライ
+        if (response.status === 429 || response.status >= 500) {
+          if (attempt < retries) {
+            console.log(`⏳ ${retryDelay}ms 待機してリトライ...`)
+            await new Promise(resolve => setTimeout(resolve, retryDelay * attempt))
+            continue
+          }
+        }
+        
+        // その他のエラーはリトライしない
+        break
+      }
+
+      const data = await response.json()
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+
+      if (!content) {
+        lastError = 'AIの応答が空でした'
+        console.error(`❌ 応答なし (${model})`)
+        continue
+      }
+
+      const totalTime = Date.now() - startTime
+      console.log(`✅ Gemini API成功: ${model} (${attempt}回目, ${totalTime}ms)`)
+
+      return {
+        success: true,
+        content,
+        model,
+        attempts: attempt,
+        totalTime
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'Unknown error'
+      console.error(`❌ Gemini API例外 (${model}):`, lastError)
+      
+      if (attempt < retries) {
+        console.log(`⏳ ${retryDelay}ms 待機してリトライ...`)
+        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt))
+      }
+    }
+  }
+
+  const totalTime = Date.now() - startTime
+  console.error(`❌ Gemini API失敗: ${model} (全${retries}回試行, ${totalTime}ms)`)
+
+  return {
+    success: false,
+    error: lastError,
+    model,
+    attempts: retries,
+    totalTime
+  }
+}
+
 // CORS設定
 app.use('/api/*', cors())
 
@@ -2063,84 +2173,34 @@ app.post('/api/ai/suggest-units', async (c) => {
   }
   
   try {
-    const prompt = `あなたは小中学校の教育専門家です。以下の情報に基づいて、学習指導要領に沿った主要な単元名を10個提案してください。
-
-学年: ${grade}
-教科: ${subject}
-教科書会社: ${textbook}
-
-【出力形式】
-- 単元名のみをリスト形式で出力してください
-- 各単元名は1行に1つ
-- 番号や記号は不要
-- 学習指導要領に基づいた正確な単元名を使用
-- 学年に適した順序で並べる
-- 説明文は不要
-
-例:
+    const prompt = `${grade}${subject}（${textbook}）の単元名を10個、1行に1つずつ出力。番号不要。例:
 かけ算の筆算
 わり算の筆算
-小数のかけ算
-分数のたし算とひき算`
+小数のかけ算`
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000
-          }
-        })
-      }
-    )
-
-    if (!response.ok) {
-      // フォールバック: Gemini 2.5 Flash
-      const fallbackResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1000
-            }
-          })
-        }
-      )
-      
-      if (!fallbackResponse.ok) {
-        throw new Error('単元候補の生成に失敗しました')
-      }
-      
-      const data = await fallbackResponse.json()
-      const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-      
-      // レスポンスから単元名を抽出
-      const units = aiResponse
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line && !line.match(/^[\d\.\-\*]+/) && line.length > 2 && line.length < 50)
-        .slice(0, 10)
-      
-      return c.json({
-        success: true,
-        units,
-        model_used: 'gemini-2.5-flash'
+    // 新しいヘルパー関数を使用（自動リトライ付き）
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash']
+    let result: GeminiResponse | null = null
+    
+    for (const model of models) {
+      result = await callGeminiAPI({
+        model,
+        prompt,
+        apiKey,
+        maxOutputTokens: 1000,
+        temperature: 0.7,
+        retries: 2
       })
+      
+      if (result.success) break
     }
-
-    const data = await response.json()
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    if (!result || !result.success || !result.content) {
+      throw new Error('すべてのモデルで単元候補の生成に失敗しました')
+    }
     
     // レスポンスから単元名を抽出
-    const units = aiResponse
+    const units = result.content
       .split('\n')
       .map(line => line.trim())
       .filter(line => line && !line.match(/^[\d\.\-\*]+/) && line.length > 2 && line.length < 50)
@@ -2149,15 +2209,18 @@ app.post('/api/ai/suggest-units', async (c) => {
     return c.json({
       success: true,
       units,
-      model_used: 'gemini-3-flash-preview'
+      model_used: result.model,
+      attempts: result.attempts,
+      totalTime: result.totalTime
     })
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('単元候補生成エラー:', error)
     return c.json({
       error: '単元候補の生成に失敗しました。',
+      details: error.message,
       units: []
-    })
+    }, 500)
   }
 })
 
@@ -3284,81 +3347,7 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
 })
 
 // APIルート：単元名候補の生成（AI検索機能）
-app.post('/api/ai/suggest-units', async (c) => {
-  const { env } = c
-  const { grade, subject, textbook } = await c.req.json()
-  
-  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
-  
-  if (!apiKey) {
-    return c.json({ error: 'API key not configured' }, 500)
-  }
-  
-  try {
-    const prompt = `${grade}${subject}（${textbook}）の単元名12個をJSONで。
-{"units":["単元1","単元2","単元3","単元4","単元5","単元6","単元7","単元8","単元9","単元10","単元11","単元12"]}
-教科書目次の形式で12個必須。JSON出力:`
-
-    const models = ['gemini-2.5-flash', 'gemini-2.0-flash']
-    let response
-    
-    for (const model of models) {
-      try {
-        console.log(`🔄 単元候補生成モデル試行中: ${model}`)
-        response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
-            })
-          }
-        )
-        
-        if (response.ok) {
-          console.log(`✅ 単元候補生成成功: ${model}`)
-          break
-        } else {
-          console.warn(`⚠️ 単元候補生成失敗: ${model}`)
-        }
-      } catch (error) {
-        console.warn(`⚠️ 単元候補生成エラー: ${model}`)
-      }
-    }
-    
-    if (!response || !response.ok) {
-      throw new Error('All models failed')
-    }
-    
-    const data = await response.json()
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
-    
-    if (!aiResponse) {
-      throw new Error('AI response is empty')
-    }
-    
-    // JSONを抽出
-    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
-    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
-    
-    const result = JSON.parse(jsonText)
-    
-    return c.json({
-      success: true,
-      units: result.units || []
-    })
-    
-  } catch (error: any) {
-    console.error('単元候補生成エラー:', error)
-    return c.json({
-      error: '単元候補の生成に失敗しました',
-      details: error.message,
-      units: []
-    }, 500)
-  }
-})
+// 重複エンドポイント削除（2162行目に正式版あり）
 
 // APIルート：単元の更新（編集）
 app.put('/api/curriculum/:id', async (c) => {
@@ -3482,6 +3471,162 @@ app.delete('/api/curriculum/:id', async (c) => {
     return c.json({
       success: false,
       error: '単元の削除に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：選択問題の削除
+app.delete('/api/optional-problem/:id', async (c) => {
+  const { env } = c
+  const problemId = c.req.param('id')
+  
+  try {
+    await env.DB.prepare(`
+      DELETE FROM optional_problems WHERE id = ?
+    `).bind(problemId).run()
+    
+    return c.json({
+      success: true,
+      message: '選択問題を削除しました'
+    })
+  } catch (error: any) {
+    console.error('選択問題削除エラー:', error)
+    return c.json({
+      success: false,
+      error: '選択問題の削除に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：チェックテストの再生成
+app.post('/api/curriculum/:id/regenerate-check-test', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('id')
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({
+      success: false,
+      error: 'APIキーが設定されていません'
+    }, 500)
+  }
+  
+  try {
+    // カリキュラム情報を取得
+    const curriculum = await env.DB.prepare(`
+      SELECT * FROM curriculum WHERE id = ?
+    `).bind(curriculumId).first()
+    
+    if (!curriculum) {
+      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    }
+    
+    const prompt = `${curriculum.grade}${curriculum.subject}「${curriculum.unit_name}」の基礎確認テスト6問を生成。各問は30字以上、answer必須。JSON出力:
+{"sample_problems":[{"problem_number":1,"problem_text":"問題文","answer":"答え"}]}`
+
+    const result = await callGeminiAPI({
+      model: 'gemini-2.5-flash',
+      prompt,
+      apiKey,
+      maxOutputTokens: 4096,
+      temperature: 0.8,
+      retries: 3
+    })
+    
+    if (!result.success || !result.content) {
+      throw new Error('チェックテストの生成に失敗しました')
+    }
+    
+    // JSONを抽出
+    let jsonMatch = result.content.match(/```json\n([\s\S]*?)\n```/)
+    let jsonText = jsonMatch ? jsonMatch[1] : result.content
+    const checkTest = JSON.parse(jsonText)
+    
+    // データベースに保存
+    await env.DB.prepare(`
+      INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
+      VALUES (?, 'common_check_test', ?)
+    `).bind(
+      curriculumId,
+      JSON.stringify({
+        test_title: '基礎基本チェックテスト',
+        test_description: '全コース共通の基礎基本チェックテスト（知識理解の最低保証）',
+        test_note: '6問中5問以上正解で合格です！',
+        sample_problems: checkTest.sample_problems
+      })
+    ).run()
+    
+    return c.json({
+      success: true,
+      checkTest: checkTest.sample_problems,
+      model_used: result.model
+    })
+  } catch (error: any) {
+    console.error('チェックテスト再生成エラー:', error)
+    return c.json({
+      success: false,
+      error: 'チェックテストの再生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：システム統計情報取得（API呼び出し回数、データベース統計など）
+app.get('/api/system/stats', async (c) => {
+  const { env } = c
+  
+  try {
+    // カリキュラム統計
+    const curriculumStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_curriculums,
+        COUNT(DISTINCT grade) as total_grades,
+        COUNT(DISTINCT subject) as total_subjects,
+        COUNT(DISTINCT textbook_company) as total_textbooks
+      FROM curriculum
+    `).first()
+    
+    // コース統計
+    const courseStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_courses,
+        COUNT(DISTINCT curriculum_id) as curriculums_with_courses
+      FROM courses
+    `).first()
+    
+    // 学習カード統計
+    const cardStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_cards,
+        COUNT(DISTINCT course_id) as courses_with_cards
+      FROM learning_cards
+    `).first()
+    
+    // 選択問題統計
+    const optionalProblemStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_optional_problems,
+        COUNT(DISTINCT curriculum_id) as curriculums_with_optional_problems
+      FROM optional_problems
+    `).first()
+    
+    return c.json({
+      success: true,
+      stats: {
+        curriculum: curriculumStats,
+        courses: courseStats,
+        cards: cardStats,
+        optional_problems: optionalProblemStats
+      },
+      timestamp: new Date().toISOString()
+    })
+  } catch (error: any) {
+    console.error('統計情報取得エラー:', error)
+    return c.json({
+      success: false,
+      error: '統計情報の取得に失敗しました',
       details: error.message
     }, 500)
   }

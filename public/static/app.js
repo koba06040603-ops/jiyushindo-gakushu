@@ -41,6 +41,33 @@ const state = {
   }
 }
 
+// グローバルローディング管理
+const loadingManager = {
+  show: (message = '読み込み中...') => {
+    const existing = document.getElementById('global-loading')
+    if (existing) return
+    
+    const loadingDiv = document.createElement('div')
+    loadingDiv.id = 'global-loading'
+    loadingDiv.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    loadingDiv.innerHTML = `
+      <div class="bg-white rounded-lg p-8 shadow-2xl max-w-sm mx-4 text-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-4"></div>
+        <p class="text-xl font-bold text-gray-800 mb-2">${message}</p>
+        <p class="text-sm text-gray-500">しばらくお待ちください</p>
+      </div>
+    `
+    document.body.appendChild(loadingDiv)
+  },
+  
+  hide: () => {
+    const loading = document.getElementById('global-loading')
+    if (loading) {
+      loading.remove()
+    }
+  }
+}
+
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
   renderTopPage()
@@ -594,6 +621,7 @@ async function saveEditedCurriculum(curriculumId) {
 // ============================================
 async function loadGuidePage(curriculumId) {
   state.currentView = 'guide'
+  loadingManager.show('学習のてびきを読み込み中...')
   
   try {
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
@@ -925,8 +953,11 @@ async function loadGuidePage(curriculumId) {
         </div>
       </div>
     `
+    
+    loadingManager.hide()
   } catch (error) {
     console.error('学習のてびき読み込みエラー:', error)
+    loadingManager.hide()
     alert('データの読み込みに失敗しました')
   }
 }
