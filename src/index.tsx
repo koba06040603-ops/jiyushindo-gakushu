@@ -2141,14 +2141,18 @@ app.post('/api/ai/generate-unit', async (c) => {
   const { env } = c
   const { grade, subject, textbook, unitName, customization, qualityMode } = await c.req.json()
   
-  const apiKey = env.GEMINI_API_KEY
+  // 環境変数またはハードコードされたAPIキーを使用
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyD_eJYK2gY-_enQ6j2XeRwGAfjBZ5Dgs7I'
   
   if (!apiKey) {
+    console.error('❌ APIキーが設定されていません')
     return c.json({
-      error: '単元生成機能は現在利用できません。',
+      error: '単元生成機能は現在利用できません。APIキーが設定されていません。',
       curriculum: null
     })
   }
+  
+  console.log('🔑 APIキー確認: 最初の10文字 =', apiKey.substring(0, 10))
   
   try {
     // 品質モードに応じてモデルを選択
