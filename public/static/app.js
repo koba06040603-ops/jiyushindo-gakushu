@@ -10694,3 +10694,230 @@ window.generateProblem = generateProblem
 window.regenerateProblem = regenerateProblem
 window.saveGeneratedProblem = saveGeneratedProblem
 
+// =====================================
+// Phase 9: 学習行動ログ収集機能
+// =====================================
+
+// 学習行動ログ収集システム
+const BehaviorLogger = {
+  // セッションID（ページ読み込み時に生成）
+  sessionId: null,
+  sessionStartTime: null,
+  
+  // ログバッファ（一定数貯まったらバッチ送信）
+  logBuffer: [],
+  maxBufferSize: 10,
+  
+  // 送信タイマー（一定時間ごとに自動送信）
+  autoSendInterval: 30000, // 30秒
+  autoSendTimer: null,
+  
+  // 初期化
+  init() {
+    this.sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    this.sessionStartTime = new Date().toISOString()
+    
+    console.log('📊 学習行動ログ収集開始:', this.sessionId)
+    
+    // イベントリスナーを設定
+    this.setupEventListeners()
+    
+    // 自動送信タイマーを開始
+    this.startAutoSend()
+    
+    // ページ離脱時に残りのログを送信
+    window.addEventListener('beforeunload', () => {
+      this.flushLogs(true) // 同期送信
+    })
+  },
+  
+  // イベントリスナーを設定
+  setupEventListeners() {
+    // ページビュー
+    this.logAction('page_view', 'page', {
+      url: window.location.pathname,
+      referrer: document.referrer
+    })
+    
+    // クリックイベント
+    document.addEventListener('click', (e) => {
+      const target = e.target
+      const elementType = this.getElementType(target)
+      const elementInfo = this.getElementInfo(target)
+      
+      if (elementInfo.relevance > 0.5) { // 関連性の高い要素のみログ
+        this.logAction('click', elementType, {
+          element: elementInfo,
+          x: e.clientX,
+          y: e.clientY
+        })
+      }
+    })
+    
+    // ヒントカード表示
+    const originalShowHintCard = window.showHintCard
+    if (originalShowHintCard) {
+      window.showHintCard = (...args) => {
+        const [cardId, level] = args
+        this.logAction('hint_view', 'hint_card', {
+          card_id: cardId,
+          hint_level: level
+        })
+        return originalShowHintCard.apply(window, args)
+      }
+    }
+    
+    // AI先生質問
+    const originalAskAI = window.askAI
+    if (originalAskAI) {
+      window.askAI = (...args) => {
+        this.logAction('ai_question', 'ai_teacher', {
+          question_length: document.getElementById('aiQuestionInput')?.value?.length || 0
+        })
+        return originalAskAI.apply(window, args)
+      }
+    }
+    
+    // 助け要請
+    const originalHelpButtons = document.querySelectorAll('[onclick*="requestHelp"]')
+    originalHelpButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.logAction('help_request', 'help_button', {
+          help_type: btn.textContent.includes('先生') ? 'teacher' : 'peer'
+        })
+      })
+    })
+  },
+  
+  // 要素タイプを判定
+  getElementType(element) {
+    if (!element) return 'unknown'
+    
+    const tag = element.tagName.toLowerCase()
+    const classes = element.className || ''
+    const id = element.id || ''
+    
+    if (tag === 'button' || element.onclick) return 'button'
+    if (tag === 'a') return 'link'
+    if (tag === 'input' || tag === 'textarea') return 'input'
+    if (tag === 'img') return 'image'
+    if (tag === 'video') return 'video'
+    if (classes.includes('hint') || id.includes('hint')) return 'hint'
+    if (classes.includes('card')) return 'card'
+    
+    return 'text'
+  },
+  
+  // 要素情報を取得
+  getElementInfo(element) {
+    if (!element) return { relevance: 0 }
+    
+    const info = {
+      tag: element.tagName?.toLowerCase(),
+      id: element.id,
+      class: element.className,
+      text: element.textContent?.substring(0, 50),
+      relevance: 0
+    }
+    
+    // 学習関連要素の関連性スコア
+    const learningKeywords = ['hint', 'card', 'problem', 'answer', 'ai', 'help', 'question', 'solution']
+    const elementString = `${info.id} ${info.class} ${info.text}`.toLowerCase()
+    
+    learningKeywords.forEach(keyword => {
+      if (elementString.includes(keyword)) {
+        info.relevance += 0.2
+      }
+    })
+    
+    // ボタンやリンクは関連性を高める
+    if (info.tag === 'button' || info.tag === 'a') {
+      info.relevance += 0.3
+    }
+    
+    return info
+  },
+  
+  // アクションをログに記録
+  logAction(actionType, elementType, metadata = {}) {
+    if (!state.student || !state.student.id) {
+      // ログイン前はログを記録しない
+      return
+    }
+    
+    const log = {
+      student_id: state.student.id,
+      curriculum_id: state.selectedCurriculum?.id || null,
+      learning_card_id: state.selectedCard?.id || null,
+      action_type: actionType,
+      action_timestamp: new Date().toISOString(),
+      session_id: this.sessionId,
+      session_duration: Math.floor((Date.now() - new Date(this.sessionStartTime).getTime()) / 1000),
+      page_element: elementType,
+      element_type: elementType,
+      metadata: JSON.stringify(metadata),
+      current_understanding_level: state.selectedCard?.understanding_level || null
+    }
+    
+    this.logBuffer.push(log)
+    
+    // バッファが満杯なら送信
+    if (this.logBuffer.length >= this.maxBufferSize) {
+      this.flushLogs()
+    }
+  },
+  
+  // ログを送信
+  async flushLogs(sync = false) {
+    if (this.logBuffer.length === 0) return
+    
+    const logsToSend = [...this.logBuffer]
+    this.logBuffer = []
+    
+    try {
+      if (sync) {
+        // 同期送信（ページ離脱時）
+        navigator.sendBeacon('/api/behavior/logs', JSON.stringify(logsToSend))
+      } else {
+        // 非同期送信（通常時）
+        await axios.post('/api/behavior/logs', logsToSend)
+        console.log(`📊 ${logsToSend.length}件の学習行動ログを送信しました`)
+      }
+    } catch (error) {
+      console.error('ログ送信エラー:', error)
+      // エラー時はバッファに戻す
+      this.logBuffer.unshift(...logsToSend)
+    }
+  },
+  
+  // 自動送信を開始
+  startAutoSend() {
+    this.autoSendTimer = setInterval(() => {
+      this.flushLogs()
+    }, this.autoSendInterval)
+  },
+  
+  // 自動送信を停止
+  stopAutoSend() {
+    if (this.autoSendTimer) {
+      clearInterval(this.autoSendTimer)
+      this.autoSendTimer = null
+    }
+  }
+}
+
+// ログイン成功時に初期化
+const originalLogin = window.login
+if (originalLogin) {
+  window.login = async function(...args) {
+    const result = await originalLogin.apply(window, args)
+    if (result && state.student) {
+      BehaviorLogger.init()
+    }
+    return result
+  }
+}
+
+// グローバルスコープに登録
+window.BehaviorLogger = BehaviorLogger
+

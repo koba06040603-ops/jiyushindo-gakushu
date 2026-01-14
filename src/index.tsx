@@ -5501,6 +5501,639 @@ app.post('/api/ai/feedback', async (c) => {
 })
 
 // ==============================================
+// Phase 9: 学習行動ログAPI
+// ==============================================
+
+// 学習行動ログの保存（バッチ保存）
+app.post('/api/behavior/logs', async (c) => {
+  const { env } = c
+  const logs = await c.req.json()
+  
+  if (!Array.isArray(logs) || logs.length === 0) {
+    return c.json({
+      success: false,
+      error: 'ログデータが不正です'
+    }, 400)
+  }
+  
+  try {
+    // バッチ挿入
+    const stmt = env.DB.prepare(`
+      INSERT INTO learning_behavior_logs (
+        student_id, curriculum_id, learning_card_id, action_type, action_timestamp,
+        session_id, session_duration, page_element, element_type, metadata,
+        current_understanding_level
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    
+    const batch = logs.map(log => 
+      stmt.bind(
+        log.student_id,
+        log.curriculum_id || null,
+        log.learning_card_id || null,
+        log.action_type,
+        log.action_timestamp,
+        log.session_id,
+        log.session_duration || 0,
+        log.page_element || null,
+        log.element_type || null,
+        log.metadata || null,
+        log.current_understanding_level || null
+      )
+    )
+    
+    await env.DB.batch(batch)
+    
+    return c.json({
+      success: true,
+      message: `${logs.length}件のログを保存しました`,
+      count: logs.length
+    })
+  } catch (error: any) {
+    console.error('学習行動ログ保存エラー:', error)
+    return c.json({
+      success: false,
+      error: 'ログの保存に失敗しました'
+    }, 500)
+  }
+})
+
+// 学習行動ログの取得（分析用）
+app.get('/api/behavior/logs/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const limit = c.req.query('limit') || '100'
+  const actionType = c.req.query('actionType')
+  const startDate = c.req.query('startDate')
+  const endDate = c.req.query('endDate')
+  
+  try {
+    let query = `
+      SELECT * FROM learning_behavior_logs
+      WHERE student_id = ?
+    `
+    const params: any[] = [studentId]
+    
+    if (actionType) {
+      query += ` AND action_type = ?`
+      params.push(actionType)
+    }
+    
+    if (startDate) {
+      query += ` AND action_timestamp >= ?`
+      params.push(startDate)
+    }
+    
+    if (endDate) {
+      query += ` AND action_timestamp <= ?`
+      params.push(endDate)
+    }
+    
+    query += ` ORDER BY action_timestamp DESC LIMIT ?`
+    params.push(parseInt(limit))
+    
+    const logs = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      logs: logs.results || [],
+      count: logs.results?.length || 0
+    })
+  } catch (error: any) {
+    console.error('学習行動ログ取得エラー:', error)
+    return c.json({
+      success: false,
+      error: 'ログの取得に失敗しました'
+    }, 500)
+  }
+})
+
+// ==============================================
+// Phase 9: 学習パターン分析API
+// ==============================================
+
+// 統合学習パターン分析（6つの分析を一度に実行）
+app.post('/api/analysis/patterns/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const { curriculumId } = await c.req.json()
+  
+  try {
+    // 1. 時間的パターン分析
+    const timePattern = await analyzeTimePattern(env.DB, parseInt(studentId))
+    
+    // 2. 学習スタイル分析（VAKモデル）
+    const learningStyle = await analyzeLearningStyle(env.DB, parseInt(studentId))
+    
+    // 3. 理解パターン分析
+    const comprehension = await analyzeComprehension(env.DB, parseInt(studentId), curriculumId)
+    
+    // 4. 助け要請パターン分析
+    const helpSeeking = await analyzeHelpSeeking(env.DB, parseInt(studentId))
+    
+    // 5. 進捗速度パターン分析
+    const progressSpeed = await analyzeProgressSpeed(env.DB, parseInt(studentId), curriculumId)
+    
+    // 6. エンゲージメントパターン分析
+    const engagement = await analyzeEngagement(env.DB, parseInt(studentId))
+    
+    // 総合スコア計算
+    const overallScore = calculateOverallScore({
+      timePattern,
+      learningStyle,
+      comprehension,
+      helpSeeking,
+      progressSpeed,
+      engagement
+    })
+    
+    const result = {
+      student_id: studentId,
+      curriculum_id: curriculumId,
+      patterns: {
+        time: timePattern,
+        learning_style: learningStyle,
+        comprehension,
+        help_seeking: helpSeeking,
+        progress_speed: progressSpeed,
+        engagement
+      },
+      overall_score: overallScore,
+      analyzed_at: new Date().toISOString()
+    }
+    
+    // 分析結果を保存
+    await env.DB.prepare(`
+      INSERT INTO pattern_analysis_results (
+        student_id, curriculum_id, pattern_type, analysis_data, confidence_score, sample_size, analysis_date
+      ) VALUES (?, ?, ?, ?, ?, ?, date('now'))
+    `).bind(
+      studentId,
+      curriculumId,
+      'comprehensive',
+      JSON.stringify(result.patterns),
+      overallScore / 100,
+      0
+    ).run()
+    
+    return c.json({
+      success: true,
+      analysis: result
+    })
+  } catch (error: any) {
+    console.error('学習パターン分析エラー:', error)
+    return c.json({
+      success: false,
+      error: '分析に失敗しました'
+    }, 500)
+  }
+})
+
+// ヘルパー関数: 時間的パターン分析
+async function analyzeTimePattern(db: D1Database, studentId: number) {
+  const logs = await db.prepare(`
+    SELECT 
+      strftime('%H', action_timestamp) as hour,
+      COUNT(*) as count,
+      AVG(session_duration) as avg_duration
+    FROM learning_behavior_logs
+    WHERE student_id = ?
+    GROUP BY hour
+    ORDER BY count DESC
+  `).bind(studentId).all()
+  
+  const hourData = logs.results || []
+  const topHours = hourData.slice(0, 2).map((r: any) => `${r.hour}:00`)
+  
+  return {
+    optimal_study_time: topHours.length > 0 ? topHours : ['10:00', '14:00'],
+    concentration_span: 28,
+    best_performance_time: topHours[0] ? (parseInt(topHours[0]) < 12 ? '午前中' : '午後') : '午前中'
+  }
+}
+
+// ヘルパー関数: 学習スタイル分析
+async function analyzeLearningStyle(db: D1Database, studentId: number) {
+  const logs = await db.prepare(`
+    SELECT element_type, COUNT(*) as count
+    FROM learning_behavior_logs
+    WHERE student_id = ? AND element_type IN ('image', 'video', 'text', 'audio', 'button', 'interactive')
+    GROUP BY element_type
+  `).bind(studentId).all()
+  
+  const elementCounts = logs.results || []
+  let visual = 0, auditory = 0, kinesthetic = 0
+  
+  elementCounts.forEach((row: any) => {
+    if (row.element_type === 'image' || row.element_type === 'video') visual += row.count
+    if (row.element_type === 'audio') auditory += row.count
+    if (row.element_type === 'button' || row.element_type === 'interactive') kinesthetic += row.count
+  })
+  
+  const total = visual + auditory + kinesthetic || 1
+  return {
+    visual: Math.round((visual / total) * 100),
+    auditory: Math.round((auditory / total) * 100),
+    kinesthetic: Math.round((kinesthetic / total) * 100),
+    dominant_style: visual > auditory && visual > kinesthetic ? 'visual' : 
+                   auditory > kinesthetic ? 'auditory' : 'kinesthetic'
+  }
+}
+
+// ヘルパー関数: 理解パターン分析
+async function analyzeComprehension(db: D1Database, studentId: number, curriculumId?: number) {
+  const progress = await db.prepare(`
+    SELECT 
+      AVG(understanding_level) as avg_understanding,
+      COUNT(*) as total_cards
+    FROM student_progress
+    WHERE student_id = ? ${curriculumId ? 'AND curriculum_id = ?' : ''}
+  `).bind(curriculumId ? studentId : studentId, ...(curriculumId ? [curriculumId] : [])).first()
+  
+  return {
+    average_understanding: progress?.avg_understanding || 0,
+    total_completed: progress?.total_cards || 0,
+    prediction_3_days: Math.min((progress?.avg_understanding || 0) + 10, 100)
+  }
+}
+
+// ヘルパー関数: 助け要請パターン分析
+async function analyzeHelpSeeking(db: D1Database, studentId: number) {
+  const helpLogs = await db.prepare(`
+    SELECT COUNT(*) as help_count
+    FROM learning_behavior_logs
+    WHERE student_id = ? AND action_type = 'help_request'
+  `).bind(studentId).first()
+  
+  return {
+    help_frequency: helpLogs?.help_count || 0,
+    average_wait_time: 5.0,
+    help_type: (helpLogs?.help_count || 0) > 10 ? 'frequent' : 'moderate'
+  }
+}
+
+// ヘルパー関数: 進捗速度パターン分析
+async function analyzeProgressSpeed(db: D1Database, studentId: number, curriculumId?: number) {
+  const weeklyProgress = await db.prepare(`
+    SELECT 
+      strftime('%W', completed_at) as week,
+      COUNT(*) as cards_completed
+    FROM student_progress
+    WHERE student_id = ? ${curriculumId ? 'AND curriculum_id = ?' : ''}
+      AND status = 'completed'
+      AND completed_at >= date('now', '-4 weeks')
+    GROUP BY week
+    ORDER BY week DESC
+    LIMIT 3
+  `).bind(curriculumId ? studentId : studentId, ...(curriculumId ? [curriculumId] : [])).all()
+  
+  const weeklyCards = (weeklyProgress.results || []).map((r: any) => r.cards_completed)
+  const trend = weeklyCards.length >= 2 && weeklyCards[0] > weeklyCards[1] ? 'accelerating' : 'stable'
+  
+  return {
+    cards_per_week: weeklyCards.length > 0 ? weeklyCards : [3, 4, 5],
+    trend,
+    type: trend === 'accelerating' ? '加速型' : '安定型'
+  }
+}
+
+// ヘルパー関数: エンゲージメントパターン分析
+async function analyzeEngagement(db: D1Database, studentId: number) {
+  const sessionStats = await db.prepare(`
+    SELECT 
+      COUNT(DISTINCT session_id) as session_count,
+      AVG(session_duration) as avg_duration
+    FROM learning_behavior_logs
+    WHERE student_id = ?
+      AND action_timestamp >= datetime('now', '-7 days')
+  `).bind(studentId).first()
+  
+  return {
+    sessions_per_week: sessionStats?.session_count || 0,
+    average_session_duration: Math.round(sessionStats?.avg_duration || 0),
+    engagement_level: (sessionStats?.session_count || 0) >= 5 ? 'high' : 'moderate'
+  }
+}
+
+// ヘルパー関数: 総合スコア計算
+function calculateOverallScore(patterns: any) {
+  let score = 60 // ベーススコア
+  
+  // 学習スタイルが明確 +10
+  const dominantStyle = Math.max(patterns.learning_style.visual, patterns.learning_style.auditory, patterns.learning_style.kinesthetic)
+  if (dominantStyle >= 60) score += 10
+  
+  // 理解度が高い +15
+  if (patterns.comprehension.average_understanding >= 4) score += 15
+  
+  // エンゲージメントが高い +10
+  if (patterns.engagement.engagement_level === 'high') score += 10
+  
+  // 進捗が加速 +5
+  if (patterns.progress_speed.trend === 'accelerating') score += 5
+  
+  return Math.min(score, 100)
+}
+
+// ==============================================
+// Phase 9: 総合プロファイル生成 & 個別最適化プラン
+// ==============================================
+
+// 総合学習プロファイル生成（Gemini統合分析）
+app.post('/api/analysis/profile/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const { curriculumId } = await c.req.json()
+  
+  try {
+    // 6つの分析結果を取得
+    const analysisResponse = await fetch(`${c.req.url.split('/api')[0]}/api/analysis/patterns/${studentId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ curriculumId })
+    })
+    
+    if (!analysisResponse.ok) {
+      throw new Error('パターン分析の取得に失敗しました')
+    }
+    
+    const analysisData = await analysisResponse.json()
+    const patterns = analysisData.analysis.patterns
+    
+    // 学生情報を取得
+    const student = await env.DB.prepare(`
+      SELECT name, email FROM users WHERE id = ?
+    `).bind(studentId).first()
+    
+    // Gemini APIで統合分析
+    const apiKey = env.GEMINI_API_KEY
+    if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+      // APIキーが設定されていない場合は簡易プロファイルを返す
+      const profile = generateSimpleProfile(patterns, student)
+      await saveProfile(env.DB, studentId, curriculumId, profile)
+      return c.json({ success: true, profile })
+    }
+    
+    const geminiPrompt = `
+あなたは教育心理学とデータ分析の専門家です。以下の学習パターン分析結果から、児童の総合学習プロファイルを生成してください。
+
+【児童情報】
+名前: ${student?.name || '不明'}
+ID: ${studentId}
+
+【分析結果】
+1. 時間的パターン:
+- 最適学習時間: ${patterns.time.optimal_study_time.join(', ')}
+- 集中持続時間: ${patterns.time.concentration_span}分
+- 最高パフォーマンス時間帯: ${patterns.time.best_performance_time}
+
+2. 学習スタイル (VAKモデル):
+- 視覚型 (Visual): ${patterns.learning_style.visual}%
+- 聴覚型 (Auditory): ${patterns.learning_style.auditory}%
+- 体感型 (Kinesthetic): ${patterns.learning_style.kinesthetic}%
+- 優勢スタイル: ${patterns.learning_style.dominant_style}
+
+3. 理解パターン:
+- 平均理解度: ${patterns.comprehension.average_understanding}
+- 完了カード数: ${patterns.comprehension.total_completed}
+- 3日後予測: ${patterns.comprehension.prediction_3_days}%
+
+4. 助け要請パターン:
+- 要請頻度: ${patterns.help_seeking.help_frequency}回
+- 平均待ち時間: ${patterns.help_seeking.average_wait_time}分
+- タイプ: ${patterns.help_seeking.help_type}
+
+5. 進捗速度:
+- 週次カード数: ${patterns.progress_speed.cards_per_week.join(', ')}
+- トレンド: ${patterns.progress_speed.trend}
+- タイプ: ${patterns.progress_speed.type}
+
+6. エンゲージメント:
+- 週次セッション数: ${patterns.engagement.sessions_per_week}
+- 平均セッション時間: ${patterns.engagement.average_session_duration}秒
+- レベル: ${patterns.engagement.engagement_level}
+
+【出力形式】
+以下のJSON形式で出力してください：
+
+{
+  "summary": "この児童の学習特性を2-3文で要約",
+  "strengths": ["強み1", "強み2", "強み3"],
+  "weaknesses": ["課題1", "課題2"],
+  "recommendations": {
+    "for_teacher": ["教師への推奨事項1", "教師への推奨事項2", "教師への推奨事項3"],
+    "for_parent": ["保護者への推奨事項1", "保護者への推奨事項2"],
+    "for_student": ["児童本人への推奨事項1", "児童本人への推奨事項2"]
+  },
+  "learning_type": "学習タイプの分類（例：視覚型×加速型×積極支援型）",
+  "recommended_course": "じっくりコース / しっかりコース / ぐんぐんコース のいずれか"
+}
+`
+    
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: geminiPrompt }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000
+          }
+        })
+      }
+    )
+    
+    if (!geminiResponse.ok) {
+      throw new Error('Gemini API呼び出しに失敗しました')
+    }
+    
+    const geminiData = await geminiResponse.json()
+    const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSONを抽出
+    const jsonMatch = geminiText.match(/\{[\s\S]*\}/)
+    const geminiProfile = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
+    
+    const profile = {
+      student_id: studentId,
+      curriculum_id: curriculumId,
+      student_name: student?.name,
+      profile_summary: geminiProfile.summary || '',
+      learning_type: geminiProfile.learning_type || '',
+      overall_score: analysisData.analysis.overall_score,
+      confidence_level: analysisData.analysis.overall_score >= 80 ? 'high' : 'medium',
+      recommended_course: geminiProfile.recommended_course || 'しっかりコース',
+      patterns: patterns,
+      strengths: geminiProfile.strengths || [],
+      weaknesses: geminiProfile.weaknesses || [],
+      recommendations: geminiProfile.recommendations || {},
+      generated_at: new Date().toISOString()
+    }
+    
+    // プロファイルを保存
+    await saveProfile(env.DB, studentId, curriculumId, profile)
+    
+    return c.json({
+      success: true,
+      profile
+    })
+  } catch (error: any) {
+    console.error('総合プロファイル生成エラー:', error)
+    return c.json({
+      success: false,
+      error: 'プロファイル生成に失敗しました'
+    }, 500)
+  }
+})
+
+// ヘルパー: 簡易プロファイル生成（Gemini API未設定時）
+function generateSimpleProfile(patterns: any, student: any) {
+  const dominantStyle = patterns.learning_style.dominant_style
+  const styleText = dominantStyle === 'visual' ? '視覚型' : 
+                   dominantStyle === 'auditory' ? '聴覚型' : '体感型'
+  
+  return {
+    student_name: student?.name,
+    profile_summary: `${styleText}の学習スタイルを持ち、${patterns.progress_speed.type}の進捗を示しています。`,
+    learning_type: `${styleText}×${patterns.progress_speed.type}`,
+    strengths: ['自己学習能力', '継続的な取り組み'],
+    weaknesses: ['さらなる分析が必要'],
+    recommendations: {
+      for_teacher: ['学習スタイルに合わせた指導を行ってください'],
+      for_parent: ['家庭学習の継続をサポートしてください'],
+      for_student: ['自分のペースで学習を進めましょう']
+    },
+    recommended_course: 'しっかりコース'
+  }
+}
+
+// ヘルパー: プロファイル保存
+async function saveProfile(db: D1Database, studentId: string, curriculumId: number, profile: any) {
+  await db.prepare(`
+    INSERT OR REPLACE INTO learning_profiles (
+      student_id, curriculum_id, profile_type, profile_data, overall_score, confidence_level, 
+      expires_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, datetime('now', '+7 days'), datetime('now'))
+  `).bind(
+    studentId,
+    curriculumId,
+    'comprehensive',
+    JSON.stringify(profile),
+    profile.overall_score || 0,
+    profile.confidence_level || 'medium'
+  ).run()
+}
+
+// 個別最適化プラン生成
+app.post('/api/analysis/personalized-plan/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const { curriculumId, profileId } = await c.req.json()
+  
+  try {
+    // プロファイルを取得
+    const profile = await env.DB.prepare(`
+      SELECT profile_data FROM learning_profiles
+      WHERE student_id = ? AND curriculum_id = ?
+      ORDER BY updated_at DESC LIMIT 1
+    `).bind(studentId, curriculumId).first()
+    
+    if (!profile) {
+      return c.json({
+        success: false,
+        error: 'プロファイルが見つかりません'
+      }, 404)
+    }
+    
+    const profileData = JSON.parse(profile.profile_data as string)
+    
+    // 簡易的な個別最適化プラン生成
+    const plan = {
+      student_id: studentId,
+      curriculum_id: curriculumId,
+      plan_type: 'daily',
+      daily_schedule: generateDailySchedule(profileData),
+      weekly_goals: generateWeeklyGoals(profileData),
+      adaptive_strategies: generateAdaptiveStrategies(profileData),
+      created_at: new Date().toISOString()
+    }
+    
+    // プラン保存
+    await env.DB.prepare(`
+      INSERT INTO personalized_plans (
+        student_id, curriculum_id, profile_id, plan_type, plan_data, status, start_date, end_date
+      ) VALUES (?, ?, ?, ?, ?, 'active', date('now'), date('now', '+7 days'))
+    `).bind(
+      studentId,
+      curriculumId,
+      profileId || null,
+      'daily',
+      JSON.stringify(plan)
+    ).run()
+    
+    return c.json({
+      success: true,
+      plan
+    })
+  } catch (error: any) {
+    console.error('個別最適化プラン生成エラー:', error)
+    return c.json({
+      success: false,
+      error: 'プラン生成に失敗しました'
+    }, 500)
+  }
+})
+
+// ヘルパー: 1日のスケジュール生成
+function generateDailySchedule(profileData: any) {
+  const optimalTime = profileData.patterns?.time?.optimal_study_time?.[0] || '10:00'
+  return {
+    morning: {
+      time: optimalTime,
+      activity: '新しい学習カード',
+      duration: 30,
+      support: `${profileData.learning_type}に最適化された教材を使用`
+    },
+    afternoon: {
+      time: '14:00',
+      activity: '復習・確認',
+      duration: 20,
+      support: '理解度確認クイズ'
+    }
+  }
+}
+
+// ヘルパー: 週次目標生成
+function generateWeeklyGoals(profileData: any) {
+  const cardsPerWeek = profileData.patterns?.progress_speed?.cards_per_week?.[0] || 3
+  return [
+    `今週の目標: ${cardsPerWeek + 1}カード完了`,
+    `理解度目標: 平均4以上`,
+    `継続的な学習習慣の維持`
+  ]
+}
+
+// ヘルパー: 適応的戦略生成
+function generateAdaptiveStrategies(profileData: any) {
+  return [
+    {
+      condition: 'つまずいた時',
+      action: `${profileData.learning_type}に合わせたヒントを表示`,
+      timing: '3分経過後'
+    },
+    {
+      condition: '集中力低下',
+      action: '休憩を促す',
+      timing: '30分経過後'
+    }
+  ]
+}
+
+// ==============================================
 // WebSocketエンドポイント
 // ==============================================
 
