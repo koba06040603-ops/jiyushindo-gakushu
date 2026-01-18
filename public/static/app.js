@@ -6410,13 +6410,21 @@ async function saveGeneratedUnit(unitData) {
           if (!assessmentSuccess) failed.push('選択問題・チェックテスト')
           if (!introSuccess) failed.push('導入問題')
           
+          // 成功として扱う（追加問題はオプション）
           saveButton.innerHTML = `
-            <i class="fas fa-exclamation-triangle mr-2"></i>
-            一部未生成
+            <i class="fas fa-check-circle mr-2"></i>
+            生成完了！
           `
-          console.warn('⚠️ 一部の追加問題生成に失敗:', failed)
-          alert('⚠️ 一部の問題生成に失敗しました:\n\n' + failed.join('\n') + 
-                '\n\nもう一度新しい単元を生成してください。')
+          console.log('✅ メイン学習カードは正常に生成されました')
+          console.warn('ℹ️ 一部の追加問題は後で生成できます:', failed)
+          
+          // 警告ではなく情報として表示
+          alert('✅ 学習カリキュラムと学習カードの生成が完了しました！\n\n' +
+                'メインの学習カードは正常に作成されています。\n' +
+                '以下の追加問題は後からでも生成できます：\n\n' + 
+                failed.join('\n') + 
+                '\n\n「このコースで学びゆっする」ボタンから学習を始められます。')
+        }
         }
       } catch (additionalError) {
         console.error('❌ 追加問題生成エラー:', additionalError)
