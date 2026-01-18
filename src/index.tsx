@@ -2355,14 +2355,18 @@ app.get('/', (c) => {
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script src="/static/app.js"></script>
         <script>
-          console.log('✅ ページ読み込み完了')
-          
-          // ページ初期化
-          setTimeout(() => {
+          // すべてのリソース読み込み後に実行
+          window.addEventListener('load', () => {
+            console.log('✅ ページ読み込み完了')
+            console.log('📦 renderTopPage:', typeof renderTopPage)
+            
             try {
               if (typeof renderTopPage === 'function') {
                 renderTopPage()
+              } else if (typeof window.renderTopPage === 'function') {
+                window.renderTopPage()
               } else {
+                console.error('❌ renderTopPage関数が見つかりません')
                 // エラー表示
                 document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">システムエラー</h2><p class="text-gray-600 mb-6">ページをリフレッシュしてください。</p><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"><i class="fas fa-redo mr-2"></i>リフレッシュ</button></div></div>'
               }
@@ -2370,7 +2374,7 @@ app.get('/', (c) => {
               console.error('エラー:', error)
               document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">エラー</h2><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition">リフレッシュ</button></div></div>'
             }
-          }, 100)
+          })
         </script>
     </body>
     </html>
