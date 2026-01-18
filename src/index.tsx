@@ -4624,6 +4624,193 @@ app.post('/api/curriculum/:id/check-test/problem', async (c) => {
   }
 })
 
+// ============================================================
+// 学習スタイル対応 - カード編集API
+// ============================================================
+
+// APIルート：学習カードの更新（学習スタイル対応）
+app.put('/api/card/:cardId', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  const updates = await c.req.json()
+  
+  try {
+    // 更新可能なフィールド
+    const allowedFields = [
+      'card_title',
+      'problem_description',
+      'answer',
+      'visual_support',
+      'auditory_support',
+      'kinesthetic_support',
+      'hints',
+      'example_problem',
+      'example_solution',
+      'real_world_connection',
+      'new_terms',
+      'textbook_page',
+      'learning_style_notes'
+    ]
+    
+    const updateFields: string[] = []
+    const values: any[] = []
+    
+    for (const field of allowedFields) {
+      if (field in updates) {
+        updateFields.push(`${field} = ?`)
+        // JSON型のフィールドは文字列化
+        if (['hints', 'new_terms', 'visual_support', 'auditory_support', 'kinesthetic_support'].includes(field)) {
+          values.push(JSON.stringify(updates[field]))
+        } else {
+          values.push(updates[field])
+        }
+      }
+    }
+    
+    if (updateFields.length === 0) {
+      return c.json({
+        success: false,
+        error: '更新するフィールドがありません'
+      }, 400)
+    }
+    
+    values.push(cardId)
+    
+    const sql = `
+      UPDATE learning_cards
+      SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `
+    
+    await env.DB.prepare(sql).bind(...values).run()
+    
+    // 更新後のカードを取得
+    const card = await env.DB.prepare(`
+      SELECT * FROM learning_cards WHERE id = ?
+    `).bind(cardId).first()
+    
+    // 履歴記録
+    await recordHistory(env.DB, {
+      type: 'card',
+      action: 'update_learning_styles',
+      idField: 'card_id',
+      idValue: parseInt(cardId),
+      changedFields: updateFields.map(f => f.split(' = ')[0]),
+      snapshot: card
+    })
+    
+    return c.json({
+      success: true,
+      message: '学習カードを更新しました',
+      card
+    })
+  } catch (error: any) {
+    console.error('カード更新エラー:', error)
+    return c.json({
+      success: false,
+      error: 'カードの更新に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：学習スタイル自動提案
+app.post('/api/card/:cardId/suggest-learning-styles', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({
+      success: false,
+      error: 'APIキーが設定されていません'
+    }, 500)
+  }
+  
+  try {
+    // カード情報を取得
+    const card: any = await env.DB.prepare(`
+      SELECT lc.*, c.grade, c.subject, c.unit_name, c.textbook_company
+      FROM learning_cards lc
+      JOIN courses co ON lc.course_id = co.id
+      JOIN curriculum c ON co.curriculum_id = c.id
+      WHERE lc.id = ?
+    `).bind(cardId).first()
+    
+    if (!card) {
+      return c.json({ error: 'カードが見つかりません' }, 404)
+    }
+    
+    const prompt = `以下の学習カードに対して、視覚優位・聴覚優位・体感優位の3つの学習スタイルに応じたサポート内容を提案してください。
+
+【学習カード情報】
+学年: ${card.grade}
+教科: ${card.subject}
+単元: ${card.unit_name}
+カード番号: ${card.card_number}
+カード名: ${card.card_title}
+問題: ${card.problem_description}
+
+【出力形式】JSON形式で出力してください：
+{
+  "visual_support": {
+    "description": "視覚優位な子どもへの支援内容（図やイラスト、色分け、図解などの提案）",
+    "materials": ["必要な教材1", "必要な教材2"],
+    "activities": ["活動例1", "活動例2"]
+  },
+  "auditory_support": {
+    "description": "聴覚優位な子どもへの支援内容（音読、リズム、語呂合わせなどの提案）",
+    "materials": ["必要な教材1", "必要な教材2"],
+    "activities": ["活動例1", "活動例2"]
+  },
+  "kinesthetic_support": {
+    "description": "体感優位な子どもへの支援内容（身体活動、具体物操作などの提案）",
+    "materials": ["必要な教材1", "必要な教材2"],
+    "activities": ["活動例1", "活動例2"]
+  },
+  "learning_style_notes": "教師向けの指導上の留意点"
+}`
+
+    const result = await callGeminiAPI({
+      model: 'gemini-2.5-flash',
+      prompt,
+      apiKey,
+      maxOutputTokens: 4096,
+      temperature: 0.7,
+      retries: 2
+    })
+    
+    if (!result.success || !result.content) {
+      throw new Error('学習スタイル提案の生成に失敗しました')
+    }
+    
+    // JSON抽出
+    let jsonMatch = result.content.match(/```json\n([\s\S]*?)\n```/)
+    if (!jsonMatch) {
+      jsonMatch = result.content.match(/```\n([\s\S]*?)\n```/)
+    }
+    if (!jsonMatch) {
+      jsonMatch = result.content.match(/(\{[\s\S]*\})/)
+    }
+    
+    const jsonText = jsonMatch ? jsonMatch[1] : result.content
+    const suggestions = JSON.parse(jsonText)
+    
+    return c.json({
+      success: true,
+      suggestions,
+      message: '学習スタイル提案を生成しました'
+    })
+  } catch (error: any) {
+    console.error('学習スタイル提案エラー:', error)
+    return c.json({
+      success: false,
+      error: '学習スタイル提案の生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
 // APIルート：チェックテストの再生成
 app.post('/api/curriculum/:id/regenerate-check-test', async (c) => {
   const { env } = c
