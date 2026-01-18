@@ -2989,28 +2989,40 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       })
     }
     
-    console.log('📝 AIレスポンス（最初の300文字）:', aiResponse.substring(0, 300))
+    console.log('📝 AIレスポンス（最初の500文字）:', aiResponse.substring(0, 500))
+    console.log('📝 AIレスポンス（最後の200文字）:', aiResponse.substring(Math.max(0, aiResponse.length - 200)))
     
-    // JSONを抽出（複数パターン対応）
+    // JSONを抽出（複数パターン対応、より寛容に）
     let jsonStr
+    
+    // パターン1: ```json ... ``` コードブロック
     const jsonCodeBlock = aiResponse.match(/```json\s*([\s\S]*?)\s*```/)
+    // パターン2: ``` ... ``` プレーンコードブロック（jsonタグなし）
+    const plainCodeBlock = aiResponse.match(/```\s*([\s\S]*?)\s*```/)
+    // パターン3: { ... } JSON オブジェクト（最長マッチ）
     const jsonObject = aiResponse.match(/\{[\s\S]*\}/)
     
     if (jsonCodeBlock) {
-      jsonStr = jsonCodeBlock[1]
-      console.log('✅ JSONコードブロックを検出')
+      jsonStr = jsonCodeBlock[1].trim()
+      console.log('✅ JSONコードブロック（```json）を検出')
+    } else if (plainCodeBlock) {
+      jsonStr = plainCodeBlock[1].trim()
+      console.log('✅ プレーンコードブロック（```）を検出')
     } else if (jsonObject) {
-      jsonStr = jsonObject[0]
+      jsonStr = jsonObject[0].trim()
       console.log('✅ JSON オブジェクトを検出')
     } else {
       console.error('❌ JSONが見つかりません')
-      console.error('   AIレスポンス全文:', aiResponse)
+      console.error('   AIレスポンス全文（最初の1000文字）:', aiResponse.substring(0, 1000))
       return c.json({
         error: '単元の生成に失敗しました。AIの応答からJSONを抽出できませんでした。',
-        details: aiResponse.substring(0, 300),
-        curriculum: null
-      })
+        details: aiResponse.substring(0, 500),
+        curriculum: null,
+        raw_response: aiResponse.substring(0, 1000)
+      }, 500)
     }
+    
+    console.log('📋 抽出されたJSON（最初の300文字）:', jsonStr.substring(0, 300))
     
     let unitData
     try {
