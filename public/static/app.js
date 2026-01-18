@@ -6520,6 +6520,18 @@ function showCardDetail(card) {
                 <i class="fas fa-tasks mr-2"></i>
                 問題・課題
               </h3>
+              ${state.auth.user?.role === 'teacher' ? `
+                <button onclick="editCardImageUrl(${card.id}, 'problem')" 
+                        class="mb-3 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                  <i class="fas fa-image mr-1"></i>
+                  ${card.problem_image_url ? '画像URLを編集' : '画像URLを追加'}
+                </button>
+              ` : ''}
+              ${card.problem_image_url ? `
+                <div class="mb-4 text-center">
+                  <img src="${card.problem_image_url}" alt="問題画像" class="max-w-full h-auto rounded-lg shadow-md mx-auto" style="max-height: 400px;">
+                </div>
+              ` : ''}
               <p class="text-gray-800 whitespace-pre-wrap text-lg">${card.problem_description || 'なし'}</p>
             </div>
 
@@ -6600,6 +6612,18 @@ function showCardDetail(card) {
                   解答
                 </h3>
                 <div class="bg-white p-6 rounded-lg border-2 border-green-200">
+                  ${state.auth.user?.role === 'teacher' ? `
+                    <button onclick="editCardImageUrl(${card.id}, 'answer')" 
+                            class="mb-3 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+                      <i class="fas fa-image mr-1"></i>
+                      ${card.answer_image_url ? '画像URLを編集' : '画像URLを追加'}
+                    </button>
+                  ` : ''}
+                  ${card.answer_image_url ? `
+                    <div class="mb-4 text-center">
+                      <img src="${card.answer_image_url}" alt="解答画像" class="max-w-full h-auto rounded-lg shadow-md mx-auto" style="max-height: 400px;">
+                    </div>
+                  ` : ''}
                   <p class="text-gray-800 text-lg whitespace-pre-wrap">${card.answer || card.example_solution}</p>
                 </div>
               </div>
@@ -12900,5 +12924,37 @@ window.showMunicipalityDashboard = showMunicipalityDashboard
 window.exportMunicipalityData = exportMunicipalityData
 window.showResearchDatasetCreator = showResearchDatasetCreator
 
+// 学習カード画像URL編集機能
+async function editCardImageUrl(cardId, imageType) {
+  const currentUrl = prompt(
+    imageType === 'problem' 
+      ? '問題画像のURLを入力してください（削除する場合は空欄にしてください）:' 
+      : '解答画像のURLを入力してください（削除する場合は空欄にしてください）:'
+  )
+  
+  if (currentUrl === null) return // キャンセル
+  
+  try {
+    const fieldName = imageType === 'problem' ? 'problem_image_url' : 'answer_image_url'
+    const response = await axios.put(`/api/card/${cardId}`, {
+      [fieldName]: currentUrl
+    })
+    
+    if (response.data.success) {
+      alert('✅ 画像URLを更新しました')
+      // モーダルを閉じて再度開く（更新を反映）
+      closeCardDetail()
+      // 再読み込み処理は呼び出し元に委ねる
+      window.location.reload()
+    }
+  } catch (error) {
+    console.error('画像URL更新エラー:', error)
+    alert('画像URLの更新に失敗しました')
+  }
+}
+
+window.editCardImageUrl = editCardImageUrl
+
 console.log('✅ Phase 17-19: 深層学習・マルチモーダル・大規模展開 機能読み込み完了')
+
 
