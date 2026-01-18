@@ -156,7 +156,7 @@ async function callGeminiAPI(options: GeminiCallOptions): Promise<GeminiResponse
 app.use('/api/*', cors())
 
 // 静的ファイル配信
-app.use('/static/*', serveStatic({ root: './public' }))
+app.use('/static/*', serveStatic({ root: './' }))
 
 // APIルート：カリキュラム一覧取得
 app.get('/api/curriculum', async (c) => {
