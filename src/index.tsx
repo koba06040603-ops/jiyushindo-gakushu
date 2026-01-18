@@ -2345,9 +2345,15 @@ app.get('/', (c) => {
           // app.js読み込み確認
           console.log('✅ app.js読み込み完了')
           console.log('📦 利用可能な関数:', {
-            renderTopPage: typeof renderTopPage,
-            showTopPage: typeof showTopPage
+            renderTopPage: typeof renderTopPage
           })
+          
+          // ページ初期化
+          if (typeof renderTopPage === 'function') {
+            renderTopPage()
+          } else {
+            console.error('❌ renderTopPage関数が見つかりません')
+          }
         </script>
     </body>
     </html>
