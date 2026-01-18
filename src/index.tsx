@@ -2329,31 +2329,34 @@ app.get('/', (c) => {
         </style>
     </head>
     <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
-        <div id="app"></div>
+        <div id="app">
+          <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+              <div class="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
+              <p class="text-xl text-gray-700">システムを読み込んでいます...</p>
+            </div>
+          </div>
+        </div>
         
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-        <script>
-          // 動作確認用
-          console.log('✅ ページ読み込み完了 - バックエンドAPI正常動作')
-          console.log('📍 現在のURL:', window.location.href)
-          console.log('🔗 axios読み込み:', typeof axios !== 'undefined' ? '成功' : '失敗')
-          console.log('📊 Chart.js読み込み:', typeof Chart !== 'undefined' ? '成功' : '失敗')
-          console.log('🤖 TensorFlow.js読み込み:', typeof tf !== 'undefined' ? '成功' : '失敗')
-        </script>
         <script src="/static/app.js"></script>
         <script>
-          // app.js読み込み確認
-          console.log('✅ app.js読み込み完了')
-          console.log('📦 利用可能な関数:', {
-            renderTopPage: typeof renderTopPage
-          })
+          console.log('✅ ページ読み込み完了')
           
           // ページ初期化
-          if (typeof renderTopPage === 'function') {
-            renderTopPage()
-          } else {
-            console.error('❌ renderTopPage関数が見つかりません')
-          }
+          setTimeout(() => {
+            try {
+              if (typeof renderTopPage === 'function') {
+                renderTopPage()
+              } else {
+                // エラー表示
+                document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">システムエラー</h2><p class="text-gray-600 mb-6">ページをリフレッシュしてください。</p><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"><i class="fas fa-redo mr-2"></i>リフレッシュ</button></div></div>'
+              }
+            } catch (error) {
+              console.error('エラー:', error)
+              document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">エラー</h2><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition">リフレッシュ</button></div></div>'
+            }
+          }, 100)
         </script>
     </body>
     </html>

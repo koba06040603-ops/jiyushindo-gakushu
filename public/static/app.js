@@ -6410,21 +6410,13 @@ async function saveGeneratedUnit(unitData) {
           if (!assessmentSuccess) failed.push('選択問題・チェックテスト')
           if (!introSuccess) failed.push('導入問題')
           
-          // 成功として扱う（追加問題はオプション）
           saveButton.innerHTML = `
-            <i class="fas fa-check-circle mr-2"></i>
-            生成完了！
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            一部未生成
           `
-          console.log('✅ メイン学習カードは正常に生成されました')
-          console.warn('ℹ️ 一部の追加問題は後で生成できます:', failed)
-          
-          // 警告ではなく情報として表示
-          alert('✅ 学習カリキュラムと学習カードの生成が完了しました！\n\n' +
-                'メインの学習カードは正常に作成されています。\n' +
-                '以下の追加問題は後からでも生成できます：\n\n' + 
-                failed.join('\n') + 
-                '\n\n「このコースで学びゆっする」ボタンから学習を始められます。')
-        }
+          console.warn('⚠️ 一部の追加問題生成に失敗:', failed)
+          alert('⚠️ 一部の問題生成に失敗しました:\n\n' + failed.join('\n') + 
+                '\n\nもう一度新しい単元を生成してください。')
         }
       } catch (additionalError) {
         console.error('❌ 追加問題生成エラー:', additionalError)
@@ -6494,26 +6486,22 @@ function showCardDetail(card) {
         </div>
 
         <!-- タブナビゲーション -->
-        <div class="bg-gray-100 border-b border-gray-300 flex overflow-x-auto">
+        <div class="bg-gray-100 border-b border-gray-300 flex">
           <button onclick="switchCardTab('problem')" id="tab-problem" 
-                  class="flex-shrink-0 px-4 py-4 font-bold text-center transition border-b-4 border-blue-600 bg-white text-blue-600">
+                  class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-blue-600 bg-white text-blue-600">
             <i class="fas fa-tasks mr-2"></i>問題
           </button>
           <button onclick="switchCardTab('hints')" id="tab-hints" 
-                  class="flex-shrink-0 px-4 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
+                  class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
             <i class="fas fa-lightbulb mr-2"></i>ヒント
           </button>
           <button onclick="switchCardTab('answer')" id="tab-answer" 
-                  class="flex-shrink-0 px-4 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
+                  class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
             <i class="fas fa-check-circle mr-2"></i>解答
           </button>
           <button onclick="switchCardTab('explanation')" id="tab-explanation" 
-                  class="flex-shrink-0 px-4 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
+                  class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
             <i class="fas fa-book-open mr-2"></i>解説
-          </button>
-          <button onclick="switchCardTab('learning-styles')" id="tab-learning-styles" 
-                  class="flex-shrink-0 px-4 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
-            <i class="fas fa-palette mr-2"></i>学習スタイル
           </button>
         </div>
 
@@ -6656,87 +6644,6 @@ function showCardDetail(card) {
               </div>
             ` : ''}
           </div>
-
-          <!-- 学習スタイルタブ -->
-          <div id="content-learning-styles" class="tab-content space-y-4 hidden">
-            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-400 p-6 rounded-xl shadow-lg">
-              <div class="flex items-center justify-between mb-4">
-                <h3 class="font-bold text-blue-800 text-xl flex items-center">
-                  <i class="fas fa-palette mr-2 text-2xl"></i>
-                  学習スタイル別サポート
-                </h3>
-                <button onclick="suggestLearningStyles(${card.id})" 
-                        id="suggestStylesBtn-${card.id}"
-                        class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2 px-4 rounded-lg transition shadow text-sm">
-                  <i class="fas fa-magic mr-2"></i>AI提案
-                </button>
-              </div>
-              
-              <!-- 視覚優位サポート -->
-              <div class="bg-white p-5 rounded-lg border-2 border-blue-200 mb-4">
-                <h4 class="font-bold text-blue-700 mb-3 flex items-center text-lg">
-                  <i class="fas fa-eye mr-2"></i>👁️ 視覚優位（見て学ぶ）
-                </h4>
-                <div id="visual-support-${card.id}" class="space-y-2">
-                  ${card.visual_support ? `
-                    <p class="text-gray-700 whitespace-pre-wrap">${typeof card.visual_support === 'string' ? card.visual_support : JSON.parse(card.visual_support).description}</p>
-                  ` : `
-                    <p class="text-gray-500 italic">図やイラスト、色分けなどの視覚的支援を提案できます</p>
-                  `}
-                </div>
-                <button onclick="editLearningStyle(${card.id}, 'visual')" 
-                        class="mt-3 text-blue-600 hover:text-blue-800 font-semibold text-sm">
-                  <i class="fas fa-edit mr-1"></i>編集
-                </button>
-              </div>
-              
-              <!-- 聴覚優位サポート -->
-              <div class="bg-white p-5 rounded-lg border-2 border-green-200 mb-4">
-                <h4 class="font-bold text-green-700 mb-3 flex items-center text-lg">
-                  <i class="fas fa-headphones mr-2"></i>👂 聴覚優位（聞いて学ぶ）
-                </h4>
-                <div id="auditory-support-${card.id}" class="space-y-2">
-                  ${card.auditory_support ? `
-                    <p class="text-gray-700 whitespace-pre-wrap">${typeof card.auditory_support === 'string' ? card.auditory_support : JSON.parse(card.auditory_support).description}</p>
-                  ` : `
-                    <p class="text-gray-500 italic">音読、リズム、語呂合わせなどの聴覚的支援を提案できます</p>
-                  `}
-                </div>
-                <button onclick="editLearningStyle(${card.id}, 'auditory')" 
-                        class="mt-3 text-green-600 hover:text-green-800 font-semibold text-sm">
-                  <i class="fas fa-edit mr-1"></i>編集
-                </button>
-              </div>
-              
-              <!-- 体感優位サポート -->
-              <div class="bg-white p-5 rounded-lg border-2 border-orange-200 mb-4">
-                <h4 class="font-bold text-orange-700 mb-3 flex items-center text-lg">
-                  <i class="fas fa-running mr-2"></i>🤸 体感優位（体で学ぶ）
-                </h4>
-                <div id="kinesthetic-support-${card.id}" class="space-y-2">
-                  ${card.kinesthetic_support ? `
-                    <p class="text-gray-700 whitespace-pre-wrap">${typeof card.kinesthetic_support === 'string' ? card.kinesthetic_support : JSON.parse(card.kinesthetic_support).description}</p>
-                  ` : `
-                    <p class="text-gray-500 italic">身体活動、具体物操作などの体感的支援を提案できます</p>
-                  `}
-                </div>
-                <button onclick="editLearningStyle(${card.id}, 'kinesthetic')" 
-                        class="mt-3 text-orange-600 hover:text-orange-800 font-semibold text-sm">
-                  <i class="fas fa-edit mr-1"></i>編集
-                </button>
-              </div>
-              
-              <!-- 指導上の留意点 -->
-              ${card.learning_style_notes ? `
-                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                  <h4 class="font-bold text-yellow-800 mb-2 flex items-center">
-                    <i class="fas fa-exclamation-triangle mr-2"></i>指導上の留意点
-                  </h4>
-                  <p class="text-gray-700 whitespace-pre-wrap">${card.learning_style_notes}</p>
-                </div>
-              ` : ''}
-            </div>
-          </div>
         </div>
 
         <!-- フッター -->
@@ -6765,7 +6672,7 @@ function showCardDetail(card) {
 function switchCardTab(tabName) {
   // すべてのタブボタンを非アクティブに
   document.querySelectorAll('#cardDetailModal button[id^="tab-"]').forEach(btn => {
-    btn.className = 'flex-shrink-0 px-4 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600'
+    btn.className = 'flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600'
   })
   
   // アクティブタブのボタンをハイライト
@@ -6775,10 +6682,9 @@ function switchCardTab(tabName) {
       problem: 'border-blue-600 bg-white text-blue-600',
       hints: 'border-yellow-600 bg-white text-yellow-600',
       answer: 'border-green-600 bg-white text-green-600',
-      explanation: 'border-purple-600 bg-white text-purple-600',
-      'learning-styles': 'border-pink-600 bg-white text-pink-600'
+      explanation: 'border-purple-600 bg-white text-purple-600'
     }
-    activeTab.className = `flex-shrink-0 px-4 py-4 font-bold text-center transition border-b-4 ${colors[tabName]}`
+    activeTab.className = `flex-1 px-6 py-4 font-bold text-center transition border-b-4 ${colors[tabName]}`
   }
   
   // すべてのタブコンテンツを非表示
@@ -6818,154 +6724,9 @@ async function generateSimilarProblem(cardId) {
   }
 }
 
-// 学習スタイル提案関数
-async function suggestLearningStyles(cardId) {
-  const button = document.getElementById(`suggestStylesBtn-${cardId}`)
-  const originalHTML = button.innerHTML
-  button.disabled = true
-  button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>生成中...'
-  
-  try {
-    const response = await axios.post(`/api/card/${cardId}/suggest-learning-styles`)
-    
-    if (response.data.success) {
-      const suggestions = response.data.suggestions
-      
-      // 視覚優位サポートを更新
-      const visualDiv = document.getElementById(`visual-support-${cardId}`)
-      if (suggestions.visual_support) {
-        visualDiv.innerHTML = `
-          <p class="text-gray-700 whitespace-pre-wrap mb-2">${suggestions.visual_support.description}</p>
-          ${suggestions.visual_support.materials ? `
-            <div class="bg-blue-50 p-3 rounded mt-2">
-              <p class="font-semibold text-blue-700 mb-1"><i class="fas fa-box mr-1"></i>必要な教材:</p>
-              <ul class="list-disc list-inside text-sm text-gray-700">
-                ${suggestions.visual_support.materials.map(m => `<li>${m}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-          ${suggestions.visual_support.activities ? `
-            <div class="bg-blue-50 p-3 rounded mt-2">
-              <p class="font-semibold text-blue-700 mb-1"><i class="fas fa-tasks mr-1"></i>活動例:</p>
-              <ul class="list-disc list-inside text-sm text-gray-700">
-                ${suggestions.visual_support.activities.map(a => `<li>${a}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-        `
-      }
-      
-      // 聴覚優位サポートを更新
-      const auditoryDiv = document.getElementById(`auditory-support-${cardId}`)
-      if (suggestions.auditory_support) {
-        auditoryDiv.innerHTML = `
-          <p class="text-gray-700 whitespace-pre-wrap mb-2">${suggestions.auditory_support.description}</p>
-          ${suggestions.auditory_support.materials ? `
-            <div class="bg-green-50 p-3 rounded mt-2">
-              <p class="font-semibold text-green-700 mb-1"><i class="fas fa-box mr-1"></i>必要な教材:</p>
-              <ul class="list-disc list-inside text-sm text-gray-700">
-                ${suggestions.auditory_support.materials.map(m => `<li>${m}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-          ${suggestions.auditory_support.activities ? `
-            <div class="bg-green-50 p-3 rounded mt-2">
-              <p class="font-semibold text-green-700 mb-1"><i class="fas fa-tasks mr-1"></i>活動例:</p>
-              <ul class="list-disc list-inside text-sm text-gray-700">
-                ${suggestions.auditory_support.activities.map(a => `<li>${a}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-        `
-      }
-      
-      // 体感優位サポートを更新
-      const kinestheticDiv = document.getElementById(`kinesthetic-support-${cardId}`)
-      if (suggestions.kinesthetic_support) {
-        kinestheticDiv.innerHTML = `
-          <p class="text-gray-700 whitespace-pre-wrap mb-2">${suggestions.kinesthetic_support.description}</p>
-          ${suggestions.kinesthetic_support.materials ? `
-            <div class="bg-orange-50 p-3 rounded mt-2">
-              <p class="font-semibold text-orange-700 mb-1"><i class="fas fa-box mr-1"></i>必要な教材:</p>
-              <ul class="list-disc list-inside text-sm text-gray-700">
-                ${suggestions.kinesthetic_support.materials.map(m => `<li>${m}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-          ${suggestions.kinesthetic_support.activities ? `
-            <div class="bg-orange-50 p-3 rounded mt-2">
-              <p class="font-semibold text-orange-700 mb-1"><i class="fas fa-tasks mr-1"></i>活動例:</p>
-              <ul class="list-disc list-inside text-sm text-gray-700">
-                ${suggestions.kinesthetic_support.activities.map(a => `<li>${a}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-        `
-      }
-      
-      // データベースに保存
-      await axios.put(`/api/card/${cardId}`, {
-        visual_support: suggestions.visual_support,
-        auditory_support: suggestions.auditory_support,
-        kinesthetic_support: suggestions.kinesthetic_support,
-        learning_style_notes: suggestions.learning_style_notes
-      })
-      
-      alert('✨ 学習スタイル提案を生成しました！')
-    } else {
-      throw new Error(response.data.error || '生成に失敗しました')
-    }
-  } catch (error) {
-    console.error('学習スタイル提案エラー:', error)
-    alert('❌ 提案の生成に失敗しました。もう一度お試しください。')
-  } finally {
-    button.disabled = false
-    button.innerHTML = originalHTML
-  }
-}
-
-// 学習スタイル編集関数
-async function editLearningStyle(cardId, styleType) {
-  const styleNames = {
-    visual: '視覚優位サポート',
-    auditory: '聴覚優位サポート',
-    kinesthetic: '体感優位サポート'
-  }
-  
-  const currentDiv = document.getElementById(`${styleType}-support-${cardId}`)
-  const currentText = currentDiv.querySelector('p')?.textContent?.trim() || ''
-  
-  const newContent = prompt(`${styleNames[styleType]}を編集してください：`, currentText)
-  
-  if (newContent !== null && newContent !== currentText) {
-    try {
-      const updateData = {}
-      updateData[`${styleType}_support`] = {
-        description: newContent,
-        materials: [],
-        activities: []
-      }
-      
-      const response = await axios.put(`/api/card/${cardId}`, updateData)
-      
-      if (response.data.success) {
-        currentDiv.innerHTML = `<p class="text-gray-700 whitespace-pre-wrap">${newContent}</p>`
-        alert('✅ 更新しました！')
-      } else {
-        throw new Error(response.data.error || '更新に失敗しました')
-      }
-    } catch (error) {
-      console.error('学習スタイル更新エラー:', error)
-      alert('❌ 更新に失敗しました。もう一度お試しください。')
-    }
-  }
-}
-
 // グローバル関数として登録
 window.switchCardTab = switchCardTab
 window.generateSimilarProblem = generateSimilarProblem
-window.suggestLearningStyles = suggestLearningStyles
-window.editLearningStyle = editLearningStyle
 
 // カード詳細モーダルを閉じる
 function closeCardDetail(event) {
