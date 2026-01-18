@@ -57,9 +57,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://68a36042.jiyushindo-gakushu.pages.dev
+- **最新デプロイ**: https://68e0b1ce.jiyushindo-gakushu.pages.dev
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `e462f0b` (画像表示機能 + AI先生プロンプト変更 + ページ初期化修正)
+- **最終コミット**: `065fe50` (セキュリティ修正：漏洩APIキー削除 + 新APIキー設定完了)
 
 ## 🎉 実装完了した全機能
 
