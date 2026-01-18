@@ -2258,7 +2258,7 @@ ${cardContext ? `
 質問「区切りってどういうこと？」
 →「区切りっていうのは、大きな数をわかりやすく分けることだよ。例えば、10000を「10と1000」に分けると計算しやすくなるよね。この問題では、どこで区切ると計算しやすいかな？」`
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyDsrDEO0WuKcNIWwQV0FrkpmJ-vKyZwu3I', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2814,11 +2814,27 @@ app.post('/api/ai/suggest-units', async (c) => {
     }
     
     // レスポンスから単元名を抽出
+    console.log('📝 Gemini レスポンス:', result.content)
+    
     const units = result.content
       .split('\n')
       .map(line => line.trim())
-      .filter(line => line && !line.match(/^[\d\.\-\*]+/) && line.length > 2 && line.length < 50)
+      .filter(line => {
+        // 数字・記号で始まる行を除外、長さチェックを緩和
+        const isValid = line && 
+                       !line.match(/^[\d\.\-\*\#]+\s*$/) && 
+                       line.length > 1 && 
+                       line.length < 100
+        if (line && line.length > 0) {
+          console.log(`  行: "${line}" -> ${isValid ? '✅ 採用' : '❌ 除外'}`)
+        }
+        return isValid
+      })
+      .map(line => line.replace(/^[\d\.\-\*\#\s]+/, '').trim()) // 先頭の番号・記号を削除
+      .filter(line => line.length > 1)
       .slice(0, 10)
+    
+    console.log('✅ 抽出された単元:', units)
     
     return c.json({
       success: true,
@@ -2844,7 +2860,7 @@ app.post('/api/ai/generate-unit', async (c) => {
   const { grade, subject, textbook, unitName, customization, qualityMode } = await c.req.json()
   
   // 環境変数またはハードコードされたAPIキーを使用
-  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyDsrDEO0WuKcNIWwQV0FrkpmJ-vKyZwu3I'
   
   if (!apiKey) {
     console.error('❌ APIキーが設定されていません')
@@ -3227,7 +3243,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
 app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyDsrDEO0WuKcNIWwQV0FrkpmJ-vKyZwu3I'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -3367,7 +3383,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
 app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyDsrDEO0WuKcNIWwQV0FrkpmJ-vKyZwu3I'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -3525,7 +3541,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyDsrDEO0WuKcNIWwQV0FrkpmJ-vKyZwu3I'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -3673,7 +3689,7 @@ app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
 app.post('/api/curriculum/:curriculumId/generate-additional-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
-  const apiKey = env.GEMINI_API_KEY || 'AIzaSyCQpcQXAKYy1BDRgx1yEGJ96Lfsj5gVGKk'
+  const apiKey = env.GEMINI_API_KEY || 'AIzaSyDsrDEO0WuKcNIWwQV0FrkpmJ-vKyZwu3I'
   
   if (!apiKey) {
     return c.json({ error: 'API key not configured' }, 500)
@@ -4949,7 +4965,7 @@ app.post('/api/auth/register', async (c) => {
     const result = await env.DB.prepare(`
       INSERT INTO users (name, email, password_hash, role, class_code, student_number, is_active)
       VALUES (?, ?, ?, ?, ?, ?, 1)
-    `).bind(name, email, passwordHash, role || 'student', class_code, student_number).run()
+    `).bind(name, email, passwordHash, role || 'student', class_code || null, student_number || null).run()
     
     return c.json({
       success: true,
