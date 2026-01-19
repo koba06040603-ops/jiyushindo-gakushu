@@ -1128,11 +1128,11 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://11be1e5c.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://26193fbc.jiyushindo-gakushu.pages.dev ✅
 - **本番URL**: https://jiyushindo-gakushu.pages.dev
-- **テストページ**: https://11be1e5c.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
+- **テストページ**: https://26193fbc.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `3f95959` (デモデータをクリーンアップ - 重複削除済み、正しい学習フロー)
+- **最終コミット**: `f4589f3` (進捗ボード: 各児童の選択コースのカードのみ表示するよう修正)
 
 ## 🔐 デモアカウント
 
