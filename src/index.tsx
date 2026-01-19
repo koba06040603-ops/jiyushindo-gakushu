@@ -8997,39 +8997,34 @@ app.post('/api/media/generate-video', async (c) => {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
           width: 100%; 
-          height: 100vh; 
+          height: 100%; 
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
           font-family: 'Arial', sans-serif;
-          display: flex;
-          align-items: center;
-          justify-content: center;
           overflow: hidden;
         }
         .animation-container { 
-          width: 95%; 
-          height: 95vh; 
+          width: 100%; 
+          height: 100%; 
           position: relative; 
           background: white; 
-          border-radius: 20px; 
-          overflow: visible;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+          overflow: hidden;
         }
         .title { 
           text-align: center; 
-          padding: 30px; 
-          font-size: 36px; 
+          padding: 20px; 
+          font-size: 32px; 
           font-weight: bold; 
           color: #1e40af; 
         }
         .stage {
           position: relative;
           width: 100%;
-          height: calc(100% - 100px);
+          height: 500px;
           padding: 20px;
         }
         .block { 
-          width: 120px; 
-          height: 120px; 
+          width: 100px; 
+          height: 100px; 
           background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); 
           border-radius: 16px; 
           position: absolute; 
@@ -9037,21 +9032,21 @@ app.post('/api/media/generate-video', async (c) => {
           align-items: center; 
           justify-content: center; 
           color: white; 
-          font-size: 42px; 
+          font-size: 36px; 
           font-weight: bold; 
           opacity: 0;
           box-shadow: 0 10px 30px rgba(34, 197, 94, 0.4);
         }
-        .block1 { top: 120px; left: 10%; animation: appear 0.5s 0.5s forwards, move1 1.2s 2.5s forwards; }
-        .block2 { top: 120px; left: 30%; animation: appear 0.5s 1s forwards, move2 1.2s 2.5s forwards; }
-        .block3 { top: 120px; left: 50%; animation: appear 0.5s 1.5s forwards, move3 1.2s 2.5s forwards; }
-        .block4 { top: 120px; left: 70%; animation: appear 0.5s 2s forwards, move4 1.2s 2.5s forwards; }
+        .block1 { top: 50px; left: 10%; animation: appear 0.5s 0.5s forwards, move1 1.2s 2.5s forwards; }
+        .block2 { top: 50px; left: 30%; animation: appear 0.5s 1s forwards, move2 1.2s 2.5s forwards; }
+        .block3 { top: 50px; left: 50%; animation: appear 0.5s 1.5s forwards, move3 1.2s 2.5s forwards; }
+        .block4 { top: 50px; left: 70%; animation: appear 0.5s 2s forwards, move4 1.2s 2.5s forwards; }
         .equation {
           position: absolute;
-          top: 300px;
+          top: 220px;
           left: 50%;
           transform: translateX(-50%);
-          font-size: 56px;
+          font-size: 40px;
           font-weight: bold;
           color: #6b7280;
           opacity: 0;
@@ -9059,10 +9054,10 @@ app.post('/api/media/generate-video', async (c) => {
         }
         .result { 
           position: absolute; 
-          bottom: 100px; 
+          top: 320px; 
           left: 50%; 
           transform: translateX(-50%); 
-          font-size: 72px; 
+          font-size: 64px; 
           font-weight: bold; 
           color: #3b82f6; 
           opacity: 0; 
@@ -9073,10 +9068,10 @@ app.post('/api/media/generate-video', async (c) => {
           0% { opacity: 0; transform: scale(0) rotate(180deg); }
           100% { opacity: 1; transform: scale(1) rotate(0deg); } 
         }
-        @keyframes move1 { to { top: 450px; left: 15%; } }
-        @keyframes move2 { to { top: 450px; left: 35%; } }
-        @keyframes move3 { to { top: 450px; left: 55%; } }
-        @keyframes move4 { to { top: 450px; left: 75%; } }
+        @keyframes move1 { to { top: 180px; left: 15%; } }
+        @keyframes move2 { to { top: 180px; left: 35%; } }
+        @keyframes move3 { to { top: 180px; left: 55%; } }
+        @keyframes move4 { to { top: 180px; left: 75%; } }
         @keyframes equationAppear { 
           0% { opacity: 0; transform: translateX(-50%) scale(0.5); }
           100% { opacity: 1; transform: translateX(-50%) scale(1); } 
@@ -9199,63 +9194,42 @@ app.post('/api/media/generate-interactive', async (c) => {
 })
 
 function generateInteractiveContent(topic: string, type: string): string {
-  // 小数のかけ算シミュレーター
+  // 小数のかけ算シミュレーター - グローバル関数として定義
   return `
     <div class="interactive-simulator bg-white rounded-lg p-4 border-2 border-purple-300">
       <h4 class="font-bold text-purple-800 mb-4 text-center">🧪 小数のかけ算実験</h4>
       <p class="text-center text-sm text-gray-600 mb-4">容器をクリックして0.3Lずつ水を追加しましょう</p>
-      <div class="grid grid-cols-4 gap-2 mb-4" id="containers">
-        ${[1,2,3,4].map(i => `
-          <button onclick="fillContainer(${i})" class="container-btn bg-purple-500 hover:bg-purple-600 text-white p-6 rounded text-center font-bold transition transform hover:scale-105" id="container-${i}">
-            <div class="text-3xl mb-2">🧪</div>
-            <div class="text-xs">容器${i}</div>
-            <div class="text-sm mt-2 filled-amount" style="display:none;">+0.3L</div>
-          </button>
-        `).join('')}
+      <div class="grid grid-cols-4 gap-2 mb-4" id="sim-containers">
+        <button onclick="window.fillSimContainer(1)" class="container-btn bg-purple-500 hover:bg-purple-600 text-white p-6 rounded text-center font-bold transition transform hover:scale-105" id="sim-container-1">
+          <div class="text-3xl mb-2">🧪</div>
+          <div class="text-xs">容器1</div>
+          <div class="text-sm mt-2 filled-amount" style="display:none;">+0.3L</div>
+        </button>
+        <button onclick="window.fillSimContainer(2)" class="container-btn bg-purple-500 hover:bg-purple-600 text-white p-6 rounded text-center font-bold transition transform hover:scale-105" id="sim-container-2">
+          <div class="text-3xl mb-2">🧪</div>
+          <div class="text-xs">容器2</div>
+          <div class="text-sm mt-2 filled-amount" style="display:none;">+0.3L</div>
+        </button>
+        <button onclick="window.fillSimContainer(3)" class="container-btn bg-purple-500 hover:bg-purple-600 text-white p-6 rounded text-center font-bold transition transform hover:scale-105" id="sim-container-3">
+          <div class="text-3xl mb-2">🧪</div>
+          <div class="text-xs">容器3</div>
+          <div class="text-sm mt-2 filled-amount" style="display:none;">+0.3L</div>
+        </button>
+        <button onclick="window.fillSimContainer(4)" class="container-btn bg-purple-500 hover:bg-purple-600 text-white p-6 rounded text-center font-bold transition transform hover:scale-105" id="sim-container-4">
+          <div class="text-3xl mb-2">🧪</div>
+          <div class="text-xs">容器4</div>
+          <div class="text-sm mt-2 filled-amount" style="display:none;">+0.3L</div>
+        </button>
       </div>
       <div class="result-area bg-purple-50 rounded-lg p-4 border-2 border-purple-300">
         <div class="text-center">
           <p class="text-2xl font-bold text-purple-800 mb-2">
-            合計: <span id="total-amount" class="text-4xl">0</span>L
+            合計: <span id="sim-total-amount" class="text-4xl">0</span>L
           </p>
-          <p class="text-lg text-gray-700" id="calculation-display">まだ水を追加していません</p>
+          <p class="text-lg text-gray-700" id="sim-calculation-display">まだ水を追加していません</p>
         </div>
       </div>
     </div>
-    <script>
-      let filledCount = 0;
-      let filledContainers = [];
-      
-      function fillContainer(num) {
-        if (filledContainers.includes(num)) return;
-        
-        const container = document.getElementById('container-' + num);
-        const amountDisplay = container.querySelector('.filled-amount');
-        
-        amountDisplay.style.display = 'block';
-        container.style.backgroundColor = '#8B5CF6';
-        container.style.transform = 'scale(1.1)';
-        setTimeout(() => { container.style.transform = 'scale(1)'; }, 200);
-        
-        filledCount++;
-        filledContainers.push(num);
-        
-        const total = (filledCount * 0.3).toFixed(1);
-        document.getElementById('total-amount').textContent = total;
-        
-        // 計算式を更新
-        const calculation = '0.3 × ' + filledCount + ' = ' + total;
-        document.getElementById('calculation-display').textContent = calculation;
-        
-        if (filledCount === 4) {
-          setTimeout(() => {
-            document.getElementById('calculation-display').textContent = '✅ 正解！ 0.3 × 4 = 1.2 です！';
-            document.getElementById('calculation-display').style.color = '#166534';
-            document.getElementById('calculation-display').style.fontWeight = 'bold';
-          }, 500);
-        }
-      }
-    </script>
   `
 }
 

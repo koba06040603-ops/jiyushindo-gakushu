@@ -13947,10 +13947,62 @@ async function generateKinestheticDemo() {
           <p class="text-sm text-gray-600 bg-purple-50 p-3 rounded mt-3">${response.data.note}</p>
         </div>
       `
+      
+      // インタラクティブシミュレーターの初期化
+      initializeSimulator()
     }
   } catch (error) {
     console.error('インタラクティブ教材生成エラー:', error)
     demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
+  }
+}
+
+// シミュレーター用のグローバル変数と関数
+let simFilledCount = 0
+let simFilledContainers = []
+
+function initializeSimulator() {
+  simFilledCount = 0
+  simFilledContainers = []
+}
+
+window.fillSimContainer = function(num) {
+  if (simFilledContainers.includes(num)) return
+  
+  const container = document.getElementById('sim-container-' + num)
+  if (!container) return
+  
+  const amountDisplay = container.querySelector('.filled-amount')
+  
+  amountDisplay.style.display = 'block'
+  container.style.backgroundColor = '#8B5CF6'
+  container.style.transform = 'scale(1.1)'
+  setTimeout(() => { container.style.transform = 'scale(1)' }, 200)
+  
+  simFilledCount++
+  simFilledContainers.push(num)
+  
+  const total = (simFilledCount * 0.3).toFixed(1)
+  const totalElement = document.getElementById('sim-total-amount')
+  if (totalElement) {
+    totalElement.textContent = total
+  }
+  
+  // 計算式を更新
+  const calculation = '0.3 × ' + simFilledCount + ' = ' + total
+  const calcElement = document.getElementById('sim-calculation-display')
+  if (calcElement) {
+    calcElement.textContent = calculation
+  }
+  
+  if (simFilledCount === 4) {
+    setTimeout(() => {
+      if (calcElement) {
+        calcElement.textContent = '✅ 正解！ 0.3 × 4 = 1.2 です！'
+        calcElement.style.color = '#166534'
+        calcElement.style.fontWeight = 'bold'
+      }
+    }, 500)
   }
 }
 
