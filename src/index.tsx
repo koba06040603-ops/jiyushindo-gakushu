@@ -9012,16 +9012,16 @@ app.post('/api/media/generate-video', async (c) => {
         }
         .title { 
           text-align: center; 
-          padding: 15px; 
-          font-size: 28px; 
+          padding: 10px; 
+          font-size: 24px; 
           font-weight: bold; 
           color: #1e40af; 
         }
         .stage {
           position: relative;
           width: 100%;
-          height: 480px;
-          padding: 10px;
+          height: 520px;
+          padding: 20px 10px;
         }
         .block { 
           width: 100px; 
@@ -9038,13 +9038,13 @@ app.post('/api/media/generate-video', async (c) => {
           opacity: 0;
           box-shadow: 0 10px 30px rgba(34, 197, 94, 0.4);
         }
-        .block1 { top: 50px; left: 10%; animation: appear 0.5s 0.5s forwards, move1 1.2s 2.5s forwards; }
-        .block2 { top: 50px; left: 30%; animation: appear 0.5s 1s forwards, move2 1.2s 2.5s forwards; }
-        .block3 { top: 50px; left: 50%; animation: appear 0.5s 1.5s forwards, move3 1.2s 2.5s forwards; }
-        .block4 { top: 50px; left: 70%; animation: appear 0.5s 2s forwards, move4 1.2s 2.5s forwards; }
+        .block1 { top: 80px; left: 10%; animation: appear 0.5s 0.5s forwards, move1 1.2s 2.5s forwards; }
+        .block2 { top: 80px; left: 30%; animation: appear 0.5s 1s forwards, move2 1.2s 2.5s forwards; }
+        .block3 { top: 80px; left: 50%; animation: appear 0.5s 1.5s forwards, move3 1.2s 2.5s forwards; }
+        .block4 { top: 80px; left: 70%; animation: appear 0.5s 2s forwards, move4 1.2s 2.5s forwards; }
         .equation {
           position: absolute;
-          top: 220px;
+          top: 240px;
           left: 50%;
           transform: translateX(-50%);
           font-size: 36px;
@@ -9055,7 +9055,7 @@ app.post('/api/media/generate-video', async (c) => {
         }
         .result { 
           position: absolute; 
-          top: 310px; 
+          top: 340px; 
           left: 50%; 
           transform: translateX(-50%); 
           font-size: 56px; 
@@ -9223,6 +9223,29 @@ AI音楽生成APIキーを設定する方法：
   try {
     console.log('🎵 AI音楽生成開始（AIML API - MiniMax Music 2.0）...')
     
+    // 歌詞を改善：MiniMax Music 2.0用のフォーマット
+    // 構造タグを使用し、各行を()で区切る
+    const formattedLyrics = `[Intro]
+れいてんさん かける よん について考えよう
+[Verse]
+れいてんさん が よんこ
+ならんで いるよ
+たしてみよう ひとつずつ
+れいてんさん れいてんろく
+[Verse]
+もういっこ たすと
+れいてんきゅう になるね
+さいごに もういっこ
+いってんに だよ
+[Chorus]
+かけざんは たしざんだ
+おなじかずを なんかいも
+ぜろてんさん かける よん
+こたえは いってんに
+[Outro]
+ぜろてんさん かける よん
+こたえは いってんに`
+    
     // AIML API経由でMiniMax Music 2.0を使用
     // https://docs.aimlapi.com/api-references/music-models/minimax/music-2.0
     const generateResponse = await fetch('https://api.aimlapi.com/v2/generate/audio', {
@@ -9233,8 +9256,8 @@ AI音楽生成APIキーを設定する方法：
       },
       body: JSON.stringify({
         model: 'minimax/music-2.0',
-        prompt: style || 'A cheerful educational pop song for children learning math, upbeat and memorable',
-        lyrics: lyrics
+        prompt: style || 'A cheerful and catchy educational pop song for children learning decimal multiplication, upbeat tempo, clear vocals, memorable melody, Japanese children\'s song style',
+        lyrics: formattedLyrics
       })
     })
     
