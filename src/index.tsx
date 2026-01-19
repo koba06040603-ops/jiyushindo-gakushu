@@ -122,6 +122,21 @@ function extractJSON(aiResponse: string): any {
   // 配列・オブジェクト末尾の余分なカンマを削除
   jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1')
   
+  // 未閉じの文字列を検出して修正を試みる
+  let quoteCount = 0
+  for (let i = 0; i < jsonText.length; i++) {
+    if (jsonText[i] === '"' && (i === 0 || jsonText[i-1] !== '\\')) {
+      quoteCount++
+    }
+  }
+  
+  // 引用符の数が奇数の場合、末尾に引用符を追加
+  if (quoteCount % 2 !== 0) {
+    console.warn('⚠️ 未閉じの引用符を検出、修正を試みます')
+    // 最後のオブジェクトまたは配列の閉じ括弧の前に引用符を追加
+    jsonText = jsonText.replace(/([}\]])(\s*)$/, '"$1$2')
+  }
+  
   try {
     return JSON.parse(jsonText)
   } catch (error) {
@@ -139,6 +154,11 @@ function extractJSON(aiResponse: string): any {
         const end = Math.min(jsonText.length, pos + 100)
         console.error(`Error context (pos ${pos}):`, jsonText.substring(start, end))
         console.error(`Character at error position:`, jsonText.charAt(pos), `(code: ${jsonText.charCodeAt(pos)})`)
+        
+        // 周辺の文字も確認
+        for (let i = Math.max(0, pos - 10); i < Math.min(jsonText.length, pos + 10); i++) {
+          console.error(`  pos ${i}: '${jsonText.charAt(i)}' (code: ${jsonText.charCodeAt(i)})`)
+        }
       }
     }
     
