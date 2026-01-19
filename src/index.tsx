@@ -2971,35 +2971,48 @@ app.get('/test-buttons.html', async (c) => {
         </div>
     </div>
     
+    <script>
+        // DOMContentLoaded後に初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            // コンソールログをページに表示
+            const originalLog = console.log
+            const originalError = console.error
+            const logDiv = document.getElementById('console-log')
+            
+            function addLog(message, isError = false) {
+                if (!logDiv) return
+                const line = document.createElement('div')
+                line.textContent = new Date().toLocaleTimeString() + ' - ' + message
+                line.className = isError ? 'text-red-400' : 'text-green-400'
+                logDiv.appendChild(line)
+                logDiv.scrollTop = logDiv.scrollHeight
+            }
+            
+            console.log = function(...args) {
+                originalLog.apply(console, args)
+                addLog(args.join(' '))
+            }
+            
+            console.error = function(...args) {
+                originalError.apply(console, args)
+                addLog(args.join(' '), true)
+            }
+            
+            console.log('✅ テストページ初期化完了')
+        })
+    </script>
+    
     <script src="/static/app.js"></script>
     
     <script>
-        // コンソールログをページに表示
-        const originalLog = console.log
-        const originalError = console.error
-        const logDiv = document.getElementById('console-log')
-        
-        function addLog(message, isError = false) {
-            const line = document.createElement('div')
-            line.textContent = new Date().toLocaleTimeString() + ' - ' + message
-            line.className = isError ? 'text-red-400' : 'text-green-400'
-            logDiv.appendChild(line)
-            logDiv.scrollTop = logDiv.scrollHeight
-        }
-        
-        console.log = function(...args) {
-            originalLog.apply(console, args)
-            addLog(args.join(' '))
-        }
-        
-        console.error = function(...args) {
-            originalError.apply(console, args)
-            addLog(args.join(' '), true)
-        }
-        
-        // グローバル関数の存在チェック
+        // app.js読み込み後にグローバル関数をチェック
         window.addEventListener('load', () => {
             const checkDiv = document.getElementById('function-check')
+            if (!checkDiv) {
+                console.error('❌ function-check 要素が見つかりません')
+                return
+            }
+            
             const functions = [
                 'showProgressBoardSelection',
                 'showDemoWeeklyReport',
@@ -3014,7 +3027,7 @@ app.get('/test-buttons.html', async (c) => {
                 checkDiv.innerHTML += \`<div class="\${color}">\${status} window.\${fname} = \${typeof window[fname]}</div>\`
             })
             
-            console.log('グローバル関数チェック完了')
+            console.log('✅ グローバル関数チェック完了')
         })
         
         // テスト関数
