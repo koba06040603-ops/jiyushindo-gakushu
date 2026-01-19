@@ -2551,12 +2551,17 @@ function setUnderstanding(level) {
 
 // 解答表示
 function showAnswer() {
+  console.log('🔍 showAnswer() called')
   const answerSection = document.getElementById('answerSection')
+  console.log('📦 answerSection element:', answerSection)
   if (answerSection) {
     answerSection.classList.toggle('hidden')
+    console.log('✅ Toggled hidden class. Currently hidden:', answerSection.classList.contains('hidden'))
     if (!answerSection.classList.contains('hidden')) {
       answerSection.scrollIntoView({ behavior: 'smooth' })
     }
+  } else {
+    console.error('❌ answerSection element not found')
   }
 }
 

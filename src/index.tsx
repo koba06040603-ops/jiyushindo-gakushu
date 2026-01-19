@@ -13,6 +13,33 @@ const app = new Hono<{ Bindings: Bindings }>()
 // Durable Object（WebSocket）をエクスポート
 export { ProgressWebSocket } from './websocket'
 
+// JSON抽出ヘルパー（バッククォート対応）
+function extractJSON(aiResponse: string): any {
+  // ```json ... ``` or ``` ... ``` のパターンを抽出
+  let jsonMatch = aiResponse.match(/```(?:json)?\s*\n([\s\S]*?)\n```/)
+  let jsonText = jsonMatch ? jsonMatch[1].trim() : aiResponse.trim()
+  
+  // もしマッチしなければ、バッククォートなしで全体から抽出
+  if (!jsonMatch) {
+    // { ... } または [ ... ] のパターンを抽出
+    const objectMatch = aiResponse.match(/(\{[\s\S]*\})/)
+    const arrayMatch = aiResponse.match(/(\[[\s\S]*\])/)
+    jsonText = (objectMatch || arrayMatch)?.[1]?.trim() || aiResponse.trim()
+  }
+  
+  // 先頭・末尾の余分な文字を削除
+  jsonText = jsonText.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '')
+  
+  try {
+    return JSON.parse(jsonText)
+  } catch (error) {
+    console.error('JSON parse error:', error)
+    console.error('JSON text (first 500 chars):', jsonText.substring(0, 500))
+    console.error('AI response (first 500 chars):', aiResponse.substring(0, 500))
+    throw new Error(`JSON parse failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
 // 履歴記録ヘルパー
 async function recordHistory(
   db: D1Database,
@@ -3365,9 +3392,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
     
     // JSONを抽出
     console.log('AIレスポンス（コース問題）:', aiResponse)
-    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
-    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
-    const problems = JSON.parse(jsonText)
+    const problems = extractJSON(aiResponse)
     console.log('パース結果（コース問題）:', JSON.stringify(problems, null, 2))
     
     // データベースに保存
@@ -3507,9 +3532,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
     
     // JSONを抽出
     console.log('AIレスポンス（評価問題）:', aiResponse)
-    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
-    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
-    const problems = JSON.parse(jsonText)
+    const problems = extractJSON(aiResponse)
     console.log('パース結果（評価問題）:', JSON.stringify(problems, null, 2))
     
     // データベースに保存
@@ -3658,9 +3681,7 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
     
     // JSONを抽出
     console.log('AIレスポンス（導入問題）:', aiResponse)
-    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
-    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
-    const problems = JSON.parse(jsonText)
+    const problems = extractJSON(aiResponse)
     console.log('パース結果（導入問題）:', JSON.stringify(problems, null, 2))
     
     // データベースに保存
@@ -3944,10 +3965,7 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
     }
     
     // JSONを抽出
-    let jsonMatch = aiResponse.match(/```json\n([\s\S]*?)\n```/)
-    let jsonText = jsonMatch ? jsonMatch[1] : aiResponse
-    
-    const additionalProblems = JSON.parse(jsonText)
+    const additionalProblems = extractJSON(aiResponse)
     
     // データベースに保存
     // コース選択問題
@@ -4814,16 +4832,7 @@ app.post('/api/card/:cardId/suggest-learning-styles', async (c) => {
     }
     
     // JSON抽出
-    let jsonMatch = result.content.match(/```json\n([\s\S]*?)\n```/)
-    if (!jsonMatch) {
-      jsonMatch = result.content.match(/```\n([\s\S]*?)\n```/)
-    }
-    if (!jsonMatch) {
-      jsonMatch = result.content.match(/(\{[\s\S]*\})/)
-    }
-    
-    const jsonText = jsonMatch ? jsonMatch[1] : result.content
-    const suggestions = JSON.parse(jsonText)
+    const suggestions = extractJSON(result.content)
     
     return c.json({
       success: true,
@@ -4880,9 +4889,7 @@ app.post('/api/curriculum/:id/regenerate-check-test', async (c) => {
     }
     
     // JSONを抽出
-    let jsonMatch = result.content.match(/```json\n([\s\S]*?)\n```/)
-    let jsonText = jsonMatch ? jsonMatch[1] : result.content
-    const checkTest = JSON.parse(jsonText)
+    const checkTest = extractJSON(result.content)
     
     // データベースに保存
     await env.DB.prepare(`
