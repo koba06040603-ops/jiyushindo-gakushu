@@ -4131,7 +4131,7 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
   
   try {
     // カリキュラム情報取得
-    const curriculumIds = curriculumId2 ? `${curriculumId},${curriculumId2}` : curriculumId
+    const curriculumIds = curriculumId2 ? `${curriculumId},${curriculumId2}` : String(curriculumId)
     const curriculums = []
     
     console.log('📖 カリキュラム情報を取得中...', curriculumIds)
