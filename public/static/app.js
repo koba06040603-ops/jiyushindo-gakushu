@@ -13777,27 +13777,97 @@ async function generateMusicDemo() {
   const demoArea = document.getElementById('auditory-demo-area')
   if (!demoArea) return
   
+  // 曲調選択UIを表示
+  demoArea.innerHTML = `
+    <div class="bg-white p-6 rounded-lg border-2 border-orange-300">
+      <h4 class="font-bold text-orange-800 mb-4 text-center">🎵 音楽の曲調を選んでください</h4>
+      <p class="text-sm text-gray-600 mb-4 text-center">好きな曲調を選んで、学習ソングを生成します</p>
+      
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <button onclick="selectMusicStyle('cheerful-pop')" 
+                class="music-style-btn bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white p-4 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
+          <i class="fas fa-smile text-2xl mb-2"></i>
+          <div>明るいポップ</div>
+          <div class="text-xs opacity-90">元気で楽しい</div>
+        </button>
+        
+        <button onclick="selectMusicStyle('calm-ballad')" 
+                class="music-style-btn bg-gradient-to-r from-blue-400 to-cyan-400 hover:from-blue-500 hover:to-cyan-500 text-white p-4 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
+          <i class="fas fa-heart text-2xl mb-2"></i>
+          <div>やさしいバラード</div>
+          <div class="text-xs opacity-90">ゆったり落ち着く</div>
+        </button>
+        
+        <button onclick="selectMusicStyle('rhythmic-dance')" 
+                class="music-style-btn bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white p-4 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
+          <i class="fas fa-music text-2xl mb-2"></i>
+          <div>リズミカル</div>
+          <div class="text-xs opacity-90">ダンスみたいに</div>
+        </button>
+        
+        <button onclick="selectMusicStyle('acoustic-folk')" 
+                class="music-style-btn bg-gradient-to-r from-green-400 to-teal-400 hover:from-green-500 hover:to-teal-500 text-white p-4 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
+          <i class="fas fa-guitar text-2xl mb-2"></i>
+          <div>アコースティック</div>
+          <div class="text-xs opacity-90">ギターの優しい音</div>
+        </button>
+      </div>
+      
+      <p class="text-xs text-gray-500 text-center">💡 選んだ曲調で、AIが学習ソングを生成します</p>
+    </div>
+  `
+}
+
+// 選択された曲調で音楽を生成
+async function selectMusicStyle(style) {
+  const demoArea = document.getElementById('auditory-demo-area')
+  if (!demoArea) return
+  
+  // 曲調の日本語説明
+  const styleDescriptions = {
+    'cheerful-pop': {
+      name: '明るいポップ',
+      prompt: 'A cheerful and upbeat pop song for children, bright melody, energetic rhythm, happy vocals, Japanese children\'s song style'
+    },
+    'calm-ballad': {
+      name: 'やさしいバラード',
+      prompt: 'A gentle and calm ballad for children, soft melody, slow tempo, soothing vocals, peaceful atmosphere, Japanese lullaby style'
+    },
+    'rhythmic-dance': {
+      name: 'リズミカル',
+      prompt: 'A rhythmic and danceable song for children, catchy beat, fun tempo, energetic vocals, dance-pop style for kids'
+    },
+    'acoustic-folk': {
+      name: 'アコースティック',
+      prompt: 'An acoustic folk song for children, gentle guitar, warm melody, soft vocals, natural and organic sound, Japanese folk style'
+    }
+  }
+  
+  const selectedStyle = styleDescriptions[style]
+  window.selectedMusicStyle = selectedStyle.prompt
+  
   demoArea.innerHTML = `
     <div class="text-center py-4">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-      <p class="mt-2 text-sm text-gray-600">AIが学習ソングを生成中...</p>
+      <p class="mt-2 text-sm text-gray-600">「${selectedStyle.name}」で学習ソングを生成中...</p>
     </div>
   `
   
   try {
     const response = await axios.post('/api/media/generate-music', {
       lyrics: '小数のかけ算の歌',
-      style: 'educational-pop'
+      style: selectedStyle.name
     })
     
     if (response.data.success) {
       demoArea.innerHTML = `
         <div class="bg-white p-4 rounded-lg border-2 border-orange-300">
-          <h4 class="font-bold text-orange-800 mb-3">🎵 AIが生成した学習ソング</h4>
+          <h4 class="font-bold text-orange-800 mb-3">🎵 ${selectedStyle.name}の学習ソング</h4>
           <div class="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-lg mb-3 border-2 border-yellow-300">
             <div class="text-center mb-4">
               <i class="fas fa-music text-6xl text-orange-600 mb-3" id="music-icon"></i>
               <p class="text-lg font-bold text-orange-900 mb-4">🎤 小数のかけ算のうた</p>
+              <p class="text-sm text-gray-600 bg-white px-3 py-1 rounded-full inline-block">曲調: ${selectedStyle.name}</p>
             </div>
             <div class="bg-white p-4 rounded border-2 border-orange-200 mb-4">
               <pre id="lyrics-content" class="text-sm text-gray-700 whitespace-pre-wrap font-sans text-center leading-relaxed">${response.data.lyrics}</pre>
@@ -13812,7 +13882,7 @@ async function generateMusicDemo() {
               </p>
               <ul class="text-xs text-gray-600 space-y-1 ml-4">
                 <li>✅ 歌詞からメロディーとボーカルを自動生成</li>
-                <li>✅ 子ども向けのポップで明るい曲調</li>
+                <li>✅ 選んだ曲調で音楽を生成</li>
                 <li>✅ 約30秒〜2分の学習ソング</li>
                 <li>✅ 覚えやすいリズムとフレーズ</li>
                 <li>💰 料金: 約$0.015-0.02 per call</li>
@@ -13829,9 +13899,15 @@ async function generateMusicDemo() {
                 <i class="fas fa-stop mr-2"></i>停止
               </button>
               <div class="mt-3">
-                <button onclick="generateRealSunoMusic()" 
+                <button onclick="generateRealSunoMusicWithStyle()" 
                         class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold transition shadow-lg">
-                  <i class="fas fa-magic mr-2"></i>🎤 AIで実際の曲と声を生成
+                  <i class="fas fa-magic mr-2"></i>🎤 「${selectedStyle.name}」でAI音楽生成
+                </button>
+              </div>
+              <div class="mt-2">
+                <button onclick="generateMusicDemo()" 
+                        class="text-sm text-gray-600 hover:text-gray-800 underline">
+                  <i class="fas fa-redo mr-1"></i>曲調を変更する
                 </button>
               </div>
             </div>
@@ -14110,6 +14186,106 @@ async function generateRealSunoMusic() {
 }
 
 window.generateRealSunoMusic = generateRealSunoMusic
+
+// 選択した曲調でAI音楽を生成
+async function generateRealSunoMusicWithStyle() {
+  const demoArea = document.getElementById('auditory-demo-area')
+  if (!demoArea) return
+  
+  const musicStyle = window.selectedMusicStyle || 'A cheerful educational pop song for children'
+  
+  demoArea.innerHTML = `
+    <div class="text-center py-8">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-purple-600 mb-4"></div>
+      <p class="text-lg font-bold text-purple-800">🎤 AIが実際の曲を生成中...</p>
+      <p class="text-sm text-gray-600 mt-2">選んだ曲調で、メロディーとボーカルを生成しています...</p>
+      <p class="text-xs text-gray-500 mt-1">この処理には30秒〜1分程度かかります</p>
+    </div>
+  `
+  
+  try {
+    const response = await axios.post('/api/media/generate-suno-music', {
+      lyrics: window.musicLyrics || '小数のかけ算の歌',
+      style: musicStyle
+    })
+    
+    if (response.data.success) {
+      demoArea.innerHTML = `
+        <div class="bg-white p-4 rounded-lg border-2 border-purple-300">
+          <h4 class="font-bold text-purple-800 mb-3">🎤 AIが生成した学習ソング</h4>
+          <div class="mb-4">
+            <audio controls class="w-full">
+              <source src="${response.data.musicUrl}" type="audio/mpeg">
+            </audio>
+          </div>
+          <div class="bg-purple-50 p-4 rounded mb-3">
+            <h5 class="font-bold text-sm mb-2">歌詞:</h5>
+            <pre class="text-sm whitespace-pre-wrap">${response.data.lyrics}</pre>
+          </div>
+          <p class="text-sm text-gray-600 bg-purple-50 p-3 rounded">${response.data.note}</p>
+          <div class="mt-3 text-center">
+            <button onclick="generateMusicDemo()" 
+                    class="text-sm text-gray-600 hover:text-gray-800 underline">
+              <i class="fas fa-redo mr-1"></i>曲調を変更して再生成
+            </button>
+          </div>
+        </div>
+      `
+    } else {
+      // APIキーが未設定の場合
+      demoArea.innerHTML = `
+        <div class="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-400">
+          <h4 class="font-bold text-yellow-800 mb-3">
+            <i class="fas fa-key mr-2"></i>AI音楽生成APIキーが必要です
+          </h4>
+          <div class="bg-white p-4 rounded mb-3 text-left">
+            <h5 class="font-bold text-sm mb-2">💡 推奨サービス：AIML API</h5>
+            <ul class="text-sm text-gray-700 space-y-2 mb-3">
+              <li>✅ Suno相当の高品質AI音楽生成</li>
+              <li>✅ 無料トライアルあり</li>
+              <li>✅ 約$0.015-0.02 per call</li>
+              <li>✅ 簡単な統合</li>
+            </ul>
+            <h5 class="font-bold text-sm mb-2">設定方法：</h5>
+            <pre class="text-xs bg-gray-100 p-3 rounded overflow-x-auto">${response.data.instructions}</pre>
+          </div>
+          <p class="text-sm text-gray-700">
+            <strong>現在はデモ音のみ利用可能です。</strong><br>
+            AIML APIキーを設定すると、実際のAI生成音楽が再生できます。
+          </p>
+          <div class="mt-3">
+            <a href="https://aimlapi.com" target="_blank" 
+               class="inline-block bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-bold">
+              AIML APIを始める →
+            </a>
+          </div>
+        </div>
+      `
+    }
+  } catch (error) {
+    console.error('AI音楽生成エラー:', error)
+    demoArea.innerHTML = `
+      <div class="bg-red-50 p-6 rounded-lg border-2 border-red-400">
+        <h4 class="font-bold text-red-800 mb-3">
+          <i class="fas fa-exclamation-triangle mr-2"></i>エラーが発生しました
+        </h4>
+        <p class="text-sm text-gray-700 mb-3">${error.message}</p>
+        <p class="text-sm text-gray-600">
+          <strong>現在はデモ音のみ利用可能です。</strong><br>
+          AIML APIキーを設定すると、実際のAI生成音楽が利用できます。
+        </p>
+        <div class="mt-3">
+          <a href="https://aimlapi.com/suno-ai-api" target="_blank" 
+             class="inline-block bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-bold">
+            AIML API ドキュメント →
+          </a>
+        </div>
+      </div>
+    `
+  }
+}
+
+window.generateRealSunoMusicWithStyle = generateRealSunoMusicWithStyle
 
 console.log('✅ Phase 17-19: 深層学習・マルチモーダル・大規模展開 機能読み込み完了')
 

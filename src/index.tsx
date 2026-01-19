@@ -9012,16 +9012,17 @@ app.post('/api/media/generate-video', async (c) => {
         }
         .title { 
           text-align: center; 
-          padding: 10px; 
-          font-size: 24px; 
+          padding: 5px; 
+          font-size: 20px; 
           font-weight: bold; 
           color: #1e40af; 
+          margin-bottom: 10px;
         }
         .stage {
           position: relative;
           width: 100%;
-          height: 520px;
-          padding: 20px 10px;
+          height: 560px;
+          padding: 5px 10px;
         }
         .block { 
           width: 100px; 
@@ -9038,13 +9039,13 @@ app.post('/api/media/generate-video', async (c) => {
           opacity: 0;
           box-shadow: 0 10px 30px rgba(34, 197, 94, 0.4);
         }
-        .block1 { top: 80px; left: 10%; animation: appear 0.5s 0.5s forwards, move1 1.2s 2.5s forwards; }
-        .block2 { top: 80px; left: 30%; animation: appear 0.5s 1s forwards, move2 1.2s 2.5s forwards; }
-        .block3 { top: 80px; left: 50%; animation: appear 0.5s 1.5s forwards, move3 1.2s 2.5s forwards; }
-        .block4 { top: 80px; left: 70%; animation: appear 0.5s 2s forwards, move4 1.2s 2.5s forwards; }
+        .block1 { top: 40px; left: 5%; animation: appear 0.5s 0.5s forwards, move1 1.2s 2.5s forwards; }
+        .block2 { top: 40px; left: 27%; animation: appear 0.5s 1s forwards, move2 1.2s 2.5s forwards; }
+        .block3 { top: 40px; left: 49%; animation: appear 0.5s 1.5s forwards, move3 1.2s 2.5s forwards; }
+        .block4 { top: 40px; left: 71%; animation: appear 0.5s 2s forwards, move4 1.2s 2.5s forwards; }
         .equation {
           position: absolute;
-          top: 240px;
+          top: 280px;
           left: 50%;
           transform: translateX(-50%);
           font-size: 36px;
@@ -9055,7 +9056,7 @@ app.post('/api/media/generate-video', async (c) => {
         }
         .result { 
           position: absolute; 
-          top: 340px; 
+          top: 400px; 
           left: 50%; 
           transform: translateX(-50%); 
           font-size: 56px; 
@@ -9069,10 +9070,10 @@ app.post('/api/media/generate-video', async (c) => {
           0% { opacity: 0; transform: scale(0) rotate(180deg); }
           100% { opacity: 1; transform: scale(1) rotate(0deg); } 
         }
-        @keyframes move1 { to { top: 150px; left: 15%; } }
-        @keyframes move2 { to { top: 150px; left: 35%; } }
-        @keyframes move3 { to { top: 150px; left: 55%; } }
-        @keyframes move4 { to { top: 150px; left: 75%; } }
+        @keyframes move1 { to { top: 180px; left: 12%; } }
+        @keyframes move2 { to { top: 180px; left: 34%; } }
+        @keyframes move3 { to { top: 180px; left: 56%; } }
+        @keyframes move4 { to { top: 180px; left: 78%; } }
         @keyframes equationAppear { 
           0% { opacity: 0; transform: translateX(-50%) scale(0.5); }
           100% { opacity: 1; transform: translateX(-50%) scale(1); } 
