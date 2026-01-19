@@ -72,9 +72,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://779a72c2.jiyushindo-gakushu.pages.dev
+- **最新デプロイ**: https://d904238d.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `46791f0` (状態機械式JSONパーサー実装 - 完全動作確認済み)
+- **最終コミット**: `fb555d3` (単元候補生成フィルタリング改善 - 10個の単元名を確実に返す)
 
 ## 🎉 実装完了した全機能
 
