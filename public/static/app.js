@@ -9868,13 +9868,16 @@ function generateCardProgressBar(cardProgress) {
     return '<div class="bg-gray-200 h-8 rounded flex items-center justify-center text-xs text-gray-500">未開始</div>'
   }
 
-  // 各児童は1つのコースのみ選択（6枚）
-  const totalCards = 6
-  const completed = cardProgress.filter(c => c.status === 'completed').length
-  const percentComplete = Math.round((completed / totalCards) * 100)
+  // 各児童が選択した1つのコースのカードのみを使用
+  // 同じcourse_levelのカードのみをカウント
+  const courseLevel = cardProgress[0]?.course_level || 'standard'
+  const courseCards = cardProgress.filter(c => c.course_level === courseLevel)
+  
+  const totalCards = courseCards.length // 実際のカード数を使用
+  const completed = courseCards.filter(c => c.status === 'completed').length
+  const percentComplete = totalCards > 0 ? Math.round((completed / totalCards) * 100) : 0
 
   // コース別に色分け
-  const courseLevel = cardProgress[0]?.course_level || 'standard'
   const courseColors = {
     'basic': 'bg-green-500',
     'standard': 'bg-blue-500',
