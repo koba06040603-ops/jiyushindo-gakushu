@@ -4327,6 +4327,10 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
   }
 }
 
+// グローバルスコープに登録
+window.loadProgressBoard = loadProgressBoard
+console.log('✅ loadProgressBoard をグローバルに登録しました')
+
 // 進捗バー生成
 function generateProgressBars(studentProgress, courses) {
   let html = ''
