@@ -13580,13 +13580,19 @@ async function generateVideoDemo() {
       demoArea.innerHTML = `
         <div class="bg-white p-4 rounded-lg border-2 border-green-300">
           <h4 class="font-bold text-green-800 mb-3">🎬 AIが生成したアニメーション</h4>
-          <div class="bg-gray-100 rounded-lg overflow-hidden mb-3 shadow-lg">
+          <div class="bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg overflow-hidden mb-3 shadow-lg" style="height: 500px;">
             <iframe srcdoc="${response.data.animationHtml.replace(/"/g, '&quot;')}" 
-                    style="width: 100%; height: 450px; border: none;">
+                    style="width: 100%; height: 100%; border: none; display: block;">
             </iframe>
           </div>
+          <div class="flex gap-2 mb-3">
+            <button onclick="document.querySelector('#visual-demo-area iframe').contentWindow.location.reload()" 
+                    class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold transition">
+              <i class="fas fa-redo mr-2"></i>アニメーションを再生
+            </button>
+          </div>
           <p class="text-sm text-gray-600 bg-blue-50 p-3 rounded">${response.data.note}</p>
-          <p class="text-xs text-gray-500 mt-2">💡 アニメーションは自動的に再生されます（約4秒）</p>
+          <p class="text-xs text-gray-500 mt-2">💡 アニメーションは約5秒間再生されます</p>
         </div>
       `
     }
@@ -13614,26 +13620,129 @@ async function generateAudioDemo() {
     })
     
     if (response.data.success) {
+      const scriptLines = response.data.scriptText.split('\n').filter(line => line.trim())
+      
       demoArea.innerHTML = `
         <div class="bg-white p-4 rounded-lg border-2 border-orange-300">
           <h4 class="font-bold text-orange-800 mb-3">🎙️ AIが生成した音声解説</h4>
           <div class="bg-orange-50 p-4 rounded-lg mb-3">
             <div class="text-center mb-3">
-              <i class="fas fa-volume-up text-5xl text-orange-600"></i>
+              <i class="fas fa-volume-up text-5xl text-orange-600 mb-3" id="speaker-icon"></i>
+              <div>
+                <button onclick="speakAudioScript()" id="speak-button"
+                        class="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg">
+                  <i class="fas fa-play mr-2"></i>音声を再生
+                </button>
+                <button onclick="stopAudioScript()" id="stop-button" style="display:none;"
+                        class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg ml-2">
+                  <i class="fas fa-stop mr-2"></i>停止
+                </button>
+              </div>
             </div>
             <div class="bg-white p-4 rounded border-2 border-orange-200 mb-3">
-              <pre class="text-sm text-gray-700 whitespace-pre-wrap font-sans">${response.data.scriptText}</pre>
+              <div id="script-content" class="text-sm text-gray-700 space-y-2">
+                ${scriptLines.map((line, index) => `
+                  <p id="line-${index}" class="transition-all duration-300">${line}</p>
+                `).join('')}
+              </div>
             </div>
           </div>
           <p class="text-sm text-gray-600 bg-orange-50 p-3 rounded">${response.data.note}</p>
-          <p class="text-xs text-gray-500 mt-2">💡 実際のシステムでは、この読み上げ音声が自動生成されます</p>
+          <p class="text-xs text-gray-500 mt-2">💡 「音声を再生」ボタンをクリックすると、ブラウザの音声合成機能で読み上げます</p>
         </div>
       `
+      
+      // スクリプトデータを保存
+      window.audioScriptData = scriptLines
     }
   } catch (error) {
     console.error('音声生成エラー:', error)
     demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
   }
+}
+
+// 音声読み上げ機能
+let speechSynthesis = window.speechSynthesis
+let currentUtterance = null
+let currentLineIndex = 0
+
+function speakAudioScript() {
+  if (!window.audioScriptData) return
+  
+  // ボタン切り替え
+  document.getElementById('speak-button').style.display = 'none'
+  document.getElementById('stop-button').style.display = 'inline-block'
+  
+  currentLineIndex = 0
+  speakNextLine()
+}
+
+function speakNextLine() {
+  if (!window.audioScriptData || currentLineIndex >= window.audioScriptData.length) {
+    stopAudioScript()
+    return
+  }
+  
+  const line = window.audioScriptData[currentLineIndex]
+  const lineElement = document.getElementById(`line-${currentLineIndex}`)
+  
+  // 現在の行をハイライト
+  if (lineElement) {
+    document.querySelectorAll('#script-content p').forEach(p => {
+      p.style.backgroundColor = ''
+      p.style.fontWeight = 'normal'
+      p.style.transform = 'scale(1)'
+    })
+    lineElement.style.backgroundColor = '#fed7aa'
+    lineElement.style.fontWeight = 'bold'
+    lineElement.style.transform = 'scale(1.05)'
+    lineElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+  
+  // スピーカーアイコンをアニメーション
+  const icon = document.getElementById('speaker-icon')
+  if (icon) {
+    icon.classList.add('animate-pulse')
+  }
+  
+  currentUtterance = new SpeechSynthesisUtterance(line)
+  currentUtterance.lang = 'ja-JP'
+  currentUtterance.rate = 0.9
+  currentUtterance.pitch = 1.1
+  
+  currentUtterance.onend = () => {
+    currentLineIndex++
+    setTimeout(() => speakNextLine(), 500)
+  }
+  
+  speechSynthesis.speak(currentUtterance)
+}
+
+function stopAudioScript() {
+  speechSynthesis.cancel()
+  
+  // ボタンを元に戻す
+  if (document.getElementById('speak-button')) {
+    document.getElementById('speak-button').style.display = 'inline-block'
+  }
+  if (document.getElementById('stop-button')) {
+    document.getElementById('stop-button').style.display = 'none'
+  }
+  
+  // ハイライトを解除
+  document.querySelectorAll('#script-content p').forEach(p => {
+    p.style.backgroundColor = ''
+    p.style.fontWeight = 'normal'
+    p.style.transform = 'scale(1)'
+  })
+  
+  // アイコンのアニメーションを停止
+  const icon = document.getElementById('speaker-icon')
+  if (icon) {
+    icon.classList.remove('animate-pulse')
+  }
+  
+  currentLineIndex = 0
 }
 
 async function generateMusicDemo() {
@@ -13659,20 +13768,110 @@ async function generateMusicDemo() {
           <h4 class="font-bold text-orange-800 mb-3">🎵 AIが生成した学習ソング</h4>
           <div class="bg-orange-50 p-4 rounded-lg mb-3">
             <div class="text-center mb-3">
-              <i class="fas fa-music text-5xl text-orange-600"></i>
+              <i class="fas fa-music text-5xl text-orange-600 mb-3" id="music-icon"></i>
+              <div>
+                <button onclick="playMusicDemo()" id="play-music-button"
+                        class="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg">
+                  <i class="fas fa-play mr-2"></i>歌を再生
+                </button>
+                <button onclick="stopMusicDemo()" id="stop-music-button" style="display:none;"
+                        class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg ml-2">
+                  <i class="fas fa-stop mr-2"></i>停止
+                </button>
+              </div>
             </div>
             <div class="bg-white p-4 rounded border-2 border-orange-200">
-              <pre class="text-sm text-gray-700 whitespace-pre-wrap font-sans text-center">${response.data.lyrics}</pre>
+              <pre id="lyrics-content" class="text-sm text-gray-700 whitespace-pre-wrap font-sans text-center">${response.data.lyrics}</pre>
             </div>
           </div>
           <p class="text-sm text-gray-600 bg-orange-50 p-3 rounded">${response.data.note}</p>
-          <p class="text-xs text-gray-500 mt-2">💡 実際のシステムでは、このメロディーとボーカルが自動生成されます</p>
+          <p class="text-xs text-gray-500 mt-2">💡 「歌を再生」ボタンをクリックすると、メロディーと共に歌詞が流れます</p>
         </div>
       `
+      
+      window.musicLyrics = response.data.lyrics
     }
   } catch (error) {
     console.error('音楽生成エラー:', error)
     demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
+  }
+}
+
+// 音楽再生機能（Web Audio APIでシンプルなメロディー生成）
+let audioContext = null
+let musicPlaying = false
+
+function playMusicDemo() {
+  if (musicPlaying) return
+  
+  musicPlaying = true
+  document.getElementById('play-music-button').style.display = 'none'
+  document.getElementById('stop-music-button').style.display = 'inline-block'
+  document.getElementById('music-icon').classList.add('animate-bounce')
+  
+  // AudioContext初期化
+  audioContext = new (window.AudioContext || window.webkitAudioContext)()
+  
+  // シンプルなメロディーを再生
+  const notes = [
+    { freq: 523.25, duration: 0.5 }, // C5
+    { freq: 587.33, duration: 0.5 }, // D5
+    { freq: 659.25, duration: 0.5 }, // E5
+    { freq: 698.46, duration: 0.5 }, // F5
+    { freq: 783.99, duration: 0.5 }, // G5
+    { freq: 783.99, duration: 0.5 }, // G5
+    { freq: 659.25, duration: 0.5 }, // E5
+    { freq: 523.25, duration: 1.0 }, // C5
+  ]
+  
+  let currentTime = audioContext.currentTime
+  
+  notes.forEach(note => {
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    oscillator.frequency.value = note.freq
+    oscillator.type = 'sine'
+    
+    gainNode.gain.setValueAtTime(0, currentTime)
+    gainNode.gain.linearRampToValueAtTime(0.3, currentTime + 0.01)
+    gainNode.gain.linearRampToValueAtTime(0, currentTime + note.duration)
+    
+    oscillator.start(currentTime)
+    oscillator.stop(currentTime + note.duration)
+    
+    currentTime += note.duration
+  })
+  
+  // 再生終了後の処理
+  setTimeout(() => {
+    if (musicPlaying) {
+      stopMusicDemo()
+    }
+  }, currentTime * 1000)
+}
+
+function stopMusicDemo() {
+  musicPlaying = false
+  
+  if (audioContext) {
+    audioContext.close()
+    audioContext = null
+  }
+  
+  if (document.getElementById('play-music-button')) {
+    document.getElementById('play-music-button').style.display = 'inline-block'
+  }
+  if (document.getElementById('stop-music-button')) {
+    document.getElementById('stop-music-button').style.display = 'none'
+  }
+  
+  const icon = document.getElementById('music-icon')
+  if (icon) {
+    icon.classList.remove('animate-bounce')
   }
 }
 
