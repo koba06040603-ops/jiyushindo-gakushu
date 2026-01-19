@@ -8919,4 +8919,119 @@ app.get('/proposal', (c) => {
 </html>`)
 })
 
+// メディア生成API - 画像生成
+app.post('/api/media/generate-image', async (c) => {
+  const { prompt, style } = await c.req.json()
+  
+  // Note: 実際の画像生成は外部サービス（Stability AI、DALL-E等）が必要
+  // ここではモックレスポンスを返す
+  return c.json({
+    success: true,
+    imageUrl: 'https://via.placeholder.com/600x400/4CAF50/ffffff?text=0.3+x+4+%3D+1.2',
+    prompt: prompt,
+    style: style,
+    note: '実際のシステムでは生成AIが画像を作成します'
+  })
+})
+
+// メディア生成API - 動画生成
+app.post('/api/media/generate-video', async (c) => {
+  const { prompt, duration } = await c.req.json()
+  
+  // Note: 実際の動画生成は外部サービス（Runway、Pika等）が必要
+  // ここではモックレスポンスを返す
+  return c.json({
+    success: true,
+    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    thumbnailUrl: 'https://via.placeholder.com/600x400/2196F3/ffffff?text=Animation',
+    prompt: prompt,
+    duration: duration || 5,
+    note: '実際のシステムでは生成AIが動画を作成します'
+  })
+})
+
+// メディア生成API - 音声生成
+app.post('/api/media/generate-audio', async (c) => {
+  const { text, voice } = await c.req.json()
+  
+  // Note: 実際の音声生成は外部サービス（ElevenLabs、Google TTS等）が必要
+  // ここではモックレスポンスを返す
+  return c.json({
+    success: true,
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    text: text,
+    voice: voice || 'default',
+    note: '実際のシステムでは生成AIが音声を作成します'
+  })
+})
+
+// メディア生成API - 音楽生成
+app.post('/api/media/generate-music', async (c) => {
+  const { lyrics, style } = await c.req.json()
+  
+  // Note: 実際の音楽生成は外部サービス（Suno、MusicGen等）が必要
+  // ここではモックレスポンスを返す
+  return c.json({
+    success: true,
+    musicUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+    lyrics: lyrics,
+    style: style || 'educational',
+    note: '実際のシステムでは生成AIが音楽を作成します'
+  })
+})
+
+// メディア生成API - インタラクティブ教材生成
+app.post('/api/media/generate-interactive', async (c) => {
+  const { topic, interactionType } = await c.req.json()
+  
+  return c.json({
+    success: true,
+    interactiveHtml: generateInteractiveContent(topic, interactionType),
+    topic: topic,
+    interactionType: interactionType,
+    note: '実際のシステムでは生成AIがインタラクティブ教材を作成します'
+  })
+})
+
+function generateInteractiveContent(topic: string, type: string): string {
+  // 小数のかけ算シミュレーター
+  return `
+    <div class="interactive-simulator bg-white rounded-lg p-4 border-2 border-purple-300">
+      <h4 class="font-bold text-purple-800 mb-4 text-center">実験シミュレーター</h4>
+      <div class="grid grid-cols-4 gap-2 mb-4" id="containers">
+        ${[1,2,3,4].map(i => `
+          <button onclick="fillContainer(${i})" class="container-btn bg-purple-500 hover:bg-purple-600 text-white p-6 rounded text-center font-bold transition transform hover:scale-105" id="container-${i}">
+            <div class="text-3xl mb-2">🧪</div>
+            <div class="text-xs">容器${i}</div>
+            <div class="text-sm mt-2 filled-amount" style="display:none;">0.3L</div>
+          </button>
+        `).join('')}
+      </div>
+      <div class="result-area bg-purple-50 rounded-lg p-4 border-2 border-purple-300 text-center">
+        <p class="text-lg font-bold text-purple-800 mb-2">合計: <span id="total-amount">0</span>L</p>
+        <p class="text-sm text-gray-600">容器をクリックして0.3Lずつ追加してみましょう</p>
+      </div>
+    </div>
+    <script>
+      let filledCount = 0;
+      function fillContainer(num) {
+        const container = document.getElementById('container-' + num);
+        const amountDisplay = container.querySelector('.filled-amount');
+        if (amountDisplay.style.display === 'none') {
+          amountDisplay.style.display = 'block';
+          container.style.backgroundColor = '#8B5CF6';
+          filledCount++;
+          document.getElementById('total-amount').textContent = (filledCount * 0.3).toFixed(1);
+          
+          if (filledCount === 4) {
+            setTimeout(() => {
+              alert('正解！ 0.3 × 4 = 1.2 です！');
+            }, 300);
+          }
+        }
+      }
+    </script>
+  `
+}
+
 export default app

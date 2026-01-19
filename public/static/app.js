@@ -13534,36 +13534,42 @@ async function generateVisualDemo() {
   demoArea.innerHTML = `
     <div class="text-center py-4">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      <p class="mt-2 text-sm text-gray-600">画像を生成中...</p>
+      <p class="mt-2 text-sm text-gray-600">AIが画像を生成中...</p>
     </div>
   `
   
   try {
-    // 画像生成APIを呼び出し（サンプル用にモック）
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    const response = await axios.post('/api/media/generate-image', {
+      prompt: '小数のかけ算 0.3 × 4 を視覚的に表現した図解。4つの0.3を並べて合計1.2を示す',
+      style: 'educational-diagram'
+    })
     
-    demoArea.innerHTML = `
-      <div class="bg-white p-4 rounded-lg border-2 border-green-300">
-        <h4 class="font-bold text-green-800 mb-2">🎨 生成された図解</h4>
-        <div class="bg-gradient-to-r from-green-100 to-blue-100 p-6 rounded-lg">
-          <div class="text-center mb-4">
-            <p class="text-2xl font-bold mb-2">0.3 × 4 = 1.2</p>
+    if (response.data.success) {
+      demoArea.innerHTML = `
+        <div class="bg-white p-4 rounded-lg border-2 border-green-300">
+          <h4 class="font-bold text-green-800 mb-2">🎨 生成された図解</h4>
+          <img src="${response.data.imageUrl}" alt="生成された図解" class="w-full rounded-lg mb-2">
+          <div class="bg-gradient-to-r from-green-100 to-blue-100 p-4 rounded-lg">
+            <div class="text-center mb-3">
+              <p class="text-2xl font-bold mb-2">0.3 × 4 = 1.2</p>
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+              ${[1,2,3,4].map(i => `
+                <div class="bg-green-500 text-white p-4 rounded text-center font-bold">
+                  0.3
+                </div>
+              `).join('')}
+            </div>
+            <div class="mt-3 text-center">
+              <p class="text-lg">0.3 + 0.3 + 0.3 + 0.3 = 1.2</p>
+            </div>
           </div>
-          <div class="grid grid-cols-4 gap-2">
-            ${[1,2,3,4].map(i => `
-              <div class="bg-green-500 text-white p-6 rounded text-center font-bold">
-                0.3
-              </div>
-            `).join('')}
-          </div>
-          <div class="mt-4 text-center">
-            <p class="text-lg">0.3 + 0.3 + 0.3 + 0.3 = 1.2</p>
-          </div>
+          <p class="mt-2 text-sm text-gray-600">${response.data.note}</p>
         </div>
-        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じた図解を自動生成します</p>
-      </div>
-    `
+      `
+    }
   } catch (error) {
+    console.error('画像生成エラー:', error)
     demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
   }
 }
@@ -13575,29 +13581,36 @@ async function generateVideoDemo() {
   demoArea.innerHTML = `
     <div class="text-center py-4">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      <p class="mt-2 text-sm text-gray-600">動画を生成中...</p>
+      <p class="mt-2 text-sm text-gray-600">AIが動画を生成中...</p>
     </div>
   `
   
   try {
-    await new Promise(resolve => setTimeout(resolve, 3000))
+    const response = await axios.post('/api/media/generate-video', {
+      prompt: '小数のかけ算 0.3 × 4 のアニメーション。0.3が4つ集まって1.2になる様子を動画で表現',
+      duration: 5
+    })
     
-    demoArea.innerHTML = `
-      <div class="bg-white p-4 rounded-lg border-2 border-green-300">
-        <h4 class="font-bold text-green-800 mb-2">🎬 生成されたアニメーション</h4>
-        <div class="bg-gray-900 rounded-lg overflow-hidden">
-          <div class="aspect-video bg-gradient-to-r from-green-400 to-blue-500 flex items-center justify-center">
-            <div class="text-white text-center">
-              <i class="fas fa-play-circle text-6xl mb-4"></i>
-              <p class="text-xl font-bold">小数のかけ算アニメーション</p>
-              <p class="text-sm mt-2">0.3が4つ集まる様子を動画で表現</p>
-            </div>
+    if (response.data.success) {
+      demoArea.innerHTML = `
+        <div class="bg-white p-4 rounded-lg border-2 border-green-300">
+          <h4 class="font-bold text-green-800 mb-2">🎬 生成されたアニメーション</h4>
+          <div class="bg-gray-900 rounded-lg overflow-hidden mb-2">
+            <video controls class="w-full" poster="${response.data.thumbnailUrl}">
+              <source src="${response.data.videoUrl}" type="video/mp4">
+              お使いのブラウザは動画タグをサポートしていません。
+            </video>
           </div>
+          <div class="bg-gradient-to-r from-green-400 to-blue-500 text-white p-4 rounded-lg text-center">
+            <p class="text-xl font-bold">小数のかけ算アニメーション</p>
+            <p class="text-sm mt-2">0.3が4つ集まる様子を動画で表現</p>
+          </div>
+          <p class="mt-2 text-sm text-gray-600">${response.data.note}</p>
         </div>
-        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じたアニメーションを自動生成します</p>
-      </div>
-    `
+      `
+    }
   } catch (error) {
+    console.error('動画生成エラー:', error)
     demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
   }
 }
@@ -13609,36 +13622,41 @@ async function generateAudioDemo() {
   demoArea.innerHTML = `
     <div class="text-center py-4">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-      <p class="mt-2 text-sm text-gray-600">音声を生成中...</p>
+      <p class="mt-2 text-sm text-gray-600">AIが音声を生成中...</p>
     </div>
   `
   
   try {
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    const response = await axios.post('/api/media/generate-audio', {
+      text: 'れいてんさん かける よん について考えましょう。れいてんさん が よん個 あります。れいてんさん たす れいてんさん たす れいてんさん たす れいてんさん。こたえは いってんに です。',
+      voice: 'female-teacher'
+    })
     
-    demoArea.innerHTML = `
-      <div class="bg-white p-4 rounded-lg border-2 border-orange-300">
-        <h4 class="font-bold text-orange-800 mb-2">🎙️ 生成された音声解説</h4>
-        <div class="bg-orange-50 p-6 rounded-lg">
-          <div class="text-center mb-4">
-            <i class="fas fa-volume-up text-5xl text-orange-600"></i>
+    if (response.data.success) {
+      demoArea.innerHTML = `
+        <div class="bg-white p-4 rounded-lg border-2 border-orange-300">
+          <h4 class="font-bold text-orange-800 mb-2">🎙️ 生成された音声解説</h4>
+          <div class="bg-orange-50 p-6 rounded-lg mb-3">
+            <div class="text-center mb-4">
+              <i class="fas fa-volume-up text-5xl text-orange-600"></i>
+            </div>
+            <audio controls class="w-full mb-4">
+              <source src="${response.data.audioUrl}" type="audio/mpeg">
+              お使いのブラウザは音声タグをサポートしていません。
+            </audio>
+            <div class="space-y-2">
+              <p class="text-lg">🔊 「れいてんさん かける よん について考えましょう」</p>
+              <p class="text-lg">🔊 「れいてんさん が よん個 あります」</p>
+              <p class="text-lg">🔊 「れいてんさん たす れいてんさん たす れいてんさん たす れいてんさん」</p>
+              <p class="text-lg">🔊 「こたえは いってんに です」</p>
+            </div>
           </div>
-          <div class="space-y-2">
-            <p class="text-lg">🔊 「れいてんさん かける よん について考えましょう」</p>
-            <p class="text-lg">🔊 「れいてんさん が よん個 あります」</p>
-            <p class="text-lg">🔊 「れいてんさん たす れいてんさん たす れいてんさん たす れいてんさん」</p>
-            <p class="text-lg">🔊 「こたえは いってんに です」</p>
-          </div>
-          <div class="mt-4 text-center">
-            <button class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-full">
-              <i class="fas fa-play mr-2"></i>音声を再生
-            </button>
-          </div>
+          <p class="mt-2 text-sm text-gray-600">${response.data.note}</p>
         </div>
-        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じた音声解説を自動生成します</p>
-      </div>
-    `
+      `
+    }
   } catch (error) {
+    console.error('音声生成エラー:', error)
     demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
   }
 }
@@ -13650,37 +13668,42 @@ async function generateMusicDemo() {
   demoArea.innerHTML = `
     <div class="text-center py-4">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
-      <p class="mt-2 text-sm text-gray-600">音楽を生成中...</p>
+      <p class="mt-2 text-sm text-gray-600">AIが音楽を生成中...</p>
     </div>
   `
   
   try {
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    const response = await axios.post('/api/media/generate-music', {
+      lyrics: '♪ れいてんさん が よんこ ♪ たしてみよう いってんに ♪ かけざんは たしざんだ ♪ おぼえたら かんたんさ ♪',
+      style: 'educational-pop'
+    })
     
-    demoArea.innerHTML = `
-      <div class="bg-white p-4 rounded-lg border-2 border-orange-300">
-        <h4 class="font-bold text-orange-800 mb-2">🎵 生成された学習ソング</h4>
-        <div class="bg-orange-50 p-6 rounded-lg">
-          <div class="text-center mb-4">
-            <i class="fas fa-music text-5xl text-orange-600"></i>
+    if (response.data.success) {
+      demoArea.innerHTML = `
+        <div class="bg-white p-4 rounded-lg border-2 border-orange-300">
+          <h4 class="font-bold text-orange-800 mb-2">🎵 生成された学習ソング</h4>
+          <div class="bg-orange-50 p-6 rounded-lg mb-3">
+            <div class="text-center mb-4">
+              <i class="fas fa-music text-5xl text-orange-600"></i>
+            </div>
+            <audio controls class="w-full mb-4">
+              <source src="${response.data.musicUrl}" type="audio/mpeg">
+              お使いのブラウザは音声タグをサポートしていません。
+            </audio>
+            <div class="space-y-2 text-center">
+              <p class="text-xl font-bold">「小数のかけ算のうた」</p>
+              <p class="text-lg mt-4">♪ れいてんさん が よんこ ♪</p>
+              <p class="text-lg">♪ たしてみよう いってんに ♪</p>
+              <p class="text-lg">♪ かけざんは たしざんだ ♪</p>
+              <p class="text-lg">♪ おぼえたら かんたんさ ♪</p>
+            </div>
           </div>
-          <div class="space-y-2 text-center">
-            <p class="text-xl font-bold">「小数のかけ算のうた」</p>
-            <p class="text-lg mt-4">♪ れいてんさん が よんこ ♪</p>
-            <p class="text-lg">♪ たしてみよう いってんに ♪</p>
-            <p class="text-lg">♪ かけざんは たしざんだ ♪</p>
-            <p class="text-lg">♪ おぼえたら かんたんさ ♪</p>
-          </div>
-          <div class="mt-4 text-center">
-            <button class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-full">
-              <i class="fas fa-play mr-2"></i>歌を再生
-            </button>
-          </div>
+          <p class="mt-2 text-sm text-gray-600">${response.data.note}</p>
         </div>
-        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じたオリジナルソングを自動生成します</p>
-      </div>
-    `
+      `
+    }
   } catch (error) {
+    console.error('音楽生成エラー:', error)
     demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
   }
 }
@@ -13692,37 +13715,27 @@ async function generateKinestheticDemo() {
   demoArea.innerHTML = `
     <div class="text-center py-4">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-      <p class="mt-2 text-sm text-gray-600">体験型コンテンツを生成中...</p>
+      <p class="mt-2 text-sm text-gray-600">AIが体験型コンテンツを生成中...</p>
     </div>
   `
   
   try {
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    const response = await axios.post('/api/media/generate-interactive', {
+      topic: '小数のかけ算 0.3 × 4',
+      interactionType: 'simulation'
+    })
     
-    demoArea.innerHTML = `
-      <div class="bg-white p-4 rounded-lg border-2 border-purple-300">
-        <h4 class="font-bold text-purple-800 mb-2">🎮 生成されたインタラクティブ教材</h4>
-        <div class="bg-purple-50 p-6 rounded-lg">
-          <div class="text-center mb-4">
-            <p class="text-xl font-bold">実験シミュレーター</p>
-          </div>
-          <div class="grid grid-cols-4 gap-2 mb-4">
-            ${[1,2,3,4].map(i => `
-              <button class="bg-purple-500 hover:bg-purple-600 text-white p-4 rounded text-center font-bold transition transform hover:scale-105">
-                <div>🧪</div>
-                <div class="text-xs mt-1">容器${i}</div>
-              </button>
-            `).join('')}
-          </div>
-          <div class="text-center p-4 bg-white rounded border-2 border-purple-300">
-            <p class="text-lg mb-2">各容器に0.3Lの水が入っています</p>
-            <p class="text-sm text-gray-600">容器をクリックして水を合わせてみましょう</p>
-          </div>
+    if (response.data.success) {
+      demoArea.innerHTML = `
+        <div class="bg-white p-4 rounded-lg border-2 border-purple-300">
+          <h4 class="font-bold text-purple-800 mb-2">🎮 生成されたインタラクティブ教材</h4>
+          ${response.data.interactiveHtml}
+          <p class="mt-2 text-sm text-gray-600">${response.data.note}</p>
         </div>
-        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じたインタラクティブな教材を自動生成します</p>
-      </div>
-    `
+      `
+    }
   } catch (error) {
+    console.error('インタラクティブ教材生成エラー:', error)
     demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
   }
 }
