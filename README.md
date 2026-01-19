@@ -1128,9 +1128,9 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://7ba34fe9.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://e1c3d562.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `4528235` (進捗ボードカリキュラムボタン修正 - イベント委譲で実装)
+- **最終コミット**: `2781ee9` (カリキュラムボタン修正 - 直接イベントリスナー登録方式に変更)
 
 ## 🔐 デモアカウント
 
