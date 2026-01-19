@@ -3933,10 +3933,6 @@ async function showProgressBoardSelection() {
   }
 }
 
-// グローバルスコープに登録
-window.showProgressBoardSelection = showProgressBoardSelection
-console.log('✅ showProgressBoardSelection をグローバルに登録しました')
-
 // 週次レポートのデモ表示関数を追加
 function showDemoWeeklyReport() {
   console.log('📊 週次レポート（デモ）を表示')
@@ -4076,10 +4072,6 @@ function showDemoWeeklyReport() {
     modal.remove()
   })
 }
-
-// グローバルスコープに登録
-window.showDemoWeeklyReport = showDemoWeeklyReport
-console.log('✅ showDemoWeeklyReport をグローバルに登録しました')
 
 async function loadProgressBoard(curriculumId, curriculumId2 = null) {
   console.log('🎯 進捗ボード読み込み開始:', curriculumId)
