@@ -13808,13 +13808,14 @@ async function generateMusicDemo() {
                 <i class="fas fa-info-circle mr-2"></i>実際のAI音楽生成について
               </p>
               <p class="text-sm text-gray-700 mb-2">
-                本番システムでは、<strong>Suno AI</strong>や<strong>Udio</strong>などの最新AI音楽生成サービスを使用します。
+                本番システムでは、<strong>AIML API</strong>（Suno相当）などの最新AI音楽生成サービスを使用します。
               </p>
               <ul class="text-xs text-gray-600 space-y-1 ml-4">
                 <li>✅ 歌詞からメロディーとボーカルを自動生成</li>
                 <li>✅ 子ども向けのポップで明るい曲調</li>
                 <li>✅ 約30秒〜2分の学習ソング</li>
                 <li>✅ 覚えやすいリズムとフレーズ</li>
+                <li>💰 料金: 約$0.015-0.02 per call</li>
               </ul>
             </div>
             
@@ -13830,7 +13831,7 @@ async function generateMusicDemo() {
               <div class="mt-3">
                 <button onclick="generateRealSunoMusic()" 
                         class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold transition shadow-lg">
-                  <i class="fas fa-magic mr-2"></i>🎤 Suno AIで実際の曲と声を生成
+                  <i class="fas fa-magic mr-2"></i>🎤 AIで実際の曲と声を生成
                 </button>
               </div>
             </div>
@@ -14018,7 +14019,7 @@ window.generateAudioDemo = generateAudioDemo
 window.generateMusicDemo = generateMusicDemo
 window.generateKinestheticDemo = generateKinestheticDemo
 
-// Suno AIで実際の音楽を生成
+// Suno相当のAI音楽を生成（AIML API経由）
 async function generateRealSunoMusic() {
   const demoArea = document.getElementById('auditory-demo-area')
   if (!demoArea) return
@@ -14026,7 +14027,7 @@ async function generateRealSunoMusic() {
   demoArea.innerHTML = `
     <div class="text-center py-8">
       <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-purple-600 mb-4"></div>
-      <p class="text-lg font-bold text-purple-800">🎤 Suno AIで実際の曲を生成中...</p>
+      <p class="text-lg font-bold text-purple-800">🎤 AIが実際の曲を生成中...</p>
       <p class="text-sm text-gray-600 mt-2">AIが歌詞をもとに、メロディーとボーカルを生成しています...</p>
       <p class="text-xs text-gray-500 mt-1">この処理には30秒〜1分程度かかります</p>
     </div>
@@ -14041,7 +14042,7 @@ async function generateRealSunoMusic() {
     if (response.data.success) {
       demoArea.innerHTML = `
         <div class="bg-white p-4 rounded-lg border-2 border-purple-300">
-          <h4 class="font-bold text-purple-800 mb-3">🎤 Suno AIが生成した学習ソング</h4>
+          <h4 class="font-bold text-purple-800 mb-3">🎤 AIが生成した学習ソング</h4>
           <div class="mb-4">
             <audio controls class="w-full">
               <source src="${response.data.musicUrl}" type="audio/mpeg">
@@ -14059,21 +14060,34 @@ async function generateRealSunoMusic() {
       demoArea.innerHTML = `
         <div class="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-400">
           <h4 class="font-bold text-yellow-800 mb-3">
-            <i class="fas fa-key mr-2"></i>Suno API Keyが必要です
+            <i class="fas fa-key mr-2"></i>AI音楽生成APIキーが必要です
           </h4>
           <div class="bg-white p-4 rounded mb-3 text-left">
+            <h5 class="font-bold text-sm mb-2">💡 推奨サービス：AIML API</h5>
+            <ul class="text-sm text-gray-700 space-y-2 mb-3">
+              <li>✅ Suno相当の高品質AI音楽生成</li>
+              <li>✅ 無料トライアルあり</li>
+              <li>✅ 約$0.015-0.02 per call</li>
+              <li>✅ 簡単な統合</li>
+            </ul>
             <h5 class="font-bold text-sm mb-2">設定方法：</h5>
             <pre class="text-xs bg-gray-100 p-3 rounded overflow-x-auto">${response.data.instructions}</pre>
           </div>
           <p class="text-sm text-gray-700">
             <strong>現在はデモ音のみ利用可能です。</strong><br>
-            本番システムでSuno AIを統合すると、実際のAI生成音楽が再生できます。
+            AIML APIキーを設定すると、実際のAI生成音楽が再生できます。
           </p>
+          <div class="mt-3">
+            <a href="https://aimlapi.com" target="_blank" 
+               class="inline-block bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-bold">
+              AIML APIを始める →
+            </a>
+          </div>
         </div>
       `
     }
   } catch (error) {
-    console.error('Suno AI生成エラー:', error)
+    console.error('AI音楽生成エラー:', error)
     demoArea.innerHTML = `
       <div class="bg-red-50 p-6 rounded-lg border-2 border-red-400">
         <h4 class="font-bold text-red-800 mb-3">
@@ -14082,8 +14096,14 @@ async function generateRealSunoMusic() {
         <p class="text-sm text-gray-700 mb-3">${error.message}</p>
         <p class="text-sm text-gray-600">
           <strong>現在はデモ音のみ利用可能です。</strong><br>
-          本番システムでSuno APIキーを設定すると、実際のAI生成音楽が利用できます。
+          AIML APIキーを設定すると、実際のAI生成音楽が利用できます。
         </p>
+        <div class="mt-3">
+          <a href="https://aimlapi.com/suno-ai-api" target="_blank" 
+             class="inline-block bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-bold">
+            AIML API ドキュメント →
+          </a>
+        </div>
       </div>
     `
   }

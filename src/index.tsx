@@ -9181,84 +9181,92 @@ app.post('/api/media/generate-music', async (c) => {
   })
 })
 
-// メディア生成API - Suno AIで実際の音楽生成
+// メディア生成API - AI音楽生成（AIML API経由）
 app.post('/api/media/generate-suno-music', async (c) => {
   const { lyrics, style } = await c.req.json()
   const { env } = c
   
-  // Suno API Keyの確認
-  const sunoApiKey = env.SUNO_API_KEY
+  // AIML API Keyの確認
+  const aimlApiKey = env.AIML_API_KEY
   
-  if (!sunoApiKey) {
+  if (!aimlApiKey) {
     return c.json({
       success: false,
-      error: 'Suno API Keyが設定されていません',
+      error: 'AIML API Keyが設定されていません',
       instructions: `
-Suno AIのAPIキーを設定する方法：
+AI音楽生成APIキーを設定する方法：
 
-1. Suno AIアカウントを作成
-   https://suno.ai にアクセスしてアカウント作成
+【推奨】AIML API を使用
+1. AIML APIアカウントを作成
+   https://aimlapi.com にアクセスしてアカウント作成
 
 2. APIキーを取得
-   https://suno.ai/api-keys からAPIキーを生成
+   ダッシュボードからAPIキーを生成（無料トライアルあり）
 
 3. Cloudflare Secretsに設定
-   wrangler secret put SUNO_API_KEY --project-name jiyushindo-gakushu
+   wrangler secret put AIML_API_KEY --project-name jiyushindo-gakushu
    
 4. ローカル開発用（.dev.vars ファイル）
-   SUNO_API_KEY=your-api-key-here
+   AIML_API_KEY=your-api-key-here
 
-詳細: https://suno.ai/docs
+料金: 約$0.015-0.02 per call
+詳細: https://aimlapi.com/suno-ai-api
+
+【代替案】
+- MiniMax Music API: https://aimlapi.com (同じAIML APIで利用可能)
+- ElevenLabs Music: https://elevenlabs.io/music
+- Udio API: https://udio.com
       `.trim()
     }, 400)
   }
   
   try {
-    console.log('🎵 Suno AI音楽生成開始...')
+    console.log('🎵 AI音楽生成開始（AIML API）...')
     
-    // Suno AI API呼び出し
-    // Note: 実際のSuno APIのエンドポイントとパラメータは公式ドキュメントを参照
-    const response = await fetch('https://api.suno.ai/v1/generate', {
+    // AIML API経由でSuno相当の音楽生成
+    // https://aimlapi.com/docs を参照
+    const response = await fetch('https://api.aimlapi.com/v1/music/generate', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${sunoApiKey}`,
+        'Authorization': `Bearer ${aimlApiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        model: 'suno-v3.5', // または 'minimax-music'
         prompt: lyrics,
         style: style || 'educational pop japanese children',
-        duration: 60,
-        instrumental: false
+        make_instrumental: false,
+        wait_audio: true // 音声生成完了まで待機
       })
     })
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Suno API Error:', errorText)
+      console.error('AIML API Error:', errorText)
       return c.json({
         success: false,
-        error: 'Suno API呼び出しに失敗しました',
+        error: 'AI音楽生成APIの呼び出しに失敗しました',
         details: errorText
       }, response.status)
     }
     
     const data = await response.json()
     
-    console.log('✅ Suno AI音楽生成完了')
+    console.log('✅ AI音楽生成完了')
     
     return c.json({
       success: true,
-      musicUrl: data.audio_url || data.url,
-      imageUrl: data.image_url || data.cover_url,
-      duration: data.duration,
+      musicUrl: data.audio_url || data.url || data.data?.audio_url,
+      imageUrl: data.image_url || data.cover_url || data.data?.image_url,
+      duration: data.duration || data.data?.duration,
       lyrics: lyrics,
       style: style,
-      generationId: data.id,
-      note: 'Suno AIで生成された学習ソング'
+      generationId: data.id || data.data?.id,
+      note: 'AIが生成した学習ソング（AIML API経由）'
     })
     
   } catch (error: any) {
-    console.error('Suno AI生成エラー:', error)
+    console.error('AI音楽生成エラー:', error)
     return c.json({
       success: false,
       error: '音楽生成中にエラーが発生しました',
