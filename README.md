@@ -1132,7 +1132,7 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 - **本番URL**: https://jiyushindo-gakushu.pages.dev
 - **テストページ**: https://e9321a67.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `01e805b` (デモ進捗データを正しい学習フローに修正)
+- **最終コミット**: `92e1469` (デモ進捗データを本番DBに適用 - 正しい学習フロー)
 
 ## 🔐 デモアカウント
 
