@@ -72,9 +72,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://d904238d.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://51aaad8f.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `fb555d3` (単元候補生成フィルタリング改善 - 10個の単元名を確実に返す)
+- **最終コミット**: `17f1089` (NOT NULL制約エラー修正 - optional_problemsテーブルへの安全な挿入)
 
 ## 🎉 実装完了した全機能
 
