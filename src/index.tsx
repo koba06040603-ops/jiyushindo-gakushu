@@ -530,6 +530,236 @@ app.post('/api/progress', async (c) => {
   }
 })
 
+// =============================================================================
+// 学習ログ記録API（個別最適化のためのデータ収集）
+// =============================================================================
+
+// 学習ログ記録API - 学習カード個別最適化のためのデータ収集
+app.post('/api/learning/log', async (c) => {
+  const { env } = c
+  const logData = await c.req.json()
+  
+  try {
+    // 学習ログを記録
+    await env.DB.prepare(`
+      INSERT INTO learning_logs (
+        student_id, unit_id, card_id, course_type,
+        is_correct, answer_time_seconds, hint_count, retry_count,
+        difficulty_level, problem_type, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      logData.student_id,
+      logData.unit_id || logData.curriculum_id,  // 互換性のため
+      logData.card_id,
+      logData.course_type || 'unknown',
+      logData.is_correct ? 1 : 0,
+      logData.answer_time_seconds || 0,
+      logData.hint_count || 0,
+      logData.retry_count || 0,
+      logData.difficulty_level || 'medium',
+      logData.problem_type || 'general'
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('学習ログ保存エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習セッション開始API
+app.post('/api/learning/session/start', async (c) => {
+  const { env } = c
+  const { student_id, unit_id, session_id } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO learning_sessions (
+        student_id, unit_id, session_id,
+        started_at, is_active
+      ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1)
+    `).bind(student_id, unit_id, session_id).run()
+    
+    return c.json({ success: true, session_id })
+  } catch (error) {
+    console.error('セッション開始エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習セッション終了API
+app.post('/api/learning/session/end', async (c) => {
+  const { env } = c
+  const { session_id, total_problems, correct_problems, total_hints_used, total_ai_requests } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE learning_sessions
+      SET ended_at = CURRENT_TIMESTAMP,
+          is_active = 0,
+          total_problems = ?,
+          correct_problems = ?,
+          total_hints_used = ?,
+          total_ai_requests = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE session_id = ?
+    `).bind(
+      total_problems || 0,
+      correct_problems || 0,
+      total_hints_used || 0,
+      total_ai_requests || 0,
+      session_id
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('セッション終了エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習プロファイル取得API
+app.get('/api/learning/profile/:student_id', async (c) => {
+  const { env } = c
+  const student_id = c.req.param('student_id')
+  
+  try {
+    const profile = await env.DB.prepare(`
+      SELECT * FROM student_learning_profiles WHERE student_id = ?
+    `).bind(student_id).first()
+    
+    return c.json({ success: true, profile })
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習プロファイル更新API（簡易版 - 最新50件のログから分析）
+app.post('/api/learning/profile/update', async (c) => {
+  const { env } = c
+  const { student_id } = await c.req.json()
+  
+  try {
+    // 過去50件の学習ログを取得
+    const logs = await env.DB.prepare(`
+      SELECT 
+        is_correct,
+        answer_time_seconds,
+        difficulty_level,
+        problem_type,
+        hint_count
+      FROM learning_logs
+      WHERE student_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).bind(student_id).all()
+    
+    if (!logs.results || logs.results.length === 0) {
+      return c.json({ success: true, profile: null, message: 'データ不足' })
+    }
+    
+    // 正答率計算
+    const correctCount = logs.results.filter((l: any) => l.is_correct).length
+    const correctRate = correctCount / logs.results.length
+    
+    // 平均解答時間
+    const avgTime = logs.results.reduce((sum: number, l: any) => sum + l.answer_time_seconds, 0) / logs.results.length
+    
+    // レベル判定
+    let level = 'beginner'
+    if (correctRate >= 0.8 && avgTime < 60) {
+      level = 'advanced'
+    } else if (correctRate >= 0.6) {
+      level = 'intermediate'
+    }
+    
+    // 推奨難易度
+    let preferredDifficulty = 'medium'
+    if (correctRate >= 0.85) {
+      preferredDifficulty = 'hard'
+    } else if (correctRate < 0.5) {
+      preferredDifficulty = 'easy'
+    }
+    
+    // 問題タイプ別統計
+    const problemTypeStats: { [key: string]: { correct: number; total: number } } = {}
+    logs.results.forEach((log: any) => {
+      const type = log.problem_type
+      if (!problemTypeStats[type]) {
+        problemTypeStats[type] = { correct: 0, total: 0 }
+      }
+      problemTypeStats[type].total++
+      if (log.is_correct) problemTypeStats[type].correct++
+    })
+    
+    // 苦手・得意分野
+    const weakAreas: string[] = []
+    const strongAreas: string[] = []
+    
+    Object.entries(problemTypeStats).forEach(([type, stats]) => {
+      const rate = stats.correct / stats.total
+      if (rate < 0.5 && stats.total >= 3) {
+        weakAreas.push(type)
+      } else if (rate >= 0.8 && stats.total >= 3) {
+        strongAreas.push(type)
+      }
+    })
+    
+    // ヒント依存度
+    const avgHintCount = logs.results.reduce((sum: number, l: any) => sum + l.hint_count, 0) / logs.results.length
+    const hintDependency = Math.min(avgHintCount / 3, 1.0)  // 0-1にノーマライズ
+    
+    // プロファイル更新
+    await env.DB.prepare(`
+      INSERT INTO student_learning_profiles (
+        student_id, overall_level, avg_correct_rate, avg_answer_time,
+        preferred_difficulty, weak_areas, strong_areas,
+        hint_dependency_score, total_problems_solved,
+        last_updated, stats_updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT(student_id) DO UPDATE SET
+        overall_level = excluded.overall_level,
+        avg_correct_rate = excluded.avg_correct_rate,
+        avg_answer_time = excluded.avg_answer_time,
+        preferred_difficulty = excluded.preferred_difficulty,
+        weak_areas = excluded.weak_areas,
+        strong_areas = excluded.strong_areas,
+        hint_dependency_score = excluded.hint_dependency_score,
+        total_problems_solved = excluded.total_problems_solved,
+        last_updated = CURRENT_TIMESTAMP,
+        stats_updated_at = CURRENT_TIMESTAMP
+    `).bind(
+      student_id,
+      level,
+      correctRate,
+      avgTime,
+      preferredDifficulty,
+      JSON.stringify(weakAreas),
+      JSON.stringify(strongAreas),
+      hintDependency,
+      logs.results.length
+    ).run()
+    
+    return c.json({
+      success: true,
+      profile: {
+        level,
+        correctRate: (correctRate * 100).toFixed(1) + '%',
+        avgTime: avgTime.toFixed(1) + '秒',
+        preferredDifficulty,
+        weakAreas,
+        strongAreas,
+        hintDependency: (hintDependency * 100).toFixed(0) + '%'
+      }
+    })
+  } catch (error) {
+    console.error('プロファイル更新エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// =============================================================================
+
 // APIルート：クラスの進捗取得
 app.get('/api/progress/class/:classCode', async (c) => {
   const { env } = c

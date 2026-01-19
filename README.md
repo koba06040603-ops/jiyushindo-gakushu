@@ -179,6 +179,896 @@ async function nightlyBatchGeneration() {
 - ✅ **継続的改善**: 使うほど精度向上
 - ✅ **サーバー負荷分散**: 段階的生成で負荷軽減
 
+## 🚀 学習カード個別最適化の実装ロードマップ
+
+### 推奨実装順序（6ステップ）
+
+---
+
+## 📍 Step 1: データ収集基盤の構築（Week 1-2）
+
+### 目的
+個別最適化に必要なデータを収集する基盤を作る
+
+### 実装内容
+
+#### A. 学習ログテーブル作成
+```sql
+-- D1 Database Migration
+CREATE TABLE learning_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id TEXT NOT NULL,
+  unit_id TEXT NOT NULL,
+  card_id TEXT NOT NULL,
+  course_type TEXT NOT NULL,  -- じっくり/しっかり/ぐんぐん
+  
+  -- 解答データ
+  is_correct BOOLEAN NOT NULL,
+  answer_time_seconds INTEGER NOT NULL,
+  hint_count INTEGER DEFAULT 0,
+  retry_count INTEGER DEFAULT 0,
+  
+  -- コンテキスト
+  difficulty_level TEXT,  -- easy/medium/hard
+  problem_type TEXT,      -- calculation/word_problem/application
+  
+  -- タイムスタンプ
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  
+  INDEX idx_student_unit (student_id, unit_id),
+  INDEX idx_created_at (created_at)
+);
+
+-- 学習セッション
+CREATE TABLE learning_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id TEXT NOT NULL,
+  unit_id TEXT NOT NULL,
+  
+  -- セッション情報
+  started_at DATETIME NOT NULL,
+  ended_at DATETIME,
+  total_problems INTEGER DEFAULT 0,
+  correct_problems INTEGER DEFAULT 0,
+  
+  -- 学習スタイル
+  preferred_style TEXT,  -- visual/auditory/kinesthetic
+  
+  INDEX idx_student (student_id)
+);
+```
+
+#### B. フロントエンドでのログ記録
+```javascript
+// public/static/app.js に追加
+
+// 学習ログ記録関数
+async function logLearningActivity(data) {
+  try {
+    await axios.post('/api/learning/log', {
+      student_id: currentUser.id,
+      unit_id: currentUnit.id,
+      card_id: data.cardId,
+      course_type: data.courseType,
+      is_correct: data.isCorrect,
+      answer_time_seconds: data.answerTime,
+      hint_count: data.hintCount,
+      retry_count: data.retryCount,
+      difficulty_level: data.difficulty,
+      problem_type: data.problemType
+    })
+  } catch (error) {
+    console.error('ログ記録エラー:', error)
+  }
+}
+
+// 問題解答時に自動記録
+window.checkAnswer = function(cardId, userAnswer) {
+  const startTime = window.answerStartTime || Date.now()
+  const answerTime = Math.floor((Date.now() - startTime) / 1000)
+  
+  const isCorrect = validateAnswer(cardId, userAnswer)
+  
+  // ログ記録
+  logLearningActivity({
+    cardId: cardId,
+    courseType: currentCourseType,
+    isCorrect: isCorrect,
+    answerTime: answerTime,
+    hintCount: window.hintCount || 0,
+    retryCount: window.retryCount || 0,
+    difficulty: currentDifficulty,
+    problemType: getCurrentProblemType(cardId)
+  })
+  
+  // 結果表示
+  displayResult(isCorrect)
+}
+```
+
+#### C. バックエンドAPI
+```typescript
+// src/index.tsx に追加
+
+// 学習ログ記録API
+app.post('/api/learning/log', async (c) => {
+  const { env } = c
+  const logData = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO learning_logs (
+        student_id, unit_id, card_id, course_type,
+        is_correct, answer_time_seconds, hint_count, retry_count,
+        difficulty_level, problem_type, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      logData.student_id,
+      logData.unit_id,
+      logData.card_id,
+      logData.course_type,
+      logData.is_correct ? 1 : 0,
+      logData.answer_time_seconds,
+      logData.hint_count,
+      logData.retry_count,
+      logData.difficulty_level,
+      logData.problem_type
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('ログ保存エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+```
+
+### 成果物
+- ✅ 学習データが自動収集される
+- ✅ 学習履歴が蓄積される
+- ✅ 次ステップの分析基盤が整う
+
+---
+
+## 📍 Step 2: 学習プロファイル生成（Week 3-4）
+
+### 目的
+収集したデータから生徒の学習プロファイルを作成
+
+### 実装内容
+
+#### A. プロファイルテーブル
+```sql
+CREATE TABLE student_profiles (
+  student_id TEXT PRIMARY KEY,
+  
+  -- 理解度レベル
+  overall_level TEXT DEFAULT 'beginner',  -- beginner/intermediate/advanced
+  
+  -- 学習スタイル
+  learning_style TEXT,  -- visual/auditory/kinesthetic/mixed
+  style_confidence REAL DEFAULT 0.0,
+  
+  -- パフォーマンス指標
+  avg_correct_rate REAL DEFAULT 0.0,
+  avg_answer_time REAL DEFAULT 0.0,
+  preferred_difficulty TEXT DEFAULT 'medium',
+  
+  -- 苦手・得意分野
+  weak_areas TEXT,  -- JSON配列 ["calculation", "word_problem"]
+  strong_areas TEXT,  -- JSON配列
+  
+  -- メタデータ
+  total_problems_solved INTEGER DEFAULT 0,
+  last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+  
+  INDEX idx_level (overall_level)
+);
+```
+
+#### B. プロファイル生成API
+```typescript
+// プロファイル分析・更新API
+app.post('/api/learning/profile/update', async (c) => {
+  const { env } = c
+  const { student_id } = await c.req.json()
+  
+  try {
+    // 過去の学習ログを分析
+    const logs = await env.DB.prepare(`
+      SELECT 
+        is_correct,
+        answer_time_seconds,
+        difficulty_level,
+        problem_type,
+        hint_count
+      FROM learning_logs
+      WHERE student_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).bind(student_id).all()
+    
+    if (!logs.results || logs.results.length === 0) {
+      return c.json({ success: true, profile: null })
+    }
+    
+    // 正答率計算
+    const correctCount = logs.results.filter(l => l.is_correct).length
+    const correctRate = correctCount / logs.results.length
+    
+    // 平均解答時間
+    const avgTime = logs.results.reduce((sum, l) => sum + l.answer_time_seconds, 0) / logs.results.length
+    
+    // レベル判定
+    let level = 'beginner'
+    if (correctRate >= 0.8 && avgTime < 60) {
+      level = 'advanced'
+    } else if (correctRate >= 0.6) {
+      level = 'intermediate'
+    }
+    
+    // 推奨難易度
+    let preferredDifficulty = 'medium'
+    if (correctRate >= 0.85) {
+      preferredDifficulty = 'hard'
+    } else if (correctRate < 0.5) {
+      preferredDifficulty = 'easy'
+    }
+    
+    // 苦手分野の特定
+    const problemTypeStats = {}
+    logs.results.forEach(log => {
+      const type = log.problem_type
+      if (!problemTypeStats[type]) {
+        problemTypeStats[type] = { correct: 0, total: 0 }
+      }
+      problemTypeStats[type].total++
+      if (log.is_correct) problemTypeStats[type].correct++
+    })
+    
+    const weakAreas = []
+    const strongAreas = []
+    
+    Object.entries(problemTypeStats).forEach(([type, stats]) => {
+      const rate = stats.correct / stats.total
+      if (rate < 0.5 && stats.total >= 3) {
+        weakAreas.push(type)
+      } else if (rate >= 0.8 && stats.total >= 3) {
+        strongAreas.push(type)
+      }
+    })
+    
+    // プロファイル更新
+    await env.DB.prepare(`
+      INSERT INTO student_profiles (
+        student_id, overall_level, avg_correct_rate, avg_answer_time,
+        preferred_difficulty, weak_areas, strong_areas, 
+        total_problems_solved, last_updated
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(student_id) DO UPDATE SET
+        overall_level = excluded.overall_level,
+        avg_correct_rate = excluded.avg_correct_rate,
+        avg_answer_time = excluded.avg_answer_time,
+        preferred_difficulty = excluded.preferred_difficulty,
+        weak_areas = excluded.weak_areas,
+        strong_areas = excluded.strong_areas,
+        total_problems_solved = excluded.total_problems_solved,
+        last_updated = CURRENT_TIMESTAMP
+    `).bind(
+      student_id,
+      level,
+      correctRate,
+      avgTime,
+      preferredDifficulty,
+      JSON.stringify(weakAreas),
+      JSON.stringify(strongAreas),
+      logs.results.length
+    ).run()
+    
+    return c.json({
+      success: true,
+      profile: {
+        level,
+        correctRate,
+        avgTime,
+        preferredDifficulty,
+        weakAreas,
+        strongAreas
+      }
+    })
+  } catch (error) {
+    console.error('プロファイル更新エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// プロファイル取得API
+app.get('/api/learning/profile/:student_id', async (c) => {
+  const { env } = c
+  const student_id = c.req.param('student_id')
+  
+  try {
+    const profile = await env.DB.prepare(`
+      SELECT * FROM student_profiles WHERE student_id = ?
+    `).bind(student_id).first()
+    
+    return c.json({ success: true, profile })
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+```
+
+### 成果物
+- ✅ 各生徒の学習プロファイルが自動生成
+- ✅ レベル・得意/苦手分野が特定される
+- ✅ 推奨難易度が計算される
+
+---
+
+## 📍 Step 3: 基本カードセットのキャッシュ（Week 5-6）
+
+### 目的
+即座に提供できる基本カードセットを準備
+
+### 実装内容
+
+#### A. カードテンプレートテーブル
+```sql
+CREATE TABLE card_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  unit_id TEXT NOT NULL,
+  difficulty_level TEXT NOT NULL,  -- easy/medium/hard
+  problem_type TEXT NOT NULL,      -- calculation/word_problem/application
+  
+  -- 問題テンプレート
+  problem_template TEXT NOT NULL,
+  answer_template TEXT NOT NULL,
+  hints_template TEXT,  -- JSON配列
+  
+  -- メタデータ
+  order_index INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT 1,
+  
+  INDEX idx_unit_difficulty (unit_id, difficulty_level)
+);
+```
+
+#### B. カードキャッシュ生成
+```typescript
+// 単元ごとの基本カードセット生成
+app.post('/api/cards/generate-basic-set', async (c) => {
+  const { env } = c
+  const { unit_id } = await c.req.json()
+  
+  try {
+    // 基本的な3レベル × 3タイプの問題セット
+    const difficulties = ['easy', 'medium', 'hard']
+    const problemTypes = ['calculation', 'word_problem', 'application']
+    
+    const cardSet = []
+    
+    for (const difficulty of difficulties) {
+      for (const problemType of problemTypes) {
+        // AI生成（Gemini API）
+        const prompt = `
+単元: ${unit_id}
+難易度: ${difficulty}
+問題タイプ: ${problemType}
+
+この条件で小学生向けの算数問題を1問作成してください。
+JSON形式で返してください：
+{
+  "problem": "問題文",
+  "answer": "解答",
+  "explanation": "解説",
+  "hints": ["ヒント1", "ヒント2"]
+}
+        `
+        
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }]
+            })
+          }
+        )
+        
+        const data = await response.json()
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+        const problemData = JSON.parse(content)
+        
+        // テンプレートとして保存
+        await env.DB.prepare(`
+          INSERT INTO card_templates (
+            unit_id, difficulty_level, problem_type,
+            problem_template, answer_template, hints_template,
+            order_index, is_active
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        `).bind(
+          unit_id,
+          difficulty,
+          problemType,
+          problemData.problem,
+          problemData.answer,
+          JSON.stringify(problemData.hints),
+          cardSet.length
+        ).run()
+        
+        cardSet.push({
+          difficulty,
+          problemType,
+          ...problemData
+        })
+      }
+    }
+    
+    return c.json({ success: true, cardSet, count: cardSet.length })
+  } catch (error) {
+    console.error('カード生成エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// キャッシュされた基本カード取得
+app.get('/api/cards/basic-set/:unit_id', async (c) => {
+  const { env } = c
+  const unit_id = c.req.param('unit_id')
+  
+  try {
+    const cards = await env.DB.prepare(`
+      SELECT * FROM card_templates
+      WHERE unit_id = ? AND is_active = 1
+      ORDER BY order_index
+      LIMIT 9
+    `).bind(unit_id).all()
+    
+    return c.json({ success: true, cards: cards.results })
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+```
+
+### 成果物
+- ✅ 各単元の基本カードセットが事前生成
+- ✅ 即座に提供できるカードが準備される
+- ✅ 待ち時間が解消
+
+---
+
+## 📍 Step 4: 個別化カード生成エンジン（Week 7-9）
+
+### 目的
+プロファイルに基づいて最適な問題を生成
+
+### 実装内容
+
+#### A. 個別化生成API
+```typescript
+// プロファイルベースの個別化カード生成
+app.post('/api/cards/personalized', async (c) => {
+  const { env } = c
+  const { student_id, unit_id, count = 6 } = await c.req.json()
+  
+  try {
+    // プロファイル取得
+    const profile = await env.DB.prepare(`
+      SELECT * FROM student_profiles WHERE student_id = ?
+    `).bind(student_id).first()
+    
+    if (!profile) {
+      // プロファイルがない場合は基本セットを返す
+      return c.redirect(`/api/cards/basic-set/${unit_id}`)
+    }
+    
+    // プロファイルに基づく生成条件
+    const difficulty = profile.preferred_difficulty
+    const weakAreas = JSON.parse(profile.weak_areas || '[]')
+    const strongAreas = JSON.parse(profile.strong_areas || '[]')
+    
+    // 問題配分戦略
+    // 60% 苦手分野、30% バランス、10% 得意分野（復習）
+    const problemDistribution = []
+    
+    // 苦手分野重点
+    const weakCount = Math.ceil(count * 0.6)
+    for (let i = 0; i < weakCount && weakAreas.length > 0; i++) {
+      problemDistribution.push({
+        type: weakAreas[i % weakAreas.length],
+        difficulty: difficulty === 'hard' ? 'medium' : difficulty  // 少し易しく
+      })
+    }
+    
+    // バランス問題
+    const balanceCount = Math.ceil(count * 0.3)
+    const allTypes = ['calculation', 'word_problem', 'application']
+    for (let i = 0; i < balanceCount; i++) {
+      problemDistribution.push({
+        type: allTypes[i % allTypes.length],
+        difficulty: difficulty
+      })
+    }
+    
+    // 得意分野（自信向上）
+    const strongCount = count - weakCount - balanceCount
+    for (let i = 0; i < strongCount && strongAreas.length > 0; i++) {
+      problemDistribution.push({
+        type: strongAreas[i % strongAreas.length],
+        difficulty: difficulty === 'easy' ? 'medium' : difficulty  // 少し難しく
+      })
+    }
+    
+    // AI生成
+    const personalizedCards = []
+    
+    for (const spec of problemDistribution) {
+      const prompt = `
+あなたは小学生向けの算数問題作成の専門家です。
+
+生徒プロファイル:
+- レベル: ${profile.overall_level}
+- 平均正答率: ${(profile.avg_correct_rate * 100).toFixed(0)}%
+- 苦手分野: ${weakAreas.join(', ')}
+- 得意分野: ${strongAreas.join(', ')}
+
+問題条件:
+- 単元: ${unit_id}
+- 難易度: ${spec.difficulty}
+- 問題タイプ: ${spec.type}
+
+この生徒に最適な問題を1問作成してください。
+${spec.type === weakAreas[0] ? '苦手分野なので、段階的なヒントを多めに用意してください。' : ''}
+
+JSON形式で返してください：
+{
+  "problem": "問題文（この生徒のレベルに合わせて）",
+  "answer": "解答",
+  "explanation": "詳しい解説（この生徒が理解しやすいように）",
+  "hints": ["段階的なヒント1", "ヒント2", "ヒント3"],
+  "difficulty_score": 0.0-1.0の難易度スコア
+}
+      `
+      
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${env.GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.8,
+              topP: 0.95
+            }
+          })
+        }
+      )
+      
+      const data = await response.json()
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+      
+      // JSON抽出
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const problemData = JSON.parse(jsonMatch[0])
+        personalizedCards.push({
+          ...problemData,
+          difficulty: spec.difficulty,
+          problemType: spec.type,
+          personalized: true
+        })
+      }
+    }
+    
+    return c.json({
+      success: true,
+      cards: personalizedCards,
+      profile: {
+        level: profile.overall_level,
+        weakAreas,
+        strongAreas
+      }
+    })
+  } catch (error) {
+    console.error('個別化生成エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+```
+
+### 成果物
+- ✅ 生徒の苦手分野に重点を置いた問題生成
+- ✅ レベルに合わせた難易度調整
+- ✅ 段階的なヒント提供
+
+---
+
+## 📍 Step 5: フロントエンド統合（Week 10-11）
+
+### 目的
+ユーザー体験を最適化した個別化フローの実装
+
+### 実装内容
+
+#### A. 段階的カード提供UI
+```javascript
+// public/static/app.js
+
+// 学習カード表示（段階的個別化）
+async function displayLearningCards(unitId) {
+  const container = document.getElementById('cards-container')
+  
+  // Phase 1: 基本カードを即座に表示
+  container.innerHTML = `
+    <div class="mb-4 bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+      <p class="text-blue-800 font-bold">
+        <i class="fas fa-rocket mr-2"></i>学習を開始します
+      </p>
+      <p class="text-sm text-gray-600 mt-2">
+        まずは基本問題から始めます。あなたの理解度を確認しながら、
+        ピッタリな問題を準備していきます！
+      </p>
+    </div>
+    <div id="basic-cards"></div>
+    <div id="personalized-cards"></div>
+  `
+  
+  try {
+    // 1. 基本カード取得（即座）
+    const basicResponse = await axios.get(`/api/cards/basic-set/${unitId}`)
+    const basicCards = basicResponse.data.cards.slice(0, 3)
+    
+    // 基本カード表示
+    displayCards('basic-cards', basicCards, '基本問題')
+    
+    // 2. バックグラウンドでプロファイル更新
+    await axios.post('/api/learning/profile/update', {
+      student_id: currentUser.id
+    })
+    
+    // 3. 個別化カード生成（バックグラウンド）
+    const personalizedPromise = axios.post('/api/cards/personalized', {
+      student_id: currentUser.id,
+      unit_id: unitId,
+      count: 6
+    })
+    
+    // プログレス表示
+    showPersonalizationProgress()
+    
+    // 4. 個別化カード準備完了
+    const personalizedResponse = await personalizedPromise
+    const personalizedCards = personalizedResponse.data.cards
+    const profile = personalizedResponse.data.profile
+    
+    // 完了通知
+    showPersonalizationComplete(profile)
+    
+    // 個別化カード表示
+    displayCards('personalized-cards', personalizedCards, 'あなた専用の問題')
+    
+  } catch (error) {
+    console.error('カード表示エラー:', error)
+    container.innerHTML = `<p class="text-red-600">エラーが発生しました</p>`
+  }
+}
+
+// プログレス表示
+function showPersonalizationProgress() {
+  const container = document.getElementById('personalized-cards')
+  container.innerHTML = `
+    <div class="mt-6 bg-purple-50 border-2 border-purple-300 rounded-lg p-6">
+      <div class="text-center">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-purple-600 mb-4"></div>
+        <p class="text-lg font-bold text-purple-800">
+          <i class="fas fa-magic mr-2"></i>🎯 あなた専用の問題を準備中...
+        </p>
+        <p class="text-sm text-gray-600 mt-2">
+          あなたの学習履歴をもとに、最適な問題を生成しています
+        </p>
+        <div class="mt-4 bg-white rounded-full h-4 overflow-hidden">
+          <div class="progress-bar bg-gradient-to-r from-purple-400 to-pink-400 h-full" 
+               style="width: 0%; transition: width 0.5s"></div>
+        </div>
+      </div>
+    </div>
+  `
+  
+  // プログレスアニメーション
+  let progress = 0
+  const interval = setInterval(() => {
+    progress += 10
+    const bar = document.querySelector('.progress-bar')
+    if (bar) {
+      bar.style.width = `${Math.min(progress, 90)}%`
+    }
+    if (progress >= 90) clearInterval(interval)
+  }, 300)
+}
+
+// 完了通知
+function showPersonalizationComplete(profile) {
+  const notification = document.createElement('div')
+  notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-xl animate-bounce z-50'
+  notification.innerHTML = `
+    <p class="font-bold">
+      <i class="fas fa-check-circle mr-2"></i>✨ 準備完了！
+    </p>
+    <p class="text-sm mt-1">
+      あなたのレベル: ${profile.level}<br>
+      ${profile.weakAreas.length > 0 ? `重点: ${profile.weakAreas[0]}` : ''}
+    </p>
+  `
+  document.body.appendChild(notification)
+  
+  setTimeout(() => notification.remove(), 5000)
+}
+
+// カード表示
+function displayCards(containerId, cards, title) {
+  const container = document.getElementById(containerId)
+  
+  let html = `
+    <div class="mb-6">
+      <h3 class="text-xl font-bold mb-4">
+        ${title} 
+        ${cards[0]?.personalized ? '💎' : '📚'}
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  `
+  
+  cards.forEach((card, index) => {
+    html += `
+      <div class="card-item bg-white rounded-lg shadow-lg p-6 border-2 
+                  ${card.personalized ? 'border-purple-300 bg-gradient-to-br from-purple-50 to-pink-50' : 'border-gray-300'}">
+        <div class="flex justify-between items-start mb-3">
+          <span class="text-lg font-bold text-gray-700">問題 ${index + 1}</span>
+          <span class="text-xs px-2 py-1 rounded ${getDifficultyColor(card.difficulty)}">
+            ${getDifficultyLabel(card.difficulty)}
+          </span>
+        </div>
+        <p class="text-gray-800 mb-4">${card.problem_template || card.problem}</p>
+        <button onclick="showAnswer('${card.id || index}')" 
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+          解答を見る
+        </button>
+      </div>
+    `
+  })
+  
+  html += '</div></div>'
+  container.innerHTML = html
+}
+
+function getDifficultyColor(difficulty) {
+  const colors = {
+    'easy': 'bg-green-200 text-green-800',
+    'medium': 'bg-yellow-200 text-yellow-800',
+    'hard': 'bg-red-200 text-red-800'
+  }
+  return colors[difficulty] || colors.medium
+}
+
+function getDifficultyLabel(difficulty) {
+  const labels = {
+    'easy': 'やさしい',
+    'medium': 'ふつう',
+    'hard': 'むずかしい'
+  }
+  return labels[difficulty] || 'ふつう'
+}
+```
+
+### 成果物
+- ✅ スムーズな段階的個別化体験
+- ✅ ビジュアルフィードバック
+- ✅ ユーザーフレンドリーなUI
+
+---
+
+## 📍 Step 6: 継続的最適化と検証（Week 12以降）
+
+### 目的
+システムの精度向上と効果測定
+
+### 実装内容
+
+#### A. 効果測定ダッシュボード
+```sql
+-- 効果測定用ビュー
+CREATE VIEW personalization_effectiveness AS
+SELECT 
+  student_id,
+  COUNT(*) as total_problems,
+  AVG(CASE WHEN is_correct THEN 1.0 ELSE 0.0 END) as correct_rate,
+  AVG(answer_time_seconds) as avg_time,
+  COUNT(CASE WHEN hint_count = 0 THEN 1 END) as no_hint_count
+FROM learning_logs
+WHERE created_at >= datetime('now', '-30 days')
+GROUP BY student_id;
+```
+
+#### B. A/Bテスト機能
+```typescript
+// 個別化の効果を測定
+app.get('/api/analytics/personalization-effect', async (c) => {
+  const { env } = c
+  
+  try {
+    // 個別化前後の比較
+    const beforePersonalization = await env.DB.prepare(`
+      SELECT AVG(CASE WHEN is_correct THEN 1.0 ELSE 0.0 END) as avg_correct
+      FROM learning_logs
+      WHERE created_at < ?
+    `).bind(personalizationStartDate).first()
+    
+    const afterPersonalization = await env.DB.prepare(`
+      SELECT AVG(CASE WHEN is_correct THEN 1.0 ELSE 0.0 END) as avg_correct
+      FROM learning_logs
+      WHERE created_at >= ?
+    `).bind(personalizationStartDate).first()
+    
+    const improvement = (afterPersonalization.avg_correct - beforePersonalization.avg_correct) * 100
+    
+    return c.json({
+      success: true,
+      before: beforePersonalization.avg_correct,
+      after: afterPersonalization.avg_correct,
+      improvement: `${improvement.toFixed(1)}%`
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+```
+
+### 成果物
+- ✅ 個別化効果の定量測定
+- ✅ 継続的な改善サイクル
+- ✅ データドリブンな最適化
+
+---
+
+## 📊 実装スケジュール概要
+
+| Week | ステップ | 主要タスク | 成果物 |
+|------|---------|----------|--------|
+| 1-2 | Step 1 | データ収集基盤構築 | ログテーブル、API |
+| 3-4 | Step 2 | プロファイル生成 | 分析ロジック、プロファイルDB |
+| 5-6 | Step 3 | 基本カードキャッシュ | テンプレート生成、キャッシュAPI |
+| 7-9 | Step 4 | 個別化エンジン | AI生成ロジック、最適化アルゴリズム |
+| 10-11 | Step 5 | フロントエンド統合 | UI実装、UX最適化 |
+| 12+ | Step 6 | 継続最適化 | 分析ダッシュボード、改善サイクル |
+
+## 🎯 各ステップの優先度
+
+### 必須（MVP）
+- ✅ Step 1: データ収集
+- ✅ Step 3: 基本カードキャッシュ
+- ✅ Step 5: フロントエンド統合（基本版）
+
+### 推奨（Early Release）
+- ✅ Step 2: プロファイル生成
+- ✅ Step 4: 個別化エンジン（簡易版）
+
+### 最適化（継続改善）
+- ✅ Step 4: 高度な個別化
+- ✅ Step 6: 効果測定と最適化
+
+## 💡 成功のポイント
+
+1. **段階的リリース**: 完璧を求めず、段階的に機能追加
+2. **ユーザーフィードバック**: 早期からユーザーの声を収集
+3. **データドリブン**: 数値で効果を測定し改善
+4. **パフォーマンス重視**: 待ち時間を最小化
+5. **透明性**: 個別化のロジックをユーザーに説明
+
+---
+
 ## 🌟 Phase 5 新機能（2024年実装完了）
 
 ### 先生カスタマイズモード

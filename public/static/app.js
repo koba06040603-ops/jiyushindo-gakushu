@@ -47,6 +47,151 @@ const state = {
   }
 }
 
+// =============================================================================
+// 学習ログ記録機能（個別最適化のためのデータ収集）
+// =============================================================================
+
+// 学習セッション管理
+const learningSession = {
+  sessionId: null,
+  startTime: null,
+  currentCardStartTime: null,
+  stats: {
+    totalProblems: 0,
+    correctProblems: 0,
+    totalHintsUsed: 0,
+    totalAIRequests: 0
+  }
+}
+
+// セッションID生成
+function generateSessionId() {
+  return `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
+}
+
+// 学習セッション開始
+async function startLearningSession(unitId) {
+  learningSession.sessionId = generateSessionId()
+  learningSession.startTime = Date.now()
+  learningSession.stats = {
+    totalProblems: 0,
+    correctProblems: 0,
+    totalHintsUsed: 0,
+    totalAIRequests: 0
+  }
+  
+  try {
+    await axios.post('/api/learning/session/start', {
+      student_id: state.student.id || 1,
+      unit_id: unitId,
+      session_id: learningSession.sessionId
+    })
+    console.log('📊 学習セッション開始:', learningSession.sessionId)
+  } catch (error) {
+    console.error('セッション開始エラー:', error)
+  }
+}
+
+// 学習セッション終了
+async function endLearningSession() {
+  if (!learningSession.sessionId) return
+  
+  try {
+    await axios.post('/api/learning/session/end', {
+      session_id: learningSession.sessionId,
+      ...learningSession.stats
+    })
+    console.log('📊 学習セッション終了:', learningSession.stats)
+  } catch (error) {
+    console.error('セッション終了エラー:', error)
+  }
+  
+  learningSession.sessionId = null
+}
+
+// 学習カード開始時刻記録
+function startCardTiming() {
+  learningSession.currentCardStartTime = Date.now()
+}
+
+// 学習ログ記録関数
+async function logLearningActivity(data) {
+  try {
+    await axios.post('/api/learning/log', {
+      student_id: state.student.id || 1,
+      unit_id: data.unitId || state.selectedCurriculum?.id,
+      card_id: data.cardId,
+      course_type: data.courseType || state.selectedCourse?.course_level || 'unknown',
+      is_correct: data.isCorrect,
+      answer_time_seconds: data.answerTime,
+      hint_count: data.hintCount || 0,
+      retry_count: data.retryCount || 0,
+      difficulty_level: data.difficulty || 'medium',
+      problem_type: data.problemType || 'general'
+    })
+    
+    // セッション統計更新
+    if (learningSession.sessionId) {
+      learningSession.stats.totalProblems++
+      if (data.isCorrect) {
+        learningSession.stats.correctProblems++
+      }
+      learningSession.stats.totalHintsUsed += (data.hintCount || 0)
+    }
+    
+    console.log('📝 学習ログ記録成功:', data.cardId)
+  } catch (error) {
+    console.error('学習ログ記録エラー:', error)
+  }
+}
+
+// 問題タイプ判定ヘルパー
+function getProblemType(cardTitle) {
+  if (!cardTitle) return 'general'
+  
+  if (cardTitle.includes('計算') || cardTitle.includes('かけ算') || cardTitle.includes('たし算')) {
+    return 'calculation'
+  } else if (cardTitle.includes('文章') || cardTitle.includes('問題')) {
+    return 'word_problem'
+  } else if (cardTitle.includes('応用') || cardTitle.includes('活用')) {
+    return 'application'
+  } else if (cardTitle.includes('図') || cardTitle.includes('グラフ')) {
+    return 'visualization'
+  }
+  
+  return 'general'
+}
+
+// 難易度判定ヘルパー
+function getDifficultyLevel(courseLevel) {
+  if (!courseLevel) return 'medium'
+  
+  if (courseLevel === 'じっくり' || courseLevel === '基礎') {
+    return 'easy'
+  } else if (courseLevel === 'ぐんぐん' || courseLevel === '発展') {
+    return 'hard'
+  }
+  
+  return 'medium'
+}
+
+// 学習プロファイル更新（バックグラウンド）
+async function updateLearningProfile() {
+  try {
+    const response = await axios.post('/api/learning/profile/update', {
+      student_id: state.student.id || 1
+    })
+    
+    if (response.data.success && response.data.profile) {
+      console.log('📈 学習プロファイル更新:', response.data.profile)
+    }
+  } catch (error) {
+    console.error('プロファイル更新エラー:', error)
+  }
+}
+
+// =============================================================================
+
 // グローバルローディング管理
 const loadingManager = {
   show: (message = '読み込み中...') => {
@@ -1985,6 +2130,11 @@ async function selectCourse(courseId) {
     const cards = response.data
     
     state.selectedCourse = courseId
+    
+    // 学習セッションを開始（初回のみ）
+    if (!learningSession.sessionId) {
+      await startLearningSession(state.selectedCurriculum?.id)
+    }
 
     const app = document.getElementById('app')
     app.innerHTML = `
@@ -2654,6 +2804,29 @@ async function saveProgress(teacherCall = false) {
   }
   
   try {
+    // 解答時間を計算（秒単位）
+    let answerTime = 0
+    if (learningSession.currentCardStartTime) {
+      answerTime = Math.floor((Date.now() - learningSession.currentCardStartTime) / 1000)
+    }
+    
+    // 正解かどうかを理解度から推測（暫定実装）
+    const isCorrect = (window.currentUnderstandingLevel || 0) >= 60
+    
+    // 学習ログを記録
+    await logLearningActivity({
+      cardId: state.selectedCard,
+      unitId: state.selectedCurriculum?.id,
+      courseType: state.selectedCourse,
+      isCorrect: isCorrect,
+      answerTime: answerTime,
+      hintCount: window.helpCount || 0,
+      retryCount: 0,  // TODO: 再試行回数のトラッキング実装
+      difficulty: getDifficultyLevel(state.selectedCourse),
+      problemType: getProblemType(state.selectedCard?.card_title || '')
+    })
+    
+    // 進捗を保存
     await axios.post('/api/progress', {
       student_id: state.student.id,
       curriculum_id: state.selectedCurriculum.id,
@@ -2674,6 +2847,11 @@ async function saveProgress(teacherCall = false) {
       'completed',
       window.currentUnderstandingLevel
     )
+    
+    // バックグラウンドでプロファイルを更新（5問ごと）
+    if (learningSession.stats.totalProblems % 5 === 0) {
+      updateLearningProfile()
+    }
     
     if (!teacherCall) {
       alert('保存しました！次のカードに進みましょう。')
@@ -6557,6 +6735,9 @@ window.saveGeneratedUnit = saveGeneratedUnit
 
 // 学習カード詳細表示モーダル
 function showCardDetail(card) {
+  // 学習カード開始時刻を記録
+  startCardTiming()
+  
   // モーダルHTML
   const modalHTML = `
     <div id="cardDetailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeCardDetail(event)">
