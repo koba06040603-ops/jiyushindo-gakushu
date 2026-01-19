@@ -13827,6 +13827,12 @@ async function generateMusicDemo() {
                       class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg ml-2">
                 <i class="fas fa-stop mr-2"></i>停止
               </button>
+              <div class="mt-3">
+                <button onclick="generateRealSunoMusic()" 
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold transition shadow-lg">
+                  <i class="fas fa-magic mr-2"></i>🎤 Suno AIで実際の曲と声を生成
+                </button>
+              </div>
             </div>
           </div>
           <p class="text-sm text-gray-600 bg-orange-50 p-3 rounded">${response.data.note}</p>
@@ -14011,6 +14017,79 @@ window.generateVideoDemo = generateVideoDemo
 window.generateAudioDemo = generateAudioDemo
 window.generateMusicDemo = generateMusicDemo
 window.generateKinestheticDemo = generateKinestheticDemo
+
+// Suno AIで実際の音楽を生成
+async function generateRealSunoMusic() {
+  const demoArea = document.getElementById('auditory-demo-area')
+  if (!demoArea) return
+  
+  demoArea.innerHTML = `
+    <div class="text-center py-8">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-purple-600 mb-4"></div>
+      <p class="text-lg font-bold text-purple-800">🎤 Suno AIで実際の曲を生成中...</p>
+      <p class="text-sm text-gray-600 mt-2">AIが歌詞をもとに、メロディーとボーカルを生成しています...</p>
+      <p class="text-xs text-gray-500 mt-1">この処理には30秒〜1分程度かかります</p>
+    </div>
+  `
+  
+  try {
+    const response = await axios.post('/api/media/generate-suno-music', {
+      lyrics: window.musicLyrics || '小数のかけ算の歌',
+      style: 'educational pop japanese children'
+    })
+    
+    if (response.data.success) {
+      demoArea.innerHTML = `
+        <div class="bg-white p-4 rounded-lg border-2 border-purple-300">
+          <h4 class="font-bold text-purple-800 mb-3">🎤 Suno AIが生成した学習ソング</h4>
+          <div class="mb-4">
+            <audio controls class="w-full">
+              <source src="${response.data.musicUrl}" type="audio/mpeg">
+            </audio>
+          </div>
+          <div class="bg-purple-50 p-4 rounded mb-3">
+            <h5 class="font-bold text-sm mb-2">歌詞:</h5>
+            <pre class="text-sm whitespace-pre-wrap">${response.data.lyrics}</pre>
+          </div>
+          <p class="text-sm text-gray-600 bg-purple-50 p-3 rounded">${response.data.note}</p>
+        </div>
+      `
+    } else {
+      // APIキーが未設定の場合
+      demoArea.innerHTML = `
+        <div class="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-400">
+          <h4 class="font-bold text-yellow-800 mb-3">
+            <i class="fas fa-key mr-2"></i>Suno API Keyが必要です
+          </h4>
+          <div class="bg-white p-4 rounded mb-3 text-left">
+            <h5 class="font-bold text-sm mb-2">設定方法：</h5>
+            <pre class="text-xs bg-gray-100 p-3 rounded overflow-x-auto">${response.data.instructions}</pre>
+          </div>
+          <p class="text-sm text-gray-700">
+            <strong>現在はデモ音のみ利用可能です。</strong><br>
+            本番システムでSuno AIを統合すると、実際のAI生成音楽が再生できます。
+          </p>
+        </div>
+      `
+    }
+  } catch (error) {
+    console.error('Suno AI生成エラー:', error)
+    demoArea.innerHTML = `
+      <div class="bg-red-50 p-6 rounded-lg border-2 border-red-400">
+        <h4 class="font-bold text-red-800 mb-3">
+          <i class="fas fa-exclamation-triangle mr-2"></i>エラーが発生しました
+        </h4>
+        <p class="text-sm text-gray-700 mb-3">${error.message}</p>
+        <p class="text-sm text-gray-600">
+          <strong>現在はデモ音のみ利用可能です。</strong><br>
+          本番システムでSuno APIキーを設定すると、実際のAI生成音楽が利用できます。
+        </p>
+      </div>
+    `
+  }
+}
+
+window.generateRealSunoMusic = generateRealSunoMusic
 
 console.log('✅ Phase 17-19: 深層学習・マルチモーダル・大規模展開 機能読み込み完了')
 

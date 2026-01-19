@@ -5,6 +5,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 type Bindings = {
   DB: D1Database
   GEMINI_API_KEY?: string
+  SUNO_API_KEY?: string
   PROGRESS_WEBSOCKET?: DurableObjectNamespace
 }
 
@@ -9011,16 +9012,16 @@ app.post('/api/media/generate-video', async (c) => {
         }
         .title { 
           text-align: center; 
-          padding: 20px; 
-          font-size: 32px; 
+          padding: 15px; 
+          font-size: 28px; 
           font-weight: bold; 
           color: #1e40af; 
         }
         .stage {
           position: relative;
           width: 100%;
-          height: 500px;
-          padding: 20px;
+          height: 480px;
+          padding: 10px;
         }
         .block { 
           width: 100px; 
@@ -9046,7 +9047,7 @@ app.post('/api/media/generate-video', async (c) => {
           top: 220px;
           left: 50%;
           transform: translateX(-50%);
-          font-size: 40px;
+          font-size: 36px;
           font-weight: bold;
           color: #6b7280;
           opacity: 0;
@@ -9054,10 +9055,10 @@ app.post('/api/media/generate-video', async (c) => {
         }
         .result { 
           position: absolute; 
-          top: 320px; 
+          top: 310px; 
           left: 50%; 
           transform: translateX(-50%); 
-          font-size: 64px; 
+          font-size: 56px; 
           font-weight: bold; 
           color: #3b82f6; 
           opacity: 0; 
@@ -9068,10 +9069,10 @@ app.post('/api/media/generate-video', async (c) => {
           0% { opacity: 0; transform: scale(0) rotate(180deg); }
           100% { opacity: 1; transform: scale(1) rotate(0deg); } 
         }
-        @keyframes move1 { to { top: 180px; left: 15%; } }
-        @keyframes move2 { to { top: 180px; left: 35%; } }
-        @keyframes move3 { to { top: 180px; left: 55%; } }
-        @keyframes move4 { to { top: 180px; left: 75%; } }
+        @keyframes move1 { to { top: 150px; left: 15%; } }
+        @keyframes move2 { to { top: 150px; left: 35%; } }
+        @keyframes move3 { to { top: 150px; left: 55%; } }
+        @keyframes move4 { to { top: 150px; left: 75%; } }
         @keyframes equationAppear { 
           0% { opacity: 0; transform: translateX(-50%) scale(0.5); }
           100% { opacity: 1; transform: translateX(-50%) scale(1); } 
@@ -9178,6 +9179,92 @@ app.post('/api/media/generate-music', async (c) => {
     style: style || 'educational-pop',
     note: 'リズムに乗って覚えやすい学習ソングを作成しました'
   })
+})
+
+// メディア生成API - Suno AIで実際の音楽生成
+app.post('/api/media/generate-suno-music', async (c) => {
+  const { lyrics, style } = await c.req.json()
+  const { env } = c
+  
+  // Suno API Keyの確認
+  const sunoApiKey = env.SUNO_API_KEY
+  
+  if (!sunoApiKey) {
+    return c.json({
+      success: false,
+      error: 'Suno API Keyが設定されていません',
+      instructions: `
+Suno AIのAPIキーを設定する方法：
+
+1. Suno AIアカウントを作成
+   https://suno.ai にアクセスしてアカウント作成
+
+2. APIキーを取得
+   https://suno.ai/api-keys からAPIキーを生成
+
+3. Cloudflare Secretsに設定
+   wrangler secret put SUNO_API_KEY --project-name jiyushindo-gakushu
+   
+4. ローカル開発用（.dev.vars ファイル）
+   SUNO_API_KEY=your-api-key-here
+
+詳細: https://suno.ai/docs
+      `.trim()
+    }, 400)
+  }
+  
+  try {
+    console.log('🎵 Suno AI音楽生成開始...')
+    
+    // Suno AI API呼び出し
+    // Note: 実際のSuno APIのエンドポイントとパラメータは公式ドキュメントを参照
+    const response = await fetch('https://api.suno.ai/v1/generate', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${sunoApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        prompt: lyrics,
+        style: style || 'educational pop japanese children',
+        duration: 60,
+        instrumental: false
+      })
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Suno API Error:', errorText)
+      return c.json({
+        success: false,
+        error: 'Suno API呼び出しに失敗しました',
+        details: errorText
+      }, response.status)
+    }
+    
+    const data = await response.json()
+    
+    console.log('✅ Suno AI音楽生成完了')
+    
+    return c.json({
+      success: true,
+      musicUrl: data.audio_url || data.url,
+      imageUrl: data.image_url || data.cover_url,
+      duration: data.duration,
+      lyrics: lyrics,
+      style: style,
+      generationId: data.id,
+      note: 'Suno AIで生成された学習ソング'
+    })
+    
+  } catch (error: any) {
+    console.error('Suno AI生成エラー:', error)
+    return c.json({
+      success: false,
+      error: '音楽生成中にエラーが発生しました',
+      details: error.message
+    }, 500)
+  }
 })
 
 // メディア生成API - インタラクティブ教材生成
