@@ -1089,10 +1089,10 @@ async function loadGuidePage(curriculumId) {
                 ${commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0 ? `
                   <div class="bg-white rounded-xl p-4 mb-3">
                     <h4 class="font-bold text-gray-800 text-center mb-3">
-                      📝 ${commonCheckTest.test_description}
+                      📝 ${commonCheckTest.test_description || 'チェックテスト'}
                     </h4>
                     <p class="text-sm text-gray-600 text-center mb-4">
-                      ${commonCheckTest.test_note}
+                      ${commonCheckTest.test_note || '基礎基本を確認する問題です'}
                     </p>
                     <div class="space-y-3">
                       ${commonCheckTest.sample_problems.map((problem, index) => `
@@ -2255,13 +2255,13 @@ async function loadCardPage(cardId) {
                   <i class="fas fa-check-circle mr-2"></i>解答
                 </h3>
                 <div class="bg-white rounded-lg p-4 mb-4">
-                  <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer?.answer_content || card.answer || card.example_solution || '解答は準備中です'}</pre>
+                  <div class="text-gray-800 whitespace-pre-wrap font-sans" style="line-height: 1.8;">${(answer?.answer_content || card.answer || card.example_solution || '解答は準備中です').replace(/\n/g, '<br>')}</div>
                 </div>
                 <div class="bg-blue-50 rounded-lg p-4">
                   <h4 class="font-bold text-blue-800 mb-2">
                     <i class="fas fa-info-circle mr-2"></i>解説
                   </h4>
-                  <pre class="text-gray-700 whitespace-pre-wrap font-sans">${answer?.explanation || card.real_world_connection || '解説は準備中です'}</pre>
+                  <div class="text-gray-700 whitespace-pre-wrap font-sans" style="line-height: 1.8;">${(answer?.explanation || card.real_world_connection || '解説は準備中です').replace(/\n/g, '<br>')}</div>
                 </div>
               </div>
             ` : `
@@ -7480,13 +7480,13 @@ function showTeacherOverview(unitData) {
                   <p class="text-sm font-bold text-green-800 mb-2">
                     <i class="fas fa-check-circle mr-1"></i>解答
                   </p>
-                  <p class="text-gray-700">${card.answer || card.example_solution || '解答は例題の解き方を参照してください'}</p>
+                  <div class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer || card.example_solution || '解答は例題の解き方を参照してください').replace(/\n/g, '<br>')}</div>
                 </div>
                 <div class="bg-blue-50 p-3 rounded-lg">
                   <p class="text-sm font-bold text-blue-800 mb-2">
                     <i class="fas fa-info-circle mr-1"></i>解説
                   </p>
-                  <p class="text-gray-700">${card.answer_explanation || card.real_world_connection || '解説は準備中です'}</p>
+                  <div class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer_explanation || card.real_world_connection || '解説は準備中です').replace(/\n/g, '<br>')}</div>
                 </div>
               </div>
             `).join('')}
@@ -7509,12 +7509,12 @@ function showTeacherOverview(unitData) {
         ${commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0 ? `
           <div class="bg-gradient-to-br from-yellow-50 to-white border-2 border-yellow-300 rounded-xl p-6 mb-4">
             <h3 class="font-bold text-yellow-800 mb-2 text-xl">
-              📝 ${commonCheckTest.test_description}
+              📝 ${commonCheckTest.test_description || 'チェックテスト'}
             </h3>
-            <p class="text-sm text-gray-700 mb-4">${commonCheckTest.test_note}</p>
+            <p class="text-sm text-gray-700 mb-4">${commonCheckTest.test_note || '基礎基本を確認する問題です'}</p>
             <div class="bg-white rounded-lg p-4">
               <p class="font-bold text-gray-800 mb-2">
-                問題数: ${commonCheckTest.problems_count}題
+                問題数: ${commonCheckTest.problems_count || commonCheckTest.sample_problems.length}題
               </p>
             </div>
           </div>
