@@ -75,9 +75,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://8d0808a3.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://65fee976.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `c5a1486` (アニメーション拡大・TTS音声改善・Suno AI説明追加)
+- **最終コミット**: `f7980c7` (アニメーション位置修正・体験型シミュレーター動作修正)
 
 ## 🎉 実装完了した全機能
 
