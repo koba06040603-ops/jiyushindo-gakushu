@@ -1128,9 +1128,10 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://35132549.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://af9f6aec.jiyushindo-gakushu.pages.dev ✅
+- **テストページ**: https://af9f6aec.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `cff2643` (loadProgressBoard関数をグローバルに登録して進捗ボード表示を修正)
+- **最終コミット**: `384338e` (テストページルート追加とビルドスクリプト修正)
 
 ## 🔐 デモアカウント
 
