@@ -75,9 +75,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://0acdfcde.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://6aba2205.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `5bf1bc7` (実際に動作するメディア生成API実装)
+- **最終コミット**: `afd5639` (学習内容に即したメディア生成機能の実装)
 
 ## 🎉 実装完了した全機能
 
