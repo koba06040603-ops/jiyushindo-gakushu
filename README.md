@@ -63,9 +63,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://bea8673d.jiyushindo-gakushu.pages.dev
+- **最新デプロイ**: https://bf05879d.jiyushindo-gakushu.pages.dev
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `9fb25ae` (単元生成API修正 - extractJSONヘルパー統一)
+- **最終コミット**: `ba7837f` (JSON清理強化 - 制御文字・不正カンマ対応)
 
 ## 🎉 実装完了した全機能
 
