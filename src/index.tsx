@@ -9221,49 +9221,103 @@ AI音楽生成APIキーを設定する方法：
   }
   
   try {
-    console.log('🎵 AI音楽生成開始（AIML API）...')
+    console.log('🎵 AI音楽生成開始（AIML API - MiniMax Music 2.0）...')
     
-    // AIML API経由でSuno相当の音楽生成
-    // https://aimlapi.com/docs を参照
-    const response = await fetch('https://api.aimlapi.com/v1/music/generate', {
+    // AIML API経由でMiniMax Music 2.0を使用
+    // https://docs.aimlapi.com/api-references/music-models/minimax/music-2.0
+    const generateResponse = await fetch('https://api.aimlapi.com/v2/generate/audio', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${aimlApiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'suno-v3.5', // または 'minimax-music'
-        prompt: lyrics,
-        style: style || 'educational pop japanese children',
-        make_instrumental: false,
-        wait_audio: true // 音声生成完了まで待機
+        model: 'minimax/music-2.0',
+        prompt: style || 'A cheerful educational pop song for children learning math, upbeat and memorable',
+        lyrics: lyrics
       })
     })
     
-    if (!response.ok) {
-      const errorText = await response.text()
+    if (!generateResponse.ok) {
+      const errorText = await generateResponse.text()
       console.error('AIML API Error:', errorText)
       return c.json({
         success: false,
         error: 'AI音楽生成APIの呼び出しに失敗しました',
         details: errorText
-      }, response.status)
+      }, generateResponse.status)
     }
     
-    const data = await response.json()
+    const generateData = await generateResponse.json()
+    const generationId = generateData.id
     
-    console.log('✅ AI音楽生成完了')
+    if (!generationId) {
+      return c.json({
+        success: false,
+        error: '生成IDの取得に失敗しました',
+        details: generateData
+      }, 500)
+    }
     
+    console.log('🎵 音楽生成タスク作成: ' + generationId)
+    
+    // 生成完了を待つ（最大3分）
+    const maxAttempts = 12 // 12回 × 15秒 = 3分
+    let attempts = 0
+    
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 15000)) // 15秒待機
+      
+      const statusResponse = await fetch(
+        `https://api.aimlapi.com/v2/generate/audio?generation_id=${generationId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${aimlApiKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+      
+      if (!statusResponse.ok) {
+        const errorText = await statusResponse.text()
+        console.error('Status check error:', errorText)
+        attempts++
+        continue
+      }
+      
+      const statusData = await statusResponse.json()
+      console.log(`🎵 生成ステータス (${attempts + 1}/${maxAttempts}): ${statusData.status}`)
+      
+      if (statusData.status === 'completed') {
+        console.log('✅ AI音楽生成完了')
+        
+        return c.json({
+          success: true,
+          musicUrl: statusData.audio_file?.url,
+          duration: statusData.extra_info?.music_duration / 1000, // ミリ秒を秒に変換
+          lyrics: lyrics,
+          style: style,
+          generationId: generationId,
+          note: 'AIが生成した学習ソング（MiniMax Music 2.0経由）'
+        })
+      } else if (statusData.status === 'failed') {
+        return c.json({
+          success: false,
+          error: '音楽生成に失敗しました',
+          details: statusData
+        }, 500)
+      }
+      
+      attempts++
+    }
+    
+    // タイムアウト
     return c.json({
-      success: true,
-      musicUrl: data.audio_url || data.url || data.data?.audio_url,
-      imageUrl: data.image_url || data.cover_url || data.data?.image_url,
-      duration: data.duration || data.data?.duration,
-      lyrics: lyrics,
-      style: style,
-      generationId: data.id || data.data?.id,
-      note: 'AIが生成した学習ソング（AIML API経由）'
-    })
+      success: false,
+      error: '音楽生成がタイムアウトしました（3分以上）',
+      note: '生成には時間がかかる場合があります。後でもう一度お試しください。'
+    }, 408)
     
   } catch (error: any) {
     console.error('AI音楽生成エラー:', error)
