@@ -72,9 +72,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://51aaad8f.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://d5a2ea45.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `17f1089` (NOT NULL制約エラー修正 - optional_problemsテーブルへの安全な挿入)
+- **最終コミット**: `bd885e2` (JSON抽出強化 - 未閉じ引用符検出と詳細エラーロギング)
 
 ## 🎉 実装完了した全機能
 
