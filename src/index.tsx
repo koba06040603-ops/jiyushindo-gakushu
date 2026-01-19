@@ -898,11 +898,19 @@ app.get('/api/progress-board/class/:classCode', async (c) => {
       
       // 各カリキュラムの進捗を取得
       for (const curriculumId of curriculumList) {
-        // 学習カード進捗（ビューを使用）
+        // 学習カード進捗
         const cardProgress = await env.DB.prepare(`
-          SELECT * FROM v_progress_board 
-          WHERE student_id = ? AND curriculum_id = ?
-          ORDER BY course_level, card_number
+          SELECT 
+            sp.*,
+            c.course_level,
+            c.course_display_name,
+            lc.card_number,
+            lc.card_title
+          FROM student_progress sp
+          JOIN courses c ON sp.course_id = c.id
+          JOIN learning_cards lc ON sp.learning_card_id = lc.id
+          WHERE sp.student_id = ? AND sp.curriculum_id = ?
+          ORDER BY c.course_level, lc.card_number
         `).bind(student.id, curriculumId).all()
         
         // チェックテスト進捗

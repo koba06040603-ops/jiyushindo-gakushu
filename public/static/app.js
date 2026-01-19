@@ -3574,9 +3574,11 @@ async function loadAnswersTab(curriculumId) {
 // 進捗ボード用カリキュラム選択モーダル
 async function showProgressBoardSelection() {
   try {
+    console.log('📊 進捗ボード選択画面を表示中...')
     // 全カリキュラムを取得
     const response = await axios.get('/api/curriculum/list')
     const curriculums = response.data
+    console.log('📚 取得したカリキュラム:', curriculums)
     
     if (curriculums.length === 0) {
       alert('カリキュラムがまだ作成されていません。\n先に「AIで学習カードを作成する」から単元を作成してください。')
@@ -3636,6 +3638,7 @@ async function showProgressBoardSelection() {
 }
 
 async function loadProgressBoard(curriculumId, curriculumId2 = null) {
+  console.log('🎯 進捗ボード読み込み開始:', curriculumId)
   state.currentView = 'progress'
   showLoading('進捗ボードを読み込み中...')
   
@@ -3644,12 +3647,15 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
     const curriculumIds = curriculumId2 ? `${curriculumId},${curriculumId2}` : curriculumId
     const curriculums = []
     
+    console.log('📖 カリキュラム情報を取得中...', curriculumIds)
     for (const id of curriculumIds.split(',')) {
       const response = await axios.get(`/api/curriculum/${id}`)
       curriculums.push(response.data)
+      console.log(`✅ カリキュラム ${id} 取得完了:`, response.data.curriculum)
     }
     
     // 進捗ボードデータ取得（新しいAPI）
+    console.log('📊 進捗データを取得中...', state.student.classCode)
     const progressResponse = await axios.get(
       `/api/progress-board/class/${state.student.classCode}?curriculumIds=${curriculumIds}`
     )
@@ -3815,9 +3821,10 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
       </div>
     `
   } catch (error) {
-    console.error('進捗ボード読み込みエラー:', error)
+    console.error('❌ 進捗ボード読み込みエラー:', error)
+    console.error('エラー詳細:', error.response?.data || error.message)
     hideLoading()
-    alert('データの読み込みに失敗しました: ' + error.message)
+    alert('データの読み込みに失敗しました: ' + (error.response?.data?.error || error.message))
   }
 }
 
