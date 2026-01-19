@@ -72,9 +72,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://c9c1c1b4.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://3f3aa1d3.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `2486832` (アラート削除と解答解説の追加)
+- **最終コミット**: `5b29a9f` (undefined表示の修正と解説表示の改善)
 
 ## 🎉 実装完了した全機能
 
