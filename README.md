@@ -1126,9 +1126,9 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://97b7eaa5.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://4243dd9a.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `9090241` (Phase 1 MVP: 学習ログデータ収集機能実装)
+- **最終コミット**: `34be790` (児童向け友達助け合いシステム実装)
 
 ## 🎉 実装完了した全機能
 
