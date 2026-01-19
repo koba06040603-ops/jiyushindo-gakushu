@@ -47,6 +47,32 @@ const state = {
   }
 }
 
+// ローディング表示関数
+function showLoading(message = '読み込み中...') {
+  // 既存のローディングを削除
+  hideLoading()
+  
+  const loading = document.createElement('div')
+  loading.id = 'global-loading'
+  loading.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+  loading.innerHTML = `
+    <div class="bg-white rounded-lg shadow-xl p-8 max-w-md">
+      <div class="flex items-center space-x-4">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-600"></div>
+        <p class="text-xl text-gray-700">${message}</p>
+      </div>
+    </div>
+  `
+  document.body.appendChild(loading)
+}
+
+function hideLoading() {
+  const loading = document.getElementById('global-loading')
+  if (loading) {
+    loading.remove()
+  }
+}
+
 // グローバル関数を後で登録するためのプレースホルダー
 // これらの関数は後で定義されますが、先にwindowオブジェクトに登録しておきます
 window.showProgressBoardSelection = async function() {
@@ -15484,6 +15510,8 @@ window.requestPeerHelp = requestPeerHelp
 window.sendPeerHelpRequest = sendPeerHelpRequest
 window.checkHelpRequests = checkHelpRequests
 window.respondToPeerHelp = respondToPeerHelp
+window.showLoading = showLoading
+window.hideLoading = hideLoading
 
 
 console.log('✅ Phase 17-19: 深層学習・マルチモーダル・大規模展開 機能読み込み完了')
@@ -15495,5 +15523,7 @@ console.log('  showProgressBoardSelection:', typeof window.showProgressBoardSele
 console.log('  showDemoWeeklyReport:', typeof window.showDemoWeeklyReport)
 console.log('  loadProgressBoard:', typeof window.loadProgressBoard)
 console.log('  renderTopPage:', typeof window.renderTopPage)
+console.log('  showLoading:', typeof window.showLoading)
+console.log('  hideLoading:', typeof window.hideLoading)
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
