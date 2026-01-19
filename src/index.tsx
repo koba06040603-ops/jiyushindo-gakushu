@@ -3121,7 +3121,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "course_label": "じっくり考えながら進むコース",
       "description": "ひとつひとつていねいに学びたい人におすすめ",
       "color_code": "green",
-      "cards": [{"card_number":1,"card_title":"タイトル","card_type":"main","textbook_page":"p.XX","problem_description":"問題","new_terms":"用語","example_problem":"例題","example_solution":"解法","real_world_connection":"つながり","answer":"解答（必須）","hints":[{"hint_level":1,"hint_text":"ヒント1"},{"hint_level":2,"hint_text":"ヒント2"},{"hint_level":3,"hint_text":"ヒント3"}]},
+      "cards": [{"card_number":1,"card_title":"タイトル","card_type":"main","textbook_page":"p.XX","problem_description":"問題","new_terms":"用語","example_problem":"例題","example_solution":"解法","real_world_connection":"つながり","answer":"解答（必須）","answer_explanation":"解答の説明・考え方（必須、100文字程度）","hints":[{"hint_level":1,"hint_text":"ヒント1"},{"hint_level":2,"hint_text":"ヒント2"},{"hint_level":3,"hint_text":"ヒント3"}]},
         ... 全6枚]
     },
     {"course_name":"しっかりコース","course_label":"自分のペースで学ぶコース","description":"しっかり考えて学びたい人","color_code":"blue","cards":[...全6枚]},
@@ -3131,7 +3131,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 
 【重要】
 - 3コース×各6枚=合計18枚のカード
-- 全カードにanswer（必須）
+- 全カードにanswer（解答、必須）
+- 全カードにanswer_explanation（解答の説明・考え方、必須、100文字程度）
 - 全カードにhints配列3つ（必須）
 - JSONコードブロックなし、完全なJSONのみ
 
@@ -3343,6 +3344,19 @@ app.post('/api/curriculum/save-generated', async (c) => {
         ).run()
         
         const cardId = cardResult.meta.last_row_id
+        
+        // 解答を保存（answersテーブル）
+        if (card.answer) {
+          await env.DB.prepare(`
+            INSERT INTO answers (
+              learning_card_id, answer_content, explanation
+            ) VALUES (?, ?, ?)
+          `).bind(
+            cardId,
+            card.answer,
+            card.answer_explanation || card.real_world_connection || ''
+          ).run()
+        }
         
         // ヒントカードを保存
         for (const hint of card.hints || []) {

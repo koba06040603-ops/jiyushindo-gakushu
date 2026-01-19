@@ -2257,14 +2257,12 @@ async function loadCardPage(cardId) {
                 <div class="bg-white rounded-lg p-4 mb-4">
                   <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer?.answer_content || card.answer || card.example_solution || '解答は準備中です'}</pre>
                 </div>
-                ${(answer?.explanation || card.real_world_connection) ? `
-                  <div class="bg-white rounded-lg p-4">
-                    <h4 class="font-bold text-gray-800 mb-2">
-                      <i class="fas fa-info-circle mr-2"></i>解説
-                    </h4>
-                    <pre class="text-gray-800 whitespace-pre-wrap font-sans">${answer?.explanation || card.real_world_connection}</pre>
-                  </div>
-                ` : ''}
+                <div class="bg-blue-50 rounded-lg p-4">
+                  <h4 class="font-bold text-blue-800 mb-2">
+                    <i class="fas fa-info-circle mr-2"></i>解説
+                  </h4>
+                  <pre class="text-gray-700 whitespace-pre-wrap font-sans">${answer?.explanation || card.real_world_connection || '解説は準備中です'}</pre>
+                </div>
               </div>
             ` : `
               <div id="answerSection" class="hidden bg-gray-50 border-l-4 border-gray-300 rounded-lg p-6">
@@ -6486,18 +6484,8 @@ async function saveGeneratedUnit(unitData) {
           console.warn('⚠️ 一部の追加問題生成に失敗:', failed)
           console.log('✅ 生成成功:', success)
           
-          // より詳細な状況を説明するメッセージ
-          const message = `⚠️ 問題生成の状況:\n\n` +
-                         `✅ 生成成功: ${success.length}件\n` +
-                         (success.length > 0 ? `   - ${success.join('\n   - ')}\n\n` : '') +
-                         `❌ 生成失敗: ${failed.length}件\n` +
-                         (failed.length > 0 ? `   - ${failed.join('\n   - ')}\n\n` : '') +
-                         `学習カード18枚は正常に生成されています。\n\n` +
-                         `「学習のてびき」を開いて確認できます。\n` +
-                         `失敗した問題は、後から「学習のてびき」画面で\n` +
-                         `自動補完されます。`
-          
-          alert(message)
+          // 重要: アラートは表示せず、学習のてびきで自動補完に任せる
+          console.info('💡 失敗した問題は「学習のてびき」画面で自動補完されます')
         }
       } catch (additionalError) {
         console.error('❌ 追加問題生成エラー:', additionalError)
@@ -7488,16 +7476,18 @@ function showTeacherOverview(unitData) {
                 <p class="font-bold text-gray-800 mb-2">
                   カード ${card.card_number}: ${card.card_title}
                 </p>
-                <div class="bg-white p-3 rounded-lg">
-                  <p class="text-sm font-bold text-orange-800 mb-2">📝 解答</p>
-                  <p class="text-gray-700">${card.example_solution || '解答例は例題の解き方を参照してください'}</p>
+                <div class="bg-white p-3 rounded-lg mb-2">
+                  <p class="text-sm font-bold text-green-800 mb-2">
+                    <i class="fas fa-check-circle mr-1"></i>解答
+                  </p>
+                  <p class="text-gray-700">${card.answer || card.example_solution || '解答は例題の解き方を参照してください'}</p>
                 </div>
-                ${card.real_world_connection ? `
-                  <div class="bg-white p-3 rounded-lg mt-2">
-                    <p class="text-sm font-bold text-blue-800 mb-2">💡 解説</p>
-                    <p class="text-gray-700">${card.real_world_connection}</p>
-                  </div>
-                ` : ''}
+                <div class="bg-blue-50 p-3 rounded-lg">
+                  <p class="text-sm font-bold text-blue-800 mb-2">
+                    <i class="fas fa-info-circle mr-1"></i>解説
+                  </p>
+                  <p class="text-gray-700">${card.answer_explanation || card.real_world_connection || '解説は準備中です'}</p>
+                </div>
               </div>
             `).join('')}
           </div>
