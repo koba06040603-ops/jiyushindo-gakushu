@@ -297,14 +297,14 @@ async function renderTopPage() {
         </h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button 
-            onclick="showProgressBoardSelection()"
+            id="show-progress-board-btn"
             class="bg-white text-blue-600 hover:bg-blue-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
             <i class="fas fa-chart-bar mr-2 text-xl"></i>
             進捗ボードを見る
             <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
           </button>
           <button 
-            onclick="showWeeklyReport()"
+            id="show-weekly-report-btn"
             class="bg-white text-indigo-600 hover:bg-indigo-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
             <i class="fas fa-calendar-week mr-2 text-xl"></i>
             週次レポート
@@ -597,6 +597,37 @@ async function updateUnitList() {
       startButton.disabled = !unitSelect.value
     })
   }
+  
+  // トップページのボタンにイベントリスナーを登録
+  setTimeout(() => {
+    console.log('🔧 トップページのイベントリスナー登録開始...')
+    
+    // 進捗ボードボタン
+    const progressBoardBtn = document.getElementById('show-progress-board-btn')
+    if (progressBoardBtn) {
+      progressBoardBtn.addEventListener('click', () => {
+        console.log('📊 進捗ボードボタンがクリックされました')
+        showProgressBoardSelection()
+      })
+      console.log('✅ 進捗ボードボタン登録完了')
+    } else {
+      console.log('ℹ️ 進捗ボードボタンが見つかりません（教師/管理者のみ表示）')
+    }
+    
+    // 週次レポートボタン
+    const weeklyReportBtn = document.getElementById('show-weekly-report-btn')
+    if (weeklyReportBtn) {
+      weeklyReportBtn.addEventListener('click', () => {
+        console.log('📅 週次レポートボタンがクリックされました')
+        showDemoWeeklyReport()
+      })
+      console.log('✅ 週次レポートボタン登録完了')
+    } else {
+      console.log('ℹ️ 週次レポートボタンが見つかりません（教師/管理者のみ表示）')
+    }
+    
+    console.log('✅ トップページのイベントリスナー登録完了')
+  }, 100)
 }
 
 // 単元を選択
