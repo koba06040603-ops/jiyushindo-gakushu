@@ -274,11 +274,11 @@ async function renderTopPage() {
         </div>
       </div>
 
-      <!-- 学習スタイル別サンプル（教育長向けプレゼンテーション用） -->
+      <!-- 学習スタイル別サンプル（プレゼン用） -->
       <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-xl p-8 mb-8">
         <div class="text-center">
           <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
-            👥 教育長向けプレゼンテーション
+            👥 プレゼン用サンプル
           </div>
           <h2 class="text-2xl font-bold text-white mb-3">
             <i class="fas fa-brain mr-2"></i>
@@ -13101,7 +13101,7 @@ async function editCardImageUrl(cardId, imageType) {
 window.editCardImageUrl = editCardImageUrl
 
 // ============================================
-// 学習スタイル別サンプルページ（教育長向けプレゼンテーション）
+// 学習スタイル別サンプルページ（プレゼン用サンプル）
 // ============================================
 function showLearningStyleSamples() {
   const app = document.getElementById('app')
@@ -13116,7 +13116,7 @@ function showLearningStyleSamples() {
           </button>
           <div class="text-center">
             <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-sm font-bold mb-4">
-              👥 教育長向けプレゼンテーション
+              👥 プレゼン用サンプル
             </div>
             <h1 class="text-4xl font-bold mb-3">
               <i class="fas fa-brain mr-3"></i>
