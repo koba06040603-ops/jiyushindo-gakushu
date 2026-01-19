@@ -72,9 +72,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://3f3aa1d3.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://67e55242.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `5b29a9f` (undefined表示の修正と解説表示の改善)
+- **最終コミット**: `fdfb4ce` (教育長向け学習スタイルサンプルページの追加)
 
 ## 🎉 実装完了した全機能
 
