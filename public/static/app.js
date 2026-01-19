@@ -3612,7 +3612,7 @@ async function showProgressBoardSelection() {
             <div class="space-y-4" id="curriculum-list">
               ${curriculums.map(c => `
                 <button 
-                  onclick="window.selectCurriculumForProgressBoard(${c.id})"
+                  data-curriculum-id="${c.id}"
                   class="curriculum-button w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white p-6 rounded-lg shadow-lg transition-all transform hover:scale-105 text-left">
                   <div class="flex items-center justify-between">
                     <div>
@@ -3638,27 +3638,50 @@ async function showProgressBoardSelection() {
       </div>
     `
     
-    // イベントリスナーを直接登録
-    document.getElementById('back-to-top').addEventListener('click', () => {
-      console.log('🏠 トップページに戻る')
-      renderTopPage()
-    })
-    
-    document.getElementById('back-to-top-bottom').addEventListener('click', () => {
-      console.log('🏠 トップページに戻る（下）')
-      renderTopPage()
-    })
-    
-    // 各カリキュラムボタンに個別にイベントリスナーを登録
-    document.querySelectorAll('.curriculum-button').forEach(button => {
-      button.addEventListener('click', () => {
+    // DOM生成完了を待ってイベントリスナーを登録
+    setTimeout(() => {
+      console.log('🔧 イベントリスナー登録開始...')
+      
+      // 戻るボタン（上）
+      const backToTopBtn = document.getElementById('back-to-top')
+      if (backToTopBtn) {
+        backToTopBtn.addEventListener('click', () => {
+          console.log('🏠 トップページに戻る')
+          renderTopPage()
+        })
+        console.log('✅ 戻るボタン（上）登録完了')
+      } else {
+        console.error('❌ 戻るボタン（上）が見つかりません')
+      }
+      
+      // 戻るボタン（下）
+      const backToTopBottomBtn = document.getElementById('back-to-top-bottom')
+      if (backToTopBottomBtn) {
+        backToTopBottomBtn.addEventListener('click', () => {
+          console.log('🏠 トップページに戻る（下）')
+          renderTopPage()
+        })
+        console.log('✅ 戻るボタン（下）登録完了')
+      } else {
+        console.error('❌ 戻るボタン（下）が見つかりません')
+      }
+      
+      // 各カリキュラムボタンに個別にイベントリスナーを登録
+      const buttons = document.querySelectorAll('.curriculum-button')
+      console.log('📋 カリキュラムボタン数:', buttons.length)
+      
+      buttons.forEach((button, index) => {
         const curriculumId = parseInt(button.dataset.curriculumId)
-        console.log('📌 カリキュラムボタンクリック:', curriculumId)
-        loadProgressBoard(curriculumId)
+        console.log(`📌 ボタン${index + 1}を登録中: ID=${curriculumId}`)
+        
+        button.addEventListener('click', () => {
+          console.log('🎯 カリキュラムボタンクリック:', curriculumId)
+          loadProgressBoard(curriculumId)
+        })
       })
-    })
-    
-    console.log('✅ イベントリスナー登録完了:', curriculums.length, 'カリキュラム')
+      
+      console.log('✅ イベントリスナー登録完了:', buttons.length, 'カリキュラム')
+    }, 100)
   } catch (error) {
     console.error('❌ カリキュラム一覧取得エラー:', error)
     alert('カリキュラムの読み込みに失敗しました: ' + error.message)
