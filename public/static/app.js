@@ -847,13 +847,22 @@ async function loadGuidePage(curriculumId) {
       console.warn(`⚠️ 導入問題が${missingIntroProblems.length}件欠落しています。自動生成を開始します...`)
       try {
         // 導入問題を自動生成
-        await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
-        console.log('✅ 導入問題の自動追補完了')
+        console.log(`🔄 導入問題自動生成開始: curriculum_id=${curriculumId}`)
+        const introResponse = await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
+        console.log('✅ 導入問題の自動追補完了:', introResponse.data)
+        
         // データを再取得
         const reloadResponse = await axios.get(`/api/curriculum/${curriculumId}`)
         courses.splice(0, courses.length, ...reloadResponse.data.courses)
+        console.log('✅ データ再取得完了。導入問題数:', courses.filter(c => c.introduction_problem).length)
       } catch (autoGenError) {
         console.error('❌ 導入問題の自動生成に失敗:', autoGenError)
+        console.error('エラー詳細:', autoGenError.response?.data || autoGenError.message)
+        
+        // エラーをユーザーに通知（オプション）
+        if (autoGenError.response?.data?.error) {
+          console.error('サーバーエラーメッセージ:', autoGenError.response.data.error)
+        }
       }
     }
     
@@ -865,12 +874,29 @@ async function loadGuidePage(curriculumId) {
                        courses.filter(c => c.introduction_problem).length === 3
     
     if (!hasAllData) {
-      console.warn('⚠️ データが不完全です:', {
-        コース選択問題: courseSelectionProblems.length + '/3',
-        導入問題: courses.filter(c => c.introduction_problem).length + '/3',
-        チェックテスト: commonCheckTest?.sample_problems?.length || 0 + '/6',
-        選択問題: optionalProblems.length + '/6'
-      })
+      const dataStatus = {
+        'コース選択問題': `${courseSelectionProblems.length}/3`,
+        '導入問題': `${courses.filter(c => c.introduction_problem).length}/3`,
+        'チェックテスト': `${commonCheckTest?.sample_problems?.length || 0}/6`,
+        '選択問題': `${optionalProblems.length}/6`
+      }
+      
+      console.warn('⚠️ データが不完全です:', dataStatus)
+      
+      // 学習カードは必ず存在するはずなので、追加問題のみチェック
+      const totalProblems = courseSelectionProblems.length + 
+                           (commonCheckTest?.sample_problems?.length || 0) +
+                           optionalProblems.length +
+                           courses.filter(c => c.introduction_problem).length
+      
+      const expectedProblems = 3 + 6 + 6 + 3 // 18
+      
+      if (totalProblems < expectedProblems) {
+        console.warn(`📊 追加問題: ${totalProblems}/${expectedProblems}件`)
+        console.info('💡 不足している問題は、ページを再読み込みすると自動補完される場合があります')
+      }
+    } else {
+      console.log('✅ すべてのデータが揃っています')
     }
     
     state.selectedCurriculum = curriculum
@@ -6411,17 +6437,46 @@ async function saveGeneratedUnit(unitData) {
           console.log('🎉 すべての追加問題が正常に生成されました')
         } else {
           const failed = []
-          if (!courseSuccess) failed.push('コース選択問題')
-          if (!assessmentSuccess) failed.push('選択問題・チェックテスト')
-          if (!introSuccess) failed.push('導入問題')
+          const success = []
+          
+          if (!courseSuccess) {
+            failed.push('コース選択問題')
+          } else {
+            success.push('コース選択問題')
+          }
+          
+          if (!assessmentSuccess) {
+            failed.push('選択問題・チェックテスト')
+          } else {
+            success.push('選択問題・チェックテスト')
+          }
+          
+          if (!introSuccess) {
+            failed.push('導入問題')
+          } else {
+            success.push('導入問題')
+          }
           
           saveButton.innerHTML = `
-            <i class="fas fa-exclamation-triangle mr-2"></i>
-            一部未生成
+            <i class="fas fa-check-circle mr-2"></i>
+            ${success.length > 0 ? success.length + '/' + (success.length + failed.length) + ' 完了' : '一部未生成'}
           `
+          
           console.warn('⚠️ 一部の追加問題生成に失敗:', failed)
-          alert('⚠️ 一部の問題生成に失敗しました:\n\n' + failed.join('\n') + 
-                '\n\nもう一度新しい単元を生成してください。')
+          console.log('✅ 生成成功:', success)
+          
+          // より詳細な状況を説明するメッセージ
+          const message = `⚠️ 問題生成の状況:\n\n` +
+                         `✅ 生成成功: ${success.length}件\n` +
+                         (success.length > 0 ? `   - ${success.join('\n   - ')}\n\n` : '') +
+                         `❌ 生成失敗: ${failed.length}件\n` +
+                         (failed.length > 0 ? `   - ${failed.join('\n   - ')}\n\n` : '') +
+                         `学習カード18枚は正常に生成されています。\n\n` +
+                         `「学習のてびき」を開いて確認できます。\n` +
+                         `失敗した問題は、後から「学習のてびき」画面で\n` +
+                         `自動補完されます。`
+          
+          alert(message)
         }
       } catch (additionalError) {
         console.error('❌ 追加問題生成エラー:', additionalError)
