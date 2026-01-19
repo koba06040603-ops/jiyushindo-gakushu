@@ -236,7 +236,7 @@ async function nightlyBatchGeneration() {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://5ac480a2.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://0c39d26c.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
 - **最終コミット**: `f7980c7` (アニメーション位置修正・体験型シミュレーター動作修正)
 
