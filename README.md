@@ -75,7 +75,7 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://e86c2a8c.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://d5a65720.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
 - **最終コミット**: `f7980c7` (アニメーション位置修正・体験型シミュレーター動作修正)
 
