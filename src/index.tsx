@@ -34,11 +34,23 @@ function extractJSON(aiResponse: string): any {
   // 改行コードを保持しながら、他の制御文字を削除
   jsonText = jsonText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
   
+  // 文字列値内の不正な改行をエスケープ
+  // "key": "value with
+  // newline" → "key": "value with\\nnewline"
+  jsonText = jsonText.replace(/"([^"]*?)"\s*:\s*"([^"]*)"/gs, (match, key, value) => {
+    // 値内の実際の改行を\\nに置換
+    const cleanValue = value.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
+    return `"${key}": "${cleanValue}"`
+  })
+  
   // 不正なカンマを修正（,, → ,）
   jsonText = jsonText.replace(/,\s*,/g, ',')
   
   // 配列・オブジェクト末尾の余分なカンマを削除
   jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1')
+  
+  // 文字列内のバックスラッシュのエスケープ漏れを修正
+  // "text\nmore" が "text\\nmore" になっていることを確認
   
   try {
     return JSON.parse(jsonText)
@@ -56,6 +68,7 @@ function extractJSON(aiResponse: string): any {
         const start = Math.max(0, pos - 100)
         const end = Math.min(jsonText.length, pos + 100)
         console.error(`Error context (pos ${pos}):`, jsonText.substring(start, end))
+        console.error(`Character at error position:`, jsonText.charAt(pos), `(code: ${jsonText.charCodeAt(pos)})`)
       }
     }
     
