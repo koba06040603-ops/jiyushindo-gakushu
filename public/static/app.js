@@ -3603,14 +3603,14 @@ async function showProgressBoardSelection() {
             
             <p class="text-gray-600 mb-6">表示したいカリキュラムを選択してください</p>
             
-            <div class="space-y-4">
+            <div class="space-y-4" id="curriculum-list">
               ${curriculums.map(c => `
                 <button 
-                  onclick="loadProgressBoard(${c.id})"
-                  class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white p-6 rounded-lg shadow-lg transition-all transform hover:scale-105 text-left">
+                  data-curriculum-id="${c.id}"
+                  class="curriculum-button w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white p-6 rounded-lg shadow-lg transition-all transform hover:scale-105 text-left">
                   <div class="flex items-center justify-between">
                     <div>
-                      <p class="text-sm opacity-90">${c.grade}年 ${c.subject}</p>
+                      <p class="text-sm opacity-90">${c.grade} ${c.subject}</p>
                       <p class="text-2xl font-bold">${c.unit_name}</p>
                       <p class="text-sm opacity-75 mt-1">${c.textbook || ''}</p>
                     </div>
@@ -3631,6 +3631,22 @@ async function showProgressBoardSelection() {
         </div>
       </div>
     `
+    
+    // イベント委譲でボタンクリックを処理
+    setTimeout(() => {
+      const curriculumList = document.getElementById('curriculum-list')
+      if (curriculumList) {
+        curriculumList.addEventListener('click', (e) => {
+          const button = e.target.closest('.curriculum-button')
+          if (button) {
+            const curriculumId = button.dataset.curriculumId
+            console.log('📌 カリキュラムボタンクリック:', curriculumId)
+            loadProgressBoard(parseInt(curriculumId))
+          }
+        })
+        console.log('✅ カリキュラムリストのイベントリスナー登録完了')
+      }
+    }, 100)
   } catch (error) {
     console.error('カリキュラム一覧取得エラー:', error)
     alert('カリキュラムの読み込みに失敗しました')
