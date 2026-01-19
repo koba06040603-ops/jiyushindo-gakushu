@@ -18,7 +18,7 @@ VALUES
   -- じっくりコース: learning_card_id 1-6
   (2, 1, 1, 1, 'completed', 3, NULL, 0, datetime('now', '-5 hours'), datetime('now', '-5 hours')),
   (2, 1, 1, 2, 'completed', 3, NULL, 0, datetime('now', '-4 hours'), datetime('now', '-4 hours')),
-  (2, 1, 1, 3, 'completed', 3, 'peer', 1, datetime('now', '-3 hours'), datetime('now', '-3 hours')),
+  (2, 1, 1, 3, 'completed', 3, 'friend', 1, datetime('now', '-3 hours'), datetime('now', '-3 hours')),
   (2, 1, 1, 4, 'completed', 3, NULL, 0, datetime('now', '-2 hours'), datetime('now', '-2 hours')),
   (2, 1, 1, 5, 'completed', 3, 'teacher', 2, datetime('now', '-1 hours'), datetime('now', '-1 hours')),
   (2, 1, 1, 6, 'in_progress', 3, 'teacher', 3, datetime('now', '-30 minutes'), datetime('now', '-5 minutes'));
