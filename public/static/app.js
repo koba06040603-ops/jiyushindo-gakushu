@@ -140,10 +140,18 @@ window.showProgressBoardSelection = async function() {
         const curriculumId = parseInt(button.dataset.curriculumId)
         console.log(`📌 ボタン${index + 1}を登録中: ID=${curriculumId}`)
         
-        button.addEventListener('click', () => {
+        button.addEventListener('click', async () => {
           console.log('🎯 カリキュラムボタンクリック:', curriculumId)
           if (window.loadProgressBoard) {
-            window.loadProgressBoard(curriculumId)
+            console.log('🔄 loadProgressBoard を呼び出します...')
+            try {
+              await window.loadProgressBoard(curriculumId)
+              console.log('✅ loadProgressBoard 完了')
+            } catch (error) {
+              console.error('❌ loadProgressBoard エラー:', error)
+            }
+          } else {
+            console.error('❌ window.loadProgressBoard が見つかりません！')
           }
         })
       })
@@ -2529,7 +2537,6 @@ window.saveLearningPlan = saveLearningPlan
 window.showIntegratedPrintPreview = showIntegratedPrintPreview
 window.selectCourse = selectCourse
 window.loadCardPage = loadCardPage
-window.loadProgressBoard = loadProgressBoard
 
 // ============================================
 // 学習カードページ
