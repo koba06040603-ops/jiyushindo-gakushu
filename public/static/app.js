@@ -141,13 +141,17 @@ window.showProgressBoardSelection = async function() {
       // 各カリキュラムボタンに個別にイベントリスナーを登録
       const buttons = document.querySelectorAll('.curriculum-button')
       console.log('📋 カリキュラムボタン数:', buttons.length)
+      console.log('🔍 window.loadProgressBoard の型:', typeof window.loadProgressBoard)
       
       buttons.forEach((button, index) => {
         const curriculumId = parseInt(button.dataset.curriculumId)
         console.log(`📌 ボタン${index + 1}を登録中: ID=${curriculumId}`)
         
         button.addEventListener('click', async () => {
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
           console.log('🎯 カリキュラムボタンクリック:', curriculumId)
+          console.log('🔍 window.loadProgressBoard:', typeof window.loadProgressBoard)
+          
           if (window.loadProgressBoard) {
             console.log('🔄 loadProgressBoard を呼び出します...')
             try {
@@ -155,10 +159,13 @@ window.showProgressBoardSelection = async function() {
               console.log('✅ loadProgressBoard 完了')
             } catch (error) {
               console.error('❌ loadProgressBoard エラー:', error)
+              console.error('❌ エラースタック:', error.stack)
             }
           } else {
             console.error('❌ window.loadProgressBoard が見つかりません！')
+            console.error('利用可能な window のプロパティ:', Object.keys(window).filter(k => k.includes('load')))
           }
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
         })
       })
       
@@ -15481,4 +15488,12 @@ window.respondToPeerHelp = respondToPeerHelp
 
 console.log('✅ Phase 17-19: 深層学習・マルチモーダル・大規模展開 機能読み込み完了')
 
+// 最終確認：重要な関数がグローバルに登録されているか
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+console.log('🔍 グローバル関数の最終確認:')
+console.log('  showProgressBoardSelection:', typeof window.showProgressBoardSelection)
+console.log('  showDemoWeeklyReport:', typeof window.showDemoWeeklyReport)
+console.log('  loadProgressBoard:', typeof window.loadProgressBoard)
+console.log('  renderTopPage:', typeof window.renderTopPage)
+console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
