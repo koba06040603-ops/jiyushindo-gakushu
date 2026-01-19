@@ -332,6 +332,24 @@ app.get('/api/curriculum', async (c) => {
 })
 
 // APIルート：学年と教科の一覧取得
+// APIルート：全カリキュラム一覧取得
+app.get('/api/curriculum/list', async (c) => {
+  const { env } = c
+  
+  try {
+    const curriculums = await env.DB.prepare(`
+      SELECT id, grade, subject, unit_name, textbook_company as textbook, created_at
+      FROM curriculum
+      ORDER BY created_at DESC
+    `).all()
+    
+    return c.json(curriculums.results)
+  } catch (error) {
+    console.error('Curriculum list error:', error)
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
 app.get('/api/curriculum/options', async (c) => {
   const { env } = c
   

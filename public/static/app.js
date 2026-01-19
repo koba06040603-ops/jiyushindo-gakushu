@@ -289,6 +289,31 @@ async function renderTopPage() {
         </div>
       </div>
 
+      ${state.auth.user && (state.auth.user.role === 'teacher' || state.auth.user.role === 'admin') ? `
+      <!-- 教師用メニュー -->
+      <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-xl p-6 mb-8">
+        <h2 class="text-2xl font-bold text-white mb-4 text-center">
+          <i class="fas fa-chalkboard-teacher mr-2"></i>教師用メニュー
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button 
+            onclick="showProgressBoardSelection()"
+            class="bg-white text-blue-600 hover:bg-blue-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
+            <i class="fas fa-chart-bar mr-2 text-xl"></i>
+            進捗ボードを見る
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+          <button 
+            onclick="showWeeklyReport()"
+            class="bg-white text-indigo-600 hover:bg-indigo-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
+            <i class="fas fa-calendar-week mr-2 text-xl"></i>
+            週次レポート
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- メインアクション：AI単元生成 -->
       <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-2xl p-10 mb-8">
         <div class="text-center mb-6">
@@ -3545,6 +3570,71 @@ async function loadAnswersTab(curriculumId) {
 // ============================================
 // 進捗ボードページ
 // ============================================
+
+// 進捗ボード用カリキュラム選択モーダル
+async function showProgressBoardSelection() {
+  try {
+    // 全カリキュラムを取得
+    const response = await axios.get('/api/curriculum/list')
+    const curriculums = response.data
+    
+    if (curriculums.length === 0) {
+      alert('カリキュラムがまだ作成されていません。\n先に「AIで学習カードを作成する」から単元を作成してください。')
+      return
+    }
+    
+    // モーダルを表示
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+          <div class="bg-white rounded-lg shadow-xl p-8">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-3xl font-bold text-gray-800">
+                <i class="fas fa-chart-bar mr-2 text-blue-600"></i>
+                進捗ボードを表示
+              </h2>
+              <button onclick="renderTopPage()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+              </button>
+            </div>
+            
+            <p class="text-gray-600 mb-6">表示したいカリキュラムを選択してください</p>
+            
+            <div class="space-y-4">
+              ${curriculums.map(c => `
+                <button 
+                  onclick="loadProgressBoard(${c.id})"
+                  class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white p-6 rounded-lg shadow-lg transition-all transform hover:scale-105 text-left">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="text-sm opacity-90">${c.grade}年 ${c.subject}</p>
+                      <p class="text-2xl font-bold">${c.unit_name}</p>
+                      <p class="text-sm opacity-75 mt-1">${c.textbook || ''}</p>
+                    </div>
+                    <i class="fas fa-arrow-right text-3xl"></i>
+                  </div>
+                </button>
+              `).join('')}
+            </div>
+            
+            <div class="mt-6 text-center">
+              <button 
+                onclick="renderTopPage()"
+                class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition">
+                <i class="fas fa-arrow-left mr-2"></i>トップページに戻る
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    console.error('カリキュラム一覧取得エラー:', error)
+    alert('カリキュラムの読み込みに失敗しました')
+  }
+}
+
 async function loadProgressBoard(curriculumId, curriculumId2 = null) {
   state.currentView = 'progress'
   showLoading('進捗ボードを読み込み中...')
