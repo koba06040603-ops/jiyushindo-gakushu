@@ -75,9 +75,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: Deploying... (AIメディア生成デモ機能の追加) ✅
+- **最新デプロイ**: https://8e6d6397.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `e4dfa26` (AIメディア生成デモ機能の追加)
+- **最終コミット**: `4c37e0e` (AIメディア生成デモ機能の追加とビルドスクリプト修正)
 
 ## 🎉 実装完了した全機能
 
