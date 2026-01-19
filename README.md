@@ -1128,11 +1128,11 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://e398838f.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://76ce14e7.jiyushindo-gakushu.pages.dev ✅
 - **本番URL**: https://jiyushindo-gakushu.pages.dev
-- **テストページ**: https://e398838f.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
+- **テストページ**: https://76ce14e7.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `ec13289` (DOM要素のnullチェック追加)
+- **最終コミット**: `dc6ff84` (詳細デバッグログ追加)
 
 ## 🔐 デモアカウント
 
