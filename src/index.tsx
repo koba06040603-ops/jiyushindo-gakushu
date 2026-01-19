@@ -30,12 +30,35 @@ function extractJSON(aiResponse: string): any {
   // 先頭・末尾の余分な文字を削除
   jsonText = jsonText.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '')
   
+  // JSONクリーニング: 不正な制御文字を削除
+  // 改行コードを保持しながら、他の制御文字を削除
+  jsonText = jsonText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+  
+  // 不正なカンマを修正（,, → ,）
+  jsonText = jsonText.replace(/,\s*,/g, ',')
+  
+  // 配列・オブジェクト末尾の余分なカンマを削除
+  jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1')
+  
   try {
     return JSON.parse(jsonText)
   } catch (error) {
     console.error('JSON parse error:', error)
     console.error('JSON text (first 500 chars):', jsonText.substring(0, 500))
+    console.error('JSON text (last 500 chars):', jsonText.substring(Math.max(0, jsonText.length - 500)))
     console.error('AI response (first 500 chars):', aiResponse.substring(0, 500))
+    
+    // エラー位置を特定
+    if (error instanceof SyntaxError && error.message.includes('position')) {
+      const posMatch = error.message.match(/position (\d+)/)
+      if (posMatch) {
+        const pos = parseInt(posMatch[1])
+        const start = Math.max(0, pos - 100)
+        const end = Math.min(jsonText.length, pos + 100)
+        console.error(`Error context (pos ${pos}):`, jsonText.substring(start, end))
+      }
+    }
+    
     throw new Error(`JSON parse failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
