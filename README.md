@@ -1128,9 +1128,9 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://eb690822.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://1c5dae5b.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `d811df5` (教師用進捗ボードへのアクセス改善)
+- **最終コミット**: `d5b1ef4` (進捗ボードAPI修正 - デモデータ表示対応)
 
 ## 🔐 デモアカウント
 
