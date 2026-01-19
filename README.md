@@ -32,6 +32,12 @@
 
 ## 🎨 最新アップデート（2026-01-18）
 
+### バグ修正と機能改善
+- **JSON抽出ヘルパー関数**: Gemini APIからの様々なJSON形式に対応
+- **導入問題自動生成**: 3コースの導入問題を自動生成する機能を修正
+- **エラーハンドリング**: バッククォート、空レスポンスなどのエッジケースに対応
+- **デバッグログ**: showAnswer()関数にデバッグログを追加
+
 ### 学習カード画像表示機能
 - **問題画像**: 学習カードの問題に画像URLを追加可能
 - **解答画像**: 解答に画像URLを追加可能
@@ -57,9 +63,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://68e0b1ce.jiyushindo-gakushu.pages.dev
+- **最新デプロイ**: https://7a4ef251.jiyushindo-gakushu.pages.dev
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `065fe50` (セキュリティ修正：漏洩APIキー削除 + 新APIキー設定完了)
+- **最終コミット**: `f7d93db` (JSON抽出ヘルパー + 導入問題生成修正)
 
 ## 🎉 実装完了した全機能
 
