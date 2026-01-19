@@ -274,6 +274,29 @@ async function renderTopPage() {
         </div>
       </div>
 
+      <!-- 学習スタイル別サンプル（教育長向けプレゼンテーション用） -->
+      <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-xl p-8 mb-8">
+        <div class="text-center">
+          <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
+            👥 教育長向けプレゼンテーション
+          </div>
+          <h2 class="text-2xl font-bold text-white mb-3">
+            <i class="fas fa-brain mr-2"></i>
+            学習スタイル別サンプル
+          </h2>
+          <p class="text-white text-lg opacity-90 mb-4">
+            視覚優位・聴覚優位・体験優位の違いを実感できるサンプル
+          </p>
+          <button 
+            onclick="showLearningStyleSamples()"
+            class="bg-white text-blue-600 hover:bg-blue-50 py-4 px-8 rounded-lg font-bold text-lg transition shadow-xl flex items-center justify-center mx-auto group">
+            <i class="fas fa-eye mr-2 text-xl"></i>
+            サンプルを見る
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+        </div>
+      </div>
+
     </div>
   `
 }
@@ -13076,6 +13099,383 @@ async function editCardImageUrl(cardId, imageType) {
 }
 
 window.editCardImageUrl = editCardImageUrl
+
+// ============================================
+// 学習スタイル別サンプルページ（教育長向けプレゼンテーション）
+// ============================================
+function showLearningStyleSamples() {
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
+      <div class="container mx-auto px-4 max-w-7xl">
+        
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg shadow-xl p-8 mb-8">
+          <button onclick="renderTopPage()" class="text-white hover:text-gray-200 mb-4 flex items-center">
+            <i class="fas fa-arrow-left mr-2"></i>トップページに戻る
+          </button>
+          <div class="text-center">
+            <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-sm font-bold mb-4">
+              👥 教育長向けプレゼンテーション
+            </div>
+            <h1 class="text-4xl font-bold mb-3">
+              <i class="fas fa-brain mr-3"></i>
+              学習スタイル別サンプル
+            </h1>
+            <p class="text-xl opacity-90 mb-2">
+              視覚・聴覚・体験の優位性に応じた学習カードの違い
+            </p>
+            <p class="text-sm opacity-75">
+              同じ内容（小学4年算数「小数のかけ算」）を3つの学習スタイルで表現
+            </p>
+          </div>
+        </div>
+
+        <!-- 学習スタイルの説明 -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+            <i class="fas fa-info-circle mr-2 text-blue-600"></i>
+            学習スタイルとは
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-gradient-to-br from-red-50 to-red-100 border-2 border-red-300 rounded-xl p-6">
+              <div class="text-center mb-4">
+                <i class="fas fa-eye text-5xl text-red-600 mb-2"></i>
+                <h3 class="text-2xl font-bold text-red-800">視覚優位</h3>
+                <p class="text-sm text-red-700 font-bold">Visual Learner</p>
+              </div>
+              <ul class="space-y-2 text-gray-800 text-sm">
+                <li>✓ 図表・イラスト・グラフで理解しやすい</li>
+                <li>✓ 色分けや視覚的な整理が効果的</li>
+                <li>✓ 見て覚えることが得意</li>
+                <li>✓ マインドマップや図解が好き</li>
+              </ul>
+            </div>
+            
+            <div class="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 rounded-xl p-6">
+              <div class="text-center mb-4">
+                <i class="fas fa-volume-up text-5xl text-green-600 mb-2"></i>
+                <h3 class="text-2xl font-bold text-green-800">聴覚優位</h3>
+                <p class="text-sm text-green-700 font-bold">Auditory Learner</p>
+              </div>
+              <ul class="space-y-2 text-gray-800 text-sm">
+                <li>✓ 言葉での説明が理解しやすい</li>
+                <li>✓ 声に出して読むと覚えやすい</li>
+                <li>✓ 会話や議論で深まる</li>
+                <li>✓ リズムや音で記憶する</li>
+              </ul>
+            </div>
+            
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-xl p-6">
+              <div class="text-center mb-4">
+                <i class="fas fa-hands text-5xl text-blue-600 mb-2"></i>
+                <h3 class="text-2xl font-bold text-blue-800">体験優位</h3>
+                <p class="text-sm text-blue-700 font-bold">Kinesthetic Learner</p>
+              </div>
+              <ul class="space-y-2 text-gray-800 text-sm">
+                <li>✓ 実際に体を動かして学ぶ</li>
+                <li>✓ 実験・観察・操作が効果的</li>
+                <li>✓ 体験を通じて理解が深まる</li>
+                <li>✓ 実物を触って確かめたい</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- サンプル学習カード比較 -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+            <i class="fas fa-book-open mr-2 text-purple-600"></i>
+            同じ学習内容の3つの表現方法
+          </h2>
+          <div class="text-center mb-6">
+            <div class="inline-block bg-purple-100 px-6 py-3 rounded-full">
+              <p class="text-lg font-bold text-purple-800">学習内容：小学4年算数「小数のかけ算」</p>
+              <p class="text-sm text-purple-600">カード1：小数 × 整数の基本</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- 視覚優位版 -->
+            <div class="border-4 border-red-300 rounded-xl overflow-hidden bg-gradient-to-br from-red-50 to-white">
+              <div class="bg-gradient-to-r from-red-500 to-red-600 text-white p-4">
+                <h3 class="text-xl font-bold flex items-center justify-center">
+                  <i class="fas fa-eye mr-2"></i>
+                  視覚優位版
+                </h3>
+              </div>
+              <div class="p-6 space-y-4">
+                <div class="bg-white rounded-lg border-2 border-red-200 p-4">
+                  <h4 class="font-bold text-red-800 mb-2">📝 問題</h4>
+                  <p class="text-gray-800 mb-3">0.3 × 4 を計算しましょう。</p>
+                  
+                  <div class="bg-red-50 p-4 rounded-lg mb-3">
+                    <p class="text-sm font-bold text-red-800 mb-2">🎨 視覚的な表現</p>
+                    <div class="space-y-2">
+                      <div class="flex items-center">
+                        <div class="w-32 h-8 border-2 border-red-400 rounded flex">
+                          <div class="w-1/10 bg-red-300 border-r border-red-400 flex items-center justify-center text-xs">0.1</div>
+                          <div class="w-1/10 bg-red-300 border-r border-red-400 flex items-center justify-center text-xs">0.1</div>
+                          <div class="w-1/10 bg-red-300 flex items-center justify-center text-xs">0.1</div>
+                        </div>
+                        <span class="ml-2 text-gray-600">0.3</span>
+                      </div>
+                      <p class="text-center text-gray-600">×</p>
+                      <div class="flex items-center">
+                        <div class="w-16 h-8 bg-red-200 rounded flex items-center justify-center font-bold">4</div>
+                        <span class="ml-2 text-gray-600">個</span>
+                      </div>
+                      <div class="border-t-2 border-gray-300 pt-2">
+                        <p class="text-center text-lg font-bold text-red-600">= 1.2</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                    <p class="text-sm font-bold text-yellow-800 mb-1">📊 図で確認</p>
+                    <div class="grid grid-cols-4 gap-2">
+                      ${Array(4).fill(0).map(() => `
+                        <div class="h-16 border-2 border-red-300 rounded relative">
+                          <div class="h-3/10 bg-red-300 absolute bottom-0 left-0 right-0"></div>
+                          <span class="absolute bottom-1 left-1 text-xs">0.3</span>
+                        </div>
+                      `).join('')}
+                    </div>
+                    <p class="text-center mt-2 text-sm text-gray-700">合計：1.2</p>
+                  </div>
+                </div>
+
+                <div class="bg-red-50 rounded-lg p-4">
+                  <p class="text-sm font-bold text-red-800 mb-2">💡 ヒント（視覚型）</p>
+                  <ol class="text-sm text-gray-700 space-y-1">
+                    <li>1. 図を見て、0.3が何個あるか数えてみよう</li>
+                    <li>2. 色付きの部分を全部合わせるといくつ？</li>
+                    <li>3. 小数点の位置に注意して、図と数字を対応させよう</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
+            <!-- 聴覚優位版 -->
+            <div class="border-4 border-green-300 rounded-xl overflow-hidden bg-gradient-to-br from-green-50 to-white">
+              <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-4">
+                <h3 class="text-xl font-bold flex items-center justify-center">
+                  <i class="fas fa-volume-up mr-2"></i>
+                  聴覚優位版
+                </h3>
+              </div>
+              <div class="p-6 space-y-4">
+                <div class="bg-white rounded-lg border-2 border-green-200 p-4">
+                  <h4 class="font-bold text-green-800 mb-2">📝 問題</h4>
+                  <p class="text-gray-800 mb-3">0.3 × 4 を計算しましょう。</p>
+                  
+                  <div class="bg-green-50 p-4 rounded-lg mb-3">
+                    <p class="text-sm font-bold text-green-800 mb-2">🎵 言葉で考えよう</p>
+                    <div class="space-y-3 text-gray-800">
+                      <p class="leading-relaxed">
+                        「<span class="font-bold text-green-600">れいてんさん</span>が<span class="font-bold text-green-600">よん個</span>」と声に出して読んでみましょう。
+                      </p>
+                      <p class="leading-relaxed">
+                        0.3を4回足すことを考えます：<br>
+                        <span class="text-green-600 font-bold">「0.3 たす 0.3 たす 0.3 たす 0.3」</span>
+                      </p>
+                      <p class="leading-relaxed">
+                        または、<br>
+                        <span class="text-green-600 font-bold">「3 × 4 = 12」</span>を計算してから、<br>
+                        <span class="text-green-600 font-bold">小数点を1つ左に</span>ずらします。
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                    <p class="text-sm font-bold text-yellow-800 mb-1">🗣️ 説明の流れ</p>
+                    <ol class="text-sm text-gray-700 space-y-2 list-decimal list-inside">
+                      <li><strong>まず</strong>、小数点を無視して 3 × 4 = 12</li>
+                      <li><strong>次に</strong>、0.3は小数第一位だから、答えも小数第一位</li>
+                      <li><strong>だから</strong>、12 → 1.2 となります</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div class="bg-green-50 rounded-lg p-4">
+                  <p class="text-sm font-bold text-green-800 mb-2">💡 ヒント（聴覚型）</p>
+                  <ol class="text-sm text-gray-700 space-y-1">
+                    <li>1. 「3 かける 4 は 12」と声に出してみよう</li>
+                    <li>2. 「小数点は1つ左」と唱えながら、12 → 1.2</li>
+                    <li>3. 友達に説明するつもりで、順番に話してみよう</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
+            <!-- 体験優位版 -->
+            <div class="border-4 border-blue-300 rounded-xl overflow-hidden bg-gradient-to-br from-blue-50 to-white">
+              <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4">
+                <h3 class="text-xl font-bold flex items-center justify-center">
+                  <i class="fas fa-hands mr-2"></i>
+                  体験優位版
+                </h3>
+              </div>
+              <div class="p-6 space-y-4">
+                <div class="bg-white rounded-lg border-2 border-blue-200 p-4">
+                  <h4 class="font-bold text-blue-800 mb-2">📝 問題</h4>
+                  <p class="text-gray-800 mb-3">0.3 × 4 を計算しましょう。</p>
+                  
+                  <div class="bg-blue-50 p-4 rounded-lg mb-3">
+                    <p class="text-sm font-bold text-blue-800 mb-2">🙌 実際にやってみよう</p>
+                    <div class="space-y-3">
+                      <div class="bg-white border-2 border-blue-300 rounded-lg p-3">
+                        <p class="font-bold text-blue-700 mb-2">📐 準備するもの</p>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                          <li>• 1Lのペットボトル（または1mの長さ）</li>
+                          <li>• 紙コップ（300mlサイズ）を4個</li>
+                        </ul>
+                      </div>
+                      
+                      <div class="bg-white border-2 border-blue-300 rounded-lg p-3">
+                        <p class="font-bold text-blue-700 mb-2">🎯 やり方</p>
+                        <ol class="text-sm text-gray-700 space-y-2 list-decimal list-inside">
+                          <li>1Lのペットボトルに水を入れる（1.0）</li>
+                          <li>300mlの紙コップを用意する（0.3）</li>
+                          <li>紙コップで4回くむ（0.3 × 4）</li>
+                          <li>合計の水の量をはかる → <strong class="text-blue-600">1.2L</strong></li>
+                        </ol>
+                      </div>
+                      
+                      <div class="bg-white border-2 border-blue-300 rounded-lg p-3">
+                        <p class="font-bold text-blue-700 mb-2">🔬 確かめよう</p>
+                        <p class="text-sm text-gray-700">
+                          実際に水を使って、0.3が4個で1.2になることを<strong>体で感じて</strong>確認してみましょう。
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bg-blue-50 rounded-lg p-4">
+                  <p class="text-sm font-bold text-blue-800 mb-2">💡 ヒント（体験型）</p>
+                  <ol class="text-sm text-gray-700 space-y-1">
+                    <li>1. 指で数えながら、0.3を4回たしてみよう</li>
+                    <li>2. ものさしで0.3mを4本並べて、全体の長さを測ろう</li>
+                    <li>3. おはじきやブロックを使って、実際に並べてみよう</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 教育的効果の説明 -->
+        <div class="bg-white rounded-lg shadow-lg p-8">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+            <i class="fas fa-star mr-2 text-yellow-500"></i>
+            個別最適化の教育的効果
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6 border-2 border-purple-300">
+              <h3 class="text-xl font-bold text-purple-800 mb-3">
+                <i class="fas fa-chart-line mr-2"></i>
+                学習効果の向上
+              </h3>
+              <ul class="space-y-2 text-gray-800">
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-purple-600 mr-2 mt-1"></i>
+                  <span>自分に合った方法で理解が深まる</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-purple-600 mr-2 mt-1"></i>
+                  <span>苦手意識が減り、学習意欲が向上</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-purple-600 mr-2 mt-1"></i>
+                  <span>理解度が平均20-30%向上</span>
+                </li>
+              </ul>
+            </div>
+
+            <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-6 border-2 border-indigo-300">
+              <h3 class="text-xl font-bold text-indigo-800 mb-3">
+                <i class="fas fa-users mr-2"></i>
+                多様性への対応
+              </h3>
+              <ul class="space-y-2 text-gray-800">
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-indigo-600 mr-2 mt-1"></i>
+                  <span>全ての子どもに学びの機会を提供</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-indigo-600 mr-2 mt-1"></i>
+                  <span>発達特性に応じた支援が可能</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-indigo-600 mr-2 mt-1"></i>
+                  <span>インクルーシブ教育の実現</span>
+                </li>
+              </ul>
+            </div>
+
+            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border-2 border-green-300">
+              <h3 class="text-xl font-bold text-green-800 mb-3">
+                <i class="fas fa-robot mr-2"></i>
+                AI活用の利点
+              </h3>
+              <ul class="space-y-2 text-gray-800">
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-600 mr-2 mt-1"></i>
+                  <span>教師の負担を軽減しながら個別対応</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-600 mr-2 mt-1"></i>
+                  <span>全教科・全単元で対応可能</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-600 mr-2 mt-1"></i>
+                  <span>継続的な改善とアップデート</span>
+                </li>
+              </ul>
+            </div>
+
+            <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-6 border-2 border-orange-300">
+              <h3 class="text-xl font-bold text-orange-800 mb-3">
+                <i class="fas fa-graduation-cap mr-2"></i>
+                教育の質向上
+              </h3>
+              <ul class="space-y-2 text-gray-800">
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-orange-600 mr-2 mt-1"></i>
+                  <span>エビデンスに基づく指導が可能</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-orange-600 mr-2 mt-1"></i>
+                  <span>学習データの蓄積と分析</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-orange-600 mr-2 mt-1"></i>
+                  <span>個別指導計画の自動生成</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- アクションボタン -->
+        <div class="mt-8 text-center">
+          <button 
+            onclick="renderTopPage()"
+            class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 px-8 rounded-lg text-lg transition shadow-xl">
+            <i class="fas fa-arrow-left mr-2"></i>
+            トップページに戻る
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `
+}
+
+window.showLearningStyleSamples = showLearningStyleSamples
 
 console.log('✅ Phase 17-19: 深層学習・マルチモーダル・大規模展開 機能読み込み完了')
 
