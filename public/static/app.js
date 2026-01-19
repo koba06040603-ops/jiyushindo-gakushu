@@ -2187,6 +2187,17 @@ async function selectCourse(courseId) {
             みんなの進捗を見る
           </button>
         </div>
+        
+        <!-- クラス進捗確認ボタン（児童用）-->
+        <div class="mt-4 text-center">
+          <button onclick="showClassProgress()" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-8 rounded-lg font-bold transition">
+            <i class="fas fa-users mr-2"></i>
+            クラスのみんなの進捗を見る
+          </button>
+          <p class="text-sm text-gray-600 mt-2">
+            できている友達に助けを求めることができます
+          </p>
+        </div>
       </div>
     `
   } catch (error) {
@@ -2746,11 +2757,74 @@ function callTeacher() {
 }
 
 // 友達に聞く
-function askFriend() {
+async function askFriend() {
   window.currentHelpType = 'friend'
   window.helpCount++
   
-  alert('この学習カードをクリアした友達に聞いてみましょう！\n\n※実際のクラスでは、進捗ボードで誰ができているか確認できます。')
+  try {
+    // 助けられる友達リストを取得
+    const response = await axios.get(
+      `/api/help/available-helpers/${state.student.classCode}/${state.selectedCurriculum.id}/${state.selectedCard}`
+    )
+    const { helpers } = response.data
+    
+    if (helpers.length === 0) {
+      alert('この問題をすでにクリアしている友達がまだいません。\n\nヒントカードやAI先生を使ってみましょう！')
+      return
+    }
+    
+    // 助けられる友達リストをモーダルで表示
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-auto p-8">
+        <h2 class="text-3xl font-bold text-green-600 mb-6">
+          <i class="fas fa-user-friends mr-3"></i>助けられる友達
+        </h2>
+        
+        <div class="bg-green-50 border-2 border-green-300 rounded-lg p-4 mb-6">
+          <p class="text-gray-700">
+            この問題をすでにクリアしている友達がいます！<br>
+            助けを求めてみましょう。
+          </p>
+        </div>
+        
+        <div class="space-y-4 mb-6">
+          ${helpers.map(helper => `
+            <div class="bg-white border-2 border-green-300 rounded-lg p-6 hover:bg-green-50 transition">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                  <div class="w-12 h-12 rounded-full bg-green-400 flex items-center justify-center text-white font-bold text-lg mr-4">
+                    ${helper.student_number}
+                  </div>
+                  <div>
+                    <h3 class="text-xl font-bold text-gray-800">${helper.name}</h3>
+                    <p class="text-sm text-gray-600">
+                      完了カード数: ${helper.total_completed}枚
+                    </p>
+                  </div>
+                </div>
+                <button onclick="requestPeerHelp('${helper.id}', '${helper.name}'); this.closest('.fixed').remove()" 
+                        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg">
+                  <i class="fas fa-comments mr-2"></i>助けを求める
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        
+        <button onclick="this.closest('.fixed').remove()" 
+                class="w-full bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg">
+          閉じる
+        </button>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    console.error('友達検索エラー:', error)
+    alert('この問題をすでにクリアしている友達がまだいません。\n\nヒントカードやAI先生を使ってみましょう！')
+  }
 }
 
 // 分かった度設定
@@ -14467,6 +14541,333 @@ async function generateRealSunoMusicWithStyle() {
 }
 
 window.generateRealSunoMusicWithStyle = generateRealSunoMusicWithStyle
+
+// =============================================================================
+// 児童向けクラス進捗確認 & 友達助け合い機能
+// =============================================================================
+
+// クラス進捗確認ページ（児童用シンプル版）
+async function showClassProgress() {
+  state.currentView = 'class-progress'
+  
+  try {
+    showLoading('クラスのみんなの進捗を確認中...')
+    
+    // クラス進捗データ取得
+    const response = await axios.get(`/api/progress/class-peer/${state.student.classCode}/${state.selectedCurriculum.id}`)
+    const { peers } = response.data
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg shadow-xl p-8 mb-8">
+          <button onclick="loadGuidePage(${state.selectedCurriculum.id})" 
+                  class="text-white hover:text-gray-200 mb-4 inline-flex items-center">
+            <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
+          </button>
+          <h1 class="text-4xl font-bold mb-3">
+            <i class="fas fa-users mr-3"></i>クラスのみんなの進捗
+          </h1>
+          <p class="text-xl opacity-90">
+            ${state.selectedCurriculum.unit_name}
+          </p>
+        </div>
+        
+        <!-- 説明 -->
+        <div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-6 mb-8">
+          <h3 class="text-xl font-bold text-blue-800 mb-3">
+            <i class="fas fa-info-circle mr-2"></i>友達に助けを求めよう！
+          </h3>
+          <p class="text-gray-700 mb-2">
+            たくさん問題をクリアしている友達は、<strong class="text-green-600">「助けられます」</strong>マークがついています。
+          </p>
+          <p class="text-gray-700">
+            困ったときは、その友達に助けを求めてみましょう！
+          </p>
+        </div>
+        
+        <!-- クラスメイト一覧 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          ${peers.map(peer => `
+            <div class="bg-white rounded-lg shadow-lg p-6 border-2 ${
+              peer.id === state.student.id ? 'border-purple-400 bg-purple-50' : 
+              peer.can_help ? 'border-green-400' : 'border-gray-300'
+            }">
+              <!-- 名前と出席番号 -->
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center">
+                  <div class="w-12 h-12 rounded-full ${
+                    peer.id === state.student.id ? 'bg-purple-400' :
+                    peer.can_help ? 'bg-green-400' : 'bg-gray-400'
+                  } flex items-center justify-center text-white font-bold text-lg mr-3">
+                    ${peer.student_number}
+                  </div>
+                  <div>
+                    <h3 class="text-xl font-bold text-gray-800">
+                      ${peer.name}
+                      ${peer.id === state.student.id ? '<span class="text-sm text-purple-600">(自分)</span>' : ''}
+                    </h3>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 進捗情報 -->
+              <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm text-gray-600">完了カード</span>
+                  <span class="text-2xl font-bold text-indigo-600">${peer.completed_cards}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                  <div class="bg-gradient-to-r from-indigo-400 to-purple-400 h-3 rounded-full" 
+                       style="width: ${Math.min((peer.completed_cards / 18) * 100, 100)}%"></div>
+                </div>
+              </div>
+              
+              <!-- ステータス -->
+              ${peer.can_help ? `
+                <div class="bg-green-50 border-2 border-green-300 rounded-lg p-3 text-center mb-3">
+                  <p class="text-green-700 font-bold">
+                    <i class="fas fa-hand-holding-heart mr-2"></i>助けられます！
+                  </p>
+                </div>
+              ` : peer.completed_cards > 0 ? `
+                <div class="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3 text-center mb-3">
+                  <p class="text-yellow-700 text-sm">
+                    <i class="fas fa-running mr-2"></i>がんばり中
+                  </p>
+                </div>
+              ` : `
+                <div class="bg-gray-50 border-2 border-gray-300 rounded-lg p-3 text-center mb-3">
+                  <p class="text-gray-600 text-sm">
+                    <i class="fas fa-clock mr-2"></i>これから
+                  </p>
+                </div>
+              `}
+              
+              <!-- アクションボタン -->
+              ${peer.can_help && peer.id !== state.student.id ? `
+                <button onclick="requestPeerHelp('${peer.id}', '${peer.name}')" 
+                        class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-lg transition">
+                  <i class="fas fa-comments mr-2"></i>助けを求める
+                </button>
+              ` : peer.id === state.student.id ? `
+                <button onclick="checkHelpRequests()" 
+                        class="w-full bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition">
+                  <i class="fas fa-bell mr-2"></i>ヘルプ要請を確認
+                </button>
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `
+    
+    hideLoading()
+  } catch (error) {
+    console.error('クラス進捗取得エラー:', error)
+    hideLoading()
+    alert('クラス進捗の読み込みに失敗しました')
+  }
+}
+
+// 友達に助けを求める
+async function requestPeerHelp(helperId, helperName) {
+  // 助けられる友達リストを取得
+  try {
+    const response = await axios.get(
+      `/api/help/available-helpers/${state.student.classCode}/${state.selectedCurriculum.id}/${state.selectedCard}`
+    )
+    const { helpers } = response.data
+    
+    if (helpers.length === 0) {
+      alert(`${helperName}さんはまだこの問題をクリアしていないようです。\n別の友達に聞いてみましょう！`)
+      return
+    }
+    
+    // モーダルを表示
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full p-8">
+        <h2 class="text-3xl font-bold text-green-600 mb-6">
+          <i class="fas fa-user-friends mr-3"></i>${helperName}さんに助けを求める
+        </h2>
+        
+        <div class="bg-green-50 border-2 border-green-300 rounded-lg p-6 mb-6">
+          <p class="text-gray-700 mb-3">
+            ${helperName}さんは、この問題をすでにクリアしています！
+          </p>
+          <p class="text-gray-700 font-bold">
+            どんなことを聞きたいですか？
+          </p>
+        </div>
+        
+        <textarea id="helpMessage" 
+                  class="w-full border-2 border-gray-300 rounded-lg p-4 mb-6 text-lg" 
+                  rows="4" 
+                  placeholder="例：この問題のやり方を教えてください"></textarea>
+        
+        <div class="flex gap-4">
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="flex-1 bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg">
+            キャンセル
+          </button>
+          <button onclick="sendPeerHelpRequest('${helperId}', '${helperName}')" 
+                  class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg">
+            <i class="fas fa-paper-plane mr-2"></i>送信する
+          </button>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    console.error('ヘルパー検索エラー:', error)
+    alert('エラーが発生しました')
+  }
+}
+
+// ヘルプ要請を送信
+async function sendPeerHelpRequest(helperId, helperName) {
+  const message = document.getElementById('helpMessage').value.trim()
+  
+  if (!message) {
+    alert('メッセージを入力してください')
+    return
+  }
+  
+  try {
+    showLoading('ヘルプ要請を送信中...')
+    
+    await axios.post('/api/help/request-peer', {
+      requester_id: state.student.id,
+      helper_id: helperId,
+      curriculum_id: state.selectedCurriculum.id,
+      learning_card_id: state.selectedCard,
+      message: message
+    })
+    
+    hideLoading()
+    
+    // モーダルを閉じる
+    document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
+    
+    // 成功メッセージ
+    alert(`${helperName}さんにヘルプ要請を送りました！\n\n${helperName}さんが見てくれるまで、もう少し待ってみましょう。`)
+  } catch (error) {
+    console.error('ヘルプ要請送信エラー:', error)
+    hideLoading()
+    alert('ヘルプ要請の送信に失敗しました')
+  }
+}
+
+// 自分宛のヘルプ要請を確認
+async function checkHelpRequests() {
+  try {
+    showLoading('ヘルプ要請を確認中...')
+    
+    const response = await axios.get(`/api/help/requests-for-me/${state.student.id}`)
+    const { requests } = response.data
+    
+    hideLoading()
+    
+    if (requests.length === 0) {
+      alert('現在、あなた宛のヘルプ要請はありません。')
+      return
+    }
+    
+    // モーダルを表示
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-auto p-8">
+        <h2 class="text-3xl font-bold text-purple-600 mb-6">
+          <i class="fas fa-bell mr-3"></i>あなた宛のヘルプ要請 (${requests.length}件)
+        </h2>
+        
+        <div class="space-y-4">
+          ${requests.map(req => `
+            <div class="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-xl font-bold text-gray-800">
+                  <i class="fas fa-user-circle mr-2"></i>${req.requester_name}さん
+                </h3>
+                <span class="text-sm text-gray-600">${new Date(req.created_at).toLocaleString('ja-JP')}</span>
+              </div>
+              
+              <div class="bg-white rounded p-4 mb-4">
+                <p class="text-sm text-gray-600 mb-2">
+                  <strong>単元：</strong>${req.unit_name}
+                </p>
+                <p class="text-sm text-gray-600 mb-2">
+                  <strong>カード：</strong>${req.card_title}
+                </p>
+                <p class="text-gray-700 font-bold">
+                  <i class="fas fa-comment mr-2"></i>${req.message}
+                </p>
+              </div>
+              
+              <div class="flex gap-3">
+                <button onclick="respondToPeerHelp(${req.id}, 'accepted', '${req.requester_name}')" 
+                        class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                  <i class="fas fa-check mr-2"></i>助けに行く
+                </button>
+                <button onclick="respondToPeerHelp(${req.id}, 'declined', '${req.requester_name}')" 
+                        class="flex-1 bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">
+                  <i class="fas fa-times mr-2"></i>今は無理
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        
+        <div class="mt-6">
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="w-full bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg">
+            閉じる
+          </button>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+  } catch (error) {
+    console.error('ヘルプ要請確認エラー:', error)
+    hideLoading()
+    alert('ヘルプ要請の確認に失敗しました')
+  }
+}
+
+// ヘルプ要請に応答
+async function respondToPeerHelp(requestId, response, requesterName) {
+  try {
+    await axios.post('/api/help/respond-peer', {
+      request_id: requestId,
+      response: response
+    })
+    
+    if (response === 'accepted') {
+      alert(`${requesterName}さんを助けに行きます！\n\n実際の教室では、${requesterName}さんの席に行って教えてあげましょう。`)
+    } else {
+      alert(`${requesterName}さんに「今は無理」と伝えました。`)
+    }
+    
+    // モーダルを閉じる
+    document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
+  } catch (error) {
+    console.error('応答送信エラー:', error)
+    alert('応答の送信に失敗しました')
+  }
+}
+
+// グローバルスコープに登録
+window.showClassProgress = showClassProgress
+window.requestPeerHelp = requestPeerHelp
+window.sendPeerHelpRequest = sendPeerHelpRequest
+window.checkHelpRequests = checkHelpRequests
+window.respondToPeerHelp = respondToPeerHelp
+
 
 console.log('✅ Phase 17-19: 深層学習・マルチモーダル・大規模展開 機能読み込み完了')
 

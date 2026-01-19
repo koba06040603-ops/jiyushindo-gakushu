@@ -1027,6 +1027,198 @@ app.post('/api/progress/activity', async (c) => {
   }
 })
 
+// =============================================================================
+// 児童向けクラス進捗確認 & 友達助け合い機能API
+// =============================================================================
+
+// 児童向けクラス進捗取得API（シンプル版・プライバシー配慮）
+app.get('/api/progress/class-peer/:classCode/:curriculumId', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    // クラスの全生徒と進捗状況を取得（シンプル版）
+    const classPeers = await env.DB.prepare(`
+      SELECT 
+        u.id,
+        u.name,
+        u.student_number,
+        COUNT(DISTINCT sp.learning_card_id) as completed_cards,
+        AVG(sp.understanding_level) as avg_understanding,
+        MAX(sp.created_at) as last_activity,
+        SUM(CASE WHEN sp.status = 'help_requested' THEN 1 ELSE 0 END) as is_asking_help
+      FROM users u
+      LEFT JOIN student_progress sp ON u.id = sp.student_id 
+        AND sp.curriculum_id = ? 
+        AND sp.status = 'completed'
+      WHERE u.class_code = ? AND u.role = 'student'
+      GROUP BY u.id, u.name, u.student_number
+      ORDER BY u.student_number
+    `).bind(curriculumId, classCode).all()
+    
+    // プライバシー配慮：理解度の詳細は隠して、完了カード数のみ表示
+    const simplifiedPeers = classPeers.results.map(peer => ({
+      id: peer.id,
+      name: peer.name,
+      student_number: peer.student_number,
+      completed_cards: peer.completed_cards || 0,
+      can_help: (peer.completed_cards || 0) >= 3 && (peer.avg_understanding || 0) >= 60, // 3枚以上完了 & 平均理解度60以上
+      is_asking_help: (peer.is_asking_help || 0) > 0,
+      last_activity: peer.last_activity
+    }))
+    
+    return c.json({ success: true, peers: simplifiedPeers })
+  } catch (error) {
+    console.error('クラス進捗取得エラー:', error)
+    return c.json({ success: false, error: 'データ取得に失敗しました' }, 500)
+  }
+})
+
+// 助けられる友達リスト取得API
+app.get('/api/help/available-helpers/:classCode/:curriculumId/:cardId', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  const curriculumId = c.req.param('curriculumId')
+  const cardId = c.req.param('cardId')
+  
+  try {
+    // このカードをすでにクリアしている友達を検索
+    const helpers = await env.DB.prepare(`
+      SELECT 
+        u.id,
+        u.name,
+        u.student_number,
+        sp.understanding_level,
+        sp.created_at as completed_at,
+        COUNT(DISTINCT sp2.learning_card_id) as total_completed
+      FROM users u
+      INNER JOIN student_progress sp ON u.id = sp.student_id
+        AND sp.curriculum_id = ?
+        AND sp.learning_card_id = ?
+        AND sp.status = 'completed'
+        AND sp.understanding_level >= 60
+      LEFT JOIN student_progress sp2 ON u.id = sp2.student_id
+        AND sp2.curriculum_id = ?
+        AND sp2.status = 'completed'
+      WHERE u.class_code = ? AND u.role = 'student'
+      GROUP BY u.id, u.name, u.student_number, sp.understanding_level, sp.created_at
+      HAVING total_completed >= 3
+      ORDER BY sp.understanding_level DESC, sp.created_at ASC
+      LIMIT 10
+    `).bind(curriculumId, cardId, curriculumId, classCode).all()
+    
+    return c.json({ 
+      success: true, 
+      helpers: helpers.results.map(h => ({
+        id: h.id,
+        name: h.name,
+        student_number: h.student_number,
+        total_completed: h.total_completed,
+        completed_at: h.completed_at
+      }))
+    })
+  } catch (error) {
+    console.error('ヘルパー検索エラー:', error)
+    return c.json({ success: false, error: 'データ取得に失敗しました' }, 500)
+  }
+})
+
+// 友達へのヘルプ要請API
+app.post('/api/help/request-peer', async (c) => {
+  const { env } = c
+  const { requester_id, helper_id, curriculum_id, learning_card_id, message } = await c.req.json()
+  
+  try {
+    // ヘルプ要請を記録
+    const result = await env.DB.prepare(`
+      INSERT INTO peer_help_requests (
+        requester_id, helper_id, curriculum_id, learning_card_id, 
+        message, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+    `).bind(
+      requester_id,
+      helper_id,
+      curriculum_id,
+      learning_card_id,
+      message || 'この問題を教えてください'
+    ).run()
+    
+    // 進捗レコードを更新（help_requested_from = 'friend'）
+    await env.DB.prepare(`
+      UPDATE student_progress
+      SET help_requested_from = 'friend',
+          help_count = help_count + 1,
+          last_activity_at = CURRENT_TIMESTAMP
+      WHERE student_id = ? AND learning_card_id = ? AND curriculum_id = ?
+    `).bind(requester_id, learning_card_id, curriculum_id).run()
+    
+    return c.json({ 
+      success: true, 
+      message: 'ヘルプ要請を送信しました',
+      request_id: result.meta.last_row_id
+    })
+  } catch (error) {
+    console.error('ヘルプ要請エラー:', error)
+    return c.json({ success: false, error: 'ヘルプ要請に失敗しました' }, 500)
+  }
+})
+
+// 自分宛のヘルプ要請一覧取得API
+app.get('/api/help/requests-for-me/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    const requests = await env.DB.prepare(`
+      SELECT 
+        phr.id,
+        phr.requester_id,
+        u.name as requester_name,
+        phr.curriculum_id,
+        cur.unit_name,
+        phr.learning_card_id,
+        lc.card_title,
+        phr.message,
+        phr.status,
+        phr.created_at
+      FROM peer_help_requests phr
+      INNER JOIN users u ON phr.requester_id = u.id
+      INNER JOIN curriculum cur ON phr.curriculum_id = cur.id
+      LEFT JOIN learning_cards lc ON phr.learning_card_id = lc.id
+      WHERE phr.helper_id = ? AND phr.status = 'pending'
+      ORDER BY phr.created_at DESC
+      LIMIT 20
+    `).bind(studentId).all()
+    
+    return c.json({ success: true, requests: requests.results })
+  } catch (error) {
+    console.error('ヘルプ要請取得エラー:', error)
+    return c.json({ success: false, error: 'データ取得に失敗しました' }, 500)
+  }
+})
+
+// ヘルプ要請への応答API（受諾/拒否）
+app.post('/api/help/respond-peer', async (c) => {
+  const { env } = c
+  const { request_id, response } = await c.req.json() // response: 'accepted' or 'declined'
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE peer_help_requests
+      SET status = ?, responded_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(response, request_id).run()
+    
+    return c.json({ success: true, message: '応答を記録しました' })
+  } catch (error) {
+    console.error('応答記録エラー:', error)
+    return c.json({ success: false, error: '応答の記録に失敗しました' }, 500)
+  }
+})
+
+// =============================================================================
+
 // APIルート：週次レポート
 app.get('/api/reports/weekly/:classCode', async (c) => {
   const { env } = c
