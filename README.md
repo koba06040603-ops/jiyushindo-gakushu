@@ -72,9 +72,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://f4625b06.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://9640f3f3.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `4cd6b33` (追加問題生成エラーハンドリング改善 - 詳細な状況表示と自動補完)
+- **最終コミット**: `f663782` (教師用全体確認画面にコース選択問題と共通チェックテストを追加)
 
 ## 🎉 実装完了した全機能
 
