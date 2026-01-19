@@ -34,23 +34,54 @@ function extractJSON(aiResponse: string): any {
   // 改行コードを保持しながら、他の制御文字を削除
   jsonText = jsonText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
   
-  // 文字列値内の不正な改行をエスケープ
-  // "key": "value with
-  // newline" → "key": "value with\\nnewline"
-  jsonText = jsonText.replace(/"([^"]*?)"\s*:\s*"([^"]*)"/gs, (match, key, value) => {
-    // 値内の実際の改行を\\nに置換
-    const cleanValue = value.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
-    return `"${key}": "${cleanValue}"`
-  })
+  // より確実な改行エスケープ処理
+  // JSON文字列内の改行を検出して置換
+  // ": "..." のパターンで、"..." 内の改行を \n に置換
+  let inString = false
+  let inKey = false
+  let result = ''
+  let i = 0
+  
+  while (i < jsonText.length) {
+    const char = jsonText[i]
+    const prevChar = i > 0 ? jsonText[i - 1] : ''
+    
+    // エスケープされた引用符は無視
+    if (char === '"' && prevChar !== '\\') {
+      result += char
+      inString = !inString
+      // キーか値かを判定（直前が : ならvalue、それ以外ならkey）
+      if (inString && i > 0) {
+        // 前方を遡って : を探す
+        let j = i - 1
+        while (j >= 0 && /\s/.test(jsonText[j])) j--
+        inKey = jsonText[j] !== ':'
+      }
+    } else if (inString && !inKey) {
+      // 文字列値内での改行処理
+      if (char === '\n') {
+        result += '\\n'
+      } else if (char === '\r') {
+        result += '\\r'
+      } else if (char === '\t') {
+        result += '\\t'
+      } else {
+        result += char
+      }
+    } else {
+      result += char
+    }
+    
+    i++
+  }
+  
+  jsonText = result
   
   // 不正なカンマを修正（,, → ,）
   jsonText = jsonText.replace(/,\s*,/g, ',')
   
   // 配列・オブジェクト末尾の余分なカンマを削除
   jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1')
-  
-  // 文字列内のバックスラッシュのエスケープ漏れを修正
-  // "text\nmore" が "text\\nmore" になっていることを確認
   
   try {
     return JSON.parse(jsonText)
