@@ -13206,6 +13206,24 @@ function showLearningStyleSamples() {
                 </h3>
               </div>
               <div class="p-6 space-y-4">
+                
+                <!-- AIメディア生成デモボタン -->
+                <div class="bg-gradient-to-r from-blue-100 to-purple-100 p-4 rounded-lg">
+                  <p class="text-sm font-bold text-gray-800 mb-2 text-center">
+                    <i class="fas fa-magic mr-2"></i>AIメディア生成デモ
+                  </p>
+                  <div class="flex gap-2">
+                    <button onclick="generateVisualDemo()" class="flex-1 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white px-3 py-2 rounded-lg text-sm font-bold transition transform hover:scale-105 shadow-lg">
+                      <i class="fas fa-image mr-1"></i>画像生成
+                    </button>
+                    <button onclick="generateVideoDemo()" class="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white px-3 py-2 rounded-lg text-sm font-bold transition transform hover:scale-105 shadow-lg">
+                      <i class="fas fa-video mr-1"></i>動画生成
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- デモ表示エリア -->
+                <div id="visual-demo-area"></div>
                 <div class="bg-white rounded-lg border-2 border-red-200 p-4">
                   <h4 class="font-bold text-red-800 mb-2">📝 問題</h4>
                   <p class="text-gray-800 mb-3">0.3 × 4 を計算しましょう。</p>
@@ -13266,6 +13284,24 @@ function showLearningStyleSamples() {
                 </h3>
               </div>
               <div class="p-6 space-y-4">
+                
+                <!-- AIメディア生成デモボタン -->
+                <div class="bg-gradient-to-r from-orange-100 to-yellow-100 p-4 rounded-lg">
+                  <p class="text-sm font-bold text-gray-800 mb-2 text-center">
+                    <i class="fas fa-magic mr-2"></i>AIメディア生成デモ
+                  </p>
+                  <div class="flex gap-2">
+                    <button onclick="generateAudioDemo()" class="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-3 py-2 rounded-lg text-sm font-bold transition transform hover:scale-105 shadow-lg">
+                      <i class="fas fa-microphone mr-1"></i>音声生成
+                    </button>
+                    <button onclick="generateMusicDemo()" class="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-3 py-2 rounded-lg text-sm font-bold transition transform hover:scale-105 shadow-lg">
+                      <i class="fas fa-music mr-1"></i>音楽生成
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- デモ表示エリア -->
+                <div id="auditory-demo-area"></div>
                 <div class="bg-white rounded-lg border-2 border-green-200 p-4">
                   <h4 class="font-bold text-green-800 mb-2">📝 問題</h4>
                   <p class="text-gray-800 mb-3">0.3 × 4 を計算しましょう。</p>
@@ -13318,6 +13354,19 @@ function showLearningStyleSamples() {
                 </h3>
               </div>
               <div class="p-6 space-y-4">
+                
+                <!-- AIメディア生成デモボタン -->
+                <div class="bg-gradient-to-r from-purple-100 to-pink-100 p-4 rounded-lg">
+                  <p class="text-sm font-bold text-gray-800 mb-2 text-center">
+                    <i class="fas fa-magic mr-2"></i>AIインタラクティブ教材生成デモ
+                  </p>
+                  <button onclick="generateKinestheticDemo()" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-3 py-2 rounded-lg text-sm font-bold transition transform hover:scale-105 shadow-lg">
+                    <i class="fas fa-gamepad mr-2"></i>体験型教材を生成
+                  </button>
+                </div>
+                
+                <!-- デモ表示エリア -->
+                <div id="kinesthetic-demo-area"></div>
                 <div class="bg-white rounded-lg border-2 border-blue-200 p-4">
                   <h4 class="font-bold text-blue-800 mb-2">📝 問題</h4>
                   <p class="text-gray-800 mb-3">0.3 × 4 を計算しましょう。</p>
@@ -13476,6 +13525,213 @@ function showLearningStyleSamples() {
 }
 
 window.showLearningStyleSamples = showLearningStyleSamples
+
+// メディア生成デモ機能
+async function generateVisualDemo() {
+  const demoArea = document.getElementById('visual-demo-area')
+  if (!demoArea) return
+  
+  demoArea.innerHTML = `
+    <div class="text-center py-4">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <p class="mt-2 text-sm text-gray-600">画像を生成中...</p>
+    </div>
+  `
+  
+  try {
+    // 画像生成APIを呼び出し（サンプル用にモック）
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    demoArea.innerHTML = `
+      <div class="bg-white p-4 rounded-lg border-2 border-green-300">
+        <h4 class="font-bold text-green-800 mb-2">🎨 生成された図解</h4>
+        <div class="bg-gradient-to-r from-green-100 to-blue-100 p-6 rounded-lg">
+          <div class="text-center mb-4">
+            <p class="text-2xl font-bold mb-2">0.3 × 4 = 1.2</p>
+          </div>
+          <div class="grid grid-cols-4 gap-2">
+            ${[1,2,3,4].map(i => `
+              <div class="bg-green-500 text-white p-6 rounded text-center font-bold">
+                0.3
+              </div>
+            `).join('')}
+          </div>
+          <div class="mt-4 text-center">
+            <p class="text-lg">0.3 + 0.3 + 0.3 + 0.3 = 1.2</p>
+          </div>
+        </div>
+        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じた図解を自動生成します</p>
+      </div>
+    `
+  } catch (error) {
+    demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
+  }
+}
+
+async function generateVideoDemo() {
+  const demoArea = document.getElementById('visual-demo-area')
+  if (!demoArea) return
+  
+  demoArea.innerHTML = `
+    <div class="text-center py-4">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <p class="mt-2 text-sm text-gray-600">動画を生成中...</p>
+    </div>
+  `
+  
+  try {
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    
+    demoArea.innerHTML = `
+      <div class="bg-white p-4 rounded-lg border-2 border-green-300">
+        <h4 class="font-bold text-green-800 mb-2">🎬 生成されたアニメーション</h4>
+        <div class="bg-gray-900 rounded-lg overflow-hidden">
+          <div class="aspect-video bg-gradient-to-r from-green-400 to-blue-500 flex items-center justify-center">
+            <div class="text-white text-center">
+              <i class="fas fa-play-circle text-6xl mb-4"></i>
+              <p class="text-xl font-bold">小数のかけ算アニメーション</p>
+              <p class="text-sm mt-2">0.3が4つ集まる様子を動画で表現</p>
+            </div>
+          </div>
+        </div>
+        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じたアニメーションを自動生成します</p>
+      </div>
+    `
+  } catch (error) {
+    demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
+  }
+}
+
+async function generateAudioDemo() {
+  const demoArea = document.getElementById('auditory-demo-area')
+  if (!demoArea) return
+  
+  demoArea.innerHTML = `
+    <div class="text-center py-4">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+      <p class="mt-2 text-sm text-gray-600">音声を生成中...</p>
+    </div>
+  `
+  
+  try {
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    demoArea.innerHTML = `
+      <div class="bg-white p-4 rounded-lg border-2 border-orange-300">
+        <h4 class="font-bold text-orange-800 mb-2">🎙️ 生成された音声解説</h4>
+        <div class="bg-orange-50 p-6 rounded-lg">
+          <div class="text-center mb-4">
+            <i class="fas fa-volume-up text-5xl text-orange-600"></i>
+          </div>
+          <div class="space-y-2">
+            <p class="text-lg">🔊 「れいてんさん かける よん について考えましょう」</p>
+            <p class="text-lg">🔊 「れいてんさん が よん個 あります」</p>
+            <p class="text-lg">🔊 「れいてんさん たす れいてんさん たす れいてんさん たす れいてんさん」</p>
+            <p class="text-lg">🔊 「こたえは いってんに です」</p>
+          </div>
+          <div class="mt-4 text-center">
+            <button class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-full">
+              <i class="fas fa-play mr-2"></i>音声を再生
+            </button>
+          </div>
+        </div>
+        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じた音声解説を自動生成します</p>
+      </div>
+    `
+  } catch (error) {
+    demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
+  }
+}
+
+async function generateMusicDemo() {
+  const demoArea = document.getElementById('auditory-demo-area')
+  if (!demoArea) return
+  
+  demoArea.innerHTML = `
+    <div class="text-center py-4">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+      <p class="mt-2 text-sm text-gray-600">音楽を生成中...</p>
+    </div>
+  `
+  
+  try {
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    demoArea.innerHTML = `
+      <div class="bg-white p-4 rounded-lg border-2 border-orange-300">
+        <h4 class="font-bold text-orange-800 mb-2">🎵 生成された学習ソング</h4>
+        <div class="bg-orange-50 p-6 rounded-lg">
+          <div class="text-center mb-4">
+            <i class="fas fa-music text-5xl text-orange-600"></i>
+          </div>
+          <div class="space-y-2 text-center">
+            <p class="text-xl font-bold">「小数のかけ算のうた」</p>
+            <p class="text-lg mt-4">♪ れいてんさん が よんこ ♪</p>
+            <p class="text-lg">♪ たしてみよう いってんに ♪</p>
+            <p class="text-lg">♪ かけざんは たしざんだ ♪</p>
+            <p class="text-lg">♪ おぼえたら かんたんさ ♪</p>
+          </div>
+          <div class="mt-4 text-center">
+            <button class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-full">
+              <i class="fas fa-play mr-2"></i>歌を再生
+            </button>
+          </div>
+        </div>
+        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じたオリジナルソングを自動生成します</p>
+      </div>
+    `
+  } catch (error) {
+    demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
+  }
+}
+
+async function generateKinestheticDemo() {
+  const demoArea = document.getElementById('kinesthetic-demo-area')
+  if (!demoArea) return
+  
+  demoArea.innerHTML = `
+    <div class="text-center py-4">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+      <p class="mt-2 text-sm text-gray-600">体験型コンテンツを生成中...</p>
+    </div>
+  `
+  
+  try {
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    demoArea.innerHTML = `
+      <div class="bg-white p-4 rounded-lg border-2 border-purple-300">
+        <h4 class="font-bold text-purple-800 mb-2">🎮 生成されたインタラクティブ教材</h4>
+        <div class="bg-purple-50 p-6 rounded-lg">
+          <div class="text-center mb-4">
+            <p class="text-xl font-bold">実験シミュレーター</p>
+          </div>
+          <div class="grid grid-cols-4 gap-2 mb-4">
+            ${[1,2,3,4].map(i => `
+              <button class="bg-purple-500 hover:bg-purple-600 text-white p-4 rounded text-center font-bold transition transform hover:scale-105">
+                <div>🧪</div>
+                <div class="text-xs mt-1">容器${i}</div>
+              </button>
+            `).join('')}
+          </div>
+          <div class="text-center p-4 bg-white rounded border-2 border-purple-300">
+            <p class="text-lg mb-2">各容器に0.3Lの水が入っています</p>
+            <p class="text-sm text-gray-600">容器をクリックして水を合わせてみましょう</p>
+          </div>
+        </div>
+        <p class="mt-2 text-sm text-gray-600">※ 実際のシステムではAIが学習内容に応じたインタラクティブな教材を自動生成します</p>
+      </div>
+    `
+  } catch (error) {
+    demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
+  }
+}
+
+window.generateVisualDemo = generateVisualDemo
+window.generateVideoDemo = generateVideoDemo
+window.generateAudioDemo = generateAudioDemo
+window.generateMusicDemo = generateMusicDemo
+window.generateKinestheticDemo = generateKinestheticDemo
 
 console.log('✅ Phase 17-19: 深層学習・マルチモーダル・大規模展開 機能読み込み完了')
 
