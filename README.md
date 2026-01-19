@@ -1126,9 +1126,9 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://0c39d26c.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://97b7eaa5.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `f7980c7` (アニメーション位置修正・体験型シミュレーター動作修正)
+- **最終コミット**: `9090241` (Phase 1 MVP: 学習ログデータ収集機能実装)
 
 ## 🎉 実装完了した全機能
 
