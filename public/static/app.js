@@ -2029,12 +2029,33 @@ async function loadTeacherOverview(curriculumId) {
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
     const { curriculum, courses } = response.data
     
+    // コース選択問題と共通チェックテストをメタデータから取得
+    let courseSelectionProblems = []
+    let commonCheckTest = null
+    try {
+      const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+      courseSelectionProblems = metaResponse.data.course_selection_problems || []
+      commonCheckTest = metaResponse.data.common_check_test || null
+      console.log('✅ メタデータ取得 (教師用):', {
+        courseSelectionCount: courseSelectionProblems.length,
+        hasCheckTest: !!commonCheckTest
+      })
+    } catch (metaError) {
+      console.warn('⚠️ メタデータ取得エラー:', metaError)
+    }
+    
     // 選択問題を取得
     const optionalProblemsResponse = await axios.get(`/api/curriculum/${curriculumId}/optional-problems`)
     const optionalProblems = optionalProblemsResponse.data.optional_problems || []
     
-    // プレビュー画面を表示（教師用モード）
-    showUnitPreview({ curriculum, courses, optionalProblems }, 'teacher-mode')
+    // 教師用全体確認画面を表示
+    showTeacherOverview({ 
+      curriculum, 
+      courses, 
+      optional_problems: optionalProblems,
+      course_selection_problems: courseSelectionProblems,
+      common_check_test: commonCheckTest
+    })
   } catch (error) {
     console.error('教師用モード読み込みエラー:', error)
     alert('教師用モードの読み込みに失敗しました。')
@@ -7034,6 +7055,7 @@ function showTeacherOverview(unitData) {
   const curriculum = unitData.curriculum
   const courses = unitData.courses || []
   const optionalProblems = unitData.optional_problems || []
+  const courseSelectionProblems = unitData.course_selection_problems || []
   const commonCheckTest = unitData.common_check_test || null
   
   const app = document.getElementById('app')
@@ -7327,6 +7349,56 @@ function showTeacherOverview(unitData) {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- コース選択問題 -->
+      <div id="course-selection" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-route mr-2"></i>
+          コース選択問題（全3問）
+        </h2>
+        <div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 mb-4">
+          <p class="text-sm text-indigo-900">
+            <i class="fas fa-info-circle mr-2"></i>
+            <strong>各コースの特徴を知るための問題です。</strong>生徒が自分に合ったコースを選ぶ参考にします。
+          </p>
+        </div>
+        ${courseSelectionProblems.length > 0 ? `
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            ${courseSelectionProblems.map((problem, index) => {
+              const course = courses[index]
+              const colorClasses = index === 0 ? 'border-green-500 bg-green-50' :
+                                   index === 1 ? 'border-blue-500 bg-blue-50' :
+                                   'border-purple-500 bg-purple-50'
+              return `
+                <div class="border-2 ${colorClasses} rounded-lg p-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-gray-800">${course ? course.course_name : `コース${index + 1}`}</h3>
+                    <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
+                      問題 ${index + 1}
+                    </span>
+                  </div>
+                  <div class="bg-white p-3 rounded-lg mb-3">
+                    <p class="text-sm font-bold text-gray-800 mb-2">${problem.problem_title}</p>
+                    <p class="text-xs text-gray-700">${problem.problem_content || problem.problem_description || ''}</p>
+                  </div>
+                  ${problem.answer ? `
+                    <div class="bg-yellow-50 p-2 rounded-lg">
+                      <p class="text-xs font-bold text-yellow-800 mb-1">💡 解答</p>
+                      <p class="text-xs text-gray-700">${problem.answer}</p>
+                    </div>
+                  ` : ''}
+                </div>
+              `
+            }).join('')}
+          </div>
+        ` : `
+          <div class="bg-gray-50 p-4 rounded-lg text-center">
+            <i class="fas fa-times-circle text-6xl text-gray-300 mb-4"></i>
+            <p class="text-gray-600">コース選択問題が生成されていません</p>
+            <p class="text-xs text-gray-500 mt-2">単元保存後、自動生成されます</p>
+          </div>
+        `}
       </div>
 
       <!-- 全コース・全カード一覧 -->
