@@ -1128,11 +1128,11 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://310dc744.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://d1dc34bb.jiyushindo-gakushu.pages.dev ✅
 - **本番URL**: https://jiyushindo-gakushu.pages.dev
-- **テストページ**: https://310dc744.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
+- **テストページ**: https://d1dc34bb.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `20ea408` (重複するグローバル関数登録を削除)
+- **最終コミット**: `95c1e88` (関数定義順序の修正と非同期イベント処理の改善)
 
 ## 🔐 デモアカウント
 
