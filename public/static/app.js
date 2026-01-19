@@ -63,6 +63,12 @@ window.showProgressBoardSelection = async function() {
     }
     
     const app = document.getElementById('app')
+    if (!app) {
+      console.error('❌ #app 要素が見つかりません')
+      alert('システムエラー：ページをリフレッシュしてください')
+      return
+    }
+    
     app.innerHTML = `
       <div class="container mx-auto px-4 py-8">
         <div class="max-w-4xl mx-auto">
@@ -510,6 +516,11 @@ async function renderTopPage() {
   state.currentView = 'top'
   
   const app = document.getElementById('app')
+  if (!app) {
+    console.error('❌ #app 要素が見つかりません')
+    return
+  }
+  
   app.innerHTML = `
     <div class="container mx-auto px-4 py-8">
       <!-- ヘッダー -->
