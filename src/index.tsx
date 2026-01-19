@@ -8994,31 +8994,114 @@ app.post('/api/media/generate-video', async (c) => {
     <html>
     <head>
       <style>
-        body { margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-family: Arial, sans-serif; }
-        .animation-container { width: 100%; height: 400px; position: relative; background: white; border-radius: 16px; overflow: hidden; }
-        .title { text-align: center; padding: 20px; font-size: 28px; font-weight: bold; color: #1e40af; }
-        .block { width: 80px; height: 80px; background: #22c55e; border-radius: 12px; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; opacity: 0; }
-        .block1 { top: 100px; left: 50px; animation: appear 0.5s 0.5s forwards, move1 1s 2s forwards; }
-        .block2 { top: 100px; left: 150px; animation: appear 0.5s 1s forwards, move2 1s 2s forwards; }
-        .block3 { top: 100px; left: 250px; animation: appear 0.5s 1.5s forwards, move3 1s 2s forwards; }
-        .block4 { top: 100px; left: 350px; animation: appear 0.5s 2s forwards, move4 1s 2s forwards; }
-        .result { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); font-size: 48px; font-weight: bold; color: #3b82f6; opacity: 0; animation: resultAppear 0.5s 3.5s forwards; }
-        @keyframes appear { to { opacity: 1; } }
-        @keyframes move1 { to { top: 250px; left: 100px; } }
-        @keyframes move2 { to { top: 250px; left: 200px; } }
-        @keyframes move3 { to { top: 250px; left: 300px; } }
-        @keyframes move4 { to { top: 250px; left: 400px; } }
-        @keyframes resultAppear { to { opacity: 1; } }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+          width: 100%; 
+          height: 100vh; 
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+          font-family: 'Arial', sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: hidden;
+        }
+        .animation-container { 
+          width: 95%; 
+          height: 95vh; 
+          position: relative; 
+          background: white; 
+          border-radius: 20px; 
+          overflow: visible;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .title { 
+          text-align: center; 
+          padding: 30px; 
+          font-size: 36px; 
+          font-weight: bold; 
+          color: #1e40af; 
+        }
+        .stage {
+          position: relative;
+          width: 100%;
+          height: calc(100% - 100px);
+          padding: 20px;
+        }
+        .block { 
+          width: 120px; 
+          height: 120px; 
+          background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); 
+          border-radius: 16px; 
+          position: absolute; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          color: white; 
+          font-size: 42px; 
+          font-weight: bold; 
+          opacity: 0;
+          box-shadow: 0 10px 30px rgba(34, 197, 94, 0.4);
+        }
+        .block1 { top: 120px; left: 10%; animation: appear 0.5s 0.5s forwards, move1 1.2s 2.5s forwards; }
+        .block2 { top: 120px; left: 30%; animation: appear 0.5s 1s forwards, move2 1.2s 2.5s forwards; }
+        .block3 { top: 120px; left: 50%; animation: appear 0.5s 1.5s forwards, move3 1.2s 2.5s forwards; }
+        .block4 { top: 120px; left: 70%; animation: appear 0.5s 2s forwards, move4 1.2s 2.5s forwards; }
+        .equation {
+          position: absolute;
+          top: 300px;
+          left: 50%;
+          transform: translateX(-50%);
+          font-size: 56px;
+          font-weight: bold;
+          color: #6b7280;
+          opacity: 0;
+          animation: equationAppear 0.5s 3.8s forwards;
+        }
+        .result { 
+          position: absolute; 
+          bottom: 100px; 
+          left: 50%; 
+          transform: translateX(-50%); 
+          font-size: 72px; 
+          font-weight: bold; 
+          color: #3b82f6; 
+          opacity: 0; 
+          animation: resultAppear 0.8s 4.5s forwards, pulse 0.5s 5s infinite;
+          text-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
+        }
+        @keyframes appear { 
+          0% { opacity: 0; transform: scale(0) rotate(180deg); }
+          100% { opacity: 1; transform: scale(1) rotate(0deg); } 
+        }
+        @keyframes move1 { to { top: 450px; left: 15%; } }
+        @keyframes move2 { to { top: 450px; left: 35%; } }
+        @keyframes move3 { to { top: 450px; left: 55%; } }
+        @keyframes move4 { to { top: 450px; left: 75%; } }
+        @keyframes equationAppear { 
+          0% { opacity: 0; transform: translateX(-50%) scale(0.5); }
+          100% { opacity: 1; transform: translateX(-50%) scale(1); } 
+        }
+        @keyframes resultAppear { 
+          0% { opacity: 0; transform: translateX(-50%) translateY(50px); }
+          100% { opacity: 1; transform: translateX(-50%) translateY(0); } 
+        }
+        @keyframes pulse {
+          0%, 100% { transform: translateX(-50%) scale(1); }
+          50% { transform: translateX(-50%) scale(1.05); }
+        }
       </style>
     </head>
     <body>
       <div class="animation-container">
         <div class="title">小数のかけ算アニメーション</div>
-        <div class="block block1">0.3</div>
-        <div class="block block2">0.3</div>
-        <div class="block block3">0.3</div>
-        <div class="block block4">0.3</div>
-        <div class="result">0.3 × 4 = 1.2</div>
+        <div class="stage">
+          <div class="block block1">0.3</div>
+          <div class="block block2">0.3</div>
+          <div class="block block3">0.3</div>
+          <div class="block block4">0.3</div>
+          <div class="equation">0.3 + 0.3 + 0.3 + 0.3</div>
+          <div class="result">= 1.2</div>
+        </div>
       </div>
     </body>
     </html>

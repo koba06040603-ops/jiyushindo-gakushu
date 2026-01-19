@@ -13580,25 +13580,32 @@ async function generateVideoDemo() {
       demoArea.innerHTML = `
         <div class="bg-white p-4 rounded-lg border-2 border-green-300">
           <h4 class="font-bold text-green-800 mb-3">🎬 AIが生成したアニメーション</h4>
-          <div class="bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg overflow-hidden mb-3 shadow-lg" style="height: 500px;">
+          <div class="bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg overflow-hidden mb-3 shadow-lg" style="height: 600px; width: 100%;">
             <iframe srcdoc="${response.data.animationHtml.replace(/"/g, '&quot;')}" 
                     style="width: 100%; height: 100%; border: none; display: block;">
             </iframe>
           </div>
           <div class="flex gap-2 mb-3">
-            <button onclick="document.querySelector('#visual-demo-area iframe').contentWindow.location.reload()" 
-                    class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold transition">
-              <i class="fas fa-redo mr-2"></i>アニメーションを再生
+            <button onclick="reloadAnimation()" 
+                    class="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg">
+              <i class="fas fa-redo mr-2"></i>もう一度再生
             </button>
           </div>
           <p class="text-sm text-gray-600 bg-blue-50 p-3 rounded">${response.data.note}</p>
-          <p class="text-xs text-gray-500 mt-2">💡 アニメーションは約5秒間再生されます</p>
+          <p class="text-xs text-gray-500 mt-2">💡 アニメーションは約6秒間再生されます</p>
         </div>
       `
     }
   } catch (error) {
     console.error('動画生成エラー:', error)
     demoArea.innerHTML = `<p class="text-red-600">生成エラーが発生しました</p>`
+  }
+}
+
+function reloadAnimation() {
+  const iframe = document.querySelector('#visual-demo-area iframe')
+  if (iframe) {
+    iframe.contentWindow.location.reload()
   }
 }
 
@@ -13665,6 +13672,22 @@ async function generateAudioDemo() {
 let speechSynthesis = window.speechSynthesis
 let currentUtterance = null
 let currentLineIndex = 0
+let japaneseVoice = null
+
+// 日本語音声を取得
+function getJapaneseVoice() {
+  if (japaneseVoice) return japaneseVoice
+  
+  const voices = speechSynthesis.getVoices()
+  // 日本語音声を優先的に選択
+  japaneseVoice = voices.find(voice => voice.lang === 'ja-JP') || voices[0]
+  return japaneseVoice
+}
+
+// ページ読み込み時に音声リストを取得
+if (speechSynthesis.onvoiceschanged !== undefined) {
+  speechSynthesis.onvoiceschanged = getJapaneseVoice
+}
 
 function speakAudioScript() {
   if (!window.audioScriptData) return
@@ -13706,13 +13729,18 @@ function speakNextLine() {
   }
   
   currentUtterance = new SpeechSynthesisUtterance(line)
+  const voice = getJapaneseVoice()
+  if (voice) {
+    currentUtterance.voice = voice
+  }
   currentUtterance.lang = 'ja-JP'
-  currentUtterance.rate = 0.9
-  currentUtterance.pitch = 1.1
+  currentUtterance.rate = 0.85  // さらにゆっくり
+  currentUtterance.pitch = 1.0  // 自然なピッチ
+  currentUtterance.volume = 1.0
   
   currentUtterance.onend = () => {
     currentLineIndex++
-    setTimeout(() => speakNextLine(), 500)
+    setTimeout(() => speakNextLine(), 800)  // より長い間隔
   }
   
   speechSynthesis.speak(currentUtterance)
@@ -13766,26 +13794,45 @@ async function generateMusicDemo() {
       demoArea.innerHTML = `
         <div class="bg-white p-4 rounded-lg border-2 border-orange-300">
           <h4 class="font-bold text-orange-800 mb-3">🎵 AIが生成した学習ソング</h4>
-          <div class="bg-orange-50 p-4 rounded-lg mb-3">
-            <div class="text-center mb-3">
-              <i class="fas fa-music text-5xl text-orange-600 mb-3" id="music-icon"></i>
-              <div>
-                <button onclick="playMusicDemo()" id="play-music-button"
-                        class="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg">
-                  <i class="fas fa-play mr-2"></i>歌を再生
-                </button>
-                <button onclick="stopMusicDemo()" id="stop-music-button" style="display:none;"
-                        class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg ml-2">
-                  <i class="fas fa-stop mr-2"></i>停止
-                </button>
-              </div>
+          <div class="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-lg mb-3 border-2 border-yellow-300">
+            <div class="text-center mb-4">
+              <i class="fas fa-music text-6xl text-orange-600 mb-3" id="music-icon"></i>
+              <p class="text-lg font-bold text-orange-900 mb-4">🎤 小数のかけ算のうた</p>
             </div>
-            <div class="bg-white p-4 rounded border-2 border-orange-200">
-              <pre id="lyrics-content" class="text-sm text-gray-700 whitespace-pre-wrap font-sans text-center">${response.data.lyrics}</pre>
+            <div class="bg-white p-4 rounded border-2 border-orange-200 mb-4">
+              <pre id="lyrics-content" class="text-sm text-gray-700 whitespace-pre-wrap font-sans text-center leading-relaxed">${response.data.lyrics}</pre>
+            </div>
+            
+            <div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-3">
+              <p class="text-sm font-bold text-blue-900 mb-2">
+                <i class="fas fa-info-circle mr-2"></i>実際のAI音楽生成について
+              </p>
+              <p class="text-sm text-gray-700 mb-2">
+                本番システムでは、<strong>Suno AI</strong>や<strong>Udio</strong>などの最新AI音楽生成サービスを使用します。
+              </p>
+              <ul class="text-xs text-gray-600 space-y-1 ml-4">
+                <li>✅ 歌詞からメロディーとボーカルを自動生成</li>
+                <li>✅ 子ども向けのポップで明るい曲調</li>
+                <li>✅ 約30秒〜2分の学習ソング</li>
+                <li>✅ 覚えやすいリズムとフレーズ</li>
+              </ul>
+            </div>
+            
+            <div class="text-center">
+              <button onclick="playMusicDemo()" id="play-music-button"
+                      class="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg">
+                <i class="fas fa-play mr-2"></i>デモ音を再生
+              </button>
+              <button onclick="stopMusicDemo()" id="stop-music-button" style="display:none;"
+                      class="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-bold text-lg transition transform hover:scale-105 shadow-lg ml-2">
+                <i class="fas fa-stop mr-2"></i>停止
+              </button>
             </div>
           </div>
           <p class="text-sm text-gray-600 bg-orange-50 p-3 rounded">${response.data.note}</p>
-          <p class="text-xs text-gray-500 mt-2">💡 「歌を再生」ボタンをクリックすると、メロディーと共に歌詞が流れます</p>
+          <p class="text-xs text-gray-500 mt-2">
+            💡 「デモ音を再生」は簡易メロディーです。実際のシステムではAIが完全な楽曲を生成します
+          </p>
         </div>
       `
       
