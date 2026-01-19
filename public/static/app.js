@@ -48,8 +48,249 @@ const state = {
 }
 
 // グローバル関数を後で登録するためのプレースホルダー
-window.showProgressBoardSelection = null
-window.showDemoWeeklyReport = null
+// これらの関数は後で定義されますが、先にwindowオブジェクトに登録しておきます
+window.showProgressBoardSelection = async function() {
+  console.log('📋 進捗ボード選択画面を表示中...')
+  
+  try {
+    const response = await axios.get('/api/curriculum/list')
+    const curriculums = response.data
+    console.log('✅ 取得したカリキュラム:', curriculums)
+    
+    if (curriculums.length === 0) {
+      alert('カリキュラムがまだ作成されていません。\n先に「AIで学習カードを作成する」から単元を作成してください。')
+      return
+    }
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <div class="max-w-4xl mx-auto">
+          <div class="bg-white rounded-lg shadow-xl p-8">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-3xl font-bold text-gray-800">
+                <i class="fas fa-chart-bar mr-2 text-blue-600"></i>
+                進捗ボードを表示
+              </h2>
+              <button id="back-to-top" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+              </button>
+            </div>
+            
+            <p class="text-gray-600 mb-6">表示したいカリキュラムを選択してください</p>
+            
+            <div class="space-y-4" id="curriculum-list">
+              ${curriculums.map(c => `
+                <button 
+                  data-curriculum-id="${c.id}"
+                  class="curriculum-button w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white p-6 rounded-lg shadow-lg transition-all transform hover:scale-105 text-left">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="text-sm opacity-90">${c.grade} ${c.subject}</p>
+                      <p class="text-2xl font-bold">${c.unit_name}</p>
+                      <p class="text-sm opacity-75 mt-1">${c.textbook || ''}</p>
+                    </div>
+                    <i class="fas fa-arrow-right text-3xl"></i>
+                  </div>
+                </button>
+              `).join('')}
+            </div>
+            
+            <div class="mt-6 text-center">
+              <button 
+                id="back-to-top-bottom"
+                class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition">
+                <i class="fas fa-arrow-left mr-2"></i>トップページに戻る
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    
+    // DOM生成完了を待ってイベントリスナーを登録
+    setTimeout(() => {
+      console.log('🔧 イベントリスナー登録開始...')
+      
+      // 戻るボタン（上）
+      const backToTopBtn = document.getElementById('back-to-top')
+      if (backToTopBtn) {
+        backToTopBtn.addEventListener('click', () => {
+          console.log('🏠 トップページに戻る')
+          renderTopPage()
+        })
+        console.log('✅ 戻るボタン（上）登録完了')
+      }
+      
+      // 戻るボタン（下）
+      const backToTopBottomBtn = document.getElementById('back-to-top-bottom')
+      if (backToTopBottomBtn) {
+        backToTopBottomBtn.addEventListener('click', () => {
+          console.log('🏠 トップページに戻る（下）')
+          renderTopPage()
+        })
+        console.log('✅ 戻るボタン（下）登録完了')
+      }
+      
+      // 各カリキュラムボタンに個別にイベントリスナーを登録
+      const buttons = document.querySelectorAll('.curriculum-button')
+      console.log('📋 カリキュラムボタン数:', buttons.length)
+      
+      buttons.forEach((button, index) => {
+        const curriculumId = parseInt(button.dataset.curriculumId)
+        console.log(`📌 ボタン${index + 1}を登録中: ID=${curriculumId}`)
+        
+        button.addEventListener('click', () => {
+          console.log('🎯 カリキュラムボタンクリック:', curriculumId)
+          if (window.loadProgressBoard) {
+            window.loadProgressBoard(curriculumId)
+          }
+        })
+      })
+      
+      console.log('✅ イベントリスナー登録完了:', buttons.length, 'カリキュラム')
+    }, 100)
+  } catch (error) {
+    console.error('❌ カリキュラム一覧取得エラー:', error)
+    alert('カリキュラムの読み込みに失敗しました: ' + error.message)
+  }
+}
+
+window.showDemoWeeklyReport = function() {
+  console.log('📊 週次レポート（デモ）を表示')
+  
+  const today = new Date()
+  const dayOfWeek = today.getDay()
+  const startOfWeek = new Date(today)
+  startOfWeek.setDate(today.getDate() - dayOfWeek)
+  const endOfWeek = new Date(today)
+  endOfWeek.setDate(today.getDate() + (6 - dayOfWeek))
+  
+  const startDate = startOfWeek.toLocaleDateString('ja-JP')
+  const endDate = endOfWeek.toLocaleDateString('ja-JP')
+  
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="bg-gradient-to-r from-green-500 to-blue-500 text-white p-6 rounded-t-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-bold">📊 週次レポート（デモ）</h2>
+            <p class="text-sm mt-1">${startDate} 〜 ${endDate}</p>
+            <p class="text-sm">クラス: CLASS2024A</p>
+          </div>
+          <button class="close-modal text-white hover:text-gray-200 text-3xl">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-blue-50 rounded-lg p-4">
+            <div class="text-blue-600 text-sm font-bold mb-1">学習時間合計</div>
+            <div class="text-3xl font-bold text-blue-800">12.5 <span class="text-lg">時間</span></div>
+          </div>
+          <div class="bg-green-50 rounded-lg p-4">
+            <div class="text-green-600 text-sm font-bold mb-1">完了カード数</div>
+            <div class="text-3xl font-bold text-green-800">45 <span class="text-lg">枚</span></div>
+          </div>
+          <div class="bg-purple-50 rounded-lg p-4">
+            <div class="text-purple-600 text-sm font-bold mb-1">ヘルプ要請</div>
+            <div class="text-3xl font-bold text-purple-800">18 <span class="text-lg">回</span></div>
+          </div>
+          <div class="bg-yellow-50 rounded-lg p-4">
+            <div class="text-yellow-600 text-sm font-bold mb-1">平均理解度</div>
+            <div class="text-3xl font-bold text-yellow-800">3.2 <span class="text-lg">/5</span></div>
+          </div>
+        </div>
+
+        <h3 class="text-lg font-bold text-gray-800 mb-4">児童別詳細</h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">児童名</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">学習時間</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">完了カード</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">理解度</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ヘルプ</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状態</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <div class="font-medium text-gray-900">山田太郎</div>
+                  <div class="text-xs text-gray-500">出席番号: 1</div>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">4.2時間</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">15枚</td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">3.5</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">5回</td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">進行中</span>
+                </td>
+              </tr>
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <div class="font-medium text-gray-900">佐藤花子</div>
+                  <div class="text-xs text-gray-500">出席番号: 2</div>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">3.8時間</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">12枚</td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">2.8</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">8回</td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded">停滞気味</span>
+                </td>
+              </tr>
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <div class="font-medium text-gray-900">鈴木次郎</div>
+                  <div class="text-xs text-gray-500">出席番号: 3</div>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">4.5時間</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">18枚</td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">4.2</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">5回</td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                  <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">順調</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-6 bg-blue-50 rounded-lg p-4">
+          <h3 class="text-base font-bold text-blue-800 mb-3">
+            <i class="fas fa-lightbulb mr-2"></i>推奨アクション
+          </h3>
+          <ul class="space-y-2 text-sm text-gray-700">
+            <li><i class="fas fa-check text-blue-500 mr-2"></i>佐藤花子さん: 停滞気味のため個別面談を推奨</li>
+            <li><i class="fas fa-check text-blue-500 mr-2"></i>山田太郎さん: ヘルプ要請が多いため、基礎的な理解の確認が必要</li>
+            <li><i class="fas fa-check text-blue-500 mr-2"></i>鈴木次郎さん: 順調に進んでいるため、発展問題の提供を検討</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  
+  modal.querySelector('.close-modal').addEventListener('click', () => {
+    modal.remove()
+  })
+}
+
+console.log('✅ グローバル関数を初期化しました: showProgressBoardSelection, showDemoWeeklyReport')
 
 // =============================================================================
 // 学習ログ記録機能（個別最適化のためのデータ収集）
