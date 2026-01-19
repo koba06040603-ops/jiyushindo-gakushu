@@ -9868,29 +9868,23 @@ function generateCardProgressBar(cardProgress) {
     return '<div class="bg-gray-200 h-8 rounded flex items-center justify-center text-xs text-gray-500">未開始</div>'
   }
 
-  // コース別にカウント
-  const basicCards = cardProgress.filter(c => c.course_level === 'basic')
-  const standardCards = cardProgress.filter(c => c.course_level === 'standard')
-  const advancedCards = cardProgress.filter(c => c.course_level === 'advanced')
-
-  const basicCompleted = basicCards.filter(c => c.status === 'completed').length
-  const standardCompleted = standardCards.filter(c => c.status === 'completed').length
-  const advancedCompleted = advancedCards.filter(c => c.status === 'completed').length
-
-  const totalCards = 18 // 3コース × 6枚
-  const completed = basicCompleted + standardCompleted + advancedCompleted
+  // 各児童は1つのコースのみ選択（6枚）
+  const totalCards = 6
+  const completed = cardProgress.filter(c => c.status === 'completed').length
   const percentComplete = Math.round((completed / totalCards) * 100)
 
-  // 横棒グラフ（3色）
-  const basicPercent = (basicCompleted / totalCards) * 100
-  const standardPercent = (standardCompleted / totalCards) * 100
-  const advancedPercent = (advancedCompleted / totalCards) * 100
+  // コース別に色分け
+  const courseLevel = cardProgress[0]?.course_level || 'standard'
+  const courseColors = {
+    'basic': 'bg-green-500',
+    'standard': 'bg-blue-500',
+    'advanced': 'bg-purple-500'
+  }
+  const barColor = courseColors[courseLevel] || 'bg-blue-500'
 
   return `
     <div class="relative bg-gray-200 h-8 rounded overflow-hidden flex">
-      ${basicPercent > 0 ? `<div class="bg-green-500 h-full" style="width: ${basicPercent}%"></div>` : ''}
-      ${standardPercent > 0 ? `<div class="bg-blue-500 h-full" style="width: ${standardPercent}%"></div>` : ''}
-      ${advancedPercent > 0 ? `<div class="bg-purple-500 h-full" style="width: ${advancedPercent}%"></div>` : ''}
+      <div class="${barColor} h-full" style="width: ${percentComplete}%"></div>
       <div class="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-800">
         ${completed}/${totalCards}
       </div>
@@ -9899,7 +9893,7 @@ function generateCardProgressBar(cardProgress) {
 }
 
 function generateCheckTestIndicator(checkProgress) {
-  const total = 6 // チェックテスト6問想定
+  const total = 5 // チェックテスト5問
   const completed = checkProgress.filter(p => p.status === 'completed').length
   const failed = checkProgress.filter(p => p.status === 'failed').length
 
@@ -9919,10 +9913,10 @@ function generateCheckTestIndicator(checkProgress) {
 }
 
 function generateOptionalProblemIndicators(optionalProgress) {
-  const total = 6 // 選択問題6題想定
+  const total = 5 // 選択問題5題
   const completed = optionalProgress.filter(p => p.status === 'completed').length
 
-  // 6つの丸を表示
+  // 5つの丸を表示
   let html = ''
   for (let i = 1; i <= total; i++) {
     const problem = optionalProgress.find(p => p.problem_number === i)
