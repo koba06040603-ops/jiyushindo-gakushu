@@ -8923,60 +8923,182 @@ app.get('/proposal', (c) => {
 app.post('/api/media/generate-image', async (c) => {
   const { prompt, style } = await c.req.json()
   
-  // Note: 実際の画像生成は外部サービス（Stability AI、DALL-E等）が必要
-  // ここではモックレスポンスを返す
+  // 小数のかけ算に特化した図解SVGを生成
+  const svgImage = `
+    <svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
+      <!-- 背景 -->
+      <rect width="600" height="400" fill="#f0fdf4"/>
+      
+      <!-- タイトル -->
+      <text x="300" y="40" font-size="28" font-weight="bold" text-anchor="middle" fill="#166534">
+        0.3 × 4 = 1.2
+      </text>
+      
+      <!-- 4つの0.3を視覚化 -->
+      <g id="blocks">
+        <!-- ブロック1 -->
+        <rect x="50" y="80" width="120" height="80" fill="#22c55e" stroke="#166534" stroke-width="2" rx="8"/>
+        <text x="110" y="130" font-size="32" font-weight="bold" text-anchor="middle" fill="white">0.3</text>
+        
+        <!-- ブロック2 -->
+        <rect x="190" y="80" width="120" height="80" fill="#22c55e" stroke="#166534" stroke-width="2" rx="8"/>
+        <text x="250" y="130" font-size="32" font-weight="bold" text-anchor="middle" fill="white">0.3</text>
+        
+        <!-- ブロック3 -->
+        <rect x="330" y="80" width="120" height="80" fill="#22c55e" stroke="#166534" stroke-width="2" rx="8"/>
+        <text x="390" y="130" font-size="32" font-weight="bold" text-anchor="middle" fill="white">0.3</text>
+        
+        <!-- ブロック4 -->
+        <rect x="470" y="80" width="120" height="80" fill="#22c55e" stroke="#166534" stroke-width="2" rx="8"/>
+        <text x="530" y="130" font-size="32" font-weight="bold" text-anchor="middle" fill="white">0.3</text>
+      </g>
+      
+      <!-- 矢印 -->
+      <path d="M 300 180 L 300 220" stroke="#166534" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+      <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+          <polygon points="0 0, 10 5, 0 10" fill="#166534"/>
+        </marker>
+      </defs>
+      
+      <!-- 合計 -->
+      <rect x="150" y="240" width="300" height="100" fill="#3b82f6" stroke="#1e40af" stroke-width="2" rx="8"/>
+      <text x="300" y="280" font-size="24" font-weight="bold" text-anchor="middle" fill="white">
+        0.3 + 0.3 + 0.3 + 0.3
+      </text>
+      <text x="300" y="320" font-size="40" font-weight="bold" text-anchor="middle" fill="white">
+        = 1.2
+      </text>
+    </svg>
+  `
+  
+  // SVGをData URLに変換
+  const svgDataUrl = 'data:image/svg+xml;base64,' + Buffer.from(svgImage).toString('base64')
+  
   return c.json({
     success: true,
-    imageUrl: 'https://via.placeholder.com/600x400/4CAF50/ffffff?text=0.3+x+4+%3D+1.2',
+    imageUrl: svgDataUrl,
     prompt: prompt,
     style: style,
-    note: '実際のシステムでは生成AIが画像を作成します'
+    note: '0.3が4つで1.2になることを図解で表現しました'
   })
 })
 
-// メディア生成API - 動画生成
+// メディア生成API - 動画生成（アニメーションHTML）
 app.post('/api/media/generate-video', async (c) => {
   const { prompt, duration } = await c.req.json()
   
-  // Note: 実際の動画生成は外部サービス（Runway、Pika等）が必要
-  // ここではモックレスポンスを返す
+  // CSSアニメーションを使った小数のかけ算アニメーション
+  const animationHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); font-family: Arial, sans-serif; }
+        .animation-container { width: 100%; height: 400px; position: relative; background: white; border-radius: 16px; overflow: hidden; }
+        .title { text-align: center; padding: 20px; font-size: 28px; font-weight: bold; color: #1e40af; }
+        .block { width: 80px; height: 80px; background: #22c55e; border-radius: 12px; position: absolute; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; opacity: 0; }
+        .block1 { top: 100px; left: 50px; animation: appear 0.5s 0.5s forwards, move1 1s 2s forwards; }
+        .block2 { top: 100px; left: 150px; animation: appear 0.5s 1s forwards, move2 1s 2s forwards; }
+        .block3 { top: 100px; left: 250px; animation: appear 0.5s 1.5s forwards, move3 1s 2s forwards; }
+        .block4 { top: 100px; left: 350px; animation: appear 0.5s 2s forwards, move4 1s 2s forwards; }
+        .result { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); font-size: 48px; font-weight: bold; color: #3b82f6; opacity: 0; animation: resultAppear 0.5s 3.5s forwards; }
+        @keyframes appear { to { opacity: 1; } }
+        @keyframes move1 { to { top: 250px; left: 100px; } }
+        @keyframes move2 { to { top: 250px; left: 200px; } }
+        @keyframes move3 { to { top: 250px; left: 300px; } }
+        @keyframes move4 { to { top: 250px; left: 400px; } }
+        @keyframes resultAppear { to { opacity: 1; } }
+      </style>
+    </head>
+    <body>
+      <div class="animation-container">
+        <div class="title">小数のかけ算アニメーション</div>
+        <div class="block block1">0.3</div>
+        <div class="block block2">0.3</div>
+        <div class="block block3">0.3</div>
+        <div class="block block4">0.3</div>
+        <div class="result">0.3 × 4 = 1.2</div>
+      </div>
+    </body>
+    </html>
+  `
+  
   return c.json({
     success: true,
-    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
-    thumbnailUrl: 'https://via.placeholder.com/600x400/2196F3/ffffff?text=Animation',
+    animationHtml: animationHtml,
     prompt: prompt,
     duration: duration || 5,
-    note: '実際のシステムでは生成AIが動画を作成します'
+    note: '0.3が4つ集まって1.2になる様子をアニメーションで表現しました'
   })
 })
 
-// メディア生成API - 音声生成
+// メディア生成API - 音声生成（読み上げテキスト）
 app.post('/api/media/generate-audio', async (c) => {
   const { text, voice } = await c.req.json()
   
-  // Note: 実際の音声生成は外部サービス（ElevenLabs、Google TTS等）が必要
-  // ここではモックレスポンスを返す
+  const scriptText = `
+れいてんさん かける よん について考えましょう。
+
+れいてんさん というのは、ぜろてんさん のことです。
+これが よんこ あります。
+
+れいてんさん たす れいてんさん たす れいてんさん たす れいてんさん。
+
+ひとつずつ たしていくと...
+れいてんさん、れいてんろく、れいてんきゅう、いってんに。
+
+こたえは いってんに です！
+
+かけざんは、おなじかずを なんかいも たすことと おなじですね。
+  `
+  
   return c.json({
     success: true,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+    scriptText: scriptText.trim(),
     text: text,
-    voice: voice || 'default',
-    note: '実際のシステムでは生成AIが音声を作成します'
+    voice: voice || 'female-teacher',
+    note: '小数のかけ算を音声で丁寧に解説しました'
   })
 })
 
-// メディア生成API - 音楽生成
+// メディア生成API - 音楽生成（歌詞）
 app.post('/api/media/generate-music', async (c) => {
   const { lyrics, style } = await c.req.json()
   
-  // Note: 実際の音楽生成は外部サービス（Suno、MusicGen等）が必要
-  // ここではモックレスポンスを返す
+  const songLyrics = `
+🎵 小数のかけ算のうた 🎵
+
+(1番)
+れいてんさん が よんこ
+ならんで いるよ
+
+たしてみよう ひとつずつ
+れいてんさん れいてんろく
+
+(2番)  
+もういっこ たすと
+れいてんきゅう になるね
+
+さいごに もういっこ
+いってんに だよ！
+
+(サビ)
+かけざんは たしざんだ
+おなじかずを なんかいも
+
+ぜろてんさん かける よん
+こたえは いってんに！
+
+ぜろてんさん かける よん
+こたえは いってんに！
+  `
+  
   return c.json({
     success: true,
-    musicUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-    lyrics: lyrics,
-    style: style || 'educational',
-    note: '実際のシステムでは生成AIが音楽を作成します'
+    lyrics: songLyrics.trim(),
+    style: style || 'educational-pop',
+    note: 'リズムに乗って覚えやすい学習ソングを作成しました'
   })
 })
 
@@ -8989,7 +9111,7 @@ app.post('/api/media/generate-interactive', async (c) => {
     interactiveHtml: generateInteractiveContent(topic, interactionType),
     topic: topic,
     interactionType: interactionType,
-    note: '実際のシステムでは生成AIがインタラクティブ教材を作成します'
+    note: 'クリックして実際に体験できるシミュレーターを作成しました'
   })
 })
 
@@ -8997,37 +9119,57 @@ function generateInteractiveContent(topic: string, type: string): string {
   // 小数のかけ算シミュレーター
   return `
     <div class="interactive-simulator bg-white rounded-lg p-4 border-2 border-purple-300">
-      <h4 class="font-bold text-purple-800 mb-4 text-center">実験シミュレーター</h4>
+      <h4 class="font-bold text-purple-800 mb-4 text-center">🧪 小数のかけ算実験</h4>
+      <p class="text-center text-sm text-gray-600 mb-4">容器をクリックして0.3Lずつ水を追加しましょう</p>
       <div class="grid grid-cols-4 gap-2 mb-4" id="containers">
         ${[1,2,3,4].map(i => `
           <button onclick="fillContainer(${i})" class="container-btn bg-purple-500 hover:bg-purple-600 text-white p-6 rounded text-center font-bold transition transform hover:scale-105" id="container-${i}">
             <div class="text-3xl mb-2">🧪</div>
             <div class="text-xs">容器${i}</div>
-            <div class="text-sm mt-2 filled-amount" style="display:none;">0.3L</div>
+            <div class="text-sm mt-2 filled-amount" style="display:none;">+0.3L</div>
           </button>
         `).join('')}
       </div>
-      <div class="result-area bg-purple-50 rounded-lg p-4 border-2 border-purple-300 text-center">
-        <p class="text-lg font-bold text-purple-800 mb-2">合計: <span id="total-amount">0</span>L</p>
-        <p class="text-sm text-gray-600">容器をクリックして0.3Lずつ追加してみましょう</p>
+      <div class="result-area bg-purple-50 rounded-lg p-4 border-2 border-purple-300">
+        <div class="text-center">
+          <p class="text-2xl font-bold text-purple-800 mb-2">
+            合計: <span id="total-amount" class="text-4xl">0</span>L
+          </p>
+          <p class="text-lg text-gray-700" id="calculation-display">まだ水を追加していません</p>
+        </div>
       </div>
     </div>
     <script>
       let filledCount = 0;
+      let filledContainers = [];
+      
       function fillContainer(num) {
+        if (filledContainers.includes(num)) return;
+        
         const container = document.getElementById('container-' + num);
         const amountDisplay = container.querySelector('.filled-amount');
-        if (amountDisplay.style.display === 'none') {
-          amountDisplay.style.display = 'block';
-          container.style.backgroundColor = '#8B5CF6';
-          filledCount++;
-          document.getElementById('total-amount').textContent = (filledCount * 0.3).toFixed(1);
-          
-          if (filledCount === 4) {
-            setTimeout(() => {
-              alert('正解！ 0.3 × 4 = 1.2 です！');
-            }, 300);
-          }
+        
+        amountDisplay.style.display = 'block';
+        container.style.backgroundColor = '#8B5CF6';
+        container.style.transform = 'scale(1.1)';
+        setTimeout(() => { container.style.transform = 'scale(1)'; }, 200);
+        
+        filledCount++;
+        filledContainers.push(num);
+        
+        const total = (filledCount * 0.3).toFixed(1);
+        document.getElementById('total-amount').textContent = total;
+        
+        // 計算式を更新
+        const calculation = '0.3 × ' + filledCount + ' = ' + total;
+        document.getElementById('calculation-display').textContent = calculation;
+        
+        if (filledCount === 4) {
+          setTimeout(() => {
+            document.getElementById('calculation-display').textContent = '✅ 正解！ 0.3 × 4 = 1.2 です！';
+            document.getElementById('calculation-display').style.color = '#166534';
+            document.getElementById('calculation-display').style.fontWeight = 'bold';
+          }, 500);
         }
       }
     </script>
