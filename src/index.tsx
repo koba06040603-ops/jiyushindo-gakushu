@@ -3344,14 +3344,15 @@ app.post('/api/curriculum/save-generated', async (c) => {
     for (const problem of optionalProblems || []) {
       await env.DB.prepare(`
         INSERT INTO optional_problems (
-          curriculum_id, problem_number, problem_title, problem_description,
+          curriculum_id, problem_number, problem_title, problem_description, problem_content,
           difficulty_level, learning_meaning
-        ) VALUES (?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `).bind(
         curriculumId,
         problem.problem_number || 1,
         problem.problem_title,
-        problem.problem_description,
+        problem.problem_description || '',
+        problem.problem_content || problem.problem_description || '問題内容',
         problem.difficulty_level || 'medium',
         problem.learning_meaning || ''
       ).run()
@@ -3677,9 +3678,9 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
         `).bind(
           curriculumId,
           problem.problem_number,
-          problem.problem_title,
-          problem.problem_description,  // problem_content
-          problem.problem_description,  // problem_description
+          problem.problem_title || '問題',
+          problem.problem_content || problem.problem_description || '問題内容',
+          problem.problem_description || problem.problem_content || '問題の説明',
           problem.difficulty_level || 'medium',
           problem.learning_meaning || ''
         ).run()
@@ -4119,9 +4120,9 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
         `).bind(
           curriculumId,
           problem.problem_number,
-          problem.problem_title,
-          problem.problem_description,  // problem_content
-          problem.problem_description,  // problem_description
+          problem.problem_title || '問題',
+          problem.problem_content || problem.problem_description || '問題内容',
+          problem.problem_description || problem.problem_content || '問題の説明',
           problem.difficulty_level || 'medium',
           problem.learning_meaning || ''
         ).run()
@@ -4537,9 +4538,9 @@ app.post('/api/curriculum/:id/optional-problem', async (c) => {
     `).bind(
       curriculumId,
       problem_number,
-      problem_title,
-      problem_description,
-      problem_content || '',
+      problem_title || '問題',
+      problem_description || '問題の説明',
+      problem_content || problem_description || '問題内容',
       difficulty_level || 'medium',
       learning_meaning || ''
     ).run()
