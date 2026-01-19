@@ -3596,7 +3596,7 @@ async function showProgressBoardSelection() {
                 <i class="fas fa-chart-bar mr-2 text-blue-600"></i>
                 進捗ボードを表示
               </h2>
-              <button onclick="renderTopPage()" class="text-gray-500 hover:text-gray-700">
+              <button id="back-to-top" class="text-gray-500 hover:text-gray-700">
                 <i class="fas fa-times text-2xl"></i>
               </button>
             </div>
@@ -3622,7 +3622,7 @@ async function showProgressBoardSelection() {
             
             <div class="mt-6 text-center">
               <button 
-                onclick="renderTopPage()"
+                id="back-to-top-bottom"
                 class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition">
                 <i class="fas fa-arrow-left mr-2"></i>トップページに戻る
               </button>
@@ -3632,24 +3632,30 @@ async function showProgressBoardSelection() {
       </div>
     `
     
-    // イベント委譲でボタンクリックを処理
-    setTimeout(() => {
-      const curriculumList = document.getElementById('curriculum-list')
-      if (curriculumList) {
-        curriculumList.addEventListener('click', (e) => {
-          const button = e.target.closest('.curriculum-button')
-          if (button) {
-            const curriculumId = button.dataset.curriculumId
-            console.log('📌 カリキュラムボタンクリック:', curriculumId)
-            loadProgressBoard(parseInt(curriculumId))
-          }
-        })
-        console.log('✅ カリキュラムリストのイベントリスナー登録完了')
-      }
-    }, 100)
+    // イベントリスナーを直接登録
+    document.getElementById('back-to-top').addEventListener('click', () => {
+      console.log('🏠 トップページに戻る')
+      renderTopPage()
+    })
+    
+    document.getElementById('back-to-top-bottom').addEventListener('click', () => {
+      console.log('🏠 トップページに戻る（下）')
+      renderTopPage()
+    })
+    
+    // 各カリキュラムボタンに個別にイベントリスナーを登録
+    document.querySelectorAll('.curriculum-button').forEach(button => {
+      button.addEventListener('click', () => {
+        const curriculumId = parseInt(button.dataset.curriculumId)
+        console.log('📌 カリキュラムボタンクリック:', curriculumId)
+        loadProgressBoard(curriculumId)
+      })
+    })
+    
+    console.log('✅ イベントリスナー登録完了:', curriculums.length, 'カリキュラム')
   } catch (error) {
-    console.error('カリキュラム一覧取得エラー:', error)
-    alert('カリキュラムの読み込みに失敗しました')
+    console.error('❌ カリキュラム一覧取得エラー:', error)
+    alert('カリキュラムの読み込みに失敗しました: ' + error.message)
   }
 }
 
