@@ -30,52 +30,91 @@ function extractJSON(aiResponse: string): any {
   // 先頭・末尾の余分な文字を削除
   jsonText = jsonText.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '')
   
-  // JSONクリーニング: 不正な制御文字を削除
-  // 改行コードを保持しながら、他の制御文字を削除
-  jsonText = jsonText.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-  
-  // より確実な改行エスケープ処理
-  // JSON文字列内の改行を検出して置換
-  // ": "..." のパターンで、"..." 内の改行を \n に置換
+  // 状態機械式パーサーで文字列内の改行をエスケープ
   let inString = false
-  let inKey = false
+  let escaped = false
   let result = ''
-  let i = 0
   
-  while (i < jsonText.length) {
+  for (let i = 0; i < jsonText.length; i++) {
     const char = jsonText[i]
-    const prevChar = i > 0 ? jsonText[i - 1] : ''
     
-    // エスケープされた引用符は無視
-    if (char === '"' && prevChar !== '\\') {
+    if (escaped) {
+      // 前の文字がバックスラッシュだった場合
+      result += char
+      escaped = false
+      continue
+    }
+    
+    if (char === '\\') {
+      result += char
+      escaped = true
+      continue
+    }
+    
+    if (char === '"') {
       result += char
       inString = !inString
-      // キーか値かを判定（直前が : ならvalue、それ以外ならkey）
-      if (inString && i > 0) {
-        // 前方を遡って : を探す
-        let j = i - 1
-        while (j >= 0 && /\s/.test(jsonText[j])) j--
-        inKey = jsonText[j] !== ':'
-      }
-    } else if (inString && !inKey) {
-      // 文字列値内での改行処理
+      continue
+    }
+    
+    if (inString) {
+      // 文字列内での特殊文字処理
       if (char === '\n') {
         result += '\\n'
       } else if (char === '\r') {
         result += '\\r'
       } else if (char === '\t') {
         result += '\\t'
+      } else if (char === '\b') {
+        result += '\\b'
+      } else if (char === '\f') {
+        result += '\\f'
       } else {
         result += char
       }
     } else {
       result += char
     }
-    
-    i++
   }
   
   jsonText = result
+  
+  // JSONクリーニング: 文字列外の不正な制御文字を削除
+  // （文字列内はすでにエスケープ済み）
+  const cleaned: string[] = []
+  inString = false
+  escaped = false
+  
+  for (let i = 0; i < jsonText.length; i++) {
+    const char = jsonText[i]
+    
+    if (escaped) {
+      cleaned.push(char)
+      escaped = false
+      continue
+    }
+    
+    if (char === '\\') {
+      cleaned.push(char)
+      escaped = true
+      continue
+    }
+    
+    if (char === '"') {
+      cleaned.push(char)
+      inString = !inString
+      continue
+    }
+    
+    if (!inString && /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(char)) {
+      // 文字列外の制御文字は削除
+      continue
+    }
+    
+    cleaned.push(char)
+  }
+  
+  jsonText = cleaned.join('')
   
   // 不正なカンマを修正（,, → ,）
   jsonText = jsonText.replace(/,\s*,/g, ',')
@@ -2908,10 +2947,25 @@ app.post('/api/ai/suggest-units', async (c) => {
   }
   
   try {
-    const prompt = `${grade}${subject}（${textbook}）の単元名を10個、1行に1つずつ出力。番号不要。例:
+    const prompt = `${grade}${subject}（${textbook}）の主要な単元名を正確に10個、1行に1つずつ日本語で出力してください。
+
+【重要な指示】
+- 単元名のみを日本語で出力すること
+- 番号、記号、説明、英語、思考過程（THOUGHT）は一切不要
+- 1行に1つの単元名のみを出力
+- 正確に10行出力すること
+
+出力例:
 かけ算の筆算
 わり算の筆算
-小数のかけ算`
+小数のかけ算
+分数のたし算
+面積の求め方
+体積の学習
+グラフの読み方
+資料の整理
+確率の基礎
+図形の性質`
 
     // 新しいヘルパー関数を使用（自動リトライ付き）
     const models = ['gemini-2.5-flash', 'gemini-2.0-flash']
@@ -2922,7 +2976,7 @@ app.post('/api/ai/suggest-units', async (c) => {
         model,
         prompt,
         apiKey,
-        maxOutputTokens: 1000,
+        maxOutputTokens: 2048,  // トークン数を増やす
         temperature: 0.7,
         retries: 2
       })
@@ -2941,21 +2995,41 @@ app.post('/api/ai/suggest-units', async (c) => {
       .split('\n')
       .map(line => line.trim())
       .filter(line => {
-        // 数字・記号で始まる行を除外、長さチェックを緩和
-        const isValid = line && 
-                       !line.match(/^[\d\.\-\*\#]+\s*$/) && 
-                       line.length > 1 && 
-                       line.length < 100
-        if (line && line.length > 0) {
-          console.log(`  行: "${line}" -> ${isValid ? '✅ 採用' : '❌ 除外'}`)
-        }
+        // 不要な行を除外
+        if (!line || line.length === 0) return false
+        
+        // 思考過程や説明を除外
+        if (line.includes('THOUGHT') || line.includes('user wants') || line.includes('need to')) return false
+        if (line.includes('Common themes') || line.includes('Japan:')) return false
+        if (line.startsWith('I ') || line.startsWith('The ')) return false
+        
+        // 英語の説明や記号のみの行を除外
+        if (line.match(/^[\*\-\#\d\.\s\:\(\)]+$/)) return false
+        if (line.match(/^[a-zA-Z\s\:\(\)\*\-]+$/)) return false  // 英語のみの行
+        
+        // 日本語が含まれる行のみを採用
+        const hasJapanese = line.match(/[ぁ-んァ-ヶー一-龯]/)
+        if (!hasJapanese) return false
+        
+        // 長さチェック
+        if (line.length < 2 || line.length > 100) return false
+        
+        const isValid = true
+        console.log(`  行: "${line}" -> ${isValid ? '✅ 採用' : '❌ 除外'}`)
         return isValid
       })
-      .map(line => line.replace(/^[\d\.\-\*\#\s]+/, '').trim()) // 先頭の番号・記号を削除
+      .map(line => {
+        // 先頭の番号・記号・英語記号を削除
+        return line
+          .replace(/^[\d\.\-\*\#\s\:\(\)]+/, '')
+          .replace(/\*+$/, '')  // 末尾のアスタリスクを削除
+          .trim()
+      })
       .filter(line => line.length > 1)
       .slice(0, 10)
     
     console.log('✅ 抽出された単元:', units)
+    console.log('📊 抽出された単元数:', units.length)
     
     return c.json({
       success: true,
