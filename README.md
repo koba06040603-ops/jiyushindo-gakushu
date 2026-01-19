@@ -75,9 +75,9 @@
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://d9a7fa36.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://8d0808a3.jiyushindo-gakushu.pages.dev ✅
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `5c03550` (完全インタラクティブなメディア機能の実装)
+- **最終コミット**: `c5a1486` (アニメーション拡大・TTS音声改善・Suno AI説明追加)
 
 ## 🎉 実装完了した全機能
 
