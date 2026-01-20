@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://9123ffad.jiyushindo-gakushu.pages.dev** ✅ 最新版（3名のデモデータ完備）
+**https://bb497461.jiyushindo-gakushu.pages.dev** ✅ 最新版（週次推移グラフ追加）
 
 ### 🔐 デモアカウント
 
