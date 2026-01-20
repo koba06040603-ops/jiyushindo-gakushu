@@ -1230,11 +1230,28 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://f76e435d.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://2158eadb.jiyushindo-gakushu.pages.dev ✅
 - **本番URL**: https://jiyushindo-gakushu.pages.dev
-- **テストページ**: https://f76e435d.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
+- **テストページ**: https://2158eadb.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `4552c5e` (テキスト読み上げ・動的視覚支援・リアルタイム通信機能を追加)
+- **最終コミット**: `2e2c361` (紙学習対応ガイド追加 - [詳細](./PAPER_LEARNING_SUPPORT.md))
+
+## 📄 紙学習への対応
+
+デジタル学習が苦手な児童や、家庭にデバイスがない児童のために、紙媒体でも同等のサポートを提供します。
+
+**詳細ガイド**: [PAPER_LEARNING_SUPPORT.md](./PAPER_LEARNING_SUPPORT.md)
+
+### 主な対応策
+1. **個人レポート** → 誤答記録シート・成長グラフシート（手書き）
+2. **音声読み上げ** → QRコード付き音声ガイド・ルビ版プリント
+3. **視覚支援** → 色分けプリント・拡大版・フォーカスシート
+4. **リアルタイム通信** → ヘルプカード・進捗ボード（教室掲示）
+
+### ハイブリッド運用
+- デジタル/紙/ハイブリッドを児童が選択可能
+- 週1回: AI分析→紙レポート配布
+- QRコードでデジタルサポートにアクセス
 
 ## 🔐 デモアカウント
 
