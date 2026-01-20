@@ -1253,11 +1253,11 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 
 ## 🌐 URL・リンク
 
-- **本番URL**: https://jiyushindo-gakushu.pages.dev ✅
-- **最新デプロイ**: https://2158eadb.jiyushindo-gakushu.pages.dev
-- **テストページ**: https://2158eadb.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
+- **本番URL**: https://jiyushindo-gakushu.pages.dev
+- **最新デプロイ**: https://ad6b2d82.jiyushindo-gakushu.pages.dev ✅ システムエラー修正済み
+- **テストページ**: https://ad6b2d82.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `a71418b` (わかりやすいREADME追加・デモ動画ガイド・ブログ公開方法・生徒説明ポイント)
+- **最終コミット**: `37a24b8` (重複関数定義の削除 - システムエラー修正)
 
 ## 🔐 デモアカウント
 
