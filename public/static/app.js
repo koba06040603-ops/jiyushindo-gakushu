@@ -4127,6 +4127,10 @@ function showDemoWeeklyReport() {
 async function loadProgressBoard(curriculumId, curriculumId2 = null) {
   console.log('🎯 進捗ボード読み込み開始:', curriculumId)
   state.currentView = 'progress'
+  
+  // カリキュラムIDを保存（AI誤答分析で使用）
+  state.selectedCurriculumId = curriculumId
+  
   showLoading('進捗ボードを読み込み中...')
   
   try {
@@ -6181,9 +6185,9 @@ async function loadAIPlanSuggestion() {
 // AI誤答分析ページを読み込む（先生用）
 async function loadAIErrorAnalysis() {
   console.log('🔬 AI誤答分析を開始')
-  console.log('📊 state.selectedCurriculum:', state.selectedCurriculum)
+  console.log('📊 state.selectedCurriculumId:', state.selectedCurriculumId)
   
-  if (!state.selectedCurriculum || !state.selectedCurriculum.id) {
+  if (!state.selectedCurriculumId) {
     alert('カリキュラムが選択されていません。進捗ボードから再度お試しください。')
     return
   }
@@ -6195,7 +6199,7 @@ async function loadAIErrorAnalysis() {
     <div class="max-w-6xl mx-auto p-6">
       <!-- ヘッダー -->
       <div class="flex justify-between items-center mb-6">
-        <button onclick="loadProgressBoard(${state.selectedCurriculum.id})" 
+        <button onclick="loadProgressBoard(${state.selectedCurriculumId})" 
                 class="text-blue-600 hover:text-blue-800 flex items-center">
           <i class="fas fa-arrow-left mr-2"></i>
           進捗ボードに戻る
@@ -6230,7 +6234,7 @@ async function loadAIErrorAnalysis() {
 // 生徒一覧を読み込む（分析用）
 async function loadStudentsForAnalysis() {
   try {
-    const response = await axios.get('/api/progress/curriculum/' + state.selectedCurriculum.id)
+    const response = await axios.get('/api/progress/curriculum/' + state.selectedCurriculumId)
     const students = response.data.students
     
     const studentSelector = document.getElementById('studentSelector')
@@ -6258,10 +6262,7 @@ async function analyzeStudent(studentId, studentName) {
   `
   
   try {
-    const response = await axios.post('/api/ai/analyze-errors', {
-      studentId: studentId,
-      curriculumId: state.selectedCurriculum.id
-    })
+    const response = await axios.get(`/api/error-analysis/${studentId}/${state.selectedCurriculumId}`)
     
     const analysis = response.data
     
