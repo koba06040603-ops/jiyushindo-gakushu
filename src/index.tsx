@@ -9645,20 +9645,25 @@ app.get('/api/export/student/:studentId/csv', async (c) => {
   
   // デモ用：学生IDが数字のみ（1桁または2桁）の場合はデモCSVを返す
   if (/^\d{1,2}$/.test(studentId)) {
-    const demoCSV = `# 生徒情報
-氏名,学生番号,クラスコード,メールアドレス
+    const today = new Date().toISOString().split('T')[0]
+    const demoCSV = `氏名,学生番号,クラスコード,メールアドレス
 デモ生徒,001,CLASS2024A,demo@student.jp
 
-# 学習進捗
-コース名,カリキュラム名,進捗率,完了ステータス,学習時間(分),最終学習日
-しっかりコース,かけ算の筆算,75%,進行中,120,${new Date().toISOString()}
+コース名,カリキュラム名,進捗率(%),完了ステータス,学習時間(分),最終学習日
+しっかりコース,かけ算の筆算,75,進行中,120,${today}
+じっくりコース,わり算の基礎,50,進行中,90,${today}
 
-# 誤答履歴
-問題名,問題タイプ,正誤,誤答パターン,解答,正解,難易度,回答日時
-学習カード1,learning_card,誤答,くり上がり忘れ,72,78,中,${new Date().toISOString()}
-学習カード2,learning_card,正解,,126,126,中,${new Date().toISOString()}`
+問題名,問題タイプ,正誤,誤答パターン,生徒の解答,正解,難易度,回答日時
+学習カード1,学習カード,誤答,くり上がり忘れ,72,78,中,${today}
+学習カード2,学習カード,正解,-,126,126,中,${today}
+チェックテスト問題3,チェックテスト,誤答,計算ミス,144,154,高,${today}
+学習カード4,学習カード,正解,-,96,96,易,${today}`
     
-    return new Response(demoCSV, {
+    // BOM付きUTF-8でエンコード
+    const bom = '\uFEFF'
+    const csvWithBom = bom + demoCSV
+    
+    return new Response(csvWithBom, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="demo_student_data.csv"`
@@ -9741,27 +9746,29 @@ app.get('/api/export/student/:studentId/csv', async (c) => {
     const csv = []
     
     // ヘッダー: 生徒情報
-    csv.push('# 生徒情報')
     csv.push('氏名,学生番号,クラスコード,メールアドレス')
-    csv.push(`${student.name},${student.student_number || ''},${student.class_code || ''},${student.email}`)
+    csv.push(`${student.name},${student.student_number || '-'},${student.class_code || '-'},${student.email}`)
     csv.push('')
     
     // 学習進捗
-    csv.push('# 学習進捗')
-    csv.push('コース名,カリキュラム名,進捗率,完了ステータス,学習時間(分),最終学習日')
+    csv.push('コース名,カリキュラム名,進捗率(%),完了ステータス,学習時間(分),最終学習日')
     progress.results.forEach((p: any) => {
-      csv.push(`${p.course_title || ''},${p.curriculum_title || ''},${p.completion_percentage || 0}%,${p.status || ''},${p.total_learning_time || 0},${p.updated_at || ''}`)
+      const status = p.status === 'completed' ? '完了' : p.status === 'in_progress' ? '進行中' : 'まだ開始していません'
+      csv.push(`${p.course_title || '-'},${p.curriculum_title || '-'},${p.completion_percentage || 0},${status},${p.total_learning_time || 0},${p.updated_at || '-'}`)
     })
     csv.push('')
     
     // 誤答履歴
-    csv.push('# 誤答履歴')
-    csv.push('問題名,問題タイプ,正誤,誤答パターン,解答,正解,難易度,回答日時')
+    csv.push('問題名,問題タイプ,正誤,誤答パターン,生徒の解答,正解,難易度,回答日時')
     errors.results.forEach((e: any) => {
-      csv.push(`${e.question_title || ''},${e.question_type || ''},${e.is_correct ? '正解' : '誤答'},${e.error_pattern || ''},${e.student_answer || ''},${e.correct_answer || ''},${e.difficulty || ''},${e.submitted_at || ''}`)
+      const questionType = e.question_type === 'learning_card' ? '学習カード' : 
+                         e.question_type === 'check_test' ? 'チェックテスト' : 
+                         e.question_type === 'optional' ? '選択問題' : e.question_type
+      csv.push(`${e.question_title || '-'},${questionType},${e.is_correct ? '正解' : '誤答'},${e.error_pattern || '-'},${e.student_answer || '-'},${e.correct_answer || '-'},${e.difficulty || '中'},${e.submitted_at || '-'}`)
     })
     
-    return new Response(csv.join('\n'), {
+    const bom = '\uFEFF'
+    return new Response(bom + csv.join('\n'), {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="student_${studentId}_data.csv"`
@@ -9779,6 +9786,26 @@ app.get('/api/export/class/:classCode/csv', async (c) => {
   const classCode = c.req.param('classCode')
   const { curriculumId } = c.req.query()
   
+  // デモ用：CLASS2024Aの場合はデモCSVを返す
+  if (classCode === 'CLASS2024A') {
+    const today = new Date().toISOString().split('T')[0]
+    const demoCSV = `学生番号,氏名,完了カリキュラム数,総学習時間(分),総問題数,総正答数,正答率(%)
+001,山田太郎,2,180,40,30,75.0
+002,佐藤花子,3,150,35,32,91.4
+003,鈴木次郎,1,120,30,21,70.0`
+    
+    // BOM付きUTF-8
+    const bom = '\uFEFF'
+    const csvWithBom = bom + demoCSV
+    
+    return new Response(csvWithBom, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="class_${classCode}_data.csv"`
+      }
+    })
+  }
+  
   try {
     // クラスの生徒一覧
     const students = await env.DB.prepare(`
@@ -9792,15 +9819,10 @@ app.get('/api/export/class/:classCode/csv', async (c) => {
     }
     
     const csv = []
-    csv.push('# クラス全体学習データ')
-    csv.push(`クラスコード: ${classCode}`)
-    csv.push(`エクスポート日時: ${new Date().toISOString()}`)
-    csv.push('')
     
     // カリキュラム別の進捗
     if (curriculumId) {
-      csv.push('# カリキュラム進捗')
-      csv.push('学生番号,氏名,進捗率,完了ステータス,学習時間(分),正答率,最終学習日')
+      csv.push('学生番号,氏名,進捗率(%),完了ステータス,学習時間(分),正答率(%),最終学習日')
       
       for (const student of students.results as any[]) {
         const progress = await env.DB.prepare(`
@@ -9820,11 +9842,11 @@ app.get('/api/export/class/:classCode/csv', async (c) => {
           ? ((accuracy.correct / accuracy.total) * 100).toFixed(1) 
           : '0.0'
         
-        csv.push(`${student.student_number || ''},${student.name},${progress?.completion_percentage || 0}%,${progress?.status || '未開始'},${progress?.total_learning_time || 0},${accuracyRate}%,${progress?.updated_at || ''}`)
+        const status = progress?.status === 'completed' ? '完了' : progress?.status === 'in_progress' ? '進行中' : '未開始'
+        csv.push(`${student.student_number || '-'},${student.name},${progress?.completion_percentage || 0},${status},${progress?.total_learning_time || 0},${accuracyRate},${progress?.updated_at || '-'}`)
       }
     } else {
-      csv.push('# 全体進捗概要')
-      csv.push('学生番号,氏名,完了カリキュラム数,総学習時間(分),総問題数,総正答数,正答率')
+      csv.push('学生番号,氏名,完了カリキュラム数,総学習時間(分),総問題数,総正答数,正答率(%)')
       
       for (const student of students.results as any[]) {
         const summary = await env.DB.prepare(`
@@ -9847,11 +9869,12 @@ app.get('/api/export/class/:classCode/csv', async (c) => {
           ? ((errors.correct / errors.total) * 100).toFixed(1) 
           : '0.0'
         
-        csv.push(`${student.student_number || ''},${student.name},${summary?.completed_count || 0},${summary?.total_time || 0},${errors?.total || 0},${errors?.correct || 0},${accuracyRate}%`)
+        csv.push(`${student.student_number || '-'},${student.name},${summary?.completed_count || 0},${summary?.total_time || 0},${errors?.total || 0},${errors?.correct || 0},${accuracyRate}`)
       }
     }
     
-    return new Response(csv.join('\n'), {
+    const bom = '\uFEFF'
+    return new Response(bom + csv.join('\n'), {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="class_${classCode}_data.csv"`
@@ -9871,26 +9894,32 @@ app.get('/api/export/phase3/:studentId/csv', async (c) => {
   
   // デモ用：学生IDが数字のみの場合はデモCSVを返す
   if (/^\d{1,2}$/.test(studentId)) {
-    const demoCSV = `# Phase 3 学習記録 - デモ生徒
-エクスポート日時: ${new Date().toISOString()}
+    const today = new Date().toISOString().split('T')[0]
+    const demoCSV = `選択課題の成果物
+カリキュラム,課題名,投稿タイプ,自己評価(1-5),自己コメント,教師コメント,教師評価(1-5),投稿日時
+かけ算の筆算,発展問題チャレンジ,画像,4,がんばって解きました,よく頑張りましたね！,5,${today}
+かけ算の筆算,自由課題,テキスト,3,難しかったです,次はもっとできるよ,4,${today}
 
-## 選択課題の成果物
-カリキュラム,課題名,投稿タイプ,自己評価,自己コメント,教師コメント,教師評価,投稿日時
-かけ算の筆算,発展問題チャレンジ,image,4,がんばって解きました,よく頑張りましたね！,5,${new Date().toISOString()}
+教師の見取り記録
+観察日,カリキュラム,観察タイプ,観察内容,非認知能力タグ,ポジティブ評価,保護者共有
+${today},かけ算の筆算,学習態度,集中して取り組んでいる,やり抜く力,はい,はい
+${today},かけ算の筆算,理解度,基礎的な理解は定着している,理解力,はい,いいえ
+${today},かけ算の筆算,協働性,友達と教え合っている,協働性,はい,はい
 
-## 教師の見取り記録
-観察日,カリキュラム,観察タイプ,観察内容,非認知タグ,ポジティブ,保護者共有
-${new Date().toISOString().split('T')[0]},かけ算の筆算,learning_attitude,集中して取り組んでいる,やり抜く力,はい,はい
+生徒の振り返り記録
+振り返り日,カリキュラム,振り返りタイプ,学んだこと,理解したこと,難しかったこと,楽しかったこと,次の目標,気分評価(1-5),努力評価(1-5),理解度評価(1-5)
+${today},かけ算の筆算,日次,くり上がりの方法,位を揃えること,大きい数の計算,パターンを見つけること,もっと速く計算する,4,4,4
+${today},かけ算の筆算,単元,筆算の基礎,筆算の手順,ケタの多い計算,自分で解けたこと,応用問題に挑戦,5,5,4
 
-## 生徒の振り返り記録
-振り返り日,カリキュラム,振り返りタイプ,学んだこと,理解したこと,難しかったこと,楽しかったこと,次の目標,気分評価,努力評価,理解度評価
-${new Date().toISOString().split('T')[0]},かけ算の筆算,daily,くり上がりの方法,位を揃えること,大きい数の計算,パターンを見つけること,もっと速く計算できるようになる,4,4,4
-
-## 教科横断評価
+教科横断評価
 評価期間開始,評価期間終了,読解力,文章表現力,論理的思考力,創造的思考力,問題解決力,やり抜く力,自己調整力,協働性,好奇心,メタ認知,成長マインド
-${new Date().toISOString().split('T')[0]},${new Date().toISOString().split('T')[0]},75,70,80,75,85,80,75,70,85,75,80`
+${today},${today},75,70,80,75,85,80,75,70,85,75,80`
     
-    return new Response(demoCSV, {
+    // BOM付きUTF-8
+    const bom = '\uFEFF'
+    const csvWithBom = bom + demoCSV
+    
+    return new Response(csvWithBom, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="phase3_demo_data.csv"`
