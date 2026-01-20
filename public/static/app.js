@@ -6234,8 +6234,17 @@ async function loadAIErrorAnalysis() {
 // 生徒一覧を読み込む（分析用）
 async function loadStudentsForAnalysis() {
   try {
-    const response = await axios.get('/api/progress/curriculum/' + state.selectedCurriculumId)
-    const students = response.data.students
+    console.log('📊 生徒データ取得中...', {
+      curriculumId: state.selectedCurriculumId,
+      classCode: state.student?.classCode
+    })
+    const response = await axios.get(`/api/progress/curriculum/${state.selectedCurriculumId}/class/${state.student.classCode}`)
+    
+    // APIレスポンスはオブジェクト形式 { studentId: { student, progress } } なので配列に変換
+    const studentProgress = response.data
+    const students = Object.values(studentProgress).map(sp => sp.student)
+    
+    console.log('✅ 生徒データ取得成功:', students.length, '名')
     
     const studentSelector = document.getElementById('studentSelector')
     studentSelector.innerHTML = students.map(student => `
