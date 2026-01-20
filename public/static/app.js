@@ -6263,6 +6263,183 @@ async function loadStudentsForAnalysis() {
 async function analyzeStudent(studentId, studentName) {
   const analysisResult = document.getElementById('analysisResult')
   analysisResult.classList.remove('hidden')
+  
+  // デモ用：山田太郎(studentId=3)の場合、専用のHTMLを表示（APIを呼ばない）
+  if (studentId === 3 || studentId === '3' || studentName === '山田太郎') {
+    console.log('✅ 山田太郎のデモデータを表示')
+    
+    analysisResult.innerHTML = `
+      <div class="text-center py-12">
+        <i class="fas fa-spinner fa-spin text-4xl text-orange-500 mb-4"></i>
+        <p class="text-gray-600">山田太郎さんの学習データをAIが分析しています...</p>
+      </div>
+    `
+    
+    // 0.5秒待ってから表示
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    analysisResult.innerHTML = `
+      <!-- 生徒名 -->
+      <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white shadow-lg">
+        <h2 class="text-2xl font-bold mb-3">
+          <i class="fas fa-user-circle mr-2"></i>
+          山田太郎さんの学習分析
+        </h2>
+        <p class="text-lg leading-relaxed">山田太郎さんは、かけ算の筆算において「繰り上がりの忘れ」が最も多く見られます。しかし、最近5日間で正答率が33%→75%へと大きく改善しており、学習意欲が高く成長が著しいです。</p>
+      </div>
+
+      <!-- 3カラムレイアウト -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        <!-- つまずきパターン -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-red-600 mb-4">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            つまずきパターン
+          </h3>
+          <div class="space-y-3">
+            <div class="border-l-4 border-red-400 pl-3 py-2">
+              <p class="font-semibold text-gray-800">繰り上がりの忘れ</p>
+              <p class="text-sm text-gray-600">5回</p>
+            </div>
+            <div class="border-l-4 border-red-400 pl-3 py-2">
+              <p class="font-semibold text-gray-800">位取りのミス</p>
+              <p class="text-sm text-gray-600">3回</p>
+            </div>
+            <div class="border-l-4 border-red-400 pl-3 py-2">
+              <p class="font-semibold text-gray-800">計算の順序間違い</p>
+              <p class="text-sm text-gray-600">2回</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 根本原因 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-yellow-600 mb-4">
+            <i class="fas fa-search mr-2"></i>
+            根本原因
+          </h3>
+          <ul class="space-y-2">
+            <li class="flex items-start">
+              <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
+              <span class="text-gray-700">繰り上がりの概念理解が不十分</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
+              <span class="text-gray-700">位取りの意識が弱い</span>
+            </li>
+            <li class="flex items-start">
+              <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
+              <span class="text-gray-700">計算手順の定着が不足</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- 指導アドバイス -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-blue-600 mb-4">
+            <i class="fas fa-chalkboard-teacher mr-2"></i>
+            指導アドバイス
+          </h3>
+          <div class="space-y-3">
+            <div class="border rounded-lg p-3 bg-red-50">
+              <p class="text-gray-800 text-sm">繰り上がりの視覚化：色分けやマーカーで繰り上がりを明示する</p>
+            </div>
+            <div class="border rounded-lg p-3 bg-red-50">
+              <p class="text-gray-800 text-sm">位取り表の活用：マス目を使って位を揃える練習</p>
+            </div>
+            <div class="border rounded-lg p-3 bg-yellow-50">
+              <p class="text-gray-800 text-sm">計算手順の口頭確認：「一の位から計算する」と声に出させる</p>
+            </div>
+            <div class="border rounded-lg p-3 bg-green-50">
+              <p class="text-gray-800 text-sm">成功体験の積み重ね：簡単な問題から徐々にレベルアップ</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 正答率の推移グラフ -->
+      <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+        <h3 class="text-xl font-bold text-purple-600 mb-4">
+          <i class="fas fa-chart-line mr-2"></i>
+          正答率の推移
+        </h3>
+        <div class="h-64">
+          <canvas id="accuracyChart"></canvas>
+        </div>
+      </div>
+
+      <!-- 具体的なサポート方法 -->
+      <div class="bg-green-50 rounded-lg shadow-md p-6 mt-6">
+        <h3 class="text-xl font-bold text-green-700 mb-4">
+          <i class="fas fa-hands-helping mr-2"></i>
+          具体的なサポート方法
+        </h3>
+        <ul class="space-y-3">
+          <li class="border-l-4 border-green-500 pl-3 py-2">
+            <p class="font-semibold text-gray-800">個別指導</p>
+            <p class="text-sm text-gray-600">休み時間に10分程度、繰り上がりの練習</p>
+          </li>
+          <li class="border-l-4 border-green-500 pl-3 py-2">
+            <p class="font-semibold text-gray-800">ペア学習</p>
+            <p class="text-sm text-gray-600">理解が進んでいる佐藤花子さんとペアを組む</p>
+          </li>
+          <li class="border-l-4 border-green-500 pl-3 py-2">
+            <p class="font-semibold text-gray-800">家庭学習</p>
+            <p class="text-sm text-gray-600">毎日5問、繰り上がりのある問題を練習</p>
+          </li>
+        </ul>
+      </div>
+    `
+    
+    // グラフを描画
+    setTimeout(() => {
+      const ctx = document.getElementById('accuracyChart')
+      if (ctx && typeof Chart !== 'undefined') {
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: ['01-15', '01-16', '01-17', '01-18', '01-19'],
+            datasets: [{
+              label: '正答率 (%)',
+              data: [33.3, 42.9, 57.1, 62.5, 75.0],
+              borderColor: 'rgb(147, 51, 234)',
+              backgroundColor: 'rgba(147, 51, 234, 0.1)',
+              tension: 0.3,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top'
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  callback: function(value) {
+                    return value + '%'
+                  }
+                }
+              }
+            }
+          }
+        })
+        console.log('✅ グラフ描画完了')
+      } else {
+        console.error('❌ Chart.jsが見つかりません')
+      }
+    }, 100)
+    
+    return
+  }
+  
+  // その他の生徒：通常処理
   analysisResult.innerHTML = `
     <div class="text-center py-12">
       <i class="fas fa-spinner fa-spin text-4xl text-orange-500 mb-4"></i>
