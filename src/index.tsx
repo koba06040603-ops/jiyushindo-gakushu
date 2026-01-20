@@ -3074,7 +3074,6 @@ app.get('/test-buttons.html', async (c) => {
         })
     </script>
     
-    <script src="/static/student-demo-data.js"></script>
     <script src="/static/app.js"></script>
     
     <script>
