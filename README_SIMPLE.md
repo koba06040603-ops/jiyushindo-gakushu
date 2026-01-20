@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://cddcc342.jiyushindo-gakushu.pages.dev** ✅ 最新版（エクスポート・統計エラー修正版）
+**https://64e08169.jiyushindo-gakushu.pages.dev** ✅ 最新版（デモデータ対応・全機能動作確認済み）
 
 ### 🔐 デモアカウント
 
