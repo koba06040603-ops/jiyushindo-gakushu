@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://375ac42f.jiyushindo-gakushu.pages.dev** ✅ 最新版（山田太郎デモ完全版）
+**https://05031cba.jiyushindo-gakushu.pages.dev** ✅ 最新版（選択課題+非認知能力統合）
 
 ### 🔐 デモアカウント
 
