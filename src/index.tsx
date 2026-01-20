@@ -1036,6 +1036,78 @@ app.post('/api/progress/help-resolve', async (c) => {
   }
 })
 
+// APIルート：個人レポート（AI誤答分析）
+app.get('/api/error-analysis/:studentId/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    // 誤答履歴を取得
+    const errorHistory = await env.DB.prepare(`
+      SELECT 
+        eh.*,
+        CASE 
+          WHEN eh.question_type = 'learning_card' THEN lc.card_title
+          WHEN eh.question_type = 'check_test' THEN 'チェックテスト問題' || eh.question_number
+          WHEN eh.question_type = 'optional' THEN op.problem_title
+        END as question_title
+      FROM error_history eh
+      LEFT JOIN learning_cards lc ON eh.question_type = 'learning_card' AND eh.question_id = lc.id
+      LEFT JOIN optional_problems op ON eh.question_type = 'optional' AND eh.question_id = op.id
+      WHERE eh.student_id = ? AND eh.curriculum_id = ?
+      ORDER BY eh.submitted_at DESC
+      LIMIT 100
+    `).bind(studentId, curriculumId).all()
+    
+    // 誤答パターン分析
+    const errorPatterns = await env.DB.prepare(`
+      SELECT 
+        error_pattern,
+        COUNT(*) as count,
+        GROUP_CONCAT(question_type) as question_types
+      FROM error_history
+      WHERE student_id = ? AND curriculum_id = ? AND is_correct = 0 AND error_pattern IS NOT NULL
+      GROUP BY error_pattern
+      ORDER BY count DESC
+    `).bind(studentId, curriculumId).all()
+    
+    // 正答率の推移
+    const accuracyTrend = await env.DB.prepare(`
+      SELECT 
+        DATE(submitted_at) as date,
+        COUNT(*) as total,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+      FROM error_history
+      WHERE student_id = ? AND curriculum_id = ?
+      GROUP BY DATE(submitted_at)
+      ORDER BY date ASC
+    `).bind(studentId, curriculumId).all()
+    
+    // 学生情報
+    const student = await env.DB.prepare(`
+      SELECT id, name, email, student_number
+      FROM users
+      WHERE id = ? AND role = 'student'
+    `).bind(studentId).first()
+    
+    return c.json({
+      success: true,
+      student,
+      error_history: errorHistory.results,
+      error_patterns: errorPatterns.results,
+      accuracy_trend: accuracyTrend.results
+    })
+  } catch (error) {
+    console.error('誤答分析エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '誤答分析の読み込みに失敗しました',
+      details: error.message 
+    }, 500)
+  }
+})
+
 // APIルート：活動記録更新
 app.post('/api/progress/activity', async (c) => {
   const { env } = c
