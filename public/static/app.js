@@ -4271,9 +4271,6 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
           <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs md:text-sm">
             ${generateHelpStatsNew(progressData.students)}
           </div>
-          <div class="mt-4 text-center">
-            <button onclick="loadAIErrorAnalysis()" 
-                    class="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-bold py-2 px-4 rounded-lg shadow-lg transform hover:scale-105 transition-all">
               <i class="fas fa-microscope mr-2"></i>
               AI誤答分析で詳しく見る
               <span class="ml-2 text-xs bg-white text-red-600 px-2 py-0.5 rounded animate-pulse">NEW</span>
@@ -6250,52 +6247,21 @@ async function analyzeStudent(studentId, studentName) {
   `
   
   try {
-    const response = await axios.get(`/api/error-analysis/${studentId}/${state.selectedCurriculum.id}`)
+    const response = await axios.post('/api/ai/analyze-errors', {
+      studentId: studentId,
+      curriculumId: state.selectedCurriculum.id
+    })
     
-    if (!response.data.success) {
-      throw new Error(response.data.error || '分析データの取得に失敗しました')
-    }
-    
-    const data = response.data
-    const student = data.student
-    const errorHistory = data.error_history || []
-    const errorPatterns = data.error_patterns || []
-    const accuracyTrend = data.accuracy_trend || []
-    
-    // 統計情報を計算
-    const totalAttempts = errorHistory.length
-    const correctCount = errorHistory.filter(h => h.is_correct === 1).length
-    const incorrectCount = totalAttempts - correctCount
-    const accuracyRate = totalAttempts > 0 ? Math.round((correctCount / totalAttempts) * 100) : 0
-    
-    // 最新の誤答パターンTop3
-    const topPatterns = errorPatterns.slice(0, 3)
+    const analysis = response.data
     
     analysisResult.innerHTML = `
-      <!-- 生徒名と概要 -->
+      <!-- 生徒名 -->
       <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white shadow-lg">
         <h2 class="text-2xl font-bold mb-3">
           <i class="fas fa-user-circle mr-2"></i>
-          ${studentName}さんの個人レポート
+          ${studentName}さんの学習分析
         </h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-          <div class="bg-white/20 rounded-lg p-3 text-center">
-            <p class="text-sm mb-1">解答数</p>
-            <p class="text-2xl font-bold">${totalAttempts}問</p>
-          </div>
-          <div class="bg-white/20 rounded-lg p-3 text-center">
-            <p class="text-sm mb-1">正解</p>
-            <p class="text-2xl font-bold text-green-300">${correctCount}問</p>
-          </div>
-          <div class="bg-white/20 rounded-lg p-3 text-center">
-            <p class="text-sm mb-1">誤答</p>
-            <p class="text-2xl font-bold text-red-300">${incorrectCount}問</p>
-          </div>
-          <div class="bg-white/20 rounded-lg p-3 text-center">
-            <p class="text-sm mb-1">正答率</p>
-            <p class="text-2xl font-bold">${accuracyRate}%</p>
-          </div>
-        </div>
+        <p class="text-lg leading-relaxed">${analysis.overall_analysis || '分析を表示できません'}</p>
       </div>
 
       <!-- 3カラムレイアウト -->
@@ -6304,289 +6270,68 @@ async function analyzeStudent(studentId, studentName) {
         <div class="bg-white rounded-lg shadow-md p-6">
           <h3 class="text-xl font-bold text-red-600 mb-4">
             <i class="fas fa-exclamation-circle mr-2"></i>
-            つまずきパターン Top3
+            つまずきパターン
           </h3>
-          ${topPatterns.length > 0 ? `
-            <div class="space-y-3">
-              ${topPatterns.map((pattern, index) => `
-                <div class="border-l-4 border-red-400 pl-3 py-2">
-                  <div class="flex items-center justify-between mb-1">
-                    <span class="text-xs font-bold text-white bg-red-500 rounded-full px-2 py-0.5">#${index + 1}</span>
-                    <span class="text-sm text-gray-500">${pattern.count}回</span>
-                  </div>
-                  <p class="font-semibold text-gray-800">${pattern.error_pattern}</p>
-                  <p class="text-xs text-gray-500 mt-1">出現問題: ${pattern.question_types}</p>
-                </div>
-              `).join('')}
-            </div>
-          ` : '<p class="text-gray-500 text-center py-4">誤答パターンがありません</p>'}
-        </div>
-
-        <!-- 最近の誤答履歴 -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-xl font-bold text-yellow-600 mb-4">
-            <i class="fas fa-history mr-2"></i>
-            最近の誤答履歴
-          </h3>
-          ${errorHistory.filter(h => h.is_correct === 0).slice(0, 5).length > 0 ? `
-            <div class="space-y-3 max-h-96 overflow-y-auto">
-              ${errorHistory.filter(h => h.is_correct === 0).slice(0, 5).map(error => `
-                <div class="border border-gray-200 rounded-lg p-3">
-                  <p class="text-xs text-gray-500 mb-1">${new Date(error.submitted_at).toLocaleString('ja-JP')}</p>
-                  <p class="font-semibold text-sm text-gray-800 mb-1">${error.question_title || '問題'}</p>
-                  <div class="bg-red-50 rounded p-2 mb-2">
-                    <p class="text-xs text-gray-600">誤答: ${error.answer_text}</p>
-                  </div>
-                  ${error.ai_feedback ? `
-                    <div class="bg-blue-50 rounded p-2">
-                      <p class="text-xs text-blue-800"><i class="fas fa-robot mr-1"></i>${error.ai_feedback}</p>
-                    </div>
-                  ` : ''}
-                </div>
-              `).join('')}
-            </div>
-          ` : '<p class="text-gray-500 text-center py-4">誤答履歴がありません</p>'}
-        </div>
-
-        <!-- AI指導アドバイス -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-xl font-bold text-green-600 mb-4">
-            <i class="fas fa-lightbulb mr-2"></i>
-            AI指導アドバイス
-          </h3>
-          ${generateTeachingAdvice(topPatterns, accuracyRate)}
-        </div>
-      </div>
-
-      <!-- 正答率の推移グラフ -->
-      ${accuracyTrend.length > 0 ? `
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-xl font-bold text-blue-600 mb-4">
-            <i class="fas fa-chart-line mr-2"></i>
-            正答率の推移
-          </h3>
-          <div class="h-64">
-            <canvas id="accuracyChart"></canvas>
+          <div class="space-y-3">
+            ${(analysis.error_patterns || []).map(pattern => `
+              <div class="border-l-4 border-red-400 pl-3 py-2">
+                <p class="font-semibold text-gray-800">${pattern.pattern}</p>
+                <p class="text-sm text-gray-600">${pattern.frequency}</p>
+              </div>
+            `).join('')}
           </div>
         </div>
-      ` : ''}
 
-      <!-- 全誤答履歴 -->
-      <div class="bg-white rounded-lg shadow-md p-6">
-        <h3 class="text-xl font-bold text-gray-800 mb-4">
-          <i class="fas fa-list mr-2"></i>
-          全解答履歴（最新20件）
+        <!-- 根本原因 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-yellow-600 mb-4">
+            <i class="fas fa-search mr-2"></i>
+            根本原因
+          </h3>
+          <ul class="space-y-2">
+            ${(analysis.root_causes || []).map(cause => `
+              <li class="flex items-start">
+                <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
+                <span class="text-gray-700">${cause}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+
+        <!-- 指導アドバイス -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h3 class="text-xl font-bold text-blue-600 mb-4">
+            <i class="fas fa-chalkboard-teacher mr-2"></i>
+            指導アドバイス
+          </h3>
+          <div class="space-y-3">
+            ${(analysis.suggestions_for_teacher || []).map(suggestion => {
+              const priorityColor = suggestion.priority === 'high' ? 'red' : 
+                                   suggestion.priority === 'medium' ? 'yellow' : 'green'
+              return `
+                <div class="border rounded-lg p-3 bg-${priorityColor}-50">
+                  <p class="text-gray-800 text-sm">${suggestion.suggestion}</p>
+                </div>
+              `
+            }).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- サポート方法 -->
+      ${(analysis.support_strategies && analysis.support_strategies.length > 0) ? `
+      <div class="bg-green-50 rounded-lg shadow-md p-6">
+        <h3 class="text-xl font-bold text-green-700 mb-4">
+          <i class="fas fa-hands-helping mr-2"></i>
+          具体的なサポート方法
         </h3>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-100">
-              <tr>
-                <th class="px-4 py-2 text-left">日時</th>
-                <th class="px-4 py-2 text-left">問題</th>
-                <th class="px-4 py-2 text-left">解答</th>
-                <th class="px-4 py-2 text-center">結果</th>
-                <th class="px-4 py-2 text-left">パターン</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${errorHistory.slice(0, 20).map(h => `
-                <tr class="border-b hover:bg-gray-50">
-                  <td class="px-4 py-2 text-xs text-gray-600">${new Date(h.submitted_at).toLocaleString('ja-JP', {month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'})}</td>
-                  <td class="px-4 py-2">${h.question_title || '問題'}</td>
-                  <td class="px-4 py-2 text-xs">${h.answer_text.substring(0, 30)}${h.answer_text.length > 30 ? '...' : ''}</td>
-                  <td class="px-4 py-2 text-center">
-                    ${h.is_correct ? '<span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">正解</span>' : '<span class="bg-red-100 text-red-800 px-2 py-1 rounded text-xs">誤答</span>'}
-                  </td>
-                  <td class="px-4 py-2 text-xs text-gray-600">${h.error_pattern || '-'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `
-    
-    // グラフを描画
-    if (accuracyTrend.length > 0) {
-      setTimeout(() => {
-        drawAccuracyChart(accuracyTrend)
-      }, 100)
-    }
-  } catch (error) {
-    console.error('分析エラー:', error)
-    analysisResult.innerHTML = `
-      <div class="bg-red-50 border-2 border-red-200 rounded-lg p-6 text-center">
-        <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-3"></i>
-        <p class="text-red-800 font-bold mb-2">分析データの読み込みに失敗しました</p>
-        <p class="text-red-600 text-sm">${error.message || 'エラーが発生しました'}</p>
-        <button onclick="loadAIErrorAnalysis()" class="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded">
-          <i class="fas fa-redo mr-2"></i>再試行
-        </button>
-      </div>
-    `
-  }
-}
-
-// AI指導アドバイスを生成
-function generateTeachingAdvice(patterns, accuracyRate) {
-  if (patterns.length === 0) {
-    return `
-      <div class="bg-green-50 rounded-lg p-4 text-center">
-        <i class="fas fa-check-circle text-green-600 text-3xl mb-2"></i>
-        <p class="text-green-800 font-semibold">順調に学習が進んでいます！</p>
-        <p class="text-green-600 text-sm mt-2">継続して学習を進めましょう。</p>
-      </div>
-    `
-  }
-  
-  const topPattern = patterns[0].error_pattern
-  let advice = ''
-  
-  if (topPattern.includes('くり上がり')) {
-    advice = `
-      <div class="space-y-3">
-        <div class="bg-blue-50 border-l-4 border-blue-500 p-3">
-          <p class="font-semibold text-blue-900 mb-2">🎯 重点指導項目</p>
-          <p class="text-sm text-blue-800">くり上がりの計算</p>
-        </div>
-        <div class="space-y-2 text-sm">
-          <p><i class="fas fa-check text-green-600 mr-2"></i>位ごとに分けて計算する練習</p>
-          <p><i class="fas fa-check text-green-600 mr-2"></i>くり上がりをメモする習慣</p>
-          <p><i class="fas fa-check text-green-600 mr-2"></i>10のまとまりで考える練習</p>
-        </div>
-        <div class="bg-yellow-50 rounded p-3 mt-3">
-          <p class="text-xs text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>具体物（おはじきなど）を使った視覚的指導が効果的です。</p>
-        </div>
-      </div>
-    `
-  } else if (topPattern.includes('位')) {
-    advice = `
-      <div class="space-y-3">
-        <div class="bg-blue-50 border-l-4 border-blue-500 p-3">
-          <p class="font-semibold text-blue-900 mb-2">🎯 重点指導項目</p>
-          <p class="text-sm text-blue-800">位（くら）の理解</p>
-        </div>
-        <div class="space-y-2 text-sm">
-          <p><i class="fas fa-check text-green-600 mr-2"></i>位取りの練習（一の位、十の位、百の位）</p>
-          <p><i class="fas fa-check text-green-600 mr-2"></i>筆算を縦に揃えて書く練習</p>
-          <p><i class="fas fa-check text-green-600 mr-2"></i>方眼ノートを使った位の視覚化</p>
-        </div>
-        <div class="bg-yellow-50 rounded p-3 mt-3">
-          <p class="text-xs text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>色分けされた位のカードを使うと効果的です。</p>
-        </div>
-      </div>
-    `
-  } else if (topPattern.includes('立式')) {
-    advice = `
-      <div class="space-y-3">
-        <div class="bg-blue-50 border-l-4 border-blue-500 p-3">
-          <p class="font-semibold text-blue-900 mb-2">🎯 重点指導項目</p>
-          <p class="text-sm text-blue-800">文章題の立式</p>
-        </div>
-        <div class="space-y-2 text-sm">
-          <p><i class="fas fa-check text-green-600 mr-2"></i>「〜ずつ」「〜分」などキーワードの理解</p>
-          <p><i class="fas fa-check text-green-600 mr-2"></i>図や絵を描いて状況を整理する練習</p>
-          <p><i class="fas fa-check text-green-600 mr-2"></i>かけ算を使う場面の理解</p>
-        </div>
-        <div class="bg-yellow-50 rounded p-3 mt-3">
-          <p class="text-xs text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>実生活の場面と結びつけた指導が効果的です。</p>
-        </div>
-      </div>
-    `
-  } else {
-    advice = `
-      <div class="space-y-3">
-        <div class="bg-blue-50 border-l-4 border-blue-500 p-3">
-          <p class="font-semibold text-blue-900 mb-2">🎯 個別対応が必要です</p>
-          <p class="text-sm text-blue-800">${topPattern}</p>
-        </div>
-        <div class="space-y-2 text-sm">
-          <p><i class="fas fa-check text-green-600 mr-2"></i>個別の補習指導を検討</p>
-          <p><i class="fas fa-check text-green-600 mr-2"></i>基礎概念の確認</p>
-          <p><i class="fas fa-check text-green-600 mr-2"></i>スモールステップでの指導</p>
-        </div>
-      </div>
-    `
-  }
-  
-  // 正答率による追加アドバイス
-  if (accuracyRate < 50) {
-    advice += `
-      <div class="bg-red-50 border border-red-200 rounded p-3 mt-3">
-        <p class="text-xs text-red-800 font-semibold"><i class="fas fa-exclamation-circle mr-1"></i>要注意</p>
-        <p class="text-xs text-red-700 mt-1">正答率が低いため、個別の手厚い支援が必要です。</p>
-      </div>
-    `
-  } else if (accuracyRate >= 80) {
-    advice += `
-      <div class="bg-green-50 border border-green-200 rounded p-3 mt-3">
-        <p class="text-xs text-green-800 font-semibold"><i class="fas fa-star mr-1"></i>良好</p>
-        <p class="text-xs text-green-700 mt-1">理解度は高いです。応用問題に挑戦しましょう。</p>
-      </div>
-    `
-  }
-  
-  return advice
-}
-
-// 正答率推移グラフを描画
-function drawAccuracyChart(accuracyTrend) {
-  const canvas = document.getElementById('accuracyChart')
-  if (!canvas) return
-  
-  const ctx = canvas.getContext('2d')
-  
-  // Chart.jsがCDNで読み込まれていることを前提
-  if (typeof Chart === 'undefined') {
-    canvas.parentElement.innerHTML = '<p class="text-gray-500 text-center py-4">グラフライブラリが読み込まれていません</p>'
-    return
-  }
-  
-  const labels = accuracyTrend.map(d => {
-    const date = new Date(d.date)
-    return `${date.getMonth() + 1}/${date.getDate()}`
-  })
-  
-  const data = accuracyTrend.map(d => {
-    return d.total > 0 ? Math.round((d.correct / d.total) * 100) : 0
-  })
-  
-  new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: '正答率 (%)',
-        data: data,
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.3,
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top'
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          max: 100,
-          ticks: {
-            callback: function(value) {
-              return value + '%'
-            }
-          }
-        }
-      }
-    }
-  })
-}
+        <ul class="space-y-2">
+          ${analysis.support_strategies.map(strategy => `
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+              <span class="text-gray-700">${strategy}</span>
+            </li>
+          `).join('')}
         </ul>
       </div>
       ` : ''}
@@ -15777,11 +15522,5 @@ console.log('  loadProgressBoard:', typeof window.loadProgressBoard)
 console.log('  renderTopPage:', typeof window.renderTopPage)
 console.log('  showLoading:', typeof window.showLoading)
 console.log('  hideLoading:', typeof window.hideLoading)
-console.log('  generateTeachingAdvice:', typeof window.generateTeachingAdvice)
-console.log('  drawAccuracyChart:', typeof window.drawAccuracyChart)
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-// 個人レポート用ヘルパー関数をグローバルに登録
-window.generateTeachingAdvice = generateTeachingAdvice
-window.drawAccuracyChart = drawAccuracyChart
 
