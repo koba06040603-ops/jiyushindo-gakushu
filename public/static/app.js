@@ -6279,8 +6279,16 @@ async function analyzeStudent(studentId, studentName) {
       studentId,
       studentIdType: typeof studentId,
       hasErrorPatterns: !!analysis.error_patterns,
-      errorPatternsLength: analysis.error_patterns?.length
+      errorPatternsLength: analysis.error_patterns?.length,
+      hasRootCauses: !!analysis.root_causes,
+      rootCausesLength: analysis.root_causes?.length,
+      hasSuggestions: !!analysis.suggestions_for_teacher,
+      suggestionsLength: analysis.suggestions_for_teacher?.length,
+      hasAccuracyTrend: !!analysis.accuracy_trend,
+      accuracyTrendLength: analysis.accuracy_trend?.length
     })
+    
+    console.log('📋 実際のデータ:', analysis)
     
     // デモ用：山田太郎(studentId=3)の場合、詳細なモックデータを追加
     // 文字列と数値の両方に対応
@@ -6349,13 +6357,14 @@ async function analyzeStudent(studentId, studentName) {
         </div>
 
         <!-- 根本原因 -->
+        ${(analysis.root_causes && analysis.root_causes.length > 0) ? `
         <div class="bg-white rounded-lg shadow-md p-6">
           <h3 class="text-xl font-bold text-yellow-600 mb-4">
             <i class="fas fa-search mr-2"></i>
             根本原因
           </h3>
           <ul class="space-y-2">
-            ${(analysis.root_causes || []).map(cause => `
+            ${analysis.root_causes.map(cause => `
               <li class="flex items-start">
                 <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
                 <span class="text-gray-700">${cause}</span>
@@ -6363,15 +6372,17 @@ async function analyzeStudent(studentId, studentName) {
             `).join('')}
           </ul>
         </div>
+        ` : '<div class="bg-white rounded-lg shadow-md p-6"><p class="text-gray-500">根本原因データがありません</p></div>'}
 
         <!-- 指導アドバイス -->
+        ${(analysis.suggestions_for_teacher && analysis.suggestions_for_teacher.length > 0) ? `
         <div class="bg-white rounded-lg shadow-md p-6">
           <h3 class="text-xl font-bold text-blue-600 mb-4">
             <i class="fas fa-chalkboard-teacher mr-2"></i>
             指導アドバイス
           </h3>
           <div class="space-y-3">
-            ${(analysis.suggestions_for_teacher || []).map(suggestion => {
+            ${analysis.suggestions_for_teacher.map(suggestion => {
               const priorityColor = suggestion.priority === 'high' ? 'red' : 
                                    suggestion.priority === 'medium' ? 'yellow' : 'green'
               return `
@@ -6382,6 +6393,7 @@ async function analyzeStudent(studentId, studentName) {
             }).join('')}
           </div>
         </div>
+        ` : '<div class="bg-white rounded-lg shadow-md p-6"><p class="text-gray-500">指導アドバイスデータがありません</p></div>'}
       </div>
 
       <!-- 正答率の推移グラフ -->
