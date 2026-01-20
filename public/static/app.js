@@ -4502,7 +4502,7 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
             </div>
             
             <!-- クラス統計ダッシュボードボタン -->
-            <button onclick="showClassStatistics('${progressData.classCode}')" 
+            <button onclick="showClassStatistics('${progressData.class_code || 'CLASS2024A'}')" 
                     class="ml-4 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition font-semibold text-sm whitespace-nowrap shadow-md">
               <i class="fas fa-chart-bar mr-2"></i>
               クラス統計
