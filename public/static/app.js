@@ -9200,13 +9200,6 @@ function closeStudentDetail() {
 }
 
 // 理解度の絵文字取得
-function getUnderstandingEmoji(level) {
-  if (level >= 80) return '🤩'
-  if (level >= 60) return '😄'
-  if (level >= 40) return '😊'
-  if (level >= 20) return '😕'
-  return '😢'
-}
 
 // PDF出力機能
 async function exportProgressToPDF() {
@@ -9868,16 +9861,13 @@ function generateCardProgressBar(cardProgress) {
     return '<div class="bg-gray-200 h-8 rounded flex items-center justify-center text-xs text-gray-500">未開始</div>'
   }
 
-  // 各児童が選択した1つのコースのカードのみを使用
-  // 同じcourse_levelのカードのみをカウント
-  const courseLevel = cardProgress[0]?.course_level || 'standard'
-  const courseCards = cardProgress.filter(c => c.course_level === courseLevel)
-  
-  const totalCards = courseCards.length // 実際のカード数を使用
-  const completed = courseCards.filter(c => c.status === 'completed').length
-  const percentComplete = totalCards > 0 ? Math.round((completed / totalCards) * 100) : 0
+  // 各児童は1つのコースのみ選択（6枚）
+  const totalCards = 6
+  const completed = cardProgress.filter(c => c.status === 'completed').length
+  const percentComplete = Math.round((completed / totalCards) * 100)
 
   // コース別に色分け
+  const courseLevel = cardProgress[0]?.course_level || 'standard'
   const courseColors = {
     'basic': 'bg-green-500',
     'standard': 'bg-blue-500',
@@ -11626,12 +11616,12 @@ function showProblemGenerationModal(curriculumId) {
   // フォーム送信処理
   document.getElementById('problemGenerationForm').addEventListener('submit', async (e) => {
     e.preventDefault()
-    await generateProblem(curriculumId)
+    await generateCustomProblem(curriculumId)
   })
 }
 
 // 問題生成実行
-async function generateProblem(curriculumId) {
+async function generateCustomProblem(curriculumId) {
   const problemType = document.getElementById('problemType').value
   const difficultyLevel = parseInt(document.getElementById('difficultyLevel').value)
   const specificRequirements = document.getElementById('specificRequirements').value
@@ -12184,7 +12174,7 @@ function getConfidenceBadge(level) {
 }
 
 // 生徒詳細を表示
-async function showStudentDetail(studentId) {
+async function showStudentDetailAsync(studentId) {
   showLoading('生徒の詳細データを読み込み中...')
   
   try {
@@ -12359,7 +12349,7 @@ async function generateStudentProfile(studentId) {
       alert('✅ プロファイルを生成しました！')
       // モーダルを閉じて再表示
       document.querySelectorAll('.fixed').forEach(modal => modal.remove())
-      await showStudentDetail(studentId)
+      await showStudentDetailAsync(studentId)
     } else {
       throw new Error(response.data.error)
     }
