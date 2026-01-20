@@ -9655,7 +9655,7 @@ app.get('/api/export/student/:studentId/csv', async (c) => {
     }
     
     // 学習進捗データ
-    const progress = await env.DB.prepare(`
+    let progressQuery = env.DB.prepare(`
       SELECT p.*, c.curriculum_title, co.course_title
       FROM progress p
       LEFT JOIN curriculum c ON p.curriculum_id = c.id
@@ -9663,10 +9663,17 @@ app.get('/api/export/student/:studentId/csv', async (c) => {
       WHERE p.student_id = ?
       ${curriculumId ? 'AND p.curriculum_id = ?' : ''}
       ORDER BY p.created_at DESC
-    `).bind(curriculumId ? [studentId, curriculumId] : [studentId]).all()
+    `)
+    
+    if (curriculumId) {
+      progressQuery = progressQuery.bind(studentId, curriculumId)
+    } else {
+      progressQuery = progressQuery.bind(studentId)
+    }
+    const progress = await progressQuery.all()
     
     // 誤答履歴
-    const errors = await env.DB.prepare(`
+    let errorsQuery = env.DB.prepare(`
       SELECT eh.*, 
         CASE 
           WHEN eh.question_type = 'learning_card' THEN lc.card_title
@@ -9679,7 +9686,14 @@ app.get('/api/export/student/:studentId/csv', async (c) => {
       WHERE eh.student_id = ?
       ${curriculumId ? 'AND eh.curriculum_id = ?' : ''}
       ORDER BY eh.submitted_at DESC
-    `).bind(curriculumId ? [studentId, curriculumId] : [studentId]).all()
+    `)
+    
+    if (curriculumId) {
+      errorsQuery = errorsQuery.bind(studentId, curriculumId)
+    } else {
+      errorsQuery = errorsQuery.bind(studentId)
+    }
+    const errors = await errorsQuery.all()
     
     // CSV形式に変換
     const csv = []
@@ -9828,7 +9842,7 @@ app.get('/api/export/phase3/:studentId/csv', async (c) => {
     csv.push('')
     
     // 選択課題の成果物
-    const submissions = await env.DB.prepare(`
+    let submissionsQuery = env.DB.prepare(`
       SELECT ops.*, op.problem_title, c.curriculum_title
       FROM optional_problem_submissions ops
       LEFT JOIN optional_problems op ON ops.optional_problem_id = op.id
@@ -9837,9 +9851,18 @@ app.get('/api/export/phase3/:studentId/csv', async (c) => {
       ${startDate ? 'AND DATE(ops.submitted_at) >= ?' : ''}
       ${endDate ? 'AND DATE(ops.submitted_at) <= ?' : ''}
       ORDER BY ops.submitted_at DESC
-    `).bind(startDate && endDate ? [studentId, startDate, endDate] : 
-            startDate ? [studentId, startDate] : 
-            endDate ? [studentId, endDate] : [studentId]).all()
+    `)
+    
+    if (startDate && endDate) {
+      submissionsQuery = submissionsQuery.bind(studentId, startDate, endDate)
+    } else if (startDate) {
+      submissionsQuery = submissionsQuery.bind(studentId, startDate)
+    } else if (endDate) {
+      submissionsQuery = submissionsQuery.bind(studentId, endDate)
+    } else {
+      submissionsQuery = submissionsQuery.bind(studentId)
+    }
+    const submissions = await submissionsQuery.all()
     
     csv.push('## 選択課題の成果物')
     csv.push('カリキュラム,課題名,投稿タイプ,自己評価,自己コメント,教師コメント,教師評価,投稿日時')
@@ -9849,7 +9872,7 @@ app.get('/api/export/phase3/:studentId/csv', async (c) => {
     csv.push('')
     
     // 教師の見取り
-    const observations = await env.DB.prepare(`
+    let observationsQuery = env.DB.prepare(`
       SELECT to.*, c.curriculum_title
       FROM teacher_observations to
       LEFT JOIN curriculum c ON to.curriculum_id = c.id
@@ -9857,9 +9880,18 @@ app.get('/api/export/phase3/:studentId/csv', async (c) => {
       ${startDate ? 'AND DATE(to.observation_date) >= ?' : ''}
       ${endDate ? 'AND DATE(to.observation_date) <= ?' : ''}
       ORDER BY to.observation_date DESC
-    `).bind(startDate && endDate ? [studentId, startDate, endDate] : 
-            startDate ? [studentId, startDate] : 
-            endDate ? [studentId, endDate] : [studentId]).all()
+    `)
+    
+    if (startDate && endDate) {
+      observationsQuery = observationsQuery.bind(studentId, startDate, endDate)
+    } else if (startDate) {
+      observationsQuery = observationsQuery.bind(studentId, startDate)
+    } else if (endDate) {
+      observationsQuery = observationsQuery.bind(studentId, endDate)
+    } else {
+      observationsQuery = observationsQuery.bind(studentId)
+    }
+    const observations = await observationsQuery.all()
     
     csv.push('## 教師の見取り記録')
     csv.push('観察日,カリキュラム,観察タイプ,観察内容,非認知タグ,ポジティブ,保護者共有')
@@ -9869,7 +9901,7 @@ app.get('/api/export/phase3/:studentId/csv', async (c) => {
     csv.push('')
     
     // 生徒の振り返り
-    const reflections = await env.DB.prepare(`
+    let reflectionsQuery = env.DB.prepare(`
       SELECT sr.*, c.curriculum_title
       FROM student_reflections sr
       LEFT JOIN curriculum c ON sr.curriculum_id = c.id
@@ -9877,9 +9909,18 @@ app.get('/api/export/phase3/:studentId/csv', async (c) => {
       ${startDate ? 'AND DATE(sr.reflection_date) >= ?' : ''}
       ${endDate ? 'AND DATE(sr.reflection_date) <= ?' : ''}
       ORDER BY sr.reflection_date DESC
-    `).bind(startDate && endDate ? [studentId, startDate, endDate] : 
-            startDate ? [studentId, startDate] : 
-            endDate ? [studentId, endDate] : [studentId]).all()
+    `)
+    
+    if (startDate && endDate) {
+      reflectionsQuery = reflectionsQuery.bind(studentId, startDate, endDate)
+    } else if (startDate) {
+      reflectionsQuery = reflectionsQuery.bind(studentId, startDate)
+    } else if (endDate) {
+      reflectionsQuery = reflectionsQuery.bind(studentId, endDate)
+    } else {
+      reflectionsQuery = reflectionsQuery.bind(studentId)
+    }
+    const reflections = await reflectionsQuery.all()
     
     csv.push('## 生徒の振り返り記録')
     csv.push('振り返り日,カリキュラム,振り返りタイプ,学んだこと,理解したこと,難しかったこと,楽しかったこと,次の目標,気分評価,努力評価,理解度評価')
@@ -9889,15 +9930,24 @@ app.get('/api/export/phase3/:studentId/csv', async (c) => {
     csv.push('')
     
     // 教科横断評価
-    const evaluations = await env.DB.prepare(`
+    let evaluationsQuery = env.DB.prepare(`
       SELECT * FROM cross_subject_evaluations
       WHERE student_id = ?
       ${startDate ? 'AND DATE(evaluation_period_start) >= ?' : ''}
       ${endDate ? 'AND DATE(evaluation_period_end) <= ?' : ''}
       ORDER BY evaluation_period_start DESC
-    `).bind(startDate && endDate ? [studentId, startDate, endDate] : 
-            startDate ? [studentId, startDate] : 
-            endDate ? [studentId, endDate] : [studentId]).all()
+    `)
+    
+    if (startDate && endDate) {
+      evaluationsQuery = evaluationsQuery.bind(studentId, startDate, endDate)
+    } else if (startDate) {
+      evaluationsQuery = evaluationsQuery.bind(studentId, startDate)
+    } else if (endDate) {
+      evaluationsQuery = evaluationsQuery.bind(studentId, endDate)
+    } else {
+      evaluationsQuery = evaluationsQuery.bind(studentId)
+    }
+    const evaluations = await evaluationsQuery.all()
     
     csv.push('## 教科横断評価')
     csv.push('評価期間開始,評価期間終了,読解力,文章表現力,論理的思考力,創造的思考力,問題解決力,やり抜く力,自己調整力,協働性,好奇心,メタ認知,成長マインド')
@@ -9941,8 +9991,11 @@ app.get('/api/statistics/class/:classCode', async (c) => {
     
     const studentIds = students.results.map((s: any) => s.id)
     
+    // プレースホルダーを生成（?, ?, ?のような形式）
+    const placeholders = studentIds.map(() => '?').join(',')
+    
     // 進捗統計
-    const progressStats = await env.DB.prepare(`
+    let progressStatsQuery = env.DB.prepare(`
       SELECT 
         AVG(completion_percentage) as avg_completion,
         MIN(completion_percentage) as min_completion,
@@ -9950,39 +10003,60 @@ app.get('/api/statistics/class/:classCode', async (c) => {
         COUNT(DISTINCT student_id) as active_students,
         SUM(total_learning_time) as total_time
       FROM progress
-      WHERE student_id IN (${studentIds.join(',')})
+      WHERE student_id IN (${placeholders})
       ${curriculumId ? 'AND curriculum_id = ?' : ''}
-    `).bind(curriculumId ? [curriculumId] : []).first()
+    `)
+    
+    if (curriculumId) {
+      progressStatsQuery = progressStatsQuery.bind(...studentIds, curriculumId)
+    } else {
+      progressStatsQuery = progressStatsQuery.bind(...studentIds)
+    }
+    const progressStats = await progressStatsQuery.first()
     
     // 正答率統計
-    const accuracyStats = await env.DB.prepare(`
+    let accuracyStatsQuery = env.DB.prepare(`
       SELECT 
         COUNT(*) as total_questions,
         SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_questions,
         AVG(CASE WHEN is_correct = 1 THEN 100.0 ELSE 0.0 END) as avg_accuracy
       FROM error_history
-      WHERE student_id IN (${studentIds.join(',')})
+      WHERE student_id IN (${placeholders})
       ${curriculumId ? 'AND curriculum_id = ?' : ''}
-    `).bind(curriculumId ? [curriculumId] : []).first()
+    `)
+    
+    if (curriculumId) {
+      accuracyStatsQuery = accuracyStatsQuery.bind(...studentIds, curriculumId)
+    } else {
+      accuracyStatsQuery = accuracyStatsQuery.bind(...studentIds)
+    }
+    const accuracyStats = await accuracyStatsQuery.first()
     
     // 誤答パターン分析
-    const errorPatterns = await env.DB.prepare(`
+    let errorPatternsQuery = env.DB.prepare(`
       SELECT 
         error_pattern,
         COUNT(*) as count,
         COUNT(DISTINCT student_id) as affected_students
       FROM error_history
-      WHERE student_id IN (${studentIds.join(',')})
+      WHERE student_id IN (${placeholders})
       ${curriculumId ? 'AND curriculum_id = ?' : ''}
         AND is_correct = 0 
         AND error_pattern IS NOT NULL
       GROUP BY error_pattern
       ORDER BY count DESC
       LIMIT 10
-    `).bind(curriculumId ? [curriculumId] : []).all()
+    `)
+    
+    if (curriculumId) {
+      errorPatternsQuery = errorPatternsQuery.bind(...studentIds, curriculumId)
+    } else {
+      errorPatternsQuery = errorPatternsQuery.bind(...studentIds)
+    }
+    const errorPatterns = await errorPatternsQuery.all()
     
     // 学習時間の分布
-    const learningTimeDistribution = await env.DB.prepare(`
+    let learningTimeDistQuery = env.DB.prepare(`
       SELECT 
         u.name,
         u.student_number,
@@ -9994,10 +10068,17 @@ app.get('/api/statistics/class/:classCode', async (c) => {
       ${curriculumId ? 'AND p.curriculum_id = ?' : ''}
       GROUP BY u.id, u.name, u.student_number
       ORDER BY total_time DESC
-    `).bind(curriculumId ? [classCode, curriculumId] : [classCode]).all()
+    `)
+    
+    if (curriculumId) {
+      learningTimeDistQuery = learningTimeDistQuery.bind(classCode, curriculumId)
+    } else {
+      learningTimeDistQuery = learningTimeDistQuery.bind(classCode)
+    }
+    const learningTimeDistribution = await learningTimeDistQuery.all()
     
     // 進捗率の分布
-    const progressDistribution = await env.DB.prepare(`
+    let progressDistQuery = env.DB.prepare(`
       SELECT 
         CASE 
           WHEN completion_percentage = 0 THEN '未開始'
@@ -10009,7 +10090,7 @@ app.get('/api/statistics/class/:classCode', async (c) => {
         END as range,
         COUNT(DISTINCT student_id) as count
       FROM progress
-      WHERE student_id IN (${studentIds.join(',')})
+      WHERE student_id IN (${placeholders})
       ${curriculumId ? 'AND curriculum_id = ?' : ''}
       GROUP BY range
       ORDER BY 
@@ -10021,7 +10102,14 @@ app.get('/api/statistics/class/:classCode', async (c) => {
           WHEN '75-99%' THEN 5
           WHEN '完了' THEN 6
         END
-    `).bind(curriculumId ? [curriculumId] : []).all()
+    `)
+    
+    if (curriculumId) {
+      progressDistQuery = progressDistQuery.bind(...studentIds, curriculumId)
+    } else {
+      progressDistQuery = progressDistQuery.bind(...studentIds)
+    }
+    const progressDistribution = await progressDistQuery.all()
     
     return c.json({
       classCode,
@@ -10054,6 +10142,7 @@ app.get('/api/statistics/noncognitive/:classCode', async (c) => {
     }
     
     const studentIds = students.results.map((s: any) => s.id)
+    const placeholders = studentIds.map(() => '?').join(',')
     
     // 最新の教科横断評価から非認知能力スコアを取得
     const noncognitiveScores = []
@@ -10105,11 +10194,11 @@ app.get('/api/statistics/noncognitive/:classCode', async (c) => {
         COUNT(*) as count,
         SUM(CASE WHEN is_positive = 1 THEN 1 ELSE 0 END) as positive_count
       FROM teacher_observations
-      WHERE student_id IN (${studentIds.join(',')})
+      WHERE student_id IN (${placeholders})
         AND observation_date >= date('now', '-30 days')
       GROUP BY observation_type
       ORDER BY count DESC
-    `).bind().all()
+    `).bind(...studentIds).all()
     
     // 振り返り統計
     const reflectionStats = await env.DB.prepare(`
@@ -10119,9 +10208,9 @@ app.get('/api/statistics/noncognitive/:classCode', async (c) => {
         AVG(understanding_rating) as avg_understanding,
         COUNT(*) as total_reflections
       FROM student_reflections
-      WHERE student_id IN (${studentIds.join(',')})
+      WHERE student_id IN (${placeholders})
         AND reflection_date >= date('now', '-30 days')
-    `).bind().first()
+    `).bind(...studentIds).first()
     
     return c.json({
       classCode,
