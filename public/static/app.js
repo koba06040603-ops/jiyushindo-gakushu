@@ -6180,6 +6180,14 @@ async function loadAIPlanSuggestion() {
 
 // AI誤答分析ページを読み込む（先生用）
 async function loadAIErrorAnalysis() {
+  console.log('🔬 AI誤答分析を開始')
+  console.log('📊 state.selectedCurriculum:', state.selectedCurriculum)
+  
+  if (!state.selectedCurriculum || !state.selectedCurriculum.id) {
+    alert('カリキュラムが選択されていません。進捗ボードから再度お試しください。')
+    return
+  }
+  
   state.currentView = 'ai-error-analysis'
   
   const app = document.getElementById('app')
@@ -6372,6 +6380,9 @@ window.setDifficulty = setDifficulty
 window.generateProblem = generateProblem
 window.toggleAnswer = toggleAnswer
 window.analyzeStudent = analyzeStudent
+
+console.log('✅ AI機能のグローバル関数を登録しました')
+console.log('  loadAIErrorAnalysis:', typeof window.loadAIErrorAnalysis)
 
 // ============================================
 // Phase 7: AI単元自動生成システム
