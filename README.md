@@ -1230,11 +1230,11 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://6957bffc.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://f76e435d.jiyushindo-gakushu.pages.dev ✅
 - **本番URL**: https://jiyushindo-gakushu.pages.dev
-- **テストページ**: https://6957bffc.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
+- **テストページ**: https://f76e435d.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `c45bf0d` (個人レポート（AI誤答分析）機能実装 + デモデータ投入)
+- **最終コミット**: `4552c5e` (テキスト読み上げ・動的視覚支援・リアルタイム通信機能を追加)
 
 ## 🔐 デモアカウント
 
