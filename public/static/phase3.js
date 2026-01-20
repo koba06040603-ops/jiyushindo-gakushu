@@ -1333,4 +1333,455 @@ function renderCrossEvaluations(evaluations) {
   }).join('')
 }
 
-console.log('✅ Phase 3 機能を読み込みました')
+// ============================================
+// 5. データエクスポート機能
+// ============================================
+
+// エクスポートボタンを表示
+window.showExportButtons = function(studentId, studentName) {
+  window.phase3State.currentStudentId = studentId
+  
+  const buttonHtml = `
+    <div class="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+      <h4 class="text-lg font-bold text-gray-800 mb-3">
+        <i class="fas fa-download mr-2 text-blue-600"></i>
+        データエクスポート
+      </h4>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <button onclick="exportStudentData('${studentId}', '${studentName}')" 
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+          <i class="fas fa-file-csv mr-2"></i>学習データCSV
+        </button>
+        <button onclick="exportPhase3Data('${studentId}', '${studentName}')" 
+                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+          <i class="fas fa-file-alt mr-2"></i>Phase3データCSV
+        </button>
+        <button onclick="showStatisticsDashboard('${studentId}', '${studentName}')" 
+                class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+          <i class="fas fa-chart-bar mr-2"></i>統計分析
+        </button>
+      </div>
+    </div>
+  `
+  
+  // AI誤答分析の下に追加
+  const container = document.getElementById('error-analysis-container')
+  if (container) {
+    let exportDiv = document.getElementById('export-buttons')
+    if (!exportDiv) {
+      exportDiv = document.createElement('div')
+      exportDiv.id = 'export-buttons'
+      container.appendChild(exportDiv)
+    }
+    exportDiv.innerHTML = buttonHtml
+  }
+}
+
+// 学習データをCSV形式でエクスポート
+window.exportStudentData = async function(studentId, studentName) {
+  try {
+    const curriculumId = window.phase3State.currentCurriculumId || ''
+    const url = `/api/export/student/${studentId}/csv${curriculumId ? '?curriculumId=' + curriculumId : ''}`
+    
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('Export failed')
+    
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = `${studentName}_学習データ_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(downloadUrl)
+    
+    alert('✅ 学習データをエクスポートしました')
+  } catch (error) {
+    console.error('Export error:', error)
+    alert('❌ エクスポートに失敗しました')
+  }
+}
+
+// Phase 3データをCSV形式でエクスポート
+window.exportPhase3Data = async function(studentId, studentName) {
+  try {
+    const url = `/api/export/phase3/${studentId}/csv`
+    
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('Export failed')
+    
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = `${studentName}_Phase3データ_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(downloadUrl)
+    
+    alert('✅ Phase 3データをエクスポートしました')
+  } catch (error) {
+    console.error('Phase 3 export error:', error)
+    alert('❌ エクスポートに失敗しました')
+  }
+}
+
+// ============================================
+// 6. 統計ダッシュボード
+// ============================================
+
+// 統計ダッシュボードを表示
+window.showStatisticsDashboard = async function(studentId, studentName) {
+  const modalHtml = `
+    <div id="statisticsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg max-w-6xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-chart-line mr-2 text-purple-600"></i>
+            ${studentName}さんの成長分析
+          </h3>
+          <button onclick="closeStatisticsModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <div id="statistics-content" class="space-y-6">
+          <div class="flex items-center justify-center py-8">
+            <i class="fas fa-spinner fa-spin text-4xl text-purple-600 mr-3"></i>
+            <span class="text-lg text-gray-600">分析中...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+  
+  // AI成長分析を取得
+  try {
+    const response = await fetch('/api/ai/analyze-growth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentId: studentId,
+        analysisType: '総合的な成長パターン'
+      })
+    })
+    
+    if (!response.ok) throw new Error('Analysis failed')
+    
+    const analysis = await response.json()
+    renderStatisticsContent(analysis)
+  } catch (error) {
+    console.error('Statistics error:', error)
+    document.getElementById('statistics-content').innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-3"></i>
+        <p>統計分析の取得に失敗しました</p>
+      </div>
+    `
+  }
+}
+
+// 統計コンテンツをレンダリング
+function renderStatisticsContent(analysis) {
+  const content = document.getElementById('statistics-content')
+  
+  content.innerHTML = `
+    <!-- 分析サマリー -->
+    <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 border border-purple-200">
+      <div class="flex items-center mb-4">
+        <i class="fas fa-brain text-3xl text-purple-600 mr-3"></i>
+        <div>
+          <h4 class="text-xl font-bold text-gray-800">AI成長パターン分析</h4>
+          <p class="text-sm text-gray-600">分析日時: ${new Date(analysis.analysisDate).toLocaleString('ja-JP')}</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-4 mt-4">
+        <div class="bg-white rounded-lg p-3 text-center">
+          <p class="text-sm text-gray-600">振り返り</p>
+          <p class="text-2xl font-bold text-purple-600">${analysis.dataQuality.reflectionsCount}</p>
+          <p class="text-xs text-gray-500">件</p>
+        </div>
+        <div class="bg-white rounded-lg p-3 text-center">
+          <p class="text-sm text-gray-600">見取り</p>
+          <p class="text-2xl font-bold text-indigo-600">${analysis.dataQuality.observationsCount}</p>
+          <p class="text-xs text-gray-500">件</p>
+        </div>
+        <div class="bg-white rounded-lg p-3 text-center">
+          <p class="text-sm text-gray-600">評価</p>
+          <p class="text-2xl font-bold text-blue-600">${analysis.dataQuality.evaluationsCount}</p>
+          <p class="text-xs text-gray-500">件</p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 成長パターン -->
+    <div class="bg-white rounded-lg border border-gray-200 p-6">
+      <h4 class="text-lg font-bold text-gray-800 mb-4">
+        <i class="fas fa-chart-line mr-2 text-green-600"></i>
+        成長パターン
+      </h4>
+      <div class="space-y-4">
+        ${analysis.growthPatterns.map(pattern => `
+          <div class="border-l-4 ${
+            pattern.trend === '向上' ? 'border-green-500 bg-green-50' :
+            pattern.trend === '安定' ? 'border-blue-500 bg-blue-50' :
+            'border-yellow-500 bg-yellow-50'
+          } p-4 rounded-r-lg">
+            <div class="flex items-center justify-between mb-2">
+              <h5 class="font-bold text-gray-800">${pattern.category}</h5>
+              <span class="px-3 py-1 rounded-full text-sm font-medium ${
+                pattern.trend === '向上' ? 'bg-green-200 text-green-800' :
+                pattern.trend === '安定' ? 'bg-blue-200 text-blue-800' :
+                'bg-yellow-200 text-yellow-800'
+              }">
+                ${pattern.trend}
+              </span>
+            </div>
+            <p class="text-sm text-gray-700 mb-2">${pattern.description}</p>
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-info-circle mr-1"></i>${pattern.evidence}
+            </p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <!-- 強みと課題 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- 強み -->
+      <div class="bg-white rounded-lg border border-gray-200 p-6">
+        <h4 class="text-lg font-bold text-gray-800 mb-4">
+          <i class="fas fa-star mr-2 text-yellow-500"></i>
+          強み
+        </h4>
+        <ul class="space-y-2">
+          ${analysis.strengths.map(strength => `
+            <li class="flex items-start">
+              <i class="fas fa-check-circle text-green-600 mr-2 mt-1"></i>
+              <span class="text-gray-700">${strength}</span>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+      
+      <!-- 課題 -->
+      <div class="bg-white rounded-lg border border-gray-200 p-6">
+        <h4 class="text-lg font-bold text-gray-800 mb-4">
+          <i class="fas fa-target mr-2 text-orange-500"></i>
+          今後の課題
+        </h4>
+        <ul class="space-y-2">
+          ${analysis.challenges.map(challenge => `
+            <li class="flex items-start">
+              <i class="fas fa-arrow-circle-up text-orange-600 mr-2 mt-1"></i>
+              <span class="text-gray-700">${challenge}</span>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    </div>
+    
+    <!-- 推奨事項 -->
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-6">
+      <h4 class="text-lg font-bold text-gray-800 mb-4">
+        <i class="fas fa-lightbulb mr-2 text-blue-600"></i>
+        推奨事項
+      </h4>
+      <div class="space-y-3">
+        ${analysis.recommendations.map((rec, index) => `
+          <div class="flex items-start bg-white rounded-lg p-4">
+            <div class="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold mr-3">
+              ${index + 1}
+            </div>
+            <p class="text-gray-700 flex-1">${rec}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <!-- アクションボタン -->
+    <div class="flex justify-end space-x-3">
+      <button onclick="window.print()" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+        <i class="fas fa-print mr-2"></i>印刷
+      </button>
+      <button onclick="closeStatisticsModal()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+        <i class="fas fa-check mr-2"></i>閉じる
+      </button>
+    </div>
+  `
+}
+
+// 統計モーダルを閉じる
+window.closeStatisticsModal = function() {
+  const modal = document.getElementById('statisticsModal')
+  if (modal) modal.remove()
+}
+
+// クラス全体の統計ダッシュボードを表示
+window.showClassStatistics = async function(classCode) {
+  const modalHtml = `
+    <div id="classStatisticsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg max-w-6xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-users mr-2 text-blue-600"></i>
+            クラス全体の統計分析
+          </h3>
+          <button onclick="closeClassStatisticsModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <div id="class-statistics-content" class="space-y-6">
+          <div class="flex items-center justify-center py-8">
+            <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mr-3"></i>
+            <span class="text-lg text-gray-600">クラスデータを分析中...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+  
+  // クラス統計を取得
+  try {
+    const response = await fetch(`/api/statistics/class/${classCode}`)
+    if (!response.ok) throw new Error('Statistics failed')
+    
+    const stats = await response.json()
+    renderClassStatisticsContent(stats)
+  } catch (error) {
+    console.error('Class statistics error:', error)
+    document.getElementById('class-statistics-content').innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-3"></i>
+        <p>クラス統計の取得に失敗しました</p>
+      </div>
+    `
+  }
+}
+
+// クラス統計コンテンツをレンダリング
+function renderClassStatisticsContent(stats) {
+  const content = document.getElementById('class-statistics-content')
+  
+  const avgCompletion = stats.progressStats?.avg_completion?.toFixed(1) || 0
+  const avgAccuracy = stats.accuracyStats?.avg_accuracy?.toFixed(1) || 0
+  const totalTime = stats.progressStats?.total_time || 0
+  
+  content.innerHTML = `
+    <!-- サマリーカード -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+        <div class="flex items-center justify-between mb-2">
+          <i class="fas fa-users text-2xl text-blue-600"></i>
+          <span class="text-xs text-blue-700 font-medium">生徒数</span>
+        </div>
+        <p class="text-3xl font-bold text-blue-800">${stats.studentCount}</p>
+        <p class="text-xs text-blue-600 mt-1">人</p>
+      </div>
+      
+      <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+        <div class="flex items-center justify-between mb-2">
+          <i class="fas fa-check-circle text-2xl text-green-600"></i>
+          <span class="text-xs text-green-700 font-medium">平均進捗率</span>
+        </div>
+        <p class="text-3xl font-bold text-green-800">${avgCompletion}%</p>
+        <p class="text-xs text-green-600 mt-1">完了</p>
+      </div>
+      
+      <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+        <div class="flex items-center justify-between mb-2">
+          <i class="fas fa-bullseye text-2xl text-purple-600"></i>
+          <span class="text-xs text-purple-700 font-medium">平均正答率</span>
+        </div>
+        <p class="text-3xl font-bold text-purple-800">${avgAccuracy}%</p>
+        <p class="text-xs text-purple-600 mt-1">正解</p>
+      </div>
+      
+      <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
+        <div class="flex items-center justify-between mb-2">
+          <i class="fas fa-clock text-2xl text-orange-600"></i>
+          <span class="text-xs text-orange-700 font-medium">総学習時間</span>
+        </div>
+        <p class="text-3xl font-bold text-orange-800">${Math.round(totalTime / 60)}</p>
+        <p class="text-xs text-orange-600 mt-1">時間</p>
+      </div>
+    </div>
+    
+    <!-- エラーパターン -->
+    <div class="bg-white rounded-lg border border-gray-200 p-6">
+      <h4 class="text-lg font-bold text-gray-800 mb-4">
+        <i class="fas fa-exclamation-triangle mr-2 text-red-600"></i>
+        クラス全体の誤答パターン（トップ10）
+      </h4>
+      <div class="space-y-2">
+        ${stats.errorPatterns.map((pattern, index) => `
+          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+            <div class="flex items-center flex-1">
+              <span class="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center font-bold text-sm mr-3">
+                ${index + 1}
+              </span>
+              <div class="flex-1">
+                <p class="font-medium text-gray-800">${pattern.error_pattern}</p>
+                <p class="text-xs text-gray-500">${pattern.affected_students}人が該当</p>
+              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-2xl font-bold text-red-600">${pattern.count}</p>
+              <p class="text-xs text-gray-500">回</p>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    
+    <!-- CSVエクスポート -->
+    <div class="flex justify-end space-x-3">
+      <button onclick="exportClassData('${stats.classCode}')" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+        <i class="fas fa-file-csv mr-2"></i>クラスデータをCSVエクスポート
+      </button>
+      <button onclick="closeClassStatisticsModal()" class="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+        <i class="fas fa-times mr-2"></i>閉じる
+      </button>
+    </div>
+  `
+}
+
+// クラス統計モーダルを閉じる
+window.closeClassStatisticsModal = function() {
+  const modal = document.getElementById('classStatisticsModal')
+  if (modal) modal.remove()
+}
+
+// クラスデータをCSVエクスポート
+window.exportClassData = async function(classCode) {
+  try {
+    const url = `/api/export/class/${classCode}/csv`
+    
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('Export failed')
+    
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = `クラス${classCode}_学習データ_${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(downloadUrl)
+    
+    alert('✅ クラスデータをエクスポートしました')
+  } catch (error) {
+    console.error('Class export error:', error)
+    alert('❌ エクスポートに失敗しました')
+  }
+}
+
+console.log('✅ Phase 3 機能を読み込みました（エクスポート・統計分析を含む）')

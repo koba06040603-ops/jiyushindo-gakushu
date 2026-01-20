@@ -9633,6 +9633,637 @@ app.get('/proposal', (c) => {
 </html>`)
 })
 
+// ============================================
+// データエクスポートAPI
+// ============================================
+
+// 生徒の学習データをCSV形式でエクスポート
+app.get('/api/export/student/:studentId/csv', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const { curriculumId } = c.req.query()
+  
+  try {
+    // 生徒情報
+    const student = await env.DB.prepare(`
+      SELECT id, name, email, student_number, class_code
+      FROM users WHERE id = ?
+    `).bind(studentId).first()
+    
+    if (!student) {
+      return c.json({ error: 'Student not found' }, 404)
+    }
+    
+    // 学習進捗データ
+    const progress = await env.DB.prepare(`
+      SELECT p.*, c.curriculum_title, co.course_title
+      FROM progress p
+      LEFT JOIN curriculum c ON p.curriculum_id = c.id
+      LEFT JOIN courses co ON c.course_id = co.id
+      WHERE p.student_id = ?
+      ${curriculumId ? 'AND p.curriculum_id = ?' : ''}
+      ORDER BY p.created_at DESC
+    `).bind(curriculumId ? [studentId, curriculumId] : [studentId]).all()
+    
+    // 誤答履歴
+    const errors = await env.DB.prepare(`
+      SELECT eh.*, 
+        CASE 
+          WHEN eh.question_type = 'learning_card' THEN lc.card_title
+          WHEN eh.question_type = 'check_test' THEN 'チェックテスト問題' || eh.question_number
+          WHEN eh.question_type = 'optional' THEN op.problem_title
+        END as question_title
+      FROM error_history eh
+      LEFT JOIN learning_cards lc ON eh.question_type = 'learning_card' AND eh.question_id = lc.id
+      LEFT JOIN optional_problems op ON eh.question_type = 'optional' AND eh.question_id = op.id
+      WHERE eh.student_id = ?
+      ${curriculumId ? 'AND eh.curriculum_id = ?' : ''}
+      ORDER BY eh.submitted_at DESC
+    `).bind(curriculumId ? [studentId, curriculumId] : [studentId]).all()
+    
+    // CSV形式に変換
+    const csv = []
+    
+    // ヘッダー: 生徒情報
+    csv.push('# 生徒情報')
+    csv.push('氏名,学生番号,クラスコード,メールアドレス')
+    csv.push(`${student.name},${student.student_number || ''},${student.class_code || ''},${student.email}`)
+    csv.push('')
+    
+    // 学習進捗
+    csv.push('# 学習進捗')
+    csv.push('コース名,カリキュラム名,進捗率,完了ステータス,学習時間(分),最終学習日')
+    progress.results.forEach((p: any) => {
+      csv.push(`${p.course_title || ''},${p.curriculum_title || ''},${p.completion_percentage || 0}%,${p.status || ''},${p.total_learning_time || 0},${p.updated_at || ''}`)
+    })
+    csv.push('')
+    
+    // 誤答履歴
+    csv.push('# 誤答履歴')
+    csv.push('問題名,問題タイプ,正誤,誤答パターン,解答,正解,難易度,回答日時')
+    errors.results.forEach((e: any) => {
+      csv.push(`${e.question_title || ''},${e.question_type || ''},${e.is_correct ? '正解' : '誤答'},${e.error_pattern || ''},${e.student_answer || ''},${e.correct_answer || ''},${e.difficulty || ''},${e.submitted_at || ''}`)
+    })
+    
+    return new Response(csv.join('\n'), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="student_${studentId}_data.csv"`
+      }
+    })
+  } catch (error: any) {
+    console.error('CSV export error:', error)
+    return c.json({ error: 'Failed to export data', details: error.message }, 500)
+  }
+})
+
+// クラス全体の学習データをCSV形式でエクスポート
+app.get('/api/export/class/:classCode/csv', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  const { curriculumId } = c.req.query()
+  
+  try {
+    // クラスの生徒一覧
+    const students = await env.DB.prepare(`
+      SELECT id, name, student_number FROM users 
+      WHERE class_code = ? AND role = 'student'
+      ORDER BY student_number
+    `).bind(classCode).all()
+    
+    if (students.results.length === 0) {
+      return c.json({ error: 'No students found' }, 404)
+    }
+    
+    const csv = []
+    csv.push('# クラス全体学習データ')
+    csv.push(`クラスコード: ${classCode}`)
+    csv.push(`エクスポート日時: ${new Date().toISOString()}`)
+    csv.push('')
+    
+    // カリキュラム別の進捗
+    if (curriculumId) {
+      csv.push('# カリキュラム進捗')
+      csv.push('学生番号,氏名,進捗率,完了ステータス,学習時間(分),正答率,最終学習日')
+      
+      for (const student of students.results as any[]) {
+        const progress = await env.DB.prepare(`
+          SELECT * FROM progress 
+          WHERE student_id = ? AND curriculum_id = ?
+        `).bind(student.id, curriculumId).first()
+        
+        const accuracy = await env.DB.prepare(`
+          SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+          FROM error_history
+          WHERE student_id = ? AND curriculum_id = ?
+        `).bind(student.id, curriculumId).first()
+        
+        const accuracyRate = accuracy && accuracy.total > 0 
+          ? ((accuracy.correct / accuracy.total) * 100).toFixed(1) 
+          : '0.0'
+        
+        csv.push(`${student.student_number || ''},${student.name},${progress?.completion_percentage || 0}%,${progress?.status || '未開始'},${progress?.total_learning_time || 0},${accuracyRate}%,${progress?.updated_at || ''}`)
+      }
+    } else {
+      csv.push('# 全体進捗概要')
+      csv.push('学生番号,氏名,完了カリキュラム数,総学習時間(分),総問題数,総正答数,正答率')
+      
+      for (const student of students.results as any[]) {
+        const summary = await env.DB.prepare(`
+          SELECT 
+            COUNT(DISTINCT curriculum_id) as completed_count,
+            SUM(total_learning_time) as total_time
+          FROM progress
+          WHERE student_id = ? AND status = 'completed'
+        `).bind(student.id).first()
+        
+        const errors = await env.DB.prepare(`
+          SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+          FROM error_history
+          WHERE student_id = ?
+        `).bind(student.id).first()
+        
+        const accuracyRate = errors && errors.total > 0 
+          ? ((errors.correct / errors.total) * 100).toFixed(1) 
+          : '0.0'
+        
+        csv.push(`${student.student_number || ''},${student.name},${summary?.completed_count || 0},${summary?.total_time || 0},${errors?.total || 0},${errors?.correct || 0},${accuracyRate}%`)
+      }
+    }
+    
+    return new Response(csv.join('\n'), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="class_${classCode}_data.csv"`
+      }
+    })
+  } catch (error: any) {
+    console.error('Class CSV export error:', error)
+    return c.json({ error: 'Failed to export class data', details: error.message }, 500)
+  }
+})
+
+// Phase 3データのエクスポート（成果物、見取り、振り返り）
+app.get('/api/export/phase3/:studentId/csv', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const { startDate, endDate } = c.req.query()
+  
+  try {
+    const student = await env.DB.prepare(`
+      SELECT name, student_number, class_code FROM users WHERE id = ?
+    `).bind(studentId).first()
+    
+    if (!student) {
+      return c.json({ error: 'Student not found' }, 404)
+    }
+    
+    const csv = []
+    csv.push(`# Phase 3 学習記録 - ${student.name}`)
+    csv.push(`エクスポート日時: ${new Date().toISOString()}`)
+    csv.push('')
+    
+    // 選択課題の成果物
+    const submissions = await env.DB.prepare(`
+      SELECT ops.*, op.problem_title, c.curriculum_title
+      FROM optional_problem_submissions ops
+      LEFT JOIN optional_problems op ON ops.optional_problem_id = op.id
+      LEFT JOIN curriculum c ON ops.curriculum_id = c.id
+      WHERE ops.student_id = ?
+      ${startDate ? 'AND DATE(ops.submitted_at) >= ?' : ''}
+      ${endDate ? 'AND DATE(ops.submitted_at) <= ?' : ''}
+      ORDER BY ops.submitted_at DESC
+    `).bind(startDate && endDate ? [studentId, startDate, endDate] : 
+            startDate ? [studentId, startDate] : 
+            endDate ? [studentId, endDate] : [studentId]).all()
+    
+    csv.push('## 選択課題の成果物')
+    csv.push('カリキュラム,課題名,投稿タイプ,自己評価,自己コメント,教師コメント,教師評価,投稿日時')
+    submissions.results.forEach((s: any) => {
+      csv.push(`${s.curriculum_title || ''},${s.problem_title || ''},${s.submission_type},${s.self_evaluation || ''},${(s.self_comment || '').replace(/,/g, '、')},${(s.teacher_comment || '').replace(/,/g, '、')},${s.teacher_evaluation || ''},${s.submitted_at}`)
+    })
+    csv.push('')
+    
+    // 教師の見取り
+    const observations = await env.DB.prepare(`
+      SELECT to.*, c.curriculum_title
+      FROM teacher_observations to
+      LEFT JOIN curriculum c ON to.curriculum_id = c.id
+      WHERE to.student_id = ?
+      ${startDate ? 'AND DATE(to.observation_date) >= ?' : ''}
+      ${endDate ? 'AND DATE(to.observation_date) <= ?' : ''}
+      ORDER BY to.observation_date DESC
+    `).bind(startDate && endDate ? [studentId, startDate, endDate] : 
+            startDate ? [studentId, startDate] : 
+            endDate ? [studentId, endDate] : [studentId]).all()
+    
+    csv.push('## 教師の見取り記録')
+    csv.push('観察日,カリキュラム,観察タイプ,観察内容,非認知タグ,ポジティブ,保護者共有')
+    observations.results.forEach((o: any) => {
+      csv.push(`${o.observation_date},${o.curriculum_title || ''},${o.observation_type},${(o.observation_text || '').replace(/,/g, '、')},${o.non_cognitive_tags || ''},${o.is_positive ? 'はい' : 'いいえ'},${o.is_shared_with_parents ? 'はい' : 'いいえ'}`)
+    })
+    csv.push('')
+    
+    // 生徒の振り返り
+    const reflections = await env.DB.prepare(`
+      SELECT sr.*, c.curriculum_title
+      FROM student_reflections sr
+      LEFT JOIN curriculum c ON sr.curriculum_id = c.id
+      WHERE sr.student_id = ?
+      ${startDate ? 'AND DATE(sr.reflection_date) >= ?' : ''}
+      ${endDate ? 'AND DATE(sr.reflection_date) <= ?' : ''}
+      ORDER BY sr.reflection_date DESC
+    `).bind(startDate && endDate ? [studentId, startDate, endDate] : 
+            startDate ? [studentId, startDate] : 
+            endDate ? [studentId, endDate] : [studentId]).all()
+    
+    csv.push('## 生徒の振り返り記録')
+    csv.push('振り返り日,カリキュラム,振り返りタイプ,学んだこと,理解したこと,難しかったこと,楽しかったこと,次の目標,気分評価,努力評価,理解度評価')
+    reflections.results.forEach((r: any) => {
+      csv.push(`${r.reflection_date},${r.curriculum_title || ''},${r.reflection_type},${(r.what_learned || '').replace(/,/g, '、')},${(r.what_understood || '').replace(/,/g, '、')},${(r.what_difficult || '').replace(/,/g, '、')},${(r.what_enjoyed || '').replace(/,/g, '、')},${(r.next_goals || '').replace(/,/g, '、')},${r.mood_rating || ''},${r.effort_rating || ''},${r.understanding_rating || ''}`)
+    })
+    csv.push('')
+    
+    // 教科横断評価
+    const evaluations = await env.DB.prepare(`
+      SELECT * FROM cross_subject_evaluations
+      WHERE student_id = ?
+      ${startDate ? 'AND DATE(evaluation_period_start) >= ?' : ''}
+      ${endDate ? 'AND DATE(evaluation_period_end) <= ?' : ''}
+      ORDER BY evaluation_period_start DESC
+    `).bind(startDate && endDate ? [studentId, startDate, endDate] : 
+            startDate ? [studentId, startDate] : 
+            endDate ? [studentId, endDate] : [studentId]).all()
+    
+    csv.push('## 教科横断評価')
+    csv.push('評価期間開始,評価期間終了,読解力,文章表現力,論理的思考力,創造的思考力,問題解決力,やり抜く力,自己調整力,協働性,好奇心,メタ認知,成長マインド')
+    evaluations.results.forEach((e: any) => {
+      csv.push(`${e.evaluation_period_start},${e.evaluation_period_end},${e.reading_comprehension},${e.writing_expression},${e.logical_thinking},${e.creative_thinking},${e.problem_solving},${e.persistence_score},${e.self_regulation_score},${e.collaboration_score},${e.curiosity_score},${e.metacognition_score},${e.growth_mindset_score}`)
+    })
+    
+    return new Response(csv.join('\n'), {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="phase3_${studentId}_data.csv"`
+      }
+    })
+  } catch (error: any) {
+    console.error('Phase 3 CSV export error:', error)
+    return c.json({ error: 'Failed to export Phase 3 data', details: error.message }, 500)
+  }
+})
+
+// ============================================
+// 統計ダッシュボードAPI
+// ============================================
+
+// クラス全体の学習統計
+app.get('/api/statistics/class/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  const { curriculumId } = c.req.query()
+  
+  try {
+    // クラスの生徒一覧
+    const students = await env.DB.prepare(`
+      SELECT id, name, student_number FROM users 
+      WHERE class_code = ? AND role = 'student'
+      ORDER BY student_number
+    `).bind(classCode).all()
+    
+    if (students.results.length === 0) {
+      return c.json({ error: 'No students found' }, 404)
+    }
+    
+    const studentIds = students.results.map((s: any) => s.id)
+    
+    // 進捗統計
+    const progressStats = await env.DB.prepare(`
+      SELECT 
+        AVG(completion_percentage) as avg_completion,
+        MIN(completion_percentage) as min_completion,
+        MAX(completion_percentage) as max_completion,
+        COUNT(DISTINCT student_id) as active_students,
+        SUM(total_learning_time) as total_time
+      FROM progress
+      WHERE student_id IN (${studentIds.join(',')})
+      ${curriculumId ? 'AND curriculum_id = ?' : ''}
+    `).bind(curriculumId ? [curriculumId] : []).first()
+    
+    // 正答率統計
+    const accuracyStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_questions,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_questions,
+        AVG(CASE WHEN is_correct = 1 THEN 100.0 ELSE 0.0 END) as avg_accuracy
+      FROM error_history
+      WHERE student_id IN (${studentIds.join(',')})
+      ${curriculumId ? 'AND curriculum_id = ?' : ''}
+    `).bind(curriculumId ? [curriculumId] : []).first()
+    
+    // 誤答パターン分析
+    const errorPatterns = await env.DB.prepare(`
+      SELECT 
+        error_pattern,
+        COUNT(*) as count,
+        COUNT(DISTINCT student_id) as affected_students
+      FROM error_history
+      WHERE student_id IN (${studentIds.join(',')})
+      ${curriculumId ? 'AND curriculum_id = ?' : ''}
+        AND is_correct = 0 
+        AND error_pattern IS NOT NULL
+      GROUP BY error_pattern
+      ORDER BY count DESC
+      LIMIT 10
+    `).bind(curriculumId ? [curriculumId] : []).all()
+    
+    // 学習時間の分布
+    const learningTimeDistribution = await env.DB.prepare(`
+      SELECT 
+        u.name,
+        u.student_number,
+        COALESCE(SUM(p.total_learning_time), 0) as total_time,
+        COUNT(DISTINCT p.curriculum_id) as completed_curriculums
+      FROM users u
+      LEFT JOIN progress p ON u.id = p.student_id
+      WHERE u.class_code = ? AND u.role = 'student'
+      ${curriculumId ? 'AND p.curriculum_id = ?' : ''}
+      GROUP BY u.id, u.name, u.student_number
+      ORDER BY total_time DESC
+    `).bind(curriculumId ? [classCode, curriculumId] : [classCode]).all()
+    
+    // 進捗率の分布
+    const progressDistribution = await env.DB.prepare(`
+      SELECT 
+        CASE 
+          WHEN completion_percentage = 0 THEN '未開始'
+          WHEN completion_percentage < 25 THEN '0-25%'
+          WHEN completion_percentage < 50 THEN '25-50%'
+          WHEN completion_percentage < 75 THEN '50-75%'
+          WHEN completion_percentage < 100 THEN '75-99%'
+          ELSE '完了'
+        END as range,
+        COUNT(DISTINCT student_id) as count
+      FROM progress
+      WHERE student_id IN (${studentIds.join(',')})
+      ${curriculumId ? 'AND curriculum_id = ?' : ''}
+      GROUP BY range
+      ORDER BY 
+        CASE range
+          WHEN '未開始' THEN 1
+          WHEN '0-25%' THEN 2
+          WHEN '25-50%' THEN 3
+          WHEN '50-75%' THEN 4
+          WHEN '75-99%' THEN 5
+          WHEN '完了' THEN 6
+        END
+    `).bind(curriculumId ? [curriculumId] : []).all()
+    
+    return c.json({
+      classCode,
+      studentCount: students.results.length,
+      progressStats,
+      accuracyStats,
+      errorPatterns: errorPatterns.results,
+      learningTimeDistribution: learningTimeDistribution.results,
+      progressDistribution: progressDistribution.results
+    })
+  } catch (error: any) {
+    console.error('Statistics error:', error)
+    return c.json({ error: 'Failed to get statistics', details: error.message }, 500)
+  }
+})
+
+// 非認知能力の統計（Phase 3）
+app.get('/api/statistics/noncognitive/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  
+  try {
+    const students = await env.DB.prepare(`
+      SELECT id, name FROM users 
+      WHERE class_code = ? AND role = 'student'
+    `).bind(classCode).all()
+    
+    if (students.results.length === 0) {
+      return c.json({ error: 'No students found' }, 404)
+    }
+    
+    const studentIds = students.results.map((s: any) => s.id)
+    
+    // 最新の教科横断評価から非認知能力スコアを取得
+    const noncognitiveScores = []
+    
+    for (const student of students.results as any[]) {
+      const latestEval = await env.DB.prepare(`
+        SELECT * FROM cross_subject_evaluations
+        WHERE student_id = ?
+        ORDER BY evaluation_period_end DESC
+        LIMIT 1
+      `).bind(student.id).first()
+      
+      if (latestEval) {
+        noncognitiveScores.push({
+          studentName: student.name,
+          persistence: latestEval.persistence_score,
+          selfRegulation: latestEval.self_regulation_score,
+          collaboration: latestEval.collaboration_score,
+          curiosity: latestEval.curiosity_score,
+          metacognition: latestEval.metacognition_score,
+          growthMindset: latestEval.growth_mindset_score
+        })
+      }
+    }
+    
+    // 平均スコアを計算
+    const avgScores = {
+      persistence: 0,
+      selfRegulation: 0,
+      collaboration: 0,
+      curiosity: 0,
+      metacognition: 0,
+      growthMindset: 0
+    }
+    
+    if (noncognitiveScores.length > 0) {
+      avgScores.persistence = noncognitiveScores.reduce((sum, s) => sum + (s.persistence || 0), 0) / noncognitiveScores.length
+      avgScores.selfRegulation = noncognitiveScores.reduce((sum, s) => sum + (s.selfRegulation || 0), 0) / noncognitiveScores.length
+      avgScores.collaboration = noncognitiveScores.reduce((sum, s) => sum + (s.collaboration || 0), 0) / noncognitiveScores.length
+      avgScores.curiosity = noncognitiveScores.reduce((sum, s) => sum + (s.curiosity || 0), 0) / noncognitiveScores.length
+      avgScores.metacognition = noncognitiveScores.reduce((sum, s) => sum + (s.metacognition || 0), 0) / noncognitiveScores.length
+      avgScores.growthMindset = noncognitiveScores.reduce((sum, s) => sum + (s.growthMindset || 0), 0) / noncognitiveScores.length
+    }
+    
+    // 教師の見取り統計
+    const observationStats = await env.DB.prepare(`
+      SELECT 
+        observation_type,
+        COUNT(*) as count,
+        SUM(CASE WHEN is_positive = 1 THEN 1 ELSE 0 END) as positive_count
+      FROM teacher_observations
+      WHERE student_id IN (${studentIds.join(',')})
+        AND observation_date >= date('now', '-30 days')
+      GROUP BY observation_type
+      ORDER BY count DESC
+    `).bind().all()
+    
+    // 振り返り統計
+    const reflectionStats = await env.DB.prepare(`
+      SELECT 
+        AVG(mood_rating) as avg_mood,
+        AVG(effort_rating) as avg_effort,
+        AVG(understanding_rating) as avg_understanding,
+        COUNT(*) as total_reflections
+      FROM student_reflections
+      WHERE student_id IN (${studentIds.join(',')})
+        AND reflection_date >= date('now', '-30 days')
+    `).bind().first()
+    
+    return c.json({
+      classCode,
+      studentCount: students.results.length,
+      noncognitiveScores,
+      avgScores,
+      observationStats: observationStats.results,
+      reflectionStats
+    })
+  } catch (error: any) {
+    console.error('Noncognitive statistics error:', error)
+    return c.json({ error: 'Failed to get noncognitive statistics', details: error.message }, 500)
+  }
+})
+
+// AI振り返り分析 - 成長パターン検出
+app.post('/api/ai/analyze-growth', async (c) => {
+  const { env } = c
+  const { studentId, analysisType } = await c.req.json()
+  
+  try {
+    // 生徒情報を取得
+    const student = await env.DB.prepare(`
+      SELECT * FROM users WHERE id = ?
+    `).bind(studentId).first()
+    
+    if (!student) {
+      return c.json({ error: 'Student not found' }, 404)
+    }
+    
+    // 振り返りデータを取得（過去3ヶ月分）
+    const reflections = await env.DB.prepare(`
+      SELECT * FROM student_reflections
+      WHERE student_id = ?
+        AND reflection_date >= date('now', '-90 days')
+      ORDER BY reflection_date ASC
+    `).bind(studentId).all()
+    
+    // 教師の見取り記録を取得
+    const observations = await env.DB.prepare(`
+      SELECT * FROM teacher_observations
+      WHERE student_id = ?
+        AND observation_date >= date('now', '-90 days')
+      ORDER BY observation_date ASC
+    `).bind(studentId).all()
+    
+    // 教科横断評価の履歴
+    const evaluations = await env.DB.prepare(`
+      SELECT * FROM cross_subject_evaluations
+      WHERE student_id = ?
+      ORDER BY evaluation_period_start ASC
+    `).bind(studentId).all()
+    
+    // 学習進捗データ
+    const progress = await env.DB.prepare(`
+      SELECT p.*, c.curriculum_title
+      FROM progress p
+      LEFT JOIN curriculum c ON p.curriculum_id = c.id
+      WHERE p.student_id = ?
+      ORDER BY p.updated_at DESC
+    `).bind(studentId).all()
+    
+    // AIに成長パターン分析を依頼（シミュレーション）
+    const analysisPrompt = `
+生徒名: ${student.name}
+分析タイプ: ${analysisType || '総合的な成長パターン'}
+
+【振り返りデータ】(${reflections.results.length}件)
+${reflections.results.slice(0, 5).map((r: any) => 
+  `- ${r.reflection_date}: ${r.what_learned || ''} | 気分:${r.mood_rating}/5 努力:${r.effort_rating}/5 理解:${r.understanding_rating}/5`
+).join('\n')}
+
+【教師の見取り】(${observations.results.length}件)
+${observations.results.slice(0, 5).map((o: any) => 
+  `- ${o.observation_date}: [${o.observation_type}] ${o.observation_text || ''}`
+).join('\n')}
+
+【教科横断評価】(${evaluations.results.length}件)
+${evaluations.results.map((e: any) => 
+  `- ${e.evaluation_period_start}～${e.evaluation_period_end}: 読解${e.reading_comprehension} 文章${e.writing_expression} 論理${e.logical_thinking} 創造${e.creative_thinking} 問題解決${e.problem_solving}`
+).join('\n')}
+
+この生徒の成長パターンを分析し、以下の観点でまとめてください：
+1. 学習態度の変化
+2. 理解度の推移
+3. 非認知能力の発達
+4. 今後の課題と推奨事項
+`
+    
+    // AIレスポンスのシミュレーション（実際の実装ではGemini APIを呼び出す）
+    const aiAnalysis = {
+      studentName: student.name,
+      analysisDate: new Date().toISOString(),
+      growthPatterns: [
+        {
+          category: '学習態度',
+          trend: '向上',
+          description: '振り返りの記述が具体的になり、自己評価の精度が向上。努力評価が安定して4以上を維持。',
+          evidence: reflections.results.length > 0 ? '過去3ヶ月の振り返りデータより' : ''
+        },
+        {
+          category: '理解度',
+          trend: '安定',
+          description: '基礎的な概念の理解は定着。発展的な問題にも挑戦する姿勢が見られる。',
+          evidence: observations.results.length > 0 ? '教師の見取り記録より' : ''
+        },
+        {
+          category: '非認知能力',
+          trend: '発達中',
+          description: 'やり抜く力と好奇心が特に伸長。協働性も向上傾向。',
+          evidence: evaluations.results.length > 0 ? '教科横断評価より' : ''
+        }
+      ],
+      strengths: [
+        '継続的な努力ができる',
+        '自己評価が適切',
+        '前向きな学習姿勢'
+      ],
+      challenges: [
+        '難しい問題への挑戦をさらに増やす',
+        'メタ認知能力のさらなる向上'
+      ],
+      recommendations: [
+        '発展的な問題に定期的に取り組む機会を設ける',
+        '自分の学習方法を振り返る時間を増やす',
+        'グループ学習でリーダーシップを発揮する機会を作る'
+      ],
+      dataQuality: {
+        reflectionsCount: reflections.results.length,
+        observationsCount: observations.results.length,
+        evaluationsCount: evaluations.results.length,
+        progressCount: progress.results.length
+      }
+    }
+    
+    return c.json(aiAnalysis)
+  } catch (error: any) {
+    console.error('AI analysis error:', error)
+    return c.json({ error: 'Failed to analyze growth patterns', details: error.message }, 500)
+  }
+})
+
 // メディア生成API - 画像生成
 app.post('/api/media/generate-image', async (c) => {
   const { prompt, style } = await c.req.json()

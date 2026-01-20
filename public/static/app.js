@@ -4477,27 +4477,36 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
 
         <!-- コース凡例（コンパクト） -->
         <div class="bg-white rounded-lg shadow p-2 mb-3">
-          <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs md:text-sm">
-            <div class="flex items-center gap-1">
-              <div class="w-4 h-4 bg-green-500 rounded"></div>
-              <span class="font-bold">じっくり</span>
+          <div class="flex items-center justify-between">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs md:text-sm flex-1">
+              <div class="flex items-center gap-1">
+                <div class="w-4 h-4 bg-green-500 rounded"></div>
+                <span class="font-bold">じっくり</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <div class="w-4 h-4 bg-blue-500 rounded"></div>
+                <span class="font-bold">しっかり</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <div class="w-4 h-4 bg-purple-500 rounded"></div>
+                <span class="font-bold">ぐんぐん</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <i class="fas fa-hand-paper text-orange-500"></i>
+                <span class="font-bold text-orange-600">ヘルプ</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <i class="fas fa-exclamation-triangle text-red-500"></i>
+                <span class="font-bold text-red-600">停滞</span>
+              </div>
             </div>
-            <div class="flex items-center gap-1">
-              <div class="w-4 h-4 bg-blue-500 rounded"></div>
-              <span class="font-bold">しっかり</span>
-            </div>
-            <div class="flex items-center gap-1">
-              <div class="w-4 h-4 bg-purple-500 rounded"></div>
-              <span class="font-bold">ぐんぐん</span>
-            </div>
-            <div class="flex items-center gap-1">
-              <i class="fas fa-hand-paper text-orange-500"></i>
-              <span class="font-bold text-orange-600">ヘルプ</span>
-            </div>
-            <div class="flex items-center gap-1">
-              <i class="fas fa-exclamation-triangle text-red-500"></i>
-              <span class="font-bold text-red-600">停滞</span>
-            </div>
+            
+            <!-- クラス統計ダッシュボードボタン -->
+            <button onclick="showClassStatistics('${progressData.classCode}')" 
+                    class="ml-4 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition font-semibold text-sm whitespace-nowrap shadow-md">
+              <i class="fas fa-chart-bar mr-2"></i>
+              クラス統計
+            </button>
           </div>
         </div>
 
@@ -6720,6 +6729,22 @@ async function analyzeStudent(studentId, studentName) {
         <button onclick="showCrossSubjectEvaluationModal(${studentId}, '${studentName}')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition font-semibold shadow-md flex-1 min-w-[200px]">
           <i class="fas fa-chart-line mr-2"></i>
           教科横断評価
+        </button>
+      </div>
+      
+      <!-- データエクスポート・統計分析ボタン -->
+      <div class="flex flex-wrap gap-3 mb-4">
+        <button onclick="exportStudentData(${studentId}, '${studentName}')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md flex-1">
+          <i class="fas fa-file-csv mr-2"></i>
+          学習データCSV
+        </button>
+        <button onclick="exportPhase3Data(${studentId}, '${studentName}')" class="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 transition font-semibold shadow-md flex-1">
+          <i class="fas fa-file-alt mr-2"></i>
+          Phase3データCSV
+        </button>
+        <button onclick="showStatisticsDashboard(${studentId}, '${studentName}')" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold shadow-md flex-1">
+          <i class="fas fa-brain mr-2"></i>
+          AI成長分析
         </button>
       </div>
       
