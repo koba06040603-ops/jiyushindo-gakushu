@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://9b09c019.jiyushindo-gakushu.pages.dev** ✅ 最新版（クラス平均比較+保護者向けレポート）
+**https://d4939bd2.jiyushindo-gakushu.pages.dev** ✅ 最新版（読み込み改善版）
 
 ### 🔐 デモアカウント
 
