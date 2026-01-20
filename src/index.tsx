@@ -3197,6 +3197,9 @@ app.get('/', (c) => {
         </div>
         
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+        <script src="/static/tts.js"></script>
+        <script src="/static/visual-support.js"></script>
+        <script src="/static/realtime.js"></script>
         <script src="/static/app.js"></script>
         <script>
           // すべてのリソース読み込み後に実行

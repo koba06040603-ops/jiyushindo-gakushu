@@ -1117,6 +1117,108 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ### AI先生プロンプト改善
 - **旧スタイル**: ソクラテス対話法
 - **新スタイル**: 温かく忍耐強い教師
+
+## 🎉 最新機能アップデート（2026-01-20）
+
+### 1. 個人レポート（AI誤答分析）✨ NEW
+- **誤答履歴の可視化**: 各児童の誤答パターンをデータベースに記録
+- **つまずきパターン分析**: AI が誤答パターンを自動分類（例：くり上がり忘れ、位のずれ、立式ミス）
+- **正答率の推移グラフ**: Chart.js による視覚的な学習進捗の把握
+- **個別指導アドバイス**: 誤答パターンに基づいた具体的な指導方法の提案
+- **使い方**:
+  1. 教師アカウントでログイン（demo@school.jp / 123）
+  2. 「進捗ボードを見る」→「かけ算の筆算」
+  3. 「AI誤答分析で詳しく見る」ボタンをクリック
+  4. 分析する児童を選択
+  5. 個人レポートが表示される
+
+### 2. テキスト読み上げ機能（音声サポート）🔊
+- **Web Speech API活用**: ブラウザ標準の音声合成エンジン
+- **日本語対応**: 自動的に日本語音声を選択
+- **速度・音量調整**: カスタマイズ可能な読み上げ設定
+- **使い方**:
+  ```javascript
+  // 基本的な読み上げ
+  window.ttsManager.speak('これは読み上げテストです')
+  
+  // オプション付き
+  window.ttsManager.speak('ゆっくり話します', {
+    rate: 0.8,      // 速度（0.1-10）
+    pitch: 1.2,     // 音高（0-2）
+    volume: 0.9     // 音量（0-1）
+  })
+  
+  // 要素に読み上げボタンを追加
+  window.ttsManager.enableForElement('.card-title')
+  ```
+
+### 3. 動的視覚支援機能（ユニバーサルデザイン）👁️
+- **ハイライト機能**: 重要な箇所を強調表示
+- **フォーカスモード**: 背景を暗くして対象要素に集中
+- **テキストサイズ調整**: 読みやすいサイズに変更
+- **ハイコントラストモード**: 視認性の向上
+- **数式の色分け表示**: 演算子や数字を色分けして視覚化
+- **ステップバイステップ表示**: 段階的な説明をアニメーション付きで表示
+- **使い方**:
+  ```javascript
+  // フォーカスモード
+  const element = document.querySelector('.learning-card')
+  window.visualSupport.toggleFocusMode(element)
+  
+  // ハイコントラストモード
+  window.visualSupport.toggleHighContrast()
+  
+  // テキストサイズ調整（1.5倍）
+  window.visualSupport.adjustTextSize(element, 1.5)
+  
+  // 数式の色分け
+  const mathHtml = window.visualSupport.visualizeMath('23 × 4 = 92')
+  
+  // ステップバイステップ表示
+  const steps = [
+    '一の位を計算します：3 × 4 = 12',
+    '2を書いて、1を十の位にくり上げます',
+    '十の位を計算します：2 × 4 + 1 = 9',
+    '答えは92です'
+  ]
+  window.visualSupport.showStepByStep(steps, container, 2000)
+  ```
+
+### 4. リアルタイム通信機能（協働学習サポート）📡
+- **ポーリング方式**: Cloudflare Pages対応のリアルタイム通信
+- **ヘルプ要請通知**: 児童からのヘルプ要請をリアルタイムで受信
+- **進捗更新通知**: クラスメートの学習進捗をリアルタイム表示
+- **通知システム**: 視覚的＋音声での通知
+- **使い方**:
+  ```javascript
+  // リアルタイム接続開始
+  window.realtimeManager.connect(userId, 'CLASS2024A')
+  
+  // ヘルプ要請を受信
+  window.realtimeManager.on('help-request', (requests) => {
+    requests.forEach(req => {
+      window.realtimeManager.showNotification(
+        'ヘルプ要請',
+        `${req.student_name}さんが助けを求めています`,
+        'help'
+      )
+    })
+  })
+  
+  // 進捗更新を受信
+  window.realtimeManager.on('progress-update', (updates) => {
+    console.log('進捗更新:', updates)
+  })
+  
+  // 接続解除
+  window.realtimeManager.disconnect()
+  ```
+
+### デモデータ
+- **山田太郎**: くり上がり忘れのパターン（5回）
+- **佐藤花子**: 位のずれのパターン（4回）
+- **鈴木次郎**: 立式ミス（文章題）のパターン（2回）
+
 - **主な特徴**:
   - 生徒の目標と学年レベルを把握
   - 既存知識を基盤にした説明
@@ -1128,11 +1230,11 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 ## URL
 
 - **メインURL**: https://jiyushindo-gakushu.pages.dev
-- **最新デプロイ**: https://26193fbc.jiyushindo-gakushu.pages.dev ✅
+- **最新デプロイ**: https://6957bffc.jiyushindo-gakushu.pages.dev ✅
 - **本番URL**: https://jiyushindo-gakushu.pages.dev
-- **テストページ**: https://26193fbc.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
+- **テストページ**: https://6957bffc.jiyushindo-gakushu.pages.dev/test-buttons.html 🧪
 - **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu
-- **最終コミット**: `f4589f3` (進捗ボード: 各児童の選択コースのカードのみ表示するよう修正)
+- **最終コミット**: `c45bf0d` (個人レポート（AI誤答分析）機能実装 + デモデータ投入)
 
 ## 🔐 デモアカウント
 
