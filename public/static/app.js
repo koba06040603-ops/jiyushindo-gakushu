@@ -6275,8 +6275,16 @@ async function analyzeStudent(studentId, studentName) {
     
     let analysis = response.data
     
+    console.log('📊 分析データ:', {
+      studentId,
+      studentIdType: typeof studentId,
+      hasErrorPatterns: !!analysis.error_patterns,
+      errorPatternsLength: analysis.error_patterns?.length
+    })
+    
     // デモ用：山田太郎(studentId=3)の場合、詳細なモックデータを追加
-    if (studentId === 3 && (!analysis.error_patterns || analysis.error_patterns.length === 0)) {
+    // 文字列と数値の両方に対応
+    if ((studentId === 3 || studentId === '3') && (!analysis.error_patterns || analysis.error_patterns.length === 0)) {
       analysis = {
         success: true,
         student: { id: 3, name: '山田太郎', student_number: '3001' },
@@ -6333,8 +6341,8 @@ async function analyzeStudent(studentId, studentName) {
           <div class="space-y-3">
             ${(analysis.error_patterns || []).map(pattern => `
               <div class="border-l-4 border-red-400 pl-3 py-2">
-                <p class="font-semibold text-gray-800">${pattern.pattern}</p>
-                <p class="text-sm text-gray-600">${pattern.frequency}</p>
+                <p class="font-semibold text-gray-800">${pattern.error_pattern}</p>
+                <p class="text-sm text-gray-600">${pattern.count}回</p>
               </div>
             `).join('')}
           </div>
