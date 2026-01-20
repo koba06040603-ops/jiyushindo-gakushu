@@ -10117,4 +10117,252 @@ function generateInteractiveContent(topic: string, type: string): string {
   `
 }
 
+// ============================================
+// Phase 3: 選択課題成果物・教師の見取り・振り返り
+// ============================================
+
+// 選択課題成果物の投稿
+app.post('/api/optional-problems/submissions', async (c) => {
+  const { env } = c
+  const {
+    student_id,
+    curriculum_id,
+    optional_problem_id,
+    submission_type,
+    file_url,
+    file_name,
+    description,
+    self_evaluation,
+    self_comment
+  } = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO optional_problem_submissions (
+        student_id, curriculum_id, optional_problem_id, submission_type,
+        file_url, file_name, description, self_evaluation, self_comment,
+        submitted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      student_id, curriculum_id, optional_problem_id, submission_type,
+      file_url, file_name, description, self_evaluation, self_comment
+    ).run()
+    
+    return c.json({ success: true, submission_id: result.meta.last_row_id })
+  } catch (error: any) {
+    console.error('成果物投稿エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 選択課題成果物の取得
+app.get('/api/optional-problems/submissions/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    const submissions = await env.DB.prepare(`
+      SELECT s.*, op.problem_title, op.difficulty_level
+      FROM optional_problem_submissions s
+      JOIN optional_problems op ON s.optional_problem_id = op.id
+      WHERE s.student_id = ?
+      ORDER BY s.submitted_at DESC
+    `).bind(studentId).all()
+    
+    return c.json({ success: true, submissions: submissions.results })
+  } catch (error: any) {
+    console.error('成果物取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 教師コメントの追加
+app.post('/api/optional-problems/submissions/:id/teacher-comment', async (c) => {
+  const { env } = c
+  const submissionId = c.req.param('id')
+  const { teacher_comment, teacher_evaluation } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE optional_problem_submissions
+      SET teacher_comment = ?, teacher_evaluation = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).bind(teacher_comment, teacher_evaluation, submissionId).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('教師コメント追加エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 教師の見取り（観察記録）の追加
+app.post('/api/teacher-observations', async (c) => {
+  const { env } = c
+  const {
+    student_id,
+    curriculum_id,
+    observation_date,
+    observation_type,
+    observation_text,
+    context,
+    related_activity,
+    non_cognitive_tags,
+    is_positive,
+    is_shared_with_parents,
+    created_by
+  } = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO teacher_observations (
+        student_id, curriculum_id, observation_date, observation_type,
+        observation_text, context, related_activity, non_cognitive_tags,
+        is_positive, is_shared_with_parents, created_by,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      student_id, curriculum_id, observation_date, observation_type,
+      observation_text, context, related_activity, non_cognitive_tags,
+      is_positive ? 1 : 0, is_shared_with_parents ? 1 : 0, created_by
+    ).run()
+    
+    return c.json({ success: true, observation_id: result.meta.last_row_id })
+  } catch (error: any) {
+    console.error('見取り記録エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 教師の見取りの取得
+app.get('/api/teacher-observations/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    const observations = await env.DB.prepare(`
+      SELECT o.*, u.name as teacher_name, c.unit_name
+      FROM teacher_observations o
+      LEFT JOIN users u ON o.created_by = u.id
+      LEFT JOIN curriculum c ON o.curriculum_id = c.id
+      WHERE o.student_id = ?
+      ORDER BY o.observation_date DESC, o.created_at DESC
+    `).bind(studentId).all()
+    
+    return c.json({ success: true, observations: observations.results })
+  } catch (error: any) {
+    console.error('見取り取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 生徒の振り返りの投稿
+app.post('/api/student-reflections', async (c) => {
+  const { env } = c
+  const {
+    student_id,
+    curriculum_id,
+    reflection_date,
+    reflection_type,
+    what_learned,
+    what_understood,
+    what_difficult,
+    what_enjoyed,
+    next_goals,
+    mood_rating,
+    effort_rating,
+    understanding_rating
+  } = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO student_reflections (
+        student_id, curriculum_id, reflection_date, reflection_type,
+        what_learned, what_understood, what_difficult, what_enjoyed,
+        next_goals, mood_rating, effort_rating, understanding_rating,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      student_id, curriculum_id, reflection_date, reflection_type,
+      what_learned, what_understood, what_difficult, what_enjoyed,
+      next_goals, mood_rating, effort_rating, understanding_rating
+    ).run()
+    
+    return c.json({ success: true, reflection_id: result.meta.last_row_id })
+  } catch (error: any) {
+    console.error('振り返り投稿エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 生徒の振り返りの取得
+app.get('/api/student-reflections/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    const reflections = await env.DB.prepare(`
+      SELECT r.*, c.unit_name
+      FROM student_reflections r
+      LEFT JOIN curriculum c ON r.curriculum_id = c.id
+      WHERE r.student_id = ?
+      ORDER BY r.reflection_date DESC, r.created_at DESC
+    `).bind(studentId).all()
+    
+    return c.json({ success: true, reflections: reflections.results })
+  } catch (error: any) {
+    console.error('振り返り取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 教科横断評価の保存・取得
+app.post('/api/cross-subject-evaluations', async (c) => {
+  const { env } = c
+  const evaluation = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO cross_subject_evaluations (
+        student_id, evaluation_period_start, evaluation_period_end,
+        reading_comprehension, writing_expression, logical_thinking,
+        creative_thinking, problem_solving, persistence_score,
+        self_regulation_score, collaboration_score, curiosity_score,
+        metacognition_score, growth_mindset_score, overall_comment,
+        strengths, areas_for_growth, recommendations, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      evaluation.student_id, evaluation.evaluation_period_start, evaluation.evaluation_period_end,
+      evaluation.reading_comprehension, evaluation.writing_expression, evaluation.logical_thinking,
+      evaluation.creative_thinking, evaluation.problem_solving, evaluation.persistence_score,
+      evaluation.self_regulation_score, evaluation.collaboration_score, evaluation.curiosity_score,
+      evaluation.metacognition_score, evaluation.growth_mindset_score, evaluation.overall_comment,
+      evaluation.strengths, evaluation.areas_for_growth, evaluation.recommendations
+    ).run()
+    
+    return c.json({ success: true, evaluation_id: result.meta.last_row_id })
+  } catch (error: any) {
+    console.error('教科横断評価エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+app.get('/api/cross-subject-evaluations/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    const evaluations = await env.DB.prepare(`
+      SELECT * FROM cross_subject_evaluations
+      WHERE student_id = ?
+      ORDER BY evaluation_period_end DESC
+    `).bind(studentId).all()
+    
+    return c.json({ success: true, evaluations: evaluations.results })
+  } catch (error: any) {
+    console.error('教科横断評価取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app
