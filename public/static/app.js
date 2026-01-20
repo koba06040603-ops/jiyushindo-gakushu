@@ -6400,8 +6400,12 @@ async function analyzeStudent(studentId, studentName) {
     }
     
     analysisResult.innerHTML = `
-      <!-- ヘッダー部分（PDF/印刷ボタン付き） -->
+      <!-- ヘッダー部分（PDF/印刷/保護者向けボタン付き） -->
       <div class="mb-4 flex justify-end gap-2 no-print">
+        <button onclick="showParentReport('${studentName}')" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold shadow-md">
+          <i class="fas fa-heart mr-2"></i>
+          保護者向けレポート
+        </button>
         <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md">
           <i class="fas fa-print mr-2"></i>
           印刷
@@ -6689,6 +6693,111 @@ async function analyzeStudent(studentId, studentName) {
           </div>
         </div>
       </div>
+
+      <!-- クラス平均との比較 -->
+      ${typeof window.CLASS_AVERAGE_DATA !== 'undefined' ? `
+      <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+        <h3 class="text-xl font-bold text-teal-600 mb-4">
+          <i class="fas fa-users mr-2"></i>
+          クラス平均との比較
+        </h3>
+        <p class="text-sm text-gray-600 mb-6">
+          ${studentName}さんのスコアをクラス平均と比較しています。
+          <span class="font-semibold text-teal-600">クラス平均より高い項目</span>は強みとして伸ばし、
+          <span class="font-semibold text-orange-600">平均より低い項目</span>は重点的にサポートしましょう。
+        </p>
+        
+        <!-- 比較レーダーチャート -->
+        <div class="h-80 mb-6">
+          <canvas id="classComparisonChart"></canvas>
+        </div>
+        
+        <!-- 詳細比較表 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${Object.keys(nonCognitiveData).map(key => {
+            const labels = {
+              grit: '粘り強さ',
+              selfRegulation: '自己調整',
+              collaboration: '協働性',
+              curiosity: '好奇心',
+              metacognition: 'メタ認知'
+            }
+            const icons = {
+              grit: 'fa-mountain',
+              selfRegulation: 'fa-sliders-h',
+              collaboration: 'fa-users',
+              curiosity: 'fa-lightbulb',
+              metacognition: 'fa-eye'
+            }
+            const studentScore = nonCognitiveData[key]
+            const classAvg = window.CLASS_AVERAGE_DATA.nonCognitive[key]
+            const diff = studentScore - classAvg
+            const percentage = ((studentScore / classAvg - 1) * 100).toFixed(1)
+            const isAbove = diff > 0
+            const isEqual = diff === 0
+            
+            return `
+              <div class="border rounded-lg p-4 ${isAbove ? 'bg-teal-50 border-teal-300' : isEqual ? 'bg-gray-50 border-gray-300' : 'bg-orange-50 border-orange-300'}">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-semibold text-gray-800">
+                    <i class="fas ${icons[key]} mr-2"></i>
+                    ${labels[key]}
+                  </span>
+                  ${isAbove ? '<span class="text-xs bg-teal-200 text-teal-800 px-2 py-1 rounded font-semibold">強み</span>' : 
+                    isEqual ? '<span class="text-xs bg-gray-200 text-gray-800 px-2 py-1 rounded font-semibold">平均</span>' : 
+                    '<span class="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded font-semibold">要支援</span>'}
+                </div>
+                
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-600">${studentName}さん:</span>
+                    <span class="font-bold text-lg">${studentScore}</span>
+                  </div>
+                  <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-600">クラス平均:</span>
+                    <span class="font-semibold">${classAvg}</span>
+                  </div>
+                  <div class="pt-2 border-t">
+                    <div class="flex items-center justify-between text-sm">
+                      <span class="text-gray-700 font-semibold">差:</span>
+                      <span class="font-bold ${isAbove ? 'text-teal-600' : isEqual ? 'text-gray-600' : 'text-orange-600'}">
+                        ${isAbove ? '+' : ''}${diff} 
+                        ${!isEqual ? `(${isAbove ? '+' : ''}${percentage}%)` : ''}
+                        ${isAbove ? '<i class="fas fa-arrow-up ml-1"></i>' : 
+                          isEqual ? '<i class="fas fa-minus ml-1"></i>' : 
+                          '<i class="fas fa-arrow-down ml-1"></i>'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `
+          }).join('')}
+        </div>
+        
+        <!-- サマリー -->
+        <div class="mt-6 p-4 bg-gradient-to-r from-teal-50 to-blue-50 rounded-lg border border-teal-200">
+          <h4 class="font-bold text-teal-800 mb-2">
+            <i class="fas fa-chart-bar mr-2"></i>
+            総合評価
+          </h4>
+          <p class="text-sm text-gray-700">
+            ${(() => {
+              const aboveCount = Object.keys(nonCognitiveData).filter(k => nonCognitiveData[k] > window.CLASS_AVERAGE_DATA.nonCognitive[k]).length
+              const totalCount = Object.keys(nonCognitiveData).length
+              
+              if (aboveCount >= 4) {
+                return `<strong class="text-teal-700">${studentName}さんは、5つの指標のうち${aboveCount}つでクラス平均を上回っています。</strong>全体的に優れたバランスで、クラスのロールモデルとなる存在です。`
+              } else if (aboveCount >= 2) {
+                return `<strong class="text-blue-700">${studentName}さんは、${aboveCount}つの指標でクラス平均を上回っています。</strong>強みを活かしつつ、他の能力もバランス良く伸ばしていきましょう。`
+              } else {
+                return `<strong class="text-orange-700">${studentName}さんは、全体的にサポートが必要な状態です。</strong>焦らず、一つずつ確実に能力を伸ばしていきましょう。小さな成功体験を積み重ねることが大切です。`
+              }
+            })()}
+          </p>
+        </div>
+      </div>
+      ` : ''}
 
       <!-- 非認知能力の週次推移 -->
       ${demoData.nonCognitiveHistory && demoData.nonCognitiveHistory.length > 0 ? `
@@ -7003,6 +7112,83 @@ async function analyzeStudent(studentId, studentName) {
       }
     }, 200)
     
+    // クラス平均との比較レーダーチャートを描画
+    setTimeout(() => {
+      const ctx4 = document.getElementById('classComparisonChart')
+      if (ctx4 && typeof Chart !== 'undefined' && typeof window.CLASS_AVERAGE_DATA !== 'undefined' && nonCognitiveData) {
+        new Chart(ctx4, {
+          type: 'radar',
+          data: {
+            labels: ['粘り強さ', '自己調整', '協働性', '好奇心', 'メタ認知'],
+            datasets: [
+              {
+                label: studentName,
+                data: [
+                  nonCognitiveData.grit,
+                  nonCognitiveData.selfRegulation,
+                  nonCognitiveData.collaboration,
+                  nonCognitiveData.curiosity,
+                  nonCognitiveData.metacognition
+                ],
+                borderColor: 'rgb(20, 184, 166)',
+                backgroundColor: 'rgba(20, 184, 166, 0.2)',
+                borderWidth: 3,
+                pointBackgroundColor: 'rgb(20, 184, 166)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgb(20, 184, 166)',
+                pointRadius: 5
+              },
+              {
+                label: 'クラス平均',
+                data: [
+                  window.CLASS_AVERAGE_DATA.nonCognitive.grit,
+                  window.CLASS_AVERAGE_DATA.nonCognitive.selfRegulation,
+                  window.CLASS_AVERAGE_DATA.nonCognitive.collaboration,
+                  window.CLASS_AVERAGE_DATA.nonCognitive.curiosity,
+                  window.CLASS_AVERAGE_DATA.nonCognitive.metacognition
+                ],
+                borderColor: 'rgb(156, 163, 175)',
+                backgroundColor: 'rgba(156, 163, 175, 0.1)',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                pointBackgroundColor: 'rgb(156, 163, 175)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgb(156, 163, 175)',
+                pointRadius: 4
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top'
+              }
+            },
+            scales: {
+              r: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  stepSize: 20
+                },
+                pointLabels: {
+                  font: {
+                    size: 12
+                  }
+                }
+              }
+            }
+          }
+        })
+        console.log('✅ クラス平均比較チャート描画完了')
+      }
+    }, 250)
+    
     return
   }
   
@@ -7251,6 +7437,254 @@ window.setDifficulty = setDifficulty
 window.generateProblem = generateProblem
 window.toggleAnswer = toggleAnswer
 window.analyzeStudent = analyzeStudent
+
+// 保護者向けレポートを表示
+function showParentReport(studentName) {
+  // デモデータを取得
+  const studentId = studentName === '山田太郎' ? 3 : studentName === '佐藤花子' ? 4 : studentName === '鈴木次郎' ? 5 : null
+  if (!studentId) {
+    alert('この生徒のレポートは準備中です。')
+    return
+  }
+  
+  const rawData = window.STUDENT_DEMO_DATA ? (window.STUDENT_DEMO_DATA[studentId] || window.STUDENT_DEMO_DATA[studentName]) : null
+  if (!rawData) {
+    alert('レポートデータが見つかりません。')
+    return
+  }
+  
+  // データを正規化
+  const demoData = {
+    overallAnalysis: rawData.summary || '',
+    errorPatterns: rawData.errorPatterns ? rawData.errorPatterns.map(p => ({
+      error_pattern: p.pattern,
+      count: p.count
+    })) : [],
+    accuracyTrend: rawData.accuracyTrend || [],
+    optionalChallenges: rawData.optional || {},
+    nonCognitive: rawData.nonCognitive || {}
+  }
+  
+  // 最新正答率を計算
+  const latestAccuracy = demoData.accuracyTrend.length > 0 
+    ? demoData.accuracyTrend[demoData.accuracyTrend.length - 1].accuracy 
+    : 0
+  const firstAccuracy = demoData.accuracyTrend.length > 0 
+    ? demoData.accuracyTrend[0].accuracy 
+    : 0
+  const improvement = latestAccuracy - firstAccuracy
+  
+  // モーダルを表示
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-green-500 to-teal-500 text-white p-6 rounded-t-2xl">
+        <div class="flex items-center justify-between">
+          <h2 class="text-3xl font-bold">
+            <i class="fas fa-heart mr-3"></i>
+            ${studentName}さんの成長レポート
+          </h2>
+          <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200 transition">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        <p class="mt-2 text-green-50">保護者の皆様へ</p>
+      </div>
+      
+      <!-- コンテンツ -->
+      <div class="p-6 space-y-6">
+        <!-- 挨拶 -->
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+          <p class="text-gray-800 leading-relaxed">
+            いつも${studentName}さんの学習を温かく見守ってくださり、ありがとうございます。
+            ${studentName}さんの最近の学習の様子をお伝えします。
+          </p>
+        </div>
+        
+        <!-- 学習の成長 -->
+        <div class="bg-white border-2 border-blue-200 rounded-xl p-6">
+          <h3 class="text-2xl font-bold text-blue-600 mb-4 flex items-center">
+            <i class="fas fa-chart-line mr-3"></i>
+            学習の成長
+          </h3>
+          <div class="space-y-4">
+            <div class="flex items-center gap-4">
+              <div class="bg-blue-100 rounded-full p-4">
+                <i class="fas fa-pencil-alt text-blue-600 text-2xl"></i>
+              </div>
+              <div class="flex-1">
+                <p class="text-lg font-semibold text-gray-800">正答率</p>
+                <p class="text-3xl font-bold text-blue-600">${latestAccuracy.toFixed(1)}%</p>
+                ${improvement > 0 ? `
+                  <p class="text-sm text-green-600 font-semibold mt-1">
+                    <i class="fas fa-arrow-up mr-1"></i>
+                    ${firstAccuracy.toFixed(1)}%から${improvement.toFixed(1)}ポイント上昇！
+                  </p>
+                ` : ''}
+              </div>
+            </div>
+            
+            <div class="bg-blue-50 rounded-lg p-4">
+              <p class="text-gray-700 leading-relaxed">
+                <strong>${studentName}さんは、</strong>
+                ${latestAccuracy >= 80 ? '素晴らしい理解度を示しています。' : 
+                  latestAccuracy >= 60 ? '着実に力をつけています。' : 
+                  '一生懸命に取り組んでいます。'}
+                ${improvement > 10 ? 'この調子で成長を続けています！' : 
+                  improvement > 0 ? '少しずつですが、確実に前進しています。' : 
+                  '今は基礎固めの大切な時期です。'}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- チャレンジ精神 -->
+        <div class="bg-white border-2 border-purple-200 rounded-xl p-6">
+          <h3 class="text-2xl font-bold text-purple-600 mb-4 flex items-center">
+            <i class="fas fa-star mr-3"></i>
+            チャレンジ精神
+          </h3>
+          <div class="space-y-4">
+            <div class="flex items-center gap-4">
+              <div class="bg-purple-100 rounded-full p-4">
+                <i class="fas fa-trophy text-purple-600 text-2xl"></i>
+              </div>
+              <div class="flex-1">
+                <p class="text-lg font-semibold text-gray-800">選択課題への挑戦</p>
+                <p class="text-3xl font-bold text-purple-600">${demoData.optionalChallenges.totalAttempts || 0}回</p>
+                <p class="text-sm text-gray-600">
+                  完了率: <span class="font-semibold">${demoData.optionalChallenges.completionRate || 0}%</span>
+                  （クラス平均: ${window.CLASS_AVERAGE_DATA ? window.CLASS_AVERAGE_DATA.optionalAttempts : 8}回）
+                </p>
+              </div>
+            </div>
+            
+            <div class="bg-purple-50 rounded-lg p-4">
+              <p class="text-gray-700 leading-relaxed">
+                ${demoData.optionalChallenges.totalAttempts > 10 ? 
+                  `<strong>${studentName}さんは、</strong>難しい問題にも積極的にチャレンジしています。この探究心は大きな財産です。` : 
+                  demoData.optionalChallenges.totalAttempts > 5 ? 
+                  `<strong>${studentName}さんは、</strong>自分のペースで着実に学習を進めています。` : 
+                  `<strong>${studentName}さんは、</strong>基礎をしっかり固めながら学習しています。焦らず、確実に力をつけていきましょう。`}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 心の成長 -->
+        <div class="bg-white border-2 border-pink-200 rounded-xl p-6">
+          <h3 class="text-2xl font-bold text-pink-600 mb-4 flex items-center">
+            <i class="fas fa-heart mr-3"></i>
+            心の成長
+          </h3>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+            ${[
+              { key: 'grit', label: 'がんばる力', icon: 'fa-mountain', color: 'orange' },
+              { key: 'curiosity', label: '好奇心', icon: 'fa-lightbulb', color: 'purple' },
+              { key: 'collaboration', label: '協力する心', icon: 'fa-users', color: 'green' }
+            ].map(item => `
+              <div class="bg-${item.color}-50 rounded-lg p-4 text-center">
+                <i class="fas ${item.icon} text-${item.color}-600 text-3xl mb-2"></i>
+                <p class="text-sm text-gray-700 font-semibold">${item.label}</p>
+                <p class="text-2xl font-bold text-${item.color}-600 mt-1">${demoData.nonCognitive[item.key] || 0}</p>
+                <div class="mt-2">
+                  ${Array.from({length: 5}, (_, i) => 
+                    `<i class="fas fa-star text-${i < Math.floor((demoData.nonCognitive[item.key] || 0) / 20) ? item.color + '-400' : 'gray-300'} text-xs"></i>`
+                  ).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="bg-pink-50 rounded-lg p-4 mt-4">
+            <p class="text-gray-700 leading-relaxed">
+              学力だけでなく、<strong class="text-pink-600">心の成長</strong>も大切にしています。
+              ${studentName}さんは、
+              ${demoData.nonCognitive.curiosity > 75 ? '好奇心旺盛で、' : ''}
+              ${demoData.nonCognitive.grit > 75 ? 'あきらめない強い心を持っています。' : 
+                demoData.nonCognitive.grit > 60 ? '一生懸命に取り組む姿勢が見られます。' : 
+                '少しずつ努力する力を育んでいます。'}
+            </p>
+          </div>
+        </div>
+        
+        <!-- ご家庭でのサポート -->
+        <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-6">
+          <h3 class="text-2xl font-bold text-amber-700 mb-4 flex items-center">
+            <i class="fas fa-home mr-3"></i>
+            ご家庭でのサポート
+          </h3>
+          <ul class="space-y-3">
+            ${demoData.accuracyTrend.length > 0 && improvement > 0 ? `
+              <li class="flex items-start gap-3">
+                <i class="fas fa-check-circle text-green-600 mt-1"></i>
+                <p class="text-gray-700">
+                  <strong>成長を認めてあげてください：</strong>
+                  「${firstAccuracy.toFixed(0)}%から${latestAccuracy.toFixed(0)}%まで上がったね！」と、
+                  具体的な数字で褒めてあげると、さらにやる気が出ます。
+                </p>
+              </li>
+            ` : ''}
+            <li class="flex items-start gap-3">
+              <i class="fas fa-check-circle text-green-600 mt-1"></i>
+              <p class="text-gray-700">
+                <strong>学習時間を一緒に決めましょう：</strong>
+                毎日10〜15分でも構いません。短時間でも習慣化することが大切です。
+              </p>
+            </li>
+            <li class="flex items-start gap-3">
+              <i class="fas fa-check-circle text-green-600 mt-1"></i>
+              <p class="text-gray-700">
+                <strong>結果より過程を褒めましょう：</strong>
+                「〇〇ができたね」より「一生懸命考えたね」と声をかけてください。
+              </p>
+            </li>
+            <li class="flex items-start gap-3">
+              <i class="fas fa-check-circle text-green-600 mt-1"></i>
+              <p class="text-gray-700">
+                <strong>困ったときは遠慮なくご相談を：</strong>
+                学校と家庭で連携して、${studentName}さんを支えていきましょう。
+              </p>
+            </li>
+          </ul>
+        </div>
+        
+        <!-- 締めの言葉 -->
+        <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+          <p class="text-gray-800 leading-relaxed">
+            ${studentName}さんの成長を、これからも温かく見守っていきます。
+            何かご心配なことがあれば、いつでもお声がけください。
+          </p>
+          <p class="text-right text-gray-600 mt-3 font-semibold">担任より</p>
+        </div>
+      </div>
+      
+      <!-- フッター -->
+      <div class="bg-gray-50 p-4 rounded-b-2xl flex justify-end gap-2">
+        <button onclick="window.print()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">
+          <i class="fas fa-print mr-2"></i>
+          印刷
+        </button>
+        <button onclick="this.closest('.fixed').remove()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition font-semibold">
+          閉じる
+        </button>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  
+  // 背景クリックで閉じる
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.remove()
+    }
+  })
+}
+
+window.showParentReport = showParentReport
 
 // PDF出力機能
 async function exportStudentReportToPDF() {

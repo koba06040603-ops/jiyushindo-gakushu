@@ -241,6 +241,23 @@ const STUDENT_DEMO_DATA = {
   }
 }
 
+// クラス平均データ
+const CLASS_AVERAGE_DATA = {
+  nonCognitive: {
+    grit: 72,
+    selfRegulation: 70,
+    collaboration: 68,
+    curiosity: 73,
+    metacognition: 69
+  },
+  accuracyRate: 65,
+  optionalAttempts: 8,
+  optionalCompletionRate: 75
+}
+
+// クラス平均データもグローバルに公開
+window.CLASS_AVERAGE_DATA = CLASS_AVERAGE_DATA
+
 // 名前ベースのアクセスも可能にする
 STUDENT_DEMO_DATA['山田太郎'] = STUDENT_DEMO_DATA[3]
 STUDENT_DEMO_DATA['佐藤花子'] = STUDENT_DEMO_DATA[4]
