@@ -6276,6 +6276,8 @@ async function analyzeStudent(studentId, studentName) {
   
   if (isDemoStudent) {
     console.log(`✅ ${studentName}のデモデータを表示`)
+    console.log('📊 STUDENT_DEMO_DATA存在確認:', typeof window.STUDENT_DEMO_DATA !== 'undefined')
+    console.log('📊 studentId:', studentId, 'studentName:', studentName)
     
     analysisResult.innerHTML = `
       <div class="text-center py-12">
@@ -6287,10 +6289,43 @@ async function analyzeStudent(studentId, studentName) {
     // 0.5秒待ってから表示
     await new Promise(resolve => setTimeout(resolve, 500))
     
+    // スクリプトが読み込まれるまで待機（最大3秒）
+    let attempts = 0
+    while (typeof window.STUDENT_DEMO_DATA === 'undefined' && attempts < 30) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      attempts++
+    }
+    
+    if (typeof window.STUDENT_DEMO_DATA === 'undefined') {
+      console.error('❌ student-demo-data.jsの読み込みに失敗しました')
+      analysisResult.innerHTML = `
+        <div class="text-center py-12">
+          <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+          <p class="text-gray-800 font-semibold">データの読み込みに失敗しました</p>
+          <p class="text-sm text-gray-600 mt-2">ページを再読み込みしてください。</p>
+          <button onclick="location.reload()" class="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+            <i class="fas fa-sync mr-2"></i>
+            再読み込み
+          </button>
+        </div>
+      `
+      return
+    }
+    
     // デモデータを取得（外部ファイルから）
     let rawData
     if (typeof window.STUDENT_DEMO_DATA !== 'undefined') {
+      console.log('📊 利用可能なデータキー:', Object.keys(window.STUDENT_DEMO_DATA))
       rawData = window.STUDENT_DEMO_DATA[studentId] || window.STUDENT_DEMO_DATA[studentName]
+      console.log('📊 rawData取得結果:', {
+        studentId,
+        studentName,
+        foundById: !!window.STUDENT_DEMO_DATA[studentId],
+        foundByName: !!window.STUDENT_DEMO_DATA[studentName],
+        rawData: rawData ? 'データあり' : 'データなし'
+      })
+    } else {
+      console.error('❌ window.STUDENT_DEMO_DATAが見つかりません')
     }
     
     // データ構造を正規化
