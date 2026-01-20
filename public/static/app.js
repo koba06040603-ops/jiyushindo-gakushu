@@ -6707,6 +6707,22 @@ async function analyzeStudent(studentId, studentName) {
         </button>
       </div>
       
+      <!-- Phase 3 機能ボタン -->
+      <div class="flex flex-wrap gap-3 mb-4">
+        <button onclick="showObservationModal(${studentId}, '${studentName}')" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-semibold shadow-md flex-1 min-w-[200px]">
+          <i class="fas fa-eye mr-2"></i>
+          見取り記録
+        </button>
+        <button onclick="showReflectionModal(${studentId}, '${studentName}')" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold shadow-md flex-1 min-w-[200px]">
+          <i class="fas fa-pencil-alt mr-2"></i>
+          振り返り
+        </button>
+        <button onclick="showCrossSubjectEvaluationModal(${studentId}, '${studentName}')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition font-semibold shadow-md flex-1 min-w-[200px]">
+          <i class="fas fa-chart-line mr-2"></i>
+          教科横断評価
+        </button>
+      </div>
+      
       <!-- 生徒名 -->
       <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white shadow-lg">
         <h2 class="text-2xl font-bold mb-3">

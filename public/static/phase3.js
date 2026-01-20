@@ -928,4 +928,409 @@ function renderReflections(reflections) {
   `).join('')
 }
 
+// ============================================
+// 4. 教科横断評価（非認知能力評価）
+// ============================================
+
+// 教科横断評価モーダルを表示
+window.showCrossSubjectEvaluationModal = function(studentId, studentName) {
+  window.phase3State.currentStudentId = studentId
+  
+  const modalHtml = `
+    <div id="crossEvalModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-chart-line mr-2 text-indigo-600"></i>
+            ${studentName}さんの教科横断評価
+          </h3>
+          <button onclick="closeCrossEvalModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <form id="crossEvalForm" class="space-y-6">
+          <!-- 評価期間 -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">評価期間（開始）</label>
+              <input type="date" id="periodStart" class="w-full p-2 border border-gray-300 rounded-lg" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">評価期間（終了）</label>
+              <input type="date" id="periodEnd" class="w-full p-2 border border-gray-300 rounded-lg" value="${new Date().toISOString().split('T')[0]}" required>
+            </div>
+          </div>
+          
+          <!-- 教科横断的スキル -->
+          <div class="bg-blue-50 p-4 rounded-lg">
+            <h4 class="font-bold text-blue-800 mb-3">
+              <i class="fas fa-book mr-2"></i>教科横断的スキル
+            </h4>
+            <div class="grid grid-cols-2 gap-4">
+              ${[
+                { id: 'readingComprehension', label: '読解力', icon: 'book-reader' },
+                { id: 'writingExpression', label: '表現力', icon: 'pen-fancy' },
+                { id: 'logicalThinking', label: '論理的思考', icon: 'brain' },
+                { id: 'creativeThinking', label: '創造的思考', icon: 'lightbulb' },
+                { id: 'problemSolving', label: '問題解決', icon: 'puzzle-piece' }
+              ].map(skill => `
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-${skill.icon} mr-1"></i>${skill.label}
+                  </label>
+                  <input type="range" id="${skill.id}" min="0" max="100" value="50" 
+                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    oninput="updateScoreDisplay('${skill.id}')">
+                  <div class="flex justify-between text-xs text-gray-600 mt-1">
+                    <span>0</span>
+                    <span id="${skill.id}Value" class="font-bold text-blue-600">50</span>
+                    <span>100</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <!-- 非認知能力 -->
+          <div class="bg-purple-50 p-4 rounded-lg">
+            <h4 class="font-bold text-purple-800 mb-3">
+              <i class="fas fa-heart mr-2"></i>非認知能力
+            </h4>
+            <div class="grid grid-cols-2 gap-4">
+              ${[
+                { id: 'persistenceScore', label: '粘り強さ', icon: 'fist-raised' },
+                { id: 'selfRegulationScore', label: '自己調整', icon: 'balance-scale' },
+                { id: 'collaborationScore', label: '協働性', icon: 'users' },
+                { id: 'curiosityScore', label: '好奇心', icon: 'search' },
+                { id: 'metacognitionScore', label: 'メタ認知', icon: 'eye' },
+                { id: 'growthMindsetScore', label: '成長マインドセット', icon: 'seedling' }
+              ].map(skill => `
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">
+                    <i class="fas fa-${skill.icon} mr-1"></i>${skill.label}
+                  </label>
+                  <input type="range" id="${skill.id}" min="0" max="100" value="50" 
+                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    oninput="updateScoreDisplay('${skill.id}')">
+                  <div class="flex justify-between text-xs text-gray-600 mt-1">
+                    <span>0</span>
+                    <span id="${skill.id}Value" class="font-bold text-purple-600">50</span>
+                    <span>100</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <!-- 総合コメント -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">総合コメント</label>
+            <textarea id="overallComment" rows="3" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="全体的な成長の様子"></textarea>
+          </div>
+          
+          <!-- 強み -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-star text-yellow-500 mr-1"></i>強み
+            </label>
+            <textarea id="strengths" rows="2" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="特に優れている点"></textarea>
+          </div>
+          
+          <!-- 成長の余地 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-arrow-up text-green-500 mr-1"></i>成長の余地
+            </label>
+            <textarea id="areasForGrowth" rows="2" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="今後伸ばしていきたい点"></textarea>
+          </div>
+          
+          <!-- 推奨事項 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-lightbulb text-orange-500 mr-1"></i>推奨事項
+            </label>
+            <textarea id="recommendations" rows="2" class="w-full p-2 border border-gray-300 rounded-lg" placeholder="具体的な指導・支援の提案"></textarea>
+          </div>
+          
+          <!-- ボタン -->
+          <div class="flex gap-3">
+            <button type="button" onclick="closeCrossEvalModal()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-lg font-bold">
+              キャンセル
+            </button>
+            <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-bold">
+              <i class="fas fa-save mr-2"></i>保存
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHtml)
+  
+  // 初期値表示
+  document.querySelectorAll('input[type="range"]').forEach(input => {
+    updateScoreDisplay(input.id)
+  })
+  
+  document.getElementById('crossEvalForm').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    await submitCrossEvaluation()
+  })
+}
+
+window.closeCrossEvalModal = function() {
+  const modal = document.getElementById('crossEvalModal')
+  if (modal) modal.remove()
+}
+
+window.updateScoreDisplay = function(inputId) {
+  const input = document.getElementById(inputId)
+  const display = document.getElementById(`${inputId}Value`)
+  if (input && display) {
+    display.textContent = input.value
+  }
+}
+
+window.submitCrossEvaluation = async function() {
+  const data = {
+    student_id: window.phase3State.currentStudentId,
+    evaluation_period_start: document.getElementById('periodStart').value,
+    evaluation_period_end: document.getElementById('periodEnd').value,
+    reading_comprehension: parseInt(document.getElementById('readingComprehension').value),
+    writing_expression: parseInt(document.getElementById('writingExpression').value),
+    logical_thinking: parseInt(document.getElementById('logicalThinking').value),
+    creative_thinking: parseInt(document.getElementById('creativeThinking').value),
+    problem_solving: parseInt(document.getElementById('problemSolving').value),
+    persistence_score: parseInt(document.getElementById('persistenceScore').value),
+    self_regulation_score: parseInt(document.getElementById('selfRegulationScore').value),
+    collaboration_score: parseInt(document.getElementById('collaborationScore').value),
+    curiosity_score: parseInt(document.getElementById('curiosityScore').value),
+    metacognition_score: parseInt(document.getElementById('metacognitionScore').value),
+    growth_mindset_score: parseInt(document.getElementById('growthMindsetScore').value),
+    overall_comment: document.getElementById('overallComment').value,
+    strengths: document.getElementById('strengths').value,
+    areas_for_growth: document.getElementById('areasForGrowth').value,
+    recommendations: document.getElementById('recommendations').value
+  }
+  
+  try {
+    const response = await fetch('/api/cross-subject-evaluations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      alert('✅ 教科横断評価を保存しました！')
+      closeCrossEvalModal()
+      loadCrossEvaluations(data.student_id)
+    }
+  } catch (error) {
+    console.error('評価保存エラー:', error)
+    alert('❌ エラーが発生しました')
+  }
+}
+
+// 教科横断評価を読み込み
+window.loadCrossEvaluations = async function(studentId) {
+  try {
+    const response = await fetch(`/api/cross-subject-evaluations/${studentId}`)
+    const result = await response.json()
+    
+    if (result.success) {
+      window.phase3State.evaluations = result.evaluations
+      renderCrossEvaluations(result.evaluations)
+    }
+  } catch (error) {
+    console.error('評価取得エラー:', error)
+  }
+}
+
+// 教科横断評価を表示（レーダーチャート付き）
+function renderCrossEvaluations(evaluations) {
+  if (!evaluations || evaluations.length === 0) {
+    return '<div class="text-center py-8 text-gray-500">まだ教科横断評価はありません</div>'
+  }
+  
+  return evaluations.map((eval, index) => {
+    const chartId = `crossEvalChart${index}`
+    
+    // Chart.jsでレーダーチャート描画（遅延実行）
+    setTimeout(() => {
+      const ctx = document.getElementById(chartId)
+      if (ctx && typeof Chart !== 'undefined') {
+        new Chart(ctx, {
+          type: 'radar',
+          data: {
+            labels: ['読解力', '表現力', '論理思考', '創造思考', '問題解決', '粘り強さ', '自己調整', '協働性', '好奇心', 'メタ認知', '成長MS'],
+            datasets: [{
+              label: '評価スコア',
+              data: [
+                eval.reading_comprehension || 0,
+                eval.writing_expression || 0,
+                eval.logical_thinking || 0,
+                eval.creative_thinking || 0,
+                eval.problem_solving || 0,
+                eval.persistence_score || 0,
+                eval.self_regulation_score || 0,
+                eval.collaboration_score || 0,
+                eval.curiosity_score || 0,
+                eval.metacognition_score || 0,
+                eval.growth_mindset_score || 0
+              ],
+              fill: true,
+              backgroundColor: 'rgba(99, 102, 241, 0.2)',
+              borderColor: 'rgb(99, 102, 241)',
+              pointBackgroundColor: 'rgb(99, 102, 241)',
+              pointBorderColor: '#fff',
+              pointHoverBackgroundColor: '#fff',
+              pointHoverBorderColor: 'rgb(99, 102, 241)',
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              r: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  stepSize: 20
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              }
+            }
+          }
+        })
+      }
+    }, 100)
+    
+    return `
+      <div class="bg-white rounded-lg shadow-md p-6 mb-4">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <h4 class="font-bold text-lg text-gray-800">
+              教科横断評価
+            </h4>
+            <p class="text-sm text-gray-600">
+              ${new Date(eval.evaluation_period_start).toLocaleDateString('ja-JP')} 
+              〜 
+              ${new Date(eval.evaluation_period_end).toLocaleDateString('ja-JP')}
+            </p>
+          </div>
+        </div>
+        
+        <!-- レーダーチャート -->
+        <div class="mb-4 bg-gray-50 rounded-lg p-4" style="height: 400px;">
+          <canvas id="${chartId}"></canvas>
+        </div>
+        
+        <!-- スコア詳細（2列） -->
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="bg-blue-50 p-3 rounded-lg">
+            <h5 class="font-bold text-blue-800 text-sm mb-2">教科横断的スキル</h5>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between">
+                <span>読解力:</span>
+                <span class="font-bold">${eval.reading_comprehension || 0}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>表現力:</span>
+                <span class="font-bold">${eval.writing_expression || 0}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>論理的思考:</span>
+                <span class="font-bold">${eval.logical_thinking || 0}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>創造的思考:</span>
+                <span class="font-bold">${eval.creative_thinking || 0}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>問題解決:</span>
+                <span class="font-bold">${eval.problem_solving || 0}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-purple-50 p-3 rounded-lg">
+            <h5 class="font-bold text-purple-800 text-sm mb-2">非認知能力</h5>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between">
+                <span>粘り強さ:</span>
+                <span class="font-bold">${eval.persistence_score || 0}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>自己調整:</span>
+                <span class="font-bold">${eval.self_regulation_score || 0}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>協働性:</span>
+                <span class="font-bold">${eval.collaboration_score || 0}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>好奇心:</span>
+                <span class="font-bold">${eval.curiosity_score || 0}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>メタ認知:</span>
+                <span class="font-bold">${eval.metacognition_score || 0}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>成長MS:</span>
+                <span class="font-bold">${eval.growth_mindset_score || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        ${eval.overall_comment ? `
+          <div class="mb-3 p-3 bg-gray-50 rounded-lg">
+            <p class="text-sm font-medium text-gray-700 mb-1">総合コメント</p>
+            <p class="text-sm text-gray-600">${eval.overall_comment}</p>
+          </div>
+        ` : ''}
+        
+        <div class="grid grid-cols-3 gap-3">
+          ${eval.strengths ? `
+            <div class="p-3 bg-yellow-50 rounded-lg">
+              <p class="text-xs font-medium text-yellow-800 mb-1">
+                <i class="fas fa-star mr-1"></i>強み
+              </p>
+              <p class="text-xs text-gray-700">${eval.strengths}</p>
+            </div>
+          ` : ''}
+          
+          ${eval.areas_for_growth ? `
+            <div class="p-3 bg-green-50 rounded-lg">
+              <p class="text-xs font-medium text-green-800 mb-1">
+                <i class="fas fa-arrow-up mr-1"></i>成長の余地
+              </p>
+              <p class="text-xs text-gray-700">${eval.areas_for_growth}</p>
+            </div>
+          ` : ''}
+          
+          ${eval.recommendations ? `
+            <div class="p-3 bg-orange-50 rounded-lg">
+              <p class="text-xs font-medium text-orange-800 mb-1">
+                <i class="fas fa-lightbulb mr-1"></i>推奨事項
+              </p>
+              <p class="text-xs text-gray-700">${eval.recommendations}</p>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `
+  }).join('')
+}
+
 console.log('✅ Phase 3 機能を読み込みました')
