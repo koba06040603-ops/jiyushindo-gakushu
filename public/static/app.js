@@ -6278,6 +6278,42 @@ async function analyzeStudent(studentId, studentName) {
     // 0.5秒待ってから表示
     await new Promise(resolve => setTimeout(resolve, 500))
     
+    // 選択課題のデモデータ
+    const optionalData = {
+      totalAttempts: 12,        // 挑戦回数
+      completed: 10,            // 完了数
+      completionRate: 83,       // 完了率
+      classAverage: 8,          // クラス平均挑戦回数
+      difficulty: {
+        easy: 2,                // 簡単: 2回
+        medium: 5,              // 普通: 5回
+        hard: 5                 // 難しい: 5回
+      },
+      recentAttempts: [
+        { date: '01-15', difficulty: 'easy', completed: true },
+        { date: '01-15', difficulty: 'medium', completed: true },
+        { date: '01-16', difficulty: 'medium', completed: false },
+        { date: '01-16', difficulty: 'hard', completed: true },
+        { date: '01-17', difficulty: 'hard', completed: true },
+        { date: '01-17', difficulty: 'hard', completed: true },
+        { date: '01-18', difficulty: 'medium', completed: true },
+        { date: '01-18', difficulty: 'hard', completed: false },
+        { date: '01-19', difficulty: 'medium', completed: true },
+        { date: '01-19', difficulty: 'medium', completed: true },
+        { date: '01-19', difficulty: 'hard', completed: true },
+        { date: '01-19', difficulty: 'easy', completed: true }
+      ]
+    }
+    
+    // 非認知能力のデモデータ
+    const nonCognitiveData = {
+      grit: 80,              // 粘り強さ
+      selfRegulation: 70,    // 自己調整
+      collaboration: 65,     // 協働性
+      curiosity: 85,         // 好奇心
+      metacognition: 75      // メタ認知
+    }
+    
     analysisResult.innerHTML = `
       <!-- 生徒名 -->
       <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white shadow-lg">
@@ -6368,6 +6404,210 @@ async function analyzeStudent(studentId, studentName) {
         </div>
       </div>
 
+      <!-- 選択課題への取り組み -->
+      <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl p-6 text-white shadow-lg mt-6">
+        <h3 class="text-2xl font-bold mb-4">
+          <i class="fas fa-star mr-2"></i>
+          選択課題への取り組み
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- 挑戦回数 -->
+          <div class="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur">
+            <div class="text-sm opacity-90 mb-1">挑戦回数</div>
+            <div class="text-4xl font-bold">${optionalData.totalAttempts}回</div>
+            <div class="text-sm mt-2">クラス平均 ${optionalData.classAverage}回</div>
+          </div>
+          
+          <!-- 完了率 -->
+          <div class="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur">
+            <div class="text-sm opacity-90 mb-1">完了率</div>
+            <div class="text-4xl font-bold">${optionalData.completionRate}%</div>
+            <div class="text-sm mt-2">${optionalData.completed}/${optionalData.totalAttempts}問完了</div>
+          </div>
+          
+          <!-- 評価 -->
+          <div class="bg-white bg-opacity-20 rounded-lg p-4 backdrop-blur">
+            <div class="text-sm opacity-90 mb-1">評価</div>
+            <div class="text-2xl font-bold mb-1">
+              <i class="fas fa-trophy text-yellow-300 mr-2"></i>優秀
+            </div>
+            <div class="text-sm">クラストップレベル</div>
+          </div>
+        </div>
+        
+        <!-- 難易度分布 -->
+        <div class="mt-6 bg-white rounded-lg p-4 text-gray-800">
+          <h4 class="font-bold mb-3 flex items-center">
+            <i class="fas fa-chart-bar text-purple-600 mr-2"></i>
+            難易度選択の傾向
+          </h4>
+          
+          <!-- 簡単 -->
+          <div class="mb-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm">
+                <i class="fas fa-star text-yellow-400"></i>
+                <i class="far fa-star text-gray-300"></i>
+                <i class="far fa-star text-gray-300"></i>
+                簡単
+              </span>
+              <span class="text-sm font-semibold">${optionalData.difficulty.easy}回（${Math.round(optionalData.difficulty.easy / optionalData.totalAttempts * 100)}%）</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+              <div class="bg-green-500 h-3 rounded-full" style="width: ${Math.round(optionalData.difficulty.easy / optionalData.totalAttempts * 100)}%"></div>
+            </div>
+          </div>
+          
+          <!-- 普通 -->
+          <div class="mb-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm">
+                <i class="fas fa-star text-yellow-400"></i>
+                <i class="fas fa-star text-yellow-400"></i>
+                <i class="far fa-star text-gray-300"></i>
+                普通
+              </span>
+              <span class="text-sm font-semibold">${optionalData.difficulty.medium}回（${Math.round(optionalData.difficulty.medium / optionalData.totalAttempts * 100)}%）</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+              <div class="bg-blue-500 h-3 rounded-full" style="width: ${Math.round(optionalData.difficulty.medium / optionalData.totalAttempts * 100)}%"></div>
+            </div>
+          </div>
+          
+          <!-- 難しい -->
+          <div class="mb-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm">
+                <i class="fas fa-star text-yellow-400"></i>
+                <i class="fas fa-star text-yellow-400"></i>
+                <i class="fas fa-star text-yellow-400"></i>
+                難しい
+              </span>
+              <span class="text-sm font-semibold">${optionalData.difficulty.hard}回（${Math.round(optionalData.difficulty.hard / optionalData.totalAttempts * 100)}%）</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+              <div class="bg-red-500 h-3 rounded-full" style="width: ${Math.round(optionalData.difficulty.hard / optionalData.totalAttempts * 100)}%"></div>
+            </div>
+          </div>
+          
+          <!-- 先生コメント -->
+          <div class="mt-4 p-3 bg-purple-50 rounded-lg border-l-4 border-purple-500">
+            <p class="text-sm">
+              <i class="fas fa-comment-dots text-purple-600 mr-2"></i>
+              <strong>先生コメント:</strong> 難しい問題にも積極的に挑戦しており、探究心が旺盛です！この調子で頑張りましょう。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 非認知能力（社会情動的スキル） -->
+      <div class="bg-white rounded-xl shadow-lg p-6 mt-6">
+        <h3 class="text-2xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-brain text-pink-600 mr-2"></i>
+          非認知能力（社会情動的スキル）
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- レーダーチャート -->
+          <div>
+            <div class="h-80">
+              <canvas id="nonCognitiveChart"></canvas>
+            </div>
+          </div>
+          
+          <!-- 詳細スコアと説明 -->
+          <div class="space-y-4">
+            <!-- 粘り強さ -->
+            <div class="border-l-4 border-orange-500 pl-4 py-2">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-semibold text-gray-800">
+                  <i class="fas fa-mountain text-orange-500 mr-2"></i>
+                  粘り強さ
+                </span>
+                <span class="text-2xl font-bold text-orange-500">${nonCognitiveData.grit}</span>
+              </div>
+              <p class="text-sm text-gray-600">誤答後も諦めずに再挑戦する姿勢</p>
+            </div>
+            
+            <!-- 自己調整 -->
+            <div class="border-l-4 border-blue-500 pl-4 py-2">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-semibold text-gray-800">
+                  <i class="fas fa-sliders-h text-blue-500 mr-2"></i>
+                  自己調整
+                </span>
+                <span class="text-2xl font-bold text-blue-500">${nonCognitiveData.selfRegulation}</span>
+              </div>
+              <p class="text-sm text-gray-600">学習ペースの一貫性とヘルプの適切な活用</p>
+            </div>
+            
+            <!-- 協働性 -->
+            <div class="border-l-4 border-green-500 pl-4 py-2">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-semibold text-gray-800">
+                  <i class="fas fa-users text-green-500 mr-2"></i>
+                  協働性
+                </span>
+                <span class="text-2xl font-bold text-green-500">${nonCognitiveData.collaboration}</span>
+              </div>
+              <p class="text-sm text-gray-600">友達への教え合いと相互支援</p>
+            </div>
+            
+            <!-- 好奇心 -->
+            <div class="border-l-4 border-purple-500 pl-4 py-2">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-semibold text-gray-800">
+                  <i class="fas fa-lightbulb text-purple-500 mr-2"></i>
+                  好奇心
+                </span>
+                <span class="text-2xl font-bold text-purple-500">${nonCognitiveData.curiosity}</span>
+              </div>
+              <p class="text-sm text-gray-600">選択課題への自発的な取り組み</p>
+            </div>
+            
+            <!-- メタ認知 -->
+            <div class="border-l-4 border-pink-500 pl-4 py-2">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-semibold text-gray-800">
+                  <i class="fas fa-eye text-pink-500 mr-2"></i>
+                  メタ認知
+                </span>
+                <span class="text-2xl font-bold text-pink-500">${nonCognitiveData.metacognition}</span>
+              </div>
+              <p class="text-sm text-gray-600">自己評価の正確さとヒントの活用</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 強みと成長の余地 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+          <!-- 強み -->
+          <div class="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
+            <h4 class="font-bold text-green-800 mb-2">
+              <i class="fas fa-check-circle mr-2"></i>
+              強み
+            </h4>
+            <ul class="space-y-1 text-sm text-gray-700">
+              <li><i class="fas fa-star text-green-600 mr-2"></i>好奇心: 選択課題に積極的（クラストップ）</li>
+              <li><i class="fas fa-star text-green-600 mr-2"></i>粘り強さ: 誤答後も諦めずに再挑戦</li>
+            </ul>
+          </div>
+          
+          <!-- 成長の余地 -->
+          <div class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
+            <h4 class="font-bold text-blue-800 mb-2">
+              <i class="fas fa-arrow-up mr-2"></i>
+              成長の余地
+            </h4>
+            <ul class="space-y-1 text-sm text-gray-700">
+              <li><i class="fas fa-arrow-right text-blue-600 mr-2"></i>協働性: 友達への教え合いを増やそう</li>
+              <li><i class="fas fa-arrow-right text-blue-600 mr-2"></i>自己調整: 学習ペースをもう少し安定させよう</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       <!-- 具体的なサポート方法 -->
       <div class="bg-green-50 rounded-lg shadow-md p-6 mt-6">
         <h3 class="text-xl font-bold text-green-700 mb-4">
@@ -6388,6 +6628,31 @@ async function analyzeStudent(studentId, studentName) {
             <p class="text-sm text-gray-600">毎日5問、繰り上がりのある問題を練習</p>
           </li>
         </ul>
+      </div>
+      
+      <!-- 総合的な指導アドバイス -->
+      <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg mt-6">
+        <h3 class="text-2xl font-bold mb-4">
+          <i class="fas fa-lightbulb mr-2"></i>
+          総合的な指導アドバイス
+        </h3>
+        <div class="space-y-3 text-lg leading-relaxed">
+          <p>
+            <strong>山田太郎さん</strong>は、<strong class="text-yellow-300">認知面・非認知面ともにバランス良く成長</strong>しています。
+          </p>
+          <p>
+            特に<strong class="text-yellow-300">好奇心が高く</strong>（85点）、難しい問題にも積極的に挑戦する姿勢が素晴らしいです。
+            選択課題への取り組みは<strong>クラストップレベル</strong>（12回、クラス平均8回）で、探究心が旺盛です。
+          </p>
+          <p>
+            正答率も<strong>5日間で33%→75%に大きく改善</strong>しており、粘り強さ（80点）も高い水準です。
+          </p>
+          <p class="pt-3 border-t border-white border-opacity-30">
+            <i class="fas fa-arrow-right mr-2"></i>
+            <strong>今後の成長ポイント:</strong> 友達との教え合いを通じて<strong>協働性</strong>を高めることで、
+            さらなる成長が期待できます。また、学習ペースをもう少し安定させることで、<strong>自己調整力</strong>も向上するでしょう。
+          </p>
+        </div>
       </div>
     `
     
@@ -6430,11 +6695,65 @@ async function analyzeStudent(studentId, studentName) {
             }
           }
         })
-        console.log('✅ グラフ描画完了')
+        console.log('✅ 正答率グラフ描画完了')
       } else {
         console.error('❌ Chart.jsが見つかりません')
       }
     }, 100)
+    
+    // 非認知能力のレーダーチャートを描画
+    setTimeout(() => {
+      const ctx2 = document.getElementById('nonCognitiveChart')
+      if (ctx2 && typeof Chart !== 'undefined') {
+        new Chart(ctx2, {
+          type: 'radar',
+          data: {
+            labels: ['粘り強さ', '自己調整', '協働性', '好奇心', 'メタ認知'],
+            datasets: [{
+              label: '山田太郎',
+              data: [
+                nonCognitiveData.grit,
+                nonCognitiveData.selfRegulation,
+                nonCognitiveData.collaboration,
+                nonCognitiveData.curiosity,
+                nonCognitiveData.metacognition
+              ],
+              borderColor: 'rgb(236, 72, 153)',
+              backgroundColor: 'rgba(236, 72, 153, 0.2)',
+              borderWidth: 2,
+              pointBackgroundColor: 'rgb(236, 72, 153)',
+              pointBorderColor: '#fff',
+              pointHoverBackgroundColor: '#fff',
+              pointHoverBorderColor: 'rgb(236, 72, 153)'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              r: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  stepSize: 20
+                },
+                pointLabels: {
+                  font: {
+                    size: 12
+                  }
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              }
+            }
+          }
+        })
+        console.log('✅ 非認知能力レーダーチャート描画完了')
+      }
+    }, 150)
     
     return
   }
