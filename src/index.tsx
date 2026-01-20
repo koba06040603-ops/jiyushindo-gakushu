@@ -3206,6 +3206,7 @@ app.get('/', (c) => {
               '/static/tts.js',
               '/static/visual-support.js', 
               '/static/realtime.js',
+              '/static/phase3.js',
               '/static/app.js'
             ]
             

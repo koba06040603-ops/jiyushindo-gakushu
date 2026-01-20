@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://81afa9eb.jiyushindo-gakushu.pages.dev** ✅ 最新版（Phase 3 バックエンドAPI実装）
+**https://008c15f5.jiyushindo-gakushu.pages.dev** ✅ 最新版（Phase 3 フロントエンド完全実装）
 
 ### 🔐 デモアカウント
 
