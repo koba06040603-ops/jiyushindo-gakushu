@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://40d2099c.jiyushindo-gakushu.pages.dev** ✅ 最新版（データ統合版）
+**https://48096544.jiyushindo-gakushu.pages.dev** ✅ 最新版（名前混在修正版）
 
 ### 🔐 デモアカウント
 
