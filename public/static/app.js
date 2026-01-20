@@ -6315,6 +6315,18 @@ async function analyzeStudent(studentId, studentName) {
     }
     
     analysisResult.innerHTML = `
+      <!-- ヘッダー部分（PDF/印刷ボタン付き） -->
+      <div class="mb-4 flex justify-end gap-2 no-print">
+        <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md">
+          <i class="fas fa-print mr-2"></i>
+          印刷
+        </button>
+        <button onclick="exportStudentReportToPDF()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-semibold shadow-md">
+          <i class="fas fa-file-pdf mr-2"></i>
+          PDFで保存
+        </button>
+      </div>
+      
       <!-- 生徒名 -->
       <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white shadow-lg">
         <h2 class="text-2xl font-bold mb-3">
@@ -7003,6 +7015,58 @@ window.setDifficulty = setDifficulty
 window.generateProblem = generateProblem
 window.toggleAnswer = toggleAnswer
 window.analyzeStudent = analyzeStudent
+
+// PDF出力機能
+async function exportStudentReportToPDF() {
+  const reportElement = document.getElementById('analysisResult')
+  if (!reportElement) {
+    alert('レポートが見つかりません')
+    return
+  }
+  
+  try {
+    // html2pdfライブラリを動的にロード
+    if (typeof html2pdf === 'undefined') {
+      const script = document.createElement('script')
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+      document.head.appendChild(script)
+      
+      await new Promise((resolve, reject) => {
+        script.onload = resolve
+        script.onerror = reject
+      })
+      
+      // ライブラリロード後、少し待つ
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    
+    // PDF生成オプション
+    const opt = {
+      margin: 10,
+      filename: `学習レポート_山田太郎_${new Date().toLocaleDateString('ja-JP').replace(/\//g, '-')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }
+    
+    // ボタンを一時的に非表示
+    const buttons = reportElement.querySelectorAll('.no-print')
+    buttons.forEach(btn => btn.style.display = 'none')
+    
+    // PDF生成
+    await html2pdf().set(opt).from(reportElement).save()
+    
+    // ボタンを再表示
+    buttons.forEach(btn => btn.style.display = '')
+    
+    console.log('✅ PDF生成完了')
+  } catch (error) {
+    console.error('PDF生成エラー:', error)
+    alert('PDF生成に失敗しました。もう一度お試しください。')
+  }
+}
+
+window.exportStudentReportToPDF = exportStudentReportToPDF
 
 console.log('✅ AI機能のグローバル関数を登録しました')
 console.log('  loadAIErrorAnalysis:', typeof window.loadAIErrorAnalysis)
