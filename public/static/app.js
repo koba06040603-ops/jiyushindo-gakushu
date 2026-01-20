@@ -7511,44 +7511,6 @@ async function analyzeStudent(studentId, studentName) {
     
     console.log('📋 実際のデータ:', analysis)
     
-    // デモ用：山田太郎(studentId=3)の場合、常に詳細なモックデータを表示
-    // 文字列と数値の両方に対応
-    if (studentId === 3 || studentId === '3') {
-      analysis = {
-        success: true,
-        student: { id: 3, name: '山田太郎', student_number: '3001' },
-        error_patterns: [
-          { error_pattern: '繰り上がりの忘れ', count: 5 },
-          { error_pattern: '位取りのミス', count: 3 },
-          { error_pattern: '計算の順序間違い', count: 2 }
-        ],
-        accuracy_trend: [
-          { date: '2026-01-15', total: 6, correct: 2 },
-          { date: '2026-01-16', total: 7, correct: 3 },
-          { date: '2026-01-17', total: 7, correct: 4 },
-          { date: '2026-01-18', total: 8, correct: 5 },
-          { date: '2026-01-19', total: 8, correct: 6 }
-        ],
-        overall_analysis: '山田太郎さんは、かけ算の筆算において「繰り上がりの忘れ」が最も多く見られます。しかし、最近5日間で正答率が33%→75%へと大きく改善しており、学習意欲が高く成長が著しいです。',
-        root_causes: [
-          '繰り上がりの概念理解が不十分',
-          '位取りの意識が弱い',
-          '計算手順の定着が不足'
-        ],
-        suggestions_for_teacher: [
-          { priority: 'high', suggestion: '繰り上がりの視覚化：色分けやマーカーで繰り上がりを明示する' },
-          { priority: 'high', suggestion: '位取り表の活用：マス目を使って位を揃える練習' },
-          { priority: 'medium', suggestion: '計算手順の口頭確認：「一の位から計算する」と声に出させる' },
-          { priority: 'low', suggestion: '成功体験の積み重ね：簡単な問題から徐々にレベルアップ' }
-        ],
-        support_strategies: [
-          { strategy: '個別指導', details: '休み時間に10分程度、繰り上がりの練習' },
-          { strategy: 'ペア学習', details: '理解が進んでいる佐藤花子さんとペアを組む' },
-          { strategy: '家庭学習', details: '毎日5問、繰り上がりのある問題を練習' }
-        ]
-      }
-    }
-    
     analysisResult.innerHTML = `
       <!-- 生徒名 -->
       <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white shadow-lg">
