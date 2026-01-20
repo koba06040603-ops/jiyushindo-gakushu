@@ -4271,6 +4271,9 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
           <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs md:text-sm">
             ${generateHelpStatsNew(progressData.students)}
           </div>
+          <div class="mt-4 text-center">
+            <button onclick="loadAIErrorAnalysis()" 
+                    class="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-6 py-3 rounded-lg transition-all shadow-lg text-sm md:text-base font-bold">
               <i class="fas fa-microscope mr-2"></i>
               AI誤答分析で詳しく見る
               <span class="ml-2 text-xs bg-white text-red-600 px-2 py-0.5 rounded animate-pulse">NEW</span>
