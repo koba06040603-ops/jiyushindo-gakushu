@@ -6312,6 +6312,7 @@ async function analyzeStudent(studentId, studentName) {
         supportStrategies: rawData.support ? rawData.support.map(s => `${s.title}: ${s.detail}`) : [],
         optionalChallenges: rawData.optional || {},
         nonCognitive: rawData.nonCognitive || {},
+        nonCognitiveHistory: rawData.nonCognitiveHistory || [],
         comprehensiveAdvice: {
           strengths: rawData.strengths || [],
           growthAreas: rawData.growthAreas || [],
@@ -6689,6 +6690,81 @@ async function analyzeStudent(studentId, studentName) {
         </div>
       </div>
 
+      <!-- 非認知能力の週次推移 -->
+      ${demoData.nonCognitiveHistory && demoData.nonCognitiveHistory.length > 0 ? `
+      <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+        <h3 class="text-xl font-bold text-indigo-600 mb-4">
+          <i class="fas fa-chart-line mr-2"></i>
+          非認知能力の週次推移
+        </h3>
+        <p class="text-sm text-gray-600 mb-4">過去3週間の非認知能力スコアの変化を示しています。</p>
+        <div class="h-80">
+          <canvas id="nonCognitiveTimeSeriesChart"></canvas>
+        </div>
+        
+        <!-- 週次データの表 -->
+        <div class="mt-6 overflow-x-auto">
+          <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-2 text-left text-sm font-semibold text-gray-700">週</th>
+                <th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">粘り強さ</th>
+                <th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">自己調整</th>
+                <th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">協働性</th>
+                <th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">好奇心</th>
+                <th class="px-4 py-2 text-center text-sm font-semibold text-gray-700">メタ認知</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${demoData.nonCognitiveHistory.map((week, index) => `
+                <tr class="border-t ${index === demoData.nonCognitiveHistory.length - 1 ? 'bg-yellow-50 font-semibold' : ''}">
+                  <td class="px-4 py-2 text-sm text-gray-700">
+                    第${week.week}週 (${week.date})
+                    ${index === demoData.nonCognitiveHistory.length - 1 ? '<span class="ml-2 text-xs bg-yellow-200 px-2 py-1 rounded">最新</span>' : ''}
+                  </td>
+                  <td class="px-4 py-2 text-center text-sm">
+                    ${week.grit}
+                    ${index > 0 ? `<span class="ml-1 text-xs ${week.grit > demoData.nonCognitiveHistory[index-1].grit ? 'text-green-600' : week.grit < demoData.nonCognitiveHistory[index-1].grit ? 'text-red-600' : 'text-gray-400'}">
+                      ${week.grit > demoData.nonCognitiveHistory[index-1].grit ? '▲' : week.grit < demoData.nonCognitiveHistory[index-1].grit ? '▼' : '→'}
+                      ${Math.abs(week.grit - demoData.nonCognitiveHistory[index-1].grit)}
+                    </span>` : ''}
+                  </td>
+                  <td class="px-4 py-2 text-center text-sm">
+                    ${week.selfRegulation}
+                    ${index > 0 ? `<span class="ml-1 text-xs ${week.selfRegulation > demoData.nonCognitiveHistory[index-1].selfRegulation ? 'text-green-600' : week.selfRegulation < demoData.nonCognitiveHistory[index-1].selfRegulation ? 'text-red-600' : 'text-gray-400'}">
+                      ${week.selfRegulation > demoData.nonCognitiveHistory[index-1].selfRegulation ? '▲' : week.selfRegulation < demoData.nonCognitiveHistory[index-1].selfRegulation ? '▼' : '→'}
+                      ${Math.abs(week.selfRegulation - demoData.nonCognitiveHistory[index-1].selfRegulation)}
+                    </span>` : ''}
+                  </td>
+                  <td class="px-4 py-2 text-center text-sm">
+                    ${week.collaboration}
+                    ${index > 0 ? `<span class="ml-1 text-xs ${week.collaboration > demoData.nonCognitiveHistory[index-1].collaboration ? 'text-green-600' : week.collaboration < demoData.nonCognitiveHistory[index-1].collaboration ? 'text-red-600' : 'text-gray-400'}">
+                      ${week.collaboration > demoData.nonCognitiveHistory[index-1].collaboration ? '▲' : week.collaboration < demoData.nonCognitiveHistory[index-1].collaboration ? '▼' : '→'}
+                      ${Math.abs(week.collaboration - demoData.nonCognitiveHistory[index-1].collaboration)}
+                    </span>` : ''}
+                  </td>
+                  <td class="px-4 py-2 text-center text-sm">
+                    ${week.curiosity}
+                    ${index > 0 ? `<span class="ml-1 text-xs ${week.curiosity > demoData.nonCognitiveHistory[index-1].curiosity ? 'text-green-600' : week.curiosity < demoData.nonCognitiveHistory[index-1].curiosity ? 'text-red-600' : 'text-gray-400'}">
+                      ${week.curiosity > demoData.nonCognitiveHistory[index-1].curiosity ? '▲' : week.curiosity < demoData.nonCognitiveHistory[index-1].curiosity ? '▼' : '→'}
+                      ${Math.abs(week.curiosity - demoData.nonCognitiveHistory[index-1].curiosity)}
+                    </span>` : ''}
+                  </td>
+                  <td class="px-4 py-2 text-center text-sm">
+                    ${week.metacognition}
+                    ${index > 0 ? `<span class="ml-1 text-xs ${week.metacognition > demoData.nonCognitiveHistory[index-1].metacognition ? 'text-green-600' : week.metacognition < demoData.nonCognitiveHistory[index-1].metacognition ? 'text-red-600' : 'text-gray-400'}">
+                      ${week.metacognition > demoData.nonCognitiveHistory[index-1].metacognition ? '▲' : week.metacognition < demoData.nonCognitiveHistory[index-1].metacognition ? '▼' : '→'}
+                      ${Math.abs(week.metacognition - demoData.nonCognitiveHistory[index-1].metacognition)}
+                    </span>` : ''}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- 具体的なサポート方法 -->
       <div class="bg-green-50 rounded-lg shadow-md p-6 mt-6">
         <h3 class="text-xl font-bold text-green-700 mb-4">
@@ -6840,6 +6916,92 @@ async function analyzeStudent(studentId, studentName) {
         console.log('✅ 非認知能力レーダーチャート描画完了')
       }
     }, 150)
+    
+    // 非認知能力の時系列グラフを描画
+    setTimeout(() => {
+      const ctx3 = document.getElementById('nonCognitiveTimeSeriesChart')
+      if (ctx3 && typeof Chart !== 'undefined' && demoData.nonCognitiveHistory && demoData.nonCognitiveHistory.length > 0) {
+        const labels = demoData.nonCognitiveHistory.map(h => `第${h.week}週`)
+        
+        new Chart(ctx3, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: '粘り強さ',
+                data: demoData.nonCognitiveHistory.map(h => h.grit),
+                borderColor: 'rgb(249, 115, 22)',
+                backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                tension: 0.3,
+                fill: false
+              },
+              {
+                label: '自己調整',
+                data: demoData.nonCognitiveHistory.map(h => h.selfRegulation),
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.3,
+                fill: false
+              },
+              {
+                label: '協働性',
+                data: demoData.nonCognitiveHistory.map(h => h.collaboration),
+                borderColor: 'rgb(34, 197, 94)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                tension: 0.3,
+                fill: false
+              },
+              {
+                label: '好奇心',
+                data: demoData.nonCognitiveHistory.map(h => h.curiosity),
+                borderColor: 'rgb(168, 85, 247)',
+                backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                tension: 0.3,
+                fill: false
+              },
+              {
+                label: 'メタ認知',
+                data: demoData.nonCognitiveHistory.map(h => h.metacognition),
+                borderColor: 'rgb(236, 72, 153)',
+                backgroundColor: 'rgba(236, 72, 153, 0.1)',
+                tension: 0.3,
+                fill: false
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top'
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                  stepSize: 20
+                }
+              }
+            },
+            interaction: {
+              mode: 'nearest',
+              axis: 'x',
+              intersect: false
+            }
+          }
+        })
+        console.log('✅ 非認知能力時系列グラフ描画完了')
+      }
+    }, 200)
     
     return
   }

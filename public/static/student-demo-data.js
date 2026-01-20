@@ -42,6 +42,35 @@ const STUDENT_DEMO_DATA = {
       curiosity: 85,
       metacognition: 75
     },
+    nonCognitiveHistory: [
+      {
+        date: '2026-01-06',
+        week: 1,
+        grit: 70,
+        selfRegulation: 65,
+        collaboration: 60,
+        curiosity: 80,
+        metacognition: 68
+      },
+      {
+        date: '2026-01-13',
+        week: 2,
+        grit: 75,
+        selfRegulation: 68,
+        collaboration: 63,
+        curiosity: 83,
+        metacognition: 72
+      },
+      {
+        date: '2026-01-20',
+        week: 3,
+        grit: 80,
+        selfRegulation: 70,
+        collaboration: 65,
+        curiosity: 85,
+        metacognition: 75
+      }
+    ],
     strengths: ['好奇心: 選択課題に積極的（クラストップ）', '粘り強さ: 誤答後も諦めずに再挑戦'],
     growthAreas: ['協働性: 友達への教え合いを増やそう', '自己調整: 学習ペースをもう少し安定させよう'],
     overallAdvice: '山田太郎さんは、<strong class="text-yellow-300">認知面・非認知面ともにバランス良く成長</strong>しています。特に<strong class="text-yellow-300">好奇心が高く</strong>（85点）、難しい問題にも積極的に挑戦する姿勢が素晴らしいです。選択課題への取り組みは<strong>クラストップレベル</strong>（12回、クラス平均8回）で、探究心が旺盛です。正答率も<strong>5日間で33%→75%に大きく改善</strong>しており、粘り強さ（80点）も高い水準です。<br><br><i class="fas fa-arrow-right mr-2"></i><strong>今後の成長ポイント:</strong> 友達との教え合いを通じて<strong>協働性</strong>を高めることで、さらなる成長が期待できます。また、学習ペースをもう少し安定させることで、<strong>自己調整力</strong>も向上するでしょう。',
@@ -91,6 +120,35 @@ const STUDENT_DEMO_DATA = {
       curiosity: 80,
       metacognition: 88
     },
+    nonCognitiveHistory: [
+      {
+        date: '2026-01-06',
+        week: 1,
+        grit: 82,
+        selfRegulation: 88,
+        collaboration: 92,
+        curiosity: 78,
+        metacognition: 85
+      },
+      {
+        date: '2026-01-13',
+        week: 2,
+        grit: 84,
+        selfRegulation: 89,
+        collaboration: 94,
+        curiosity: 79,
+        metacognition: 87
+      },
+      {
+        date: '2026-01-20',
+        week: 3,
+        grit: 85,
+        selfRegulation: 90,
+        collaboration: 95,
+        curiosity: 80,
+        metacognition: 88
+      }
+    ],
     strengths: ['協働性: 友達への教え方が上手（クラス1位）', '自己調整: 計画的な学習習慣が確立'],
     growthAreas: ['好奇心: さらに高度な問題への挑戦', 'メタ認知: 自分の間違いパターンの分析'],
     overallAdvice: '佐藤花子さんは、<strong class="text-yellow-300">全ての面で非常に高い水準</strong>を維持しています。特に<strong class="text-yellow-300">協働性が優れており</strong>（95点）、クラスのリーダーとして友達をサポートする姿勢が素晴らしいです。正答率も<strong>83%→92%へと安定的に向上</strong>しており、学習習慣が確立しています。<br><br><i class="fas fa-arrow-right mr-2"></i><strong>今後の成長ポイント:</strong> 既に基礎は十分に身についているので、<strong>発展的な問題</strong>や<strong>応用問題</strong>にチャレンジすることで、さらなる成長が期待できます。また、<strong>自分の学習方法を言語化</strong>して友達に伝えることで、メタ認知能力もさらに向上するでしょう。',
@@ -143,6 +201,35 @@ const STUDENT_DEMO_DATA = {
       curiosity: 65,
       metacognition: 58
     },
+    nonCognitiveHistory: [
+      {
+        date: '2026-01-06',
+        week: 1,
+        grit: 68,
+        selfRegulation: 55,
+        collaboration: 50,
+        curiosity: 60,
+        metacognition: 52
+      },
+      {
+        date: '2026-01-13',
+        week: 2,
+        grit: 72,
+        selfRegulation: 58,
+        collaboration: 53,
+        curiosity: 63,
+        metacognition: 55
+      },
+      {
+        date: '2026-01-20',
+        week: 3,
+        grit: 75,
+        selfRegulation: 60,
+        collaboration: 55,
+        curiosity: 65,
+        metacognition: 58
+      }
+    ],
     strengths: ['粘り強さ: 諦めずに取り組む姿勢', '成長意欲: 徐々に難しい問題にも挑戦'],
     growthAreas: ['自己調整: 学習計画を立てて取り組む習慣', '協働性: 友達に質問する勇気を持つ'],
     overallAdvice: '鈴木次郎さんは、<strong class="text-yellow-300">着実に成長</strong>しています。最初は苦手意識がありましたが、<strong>諦めずに取り組む姿勢</strong>（粘り強さ75点）が素晴らしいです。正答率も<strong>5日間で25%→50%に倍増</strong>しており、確実に前進しています。<br><br><i class="fas fa-arrow-right mr-2"></i><strong>今後の成長ポイント:</strong> まずは<strong>九九の基礎</strong>をしっかり固めることが最優先です。焦らず、<strong>スモールステップ</strong>で一つずつクリアしていきましょう。また、<strong>友達や先生に質問する勇気</strong>を持つことで、より効率的に学習できます。',
