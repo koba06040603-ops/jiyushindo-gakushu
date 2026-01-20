@@ -6290,9 +6290,9 @@ async function analyzeStudent(studentId, studentName) {
     
     console.log('📋 実際のデータ:', analysis)
     
-    // デモ用：山田太郎(studentId=3)の場合、詳細なモックデータを追加
+    // デモ用：山田太郎(studentId=3)の場合、常に詳細なモックデータを表示
     // 文字列と数値の両方に対応
-    if ((studentId === 3 || studentId === '3') && (!analysis.error_patterns || analysis.error_patterns.length === 0)) {
+    if (studentId === 3 || studentId === '3') {
       analysis = {
         success: true,
         student: { id: 3, name: '山田太郎', student_number: '3001' },
