@@ -6264,54 +6264,138 @@ async function analyzeStudent(studentId, studentName) {
   const analysisResult = document.getElementById('analysisResult')
   analysisResult.classList.remove('hidden')
   
-  // デモ用：山田太郎(studentId=3)の場合、専用のHTMLを表示（APIを呼ばない）
-  if (studentId === 3 || studentId === '3' || studentName === '山田太郎') {
-    console.log('✅ 山田太郎のデモデータを表示')
+  // デモ用：3人の生徒（山田太郎、佐藤花子、鈴木次郎）の専用デモデータを表示
+  const demoStudents = {
+    '山田太郎': 3,
+    '佐藤花子': 4,
+    '鈴木次郎': 5
+  }
+  
+  const isDemoStudent = Object.keys(demoStudents).includes(studentName) || 
+                        [3, '3', 4, '4', 5, '5'].includes(studentId)
+  
+  if (isDemoStudent) {
+    console.log(`✅ ${studentName}のデモデータを表示`)
     
     analysisResult.innerHTML = `
       <div class="text-center py-12">
         <i class="fas fa-spinner fa-spin text-4xl text-orange-500 mb-4"></i>
-        <p class="text-gray-600">山田太郎さんの学習データをAIが分析しています...</p>
+        <p class="text-gray-600">${studentName}さんの学習データをAIが分析しています...</p>
       </div>
     `
     
     // 0.5秒待ってから表示
     await new Promise(resolve => setTimeout(resolve, 500))
     
-    // 選択課題のデモデータ
-    const optionalData = {
-      totalAttempts: 12,        // 挑戦回数
-      completed: 10,            // 完了数
-      completionRate: 83,       // 完了率
-      classAverage: 8,          // クラス平均挑戦回数
-      difficulty: {
-        easy: 2,                // 簡単: 2回
-        medium: 5,              // 普通: 5回
-        hard: 5                 // 難しい: 5回
-      },
-      recentAttempts: [
-        { date: '01-15', difficulty: 'easy', completed: true },
-        { date: '01-15', difficulty: 'medium', completed: true },
-        { date: '01-16', difficulty: 'medium', completed: false },
-        { date: '01-16', difficulty: 'hard', completed: true },
-        { date: '01-17', difficulty: 'hard', completed: true },
-        { date: '01-17', difficulty: 'hard', completed: true },
-        { date: '01-18', difficulty: 'medium', completed: true },
-        { date: '01-18', difficulty: 'hard', completed: false },
-        { date: '01-19', difficulty: 'medium', completed: true },
-        { date: '01-19', difficulty: 'medium', completed: true },
-        { date: '01-19', difficulty: 'hard', completed: true },
-        { date: '01-19', difficulty: 'easy', completed: true }
-      ]
+    // デモデータを取得（外部ファイルから）
+    let rawData
+    if (typeof window.STUDENT_DEMO_DATA !== 'undefined') {
+      rawData = window.STUDENT_DEMO_DATA[studentId] || window.STUDENT_DEMO_DATA[studentName]
     }
     
-    // 非認知能力のデモデータ
-    const nonCognitiveData = {
-      grit: 80,              // 粘り強さ
-      selfRegulation: 70,    // 自己調整
-      collaboration: 65,     // 協働性
-      curiosity: 85,         // 好奇心
-      metacognition: 75      // メタ認知
+    // データ構造を正規化
+    let demoData
+    if (rawData) {
+      // student-demo-data.jsの構造を内部形式に変換
+      demoData = {
+        overallAnalysis: rawData.summary || '',
+        errorPatterns: rawData.errorPatterns ? rawData.errorPatterns.map(p => ({
+          error_pattern: p.pattern,
+          count: p.count
+        })) : [],
+        rootCauses: rawData.rootCauses || [],
+        suggestions: rawData.suggestions ? rawData.suggestions.map(s => ({
+          suggestion: s.text,
+          priority: s.priority
+        })) : [],
+        accuracyTrend: rawData.accuracyTrend || [],
+        supportStrategies: rawData.support ? rawData.support.map(s => `${s.title}: ${s.detail}`) : [],
+        optionalChallenges: rawData.optional || {},
+        nonCognitive: rawData.nonCognitive || {},
+        comprehensiveAdvice: {
+          strengths: rawData.strengths || [],
+          growthAreas: rawData.growthAreas || [],
+          overallAdvice: rawData.overallAdvice || ''
+        }
+      }
+    }
+    
+    // フォールバック：外部ファイルが読み込めない場合は山田太郎のデータを使用
+    if (!demoData) {
+      demoData = {
+        overallAnalysis: '繰り上がりの忘れが最も多い課題ですが、最近5日間で正答率が33%から75%へ大幅に改善しています。学習意欲が高く、成長が著しいです。',
+        errorPatterns: [
+          { error_pattern: '繰り上がりの忘れ', count: 5 },
+          { error_pattern: '位取りのミス', count: 3 },
+          { error_pattern: '計算の順序間違い', count: 2 }
+        ],
+        rootCauses: [
+          '繰り上がりの概念理解が不足している',
+          '位取りに対する意識が弱い',
+          '計算手順の定着が不十分'
+        ],
+        suggestions: [
+          { suggestion: '繰り上がりを視覚化する教材を使用', priority: 'high' },
+          { suggestion: '位取り表を活用した練習', priority: 'medium' },
+          { suggestion: '計算手順を口頭で確認させる', priority: 'high' },
+          { suggestion: '成功体験を積み重ねる', priority: 'low' }
+        ],
+        accuracyTrend: [
+          { date: '2026-01-15', total: 6, correct: 2 },
+          { date: '2026-01-16', total: 7, correct: 3 },
+          { date: '2026-01-17', total: 8, correct: 4 },
+          { date: '2026-01-18', total: 7, correct: 4 },
+          { date: '2026-01-19', total: 8, correct: 6 }
+        ],
+        supportStrategies: [
+          '個別指導で繰り上がりの仕組みを丁寧に説明する',
+          'ペア学習で友達に教える機会を作る',
+          '家庭学習で毎日5分の計算練習を推奨'
+        ],
+        optionalChallenges: {
+          totalAttempts: 12,
+          completed: 10,
+          completionRate: 83,
+          classAverage: 8,
+          difficulty: { easy: 2, medium: 5, hard: 5 },
+          recentAttempts: [
+            { date: '01-15', difficulty: 'easy', completed: true },
+            { date: '01-15', difficulty: 'medium', completed: true },
+            { date: '01-16', difficulty: 'medium', completed: false },
+            { date: '01-16', difficulty: 'hard', completed: true },
+            { date: '01-17', difficulty: 'hard', completed: true },
+            { date: '01-17', difficulty: 'hard', completed: true },
+            { date: '01-18', difficulty: 'medium', completed: true },
+            { date: '01-18', difficulty: 'hard', completed: false },
+            { date: '01-19', difficulty: 'medium', completed: true },
+            { date: '01-19', difficulty: 'medium', completed: true },
+            { date: '01-19', difficulty: 'hard', completed: true },
+            { date: '01-19', difficulty: 'easy', completed: true }
+          ]
+        },
+        nonCognitive: {
+          grit: 80,
+          selfRegulation: 70,
+          collaboration: 65,
+          curiosity: 85,
+          metacognition: 75
+        }
+      }
+    }
+    
+    const optionalData = demoData ? demoData.optionalChallenges : null
+    const nonCognitiveData = demoData ? demoData.nonCognitive : null
+    
+    // デモデータがない場合は、その他の生徒用の処理にフォールバック
+    if (!demoData) {
+      analysisResult.innerHTML = `
+        <div class="text-center py-12">
+          <i class="fas fa-info-circle text-4xl text-gray-400 mb-4"></i>
+          <p class="text-gray-600">${studentName}さんの分析データは準備中です。</p>
+          <p class="text-sm text-gray-500 mt-2">現在、山田太郎さん、佐藤花子さん、鈴木次郎さんのデモデータが利用可能です。</p>
+        </div>
+      `
+      return
     }
     
     analysisResult.innerHTML = `
@@ -6331,9 +6415,9 @@ async function analyzeStudent(studentId, studentName) {
       <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl p-6 text-white shadow-lg">
         <h2 class="text-2xl font-bold mb-3">
           <i class="fas fa-user-circle mr-2"></i>
-          山田太郎さんの学習分析
+          ${studentName}さんの学習分析
         </h2>
-        <p class="text-lg leading-relaxed">山田太郎さんは、かけ算の筆算において「繰り上がりの忘れ」が最も多く見られます。しかし、最近5日間で正答率が33%→75%へと大きく改善しており、学習意欲が高く成長が著しいです。</p>
+        <p class="text-lg leading-relaxed">${demoData.overallAnalysis}</p>
       </div>
 
       <!-- 3カラムレイアウト -->
@@ -6345,18 +6429,12 @@ async function analyzeStudent(studentId, studentName) {
             つまずきパターン
           </h3>
           <div class="space-y-3">
-            <div class="border-l-4 border-red-400 pl-3 py-2">
-              <p class="font-semibold text-gray-800">繰り上がりの忘れ</p>
-              <p class="text-sm text-gray-600">5回</p>
-            </div>
-            <div class="border-l-4 border-red-400 pl-3 py-2">
-              <p class="font-semibold text-gray-800">位取りのミス</p>
-              <p class="text-sm text-gray-600">3回</p>
-            </div>
-            <div class="border-l-4 border-red-400 pl-3 py-2">
-              <p class="font-semibold text-gray-800">計算の順序間違い</p>
-              <p class="text-sm text-gray-600">2回</p>
-            </div>
+            ${demoData.errorPatterns.map(pattern => `
+              <div class="border-l-4 border-red-400 pl-3 py-2">
+                <p class="font-semibold text-gray-800">${pattern.error_pattern}</p>
+                <p class="text-sm text-gray-600">${pattern.count}回</p>
+              </div>
+            `).join('')}
           </div>
         </div>
 
@@ -6367,18 +6445,12 @@ async function analyzeStudent(studentId, studentName) {
             根本原因
           </h3>
           <ul class="space-y-2">
-            <li class="flex items-start">
-              <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
-              <span class="text-gray-700">繰り上がりの概念理解が不十分</span>
-            </li>
-            <li class="flex items-start">
-              <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
-              <span class="text-gray-700">位取りの意識が弱い</span>
-            </li>
-            <li class="flex items-start">
-              <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
-              <span class="text-gray-700">計算手順の定着が不足</span>
-            </li>
+            ${demoData.rootCauses.map(cause => `
+              <li class="flex items-start">
+                <i class="fas fa-arrow-right text-yellow-500 mt-1 mr-2"></i>
+                <span class="text-gray-700">${cause}</span>
+              </li>
+            `).join('')}
           </ul>
         </div>
 
@@ -6389,18 +6461,15 @@ async function analyzeStudent(studentId, studentName) {
             指導アドバイス
           </h3>
           <div class="space-y-3">
-            <div class="border rounded-lg p-3 bg-red-50">
-              <p class="text-gray-800 text-sm">繰り上がりの視覚化：色分けやマーカーで繰り上がりを明示する</p>
-            </div>
-            <div class="border rounded-lg p-3 bg-red-50">
-              <p class="text-gray-800 text-sm">位取り表の活用：マス目を使って位を揃える練習</p>
-            </div>
-            <div class="border rounded-lg p-3 bg-yellow-50">
-              <p class="text-gray-800 text-sm">計算手順の口頭確認：「一の位から計算する」と声に出させる</p>
-            </div>
-            <div class="border rounded-lg p-3 bg-green-50">
-              <p class="text-gray-800 text-sm">成功体験の積み重ね：簡単な問題から徐々にレベルアップ</p>
-            </div>
+            ${demoData.suggestions.map(suggestion => {
+              const bgColor = suggestion.priority === 'high' ? 'bg-red-50' : 
+                             suggestion.priority === 'medium' ? 'bg-yellow-50' : 'bg-green-50'
+              return `
+                <div class="border rounded-lg p-3 ${bgColor}">
+                  <p class="text-gray-800 text-sm">${suggestion.suggestion}</p>
+                </div>
+              `
+            }).join('')}
           </div>
         </div>
       </div>
@@ -6507,7 +6576,7 @@ async function analyzeStudent(studentId, studentName) {
           <div class="mt-4 p-3 bg-purple-50 rounded-lg border-l-4 border-purple-500">
             <p class="text-sm">
               <i class="fas fa-comment-dots text-purple-600 mr-2"></i>
-              <strong>先生コメント:</strong> 難しい問題にも積極的に挑戦しており、探究心が旺盛です！この調子で頑張りましょう。
+              <strong>先生コメント:</strong> ${optionalData.comment || '着実に取り組んでいます。この調子で頑張りましょう。'}
             </p>
           </div>
         </div>
@@ -6627,18 +6696,11 @@ async function analyzeStudent(studentId, studentName) {
           具体的なサポート方法
         </h3>
         <ul class="space-y-3">
-          <li class="border-l-4 border-green-500 pl-3 py-2">
-            <p class="font-semibold text-gray-800">個別指導</p>
-            <p class="text-sm text-gray-600">休み時間に10分程度、繰り上がりの練習</p>
-          </li>
-          <li class="border-l-4 border-green-500 pl-3 py-2">
-            <p class="font-semibold text-gray-800">ペア学習</p>
-            <p class="text-sm text-gray-600">理解が進んでいる佐藤花子さんとペアを組む</p>
-          </li>
-          <li class="border-l-4 border-green-500 pl-3 py-2">
-            <p class="font-semibold text-gray-800">家庭学習</p>
-            <p class="text-sm text-gray-600">毎日5問、繰り上がりのある問題を練習</p>
-          </li>
+          ${demoData.supportStrategies.map(strategy => `
+            <li class="border-l-4 border-green-500 pl-3 py-2">
+              <p class="text-gray-800">${strategy}</p>
+            </li>
+          `).join('')}
         </ul>
       </div>
       
@@ -6649,36 +6711,48 @@ async function analyzeStudent(studentId, studentName) {
           総合的な指導アドバイス
         </h3>
         <div class="space-y-3 text-lg leading-relaxed">
-          <p>
-            <strong>山田太郎さん</strong>は、<strong class="text-yellow-300">認知面・非認知面ともにバランス良く成長</strong>しています。
-          </p>
-          <p>
-            特に<strong class="text-yellow-300">好奇心が高く</strong>（85点）、難しい問題にも積極的に挑戦する姿勢が素晴らしいです。
-            選択課題への取り組みは<strong>クラストップレベル</strong>（12回、クラス平均8回）で、探究心が旺盛です。
-          </p>
-          <p>
-            正答率も<strong>5日間で33%→75%に大きく改善</strong>しており、粘り強さ（80点）も高い水準です。
-          </p>
-          <p class="pt-3 border-t border-white border-opacity-30">
-            <i class="fas fa-arrow-right mr-2"></i>
-            <strong>今後の成長ポイント:</strong> 友達との教え合いを通じて<strong>協働性</strong>を高めることで、
-            さらなる成長が期待できます。また、学習ペースをもう少し安定させることで、<strong>自己調整力</strong>も向上するでしょう。
-          </p>
+          ${demoData.comprehensiveAdvice.overallAdvice ? `
+            <p>${demoData.comprehensiveAdvice.overallAdvice}</p>
+          ` : `
+            <p><strong>${studentName}さん</strong>は、認知面・非認知面ともにバランス良く成長しています。</p>
+          `}
+          
+          ${demoData.comprehensiveAdvice.strengths && demoData.comprehensiveAdvice.strengths.length > 0 ? `
+            <div class="pt-3 border-t border-white border-opacity-30">
+              <p class="font-semibold mb-2"><i class="fas fa-star mr-2"></i>強み:</p>
+              <ul class="list-disc list-inside space-y-1 ml-4">
+                ${demoData.comprehensiveAdvice.strengths.map(s => `<li>${s}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+          
+          ${demoData.comprehensiveAdvice.growthAreas && demoData.comprehensiveAdvice.growthAreas.length > 0 ? `
+            <div class="pt-3 border-t border-white border-opacity-30">
+              <p class="font-semibold mb-2"><i class="fas fa-arrow-up mr-2"></i>成長の余地:</p>
+              <ul class="list-disc list-inside space-y-1 ml-4">
+                ${demoData.comprehensiveAdvice.growthAreas.map(g => `<li>${g}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
         </div>
       </div>
     `
     
     // グラフを描画
     setTimeout(() => {
+      // 正答率推移グラフ
       const ctx = document.getElementById('accuracyChart')
-      if (ctx && typeof Chart !== 'undefined') {
+      if (ctx && typeof Chart !== 'undefined' && demoData.accuracyTrend && demoData.accuracyTrend.length > 0) {
+        const labels = demoData.accuracyTrend.map(d => d.date)
+        const data = demoData.accuracyTrend.map(d => d.accuracy)
+        
         new Chart(ctx, {
           type: 'line',
           data: {
-            labels: ['01-15', '01-16', '01-17', '01-18', '01-19'],
+            labels: labels,
             datasets: [{
               label: '正答率 (%)',
-              data: [33.3, 42.9, 57.1, 62.5, 75.0],
+              data: data,
               borderColor: 'rgb(147, 51, 234)',
               backgroundColor: 'rgba(147, 51, 234, 0.1)',
               tension: 0.3,
@@ -6716,13 +6790,13 @@ async function analyzeStudent(studentId, studentName) {
     // 非認知能力のレーダーチャートを描画
     setTimeout(() => {
       const ctx2 = document.getElementById('nonCognitiveChart')
-      if (ctx2 && typeof Chart !== 'undefined') {
+      if (ctx2 && typeof Chart !== 'undefined' && nonCognitiveData) {
         new Chart(ctx2, {
           type: 'radar',
           data: {
             labels: ['粘り強さ', '自己調整', '協働性', '好奇心', 'メタ認知'],
             datasets: [{
-              label: '山田太郎',
+              label: studentName,
               data: [
                 nonCognitiveData.grit,
                 nonCognitiveData.selfRegulation,
