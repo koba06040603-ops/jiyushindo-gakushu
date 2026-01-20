@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://05031cba.jiyushindo-gakushu.pages.dev** ✅ 最新版（選択課題+非認知能力統合）
+**https://9123ffad.jiyushindo-gakushu.pages.dev** ✅ 最新版（3名のデモデータ完備）
 
 ### 🔐 デモアカウント
 
