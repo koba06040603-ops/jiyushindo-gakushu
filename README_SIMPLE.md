@@ -586,10 +586,30 @@ Email: xxx@school.jp
 
 ## 📄 関連ドキュメント
 
+### 📚 システム関連
 - 📘 [詳細README（技術者向け）](./README.md)
 - 📄 [紙学習対応ガイド](./PAPER_LEARNING_SUPPORT.md)
 - 🔗 [GitHub](https://github.com/koba06040603-ops/jiyushindo-gakushu)
-- 🌐 [本番環境](https://jiyushindo-gakushu.pages.dev)
+- 🌐 [本番環境](https://601ac8b7.jiyushindo-gakushu.pages.dev)
+
+### 🔒 セキュリティ・プライバシー関連
+- **[セキュリティ・プライバシーポリシー](./SECURITY_PRIVACY.md)** - 完全版
+  - 個人情報保護法準拠の証明
+  - ISO 27001等の国際認証情報
+  - インシデント対応手順・監査スケジュール
+  - 法令遵守チェックリスト
+
+- **[データ長期保存ガイド](./DATA_RETENTION_GUIDE.md)**
+  - 振り返り文章の永久保存方法（3つのオプション）
+  - 自動エクスポート設定手順
+  - 卒業時のデータ引き継ぎ方法
+  - コスト試算（月100円〜無料）
+
+- **[ステークホルダー向け説明資料](./STAKEHOLDER_DOCUMENTS.md)**
+  - 村長・教育長向け（1ページサマリー・議会説明用）
+  - 校長・教頭向け（導入判断資料）
+  - 保護者向け（わかりやすい説明・同意書サンプル）
+  - 教師向け（実務マニュアル）
 
 ---
 
