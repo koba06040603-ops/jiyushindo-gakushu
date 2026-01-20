@@ -3197,30 +3197,48 @@ app.get('/', (c) => {
         </div>
         
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
-        <script src="/static/tts.js"></script>
-        <script src="/static/visual-support.js"></script>
-        <script src="/static/realtime.js"></script>
-        <script src="/static/app.js"></script>
         <script>
-          // すべてのリソース読み込み後に実行
-          window.addEventListener('load', () => {
-            console.log('✅ ページ読み込み完了')
-            console.log('📦 renderTopPage:', typeof renderTopPage)
+          // DOMContentLoaded後にスクリプトを動的読み込み
+          document.addEventListener('DOMContentLoaded', () => {
+            console.log('📦 DOMContentLoaded: スクリプト読み込み開始')
             
-            try {
-              if (typeof renderTopPage === 'function') {
-                renderTopPage()
-              } else if (typeof window.renderTopPage === 'function') {
-                window.renderTopPage()
-              } else {
-                console.error('❌ renderTopPage関数が見つかりません')
-                // エラー表示
-                document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">システムエラー</h2><p class="text-gray-600 mb-6">ページをリフレッシュしてください。</p><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"><i class="fas fa-redo mr-2"></i>リフレッシュ</button></div></div>'
+            const scripts = [
+              '/static/tts.js',
+              '/static/visual-support.js', 
+              '/static/realtime.js',
+              '/static/app.js'
+            ]
+            
+            let loadedCount = 0
+            
+            scripts.forEach((src, index) => {
+              const script = document.createElement('script')
+              script.src = src
+              script.async = false // 順番に読み込む
+              script.onload = () => {
+                console.log('✅ 読み込み完了:', src)
+                loadedCount++
+                
+                // 全スクリプト読み込み完了後
+                if (loadedCount === scripts.length) {
+                  console.log('🚀 全スクリプト読み込み完了')
+                  setTimeout(() => {
+                    if (typeof window.renderTopPage === 'function') {
+                      console.log('🎯 renderTopPageを実行')
+                      window.renderTopPage()
+                    } else {
+                      console.error('❌ renderTopPage not found')
+                      document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">システムエラー</h2><p class="text-gray-600 mb-6">スクリプトの読み込みに失敗しました。ページをリフレッシュしてください。</p><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"><i class="fas fa-redo mr-2"></i>リフレッシュ</button></div></div>'
+                    }
+                  }, 200)
+                }
               }
-            } catch (error) {
-              console.error('エラー:', error)
-              document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">エラー</h2><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition">リフレッシュ</button></div></div>'
-            }
+              script.onerror = (error) => {
+                console.error('❌ 読み込みエラー:', src, error)
+                document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">読み込みエラー</h2><p class="text-gray-600 mb-6">ファイル: ' + src + '</p><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"><i class="fas fa-redo mr-2"></i>リフレッシュ</button></div></div>'
+              }
+              document.head.appendChild(script)
+            })
           })
         </script>
     </body>

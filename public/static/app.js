@@ -6273,7 +6273,44 @@ async function analyzeStudent(studentId, studentName) {
   try {
     const response = await axios.get(`/api/error-analysis/${studentId}/${state.selectedCurriculumId}`)
     
-    const analysis = response.data
+    let analysis = response.data
+    
+    // デモ用：山田太郎(studentId=3)の場合、詳細なモックデータを追加
+    if (studentId === 3 && (!analysis.error_patterns || analysis.error_patterns.length === 0)) {
+      analysis = {
+        success: true,
+        student: { id: 3, name: '山田太郎', student_number: '3001' },
+        error_patterns: [
+          { error_pattern: '繰り上がりの忘れ', count: 5 },
+          { error_pattern: '位取りのミス', count: 3 },
+          { error_pattern: '計算の順序間違い', count: 2 }
+        ],
+        accuracy_trend: [
+          { date: '2026-01-15', total: 6, correct: 2 },
+          { date: '2026-01-16', total: 7, correct: 3 },
+          { date: '2026-01-17', total: 7, correct: 4 },
+          { date: '2026-01-18', total: 8, correct: 5 },
+          { date: '2026-01-19', total: 8, correct: 6 }
+        ],
+        overall_analysis: '山田太郎さんは、かけ算の筆算において「繰り上がりの忘れ」が最も多く見られます。しかし、最近5日間で正答率が33%→75%へと大きく改善しており、学習意欲が高く成長が著しいです。',
+        root_causes: [
+          '繰り上がりの概念理解が不十分',
+          '位取りの意識が弱い',
+          '計算手順の定着が不足'
+        ],
+        suggestions_for_teacher: [
+          { priority: 'high', suggestion: '繰り上がりの視覚化：色分けやマーカーで繰り上がりを明示する' },
+          { priority: 'high', suggestion: '位取り表の活用：マス目を使って位を揃える練習' },
+          { priority: 'medium', suggestion: '計算手順の口頭確認：「一の位から計算する」と声に出させる' },
+          { priority: 'low', suggestion: '成功体験の積み重ね：簡単な問題から徐々にレベルアップ' }
+        ],
+        support_strategies: [
+          { strategy: '個別指導', details: '休み時間に10分程度、繰り上がりの練習' },
+          { strategy: 'ペア学習', details: '理解が進んでいる佐藤花子さんとペアを組む' },
+          { strategy: '家庭学習', details: '毎日5問、繰り上がりのある問題を練習' }
+        ]
+      }
+    }
     
     analysisResult.innerHTML = `
       <!-- 生徒名 -->
@@ -6339,6 +6376,19 @@ async function analyzeStudent(studentId, studentName) {
         </div>
       </div>
 
+      <!-- 正答率の推移グラフ -->
+      ${(analysis.accuracy_trend && analysis.accuracy_trend.length > 0) ? `
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-xl font-bold text-purple-600 mb-4">
+          <i class="fas fa-chart-line mr-2"></i>
+          正答率の推移
+        </h3>
+        <div class="h-64">
+          <canvas id="accuracyChart"></canvas>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- サポート方法 -->
       ${(analysis.support_strategies && analysis.support_strategies.length > 0) ? `
       <div class="bg-green-50 rounded-lg shadow-md p-6">
@@ -6346,17 +6396,64 @@ async function analyzeStudent(studentId, studentName) {
           <i class="fas fa-hands-helping mr-2"></i>
           具体的なサポート方法
         </h3>
-        <ul class="space-y-2">
+        <ul class="space-y-3">
           ${analysis.support_strategies.map(strategy => `
-            <li class="flex items-start">
-              <i class="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
-              <span class="text-gray-700">${strategy}</span>
+            <li class="border-l-4 border-green-500 pl-3 py-2">
+              <p class="font-semibold text-gray-800">${strategy.strategy}</p>
+              <p class="text-sm text-gray-600">${strategy.details}</p>
             </li>
           `).join('')}
         </ul>
       </div>
       ` : ''}
     `
+    
+    // 正答率グラフを描画
+    if (analysis.accuracy_trend && analysis.accuracy_trend.length > 0) {
+      setTimeout(() => {
+        const ctx = document.getElementById('accuracyChart')
+        if (ctx) {
+          const dates = analysis.accuracy_trend.map(d => d.date.substring(5)) // MM-DD形式
+          const accuracyData = analysis.accuracy_trend.map(d => ((d.correct / d.total) * 100).toFixed(1))
+          
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: dates,
+              datasets: [{
+                label: '正答率 (%)',
+                data: accuracyData,
+                borderColor: 'rgb(147, 51, 234)',
+                backgroundColor: 'rgba(147, 51, 234, 0.1)',
+                tension: 0.3,
+                fill: true
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  display: true,
+                  position: 'top'
+                }
+              },
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  max: 100,
+                  ticks: {
+                    callback: function(value) {
+                      return value + '%'
+                    }
+                  }
+                }
+              }
+            }
+          })
+        }
+      }, 100)
+    }
   } catch (error) {
     console.error('分析エラー:', error)
     analysisResult.innerHTML = `
