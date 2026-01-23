@@ -2832,6 +2832,116 @@ app.delete('/api/hints/:hintId', async (c) => {
   }
 })
 
+// APIルート：コースに新しい学習カードを追加（7枚目、8枚目など）
+app.post('/api/course/:courseId/add-card', async (c) => {
+  const { env } = c
+  const courseId = c.req.param('courseId')
+  const body = await c.req.json()
+  
+  try {
+    // 現在のコースの最大カード番号を取得
+    const maxCardNumber = await env.DB.prepare(`
+      SELECT MAX(card_number) as max_num
+      FROM learning_cards
+      WHERE course_id = ?
+    `).bind(courseId).first()
+    
+    const nextCardNumber = (maxCardNumber?.max_num || 0) + 1
+    
+    // 新しいカードを挿入
+    const result = await env.DB.prepare(`
+      INSERT INTO learning_cards (
+        course_id, card_number, card_title, card_type,
+        textbook_page, problem_description, new_terms, 
+        example_problem, example_solution, real_world_connection,
+        answer, answer_explanation
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      courseId,
+      nextCardNumber,
+      body.card_title || `学習カード${nextCardNumber}`,
+      body.card_type || 'main',
+      body.textbook_page || '',
+      body.problem_description || '',
+      body.new_terms || '',
+      body.example_problem || '',
+      body.example_solution || '',
+      body.real_world_connection || '',
+      body.answer || '',
+      body.answer_explanation || ''
+    ).run()
+    
+    const newCardId = result.meta.last_row_id
+    
+    // ヒントカードも追加（提供されている場合）
+    if (body.hints && Array.isArray(body.hints)) {
+      for (const hint of body.hints) {
+        await env.DB.prepare(`
+          INSERT INTO hint_cards (
+            learning_card_id, hint_number, hint_content, thinking_tool_suggestion
+          ) VALUES (?, ?, ?, ?)
+        `).bind(
+          newCardId,
+          hint.hint_level || hint.hint_number || 1,
+          hint.hint_text || hint.hint_content || '',
+          hint.thinking_tool_suggestion || ''
+        ).run()
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      cardId: newCardId,
+      cardNumber: nextCardNumber
+    })
+  } catch (error: any) {
+    console.error('カード追加エラー:', error)
+    return c.json({ error: 'カードの追加に失敗しました', details: error.message }, 500)
+  }
+})
+
+// APIルート：学習カードを更新
+app.put('/api/cards/:cardId', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  const body = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE learning_cards SET
+        card_title = ?,
+        card_type = ?,
+        textbook_page = ?,
+        problem_description = ?,
+        new_terms = ?,
+        example_problem = ?,
+        example_solution = ?,
+        real_world_connection = ?,
+        answer = ?,
+        answer_explanation = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      body.card_title || '',
+      body.card_type || 'main',
+      body.textbook_page || '',
+      body.problem_description || '',
+      body.new_terms || '',
+      body.example_problem || '',
+      body.example_solution || '',
+      body.real_world_connection || '',
+      body.answer || '',
+      body.answer_explanation || '',
+      cardId
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('カード更新エラー:', error)
+    return c.json({ error: 'カードの更新に失敗しました', details: error.message }, 500)
+  }
+})
+
 // APIルート：類似問題生成
 app.post('/api/cards/:cardId/generate-similar', async (c) => {
   const { env } = c
@@ -3681,25 +3791,36 @@ app.post('/api/ai/suggest-units', async (c) => {
   }
   
   try {
-    const prompt = `${grade}${subject}（${textbook}）の主要な単元名を正確に10個、1行に1つずつ日本語で出力してください。
+    const prompt = `${grade}${subject}（${textbook}）の主要な単元名を正確に20個、1行に1つずつ日本語で出力してください。
 
 【重要な指示】
 - 単元名のみを日本語で出力すること
 - 番号、記号、説明、英語、思考過程（THOUGHT）は一切不要
 - 1行に1つの単元名のみを出力
-- 正確に10行出力すること
+- 正確に20行出力すること
+- 教科書の順序に従って出力すること
 
 出力例:
 かけ算の筆算
 わり算の筆算
 小数のかけ算
+小数のわり算
 分数のたし算
+分数のひき算
+分数のかけ算
+分数のわり算
 面積の求め方
 体積の学習
 グラフの読み方
 資料の整理
 確率の基礎
-図形の性質`
+図形の性質
+比と比の値
+速さの問題
+割合の計算
+平均の求め方
+対称な図形
+拡大図と縮図`
 
     // 新しいヘルパー関数を使用（自動リトライ付き）
     const models = ['gemini-2.5-flash', 'gemini-2.0-flash']
@@ -3760,7 +3881,7 @@ app.post('/api/ai/suggest-units', async (c) => {
           .trim()
       })
       .filter(line => line.length > 1)
-      .slice(0, 10)
+      .slice(0, 20)
     
     console.log('✅ 抽出された単元:', units)
     console.log('📊 抽出された単元数:', units.length)
@@ -3838,8 +3959,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "cards": [{"card_number":1,"card_title":"タイトル","card_type":"main","textbook_page":"p.XX","problem_description":"問題","new_terms":"用語","example_problem":"例題","example_solution":"解法","real_world_connection":"つながり","answer":"解答（必須）","answer_explanation":"解答の説明・考え方（必須、100文字程度）","hints":[{"hint_level":1,"hint_text":"ヒント1"},{"hint_level":2,"hint_text":"ヒント2"},{"hint_level":3,"hint_text":"ヒント3"}]},
         ... 全6枚]
     },
-    {"course_name":"しっかりコース","course_label":"自分のペースで学ぶコース","description":"しっかり考えて学びたい人","color_code":"blue","cards":[...全6枚]},
-    {"course_name":"どんどんコース","course_label":"いろいろなことにちょうせんするコース","description":"発展的に学びたい人","color_code":"purple","cards":[...全6枚]}
+    {"course_name":"しっかりコース","course_label":"自分のペースで学ぶコース","description":"しっかり考えて学びたい人","color_code":"blue","cards":[...最低6枚、追加可能]},
+    {"course_name":"どんどんコース","course_label":"いろいろなことにちょうせんするコース","description":"発展的に学びたい人","color_code":"purple","cards":[...最低6枚、追加可能]}
   ]
 }
 
@@ -3949,8 +4070,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       unitData.courses.forEach((course: any, index: number) => {
         if (!course.cards || !Array.isArray(course.cards)) {
           validationErrors.push(`コース${index + 1}の cards が欠けているか配列ではありません`)
-        } else if (course.cards.length !== 6) {
-          validationErrors.push(`コース${index + 1}は6枚のカードが必須ですが、${course.cards.length}枚しかありません`)
+        } else if (course.cards.length < 6) {
+          validationErrors.push(`コース${index + 1}は最低6枚のカードが必要ですが、${course.cards.length}枚しかありません`)
         }
       })
     }
