@@ -3791,13 +3791,13 @@ app.post('/api/ai/suggest-units', async (c) => {
   }
   
   try {
-    const prompt = `${grade}${subject}（${textbook}）の主要な単元名を正確に20個、1行に1つずつ日本語で出力してください。
+    const prompt = `${grade}${subject}（${textbook}）の主要な単元名を正確に30個、1行に1つずつ日本語で出力してください。
 
 【重要な指示】
 - 単元名のみを日本語で出力すること
 - 番号、記号、説明、英語、思考過程（THOUGHT）は一切不要
 - 1行に1つの単元名のみを出力
-- 正確に20行出力すること
+- 正確に30行出力すること
 - 教科書の順序に従って出力すること
 
 出力例:
@@ -3820,7 +3820,17 @@ app.post('/api/ai/suggest-units', async (c) => {
 割合の計算
 平均の求め方
 対称な図形
-拡大図と縮図`
+拡大図と縮図
+円の面積
+円周率の活用
+角柱と円柱の体積
+分数と小数の関係
+資料の調べ方
+変わり方の調べ方
+比例と反比例
+定義域と値域
+論理的推論の基礎
+集合の概念`
 
     // 新しいヘルパー関数を使用（自動リトライ付き）
     const models = ['gemini-2.5-flash', 'gemini-2.0-flash']
@@ -3881,7 +3891,7 @@ app.post('/api/ai/suggest-units', async (c) => {
           .trim()
       })
       .filter(line => line.length > 1)
-      .slice(0, 20)
+      .slice(0, 30)
     
     console.log('✅ 抽出された単元:', units)
     console.log('📊 抽出された単元数:', units.length)
