@@ -4507,11 +4507,18 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
               <i class="fas fa-chart-bar mr-2"></i>
               クラス統計
             </button>
+            
+            <!-- モード切り替えボタン -->
+            <button id="toggle-edit-mode-btn"
+                    class="ml-2 px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition font-semibold text-sm whitespace-nowrap shadow-md">
+              <i class="fas fa-edit mr-2"></i>
+              編集モード
+            </button>
           </div>
         </div>
 
-        <!-- メイン進捗ボード -->
-        <div class="bg-white rounded-lg shadow-md p-2 md:p-4 overflow-x-auto">
+        <!-- メイン進捗ボード（閲覧モード） -->
+        <div id="view-mode-board" class="bg-white rounded-lg shadow-md p-2 md:p-4 overflow-x-auto">
           <div class="min-w-[1200px]">
             <!-- ヘッダー行 -->
             <div class="grid grid-cols-[150px_1fr] gap-2 mb-2 text-xs font-bold">
@@ -4527,6 +4534,35 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
             <!-- 生徒ごとの進捗行 -->
             ${generateProgressBoardRows(progressData.students, curriculums)}
           </div>
+        </div>
+        
+        <!-- カード編集モード -->
+        <div id="edit-mode-board" class="bg-white rounded-lg shadow-md p-4 hidden">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-800">
+              <i class="fas fa-edit mr-2"></i>学習カード管理
+            </h2>
+            <div class="text-sm text-gray-600">
+              💡 ドラッグ&ドロップで並び替えできます
+            </div>
+          </div>
+          
+          <!-- コース選択タブ -->
+          <div id="course-tabs" class="flex gap-2 mb-4 border-b border-gray-200">
+            <!-- JavaScriptで動的生成 -->
+          </div>
+          
+          <!-- カード一覧 -->
+          <div id="card-list" class="space-y-2 mb-4">
+            <!-- JavaScriptで動的生成 -->
+          </div>
+          
+          <!-- カード追加ボタン -->
+          <button id="add-card-btn" 
+                  class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-bold py-3 rounded-lg transition-all shadow-lg">
+            <i class="fas fa-plus-circle mr-2"></i>
+            カードを追加
+          </button>
         </div>
 
         <!-- 指導介入優先リスト -->
@@ -4654,6 +4690,35 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
         })
       }
       
+      // モード切り替えボタン
+      const toggleEditModeBtn = document.getElementById('toggle-edit-mode-btn')
+      if (toggleEditModeBtn) {
+        let isEditMode = false
+        toggleEditModeBtn.addEventListener('click', async () => {
+          isEditMode = !isEditMode
+          
+          const viewModeBoard = document.getElementById('view-mode-board')
+          const editModeBoard = document.getElementById('edit-mode-board')
+          
+          if (isEditMode) {
+            // 編集モードに切り替え
+            viewModeBoard.classList.add('hidden')
+            editModeBoard.classList.remove('hidden')
+            toggleEditModeBtn.innerHTML = '<i class="fas fa-eye mr-2"></i>閲覧モード'
+            toggleEditModeBtn.className = 'ml-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition font-semibold text-sm whitespace-nowrap shadow-md'
+            
+            // カリキュラムのコース情報を取得して表示
+            await loadEditMode(curriculumId)
+          } else {
+            // 閲覧モードに切り替え
+            viewModeBoard.classList.remove('hidden')
+            editModeBoard.classList.add('hidden')
+            toggleEditModeBtn.innerHTML = '<i class="fas fa-edit mr-2"></i>編集モード'
+            toggleEditModeBtn.className = 'ml-2 px-4 py-2 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg hover:from-green-700 hover:to-teal-700 transition font-semibold text-sm whitespace-nowrap shadow-md'
+          }
+        })
+      }
+      
       console.log('✅ 進捗ボードのイベントリスナー登録完了')
     }, 100)
     
@@ -4668,6 +4733,394 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
 // グローバルスコープに登録
 window.loadProgressBoard = loadProgressBoard
 console.log('✅ loadProgressBoard をグローバルに登録しました')
+
+// ============================================
+// カード編集モード機能
+// ============================================
+
+// 編集モードの読み込み
+let currentCourseId = null
+let currentCourses = []
+
+async function loadEditMode(curriculumId) {
+  try {
+    console.log('📝 編集モード読み込み開始:', curriculumId)
+    
+    // カリキュラム情報取得
+    const curriculumResponse = await axios.get(`/api/curriculum/${curriculumId}`)
+    const curriculum = curriculumResponse.data.curriculum
+    currentCourses = curriculumResponse.data.courses
+    
+    console.log('✅ コース情報取得:', currentCourses.length, '件')
+    
+    // コースタブを生成
+    const courseTabs = document.getElementById('course-tabs')
+    courseTabs.innerHTML = currentCourses.map((course, index) => `
+      <button class="course-tab px-6 py-3 font-semibold transition-all ${index === 0 ? 'border-b-4 border-blue-600 text-blue-600' : 'text-gray-600 hover:text-blue-600'}"
+              data-course-id="${course.id}"
+              onclick="switchCourse(${course.id})">
+        ${course.course_name}
+      </button>
+    `).join('')
+    
+    // 最初のコースを表示
+    if (currentCourses.length > 0) {
+      await switchCourse(currentCourses[0].id)
+    }
+    
+  } catch (error) {
+    console.error('❌ 編集モード読み込みエラー:', error)
+    alert('編集モードの読み込みに失敗しました')
+  }
+}
+
+// コース切り替え
+async function switchCourse(courseId) {
+  currentCourseId = courseId
+  
+  // タブのアクティブ状態を更新
+  document.querySelectorAll('.course-tab').forEach(tab => {
+    if (parseInt(tab.dataset.courseId) === courseId) {
+      tab.className = 'course-tab px-6 py-3 font-semibold transition-all border-b-4 border-blue-600 text-blue-600'
+    } else {
+      tab.className = 'course-tab px-6 py-3 font-semibold transition-all text-gray-600 hover:text-blue-600'
+    }
+  })
+  
+  // カード一覧を読み込み
+  await loadCards(courseId)
+}
+
+// カード一覧を読み込み
+async function loadCards(courseId) {
+  try {
+    console.log('📋 カード一覧読み込み:', courseId)
+    
+    // カード情報取得
+    const response = await axios.get(`/api/course/${courseId}`)
+    const cards = response.data.cards || []
+    
+    console.log('✅ カード取得:', cards.length, '枚')
+    
+    // カード一覧を表示
+    const cardList = document.getElementById('card-list')
+    if (cards.length === 0) {
+      cardList.innerHTML = `
+        <div class="text-center py-12 text-gray-500">
+          <i class="fas fa-inbox text-6xl mb-4"></i>
+          <p class="text-lg">カードがありません</p>
+          <p class="text-sm">「カードを追加」ボタンで新しいカードを作成できます</p>
+        </div>
+      `
+    } else {
+      cardList.innerHTML = cards.map(card => `
+        <div class="card-item bg-gray-50 border-2 border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-all cursor-move"
+             data-card-id="${card.id}">
+          <div class="flex items-center gap-4">
+            <div class="drag-handle text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing text-2xl">
+              <i class="fas fa-grip-vertical"></i>
+            </div>
+            <div class="flex-shrink-0 w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-lg">
+              ${card.card_number}
+            </div>
+            <div class="flex-1">
+              <h3 class="font-bold text-gray-800 text-lg">${card.card_title}</h3>
+              <p class="text-sm text-gray-600 mt-1">${(card.problem_description || '').substring(0, 100)}${(card.problem_description || '').length > 100 ? '...' : ''}</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="editCard(${card.id})" 
+                      class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition">
+                <i class="fas fa-edit mr-1"></i>編集
+              </button>
+              <button onclick="deleteCard(${card.id})" 
+                      class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition">
+                <i class="fas fa-trash mr-1"></i>削除
+              </button>
+            </div>
+          </div>
+        </div>
+      `).join('')
+      
+      // Sortable.jsで並び替え可能にする
+      const sortable = Sortable.create(cardList, {
+        animation: 150,
+        handle: '.drag-handle',
+        ghostClass: 'bg-blue-100',
+        onEnd: async function(evt) {
+          await saveCardOrder()
+        }
+      })
+    }
+    
+    // カード追加ボタンのイベントリスナー
+    const addCardBtn = document.getElementById('add-card-btn')
+    if (addCardBtn) {
+      addCardBtn.onclick = () => showAddCardModal()
+    }
+    
+  } catch (error) {
+    console.error('❌ カード読み込みエラー:', error)
+    alert('カードの読み込みに失敗しました')
+  }
+}
+
+// カード順序を保存
+async function saveCardOrder() {
+  try {
+    const cardItems = document.querySelectorAll('.card-item')
+    const cardIds = Array.from(cardItems).map(item => parseInt(item.dataset.cardId))
+    
+    console.log('💾 カード順序保存:', cardIds)
+    
+    await axios.post(`/api/course/${currentCourseId}/reorder-cards`, {
+      cardIds: cardIds
+    })
+    
+    console.log('✅ カード順序保存完了')
+    
+    // 成功通知（控えめに）
+    const notification = document.createElement('div')
+    notification.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50'
+    notification.innerHTML = '<i class="fas fa-check-circle mr-2"></i>順序を保存しました'
+    document.body.appendChild(notification)
+    
+    setTimeout(() => notification.remove(), 2000)
+    
+  } catch (error) {
+    console.error('❌ カード順序保存エラー:', error)
+    alert('順序の保存に失敗しました')
+  }
+}
+
+// カード削除
+async function deleteCard(cardId) {
+  if (!confirm('このカードを削除しますか？\n削除すると元に戻せません。')) {
+    return
+  }
+  
+  try {
+    console.log('🗑️ カード削除:', cardId)
+    
+    await axios.delete(`/api/cards/${cardId}`)
+    
+    console.log('✅ カード削除完了')
+    
+    // カード一覧を再読み込み
+    await loadCards(currentCourseId)
+    
+    alert('✅ カードを削除しました')
+    
+  } catch (error) {
+    console.error('❌ カード削除エラー:', error)
+    alert('カードの削除に失敗しました')
+  }
+}
+
+// カード追加モーダルを表示
+function showAddCardModal() {
+  const modal = document.createElement('div')
+  modal.id = 'add-card-modal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div class="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+        <h2 class="text-2xl font-bold text-gray-800">
+          <i class="fas fa-plus-circle mr-2 text-green-600"></i>
+          新しいカードを追加
+        </h2>
+        <button onclick="document.getElementById('add-card-modal').remove()" 
+                class="text-gray-500 hover:text-gray-700 text-3xl">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <form id="add-card-form" class="p-6 space-y-6">
+        <!-- カードタイトル -->
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-2">
+            カードタイトル <span class="text-red-500">*</span>
+          </label>
+          <input type="text" name="card_title" required
+                 class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                 placeholder="例: かけ算の筆算（発展問題）">
+        </div>
+        
+        <!-- 問題文 -->
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-2">
+            問題文 <span class="text-red-500">*</span>
+          </label>
+          <textarea name="problem_description" required rows="4"
+                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                    placeholder="問題の内容を入力してください"></textarea>
+        </div>
+        
+        <!-- 新しい用語 -->
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-2">
+            新しい用語
+          </label>
+          <input type="text" name="new_terms"
+                 class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                 placeholder="例: 筆算, くり上がり">
+        </div>
+        
+        <!-- 例題 -->
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-2">
+            例題
+          </label>
+          <textarea name="example_problem" rows="2"
+                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                    placeholder="例: 23 × 4 = ?"></textarea>
+        </div>
+        
+        <!-- 解答例 -->
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-2">
+            解答例
+          </label>
+          <textarea name="example_solution" rows="3"
+                    class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                    placeholder="解答の説明を入力してください"></textarea>
+        </div>
+        
+        <!-- ヒント -->
+        <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+          <h3 class="font-bold text-blue-800 mb-4">
+            <i class="fas fa-lightbulb mr-2"></i>
+            ヒントカード（3段階）
+          </h3>
+          
+          <!-- ヒント1 -->
+          <div class="mb-4">
+            <label class="block text-sm font-bold text-gray-700 mb-2">
+              ヒント1（軽いヒント）
+            </label>
+            <input type="text" name="hint_1_text"
+                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none mb-2"
+                   placeholder="最初のヒント">
+            <input type="text" name="hint_1_tool"
+                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
+                   placeholder="考え方ツール（例: 図に描く）">
+          </div>
+          
+          <!-- ヒント2 -->
+          <div class="mb-4">
+            <label class="block text-sm font-bold text-gray-700 mb-2">
+              ヒント2（中くらいのヒント）
+            </label>
+            <input type="text" name="hint_2_text"
+                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none mb-2"
+                   placeholder="2番目のヒント">
+            <input type="text" name="hint_2_tool"
+                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
+                   placeholder="考え方ツール">
+          </div>
+          
+          <!-- ヒント3 -->
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">
+              ヒント3（具体的なヒント）
+            </label>
+            <input type="text" name="hint_3_text"
+                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none mb-2"
+                   placeholder="3番目のヒント">
+            <input type="text" name="hint_3_tool"
+                   class="w-full border-2 border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
+                   placeholder="考え方ツール">
+          </div>
+        </div>
+        
+        <!-- ボタン -->
+        <div class="flex gap-3 pt-4">
+          <button type="button" onclick="document.getElementById('add-card-modal').remove()"
+                  class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>
+            キャンセル
+          </button>
+          <button type="submit"
+                  class="flex-1 bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-bold py-3 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>
+            保存
+          </button>
+        </div>
+      </form>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+  
+  // フォーム送信イベント
+  document.getElementById('add-card-form').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    await addCard(e.target)
+  })
+}
+
+// カード追加処理
+async function addCard(form) {
+  try {
+    const formData = new FormData(form)
+    
+    const data = {
+      card_title: formData.get('card_title'),
+      card_type: 'main',
+      problem_description: formData.get('problem_description'),
+      new_terms: formData.get('new_terms') || '',
+      example_problem: formData.get('example_problem') || '',
+      example_solution: formData.get('example_solution') || '',
+      hints: [
+        {
+          hint_number: 1,
+          hint_text: formData.get('hint_1_text') || '',
+          thinking_tool_suggestion: formData.get('hint_1_tool') || ''
+        },
+        {
+          hint_number: 2,
+          hint_text: formData.get('hint_2_text') || '',
+          thinking_tool_suggestion: formData.get('hint_2_tool') || ''
+        },
+        {
+          hint_number: 3,
+          hint_text: formData.get('hint_3_text') || '',
+          thinking_tool_suggestion: formData.get('hint_3_tool') || ''
+        }
+      ].filter(h => h.hint_text) // 空のヒントは除外
+    }
+    
+    console.log('➕ カード追加:', data)
+    
+    const response = await axios.post(`/api/course/${currentCourseId}/add-card`, data)
+    
+    console.log('✅ カード追加完了:', response.data)
+    
+    // モーダルを閉じる
+    document.getElementById('add-card-modal').remove()
+    
+    // カード一覧を再読み込み
+    await loadCards(currentCourseId)
+    
+    alert(`✅ カード${response.data.cardNumber}を追加しました！`)
+    
+  } catch (error) {
+    console.error('❌ カード追加エラー:', error)
+    alert('カードの追加に失敗しました: ' + (error.response?.data?.error || error.message))
+  }
+}
+
+// カード編集（簡略版・後で実装）
+function editCard(cardId) {
+  alert('カード編集機能は近日実装予定です。\n現在は削除→追加で対応してください。')
+}
+
+// グローバルスコープに登録
+window.loadEditMode = loadEditMode
+window.switchCourse = switchCourse
+window.deleteCard = deleteCard
+window.editCard = editCard
+
+console.log('✅ カード管理機能をグローバルに登録しました')
 
 // 進捗バー生成
 function generateProgressBars(studentProgress, courses) {
