@@ -164,6 +164,78 @@ function extractJSON(aiResponse: string): any {
     console.error('📄 AI response length:', aiResponse.length)
     console.error('📄 AI response (first 500 chars):', aiResponse.substring(0, 500))
     
+    // "Unexpected end of JSON input"エラーの場合、JSON補完を試みる
+    if (error instanceof SyntaxError && error.message.includes('Unexpected end of JSON input')) {
+      console.warn('⚠️ JSON不完全エラー検出、自動補完を試みます')
+      
+      // 開いている括弧・配列・文字列をカウント
+      let openBraces = 0
+      let openBrackets = 0
+      let inString = false
+      let escaped = false
+      
+      for (let i = 0; i < jsonText.length; i++) {
+        const char = jsonText[i]
+        
+        if (escaped) {
+          escaped = false
+          continue
+        }
+        
+        if (char === '\\' && inString) {
+          escaped = true
+          continue
+        }
+        
+        if (char === '"' && !escaped) {
+          inString = !inString
+          continue
+        }
+        
+        if (!inString) {
+          if (char === '{') openBraces++
+          if (char === '}') openBraces--
+          if (char === '[') openBrackets++
+          if (char === ']') openBrackets--
+        }
+      }
+      
+      console.log(`🔍 括弧の状態: { ${openBraces}, [ ${openBrackets}, inString: ${inString}`)
+      
+      // 不完全な文字列を閉じる
+      if (inString) {
+        jsonText += '"'
+        console.log('✅ 文字列を閉じました')
+      }
+      
+      // カンマを削除（最後の要素の後のカンマ）
+      jsonText = jsonText.replace(/,(\s*)$/, '$1')
+      
+      // 開いている配列を閉じる
+      while (openBrackets > 0) {
+        jsonText += ']'
+        openBrackets--
+        console.log('✅ 配列を閉じました')
+      }
+      
+      // 開いているオブジェクトを閉じる
+      while (openBraces > 0) {
+        jsonText += '}'
+        openBraces--
+        console.log('✅ オブジェクトを閉じました')
+      }
+      
+      console.log('🔄 補完後のJSON再パース試行...')
+      console.log('📄 補完後のJSON (last 500 chars):', jsonText.substring(Math.max(0, jsonText.length - 500)))
+      
+      try {
+        return JSON.parse(jsonText)
+      } catch (retryError) {
+        console.error('❌ 補完後もパース失敗:', retryError)
+        // 補完失敗、元のエラーを継続
+      }
+    }
+    
     // エラー位置を特定
     if (error instanceof SyntaxError && error.message.includes('position')) {
       const posMatch = error.message.match(/position (\d+)/)
@@ -4381,7 +4453,16 @@ ${customInfo}
     console.log('📦 API Response Status:', response.status)
     console.log('📦 API Response Data Keys:', Object.keys(data))
     
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
+    // finishReasonをチェック
+    const candidate = data.candidates?.[0]
+    const finishReason = candidate?.finishReason
+    console.log('📊 finishReason:', finishReason)
+    
+    if (finishReason === 'MAX_TOKENS') {
+      console.warn('⚠️ 警告: トークン上限に達しました。JSONが不完全な可能性があります。')
+    }
+    
+    const aiResponse = candidate?.content?.parts?.[0]?.text
     
     if (!aiResponse) {
       console.error('❌ AIレスポンスが空です')
