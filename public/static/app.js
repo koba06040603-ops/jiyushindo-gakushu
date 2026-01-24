@@ -1991,8 +1991,33 @@ async function loadGuidePage(curriculumId) {
                 どんな ちからが つくのか、かくにんして ちょうせんしよう！
               </p>
               <div class="grid grid-cols-2 gap-4">
-                ${optionalProblems.map((problem, index) => `
-                  <div class="border-2 border-pink-200 bg-gradient-to-br from-white to-pink-50 rounded-xl p-4 hover:shadow-lg transition">
+                ${optionalProblems.map((problem, index) => {
+                  // 選択問題の進捗状態を表示（将来的にAPIから取得）
+                  const progress = window.optionalProblemProgress?.[problem.id] || { status: 'not_started', attempts_count: 0 }
+                  const isCompleted = progress.status === 'completed'
+                  const attemptsCount = progress.attempts_count || 0
+                  
+                  return `
+                  <div class="border-2 ${isCompleted ? 'border-green-400 bg-gradient-to-br from-green-50 to-white' : 'border-pink-200 bg-gradient-to-br from-white to-pink-50'} rounded-xl p-4 hover:shadow-lg transition relative">
+                    <!-- 完了バッジ -->
+                    ${isCompleted ? `
+                      <div class="absolute top-2 right-2">
+                        <span class="bg-green-500 text-white text-xs px-3 py-1 rounded-full font-bold flex items-center gap-1">
+                          <i class="fas fa-check-circle"></i>
+                          クリア！
+                        </span>
+                      </div>
+                    ` : ''}
+                    
+                    <!-- 挑戦回数バッジ -->
+                    ${attemptsCount > 0 ? `
+                      <div class="absolute top-2 ${isCompleted ? 'right-20' : 'right-2'}">
+                        <span class="bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+                          ${attemptsCount}回挑戦
+                        </span>
+                      </div>
+                    ` : ''}
+                    
                     <div class="flex items-start mb-2">
                       <div class="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold mr-3 flex-shrink-0">
                         ${problem.problem_number}
@@ -2024,7 +2049,7 @@ async function loadGuidePage(curriculumId) {
                       </span>
                     </div>
                   </div>
-                `).join('')}
+                `}).join('')}
               </div>
             </div>
 
@@ -10514,6 +10539,43 @@ async function generateAndShowSimilarProblem(cardId) {
       
       // ドラッグ機能を初期化
       initModalDrag('similarProblemHeader', 'similarProblemContent')
+      
+      // 復習の開始時刻を記録
+      window.reviewStartTime = Date.now()
+      
+      // 🌟 復習ログを記録（既にクリアしたカードの「もう一度練習」を評価）
+      try {
+        const reviewLogResponse = await axios.post('/api/card/review-log', {
+          student_id: state.auth.user?.username || 'anonymous',
+          card_id: cardId,
+          curriculum_id: state.selectedCurriculum?.id || 0,
+          review_type: 'similar_problem',
+          is_already_cleared: true,  // クリア済みカードの復習
+          is_correct: null,  // まだ解いていない
+          answer_time_seconds: 0,
+          hint_count: 0
+        })
+        
+        if (reviewLogResponse.data.success) {
+          console.log('✅ 復習ログ記録:', reviewLogResponse.data)
+          
+          // 励ましメッセージを表示（短時間）
+          setTimeout(() => {
+            const encouragement = document.createElement('div')
+            encouragement.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-[60]'
+            encouragement.innerHTML = '<i class="fas fa-star mr-2"></i>復習の努力が記録されました！'
+            document.body.appendChild(encouragement)
+            
+            setTimeout(() => {
+              encouragement.style.transition = 'opacity 0.5s'
+              encouragement.style.opacity = '0'
+              setTimeout(() => encouragement.remove(), 500)
+            }, 2000)
+          }, 300)
+        }
+      } catch (reviewError) {
+        console.warn('復習ログ記録エラー（非致命的）:', reviewError)
+      }
       
     } else {
       throw new Error(response.data.error || '生成に失敗しました')

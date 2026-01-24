@@ -125,11 +125,19 @@ function extractJSON(aiResponse: string): any {
   // 不正なカンマを修正（,, → ,）
   jsonText = jsonText.replace(/,\s*,/g, ',')
   
-  // 配列・オブジェクト末尾の余分なカンマを削除
-  jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1')
+  // 配列・オブジェクト末尾の余分なカンマを削除（複数回実行）
+  for (let i = 0; i < 5; i++) {
+    jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1')
+  }
   
   // 閉じ括弧の後の不正な文字を削除（例: ]| → ]）
   jsonText = jsonText.replace(/(\]|\})([^\s,\]}\n])/g, '$1')
+  
+  // 配列内の不正な区切り文字を修正（例: '] 'や']|'を','に）
+  jsonText = jsonText.replace(/\]\s+"/g, '],"')
+  jsonText = jsonText.replace(/\}\s+"/g, '},"')
+  jsonText = jsonText.replace(/\]\|"/g, '],"')
+  jsonText = jsonText.replace(/\}\|"/g, '},"')
   
   // 未閉じの文字列を検出して修正を試みる
   let quoteCount = 0
@@ -11829,6 +11837,214 @@ app.get('/api/feedback/list', async (c) => {
     return c.json({ success: true, feedbacks: feedbacks.results })
   } catch (error: any) {
     console.error('フィードバック取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ============================================
+// 選択問題進捗 & 復習努力記録API
+// ============================================
+
+// 選択問題の進捗を記録
+app.post('/api/optional-problem/progress', async (c) => {
+  const { env } = c
+  const { student_id, curriculum_id, optional_problem_id, status, understanding_level, time_spent_minutes } = await c.req.json()
+  
+  try {
+    // 既存の進捗を確認
+    const existing = await env.DB.prepare(`
+      SELECT id, attempts_count FROM optional_problem_progress
+      WHERE student_id = ? AND optional_problem_id = ?
+    `).bind(student_id, optional_problem_id).first()
+    
+    if (existing) {
+      // 更新
+      const newAttempts = (existing.attempts_count || 0) + 1
+      const isCompleted = status === 'completed' ? 1 : 0
+      
+      await env.DB.prepare(`
+        UPDATE optional_problem_progress
+        SET status = ?,
+            understanding_level = ?,
+            time_spent_minutes = time_spent_minutes + ?,
+            attempts_count = ?,
+            is_completed = ?,
+            completed_at = CASE WHEN ? = 1 AND completed_at IS NULL THEN datetime('now') ELSE completed_at END,
+            updated_at = datetime('now')
+        WHERE id = ?
+      `).bind(
+        status,
+        understanding_level,
+        time_spent_minutes,
+        newAttempts,
+        isCompleted,
+        isCompleted,
+        existing.id
+      ).run()
+      
+      return c.json({ success: true, id: existing.id })
+    } else {
+      // 新規作成
+      const result = await env.DB.prepare(`
+        INSERT INTO optional_problem_progress (
+          student_id, curriculum_id, optional_problem_id, status, 
+          understanding_level, time_spent_minutes, attempts_count,
+          is_completed, completed_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, 
+                  CASE WHEN ? = 'completed' THEN datetime('now') ELSE NULL END,
+                  datetime('now'), datetime('now'))
+      `).bind(
+        student_id,
+        curriculum_id,
+        optional_problem_id,
+        status,
+        understanding_level,
+        time_spent_minutes,
+        status === 'completed' ? 1 : 0,
+        status
+      ).run()
+      
+      return c.json({ success: true, id: result.meta.last_row_id })
+    }
+  } catch (error: any) {
+    console.error('選択問題進捗記録エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 選択問題の進捗を取得
+app.get('/api/optional-problem/progress/:studentId/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const progress = await env.DB.prepare(`
+      SELECT 
+        opp.*,
+        op.problem_title,
+        op.problem_category
+      FROM optional_problem_progress opp
+      JOIN optional_problems op ON opp.optional_problem_id = op.id
+      WHERE opp.student_id = ? AND opp.curriculum_id = ?
+      ORDER BY op.problem_number
+    `).bind(studentId, curriculumId).all()
+    
+    return c.json({ success: true, progress: progress.results })
+  } catch (error: any) {
+    console.error('選択問題進捗取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// カード復習（「もう一度練習」）を記録
+app.post('/api/card/review-log', async (c) => {
+  const { env } = c
+  const { 
+    student_id, 
+    card_id, 
+    curriculum_id, 
+    review_type, 
+    is_already_cleared, 
+    is_correct, 
+    answer_time_seconds, 
+    hint_count 
+  } = await c.req.json()
+  
+  try {
+    // 復習ログを記録
+    const result = await env.DB.prepare(`
+      INSERT INTO card_review_logs (
+        student_id, card_id, curriculum_id, review_type,
+        is_already_cleared, is_correct, answer_time_seconds, hint_count,
+        effort_points, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+    `).bind(
+      student_id,
+      card_id,
+      curriculum_id,
+      review_type,
+      is_already_cleared ? 1 : 0,
+      is_correct ? 1 : 0,
+      answer_time_seconds,
+      hint_count
+    ).run()
+    
+    // learning_logsにも記録（retry_countを増やす）
+    await env.DB.prepare(`
+      INSERT INTO learning_logs (
+        student_id, unit_id, card_id, course_type,
+        is_correct, answer_time_seconds, hint_count, retry_count,
+        difficulty_level, problem_type, created_at
+      ) VALUES (?, ?, ?, '復習', ?, ?, ?, 1, 'review', 'review', datetime('now'))
+    `).bind(
+      student_id,
+      String(curriculum_id),
+      String(card_id),
+      is_correct ? 1 : 0,
+      answer_time_seconds,
+      hint_count
+    ).run()
+    
+    return c.json({ 
+      success: true, 
+      review_log_id: result.meta.last_row_id,
+      effort_points: 1,
+      message: '復習の努力が記録されました！頑張りましたね！'
+    })
+  } catch (error: any) {
+    console.error('復習ログ記録エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学生の学習統計を取得（選択問題と復習を含む）
+app.get('/api/student/learning-stats/:studentId/:curriculumId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    // 基本カード進捗
+    const cardProgress = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT learning_card_id) as completed_cards,
+        AVG(understanding_level) as avg_understanding,
+        SUM(help_count) as total_help_requests
+      FROM student_progress
+      WHERE student_id = ? AND curriculum_id = ?
+    `).bind(studentId, curriculumId).first()
+    
+    // 選択問題進捗
+    const optionalProgress = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as completed_optional_problems,
+        SUM(time_spent_minutes) as total_optional_time,
+        AVG(understanding_level) as avg_optional_understanding
+      FROM optional_problem_progress
+      WHERE student_id = ? AND curriculum_id = ? AND is_completed = 1
+    `).bind(studentId, curriculumId).first()
+    
+    // 復習努力
+    const reviewEffort = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as review_count,
+        SUM(effort_points) as total_effort_points,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_reviews
+      FROM card_review_logs
+      WHERE student_id = ? AND curriculum_id = ?
+    `).bind(studentId, curriculumId).first()
+    
+    return c.json({ 
+      success: true, 
+      stats: {
+        ...cardProgress,
+        ...optionalProgress,
+        ...reviewEffort
+      }
+    })
+  } catch (error: any) {
+    console.error('学習統計取得エラー:', error)
     return c.json({ success: false, error: error.message }, 500)
   }
 })
