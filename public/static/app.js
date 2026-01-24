@@ -7497,11 +7497,11 @@ async function analyzeStudent(studentId, studentName) {
         </div>
       </div>
 
-      <!-- 選択課題への取り組み -->
+      <!-- 選択式問題への取り組み -->
       <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl p-6 text-white shadow-lg mt-6">
         <h3 class="text-2xl font-bold mb-4">
-          <i class="fas fa-star mr-2"></i>
-          選択課題への取り組み
+          <i class="fas fa-check-circle mr-2"></i>
+          選択式問題への取り組み
         </h3>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -9931,17 +9931,18 @@ function showUnitPreview(unitData, modelUsed) {
         </div>
       </div>
 
-      <!-- 選択問題プレビュー -->
+      <!-- 選択式問題プレビュー -->
       ${optionalProblems.length > 0 ? `
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h2 class="text-2xl font-bold text-gray-800 mb-4">
-            <i class="fas fa-star text-yellow-500 mr-2"></i>
-            選択問題（発展問題）
+            <i class="fas fa-check-circle text-pink-500 mr-2"></i>
+            <span class="bg-pink-100 px-3 py-1 rounded-lg">選択式問題</span>
+            <span class="text-sm text-gray-600 ml-2">（えらべる発展問題）</span>
           </h2>
-          <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
+          <div class="bg-pink-50 border-l-4 border-pink-500 p-4 mb-4">
             <p class="text-sm text-gray-700">
               <i class="fas fa-info-circle mr-2"></i>
-              チェックテスト合格後に取り組める発展問題が ${optionalProblems.length} 問含まれています
+              チェックテスト合格後に取り組める<strong>選択式の発展問題</strong>が ${optionalProblems.length} 問含まれています
             </p>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -9949,7 +9950,7 @@ function showUnitPreview(unitData, modelUsed) {
               <div class="bg-pink-50 border border-pink-200 rounded-lg p-4">
                 <div class="flex items-center justify-between mb-2">
                   <span class="bg-pink-200 text-pink-800 px-3 py-1 rounded-full text-sm font-bold">
-                    問題 ${index + 1}
+                    <i class="fas fa-check-square mr-1"></i>選択式 ${index + 1}
                   </span>
                   <span class="text-xs text-gray-600">
                     ${problem.difficulty_level || '標準'}
@@ -10483,6 +10484,11 @@ async function generateAndShowSimilarProblem(cardId) {
   // フルスクリーンローディング表示
   showLoadingOverlay('AIが新しい問題を生成中...')
   
+  // 練習開始時刻を記録
+  window.practiceStartTime = Date.now()
+  window.practiceCardId = cardId
+  window.practiceHintUsed = false
+  
   try {
     const response = await axios.post(`/api/cards/${cardId}/generate-similar`)
     console.log('類似問題生成レスポンス:', response.data)
@@ -10640,6 +10646,8 @@ function toggleSimilarAnswer() {
     answer.classList.remove('hidden')
     btn.innerHTML = '<i class="fas fa-eye-slash mr-2"></i>答えを隠す'
     btn.className = 'bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition'
+    // ヒントを使用したことを記録
+    window.practiceHintUsed = true
   } else {
     answer.classList.add('hidden')
     btn.innerHTML = '<i class="fas fa-eye mr-2"></i>答えを表示'
@@ -10648,9 +10656,46 @@ function toggleSimilarAnswer() {
 }
 
 // 類似問題モーダルを閉じる
-function closeSimilarProblemModal() {
+async function closeSimilarProblemModal() {
   const modal = document.getElementById('similarProblemModal')
   if (modal) {
+    // 練習時間を計算
+    if (window.practiceStartTime && window.practiceCardId) {
+      const practiceTime = Math.floor((Date.now() - window.practiceStartTime) / 1000) // 秒単位
+      
+      console.log('📊 復習記録:', {
+        cardId: window.practiceCardId,
+        practiceTime: practiceTime + '秒',
+        hintUsed: window.practiceHintUsed
+      })
+      
+      // 復習記録をAPIに送信（学生がログインしている場合のみ）
+      if (state.student && state.student.id && state.selectedCurriculum) {
+        try {
+          await axios.post('/api/learning/log', {
+            student_id: state.student.id,
+            curriculum_id: state.selectedCurriculum.id,
+            card_id: window.practiceCardId,
+            course_type: 'review',
+            is_correct: 1, // 復習なので正解扱い
+            answer_time_seconds: practiceTime,
+            hint_count: window.practiceHintUsed ? 1 : 0,
+            retry_count: 1,
+            difficulty_level: 'review',
+            problem_type: 'similar_practice'
+          })
+          console.log('✅ 復習記録を保存しました')
+        } catch (error) {
+          console.error('❌ 復習記録の保存に失敗:', error)
+        }
+      }
+      
+      // リセット
+      window.practiceStartTime = null
+      window.practiceCardId = null
+      window.practiceHintUsed = false
+    }
+    
     modal.remove()
     document.body.style.overflow = ''
   }
@@ -11400,11 +11445,12 @@ function showTeacherOverview(unitData) {
         `}
       </div>
 
-      <!-- 選択課題 -->
+      <!-- 選択課題（選択式問題） -->
       <div id="optional-problems" class="bg-white rounded-lg shadow-lg p-6 mb-6">
         <h2 class="text-2xl font-bold text-gray-800 mb-4">
-          <i class="fas fa-star mr-2"></i>
-          選択課題（発展問題）
+          <i class="fas fa-check-circle mr-2 text-pink-500"></i>
+          <span class="bg-pink-100 px-3 py-1 rounded-lg">選択式問題</span>
+          <span class="text-sm text-gray-600 ml-2">（えらべる発展問題）</span>
         </h2>
         ${optionalProblems.length > 0 ? `
           <div class="space-y-4">
@@ -11413,7 +11459,7 @@ function showTeacherOverview(unitData) {
                 <div class="flex items-start justify-between mb-2">
                   <h3 class="font-bold text-gray-800">
                     <span class="bg-pink-200 text-pink-800 px-3 py-1 rounded-full text-sm mr-2">
-                      問題 ${index + 1}
+                      <i class="fas fa-check-square mr-1"></i>選択式 ${index + 1}
                     </span>
                     ${problem.problem_title}
                   </h3>
