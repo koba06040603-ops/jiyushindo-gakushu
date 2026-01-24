@@ -2961,7 +2961,11 @@ async function loadCardPage(cardId) {
     
     // 学年別のフォントサイズを取得
     const grade = state.selectedCurriculum?.grade || '小学3年'
-    const fontSize = getGradeFontSize(grade)
+    const defaultFontSize = getGradeFontSize(grade)
+    
+    // ローカルストレージから保存されたフォントサイズを取得
+    const savedFontSize = localStorage.getItem('customFontSize')
+    const fontSize = savedFontSize ? JSON.parse(savedFontSize) : defaultFontSize
     
     const app = document.getElementById('app')
     app.innerHTML = `
@@ -2991,6 +2995,15 @@ async function loadCardPage(cardId) {
               <h2 class="card-title text-gray-800">${card.card_title}</h2>
             </div>
             <div class="flex items-center gap-3">
+              ${state.auth.user?.role === 'teacher' ? `
+                <!-- 教師用フォントサイズ設定 -->
+                <button onclick="toggleFontSizePanel()" 
+                        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg flex flex-col items-center justify-center min-w-[100px]"
+                        title="フォントサイズ設定">
+                  <i class="fas fa-text-height text-xl mb-1"></i>
+                  <span class="text-xs">文字サイズ</span>
+                </button>
+              ` : ''}
               <!-- ヘルプボタン4つ -->
               <button onclick="showAITeacher()" 
                       class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg flex flex-col items-center justify-center min-w-[100px]"
@@ -9324,6 +9337,131 @@ async function submitFeedback() {
   }
 }
 
+// フォントサイズパネルの表示・非表示
+function toggleFontSizePanel() {
+  const panel = document.getElementById('fontSizePanel')
+  if (panel) {
+    panel.classList.toggle('hidden')
+  } else {
+    // パネルを新規作成
+    const grade = state.selectedCurriculum?.grade || '小学3年'
+    const defaultFontSize = getGradeFontSize(grade)
+    const savedFontSize = localStorage.getItem('customFontSize')
+    const currentFontSize = savedFontSize ? JSON.parse(savedFontSize) : defaultFontSize
+    
+    const panelHTML = `
+      <div id="fontSizePanel" class="fixed right-4 top-20 bg-white rounded-lg shadow-2xl p-6 z-50 border-2 border-indigo-500" style="width: 320px;">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-lg text-gray-800">
+            <i class="fas fa-text-height mr-2"></i>文字サイズ設定
+          </h3>
+          <button onclick="toggleFontSizePanel()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="space-y-4">
+          <!-- 本文サイズ -->
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">
+              本文: <span id="baseSizeLabel">${currentFontSize.base}px</span>
+            </label>
+            <input type="range" id="baseSizeSlider" min="12" max="28" value="${currentFontSize.base}" 
+                   class="w-full" oninput="updateFontSize('base', this.value)">
+          </div>
+          
+          <!-- タイトルサイズ -->
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">
+              タイトル: <span id="titleSizeLabel">${currentFontSize.title}px</span>
+            </label>
+            <input type="range" id="titleSizeSlider" min="16" max="32" value="${currentFontSize.title}" 
+                   class="w-full" oninput="updateFontSize('title', this.value)">
+          </div>
+          
+          <!-- 見出しサイズ -->
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-2">
+              見出し: <span id="headingSizeLabel">${currentFontSize.heading}px</span>
+            </label>
+            <input type="range" id="headingSizeSlider" min="14" max="30" value="${currentFontSize.heading}" 
+                   class="w-full" oninput="updateFontSize('heading', this.value)">
+          </div>
+          
+          <!-- ボタン -->
+          <div class="flex gap-2 mt-6">
+            <button onclick="resetFontSize()" 
+                    class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+              <i class="fas fa-undo mr-1"></i>リセット
+            </button>
+            <button onclick="saveFontSize()" 
+                    class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+              <i class="fas fa-save mr-1"></i>保存
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    document.body.insertAdjacentHTML('beforeend', panelHTML)
+  }
+}
+
+// フォントサイズをリアルタイム更新
+function updateFontSize(type, value) {
+  const label = document.getElementById(`${type}SizeLabel`)
+  if (label) {
+    label.textContent = `${value}px`
+  }
+  
+  // CSSを即座に更新
+  const styles = document.head.querySelector('style[data-font-size]') || document.createElement('style')
+  styles.setAttribute('data-font-size', 'true')
+  
+  const baseSize = document.getElementById('baseSizeSlider')?.value || 16
+  const titleSize = document.getElementById('titleSizeSlider')?.value || 20
+  const headingSize = document.getElementById('headingSizeSlider')?.value || 18
+  
+  styles.textContent = `
+    .card-content { font-size: ${baseSize}px !important; }
+    .card-title { font-size: ${titleSize}px !important; }
+    .card-heading { font-size: ${headingSize}px !important; }
+  `
+  
+  if (!styles.parentNode) {
+    document.head.appendChild(styles)
+  }
+}
+
+// フォントサイズをリセット
+function resetFontSize() {
+  const grade = state.selectedCurriculum?.grade || '小学3年'
+  const defaultFontSize = getGradeFontSize(grade)
+  
+  document.getElementById('baseSizeSlider').value = defaultFontSize.base
+  document.getElementById('titleSizeSlider').value = defaultFontSize.title
+  document.getElementById('headingSizeSlider').value = defaultFontSize.heading
+  
+  updateFontSize('base', defaultFontSize.base)
+  updateFontSize('title', defaultFontSize.title)
+  updateFontSize('heading', defaultFontSize.heading)
+  
+  localStorage.removeItem('customFontSize')
+  alert('✅ フォントサイズをリセットしました')
+}
+
+// フォントサイズを保存
+function saveFontSize() {
+  const fontSize = {
+    base: parseInt(document.getElementById('baseSizeSlider').value),
+    title: parseInt(document.getElementById('titleSizeSlider').value),
+    heading: parseInt(document.getElementById('headingSizeSlider').value)
+  }
+  
+  localStorage.setItem('customFontSize', JSON.stringify(fontSize))
+  alert('✅ フォントサイズを保存しました！\n\n次回から this設定が適用されます。')
+  toggleFontSizePanel()
+}
+
 // 生成プロセス表示
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
@@ -9948,6 +10086,10 @@ window.startUnitGeneration = startUnitGeneration
 window.retryUnitGeneration = retryUnitGeneration
 window.saveGeneratedUnit = saveGeneratedUnit
 window.submitFeedback = submitFeedback
+window.toggleFontSizePanel = toggleFontSizePanel
+window.updateFontSize = updateFontSize
+window.resetFontSize = resetFontSize
+window.saveFontSize = saveFontSize
 
 // 学習カード詳細表示モーダル
 function showCardDetail(card) {
