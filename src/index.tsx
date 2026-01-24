@@ -3493,20 +3493,52 @@ ${progress.results.slice(0, 5).map((p: any) =>
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 1000
+            maxOutputTokens: 2048
           }
         })
       }
     )
     
     const data = await response.json()
+    
+    if (!response.ok) {
+      console.error('Gemini API エラー:', data)
+      throw new Error(`Gemini API error: ${JSON.stringify(data)}`)
+    }
+    
     const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    console.log('AI診断レスポンス（最初の500文字）:', aiResponse.substring(0, 500))
+    console.log('AI診断レスポンス（最後の500文字）:', aiResponse.substring(Math.max(0, aiResponse.length - 500)))
     
     // JSONを抽出（```json ... ``` の中身を取得）
-    const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || 
-                      aiResponse.match(/\{[\s\S]*\}/)
-    const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : '{}'
-    const diagnosis = JSON.parse(jsonStr)
+    let jsonStr = '{}'
+    const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/)
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1]
+    } else {
+      // マークダウンブロックがない場合、直接JSONを探す
+      const directJsonMatch = aiResponse.match(/\{[\s\S]*\}/)
+      if (directJsonMatch) {
+        jsonStr = directJsonMatch[0]
+      }
+    }
+    
+    console.log('抽出したJSON（最初の500文字）:', jsonStr.substring(0, 500))
+    
+    // Unicode スマート引用符を標準引用符に置換
+    jsonStr = jsonStr
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2013\u2014]/g, '-')
+    
+    let diagnosis
+    try {
+      diagnosis = JSON.parse(jsonStr)
+    } catch (parseError) {
+      console.error('JSON parse エラー:', parseError)
+      console.error('パース失敗したJSON:', jsonStr)
+      throw new Error(`JSON parse failed: ${parseError.message}`)
+    }
     
     return c.json(diagnosis)
     
