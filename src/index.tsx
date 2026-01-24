@@ -3198,9 +3198,21 @@ ${cardContext ? `
 
     const data = await response.json()
     
+    // デバッグログ追加
+    console.log('🔍 Gemini API レスポンス構造:', {
+      hasCandidates: !!data.candidates,
+      candidatesLength: data.candidates?.length,
+      firstCandidate: data.candidates?.[0] ? {
+        finishReason: data.candidates[0].finishReason,
+        hasContent: !!data.candidates[0].content,
+        hasParts: !!data.candidates[0].content?.parts,
+        partsLength: data.candidates[0].content?.parts?.length
+      } : null
+    })
+    
     // セーフティフィルタで候補がブロックされた場合の対応
     if (!data.candidates || data.candidates.length === 0) {
-      console.error('Gemini API - 候補なし:', JSON.stringify(data, null, 2))
+      console.error('❌ Gemini API - 候補なし:', JSON.stringify(data, null, 2))
       
       // フォールバック応答: 質問の内容に応じた一般的な導き
       const fallbackResponse = `ごめんね、今その質問にうまく答えられなかったよ。
@@ -3212,18 +3224,42 @@ ${cardContext ? `
 
     const candidate = data.candidates[0]
     
-    // フィルタによるブロックをチェック
-    if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'RECITATION') {
-      console.warn('Gemini API - セーフティブロック:', candidate.finishReason, JSON.stringify(candidate.safetyRatings, null, 2))
+    // finishReasonをログ出力
+    console.log('📊 Candidate finishReason:', candidate.finishReason)
+    
+    // STOP以外のfinishReasonは問題あり
+    if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+      console.warn('⚠️ Gemini API - 異常なfinishReason:', {
+        finishReason: candidate.finishReason,
+        safetyRatings: candidate.safetyRatings,
+        content: candidate.content
+      })
       
-      const fallbackResponse = `その質問、ちょっと難しいね。
+      // SEFETYとRECITATIONのみブロック、それ以外は警告のみ
+      if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'RECITATION') {
+        const fallbackResponse = `その質問、ちょっと難しいね。
 違う聞き方で、もう一度質問してみてくれるかな？
 それか、先生に聞いてみるのもいいよ！`
+        
+        return c.json({ response: fallbackResponse })
+      }
+    }
+
+    // 回答テキストを取得
+    const aiResponse = candidate?.content?.parts?.[0]?.text
+    
+    if (!aiResponse || aiResponse.trim() === '') {
+      console.error('❌ AI回答が空:', { candidate })
+      
+      // 空の回答の場合のフォールバック
+      const fallbackResponse = `ごめんね、今その質問にうまく答えられなかったよ。
+もう一度、別の言葉で質問してみてくれるかな？
+先生に聞いてみるのもいいよ！`
       
       return c.json({ response: fallbackResponse })
     }
-
-    const aiResponse = candidate?.content?.parts?.[0]?.text || 'ごめんね、うまく答えられなかったよ。もう一度聞いてね。'
+    
+    console.log('✅ AI回答取得成功:', aiResponse.substring(0, 100))
 
     return c.json({ response: aiResponse })
   } catch (error: any) {
@@ -4510,8 +4546,20 @@ app.post('/api/curriculum/save-generated', async (c) => {
           ).run()
         }
         
-        // ヒントカードを保存
-        for (const hint of card.hints || []) {
+        // ヒントカードを保存（デフォルト値を設定）
+        const hints = card.hints || []
+        
+        // ヒントが空の場合はデフォルトで3つ生成
+        if (hints.length === 0) {
+          hints.push(
+            { hint_level: 1, hint_text: 'まず、問題で何を求められているか確認しましょう。', thinking_tool_suggestion: '' },
+            { hint_level: 2, hint_text: '図や表に書いて整理してみましょう。', thinking_tool_suggestion: '' },
+            { hint_level: 3, hint_text: '似ている問題を思い出してみましょう。', thinking_tool_suggestion: '' }
+          )
+          console.log(`⚠️ カード${card.card_number}のヒントが空のため、デフォルト値を設定しました`)
+        }
+        
+        for (const hint of hints) {
           await env.DB.prepare(`
             INSERT INTO hint_cards (
               learning_card_id, hint_number, hint_content, thinking_tool_suggestion

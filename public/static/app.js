@@ -10838,6 +10838,9 @@ window.showPrintPreview = showPrintPreview
 // ============================================
 
 function showTeacherOverview(unitData) {
+  // ユニットデータをグローバルに保存（編集機能で使用）
+  window.currentUnitData = unitData
+  
   const curriculum = unitData.curriculum
   const courses = unitData.courses || []
   const optionalProblems = unitData.optional_problems || []
@@ -11450,12 +11453,195 @@ function showTeacherOverview(unitData) {
 
 // カード内容編集モーダル（簡易版）
 function editCardContent(courseIndex, cardIndex) {
-  alert(`カード編集機能\n\nコース ${courseIndex + 1}、カード ${cardIndex + 1} の編集画面を開きます。\n\n※現在は既存の問題編集機能を使用してください。\n学習のてびきページ > 教師用ツール > 問題編集`)
+  // コースとカードを取得
+  const course = window.currentUnitData?.courses[courseIndex]
+  const card = course?.cards[cardIndex]
+  
+  if (!card) {
+    alert('カードデータが見つかりません')
+    return
+  }
+  
+  // カード編集モーダルを表示
+  const modalHTML = `
+    <div id="cardEditModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         onclick="if(event.target.id === 'cardEditModal') closeCardEditModal()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+           onclick="event.stopPropagation()">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-edit mr-2"></i>カード編集
+            </h2>
+            <button onclick="closeCardEditModal()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+          <p class="mt-2 opacity-90">
+            コース: ${course.course_display_name} | カード ${card.card_number}
+          </p>
+        </div>
+
+        <!-- コンテンツ -->
+        <div class="p-6">
+          <form id="cardEditForm" class="space-y-4">
+            <!-- カードタイトル -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-heading mr-1"></i>カードタイトル
+              </label>
+              <input type="text" id="edit_card_title" 
+                     value="${card.card_title || ''}"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                     required>
+            </div>
+
+            <!-- 問題 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-question-circle mr-1"></i>問題・課題
+              </label>
+              <textarea id="edit_problem_description" rows="4"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${card.problem_description || ''}</textarea>
+            </div>
+
+            <!-- 新出用語 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-book mr-1"></i>新しく学ぶこと
+              </label>
+              <textarea id="edit_new_terms" rows="2"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${card.new_terms || ''}</textarea>
+            </div>
+
+            <!-- 例題 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-lightbulb mr-1"></i>例題
+              </label>
+              <textarea id="edit_example_problem" rows="3"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${card.example_problem || ''}</textarea>
+            </div>
+
+            <!-- 解き方・解法 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-route mr-1"></i>解き方・解法
+              </label>
+              <textarea id="edit_example_solution" rows="3"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${card.example_solution || ''}</textarea>
+            </div>
+
+            <!-- 実社会とのつながり -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-globe mr-1"></i>実社会とのつながり
+              </label>
+              <textarea id="edit_real_world_connection" rows="2"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${card.real_world_connection || ''}</textarea>
+            </div>
+
+            <!-- 解答 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-check-circle mr-1"></i>解答
+              </label>
+              <textarea id="edit_answer" rows="3"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        required>${card.answer || ''}</textarea>
+            </div>
+
+            <!-- 解答の説明 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-comment-dots mr-1"></i>解答の説明
+              </label>
+              <textarea id="edit_answer_explanation" rows="3"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${card.answer_explanation || ''}</textarea>
+            </div>
+          </form>
+        </div>
+
+        <!-- フッター -->
+        <div class="bg-gray-50 p-4 border-t flex gap-3">
+          <button onclick="saveCardEdit(${card.id}, ${courseIndex}, ${cardIndex})" 
+                  class="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>
+            保存
+          </button>
+          <button onclick="closeCardEditModal()" 
+                  class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  // モーダルを表示
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  document.body.style.overflow = 'hidden'
+}
+
+// カード編集モーダルを閉じる
+function closeCardEditModal() {
+  const modal = document.getElementById('cardEditModal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
+// カード編集を保存
+async function saveCardEdit(cardId, courseIndex, cardIndex) {
+  try {
+    // フォームデータを取得
+    const updatedCard = {
+      card_title: document.getElementById('edit_card_title').value,
+      problem_description: document.getElementById('edit_problem_description').value,
+      new_terms: document.getElementById('edit_new_terms').value,
+      example_problem: document.getElementById('edit_example_problem').value,
+      example_solution: document.getElementById('edit_example_solution').value,
+      real_world_connection: document.getElementById('edit_real_world_connection').value,
+      answer: document.getElementById('edit_answer').value,
+      answer_explanation: document.getElementById('edit_answer_explanation').value
+    }
+    
+    // APIリクエスト
+    const response = await axios.put(`/api/cards/${cardId}`, updatedCard)
+    
+    if (response.data.success) {
+      // ローカルデータを更新
+      if (window.currentUnitData?.courses[courseIndex]?.cards[cardIndex]) {
+        Object.assign(window.currentUnitData.courses[courseIndex].cards[cardIndex], updatedCard)
+      }
+      
+      // モーダルを閉じる
+      closeCardEditModal()
+      
+      // 成功メッセージ
+      alert('✅ カードを保存しました！')
+      
+      // 画面を再描画
+      showTeacherOverview(window.currentUnitData)
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('カード保存エラー:', error)
+    alert('❌ 保存に失敗しました: ' + (error.response?.data?.error || error.message))
+  }
 }
 
 // グローバル関数として公開
 window.showTeacherOverview = showTeacherOverview
 window.editCardContent = editCardContent
+window.closeCardEditModal = closeCardEditModal
+window.saveCardEdit = saveCardEdit
 
 // 学習計画表の時数調整
 let learningPlanData = { courses: [] }
