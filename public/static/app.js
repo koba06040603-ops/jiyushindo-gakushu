@@ -8827,6 +8827,9 @@ function showUnitGeneratorModal() {
   document.getElementById('genTextbook').addEventListener('change', updateSuggestButton)
 }
 
+// 最後の生成パラメータを保存（再生成用）
+let lastGenerationParams = null
+
 // モーダルを閉じる
 function closeUnitGeneratorModal() {
   const modal = document.getElementById('unitGeneratorModal')
@@ -8928,17 +8931,35 @@ async function startUnitGeneration() {
     alert('学年、教科、教科書会社、単元名は必須です')
     return
   }
-
-  // カスタマイズ情報
-  const customization = {
-    studentNeeds: document.getElementById('genStudentNeeds').value,
-    teacherGoals: document.getElementById('genTeacherGoals').value,
-    learningStyle: document.getElementById('genLearningStyle').value,
-    specialSupport: document.getElementById('genSpecialSupport').value
+  
+  // 生成パラメータを保存（再生成用）
+  lastGenerationParams = {
+    grade,
+    subject,
+    textbook,
+    unitName,
+    studentNeeds: document.getElementById('genStudentNeeds')?.value || '',
+    teacherGoals: document.getElementById('genTeacherGoals')?.value || '',
+    learningStyle: document.getElementById('genLearningStyle')?.value || '',
+    specialSupport: document.getElementById('genSpecialSupport')?.value || '',
+    qualityMode: document.getElementById('genQualityMode')?.value || 'standard'
   }
   
-  // 品質モード
-  const qualityMode = document.querySelector('input[name="qualityMode"]:checked')?.value || 'standard'
+  // 実際の生成処理を実行
+  await executeUnitGeneration(lastGenerationParams)
+}
+
+// 単元生成の実際の処理
+async function executeUnitGeneration(params) {
+  const { grade, subject, textbook, unitName, studentNeeds, teacherGoals, learningStyle, specialSupport, qualityMode } = params
+  
+  // カスタマイズ情報
+  const customization = {
+    studentNeeds: studentNeeds || '',
+    teacherGoals: teacherGoals || '',
+    learningStyle: learningStyle || '',
+    specialSupport: specialSupport || ''
+  }
 
   // モーダルを閉じる
   closeUnitGeneratorModal()
@@ -9023,7 +9044,7 @@ async function startUnitGeneration() {
               <i class="fas fa-home mr-2"></i>
               トップページに戻る
             </button>
-            <button onclick="showUnitGeneratorModal()" 
+            <button onclick="retryUnitGeneration()" 
                     class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg">
               <i class="fas fa-redo mr-2"></i>
               もう一度生成する
@@ -9033,6 +9054,18 @@ async function startUnitGeneration() {
       </div>
     `
   }
+}
+
+// 同じパラメータで単元を再生成
+async function retryUnitGeneration() {
+  if (!lastGenerationParams) {
+    alert('前回の生成パラメータが見つかりません。最初から生成してください。')
+    renderTopPage()
+    return
+  }
+  
+  console.log('🔄 再生成を開始...', lastGenerationParams)
+  await executeUnitGeneration(lastGenerationParams)
 }
 
 // 生成プロセス表示
@@ -9656,6 +9689,7 @@ async function saveGeneratedUnit(unitData) {
 window.showUnitGeneratorModal = showUnitGeneratorModal
 window.closeUnitGeneratorModal = closeUnitGeneratorModal
 window.startUnitGeneration = startUnitGeneration
+window.retryUnitGeneration = retryUnitGeneration
 window.saveGeneratedUnit = saveGeneratedUnit
 
 // 学習カード詳細表示モーダル
