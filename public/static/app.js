@@ -1872,8 +1872,14 @@ async function loadGuidePage(curriculumId) {
                             </div>
                             <div class="flex-1">
                               <p class="text-sm text-gray-800 mb-2">${problem.problem_text}</p>
-                              <div class="bg-yellow-100 rounded px-3 py-1 text-xs text-gray-600">
-                                💡 こたえ: ${problem.answer}
+                              <div class="answer-container" id="answer-${curriculum.id}-${problem.problem_number}">
+                                <button onclick="toggleAnswer(${curriculum.id}, ${problem.problem_number})" 
+                                        class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                                  <i class="fas fa-eye mr-1"></i>答えを表示
+                                </button>
+                                <div class="hidden answer-text bg-yellow-100 rounded px-3 py-1 text-xs text-gray-600 mt-2">
+                                  💡 こたえ: ${problem.answer}
+                                </div>
                               </div>
                             </div>
                             <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition print:hidden">
@@ -2585,7 +2591,15 @@ async function showIntegratedPrintPreview(curriculumId) {
                         </div>
                         <div class="flex-1">
                           <p class="text-xs mb-1">${problem.problem_text}</p>
-                          <div class="bg-yellow-100 rounded px-2 py-1 text-xs">💡 ${problem.answer}</div>
+                          <div class="answer-container" id="review-answer-${problem.problem_number}">
+                            <button onclick="toggleReviewAnswer(${problem.problem_number})" 
+                                    class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition">
+                              <i class="fas fa-eye mr-1"></i>答えを表示
+                            </button>
+                            <div class="hidden answer-text bg-yellow-100 rounded px-2 py-1 text-xs mt-1">
+                              💡 ${problem.answer}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -8183,6 +8197,7 @@ window.selectCardForGeneration = selectCardForGeneration
 window.setDifficulty = setDifficulty
 window.generateProblem = generateProblem
 window.toggleAnswer = toggleAnswer
+window.toggleReviewAnswer = toggleReviewAnswer
 window.analyzeStudent = analyzeStudent
 
 // 保護者向けレポートを表示
@@ -12511,6 +12526,46 @@ async function saveCheckTest(curriculumId) {
 }
 
 // チェックテスト問題追加
+// チェックテストの答え表示/非表示切り替え
+function toggleAnswer(curriculumId, problemNumber) {
+  const container = document.getElementById(`answer-${curriculumId}-${problemNumber}`)
+  const button = container.querySelector('button')
+  const answerText = container.querySelector('.answer-text')
+  
+  if (answerText.classList.contains('hidden')) {
+    // 答えを表示
+    answerText.classList.remove('hidden')
+    button.innerHTML = '<i class="fas fa-eye-slash mr-1"></i>答えを隠す'
+    button.className = 'bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs font-bold transition'
+  } else {
+    // 答えを隠す
+    answerText.classList.add('hidden')
+    button.innerHTML = '<i class="fas fa-eye mr-1"></i>答えを表示'
+    button.className = 'bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold transition'
+  }
+}
+
+// レビュー画面用の答え表示切り替え
+function toggleReviewAnswer(problemNumber) {
+  const container = document.getElementById(`review-answer-${problemNumber}`)
+  if (!container) return
+  
+  const button = container.querySelector('button')
+  const answerText = container.querySelector('.answer-text')
+  
+  if (answerText.classList.contains('hidden')) {
+    // 答えを表示
+    answerText.classList.remove('hidden')
+    button.innerHTML = '<i class="fas fa-eye-slash mr-1"></i>答えを隠す'
+    button.className = 'bg-gray-500 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs font-bold transition'
+  } else {
+    // 答えを隠す
+    answerText.classList.add('hidden')
+    button.innerHTML = '<i class="fas fa-eye mr-1"></i>答えを表示'
+    button.className = 'bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition'
+  }
+}
+
 function addCheckTestProblem(curriculumId) {
   const list = document.getElementById('checkTestProblemsList')
   const index = list.children.length
