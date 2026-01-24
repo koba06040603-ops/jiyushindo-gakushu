@@ -9068,6 +9068,80 @@ async function retryUnitGeneration() {
   await executeUnitGeneration(lastGenerationParams)
 }
 
+// モーダルのドラッグ機能を初期化
+function initModalDrag(headerId, contentId) {
+  const header = document.getElementById(headerId)
+  const content = document.getElementById(contentId)
+  
+  if (!header || !content) {
+    console.warn('ドラッグ要素が見つかりません:', headerId, contentId)
+    return
+  }
+  
+  let isDragging = false
+  let currentX = 0
+  let currentY = 0
+  let initialX = 0
+  let initialY = 0
+  let xOffset = 0
+  let yOffset = 0
+  
+  header.addEventListener('mousedown', dragStart)
+  document.addEventListener('mousemove', drag)
+  document.addEventListener('mouseup', dragEnd)
+  
+  // タッチイベント対応
+  header.addEventListener('touchstart', dragStart)
+  document.addEventListener('touchmove', drag)
+  document.addEventListener('touchend', dragEnd)
+  
+  function dragStart(e) {
+    // ボタンクリックの場合はドラッグしない
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+      return
+    }
+    
+    if (e.type === 'touchstart') {
+      initialX = e.touches[0].clientX - xOffset
+      initialY = e.touches[0].clientY - yOffset
+    } else {
+      initialX = e.clientX - xOffset
+      initialY = e.clientY - yOffset
+    }
+    
+    isDragging = true
+    header.style.cursor = 'grabbing'
+  }
+  
+  function drag(e) {
+    if (!isDragging) return
+    
+    e.preventDefault()
+    
+    if (e.type === 'touchmove') {
+      currentX = e.touches[0].clientX - initialX
+      currentY = e.touches[0].clientY - initialY
+    } else {
+      currentX = e.clientX - initialX
+      currentY = e.clientY - initialY
+    }
+    
+    xOffset = currentX
+    yOffset = currentY
+    
+    setTranslate(currentX, currentY, content)
+  }
+  
+  function dragEnd(e) {
+    isDragging = false
+    header.style.cursor = 'move'
+  }
+  
+  function setTranslate(xPos, yPos, el) {
+    el.style.transform = `translate(${xPos}px, ${yPos}px)`
+  }
+}
+
 // 生成プロセス表示
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
@@ -9695,9 +9769,18 @@ window.saveGeneratedUnit = saveGeneratedUnit
 // 学習カード詳細表示モーダル
 function showCardDetail(card) {
   console.log('📋 カード詳細表示:', card)
+  console.log('📋 カードのキー:', Object.keys(card))
+  console.log('📋 hints配列:', card.hints)
   console.log('📋 ヒント数:', card.hints?.length)
-  console.log('📋 解答:', card.answer)
-  console.log('📋 解説:', card.example_solution)
+  console.log('📋 answer:', card.answer)
+  console.log('📋 answer_explanation:', card.answer_explanation)
+  console.log('📋 example_solution:', card.example_solution)
+  
+  // ヒント配列が存在する場合、各ヒントの構造を確認
+  if (card.hints && card.hints.length > 0) {
+    console.log('📋 ヒント[0]の構造:', card.hints[0])
+    console.log('📋 ヒント[0]のキー:', Object.keys(card.hints[0]))
+  }
   
   // 学習カード開始時刻を記録
   startCardTiming()
@@ -10006,13 +10089,15 @@ async function generateAndShowSimilarProblem(cardId) {
         <div id="similarProblemModal" 
              class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
              onclick="if(event.target.id === 'similarProblemModal') closeSimilarProblemModal()">
-          <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+          <div id="similarProblemContent" class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+               style="position: relative;"
                onclick="event.stopPropagation()">
-            <!-- ヘッダー -->
-            <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-2xl">
+            <!-- ヘッダー（ドラッグハンドル） -->
+            <div id="similarProblemHeader" class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-2xl cursor-move">
               <div class="flex items-center justify-between">
                 <h2 class="text-2xl font-bold">
                   <i class="fas fa-magic mr-2"></i>もう1問練習
+                  <span class="text-sm ml-2 opacity-75">（ドラッグで移動できます）</span>
                 </h2>
                 <button onclick="closeSimilarProblemModal()" 
                         class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
@@ -10086,6 +10171,9 @@ async function generateAndShowSimilarProblem(cardId) {
       // 新しいモーダルを表示
       document.body.insertAdjacentHTML('beforeend', modalHTML)
       document.body.style.overflow = 'hidden'
+      
+      // ドラッグ機能を初期化
+      initModalDrag('similarProblemHeader', 'similarProblemContent')
       
     } else {
       throw new Error(response.data.error || '生成に失敗しました')
