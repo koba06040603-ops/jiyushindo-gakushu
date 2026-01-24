@@ -1390,7 +1390,7 @@ function showEditCurriculumModal(curriculum, courses) {
             <div class="md:col-span-2">
               <label class="block text-sm font-bold text-gray-700 mb-2">単元の目標</label>
               <textarea id="editUnitGoal" rows="3" 
-                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">${curriculum.unit_goal}</textarea>
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">${formatTextWithRuby(curriculum.unit_goal)}</textarea>
             </div>
             <div class="md:col-span-2">
               <label class="block text-sm font-bold text-gray-700 mb-2">非認知目標</label>
@@ -1723,7 +1723,7 @@ async function loadGuidePage(curriculumId) {
                 <h3 class="text-xl font-bold text-blue-800 mb-2 flex items-center">
                   <i class="fas fa-bullseye mr-2"></i>たんげんのもくひょう
                 </h3>
-                <p class="text-gray-800 leading-relaxed">${curriculum.unit_goal}</p>
+                <p class="text-gray-800 leading-relaxed">${formatTextWithRuby(curriculum.unit_goal)}</p>
               </div>
               
               <div class="grid grid-cols-2 gap-4">
@@ -2056,7 +2056,7 @@ async function loadLearningPlanPage(curriculumId) {
               <h3 class="text-xl font-bold text-green-800 mb-3 flex items-center">
                 <i class="fas fa-target mr-2"></i>単元の学習目標
               </h3>
-              <p class="text-gray-800 leading-relaxed">${curriculum.unit_goal}</p>
+              <p class="text-gray-800 leading-relaxed">${formatTextWithRuby(curriculum.unit_goal)}</p>
             </div>
 
             <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-6 mb-6">
@@ -2500,7 +2500,7 @@ async function showIntegratedPrintPreview(curriculumId) {
           
           <div class="mb-6 p-4 bg-blue-50 rounded">
             <h3 class="font-bold text-blue-800 mb-2">📚 単元の目標</h3>
-            <p class="text-sm">${curriculum.unit_goal}</p>
+            <p class="text-sm">${formatTextWithRuby(curriculum.unit_goal)}</p>
           </div>
           
           <div class="mb-6 p-4 bg-purple-50 rounded">
@@ -2622,7 +2622,7 @@ async function showIntegratedPrintPreview(curriculumId) {
           
           <div class="mb-4 p-4 bg-green-50 rounded">
             <h3 class="font-bold text-green-800 mb-2">📚 単元の目標</h3>
-            <p class="text-sm">${curriculum.unit_goal}</p>
+            <p class="text-sm">${formatTextWithRuby(curriculum.unit_goal)}</p>
           </div>
           
           <div class="mb-4 p-4 bg-purple-50 rounded">
@@ -3656,7 +3656,7 @@ async function loadLearningPlan(curriculumId) {
             <h3 class="text-lg font-bold text-blue-800 mb-2">
               <i class="fas fa-bullseye mr-2"></i>単元の目標
             </h3>
-            <p class="text-gray-800 text-sm">${curriculum.unit_goal}</p>
+            <p class="text-gray-800 text-sm">${formatTextWithRuby(curriculum.unit_goal)}</p>
           </div>
           <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-6">
             <h3 class="text-lg font-bold text-green-800 mb-2">
@@ -5441,6 +5441,15 @@ function formatTimestamp(timestamp) {
   
   const diffHours = Math.round(diffMins / 60)
   return `${diffHours}時間前`
+}
+
+// ふりがな付きテキストをHTMLのrubyタグに変換
+function formatTextWithRuby(text) {
+  if (!text) return ''
+  
+  // 漢字（ひらがな）の形式を <ruby>漢字<rt>ひらがな</rt></ruby> に変換
+  // 例：国会（こっかい） → <ruby>国会<rt>こっかい</rt></ruby>
+  return text.replace(/([一-龯々]+)（([ぁ-ん]+)）/g, '<ruby>$1<rt>$2</rt></ruby>')
 }
 
 // ==================== Phase 5: 先生カスタマイズモード ====================
@@ -9366,7 +9375,7 @@ function showUnitPreview(unitData, modelUsed) {
         <div class="space-y-4">
           <div class="bg-blue-50 p-4 rounded-lg">
             <p class="text-sm font-bold text-blue-800 mb-2">学習目標</p>
-            <p class="text-gray-800">${curriculum.unit_goal}</p>
+            <p class="text-gray-800">${formatTextWithRuby(curriculum.unit_goal)}</p>
           </div>
           <div class="bg-green-50 p-4 rounded-lg">
             <p class="text-sm font-bold text-green-800 mb-2">心の成長目標（非認知能力）</p>
@@ -10004,7 +10013,7 @@ function showPrintPreview(unitData) {
         <!-- 単元の目標 -->
         <div class="mb-8 p-4 bg-blue-50 border-l-4 border-blue-600 rounded print:break-inside-avoid">
           <h2 class="text-xl font-bold text-blue-800 mb-2">📚 単元の目標</h2>
-          <p class="text-gray-800">${curriculum.unit_goal}</p>
+          <p class="text-gray-800">${formatTextWithRuby(curriculum.unit_goal)}</p>
         </div>
 
         <!-- 各コースのカード一覧 -->
@@ -10271,7 +10280,7 @@ function showTeacherOverview(unitData) {
         
         <div class="bg-blue-50 p-4 rounded-lg mb-3">
           <p class="text-sm font-bold text-blue-800 mb-2">📚 学習目標</p>
-          <p class="text-gray-800">${curriculum.unit_goal}</p>
+          <p class="text-gray-800">${formatTextWithRuby(curriculum.unit_goal)}</p>
         </div>
         
         <div class="bg-green-50 p-4 rounded-lg">

@@ -4029,8 +4029,8 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     "textbook_company": "${textbook}",
     "unit_name": "${unitName}",
     "total_hours": 8,
-    "unit_goal": "学習目標（100文字、ふりがな付き）",
-    "non_cognitive_goal": "非認知目標（80文字）"
+    "unit_goal": "学習目標（100文字以内。難しい漢字には直後に（ひらがな）をつける。例：国会（こっかい））",
+    "non_cognitive_goal": "非認知目標（80文字以内）"
   },
   "courses": [
     {
