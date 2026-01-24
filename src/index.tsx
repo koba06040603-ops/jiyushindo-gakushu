@@ -3873,16 +3873,88 @@ app.post('/api/ai/suggest-units', async (c) => {
   }
   
   try {
+    // 学年・科目別の詳細な指示を追加
+    let specificInstructions = ''
+    
+    if (grade === '小学6年' && subject === '社会') {
+      specificInstructions = `
+【小学6年社会の重点単元】
+小学6年社会は主に「歴史」が中心です。以下の順序で単元を出力してください：
+
+1. 縄文時代・弥生時代の暮らし
+2. 古墳時代と大和朝廷
+3. 飛鳥時代の文化と政治
+4. 奈良時代の政治と文化
+5. 平安時代の貴族の暮らし
+6. 鎌倉時代の武士の政治
+7. 室町時代の文化と社会
+8. 戦国時代と天下統一
+9. 江戸時代の幕府政治
+10. 江戸時代の文化と産業
+11. 明治維新と近代化
+12. 大正デモクラシー
+13. 昭和時代と戦争
+14. 戦後の日本の発展
+15. 現代の日本と世界
+
+さらに政治・国際関係の単元：
+16. 日本国憲法と基本的人権
+17. 国会・内閣・裁判所の働き
+18. 地方自治のしくみ
+19. 世界の中の日本
+20. 国際連合の役割
+
+（以下、補足的な単元を10個追加して合計30個）
+`
+    } else if (grade === '小学5年' && subject === '社会') {
+      specificInstructions = `
+【小学5年社会の重点単元】
+小学5年社会は「産業」「環境」「国土」が中心です：
+
+1. 日本の国土と地形
+2. 日本の気候と自然災害
+3. 米作りと農業
+4. 水産業とその課題
+5. 工業の種類と特色
+6. 自動車工業の発展
+7. 食料生産と流通
+8. 情報産業とメディア
+9. 環境問題と取り組み
+10. 森林の保全
+
+（以下、20個の補足単元）
+`
+    } else if (grade === '小学4年' && subject === '社会') {
+      specificInstructions = `
+【小学4年社会の重点単元】
+小学4年社会は「地域」「くらし」が中心です：
+
+1. わたしたちの県
+2. 地図の見方・使い方
+3. 水はどこから（水道）
+4. ごみのゆくえ
+5. 自然災害からくらしを守る
+6. 伝統的な工芸品
+7. 地域の発展につくした人々
+8. 県内の交通と通信
+
+（以下、22個の補足単元）
+`
+    }
+    
     const prompt = `${grade}${subject}（${textbook}）の主要な単元名を正確に30個、1行に1つずつ日本語で出力してください。
+
+${specificInstructions}
 
 【重要な指示】
 - 単元名のみを日本語で出力すること
 - 番号、記号、説明、英語、思考過程（THOUGHT）は一切不要
 - 1行に1つの単元名のみを出力
 - 正確に30行出力すること
-- 教科書の順序に従って出力すること
+- 教科書の順序と学習指導要領に従って出力すること
+- ${grade}${subject}の学習内容に完全に一致させること
 
-出力例:
+出力例（算数の場合）:
 かけ算の筆算
 わり算の筆算
 小数のかけ算
@@ -4015,11 +4087,6 @@ app.post('/api/ai/generate-unit', async (c) => {
   console.log('🔑 APIキー確認: 最初の10文字 =', apiKey.substring(0, 10))
   
   try {
-    // 品質モードに応じてモデルを選択
-    // 'standard' (デフォルト): Gemini 3 Flash - 高速
-    // 'high': Gemini 3 Pro - 高品質・詳細
-    const useHighQuality = qualityMode === 'high'
-    
     // カスタマイズ情報を整形
     const customInfo = customization ? `
 
@@ -4104,12 +4171,38 @@ ${customInfo}
 
 上記の形式に従って、完全な有効JSONのみを出力してください。`
     // 品質モードに応じてモデルを選択
-    // 複数モデルでフォールバック（最新安定版を優先）
-    const models = [
-      { name: 'gemini-2.5-flash', maxTokens: 16384 },     // 最新・最も安定
-      { name: 'gemini-2.0-flash', maxTokens: 16384 },     // 高速
-      { name: 'gemini-2.5-pro', maxTokens: 16384 }        // 最高品質
-    ]
+    // 'standard' (デフォルト): Gemini 2.5 Flash - 高速
+    // 'high': Gemini 2.5 Pro - 高品質・詳細・厳密
+    const useHighQuality = qualityMode === 'high'
+    
+    let models
+    let generationConfig
+    
+    if (useHighQuality) {
+      // 確実モード: Gemini 2.5 Pro のみを使用、より厳密な設定
+      models = [
+        { name: 'gemini-2.5-pro', maxTokens: 16384 }  // Proのみ
+      ]
+      generationConfig = {
+        temperature: 0.5,   // より確実で一貫性のある出力
+        maxOutputTokens: 16384,
+        topP: 0.9,          // より保守的な選択
+        topK: 20            // トークン候補を制限
+      }
+    } else {
+      // 標準モード: Flash優先、フォールバックあり
+      models = [
+        { name: 'gemini-2.5-flash', maxTokens: 16384 },     // 最新・最も安定
+        { name: 'gemini-2.0-flash', maxTokens: 16384 },     // 高速
+        { name: 'gemini-2.5-pro', maxTokens: 16384 }        // 最高品質（フォールバック）
+      ]
+      generationConfig = {
+        temperature: 0.7,
+        maxOutputTokens: 16384,
+        topP: 0.95,
+        topK: 40
+      }
+    }
     
     let response
     let modelName
@@ -4127,12 +4220,7 @@ ${customInfo}
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: model.maxTokens,
-                topP: 0.95,
-                topK: 40
-              }
+              generationConfig: generationConfig
             })
           }
         )
