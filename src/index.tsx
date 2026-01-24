@@ -3235,13 +3235,36 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
 
 // AIチャット機能（学習カード用）
 app.post('/api/ai-chat', async (c) => {
+  console.log('🤖 AI Chat API called')
+  
   try {
     const { message, cardContext, conversationHistory, studentGrade } = await c.req.json()
+    
+    console.log('📝 Request data:', {
+      message: message?.substring(0, 50),
+      hasCardContext: !!cardContext,
+      conversationHistoryLength: conversationHistory?.length || 0,
+      studentGrade
+    })
+    
+    // Gemini API キーの確認
+    const { env } = c
+    if (!env.GEMINI_API_KEY) {
+      console.error('❌ GEMINI_API_KEY not found')
+      return c.json({ 
+        error: 'APIキーが設定されていません',
+        details: 'GEMINI_API_KEY is not configured'
+      }, 500)
+    }
+    
+    console.log('✅ GEMINI_API_KEY found:', env.GEMINI_API_KEY.substring(0, 10) + '...')
     
     // 会話履歴から学年を確認（初回は学年を尋ねる）
     const hasGradeInfo = studentGrade || (conversationHistory && conversationHistory.some((msg: any) => 
       msg.text && msg.text.match(/[1-6]年生/)
     ))
+    
+    console.log('📊 Grade info:', { hasGradeInfo, studentGrade })
     
     let systemPrompt = ''
     
@@ -3325,6 +3348,10 @@ ${cardContext ? `
           }
         ]
 
+    console.log('🚀 Calling Gemini API...')
+    console.log('📤 Request contents length:', contents.length)
+    console.log('📤 First content:', JSON.stringify(contents[0]).substring(0, 200))
+
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3357,13 +3384,19 @@ ${cardContext ? `
       })
     })
 
+    console.log('📥 Gemini API response status:', response.status)
+    console.log('📥 Response OK:', response.ok)
+
     if (!response.ok) {
       const errorData = await response.text()
-      console.error('Gemini APIエラー:', response.status, errorData)
-      throw new Error(`Gemini API returned ${response.status}`)
+      console.error('❌ Gemini APIエラー:', response.status, response.statusText)
+      console.error('❌ Error body:', errorData)
+      throw new Error(`Gemini API returned ${response.status}: ${response.statusText}`)
     }
 
     const data = await response.json()
+    console.log('✅ Gemini API response received')
+    console.log('📊 Response data keys:', Object.keys(data))
     
     // デバッグログ追加
     console.log('🔍 Gemini API レスポンス構造:', {
