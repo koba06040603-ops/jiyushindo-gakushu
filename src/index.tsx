@@ -260,44 +260,100 @@ function extractJSON(aiResponse: string): any {
           console.error(`  pos ${i}: '${display}' (code: ${code})${i === pos ? ' <-- ERROR HERE' : ''}`)
         }
         
-        // エラー位置での自動修正を試みる
-        if (error.message.includes("Expected ',' or ']'")) {
-          console.warn('⚠️ 配列要素のカンマエラー検出、修正を試みます')
+        // エラー位置での自動修正を試みる（より包括的な修正）
+        if (error.message.includes("Expected ',' or ']'") || error.message.includes("Expected ',' or '}'")) {
+          console.warn('⚠️ JSON構文エラー検出、包括的な修正を試みます')
           
-          // エラー位置の文字をチェック
-          const charAtPos = jsonText.charAt(pos)
+          // 修正方法を順番に試す
+          const fixStrategies = [
+            // 戦略1: エラー位置の前で文字列を閉じてカンマを追加
+            () => {
+              let fixed = jsonText.substring(0, pos).trimEnd()
+              if (!fixed.endsWith('"') && !fixed.endsWith(',') && !fixed.endsWith('}') && !fixed.endsWith(']')) {
+                fixed += '"'
+              }
+              fixed += ',' + jsonText.substring(pos)
+              return fixed
+            },
+            // 戦略2: エラー位置の不正な文字をカンマで置換
+            () => jsonText.substring(0, pos) + ',' + jsonText.substring(pos + 1),
+            // 戦略3: エラー位置の前の不完全な文字列を修正
+            () => {
+              let fixed = jsonText.substring(0, pos)
+              const lastQuote = fixed.lastIndexOf('"')
+              const lastComma = fixed.lastIndexOf(',')
+              const lastBrace = Math.max(fixed.lastIndexOf('{'), fixed.lastIndexOf('['))
+              
+              // 文字列が開かれたまま閉じられていない場合
+              if (lastQuote > lastComma && lastQuote > lastBrace) {
+                const beforeQuote = fixed.substring(0, lastQuote)
+                const afterQuote = fixed.substring(lastQuote + 1)
+                // 閉じクオートを追加
+                fixed = beforeQuote + '"' + afterQuote.replace(/[^"]*$/, '') + '",'
+              }
+              
+              return fixed + jsonText.substring(pos)
+            },
+            // 戦略4: エラー位置以降の不正な部分を切り捨てて配列/オブジェクトを閉じる
+            () => {
+              let fixed = jsonText.substring(0, pos).trimEnd()
+              // 末尾のカンマや不完全な要素を削除
+              fixed = fixed.replace(/,\s*$/, '').replace(/"[^"]*$/, '"')
+              
+              // 開いている括弧を数える
+              let openBraces = 0, openBrackets = 0
+              let inString = false, escaped = false
+              
+              for (let i = 0; i < fixed.length; i++) {
+                const char = fixed[i]
+                if (escaped) {
+                  escaped = false
+                  continue
+                }
+                if (char === '\\') {
+                  escaped = true
+                  continue
+                }
+                if (char === '"') {
+                  inString = !inString
+                  continue
+                }
+                if (inString) continue
+                
+                if (char === '{') openBraces++
+                else if (char === '}') openBraces--
+                else if (char === '[') openBrackets++
+                else if (char === ']') openBrackets--
+              }
+              
+              // 閉じる
+              while (openBrackets > 0) {
+                fixed += ']'
+                openBrackets--
+              }
+              while (openBraces > 0) {
+                fixed += '}'
+                openBraces--
+              }
+              
+              return fixed
+            }
+          ]
           
-          // オプション1: 不正な文字を削除してカンマを追加
-          let fixedJson = jsonText.substring(0, pos) + ',' + jsonText.substring(pos + 1)
-          
-          // オプション2: 文字列が閉じられていない場合、閉じてからカンマ
-          if (charAtPos === '\n' || charAtPos === ' ') {
-            fixedJson = jsonText.substring(0, pos) + '",' + jsonText.substring(pos)
+          // 各修正戦略を順番に試す
+          for (let i = 0; i < fixStrategies.length; i++) {
+            try {
+              console.log(`🔄 修正戦略 ${i + 1}/${fixStrategies.length} を試行中...`)
+              const fixedJson = fixStrategies[i]()
+              const parsed = JSON.parse(fixedJson)
+              console.log(`✅ 修正戦略 ${i + 1} が成功しました！`)
+              return parsed
+            } catch (retryError) {
+              console.error(`❌ 修正戦略 ${i + 1} 失敗:`, retryError instanceof Error ? retryError.message : String(retryError))
+            }
           }
           
-          console.log('🔄 修正後のJSON再パース試行...')
-          
-          try {
-            return JSON.parse(fixedJson)
-          } catch (retryError) {
-            console.error('❌ 修正後もパース失敗:', retryError)
-            // 次の修正方法を試す
-          }
-        }
-        
-        if (error.message.includes("Expected ',' or '}'")) {
-          console.warn('⚠️ オブジェクトのカンマエラー検出、修正を試みます')
-          
-          // エラー位置にカンマを挿入
-          let fixedJson = jsonText.substring(0, pos) + ',' + jsonText.substring(pos)
-          
-          console.log('🔄 修正後のJSON再パース試行...')
-          
-          try {
-            return JSON.parse(fixedJson)
-          } catch (retryError) {
-            console.error('❌ 修正後もパース失敗:', retryError)
-          }
+          console.error('❌ すべての修正戦略が失敗しました')
         }
       }
     }
@@ -4612,9 +4668,29 @@ ${customInfo}
       console.log('📊 データ構造キー:', Object.keys(unitData))
     } catch (parseError: any) {
       console.error('❌ JSONパースエラー:', parseError.message)
+      console.error('📝 パースに失敗したレスポンスの最初の1000文字:')
+      console.error(aiResponse.substring(0, 1000))
+      console.error('📝 パースに失敗したレスポンスの最後の1000文字:')
+      console.error(aiResponse.substring(Math.max(0, aiResponse.length - 1000)))
+      
+      // フォールバック: 部分的なJSONを返す試み
+      let partialData = null
+      try {
+        // 最初の完全なオブジェクトを抽出
+        const match = aiResponse.match(/\{[\s\S]*?\}(?=\s*$|$)/)
+        if (match) {
+          partialData = JSON.parse(match[0])
+          console.log('⚠️ 部分的なJSONパースに成功しました')
+        }
+      } catch (fallbackError) {
+        console.error('❌ フォールバックパースも失敗:', fallbackError)
+      }
+      
       return c.json({
         error: '単元の生成に失敗しました。AIの応答がJSON形式ではありませんでした。',
         details: `パースエラー: ${parseError.message}`,
+        partial_data: partialData,
+        ai_response_preview: aiResponse.substring(0, 500),
         curriculum: null
       }, 500)
     }
