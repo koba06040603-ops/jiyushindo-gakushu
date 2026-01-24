@@ -128,6 +128,9 @@ function extractJSON(aiResponse: string): any {
   // 配列・オブジェクト末尾の余分なカンマを削除
   jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1')
   
+  // 閉じ括弧の後の不正な文字を削除（例: ]| → ]）
+  jsonText = jsonText.replace(/(\]|\})([^\s,\]}\n])/g, '$1')
+  
   // 未閉じの文字列を検出して修正を試みる
   let quoteCount = 0
   for (let i = 0; i < jsonText.length; i++) {
@@ -146,24 +149,31 @@ function extractJSON(aiResponse: string): any {
   try {
     return JSON.parse(jsonText)
   } catch (error) {
-    console.error('JSON parse error:', error)
-    console.error('JSON text (first 500 chars):', jsonText.substring(0, 500))
-    console.error('JSON text (last 500 chars):', jsonText.substring(Math.max(0, jsonText.length - 500)))
-    console.error('AI response (first 500 chars):', aiResponse.substring(0, 500))
+    console.error('❌ JSON parse error:', error)
+    console.error('📄 JSON text length:', jsonText.length)
+    console.error('📄 JSON text (first 500 chars):', jsonText.substring(0, 500))
+    console.error('📄 JSON text (last 500 chars):', jsonText.substring(Math.max(0, jsonText.length - 500)))
+    console.error('📄 AI response length:', aiResponse.length)
+    console.error('📄 AI response (first 500 chars):', aiResponse.substring(0, 500))
     
     // エラー位置を特定
     if (error instanceof SyntaxError && error.message.includes('position')) {
       const posMatch = error.message.match(/position (\d+)/)
       if (posMatch) {
         const pos = parseInt(posMatch[1])
-        const start = Math.max(0, pos - 100)
-        const end = Math.min(jsonText.length, pos + 100)
-        console.error(`Error context (pos ${pos}):`, jsonText.substring(start, end))
-        console.error(`Character at error position:`, jsonText.charAt(pos), `(code: ${jsonText.charCodeAt(pos)})`)
+        const start = Math.max(0, pos - 200)
+        const end = Math.min(jsonText.length, pos + 200)
+        console.error(`🔍 Error context (pos ${pos}):`)
+        console.error(jsonText.substring(start, end))
+        console.error(`🔍 Character at error position: '${jsonText.charAt(pos)}' (code: ${jsonText.charCodeAt(pos)})`)
         
         // 周辺の文字も確認
-        for (let i = Math.max(0, pos - 10); i < Math.min(jsonText.length, pos + 10); i++) {
-          console.error(`  pos ${i}: '${jsonText.charAt(i)}' (code: ${jsonText.charCodeAt(i)})`)
+        console.error('🔍 Characters around error position:')
+        for (let i = Math.max(0, pos - 20); i < Math.min(jsonText.length, pos + 20); i++) {
+          const char = jsonText.charAt(i)
+          const code = jsonText.charCodeAt(i)
+          const display = char === '\n' ? '\\n' : char === '\r' ? '\\r' : char === '\t' ? '\\t' : char
+          console.error(`  pos ${i}: '${display}' (code: ${code})${i === pos ? ' <-- ERROR HERE' : ''}`)
         }
       }
     }
