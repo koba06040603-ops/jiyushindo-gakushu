@@ -3145,6 +3145,22 @@ async function loadCardPage(cardId) {
               </ul>
             </div>
 
+            <!-- もう1問練習する -->
+            <div class="bg-purple-50 rounded-lg p-6">
+              <h3 class="text-lg font-bold text-purple-800 mb-3">
+                <i class="fas fa-redo mr-2"></i>もっと練習する
+              </h3>
+              <button onclick="generateAndShowSimilarProblem(${card.id})" 
+                      id="generateSimilarBtn"
+                      class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg">
+                <i class="fas fa-magic mr-2"></i>
+                もう1問練習する
+              </button>
+              <p class="text-xs text-gray-600 mt-2">
+                AIが似たような問題を作ります
+              </p>
+            </div>
+
             <!-- 進捗情報 -->
             <div class="bg-white rounded-lg shadow p-6">
               <h3 class="text-lg font-bold text-gray-800 mb-3">
@@ -9921,9 +9937,151 @@ async function generateSimilarProblem(cardId) {
   }
 }
 
+// 学習カード画面用の類似問題生成関数
+async function generateAndShowSimilarProblem(cardId) {
+  const button = document.getElementById('generateSimilarBtn')
+  if (!button) return
+  
+  const originalHTML = button.innerHTML
+  button.disabled = true
+  button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>生成中...'
+  
+  try {
+    const response = await axios.post(`/api/cards/${cardId}/generate-similar`)
+    console.log('類似問題生成レスポンス:', response.data)
+    
+    if (response.data.success && response.data.problem) {
+      const problem = response.data.problem
+      
+      // モーダルで問題を表示
+      const modalHTML = `
+        <div id="similarProblemModal" 
+             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+             onclick="if(event.target.id === 'similarProblemModal') closeSimilarProblemModal()">
+          <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+               onclick="event.stopPropagation()">
+            <!-- ヘッダー -->
+            <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-2xl">
+              <div class="flex items-center justify-between">
+                <h2 class="text-2xl font-bold">
+                  <i class="fas fa-magic mr-2"></i>もう1問練習
+                </h2>
+                <button onclick="closeSimilarProblemModal()" 
+                        class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+                  <i class="fas fa-times text-xl"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- コンテンツ -->
+            <div class="p-6">
+              <!-- 問題 -->
+              <div class="bg-blue-50 rounded-lg p-6 mb-6">
+                <h3 class="text-lg font-bold text-blue-800 mb-3">
+                  <i class="fas fa-pencil-alt mr-2"></i>問題
+                </h3>
+                <pre class="text-gray-800 whitespace-pre-wrap font-sans text-lg">${problem.problem_text}</pre>
+              </div>
+
+              <!-- 答えを表示ボタン -->
+              <div class="mb-4">
+                <button onclick="toggleSimilarAnswer()" 
+                        id="toggleSimilarAnswerBtn"
+                        class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg transition">
+                  <i class="fas fa-eye mr-2"></i>答えを表示
+                </button>
+              </div>
+
+              <!-- 答え（初期非表示） -->
+              <div id="similarAnswer" class="hidden">
+                <div class="bg-green-50 rounded-lg p-6 mb-4">
+                  <h3 class="text-lg font-bold text-green-800 mb-3">
+                    <i class="fas fa-check-circle mr-2"></i>答え
+                  </h3>
+                  <pre class="text-gray-800 whitespace-pre-wrap font-sans text-lg">${problem.answer}</pre>
+                </div>
+
+                ${problem.explanation ? `
+                  <div class="bg-purple-50 rounded-lg p-6">
+                    <h3 class="text-lg font-bold text-purple-800 mb-3">
+                      <i class="fas fa-lightbulb mr-2"></i>解説
+                    </h3>
+                    <pre class="text-gray-800 whitespace-pre-wrap font-sans">${problem.explanation}</pre>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- フッター -->
+            <div class="bg-gray-50 p-4 border-t flex gap-3">
+              <button onclick="generateAndShowSimilarProblem(${cardId})" 
+                      class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
+                <i class="fas fa-redo mr-2"></i>
+                もう1問
+              </button>
+              <button onclick="closeSimilarProblemModal()" 
+                      class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition">
+                <i class="fas fa-check mr-2"></i>
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      `
+      
+      // 既存のモーダルがあれば削除
+      const existingModal = document.getElementById('similarProblemModal')
+      if (existingModal) {
+        existingModal.remove()
+      }
+      
+      // 新しいモーダルを表示
+      document.body.insertAdjacentHTML('beforeend', modalHTML)
+      document.body.style.overflow = 'hidden'
+      
+    } else {
+      throw new Error(response.data.error || '生成に失敗しました')
+    }
+  } catch (error) {
+    console.error('類似問題生成エラー:', error)
+    alert('❌ 問題の生成に失敗しました。\n\nもう一度お試しください。')
+  } finally {
+    button.disabled = false
+    button.innerHTML = originalHTML
+  }
+}
+
+// 類似問題の答えを表示/非表示
+function toggleSimilarAnswer() {
+  const answer = document.getElementById('similarAnswer')
+  const btn = document.getElementById('toggleSimilarAnswerBtn')
+  
+  if (answer.classList.contains('hidden')) {
+    answer.classList.remove('hidden')
+    btn.innerHTML = '<i class="fas fa-eye-slash mr-2"></i>答えを隠す'
+    btn.className = 'bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition'
+  } else {
+    answer.classList.add('hidden')
+    btn.innerHTML = '<i class="fas fa-eye mr-2"></i>答えを表示'
+    btn.className = 'bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg transition'
+  }
+}
+
+// 類似問題モーダルを閉じる
+function closeSimilarProblemModal() {
+  const modal = document.getElementById('similarProblemModal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
 // グローバル関数として登録
 window.switchCardTab = switchCardTab
 window.generateSimilarProblem = generateSimilarProblem
+window.generateAndShowSimilarProblem = generateAndShowSimilarProblem
+window.toggleSimilarAnswer = toggleSimilarAnswer
+window.closeSimilarProblemModal = closeSimilarProblemModal
 
 // カード詳細モーダルを閉じる
 function closeCardDetail(event) {
