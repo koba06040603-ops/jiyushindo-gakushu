@@ -3191,7 +3191,8 @@ ${cardContext ? `
    - ❌ 絶対禁止: 「答えられません」「わかりません」「説明が難しいです」と言うこと
    - ✅ 必ず実行: どんな質問でも、子どもに分かる形で説明を提供する
    - ✅ 方法: 難しい内容でも、具体例・たとえ話・身近な例で説明する
-   - ✅ 答えは教えず: 考え方やヒントを段階的に導く
+   - ✅ **簡単な質問・基本的な質問には直接答えてOK**
+   - ✅ 難しい問題や考えさせたい問題の場合のみ、考え方やヒントを段階的に導く
 
 3. **やさしく対話を続ける**
    - 「まず〜を考えてみよう」のようにステップを示す
@@ -3201,11 +3202,20 @@ ${cardContext ? `
    - 最後に「〜は分かったかな？」と理解確認の質問を入れる
 
 【良い回答例】
-質問「安全保障理事会って何？」
-→ 小学4年生向け: 「あんぜんほしょうりじかいは、世界の平和を守るための大切な話し合いの場だよ。15の国がメンバーで、その中でも特に大きな力を持つ5つの国があるんだ。日本も参加したいと考えているよ。どんなことを話し合うと思う？」
 
-質問「掛け算がわからない」
-→ 小学2年生向け: 「かけ算は、同じ数をたくさん足すことだよ。たとえば、3×4は『3を4回足す』から、3+3+3+3=12になるんだ。りんごが3こずつ、4つのかごにあると考えてみて。全部でいくつかな？」
+**簡単な質問・用語説明（直接答える）：**
+質問「安全保障理事会って何？」
+→ 小学4年生向け: 「あんぜんほしょうりじかいは、世界の平和を守るための大切な話し合いの場だよ。15の国がメンバーで、その中でも特に大きな力を持つ5つの国があるんだ。日本も参加したいと考えているよ。国と国のけんかを止めたり、平和を守るためのルールを決めたりしているんだよ。」
+
+質問「首都って何？」
+→ 小学3年生向け: 「しゅとは、国で一番大切な町のことだよ。日本のしゅとは東京で、国のリーダーや大切な建物があるんだ。アメリカのしゅとはワシントンD.C.だよ。」
+
+質問「3×4はいくつ？」
+→ 小学2年生向け: 「3×4は12だよ！かけ算は、同じ数をたくさん足すことだから、3+3+3+3=12になるんだ。りんごが3こずつ、4つのかごにあると考えてみてね。」
+
+**考えさせたい問題（ヒントで導く）：**
+質問「この問題の答えを教えて」
+→ 「まず、問題文で何を聞かれているか確認してみよう。次に、分かっていることを整理すると考えやすくなるよ。どんなところまで分かったかな？」
 
 質問「なんで勉強しないといけないの？」
 → 小学3年生向け: 「いい質問だね！勉強は、きみの『できること』をふやすためだよ。字が読めると本が読めるし、計算ができるとお買い物も楽しくなる。将来なりたいものを見つけたとき、勉強したことが役に立つんだ。今は何に興味があるかな？」`
@@ -3298,42 +3308,41 @@ ${cardContext ? `
     
     // finishReasonをログ出力
     console.log('📊 Candidate finishReason:', candidate.finishReason)
+    console.log('📊 Has content:', !!candidate.content)
+    console.log('📊 Has parts:', !!candidate.content?.parts)
+    console.log('📊 Parts length:', candidate.content?.parts?.length)
     
-    // STOP以外のfinishReasonは問題あり
-    if (candidate.finishReason && candidate.finishReason !== 'STOP') {
-      console.warn('⚠️ Gemini API - 異常なfinishReason:', {
-        finishReason: candidate.finishReason,
-        safetyRatings: candidate.safetyRatings,
-        content: candidate.content
-      })
-      
-      // SEFETYとRECITATIONのみブロック、それ以外は警告のみ
-      if (candidate.finishReason === 'SAFETY' || candidate.finishReason === 'RECITATION') {
-        const fallbackResponse = `その質問、ちょっと難しいね。
-違う聞き方で、もう一度質問してみてくれるかな？
-それか、先生に聞いてみるのもいいよ！`
-        
-        return c.json({ response: fallbackResponse })
-      }
-    }
-
-    // 回答テキストを取得
+    // 回答テキストを取得（finishReasonに関わらず、contentがあれば使用）
     const aiResponse = candidate?.content?.parts?.[0]?.text
     
-    if (!aiResponse || aiResponse.trim() === '') {
-      console.error('❌ AI回答が空:', { candidate })
-      
-      // 空の回答の場合のフォールバック
-      const fallbackResponse = `ごめんね、今その質問にうまく答えられなかったよ。
-もう一度、別の言葉で質問してみてくれるかな？
-先生に聞いてみるのもいいよ！`
+    // テキストが存在する場合は使用（finishReasonは無視）
+    if (aiResponse && aiResponse.trim() !== '') {
+      console.log('✅ AI回答取得成功:', aiResponse.substring(0, 100))
+      return c.json({ response: aiResponse })
+    }
+    
+    // テキストが空の場合のみフォールバック
+    console.error('❌ AI回答が空:', { 
+      candidate,
+      finishReason: candidate.finishReason,
+      safetyRatings: candidate.safetyRatings 
+    })
+    
+    // SEFETYブロックの場合
+    if (candidate.finishReason === 'SAFETY') {
+      const fallbackResponse = `その質問、ちょっと難しいね。
+違う聞き方で、もう一度質問してみてくれるかな？
+それか、先生に聞いてみるのもいいよ！`
       
       return c.json({ response: fallbackResponse })
     }
     
-    console.log('✅ AI回答取得成功:', aiResponse.substring(0, 100))
-
-    return c.json({ response: aiResponse })
+    // その他の空応答
+    const fallbackResponse = `ごめんね、今その質問にうまく答えられなかったよ。
+もう一度、別の言葉で質問してみてくれるかな？
+先生に聞いてみるのもいいよ！`
+    
+    return c.json({ response: fallbackResponse })
   } catch (error: any) {
     console.error('AIチャットエラー:', error)
     console.error('エラー詳細:', error.message)

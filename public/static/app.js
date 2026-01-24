@@ -2889,17 +2889,9 @@ async function selectCourse(courseId) {
             </div>
           `).join('')}
         </div>
-
-        <!-- 進捗ボードへのリンク -->
-        <div class="mt-8 text-center">
-          <button onclick="loadProgressBoard()" class="bg-green-600 text-white py-3 px-8 rounded-lg font-bold hover:bg-green-700 transition">
-            <i class="fas fa-chart-bar mr-2"></i>
-            みんなの進捗を見る
-          </button>
-        </div>
         
         <!-- クラス進捗確認ボタン（児童用）-->
-        <div class="mt-4 text-center">
+        <div class="mt-6 text-center">
           <button onclick="showClassProgress()" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-8 rounded-lg font-bold transition">
             <i class="fas fa-users mr-2"></i>
             クラスのみんなの進捗を見る
@@ -9919,6 +9911,38 @@ function showUnitPreview(unitData, modelUsed) {
         </div>
       </div>
 
+      <!-- 選択問題プレビュー -->
+      ${optionalProblems.length > 0 ? `
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 class="text-2xl font-bold text-gray-800 mb-4">
+            <i class="fas fa-star text-yellow-500 mr-2"></i>
+            選択問題（発展問題）
+          </h2>
+          <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
+            <p class="text-sm text-gray-700">
+              <i class="fas fa-info-circle mr-2"></i>
+              チェックテスト合格後に取り組める発展問題が ${optionalProblems.length} 問含まれています
+            </p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${optionalProblems.map((problem, index) => `
+              <div class="bg-pink-50 border border-pink-200 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="bg-pink-200 text-pink-800 px-3 py-1 rounded-full text-sm font-bold">
+                    問題 ${index + 1}
+                  </span>
+                  <span class="text-xs text-gray-600">
+                    ${problem.difficulty_level || '標準'}
+                  </span>
+                </div>
+                <h3 class="font-bold text-gray-800 mb-2">${problem.problem_title}</h3>
+                <p class="text-sm text-gray-600 line-clamp-2">${problem.problem_description || ''}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       <!-- アクションボタン -->
       <div class="flex flex-col space-y-3">
         <!-- 教師用：全体確認・編集ボタン -->
@@ -11373,14 +11397,26 @@ function showTeacherOverview(unitData) {
                     </span>
                     ${problem.problem_title}
                   </h3>
-                  <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-                    難易度: ${problem.difficulty_level || '標準'}
-                  </span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
+                      難易度: ${problem.difficulty_level || '標準'}
+                    </span>
+                    <button onclick="editOptionalProblem(${index})" 
+                            class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded transition">
+                      <i class="fas fa-edit mr-1"></i>編集
+                    </button>
+                  </div>
                 </div>
                 <div class="bg-white p-3 rounded-lg mb-3">
                   <p class="text-sm font-bold text-pink-800 mb-1">📝 問題</p>
                   <p class="text-gray-700">${problem.problem_description}</p>
                 </div>
+                ${problem.learning_meaning ? `
+                  <div class="bg-purple-50 p-3 rounded-lg mb-3">
+                    <p class="text-sm font-bold text-purple-800 mb-1">🎯 学習の意義</p>
+                    <p class="text-gray-700">${problem.learning_meaning}</p>
+                  </div>
+                ` : ''}
                 ${problem.hint_text ? `
                   <div class="bg-yellow-50 p-3 rounded-lg">
                     <p class="text-sm font-bold text-yellow-800 mb-1">💡 ヒント</p>
@@ -11642,6 +11678,135 @@ window.showTeacherOverview = showTeacherOverview
 window.editCardContent = editCardContent
 window.closeCardEditModal = closeCardEditModal
 window.saveCardEdit = saveCardEdit
+
+// 選択問題編集機能
+function editOptionalProblem(problemIndex) {
+  const problem = window.currentUnitData?.optional_problems[problemIndex]
+  
+  if (!problem) {
+    alert('選択問題データが見つかりません')
+    return
+  }
+  
+  const modalHTML = `
+    <div id="optionalProblemEditModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         onclick="if(event.target.id === 'optionalProblemEditModal') closeOptionalProblemEditModal()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+           onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-r from-pink-600 to-purple-600 text-white p-6 rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-star mr-2"></i>選択問題 ${problemIndex + 1} の編集
+            </h2>
+            <button onclick="closeOptionalProblemEditModal()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          <form id="optionalProblemEditForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-heading mr-1"></i>問題タイトル
+              </label>
+              <input type="text" id="edit_problem_title" 
+                     value="${problem.problem_title || ''}"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                     required>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-align-left mr-1"></i>問題説明
+              </label>
+              <textarea id="edit_problem_description" rows="4"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        required>${problem.problem_description || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-book-reader mr-1"></i>学習の意義
+              </label>
+              <textarea id="edit_learning_meaning" rows="3"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500">${problem.learning_meaning || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-chart-line mr-1"></i>難易度
+              </label>
+              <select id="edit_difficulty_level"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500">
+                <option value="easy" ${problem.difficulty_level === 'easy' ? 'selected' : ''}>かんたん</option>
+                <option value="medium" ${problem.difficulty_level === 'medium' ? 'selected' : ''}>ふつう</option>
+                <option value="hard" ${problem.difficulty_level === 'hard' ? 'selected' : ''}>むずかしい</option>
+                <option value="very_hard" ${problem.difficulty_level === 'very_hard' ? 'selected' : ''}>とてもむずかしい</option>
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-gray-50 p-4 border-t flex gap-3">
+          <button onclick="saveOptionalProblemEdit(${problem.id}, ${problemIndex})" 
+                  class="flex-1 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>保存
+          </button>
+          <button onclick="closeOptionalProblemEditModal()" 
+                  class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  document.body.style.overflow = 'hidden'
+}
+
+function closeOptionalProblemEditModal() {
+  const modal = document.getElementById('optionalProblemEditModal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
+async function saveOptionalProblemEdit(problemId, problemIndex) {
+  try {
+    const updatedProblem = {
+      problem_title: document.getElementById('edit_problem_title').value,
+      problem_description: document.getElementById('edit_problem_description').value,
+      learning_meaning: document.getElementById('edit_learning_meaning').value,
+      difficulty_level: document.getElementById('edit_difficulty_level').value
+    }
+    
+    const response = await axios.put(`/api/optional-problems/${problemId}`, updatedProblem)
+    
+    if (response.data.success) {
+      if (window.currentUnitData?.optional_problems[problemIndex]) {
+        Object.assign(window.currentUnitData.optional_problems[problemIndex], updatedProblem)
+      }
+      
+      closeOptionalProblemEditModal()
+      alert('✅ 選択問題を保存しました！')
+      showTeacherOverview(window.currentUnitData)
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('選択問題保存エラー:', error)
+    alert('❌ 保存に失敗しました: ' + (error.response?.data?.error || error.message))
+  }
+}
+
+window.editOptionalProblem = editOptionalProblem
+window.closeOptionalProblemEditModal = closeOptionalProblemEditModal
+window.saveOptionalProblemEdit = saveOptionalProblemEdit
 
 // 学習計画表の時数調整
 let learningPlanData = { courses: [] }
