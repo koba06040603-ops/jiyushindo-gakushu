@@ -31,6 +31,11 @@ function extractJSON(aiResponse: string): any {
   // 先頭・末尾の余分な文字を削除
   jsonText = jsonText.replace(/^[^{[]*/, '').replace(/[^}\]]*$/, '')
   
+  // **NEW: Unicodeスマート引用符を標準引用符に置換**
+  jsonText = jsonText.replace(/[\u2018\u2019]/g, "'")  // ' → '
+  jsonText = jsonText.replace(/[\u201C\u201D]/g, '"')  // " " → "
+  jsonText = jsonText.replace(/[\u2013\u2014]/g, '-')  // – — → -
+  
   // 状態機械式パーサーで文字列内の改行をエスケープ
   let inString = false
   let escaped = false
