@@ -9694,6 +9694,11 @@ window.saveGeneratedUnit = saveGeneratedUnit
 
 // 学習カード詳細表示モーダル
 function showCardDetail(card) {
+  console.log('📋 カード詳細表示:', card)
+  console.log('📋 ヒント数:', card.hints?.length)
+  console.log('📋 解答:', card.answer)
+  console.log('📋 解説:', card.example_solution)
+  
   // 学習カード開始時刻を記録
   startCardTiming()
   
