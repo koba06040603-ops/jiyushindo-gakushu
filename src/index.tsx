@@ -3100,6 +3100,47 @@ app.put('/api/cards/:cardId', async (c) => {
   }
 })
 
+// APIルート：カードのヒント更新
+app.put('/api/cards/:cardId/hints', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  const { hints } = await c.req.json()
+  
+  try {
+    // 既存のヒントを削除
+    await env.DB.prepare(`
+      DELETE FROM hint_cards WHERE learning_card_id = ?
+    `).bind(cardId).run()
+    
+    // 新しいヒントを挿入
+    if (hints && hints.length > 0) {
+      for (let i = 0; i < hints.length; i++) {
+        const hint = hints[i]
+        await env.DB.prepare(`
+          INSERT INTO hint_cards (
+            learning_card_id, hint_number, hint_content, hint_text, thinking_tool_suggestion
+          ) VALUES (?, ?, ?, ?, ?)
+        `).bind(
+          cardId,
+          i + 1,
+          hint.hint_text || hint.hint_content || '',
+          hint.hint_text || hint.hint_content || '',
+          hint.thinking_tool_suggestion || ''
+        ).run()
+      }
+    }
+    
+    return c.json({ success: true, message: 'ヒントを更新しました' })
+  } catch (error: any) {
+    console.error('ヒント更新エラー:', error)
+    return c.json({ 
+      success: false,
+      error: 'ヒントの更新に失敗しました', 
+      details: error.message 
+    }, 500)
+  }
+})
+
 // APIルート：類似問題生成
 app.post('/api/cards/:cardId/generate-similar', async (c) => {
   const { env } = c
@@ -5923,6 +5964,42 @@ app.post('/api/curriculum/:id/optional-problem', async (c) => {
     return c.json({
       success: false,
       error: '選択問題の追加に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：選択問題の更新
+app.put('/api/optional-problems/:id', async (c) => {
+  const { env } = c
+  const problemId = c.req.param('id')
+  const { problem_title, problem_description, learning_meaning, difficulty_level } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE optional_problems
+      SET problem_title = ?,
+          problem_description = ?,
+          learning_meaning = ?,
+          difficulty_level = ?
+      WHERE id = ?
+    `).bind(
+      problem_title,
+      problem_description,
+      learning_meaning || '',
+      difficulty_level || 'medium',
+      problemId
+    ).run()
+    
+    return c.json({
+      success: true,
+      message: '選択問題を更新しました'
+    })
+  } catch (error: any) {
+    console.error('選択問題更新エラー:', error)
+    return c.json({
+      success: false,
+      error: '選択問題の更新に失敗しました',
       details: error.message
     }, 500)
   }

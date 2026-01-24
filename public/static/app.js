@@ -11469,9 +11469,15 @@ function showTeacherOverview(unitData) {
             </h3>
             ${(course.cards || []).map((card, cardIndex) => `
               <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-3">
-                <p class="font-bold text-gray-800 mb-3">
-                  カード ${card.card_number}: ${card.card_title}
-                </p>
+                <div class="flex items-center justify-between mb-3">
+                  <p class="font-bold text-gray-800">
+                    カード ${card.card_number}: ${card.card_title}
+                  </p>
+                  <button onclick="editCardHints(${courseIndex}, ${cardIndex})" 
+                          class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-3 py-1 rounded transition">
+                    <i class="fas fa-edit mr-1"></i>ヒントを編集
+                  </button>
+                </div>
                 ${(card.hints || []).map((hint, hintIndex) => `
                   <div class="bg-white p-3 rounded-lg mb-2">
                     <p class="text-sm font-bold text-yellow-800 mb-1">
@@ -11827,6 +11833,129 @@ async function saveOptionalProblemEdit(problemId, problemIndex) {
 window.editOptionalProblem = editOptionalProblem
 window.closeOptionalProblemEditModal = closeOptionalProblemEditModal
 window.saveOptionalProblemEdit = saveOptionalProblemEdit
+
+// ヒント編集機能
+function editCardHints(courseIndex, cardIndex) {
+  const course = window.currentUnitData?.courses[courseIndex]
+  const card = course?.cards[cardIndex]
+  
+  if (!card) {
+    alert('カードデータが見つかりません')
+    return
+  }
+  
+  const hints = card.hints || []
+  
+  const modalHTML = `
+    <div id="hintsEditModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         onclick="if(event.target.id === 'hintsEditModal') closeHintsEditModal()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+           onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-6 rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-lightbulb mr-2"></i>ヒントの編集
+            </h2>
+            <button onclick="closeHintsEditModal()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+          <p class="text-sm mt-2 opacity-90">カード: ${card.card_title}</p>
+        </div>
+
+        <div class="p-6">
+          <form id="hintsEditForm" class="space-y-6">
+            ${[0, 1, 2].map(i => {
+              const hint = hints[i] || {}
+              return `
+                <div class="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
+                  <h3 class="font-bold text-yellow-800 mb-3 flex items-center">
+                    <span class="bg-yellow-500 text-white w-8 h-8 rounded-full flex items-center justify-center mr-2">${i + 1}</span>
+                    ヒント ${i + 1}
+                  </h3>
+                  <div class="space-y-3">
+                    <div>
+                      <label class="block text-sm font-bold text-gray-700 mb-1">
+                        <i class="fas fa-comment mr-1"></i>ヒント内容
+                      </label>
+                      <textarea id="hint_text_${i}" rows="3"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                                placeholder="ヒント内容を入力...">${hint.hint_text || hint.hint_content || ''}</textarea>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-bold text-gray-700 mb-1">
+                        <i class="fas fa-tools mr-1"></i>思考ツールの提案（任意）
+                      </label>
+                      <input type="text" id="thinking_tool_${i}"
+                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                             placeholder="例：図に書いてみよう"
+                             value="${hint.thinking_tool_suggestion || ''}">
+                    </div>
+                  </div>
+                </div>
+              `
+            }).join('')}
+          </form>
+        </div>
+
+        <div class="bg-gray-50 p-4 border-t flex gap-3">
+          <button onclick="saveHintsEdit(${card.id}, ${courseIndex}, ${cardIndex})" 
+                  class="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>保存
+          </button>
+          <button onclick="closeHintsEditModal()" 
+                  class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  document.body.style.overflow = 'hidden'
+}
+
+function closeHintsEditModal() {
+  const modal = document.getElementById('hintsEditModal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
+async function saveHintsEdit(cardId, courseIndex, cardIndex) {
+  try {
+    const hints = [0, 1, 2].map(i => ({
+      hint_text: document.getElementById(`hint_text_${i}`).value,
+      thinking_tool_suggestion: document.getElementById(`thinking_tool_${i}`).value
+    })).filter(hint => hint.hint_text.trim() !== '')
+    
+    const response = await axios.put(`/api/cards/${cardId}/hints`, { hints })
+    
+    if (response.data.success) {
+      // ローカルデータを更新
+      if (window.currentUnitData?.courses[courseIndex]?.cards[cardIndex]) {
+        window.currentUnitData.courses[courseIndex].cards[cardIndex].hints = hints
+      }
+      
+      closeHintsEditModal()
+      alert('✅ ヒントを保存しました！')
+      showTeacherOverview(window.currentUnitData)
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('ヒント保存エラー:', error)
+    alert('❌ 保存に失敗しました: ' + (error.response?.data?.error || error.message))
+  }
+}
+
+window.editCardHints = editCardHints
+window.closeHintsEditModal = closeHintsEditModal
+window.saveHintsEdit = saveHintsEdit
 
 // 学習計画表の時数調整
 let learningPlanData = { courses: [] }
@@ -18480,9 +18609,9 @@ async function showClassProgress() {
       <div class="container mx-auto px-4 py-8 max-w-6xl">
         <!-- ヘッダー -->
         <div class="bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg shadow-xl p-8 mb-8">
-          <button onclick="loadGuidePage(${state.selectedCurriculum.id})" 
+          <button onclick="${state.selectedCard ? `loadCardPage(${state.selectedCard})` : `loadGuidePage(${state.selectedCurriculum.id})`}" 
                   class="text-white hover:text-gray-200 mb-4 inline-flex items-center">
-            <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
+            <i class="fas fa-arrow-left mr-2"></i>${state.selectedCard ? '学習カードに戻る' : '学習のてびきに戻る'}
           </button>
           <h1 class="text-4xl font-bold mb-3">
             <i class="fas fa-users mr-3"></i>クラスのみんなの進捗
