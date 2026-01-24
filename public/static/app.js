@@ -2889,8 +2889,24 @@ async function loadCardPage(cardId) {
     // カードデータをグローバルに保存（ヘルプ要請時に使用）
     window.currentCardData = card
     
+    // 学年別のフォントサイズを取得
+    const grade = state.selectedCurriculum?.grade || '小学3年'
+    const fontSize = getGradeFontSize(grade)
+    
     const app = document.getElementById('app')
     app.innerHTML = `
+      <style>
+        .card-content {
+          font-size: ${fontSize.base}px;
+          line-height: 1.8;
+        }
+        .card-title {
+          font-size: ${fontSize.title}px;
+        }
+        .card-heading {
+          font-size: ${fontSize.heading}px;
+        }
+      </style>
       <div class="container mx-auto px-4 py-8">
         <!-- ヘッダー -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -2902,7 +2918,7 @@ async function loadCardPage(cardId) {
               <h1 class="text-3xl font-bold text-indigo-600 mb-2">
                 学習カード ${card.card_number}
               </h1>
-              <h2 class="text-xl text-gray-800">${card.card_title}</h2>
+              <h2 class="card-title text-gray-800">${card.card_title}</h2>
             </div>
             <div class="flex items-center gap-3">
               <!-- ヘルプボタン4つ -->
@@ -2943,28 +2959,28 @@ async function loadCardPage(cardId) {
             <!-- 新出語句・キーワード -->
             ${card.new_terms ? `
               <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
-                <h3 class="text-lg font-bold text-blue-800 mb-3">
+                <h3 class="card-heading font-bold text-blue-800 mb-3">
                   <i class="fas fa-book mr-2"></i>新しく学ぶこと
                 </h3>
-                <pre class="text-gray-800 whitespace-pre-wrap font-sans">${card.new_terms}</pre>
+                <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans">${card.new_terms}</pre>
               </div>
             ` : ''}
 
             <!-- 例題 -->
             ${card.example_problem ? `
               <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">
+                <h3 class="card-heading font-bold text-gray-800 mb-4">
                   <i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題
                 </h3>
                 <div class="bg-yellow-50 rounded-lg p-4 mb-4">
-                  <pre class="text-gray-800 whitespace-pre-wrap font-sans font-bold">${card.example_problem}</pre>
+                  <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${card.example_problem}</pre>
                 </div>
                 ${card.example_solution ? `
                   <div class="bg-green-50 rounded-lg p-4">
-                    <h4 class="font-bold text-green-800 mb-2">
+                    <h4 class="card-heading font-bold text-green-800 mb-2">
                       <i class="fas fa-check-circle mr-2"></i>解き方
                     </h4>
-                    <pre class="text-gray-800 whitespace-pre-wrap font-sans">${card.example_solution}</pre>
+                    <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans">${card.example_solution}</pre>
                   </div>
                 ` : ''}
               </div>
@@ -2972,7 +2988,7 @@ async function loadCardPage(cardId) {
 
             <!-- 問題 -->
             <div class="bg-white rounded-lg shadow-lg p-6">
-              <h3 class="text-lg font-bold text-gray-800 mb-4">
+              <h3 class="card-heading font-bold text-gray-800 mb-4">
                 <i class="fas fa-pencil-alt mr-2 text-indigo-600"></i>問題
               </h3>
               ${card.real_world_context ? `
@@ -2982,7 +2998,7 @@ async function loadCardPage(cardId) {
                 </div>
               ` : ''}
               <div class="bg-gray-50 rounded-lg p-6">
-                <pre class="text-gray-800 whitespace-pre-wrap font-sans text-lg leading-relaxed">${card.problem_content}</pre>
+                <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">${card.problem_content}</pre>
               </div>
               
               <!-- 回答欄 -->
@@ -8830,6 +8846,23 @@ function showUnitGeneratorModal() {
 // 最後の生成パラメータを保存（再生成用）
 let lastGenerationParams = null
 
+// 学年別のフォントサイズを返す
+function getGradeFontSize(grade) {
+  const gradeMap = {
+    '小学1年': { base: 22, title: 28, heading: 24 },
+    '小学2年': { base: 20, title: 26, heading: 22 },
+    '小学3年': { base: 19, title: 24, heading: 21 },
+    '小学4年': { base: 18, title: 22, heading: 20 },
+    '小学5年': { base: 17, title: 21, heading: 19 },
+    '小学6年': { base: 16, title: 20, heading: 18 },
+    '中学1年': { base: 16, title: 20, heading: 18 },
+    '中学2年': { base: 16, title: 20, heading: 18 },
+    '中学3年': { base: 16, title: 20, heading: 18 }
+  }
+  
+  return gradeMap[grade] || { base: 16, title: 20, heading: 18 }
+}
+
 // モーダルを閉じる
 function closeUnitGeneratorModal() {
   const modal = document.getElementById('unitGeneratorModal')
@@ -9139,6 +9172,38 @@ function initModalDrag(headerId, contentId) {
   
   function setTranslate(xPos, yPos, el) {
     el.style.transform = `translate(${xPos}px, ${yPos}px)`
+  }
+}
+
+// フルスクリーンローディングオーバーレイを表示
+function showLoadingOverlay(message = '処理中...') {
+  const overlay = document.createElement('div')
+  overlay.id = 'loadingOverlay'
+  overlay.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[9999]'
+  overlay.innerHTML = `
+    <div class="bg-white rounded-2xl p-8 shadow-2xl text-center max-w-md">
+      <div class="mb-4">
+        <i class="fas fa-spinner fa-spin text-6xl text-purple-600"></i>
+      </div>
+      <p class="text-xl font-bold text-gray-800 mb-2">${message}</p>
+      <p class="text-sm text-gray-600">しばらくお待ちください...</p>
+      <div class="mt-4 flex justify-center">
+        <div class="animate-bounce mx-1 h-3 w-3 bg-purple-600 rounded-full"></div>
+        <div class="animate-bounce mx-1 h-3 w-3 bg-pink-600 rounded-full" style="animation-delay: 0.1s"></div>
+        <div class="animate-bounce mx-1 h-3 w-3 bg-blue-600 rounded-full" style="animation-delay: 0.2s"></div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+  document.body.style.overflow = 'hidden'
+}
+
+// フルスクリーンローディングオーバーレイを非表示
+function hideLoadingOverlay() {
+  const overlay = document.getElementById('loadingOverlay')
+  if (overlay) {
+    overlay.remove()
+    document.body.style.overflow = ''
   }
 }
 
@@ -10070,12 +10135,8 @@ async function generateSimilarProblem(cardId) {
 
 // 学習カード画面用の類似問題生成関数
 async function generateAndShowSimilarProblem(cardId) {
-  const button = document.getElementById('generateSimilarBtn')
-  if (!button) return
-  
-  const originalHTML = button.innerHTML
-  button.disabled = true
-  button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>生成中...'
+  // フルスクリーンローディング表示
+  showLoadingOverlay('AIが新しい問題を生成中...')
   
   try {
     const response = await axios.post(`/api/cards/${cardId}/generate-similar`)
@@ -10083,6 +10144,9 @@ async function generateAndShowSimilarProblem(cardId) {
     
     if (response.data.success && response.data.problem) {
       const problem = response.data.problem
+      
+      // ローディングを非表示
+      hideLoadingOverlay()
       
       // モーダルで問題を表示
       const modalHTML = `
@@ -10180,10 +10244,8 @@ async function generateAndShowSimilarProblem(cardId) {
     }
   } catch (error) {
     console.error('類似問題生成エラー:', error)
+    hideLoadingOverlay()
     alert('❌ 問題の生成に失敗しました。\n\nもう一度お試しください。')
-  } finally {
-    button.disabled = false
-    button.innerHTML = originalHTML
   }
 }
 
