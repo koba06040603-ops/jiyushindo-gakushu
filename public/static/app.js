@@ -3219,6 +3219,14 @@ function showAITeacher() {
   window.currentHelpType = 'ai'
   window.helpCount++
   
+  // 会話履歴を初期化
+  if (!window.aiConversationHistory) {
+    window.aiConversationHistory = []
+  }
+  if (!window.aiDetectedGrade) {
+    window.aiDetectedGrade = null
+  }
+  
   // 初回メッセージ
   const aiChat = document.getElementById('aiChat')
   if (aiChat.children.length === 0) {
@@ -3269,6 +3277,24 @@ async function askAI() {
   addAIMessage(question, 'user')
   input.value = ''
   
+  // 会話履歴に質問を追加
+  if (!window.aiConversationHistory) {
+    window.aiConversationHistory = []
+  }
+  window.aiConversationHistory.push({
+    role: 'user',
+    message: question
+  })
+  
+  // 学年を検出（質問内容から）
+  if (!window.aiDetectedGrade) {
+    const gradeMatch = question.match(/([1-6])年生/)
+    if (gradeMatch) {
+      window.aiDetectedGrade = `小学${gradeMatch[1]}年生`
+      console.log('学年を検出しました:', window.aiDetectedGrade)
+    }
+  }
+  
   // ローディング表示
   const aiChat = document.getElementById('aiChat')
   const loadingId = 'loading-' + Date.now()
@@ -3288,14 +3314,18 @@ async function askAI() {
       new_terms: card.new_terms
     } : null
     
-    // AI先生APIを呼び出す
-    const response = await axios.post('/api/ai/ask', {
-      studentId: state.student.id,
-      curriculumId: state.selectedCurriculum.id,
-      cardId: state.selectedCard,
-      question: question,
-      context: cardContext ? JSON.stringify(cardContext) : '',
-      sessionId: window.aiSessionId
+    // 会話履歴をAPIに送信する形式に変換
+    const conversationHistory = window.aiConversationHistory.map(conv => ({
+      role: conv.role,
+      content: conv.message
+    }))
+    
+    // AI先生APIを呼び出す（会話履歴と学年を含める）
+    const response = await axios.post('/api/ai-chat', {
+      message: question,
+      cardContext: cardContext,
+      conversationHistory: conversationHistory,
+      studentGrade: window.aiDetectedGrade || null
     })
     
     // ローディングメッセージを削除
@@ -3303,8 +3333,19 @@ async function askAI() {
     if (loadingMsg) loadingMsg.remove()
     
     // AIの回答を追加
-    const answer = response.data.answer || 'ごめんね、うまく答えられなかったよ。先生に聞いてみてね。'
+    const answer = response.data.response || 'ごめんね、うまく答えられなかったよ。先生に聞いてみてね。'
     addAIMessage(answer, 'ai')
+    
+    // 会話履歴に回答を追加
+    window.aiConversationHistory.push({
+      role: 'assistant',
+      message: answer
+    })
+    
+    // 学年を再検出（AIの回答から）
+    if (!window.aiDetectedGrade && answer.includes('何年生')) {
+      console.log('AIが学年を尋ねています')
+    }
     
     // セッションIDを更新
     if (response.data.sessionId) {
