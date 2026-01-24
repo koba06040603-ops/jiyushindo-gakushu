@@ -9951,19 +9951,17 @@ window.submitFeedback = submitFeedback
 
 // 学習カード詳細表示モーダル
 function showCardDetail(card) {
-  console.log('📋 カード詳細表示:', card)
-  console.log('📋 カードのキー:', Object.keys(card))
-  console.log('📋 hints配列:', card.hints)
-  console.log('📋 ヒント数:', card.hints?.length)
-  console.log('📋 answer:', card.answer)
-  console.log('📋 answer_explanation:', card.answer_explanation)
-  console.log('📋 example_solution:', card.example_solution)
-  
-  // ヒント配列が存在する場合、各ヒントの構造を確認
-  if (card.hints && card.hints.length > 0) {
-    console.log('📋 ヒント[0]の構造:', card.hints[0])
-    console.log('📋 ヒント[0]のキー:', Object.keys(card.hints[0]))
+  // デバッグログ（開発時のみ）
+  if (window.location.hostname === 'localhost' || window.location.hostname.includes('dev')) {
+    console.log('📋 カード詳細:', card)
+    console.log('📋 hints:', card.hints)
+    console.log('📋 answer:', card.answer)
   }
+  
+  // データのフォールバック処理
+  const hints = card.hints || []
+  const answer = card.answer || card.example_solution || ''
+  const explanation = card.answer_explanation || card.example_solution || ''
   
   // 学習カード開始時刻を記録
   startCardTiming()
@@ -10074,9 +10072,9 @@ function showCardDetail(card) {
 
           <!-- ヒントタブ -->
           <div id="content-hints" class="tab-content space-y-4 hidden">
-            ${card.hints && card.hints.length > 0 ? `
+            ${hints && hints.length > 0 ? `
               <div class="space-y-4">
-                ${card.hints.map((hint, index) => `
+                ${hints.map((hint, index) => `
                   <div class="bg-gradient-to-r from-pink-50 to-yellow-50 p-6 rounded-xl border-2 border-pink-200 shadow-md">
                     <div class="flex items-center mb-3">
                       <span class="bg-gradient-to-r from-pink-500 to-yellow-500 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl mr-3">
@@ -10108,7 +10106,7 @@ function showCardDetail(card) {
 
           <!-- 解答タブ -->
           <div id="content-answer" class="tab-content space-y-4 hidden">
-            ${card.answer || card.example_solution ? `
+            ${answer ? `
               <div class="bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-400 p-6 rounded-xl shadow-lg">
                 <h3 class="font-bold text-green-800 mb-4 flex items-center text-xl">
                   <i class="fas fa-check-circle mr-2 text-2xl"></i>
@@ -10127,7 +10125,7 @@ function showCardDetail(card) {
                       <img src="${card.answer_image_url}" alt="解答画像" class="max-w-full h-auto rounded-lg shadow-md mx-auto" style="max-height: 400px;">
                     </div>
                   ` : ''}
-                  <p class="text-gray-800 text-lg whitespace-pre-wrap">${card.answer || card.example_solution}</p>
+                  <p class="text-gray-800 text-lg whitespace-pre-wrap">${answer}</p>
                 </div>
               </div>
             ` : `
@@ -10140,14 +10138,26 @@ function showCardDetail(card) {
 
           <!-- 解説タブ -->
           <div id="content-explanation" class="tab-content space-y-4 hidden">
-            ${card.example_solution ? `
+            ${explanation ? `
               <div class="bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-400 p-6 rounded-xl shadow-lg">
                 <h3 class="font-bold text-blue-800 mb-4 flex items-center text-xl">
                   <i class="fas fa-book-open mr-2 text-2xl"></i>
                   解き方・考え方
                 </h3>
                 <div class="bg-white p-6 rounded-lg border-2 border-blue-200">
-                  <p class="text-gray-800 text-lg whitespace-pre-wrap">${card.example_solution}</p>
+                  <p class="text-gray-800 text-lg whitespace-pre-wrap">${explanation}</p>
+                </div>
+              </div>
+            ` : ''}
+            
+            ${card.answer_explanation ? `
+              <div class="bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-400 p-6 rounded-xl shadow-lg mt-4">
+                <h3 class="font-bold text-indigo-800 mb-4 flex items-center text-xl">
+                  <i class="fas fa-comment-dots mr-2 text-2xl"></i>
+                  解説・ポイント
+                </h3>
+                <div class="bg-white p-6 rounded-lg border-2 border-indigo-200">
+                  <p class="text-gray-800 text-lg whitespace-pre-wrap">${card.answer_explanation}</p>
                 </div>
               </div>
             ` : ''}
