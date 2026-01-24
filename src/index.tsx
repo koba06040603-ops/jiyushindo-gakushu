@@ -3042,9 +3042,29 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
 // AIチャット機能（学習カード用）
 app.post('/api/ai-chat', async (c) => {
   try {
-    const { message, cardContext } = await c.req.json()
+    const { message, cardContext, conversationHistory, studentGrade } = await c.req.json()
     
-    const systemPrompt = `あなたは小学生の学習を優しくサポートするAI先生です。
+    // 会話履歴から学年を確認（初回は学年を尋ねる）
+    const hasGradeInfo = studentGrade || (conversationHistory && conversationHistory.some((msg: any) => 
+      msg.text && msg.text.match(/[1-6]年生/)
+    ))
+    
+    let systemPrompt = ''
+    
+    if (!hasGradeInfo && (!conversationHistory || conversationHistory.length === 0)) {
+      // 初回メッセージ：学年を尋ねる
+      systemPrompt = `あなたは小学生の学習を優しくサポートするAI先生です。
+
+【初回対応】
+最初に、子どもに何年生かを尋ねてください。その後、その学年に合わせた言葉と説明の難しさで対応してください。
+
+【回答例】
+「こんにちは！AI先生だよ。何年生かな？教えてくれると、ちょうどいい説明ができるよ！」`
+    } else {
+      // 学年がわかっている場合：通常の対応
+      const gradeLevel = studentGrade || '小学生'
+      
+      systemPrompt = `あなたは${gradeLevel}の学習を優しくサポートするAI先生です。
 ${cardContext ? `
 【現在の学習内容】
 - カードタイトル: ${cardContext.card_title}
@@ -3053,7 +3073,7 @@ ${cardContext ? `
 ` : ''}
 
 【回答ルール】
-1. 小学生が使う言葉で、具体的に説明する（難しい言葉は使わない）
+1. ${gradeLevel}が使う言葉で、具体的に説明する（難しい言葉は使わない）
 2. 答えは教えず、「まず〜を考えてみよう」のように段階的にヒントを出す
 3. 図や絵で考える方法を提案する（例：「図に書いてみるといいよ」）
 4. 「いいところに気づいたね！」など励ましを入れる
@@ -3063,17 +3083,32 @@ ${cardContext ? `
 【回答例】
 質問「区切りってどういうこと？」
 →「区切りっていうのは、大きな数をわかりやすく分けることだよ。例えば、10000を「10と1000」に分けると計算しやすくなるよね。この問題では、どこで区切ると計算しやすいかな？」`
+    }
+    
+    // 会話履歴を含めてリクエスト
+    const contents = conversationHistory && conversationHistory.length > 0
+      ? [
+          { parts: [{ text: systemPrompt }] },
+          ...conversationHistory.map((msg: any) => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.text }]
+          })),
+          { role: 'user', parts: [{ text: message }] }
+        ]
+      : [
+          {
+            parts: [
+              { text: systemPrompt },
+              { text: `子どもの質問: ${message}` }
+            ]
+          }
+        ]
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: systemPrompt },
-            { text: `子どもの質問: ${message}` }
-          ]
-        }],
+        contents,
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 500
