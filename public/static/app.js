@@ -9337,6 +9337,15 @@ function showUnitPreview(unitData, modelUsed) {
       return hintSum + (card.hints?.length || 0)
     }, 0)
   }, 0)
+  
+  // モデル名を読みやすく変換
+  const displayModelName = (model) => {
+    if (!model) return '不明'
+    if (model.includes('gemini-2.5-pro') || model.includes('gemini-3-pro')) return 'Gemini 3.0 Pro（確実モード）'
+    if (model.includes('gemini-2.5-flash')) return 'Gemini 3.0 Flash（標準モード）'
+    if (model.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash'
+    return model
+  }
 
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -9358,7 +9367,7 @@ function showUnitPreview(unitData, modelUsed) {
           </div>
           <div class="text-right">
             <p class="text-sm opacity-75">使用モデル</p>
-            <p class="font-bold">${modelUsed}</p>
+            <p class="font-bold">${displayModelName(modelUsed)}</p>
           </div>
         </div>
       </div>
