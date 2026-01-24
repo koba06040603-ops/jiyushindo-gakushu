@@ -164,8 +164,12 @@ function extractJSON(aiResponse: string): any {
     console.error('📄 AI response length:', aiResponse.length)
     console.error('📄 AI response (first 500 chars):', aiResponse.substring(0, 500))
     
-    // "Unexpected end of JSON input"エラーの場合、JSON補完を試みる
-    if (error instanceof SyntaxError && error.message.includes('Unexpected end of JSON input')) {
+    // JSONエラーの自動修正を試みる
+    if (error instanceof SyntaxError && (
+      error.message.includes('Unexpected end of JSON input') ||
+      error.message.includes("Expected ',' or ']'") ||
+      error.message.includes("Expected ',' or '}'")
+    )) {
       console.warn('⚠️ JSON不完全エラー検出、自動補完を試みます')
       
       // 開いている括弧・配列・文字列をカウント
@@ -236,7 +240,7 @@ function extractJSON(aiResponse: string): any {
       }
     }
     
-    // エラー位置を特定
+    // エラー位置を特定して修正を試みる
     if (error instanceof SyntaxError && error.message.includes('position')) {
       const posMatch = error.message.match(/position (\d+)/)
       if (posMatch) {
@@ -254,6 +258,46 @@ function extractJSON(aiResponse: string): any {
           const code = jsonText.charCodeAt(i)
           const display = char === '\n' ? '\\n' : char === '\r' ? '\\r' : char === '\t' ? '\\t' : char
           console.error(`  pos ${i}: '${display}' (code: ${code})${i === pos ? ' <-- ERROR HERE' : ''}`)
+        }
+        
+        // エラー位置での自動修正を試みる
+        if (error.message.includes("Expected ',' or ']'")) {
+          console.warn('⚠️ 配列要素のカンマエラー検出、修正を試みます')
+          
+          // エラー位置の文字をチェック
+          const charAtPos = jsonText.charAt(pos)
+          
+          // オプション1: 不正な文字を削除してカンマを追加
+          let fixedJson = jsonText.substring(0, pos) + ',' + jsonText.substring(pos + 1)
+          
+          // オプション2: 文字列が閉じられていない場合、閉じてからカンマ
+          if (charAtPos === '\n' || charAtPos === ' ') {
+            fixedJson = jsonText.substring(0, pos) + '",' + jsonText.substring(pos)
+          }
+          
+          console.log('🔄 修正後のJSON再パース試行...')
+          
+          try {
+            return JSON.parse(fixedJson)
+          } catch (retryError) {
+            console.error('❌ 修正後もパース失敗:', retryError)
+            // 次の修正方法を試す
+          }
+        }
+        
+        if (error.message.includes("Expected ',' or '}'")) {
+          console.warn('⚠️ オブジェクトのカンマエラー検出、修正を試みます')
+          
+          // エラー位置にカンマを挿入
+          let fixedJson = jsonText.substring(0, pos) + ',' + jsonText.substring(pos)
+          
+          console.log('🔄 修正後のJSON再パース試行...')
+          
+          try {
+            return JSON.parse(fixedJson)
+          } catch (retryError) {
+            console.error('❌ 修正後もパース失敗:', retryError)
+          }
         }
       }
     }
