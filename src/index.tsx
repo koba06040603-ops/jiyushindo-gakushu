@@ -11686,4 +11686,75 @@ app.get('/api/cross-subject-evaluations/:studentId', async (c) => {
   }
 })
 
+// =============================================================================
+// フィードバック・お問い合わせAPI
+// =============================================================================
+
+// APIルート：フィードバック送信
+app.post('/api/feedback', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    // フィードバックをデータベースに保存
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS user_feedback (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        email TEXT,
+        message TEXT NOT NULL,
+        user_id TEXT,
+        user_name TEXT,
+        user_role TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO user_feedback 
+        (type, email, message, user_id, user_name, user_role, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      body.type || 'feedback',
+      body.email || '',
+      body.message,
+      body.user_id || '',
+      body.user_name || '',
+      body.user_role || 'student'
+    ).run()
+    
+    console.log('✅ フィードバック保存完了:', result.meta.last_row_id)
+    
+    return c.json({ 
+      success: true, 
+      id: result.meta.last_row_id,
+      message: 'フィードバックを受け付けました'
+    })
+  } catch (error: any) {
+    console.error('フィードバック保存エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message || 'フィードバックの保存に失敗しました' 
+    }, 500)
+  }
+})
+
+// APIルート：フィードバック一覧取得（管理者用）
+app.get('/api/feedback/list', async (c) => {
+  const { env } = c
+  
+  try {
+    const feedbacks = await env.DB.prepare(`
+      SELECT * FROM user_feedback 
+      ORDER BY created_at DESC 
+      LIMIT 100
+    `).all()
+    
+    return c.json({ success: true, feedbacks: feedbacks.results })
+  } catch (error: any) {
+    console.error('フィードバック取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app

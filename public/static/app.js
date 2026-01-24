@@ -1043,6 +1043,76 @@ async function renderTopPage() {
         </div>
       </div>
 
+      <!-- お問い合わせ・感想フォーム -->
+      <div class="bg-gradient-to-r from-green-500 to-teal-500 rounded-lg shadow-xl p-8">
+        <div class="text-center mb-6">
+          <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
+            💬 ご意見・ご感想をお聞かせください
+          </div>
+          <h2 class="text-2xl font-bold text-white mb-3">
+            <i class="fas fa-comment-dots mr-2"></i>
+            お問い合わせ・感想フォーム
+          </h2>
+          <p class="text-white opacity-90 mb-4">
+            システムへのご意見・ご要望・バグ報告など、お気軽にお寄せください
+          </p>
+        </div>
+        
+        <div class="bg-white rounded-lg p-6 max-w-2xl mx-auto">
+          <div class="space-y-4">
+            <!-- フィードバックタイプ -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-tag mr-1"></i>種類
+              </label>
+              <select id="feedbackType" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none">
+                <option value="feedback">ご意見・ご感想</option>
+                <option value="bug">バグ報告</option>
+                <option value="feature">機能要望</option>
+                <option value="question">使い方の質問</option>
+                <option value="other">その他</option>
+              </select>
+            </div>
+            
+            <!-- メールアドレス（任意） -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-envelope mr-1"></i>メールアドレス（任意・返信希望の場合）
+              </label>
+              <input 
+                type="email" 
+                id="feedbackEmail" 
+                class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                placeholder="example@mail.com">
+            </div>
+            
+            <!-- メッセージ -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-pen mr-1"></i>内容
+              </label>
+              <textarea 
+                id="feedbackMessage" 
+                rows="6" 
+                class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                placeholder="ご意見・ご感想をお書きください...&#10;&#10;例：&#10;・AI生成が速くて便利です！&#10;・カードの編集機能が欲しいです&#10;・〇〇の使い方がわかりません"></textarea>
+            </div>
+            
+            <!-- 送信ボタン -->
+            <button 
+              onclick="submitFeedback()"
+              class="w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg flex items-center justify-center">
+              <i class="fas fa-paper-plane mr-2"></i>
+              送信する
+            </button>
+            
+            <p class="text-xs text-gray-500 text-center mt-2">
+              ※ 送信いただいた内容は、システム改善のために使用させていただきます
+            </p>
+          </div>
+        </div>
+      </div>
+
     </div>
   `
 }
@@ -9207,6 +9277,53 @@ function hideLoadingOverlay() {
   }
 }
 
+// フィードバックを送信
+async function submitFeedback() {
+  const type = document.getElementById('feedbackType')?.value
+  const email = document.getElementById('feedbackEmail')?.value || ''
+  const message = document.getElementById('feedbackMessage')?.value
+  
+  if (!message || message.trim() === '') {
+    alert('内容を入力してください')
+    return
+  }
+  
+  try {
+    showLoadingOverlay('フィードバックを送信中...')
+    
+    // フィードバックデータを作成
+    const feedbackData = {
+      type,
+      email,
+      message: message.trim(),
+      user_id: state.auth.user?.id || state.student.id,
+      user_name: state.student.name,
+      user_role: state.auth.user?.role || 'student',
+      timestamp: new Date().toISOString()
+    }
+    
+    // APIに送信（後でバックエンドに追加）
+    const response = await axios.post('/api/feedback', feedbackData)
+    
+    hideLoadingOverlay()
+    
+    if (response.data.success) {
+      alert('✅ フィードバックを送信しました！\n\nご意見ありがとうございます。システム改善の参考にさせていただきます。')
+      
+      // フォームをクリア
+      document.getElementById('feedbackType').value = 'feedback'
+      document.getElementById('feedbackEmail').value = ''
+      document.getElementById('feedbackMessage').value = ''
+    } else {
+      throw new Error(response.data.error || '送信に失敗しました')
+    }
+  } catch (error) {
+    console.error('フィードバック送信エラー:', error)
+    hideLoadingOverlay()
+    alert('❌ フィードバックの送信に失敗しました。\n\nもう一度お試しください。')
+  }
+}
+
 // 生成プロセス表示
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
@@ -9830,6 +9947,7 @@ window.closeUnitGeneratorModal = closeUnitGeneratorModal
 window.startUnitGeneration = startUnitGeneration
 window.retryUnitGeneration = retryUnitGeneration
 window.saveGeneratedUnit = saveGeneratedUnit
+window.submitFeedback = submitFeedback
 
 // 学習カード詳細表示モーダル
 function showCardDetail(card) {
