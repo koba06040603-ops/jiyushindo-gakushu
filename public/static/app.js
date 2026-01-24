@@ -2963,6 +2963,12 @@ async function loadCardPage(cardId) {
     const grade = state.selectedCurriculum?.grade || '小学3年'
     const defaultFontSize = getGradeFontSize(grade)
     
+    // AI先生用に学年情報を保存（会話時に使用）
+    if (!window.aiDetectedGrade && grade) {
+      window.aiDetectedGrade = grade
+      console.log('学年情報を設定:', window.aiDetectedGrade)
+    }
+    
     // ローカルストレージから保存されたフォントサイズを取得
     const savedFontSize = localStorage.getItem('customFontSize')
     const fontSize = savedFontSize ? JSON.parse(savedFontSize) : defaultFontSize
