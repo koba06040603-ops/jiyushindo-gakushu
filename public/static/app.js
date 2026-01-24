@@ -2973,6 +2973,11 @@ async function loadCardPage(cardId) {
     const response = await axios.get(`/api/cards/${cardId}`)
     const { card, hints, answer } = response.data
     
+    // カードデータにヒントと解答を含める
+    card.hints = hints || []
+    card.answer = answer?.answer_text || card.example_solution || ''
+    card.answer_explanation = answer?.explanation || card.answer_explanation || ''
+    
     // カードデータをグローバルに保存（ヘルプ要請時に使用）
     window.currentCardData = card
     
@@ -3471,28 +3476,43 @@ async function askAI() {
     if (loadingMsg) loadingMsg.remove()
     
     // AIの回答を追加
-    const answer = response.data.response || 'ごめんね、うまく答えられなかったよ。先生に聞いてみてね。'
-    addAIMessage(answer, 'ai')
-    
-    // 会話履歴に回答を追加
-    window.aiConversationHistory.push({
-      role: 'assistant',
-      message: answer
-    })
-    
-    // 学年を再検出（AIの回答から）
-    if (!window.aiDetectedGrade && answer.includes('何年生')) {
-      console.log('AIが学年を尋ねています')
-    }
-    
-    // セッションIDを更新
-    if (response.data.sessionId) {
-      window.aiSessionId = response.data.sessionId
-    }
-    
-    // トークン使用量を表示（デバッグ用）
-    if (response.data.tokensUsed) {
-      console.log('AI Tokens used:', response.data.tokensUsed)
+    if (response.data.error) {
+      // エラーレスポンスの場合、詳細をログに出力
+      console.error('❌ AIエラーレスポンス:', response.data)
+      const errorAnswer = `ごめんね、今その質問にうまく答えられなかったよ。
+もう一度、別の言葉で質問してみてくれるかな？
+先生に聞いてみるのもいいよ！`
+      addAIMessage(errorAnswer, 'ai')
+      
+      // 会話履歴に回答を追加
+      window.aiConversationHistory.push({
+        role: 'assistant',
+        message: errorAnswer
+      })
+    } else {
+      const answer = response.data.response || 'ごめんね、うまく答えられなかったよ。先生に聞いてみてね。'
+      addAIMessage(answer, 'ai')
+      
+      // 会話履歴に回答を追加
+      window.aiConversationHistory.push({
+        role: 'assistant',
+        message: answer
+      })
+      
+      // 学年を再検出（AIの回答から）
+      if (!window.aiDetectedGrade && answer.includes('何年生')) {
+        console.log('AIが学年を尋ねています')
+      }
+      
+      // セッションIDを更新
+      if (response.data.sessionId) {
+        window.aiSessionId = response.data.sessionId
+      }
+      
+      // トークン使用量を表示（デバッグ用）
+      if (response.data.tokensUsed) {
+        console.log('AI Tokens used:', response.data.tokensUsed)
+      }
     }
     
   } catch (error) {
