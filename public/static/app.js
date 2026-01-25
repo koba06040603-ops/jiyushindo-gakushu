@@ -1952,27 +1952,9 @@ async function loadGuidePage(curriculumId) {
                                 </div>
                               </div>
                             </div>
-                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition print:hidden">
-                              <button onclick="editCheckTestProblem(${curriculum.id}, ${problem.problem_number})" 
-                                      class="text-blue-600 hover:text-blue-800 px-2 py-1 text-xs"
-                                      title="編集">
-                                <i class="fas fa-edit"></i>
-                              </button>
-                              <button onclick="deleteCheckTestProblem(${curriculum.id}, ${problem.problem_number})" 
-                                      class="text-red-600 hover:text-red-800 px-2 py-1 text-xs"
-                                      title="削除">
-                                <i class="fas fa-trash"></i>
-                              </button>
-                            </div>
                           </div>
                         </div>
                       `).join('')}
-                    </div>
-                    <div class="mt-4 text-center print:hidden">
-                      <button onclick="addCheckTestProblem(${curriculum.id})" 
-                              class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
-                        <i class="fas fa-plus mr-2"></i>問題を追加
-                      </button>
                     </div>
                   </div>
                 ` : ''}

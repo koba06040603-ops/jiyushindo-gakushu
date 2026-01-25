@@ -4653,23 +4653,63 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
       "course_label": "自分のペースで学ぶコース",
       "description": "しっかり考えて学びたい人",
       "color_code": "blue",
-      "cards": []
+      "cards": [
+        {
+          "card_number": 1,
+          "card_title": "タイトル",
+          "card_type": "main",
+          "textbook_page": "p.XX",
+          "problem_description": "問題",
+          "new_terms": "用語",
+          "example_problem": "例題",
+          "example_solution": "解法",
+          "real_world_connection": "つながり",
+          "answer": "解答（必須）",
+          "answer_explanation": "解答の説明・考え方（必須、100文字程度）",
+          "hints": [
+            {"hint_level": 1, "hint_text": "ヒント1"},
+            {"hint_level": 2, "hint_text": "ヒント2"},
+            {"hint_level": 3, "hint_text": "ヒント3"}
+          ]
+        }
+      ]
     },
     {
       "course_name": "どんどんコース",
       "course_label": "いろいろなことにちょうせんするコース",
       "description": "発展的に学びたい人",
       "color_code": "purple",
-      "cards": []
+      "cards": [
+        {
+          "card_number": 1,
+          "card_title": "タイトル",
+          "card_type": "main",
+          "textbook_page": "p.XX",
+          "problem_description": "問題",
+          "new_terms": "用語",
+          "example_problem": "例題",
+          "example_solution": "解法",
+          "real_world_connection": "つながり",
+          "answer": "解答（必須）",
+          "answer_explanation": "解答の説明・考え方（必須、100文字程度）",
+          "hints": [
+            {"hint_level": 1, "hint_text": "ヒント1"},
+            {"hint_level": 2, "hint_text": "ヒント2"},
+            {"hint_level": 3, "hint_text": "ヒント3"}
+          ]
+        }
+      ]
     }
   ]
 }
 
 必須要件:
-- 3コース×各6枚=合計18枚のカード
+- **必ず3コース全て**を生成すること（ゆっくりコース、しっかりコース、どんどんコース）
+- 各コース×6枚=合計18枚のカード
 - 全カードにanswer（解答）とanswer_explanation（解答の説明、100文字程度）が必須
 - 全カードにhints配列3つが必須
 - 有効なJSON形式のみを出力（説明文やコメントは不要）
+- **2コースだけで終わらないこと！必ず3コース分のcardsを生成すること！**
 
 ${customInfo}
 
