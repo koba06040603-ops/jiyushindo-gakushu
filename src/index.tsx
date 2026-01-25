@@ -458,6 +458,18 @@ function extractJSON(aiResponse: string): any {
   }
 }
 
+// card_type の値を検証する関数
+function validateCardType(cardType: string | undefined): string {
+  const allowedCardTypes = ['selection', 'main', 'check', 'optional']
+  if (cardType && allowedCardTypes.includes(cardType)) {
+    return cardType
+  }
+  if (cardType && !allowedCardTypes.includes(cardType)) {
+    console.warn(`⚠️ 不正な card_type: '${cardType}' → 'main' に変更しました`)
+  }
+  return 'main'
+}
+
 // 学年別の言葉遣いルールを取得
 function getGradeLanguageRule(grade: string | undefined): string {
   if (!grade) {
@@ -3049,7 +3061,7 @@ app.post('/api/cards', async (c) => {
       body.course_id,
       body.card_number,
       body.card_title || '',
-      body.card_type || 'main',
+      validateCardType(body.card_type),
       body.problem_description || '',
       body.new_terms || '',
       body.example_problem || '',
@@ -3178,7 +3190,7 @@ app.post('/api/course/:courseId/add-card', async (c) => {
       courseId,
       nextCardNumber,
       body.card_title || `学習カード${nextCardNumber}`,
-      body.card_type || 'main',
+      validateCardType(body.card_type),
       body.textbook_page || '',
       body.problem_description || '',
       body.new_terms || '',
@@ -3241,7 +3253,7 @@ app.put('/api/cards/:cardId', async (c) => {
       WHERE id = ?
     `).bind(
       body.card_title || '',
-      body.card_type || 'main',
+      validateCardType(body.card_type),
       body.textbook_page || '',
       body.problem_description || '',
       body.new_terms || '',
@@ -4901,6 +4913,9 @@ app.post('/api/curriculum/save-generated', async (c) => {
       
       // 学習カードを保存
       for (const card of course.cards || []) {
+        // card_type の値を検証（許可された値のみ）
+        const cardType = validateCardType(card.card_type)
+        
         const cardResult = await env.DB.prepare(`
           INSERT INTO learning_cards (
             course_id, card_number, card_title, card_type,
@@ -4911,7 +4926,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
           courseId,
           card.card_number,
           card.card_title,
-          card.card_type || 'main',
+          cardType,
           card.problem_description || card.problem_content || '',
           card.new_terms || '',
           card.example_problem || '',
