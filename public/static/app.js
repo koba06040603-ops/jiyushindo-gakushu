@@ -11434,15 +11434,21 @@ function showTeacherOverview(unitData) {
           <div class="space-y-4">
             ${commonCheckTest.sample_problems.map((problem, index) => `
               <div class="bg-gradient-to-r from-yellow-50 to-white border-l-4 border-yellow-500 p-5 rounded-lg shadow-md">
-                <div class="flex items-start mb-3">
-                  <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 text-white flex items-center justify-center font-bold text-lg mr-4 flex-shrink-0">
-                    ${problem.problem_number}
+                <div class="flex items-start justify-between mb-3">
+                  <div class="flex items-start flex-1">
+                    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 text-white flex items-center justify-center font-bold text-lg mr-4 flex-shrink-0">
+                      ${problem.problem_number}
+                    </div>
+                    <div class="flex-1">
+                      <span class="text-xs bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full font-bold">
+                        難易度: ${problem.difficulty || 'basic'}
+                      </span>
+                    </div>
                   </div>
-                  <div class="flex-1">
-                    <span class="text-xs bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full font-bold">
-                      難易度: ${problem.difficulty || 'basic'}
-                    </span>
-                  </div>
+                  <button onclick="editCheckTestProblem(${index})" 
+                          class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold transition ml-4">
+                    <i class="fas fa-edit mr-1"></i>編集
+                  </button>
                 </div>
                 
                 <div class="bg-white p-4 rounded-lg mb-3 border-2 border-yellow-200">
@@ -11909,6 +11915,154 @@ async function saveOptionalProblemEdit(problemId, problemIndex) {
 window.editOptionalProblem = editOptionalProblem
 window.closeOptionalProblemEditModal = closeOptionalProblemEditModal
 window.saveOptionalProblemEdit = saveOptionalProblemEdit
+
+// チェックテスト編集機能
+function editCheckTestProblem(problemIndex) {
+  const checkTest = window.currentUnitData?.common_check_test
+  const problem = checkTest?.sample_problems[problemIndex]
+  
+  if (!problem) {
+    alert('チェックテスト問題データが見つかりません')
+    return
+  }
+  
+  const modalHTML = `
+    <div id="checkTestEditModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         onclick="if(event.target.id === 'checkTestEditModal') closeCheckTestEditModal()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+           onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-r from-yellow-500 to-orange-600 text-white p-6 rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-check-circle mr-2"></i>チェックテスト 問題${problem.problem_number} の編集
+            </h2>
+            <button onclick="closeCheckTestEditModal()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          <form id="checkTestEditForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-question-circle mr-1"></i>問題文
+              </label>
+              <textarea id="edit_problem_text" rows="4"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                        required>${problem.problem_text || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-check-circle mr-1"></i>解答
+              </label>
+              <textarea id="edit_answer" rows="3"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                        required>${problem.answer || ''}</textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-chart-line mr-1"></i>難易度
+              </label>
+              <select id="edit_difficulty"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500">
+                <option value="basic" ${problem.difficulty === 'basic' ? 'selected' : ''}>基礎</option>
+                <option value="standard" ${problem.difficulty === 'standard' ? 'selected' : ''}>標準</option>
+                <option value="advanced" ${problem.difficulty === 'advanced' ? 'selected' : ''}>発展</option>
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-gray-50 p-4 border-t flex gap-3">
+          <button onclick="saveCheckTestEdit(${problemIndex})" 
+                  class="flex-1 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>保存
+          </button>
+          <button onclick="closeCheckTestEditModal()" 
+                  class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  document.body.style.overflow = 'hidden'
+}
+
+function closeCheckTestEditModal() {
+  const modal = document.getElementById('checkTestEditModal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
+async function saveCheckTestEdit(problemIndex) {
+  try {
+    console.log('📝 チェックテスト問題の保存を開始:', { problemIndex })
+    
+    const curriculumId = window.currentUnitData?.curriculum_id
+    const problem = window.currentUnitData?.common_check_test?.sample_problems[problemIndex]
+    
+    if (!curriculumId) {
+      throw new Error('カリキュラムIDが見つかりません')
+    }
+    
+    if (!problem) {
+      throw new Error('問題データが見つかりません')
+    }
+    
+    const updatedProblem = {
+      problem_text: document.getElementById('edit_problem_text').value,
+      answer: document.getElementById('edit_answer').value,
+      difficulty: document.getElementById('edit_difficulty').value
+    }
+    
+    console.log('📝 更新データ:', updatedProblem)
+    
+    // 問題番号を使用（配列インデックスではなく）
+    const problemNumber = problem.problem_number
+    
+    const response = await axios.put(
+      `/api/curriculum/${curriculumId}/check-test/problem/${problemNumber}`, 
+      updatedProblem
+    )
+    
+    console.log('✅ サーバーレスポンス:', response.data)
+    
+    if (response.data.success) {
+      // ローカルデータを更新
+      if (window.currentUnitData?.common_check_test?.sample_problems[problemIndex]) {
+        Object.assign(
+          window.currentUnitData.common_check_test.sample_problems[problemIndex], 
+          updatedProblem
+        )
+      }
+      
+      closeCheckTestEditModal()
+      alert('✅ チェックテスト問題を保存しました！')
+      showTeacherOverview(window.currentUnitData)
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ チェックテスト問題保存エラー:', error)
+    console.error('❌ エラーレスポンス:', error.response?.data)
+    const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
+    alert(`❌ 保存に失敗しました\n\nエラー: ${errorMsg}`)
+  }
+}
+
+window.editCheckTestProblem = editCheckTestProblem
+window.closeCheckTestEditModal = closeCheckTestEditModal
+window.saveCheckTestEdit = saveCheckTestEdit
 
 // ヒント編集機能
 function editCardHints(courseIndex, cardIndex) {

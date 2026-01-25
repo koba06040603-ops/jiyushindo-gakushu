@@ -6303,7 +6303,7 @@ app.put('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('id')
   const problemNumber = parseInt(c.req.param('problemNumber'))
-  const { problem_text, answer } = await c.req.json()
+  const { problem_text, answer, difficulty } = await c.req.json()
   
   try {
     // 既存のチェックテストを取得
@@ -6326,6 +6326,9 @@ app.put('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) => {
     
     checkTest.sample_problems[problemIndex].problem_text = problem_text
     checkTest.sample_problems[problemIndex].answer = answer
+    if (difficulty !== undefined) {
+      checkTest.sample_problems[problemIndex].difficulty = difficulty
+    }
     
     // データベースに保存
     await env.DB.prepare(`
