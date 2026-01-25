@@ -11495,7 +11495,7 @@ function showTeacherOverview(unitData) {
                     <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
                       難易度: ${problem.difficulty_level || '標準'}
                     </span>
-                    <button onclick="editOptionalProblem(${index})" 
+                    <button onclick="editTeacherOptionalProblem(${index})" 
                             class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded transition">
                       <i class="fas fa-edit mr-1"></i>編集
                     </button>
@@ -11780,7 +11780,8 @@ window.closeCardEditModal = closeCardEditModal
 window.saveCardEdit = saveCardEdit
 
 // 選択問題編集機能
-function editOptionalProblem(problemIndex) {
+// 選択式問題編集機能（教師用編集画面用）
+function editTeacherOptionalProblem(problemIndex) {
   const problem = window.currentUnitData?.optional_problems[problemIndex]
   
   if (!problem) {
@@ -11851,7 +11852,7 @@ function editOptionalProblem(problemIndex) {
         </div>
 
         <div class="bg-gray-50 p-4 border-t flex gap-3">
-          <button onclick="saveOptionalProblemEdit(${problem.id}, ${problemIndex})" 
+          <button onclick="saveTeacherOptionalProblemEdit(${problem.id}, ${problemIndex})" 
                   class="flex-1 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
             <i class="fas fa-save mr-2"></i>保存
           </button>
@@ -11876,7 +11877,7 @@ function closeOptionalProblemEditModal() {
   }
 }
 
-async function saveOptionalProblemEdit(problemId, problemIndex) {
+async function saveTeacherOptionalProblemEdit(problemId, problemIndex) {
   try {
     console.log('📝 選択問題の保存を開始:', { problemId, problemIndex })
     
@@ -11912,9 +11913,9 @@ async function saveOptionalProblemEdit(problemId, problemIndex) {
   }
 }
 
-window.editOptionalProblem = editOptionalProblem
+window.editTeacherOptionalProblem = editTeacherOptionalProblem
 window.closeOptionalProblemEditModal = closeOptionalProblemEditModal
-window.saveOptionalProblemEdit = saveOptionalProblemEdit
+window.saveTeacherOptionalProblemEdit = saveTeacherOptionalProblemEdit
 
 // チェックテスト編集機能
 function editCheckTestProblem(problemIndex) {
