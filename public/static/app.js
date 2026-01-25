@@ -3243,7 +3243,7 @@ async function loadCardPage(cardId) {
                        id="aiQuestionInput" 
                        placeholder="質問を入力..." 
                        class="flex-1 p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                       onkeypress="if(event.key==='Enter') askAI()">
+                       onkeypress="if(event.key==='Enter') { event.preventDefault(); askAI(); }">
                 <button onclick="askAI()" 
                         class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition">
                   <i class="fas fa-paper-plane"></i>
@@ -3411,10 +3411,19 @@ async function loadConversationHistory() {
 
 // AI先生に質問
 async function askAI() {
+  // 送信中フラグをチェック（重複送信を防止）
+  if (window.aiSending) {
+    console.log('⚠️ 送信中です。重複送信を防止しました。')
+    return
+  }
+  
   const input = document.getElementById('aiQuestionInput')
   const question = input.value.trim()
   
   if (!question) return
+  
+  // 送信中フラグを設定
+  window.aiSending = true
   
   // ユーザーメッセージを追加
   addAIMessage(question, 'user')
@@ -3552,6 +3561,9 @@ ${response.data.details || 'Cloudflare Pagesの環境変数でGEMINI_API_KEYを�
     // エラーメッセージ
     const errorMsg = error.response?.data?.error || 'エラーが発生しました'
     addAIMessage(`ごめんね、うまく答えられなかったよ。\n\n【先生に聞いてみてね】\n${errorMsg}`, 'ai')
+  } finally {
+    // 送信中フラグをリセット（必ず実行）
+    window.aiSending = false
   }
 }
 
