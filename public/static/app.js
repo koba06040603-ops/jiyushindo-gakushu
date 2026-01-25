@@ -11279,11 +11279,18 @@ function showTeacherOverview(unitData) {
                       ${card.card_title}
                     </h3>
                   </div>
-                  <button onclick="editCardContent(${courseIndex}, ${cardIndex})"
-                          class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold transition">
-                    <i class="fas fa-edit mr-1"></i>
-                    編集
-                  </button>
+                  <div class="flex gap-2">
+                    <button onclick="editCardContent(${courseIndex}, ${cardIndex})"
+                            class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold transition">
+                      <i class="fas fa-edit mr-1"></i>
+                      編集
+                    </button>
+                    <button onclick="deleteCard(${course.id}, ${card.id}, ${courseIndex}, ${cardIndex})"
+                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold transition">
+                      <i class="fas fa-trash mr-1"></i>
+                      削除
+                    </button>
+                  </div>
                 </div>
                 
                 <!-- カード内容プレビュー -->
@@ -11315,6 +11322,15 @@ function showTeacherOverview(unitData) {
                 </div>
               </div>
             `).join('')}
+          </div>
+          
+          <!-- カード追加ボタン -->
+          <div class="mt-4">
+            <button onclick="addNewCard(${course.id}, ${courseIndex})"
+                    class="w-full bg-${course.color_code}-500 hover:bg-${course.color_code}-600 text-white px-4 py-3 rounded-lg font-bold transition">
+              <i class="fas fa-plus mr-2"></i>
+              ${course.course_name}にカードを追加
+            </button>
           </div>
         </div>
       `).join('')}
@@ -11392,10 +11408,16 @@ function showTeacherOverview(unitData) {
                       </span>
                     </div>
                   </div>
-                  <button onclick="editCheckTestProblem(${index})" 
-                          class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold transition ml-4">
-                    <i class="fas fa-edit mr-1"></i>編集
-                  </button>
+                  <div class="flex gap-2">
+                    <button onclick="editCheckTestProblem(${index})" 
+                            class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold transition">
+                      <i class="fas fa-edit mr-1"></i>編集
+                    </button>
+                    <button onclick="deleteCheckTestProblem(${index})" 
+                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold transition">
+                      <i class="fas fa-trash mr-1"></i>削除
+                    </button>
+                  </div>
                 </div>
                 
                 <div class="bg-white p-4 rounded-lg mb-3 border-2 border-yellow-200">
@@ -11412,10 +11434,24 @@ function showTeacherOverview(unitData) {
               </div>
             `).join('')}
           </div>
+          
+          <!-- チェックテスト追加ボタン -->
+          <div class="mt-4">
+            <button onclick="addCheckTestProblem()"
+                    class="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold transition">
+              <i class="fas fa-plus mr-2"></i>
+              チェックテスト問題を追加
+            </button>
+          </div>
         ` : `
           <div class="bg-gray-50 p-4 rounded-lg text-center">
             <i class="fas fa-times-circle text-6xl text-gray-300 mb-4"></i>
-            <p class="text-gray-600">チェックテストが生成されていません</p>
+            <p class="text-gray-600 mb-4">チェックテストが生成されていません</p>
+            <button onclick="addCheckTestProblem()"
+                    class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold transition">
+              <i class="fas fa-plus mr-2"></i>
+              最初のチェックテスト問題を追加
+            </button>
           </div>
         `}
       </div>
@@ -11446,6 +11482,10 @@ function showTeacherOverview(unitData) {
                             class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded transition">
                       <i class="fas fa-edit mr-1"></i>編集
                     </button>
+                    <button onclick="deleteOptionalProblem(${problem.id}, ${index})" 
+                            class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded transition">
+                      <i class="fas fa-trash mr-1"></i>削除
+                    </button>
                   </div>
                 </div>
                 <div class="bg-white p-3 rounded-lg mb-3">
@@ -11467,12 +11507,26 @@ function showTeacherOverview(unitData) {
               </div>
             `).join('')}
           </div>
+          
+          <!-- 選択問題追加ボタン -->
+          <div class="mt-4">
+            <button onclick="addOptionalProblem()"
+                    class="w-full bg-pink-500 hover:bg-pink-600 text-white px-4 py-3 rounded-lg font-bold transition">
+              <i class="fas fa-plus mr-2"></i>
+              選択問題を追加
+            </button>
+          </div>
         ` : `
           <div class="bg-gray-50 p-4 rounded-lg text-center">
-            <p class="text-gray-600">
+            <p class="text-gray-600 mb-4">
               <i class="fas fa-info-circle mr-2"></i>
               選択課題は保存後、教師が追加できます
             </p>
+            <button onclick="addOptionalProblem()"
+                    class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-3 rounded-lg font-bold transition">
+              <i class="fas fa-plus mr-2"></i>
+              最初の選択問題を追加
+            </button>
           </div>
         `}
       </div>
@@ -12011,6 +12065,543 @@ async function saveCheckTestEdit(problemIndex) {
 window.editCheckTestProblem = editCheckTestProblem
 window.closeCheckTestEditModal = closeCheckTestEditModal
 window.saveCheckTestEdit = saveCheckTestEdit
+
+// カード削除機能
+async function deleteCard(courseId, cardId, courseIndex, cardIndex) {
+  if (!confirm('このカードを削除してもよろしいですか？\n※この操作は取り消せません')) {
+    return
+  }
+  
+  try {
+    console.log('🗑️ カード削除開始:', { courseId, cardId, courseIndex, cardIndex })
+    
+    const response = await axios.delete(`/api/cards/${cardId}`)
+    
+    console.log('✅ サーバーレスポンス:', response.data)
+    
+    if (response.data.success) {
+      // ローカルデータから削除
+      if (window.currentUnitData?.courses[courseIndex]?.cards) {
+        window.currentUnitData.courses[courseIndex].cards.splice(cardIndex, 1)
+      }
+      
+      alert('✅ カードを削除しました！')
+      showTeacherOverview(window.currentUnitData)
+    } else {
+      throw new Error(response.data.error || '削除に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ カード削除エラー:', error)
+    const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
+    alert(`❌ 削除に失敗しました\n\nエラー: ${errorMsg}`)
+  }
+}
+
+// カード追加機能
+function addNewCard(courseId, courseIndex) {
+  const course = window.currentUnitData?.courses[courseIndex]
+  if (!course) {
+    alert('コースデータが見つかりません')
+    return
+  }
+  
+  const nextCardNumber = (course.cards?.length || 0) + 1
+  
+  const modalHTML = `
+    <div id="addCardModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         onclick="if(event.target.id === 'addCardModal') closeAddCardModal()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+           onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-r from-${course.color_code}-600 to-${course.color_code}-800 text-white p-6 rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-plus mr-2"></i>${course.course_name}に新しいカードを追加
+            </h2>
+            <button onclick="closeAddCardModal()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          <form id="addCardForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-heading mr-1"></i>カードタイトル
+              </label>
+              <input type="text" id="new_card_title" 
+                     placeholder="例: 比例の関係を見つけよう"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${course.color_code}-500"
+                     required>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-question-circle mr-1"></i>問題・課題
+              </label>
+              <textarea id="new_problem_description" rows="4"
+                        placeholder="学習者が取り組む問題や課題を書いてください"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${course.color_code}-500"
+                        required></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-book mr-1"></i>新出用語（カンマ区切り）
+              </label>
+              <input type="text" id="new_new_terms" 
+                     placeholder="例: 比例, 変数, 関数"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${course.color_code}-500">
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-lightbulb mr-1"></i>例題
+              </label>
+              <textarea id="new_example_problem" rows="3"
+                        placeholder="具体的な例題を書いてください"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${course.color_code}-500"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-check-circle mr-1"></i>解答
+              </label>
+              <textarea id="new_answer" rows="3"
+                        placeholder="解答を書いてください"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${course.color_code}-500"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-globe mr-1"></i>実社会とのつながり
+              </label>
+              <textarea id="new_real_world_connection" rows="2"
+                        placeholder="実社会での活用例を書いてください"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${course.color_code}-500"></textarea>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-gray-50 p-4 border-t flex gap-3">
+          <button onclick="saveNewCard(${courseId}, ${courseIndex}, ${nextCardNumber})" 
+                  class="flex-1 bg-gradient-to-r from-${course.color_code}-600 to-${course.color_code}-800 hover:from-${course.color_code}-700 hover:to-${course.color_code}-900 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>カードを追加
+          </button>
+          <button onclick="closeAddCardModal()" 
+                  class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  document.body.style.overflow = 'hidden'
+}
+
+function closeAddCardModal() {
+  const modal = document.getElementById('addCardModal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
+async function saveNewCard(courseId, courseIndex, cardNumber) {
+  try {
+    console.log('📝 新しいカードの保存を開始:', { courseId, courseIndex, cardNumber })
+    
+    const newCard = {
+      course_id: courseId,
+      card_number: cardNumber,
+      card_title: document.getElementById('new_card_title').value,
+      card_type: 'main',
+      problem_description: document.getElementById('new_problem_description').value,
+      new_terms: document.getElementById('new_new_terms').value,
+      example_problem: document.getElementById('new_example_problem').value,
+      answer: document.getElementById('new_answer').value,
+      real_world_connection: document.getElementById('new_real_world_connection').value
+    }
+    
+    console.log('📝 新規カードデータ:', newCard)
+    
+    const response = await axios.post(`/api/courses/${courseId}/cards`, newCard)
+    
+    console.log('✅ サーバーレスポンス:', response.data)
+    
+    if (response.data.success) {
+      closeAddCardModal()
+      alert('✅ 新しいカードを追加しました！')
+      
+      // データを再読み込み
+      const curriculumId = window.currentUnitData?.curriculum_id
+      if (curriculumId) {
+        await loadTeacherOverview(curriculumId)
+      }
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ カード追加エラー:', error)
+    const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
+    alert(`❌ 保存に失敗しました\n\nエラー: ${errorMsg}`)
+  }
+}
+
+window.deleteCard = deleteCard
+window.addNewCard = addNewCard
+window.closeAddCardModal = closeAddCardModal
+window.saveNewCard = saveNewCard
+
+// チェックテスト問題削除機能
+async function deleteCheckTestProblem(problemIndex) {
+  if (!confirm('このチェックテスト問題を削除してもよろしいですか？\n※この操作は取り消せません')) {
+    return
+  }
+  
+  try {
+    console.log('🗑️ チェックテスト問題削除開始:', { problemIndex })
+    
+    const curriculumId = window.currentUnitData?.curriculum_id
+    const problem = window.currentUnitData?.common_check_test?.sample_problems[problemIndex]
+    
+    if (!curriculumId || !problem) {
+      throw new Error('データが見つかりません')
+    }
+    
+    const response = await axios.delete(
+      `/api/curriculum/${curriculumId}/check-test/problem/${problem.problem_number}`
+    )
+    
+    console.log('✅ サーバーレスポンス:', response.data)
+    
+    if (response.data.success) {
+      // ローカルデータから削除
+      if (window.currentUnitData?.common_check_test?.sample_problems) {
+        window.currentUnitData.common_check_test.sample_problems.splice(problemIndex, 1)
+      }
+      
+      alert('✅ チェックテスト問題を削除しました！')
+      showTeacherOverview(window.currentUnitData)
+    } else {
+      throw new Error(response.data.error || '削除に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ チェックテスト問題削除エラー:', error)
+    const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
+    alert(`❌ 削除に失敗しました\n\nエラー: ${errorMsg}`)
+  }
+}
+
+// チェックテスト問題追加機能
+function addCheckTestProblem() {
+  const curriculumId = window.currentUnitData?.curriculum_id
+  const checkTest = window.currentUnitData?.common_check_test
+  const nextProblemNumber = (checkTest?.sample_problems?.length || 0) + 1
+  
+  if (!curriculumId) {
+    alert('カリキュラムIDが見つかりません')
+    return
+  }
+  
+  const modalHTML = `
+    <div id="addCheckTestModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         onclick="if(event.target.id === 'addCheckTestModal') closeAddCheckTestModal()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+           onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-r from-yellow-500 to-orange-600 text-white p-6 rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-plus mr-2"></i>チェックテスト問題を追加
+            </h2>
+            <button onclick="closeAddCheckTestModal()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          <form id="addCheckTestForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-question-circle mr-1"></i>問題文
+              </label>
+              <textarea id="new_check_problem_text" rows="4"
+                        placeholder="チェックテストの問題文を書いてください"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                        required></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-check-circle mr-1"></i>解答
+              </label>
+              <textarea id="new_check_answer" rows="3"
+                        placeholder="解答を書いてください"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+                        required></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-chart-line mr-1"></i>難易度
+              </label>
+              <select id="new_check_difficulty"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500">
+                <option value="basic">基礎</option>
+                <option value="standard" selected>標準</option>
+                <option value="advanced">発展</option>
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-gray-50 p-4 border-t flex gap-3">
+          <button onclick="saveNewCheckTestProblem(${curriculumId}, ${nextProblemNumber})" 
+                  class="flex-1 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>問題を追加
+          </button>
+          <button onclick="closeAddCheckTestModal()" 
+                  class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  document.body.style.overflow = 'hidden'
+}
+
+function closeAddCheckTestModal() {
+  const modal = document.getElementById('addCheckTestModal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
+async function saveNewCheckTestProblem(curriculumId, problemNumber) {
+  try {
+    console.log('📝 新しいチェックテスト問題の保存を開始:', { curriculumId, problemNumber })
+    
+    const newProblem = {
+      problem_number: problemNumber,
+      problem_text: document.getElementById('new_check_problem_text').value,
+      answer: document.getElementById('new_check_answer').value,
+      difficulty: document.getElementById('new_check_difficulty').value
+    }
+    
+    console.log('📝 新規問題データ:', newProblem)
+    
+    const response = await axios.post(
+      `/api/curriculum/${curriculumId}/check-test/problem`, 
+      newProblem
+    )
+    
+    console.log('✅ サーバーレスポンス:', response.data)
+    
+    if (response.data.success) {
+      closeAddCheckTestModal()
+      alert('✅ チェックテスト問題を追加しました！')
+      
+      // データを再読み込み
+      await loadTeacherOverview(curriculumId)
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ チェックテスト問題追加エラー:', error)
+    const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
+    alert(`❌ 保存に失敗しました\n\nエラー: ${errorMsg}`)
+  }
+}
+
+window.deleteCheckTestProblem = deleteCheckTestProblem
+window.addCheckTestProblem = addCheckTestProblem
+window.closeAddCheckTestModal = closeAddCheckTestModal
+window.saveNewCheckTestProblem = saveNewCheckTestProblem
+
+// 選択問題削除機能
+async function deleteOptionalProblem(problemId, problemIndex) {
+  if (!confirm('この選択問題を削除してもよろしいですか？\n※この操作は取り消せません')) {
+    return
+  }
+  
+  try {
+    console.log('🗑️ 選択問題削除開始:', { problemId, problemIndex })
+    
+    const response = await axios.delete(`/api/optional-problem/${problemId}`)
+    
+    console.log('✅ サーバーレスポンス:', response.data)
+    
+    if (response.data.success) {
+      // ローカルデータから削除
+      if (window.currentUnitData?.optional_problems) {
+        window.currentUnitData.optional_problems.splice(problemIndex, 1)
+      }
+      
+      alert('✅ 選択問題を削除しました！')
+      showTeacherOverview(window.currentUnitData)
+    } else {
+      throw new Error(response.data.error || '削除に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ 選択問題削除エラー:', error)
+    const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
+    alert(`❌ 削除に失敗しました\n\nエラー: ${errorMsg}`)
+  }
+}
+
+// 選択問題追加機能
+function addOptionalProblem() {
+  const curriculumId = window.currentUnitData?.curriculum_id
+  const nextProblemNumber = (window.currentUnitData?.optional_problems?.length || 0) + 1
+  
+  if (!curriculumId) {
+    alert('カリキュラムIDが見つかりません')
+    return
+  }
+  
+  const modalHTML = `
+    <div id="addOptionalProblemModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         onclick="if(event.target.id === 'addOptionalProblemModal') closeAddOptionalProblemModal()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+           onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-r from-pink-600 to-purple-600 text-white p-6 rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-plus mr-2"></i>選択問題を追加
+            </h2>
+            <button onclick="closeAddOptionalProblemModal()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-6">
+          <form id="addOptionalProblemForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-heading mr-1"></i>問題タイトル
+              </label>
+              <input type="text" id="new_optional_title" 
+                     placeholder="例: 発展問題：応用編"
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                     required>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-align-left mr-1"></i>問題説明
+              </label>
+              <textarea id="new_optional_description" rows="4"
+                        placeholder="問題の詳しい説明を書いてください"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        required></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-book-reader mr-1"></i>学習の意義
+              </label>
+              <textarea id="new_optional_meaning" rows="3"
+                        placeholder="この問題に取り組む意義を書いてください"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-chart-line mr-1"></i>難易度
+              </label>
+              <select id="new_optional_difficulty"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500">
+                <option value="easy">かんたん</option>
+                <option value="medium" selected>ふつう</option>
+                <option value="hard">むずかしい</option>
+                <option value="very_hard">とてもむずかしい</option>
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div class="bg-gray-50 p-4 border-t flex gap-3">
+          <button onclick="saveNewOptionalProblem(${curriculumId}, ${nextProblemNumber})" 
+                  class="flex-1 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-lg">
+            <i class="fas fa-save mr-2"></i>問題を追加
+          </button>
+          <button onclick="closeAddOptionalProblemModal()" 
+                  class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition">
+            <i class="fas fa-times mr-2"></i>キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  document.body.style.overflow = 'hidden'
+}
+
+function closeAddOptionalProblemModal() {
+  const modal = document.getElementById('addOptionalProblemModal')
+  if (modal) {
+    modal.remove()
+    document.body.style.overflow = ''
+  }
+}
+
+async function saveNewOptionalProblem(curriculumId, problemNumber) {
+  try {
+    console.log('📝 新しい選択問題の保存を開始:', { curriculumId, problemNumber })
+    
+    const newProblem = {
+      curriculum_id: curriculumId,
+      problem_number: problemNumber,
+      problem_title: document.getElementById('new_optional_title').value,
+      problem_description: document.getElementById('new_optional_description').value,
+      learning_meaning: document.getElementById('new_optional_meaning').value,
+      difficulty_level: document.getElementById('new_optional_difficulty').value
+    }
+    
+    console.log('📝 新規問題データ:', newProblem)
+    
+    const response = await axios.post(
+      `/api/curriculum/${curriculumId}/optional-problems`, 
+      newProblem
+    )
+    
+    console.log('✅ サーバーレスポンス:', response.data)
+    
+    if (response.data.success) {
+      closeAddOptionalProblemModal()
+      alert('✅ 選択問題を追加しました！')
+      
+      // データを再読み込み
+      await loadTeacherOverview(curriculumId)
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ 選択問題追加エラー:', error)
+    const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
+    alert(`❌ 保存に失敗しました\n\nエラー: ${errorMsg}`)
+  }
+}
+
+window.deleteOptionalProblem = deleteOptionalProblem
+window.addOptionalProblem = addOptionalProblem
+window.closeAddOptionalProblemModal = closeAddOptionalProblemModal
+window.saveNewOptionalProblem = saveNewOptionalProblem
 
 // ヒント編集機能
 function editCardHints(courseIndex, cardIndex) {
