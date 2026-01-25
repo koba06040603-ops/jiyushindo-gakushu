@@ -720,7 +720,15 @@ app.get('/api/cards/:cardId', async (c) => {
     `).bind(cardId).first()
     
     const hints = await env.DB.prepare(`
-      SELECT * FROM hint_cards 
+      SELECT 
+        id,
+        learning_card_id,
+        hint_number,
+        hint_number AS hint_level,
+        hint_content,
+        hint_content AS hint_text,
+        thinking_tool_suggestion
+      FROM hint_cards 
       WHERE learning_card_id = ?
       ORDER BY hint_number
     `).bind(cardId).all()

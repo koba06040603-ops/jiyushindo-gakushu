@@ -3479,9 +3479,16 @@ async function askAI() {
     if (response.data.error) {
       // エラーレスポンスの場合、詳細をログに出力
       console.error('❌ AIエラーレスポンス:', response.data)
+      console.error('❌ エラー詳細:', response.data.details)
+      
       const errorAnswer = `ごめんね、今その質問にうまく答えられなかったよ。
 もう一度、別の言葉で質問してみてくれるかな？
-先生に聞いてみるのもいいよ！`
+先生に聞いてみるのもいいよ！
+
+【デバッグ情報】
+エラー: ${response.data.error}
+詳細: ${response.data.details || 'なし'}`
+      
       addAIMessage(errorAnswer, 'ai')
       
       // 会話履歴に回答を追加
@@ -11850,6 +11857,8 @@ function closeOptionalProblemEditModal() {
 
 async function saveOptionalProblemEdit(problemId, problemIndex) {
   try {
+    console.log('📝 選択問題の保存を開始:', { problemId, problemIndex })
+    
     const updatedProblem = {
       problem_title: document.getElementById('edit_problem_title').value,
       problem_description: document.getElementById('edit_problem_description').value,
@@ -11857,7 +11866,11 @@ async function saveOptionalProblemEdit(problemId, problemIndex) {
       difficulty_level: document.getElementById('edit_difficulty_level').value
     }
     
+    console.log('📝 更新データ:', updatedProblem)
+    
     const response = await axios.put(`/api/optional-problems/${problemId}`, updatedProblem)
+    
+    console.log('✅ サーバーレスポンス:', response.data)
     
     if (response.data.success) {
       if (window.currentUnitData?.optional_problems[problemIndex]) {
@@ -11871,8 +11884,10 @@ async function saveOptionalProblemEdit(problemId, problemIndex) {
       throw new Error(response.data.error || '保存に失敗しました')
     }
   } catch (error) {
-    console.error('選択問題保存エラー:', error)
-    alert('❌ 保存に失敗しました: ' + (error.response?.data?.error || error.message))
+    console.error('❌ 選択問題保存エラー:', error)
+    console.error('❌ エラーレスポンス:', error.response?.data)
+    const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
+    alert(`❌ 保存に失敗しました\n\nエラー: ${errorMsg}`)
   }
 }
 
@@ -13795,11 +13810,21 @@ async function saveCheckTest(curriculumId) {
       })
     })
 
-    await axios.put(`/api/curriculum/${curriculumId}/check-test`, {
+    console.log('📝 チェックテスト保存データ:', {
+      curriculumId,
+      description,
+      note,
+      problemsCount: problems.length,
+      problems
+    })
+
+    const response = await axios.put(`/api/curriculum/${curriculumId}/check-test`, {
       test_description: description,
       test_note: note,
       sample_problems: problems
     })
+
+    console.log('✅ サーバーレスポンス:', response.data)
 
     hideLoading()
     alert('✅ チェックテストを保存しました')
@@ -13810,8 +13835,10 @@ async function saveCheckTest(curriculumId) {
     }
   } catch (error) {
     hideLoading()
-    console.error('チェックテスト保存エラー:', error)
-    alert('チェックテストの保存に失敗しました')
+    console.error('❌ チェックテスト保存エラー:', error)
+    console.error('❌ エラーレスポンス:', error.response?.data)
+    const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
+    alert(`❌ チェックテストの保存に失敗しました\n\nエラー: ${errorMsg}`)
   }
 }
 
