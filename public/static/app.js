@@ -3460,7 +3460,7 @@ async function askAI() {
     // 会話履歴をAPIに送信する形式に変換
     const conversationHistory = window.aiConversationHistory.map(conv => ({
       role: conv.role,
-      content: conv.message
+      text: conv.message  // 'content' ではなく 'text' を使用
     }))
     
     // AI先生APIを呼び出す（会話履歴と学年を含める）
@@ -3478,24 +3478,45 @@ async function askAI() {
     // AIの回答を追加
     if (response.data.error) {
       // エラーレスポンスの場合、詳細をログに出力
-      console.error('❌ AIエラーレスポンス:', response.data)
+      console.error('❌ AI先生のエラー:', response.data.error)
       console.error('❌ エラー詳細:', response.data.details)
       
-      const errorAnswer = `ごめんね、今その質問にうまく答えられなかったよ。
+      // APIキーが未設定の場合は特別なメッセージ
+      if (response.data.error.includes('APIキー') || response.data.error.includes('API key')) {
+        const errorAnswer = `【重要】AI先生がまだ準備できていません 🔧
+
+${response.data.error}
+
+【先生へ】
+${response.data.details || 'Cloudflare Pagesの環境変数でGEMINI_API_KEYを設定してください。'}
+
+【生徒の皆さんへ】
+今はまだAI先生が使えないから、分からないことがあったら先生に聞いてね！`
+        
+        addAIMessage(errorAnswer, 'ai')
+        
+        // 会話履歴に回答を追加
+        window.aiConversationHistory.push({
+          role: 'assistant',
+          message: errorAnswer
+        })
+      } else {
+        const errorAnswer = `ごめんね、今その質問にうまく答えられなかったよ。
 もう一度、別の言葉で質問してみてくれるかな？
 先生に聞いてみるのもいいよ！
 
 【デバッグ情報】
 エラー: ${response.data.error}
 詳細: ${response.data.details || 'なし'}`
-      
-      addAIMessage(errorAnswer, 'ai')
-      
-      // 会話履歴に回答を追加
-      window.aiConversationHistory.push({
-        role: 'assistant',
-        message: errorAnswer
-      })
+        
+        addAIMessage(errorAnswer, 'ai')
+        
+        // 会話履歴に回答を追加
+        window.aiConversationHistory.push({
+          role: 'assistant',
+          message: errorAnswer
+        })
+      }
     } else {
       const answer = response.data.response || 'ごめんね、うまく答えられなかったよ。先生に聞いてみてね。'
       addAIMessage(answer, 'ai')
