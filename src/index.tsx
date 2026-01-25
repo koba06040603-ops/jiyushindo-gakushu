@@ -3314,10 +3314,11 @@ app.post('/api/ai-chat', async (c) => {
     // Gemini API キーの確認
     const { env } = c
     if (!env.GEMINI_API_KEY) {
-      console.error('❌ GEMINI_API_KEY not found')
+      console.error('❌ GEMINI_API_KEY not found in environment variables')
+      console.error('❌ Available env keys:', Object.keys(env))
       return c.json({ 
-        error: 'APIキーが設定されていません',
-        details: 'GEMINI_API_KEY is not configured'
+        error: 'Gemini APIキーが設定されていません',
+        details: 'Cloudflare Pagesの環境変数でGEMINI_API_KEYを設定してください。Settings > Environment variables > Production/Preview から設定できます。'
       }, 500)
     }
     
@@ -6087,41 +6088,6 @@ app.post('/api/curriculum/:id/optional-problem', async (c) => {
 })
 
 // APIルート：選択問題の更新
-app.put('/api/optional-problems/:id', async (c) => {
-  const { env } = c
-  const problemId = c.req.param('id')
-  const { problem_title, problem_description, learning_meaning, difficulty_level } = await c.req.json()
-  
-  try {
-    await env.DB.prepare(`
-      UPDATE optional_problems
-      SET problem_title = ?,
-          problem_description = ?,
-          learning_meaning = ?,
-          difficulty_level = ?
-      WHERE id = ?
-    `).bind(
-      problem_title,
-      problem_description,
-      learning_meaning || '',
-      difficulty_level || 'medium',
-      problemId
-    ).run()
-    
-    return c.json({
-      success: true,
-      message: '選択問題を更新しました'
-    })
-  } catch (error: any) {
-    console.error('選択問題更新エラー:', error)
-    return c.json({
-      success: false,
-      error: '選択問題の更新に失敗しました',
-      details: error.message
-    }, 500)
-  }
-})
-
 // APIルート：導入問題の更新
 app.put('/api/course/:id/introduction-problem', async (c) => {
   const { env } = c
@@ -6226,6 +6192,68 @@ app.put('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) => {
     return c.json({
       success: false,
       error: 'チェックテスト問題の更新に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：チェックテスト全体の更新
+app.put('/api/curriculum/:id/check-test', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('id')
+  const { test_description, test_note, sample_problems } = await c.req.json()
+  
+  try {
+    console.log('📝 チェックテスト更新:', {
+      curriculumId,
+      test_description,
+      test_note,
+      problemsCount: sample_problems?.length
+    })
+    
+    // 既存のチェックテストを取得または新規作成
+    const metaRow: any = await env.DB.prepare(`
+      SELECT meta_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+    `).bind(curriculumId).first()
+    
+    const checkTest = metaRow ? JSON.parse(metaRow.meta_value) : {
+      test_title: '基礎基本チェックテスト',
+      test_description: '',
+      test_note: '',
+      sample_problems: []
+    }
+    
+    // データを更新
+    checkTest.test_description = test_description || checkTest.test_description
+    checkTest.test_note = test_note || checkTest.test_note
+    checkTest.sample_problems = sample_problems || checkTest.sample_problems
+    
+    // データベースに保存
+    if (metaRow) {
+      await env.DB.prepare(`
+        UPDATE curriculum_metadata
+        SET meta_value = ?
+        WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+      `).bind(JSON.stringify(checkTest), curriculumId).run()
+    } else {
+      await env.DB.prepare(`
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
+        VALUES (?, 'common_check_test', ?)
+      `).bind(curriculumId, JSON.stringify(checkTest)).run()
+    }
+    
+    console.log('✅ チェックテスト更新成功')
+    
+    return c.json({
+      success: true,
+      message: 'チェックテストを更新しました'
+    })
+  } catch (error: any) {
+    console.error('❌ チェックテスト更新エラー:', error)
+    return c.json({
+      success: false,
+      error: 'チェックテストの更新に失敗しました',
       details: error.message
     }, 500)
   }

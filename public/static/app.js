@@ -11868,7 +11868,7 @@ async function saveOptionalProblemEdit(problemId, problemIndex) {
     
     console.log('📝 更新データ:', updatedProblem)
     
-    const response = await axios.put(`/api/optional-problems/${problemId}`, updatedProblem)
+    const response = await axios.put(`/api/optional-problem/${problemId}`, updatedProblem)
     
     console.log('✅ サーバーレスポンス:', response.data)
     
