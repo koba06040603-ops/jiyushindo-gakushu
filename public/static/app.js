@@ -2561,69 +2561,53 @@ async function showIntegratedPrintPreview(curriculumId) {
           </button>
           <button onclick="window.print()" 
                   class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg">
-            <i class="fas fa-print mr-2"></i>印刷する
+            <i class="fas fa-print mr-2"></i>印刷する（A4 1枚 表裏）
           </button>
         </div>
 
-        <!-- 1. 学習のてびき -->
-        <div class="print-page bg-white p-8 mb-8">
-          <h1 class="text-3xl font-bold text-center mb-6 border-b-4 border-indigo-600 pb-4">学習のてびき</h1>
-          <h2 class="text-2xl font-bold text-center mb-4">${curriculum.unit_name}</h2>
-          <div class="grid grid-cols-3 gap-4 mb-6 text-sm">
+        <!-- 1ページ目: 学習のてびき -->
+        <div class="print-page bg-white p-6 mb-8">
+          <h1 class="text-2xl font-bold text-center mb-3 border-b-2 border-indigo-600 pb-2">学習のてびき</h1>
+          <h2 class="text-xl font-bold text-center mb-3">${curriculum.unit_name}</h2>
+          <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
             <div><strong>学年：</strong>${curriculum.grade}年</div>
             <div><strong>組：</strong>____ 組</div>
             <div><strong>名前：</strong>____________________</div>
           </div>
           
-          <div class="mb-6 p-4 bg-blue-50 rounded">
-            <h3 class="font-bold text-blue-800 mb-2">📚 単元の目標</h3>
-            <p class="text-sm">${formatTextWithRuby(curriculum.unit_goal)}</p>
+          <div class="mb-3 p-2 bg-blue-50 rounded">
+            <h3 class="font-bold text-blue-800 mb-1 text-sm">📚 単元の目標</h3>
+            <p class="text-xs leading-tight">${formatTextWithRuby(curriculum.unit_goal)}</p>
           </div>
           
-          <div class="mb-6 p-4 bg-purple-50 rounded">
-            <h3 class="font-bold text-purple-800 mb-2">💖 こころの成長目標</h3>
-            <p class="text-sm">${curriculum.non_cognitive_goal}</p>
+          <div class="mb-3 p-2 bg-purple-50 rounded">
+            <h3 class="font-bold text-purple-800 mb-1 text-sm">💖 こころの成長目標</h3>
+            <p class="text-xs leading-tight">${curriculum.non_cognitive_goal}</p>
           </div>
           
-          <div class="mb-6">
-            <h3 class="font-bold text-lg mb-3 text-indigo-700">🎯 コースの選び方</h3>
-            <p class="text-xs text-gray-600 mb-3">各コースの特徴と、どんな問題に取り組むかを確認しましょう</p>
+          <div class="mb-3">
+            <h3 class="font-bold text-base mb-2 text-indigo-700 bg-indigo-100 px-2 py-1 rounded">🎯 コースの選び方</h3>
             
-            <div class="grid grid-cols-3 gap-4">
+            <div class="grid grid-cols-3 gap-2">
               ${courses.map((course, index) => {
                 const colorClass = index === 0 ? 'green' : index === 1 ? 'blue' : 'purple';
                 const problem = courseSelectionProblems[index];
                 return `
-                  <div class="border-2 border-${colorClass}-500 bg-${colorClass}-50 rounded p-3">
-                    <div class="flex items-center mb-2">
-                      <div class="w-6 h-6 rounded-full bg-${colorClass}-500 text-white flex items-center justify-center font-bold text-xs mr-2">
+                  <div class="border-2 border-${colorClass}-500 bg-${colorClass}-50 rounded p-2">
+                    <div class="flex items-center mb-1">
+                      <div class="w-5 h-5 rounded-full bg-${colorClass}-600 text-white flex items-center justify-center font-bold text-xs mr-1">
                         ${index + 1}
                       </div>
-                      <h4 class="font-bold text-sm text-${colorClass}-800">${course.course_name}</h4>
+                      <h4 class="font-bold text-sm text-${colorClass}-900">${course.course_name}</h4>
                     </div>
-                    <p class="text-xs text-gray-700 mb-2">${course.description}</p>
+                    <p class="text-xs text-gray-800 mb-2 font-medium leading-snug">${course.description}</p>
                     
                     ${problem ? `
-                      <div class="bg-white rounded p-2 mb-2 border border-${colorClass}-200">
-                        <p class="text-xs font-bold text-${colorClass}-700 mb-1">
+                      <div class="bg-white rounded p-2 border-2 border-${colorClass}-300">
+                        <p class="text-xs font-bold text-${colorClass}-800 mb-1">
                           <i class="fas fa-star mr-1"></i>${problem.problem_title}
                         </p>
-                        <p class="text-xs text-gray-600">${problem.problem_description || problem.problem_content}</p>
-                      </div>
-                    ` : ''}
-                    
-                    ${course.introduction_problem ? `
-                      <div class="bg-white rounded p-2 border border-${colorClass}-300">
-                        <p class="text-xs font-bold text-${colorClass}-700 mb-1">
-                          <i class="fas fa-lightbulb mr-1"></i>導入問題
-                        </p>
-                        <p class="text-xs font-bold mb-1">${course.introduction_problem.problem_title}</p>
-                        <p class="text-xs text-gray-700 mb-1">${course.introduction_problem.problem_content}</p>
-                        ${course.introduction_problem.answer ? `
-                          <div class="bg-yellow-50 rounded px-2 py-1 text-xs mt-1">
-                            <strong>💡 ヒント:</strong> ${course.introduction_problem.answer}
-                          </div>
-                        ` : ''}
+                        <p class="text-xs text-gray-700 leading-tight">${problem.problem_description || problem.problem_content}</p>
                       </div>
                     ` : ''}
                   </div>
@@ -2632,52 +2616,21 @@ async function showIntegratedPrintPreview(curriculumId) {
             </div>
           </div>
           
-          <div class="mb-6">
-            <h3 class="font-bold text-lg mb-3">📝 各コースの学習内容</h3>
-            ${courses.map(course => `
-              <div class="mb-4 p-3 bg-${course.color_code}-50 border-l-4 border-${course.color_code}-600 rounded">
-                <h4 class="font-bold text-${course.color_code}-800 mb-2">${course.course_name}</h4>
-                <p class="text-xs mb-3">${course.description}</p>
-                
-                ${course.introduction_problem ? `
-                  <div class="bg-white rounded p-3 border-2 border-${course.color_code}-300 mt-2">
-                    <p class="text-xs font-bold text-${course.color_code}-700 mb-1">
-                      <i class="fas fa-star mr-1"></i>導入問題: ${course.introduction_problem.problem_title}
-                    </p>
-                    <p class="text-xs text-gray-700 whitespace-pre-wrap">${course.introduction_problem.problem_content}</p>
-                  </div>
-                ` : ''}
-              </div>
-            `).join('')}
-          </div>
-          
-          <div class="mb-6">
-            <h3 class="font-bold text-lg mb-3 text-yellow-700">
-              <i class="fas fa-check-circle mr-2"></i>チェックテスト（全コース共通）
+          <div class="mb-2">
+            <h3 class="font-bold text-base mb-2 text-yellow-800 bg-yellow-100 px-2 py-1 rounded">
+              <i class="fas fa-check-circle mr-1"></i>チェックテスト（全コース共通）
             </h3>
             ${commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0 ? `
-              <div class="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4">
-                <p class="text-xs font-bold text-center mb-2">${commonCheckTest.test_description}</p>
-                <p class="text-xs text-center mb-3">${commonCheckTest.test_note}</p>
-                <div class="space-y-2">
+              <div class="bg-yellow-50 border-2 border-yellow-400 rounded p-2">
+                <p class="text-xs font-bold text-center mb-1">${commonCheckTest.test_description}</p>
+                <div class="grid grid-cols-2 gap-1">
                   ${commonCheckTest.sample_problems.map(problem => `
-                    <div class="border-2 border-yellow-200 bg-white rounded p-2">
-                      <div class="flex items-start gap-2">
-                        <div class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    <div class="border border-yellow-300 bg-white rounded p-1">
+                      <div class="flex items-start gap-1">
+                        <div class="w-4 h-4 rounded-full bg-yellow-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
                           ${problem.problem_number}
                         </div>
-                        <div class="flex-1">
-                          <p class="text-xs mb-1">${problem.problem_text}</p>
-                          <div class="answer-container" id="review-answer-${problem.problem_number}">
-                            <button onclick="toggleReviewAnswer(${problem.problem_number})" 
-                                    class="bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold transition">
-                              <i class="fas fa-eye mr-1"></i>答えを表示
-                            </button>
-                            <div class="hidden answer-text bg-yellow-100 rounded px-2 py-1 text-xs mt-1">
-                              💡 ${problem.answer}
-                            </div>
-                          </div>
-                        </div>
+                        <p class="text-xs leading-tight flex-1">${problem.problem_text}</p>
                       </div>
                     </div>
                   `).join('')}
@@ -2687,41 +2640,32 @@ async function showIntegratedPrintPreview(curriculumId) {
           </div>
         </div>
 
-        <!-- 2. 学習計画表 -->
-        <div class="print-page bg-white p-8 mb-8">
-          <h1 class="text-3xl font-bold text-center mb-6 border-b-4 border-green-600 pb-4">学習計画表</h1>
-          <h2 class="text-2xl font-bold text-center mb-4">${curriculum.unit_name}</h2>
-          <div class="grid grid-cols-3 gap-4 mb-6 text-sm">
+        <!-- 2ページ目: 学習計画表 -->
+        <div class="print-page bg-white p-6 mb-8">
+          <h1 class="text-2xl font-bold text-center mb-3 border-b-2 border-green-600 pb-2">学習計画表</h1>
+          <h2 class="text-xl font-bold text-center mb-3">${curriculum.unit_name}</h2>
+          <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
             <div><strong>学年：</strong>${curriculum.grade}年</div>
             <div><strong>組：</strong>____ 組</div>
             <div><strong>名前：</strong>____________________</div>
           </div>
           
-          <div class="mb-4 p-4 bg-green-50 rounded">
-            <h3 class="font-bold text-green-800 mb-2">📚 単元の目標</h3>
-            <p class="text-sm">${formatTextWithRuby(curriculum.unit_goal)}</p>
+          <div class="mb-2 p-2 bg-green-50 rounded">
+            <h3 class="font-bold text-green-800 mb-1 text-sm">📚 単元の目標</h3>
+            <p class="text-xs leading-tight">${formatTextWithRuby(curriculum.unit_goal)}</p>
           </div>
           
-          <div class="mb-4 p-4 bg-purple-50 rounded">
-            <h3 class="font-bold text-purple-800 mb-2">💖 こころの成長目標</h3>
-            <p class="text-sm">${curriculum.non_cognitive_goal}</p>
+          <div class="mb-2 text-xs">
+            <strong>総時間数：</strong>${curriculum.total_hours}時間
           </div>
           
-          <div class="mb-4 text-sm">
-            <strong>総時間数：</strong>${curriculum.total_hours}時間　
-            <strong>計画可能時間：</strong>${curriculum.total_hours - 2}時間
-          </div>
-          
-          <table class="w-full border-collapse border-2 border-gray-400 text-xs">
+          <table class="w-full border-collapse border border-gray-400 text-xs mb-3">
             <thead>
               <tr class="bg-gray-200">
-                <th class="border border-gray-400 px-2 py-1">時間目</th>
-                <th class="border border-gray-400 px-2 py-1">教科</th>
-                <th class="border border-gray-400 px-2 py-1">予定日</th>
-                <th class="border border-gray-400 px-2 py-1">学習内容</th>
-                <th class="border border-gray-400 px-2 py-1">よかったこと</th>
-                <th class="border border-gray-400 px-2 py-1">なおしたいこと</th>
-                <th class="border border-gray-400 px-2 py-1">わかったこと</th>
+                <th class="border border-gray-400 px-1 py-1 w-12">時間</th>
+                <th class="border border-gray-400 px-1 py-1">学習内容</th>
+                <th class="border border-gray-400 px-1 py-1">よかったこと</th>
+                <th class="border border-gray-400 px-1 py-1">なおしたいこと</th>
               </tr>
             </thead>
             <tbody>
@@ -2731,67 +2675,70 @@ async function showIntegratedPrintPreview(curriculumId) {
                               : hour === curriculum.total_hours ? 'まとめ' 
                               : ''
                 return `
-                  <tr class="${isFixed ? 'bg-gray-100' : ''}">
-                    <td class="border border-gray-400 px-2 py-1 text-center font-bold">${hour}</td>
-                    <td class="border border-gray-400 px-2 py-1">${curriculum.subject}</td>
-                    <td class="border border-gray-400 px-2 py-1"></td>
-                    <td class="border border-gray-400 px-2 py-1">${content}</td>
-                    <td class="border border-gray-400 px-2 py-1"></td>
-                    <td class="border border-gray-400 px-2 py-1"></td>
-                    <td class="border border-gray-400 px-2 py-1"></td>
+                  <tr class="${isFixed ? 'bg-gray-100' : ''}" style="height: ${isFixed ? '20px' : '30px'}">
+                    <td class="border border-gray-400 px-1 py-1 text-center font-bold">${hour}</td>
+                    <td class="border border-gray-400 px-1 py-1 text-xs">${content}</td>
+                    <td class="border border-gray-400 px-1 py-1"></td>
+                    <td class="border border-gray-400 px-1 py-1"></td>
                   </tr>
                 `
               }).join('')}
             </tbody>
           </table>
           
-          <div class="mt-6 p-4 border-2 border-purple-300 rounded">
-            <h3 class="font-bold text-purple-800 mb-3">単元全体のふり返り</h3>
-            <div class="grid grid-cols-3 gap-4">
+          <div class="p-2 border-2 border-purple-300 rounded">
+            <h3 class="font-bold text-purple-800 mb-2 text-sm">単元全体のふり返り</h3>
+            <div class="grid grid-cols-2 gap-2">
               <div>
-                <p class="text-xs font-bold mb-1">よかったこと</p>
-                <div class="border border-gray-300 rounded p-2 h-20"></div>
+                <p class="text-xs font-bold mb-1">よかったこと・わかったこと</p>
+                <div class="border border-gray-300 rounded p-1 h-16 text-xs"></div>
               </div>
               <div>
-                <p class="text-xs font-bold mb-1">なおしたいこと</p>
-                <div class="border border-gray-300 rounded p-2 h-20"></div>
-              </div>
-              <div>
-                <p class="text-xs font-bold mb-1">わかったこと</p>
-                <div class="border border-gray-300 rounded p-2 h-20"></div>
+                <p class="text-xs font-bold mb-1">なおしたいこと・次の目標</p>
+                <div class="border border-gray-300 rounded p-1 h-16 text-xs"></div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 3. ヒントカード -->
-        ${allHints.map(hintCard => `
-          <div class="print-page bg-white p-6 mb-8">
-            <div class="border-4 border-blue-400 rounded-lg p-4">
-              <h2 class="text-xl font-bold text-blue-800 mb-2">${hintCard.courseName}</h2>
-              <h3 class="text-lg font-bold text-gray-800 mb-4">
-                カード${hintCard.cardNumber}：${hintCard.cardTitle}
-              </h3>
-              
-              ${hintCard.hints.map((hint, idx) => `
-                <div class="mb-4 p-3 bg-yellow-${50 * (idx + 1)} border-l-4 border-yellow-${400 + (idx * 100)} rounded">
-                  <h4 class="font-bold text-yellow-800 mb-1">💡 ヒント${hint.hint_level}</h4>
-                  <p class="text-sm">${hint.hint_text}</p>
-                  ${hint.thinking_tool_suggestion ? `
-                    <p class="text-xs text-gray-600 mt-2">🛠️ ${hint.thinking_tool_suggestion}</p>
-                  ` : ''}
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `).join('')}
+        <!-- ヒントカードは別刷り -->
+        ${allHints.length > 0 ? `
+        <div class="no-print bg-yellow-50 border-2 border-yellow-500 rounded-lg p-4 mb-4">
+          <h3 class="font-bold text-yellow-800 mb-2">
+            <i class="fas fa-lightbulb mr-2"></i>ヒントカードについて
+          </h3>
+          <p class="text-sm text-gray-700">
+            ヒントカードは${allHints.length}枚あります。必要に応じて別途印刷してください。
+          </p>
+        </div>
+        ` : ''}
       </div>
       
       <style>
         @media print {
           .no-print { display: none !important; }
-          .print-page { page-break-after: always; }
-          body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+          .print-page { 
+            page-break-after: always;
+            width: 210mm;
+            min-height: 297mm;
+            max-height: 297mm;
+            box-sizing: border-box;
+          }
+          body { 
+            print-color-adjust: exact; 
+            -webkit-print-color-adjust: exact;
+            margin: 0;
+            padding: 0;
+          }
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+        }
+        
+        /* 画面プレビュー用 */
+        .print-page {
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
       </style>
     `
