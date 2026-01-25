@@ -18,7 +18,20 @@ node_modules/
 # env
 .env
 .env.production
+.env.local
+.env.development
 .dev.vars
+
+# API keys and secrets (NEVER commit these)
+**/api-keys.txt
+**/secrets.json
+**/*_secret*
+**/*_apikey*
+
+# test files with API keys
+test_*.js
+compare_*.js
+debug_*.js
 
 # logs
 logs/
