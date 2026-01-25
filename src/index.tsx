@@ -146,6 +146,26 @@ function extractJSON(aiResponse: string): any {
   jsonText = jsonText.replace(/\]\|"/g, '],"')
   jsonText = jsonText.replace(/\}\|"/g, '},"')
   
+  // 【NEW】配列要素間のカンマ不足を修正
+  // "] {" → "], {" （オブジェクト配列）
+  jsonText = jsonText.replace(/\]\s+\{/g, '], {')
+  // "} {" → "}, {" （オブジェクト配列）
+  jsonText = jsonText.replace(/\}\s+\{/g, '}, {')
+  // "] [" → "], [" （配列の配列）
+  jsonText = jsonText.replace(/\]\s+\[/g, '], [')
+  // "" "" → "", "" （文字列配列）
+  jsonText = jsonText.replace(/"\s+"/g, '", "')
+  
+  // 【NEW】閉じ括弧と次の要素の間にカンマを追加
+  // "}"で終わる行の後に"{"で始まる行 → カンマを追加
+  jsonText = jsonText.replace(/\}(\s*)\{/g, '},$1{')
+  // "]"で終わる行の後に"["で始まる行 → カンマを追加
+  jsonText = jsonText.replace(/\](\s*)\[/g, '],$1[')
+  
+  // 【NEW】連続する閉じ括弧の修正（例: "]]" を "], ]" に）
+  // これは配列内の配列が不正に閉じられている場合の修正
+  jsonText = jsonText.replace(/\]\]/g, '], ]').replace(/\}, \]/g, '}]')
+  
   // 未閉じの文字列を検出して修正を試みる
   let quoteCount = 0
   for (let i = 0; i < jsonText.length; i++) {
@@ -308,7 +328,9 @@ function extractJSON(aiResponse: string): any {
             },
             // 戦略2: エラー位置の不正な文字をカンマで置換
             () => jsonText.substring(0, pos) + ',' + jsonText.substring(pos + 1),
-            // 戦略3: エラー位置の前の不完全な文字列を修正
+            // 戦略3: エラー位置にカンマを挿入（文字を削除しない）
+            () => jsonText.substring(0, pos) + ',' + jsonText.substring(pos),
+            // 戦略4: エラー位置の前の不完全な文字列を修正
             () => {
               let fixed = jsonText.substring(0, pos)
               const lastQuote = fixed.lastIndexOf('"')
@@ -325,7 +347,50 @@ function extractJSON(aiResponse: string): any {
               
               return fixed + jsonText.substring(pos)
             },
-            // 戦略4: エラー位置以降の不正な部分を切り捨てて配列/オブジェクトを閉じる
+            // 戦略5: エラー位置の前のオブジェクト/配列を閉じる
+            () => {
+              let fixed = jsonText.substring(0, pos).trimEnd()
+              
+              // 最後の文字を確認
+              const lastChar = fixed.charAt(fixed.length - 1)
+              
+              // 開いている括弧の種類を判定
+              let openBraces = 0, openBrackets = 0
+              let inString = false, escaped = false
+              
+              for (let i = 0; i < fixed.length; i++) {
+                const char = fixed[i]
+                if (escaped) {
+                  escaped = false
+                  continue
+                }
+                if (char === '\\') {
+                  escaped = true
+                  continue
+                }
+                if (char === '"') {
+                  inString = !inString
+                  continue
+                }
+                if (inString) continue
+                
+                if (char === '{') openBraces++
+                else if (char === '}') openBraces--
+                else if (char === '[') openBrackets++
+                else if (char === ']') openBrackets--
+              }
+              
+              // 開いている括弧を閉じる
+              if (openBrackets > 0) {
+                fixed += ']'
+              } else if (openBraces > 0) {
+                fixed += '}'
+              }
+              
+              fixed += ',' + jsonText.substring(pos)
+              return fixed
+            },
+            // 戦略6: エラー位置以降の不正な部分を切り捨てて配列/オブジェクトを閉じる
             () => {
               let fixed = jsonText.substring(0, pos).trimEnd()
               // 末尾のカンマや不完全な要素を削除
