@@ -3104,13 +3104,17 @@ async function loadCardPage(cardId) {
                         <i class="fas fa-pen mr-2"></i>指やタッチペンで書こう
                       </h4>
                       <div class="flex gap-2">
+                        <button onclick="undoAnswerHandwriting()" 
+                                class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-sm">
+                          <i class="fas fa-undo mr-1"></i>1画戻す
+                        </button>
                         <button onclick="recognizeAnswerHandwriting()" 
                                 class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-sm">
                           <i class="fas fa-magic mr-1"></i>認識
                         </button>
                         <button onclick="clearAnswerHandwriting()" 
                                 class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">
-                          <i class="fas fa-eraser mr-1"></i>消去
+                          <i class="fas fa-eraser mr-1"></i>全消去
                         </button>
                       </div>
                     </div>
@@ -3262,9 +3266,13 @@ async function loadCardPage(cardId) {
                     <i class="fas fa-pen mr-2"></i>手書きで考えを書こう
                   </h4>
                   <div class="flex gap-2">
+                    <button onclick="undoHandwriting()" 
+                            class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-sm">
+                      <i class="fas fa-undo mr-1"></i>1画戻す
+                    </button>
                     <button onclick="clearHandwriting()" 
                             class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">
-                      <i class="fas fa-eraser mr-1"></i>消去
+                      <i class="fas fa-eraser mr-1"></i>全消去
                     </button>
                     <button onclick="sendHandwriting()" 
                             class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm">
@@ -3682,15 +3690,29 @@ function speakText(text) {
   
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'ja-JP'
-  utterance.rate = 0.9  // 少しゆっくり
+  utterance.rate = 0.95  // 少しゆっくり（自然な速度）
   utterance.pitch = 1.0
   utterance.volume = 1.0
   
-  // 日本語音声を選択
+  // 日本語音声を選択（優先順位付き）
   const voices = speechSynthesis.getVoices()
-  const japaneseVoice = voices.find(v => v.lang.startsWith('ja'))
+  
+  // 優先順位：Google日本語 > Apple日本語 > Microsoft日本語 > その他日本語
+  const japaneseVoice = voices.find(v => 
+    v.lang === 'ja-JP' && v.name.includes('Google')
+  ) || voices.find(v => 
+    v.lang === 'ja-JP' && (v.name.includes('Kyoko') || v.name.includes('Otoya'))
+  ) || voices.find(v => 
+    v.lang === 'ja-JP' && v.name.includes('Microsoft')
+  ) || voices.find(v => 
+    v.lang.startsWith('ja')
+  )
+  
   if (japaneseVoice) {
     utterance.voice = japaneseVoice
+    console.log('選択された音声:', japaneseVoice.name)
+  } else {
+    console.warn('日本語音声が見つかりませんでした')
   }
   
   // 音声アイコンを表示
@@ -3869,6 +3891,12 @@ function initHandwritingCanvas() {
   canvas.addEventListener('pointerup', stopDrawing)
   canvas.addEventListener('pointerout', stopDrawing)
   
+  // マウス対応も追加（PC環境用）
+  canvas.addEventListener('mousedown', startDrawing)
+  canvas.addEventListener('mousemove', draw)
+  canvas.addEventListener('mouseup', stopDrawing)
+  canvas.addEventListener('mouseout', stopDrawing)
+  
   function startDrawing(e) {
     isDrawing = true
     const rect = canvas.getBoundingClientRect()
@@ -3877,7 +3905,9 @@ function initHandwritingCanvas() {
     
     // 新しいストロークを開始
     handwritingStrokes.push({
-      points: [{x: lastX, y: lastY, time: Date.now()}]
+      points: [{x: lastX, y: lastY, time: Date.now()}],
+      color: '#000000',
+      width: 2
     })
   }
   
@@ -3920,6 +3950,73 @@ function clearHandwriting() {
   
   // ストローク履歴もクリア
   handwritingStrokes = []
+}
+
+// 1画戻す（Undo）
+function undoHandwriting() {
+  if (handwritingStrokes.length === 0) return
+  
+  // 最後のストロークを削除
+  handwritingStrokes.pop()
+  
+  // Canvasを再描画
+  redrawHandwriting('handwritingCanvas', handwritingStrokes)
+}
+
+// 回答用の1画戻す
+function undoAnswerHandwriting() {
+  if (answerStrokes.length === 0) return
+  
+  answerStrokes.pop()
+  redrawHandwriting('answerCanvas', answerStrokes)
+}
+
+// Canvasを再描画
+function redrawHandwriting(canvasId, strokes) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  // すべてのストロークを再描画
+  strokes.forEach(stroke => {
+    ctx.strokeStyle = stroke.color || '#000000'
+    ctx.lineWidth = stroke.width || 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    
+    ctx.beginPath()
+    stroke.points.forEach((point, index) => {
+      if (index === 0) {
+        ctx.moveTo(point.x, point.y)
+      } else {
+        ctx.lineTo(point.x, point.y)
+      }
+    })
+    ctx.stroke()
+  })
+}
+
+function clearHandwriting() {
+  const canvas = document.getElementById('handwritingCanvas')
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  // ストローク履歴もクリア
+  handwritingStrokes = []
+}
+
+function clearAnswerHandwriting() {
+  const canvas = document.getElementById('answerCanvas')
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  answerStrokes = []
 }
 
 // 手書きを送信
@@ -4057,6 +4154,17 @@ function initAnswerCanvas() {
   canvas.addEventListener('pointermove', answerDraw)
   canvas.addEventListener('pointerup', answerStopDrawing)
   canvas.addEventListener('pointerout', answerStopDrawing)
+  
+  // マウス対応も追加（PC環境用）
+  canvas.removeEventListener('mousedown', answerStartDrawing)
+  canvas.removeEventListener('mousemove', answerDraw)
+  canvas.removeEventListener('mouseup', answerStopDrawing)
+  canvas.removeEventListener('mouseout', answerStopDrawing)
+  
+  canvas.addEventListener('mousedown', answerStartDrawing)
+  canvas.addEventListener('mousemove', answerDraw)
+  canvas.addEventListener('mouseup', answerStopDrawing)
+  canvas.addEventListener('mouseout', answerStopDrawing)
 }
 
 function answerStartDrawing(e) {
@@ -4067,7 +4175,9 @@ function answerStartDrawing(e) {
   answerLastY = e.clientY - rect.top
   
   answerStrokes.push({
-    points: [{x: answerLastX, y: answerLastY, time: Date.now()}]
+    points: [{x: answerLastX, y: answerLastY, time: Date.now()}],
+    color: '#000000',
+    width: 3
   })
 }
 
@@ -4315,6 +4425,8 @@ function isDiagonalCross(points1, points2) {
 window.toggleAutoVoice = toggleAutoVoice
 window.switchAnswerMode = switchAnswerMode
 window.clearAnswerHandwriting = clearAnswerHandwriting
+window.undoAnswerHandwriting = undoAnswerHandwriting
+window.undoHandwriting = undoHandwriting
 window.recognizeAnswerHandwriting = recognizeAnswerHandwriting
 
 // 先生を呼ぶ
@@ -13379,7 +13491,7 @@ async function saveNewOptionalProblem(curriculumId, problemNumber) {
     console.log('📝 新規問題データ:', newProblem)
     
     const response = await axios.post(
-      `/api/curriculum/${curriculumId}/optional-problems`, 
+      `/api/curriculum/${curriculumId}/optional-problem`, 
       newProblem
     )
     
