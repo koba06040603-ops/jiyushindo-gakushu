@@ -4301,18 +4301,31 @@ async function recognizeAnswerHandwriting() {
   canvas.style.cursor = 'wait'
   
   try {
+    console.log('=== 手書き認識開始 ===')
+    console.log('Tesseract利用可能:', typeof Tesseract !== 'undefined')
+    
     // 1. Tesseract.js で OCR 認識（日本語+英語）
     if (typeof Tesseract !== 'undefined') {
       const imageData = canvas.toDataURL('image/png')
-      console.log('Tesseract OCR 開始...')
+      console.log('✅ Tesseract OCR 開始...')
+      console.log('画像データサイズ:', imageData.length)
+      
+      alert('🔍 OCR認識中です...\n\n日本語テキストを認識しています。\n完了まで数秒かかります。')
       
       const result = await Tesseract.recognize(
         imageData,
         'jpn+eng', // 日本語と英語を認識
         {
-          logger: m => console.log('OCR進捗:', m)
+          logger: m => {
+            console.log('OCR進捗:', m)
+            if (m.status === 'recognizing text') {
+              console.log('認識進捗:', Math.round(m.progress * 100) + '%')
+            }
+          }
         }
       )
+      
+      console.log('✅ OCR完了:', result)
       
       if (result && result.data && result.data.text && result.data.text.trim()) {
         const text = result.data.text.trim()
@@ -4321,7 +4334,11 @@ async function recognizeAnswerHandwriting() {
         alert(`✅ 認識結果: ${text}`)
         switchAnswerMode('text')
         return
+      } else {
+        console.log('⚠️ OCR結果が空でした')
       }
+    } else {
+      console.log('⚠️ Tesseract.js が読み込まれていません')
     }
     
     // 2. ブラウザのHandwriting Recognition APIを試す
@@ -15885,44 +15902,6 @@ async function addOptionalProblem(curriculumId) {
   `
   
   document.body.appendChild(modal)
-}
-
-async function saveNewOptionalProblem(curriculumId) {
-  try {
-    showLoading('選択問題を追加中...')
-    
-    const title = document.getElementById('newOptionalProblemTitle').value
-    const description = document.getElementById('newOptionalProblemDesc').value
-    const content = document.getElementById('newOptionalProblemContent').value
-    const meaning = document.getElementById('newOptionalProblemMeaning').value
-    const difficulty = document.getElementById('newOptionalProblemDifficulty').value
-
-    if (!title || !content) {
-      alert('タイトルと問題内容は必須です')
-      hideLoading()
-      return
-    }
-
-    await axios.post(`/api/curriculum/${curriculumId}/optional-problem`, {
-      problem_title: title,
-      problem_description: description,
-      problem_content: content,
-      learning_meaning: meaning,
-      difficulty_level: difficulty
-    })
-
-    hideLoading()
-    alert('✅ 選択問題を追加しました')
-    
-    document.querySelector('.fixed.inset-0').remove()
-    if (state.selectedCurriculum) {
-      loadGuidePage(state.selectedCurriculum.id)
-    }
-  } catch (error) {
-    hideLoading()
-    console.error('選択問題追加エラー:', error)
-    alert('選択問題の追加に失敗しました')
-  }
 }
 
 // ============================================

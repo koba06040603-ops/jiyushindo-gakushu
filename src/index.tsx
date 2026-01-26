@@ -6210,7 +6210,10 @@ app.put('/api/optional-problem/:id', async (c) => {
 app.post('/api/curriculum/:id/optional-problem', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('id')
-  const { problem_title, problem_description, problem_content, problem_category, learning_meaning } = await c.req.json()
+  const body = await c.req.json()
+  const { problem_title, problem_description, problem_content, problem_category, learning_meaning } = body
+  
+  console.log('📝 選択問題追加リクエスト:', { curriculumId, body })
   
   try {
     // 既存の問題数を取得して次の番号を決定
@@ -6219,6 +6222,8 @@ app.post('/api/curriculum/:id/optional-problem', async (c) => {
     `).bind(curriculumId).first()
     
     const nextProblemNumber = (countResult?.count || 0) + 1
+    
+    console.log('📝 次の問題番号:', nextProblemNumber)
     
     const result = await env.DB.prepare(`
       INSERT INTO optional_problems (
@@ -6235,17 +6240,26 @@ app.post('/api/curriculum/:id/optional-problem', async (c) => {
       learning_meaning || ''
     ).run()
     
+    console.log('✅ 選択問題追加成功:', result.meta.last_row_id)
+    
     return c.json({
       success: true,
       message: '選択問題を追加しました',
       problemId: result.meta.last_row_id
     })
   } catch (error: any) {
-    console.error('選択問題追加エラー:', error)
+    console.error('❌ 選択問題追加エラー:', error)
+    console.error('エラー詳細:', {
+      message: error.message,
+      stack: error.stack,
+      curriculumId,
+      body
+    })
     return c.json({
       success: false,
       error: '選択問題の追加に失敗しました',
-      details: error.message
+      details: error.message,
+      stack: error.stack
     }, 500)
   }
 })
