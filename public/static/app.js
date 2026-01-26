@@ -792,6 +792,31 @@ const loadingManager = {
 
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
+  // 音声合成の初期化（ボイスリストを読み込む）
+  if ('speechSynthesis' in window) {
+    // ボイスリストの読み込みを待つ
+    let voicesLoaded = false
+    const loadVoices = () => {
+      const voices = speechSynthesis.getVoices()
+      if (voices.length > 0 && !voicesLoaded) {
+        voicesLoaded = true
+        console.log('音声合成が利用可能:', voices.length, '種類の音声')
+        
+        // 日本語音声の確認
+        const japaneseVoices = voices.filter(v => v.lang.startsWith('ja'))
+        console.log('日本語音声:', japaneseVoices.length, '種類')
+      }
+    }
+    
+    // Chrome/Edge用
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = loadVoices
+    }
+    
+    // Safari用（すぐに読み込まれる場合）
+    loadVoices()
+  }
+  
   // ローカルストレージから認証情報を復元
   const savedSession = localStorage.getItem('session_token')
   const savedUser = localStorage.getItem('user')
@@ -3167,16 +3192,69 @@ async function loadCardPage(cardId) {
               <div id="aiChat" class="space-y-3 mb-4 max-h-96 overflow-y-auto">
                 <!-- チャットメッセージがここに表示されます -->
               </div>
+              
+              <!-- 手書き入力エリア -->
+              <div id="handwritingArea" class="hidden mb-4 bg-white border-2 border-blue-300 rounded-lg p-4">
+                <div class="flex justify-between items-center mb-2">
+                  <h4 class="font-bold text-gray-800">
+                    <i class="fas fa-pen mr-2"></i>手書きで考えを書こう
+                  </h4>
+                  <div class="flex gap-2">
+                    <button onclick="clearHandwriting()" 
+                            class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">
+                      <i class="fas fa-eraser mr-1"></i>消去
+                    </button>
+                    <button onclick="sendHandwriting()" 
+                            class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm">
+                      <i class="fas fa-check mr-1"></i>送信
+                    </button>
+                    <button onclick="closeHandwriting()" 
+                            class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm">
+                      <i class="fas fa-times mr-1"></i>閉じる
+                    </button>
+                  </div>
+                </div>
+                <canvas id="handwritingCanvas" 
+                        width="600" 
+                        height="300" 
+                        class="border-2 border-gray-300 rounded bg-white w-full touch-none"
+                        style="touch-action: none; cursor: crosshair;">
+                </canvas>
+                <p class="text-xs text-gray-600 mt-2">
+                  <i class="fas fa-info-circle mr-1"></i>
+                  指やタッチペンで自由に書き込めます
+                </p>
+              </div>
+              
               <div class="flex gap-2">
+                <button onclick="startVoiceInput()" 
+                        id="voiceButton"
+                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg font-bold transition"
+                        title="音声で質問">
+                  <i class="fas fa-microphone"></i>
+                </button>
+                <button onclick="toggleHandwriting()" 
+                        id="handwritingButton"
+                        class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-lg font-bold transition"
+                        title="手書きで入力">
+                  <i class="fas fa-pen"></i>
+                </button>
                 <input type="text" 
                        id="aiQuestionInput" 
                        placeholder="質問を入力..." 
                        class="flex-1 p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
                        onkeypress="if(event.key==='Enter') { event.preventDefault(); askAI(); }">
                 <button onclick="askAI()" 
+                        id="aiSendBtn"
                         class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition">
                   <i class="fas fa-paper-plane"></i>
                 </button>
+              </div>
+              
+              <!-- 音声認識状態表示 -->
+              <div id="voiceStatus" class="hidden mt-2 p-2 bg-purple-100 rounded text-sm text-purple-800">
+                <i class="fas fa-microphone animate-pulse mr-2"></i>
+                <span id="voiceStatusText">音声を認識中...</span>
               </div>
             </div>
 
@@ -3512,7 +3590,314 @@ function addAIMessage(message, sender, loadingId = null) {
   
   aiChat.appendChild(messageDiv)
   aiChat.scrollTop = aiChat.scrollHeight
+  
+  // AI先生の回答を音声で読み上げ（オプション）
+  if (sender === 'ai' && window.autoPlayAIVoice) {
+    speakText(message)
+  }
 }
+
+// 音声合成（テキスト読み上げ）
+function speakText(text) {
+  // 音声合成がサポートされているか確認
+  if (!('speechSynthesis' in window)) {
+    console.warn('音声合成はこのブラウザではサポートされていません')
+    return
+  }
+  
+  // 既存の読み上げを停止
+  speechSynthesis.cancel()
+  
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'ja-JP'
+  utterance.rate = 0.9  // 少しゆっくり
+  utterance.pitch = 1.0
+  utterance.volume = 1.0
+  
+  // 日本語音声を選択
+  const voices = speechSynthesis.getVoices()
+  const japaneseVoice = voices.find(v => v.lang.startsWith('ja'))
+  if (japaneseVoice) {
+    utterance.voice = japaneseVoice
+  }
+  
+  // 音声アイコンを表示
+  const voiceButton = document.getElementById('voiceButton')
+  if (voiceButton) {
+    voiceButton.innerHTML = '<i class="fas fa-volume-up"></i>'
+  }
+  
+  utterance.onend = () => {
+    if (voiceButton) {
+      voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
+    }
+  }
+  
+  speechSynthesis.speak(utterance)
+}
+
+// 音声認識の初期化
+let recognition = null
+if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  recognition = new SpeechRecognition()
+  recognition.lang = 'ja-JP'
+  recognition.continuous = false
+  recognition.interimResults = false
+  
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript
+    console.log('音声認識結果:', transcript)
+    
+    // 認識結果を入力欄に設定
+    const input = document.getElementById('aiQuestionInput')
+    if (input) {
+      input.value = transcript
+    }
+    
+    // ステータスを非表示
+    const status = document.getElementById('voiceStatus')
+    const statusText = document.getElementById('voiceStatusText')
+    if (status) {
+      status.classList.add('hidden')
+    }
+    
+    // ボタンを元に戻す
+    const voiceButton = document.getElementById('voiceButton')
+    if (voiceButton) {
+      voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
+      voiceButton.classList.remove('bg-red-600', 'hover:bg-red-700')
+      voiceButton.classList.add('bg-purple-600', 'hover:bg-purple-700')
+    }
+    
+    // 自動送信
+    setTimeout(() => {
+      askAI()
+    }, 500)
+  }
+  
+  recognition.onerror = (event) => {
+    console.error('音声認識エラー:', event.error)
+    
+    const status = document.getElementById('voiceStatus')
+    const statusText = document.getElementById('voiceStatusText')
+    
+    let errorMessage = '音声認識エラーが発生しました'
+    if (event.error === 'no-speech') {
+      errorMessage = '音声が検出されませんでした。もう一度お試しください。'
+    } else if (event.error === 'audio-capture') {
+      errorMessage = 'マイクが見つかりません。マイクの接続を確認してください。'
+    } else if (event.error === 'not-allowed') {
+      errorMessage = 'マイクの使用が許可されていません。ブラウザの設定を確認してください。'
+    }
+    
+    if (status && statusText) {
+      statusText.textContent = errorMessage
+      status.classList.remove('bg-purple-100', 'text-purple-800')
+      status.classList.add('bg-red-100', 'text-red-800')
+      
+      setTimeout(() => {
+        status.classList.add('hidden')
+      }, 3000)
+    }
+    
+    // ボタンを元に戻す
+    const voiceButton = document.getElementById('voiceButton')
+    if (voiceButton) {
+      voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
+      voiceButton.classList.remove('bg-red-600', 'hover:bg-red-700')
+      voiceButton.classList.add('bg-purple-600', 'hover:bg-purple-700')
+    }
+  }
+  
+  recognition.onend = () => {
+    console.log('音声認識終了')
+  }
+}
+
+// 音声入力開始
+function startVoiceInput() {
+  if (!recognition) {
+    alert('音声認識はこのブラウザではサポートされていません。\n\nChrome、Edge、またはSafariをお試しください。')
+    return
+  }
+  
+  // マイクの権限をリクエスト
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(() => {
+      // 音声認識を開始
+      recognition.start()
+      console.log('音声認識開始')
+      
+      // ステータス表示
+      const status = document.getElementById('voiceStatus')
+      const statusText = document.getElementById('voiceStatusText')
+      if (status) {
+        statusText.textContent = '音声を認識中... 質問を話してください'
+        status.classList.remove('hidden', 'bg-red-100', 'text-red-800')
+        status.classList.add('bg-purple-100', 'text-purple-800')
+      }
+      
+      // ボタンの状態を変更
+      const voiceButton = document.getElementById('voiceButton')
+      if (voiceButton) {
+        voiceButton.innerHTML = '<i class="fas fa-stop"></i>'
+        voiceButton.classList.remove('bg-purple-600', 'hover:bg-purple-700')
+        voiceButton.classList.add('bg-red-600', 'hover:bg-red-700')
+      }
+    })
+    .catch((error) => {
+      console.error('マイクアクセスエラー:', error)
+      alert('マイクへのアクセスが拒否されました。\n\nブラウザの設定でマイクの使用を許可してください。')
+    })
+}
+
+// 手書きエリアの表示/非表示
+function toggleHandwriting() {
+  const handwritingArea = document.getElementById('handwritingArea')
+  if (!handwritingArea) return
+  
+  if (handwritingArea.classList.contains('hidden')) {
+    handwritingArea.classList.remove('hidden')
+    initHandwritingCanvas()
+  } else {
+    handwritingArea.classList.add('hidden')
+  }
+}
+
+// 手書きエリアを閉じる
+function closeHandwriting() {
+  const handwritingArea = document.getElementById('handwritingArea')
+  if (handwritingArea) {
+    handwritingArea.classList.add('hidden')
+  }
+}
+
+// 手書きCanvasの初期化
+let isDrawing = false
+let lastX = 0
+let lastY = 0
+let handwritingStrokes = [] // ストローク履歴（思考過程記録用）
+
+function initHandwritingCanvas() {
+  const canvas = document.getElementById('handwritingCanvas')
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  
+  // Canvas設定
+  ctx.strokeStyle = '#000000'
+  ctx.lineWidth = 2
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  
+  // タッチデバイス対応
+  canvas.addEventListener('pointerdown', startDrawing)
+  canvas.addEventListener('pointermove', draw)
+  canvas.addEventListener('pointerup', stopDrawing)
+  canvas.addEventListener('pointerout', stopDrawing)
+  
+  function startDrawing(e) {
+    isDrawing = true
+    const rect = canvas.getBoundingClientRect()
+    lastX = e.clientX - rect.left
+    lastY = e.clientY - rect.top
+    
+    // 新しいストロークを開始
+    handwritingStrokes.push({
+      points: [{x: lastX, y: lastY, time: Date.now()}]
+    })
+  }
+  
+  function draw(e) {
+    if (!isDrawing) return
+    
+    e.preventDefault()
+    
+    const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    
+    ctx.beginPath()
+    ctx.moveTo(lastX, lastY)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+    
+    // ストローク履歴に追加
+    const currentStroke = handwritingStrokes[handwritingStrokes.length - 1]
+    if (currentStroke) {
+      currentStroke.points.push({x, y, time: Date.now()})
+    }
+    
+    lastX = x
+    lastY = y
+  }
+  
+  function stopDrawing() {
+    isDrawing = false
+  }
+}
+
+// 手書きをクリア
+function clearHandwriting() {
+  const canvas = document.getElementById('handwritingCanvas')
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  // ストローク履歴もクリア
+  handwritingStrokes = []
+}
+
+// 手書きを送信
+function sendHandwriting() {
+  const canvas = document.getElementById('handwritingCanvas')
+  if (!canvas) return
+  
+  // Canvasを画像として取得
+  const imageData = canvas.toDataURL('image/png')
+  
+  // 思考過程の分析（簡易版）
+  const strokeCount = handwritingStrokes.length
+  const totalPoints = handwritingStrokes.reduce((sum, stroke) => sum + stroke.points.length, 0)
+  const avgPointsPerStroke = totalPoints / strokeCount
+  
+  let thinkingNote = ''
+  if (strokeCount > 10) {
+    thinkingNote = '（たくさん書いて考えたね！）'
+  } else if (strokeCount > 5) {
+    thinkingNote = '（しっかり書いて考えたね）'
+  } else if (strokeCount > 0) {
+    thinkingNote = '（手書きで考えたね）'
+  }
+  
+  // AI先生に送信
+  const input = document.getElementById('aiQuestionInput')
+  if (input) {
+    const originalText = input.value.trim()
+    input.value = `[手書きメモ${thinkingNote}を送信]\n${originalText || '手書きの内容について教えてください'}`
+  }
+  
+  // 画像を表示
+  addAIMessage(`[手書きメモ${thinkingNote}]\n\n📝 ${strokeCount}回のストローク、${totalPoints}個の点`, 'user')
+  
+  // 実際に質問を送信
+  askAI()
+  
+  // 手書きエリアを閉じる
+  closeHandwriting()
+  
+  // Canvasをクリア
+  clearHandwriting()
+}
+
+window.speakText = speakText
+window.startVoiceInput = startVoiceInput
+window.toggleHandwriting = toggleHandwriting
+window.closeHandwriting = closeHandwriting
+window.clearHandwriting = clearHandwriting
+window.sendHandwriting = sendHandwriting
 
 // 先生を呼ぶ
 function callTeacher() {
