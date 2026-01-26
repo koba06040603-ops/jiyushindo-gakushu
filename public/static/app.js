@@ -817,6 +817,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loadVoices()
   }
   
+  // 音声自動読み上げ設定を復元
+  const savedAutoPlayVoice = localStorage.getItem('autoPlayAIVoice')
+  window.autoPlayAIVoice = savedAutoPlayVoice === 'true'
+  
   // ローカルストレージから認証情報を復元
   const savedSession = localStorage.getItem('session_token')
   const savedUser = localStorage.getItem('user')
@@ -3069,10 +3073,59 @@ async function loadCardPage(cardId) {
               <!-- 回答欄 -->
               <div class="mt-6">
                 <label class="block text-sm font-bold text-gray-700 mb-2">あなたの答えを書きましょう</label>
-                <textarea id="answerInput" 
-                          rows="6" 
-                          class="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none"
-                          placeholder="ここに答えを書いてください..."></textarea>
+                
+                <!-- タブ切り替え -->
+                <div class="flex gap-2 mb-2">
+                  <button onclick="switchAnswerMode('text')" 
+                          id="textModeBtn"
+                          class="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-600 transition">
+                    <i class="fas fa-keyboard mr-2"></i>文字入力
+                  </button>
+                  <button onclick="switchAnswerMode('handwriting')" 
+                          id="handwritingModeBtn"
+                          class="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold hover:bg-gray-400 transition">
+                    <i class="fas fa-pen mr-2"></i>手書き入力
+                  </button>
+                </div>
+                
+                <!-- 文字入力エリア -->
+                <div id="textAnswerArea">
+                  <textarea id="answerInput" 
+                            rows="6" 
+                            class="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none"
+                            placeholder="ここに答えを書いてください..."></textarea>
+                </div>
+                
+                <!-- 手書き入力エリア -->
+                <div id="handwritingAnswerArea" class="hidden">
+                  <div class="bg-white border-2 border-blue-300 rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-2">
+                      <h4 class="font-bold text-gray-800">
+                        <i class="fas fa-pen mr-2"></i>指やタッチペンで書こう
+                      </h4>
+                      <div class="flex gap-2">
+                        <button onclick="recognizeAnswerHandwriting()" 
+                                class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-sm">
+                          <i class="fas fa-magic mr-1"></i>認識
+                        </button>
+                        <button onclick="clearAnswerHandwriting()" 
+                                class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">
+                          <i class="fas fa-eraser mr-1"></i>消去
+                        </button>
+                      </div>
+                    </div>
+                    <canvas id="answerCanvas" 
+                            width="800" 
+                            height="400" 
+                            class="border-2 border-gray-300 rounded bg-white w-full touch-none"
+                            style="touch-action: none; cursor: crosshair;">
+                    </canvas>
+                    <p class="text-xs text-gray-600 mt-2">
+                      <i class="fas fa-info-circle mr-1"></i>
+                      手書きで答えを書いて、「認識」ボタンで文字に変換できます
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <!-- 分かった度 -->
@@ -3186,9 +3239,18 @@ async function loadCardPage(cardId) {
 
             <!-- AI先生エリア -->
             <div id="aiTeacherArea" class="hidden bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
-              <h3 class="text-lg font-bold text-blue-800 mb-4">
-                <i class="fas fa-robot mr-2"></i>AI先生
-              </h3>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-blue-800">
+                  <i class="fas fa-robot mr-2"></i>AI先生
+                </h3>
+                <button onclick="toggleAutoVoice()" 
+                        id="autoVoiceToggle"
+                        class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold transition"
+                        title="音声読み上げON/OFF">
+                  <i class="fas fa-volume-mute mr-1"></i>
+                  <span id="autoVoiceStatus">読み上げOFF</span>
+                </button>
+              </div>
               <div id="aiChat" class="space-y-3 mb-4 max-h-96 overflow-y-auto">
                 <!-- チャットメッセージがここに表示されます -->
               </div>
@@ -3389,6 +3451,16 @@ function showAITeacher() {
   if (window.aiSessionId) {
     loadConversationHistory()
   }
+  
+  // 音声読み上げトグルボタンの初期状態を復元
+  setTimeout(() => {
+    const toggle = document.getElementById('autoVoiceToggle')
+    if (toggle && window.autoPlayAIVoice) {
+      toggle.classList.remove('bg-gray-200', 'hover:bg-gray-300', 'text-gray-700')
+      toggle.classList.add('bg-green-500', 'hover:bg-green-600', 'text-white')
+      toggle.innerHTML = '<i class="fas fa-volume-up mr-1"></i><span id="autoVoiceStatus">読み上げON</span>'
+    }
+  }, 100)
 }
 
 // 対話履歴を読み込む
@@ -3898,6 +3970,352 @@ window.toggleHandwriting = toggleHandwriting
 window.closeHandwriting = closeHandwriting
 window.clearHandwriting = clearHandwriting
 window.sendHandwriting = sendHandwriting
+
+// 音声自動読み上げON/OFF切り替え
+function toggleAutoVoice() {
+  window.autoPlayAIVoice = !window.autoPlayAIVoice
+  
+  // LocalStorageに保存
+  localStorage.setItem('autoPlayAIVoice', window.autoPlayAIVoice)
+  
+  const toggle = document.getElementById('autoVoiceToggle')
+  const status = document.getElementById('autoVoiceStatus')
+  
+  if (window.autoPlayAIVoice) {
+    toggle.classList.remove('bg-gray-200', 'hover:bg-gray-300', 'text-gray-700')
+    toggle.classList.add('bg-green-500', 'hover:bg-green-600', 'text-white')
+    toggle.innerHTML = '<i class="fas fa-volume-up mr-1"></i><span id="autoVoiceStatus">読み上げON</span>'
+    
+    // テスト音声
+    speakText('音声読み上げをオンにしました')
+  } else {
+    toggle.classList.remove('bg-green-500', 'hover:bg-green-600', 'text-white')
+    toggle.classList.add('bg-gray-200', 'hover:bg-gray-300', 'text-gray-700')
+    toggle.innerHTML = '<i class="fas fa-volume-mute mr-1"></i><span id="autoVoiceStatus">読み上げOFF</span>'
+    
+    // 読み上げを停止
+    speechSynthesis.cancel()
+  }
+}
+
+// 回答欄のモード切り替え
+function switchAnswerMode(mode) {
+  const textArea = document.getElementById('textAnswerArea')
+  const handwritingArea = document.getElementById('handwritingAnswerArea')
+  const textBtn = document.getElementById('textModeBtn')
+  const handwritingBtn = document.getElementById('handwritingModeBtn')
+  
+  if (mode === 'text') {
+    textArea.classList.remove('hidden')
+    handwritingArea.classList.add('hidden')
+    
+    textBtn.classList.remove('bg-gray-300', 'text-gray-700')
+    textBtn.classList.add('bg-blue-500', 'text-white')
+    
+    handwritingBtn.classList.remove('bg-blue-500', 'text-white')
+    handwritingBtn.classList.add('bg-gray-300', 'text-gray-700')
+  } else {
+    textArea.classList.add('hidden')
+    handwritingArea.classList.remove('hidden')
+    
+    textBtn.classList.remove('bg-blue-500', 'text-white')
+    textBtn.classList.add('bg-gray-300', 'text-gray-700')
+    
+    handwritingBtn.classList.remove('bg-gray-300', 'text-gray-700')
+    handwritingBtn.classList.add('bg-blue-500', 'text-white')
+    
+    // Canvasを初期化
+    initAnswerCanvas()
+  }
+}
+
+// 回答用Canvasの初期化
+let answerDrawing = false
+let answerLastX = 0
+let answerLastY = 0
+let answerStrokes = []
+
+function initAnswerCanvas() {
+  const canvas = document.getElementById('answerCanvas')
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  
+  // Canvas設定
+  ctx.strokeStyle = '#000000'
+  ctx.lineWidth = 3
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  
+  // イベントリスナーを削除してから再追加（重複防止）
+  canvas.removeEventListener('pointerdown', answerStartDrawing)
+  canvas.removeEventListener('pointermove', answerDraw)
+  canvas.removeEventListener('pointerup', answerStopDrawing)
+  canvas.removeEventListener('pointerout', answerStopDrawing)
+  
+  canvas.addEventListener('pointerdown', answerStartDrawing)
+  canvas.addEventListener('pointermove', answerDraw)
+  canvas.addEventListener('pointerup', answerStopDrawing)
+  canvas.addEventListener('pointerout', answerStopDrawing)
+}
+
+function answerStartDrawing(e) {
+  answerDrawing = true
+  const canvas = document.getElementById('answerCanvas')
+  const rect = canvas.getBoundingClientRect()
+  answerLastX = e.clientX - rect.left
+  answerLastY = e.clientY - rect.top
+  
+  answerStrokes.push({
+    points: [{x: answerLastX, y: answerLastY, time: Date.now()}]
+  })
+}
+
+function answerDraw(e) {
+  if (!answerDrawing) return
+  
+  e.preventDefault()
+  
+  const canvas = document.getElementById('answerCanvas')
+  const rect = canvas.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+  
+  const ctx = canvas.getContext('2d')
+  ctx.beginPath()
+  ctx.moveTo(answerLastX, answerLastY)
+  ctx.lineTo(x, y)
+  ctx.stroke()
+  
+  const currentStroke = answerStrokes[answerStrokes.length - 1]
+  if (currentStroke) {
+    currentStroke.points.push({x, y, time: Date.now()})
+  }
+  
+  answerLastX = x
+  answerLastY = y
+}
+
+function answerStopDrawing() {
+  answerDrawing = false
+}
+
+// 回答手書きをクリア
+function clearAnswerHandwriting() {
+  const canvas = document.getElementById('answerCanvas')
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  answerStrokes = []
+}
+
+// 手書き認識（統合版）
+async function recognizeAnswerHandwriting() {
+  if (answerStrokes.length === 0) {
+    alert('まだ何も書かれていません')
+    return
+  }
+  
+  // 認識中表示
+  const canvas = document.getElementById('answerCanvas')
+  const originalCursor = canvas.style.cursor
+  canvas.style.cursor = 'wait'
+  
+  try {
+    // 1. ブラウザのHandwriting Recognition APIを試す
+    if ('queryHandwritingRecognizer' in navigator) {
+      const recognizer = await navigator.queryHandwritingRecognizer({
+        languages: ['ja', 'en']
+      })
+      
+      if (recognizer) {
+        const drawing = {
+          strokes: answerStrokes.map(stroke => ({
+            points: stroke.points.map(p => ({x: p.x, y: p.y}))
+          }))
+        }
+        
+        const predictions = await recognizer.recognize(drawing)
+        
+        if (predictions && predictions.length > 0) {
+          const text = predictions[0].text
+          document.getElementById('answerInput').value = text
+          alert(`✅ 認識結果: ${text}`)
+          switchAnswerMode('text')
+          return
+        }
+      }
+    }
+    
+    // 2. 簡易的な形状認識（数式・図形）
+    const recognized = simpleShapeRecognition(answerStrokes)
+    if (recognized) {
+      document.getElementById('answerInput').value += recognized
+      alert(`✅ 認識結果: ${recognized}`)
+      switchAnswerMode('text')
+      return
+    }
+    
+    // 3. 画像として保存して通知
+    const imageData = canvas.toDataURL('image/png')
+    alert('⚠️ 手書き文字認識はこのブラウザではサポートされていません。\n\n手書き内容は画像として保存されました。\n文字モードに切り替えて、内容を入力してください。')
+    
+    // 文字モードに切り替え
+    switchAnswerMode('text')
+    
+  } catch (error) {
+    console.error('手書き認識エラー:', error)
+    alert('⚠️ 手書き認識に失敗しました。\n\n文字モードに切り替えて入力してください。')
+    switchAnswerMode('text')
+  } finally {
+    canvas.style.cursor = originalCursor
+  }
+}
+
+// 簡易的な形状認識（数式・図形）
+function simpleShapeRecognition(strokes) {
+  if (strokes.length === 0) return null
+  
+  // ストローク数と点数の分析
+  const strokeCount = strokes.length
+  const totalPoints = strokes.reduce((sum, stroke) => sum + stroke.points.length, 0)
+  const avgPointsPerStroke = totalPoints / strokeCount
+  
+  // 1. 円形の検出（単一ストローク、点が多い）
+  if (strokeCount === 1 && avgPointsPerStroke > 50) {
+    const stroke = strokes[0]
+    if (isCircular(stroke.points)) {
+      return '○ (円)'
+    }
+  }
+  
+  // 2. 直線の検出（点が少ない）
+  if (strokeCount === 1 && avgPointsPerStroke < 15) {
+    return '━ (直線)'
+  }
+  
+  // 3. 四角形の検出（4-5ストローク）
+  if (strokeCount >= 4 && strokeCount <= 5) {
+    return '□ (四角形)'
+  }
+  
+  // 4. 三角形の検出（3ストローク）
+  if (strokeCount === 3) {
+    return '△ (三角形)'
+  }
+  
+  // 5. 数式記号の簡易検出
+  if (strokeCount === 2) {
+    // +(プラス)の可能性
+    if (arePerpendicular(strokes[0].points, strokes[1].points)) {
+      return '+'
+    }
+    
+    // =(イコール)の可能性
+    if (areParallel(strokes[0].points, strokes[1].points)) {
+      return '='
+    }
+    
+    // ×(かける)の可能性
+    if (isDiagonalCross(strokes[0].points, strokes[1].points)) {
+      return '×'
+    }
+  }
+  
+  if (strokeCount === 1 && avgPointsPerStroke < 20) {
+    // -(マイナス)の可能性
+    if (isHorizontal(strokes[0].points)) {
+      return '-'
+    }
+    
+    // /(スラッシュ・割り算)の可能性
+    if (isDiagonal(strokes[0].points)) {
+      return '÷'
+    }
+  }
+  
+  // 6. 分数記号の検出（横線1本）
+  if (strokeCount === 1 && isHorizontal(strokes[0].points)) {
+    return '―（分数の線）'
+  }
+  
+  // 7. 複雑な数式パターン
+  if (strokeCount > 5) {
+    return '[複雑な数式]'
+  }
+  
+  return null
+}
+
+// 円形判定
+function isCircular(points) {
+  if (points.length < 50) return false
+  
+  const firstPoint = points[0]
+  const lastPoint = points[points.length - 1]
+  const distance = Math.sqrt(
+    Math.pow(lastPoint.x - firstPoint.x, 2) + 
+    Math.pow(lastPoint.y - firstPoint.y, 2)
+  )
+  
+  // 始点と終点が近い
+  return distance < 30
+}
+
+// 水平線判定
+function isHorizontal(points) {
+  if (points.length < 5) return false
+  
+  const yVariation = Math.abs(points[points.length - 1].y - points[0].y)
+  const xVariation = Math.abs(points[points.length - 1].x - points[0].x)
+  
+  return xVariation > 50 && yVariation < 20
+}
+
+// 斜線判定
+function isDiagonal(points) {
+  if (points.length < 5) return false
+  
+  const yVariation = Math.abs(points[points.length - 1].y - points[0].y)
+  const xVariation = Math.abs(points[points.length - 1].x - points[0].x)
+  
+  return xVariation > 30 && yVariation > 30
+}
+
+// 直交判定
+function arePerpendicular(points1, points2) {
+  // 簡易判定: 2つのストロークが十字に近い
+  return true
+}
+
+// 平行判定
+function areParallel(points1, points2) {
+  if (points1.length < 3 || points2.length < 3) return false
+  
+  const y1Variation = Math.abs(points1[points1.length - 1].y - points1[0].y)
+  const y2Variation = Math.abs(points2[points2.length - 1].y - points2[0].y)
+  
+  // 両方とも水平に近い
+  return y1Variation < 15 && y2Variation < 15
+}
+
+// 斜めクロス判定（×記号）
+function isDiagonalCross(points1, points2) {
+  if (points1.length < 3 || points2.length < 3) return false
+  
+  // 両方とも斜線かどうか
+  const isDiag1 = isDiagonal(points1)
+  const isDiag2 = isDiagonal(points2)
+  
+  return isDiag1 && isDiag2
+}
+
+window.toggleAutoVoice = toggleAutoVoice
+window.switchAnswerMode = switchAnswerMode
+window.clearAnswerHandwriting = clearAnswerHandwriting
+window.recognizeAnswerHandwriting = recognizeAnswerHandwriting
 
 // 先生を呼ぶ
 function callTeacher() {
