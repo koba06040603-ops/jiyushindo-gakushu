@@ -3831,6 +3831,7 @@ app.get('/', (c) => {
         <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
         <style>
           @media print {
             body { background: white !important; }
@@ -6209,7 +6210,7 @@ app.put('/api/optional-problem/:id', async (c) => {
 app.post('/api/curriculum/:id/optional-problem', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('id')
-  const { problem_title, problem_description, problem_content, problem_category } = await c.req.json()
+  const { problem_title, problem_description, problem_content, problem_category, learning_meaning } = await c.req.json()
   
   try {
     // 既存の問題数を取得して次の番号を決定
@@ -6222,15 +6223,16 @@ app.post('/api/curriculum/:id/optional-problem', async (c) => {
     const result = await env.DB.prepare(`
       INSERT INTO optional_problems (
         curriculum_id, problem_number, problem_title, 
-        problem_description, problem_content, problem_category
-      ) VALUES (?, ?, ?, ?, ?, ?)
+        problem_description, problem_content, problem_category, learning_meaning
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
       curriculumId,
       nextProblemNumber,
       problem_title || '問題',
       problem_description || '問題の説明',
       problem_content || problem_description || '問題内容',
-      problem_category || 'other'
+      problem_category || 'other',
+      learning_meaning || ''
     ).run()
     
     return c.json({

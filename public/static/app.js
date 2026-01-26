@@ -3879,13 +3879,17 @@ function initHandwritingCanvas() {
   
   const ctx = canvas.getContext('2d')
   
+  // 白い背景を描画
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  
   // Canvas設定
   ctx.strokeStyle = '#000000'
   ctx.lineWidth = 2
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   
-  // カーソルスタイルを固定
+  // カーソルスタイルを固定（黒十字）
   canvas.style.cursor = 'crosshair'
   
   // タッチデバイス対応
@@ -3967,7 +3971,10 @@ function clearHandwriting() {
   if (!canvas) return
   
   const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  // 白い背景を再描画
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   
   // ストローク履歴もクリア
   handwritingStrokes = []
@@ -3998,7 +4005,10 @@ function redrawHandwriting(canvasId, strokes) {
   if (!canvas) return
   
   const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  // 白い背景を描画
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   
   // すべてのストロークを再描画
   strokes.forEach(stroke => {
@@ -4024,7 +4034,10 @@ function clearHandwriting() {
   if (!canvas) return
   
   const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  // 白い背景を再描画
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   
   // ストローク履歴もクリア
   handwritingStrokes = []
@@ -4035,7 +4048,10 @@ function clearAnswerHandwriting() {
   if (!canvas) return
   
   const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  // 白い背景を再描画
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   
   answerStrokes = []
 }
@@ -4159,13 +4175,17 @@ function initAnswerCanvas() {
   
   const ctx = canvas.getContext('2d')
   
+  // 白い背景を描画
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  
   // Canvas設定
   ctx.strokeStyle = '#000000'
   ctx.lineWidth = 3
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   
-  // カーソルスタイルを固定
+  // カーソルスタイルを固定（黒十字）
   canvas.style.cursor = 'crosshair'
   
   // イベントリスナーを削除してから再追加（重複防止）
@@ -4260,7 +4280,10 @@ function clearAnswerHandwriting() {
   if (!canvas) return
   
   const ctx = canvas.getContext('2d')
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  
+  // 白い背景を再描画
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
   
   answerStrokes = []
 }
@@ -4278,7 +4301,30 @@ async function recognizeAnswerHandwriting() {
   canvas.style.cursor = 'wait'
   
   try {
-    // 1. ブラウザのHandwriting Recognition APIを試す
+    // 1. Tesseract.js で OCR 認識（日本語+英語）
+    if (typeof Tesseract !== 'undefined') {
+      const imageData = canvas.toDataURL('image/png')
+      console.log('Tesseract OCR 開始...')
+      
+      const result = await Tesseract.recognize(
+        imageData,
+        'jpn+eng', // 日本語と英語を認識
+        {
+          logger: m => console.log('OCR進捗:', m)
+        }
+      )
+      
+      if (result && result.data && result.data.text && result.data.text.trim()) {
+        const text = result.data.text.trim()
+        console.log('✅ OCR認識成功:', text)
+        document.getElementById('answerInput').value = text
+        alert(`✅ 認識結果: ${text}`)
+        switchAnswerMode('text')
+        return
+      }
+    }
+    
+    // 2. ブラウザのHandwriting Recognition APIを試す
     if ('queryHandwritingRecognizer' in navigator) {
       const recognizer = await navigator.queryHandwritingRecognizer({
         languages: ['ja', 'en']
@@ -4303,7 +4349,7 @@ async function recognizeAnswerHandwriting() {
       }
     }
     
-    // 2. 簡易的な形状認識（数式・図形）
+    // 3. 簡易的な形状認識（数式・図形）
     const recognized = simpleShapeRecognition(answerStrokes)
     if (recognized) {
       document.getElementById('answerInput').value += recognized
@@ -4312,9 +4358,9 @@ async function recognizeAnswerHandwriting() {
       return
     }
     
-    // 3. 画像として保存して通知
+    // 4. 画像として保存して通知
     const imageData = canvas.toDataURL('image/png')
-    alert('⚠️ 手書き文字認識はこのブラウザではサポートされていません。\n\n手書き内容は画像として保存されました。\n文字モードに切り替えて、内容を入力してください。')
+    alert('⚠️ 手書き文字認識に失敗しました。\n\n手書き内容は画像として保存されました。\n文字モードに切り替えて、内容を入力してください。')
     
     // 文字モードに切り替え
     switchAnswerMode('text')
@@ -13476,6 +13522,15 @@ function addOptionalProblem() {
 
             <div>
               <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-lightbulb mr-1"></i>学習の意義
+              </label>
+              <textarea id="new_optional_meaning" rows="2"
+                        placeholder="この問題に取り組む意義を書いてください"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
                 <i class="fas fa-tag mr-1"></i>問題カテゴリー
               </label>
               <select id="new_optional_difficulty"
@@ -13527,7 +13582,8 @@ async function saveNewOptionalProblem(curriculumId, problemNumber) {
       problem_title: document.getElementById('new_optional_title').value,
       problem_description: problemDescription,
       problem_content: problemDescription, // 問題内容として説明を使用
-      problem_category: document.getElementById('new_optional_difficulty')?.value || 'other'
+      problem_category: document.getElementById('new_optional_difficulty')?.value || 'other',
+      learning_meaning: document.getElementById('new_optional_meaning')?.value || ''
     }
     
     console.log('📝 新規問題データ:', newProblem)
