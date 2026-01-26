@@ -13419,11 +13419,20 @@ async function saveNewCheckTestProblem(curriculumId, problemNumber) {
   try {
     console.log('📝 新しいチェックテスト問題の保存を開始:', { curriculumId, problemNumber })
     
+    // 要素の存在確認
+    const problemTextEl = document.getElementById('new_check_problem_text')
+    const answerEl = document.getElementById('new_check_answer')
+    const difficultyEl = document.getElementById('new_check_difficulty')
+    
+    if (!problemTextEl || !answerEl) {
+      throw new Error('必須フィールドが見つかりません。ページを再読み込みしてください。')
+    }
+    
     const newProblem = {
       problem_number: problemNumber,
-      problem_text: document.getElementById('new_check_problem_text').value,
-      answer: document.getElementById('new_check_answer').value,
-      difficulty: document.getElementById('new_check_difficulty').value
+      problem_text: problemTextEl.value,
+      answer: answerEl.value,
+      difficulty: difficultyEl?.value || 'basic'
     }
     
     console.log('📝 新規問題データ:', newProblem)
@@ -13447,7 +13456,7 @@ async function saveNewCheckTestProblem(curriculumId, problemNumber) {
   } catch (error) {
     console.error('❌ チェックテスト問題追加エラー:', error)
     const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
-    alert(`❌ 保存に失敗しました\n\nエラー: ${errorMsg}`)
+    alert(`❌ 保存に失敗しました\n\nエラー: ${errorMsg}\n\nヒント: ページを再読み込みして再試行してください`)
   }
 }
 
@@ -13593,14 +13602,24 @@ async function saveNewOptionalProblem(curriculumId, problemNumber) {
   try {
     console.log('📝 新しい選択問題の保存を開始:', { curriculumId, problemNumber })
     
-    const problemDescription = document.getElementById('new_optional_description').value
+    // 要素の存在確認
+    const titleEl = document.getElementById('new_optional_title')
+    const descEl = document.getElementById('new_optional_description')
+    const meaningEl = document.getElementById('new_optional_meaning')
+    const categoryEl = document.getElementById('new_optional_difficulty')
+    
+    if (!titleEl || !descEl) {
+      throw new Error('必須フィールドが見つかりません。ページを再読み込みしてください。')
+    }
+    
+    const problemDescription = descEl.value
     
     const newProblem = {
-      problem_title: document.getElementById('new_optional_title').value,
+      problem_title: titleEl.value,
       problem_description: problemDescription,
       problem_content: problemDescription, // 問題内容として説明を使用
-      problem_category: document.getElementById('new_optional_difficulty')?.value || 'other',
-      learning_meaning: document.getElementById('new_optional_meaning')?.value || ''
+      problem_category: categoryEl?.value || 'other',
+      learning_meaning: meaningEl?.value || ''
     }
     
     console.log('📝 新規問題データ:', newProblem)
@@ -13624,7 +13643,7 @@ async function saveNewOptionalProblem(curriculumId, problemNumber) {
   } catch (error) {
     console.error('❌ 選択問題追加エラー:', error)
     const errorMsg = error.response?.data?.details || error.response?.data?.error || error.message
-    alert(`❌ 保存に失敗しました\n\nエラー: ${errorMsg}`)
+    alert(`❌ 保存に失敗しました\n\nエラー: ${errorMsg}\n\nヒント: ページを再読み込みして再試行してください`)
   }
 }
 
