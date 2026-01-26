@@ -3885,6 +3885,9 @@ function initHandwritingCanvas() {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   
+  // カーソルスタイルを固定
+  canvas.style.cursor = 'crosshair'
+  
   // タッチデバイス対応
   canvas.addEventListener('pointerdown', startDrawing)
   canvas.addEventListener('pointermove', draw)
@@ -4143,6 +4146,9 @@ function initAnswerCanvas() {
   ctx.lineWidth = 3
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
+  
+  // カーソルスタイルを固定
+  canvas.style.cursor = 'crosshair'
   
   // イベントリスナーを削除してから再追加（重複防止）
   canvas.removeEventListener('pointerdown', answerStartDrawing)
@@ -11825,8 +11831,8 @@ function showTeacherOverview(unitData) {
     <div class="container mx-auto px-4 py-8">
       <!-- ヘッダー -->
       <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg shadow-lg p-6 mb-6">
-        <button onclick="showUnitPreview(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" class="text-white hover:text-gray-200 mb-4">
-          <i class="fas fa-arrow-left mr-2"></i>プレビューに戻る
+        <button onclick="loadGuidePage(${curriculum.id})" class="text-white hover:text-gray-200 mb-4">
+          <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
         </button>
         <h1 class="text-3xl font-bold mb-2">
           <i class="fas fa-chalkboard-teacher mr-2"></i>
@@ -13479,11 +13485,14 @@ async function saveNewOptionalProblem(curriculumId, problemNumber) {
   try {
     console.log('📝 新しい選択問題の保存を開始:', { curriculumId, problemNumber })
     
+    const problemDescription = document.getElementById('new_optional_description').value
+    
     const newProblem = {
       curriculum_id: curriculumId,
       problem_number: problemNumber,
       problem_title: document.getElementById('new_optional_title').value,
-      problem_description: document.getElementById('new_optional_description').value,
+      problem_description: problemDescription,
+      problem_content: problemDescription, // 問題内容として説明を使用
       learning_meaning: document.getElementById('new_optional_meaning').value,
       difficulty_level: document.getElementById('new_optional_difficulty').value
     }

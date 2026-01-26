@@ -6465,7 +6465,7 @@ app.delete('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) =>
 app.post('/api/curriculum/:id/check-test/problem', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('id')
-  const { problem_text, answer } = await c.req.json()
+  const { problem_text, answer, difficulty } = await c.req.json()
   
   try {
     // 既存のチェックテストを取得
@@ -6491,7 +6491,8 @@ app.post('/api/curriculum/:id/check-test/problem', async (c) => {
     checkTest.sample_problems.push({
       problem_number: newProblemNumber,
       problem_text,
-      answer
+      answer,
+      difficulty: difficulty || 'basic'
     })
     
     // データベースに保存
