@@ -3903,8 +3903,17 @@ function initHandwritingCanvas() {
   function startDrawing(e) {
     isDrawing = true
     const rect = canvas.getBoundingClientRect()
-    lastX = e.clientX - rect.left
-    lastY = e.clientY - rect.top
+    
+    // スケール補正を計算
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    
+    // clientX/Yを使用（pageX/Yではなく）
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX)
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY)
+    
+    lastX = (clientX - rect.left) * scaleX
+    lastY = (clientY - rect.top) * scaleY
     
     // 新しいストロークを開始
     handwritingStrokes.push({
@@ -3920,8 +3929,17 @@ function initHandwritingCanvas() {
     e.preventDefault()
     
     const rect = canvas.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+    
+    // スケール補正を計算
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    
+    // clientX/Yを使用（pageX/Yではなく）
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX)
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY)
+    
+    const x = (clientX - rect.left) * scaleX
+    const y = (clientY - rect.top) * scaleY
     
     ctx.beginPath()
     ctx.moveTo(lastX, lastY)
@@ -4177,14 +4195,25 @@ function answerStartDrawing(e) {
   answerDrawing = true
   const canvas = document.getElementById('answerCanvas')
   const rect = canvas.getBoundingClientRect()
-  answerLastX = e.clientX - rect.left
-  answerLastY = e.clientY - rect.top
+  
+  // スケール補正を計算
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+  
+  // clientX/Yを使用（pageX/Yではなく）
+  const clientX = e.clientX || (e.touches && e.touches[0].clientX)
+  const clientY = e.clientY || (e.touches && e.touches[0].clientY)
+  
+  answerLastX = (clientX - rect.left) * scaleX
+  answerLastY = (clientY - rect.top) * scaleY
   
   answerStrokes.push({
     points: [{x: answerLastX, y: answerLastY, time: Date.now()}],
     color: '#000000',
     width: 3
   })
+  
+  console.log('Start drawing:', { clientX, clientY, rect, scaleX, scaleY, x: answerLastX, y: answerLastY })
 }
 
 function answerDraw(e) {
@@ -4194,8 +4223,17 @@ function answerDraw(e) {
   
   const canvas = document.getElementById('answerCanvas')
   const rect = canvas.getBoundingClientRect()
-  const x = e.clientX - rect.left
-  const y = e.clientY - rect.top
+  
+  // スケール補正を計算
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+  
+  // clientX/Yを使用（pageX/Yではなく）
+  const clientX = e.clientX || (e.touches && e.touches[0].clientX)
+  const clientY = e.clientY || (e.touches && e.touches[0].clientY)
+  
+  const x = (clientX - rect.left) * scaleX
+  const y = (clientY - rect.top) * scaleY
   
   const ctx = canvas.getContext('2d')
   ctx.beginPath()
@@ -12657,9 +12695,14 @@ function closeCardEditModal() {
 // カード編集を保存
 async function saveCardEdit(cardId, courseIndex, cardIndex) {
   try {
+    // 元のカードデータを取得
+    const originalCard = window.currentUnitData?.courses[courseIndex]?.cards[cardIndex] || {}
+    
     // フォームデータを取得
     const updatedCard = {
       card_title: document.getElementById('edit_card_title').value,
+      card_type: originalCard.card_type || 'main', // 既存のcard_typeを保持
+      textbook_page: originalCard.textbook_page || '', // 既存のtextbook_pageを保持
       problem_description: document.getElementById('edit_problem_description').value,
       new_terms: document.getElementById('edit_new_terms').value,
       example_problem: document.getElementById('edit_example_problem').value,
@@ -13433,23 +13476,16 @@ function addOptionalProblem() {
 
             <div>
               <label class="block text-sm font-bold text-gray-700 mb-2">
-                <i class="fas fa-book-reader mr-1"></i>学習の意義
-              </label>
-              <textarea id="new_optional_meaning" rows="3"
-                        placeholder="この問題に取り組む意義を書いてください"
-                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"></textarea>
-            </div>
-
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2">
-                <i class="fas fa-chart-line mr-1"></i>難易度
+                <i class="fas fa-tag mr-1"></i>問題カテゴリー
               </label>
               <select id="new_optional_difficulty"
                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500">
-                <option value="easy">かんたん</option>
-                <option value="medium" selected>ふつう</option>
-                <option value="hard">むずかしい</option>
-                <option value="very_hard">とてもむずかしい</option>
+                <option value="creative">創造的思考（アイデア・工夫）</option>
+                <option value="fieldwork">調査・体験（観察・インタビュー）</option>
+                <option value="critical">批判的思考（考察・評価）</option>
+                <option value="social">社会的課題（地域・社会）</option>
+                <option value="metacognitive">自己調整学習（振り返り）</option>
+                <option value="other" selected>その他</option>
               </select>
             </div>
           </form>
@@ -13488,13 +13524,10 @@ async function saveNewOptionalProblem(curriculumId, problemNumber) {
     const problemDescription = document.getElementById('new_optional_description').value
     
     const newProblem = {
-      curriculum_id: curriculumId,
-      problem_number: problemNumber,
       problem_title: document.getElementById('new_optional_title').value,
       problem_description: problemDescription,
       problem_content: problemDescription, // 問題内容として説明を使用
-      learning_meaning: document.getElementById('new_optional_meaning').value,
-      difficulty_level: document.getElementById('new_optional_difficulty').value
+      problem_category: document.getElementById('new_optional_difficulty')?.value || 'other'
     }
     
     console.log('📝 新規問題データ:', newProblem)

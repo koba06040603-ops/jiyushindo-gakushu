@@ -3026,6 +3026,8 @@ app.put('/api/cards/:cardId', async (c) => {
         example_solution = ?,
         diagram_url = ?,
         real_world_connection = ?,
+        answer = ?,
+        answer_explanation = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(
@@ -3036,6 +3038,8 @@ app.put('/api/cards/:cardId', async (c) => {
       body.example_solution || '',
       body.diagram_url || '',
       body.real_world_connection || '',
+      body.answer || '',
+      body.answer_explanation || '',
       cardId
     ).run()
     
@@ -6205,22 +6209,28 @@ app.put('/api/optional-problem/:id', async (c) => {
 app.post('/api/curriculum/:id/optional-problem', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('id')
-  const { problem_number, problem_title, problem_description, problem_content, difficulty_level, learning_meaning } = await c.req.json()
+  const { problem_title, problem_description, problem_content, problem_category } = await c.req.json()
   
   try {
+    // 既存の問題数を取得して次の番号を決定
+    const countResult: any = await env.DB.prepare(`
+      SELECT COUNT(*) as count FROM optional_problems WHERE curriculum_id = ?
+    `).bind(curriculumId).first()
+    
+    const nextProblemNumber = (countResult?.count || 0) + 1
+    
     const result = await env.DB.prepare(`
       INSERT INTO optional_problems (
         curriculum_id, problem_number, problem_title, 
-        problem_description, problem_content, difficulty_level, learning_meaning
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        problem_description, problem_content, problem_category
+      ) VALUES (?, ?, ?, ?, ?, ?)
     `).bind(
       curriculumId,
-      problem_number,
+      nextProblemNumber,
       problem_title || '問題',
       problem_description || '問題の説明',
       problem_content || problem_description || '問題内容',
-      difficulty_level || 'medium',
-      learning_meaning || ''
+      problem_category || 'other'
     ).run()
     
     return c.json({
