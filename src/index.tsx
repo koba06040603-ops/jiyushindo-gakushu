@@ -166,6 +166,28 @@ function extractJSON(aiResponse: string): any {
   // これは配列内の配列が不正に閉じられている場合の修正
   jsonText = jsonText.replace(/\]\]/g, '], ]').replace(/\}, \]/g, '}]')
   
+  // 【NEW】配列要素の後のカンマ欠落を修正
+  // パターン: } { → }, {
+  jsonText = jsonText.replace(/\}(\s*)\{/g, '},$1{')
+  // パターン: ] { → ], {
+  jsonText = jsonText.replace(/\](\s*)\{/g, '],$1{')
+  // パターン: } [ → }, [
+  jsonText = jsonText.replace(/\}(\s*)\[/g, '},$1[')
+  // パターン: ] [ → ], [
+  jsonText = jsonText.replace(/\](\s*)\[/g, '],$1[')
+  // パターン: " { → ", {
+  jsonText = jsonText.replace(/"(\s*)\{/g, '",$1{')
+  // パターン: " [ → ", [
+  jsonText = jsonText.replace(/"(\s*)\[/g, '",$1[')
+  // パターン: 数字 { → 数字, {
+  jsonText = jsonText.replace(/(\d)(\s*)\{/g, '$1,$2{')
+  // パターン: 数字 [ → 数字, [
+  jsonText = jsonText.replace(/(\d)(\s*)\[/g, '$1,$2[')
+  // パターン: true { → true, {
+  jsonText = jsonText.replace(/(true|false|null)(\s*)\{/g, '$1,$2{')
+  
+  console.log('✅ JSONカンマ欠落修正を実行しました')
+  
   // 未閉じの文字列を検出して修正を試みる
   let quoteCount = 0
   for (let i = 0; i < jsonText.length; i++) {
