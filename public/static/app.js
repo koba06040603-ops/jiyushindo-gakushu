@@ -3978,6 +3978,10 @@ function clearHandwriting() {
   
   // ストローク履歴もクリア
   handwritingStrokes = []
+  
+  // カーソルをcrosshairに強制設定
+  canvas.style.cursor = 'crosshair'
+  console.log('✅ AI先生手書きをクリアしました（カーソル: crosshair）')
 }
 
 // 1画戻す（Undo）
@@ -3989,6 +3993,12 @@ function undoHandwriting() {
   
   // Canvasを再描画
   redrawHandwriting('handwritingCanvas', handwritingStrokes)
+  
+  // カーソルをcrosshairに強制設定
+  const canvas = document.getElementById('handwritingCanvas')
+  if (canvas) {
+    canvas.style.cursor = 'crosshair'
+  }
 }
 
 // 回答用の1画戻す
@@ -3997,6 +4007,12 @@ function undoAnswerHandwriting() {
   
   answerStrokes.pop()
   redrawHandwriting('answerCanvas', answerStrokes)
+  
+  // カーソルをcrosshairに強制設定
+  const canvas = document.getElementById('answerCanvas')
+  if (canvas) {
+    canvas.style.cursor = 'crosshair'
+  }
 }
 
 // Canvasを再描画
@@ -4041,6 +4057,10 @@ function clearHandwriting() {
   
   // ストローク履歴もクリア
   handwritingStrokes = []
+  
+  // カーソルをcrosshairに強制設定
+  canvas.style.cursor = 'crosshair'
+  console.log('✅ AI先生手書きをクリアしました（カーソル: crosshair）')
 }
 
 function clearAnswerHandwriting() {
@@ -4054,6 +4074,10 @@ function clearAnswerHandwriting() {
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   
   answerStrokes = []
+  
+  // カーソルをcrosshairに強制設定
+  canvas.style.cursor = 'crosshair'
+  console.log('✅ 回答用手書きをクリアしました（カーソル: crosshair）')
 }
 
 // 手書きを送信
@@ -4286,6 +4310,10 @@ function clearAnswerHandwriting() {
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   
   answerStrokes = []
+  
+  // カーソルをcrosshairに強制設定
+  canvas.style.cursor = 'crosshair'
+  console.log('✅ 回答用手書きをクリアしました（カーソル: crosshair）')
 }
 
 // 手書き認識（統合版）
@@ -4312,30 +4340,48 @@ async function recognizeAnswerHandwriting() {
       
       alert('🔍 OCR認識中です...\n\n日本語テキストを認識しています。\n完了まで数秒かかります。')
       
-      const result = await Tesseract.recognize(
-        imageData,
-        'jpn+eng', // 日本語と英語を認識
-        {
+      try {
+        // Tesseract.jsの明示的な初期化とWorker設定
+        const { createWorker } = Tesseract
+        console.log('🔧 Tesseract Worker初期化中...')
+        
+        const worker = await createWorker('jpn+eng', 1, {
           logger: m => {
             console.log('OCR進捗:', m)
             if (m.status === 'recognizing text') {
               console.log('認識進捗:', Math.round(m.progress * 100) + '%')
             }
-          }
+          },
+          workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/worker.min.js',
+          langPath: 'https://cdn.jsdelivr.net/npm/tesseract.js-data@1.0.0',
+          corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.0.0',
+        })
+        
+        console.log('✅ Tesseract Worker準備完了')
+        
+        const result = await worker.recognize(imageData)
+        
+        console.log('✅ OCR完了:', result)
+        
+        await worker.terminate()
+        console.log('✅ Tesseract Worker終了')
+        
+        if (result && result.data && result.data.text && result.data.text.trim()) {
+          const text = result.data.text.trim()
+          console.log('✅ OCR認識成功:', text)
+          console.log('認識信頼度:', result.data.confidence)
+          document.getElementById('answerInput').value = text
+          alert(`✅ 認識結果: ${text}\n\n信頼度: ${Math.round(result.data.confidence)}%`)
+          switchAnswerMode('text')
+          canvas.style.cursor = originalCursor
+          return
+        } else {
+          console.log('⚠️ OCR結果が空でした')
         }
-      )
-      
-      console.log('✅ OCR完了:', result)
-      
-      if (result && result.data && result.data.text && result.data.text.trim()) {
-        const text = result.data.text.trim()
-        console.log('✅ OCR認識成功:', text)
-        document.getElementById('answerInput').value = text
-        alert(`✅ 認識結果: ${text}`)
-        switchAnswerMode('text')
-        return
-      } else {
-        console.log('⚠️ OCR結果が空でした')
+      } catch (ocrError) {
+        console.error('❌ Tesseract OCRエラー:', ocrError)
+        console.error('エラー詳細:', ocrError.message, ocrError.stack)
+        // OCRエラーでも次の方法にフォールバック
       }
     } else {
       console.log('⚠️ Tesseract.js が読み込まれていません')
@@ -11021,49 +11067,88 @@ async function saveGeneratedUnit(unitData) {
       console.log('✅ 単元を保存しました。curriculum_id:', curriculumId)
       console.log('📊 保存されたデータ:', response.data.saved_data)
       
-      // 追加問題を並列生成（必須）
+      // 追加問題を順次生成（必須）- プログレス表示対応
       console.log('🔄 追加問題生成を開始... curriculum_id:', curriculumId)
       
-      saveButton.innerHTML = `
-        <i class="fas fa-spinner fa-spin mr-2"></i>
-        追加問題を生成中... (0/3)
-      `
+      let completedCount = 0
+      const totalCount = 3
+      
+      const updateProgress = (completed) => {
+        saveButton.innerHTML = `
+          <i class="fas fa-spinner fa-spin mr-2"></i>
+          追加問題を生成中... (${completed}/${totalCount})
+        `
+      }
+      
+      updateProgress(0)
       
       try {
         console.log('🌐 API呼び出し準備完了')
         
-        // 3つのAPIを並列実行
-        const apiCalls = [
-          axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`).catch(e => { console.error('🔴 API1エラー:', e); throw e; }),
-          axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`).catch(e => { console.error('🔴 API2エラー:', e); throw e; }),
-          axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`).catch(e => { console.error('🔴 API3エラー:', e); throw e; })
-        ]
+        // API1: コース選択問題
+        let courseSuccess = false
+        let courseProblems = null
+        try {
+          console.log('🚀 API1開始: コース選択問題')
+          courseProblems = await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`)
+          courseSuccess = true
+          console.log('✅ API1成功: コース選択問題')
+        } catch (e) {
+          console.error('🔴 API1エラー:', e)
+          courseProblems = { reason: e }
+        }
+        completedCount++
+        updateProgress(completedCount)
         
-        console.log('🚀 API並列実行開始...')
-        const [courseProblems, assessmentProblems, introProblems] = await Promise.allSettled(apiCalls)
-        console.log('✅ API並列実行完了')
+        // API2: 評価問題
+        let assessmentSuccess = false
+        let assessmentProblems = null
+        try {
+          console.log('🚀 API2開始: 評価問題')
+          assessmentProblems = await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`)
+          assessmentSuccess = true
+          console.log('✅ API2成功: 評価問題')
+        } catch (e) {
+          console.error('🔴 API2エラー:', e)
+          assessmentProblems = { reason: e }
+        }
+        completedCount++
+        updateProgress(completedCount)
         
-        const courseSuccess = courseProblems.status === 'fulfilled'
-        const assessmentSuccess = assessmentProblems.status === 'fulfilled'
-        const introSuccess = introProblems.status === 'fulfilled'
+        // API3: 導入問題
+        let introSuccess = false
+        let introProblems = null
+        try {
+          console.log('🚀 API3開始: 導入問題')
+          introProblems = await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
+          introSuccess = true
+          console.log('✅ API3成功: 導入問題')
+        } catch (e) {
+          console.error('🔴 API3エラー:', e)
+          introProblems = { reason: e }
+        }
+        completedCount++
+        updateProgress(completedCount)
+        
+        console.log('✅ API順次実行完了')
         
         console.log('✅ コース選択問題:', courseSuccess ? '成功' : '失敗')
         if (courseSuccess) {
-          console.log('   レスポンス:', courseProblems.value?.data)
+          console.log('   レスポンス:', courseProblems?.data)
         } else {
           console.error('   エラー詳細:', courseProblems.reason?.response?.data || courseProblems.reason?.message || courseProblems.reason)
         }
         
         console.log('✅ 評価問題:', assessmentSuccess ? '成功' : '失敗')
         if (assessmentSuccess) {
-          console.log('   レスポンス:', assessmentProblems.value?.data)
+          console.log('   レスポンス:', assessmentProblems?.data)
         } else {
           console.error('   エラー詳細:', assessmentProblems.reason?.response?.data || assessmentProblems.reason?.message || assessmentProblems.reason)
         }
         
         console.log('✅ 導入問題:', introSuccess ? '成功' : '失敗')
         if (introSuccess) {
-          console.log('   レスポンス:', introProblems.value?.data)
+          console.log('   レスポンス:', introProblems?.data)
         } else {
           console.error('   エラー詳細:', introProblems.reason?.response?.data || introProblems.reason?.message || introProblems.reason)
         }
@@ -15640,37 +15725,7 @@ function toggleReviewAnswer(problemNumber) {
   }
 }
 
-function addCheckTestProblem(curriculumId) {
-  const list = document.getElementById('checkTestProblemsList')
-  const index = list.children.length
-  
-  const newProblem = document.createElement('div')
-  newProblem.className = 'border rounded-lg p-4 bg-gray-50'
-  newProblem.innerHTML = `
-    <div class="flex gap-4">
-      <div class="flex-1">
-        <label class="block text-xs text-gray-600 mb-1">問題 ${index + 1}</label>
-        <input type="text" placeholder="問題文を入力"
-               data-index="${index}" data-field="problem_text"
-               class="check-test-input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-      </div>
-      <div class="w-48">
-        <label class="block text-xs text-gray-600 mb-1">答え</label>
-        <input type="text" placeholder="答えを入力"
-               data-index="${index}" data-field="answer"
-               class="check-test-input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-      </div>
-      <div class="flex items-end">
-        <button onclick="this.closest('.border').remove()"
-                class="bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 transition-all">
-          <i class="fas fa-trash"></i>
-        </button>
-      </div>
-    </div>
-  `
-  
-  list.appendChild(newProblem)
-}
+// 削除済み: 重複していた古いaddCheckTestProblem関数（13385行目の新バージョンを使用）
 
 // チェックテスト問題削除
 async function deleteCheckTestProblem(curriculumId, problemNumber) {
