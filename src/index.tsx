@@ -5065,6 +5065,220 @@ app.post('/api/ai/ocr', async (c) => {
 // Web Speech APIを最適化版で使用しています
 */
 
+// APIルート：段階的コース生成（1コース=6枚のカードを生成）
+app.post('/api/ai/generate-course', async (c) => {
+  const { env } = c
+  const { 
+    grade, 
+    subject, 
+    textbook, 
+    unitName, 
+    unitGoal,
+    courseLevel,  // 'slow', 'steady', 'fast'
+    courseInfo,   // { name, label, description, color_code }
+    customization 
+  } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    console.error('❌ APIキーが設定されていません')
+    return c.json({
+      error: 'Gemini APIキーが設定されていません。管理者に連絡してください。',
+      course: null
+    }, 500)
+  }
+  
+  console.log(`🎯 コース生成開始: ${courseInfo.name} (${courseLevel})`)
+  
+  try {
+    // カスタマイズ情報を整形
+    const customInfo = customization ? `
+【カスタマイズ情報】
+- 児童生徒のニーズ: ${customization.studentNeeds}
+- 教師の指導目標: ${customization.teacherGoals}
+- 学習スタイル: ${customization.learningStyle}
+- 特別な配慮: ${customization.specialSupport}
+` : ''
+
+    // コースレベルに応じた難易度説明
+    const difficultyDescription = {
+      'slow': 'ゆっくり・じっくり学ぶコース。基礎を丁寧に、ステップを細かく分けて説明。',
+      'steady': '標準的なペースで学ぶコース。バランスよく理解を深める。',
+      'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
+    }[courseLevel] || '標準的なペースで学ぶコース'
+
+    // Gemini APIプロンプト
+    const prompt = `
+あなたは小学校・中学校の優秀な教師です。
+以下の情報をもとに、「${courseInfo.name}」コースの学習カードを6枚生成してください。
+
+【基本情報】
+- 学年: ${grade}
+- 教科: ${subject}
+- 教科書会社: ${textbook}
+- 単元名: ${unitName}
+- 単元目標: ${unitGoal}
+
+【コース情報】
+- コース名: ${courseInfo.name}
+- コースレベル: ${courseLevel}
+- コース説明: ${courseInfo.description}
+- 難易度設定: ${difficultyDescription}
+
+${customInfo}
+
+【出力形式】
+以下のJSON形式で、6枚の学習カードを生成してください：
+
+{
+  "course_name": "${courseInfo.name}",
+  "name": "${courseInfo.name}",
+  "label": "${courseInfo.label}",
+  "description": "${courseInfo.description}",
+  "color_code": "${courseInfo.color_code}",
+  "cards": [
+    {
+      "card_number": 1,
+      "card_title": "カードのタイトル",
+      "card_type": "main",
+      "textbook_page": "p.XX",
+      "problem_description": "問題の説明（100文字程度）",
+      "new_terms": "新しく学ぶ用語（カンマ区切り）",
+      "example_problem": "例題（具体的な問題）",
+      "example_solution": "例題の解き方",
+      "real_world_connection": "実生活とのつながり（50文字以上）",
+      "answer": "解答",
+      "answer_explanation": "解答の説明・考え方（100文字程度）",
+      "hints": [
+        {"hint_level": 1, "hint_text": "ヒント1の内容"},
+        {"hint_level": 2, "hint_text": "ヒント2の内容"},
+        {"hint_level": 3, "hint_text": "ヒント3の内容"}
+      ]
+    }
+    // ... 残り5枚も同様の構造
+  ]
+}
+
+【超重要：JSON構文エラーを防ぐルール】
+1. **必ず6枚のカードを生成**してください（2枚や3枚ではダメです）
+2. 各カードには**必ず3つのヒント**を含めてください
+3. すべての文字列は**ダブルクォーテーション**で囲む
+4. 配列やオブジェクトの要素間には**必ずカンマ**を入れる
+5. JSONコメント（//や/**/）は**絶対に使わない**
+6. 出力は**有効なJSONのみ**（説明文は不要）
+
+必ず上記のJSON形式で出力してください。
+`
+
+    // Gemini Flash APIを使用（コスト削減）
+    const modelName = 'gemini-2.0-flash-exp'
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
+    
+    console.log(`📡 ${modelName} APIを呼び出します...`)
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 8192,  // 6枚分なので少なめでOK
+          topP: 0.9,
+          topK: 20,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'object',
+            properties: {
+              course_name: { type: 'string' },
+              name: { type: 'string' },
+              label: { type: 'string' },
+              description: { type: 'string' },
+              color_code: { type: 'string' },
+              cards: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    card_number: { type: 'number' },
+                    card_title: { type: 'string' },
+                    card_type: { type: 'string' },
+                    textbook_page: { type: 'string' },
+                    problem_description: { type: 'string' },
+                    new_terms: { type: 'string' },
+                    example_problem: { type: 'string' },
+                    example_solution: { type: 'string' },
+                    real_world_connection: { type: 'string' },
+                    answer: { type: 'string' },
+                    answer_explanation: { type: 'string' },
+                    hints: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          hint_level: { type: 'number' },
+                          hint_text: { type: 'string' }
+                        },
+                        required: ['hint_level', 'hint_text']
+                      }
+                    }
+                  },
+                  required: ['card_number', 'card_title', 'card_type', 'textbook_page', 
+                            'problem_description', 'new_terms', 'example_problem', 
+                            'example_solution', 'real_world_connection', 'answer', 
+                            'answer_explanation', 'hints']
+                }
+              }
+            },
+            required: ['course_name', 'name', 'label', 'description', 'color_code', 'cards']
+          }
+        }
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error('APIレスポンスにcandidatesがありません')
+    }
+    
+    const aiResponse = data.candidates[0].content.parts[0].text
+    console.log('✅ コース生成成功:', courseInfo.name)
+    
+    // JSONをパース
+    let courseData
+    try {
+      courseData = JSON.parse(aiResponse)
+    } catch (parseError) {
+      console.error('❌ JSONパースエラー:', parseError)
+      // extractJSON関数を使用
+      courseData = extractJSON(aiResponse)
+    }
+    
+    // バリデーション
+    if (!courseData.cards || courseData.cards.length < 6) {
+      throw new Error(`カードが6枚未満です: ${courseData.cards?.length || 0}枚`)
+    }
+    
+    return c.json({
+      success: true,
+      course: courseData
+    })
+    
+  } catch (error: any) {
+    console.error('❌ コース生成エラー:', error)
+    return c.json({
+      error: error.message || 'コース生成に失敗しました',
+      course: null
+    }, 500)
+  }
+})
+
 // APIルート:AI単元生成
 app.post('/api/ai/generate-unit', async (c) => {
   const { env } = c

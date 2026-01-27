@@ -10373,7 +10373,7 @@ async function startUnitGeneration() {
   await executeUnitGeneration(lastGenerationParams)
 }
 
-// 単元生成の実際の処理
+// 単元生成の実際の処理（段階的生成）
 async function executeUnitGeneration(params) {
   const { grade, subject, textbook, unitName, studentNeeds, teacherGoals, learningStyle, specialSupport, qualityMode } = params
   
@@ -10392,8 +10392,11 @@ async function executeUnitGeneration(params) {
   showGenerationProgress(grade, subject, unitName, qualityMode)
 
   try {
-    // AI単元生成API呼び出し
-    const response = await axios.post('/api/ai/generate-unit', {
+    // 【段階的生成】まず単元の基本情報を生成
+    console.log('📝 ステップ1/4: 単元基本情報を生成中...')
+    updateGenerationProgress('単元の基本情報を生成しています...', 10)
+    
+    const unitInfoResponse = await axios.post('/api/ai/generate-unit', {
       grade,
       subject,
       textbook,
@@ -10402,15 +10405,98 @@ async function executeUnitGeneration(params) {
       qualityMode
     })
 
-    if (response.data.error) {
-      throw new Error(response.data.error)
+    if (unitInfoResponse.data.error) {
+      throw new Error(unitInfoResponse.data.error)
     }
 
-    // 生成成功
-    const unitData = response.data.data
-    const modelUsed = response.data.model_used
+    const unitData = unitInfoResponse.data.data
+    const unitGoal = unitData.curriculum.unit_goal
+    
+    console.log('✅ 単元基本情報の生成完了')
+    console.log('📚 単元目標:', unitGoal)
+    
+    // 【段階的生成】3つのコースを個別に生成
+    const courseDefinitions = [
+      {
+        level: 'slow',
+        info: {
+          name: 'ゆっくりコース',
+          label: 'じっくり考えながら進むコース',
+          description: 'ひとつひとつていねいに学びたい人におすすめ',
+          color_code: 'green'
+        }
+      },
+      {
+        level: 'steady',
+        info: {
+          name: 'しっかりコース',
+          label: 'バランスよく学ぶコース',
+          description: '着実に力をつけたい人におすすめ',
+          color_code: 'blue'
+        }
+      },
+      {
+        level: 'fast',
+        info: {
+          name: 'どんどんコース',
+          label: '発展的な内容にチャレンジするコース',
+          description: 'より高い目標を目指したい人におすすめ',
+          color_code: 'purple'
+        }
+      }
+    ]
+    
+    const generatedCourses = []
+    
+    // 各コースを順番に生成
+    for (let i = 0; i < courseDefinitions.length; i++) {
+      const courseDef = courseDefinitions[i]
+      const progressPercent = 25 + (i * 25)  // 25%, 50%, 75%
+      
+      console.log(`📝 ステップ${i+2}/4: ${courseDef.info.name}を生成中...`)
+      updateGenerationProgress(`${courseDef.info.name}の学習カードを生成しています...`, progressPercent)
+      
+      try {
+        const courseResponse = await axios.post('/api/ai/generate-course', {
+          grade,
+          subject,
+          textbook,
+          unitName,
+          unitGoal,
+          courseLevel: courseDef.level,
+          courseInfo: courseDef.info,
+          customization
+        })
+        
+        if (courseResponse.data.error) {
+          console.error(`❌ ${courseDef.info.name}の生成エラー:`, courseResponse.data.error)
+          throw new Error(`${courseDef.info.name}の生成に失敗しました`)
+        }
+        
+        generatedCourses.push(courseResponse.data.course)
+        console.log(`✅ ${courseDef.info.name}の生成完了（${courseResponse.data.course.cards.length}枚）`)
+        
+      } catch (courseError) {
+        console.error(`❌ ${courseDef.info.name}の生成中にエラー:`, courseError)
+        throw new Error(`${courseDef.info.name}の生成に失敗しました: ${courseError.message}`)
+      }
+    }
+    
+    // 生成されたコースをunitDataに統合
+    unitData.courses = {
+      results: generatedCourses
+    }
+    
+    console.log('✅ 全コースの生成完了:', {
+      コース1: generatedCourses[0].name + ' ' + generatedCourses[0].cards.length + '枚',
+      コース2: generatedCourses[1].name + ' ' + generatedCourses[1].cards.length + '枚',
+      コース3: generatedCourses[2].name + ' ' + generatedCourses[2].cards.length + '枚'
+    })
+    
+    updateGenerationProgress('生成完了！保存しています...', 95)
 
     // プレビュー画面を表示
+    const modelUsed = unitInfoResponse.data.model_used
     showUnitPreview(unitData, modelUsed)
 
   } catch (error) {
@@ -10904,6 +10990,56 @@ function showGenerationProgress(grade, subject, unitName, qualityMode = 'standar
 
   // 実時間ベースのプログレスアニメーション
   animateRealtimeProgress(totalTime, qualityMode)
+}
+
+// 段階的生成の進捗更新関数
+function updateGenerationProgress(message, percent) {
+  const currentTask = document.getElementById('currentTask')
+  const progressBar = document.getElementById('progressBar')
+  const progressPercent = document.getElementById('progressPercent')
+  
+  if (currentTask) currentTask.textContent = message
+  if (progressBar) {
+    progressBar.style.width = `${percent}%`
+  }
+  if (progressPercent) {
+    progressPercent.textContent = `${Math.round(percent)}%`
+  }
+  
+  // ステップカードの更新
+  if (percent >= 10 && percent < 25) {
+    updateStepCard('step1', 'active', 'ステップ1: 実行中')
+  } else if (percent >= 25 && percent < 50) {
+    updateStepCard('step1', 'completed', 'ステップ1: 完了')
+    updateStepCard('step2', 'active', 'ステップ2: 実行中')
+  } else if (percent >= 50 && percent < 75) {
+    updateStepCard('step2', 'completed', 'ステップ2: 完了')
+    updateStepCard('step3', 'active', 'ステップ3: 実行中')
+  } else if (percent >= 75) {
+    updateStepCard('step3', 'completed', 'ステップ3: 完了')
+    updateStepCard('step4', 'active', 'ステップ4: 実行中')
+  }
+  
+  if (percent >= 95) {
+    updateStepCard('step4', 'completed', 'ステップ4: 完了')
+  }
+}
+
+// ステップカードの状態更新
+function updateStepCard(stepId, status, statusText) {
+  const step = document.getElementById(stepId)
+  if (!step) return
+  
+  const statusDiv = step.querySelector('.step-status')
+  
+  step.classList.remove('active', 'completed')
+  if (status === 'active' || status === 'completed') {
+    step.classList.add(status)
+  }
+  
+  if (statusDiv) {
+    statusDiv.textContent = statusText || '待機中'
+  }
 }
 
 // 実時間ベースのプログレスアニメーション
