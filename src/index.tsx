@@ -5254,7 +5254,71 @@ ${customInfo}
         temperature: 0.5,   // より確実で一貫性のある出力
         maxOutputTokens: 16384,
         topP: 0.9,          // より保守的な選択
-        topK: 20            // トークン候補を制限
+        topK: 20,           // トークン候補を制限
+        responseMimeType: 'application/json',  // JSON出力を強制
+        responseSchema: {
+          type: 'object',
+          properties: {
+            curriculum: {
+              type: 'object',
+              properties: {
+                grade: { type: 'string' },
+                subject: { type: 'string' },
+                textbook_company: { type: 'string' },
+                unit_name: { type: 'string' },
+                total_hours: { type: 'number' },
+                unit_goal: { type: 'string' },
+                non_cognitive_goal: { type: 'string' }
+              },
+              required: ['grade', 'subject', 'unit_name', 'unit_goal']
+            },
+            courses: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  label: { type: 'string' },
+                  description: { type: 'string' },
+                  color_code: { type: 'string' },
+                  cards: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        card_number: { type: 'number' },
+                        card_title: { type: 'string' },
+                        card_type: { type: 'string' },
+                        textbook_page: { type: 'string' },
+                        problem_description: { type: 'string' },
+                        new_terms: { type: 'string' },
+                        example_problem: { type: 'string' },
+                        example_solution: { type: 'string' },
+                        real_world_connection: { type: 'string' },
+                        answer: { type: 'string' },
+                        answer_explanation: { type: 'string' },
+                        hints: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              hint_level: { type: 'number' },
+                              hint_text: { type: 'string' }
+                            },
+                            required: ['hint_level', 'hint_text']
+                          }
+                        }
+                      },
+                      required: ['card_number', 'card_title', 'problem_description', 'real_world_connection', 'answer', 'hints']
+                    }
+                  }
+                },
+                required: ['name', 'cards']
+              }
+            }
+          },
+          required: ['curriculum', 'courses']
+        }
       }
     } else {
       // 標準モード: Flash優先、フォールバックあり
@@ -5267,7 +5331,71 @@ ${customInfo}
         temperature: 0.7,
         maxOutputTokens: 16384,
         topP: 0.95,
-        topK: 40
+        topK: 40,
+        responseMimeType: 'application/json',  // JSON出力を強制（標準モードでも）
+        responseSchema: {
+          type: 'object',
+          properties: {
+            curriculum: {
+              type: 'object',
+              properties: {
+                grade: { type: 'string' },
+                subject: { type: 'string' },
+                textbook_company: { type: 'string' },
+                unit_name: { type: 'string' },
+                total_hours: { type: 'number' },
+                unit_goal: { type: 'string' },
+                non_cognitive_goal: { type: 'string' }
+              },
+              required: ['grade', 'subject', 'unit_name', 'unit_goal']
+            },
+            courses: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  label: { type: 'string' },
+                  description: { type: 'string' },
+                  color_code: { type: 'string' },
+                  cards: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        card_number: { type: 'number' },
+                        card_title: { type: 'string' },
+                        card_type: { type: 'string' },
+                        textbook_page: { type: 'string' },
+                        problem_description: { type: 'string' },
+                        new_terms: { type: 'string' },
+                        example_problem: { type: 'string' },
+                        example_solution: { type: 'string' },
+                        real_world_connection: { type: 'string' },
+                        answer: { type: 'string' },
+                        answer_explanation: { type: 'string' },
+                        hints: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              hint_level: { type: 'number' },
+                              hint_text: { type: 'string' }
+                            },
+                            required: ['hint_level', 'hint_text']
+                          }
+                        }
+                      },
+                      required: ['card_number', 'card_title', 'problem_description', 'real_world_connection', 'answer', 'hints']
+                    }
+                  }
+                },
+                required: ['name', 'cards']
+              }
+            }
+          },
+          required: ['curriculum', 'courses']
+        }
       }
     }
     
