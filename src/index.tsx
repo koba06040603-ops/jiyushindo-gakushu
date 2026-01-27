@@ -5192,31 +5192,29 @@ ${customInfo}
 必ず上記のJSON形式で出力してください。
 `
 
-    // モデルのフォールバックリスト（確実に動作するモデル優先）
-    const modelNames = [
-      'gemini-2.0-flash-exp',           // 最新の実験版Flash
-      'gemini-1.5-flash',               // 安定版Flash（確実）
-      'gemini-1.5-pro',                 // 安定版Pro（確実）
-      'gemini-1.5-flash-latest'         // 最新のFlash
-    ]
+    // 【デバッグ用】最も確実に動作する単一モデルを使用
+    const modelName = 'gemini-1.5-flash-001'
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
     
-    let lastError = null
+    console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
+    console.log(`📋 コース情報:`, {
+      コース名: courseInfo.name,
+      レベル: courseLevel,
+      単元名: unitName,
+      学年: grade,
+      教科: subject
+    })
+    
     let courseData = null
     
-    // 複数のモデルを試行
-    for (const modelName of modelNames) {
-      try {
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
-        
-        console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
-        
-        const response = await fetch(apiUrl, {
+    try {
+      const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.3,  // より厳密なJSON生成のため低めに設定
+          temperature: 0.2,  // より決定論的な出力のため低めに設定
           maxOutputTokens: 8192,  // 6枚分なので少なめでOK
           topP: 0.9,
           topK: 20,
@@ -5348,29 +5346,13 @@ ${customInfo}
       使用モデル: modelName
     })
     
-    // 成功したのでループを抜ける
-    break
-    
-      } catch (modelError: any) {
-        console.error(`❌ ${modelName} でエラー:`, modelError.message)
-        lastError = modelError
-        // 次のモデルを試行
-        continue
-      }
-    }
-    
-    // すべてのモデルで失敗した場合
-    if (!courseData) {
-      throw new Error(`すべてのモデルで失敗しました。最後のエラー: ${lastError?.message}`)
-    }
-    
     return c.json({
       success: true,
       course: courseData
     })
     
-  } catch (error: any) {
-    console.error('❌ コース生成エラー（詳細）:', {
+    } catch (error: any) {
+      console.error('❌ コース生成エラー（詳細）:', {
       エラーメッセージ: error.message,
       エラースタック: error.stack,
       エラー型: error.constructor.name,
@@ -5385,6 +5367,13 @@ ${customInfo}
         courseName: courseInfo?.name,
         courseLevel: courseLevel
       }
+    }, 500)
+    }
+  } catch (outerError: any) {
+    console.error('❌ コース生成の最外層エラー:', outerError)
+    return c.json({
+      error: outerError.message || 'コース生成に失敗しました',
+      course: null
     }, 500)
   }
 })
