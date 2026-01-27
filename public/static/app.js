@@ -4353,6 +4353,39 @@ async function recognizeAnswerHandwriting() {
   
   try {
     console.log('=== 手書き認識開始 ===')
+    
+    // 画像データを取得
+    const imageData = canvas.toDataURL('image/png')
+    console.log('画像データサイズ:', imageData.length)
+    
+    // 1. Google Cloud Vision API で OCR 認識（優先）
+    try {
+      console.log('✅ Google Cloud Vision OCR 開始...')
+      console.log('🔍 OCR認識中です... Google Cloud Vision APIを使用しています。')
+      
+      const response = await axios.post('/api/ai/ocr', {
+        imageData: imageData,
+        language: 'ja'
+      })
+      
+      if (response.data.success && response.data.text) {
+        const text = response.data.text.trim()
+        console.log('✅ Google Cloud Vision OCR認識成功:', text)
+        document.getElementById('answerInput').value = text
+        alert(`✅ 認識結果: ${text}\n\n認識方法: Google Cloud Vision API`)
+        switchAnswerMode('text')
+        canvas.style.cursor = originalCursor
+        return
+      } else {
+        console.log('⚠️ Google Cloud Vision OCRで結果が得られませんでした')
+      }
+    } catch (cloudVisionError) {
+      console.error('❌ Google Cloud Vision OCRエラー:', cloudVisionError)
+      console.log('⚠️ Google Cloud Vision APIが利用できません。Tesseract.jsにフォールバックします。')
+      // フォールバック: Tesseract.jsを試す
+    }
+    
+    // 2. Tesseract.js で OCR 認識（フォールバック）
     console.log('Tesseract利用可能:', typeof Tesseract !== 'undefined')
     
     // Tesseract.jsの読み込み待機（最大10秒）
@@ -4369,11 +4402,8 @@ async function recognizeAnswerHandwriting() {
       }
     }
     
-    // 1. Tesseract.js で OCR 認識（日本語+英語）
     if (tesseractLoaded) {
-      const imageData = canvas.toDataURL('image/png')
-      console.log('✅ Tesseract OCR 開始...')
-      console.log('画像データサイズ:', imageData.length)
+      console.log('✅ Tesseract OCR 開始（フォールバック）...')
       console.log('🔍 OCR認識中です... 日本語テキストを認識しています。完了まで数秒かかります。')
       
       try {
@@ -4404,15 +4434,15 @@ async function recognizeAnswerHandwriting() {
         
         if (result && result.data && result.data.text && result.data.text.trim()) {
           const text = result.data.text.trim()
-          console.log('✅ OCR認識成功:', text)
+          console.log('✅ Tesseract OCR認識成功:', text)
           console.log('認識信頼度:', result.data.confidence)
           document.getElementById('answerInput').value = text
-          alert(`✅ 認識結果: ${text}\n\n信頼度: ${Math.round(result.data.confidence)}%`)
+          alert(`✅ 認識結果: ${text}\n\n信頼度: ${Math.round(result.data.confidence)}%\n認識方法: Tesseract.js (フォールバック)`)
           switchAnswerMode('text')
           canvas.style.cursor = originalCursor
           return
         } else {
-          console.log('⚠️ OCR結果が空でした')
+          console.log('⚠️ Tesseract OCR結果が空でした')
         }
       } catch (ocrError) {
         console.error('❌ Tesseract OCRエラー:', ocrError)
@@ -4423,7 +4453,7 @@ async function recognizeAnswerHandwriting() {
       console.log('⚠️ Tesseract.js が読み込まれていません（10秒待機後もロードされず）')
     }
     
-    // 2. ブラウザのHandwriting Recognition APIを試す
+    // 3. ブラウザのHandwriting Recognition APIを試す
     if ('queryHandwritingRecognizer' in navigator) {
       const recognizer = await navigator.queryHandwritingRecognizer({
         languages: ['ja', 'en']
@@ -4441,24 +4471,23 @@ async function recognizeAnswerHandwriting() {
         if (predictions && predictions.length > 0) {
           const text = predictions[0].text
           document.getElementById('answerInput').value = text
-          alert(`✅ 認識結果: ${text}`)
+          alert(`✅ 認識結果: ${text}\n\n認識方法: ブラウザAPI`)
           switchAnswerMode('text')
           return
         }
       }
     }
     
-    // 3. 簡易的な形状認識（数式・図形）
+    // 4. 簡易的な形状認識（数式・図形）
     const recognized = simpleShapeRecognition(answerStrokes)
     if (recognized) {
       document.getElementById('answerInput').value += recognized
-      alert(`✅ 認識結果: ${recognized}`)
+      alert(`✅ 認識結果: ${recognized}\n\n認識方法: 形状認識`)
       switchAnswerMode('text')
       return
     }
     
-    // 4. 画像として保存して通知
-    const imageData = canvas.toDataURL('image/png')
+    // 5. 画像として保存して通知
     alert('⚠️ 手書き文字認識に失敗しました。\n\n手書き内容は画像として保存されました。\n文字モードに切り替えて、内容を入力してください。')
     
     // 文字モードに切り替え

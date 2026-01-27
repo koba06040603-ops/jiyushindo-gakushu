@@ -4795,6 +4795,100 @@ ${specificInstructions}
   }
 })
 
+// APIルート：OCR（手書き文字認識）
+app.post('/api/ai/ocr', async (c) => {
+  const { env } = c
+  const { imageData, language } = await c.req.json()
+  
+  // 環境変数からGoogle Cloud Vision APIキーを取得
+  const apiKey = env.GOOGLE_CLOUD_API_KEY || env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    console.error('❌ Google Cloud APIキーが設定されていません')
+    return c.json({
+      error: 'APIキーが設定されていません',
+      text: null
+    }, 500)
+  }
+  
+  try {
+    console.log('🔍 OCR認識を開始...')
+    
+    // Base64エンコードされた画像データからデータURL部分を削除
+    const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '')
+    
+    // Google Cloud Vision API呼び出し
+    const visionApiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`
+    
+    const requestBody = {
+      requests: [
+        {
+          image: {
+            content: base64Image
+          },
+          features: [
+            {
+              type: 'TEXT_DETECTION',
+              maxResults: 1
+            }
+          ],
+          imageContext: {
+            languageHints: language === 'ja' ? ['ja', 'en'] : ['en']
+          }
+        }
+      ]
+    }
+    
+    console.log('📤 Google Cloud Vision API リクエスト送信...')
+    
+    const response = await fetch(visionApiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Vision API エラー:', response.status, errorText)
+      throw new Error(`Vision API エラー: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    console.log('✅ Vision API レスポンス受信')
+    
+    // テキストを抽出
+    const textAnnotations = data.responses[0]?.textAnnotations
+    
+    if (textAnnotations && textAnnotations.length > 0) {
+      const recognizedText = textAnnotations[0].description.trim()
+      console.log('✅ OCR認識成功:', recognizedText)
+      
+      return c.json({
+        success: true,
+        text: recognizedText,
+        confidence: 95, // Google Cloud Visionは信頼度を直接返さないため、固定値
+        method: 'google-cloud-vision'
+      })
+    } else {
+      console.log('⚠️ テキストが検出されませんでした')
+      return c.json({
+        success: false,
+        text: null,
+        error: 'テキストが検出されませんでした'
+      })
+    }
+  } catch (error: any) {
+    console.error('❌ OCRエラー:', error)
+    return c.json({
+      success: false,
+      error: error.message,
+      text: null
+    }, 500)
+  }
+})
+
 // APIルート：AI単元生成
 app.post('/api/ai/generate-unit', async (c) => {
   const { env } = c
