@@ -3678,73 +3678,12 @@ function addAIMessage(message, sender, loadingId = null) {
 
 // 音声合成（テキスト読み上げ）
 async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
-  // Google Cloud TTS APIを使用（優先）
-  try {
-    console.log('🔊 Google Cloud TTS API を使用します')
-    console.log('📝 テキスト:', text.substring(0, 50), '...')
-    console.log('🎭 音声タイプ:', voiceType)
-    console.log('⚡ 速度:', speed)
-    
-    const response = await axios.post('/api/ai/tts', {
-      text: text,
-      voiceType: voiceType,
-      speed: speed,
-      pitch: 0.0
-    })
-    
-    if (response.data.success && response.data.audioContent) {
-      console.log('✅ Google Cloud TTS 音声データ取得成功')
-      
-      // Base64音声データをBlobに変換
-      const audioData = atob(response.data.audioContent)
-      const arrayBuffer = new ArrayBuffer(audioData.length)
-      const uint8Array = new Uint8Array(arrayBuffer)
-      for (let i = 0; i < audioData.length; i++) {
-        uint8Array[i] = audioData.charCodeAt(i)
-      }
-      const blob = new Blob([arrayBuffer], { type: 'audio/mp3' })
-      const audioUrl = URL.createObjectURL(blob)
-      
-      // Audio要素で再生
-      const audio = new Audio(audioUrl)
-      
-      // 音声アイコンを表示
-      const voiceButton = document.getElementById('voiceButton')
-      if (voiceButton) {
-        voiceButton.innerHTML = '<i class="fas fa-volume-up"></i>'
-      }
-      
-      audio.onended = () => {
-        if (voiceButton) {
-          voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
-        }
-        URL.revokeObjectURL(audioUrl)  // メモリ解放
-      }
-      
-      audio.onerror = () => {
-        console.error('❌ 音声再生エラー')
-        if (voiceButton) {
-          voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
-        }
-        // フォールバック: Web Speech API
-        speakTextWithWebSpeech(text, speed)
-      }
-      
-      audio.play()
-      console.log('✅ Google Cloud TTS 音声再生開始')
-      return
-    }
-  } catch (error) {
-    console.error('❌ Google Cloud TTS エラー:', error)
-    console.log('⚠️ Web Speech API にフォールバックします')
-  }
-  
-  // フォールバック: Web Speech API
-  speakTextWithWebSpeech(text, speed)
+  // Web Speech API を使用（最適化版）
+  speakTextWithWebSpeech(text, speed, voiceType)
 }
 
-// Web Speech API を使用した音声読み上げ（フォールバック）
-function speakTextWithWebSpeech(text, speed = 0.95) {
+// Web Speech API を使用した音声読み上げ（最適化版）
+function speakTextWithWebSpeech(text, speed = 0.95, voiceType = 'female-friendly') {
   // 音声合成がサポートされているか確認
   if (!('speechSynthesis' in window)) {
     console.warn('音声合成はこのブラウザではサポートされていません')
@@ -3756,29 +3695,75 @@ function speakTextWithWebSpeech(text, speed = 0.95) {
   
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'ja-JP'
-  utterance.rate = speed  // 速度
-  utterance.pitch = 1.0
-  utterance.volume = 1.0
+  utterance.rate = speed  // 速度（0.1 ~ 10.0）
+  utterance.pitch = 1.0   // ピッチ（0.0 ~ 2.0）
+  utterance.volume = 1.0  // 音量（0.0 ~ 1.0）
   
-  // 日本語音声を選択（優先順位付き）
+  // 音声タイプに応じてピッチと速度を調整
+  switch(voiceType) {
+    case 'female-friendly':
+      utterance.pitch = 1.1  // やや高め
+      utterance.rate = 0.9   // ゆっくり
+      break
+    case 'male-friendly':
+      utterance.pitch = 0.9  // やや低め
+      utterance.rate = 0.9   // ゆっくり
+      break
+    case 'female-energetic':
+      utterance.pitch = 1.2  // 高め
+      utterance.rate = 1.0   // 標準
+      break
+    case 'male-energetic':
+      utterance.pitch = 0.85 // 低め
+      utterance.rate = 1.0   // 標準
+      break
+    default:
+      utterance.pitch = 1.0
+      utterance.rate = speed
+  }
+  
+  // 日本語音声を選択（詳細な優先順位付き）
   const voices = speechSynthesis.getVoices()
   
-  // 優先順位：Google日本語 > Apple日本語 > Microsoft日本語 > その他日本語
-  const japaneseVoice = voices.find(v => 
-    v.lang === 'ja-JP' && v.name.includes('Google')
-  ) || voices.find(v => 
-    v.lang === 'ja-JP' && (v.name.includes('Kyoko') || v.name.includes('Otoya'))
-  ) || voices.find(v => 
-    v.lang === 'ja-JP' && v.name.includes('Microsoft')
-  ) || voices.find(v => 
-    v.lang.startsWith('ja')
-  )
+  // 音声タイプに応じた選択
+  let targetVoice = null
   
-  if (japaneseVoice) {
-    utterance.voice = japaneseVoice
-    console.log('選択された音声:', japaneseVoice.name)
+  if (voiceType === 'female-friendly' || voiceType === 'female-energetic') {
+    // 女性音声の優先順位
+    targetVoice = voices.find(v => 
+      v.lang === 'ja-JP' && v.name.includes('Google') && v.name.includes('Female')
+    ) || voices.find(v => 
+      v.lang === 'ja-JP' && (v.name.includes('Kyoko') || v.name.includes('O-ren'))
+    ) || voices.find(v => 
+      v.lang === 'ja-JP' && v.name.includes('Microsoft') && v.name.includes('Ayumi')
+    ) || voices.find(v => 
+      v.lang === 'ja-JP' && v.name.includes('Google')
+    )
   } else {
-    console.warn('日本語音声が見つかりませんでした')
+    // 男性音声の優先順位
+    targetVoice = voices.find(v => 
+      v.lang === 'ja-JP' && v.name.includes('Google') && v.name.includes('Male')
+    ) || voices.find(v => 
+      v.lang === 'ja-JP' && v.name.includes('Otoya')
+    ) || voices.find(v => 
+      v.lang === 'ja-JP' && v.name.includes('Microsoft') && v.name.includes('Ichiro')
+    ) || voices.find(v => 
+      v.lang === 'ja-JP' && v.name.includes('Google')
+    )
+  }
+  
+  // フォールバック: 任意の日本語音声
+  if (!targetVoice) {
+    targetVoice = voices.find(v => v.lang === 'ja-JP') || voices.find(v => v.lang.startsWith('ja'))
+  }
+  
+  if (targetVoice) {
+    utterance.voice = targetVoice
+    console.log('✅ 選択された音声:', targetVoice.name)
+    console.log('📊 音声タイプ:', voiceType)
+    console.log('⚡ 速度:', utterance.rate, '/ ピッチ:', utterance.pitch)
+  } else {
+    console.warn('⚠️ 日本語音声が見つかりませんでした')
   }
   
   // 音声アイコンを表示
@@ -3787,14 +3772,52 @@ function speakTextWithWebSpeech(text, speed = 0.95) {
     voiceButton.innerHTML = '<i class="fas fa-volume-up"></i>'
   }
   
+  utterance.onstart = () => {
+    console.log('🔊 音声再生開始')
+  }
+  
   utterance.onend = () => {
+    console.log('✅ 音声再生完了')
     if (voiceButton) {
       voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
     }
   }
   
-  speechSynthesis.speak(utterance)
-  console.log('✅ Web Speech API 音声再生開始（フォールバック）')
+  utterance.onerror = (event) => {
+    console.error('❌ 音声再生エラー:', event.error)
+    if (voiceButton) {
+      voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
+    }
+  }
+  
+  // テキストが長い場合は分割して読み上げ（より自然な発音）
+  if (text.length > 200) {
+    console.log('📝 長いテキストを分割して読み上げます（', text.length, '文字）')
+    
+    // 句読点で分割
+    const sentences = text.split(/([。！？、])/g).filter(s => s.trim())
+    let currentText = ''
+    
+    sentences.forEach((sentence, index) => {
+      currentText += sentence
+      
+      // 区切り文字に達したら、または最後の文なら読み上げ
+      if (sentence.match(/[。！？]/) || index === sentences.length - 1) {
+        const sentenceUtterance = new SpeechSynthesisUtterance(currentText.trim())
+        sentenceUtterance.lang = 'ja-JP'
+        sentenceUtterance.rate = utterance.rate
+        sentenceUtterance.pitch = utterance.pitch
+        sentenceUtterance.volume = utterance.volume
+        sentenceUtterance.voice = targetVoice
+        
+        speechSynthesis.speak(sentenceUtterance)
+        currentText = ''
+      }
+    })
+  } else {
+    // 通常の読み上げ
+    speechSynthesis.speak(utterance)
+  }
 }
 
 // 音声認識の初期化
