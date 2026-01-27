@@ -823,6 +823,39 @@ app.get('/api/curriculum/:id', async (c) => {
           ORDER BY card_number
         `).bind(course.id).all()
         
+        // 各カードにヒントと解答を追加
+        const cardsWithDetails = await Promise.all(
+          (cards.results || []).map(async (card: any) => {
+            // ヒント取得
+            const hints = await env.DB.prepare(`
+              SELECT 
+                id,
+                learning_card_id,
+                hint_number,
+                hint_number AS hint_level,
+                hint_content,
+                hint_content AS hint_text,
+                thinking_tool_suggestion
+              FROM hint_cards 
+              WHERE learning_card_id = ?
+              ORDER BY hint_number
+            `).bind(card.id).all()
+            
+            // 解答取得
+            const answer = await env.DB.prepare(`
+              SELECT * FROM answers WHERE learning_card_id = ?
+            `).bind(card.id).first()
+            
+            return {
+              ...card,
+              hints: hints.results || [],
+              answer: answer?.answer_content || '',
+              answer_explanation: answer?.explanation || '',
+              explanation: answer?.explanation || ''
+            }
+          })
+        )
+        
         // introduction_problemをパース
         let introductionProblem = null
         if (course.introduction_problem) {
@@ -835,7 +868,7 @@ app.get('/api/curriculum/:id', async (c) => {
         
         return { 
           ...course, 
-          cards: cards.results,
+          cards: cardsWithDetails,
           introduction_problem: introductionProblem
         }
       })
@@ -5062,14 +5095,15 @@ app.post('/api/curriculum/save-generated', async (c) => {
         const cardResult = await env.DB.prepare(`
           INSERT INTO learning_cards (
             course_id, card_number, card_title, card_type,
-            problem_content, new_terms, example_problem,
+            problem_content, problem_description, new_terms, example_problem,
             example_solution, real_world_context, textbook_page
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           courseId,
           card.card_number,
           card.card_title,
           cardType,
+          card.problem_description || card.problem_content || '',
           card.problem_description || card.problem_content || '',
           card.new_terms || '',
           card.example_problem || '',
@@ -5080,18 +5114,19 @@ app.post('/api/curriculum/save-generated', async (c) => {
         
         const cardId = cardResult.meta.last_row_id
         
-        // 解答を保存（answersテーブル）
-        if (card.answer) {
-          await env.DB.prepare(`
-            INSERT INTO answers (
-              learning_card_id, answer_content, explanation
-            ) VALUES (?, ?, ?)
-          `).bind(
-            cardId,
-            card.answer,
-            card.answer_explanation || card.real_world_connection || ''
-          ).run()
-        }
+        // 解答を保存（answersテーブル）- 必ず保存
+        const answerContent = card.answer || card.problem_description || card.problem_content || '解答を生成中です'
+        const answerExplanation = card.answer_explanation || card.explanation || card.real_world_connection || '解説を生成中です'
+        
+        await env.DB.prepare(`
+          INSERT INTO answers (
+            learning_card_id, answer_content, explanation
+          ) VALUES (?, ?, ?)
+        `).bind(
+          cardId,
+          answerContent,
+          answerExplanation
+        ).run()
         
         // ヒントカードを保存（デフォルト値を設定）
         const hints = card.hints || []
