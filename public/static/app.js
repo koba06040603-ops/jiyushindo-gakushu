@@ -12134,6 +12134,14 @@ function showTeacherOverview(unitData) {
             <p class="text-sm font-bold text-yellow-800">全ヒント一覧</p>
           </a>
         </div>
+        
+        <!-- 変更履歴ボタン -->
+        <div class="mt-4 pt-4 border-t border-gray-200">
+          <button onclick="showEditHistory()" class="w-full bg-indigo-50 hover:bg-indigo-100 p-3 rounded-lg text-center transition">
+            <i class="fas fa-history text-indigo-600 text-xl mb-1"></i>
+            <p class="text-sm font-bold text-indigo-800">変更履歴を表示</p>
+          </button>
+        </div>
       </div>
 
       <!-- 使い方ガイド -->
@@ -12148,6 +12156,11 @@ function showTeacherOverview(unitData) {
           <li>✅ 学習のてびき、チェックテスト、選択課題、解答・解説も含まれます</li>
           <li>✅ 各カードの「編集」ボタンで内容を修正できます</li>
           <li>✅ 問題がなければ「この単元を保存して使用する」をクリック</li>
+          <li>🆕 <strong>コースの折りたたみ</strong>：コース名をクリックで折りたたみ・展開</li>
+          <li>🆕 <strong>一括編集モード</strong>：複数カードの難易度・タイプを一括変更</li>
+          <li>🆕 <strong>ドラッグ&ドロップ</strong>：カードをドラッグして並び替え（同一コース内のみ）</li>
+          <li>🆕 <strong>生徒視点プレビュー</strong>：生徒が見る画面を確認</li>
+          <li>🆕 <strong>変更履歴</strong>：編集履歴を確認（目次から表示）</li>
         </ul>
       </div>
 
@@ -12521,35 +12534,86 @@ function showTeacherOverview(unitData) {
       </div>
 
       <!-- 全コース・全カード一覧 -->
-      <div id="courses"></div>
-      ${courses.map((course, courseIndex) => `
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-2xl font-bold text-${course.color_code}-800">
+      <div id="courses" class="mb-6">
+        <!-- 一括操作ツールバー -->
+        <div class="bg-white rounded-lg shadow-lg p-4 mb-4">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <h2 class="text-xl font-bold text-gray-800">
               <i class="fas fa-layer-group mr-2"></i>
-              ${course.course_name}
+              全コース・カード管理
             </h2>
-            <span class="bg-${course.color_code}-100 text-${course.color_code}-800 px-4 py-2 rounded-full font-bold">
-              ${course.cards?.length || 0}枚
-            </span>
+            <div class="flex gap-2 flex-wrap">
+              <button onclick="expandAllCourses()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                <i class="fas fa-expand-alt mr-1"></i>全て展開
+              </button>
+              <button onclick="collapseAllCourses()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                <i class="fas fa-compress-alt mr-1"></i>全て折りたたむ
+              </button>
+              <button onclick="toggleBulkEditMode()" id="bulk-edit-toggle-btn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                <i class="fas fa-edit mr-1"></i>一括編集モード
+              </button>
+              <button onclick="showStudentPreview()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                <i class="fas fa-eye mr-1"></i>生徒視点プレビュー
+              </button>
+            </div>
           </div>
-          <p class="text-gray-600 mb-4">${course.description}</p>
+        </div>
+      </div>
+      ${courses.map((course, courseIndex) => `
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6" id="course-container-${courseIndex}">
+          <!-- コースヘッダー（折りたたみ可能） -->
+          <button onclick="toggleCourseCollapse(${courseIndex})" class="w-full flex items-center justify-between mb-4 hover:bg-gray-50 p-3 rounded-lg transition">
+            <div class="flex items-center gap-3">
+              <i class="fas fa-chevron-down text-gray-600 transition-transform" id="course-icon-${courseIndex}"></i>
+              <h2 class="text-2xl font-bold text-${course.color_code}-800">
+                <i class="fas fa-layer-group mr-2"></i>
+                ${course.course_name}
+              </h2>
+              <span class="bg-${course.color_code}-100 text-${course.color_code}-800 px-4 py-2 rounded-full font-bold">
+                ${course.cards?.length || 0}枚
+              </span>
+            </div>
+            <span class="text-sm text-gray-500">クリックで折りたたみ</span>
+          </button>
           
-          <!-- カード一覧 -->
-          <div class="space-y-4">
+          <!-- コース内容（折りたたみ可能） -->
+          <div id="course-content-${courseIndex}">
+            <p class="text-gray-600 mb-4">${course.description}</p>
+            
+            <!-- カード一覧 -->
+            <div class="space-y-4" id="course-cards-${courseIndex}">
             ${(course.cards || []).map((card, cardIndex) => `
-              <div class="border-2 border-gray-200 rounded-lg p-4 hover:border-${course.color_code}-300 transition">
+              <div class="border-2 border-gray-200 rounded-lg p-4 hover:border-${course.color_code}-300 transition draggable-card" 
+                   draggable="true" 
+                   data-course-index="${courseIndex}" 
+                   data-card-index="${cardIndex}"
+                   data-card-id="${card.id}"
+                   id="card-${courseIndex}-${cardIndex}">
                 <div class="flex items-start justify-between mb-3">
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2 mb-2">
-                      <span class="bg-${course.color_code}-100 text-${course.color_code}-800 px-3 py-1 rounded-full text-sm font-bold">
-                        カード ${card.card_number}
-                      </span>
-                      <span class="text-sm text-gray-500">${card.card_type || 'main'}</span>
+                  <div class="flex items-center gap-3 flex-1">
+                    <!-- ドラッグハンドル -->
+                    <div class="drag-handle cursor-move text-gray-400 hover:text-gray-600 hidden" title="ドラッグして並び替え">
+                      <i class="fas fa-grip-vertical text-xl"></i>
                     </div>
-                    <h3 class="text-lg font-bold text-gray-800 mb-2">
-                      ${card.card_title}
-                    </h3>
+                    <div class="flex-1">
+                      <!-- 一括選択チェックボックス -->
+                      <div class="bulk-edit-checkbox hidden mb-2">
+                        <input type="checkbox" 
+                               id="bulk-select-${courseIndex}-${cardIndex}"
+                               class="w-4 h-4 text-purple-600 rounded"
+                               onchange="toggleCardSelection(${courseIndex}, ${cardIndex})">
+                        <label for="bulk-select-${courseIndex}-${cardIndex}" class="ml-2 text-sm text-gray-700">選択</label>
+                      </div>
+                      <div class="flex items-center gap-2 mb-2">
+                        <span class="bg-${course.color_code}-100 text-${course.color_code}-800 px-3 py-1 rounded-full text-sm font-bold">
+                          カード ${card.card_number}
+                        </span>
+                        <span class="text-sm text-gray-500">${card.card_type || 'main'}</span>
+                      </div>
+                      <h3 class="text-lg font-bold text-gray-800 mb-2">
+                        ${card.card_title}
+                      </h3>
+                    </div>
                   </div>
                   <div class="flex gap-2">
                     <button onclick="editCardContent(${courseIndex}, ${cardIndex})"
@@ -13174,6 +13238,448 @@ function showTeacherOverview(unitData) {
       </div>
     </div>
   `
+  
+  // ドラッグ&ドロップイベントリスナーを追加
+  initDragAndDrop()
+}
+
+// ========================================
+// コース折りたたみ機能
+// ========================================
+function toggleCourseCollapse(courseIndex) {
+  const content = document.getElementById(`course-content-${courseIndex}`)
+  const icon = document.getElementById(`course-icon-${courseIndex}`)
+  
+  if (content.style.display === 'none') {
+    content.style.display = 'block'
+    icon.style.transform = 'rotate(0deg)'
+  } else {
+    content.style.display = 'none'
+    icon.style.transform = 'rotate(-90deg)'
+  }
+}
+
+function expandAllCourses() {
+  const courses = window.currentUnitData?.courses || []
+  courses.forEach((_, index) => {
+    const content = document.getElementById(`course-content-${index}`)
+    const icon = document.getElementById(`course-icon-${index}`)
+    if (content && icon) {
+      content.style.display = 'block'
+      icon.style.transform = 'rotate(0deg)'
+    }
+  })
+}
+
+function collapseAllCourses() {
+  const courses = window.currentUnitData?.courses || []
+  courses.forEach((_, index) => {
+    const content = document.getElementById(`course-content-${index}`)
+    const icon = document.getElementById(`course-icon-${index}`)
+    if (content && icon) {
+      content.style.display = 'none'
+      icon.style.transform = 'rotate(-90deg)'
+    }
+  })
+}
+
+// ========================================
+// 一括編集モード
+// ========================================
+let bulkEditMode = false
+let selectedCards = new Set()
+
+function toggleBulkEditMode() {
+  bulkEditMode = !bulkEditMode
+  const btn = document.getElementById('bulk-edit-toggle-btn')
+  const checkboxes = document.querySelectorAll('.bulk-edit-checkbox')
+  const dragHandles = document.querySelectorAll('.drag-handle')
+  
+  if (bulkEditMode) {
+    btn.innerHTML = '<i class="fas fa-times mr-1"></i>一括編集終了'
+    btn.className = 'bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition'
+    checkboxes.forEach(cb => cb.classList.remove('hidden'))
+    dragHandles.forEach(dh => dh.classList.add('hidden'))
+    showBulkEditToolbar()
+  } else {
+    btn.innerHTML = '<i class="fas fa-edit mr-1"></i>一括編集モード'
+    btn.className = 'bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition'
+    checkboxes.forEach(cb => cb.classList.add('hidden'))
+    dragHandles.forEach(dh => dh.classList.remove('hidden'))
+    hideBulkEditToolbar()
+    selectedCards.clear()
+  }
+}
+
+function toggleCardSelection(courseIndex, cardIndex) {
+  const key = `${courseIndex}-${cardIndex}`
+  const checkbox = document.getElementById(`bulk-select-${courseIndex}-${cardIndex}`)
+  
+  if (checkbox.checked) {
+    selectedCards.add(key)
+  } else {
+    selectedCards.delete(key)
+  }
+  
+  updateBulkEditToolbar()
+}
+
+function showBulkEditToolbar() {
+  const toolbar = document.createElement('div')
+  toolbar.id = 'bulk-edit-toolbar'
+  toolbar.className = 'fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-purple-600 text-white rounded-lg shadow-2xl p-4 z-50'
+  toolbar.innerHTML = `
+    <div class="flex items-center gap-4">
+      <span id="bulk-select-count" class="font-bold">0枚選択中</span>
+      <button onclick="bulkEditField('difficulty_level')" class="bg-white text-purple-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-100 transition">
+        <i class="fas fa-star mr-1"></i>難易度一括変更
+      </button>
+      <button onclick="bulkEditField('card_type')" class="bg-white text-purple-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-100 transition">
+        <i class="fas fa-tag mr-1"></i>カードタイプ一括変更
+      </button>
+      <button onclick="bulkDeleteCards()" class="bg-red-500 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-600 transition">
+        <i class="fas fa-trash mr-1"></i>選択したカードを削除
+      </button>
+    </div>
+  `
+  document.body.appendChild(toolbar)
+}
+
+function hideBulkEditToolbar() {
+  const toolbar = document.getElementById('bulk-edit-toolbar')
+  if (toolbar) {
+    toolbar.remove()
+  }
+}
+
+function updateBulkEditToolbar() {
+  const countEl = document.getElementById('bulk-select-count')
+  if (countEl) {
+    countEl.textContent = `${selectedCards.size}枚選択中`
+  }
+}
+
+async function bulkEditField(fieldName) {
+  if (selectedCards.size === 0) {
+    alert('カードを選択してください')
+    return
+  }
+  
+  let newValue
+  if (fieldName === 'difficulty_level') {
+    newValue = prompt('難易度を選択してください:\n1: minimum (基礎)\n2: standard (標準)\n3: advanced (発展)')
+    const levels = { '1': 'minimum', '2': 'standard', '3': 'advanced' }
+    newValue = levels[newValue]
+  } else if (fieldName === 'card_type') {
+    newValue = prompt('カードタイプを選択してください:\n1: main (メイン)\n2: optional (選択)\n3: check (チェック)')
+    const types = { '1': 'main', '2': 'optional', '3': 'check' }
+    newValue = types[newValue]
+  }
+  
+  if (!newValue) {
+    alert('キャンセルされました')
+    return
+  }
+  
+  const updates = []
+  for (const key of selectedCards) {
+    const [courseIndex, cardIndex] = key.split('-').map(Number)
+    const card = window.currentUnitData?.courses[courseIndex]?.cards[cardIndex]
+    if (card) {
+      updates.push({ cardId: card.id, fieldName, newValue })
+    }
+  }
+  
+  try {
+    for (const update of updates) {
+      const response = await fetch(`/api/cards/${update.cardId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [update.fieldName]: update.newValue })
+      })
+      if (!response.ok) throw new Error('更新に失敗しました')
+    }
+    alert(`${selectedCards.size}枚のカードを更新しました`)
+    location.reload()
+  } catch (error) {
+    console.error('一括編集エラー:', error)
+    alert('一括編集に失敗しました')
+  }
+}
+
+async function bulkDeleteCards() {
+  if (selectedCards.size === 0) {
+    alert('カードを選択してください')
+    return
+  }
+  
+  if (!confirm(`選択した${selectedCards.size}枚のカードを削除しますか？`)) {
+    return
+  }
+  
+  try {
+    for (const key of selectedCards) {
+      const [courseIndex, cardIndex] = key.split('-').map(Number)
+      const course = window.currentUnitData?.courses[courseIndex]
+      const card = course?.cards[cardIndex]
+      if (card) {
+        const response = await fetch(`/api/cards/${card.id}`, { method: 'DELETE' })
+        if (!response.ok) throw new Error('削除に失敗しました')
+      }
+    }
+    alert(`${selectedCards.size}枚のカードを削除しました`)
+    location.reload()
+  } catch (error) {
+    console.error('一括削除エラー:', error)
+    alert('一括削除に失敗しました')
+  }
+}
+
+// ========================================
+// ドラッグ&ドロップ並び替え
+// ========================================
+let draggedCard = null
+
+function initDragAndDrop() {
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.draggable-card')
+    cards.forEach(card => {
+      card.addEventListener('dragstart', handleDragStart)
+      card.addEventListener('dragover', handleDragOver)
+      card.addEventListener('drop', handleDrop)
+      card.addEventListener('dragend', handleDragEnd)
+    })
+  }, 100)
+}
+
+function handleDragStart(e) {
+  if (bulkEditMode) {
+    e.preventDefault()
+    return
+  }
+  draggedCard = this
+  this.style.opacity = '0.4'
+  e.dataTransfer.effectAllowed = 'move'
+}
+
+function handleDragOver(e) {
+  if (e.preventDefault) {
+    e.preventDefault()
+  }
+  e.dataTransfer.dropEffect = 'move'
+  return false
+}
+
+function handleDrop(e) {
+  if (e.stopPropagation) {
+    e.stopPropagation()
+  }
+  
+  if (draggedCard !== this) {
+    const draggedCourseIndex = parseInt(draggedCard.dataset.courseIndex)
+    const draggedCardIndex = parseInt(draggedCard.dataset.cardIndex)
+    const targetCourseIndex = parseInt(this.dataset.courseIndex)
+    const targetCardIndex = parseInt(this.dataset.cardIndex)
+    
+    // 同じコース内のみ並び替え可能
+    if (draggedCourseIndex === targetCourseIndex) {
+      swapCards(draggedCourseIndex, draggedCardIndex, targetCardIndex)
+    } else {
+      alert('異なるコース間でのカード移動はできません')
+    }
+  }
+  
+  return false
+}
+
+function handleDragEnd(e) {
+  this.style.opacity = '1'
+}
+
+async function swapCards(courseIndex, fromIndex, toIndex) {
+  const course = window.currentUnitData?.courses[courseIndex]
+  if (!course || !course.cards) return
+  
+  const cards = course.cards
+  const [movedCard] = cards.splice(fromIndex, 1)
+  cards.splice(toIndex, 0, movedCard)
+  
+  // カード番号を更新
+  cards.forEach((card, index) => {
+    card.card_number = index + 1
+  })
+  
+  // サーバーに並び替えを保存
+  try {
+    for (const card of cards) {
+      const response = await fetch(`/api/cards/${card.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card_number: card.card_number })
+      })
+      if (!response.ok) throw new Error('並び替えに失敗しました')
+    }
+    
+    // UIを再描画
+    showTeacherOverview(window.currentUnitData)
+    alert('カードの並び替えを保存しました')
+  } catch (error) {
+    console.error('並び替えエラー:', error)
+    alert('並び替えの保存に失敗しました')
+  }
+}
+
+// ========================================
+// 生徒視点プレビュー
+// ========================================
+function showStudentPreview() {
+  const unitData = window.currentUnitData
+  if (!unitData) {
+    alert('単元データが見つかりません')
+    return
+  }
+  
+  const modalHTML = `
+    <div id="previewModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         onclick="if(event.target.id === 'previewModal') closePreviewModal()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto"
+           onclick="event.stopPropagation()">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-green-600 to-teal-600 text-white p-6 rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-eye mr-2"></i>生徒視点プレビュー
+            </h2>
+            <button onclick="closePreviewModal()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+          <p class="mt-2 opacity-90">
+            生徒が実際に見る画面のプレビューです
+          </p>
+        </div>
+
+        <!-- コンテンツ -->
+        <div class="p-6">
+          <div class="bg-gray-50 rounded-lg p-6 mb-6">
+            <h3 class="text-2xl font-bold text-gray-800 mb-4">${unitData.curriculum.unit_name}</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              ${unitData.courses.map(course => `
+                <div class="bg-white rounded-lg p-4 border-2 border-${course.color_code}-300">
+                  <h4 class="text-lg font-bold text-${course.color_code}-800 mb-2">${course.course_name}</h4>
+                  <p class="text-sm text-gray-600 mb-3">${course.description}</p>
+                  <p class="text-xs text-gray-500">学習カード: ${course.cards?.length || 0}枚</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+            <p class="text-sm text-blue-900">
+              <i class="fas fa-info-circle mr-2"></i>
+              このプレビューは教師用の確認画面です。実際の生徒画面では、選択したコースのカードのみが表示されます。
+            </p>
+          </div>
+          
+          <div class="flex justify-end">
+            <button onclick="closePreviewModal()" 
+                    class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-bold transition">
+              <i class="fas fa-times mr-2"></i>閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+}
+
+function closePreviewModal() {
+  const modal = document.getElementById('previewModal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+// ========================================
+// 変更履歴表示（簡易版）
+// ========================================
+window.cardEditHistory = window.cardEditHistory || []
+
+function trackCardEdit(cardId, fieldName, oldValue, newValue) {
+  window.cardEditHistory.push({
+    timestamp: new Date().toISOString(),
+    cardId,
+    fieldName,
+    oldValue,
+    newValue
+  })
+  
+  // 最新20件のみ保持
+  if (window.cardEditHistory.length > 20) {
+    window.cardEditHistory = window.cardEditHistory.slice(-20)
+  }
+}
+
+function showEditHistory() {
+  if (window.cardEditHistory.length === 0) {
+    alert('変更履歴がありません')
+    return
+  }
+  
+  const historyHTML = window.cardEditHistory
+    .slice()
+    .reverse()
+    .map(h => `
+      <div class="bg-gray-50 p-3 rounded-lg mb-2">
+        <p class="text-xs text-gray-500">${new Date(h.timestamp).toLocaleString('ja-JP')}</p>
+        <p class="text-sm text-gray-800"><strong>${h.fieldName}</strong> を変更</p>
+        <p class="text-xs text-gray-600">前: ${h.oldValue || '(空)'} → 後: ${h.newValue || '(空)'}</p>
+      </div>
+    `)
+    .join('')
+  
+  const modalHTML = `
+    <div id="historyModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         onclick="if(event.target.id === 'historyModal') closeHistoryModal()">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+           onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-2xl">
+          <div class="flex items-center justify-between">
+            <h2 class="text-2xl font-bold">
+              <i class="fas fa-history mr-2"></i>変更履歴
+            </h2>
+            <button onclick="closeHistoryModal()" 
+                    class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+        <div class="p-6">
+          ${historyHTML}
+          <div class="flex justify-end mt-4">
+            <button onclick="closeHistoryModal()" 
+                    class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-bold transition">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+}
+
+function closeHistoryModal() {
+  const modal = document.getElementById('historyModal')
+  if (modal) {
+    modal.remove()
+  }
 }
 
 // カード内容編集モーダル（簡易版）
@@ -13508,6 +14014,10 @@ async function saveFieldEdit(courseIndex, cardIndex, fieldName, cardId) {
     const input = document.getElementById(`input-${fieldName}-${courseIndex}-${cardIndex}`)
     const newValue = input.value
     
+    // 変更前の値を取得
+    const card = window.currentUnitData?.courses[courseIndex]?.cards[cardIndex]
+    const oldValue = card ? card[fieldName] : ''
+    
     console.log(`💾 フィールド保存: ${fieldName} = ${newValue.substring(0, 50)}...`)
     
     // APIで更新
@@ -13518,6 +14028,9 @@ async function saveFieldEdit(courseIndex, cardIndex, fieldName, cardId) {
     console.log('✅ 保存成功:', response.data)
     
     if (response.data.success) {
+      // 変更履歴をトラッキング
+      trackCardEdit(cardId, fieldName, oldValue, newValue)
+      
       // 表示を更新
       const displayDiv = document.getElementById(`display-${fieldName}-${courseIndex}-${cardIndex}`)
       if (displayDiv) {
