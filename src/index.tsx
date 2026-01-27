@@ -382,6 +382,63 @@ function extractJSON(aiResponse: string): any {
         if (error.message.includes("Expected ',' or ']'") || error.message.includes("Expected ',' or '}'")) {
           console.warn('⚠️ JSON構文エラー検出、包括的な修正を試みます')
           
+          // 行番号とカラム番号から正確な位置を計算
+          let calculatedPos = pos
+          if (error.message.includes('line') && error.message.includes('column')) {
+            const lineMatch = error.message.match(/line (\d+)/)
+            const colMatch = error.message.match(/column (\d+)/)
+            if (lineMatch && colMatch) {
+              const line = parseInt(lineMatch[1])
+              const col = parseInt(colMatch[1])
+              console.log(`🔍 Line ${line}, Column ${col}`)
+              
+              // 行番号から位置を計算
+              const lines = jsonText.split('\n')
+              let linePos = 0
+              for (let i = 0; i < line - 1 && i < lines.length; i++) {
+                linePos += lines[i].length + 1 // +1 for newline
+              }
+              calculatedPos = linePos + col - 1
+              console.log(`🔍 Calculated position: ${calculatedPos} (original: ${pos})`)
+            }
+          }
+          
+          // エラー位置の前後の文字を確認
+          let beforePos = Math.max(0, calculatedPos - 1)
+          let afterPos = calculatedPos
+          
+          // 前の非空白文字を探す
+          while (beforePos >= 0 && /\s/.test(jsonText.charAt(beforePos))) {
+            beforePos--
+          }
+          
+          // 次の非空白文字を探す
+          while (afterPos < jsonText.length && /\s/.test(jsonText.charAt(afterPos))) {
+            afterPos++
+          }
+          
+          const beforeChar = jsonText.charAt(beforePos)
+          const afterChar = jsonText.charAt(afterPos)
+          
+          console.log(`🔍 Before char: '${beforeChar}' at ${beforePos}`)
+          console.log(`🔍 After char: '${afterChar}' at ${afterPos}`)
+          
+          // 簡単な修正: } または ] または " の後に { または [ または " が来る場合、間にカンマを挿入
+          if ((beforeChar === '}' || beforeChar === ']' || beforeChar === '"') && 
+              (afterChar === '{' || afterChar === '[' || afterChar === '"')) {
+            console.log('✅ カンマを挿入します')
+            const fixedJson = jsonText.substring(0, beforePos + 1) + ',' + jsonText.substring(beforePos + 1)
+            
+            console.log('🔄 修正後のJSON再パース試行...')
+            try {
+              const result = JSON.parse(fixedJson)
+              console.log('✅ カンマ挿入による修正が成功しました！')
+              return result
+            } catch (retryError) {
+              console.error('❌ カンマ挿入後もパース失敗:', retryError)
+            }
+          }
+          
           // 修正方法を順番に試す
           const fixStrategies = [
             // 戦略1: エラー位置の前で文字列を閉じてカンマを追加
