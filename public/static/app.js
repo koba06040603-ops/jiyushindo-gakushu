@@ -12459,41 +12459,142 @@ function showTeacherOverview(unitData) {
                   <div id="card-details-${courseIndex}-${cardIndex}" class="hidden p-4 space-y-4">
                     <!-- 問題・課題 -->
                     <div class="bg-white p-4 rounded-lg border-l-4 border-orange-500">
-                      <p class="font-bold text-orange-800 mb-2">
-                        <i class="fas fa-question-circle mr-1"></i>
-                        問題・課題
-                      </p>
-                      <div class="text-gray-700 whitespace-pre-wrap" style="line-height: 1.8;">
+                      <div class="flex items-center justify-between mb-2">
+                        <p class="font-bold text-orange-800">
+                          <i class="fas fa-question-circle mr-1"></i>
+                          問題・課題
+                        </p>
+                        <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'problem_description')" 
+                                id="edit-btn-problem-${courseIndex}-${cardIndex}"
+                                class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                          <i class="fas fa-edit mr-1"></i>編集
+                        </button>
+                      </div>
+                      <div id="display-problem-${courseIndex}-${cardIndex}" class="text-gray-700 whitespace-pre-wrap" style="line-height: 1.8;">
                         ${card.problem_description || '(なし)'}
+                      </div>
+                      <div id="edit-problem-${courseIndex}-${cardIndex}" class="hidden">
+                        <textarea 
+                          id="input-problem-${courseIndex}-${cardIndex}"
+                          class="w-full p-3 border-2 border-orange-300 rounded-lg focus:border-orange-500 focus:outline-none"
+                          rows="6"
+                          style="line-height: 1.8;"
+                        >${card.problem_description || ''}</textarea>
+                        <div class="flex gap-2 mt-2">
+                          <button onclick="saveFieldEdit(${courseIndex}, ${cardIndex}, 'problem_description', ${card.id})"
+                                  class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                            <i class="fas fa-save mr-1"></i>保存
+                          </button>
+                          <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'problem_description')"
+                                  class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                            <i class="fas fa-times mr-1"></i>キャンセル
+                          </button>
+                        </div>
                       </div>
                     </div>
                     
                     <!-- 新出用語 -->
-                    ${card.new_terms ? `
-                      <div class="bg-white p-4 rounded-lg border-l-4 border-blue-500">
-                        <p class="font-bold text-blue-800 mb-2">
+                    <div class="bg-white p-4 rounded-lg border-l-4 border-blue-500">
+                      <div class="flex items-center justify-between mb-2">
+                        <p class="font-bold text-blue-800">
                           <i class="fas fa-book mr-1"></i>
                           新出用語
                         </p>
-                        <p class="text-gray-700">${card.new_terms}</p>
+                        <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'new_terms')" 
+                                id="edit-btn-new_terms-${courseIndex}-${cardIndex}"
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                          <i class="fas fa-edit mr-1"></i>編集
+                        </button>
                       </div>
-                    ` : ''}
+                      <div id="display-new_terms-${courseIndex}-${cardIndex}" class="text-gray-700">
+                        ${card.new_terms || '(なし)'}
+                      </div>
+                      <div id="edit-new_terms-${courseIndex}-${cardIndex}" class="hidden">
+                        <input 
+                          type="text"
+                          id="input-new_terms-${courseIndex}-${cardIndex}"
+                          class="w-full p-3 border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                          value="${card.new_terms || ''}"
+                          placeholder="例: 面積、体積、直方体"
+                        />
+                        <div class="flex gap-2 mt-2">
+                          <button onclick="saveFieldEdit(${courseIndex}, ${cardIndex}, 'new_terms', ${card.id})"
+                                  class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                            <i class="fas fa-save mr-1"></i>保存
+                          </button>
+                          <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'new_terms')"
+                                  class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                            <i class="fas fa-times mr-1"></i>キャンセル
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                     
                     <!-- 例題 -->
-                    ${card.example_problem ? `
+                    ${card.example_problem || true ? `
                       <div class="bg-white p-4 rounded-lg border-l-4 border-green-500">
-                        <p class="font-bold text-green-800 mb-2">
-                          <i class="fas fa-lightbulb mr-1"></i>
-                          例題
-                        </p>
-                        <div class="text-gray-700 whitespace-pre-wrap mb-3" style="line-height: 1.8;">
-                          ${card.example_problem}
+                        <div class="flex items-center justify-between mb-2">
+                          <p class="font-bold text-green-800">
+                            <i class="fas fa-lightbulb mr-1"></i>
+                            例題
+                          </p>
+                          <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'example_problem')" 
+                                  id="edit-btn-example_problem-${courseIndex}-${cardIndex}"
+                                  class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                            <i class="fas fa-edit mr-1"></i>編集
+                          </button>
                         </div>
-                        ${card.example_solution ? `
+                        <div id="display-example_problem-${courseIndex}-${cardIndex}" class="text-gray-700 whitespace-pre-wrap mb-3" style="line-height: 1.8;">
+                          ${card.example_problem || '(なし)'}
+                        </div>
+                        <div id="edit-example_problem-${courseIndex}-${cardIndex}" class="hidden mb-3">
+                          <textarea 
+                            id="input-example_problem-${courseIndex}-${cardIndex}"
+                            class="w-full p-3 border-2 border-green-300 rounded-lg focus:border-green-500 focus:outline-none"
+                            rows="4"
+                            style="line-height: 1.8;"
+                          >${card.example_problem || ''}</textarea>
+                          <div class="flex gap-2 mt-2">
+                            <button onclick="saveFieldEdit(${courseIndex}, ${cardIndex}, 'example_problem', ${card.id})"
+                                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                              <i class="fas fa-save mr-1"></i>保存
+                            </button>
+                            <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'example_problem')"
+                                    class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                              <i class="fas fa-times mr-1"></i>キャンセル
+                            </button>
+                          </div>
+                        </div>
+                        ${card.example_solution || true ? `
                           <div class="bg-green-50 p-3 rounded-lg mt-2">
-                            <p class="font-bold text-green-800 text-sm mb-1">解き方・解答</p>
-                            <div class="text-gray-700 text-sm whitespace-pre-wrap" style="line-height: 1.8;">
-                              ${card.example_solution}
+                            <div class="flex items-center justify-between mb-1">
+                              <p class="font-bold text-green-800 text-sm">解き方・解答</p>
+                              <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'example_solution')" 
+                                      id="edit-btn-example_solution-${courseIndex}-${cardIndex}"
+                                      class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-bold transition">
+                                <i class="fas fa-edit mr-1"></i>編集
+                              </button>
+                            </div>
+                            <div id="display-example_solution-${courseIndex}-${cardIndex}" class="text-gray-700 text-sm whitespace-pre-wrap" style="line-height: 1.8;">
+                              ${card.example_solution || '(なし)'}
+                            </div>
+                            <div id="edit-example_solution-${courseIndex}-${cardIndex}" class="hidden">
+                              <textarea 
+                                id="input-example_solution-${courseIndex}-${cardIndex}"
+                                class="w-full p-3 border-2 border-green-300 rounded-lg focus:border-green-500 focus:outline-none text-sm"
+                                rows="4"
+                                style="line-height: 1.8;"
+                              >${card.example_solution || ''}</textarea>
+                              <div class="flex gap-2 mt-2">
+                                <button onclick="saveFieldEdit(${courseIndex}, ${cardIndex}, 'example_solution', ${card.id})"
+                                        class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                                  <i class="fas fa-save mr-1"></i>保存
+                                </button>
+                                <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'example_solution')"
+                                        class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded text-xs font-bold transition">
+                                  <i class="fas fa-times mr-1"></i>キャンセル
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ` : ''}
@@ -12503,11 +12604,18 @@ function showTeacherOverview(unitData) {
                     <!-- ヒント -->
                     ${card.hints && card.hints.length > 0 ? `
                       <div class="bg-white p-4 rounded-lg border-l-4 border-purple-500">
-                        <p class="font-bold text-purple-800 mb-3">
-                          <i class="fas fa-hand-point-right mr-1"></i>
-                          ヒント（${card.hints.length}段階）
-                        </p>
-                        <div class="space-y-2">
+                        <div class="flex items-center justify-between mb-3">
+                          <p class="font-bold text-purple-800">
+                            <i class="fas fa-hand-point-right mr-1"></i>
+                            ヒント（${card.hints.length}段階）
+                          </p>
+                          <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'hints')" 
+                                  id="edit-btn-hints-${courseIndex}-${cardIndex}"
+                                  class="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                            <i class="fas fa-edit mr-1"></i>編集
+                          </button>
+                        </div>
+                        <div id="display-hints-${courseIndex}-${cardIndex}" class="space-y-2">
                           ${card.hints.map((hint, hintIndex) => `
                             <div class="bg-purple-50 p-3 rounded-lg">
                               <p class="font-bold text-purple-700 text-sm mb-1">
@@ -12519,34 +12627,115 @@ function showTeacherOverview(unitData) {
                             </div>
                           `).join('')}
                         </div>
-                        <button onclick="editCardHints(${courseIndex}, ${cardIndex})"
-                                class="mt-3 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
-                          <i class="fas fa-edit mr-1"></i>
-                          ヒントを編集
-                        </button>
+                        <div id="edit-hints-${courseIndex}-${cardIndex}" class="hidden">
+                          <div class="space-y-3 mb-3" id="hints-editor-${courseIndex}-${cardIndex}">
+                            ${card.hints.map((hint, hintIndex) => `
+                              <div class="bg-purple-50 p-3 rounded-lg">
+                                <div class="flex items-center justify-between mb-2">
+                                  <p class="font-bold text-purple-700 text-sm">ヒント ${hintIndex + 1}</p>
+                                  <button onclick="removeHint(${courseIndex}, ${cardIndex}, ${hintIndex})"
+                                          class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-bold transition">
+                                    <i class="fas fa-trash mr-1"></i>削除
+                                  </button>
+                                </div>
+                                <textarea 
+                                  id="input-hint-${courseIndex}-${cardIndex}-${hintIndex}"
+                                  class="w-full p-2 border-2 border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none text-sm"
+                                  rows="3"
+                                  style="line-height: 1.6;"
+                                >${hint.hint_text || hint}</textarea>
+                              </div>
+                            `).join('')}
+                          </div>
+                          <button onclick="addHint(${courseIndex}, ${cardIndex})"
+                                  class="w-full bg-purple-400 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition mb-3">
+                            <i class="fas fa-plus mr-1"></i>ヒントを追加
+                          </button>
+                          <div class="flex gap-2">
+                            <button onclick="saveHintsEdit(${courseIndex}, ${cardIndex}, ${card.id})"
+                                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                              <i class="fas fa-save mr-1"></i>保存
+                            </button>
+                            <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'hints')"
+                                    class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                              <i class="fas fa-times mr-1"></i>キャンセル
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ` : `
                       <div class="bg-white p-4 rounded-lg border-l-4 border-gray-400">
-                        <p class="font-bold text-gray-600 mb-2">
-                          <i class="fas fa-exclamation-circle mr-1"></i>
-                          ヒント
-                        </p>
-                        <p class="text-gray-500">ヒントは準備中です</p>
+                        <div class="flex items-center justify-between mb-2">
+                          <p class="font-bold text-gray-600">
+                            <i class="fas fa-exclamation-circle mr-1"></i>
+                            ヒント
+                          </p>
+                          <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'hints')" 
+                                  id="edit-btn-hints-${courseIndex}-${cardIndex}"
+                                  class="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                            <i class="fas fa-plus mr-1"></i>追加
+                          </button>
+                        </div>
+                        <div id="display-hints-${courseIndex}-${cardIndex}">
+                          <p class="text-gray-500">ヒントは準備中です</p>
+                        </div>
+                        <div id="edit-hints-${courseIndex}-${cardIndex}" class="hidden">
+                          <div class="space-y-3 mb-3" id="hints-editor-${courseIndex}-${cardIndex}">
+                            <!-- 動的に追加 -->
+                          </div>
+                          <button onclick="addHint(${courseIndex}, ${cardIndex})"
+                                  class="w-full bg-purple-400 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition mb-3">
+                            <i class="fas fa-plus mr-1"></i>ヒントを追加
+                          </button>
+                          <div class="flex gap-2">
+                            <button onclick="saveHintsEdit(${courseIndex}, ${cardIndex}, ${card.id})"
+                                    class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                              <i class="fas fa-save mr-1"></i>保存
+                            </button>
+                            <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'hints')"
+                                    class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                              <i class="fas fa-times mr-1"></i>キャンセル
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     `}
                     
                     <!-- 実社会とのつながり -->
-                    ${card.real_world_connection ? `
-                      <div class="bg-white p-4 rounded-lg border-l-4 border-teal-500">
-                        <p class="font-bold text-teal-800 mb-2">
+                    <div class="bg-white p-4 rounded-lg border-l-4 border-teal-500">
+                      <div class="flex items-center justify-between mb-2">
+                        <p class="font-bold text-teal-800">
                           <i class="fas fa-globe mr-1"></i>
                           実社会とのつながり
                         </p>
-                        <div class="text-gray-700 whitespace-pre-wrap" style="line-height: 1.8;">
-                          ${card.real_world_connection}
+                        <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'real_world_connection')" 
+                                id="edit-btn-real_world_connection-${courseIndex}-${cardIndex}"
+                                class="bg-teal-500 hover:bg-teal-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                          <i class="fas fa-edit mr-1"></i>編集
+                        </button>
+                      </div>
+                      <div id="display-real_world_connection-${courseIndex}-${cardIndex}" class="text-gray-700 whitespace-pre-wrap" style="line-height: 1.8;">
+                        ${card.real_world_connection || '(なし)'}
+                      </div>
+                      <div id="edit-real_world_connection-${courseIndex}-${cardIndex}" class="hidden">
+                        <textarea 
+                          id="input-real_world_connection-${courseIndex}-${cardIndex}"
+                          class="w-full p-3 border-2 border-teal-300 rounded-lg focus:border-teal-500 focus:outline-none"
+                          rows="4"
+                          style="line-height: 1.8;"
+                        >${card.real_world_connection || ''}</textarea>
+                        <div class="flex gap-2 mt-2">
+                          <button onclick="saveFieldEdit(${courseIndex}, ${cardIndex}, 'real_world_connection', ${card.id})"
+                                  class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                            <i class="fas fa-save mr-1"></i>保存
+                          </button>
+                          <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'real_world_connection')"
+                                  class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                            <i class="fas fa-times mr-1"></i>キャンセル
+                          </button>
                         </div>
                       </div>
-                    ` : ''}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -13028,6 +13217,199 @@ function toggleCardDetails(courseIndex, cardIndex) {
 }
 
 window.toggleCardDetails = toggleCardDetails
+
+// インライン編集モードの切り替え
+function toggleEditMode(courseIndex, cardIndex, fieldName) {
+  const displayDiv = document.getElementById(`display-${fieldName}-${courseIndex}-${cardIndex}`)
+  const editDiv = document.getElementById(`edit-${fieldName}-${courseIndex}-${cardIndex}`)
+  const editBtn = document.getElementById(`edit-btn-${fieldName}-${courseIndex}-${cardIndex}`)
+  
+  if (displayDiv && editDiv && editBtn) {
+    const isEditing = !editDiv.classList.contains('hidden')
+    
+    if (isEditing) {
+      // 編集モード → 表示モード
+      displayDiv.classList.remove('hidden')
+      editDiv.classList.add('hidden')
+      editBtn.innerHTML = '<i class="fas fa-edit mr-1"></i>編集'
+    } else {
+      // 表示モード → 編集モード
+      displayDiv.classList.add('hidden')
+      editDiv.classList.remove('hidden')
+      editBtn.innerHTML = '<i class="fas fa-times mr-1"></i>閉じる'
+    }
+  }
+}
+
+window.toggleEditMode = toggleEditMode
+
+// 編集モードのキャンセル
+function cancelEditMode(courseIndex, cardIndex, fieldName) {
+  const displayDiv = document.getElementById(`display-${fieldName}-${courseIndex}-${cardIndex}`)
+  const editDiv = document.getElementById(`edit-${fieldName}-${courseIndex}-${cardIndex}`)
+  const editBtn = document.getElementById(`edit-btn-${fieldName}-${courseIndex}-${cardIndex}`)
+  
+  if (displayDiv && editDiv && editBtn) {
+    displayDiv.classList.remove('hidden')
+    editDiv.classList.add('hidden')
+    editBtn.innerHTML = '<i class="fas fa-edit mr-1"></i>編集'
+  }
+}
+
+window.cancelEditMode = cancelEditMode
+
+// フィールド編集の保存
+async function saveFieldEdit(courseIndex, cardIndex, fieldName, cardId) {
+  try {
+    const input = document.getElementById(`input-${fieldName}-${courseIndex}-${cardIndex}`)
+    const newValue = input.value
+    
+    console.log(`💾 フィールド保存: ${fieldName} = ${newValue.substring(0, 50)}...`)
+    
+    // APIで更新
+    const response = await axios.put(`/api/card/${cardId}`, {
+      [fieldName]: newValue
+    })
+    
+    console.log('✅ 保存成功:', response.data)
+    
+    if (response.data.success) {
+      // 表示を更新
+      const displayDiv = document.getElementById(`display-${fieldName}-${courseIndex}-${cardIndex}`)
+      if (displayDiv) {
+        displayDiv.innerHTML = newValue.replace(/\n/g, '<br>') || '(なし)'
+      }
+      
+      // window.currentUnitDataも更新
+      if (window.currentUnitData && window.currentUnitData.courses[courseIndex]) {
+        const card = window.currentUnitData.courses[courseIndex].cards[cardIndex]
+        if (card) {
+          card[fieldName] = newValue
+        }
+      }
+      
+      // 編集モードを閉じる
+      cancelEditMode(courseIndex, cardIndex, fieldName)
+      
+      alert('✅ 保存しました！')
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ 保存エラー:', error)
+    alert(`❌ 保存に失敗しました\n\n${error.response?.data?.details || error.message}`)
+  }
+}
+
+window.saveFieldEdit = saveFieldEdit
+
+// ヒントの追加
+function addHint(courseIndex, cardIndex) {
+  const editorDiv = document.getElementById(`hints-editor-${courseIndex}-${cardIndex}`)
+  if (!editorDiv) return
+  
+  const currentHints = editorDiv.querySelectorAll('textarea')
+  const newIndex = currentHints.length
+  
+  const newHintHtml = `
+    <div class="bg-purple-50 p-3 rounded-lg" id="hint-container-${courseIndex}-${cardIndex}-${newIndex}">
+      <div class="flex items-center justify-between mb-2">
+        <p class="font-bold text-purple-700 text-sm">ヒント ${newIndex + 1}</p>
+        <button onclick="removeHint(${courseIndex}, ${cardIndex}, ${newIndex})"
+                class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs font-bold transition">
+          <i class="fas fa-trash mr-1"></i>削除
+        </button>
+      </div>
+      <textarea 
+        id="input-hint-${courseIndex}-${cardIndex}-${newIndex}"
+        class="w-full p-2 border-2 border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none text-sm"
+        rows="3"
+        style="line-height: 1.6;"
+        placeholder="新しいヒントを入力..."
+      ></textarea>
+    </div>
+  `
+  
+  editorDiv.insertAdjacentHTML('beforeend', newHintHtml)
+  console.log(`✅ ヒント ${newIndex + 1} を追加`)
+}
+
+window.addHint = addHint
+
+// ヒントの削除
+function removeHint(courseIndex, cardIndex, hintIndex) {
+  const container = document.getElementById(`hint-container-${courseIndex}-${cardIndex}-${hintIndex}`)
+  if (container && confirm('このヒントを削除しますか？')) {
+    container.remove()
+    console.log(`🗑️ ヒント ${hintIndex + 1} を削除`)
+  }
+}
+
+window.removeHint = removeHint
+
+// ヒント編集の保存
+async function saveHintsEdit(courseIndex, cardIndex, cardId) {
+  try {
+    const editorDiv = document.getElementById(`hints-editor-${courseIndex}-${cardIndex}`)
+    if (!editorDiv) return
+    
+    // 全てのヒントを収集
+    const hintTextareas = editorDiv.querySelectorAll('textarea')
+    const hints = []
+    
+    hintTextareas.forEach((textarea, index) => {
+      const text = textarea.value.trim()
+      if (text) {
+        hints.push({
+          hint_number: index + 1,
+          hint_text: text
+        })
+      }
+    })
+    
+    console.log(`💾 ヒント保存: ${hints.length}段階`)
+    
+    // APIで更新
+    const response = await axios.put(`/api/card/${cardId}`, {
+      hints: hints
+    })
+    
+    console.log('✅ 保存成功:', response.data)
+    
+    if (response.data.success) {
+      // window.currentUnitDataも更新
+      if (window.currentUnitData && window.currentUnitData.courses[courseIndex]) {
+        const card = window.currentUnitData.courses[courseIndex].cards[cardIndex]
+        if (card) {
+          card.hints = hints
+        }
+      }
+      
+      // 表示を更新
+      const displayDiv = document.getElementById(`display-hints-${courseIndex}-${cardIndex}`)
+      if (displayDiv) {
+        displayDiv.innerHTML = hints.map((hint, index) => `
+          <div class="bg-purple-50 p-3 rounded-lg">
+            <p class="font-bold text-purple-700 text-sm mb-1">ヒント ${index + 1}</p>
+            <p class="text-gray-700 text-sm whitespace-pre-wrap" style="line-height: 1.6;">${hint.hint_text}</p>
+          </div>
+        `).join('')
+      }
+      
+      // 編集モードを閉じる
+      cancelEditMode(courseIndex, cardIndex, 'hints')
+      
+      alert('✅ ヒントを保存しました！')
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ ヒント保存エラー:', error)
+    alert(`❌ 保存に失敗しました\n\n${error.response?.data?.details || error.message}`)
+  }
+}
+
+window.saveHintsEdit = saveHintsEdit
 window.editCardContent = editCardContent
 window.closeCardEditModal = closeCardEditModal
 window.saveCardEdit = saveCardEdit
