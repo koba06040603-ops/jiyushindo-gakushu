@@ -3678,8 +3678,11 @@ function addAIMessage(message, sender, loadingId = null) {
 
 // 音声合成（テキスト読み上げ）
 async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
+  console.log('🎤 speakText 呼び出し:', { text: text.substring(0, 50) + '...', voiceType, speed })
+  
   try {
     // まず Google Cloud TTS を試行
+    console.log('📡 Google Cloud TTS API を呼び出します...')
     const response = await axios.post('/api/ai/tts', {
       text,
       voiceType,
@@ -3687,9 +3690,15 @@ async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
       pitch: 0  // デフォルトのピッチ
     })
     
+    console.log('📦 TTS API レスポンス:', { 
+      success: response.data.success, 
+      hasAudioContent: !!response.data.audioContent,
+      fallback: response.data.fallbackToWebSpeech 
+    })
+    
     if (response.data.success && response.data.audioContent) {
       // Google Cloud TTS で音声を再生
-      console.log('✅ Google Cloud TTS を使用')
+      console.log('✅ Google Cloud TTS を使用して音声を再生します')
       const audio = new Audio('data:audio/mp3;base64,' + response.data.audioContent)
       
       // 音声アイコンを表示
@@ -3699,6 +3708,7 @@ async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
       }
       
       audio.onended = () => {
+        console.log('🔇 Google Cloud TTS 再生終了')
         if (voiceButton) {
           voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
         }
@@ -3706,17 +3716,22 @@ async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
       
       await audio.play()
       return
+    } else {
+      console.log('⚠️ Google Cloud TTS が利用できません → Web Speech API へフォールバック')
     }
   } catch (error) {
-    console.warn('⚠️ Google Cloud TTS 失敗 → Web Speech API へフォールバック:', error.message)
+    console.warn('⚠️ Google Cloud TTS エラー → Web Speech API へフォールバック:', error.message, error)
   }
   
   // Google Cloud TTS が失敗した場合、Web Speech API を使用（最適化版）
+  console.log('🔊 Web Speech API を使用します')
   speakTextWithWebSpeech(text, speed, voiceType)
 }
 
 // Web Speech API を使用した音声読み上げ（最適化版）
 function speakTextWithWebSpeech(text, speed = 0.95, voiceType = 'female-friendly') {
+  console.log('🎙️ Web Speech API 開始:', { voiceType, speed })
+  
   // 音声合成がサポートされているか確認
   if (!('speechSynthesis' in window)) {
     console.warn('音声合成はこのブラウザではサポートされていません')
@@ -3737,6 +3752,7 @@ function speakTextWithWebSpeech(text, speed = 0.95, voiceType = 'female-friendly
     case 'female-friendly':
       utterance.pitch = 1.3  // より高め（明るい女性の声）
       utterance.rate = 0.95  // ややゆっくり
+      console.log('🎀 女性の優しい声を設定: pitch 1.3')
       break
     case 'male-friendly':
       utterance.pitch = 0.85 // やや低め
