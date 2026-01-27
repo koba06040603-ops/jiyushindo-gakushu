@@ -12464,7 +12464,7 @@ function showTeacherOverview(unitData) {
                           <i class="fas fa-question-circle mr-1"></i>
                           問題・課題
                         </p>
-                        <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'problem_description')" 
+                        <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'problem')" 
                                 id="edit-btn-problem-${courseIndex}-${cardIndex}"
                                 class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs font-bold transition">
                           <i class="fas fa-edit mr-1"></i>編集
@@ -12485,7 +12485,7 @@ function showTeacherOverview(unitData) {
                                   class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
                             <i class="fas fa-save mr-1"></i>保存
                           </button>
-                          <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'problem_description')"
+                          <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'problem')"
                                   class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
                             <i class="fas fa-times mr-1"></i>キャンセル
                           </button>
@@ -12770,16 +12770,66 @@ function showTeacherOverview(unitData) {
                   カード ${card.card_number}: ${card.card_title}
                 </p>
                 <div class="bg-white p-3 rounded-lg mb-2">
-                  <p class="text-sm font-bold text-green-800 mb-2">
-                    <i class="fas fa-check-circle mr-1"></i>解答
-                  </p>
-                  <div class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer || card.example_solution || '解答は例題の解き方を参照してください').replace(/\n/g, '<br>')}</div>
+                  <div class="flex justify-between items-center mb-2">
+                    <p class="text-sm font-bold text-green-800">
+                      <i class="fas fa-check-circle mr-1"></i>解答
+                    </p>
+                    <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'answer')" 
+                            id="edit-btn-answer-${courseIndex}-${cardIndex}"
+                            class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                      <i class="fas fa-edit mr-1"></i>編集
+                    </button>
+                  </div>
+                  <div id="display-answer-${courseIndex}-${cardIndex}" class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer || card.example_solution || '解答は例題の解き方を参照してください').replace(/\n/g, '<br>')}</div>
+                  <div id="edit-answer-${courseIndex}-${cardIndex}" class="hidden">
+                    <textarea 
+                      id="input-answer-${courseIndex}-${cardIndex}"
+                      class="w-full p-3 border-2 border-green-300 rounded-lg focus:border-green-500 focus:outline-none"
+                      rows="4"
+                      style="line-height: 1.8;"
+                    >${card.answer || card.example_solution || ''}</textarea>
+                    <div class="flex gap-2 mt-2">
+                      <button onclick="saveFieldEdit(${courseIndex}, ${cardIndex}, 'answer', ${card.id})"
+                              class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                        <i class="fas fa-save mr-1"></i>保存
+                      </button>
+                      <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'answer')"
+                              class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                        <i class="fas fa-times mr-1"></i>キャンセル
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <div class="bg-blue-50 p-3 rounded-lg">
-                  <p class="text-sm font-bold text-blue-800 mb-2">
-                    <i class="fas fa-info-circle mr-1"></i>解説
-                  </p>
-                  <div class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer_explanation || card.real_world_connection || '解説は準備中です').replace(/\n/g, '<br>')}</div>
+                  <div class="flex justify-between items-center mb-2">
+                    <p class="text-sm font-bold text-blue-800">
+                      <i class="fas fa-info-circle mr-1"></i>解説
+                    </p>
+                    <button onclick="toggleEditMode(${courseIndex}, ${cardIndex}, 'explanation')" 
+                            id="edit-btn-explanation-${courseIndex}-${cardIndex}"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                      <i class="fas fa-edit mr-1"></i>編集
+                    </button>
+                  </div>
+                  <div id="display-explanation-${courseIndex}-${cardIndex}" class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer_explanation || card.real_world_connection || '解説は準備中です').replace(/\n/g, '<br>')}</div>
+                  <div id="edit-explanation-${courseIndex}-${cardIndex}" class="hidden">
+                    <textarea 
+                      id="input-explanation-${courseIndex}-${cardIndex}"
+                      class="w-full p-3 border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                      rows="4"
+                      style="line-height: 1.8;"
+                    >${card.answer_explanation || card.real_world_connection || ''}</textarea>
+                    <div class="flex gap-2 mt-2">
+                      <button onclick="saveFieldEdit(${courseIndex}, ${cardIndex}, 'answer_explanation', ${card.id})"
+                              class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                        <i class="fas fa-save mr-1"></i>保存
+                      </button>
+                      <button onclick="cancelEditMode(${courseIndex}, ${cardIndex}, 'explanation')"
+                              class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                        <i class="fas fa-times mr-1"></i>キャンセル
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             `).join('')}
