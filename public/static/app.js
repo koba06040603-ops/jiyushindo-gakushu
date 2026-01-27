@@ -3677,7 +3677,74 @@ function addAIMessage(message, sender, loadingId = null) {
 }
 
 // 音声合成（テキスト読み上げ）
-function speakText(text) {
+async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
+  // Google Cloud TTS APIを使用（優先）
+  try {
+    console.log('🔊 Google Cloud TTS API を使用します')
+    console.log('📝 テキスト:', text.substring(0, 50), '...')
+    console.log('🎭 音声タイプ:', voiceType)
+    console.log('⚡ 速度:', speed)
+    
+    const response = await axios.post('/api/ai/tts', {
+      text: text,
+      voiceType: voiceType,
+      speed: speed,
+      pitch: 0.0
+    })
+    
+    if (response.data.success && response.data.audioContent) {
+      console.log('✅ Google Cloud TTS 音声データ取得成功')
+      
+      // Base64音声データをBlobに変換
+      const audioData = atob(response.data.audioContent)
+      const arrayBuffer = new ArrayBuffer(audioData.length)
+      const uint8Array = new Uint8Array(arrayBuffer)
+      for (let i = 0; i < audioData.length; i++) {
+        uint8Array[i] = audioData.charCodeAt(i)
+      }
+      const blob = new Blob([arrayBuffer], { type: 'audio/mp3' })
+      const audioUrl = URL.createObjectURL(blob)
+      
+      // Audio要素で再生
+      const audio = new Audio(audioUrl)
+      
+      // 音声アイコンを表示
+      const voiceButton = document.getElementById('voiceButton')
+      if (voiceButton) {
+        voiceButton.innerHTML = '<i class="fas fa-volume-up"></i>'
+      }
+      
+      audio.onended = () => {
+        if (voiceButton) {
+          voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
+        }
+        URL.revokeObjectURL(audioUrl)  // メモリ解放
+      }
+      
+      audio.onerror = () => {
+        console.error('❌ 音声再生エラー')
+        if (voiceButton) {
+          voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
+        }
+        // フォールバック: Web Speech API
+        speakTextWithWebSpeech(text, speed)
+      }
+      
+      audio.play()
+      console.log('✅ Google Cloud TTS 音声再生開始')
+      return
+    }
+  } catch (error) {
+    console.error('❌ Google Cloud TTS エラー:', error)
+    console.log('⚠️ Web Speech API にフォールバックします')
+  }
+  
+  // フォールバック: Web Speech API
+  speakTextWithWebSpeech(text, speed)
+}
+
+// Web Speech API を使用した音声読み上げ（フォールバック）
+function speakTextWithWebSpeech(text, speed = 0.95) {
   // 音声合成がサポートされているか確認
   if (!('speechSynthesis' in window)) {
     console.warn('音声合成はこのブラウザではサポートされていません')
@@ -3689,7 +3756,7 @@ function speakText(text) {
   
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'ja-JP'
-  utterance.rate = 0.95  // 少しゆっくり（自然な速度）
+  utterance.rate = speed  // 速度
   utterance.pitch = 1.0
   utterance.volume = 1.0
   
@@ -3727,6 +3794,7 @@ function speakText(text) {
   }
   
   speechSynthesis.speak(utterance)
+  console.log('✅ Web Speech API 音声再生開始（フォールバック）')
 }
 
 // 音声認識の初期化
@@ -4094,9 +4162,18 @@ function clearAnswerHandwriting() {
 }
 
 // 手書きを送信
-function sendHandwriting() {
+async function sendHandwriting() {
   const canvas = document.getElementById('handwritingCanvas')
-  if (!canvas) return
+  if (!canvas) {
+    alert('手書きキャンバスが見つかりません')
+    return
+  }
+  
+  // 手書きストロークがない場合
+  if (!handwritingStrokes || handwritingStrokes.length === 0) {
+    alert('まだ何も書かれていません')
+    return
+  }
   
   // Canvasを画像として取得
   const imageData = canvas.toDataURL('image/png')
@@ -4104,7 +4181,6 @@ function sendHandwriting() {
   // 思考過程の分析（簡易版）
   const strokeCount = handwritingStrokes.length
   const totalPoints = handwritingStrokes.reduce((sum, stroke) => sum + stroke.points.length, 0)
-  const avgPointsPerStroke = totalPoints / strokeCount
   
   let thinkingNote = ''
   if (strokeCount > 10) {
@@ -4115,18 +4191,74 @@ function sendHandwriting() {
     thinkingNote = '（手書きで考えたね）'
   }
   
-  // AI先生に送信
-  const input = document.getElementById('aiQuestionInput')
-  if (input) {
-    const originalText = input.value.trim()
-    input.value = `[手書きメモ${thinkingNote}を送信]\n${originalText || '手書きの内容について教えてください'}`
-  }
-  
   // 画像を表示
-  addAIMessage(`[手書きメモ${thinkingNote}]\n\n📝 ${strokeCount}回のストローク、${totalPoints}個の点`, 'user')
+  addAIMessage(`[手書きメモ${thinkingNote}を認識中...]\n\n📝 ${strokeCount}回のストローク、${totalPoints}個の点`, 'user')
   
-  // 実際に質問を送信
-  askAI()
+  try {
+    // OCR認識を実行
+    console.log('🔍 手書きOCR認識開始...')
+    console.log('📊 画像データサイズ:', imageData.length, 'bytes')
+    
+    // Google Cloud Vision OCR（優先）
+    const response = await axios.post('/api/ai/ocr', {
+      imageData: imageData,
+      language: 'ja'
+    })
+    
+    console.log('✅ OCR認識レスポンス:', response.data)
+    
+    if (response.data.success && response.data.text) {
+      const recognizedText = response.data.text.trim()
+      console.log('✅ 認識されたテキスト:', recognizedText)
+      console.log('📊 認識方法:', response.data.method)
+      
+      // AI先生に送信
+      const input = document.getElementById('aiQuestionInput')
+      if (input) {
+        const originalText = input.value.trim()
+        // 認識されたテキストを質問に追加
+        if (originalText) {
+          input.value = `${recognizedText}\n（補足: ${originalText}）`
+        } else {
+          input.value = recognizedText
+        }
+      }
+      
+      // 認識結果を表示
+      addAIMessage(`✅ 認識しました！\n📝 「${recognizedText}」\n\n認識方法: ${response.data.method}`, 'system')
+      
+      // 実際に質問を送信
+      askAI()
+    } else {
+      console.error('⚠️ OCR認識失敗:', response.data)
+      
+      // フォールバック: 手書きの説明だけで送信
+      const input = document.getElementById('aiQuestionInput')
+      if (input) {
+        const originalText = input.value.trim()
+        input.value = `[手書きメモ${thinkingNote}を送信（文字認識できませんでした）]\n${originalText || 'この手書きの内容について教えてください'}`
+      }
+      
+      addAIMessage('⚠️ 文字認識に失敗しました。もう一度はっきり書いてみてください。', 'system')
+      
+      // それでも質問を送信
+      askAI()
+    }
+  } catch (error) {
+    console.error('❌ OCR認識エラー:', error)
+    
+    // エラー時のフォールバック
+    const input = document.getElementById('aiQuestionInput')
+    if (input) {
+      const originalText = input.value.trim()
+      input.value = `[手書きメモ${thinkingNote}を送信（文字認識エラー）]\n${originalText || 'この手書きの内容について教えてください'}`
+    }
+    
+    addAIMessage('❌ 文字認識でエラーが発生しました。もう一度試してみてください。', 'system')
+    
+    // それでも質問を送信
+    askAI()
+  }
   
   // 手書きエリアを閉じる
   closeHandwriting()

@@ -5059,7 +5059,131 @@ app.post('/api/ai/ocr', async (c) => {
   }
 })
 
-// APIルート：AI単元生成
+// APIルート：Google Cloud Text-to-Speech（音声合成）
+app.post('/api/ai/tts', async (c) => {
+  const { env } = c
+  const { text, voiceType = 'standard', speed = 1.0, pitch = 0.0 } = await c.req.json()
+  
+  if (!text) {
+    return c.json({
+      success: false,
+      error: 'テキストが指定されていません'
+    }, 400)
+  }
+  
+  try {
+    // Gemini APIキーを使用（Google Cloud APIキーと共通）
+    const apiKey = env.GOOGLE_CLOUD_API_KEY || env.GEMINI_API_KEY
+    
+    if (!apiKey) {
+      console.error('❌ Google Cloud APIキーが設定されていません')
+      return c.json({
+        success: false,
+        error: 'APIキーが設定されていません',
+        fallback: true  // フロントエンドでWeb Speech APIにフォールバック
+      }, 500)
+    }
+    
+    console.log('🔊 Google Cloud TTS API 呼び出し開始')
+    console.log('📝 テキスト長:', text.length, '文字')
+    
+    // 音声タイプの選択
+    let voiceName = 'ja-JP-Neural2-B'  // デフォルト: 自然な女性音声
+    let ssmlGender = 'FEMALE'
+    
+    switch(voiceType) {
+      case 'female-friendly':
+        voiceName = 'ja-JP-Neural2-B'  // 優しい女性音声
+        ssmlGender = 'FEMALE'
+        break
+      case 'male-friendly':
+        voiceName = 'ja-JP-Neural2-C'  // 優しい男性音声
+        ssmlGender = 'MALE'
+        break
+      case 'female-energetic':
+        voiceName = 'ja-JP-Neural2-A'  // 元気な女性音声
+        ssmlGender = 'FEMALE'
+        break
+      case 'male-energetic':
+        voiceName = 'ja-JP-Neural2-D'  // 元気な男性音声
+        ssmlGender = 'MALE'
+        break
+      default:
+        voiceName = 'ja-JP-Neural2-B'
+        ssmlGender = 'FEMALE'
+    }
+    
+    const requestBody = {
+      input: {
+        text: text
+      },
+      voice: {
+        languageCode: 'ja-JP',
+        name: voiceName,
+        ssmlGender: ssmlGender
+      },
+      audioConfig: {
+        audioEncoding: 'MP3',
+        speakingRate: speed,  // 0.25 ~ 4.0（デフォルト 1.0）
+        pitch: pitch,         // -20.0 ~ 20.0（デフォルト 0.0）
+        volumeGainDb: 0.0,
+        effectsProfileId: ['small-bluetooth-speaker-class-device']
+      }
+    }
+    
+    const response = await fetch(
+      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Google Cloud TTS API エラー:', response.status, errorText)
+      throw new Error(`TTS API エラー: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    console.log('✅ Google Cloud TTS API レスポンス受信')
+    
+    // Base64エンコードされた音声データ
+    const audioContent = data.audioContent
+    
+    if (!audioContent) {
+      console.error('❌ 音声データが空です')
+      return c.json({
+        success: false,
+        error: '音声データの生成に失敗しました',
+        fallback: true
+      }, 500)
+    }
+    
+    console.log('✅ 音声データ生成成功（Base64サイズ:', audioContent.length, 'bytes）')
+    
+    // 音声データをそのまま返す（Base64形式）
+    return c.json({
+      success: true,
+      audioContent: audioContent,  // Base64エンコードされたMP3データ
+      voiceType: voiceType,
+      method: 'google-cloud-tts'
+    })
+    
+  } catch (error: any) {
+    console.error('❌ TTSエラー:', error)
+    return c.json({
+      success: false,
+      error: error.message,
+      fallback: true  // フロントエンドでWeb Speech APIにフォールバック
+    }, 500)
+  }
+})
+
+// APIルート:AI単元生成
 app.post('/api/ai/generate-unit', async (c) => {
   const { env } = c
   const { grade, subject, textbook, unitName, customization, qualityMode } = await c.req.json()
