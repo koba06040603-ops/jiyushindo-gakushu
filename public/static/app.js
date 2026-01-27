@@ -3919,6 +3919,9 @@ function initHandwritingCanvas() {
     lastX = (clientX - rect.left) * scaleX
     lastY = (clientY - rect.top) * scaleY
     
+    // カーソルをcrosshairに強制設定
+    canvas.style.cursor = 'crosshair'
+    
     // 新しいストロークを開始
     handwritingStrokes.push({
       points: [{x: lastX, y: lastY, time: Date.now()}],
@@ -3945,6 +3948,9 @@ function initHandwritingCanvas() {
     const x = (clientX - rect.left) * scaleX
     const y = (clientY - rect.top) * scaleY
     
+    // カーソルをcrosshairに強制設定
+    canvas.style.cursor = 'crosshair'
+    
     ctx.beginPath()
     ctx.moveTo(lastX, lastY)
     ctx.lineTo(x, y)
@@ -3962,6 +3968,8 @@ function initHandwritingCanvas() {
   
   function stopDrawing() {
     isDrawing = false
+    // カーソルをcrosshairに強制設定
+    canvas.style.cursor = 'crosshair'
   }
 }
 
@@ -4251,6 +4259,9 @@ function answerStartDrawing(e) {
   answerLastX = (clientX - rect.left) * scaleX
   answerLastY = (clientY - rect.top) * scaleY
   
+  // カーソルをcrosshairに強制設定
+  canvas.style.cursor = 'crosshair'
+  
   answerStrokes.push({
     points: [{x: answerLastX, y: answerLastY, time: Date.now()}],
     color: '#000000',
@@ -4279,6 +4290,9 @@ function answerDraw(e) {
   const x = (clientX - rect.left) * scaleX
   const y = (clientY - rect.top) * scaleY
   
+  // カーソルをcrosshairに強制設定
+  canvas.style.cursor = 'crosshair'
+  
   const ctx = canvas.getContext('2d')
   ctx.beginPath()
   ctx.moveTo(answerLastX, answerLastY)
@@ -4296,6 +4310,11 @@ function answerDraw(e) {
 
 function answerStopDrawing() {
   answerDrawing = false
+  // カーソルをcrosshairに強制設定
+  const canvas = document.getElementById('answerCanvas')
+  if (canvas) {
+    canvas.style.cursor = 'crosshair'
+  }
 }
 
 // 回答手書きをクリア
@@ -4337,8 +4356,7 @@ async function recognizeAnswerHandwriting() {
       const imageData = canvas.toDataURL('image/png')
       console.log('✅ Tesseract OCR 開始...')
       console.log('画像データサイズ:', imageData.length)
-      
-      alert('🔍 OCR認識中です...\n\n日本語テキストを認識しています。\n完了まで数秒かかります。')
+      console.log('🔍 OCR認識中です... 日本語テキストを認識しています。完了まで数秒かかります。')
       
       try {
         // Tesseract.jsの明示的な初期化とWorker設定
@@ -12544,7 +12562,7 @@ function showTeacherOverview(unitData) {
           
           <!-- チェックテスト追加ボタン -->
           <div class="mt-4">
-            <button onclick="addCheckTestProblem()"
+            <button onclick="addCheckTestProblem(${curriculum.id})"
                     class="w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold transition">
               <i class="fas fa-plus mr-2"></i>
               チェックテスト問題を追加
@@ -12554,7 +12572,7 @@ function showTeacherOverview(unitData) {
           <div class="bg-gray-50 p-4 rounded-lg text-center">
             <i class="fas fa-times-circle text-6xl text-gray-300 mb-4"></i>
             <p class="text-gray-600 mb-4">チェックテストが生成されていません</p>
-            <button onclick="addCheckTestProblem()"
+            <button onclick="addCheckTestProblem(${curriculum.id})"
                     class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold transition">
               <i class="fas fa-plus mr-2"></i>
               最初のチェックテスト問題を追加
@@ -13410,15 +13428,22 @@ async function deleteCheckTestProblem(problemIndex) {
 }
 
 // チェックテスト問題追加機能
-function addCheckTestProblem() {
-  const curriculumId = window.currentUnitData?.curriculum_id
+function addCheckTestProblem(curriculumId) {
+  // 引数からカリキュラムIDを取得（フォールバックとしてwindow.currentUnitDataも確認）
+  if (!curriculumId) {
+    curriculumId = window.currentUnitData?.curriculum_id
+  }
+  
   const checkTest = window.currentUnitData?.common_check_test
   const nextProblemNumber = (checkTest?.sample_problems?.length || 0) + 1
   
   if (!curriculumId) {
-    alert('カリキュラムIDが見つかりません')
+    alert('カリキュラムIDが見つかりません。\n\nページを再読み込みしてください。')
+    console.error('❌ カリキュラムIDが見つかりません:', { curriculumId, currentUnitData: window.currentUnitData })
     return
   }
+  
+  console.log('✅ チェックテスト追加モーダルを表示:', { curriculumId, nextProblemNumber })
   
   const modalHTML = `
     <div id="addCheckTestModal" 
@@ -15894,6 +15919,8 @@ async function deleteOptionalProblem(problemId) {
 }
 
 // 選択問題追加
+/*
+// 削除済み: 重複していた古いaddOptionalProblem関数（13610行目の新バージョンを使用）
 async function addOptionalProblem(curriculumId) {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
@@ -15977,6 +16004,9 @@ async function addOptionalProblem(curriculumId) {
   
   document.body.appendChild(modal)
 }
+*/
+
+// 削除済み: 重複していた古いaddOptionalProblem関数（13610行目の新バージョンを使用）
 
 // ============================================
 // 認証機能
