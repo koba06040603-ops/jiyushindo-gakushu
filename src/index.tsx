@@ -5653,13 +5653,13 @@ app.post('/api/curriculum/save-generated', async (c) => {
       `).bind(
         curriculumId,
         courseLevel,
-        course.course_name || course.course_label || 'コース',
-        course.course_name || 'コース選択問題',
+        course.course_name || course.course_label || course.name || 'コース',
+        course.course_name || course.name || 'コース選択問題',
         course.description || '',
-        course.course_name,
-        course.description,
-        course.color_code,
-        course.course_label || ''
+        course.course_name || course.name || 'コース',
+        course.description || '',
+        course.color_code || 'blue',
+        course.course_label || course.label || ''
       ).run()
       
       const courseId = courseResult.meta.last_row_id
@@ -5677,11 +5677,11 @@ app.post('/api/curriculum/save-generated', async (c) => {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           courseId,
-          card.card_number,
-          card.card_title,
+          card.card_number || 1,
+          card.card_title || card.title || 'カード',
           cardType,
-          card.problem_description || card.problem_content || '',
-          card.problem_description || card.problem_content || '',
+          card.problem_description || card.problem_content || card.content || '',
+          card.problem_description || card.problem_content || card.content || '',
           card.new_terms || '',
           card.example_problem || '',
           card.example_solution || '',
@@ -5743,9 +5743,9 @@ app.post('/api/curriculum/save-generated', async (c) => {
       `).bind(
         curriculumId,
         problem.problem_number || 1,
-        problem.problem_title,
-        problem.problem_description || '',
-        problem.problem_content || problem.problem_description || '問題内容',
+        problem.problem_title || problem.title || '選択問題',
+        problem.problem_description || problem.description || '',
+        problem.problem_content || problem.problem_description || problem.content || '問題内容',
         problem.difficulty_level || 'medium',
         problem.learning_meaning || ''
       ).run()
