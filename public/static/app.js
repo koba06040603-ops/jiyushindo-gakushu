@@ -3678,7 +3678,40 @@ function addAIMessage(message, sender, loadingId = null) {
 
 // 音声合成（テキスト読み上げ）
 async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
-  // Web Speech API を使用（最適化版）
+  try {
+    // まず Google Cloud TTS を試行
+    const response = await axios.post('/api/ai/tts', {
+      text,
+      voiceType,
+      speed,
+      pitch: 0  // デフォルトのピッチ
+    })
+    
+    if (response.data.success && response.data.audioContent) {
+      // Google Cloud TTS で音声を再生
+      console.log('✅ Google Cloud TTS を使用')
+      const audio = new Audio('data:audio/mp3;base64,' + response.data.audioContent)
+      
+      // 音声アイコンを表示
+      const voiceButton = document.getElementById('voiceButton')
+      if (voiceButton) {
+        voiceButton.innerHTML = '<i class="fas fa-volume-up"></i>'
+      }
+      
+      audio.onended = () => {
+        if (voiceButton) {
+          voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
+        }
+      }
+      
+      await audio.play()
+      return
+    }
+  } catch (error) {
+    console.warn('⚠️ Google Cloud TTS 失敗 → Web Speech API へフォールバック:', error.message)
+  }
+  
+  // Google Cloud TTS が失敗した場合、Web Speech API を使用（最適化版）
   speakTextWithWebSpeech(text, speed, voiceType)
 }
 
@@ -3702,19 +3735,19 @@ function speakTextWithWebSpeech(text, speed = 0.95, voiceType = 'female-friendly
   // 音声タイプに応じてピッチと速度を調整
   switch(voiceType) {
     case 'female-friendly':
-      utterance.pitch = 1.1  // やや高め
-      utterance.rate = 0.9   // ゆっくり
+      utterance.pitch = 1.3  // より高め（明るい女性の声）
+      utterance.rate = 0.95  // ややゆっくり
       break
     case 'male-friendly':
-      utterance.pitch = 0.9  // やや低め
+      utterance.pitch = 0.85 // やや低め
       utterance.rate = 0.9   // ゆっくり
       break
     case 'female-energetic':
-      utterance.pitch = 1.2  // 高め
-      utterance.rate = 1.0   // 標準
+      utterance.pitch = 1.4  // 高め（元気な女性の声）
+      utterance.rate = 1.05  // やや速め
       break
     case 'male-energetic':
-      utterance.pitch = 0.85 // 低め
+      utterance.pitch = 0.8  // 低め
       utterance.rate = 1.0   // 標準
       break
     default:

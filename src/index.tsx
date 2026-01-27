@@ -5059,11 +5059,107 @@ app.post('/api/ai/ocr', async (c) => {
   }
 })
 
-/*
 // APIルート：Google Cloud Text-to-Speech（音声合成）
-// 注: Google Cloud APIキーが必要なため、現在は使用していません
-// Web Speech APIを最適化版で使用しています
-*/
+app.post('/api/ai/tts', async (c) => {
+  const { env } = c
+  const { text, voiceType = 'female-friendly', speed = 1.0, pitch = 0 } = await c.req.json()
+  
+  const apiKey = env.GOOGLE_CLOUD_API_KEY
+  
+  // APIキーがない場合は、Web Speech API へフォールバックすることをクライアントに通知
+  if (!apiKey || apiKey === 'your-google-cloud-api-key-here') {
+    console.log('⚠️ Google Cloud APIキーが未設定 → Web Speech API を使用')
+    return c.json({
+      success: false,
+      fallbackToWebSpeech: true,
+      error: 'Google Cloud API キーが設定されていません'
+    })
+  }
+  
+  try {
+    console.log('🎤 Google Cloud TTS API 呼び出し:', {
+      textLength: text.length,
+      voiceType,
+      speed,
+      pitch
+    })
+    
+    // 音声タイプに応じた設定
+    let voiceConfig: any = {
+      languageCode: 'ja-JP',
+      ssmlGender: 'FEMALE'
+    }
+    
+    // 音声名の選択
+    switch(voiceType) {
+      case 'female-friendly':
+        voiceConfig.name = 'ja-JP-Neural2-B'  // 優しい女性の声
+        break
+      case 'male-friendly':
+        voiceConfig.name = 'ja-JP-Neural2-C'  // 優しい男性の声
+        voiceConfig.ssmlGender = 'MALE'
+        break
+      case 'female-energetic':
+        voiceConfig.name = 'ja-JP-Neural2-A'  // 元気な女性の声
+        break
+      case 'male-energetic':
+        voiceConfig.name = 'ja-JP-Neural2-D'  // 元気な男性の声
+        voiceConfig.ssmlGender = 'MALE'
+        break
+      default:
+        voiceConfig.name = 'ja-JP-Neural2-B'
+    }
+    
+    // Google Cloud TTS API リクエスト
+    const requestBody = {
+      input: { text },
+      voice: voiceConfig,
+      audioConfig: {
+        audioEncoding: 'MP3',
+        speakingRate: Math.max(0.25, Math.min(4.0, speed)),  // 0.25-4.0 の範囲
+        pitch: Math.max(-20, Math.min(20, pitch))  // -20 ~ 20 の範囲
+      }
+    }
+    
+    const response = await fetch(
+      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }
+    )
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ Google Cloud TTS API エラー:', response.status, errorText)
+      throw new Error(`Google Cloud TTS API エラー: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    
+    if (data.audioContent) {
+      console.log('✅ Google Cloud TTS 音声生成成功')
+      return c.json({
+        success: true,
+        audioContent: data.audioContent,  // base64 encoded MP3
+        method: 'google-cloud-tts'
+      })
+    } else {
+      throw new Error('音声データが生成されませんでした')
+    }
+    
+  } catch (error: any) {
+    console.error('❌ TTSエラー:', error)
+    return c.json({
+      success: false,
+      fallbackToWebSpeech: true,
+      error: error.message
+    }, 500)
+  }
+})
 
 // APIルート：段階的コース生成（1コース=6枚のカードを生成）
 app.post('/api/ai/generate-course', async (c) => {
