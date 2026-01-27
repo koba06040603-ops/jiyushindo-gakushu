@@ -12445,31 +12445,108 @@ function showTeacherOverview(unitData) {
                   </div>
                 </div>
                 
-                <!-- カード内容プレビュー -->
-                <div class="bg-gray-50 p-4 rounded-lg space-y-3 text-sm">
-                  <div>
-                    <p class="font-bold text-gray-700 mb-1">📝 問題・課題</p>
-                    <p class="text-gray-600">${card.problem_description?.substring(0, 100) || '(なし)'}${card.problem_description?.length > 100 ? '...' : ''}</p>
-                  </div>
+                <!-- カード内容詳細（展開可能） -->
+                <div class="bg-gray-50 rounded-lg overflow-hidden">
+                  <button onclick="toggleCardDetails(${courseIndex}, ${cardIndex})" 
+                          class="w-full bg-${course.color_code}-100 hover:bg-${course.color_code}-200 p-3 flex items-center justify-between transition">
+                    <span class="font-bold text-${course.color_code}-800">
+                      <i class="fas fa-eye mr-2"></i>
+                      カード詳細を表示
+                    </span>
+                    <i class="fas fa-chevron-down text-${course.color_code}-800" id="card-icon-${courseIndex}-${cardIndex}"></i>
+                  </button>
                   
-                  <div>
-                    <p class="font-bold text-gray-700 mb-1">📚 新出用語</p>
-                    <p class="text-gray-600">${card.new_terms || '(なし)'}</p>
-                  </div>
-                  
-                  <div>
-                    <p class="font-bold text-gray-700 mb-1">💡 例題</p>
-                    <p class="text-gray-600">${card.example_problem?.substring(0, 80) || '(なし)'}${card.example_problem?.length > 80 ? '...' : ''}</p>
-                  </div>
-                  
-                  <div>
-                    <p class="font-bold text-gray-700 mb-1">🌍 実社会とのつながり</p>
-                    <p class="text-gray-600">${card.real_world_connection?.substring(0, 80) || '(なし)'}${card.real_world_connection?.length > 80 ? '...' : ''}</p>
-                  </div>
-                  
-                  <div>
-                    <p class="font-bold text-gray-700 mb-1">💡 ヒント</p>
-                    <p class="text-gray-600">${card.hints?.length || 0}段階のヒントを用意</p>
+                  <div id="card-details-${courseIndex}-${cardIndex}" class="hidden p-4 space-y-4">
+                    <!-- 問題・課題 -->
+                    <div class="bg-white p-4 rounded-lg border-l-4 border-orange-500">
+                      <p class="font-bold text-orange-800 mb-2">
+                        <i class="fas fa-question-circle mr-1"></i>
+                        問題・課題
+                      </p>
+                      <div class="text-gray-700 whitespace-pre-wrap" style="line-height: 1.8;">
+                        ${card.problem_description || '(なし)'}
+                      </div>
+                    </div>
+                    
+                    <!-- 新出用語 -->
+                    ${card.new_terms ? `
+                      <div class="bg-white p-4 rounded-lg border-l-4 border-blue-500">
+                        <p class="font-bold text-blue-800 mb-2">
+                          <i class="fas fa-book mr-1"></i>
+                          新出用語
+                        </p>
+                        <p class="text-gray-700">${card.new_terms}</p>
+                      </div>
+                    ` : ''}
+                    
+                    <!-- 例題 -->
+                    ${card.example_problem ? `
+                      <div class="bg-white p-4 rounded-lg border-l-4 border-green-500">
+                        <p class="font-bold text-green-800 mb-2">
+                          <i class="fas fa-lightbulb mr-1"></i>
+                          例題
+                        </p>
+                        <div class="text-gray-700 whitespace-pre-wrap mb-3" style="line-height: 1.8;">
+                          ${card.example_problem}
+                        </div>
+                        ${card.example_solution ? `
+                          <div class="bg-green-50 p-3 rounded-lg mt-2">
+                            <p class="font-bold text-green-800 text-sm mb-1">解き方・解答</p>
+                            <div class="text-gray-700 text-sm whitespace-pre-wrap" style="line-height: 1.8;">
+                              ${card.example_solution}
+                            </div>
+                          </div>
+                        ` : ''}
+                      </div>
+                    ` : ''}
+                    
+                    <!-- ヒント -->
+                    ${card.hints && card.hints.length > 0 ? `
+                      <div class="bg-white p-4 rounded-lg border-l-4 border-purple-500">
+                        <p class="font-bold text-purple-800 mb-3">
+                          <i class="fas fa-hand-point-right mr-1"></i>
+                          ヒント（${card.hints.length}段階）
+                        </p>
+                        <div class="space-y-2">
+                          ${card.hints.map((hint, hintIndex) => `
+                            <div class="bg-purple-50 p-3 rounded-lg">
+                              <p class="font-bold text-purple-700 text-sm mb-1">
+                                ヒント ${hintIndex + 1}
+                              </p>
+                              <p class="text-gray-700 text-sm whitespace-pre-wrap" style="line-height: 1.6;">
+                                ${hint.hint_text || hint}
+                              </p>
+                            </div>
+                          `).join('')}
+                        </div>
+                        <button onclick="editCardHints(${courseIndex}, ${cardIndex})"
+                                class="mt-3 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                          <i class="fas fa-edit mr-1"></i>
+                          ヒントを編集
+                        </button>
+                      </div>
+                    ` : `
+                      <div class="bg-white p-4 rounded-lg border-l-4 border-gray-400">
+                        <p class="font-bold text-gray-600 mb-2">
+                          <i class="fas fa-exclamation-circle mr-1"></i>
+                          ヒント
+                        </p>
+                        <p class="text-gray-500">ヒントは準備中です</p>
+                      </div>
+                    `}
+                    
+                    <!-- 実社会とのつながり -->
+                    ${card.real_world_connection ? `
+                      <div class="bg-white p-4 rounded-lg border-l-4 border-teal-500">
+                        <p class="font-bold text-teal-800 mb-2">
+                          <i class="fas fa-globe mr-1"></i>
+                          実社会とのつながり
+                        </p>
+                        <div class="text-gray-700 whitespace-pre-wrap" style="line-height: 1.8;">
+                          ${card.real_world_connection}
+                        </div>
+                      </div>
+                    ` : ''}
                   </div>
                 </div>
               </div>
@@ -12933,6 +13010,24 @@ async function saveCardEdit(cardId, courseIndex, cardIndex) {
 
 // グローバル関数として公開
 window.showTeacherOverview = showTeacherOverview
+
+// カード詳細の展開/折りたたみ
+function toggleCardDetails(courseIndex, cardIndex) {
+  const detailsDiv = document.getElementById(`card-details-${courseIndex}-${cardIndex}`)
+  const icon = document.getElementById(`card-icon-${courseIndex}-${cardIndex}`)
+  
+  if (detailsDiv.classList.contains('hidden')) {
+    detailsDiv.classList.remove('hidden')
+    icon.classList.remove('fa-chevron-down')
+    icon.classList.add('fa-chevron-up')
+  } else {
+    detailsDiv.classList.add('hidden')
+    icon.classList.remove('fa-chevron-up')
+    icon.classList.add('fa-chevron-down')
+  }
+}
+
+window.toggleCardDetails = toggleCardDetails
 window.editCardContent = editCardContent
 window.closeCardEditModal = closeCardEditModal
 window.saveCardEdit = saveCardEdit
