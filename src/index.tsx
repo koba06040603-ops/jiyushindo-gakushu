@@ -214,6 +214,38 @@ function extractJSON(aiResponse: string): any {
   // パターン: "\n  " → ",\n  "（文字列配列の要素間）
   jsonText = jsonText.replace(/"(\s*\n\s*)"/g, '",$1"')
   
+  // 【NEW 2025-01-28 追加】より積極的な配列要素間カンマ修正
+  // 改行を含む複数行にわたる配列要素のパターン
+  // パターン: }\n\n  { → },\n\n  {（空行を含む）
+  jsonText = jsonText.replace(/\}(\s*\n\s*\n\s*)\{/g, '},$1{')
+  // パターン: ]\n\n  [ → ],\n\n  [
+  jsonText = jsonText.replace(/\](\s*\n\s*\n\s*)\[/g, '],$1[')
+  
+  // 【NEW】行末の } の後、次の行頭の { の前にカンマがない場合
+  // より柔軟なパターン: } (改行+空白) { → }, (改行+空白) {
+  jsonText = jsonText.replace(/\}(\s*[\r\n]+\s*)\{/g, '},$1{')
+  // パターン: ] (改行+空白) { → ], (改行+空白) {
+  jsonText = jsonText.replace(/\](\s*[\r\n]+\s*)\{/g, '],$1{')
+  // パターン: } (改行+空白) [ → }, (改行+空白) [
+  jsonText = jsonText.replace(/\}(\s*[\r\n]+\s*)\[/g, '},$1[')
+  // パターン: ] (改行+空白) [ → ], (改行+空白) [
+  jsonText = jsonText.replace(/\](\s*[\r\n]+\s*)\[/g, '],$1[')
+  
+  // 【NEW】文字列終了後の改行を含むパターン
+  // パターン: " (改行+空白) { → ", (改行+空白) {
+  jsonText = jsonText.replace(/"(\s*[\r\n]+\s*)\{/g, '",$1{')
+  // パターン: " (改行+空白) [ → ", (改行+空白) [
+  jsonText = jsonText.replace(/"(\s*[\r\n]+\s*)\[/g, '",$1[')
+  // パターン: " (改行+空白) " → ", (改行+空白) "
+  jsonText = jsonText.replace(/"(\s*[\r\n]+\s*)"/g, function(match, whitespace, offset) {
+    // キー:値のコロンの後の場合は置換しない
+    const beforeMatch = jsonText.substring(Math.max(0, offset - 10), offset)
+    if (beforeMatch.match(/:\s*$/)) {
+      return match // 置換しない
+    }
+    return '",' + whitespace + '"'
+  })
+  
   // パターン: " " → ", "（文字列間、単一行）
   jsonText = jsonText.replace(/"(\s*)"/g, function(match, whitespace) {
     // キー:値の":"の後の場合は置換しない
@@ -324,11 +356,16 @@ function extractJSON(aiResponse: string): any {
       }
       
       // 配列要素間のカンマ欠落を修正（オブジェクト直後に別のオブジェクトが続く場合）
-      jsonText = jsonText.replace(/(\})\s*(\{)/g, '$1,$2')
+      // より強力な正規表現（改行を含む）
+      jsonText = jsonText.replace(/(\})(\s*[\r\n]*\s*)(\{)/g, '$1,$2$3')
       // 配列要素間のカンマ欠落を修正（配列直後に別の要素が続く場合）
-      jsonText = jsonText.replace(/(\])\s*(\[)/g, '$1,$2')
+      jsonText = jsonText.replace(/(\])(\s*[\r\n]*\s*)(\[)/g, '$1,$2$3')
+      // オブジェクト直後に配列が続く場合
+      jsonText = jsonText.replace(/(\})(\s*[\r\n]*\s*)(\[)/g, '$1,$2$3')
+      // 配列直後にオブジェクトが続く場合
+      jsonText = jsonText.replace(/(\])(\s*[\r\n]*\s*)(\{)/g, '$1,$2$3')
       // 配列要素間のカンマ欠落を修正（文字列直後に別の文字列が続く場合）
-      jsonText = jsonText.replace(/("\s*)\s*"/g, '$1,"')
+      jsonText = jsonText.replace(/(")\s*(\s*)"/g, '$1,$2"')
       
       // カンマを削除（最後の要素の後のカンマ）
       jsonText = jsonText.replace(/,(\s*[\]}])$/g, '$1')
@@ -354,6 +391,55 @@ function extractJSON(aiResponse: string): any {
         return JSON.parse(jsonText)
       } catch (retryError) {
         console.error('❌ 補完後もパース失敗:', retryError)
+        
+        // 【NEW】さらなる修正試行: エラー位置を特定して修正
+        if (retryError instanceof SyntaxError && retryError.message.includes('position')) {
+          const posMatch = retryError.message.match(/position (\d+)/)
+          if (posMatch) {
+            const errorPos = parseInt(posMatch[1])
+            console.log(`🔍 エラー位置 ${errorPos} で修正を試みます`)
+            
+            // エラー位置の前後を確認
+            const before = jsonText.substring(Math.max(0, errorPos - 20), errorPos)
+            const after = jsonText.substring(errorPos, Math.min(jsonText.length, errorPos + 20))
+            console.log('Before:', before)
+            console.log('After:', after)
+            
+            // パターン1: } { の間にカンマを挿入
+            if (before.match(/\}\s*$/) && after.match(/^\s*\{/)) {
+              console.log('✅ パターン検出: } { → }, {')
+              jsonText = jsonText.substring(0, errorPos) + ',' + jsonText.substring(errorPos)
+              try {
+                return JSON.parse(jsonText)
+              } catch (e) {
+                console.error('パターン1修正後もエラー:', e)
+              }
+            }
+            
+            // パターン2: ] [ の間にカンマを挿入
+            if (before.match(/\]\s*$/) && after.match(/^\s*\[/)) {
+              console.log('✅ パターン検出: ] [ → ], [')
+              jsonText = jsonText.substring(0, errorPos) + ',' + jsonText.substring(errorPos)
+              try {
+                return JSON.parse(jsonText)
+              } catch (e) {
+                console.error('パターン2修正後もエラー:', e)
+              }
+            }
+            
+            // パターン3: " " の間にカンマを挿入
+            if (before.match(/"\s*$/) && after.match(/^\s*"/)) {
+              console.log('✅ パターン検出: " " → ", "')
+              jsonText = jsonText.substring(0, errorPos) + ',' + jsonText.substring(errorPos)
+              try {
+                return JSON.parse(jsonText)
+              } catch (e) {
+                console.error('パターン3修正後もエラー:', e)
+              }
+            }
+          }
+        }
+        
         // 補完失敗、元のエラーを継続
       }
     }
@@ -5039,11 +5125,21 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
   ✓ answer: 解答（必須、空文字列禁止）
   ✓ answer_explanation: 解答の説明・考え方（100文字程度、必須）
   ✓ hints: 配列（必ず3つ）、各ヒントは {hint_level: 数値, hint_text: "文字列"} の形式
-- **配列の要素間には必ずカンマを入れること**
-- **最後の要素の後にはカンマを入れないこと**
-- 有効なJSON形式のみを出力（説明文やコメントは不要）
-- **2コースだけで終わらないこと！必ず3コース分のcardsを生成すること！**
-- **各カードのhints配列は必ず3つの要素を含めること**
+
+**🚨 超重要：JSON構文エラーを防ぐルール 🚨**
+1. **配列の要素間には必ずカンマ（,）を入れること**
+   正: {"a": 1}, {"b": 2}
+   誤: {"a": 1} {"b": 2}  （カンマなし）
+2. **改行の後でも、次の要素の前にカンマを忘れないこと**
+   正しい例:
+   { "card_number": 1 },  ← このカンマを絶対に忘れない！
+   { "card_number": 2 }
+3. **最後の要素の後にはカンマを入れないこと**
+4. **すべての文字列を二重引用符（"）で囲むこと**
+5. **コメント（//や/* */）は絶対に入れないこと**
+6. **有効なJSON形式のみを出力（説明文は不要）**
+7. **2コースだけで終わらないこと！必ず3コース分のcardsを生成すること！**
+8. **各カードのhints配列は必ず3つの要素を含めること**
 
 **JSON構造チェックリスト:**
 [ ] curriculum オブジェクトが存在する
@@ -5052,7 +5148,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 [ ] 各カードに上記の必須フィールドがすべて存在する
 [ ] hints 配列に3つの要素がある
 [ ] すべての文字列が二重引用符で囲まれている
-[ ] 配列要素間にカンマがある（最後の要素を除く）
+[ ] 配列要素間にカンマがある（最後の要素を除く）← **特に重要！**
 
 ${customInfo}
 
