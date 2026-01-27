@@ -6678,9 +6678,9 @@ function formatTimestamp(timestamp) {
 function formatTextWithRuby(text) {
   if (!text) return ''
   
-  // 漢字（ひらがな）の形式を <ruby>漢字<rt>ひらがな</rt></ruby> に変換
-  // 例：国会（こっかい） → <ruby>国会<rt>こっかい</rt></ruby>
-  return text.replace(/([一-龯々]+)（([ぁ-ん]+)）/g, '<ruby>$1<rt>$2</rt></ruby>')
+  // 漢字（ひらがな）の形式から読み仮名を削除
+  // 例：国会（こっかい） → 国会
+  return text.replace(/([一-龯々]+)（[ぁ-ん]+）/g, '$1')
 }
 
 // ==================== Phase 5: 先生カスタマイズモード ====================
@@ -12422,20 +12422,62 @@ function showTeacherOverview(unitData) {
                 <div class="border-2 ${colorClasses} rounded-lg p-4">
                   <div class="flex items-center justify-between mb-3">
                     <h3 class="font-bold text-gray-800">${course ? course.course_name : `コース${index + 1}`}</h3>
-                    <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-                      問題 ${index + 1}
-                    </span>
+                    <button 
+                      onclick="toggleEditCourseSelection(${index})" 
+                      id="edit-btn-course-selection-${index}"
+                      class="text-orange-600 hover:text-orange-800 transition px-2 py-1 rounded text-sm">
+                      <i class="fas fa-edit mr-1"></i>編集
+                    </button>
                   </div>
-                  <div class="bg-white p-3 rounded-lg mb-3">
-                    <p class="text-sm font-bold text-gray-800 mb-2">${problem.problem_title}</p>
-                    <p class="text-xs text-gray-700">${problem.problem_content || problem.problem_description || ''}</p>
-                  </div>
-                  ${problem.answer ? `
-                    <div class="bg-yellow-50 p-2 rounded-lg">
-                      <p class="text-xs font-bold text-yellow-800 mb-1">💡 解答</p>
-                      <p class="text-xs text-gray-700">${problem.answer}</p>
+                  
+                  <!-- 表示モード -->
+                  <div id="display-course-selection-${index}">
+                    <div class="bg-white p-3 rounded-lg mb-3">
+                      <p class="text-sm font-bold text-gray-800 mb-2">${problem.problem_title}</p>
+                      <p class="text-xs text-gray-700">${problem.problem_content || problem.problem_description || ''}</p>
                     </div>
-                  ` : ''}
+                    ${problem.answer ? `
+                      <div class="bg-yellow-50 p-2 rounded-lg">
+                        <p class="text-xs font-bold text-yellow-800 mb-1">💡 解答</p>
+                        <p class="text-xs text-gray-700">${problem.answer}</p>
+                      </div>
+                    ` : ''}
+                  </div>
+                  
+                  <!-- 編集モード -->
+                  <div id="edit-course-selection-${index}" class="hidden">
+                    <div class="space-y-3">
+                      <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">問題タイトル</label>
+                        <input type="text" 
+                          id="input-course-selection-title-${index}" 
+                          value="${problem.problem_title || ''}"
+                          class="w-full px-3 py-2 text-sm border-2 border-orange-300 rounded-lg focus:border-orange-500 focus:outline-none">
+                      </div>
+                      <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">問題内容</label>
+                        <textarea 
+                          id="input-course-selection-content-${index}" 
+                          rows="3"
+                          class="w-full px-3 py-2 text-xs border-2 border-orange-300 rounded-lg focus:border-orange-500 focus:outline-none resize-none">${problem.problem_content || problem.problem_description || ''}</textarea>
+                      </div>
+                      <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">解答</label>
+                        <textarea 
+                          id="input-course-selection-answer-${index}" 
+                          rows="2"
+                          class="w-full px-3 py-2 text-xs border-2 border-orange-300 rounded-lg focus:border-orange-500 focus:outline-none resize-none">${problem.answer || ''}</textarea>
+                      </div>
+                      <div class="flex gap-2">
+                        <button onclick="saveCourseSelection(${index})" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white text-sm py-2 px-4 rounded-lg font-bold transition">
+                          <i class="fas fa-save mr-1"></i>保存
+                        </button>
+                        <button onclick="toggleEditCourseSelection(${index})" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 text-sm py-2 px-4 rounded-lg font-bold transition">
+                          <i class="fas fa-times mr-1"></i>キャンセル
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               `
             }).join('')}
@@ -21470,6 +21512,98 @@ async function respondToPeerHelp(requestId, response, requesterName) {
     alert('応答の送信に失敗しました')
   }
 }
+
+// コース選択問題の編集モード切り替え
+function toggleEditCourseSelection(index) {
+  const displayDiv = document.getElementById(`display-course-selection-${index}`)
+  const editDiv = document.getElementById(`edit-course-selection-${index}`)
+  const button = document.getElementById(`edit-btn-course-selection-${index}`)
+  
+  if (!displayDiv || !editDiv || !button) return
+  
+  if (editDiv.classList.contains('hidden')) {
+    // 編集モードに切り替え
+    displayDiv.classList.add('hidden')
+    editDiv.classList.remove('hidden')
+    button.innerHTML = '<i class="fas fa-times mr-1"></i>閉じる'
+  } else {
+    // 表示モードに切り替え
+    displayDiv.classList.remove('hidden')
+    editDiv.classList.add('hidden')
+    button.innerHTML = '<i class="fas fa-edit mr-1"></i>編集'
+  }
+}
+
+// コース選択問題の保存
+async function saveCourseSelection(index) {
+  const titleInput = document.getElementById(`input-course-selection-title-${index}`)
+  const contentInput = document.getElementById(`input-course-selection-content-${index}`)
+  const answerInput = document.getElementById(`input-course-selection-answer-${index}`)
+  
+  if (!titleInput || !contentInput) {
+    alert('入力欄が見つかりませんでした')
+    return
+  }
+  
+  const updatedProblem = {
+    problem_title: titleInput.value,
+    problem_content: contentInput.value,
+    answer: answerInput ? answerInput.value : ''
+  }
+  
+  try {
+    // window.currentUnitDataからcurriculumIdを取得
+    const curriculumId = window.currentUnitData?.curriculum?.id
+    if (!curriculumId) {
+      throw new Error('カリキュラムIDが見つかりません')
+    }
+    
+    // メタデータ全体を更新
+    const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+    const metadata = metaResponse.data
+    const courseSelectionProblems = metadata.course_selection_problems || []
+    
+    // 該当の問題を更新
+    courseSelectionProblems[index] = updatedProblem
+    
+    // APIでメタデータを更新
+    await axios.put(`/api/curriculum/${curriculumId}/metadata`, {
+      course_selection_problems: courseSelectionProblems
+    })
+    
+    // ローカルデータも更新
+    if (window.currentUnitData && window.currentUnitData.course_selection_problems) {
+      window.currentUnitData.course_selection_problems[index] = updatedProblem
+    }
+    
+    // UIを更新
+    const displayDiv = document.getElementById(`display-course-selection-${index}`)
+    if (displayDiv) {
+      displayDiv.innerHTML = `
+        <div class="bg-white p-3 rounded-lg mb-3">
+          <p class="text-sm font-bold text-gray-800 mb-2">${updatedProblem.problem_title}</p>
+          <p class="text-xs text-gray-700">${updatedProblem.problem_content}</p>
+        </div>
+        ${updatedProblem.answer ? `
+          <div class="bg-yellow-50 p-2 rounded-lg">
+            <p class="text-xs font-bold text-yellow-800 mb-1">💡 解答</p>
+            <p class="text-xs text-gray-700">${updatedProblem.answer}</p>
+          </div>
+        ` : ''}
+      `
+    }
+    
+    toggleEditCourseSelection(index)
+    alert('✅ コース選択問題を保存しました')
+  } catch (error) {
+    console.error('コース選択問題の保存エラー:', error)
+    alert('❌ コース選択問題の保存に失敗しました')
+  }
+}
+
+// グローバルスコープに登録
+window.toggleEditCourseSelection = toggleEditCourseSelection
+window.saveCourseSelection = saveCourseSelection
 
 // グローバルスコープに登録
 window.showClassProgress = showClassProgress

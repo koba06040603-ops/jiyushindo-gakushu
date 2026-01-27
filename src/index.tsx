@@ -978,6 +978,36 @@ app.get('/api/curriculum/:id/metadata', async (c) => {
   }
 })
 
+// APIルート：カリキュラムメタデータの更新
+app.put('/api/curriculum/:id/metadata', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  const body = await c.req.json()
+  
+  try {
+    // course_selection_problemsの更新
+    if (body.course_selection_problems) {
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        VALUES (?, 'course_selection_problems', ?)
+      `).bind(id, JSON.stringify(body.course_selection_problems)).run()
+    }
+    
+    // check_testsの更新
+    if (body.check_tests) {
+      await env.DB.prepare(`
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        VALUES (?, 'check_tests', ?)
+      `).bind(id, JSON.stringify(body.check_tests)).run()
+    }
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('メタデータ更新エラー:', error)
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
+
 // APIルート：コースの学習カード取得
 app.get('/api/courses/:courseId/cards', async (c) => {
   const { env } = c
@@ -4900,6 +4930,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 - **必ず3コース全て**を生成すること（ゆっくりコース、しっかりコース、どんどんコース）
 - 各コース×6枚=合計18枚のカード
 - 全カードにanswer（解答）とanswer_explanation（解答の説明、100文字程度）が必須
+- 全カードにreal_world_connection（実社会とのつながり、50文字以上）が必須
 - 全カードにhints配列3つが必須
 - 有効なJSON形式のみを出力（説明文やコメントは不要）
 - **2コースだけで終わらないこと！必ず3コース分のcardsを生成すること！**
@@ -5153,7 +5184,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
           INSERT INTO learning_cards (
             course_id, card_number, card_title, card_type,
             problem_content, problem_description, new_terms, example_problem,
-            example_solution, real_world_context, textbook_page
+            example_solution, real_world_connection, textbook_page
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           courseId,
