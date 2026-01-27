@@ -10482,10 +10482,8 @@ async function executeUnitGeneration(params) {
       }
     }
     
-    // 生成されたコースをunitDataに統合
-    unitData.courses = {
-      results: generatedCourses
-    }
+    // 生成されたコースをunitDataに統合（配列として直接設定）
+    unitData.courses = generatedCourses
     
     console.log('✅ 全コースの生成完了:', {
       コース1: generatedCourses[0].name + ' ' + generatedCourses[0].cards.length + '枚',
