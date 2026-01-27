@@ -819,7 +819,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 音声自動読み上げ設定を復元
   const savedAutoPlayVoice = localStorage.getItem('autoPlayAIVoice')
-  window.autoPlayAIVoice = savedAutoPlayVoice === 'true'
+  // デフォルトはON（初回アクセス時）
+  window.autoPlayAIVoice = savedAutoPlayVoice === null ? true : savedAutoPlayVoice === 'true'
+  console.log('🔊 音声自動読み上げ:', window.autoPlayAIVoice ? 'ON' : 'OFF')
   
   // ローカルストレージから認証情報を復元
   const savedSession = localStorage.getItem('session_token')
@@ -3462,10 +3464,18 @@ function showAITeacher() {
   // 音声読み上げトグルボタンの初期状態を復元
   setTimeout(() => {
     const toggle = document.getElementById('autoVoiceToggle')
-    if (toggle && window.autoPlayAIVoice) {
-      toggle.classList.remove('bg-gray-200', 'hover:bg-gray-300', 'text-gray-700')
-      toggle.classList.add('bg-green-500', 'hover:bg-green-600', 'text-white')
-      toggle.innerHTML = '<i class="fas fa-volume-up mr-1"></i><span id="autoVoiceStatus">読み上げON</span>'
+    if (toggle) {
+      if (window.autoPlayAIVoice) {
+        toggle.classList.remove('bg-gray-200', 'hover:bg-gray-300', 'text-gray-700')
+        toggle.classList.add('bg-green-500', 'hover:bg-green-600', 'text-white')
+        toggle.innerHTML = '<i class="fas fa-volume-up mr-1"></i><span id="autoVoiceStatus">読み上げON</span>'
+        console.log('✅ 音声読み上げボタン: ON に設定')
+      } else {
+        toggle.classList.remove('bg-green-500', 'hover:bg-green-600', 'text-white')
+        toggle.classList.add('bg-gray-200', 'hover:bg-gray-300', 'text-gray-700')
+        toggle.innerHTML = '<i class="fas fa-volume-mute mr-1"></i><span id="autoVoiceStatus">読み上げOFF</span>'
+        console.log('✅ 音声読み上げボタン: OFF に設定')
+      }
     }
   }, 100)
 }
