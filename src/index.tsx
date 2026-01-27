@@ -5192,12 +5192,12 @@ ${customInfo}
 必ず上記のJSON形式で出力してください。
 `
 
-    // モデルのフォールバックリスト（新しい順）
+    // モデルのフォールバックリスト（確実に動作するモデル優先）
     const modelNames = [
-      'gemini-2.0-flash-exp',      // 最新の実験版
-      'gemini-2.5-flash',          // 安定版Flash
-      'gemini-2.0-flash-thinking-exp-01-21', // 思考型
-      'gemini-2.0-flash-exp-20250102' // 特定日付版
+      'gemini-2.0-flash-exp',           // 最新の実験版Flash
+      'gemini-1.5-flash',               // 安定版Flash（確実）
+      'gemini-1.5-pro',                 // 安定版Pro（確実）
+      'gemini-1.5-flash-latest'         // 最新のFlash
     ]
     
     let lastError = null
