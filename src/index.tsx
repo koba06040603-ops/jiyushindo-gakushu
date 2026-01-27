@@ -5113,6 +5113,7 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
   },
   "courses": [
     {
+      "name": "ゆっくりコース",
       "course_name": "ゆっくりコース",
       "course_label": "じっくり考えながら進むコース",
       "description": "ひとつひとつていねいに学びたい人におすすめ",
@@ -5278,6 +5279,7 @@ ${customInfo}
                 type: 'object',
                 properties: {
                   name: { type: 'string' },
+                  course_name: { type: 'string' },
                   label: { type: 'string' },
                   description: { type: 'string' },
                   color_code: { type: 'string' },
@@ -5313,7 +5315,7 @@ ${customInfo}
                     }
                   }
                 },
-                required: ['name', 'cards']
+                required: ['name', 'course_name', 'cards']
               }
             }
           },
@@ -5355,6 +5357,7 @@ ${customInfo}
                 type: 'object',
                 properties: {
                   name: { type: 'string' },
+                  course_name: { type: 'string' },
                   label: { type: 'string' },
                   description: { type: 'string' },
                   color_code: { type: 'string' },
@@ -5390,7 +5393,7 @@ ${customInfo}
                     }
                   }
                 },
-                required: ['name', 'cards']
+                required: ['name', 'course_name', 'cards']
               }
             }
           },
