@@ -5203,8 +5203,8 @@ ${customInfo}
 必ず上記のJSON形式で出力してください。
 `
 
-    // 【デバッグ用】最も確実に動作する単一モデルを使用
-    const modelName = 'gemini-1.5-flash-001'
+    // 【デバッグ用】以前動作していたモデルに戻す
+    const modelName = 'gemini-2.0-flash-exp'
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
     
     console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
