@@ -1240,12 +1240,6 @@ async function updateUnitList() {
                 <i class="fas fa-copy"></i>
               </button>
               <button 
-                onclick="event.stopPropagation(); editCurriculum(${item.id})" 
-                class="bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
-                title="編集">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button 
                 onclick="event.stopPropagation(); deleteCurriculum(${item.id}, '${item.unit_name}')" 
                 class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
                 title="削除">
@@ -1787,11 +1781,8 @@ async function loadGuidePage(curriculumId) {
               <button onclick="downloadGuidePDF(${curriculumId})" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-file-pdf mr-2"></i>PDF出力
               </button>
-              <button onclick="editCurriculum(${curriculumId})" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
-                <i class="fas fa-edit mr-2"></i>編集
-              </button>
               <button onclick="loadTeacherOverview(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
-                <i class="fas fa-chalkboard-teacher mr-2"></i>教師用
+                <i class="fas fa-chalkboard-teacher mr-2"></i>教師用編集
               </button>
             </div>
           </div>
@@ -12162,37 +12153,95 @@ function showTeacherOverview(unitData) {
 
       <!-- 単元情報 -->
       <div id="unit-info" class="bg-white rounded-lg shadow-lg p-6 mb-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">
-          <i class="fas fa-bullseye mr-2"></i>
-          単元情報
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div class="bg-gray-50 p-4 rounded-lg">
-            <p class="text-sm text-gray-600 mb-1">学年・教科</p>
-            <p class="font-bold text-gray-800">${curriculum.grade} ${curriculum.subject}</p>
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-2xl font-bold text-gray-800">
+            <i class="fas fa-bullseye mr-2"></i>
+            単元情報
+          </h2>
+          <button onclick="toggleBasicInfoEdit()" 
+                  id="basic-info-edit-btn"
+                  class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold transition">
+            <i class="fas fa-edit mr-1"></i>編集
+          </button>
+        </div>
+        
+        <!-- 表示モード -->
+        <div id="basic-info-display">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <p class="text-sm text-gray-600 mb-1">学年・教科</p>
+              <p class="font-bold text-gray-800">${curriculum.grade} ${curriculum.subject}</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <p class="text-sm text-gray-600 mb-1">教科書会社</p>
+              <p class="font-bold text-gray-800">${curriculum.textbook_company}</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <p class="text-sm text-gray-600 mb-1">単元名</p>
+              <p class="font-bold text-gray-800">${curriculum.unit_name}</p>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <p class="text-sm text-gray-600 mb-1">総学習時間</p>
+              <p class="font-bold text-gray-800">${curriculum.total_hours}時間</p>
+            </div>
           </div>
-          <div class="bg-gray-50 p-4 rounded-lg">
-            <p class="text-sm text-gray-600 mb-1">教科書会社</p>
-            <p class="font-bold text-gray-800">${curriculum.textbook_company}</p>
+          
+          <div class="bg-blue-50 p-4 rounded-lg mb-3">
+            <p class="text-sm font-bold text-blue-800 mb-2">📚 学習目標</p>
+            <p class="text-gray-800">${formatTextWithRuby(curriculum.unit_goal)}</p>
           </div>
-          <div class="bg-gray-50 p-4 rounded-lg">
-            <p class="text-sm text-gray-600 mb-1">総学習時間</p>
-            <p class="font-bold text-gray-800">${curriculum.total_hours}時間</p>
-          </div>
-          <div class="bg-gray-50 p-4 rounded-lg">
-            <p class="text-sm text-gray-600 mb-1">コース数</p>
-            <p class="font-bold text-gray-800">${courses.length}コース</p>
+          
+          <div class="bg-green-50 p-4 rounded-lg">
+            <p class="text-sm font-bold text-green-800 mb-2">💖 非認知能力の目標</p>
+            <p class="text-gray-800">${curriculum.non_cognitive_goal}</p>
           </div>
         </div>
         
-        <div class="bg-blue-50 p-4 rounded-lg mb-3">
-          <p class="text-sm font-bold text-blue-800 mb-2">📚 学習目標</p>
-          <p class="text-gray-800">${formatTextWithRuby(curriculum.unit_goal)}</p>
-        </div>
-        
-        <div class="bg-green-50 p-4 rounded-lg">
-          <p class="text-sm font-bold text-green-800 mb-2">💖 非認知能力の目標</p>
-          <p class="text-gray-800">${curriculum.non_cognitive_goal}</p>
+        <!-- 編集モード -->
+        <div id="basic-info-edit" class="hidden">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">学年</label>
+              <input type="text" id="edit-grade" value="${curriculum.grade}" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">教科</label>
+              <input type="text" id="edit-subject" value="${curriculum.subject}" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">教科書会社</label>
+              <input type="text" id="edit-textbook" value="${curriculum.textbook_company}" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">単元名</label>
+              <input type="text" id="edit-unit-name" value="${curriculum.unit_name}" 
+                     class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-bold text-gray-700 mb-2">学習目標</label>
+              <textarea id="edit-unit-goal" rows="3" 
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">${formatTextWithRuby(curriculum.unit_goal)}</textarea>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm font-bold text-gray-700 mb-2">非認知能力の目標</label>
+              <textarea id="edit-non-cognitive-goal" rows="2" 
+                        class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">${curriculum.non_cognitive_goal}</textarea>
+            </div>
+          </div>
+          
+          <div class="flex gap-3">
+            <button onclick="saveBasicInfo(${curriculum.id})" 
+                    class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-bold transition">
+              <i class="fas fa-save mr-2"></i>保存
+            </button>
+            <button onclick="toggleBasicInfoEdit()" 
+                    class="bg-gray-400 hover:bg-gray-500 text-white px-6 py-3 rounded-lg font-bold transition">
+              <i class="fas fa-times mr-2"></i>キャンセル
+            </button>
+          </div>
         </div>
       </div>
 
@@ -13249,6 +13298,80 @@ async function saveCardEdit(cardId, courseIndex, cardIndex) {
 
 // グローバル関数として公開
 window.showTeacherOverview = showTeacherOverview
+
+// 基本情報編集モードの切り替え
+function toggleBasicInfoEdit() {
+  const displayDiv = document.getElementById('basic-info-display')
+  const editDiv = document.getElementById('basic-info-edit')
+  const editBtn = document.getElementById('basic-info-edit-btn')
+  
+  if (editDiv.classList.contains('hidden')) {
+    // 編集モードに切り替え
+    displayDiv.classList.add('hidden')
+    editDiv.classList.remove('hidden')
+    editBtn.innerHTML = '<i class="fas fa-times mr-1"></i>閉じる'
+  } else {
+    // 表示モードに切り替え
+    displayDiv.classList.remove('hidden')
+    editDiv.classList.add('hidden')
+    editBtn.innerHTML = '<i class="fas fa-edit mr-1"></i>編集'
+  }
+}
+
+window.toggleBasicInfoEdit = toggleBasicInfoEdit
+
+// 基本情報を保存
+async function saveBasicInfo(curriculumId) {
+  try {
+    const grade = document.getElementById('edit-grade').value
+    const subject = document.getElementById('edit-subject').value
+    const textbook = document.getElementById('edit-textbook').value
+    const unitName = document.getElementById('edit-unit-name').value
+    const unitGoal = document.getElementById('edit-unit-goal').value
+    const nonCognitiveGoal = document.getElementById('edit-non-cognitive-goal').value
+    
+    console.log('💾 基本情報を保存:', { grade, subject, textbook, unitName })
+    
+    // APIで更新
+    const response = await axios.put(`/api/curriculum/${curriculumId}`, {
+      basicInfo: {
+        grade,
+        subject,
+        textbook_company: textbook,
+        unit_name: unitName,
+        unit_goal: unitGoal,
+        non_cognitive_goal: nonCognitiveGoal
+      },
+      courses: [] // 空配列を渡す（カードは更新しない）
+    })
+    
+    console.log('✅ 保存成功:', response.data)
+    
+    if (response.data.success) {
+      // window.currentUnitDataを更新
+      if (window.currentUnitData && window.currentUnitData.curriculum) {
+        window.currentUnitData.curriculum.grade = grade
+        window.currentUnitData.curriculum.subject = subject
+        window.currentUnitData.curriculum.textbook_company = textbook
+        window.currentUnitData.curriculum.unit_name = unitName
+        window.currentUnitData.curriculum.unit_goal = unitGoal
+        window.currentUnitData.curriculum.non_cognitive_goal = nonCognitiveGoal
+      }
+      
+      alert('✅ 保存しました！')
+      
+      // ページを再読み込み
+      showTeacherOverview(window.currentUnitData)
+    } else {
+      throw new Error(response.data.error || '保存に失敗しました')
+    }
+  } catch (error) {
+    console.error('❌ 保存エラー:', error)
+    alert(`❌ 保存に失敗しました\\n\\n${error.response?.data?.details || error.message}`)
+  }
+}
+
+window.saveBasicInfo = saveBasicInfo
 
 // カード詳細の展開/折りたたみ
 function toggleCardDetails(courseIndex, cardIndex) {
