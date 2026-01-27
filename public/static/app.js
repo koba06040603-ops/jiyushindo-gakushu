@@ -4348,7 +4348,7 @@ async function recognizeAnswerHandwriting() {
   
   // 認識中表示
   const canvas = document.getElementById('answerCanvas')
-  const originalCursor = canvas.style.cursor
+  // カーソルは常にcrosshairを維持（認識後も変更しない）
   canvas.style.cursor = 'wait'
   
   try {
@@ -4374,7 +4374,7 @@ async function recognizeAnswerHandwriting() {
         document.getElementById('answerInput').value = text
         alert(`✅ 認識結果: ${text}\n\n認識方法: Google Cloud Vision API`)
         switchAnswerMode('text')
-        canvas.style.cursor = originalCursor
+        canvas.style.cursor = 'crosshair'
         return
       } else {
         console.log('⚠️ Google Cloud Vision OCRで結果が得られませんでした')
@@ -4439,7 +4439,7 @@ async function recognizeAnswerHandwriting() {
           document.getElementById('answerInput').value = text
           alert(`✅ 認識結果: ${text}\n\n信頼度: ${Math.round(result.data.confidence)}%\n認識方法: Tesseract.js (フォールバック)`)
           switchAnswerMode('text')
-          canvas.style.cursor = originalCursor
+          canvas.style.cursor = 'crosshair'
           return
         } else {
           console.log('⚠️ Tesseract OCR結果が空でした')
@@ -4498,7 +4498,7 @@ async function recognizeAnswerHandwriting() {
     alert('⚠️ 手書き認識に失敗しました。\n\n文字モードに切り替えて入力してください。')
     switchAnswerMode('text')
   } finally {
-    canvas.style.cursor = originalCursor
+    canvas.style.cursor = 'crosshair'
   }
 }
 
