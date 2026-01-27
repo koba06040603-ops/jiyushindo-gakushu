@@ -5718,7 +5718,7 @@ ${customInfo}
       }, 500)
     }
     
-    // データ構造を詳細に検証
+    // 【段階的生成】基本情報のみの検証（coursesは後で追加）
     const validationErrors = []
     
     // カリキュラムの検証
@@ -5731,60 +5731,7 @@ ${customInfo}
       if (!unitData.curriculum.unit_goal) validationErrors.push('curriculum.unit_goal が欠けています')
     }
     
-    // コースの検証
-    if (!unitData.courses || !Array.isArray(unitData.courses)) {
-      validationErrors.push('courses が欠けているか配列ではありません')
-    } else {
-      if (unitData.courses.length < 3) {
-        validationErrors.push(`3コース必要ですが、${unitData.courses.length}コースしかありません`)
-      }
-      
-      // 各コースの詳細検証
-      unitData.courses.forEach((course: any, courseIndex: number) => {
-        const courseNum = courseIndex + 1
-        
-        if (!course.course_name) {
-          validationErrors.push(`コース${courseNum}: course_name が欠けています`)
-        }
-        
-        if (!course.cards || !Array.isArray(course.cards)) {
-          validationErrors.push(`コース${courseNum}: cards が欠けているか配列ではありません`)
-        } else {
-          if (course.cards.length < 6) {
-            validationErrors.push(`コース${courseNum}: 最低6枚のカードが必要ですが、${course.cards.length}枚しかありません`)
-          }
-          
-          // 各カードの必須フィールドを検証
-          course.cards.forEach((card: any, cardIndex: number) => {
-            const cardNum = cardIndex + 1
-            const prefix = `コース${courseNum}カード${cardNum}:`
-            
-            if (!card.card_title) validationErrors.push(`${prefix} card_title が欠けています`)
-            if (!card.problem_description) validationErrors.push(`${prefix} problem_description が欠けています`)
-            if (!card.answer) validationErrors.push(`${prefix} answer が欠けています`)
-            if (!card.answer_explanation) validationErrors.push(`${prefix} answer_explanation が欠けています`)
-            if (!card.real_world_connection) {
-              validationErrors.push(`${prefix} real_world_connection が欠けています`)
-            } else if (card.real_world_connection.length < 20) {
-              validationErrors.push(`${prefix} real_world_connection が短すぎます（${card.real_world_connection.length}文字）`)
-            }
-            
-            if (!card.hints || !Array.isArray(card.hints)) {
-              validationErrors.push(`${prefix} hints が欠けているか配列ではありません`)
-            } else if (card.hints.length < 3) {
-              validationErrors.push(`${prefix} hints は3つ必要ですが、${card.hints.length}つしかありません`)
-            } else {
-              // 各ヒントの検証
-              card.hints.forEach((hint: any, hintIndex: number) => {
-                if (!hint.hint_text && !hint.hint_content) {
-                  validationErrors.push(`${prefix}ヒント${hintIndex + 1} のテキストが欠けています`)
-                }
-              })
-            }
-          })
-        }
-      })
-    }
+    // 【注意】coursesはフロントエンドで段階的に生成するため、ここでは検証しない
     
     if (validationErrors.length > 0) {
       console.error('❌ 単元データ検証エラー:', validationErrors)
