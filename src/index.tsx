@@ -5165,8 +5165,29 @@ ${customInfo}
 2. 各カードには**必ず3つのヒント**を含めてください
 3. すべての文字列は**ダブルクォーテーション**で囲む
 4. 配列やオブジェクトの要素間には**必ずカンマ**を入れる
-5. JSONコメント（//や/**/）は**絶対に使わない**
-6. 出力は**有効なJSONのみ**（説明文は不要）
+5. **特に重要**: カード間には必ずカンマを入れる（例：} , {）
+6. **特に重要**: ヒント間には必ずカンマを入れる（例：} , {）
+7. JSONコメント（//や/**/）は**絶対に使わない**
+8. 出力は**有効なJSONのみ**（説明文は不要）
+9. **文字列内の改行は \\n でエスケープ**してください
+10. **文字列内のダブルクォーテーションは \\" でエスケープ**してください
+
+【JSON構文の具体例】
+正しい例:
+{
+  "cards": [
+    { "card_number": 1, "card_title": "タイトル1" },
+    { "card_number": 2, "card_title": "タイトル2" }
+  ]
+}
+
+間違った例（カンマがない）:
+{
+  "cards": [
+    { "card_number": 1, "card_title": "タイトル1" }
+    { "card_number": 2, "card_title": "タイトル2" }
+  ]
+}
 
 必ず上記のJSON形式で出力してください。
 `
@@ -5249,21 +5270,59 @@ ${customInfo}
     
     const aiResponse = data.candidates[0].content.parts[0].text
     console.log('✅ コース生成成功:', courseInfo.name)
+    console.log('📄 AI生成JSON（最初の500文字）:', aiResponse.substring(0, 500))
     
-    // JSONをパース
+    // JSONをパース（複数の方法で試行）
     let courseData
     try {
+      // 1回目: 通常のJSON.parse
       courseData = JSON.parse(aiResponse)
-    } catch (parseError) {
-      console.error('❌ JSONパースエラー:', parseError)
-      // extractJSON関数を使用
-      courseData = extractJSON(aiResponse)
+      console.log('✅ JSON.parse成功（1回目）')
+    } catch (parseError1) {
+      console.error('❌ JSON.parse失敗（1回目）:', parseError1)
+      console.log('🔧 extractJSON関数を使用します...')
+      
+      try {
+        // 2回目: extractJSON関数
+        courseData = extractJSON(aiResponse)
+        console.log('✅ extractJSON成功（2回目）')
+      } catch (parseError2) {
+        console.error('❌ extractJSON失敗（2回目）:', parseError2)
+        console.log('📄 AI生成JSON全文:', aiResponse)
+        
+        // 3回目: 最後の手段 - 配列要素間のカンマを強制追加
+        try {
+          let fixedJson = aiResponse
+          // }{ → },{ に修正
+          fixedJson = fixedJson.replace(/\}\s*\{/g, '},{')
+          // }] → }] はそのまま
+          // ]{ → ],{ に修正
+          fixedJson = fixedJson.replace(/\]\s*\{/g, '],[')
+          // }[ → },[ に修正
+          fixedJson = fixedJson.replace(/\}\s*\[/g, '},[')
+          
+          courseData = JSON.parse(fixedJson)
+          console.log('✅ 手動修正JSON.parse成功（3回目）')
+        } catch (parseError3) {
+          console.error('❌ すべてのパース方法が失敗しました')
+          throw new Error(`JSONパースエラー: ${parseError1.message}`)
+        }
+      }
     }
     
     // バリデーション
     if (!courseData.cards || courseData.cards.length < 6) {
+      console.error('❌ バリデーションエラー:', {
+        cards存在: !!courseData.cards,
+        cards長さ: courseData.cards?.length || 0
+      })
       throw new Error(`カードが6枚未満です: ${courseData.cards?.length || 0}枚`)
     }
+    
+    console.log('✅ バリデーション成功:', {
+      コース名: courseData.course_name || courseData.name,
+      カード枚数: courseData.cards.length
+    })
     
     return c.json({
       success: true,
