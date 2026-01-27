@@ -5079,6 +5079,17 @@ app.post('/api/ai/generate-course', async (c) => {
     customization 
   } = await c.req.json()
   
+  console.log('🔍 コース生成APIリクエスト受信:', {
+    grade,
+    subject,
+    textbook,
+    unitName,
+    unitGoal: unitGoal?.substring(0, 50) + '...',
+    courseLevel,
+    courseInfo,
+    customization: customization ? 'あり' : 'なし'
+  })
+  
   const apiKey = env.GEMINI_API_KEY
   
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
@@ -5089,7 +5100,7 @@ app.post('/api/ai/generate-course', async (c) => {
     }, 500)
   }
   
-  console.log(`🎯 コース生成開始: ${courseInfo.name} (${courseLevel})`)
+  console.log(`🎯 コース生成開始: ${courseInfo?.name} (${courseLevel})`)
   
   try {
     // カスタマイズ情報を整形
