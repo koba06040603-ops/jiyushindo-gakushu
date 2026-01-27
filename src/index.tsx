@@ -5192,11 +5192,11 @@ ${customInfo}
 必ず上記のJSON形式で出力してください。
 `
 
-    // Gemini Flash APIを使用（コスト削減）
-    const modelName = 'gemini-2.0-flash-exp'
+    // Gemini 2.5 Proを使用（高品質なJSON生成）
+    const modelName = 'gemini-2.5-pro'
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
     
-    console.log(`📡 ${modelName} APIを呼び出します...`)
+    console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -5204,7 +5204,7 @@ ${customInfo}
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.5,
+          temperature: 0.3,  // より厳密なJSON生成のため低めに設定
           maxOutputTokens: 8192,  // 6枚分なので少なめでOK
           topP: 0.9,
           topK: 20,
