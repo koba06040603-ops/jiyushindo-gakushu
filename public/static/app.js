@@ -12635,7 +12635,7 @@ function showTeacherOverview(unitData) {
           
           <!-- 選択問題追加ボタン -->
           <div class="mt-4">
-            <button onclick="addOptionalProblem()"
+            <button onclick="addOptionalProblem(${curriculum.id})"
                     class="w-full bg-pink-500 hover:bg-pink-600 text-white px-4 py-3 rounded-lg font-bold transition">
               <i class="fas fa-plus mr-2"></i>
               選択問題を追加
@@ -12647,7 +12647,7 @@ function showTeacherOverview(unitData) {
               <i class="fas fa-info-circle mr-2"></i>
               選択課題は保存後、教師が追加できます
             </p>
-            <button onclick="addOptionalProblem()"
+            <button onclick="addOptionalProblem(${curriculum.id})"
                     class="bg-pink-500 hover:bg-pink-600 text-white px-4 py-3 rounded-lg font-bold transition">
               <i class="fas fa-plus mr-2"></i>
               最初の選択問題を追加
@@ -13607,14 +13607,21 @@ async function deleteOptionalProblem(problemId, problemIndex) {
 }
 
 // 選択問題追加機能
-function addOptionalProblem() {
-  const curriculumId = window.currentUnitData?.curriculum_id
+function addOptionalProblem(curriculumId) {
+  // 引数からカリキュラムIDを取得（フォールバックとしてwindow.currentUnitDataも確認）
+  if (!curriculumId) {
+    curriculumId = window.currentUnitData?.curriculum_id
+  }
+  
   const nextProblemNumber = (window.currentUnitData?.optional_problems?.length || 0) + 1
   
   if (!curriculumId) {
-    alert('カリキュラムIDが見つかりません')
+    alert('カリキュラムIDが見つかりません。\n\nページを再読み込みしてください。')
+    console.error('❌ カリキュラムIDが見つかりません:', { curriculumId, currentUnitData: window.currentUnitData })
     return
   }
+  
+  console.log('✅ 選択問題追加モーダルを表示:', { curriculumId, nextProblemNumber })
   
   const modalHTML = `
     <div id="addOptionalProblemModal" 

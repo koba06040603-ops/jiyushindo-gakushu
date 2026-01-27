@@ -6086,12 +6086,12 @@ app.post('/api/curriculum/:id/duplicate', async (c) => {
     
     for (const meta of metadata.results) {
       await env.DB.prepare(`
-        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
+        INSERT INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
         VALUES (?, ?, ?)
       `).bind(
         newCurriculumId,
-        (meta as any).meta_key,
-        (meta as any).meta_value
+        (meta as any).metadata_key,
+        (meta as any).metadata_value
       ).run()
     }
     
@@ -6356,15 +6356,15 @@ app.put('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) => {
   try {
     // 既存のチェックテストを取得
     const metaRow: any = await env.DB.prepare(`
-      SELECT meta_value FROM curriculum_metadata
-      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+      SELECT metadata_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
     `).bind(curriculumId).first()
     
     if (!metaRow) {
       return c.json({ error: 'チェックテストが見つかりません' }, 404)
     }
     
-    const checkTest = JSON.parse(metaRow.meta_value)
+    const checkTest = JSON.parse(metaRow.metadata_value)
     
     // 指定された問題を更新
     const problemIndex = checkTest.sample_problems.findIndex((p: any) => p.problem_number === problemNumber)
@@ -6381,8 +6381,8 @@ app.put('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) => {
     // データベースに保存
     await env.DB.prepare(`
       UPDATE curriculum_metadata
-      SET meta_value = ?
-      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+      SET metadata_value = ?
+      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
     `).bind(JSON.stringify(checkTest), curriculumId).run()
     
     return c.json({
@@ -6415,11 +6415,11 @@ app.put('/api/curriculum/:id/check-test', async (c) => {
     
     // 既存のチェックテストを取得または新規作成
     const metaRow: any = await env.DB.prepare(`
-      SELECT meta_value FROM curriculum_metadata
-      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+      SELECT metadata_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
     `).bind(curriculumId).first()
     
-    const checkTest = metaRow ? JSON.parse(metaRow.meta_value) : {
+    const checkTest = metaRow ? JSON.parse(metaRow.metadata_value) : {
       test_title: '基礎基本チェックテスト',
       test_description: '',
       test_note: '',
@@ -6435,12 +6435,12 @@ app.put('/api/curriculum/:id/check-test', async (c) => {
     if (metaRow) {
       await env.DB.prepare(`
         UPDATE curriculum_metadata
-        SET meta_value = ?
-        WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+        SET metadata_value = ?
+        WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
       `).bind(JSON.stringify(checkTest), curriculumId).run()
     } else {
       await env.DB.prepare(`
-        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
+        INSERT INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
         VALUES (?, 'common_check_test', ?)
       `).bind(curriculumId, JSON.stringify(checkTest)).run()
     }
@@ -6470,15 +6470,15 @@ app.delete('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) =>
   try {
     // 既存のチェックテストを取得
     const metaRow: any = await env.DB.prepare(`
-      SELECT meta_value FROM curriculum_metadata
-      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+      SELECT metadata_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
     `).bind(curriculumId).first()
     
     if (!metaRow) {
       return c.json({ error: 'チェックテストが見つかりません' }, 404)
     }
     
-    const checkTest = JSON.parse(metaRow.meta_value)
+    const checkTest = JSON.parse(metaRow.metadata_value)
     
     // 指定された問題を削除
     checkTest.sample_problems = checkTest.sample_problems.filter((p: any) => p.problem_number !== problemNumber)
@@ -6491,8 +6491,8 @@ app.delete('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) =>
     // データベースに保存
     await env.DB.prepare(`
       UPDATE curriculum_metadata
-      SET meta_value = ?
-      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+      SET metadata_value = ?
+      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
     `).bind(JSON.stringify(checkTest), curriculumId).run()
     
     return c.json({
@@ -6518,13 +6518,13 @@ app.post('/api/curriculum/:id/check-test/problem', async (c) => {
   try {
     // 既存のチェックテストを取得
     const metaRow: any = await env.DB.prepare(`
-      SELECT meta_value FROM curriculum_metadata
-      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+      SELECT metadata_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
     `).bind(curriculumId).first()
     
     let checkTest
     if (metaRow) {
-      checkTest = JSON.parse(metaRow.meta_value)
+      checkTest = JSON.parse(metaRow.metadata_value)
     } else {
       checkTest = {
         test_title: '基礎基本チェックテスト',
@@ -6547,12 +6547,12 @@ app.post('/api/curriculum/:id/check-test/problem', async (c) => {
     if (metaRow) {
       await env.DB.prepare(`
         UPDATE curriculum_metadata
-        SET meta_value = ?
-        WHERE curriculum_id = ? AND meta_key = 'common_check_test'
+        SET metadata_value = ?
+        WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
       `).bind(JSON.stringify(checkTest), curriculumId).run()
     } else {
       await env.DB.prepare(`
-        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
+        INSERT INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
         VALUES (?, 'common_check_test', ?)
       `).bind(curriculumId, JSON.stringify(checkTest)).run()
     }
@@ -6796,7 +6796,7 @@ app.post('/api/curriculum/:id/regenerate-check-test', async (c) => {
     
     // データベースに保存
     await env.DB.prepare(`
-      INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
+      INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
       VALUES (?, 'common_check_test', ?)
     `).bind(
       curriculumId,
