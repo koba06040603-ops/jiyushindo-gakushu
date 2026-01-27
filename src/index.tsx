@@ -5418,19 +5418,17 @@ ${customization.learningStyle ? `学習スタイル: ${customization.learningSty
 ${customization.specialSupport ? `特別支援: ${customization.specialSupport}` : ''}
 ` : ''
     
-    const prompt = `${grade}${subject}「${unitName}」（${textbook}）の学習カリキュラムをJSON形式で作成してください。
+    // 【段階的生成】基本情報のみを生成（コースは別APIで生成）
+    const prompt = `${grade}${subject}「${unitName}」（${textbook}）の学習カリキュラムの基本情報をJSON形式で作成してください。
 
 **【最重要】JSON 出力の厳格なルール:**
-1. **必ず { で始まり } で終わること**（コードブロックやマークダウンは絶対に使わないこと）
-2. **配列要素の間には必ずカンマを入れること**（例: [..., {...}, {...}, {...}]）
-3. **最後の要素の後にはカンマを入れないこと**（例: {...}, {...}, {...}] ← 最後にカンマなし）
-4. **すべての文字列は二重引用符で囲むこと**（シングルクォートは使わない）
-5. **文字列内の二重引用符は \" でエスケープすること**
-6. **改行は \\n でエスケープすること**
-7. **JSON以外のテキスト（説明・コメント・思考過程）は一切出力しないこと**
-8. **出力は必ず1行目から {curriculum: で始めること**
+1. **必ず { で始まり } で終わること**
+2. **すべての文字列は二重引用符で囲むこと**
+3. **JSON以外のテキストは一切出力しないこと**
 
-出力形式:
+${customInfo}
+
+出力形式（基本情報のみ）:
 {
   "curriculum": {
     "grade": "${grade}",
@@ -5440,134 +5438,18 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     "total_hours": 8,
     "unit_goal": "学習目標（100文字以内。難しい漢字には直後に（ひらがな）をつける。例：国会（こっかい））",
     "non_cognitive_goal": "非認知目標（80文字以内）"
-  },
-  "courses": [
-    {
-      "name": "ゆっくりコース",
-      "course_name": "ゆっくりコース",
-      "course_label": "じっくり考えながら進むコース",
-      "description": "ひとつひとつていねいに学びたい人におすすめ",
-      "color_code": "green",
-      "cards": [
-        {
-          "card_number": 1,
-          "card_title": "タイトル",
-          "card_type": "main",
-          "textbook_page": "p.XX",
-          "problem_description": "問題",
-          "new_terms": "用語",
-          "example_problem": "例題",
-          "example_solution": "解法",
-          "real_world_connection": "つながり",
-          "answer": "解答（必須）",
-          "answer_explanation": "解答の説明・考え方（必須、100文字程度）",
-          "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1"},
-            {"hint_level": 2, "hint_text": "ヒント2"},
-            {"hint_level": 3, "hint_text": "ヒント3"}
-          ]
-        }
-      ]
-    },
-    {
-      "course_name": "しっかりコース",
-      "course_label": "自分のペースで学ぶコース",
-      "description": "しっかり考えて学びたい人",
-      "color_code": "blue",
-      "cards": [
-        {
-          "card_number": 1,
-          "card_title": "タイトル",
-          "card_type": "main",
-          "textbook_page": "p.XX",
-          "problem_description": "問題",
-          "new_terms": "用語",
-          "example_problem": "例題",
-          "example_solution": "解法",
-          "real_world_connection": "つながり",
-          "answer": "解答（必須）",
-          "answer_explanation": "解答の説明・考え方（必須、100文字程度）",
-          "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1"},
-            {"hint_level": 2, "hint_text": "ヒント2"},
-            {"hint_level": 3, "hint_text": "ヒント3"}
-          ]
-        }
-      ]
-    },
-    {
-      "course_name": "どんどんコース",
-      "course_label": "いろいろなことにちょうせんするコース",
-      "description": "発展的に学びたい人",
-      "color_code": "purple",
-      "cards": [
-        {
-          "card_number": 1,
-          "card_title": "タイトル",
-          "card_type": "main",
-          "textbook_page": "p.XX",
-          "problem_description": "問題",
-          "new_terms": "用語",
-          "example_problem": "例題",
-          "example_solution": "解法",
-          "real_world_connection": "つながり",
-          "answer": "解答（必須）",
-          "answer_explanation": "解答の説明・考え方（必須、100文字程度）",
-          "hints": [
-            {"hint_level": 1, "hint_text": "ヒント1"},
-            {"hint_level": 2, "hint_text": "ヒント2"},
-            {"hint_level": 3, "hint_text": "ヒント3"}
-          ]
-        }
-      ]
-    }
-  ]
+  }
 }
 
-必須要件:
-- **必ず3コース全て**を生成すること（ゆっくりコース、しっかりコース、どんどんコース）
-- 各コース×6枚=合計18枚のカード（3コース × 6カード = 18カード）
-- **全カードに以下のフィールドが必須**:
-  ✓ card_number: 1-6の数値
-  ✓ card_title: カードのタイトル（20文字以内）
-  ✓ card_type: "main" 固定
-  ✓ textbook_page: "p.XX" 形式
-  ✓ problem_description: 問題文（50文字以上）
-  ✓ new_terms: 新出用語（カンマ区切り）
-  ✓ example_problem: 例題
-  ✓ example_solution: 例題の解法
-  ✓ real_world_connection: 実社会とのつながり（50文字以上、必須）
-  ✓ answer: 解答（必須、空文字列禁止）
-  ✓ answer_explanation: 解答の説明・考え方（100文字程度、必須）
-  ✓ hints: 配列（必ず3つ）、各ヒントは {hint_level: 数値, hint_text: "文字列"} の形式
+注意：
+- コース（courses）は含めないでください
+- 基本情報（curriculum）のみを生成してください
+- 簡潔なJSON出力をお願いします
+`
+    
+    // 高品質モード判定
+    const useProMode = qualityMode === 'high'
 
-**🚨 超重要：JSON構文エラーを防ぐルール 🚨**
-1. **配列の要素間には必ずカンマ（,）を入れること**
-   正: {"a": 1}, {"b": 2}
-   誤: {"a": 1} {"b": 2}  （カンマなし）
-2. **改行の後でも、次の要素の前にカンマを忘れないこと**
-   正しい例:
-   { "card_number": 1 },  ← このカンマを絶対に忘れない！
-   { "card_number": 2 }
-3. **最後の要素の後にはカンマを入れないこと**
-4. **すべての文字列を二重引用符（"）で囲むこと**
-5. **コメント（//や/* */）は絶対に入れないこと**
-6. **有効なJSON形式のみを出力（説明文は不要）**
-7. **2コースだけで終わらないこと！必ず3コース分のcardsを生成すること！**
-8. **各カードのhints配列は必ず3つの要素を含めること**
-
-**JSON構造チェックリスト:**
-[ ] curriculum オブジェクトが存在する
-[ ] courses 配列に3つのコースが存在する
-[ ] 各コースに cards 配列が存在し、6つのカードがある
-[ ] 各カードに上記の必須フィールドがすべて存在する
-[ ] hints 配列に3つの要素がある
-[ ] すべての文字列が二重引用符で囲まれている
-[ ] 配列要素間にカンマがある（最後の要素を除く）← **特に重要！**
-
-${customInfo}
-
-上記の形式に従って、完全な有効JSONのみを出力してください。`
     // 品質モードに応じてモデルを選択
     // 'standard' (デフォルト): Gemini 2.5 Flash - 高速
     // 'high': Gemini 2.5 Pro - 高品質・詳細・厳密
