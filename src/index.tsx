@@ -4826,12 +4826,15 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
     
     const prompt = `${grade}${subject}「${unitName}」（${textbook}）の学習カリキュラムをJSON形式で作成してください。
 
-**重要な指示:**
-1. 有効なJSON形式のみを出力してください
-2. コードブロック（\`\`\`json）は使用しないでください
-3. JSON以外のテキストや説明は一切含めないでください
-4. すべての文字列は正しくエスケープしてください
-5. 配列の最後の要素の後にカンマを入れないでください
+**【最重要】JSON 出力の厳格なルール:**
+1. **必ず { で始まり } で終わること**（コードブロックやマークダウンは絶対に使わないこと）
+2. **配列要素の間には必ずカンマを入れること**（例: [..., {...}, {...}, {...}]）
+3. **最後の要素の後にはカンマを入れないこと**（例: {...}, {...}, {...}] ← 最後にカンマなし）
+4. **すべての文字列は二重引用符で囲むこと**（シングルクォートは使わない）
+5. **文字列内の二重引用符は \" でエスケープすること**
+6. **改行は \\n でエスケープすること**
+7. **JSON以外のテキスト（説明・コメント・思考過程）は一切出力しないこと**
+8. **出力は必ず1行目から {curriculum: で始めること**
 
 出力形式:
 {
@@ -4928,12 +4931,34 @@ ${customization.specialSupport ? `特別支援: ${customization.specialSupport}`
 
 必須要件:
 - **必ず3コース全て**を生成すること（ゆっくりコース、しっかりコース、どんどんコース）
-- 各コース×6枚=合計18枚のカード
-- 全カードにanswer（解答）とanswer_explanation（解答の説明、100文字程度）が必須
-- 全カードにreal_world_connection（実社会とのつながり、50文字以上）が必須
-- 全カードにhints配列3つが必須
+- 各コース×6枚=合計18枚のカード（3コース × 6カード = 18カード）
+- **全カードに以下のフィールドが必須**:
+  ✓ card_number: 1-6の数値
+  ✓ card_title: カードのタイトル（20文字以内）
+  ✓ card_type: "main" 固定
+  ✓ textbook_page: "p.XX" 形式
+  ✓ problem_description: 問題文（50文字以上）
+  ✓ new_terms: 新出用語（カンマ区切り）
+  ✓ example_problem: 例題
+  ✓ example_solution: 例題の解法
+  ✓ real_world_connection: 実社会とのつながり（50文字以上、必須）
+  ✓ answer: 解答（必須、空文字列禁止）
+  ✓ answer_explanation: 解答の説明・考え方（100文字程度、必須）
+  ✓ hints: 配列（必ず3つ）、各ヒントは {hint_level: 数値, hint_text: "文字列"} の形式
+- **配列の要素間には必ずカンマを入れること**
+- **最後の要素の後にはカンマを入れないこと**
 - 有効なJSON形式のみを出力（説明文やコメントは不要）
 - **2コースだけで終わらないこと！必ず3コース分のcardsを生成すること！**
+- **各カードのhints配列は必ず3つの要素を含めること**
+
+**JSON構造チェックリスト:**
+[ ] curriculum オブジェクトが存在する
+[ ] courses 配列に3つのコースが存在する
+[ ] 各コースに cards 配列が存在し、6つのカードがある
+[ ] 各カードに上記の必須フィールドがすべて存在する
+[ ] hints 配列に3つの要素がある
+[ ] すべての文字列が二重引用符で囲まれている
+[ ] 配列要素間にカンマがある（最後の要素を除く）
 
 ${customInfo}
 
@@ -5079,30 +5104,83 @@ ${customInfo}
     // データ構造を詳細に検証
     const validationErrors = []
     
-    // 必須フィールドのみ検証（追加問題は別APIで生成）
-    if (!unitData.curriculum) validationErrors.push('curriculum が欠けています')
-    if (!unitData.courses || !Array.isArray(unitData.courses)) validationErrors.push('courses が欠けているか配列ではありません')
+    // カリキュラムの検証
+    if (!unitData.curriculum) {
+      validationErrors.push('curriculum が欠けています')
+    } else {
+      if (!unitData.curriculum.grade) validationErrors.push('curriculum.grade が欠けています')
+      if (!unitData.curriculum.subject) validationErrors.push('curriculum.subject が欠けています')
+      if (!unitData.curriculum.unit_name) validationErrors.push('curriculum.unit_name が欠けています')
+      if (!unitData.curriculum.unit_goal) validationErrors.push('curriculum.unit_goal が欠けています')
+    }
     
     // コースの検証
-    if (unitData.courses && Array.isArray(unitData.courses)) {
-      unitData.courses.forEach((course: any, index: number) => {
+    if (!unitData.courses || !Array.isArray(unitData.courses)) {
+      validationErrors.push('courses が欠けているか配列ではありません')
+    } else {
+      if (unitData.courses.length < 3) {
+        validationErrors.push(`3コース必要ですが、${unitData.courses.length}コースしかありません`)
+      }
+      
+      // 各コースの詳細検証
+      unitData.courses.forEach((course: any, courseIndex: number) => {
+        const courseNum = courseIndex + 1
+        
+        if (!course.course_name) {
+          validationErrors.push(`コース${courseNum}: course_name が欠けています`)
+        }
+        
         if (!course.cards || !Array.isArray(course.cards)) {
-          validationErrors.push(`コース${index + 1}の cards が欠けているか配列ではありません`)
-        } else if (course.cards.length < 6) {
-          validationErrors.push(`コース${index + 1}は最低6枚のカードが必要ですが、${course.cards.length}枚しかありません`)
+          validationErrors.push(`コース${courseNum}: cards が欠けているか配列ではありません`)
+        } else {
+          if (course.cards.length < 6) {
+            validationErrors.push(`コース${courseNum}: 最低6枚のカードが必要ですが、${course.cards.length}枚しかありません`)
+          }
+          
+          // 各カードの必須フィールドを検証
+          course.cards.forEach((card: any, cardIndex: number) => {
+            const cardNum = cardIndex + 1
+            const prefix = `コース${courseNum}カード${cardNum}:`
+            
+            if (!card.card_title) validationErrors.push(`${prefix} card_title が欠けています`)
+            if (!card.problem_description) validationErrors.push(`${prefix} problem_description が欠けています`)
+            if (!card.answer) validationErrors.push(`${prefix} answer が欠けています`)
+            if (!card.answer_explanation) validationErrors.push(`${prefix} answer_explanation が欠けています`)
+            if (!card.real_world_connection) {
+              validationErrors.push(`${prefix} real_world_connection が欠けています`)
+            } else if (card.real_world_connection.length < 20) {
+              validationErrors.push(`${prefix} real_world_connection が短すぎます（${card.real_world_connection.length}文字）`)
+            }
+            
+            if (!card.hints || !Array.isArray(card.hints)) {
+              validationErrors.push(`${prefix} hints が欠けているか配列ではありません`)
+            } else if (card.hints.length < 3) {
+              validationErrors.push(`${prefix} hints は3つ必要ですが、${card.hints.length}つしかありません`)
+            } else {
+              // 各ヒントの検証
+              card.hints.forEach((hint: any, hintIndex: number) => {
+                if (!hint.hint_text && !hint.hint_content) {
+                  validationErrors.push(`${prefix}ヒント${hintIndex + 1} のテキストが欠けています`)
+                }
+              })
+            }
+          })
         }
       })
     }
     
     if (validationErrors.length > 0) {
-      console.error('単元データ検証エラー:', validationErrors)
-      console.error('生成されたデータの一部:', JSON.stringify(unitData).substring(0, 1000))
+      console.error('❌ 単元データ検証エラー:', validationErrors)
+      console.error('📊 生成されたデータの一部:', JSON.stringify(unitData).substring(0, 1000))
       return c.json({
         error: '単元データの構造が正しくありません。',
         validation_errors: validationErrors,
+        data_preview: JSON.stringify(unitData).substring(0, 500),
         curriculum: null
-      })
+      }, 400)
     }
+    
+    console.log('✅ データ検証成功')
     
     return c.json({
       success: true,
@@ -6399,16 +6477,38 @@ app.put('/api/optional-problem/:id', async (c) => {
   const { problem_title, problem_description, problem_content, difficulty_level, learning_meaning } = await c.req.json()
   
   try {
+    // バリデーション
+    const errors = []
+    if (!problem_title || problem_title.trim() === '') {
+      errors.push('problem_title: 問題タイトルが空です')
+    }
+    if (!problem_description || problem_description.trim() === '') {
+      errors.push('problem_description: 問題内容が空です')
+    }
+    if (!difficulty_level) {
+      errors.push('difficulty_level: 難易度が指定されていません')
+    } else if (!['minimum', 'standard', 'advanced', 'easy', 'medium', 'hard'].includes(difficulty_level)) {
+      errors.push(`difficulty_level: 無効な難易度 "${difficulty_level}"（有効値: minimum, standard, advanced, easy, medium, hard）`)
+    }
+    
+    if (errors.length > 0) {
+      return c.json({
+        success: false,
+        error: '必須フィールドが入力されていないか、値が無効です',
+        validation_errors: errors
+      }, 400)
+    }
+    
     await env.DB.prepare(`
       UPDATE optional_problems
       SET problem_title = ?, problem_description = ?, 
           problem_content = ?, difficulty_level = ?, learning_meaning = ?
       WHERE id = ?
     `).bind(
-      problem_title,
-      problem_description,
+      problem_title.trim(),
+      problem_description.trim(),
       problem_content || '',
-      difficulty_level || 'medium',
+      difficulty_level,
       learning_meaning || '',
       problemId
     ).run()

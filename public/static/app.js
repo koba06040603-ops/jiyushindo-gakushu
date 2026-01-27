@@ -13740,6 +13740,23 @@ async function saveTeacherOptionalProblemEdit(problemId, problemIndex) {
     
     console.log('📝 更新データ:', updatedProblem)
     
+    // フロントエンドでのバリデーション
+    const errors = []
+    if (!updatedProblem.problem_title || updatedProblem.problem_title.trim() === '') {
+      errors.push('問題タイトルが入力されていません')
+    }
+    if (!updatedProblem.problem_description || updatedProblem.problem_description.trim() === '') {
+      errors.push('問題内容が入力されていません')
+    }
+    if (!updatedProblem.difficulty_level) {
+      errors.push('難易度が選択されていません')
+    }
+    
+    if (errors.length > 0) {
+      alert('❌ 入力エラー\n\n' + errors.join('\n'))
+      return
+    }
+    
     const response = await axios.put(`/api/optional-problem/${problemId}`, updatedProblem)
     
     console.log('✅ サーバーレスポンス:', response.data)
