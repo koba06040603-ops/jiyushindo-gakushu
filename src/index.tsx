@@ -195,7 +195,26 @@ function extractJSON(aiResponse: string): any {
   jsonText = jsonText.replace(/\](\s*)\{/g, '],$1{')
   // パターン: ] [ → ], [
   jsonText = jsonText.replace(/\](\s*)\[/g, '],$1[')
-  // パターン: " " → ", "（文字列間）
+  
+  // 【NEW 2025-01-28】より強力な修正: 改行を含む配列要素間のカンマ欠落
+  // パターン: }\n  { → },\n  {（改行後の次の要素）
+  jsonText = jsonText.replace(/\}(\s*\n\s*)\{/g, '},$1{')
+  // パターン: ]\n  { → ],\n  {
+  jsonText = jsonText.replace(/\](\s*\n\s*)\{/g, '],$1{')
+  // パターン: }\n  [ → },\n  [
+  jsonText = jsonText.replace(/\}(\s*\n\s*)\[/g, '},$1[')
+  // パターン: ]\n  [ → ],\n  [
+  jsonText = jsonText.replace(/\](\s*\n\s*)\[/g, '],$1[')
+  
+  // 【NEW】文字列終了後の改行と次の要素の間のカンマ欠落
+  // パターン: "\n  { → ",\n  {
+  jsonText = jsonText.replace(/"(\s*\n\s*)\{/g, '",$1{')
+  // パターン: "\n  [ → ",\n  [
+  jsonText = jsonText.replace(/"(\s*\n\s*)\[/g, '",$1[')
+  // パターン: "\n  " → ",\n  "（文字列配列の要素間）
+  jsonText = jsonText.replace(/"(\s*\n\s*)"/g, '",$1"')
+  
+  // パターン: " " → ", "（文字列間、単一行）
   jsonText = jsonText.replace(/"(\s*)"/g, function(match, whitespace) {
     // キー:値の":"の後の場合は置換しない
     const beforeMatch = jsonText.substring(0, jsonText.indexOf(match))
@@ -215,11 +234,11 @@ function extractJSON(aiResponse: string): any {
     }
   }
   
-  // 引用符の数が奇数の場合、末尾に引用符を追加
+  // 引用符の数が奇数の場合、末尾に引用符を追加（より慎重なアプローチ）
   if (quoteCount % 2 !== 0) {
-    console.warn('⚠️ 未閉じの引用符を検出、修正を試みます')
-    // 最後のオブジェクトまたは配列の閉じ括弧の前に引用符を追加
-    jsonText = jsonText.replace(/([}\]])(\s*)$/, '"$1$2')
+    console.warn('⚠️ 未閉じの引用符を検出')
+    // 単純に末尾に引用符を追加（閉じ括弧の前ではなく）
+    jsonText = jsonText.trim() + '"'
   }
   
   try {
@@ -304,8 +323,15 @@ function extractJSON(aiResponse: string): any {
         console.log('✅ 文字列を閉じました')
       }
       
+      // 配列要素間のカンマ欠落を修正（オブジェクト直後に別のオブジェクトが続く場合）
+      jsonText = jsonText.replace(/(\})\s*(\{)/g, '$1,$2')
+      // 配列要素間のカンマ欠落を修正（配列直後に別の要素が続く場合）
+      jsonText = jsonText.replace(/(\])\s*(\[)/g, '$1,$2')
+      // 配列要素間のカンマ欠落を修正（文字列直後に別の文字列が続く場合）
+      jsonText = jsonText.replace(/("\s*)\s*"/g, '$1,"')
+      
       // カンマを削除（最後の要素の後のカンマ）
-      jsonText = jsonText.replace(/,(\s*)$/, '$1')
+      jsonText = jsonText.replace(/,(\s*[\]}])$/g, '$1')
       
       // 開いている配列を閉じる
       while (openBrackets > 0) {
@@ -492,6 +518,28 @@ function extractJSON(aiResponse: string): any {
           
           console.error('❌ すべての修正戦略が失敗しました')
         }
+      }
+    }
+    
+    // 最後の試み: エラーをthrow
+    console.error('❌ すべての修正戦略が失敗しました')
+    
+    // 詳細なデバッグ情報を提供
+    console.error('🔴 JSON修正失敗 - デバッグ情報:')
+    console.error('エラー詳細:', error)
+    console.error('JSON長さ:', jsonText.length)
+    console.error('最初の500文字:', jsonText.substring(0, 500))
+    console.error('最後の500文字:', jsonText.substring(Math.max(0, jsonText.length - 500)))
+    
+    // エラー位置の特定（position情報がある場合）
+    if (error instanceof Error && error.message.includes('position')) {
+      const posMatch = error.message.match(/position (\d+)/)
+      if (posMatch) {
+        const errorPos = parseInt(posMatch[1])
+        const start = Math.max(0, errorPos - 200)
+        const end = Math.min(jsonText.length, errorPos + 200)
+        console.error(`エラー位置周辺（±200文字）:`, jsonText.substring(start, end))
+        console.error(`エラー位置の文字: "${jsonText[errorPos]}" (code: ${jsonText.charCodeAt(errorPos)})`)
       }
     }
     
