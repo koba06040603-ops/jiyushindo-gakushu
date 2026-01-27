@@ -186,7 +186,26 @@ function extractJSON(aiResponse: string): any {
   // パターン: true { → true, {
   jsonText = jsonText.replace(/(true|false|null)(\s*)\{/g, '$1,$2{')
   
-  console.log('✅ JSONカンマ欠落修正を実行しました')
+  // 追加修正: 配列内のオブジェクト間のカンマ欠落を修正
+  // パターン: } { → }, {（配列内のオブジェクト間）
+  jsonText = jsonText.replace(/\}(\s*)\{/g, '},$1{')
+  // パターン: } [ → }, [
+  jsonText = jsonText.replace(/\}(\s*)\[/g, '},$1[')
+  // パターン: ] { → ], {
+  jsonText = jsonText.replace(/\](\s*)\{/g, '],$1{')
+  // パターン: ] [ → ], [
+  jsonText = jsonText.replace(/\](\s*)\[/g, '],$1[')
+  // パターン: " " → ", "（文字列間）
+  jsonText = jsonText.replace(/"(\s*)"/g, function(match, whitespace) {
+    // キー:値の":"の後の場合は置換しない
+    const beforeMatch = jsonText.substring(0, jsonText.indexOf(match))
+    if (beforeMatch.match(/:\s*$/)) {
+      return match // 置換しない
+    }
+    return '",' + whitespace + '"'
+  })
+  
+  console.log('✅ JSONカンマ欠落修正を実行しました（拡張版）')
   
   // 未閉じの文字列を検出して修正を試みる
   let quoteCount = 0
