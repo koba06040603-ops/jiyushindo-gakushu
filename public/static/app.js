@@ -2957,6 +2957,14 @@ async function loadCardPage(cardId) {
         .card-heading {
           font-size: ${fontSize.heading}px;
         }
+        /* テキスト入力カーソルを黒に設定 */
+        input[type="text"],
+        input[type="number"],
+        input[type="email"],
+        input[type="password"],
+        textarea {
+          caret-color: #000000 !important;
+        }
       </style>
       <div class="container mx-auto px-4 py-8">
         <!-- ヘッダー -->
@@ -3213,7 +3221,7 @@ async function loadCardPage(cardId) {
                   <div class="bg-white rounded-lg p-4">
                     <button onclick="toggleHint(${index})" 
                             class="w-full text-left font-bold text-gray-800 hover:text-indigo-600 transition flex items-center justify-between">
-                      <span>ヒント ${hint.hint_number}</span>
+                      <span>ヒント ${index + 1}</span>
                       <i class="fas fa-chevron-down"></i>
                     </button>
                     <div id="hint-${index}" class="hidden mt-3 pt-3 border-t">
@@ -17375,6 +17383,16 @@ function renderLoginPage() {
   
   const app = document.getElementById('app')
   app.innerHTML = `
+    <style>
+      /* テキスト入力カーソルを黒に設定 */
+      input[type="text"],
+      input[type="number"],
+      input[type="email"],
+      input[type="password"],
+      textarea {
+        caret-color: #000000 !important;
+      }
+    </style>
     <div class="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center px-4">
       <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
         <!-- ヘッダー -->
