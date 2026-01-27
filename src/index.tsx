@@ -5321,8 +5321,8 @@ ${customInfo}
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.2,  // より決定論的な出力のため低めに設定
-          maxOutputTokens: 16384,  // 6枚分のカードを確実に生成
+          temperature: 0.3,  // より決定論的な出力のため低めに設定
+          maxOutputTokens: 8192,  // 6枚分のカードを生成（より小さい値で確実に）
           topP: 0.9,
           topK: 20,
           responseMimeType: 'application/json',
