@@ -3948,8 +3948,14 @@ function initHandwritingCanvas() {
     const x = (clientX - rect.left) * scaleX
     const y = (clientY - rect.top) * scaleY
     
-    // カーソルをcrosshairに強制設定
+    // カーソルをcrosshairに強制設定（重要: 毎回実行）
     canvas.style.cursor = 'crosshair'
+    
+    // 線の描画設定を毎回設定（他の処理でリセットされる可能性があるため）
+    ctx.strokeStyle = '#000000'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
     
     ctx.beginPath()
     ctx.moveTo(lastX, lastY)
@@ -4290,10 +4296,17 @@ function answerDraw(e) {
   const x = (clientX - rect.left) * scaleX
   const y = (clientY - rect.top) * scaleY
   
-  // カーソルをcrosshairに強制設定
+  // カーソルをcrosshairに強制設定（重要: 毎回実行）
   canvas.style.cursor = 'crosshair'
   
   const ctx = canvas.getContext('2d')
+  
+  // 線の描画設定を毎回設定（他の処理でリセットされる可能性があるため）
+  ctx.strokeStyle = '#000000'
+  ctx.lineWidth = 3
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  
   ctx.beginPath()
   ctx.moveTo(answerLastX, answerLastY)
   ctx.lineTo(x, y)
@@ -4351,8 +4364,22 @@ async function recognizeAnswerHandwriting() {
     console.log('=== 手書き認識開始 ===')
     console.log('Tesseract利用可能:', typeof Tesseract !== 'undefined')
     
+    // Tesseract.jsの読み込み待機（最大10秒）
+    let tesseractLoaded = typeof Tesseract !== 'undefined'
+    if (!tesseractLoaded) {
+      console.log('⏳ Tesseract.jsの読み込みを待機中...')
+      for (let i = 0; i < 20; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        tesseractLoaded = typeof Tesseract !== 'undefined'
+        if (tesseractLoaded) {
+          console.log('✅ Tesseract.js読み込み完了')
+          break
+        }
+      }
+    }
+    
     // 1. Tesseract.js で OCR 認識（日本語+英語）
-    if (typeof Tesseract !== 'undefined') {
+    if (tesseractLoaded) {
       const imageData = canvas.toDataURL('image/png')
       console.log('✅ Tesseract OCR 開始...')
       console.log('画像データサイズ:', imageData.length)
@@ -4402,7 +4429,7 @@ async function recognizeAnswerHandwriting() {
         // OCRエラーでも次の方法にフォールバック
       }
     } else {
-      console.log('⚠️ Tesseract.js が読み込まれていません')
+      console.log('⚠️ Tesseract.js が読み込まれていません（10秒待機後もロードされず）')
     }
     
     // 2. ブラウザのHandwriting Recognition APIを試す
@@ -13558,8 +13585,9 @@ async function saveNewCheckTestProblem(curriculumId, problemNumber) {
       closeAddCheckTestModal()
       alert('✅ チェックテスト問題を追加しました！')
       
-      // データを再読み込み
-      await loadTeacherOverview(curriculumId)
+      // データを再読み込み（学習のてびきページへ）
+      console.log('🔄 学習のてびきページをリロード: curriculum_id =', curriculumId)
+      await loadGuidePage(curriculumId)
     } else {
       throw new Error(response.data.error || '保存に失敗しました')
     }
@@ -13752,8 +13780,9 @@ async function saveNewOptionalProblem(curriculumId, problemNumber) {
       closeAddOptionalProblemModal()
       alert('✅ 選択問題を追加しました！')
       
-      // データを再読み込み
-      await loadTeacherOverview(curriculumId)
+      // データを再読み込み（学習のてびきページへ）
+      console.log('🔄 学習のてびきページをリロード: curriculum_id =', curriculumId)
+      await loadGuidePage(curriculumId)
     } else {
       throw new Error(response.data.error || '保存に失敗しました')
     }

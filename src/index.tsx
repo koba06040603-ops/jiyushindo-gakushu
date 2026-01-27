@@ -3874,6 +3874,15 @@ app.get('/', (c) => {
         <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
         <style>
+          /* FontAwesome fa-spin animation */
+          @keyframes fa-spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          .fa-spin {
+            animation: fa-spin 1s infinite linear;
+          }
+          
           @media print {
             body { background: white !important; }
             .print\\:hidden { display: none !important; }
