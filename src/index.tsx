@@ -5192,13 +5192,25 @@ ${customInfo}
 必ず上記のJSON形式で出力してください。
 `
 
-    // Gemini 3.0 Flashを使用（最新の安定版、高品質なJSON生成）
-    const modelName = 'gemini-3.0-flash'
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
+    // モデルのフォールバックリスト（新しい順）
+    const modelNames = [
+      'gemini-2.0-flash-exp',      // 最新の実験版
+      'gemini-2.5-flash',          // 安定版Flash
+      'gemini-2.0-flash-thinking-exp-01-21', // 思考型
+      'gemini-2.0-flash-exp-20250102' // 特定日付版
+    ]
     
-    console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
+    let lastError = null
+    let courseData = null
     
-    const response = await fetch(apiUrl, {
+    // 複数のモデルを試行
+    for (const modelName of modelNames) {
+      try {
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
+        
+        console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
+        
+        const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5259,13 +5271,24 @@ ${customInfo}
     })
     
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`)
+      const errorText = await response.text()
+      console.error('❌ Gemini API エラー:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errorText
+      })
+      throw new Error(`Gemini API Error: ${response.status} - ${errorText.substring(0, 200)}`)
     }
     
     const data = await response.json()
     
     if (!data.candidates || data.candidates.length === 0) {
-      throw new Error('APIレスポンスにcandidatesがありません')
+      console.error('❌ APIレスポンスエラー:', {
+        dataKeys: Object.keys(data),
+        promptFeedback: data.promptFeedback,
+        candidates: data.candidates
+      })
+      throw new Error('APIレスポンスにcandidatesがありません。promptFeedback: ' + JSON.stringify(data.promptFeedback))
     }
     
     const aiResponse = data.candidates[0].content.parts[0].text
@@ -5321,8 +5344,25 @@ ${customInfo}
     
     console.log('✅ バリデーション成功:', {
       コース名: courseData.course_name || courseData.name,
-      カード枚数: courseData.cards.length
+      カード枚数: courseData.cards.length,
+      使用モデル: modelName
     })
+    
+    // 成功したのでループを抜ける
+    break
+    
+      } catch (modelError: any) {
+        console.error(`❌ ${modelName} でエラー:`, modelError.message)
+        lastError = modelError
+        // 次のモデルを試行
+        continue
+      }
+    }
+    
+    // すべてのモデルで失敗した場合
+    if (!courseData) {
+      throw new Error(`すべてのモデルで失敗しました。最後のエラー: ${lastError?.message}`)
+    }
     
     return c.json({
       success: true,
@@ -5330,10 +5370,21 @@ ${customInfo}
     })
     
   } catch (error: any) {
-    console.error('❌ コース生成エラー:', error)
+    console.error('❌ コース生成エラー（詳細）:', {
+      エラーメッセージ: error.message,
+      エラースタック: error.stack,
+      エラー型: error.constructor.name,
+      コース名: courseInfo?.name,
+      コースレベル: courseLevel
+    })
     return c.json({
       error: error.message || 'コース生成に失敗しました',
-      course: null
+      course: null,
+      details: {
+        errorType: error.constructor.name,
+        courseName: courseInfo?.name,
+        courseLevel: courseLevel
+      }
     }, 500)
   }
 })
