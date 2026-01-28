@@ -4181,6 +4181,7 @@ app.get('/', (c) => {
             console.log('📦 DOMContentLoaded: スクリプト読み込み開始')
             
             const scripts = [
+              '/static/ocr-handler.js',
               '/static/tts.js',
               '/static/visual-support.js', 
               '/static/realtime.js',
