@@ -5373,7 +5373,7 @@ ${customInfo}
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 8192,
+          maxOutputTokens: 16384,  // 8192 → 16384 に増加（JSON完全性を確保）
           topP: 0.9,
           topK: 20
         }
