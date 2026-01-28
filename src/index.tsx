@@ -5347,55 +5347,9 @@ ${customInfo}
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 8192,  // gemini-1.5-flash は 8K まで（6枚分のカードに十分）
+          maxOutputTokens: 8192,
           topP: 0.9,
-          topK: 20,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: 'object',
-            properties: {
-              course_name: { type: 'string' },
-              name: { type: 'string' },
-              label: { type: 'string' },
-              description: { type: 'string' },
-              color_code: { type: 'string' },
-              cards: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    card_number: { type: 'number' },
-                    card_title: { type: 'string' },
-                    card_type: { type: 'string' },
-                    textbook_page: { type: 'string' },
-                    problem_description: { type: 'string' },
-                    new_terms: { type: 'string' },
-                    example_problem: { type: 'string' },
-                    example_solution: { type: 'string' },
-                    real_world_connection: { type: 'string' },
-                    answer: { type: 'string' },
-                    answer_explanation: { type: 'string' },
-                    hints: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          hint_level: { type: 'number' },
-                          hint_text: { type: 'string' }
-                        },
-                        required: ['hint_level', 'hint_text']
-                      }
-                    }
-                  },
-                  required: ['card_number', 'card_title', 'card_type', 'textbook_page', 
-                            'problem_description', 'new_terms', 'example_problem', 
-                            'example_solution', 'real_world_connection', 'answer', 
-                            'answer_explanation', 'hints']
-                }
-              }
-            },
-            required: ['course_name', 'name', 'label', 'description', 'color_code', 'cards']
-          }
+          topK: 20
         }
       })
     })
