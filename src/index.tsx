@@ -5324,9 +5324,9 @@ ${customInfo}
 必ず上記のJSON形式で出力してください。
 `
 
-    // 【安定版】gemini-1.5-pro を使用（最も信頼性が高い）
-    const modelName = 'gemini-1.5-pro'
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
+    // 【安定版】gemini-1.5-flash を使用（v1 API で利用可能）
+    const modelName = 'gemini-1.5-flash'
+    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`
     
     console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
     console.log(`📋 コース情報:`, {
@@ -5346,8 +5346,8 @@ ${customInfo}
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.2,  // より決定論的な出力のため低めに設定
-          maxOutputTokens: 32768,  // gemini-1.5-pro は 32K まで対応（6枚分のカードを確実に生成）
+          temperature: 0.2,
+          maxOutputTokens: 8192,  // gemini-1.5-flash は 8K まで（6枚分のカードに十分）
           topP: 0.9,
           topK: 20,
           responseMimeType: 'application/json',
