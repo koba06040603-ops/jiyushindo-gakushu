@@ -4298,31 +4298,40 @@ async function sendHandwriting() {
   // 画像を表示
   addAIMessage(`[手書きメモ${thinkingNote}を認識中...]\n\n📝 ${strokeCount}回のストローク、${totalPoints}個の点`, 'user')
   
+  // 既存のオーバーレイを削除
+  const existingOverlay = document.getElementById('ocr-loading-overlay')
+  if (existingOverlay) existingOverlay.remove()
+  
   // ローディングオーバーレイを作成
   const loadingOverlay = document.createElement('div')
   loadingOverlay.id = 'ocr-loading-overlay'
-  loadingOverlay.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    backdrop-filter: blur(4px);
-  `
+  
+  // インラインスタイルで完全制御
+  Object.assign(loadingOverlay.style, {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    width: '100vw',
+    height: '100vh',
+    background: 'rgba(0, 0, 0, 0.92)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: '2147483647',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    fontFamily: 'system-ui, -apple-system, sans-serif'
+  })
   
   loadingOverlay.innerHTML = `
-    <div style="background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 90%;">
-      <div style="font-size: 3rem; animation: spin 1s linear infinite;">🔄</div>
-      <div style="font-size: 1.25rem; font-weight: bold; margin-top: 1rem; color: #1f2937;">文字認識中...</div>
-      <div id="ocr-progress-text" style="font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem;">準備中...</div>
-      <div style="width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; margin-top: 1rem; overflow: hidden;">
-        <div id="ocr-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 0.3s;"></div>
+    <div id="ocr-overlay-content" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 3.5rem; border-radius: 2rem; box-shadow: 0 35px 100px rgba(0,0,0,0.7); text-align: center; max-width: 520px; width: 92%; border: 5px solid rgba(255,255,255,0.5); transform: scale(0.7); opacity: 0; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);">
+      <div style="font-size: 6rem; animation: spin 1s linear infinite; display: inline-block; filter: drop-shadow(0 6px 20px rgba(0,0,0,0.5));">🔄</div>
+      <div style="font-size: 2.25rem; font-weight: 900; margin-top: 1.75rem; color: white; text-shadow: 0 4px 8px rgba(0,0,0,0.5); letter-spacing: 1px;">文字認識中...</div>
+      <div id="ocr-progress-text" style="font-size: 1.3rem; color: rgba(255,255,255,0.98); margin-top: 1.2rem; min-height: 32px; font-weight: 600;">準備中...</div>
+      <div style="width: 100%; height: 16px; background: rgba(255,255,255,0.3); border-radius: 8px; margin-top: 2rem; overflow: hidden; box-shadow: inset 0 3px 6px rgba(0,0,0,0.4);">
+        <div id="ocr-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #ee5a6f); transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 20px rgba(255,255,255,0.8); border-radius: 8px;"></div>
       </div>
+      <div id="ocr-progress-percent" style="font-size: 2rem; font-weight: 900; color: white; margin-top: 1.5rem; text-shadow: 0 4px 8px rgba(0,0,0,0.5); letter-spacing: 3px;">0%</div>
     </div>
   `
   
@@ -4341,15 +4350,26 @@ async function sendHandwriting() {
     document.head.appendChild(style)
   }
   
+  // オーバーレイをアニメーション表示
+  setTimeout(() => {
+    const content = document.getElementById('ocr-overlay-content')
+    if (content) {
+      content.style.transform = 'scale(1)'
+      content.style.opacity = '1'
+    }
+  }, 50)
+  
   // 進捗更新関数
   const updateProgress = (text, percent) => {
     const progressText = document.getElementById('ocr-progress-text')
     const progressBar = document.getElementById('ocr-progress-bar')
+    const progressPercent = document.getElementById('ocr-progress-percent')
     if (progressText) progressText.textContent = text
     if (progressBar) progressBar.style.width = `${percent}%`
+    if (progressPercent) progressPercent.textContent = `${Math.round(percent)}%`
   }
   
-  // 非同期処理を100ms後に開始（UIの更新を先に完了）
+  // 非同期処理を200ms後に開始（UIの更新を確実に）
   setTimeout(async () => {
     let progressMessageId = null
     
@@ -4358,25 +4378,37 @@ async function sendHandwriting() {
       console.log('🔍 手書きOCR認識開始（2段階フォールバック）...')
       console.log('📊 画像データサイズ:', imageData.length, 'bytes')
       
-      // Check if performSimpleOCR is available
-      if (typeof window.performSimpleOCR !== 'function') {
-        console.error('❌ window.performSimpleOCR が見つかりません')
-        throw new Error('OCR Handler が読み込まれていません')
-      }
-      
       // Progress message
       progressMessageId = addAIMessage('🌐 第1段階: Google Cloud Vision API で認識中...', 'system')
-      updateProgress('🌐 第1段階: Google Cloud Vision API で認識中...', 30)
+      updateProgress('🌐 第1段階: Google Cloud Vision API で認識中...', 45)
       
-      // Call OCR function
-      const result = await window.performSimpleOCR(imageData, 'ja')
+      // Call OCR API directly (no external function needed)
+      const response = await axios.post('/api/ai/ocr', {
+        imageData: imageData,
+        language: 'ja'
+      })
+      
+      console.log('📦 サーバーレスポンス:', response.data)
       
       updateProgress('✅ 認識完了！', 100)
       
-      // ローディングオーバーレイを削除（少し遅延させてアニメーション効果）
+      // 成功表示を少し長めに
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // フェードアウトアニメーション
+      const content = document.getElementById('ocr-overlay-content')
+      if (content) {
+        content.style.transform = 'scale(0.85)'
+        content.style.opacity = '0'
+      }
+      loadingOverlay.style.opacity = '0'
+      
+      // ローディングオーバーレイを削除
       setTimeout(() => {
         loadingOverlay.remove()
-      }, 300)
+      }, 400)
+      
+      const result = response.data
       
       console.log('✅ OCR認識完了:', result)
       
