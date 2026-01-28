@@ -4298,8 +4298,56 @@ async function sendHandwriting() {
   // 画像を表示
   addAIMessage(`[手書きメモ${thinkingNote}を認識中...]\n\n📝 ${strokeCount}回のストローク、${totalPoints}個の点`, 'user')
   
-  // カーソルを待機状態に（視覚的フィードバック）
-  document.body.style.cursor = 'wait'
+  // ローディングオーバーレイを作成
+  const loadingOverlay = document.createElement('div')
+  loadingOverlay.id = 'ocr-loading-overlay'
+  loadingOverlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(4px);
+  `
+  
+  loadingOverlay.innerHTML = `
+    <div style="background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 90%;">
+      <div style="font-size: 3rem; animation: spin 1s linear infinite;">🔄</div>
+      <div style="font-size: 1.25rem; font-weight: bold; margin-top: 1rem; color: #1f2937;">文字認識中...</div>
+      <div id="ocr-progress-text" style="font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem;">準備中...</div>
+      <div style="width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; margin-top: 1rem; overflow: hidden;">
+        <div id="ocr-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 0.3s;"></div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(loadingOverlay)
+  
+  // アニメーション用CSS（spin）を追加
+  if (!document.getElementById('ocr-spin-style')) {
+    const style = document.createElement('style')
+    style.id = 'ocr-spin-style'
+    style.textContent = `
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    `
+    document.head.appendChild(style)
+  }
+  
+  // 進捗更新関数
+  const updateProgress = (text, percent) => {
+    const progressText = document.getElementById('ocr-progress-text')
+    const progressBar = document.getElementById('ocr-progress-bar')
+    if (progressText) progressText.textContent = text
+    if (progressBar) progressBar.style.width = `${percent}%`
+  }
   
   // 非同期処理を100ms後に開始（UIの更新を先に完了）
   setTimeout(async () => {
@@ -4318,12 +4366,17 @@ async function sendHandwriting() {
       
       // Progress message
       progressMessageId = addAIMessage('🌐 第1段階: Google Cloud Vision API で認識中...', 'system')
+      updateProgress('🌐 第1段階: Google Cloud Vision API で認識中...', 30)
       
       // Call OCR function
       const result = await window.performSimpleOCR(imageData, 'ja')
       
-      // カーソルを元に戻す
-      document.body.style.cursor = 'default'
+      updateProgress('✅ 認識完了！', 100)
+      
+      // ローディングオーバーレイを削除（少し遅延させてアニメーション効果）
+      setTimeout(() => {
+        loadingOverlay.remove()
+      }, 300)
       
       console.log('✅ OCR認識完了:', result)
       
@@ -4376,8 +4429,10 @@ async function sendHandwriting() {
     } catch (error) {
       console.error('❌ OCR認識エラー:', error)
       
-      // カーソルを元に戻す
-      document.body.style.cursor = 'default'
+      // ローディングオーバーレイを削除
+      if (loadingOverlay && loadingOverlay.parentNode) {
+        loadingOverlay.remove()
+      }
       
       if (progressMessageId) {
         updateAIMessage(progressMessageId, '❌ 認識エラーが発生しました')
