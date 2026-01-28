@@ -5321,10 +5321,56 @@ app.post('/api/ai/generate-course', async (c) => {
       'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
     }[courseLevel] || '標準的なペースで学ぶコース'
 
-    // プロンプト（6枚のカード生成）
-    const prompt = `${grade}${subject}「${unitName}」学習カード6枚JSON:
-{"course_name":"${courseInfo.name}","name":"${courseInfo.name}","label":"${courseInfo.label}","description":"${courseInfo.description}","color_code":"${courseInfo.color_code}","cards":[{"card_number":1,"card_title":"","card_type":"main","textbook_page":"","problem_description":"","new_terms":"","example_problem":"","example_solution":"","real_world_connection":"","answer":"","answer_explanation":"","hints":[{"hint_level":1,"hint_text":""},{"hint_level":2,"hint_text":""},{"hint_level":3,"hint_text":""}]},{"card_number":2,...},{"card_number":3,...},{"card_number":4,...},{"card_number":5,...},{"card_number":6,...}]}
-6枚、各3ヒント必須。`
+    // 【強化】プロンプト（6枚のカード生成 - より詳細な指示）
+    const prompt = `あなたは小学校の優秀な教師です。以下の単元の学習カード6枚を生成してください。
+
+【単元情報】
+- 学年: ${grade}
+- 教科: ${subject}
+- 単元名: ${unitName}
+- コース: ${courseInfo.name} (${difficultyDescription})
+
+【重要】以下のJSON形式で、必ず完全な6枚のカードを生成してください：
+
+{
+  "course_name": "${courseInfo.name}",
+  "name": "${courseInfo.name}",
+  "label": "${courseInfo.label}",
+  "description": "${courseInfo.description}",
+  "color_code": "${courseInfo.color_code}",
+  "cards": [
+    {
+      "card_number": 1,
+      "card_title": "魅力的なタイトル（20字以内）",
+      "card_type": "main",
+      "textbook_page": "p.XX",
+      "problem_description": "具体的な数字を含む問題文（80-150字）",
+      "new_terms": "新出用語（カンマ区切り）",
+      "example_problem": "例題（具体的な数字）",
+      "example_solution": "解き方の説明",
+      "real_world_connection": "実生活とのつながり",
+      "answer": "解答と解説（50-100字）",
+      "answer_explanation": "なぜその答えになるか（50-100字）",
+      "hints": [
+        {"hint_level": 1, "hint_text": "ヒント1: まず何を考える？", "thinking_tool_suggestion": "図・表・式"},
+        {"hint_level": 2, "hint_text": "ヒント2: 次に何をする？", "thinking_tool_suggestion": "図・表・式"},
+        {"hint_level": 3, "hint_text": "ヒント3: 答えに近づくために", "thinking_tool_suggestion": "図・表・式"}
+      ]
+    },
+    { /* カード2: 上記と同じ構造 */ },
+    { /* カード3: 上記と同じ構造 */ },
+    { /* カード4: 上記と同じ構造 */ },
+    { /* カード5: 上記と同じ構造 */ },
+    { /* カード6: 上記と同じ構造 */ }
+  ]
+}
+
+【厳守事項】
+1. 必ず6枚のカードを生成すること
+2. 各カードに必ず3つのヒントを含めること
+3. JSONのみを出力し、説明文は含めないこと
+4. すべてのフィールドに具体的な内容を記入すること
+5. 完全なJSON（{で始まり}で終わる）を出力すること`
 
     // 【最新】Gemini 3.0 Flash を使用
     const modelName = 'gemini-3-flash-preview'  // 最新の Gemini 3.0 Flash
@@ -5342,8 +5388,13 @@ app.post('/api/ai/generate-course', async (c) => {
     })
     
     let courseData = null
+    const MAX_RETRIES = 3  // 【新規】最大再試行回数
     
-    try {
+    // 【新規】再試行ロジック
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`🔄 コース生成試行 ${attempt}/${MAX_RETRIES}...`)
+        
       const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5460,28 +5511,103 @@ app.post('/api/ai/generate-course', async (c) => {
       }
     }
     
-    // バリデーション
-    if (!courseData.cards || courseData.cards.length < 6) {
+    // 【強化】バリデーション: 厳格なチェック
+    if (!courseData.cards || courseData.cards.length !== 6) {
       console.error('❌ バリデーションエラー:', {
         cards存在: !!courseData.cards,
-        cards長さ: courseData.cards?.length || 0
+        cards長さ: courseData.cards?.length || 0,
+        期待枚数: 6
       })
-      throw new Error(`カードが6枚未満です: ${courseData.cards?.length || 0}枚`)
+      throw new Error(`カードが6枚ではありません: ${courseData.cards?.length || 0}枚（期待: 6枚）`)
+    }
+    
+    // 【新規】各カードのヒント数チェック
+    for (let i = 0; i < courseData.cards.length; i++) {
+      const card = courseData.cards[i]
+      if (!card.hints || card.hints.length < 3) {
+        console.error(`❌ カード${i+1}のヒント不足:`, {
+          カード番号: card.card_number,
+          ヒント数: card.hints?.length || 0,
+          期待数: 3
+        })
+        
+        // 【自動修復】ヒントが不足している場合はデフォルト値で補完
+        if (!card.hints) {
+          card.hints = []
+        }
+        while (card.hints.length < 3) {
+          const hintLevel = card.hints.length + 1
+          card.hints.push({
+            hint_level: hintLevel,
+            hint_text: hintLevel === 1 ? 'まず、問題で何を求められているか確認しましょう。' :
+                      hintLevel === 2 ? '図や表に書いて整理してみましょう。' :
+                      '似ている問題を思い出してみましょう。',
+            thinking_tool_suggestion: ''
+          })
+        }
+        console.log(`✅ カード${i+1}のヒントを自動補完しました（${card.hints.length}個）`)
+      }
+    }
+    
+    // 【新規】各カードの必須フィールドチェック
+    const requiredFields = ['card_number', 'card_title', 'problem_description', 'answer']
+    for (let i = 0; i < courseData.cards.length; i++) {
+      const card = courseData.cards[i]
+      const missingFields = requiredFields.filter(field => !card[field])
+      
+      if (missingFields.length > 0) {
+        console.warn(`⚠️ カード${i+1}の必須フィールド不足:`, missingFields)
+        
+        // 【自動修復】必須フィールドをデフォルト値で補完
+        if (!card.card_number) card.card_number = i + 1
+        if (!card.card_title) card.card_title = `学習カード${i + 1}`
+        if (!card.problem_description) card.problem_description = '問題の説明を生成中です'
+        if (!card.answer) card.answer = '解答を生成中です'
+        
+        console.log(`✅ カード${i+1}の必須フィールドを自動補完しました`)
+      }
     }
     
     console.log('✅ バリデーション成功:', {
       コース名: courseData.course_name || courseData.name,
       カード枚数: courseData.cards.length,
-      使用モデル: modelName
+      使用モデル: modelName,
+      試行回数: attempt
     })
+    
+    // 【新規】成功したのでループを抜ける
+    break
+    
+      } catch (attemptError: any) {
+        console.error(`❌ 試行 ${attempt}/${MAX_RETRIES} 失敗:`, attemptError.message)
+        
+        // 最後の試行で失敗した場合はエラーを投げる
+        if (attempt === MAX_RETRIES) {
+          console.error('❌ すべての再試行が失敗しました')
+          throw attemptError
+        }
+        
+        // 再試行の前に待機（段階的バックオフ）
+        const delayMs = 2000 * attempt  // 2秒、4秒、6秒...
+        console.log(`⏳ ${delayMs}ms 待機してリトライします...`)
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+      }
+    }
+    
+    // 【新規】再試行ループ後のチェック
+    if (!courseData) {
+      throw new Error('コースデータの生成に失敗しました（すべての再試行が失敗）')
+    }
+    
+    console.log('✅ コース生成完了:', courseData.course_name || courseData.name)
     
     return c.json({
       success: true,
       course: courseData
     })
     
-    } catch (error: any) {
-      console.error('❌ コース生成エラー（詳細）:', {
+  } catch (error: any) {
+    console.error('❌ コース生成エラー（詳細）:', {
       エラーメッセージ: error.message,
       エラースタック: error.stack,
       エラー型: error.constructor.name,
@@ -5496,13 +5622,6 @@ app.post('/api/ai/generate-course', async (c) => {
         courseName: courseInfo?.name,
         courseLevel: courseLevel
       }
-    }, 500)
-    }
-  } catch (outerError: any) {
-    console.error('❌ コース生成の最外層エラー:', outerError)
-    return c.json({
-      error: outerError.message || 'コース生成に失敗しました',
-      course: null
     }, 500)
   }
 })
