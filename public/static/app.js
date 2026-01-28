@@ -4303,6 +4303,12 @@ async function sendHandwriting() {
     console.log('🔍 手書きOCR認識開始（3段階フォールバック）...')
     console.log('📊 画像データサイズ:', imageData.length, 'bytes')
     
+    // Check if performOCR is available
+    if (typeof window.performOCR !== 'function') {
+      console.error('❌ window.performOCR が見つかりません。ocr-handler.js が読み込まれていません。')
+      throw new Error('OCR Handler が読み込まれていません')
+    }
+    
     // Progress callback
     let progressMessageId = null
     const onProgress = (progressInfo) => {
