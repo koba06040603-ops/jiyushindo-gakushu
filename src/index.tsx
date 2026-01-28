@@ -5395,11 +5395,21 @@ app.post('/api/ai/generate-course', async (c) => {
       throw new Error(`Gemini API が異常終了しました: ${finishReason}`)
     }
     
-    const aiResponse = candidate.content.parts[0].text
+    let aiResponse = candidate.content.parts[0].text
     console.log('✅ コース生成成功:', courseInfo.name)
-    console.log('📄 AI生成JSON（最初の500文字）:', aiResponse.substring(0, 500))
-    console.log('📄 AI生成JSON（最後の500文字）:', aiResponse.substring(Math.max(0, aiResponse.length - 500)))
-    console.log('📊 AI生成JSON長さ:', aiResponse.length, '文字')
+    console.log('📄 AI生成JSON（生データ・最初の500文字）:', aiResponse.substring(0, 500))
+    console.log('📄 AI生成JSON（生データ・最後の500文字）:', aiResponse.substring(Math.max(0, aiResponse.length - 500)))
+    console.log('📊 AI生成JSON長さ（生データ）:', aiResponse.length, '文字')
+    
+    // マークダウンのコードブロックを除去
+    if (aiResponse.includes('```')) {
+      console.log('🔧 マークダウンのコードブロックを検出しました。除去します...')
+      // ```json と ``` を除去
+      aiResponse = aiResponse.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+      console.log('📄 クリーンアップ後のJSON（最初の500文字）:', aiResponse.substring(0, 500))
+      console.log('📄 クリーンアップ後のJSON（最後の500文字）:', aiResponse.substring(Math.max(0, aiResponse.length - 500)))
+      console.log('📊 クリーンアップ後のJSON長さ:', aiResponse.length, '文字')
+    }
     
     // JSON完全性チェック
     const lastChar = aiResponse.trim().slice(-1)
