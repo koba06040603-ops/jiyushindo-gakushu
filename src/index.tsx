@@ -5324,8 +5324,8 @@ ${customInfo}
 必ず上記のJSON形式で出力してください。
 `
 
-    // 【安定版】gemini-1.5-flash を使用（v1 API で利用可能）
-    const modelName = 'gemini-1.5-flash'
+    // 【安定版】gemini-pro を使用（v1 API で確実に利用可能）
+    const modelName = 'gemini-pro'
     const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`
     
     console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
