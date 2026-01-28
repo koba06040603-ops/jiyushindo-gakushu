@@ -5186,6 +5186,43 @@ app.post('/api/ai/tts', async (c) => {
   }
 })
 
+// デバッグ用：利用可能なGeminiモデルをリスト
+app.get('/api/ai/list-models', async (c) => {
+  const { env } = c
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    return c.json({ error: 'APIキーが設定されていません' }, 500)
+  }
+  
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
+    const data = await response.json()
+    
+    if (!response.ok) {
+      return c.json({ error: 'モデルリスト取得失敗', details: data }, 500)
+    }
+    
+    // generateContent をサポートするモデルのみをフィルター
+    const supportedModels = data.models
+      ?.filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
+      ?.map((m: any) => ({
+        name: m.name,
+        displayName: m.displayName,
+        description: m.description,
+        supportedMethods: m.supportedGenerationMethods
+      })) || []
+    
+    return c.json({
+      success: true,
+      total: supportedModels.length,
+      models: supportedModels
+    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // APIルート：段階的コース生成（1コース=3枚のカードを生成）
 app.post('/api/ai/generate-course', async (c) => {
   const { env } = c
