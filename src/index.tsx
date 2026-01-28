@@ -5346,8 +5346,8 @@ ${customInfo}
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.3,  // より決定論的な出力のため低めに設定
-          maxOutputTokens: 8192,  // 6枚分のカードを生成（より小さい値で確実に）
+          temperature: 0.2,  // より決定論的な出力のため低めに設定
+          maxOutputTokens: 16384,  // 6枚分のカードを確実に生成（約6000-10000トークン必要）
           topP: 0.9,
           topK: 20,
           responseMimeType: 'application/json',
@@ -5424,6 +5424,17 @@ ${customInfo}
     const aiResponse = data.candidates[0].content.parts[0].text
     console.log('✅ コース生成成功:', courseInfo.name)
     console.log('📄 AI生成JSON（最初の500文字）:', aiResponse.substring(0, 500))
+    console.log('📄 AI生成JSON（最後の500文字）:', aiResponse.substring(Math.max(0, aiResponse.length - 500)))
+    console.log('📊 AI生成JSON長さ:', aiResponse.length, '文字')
+    
+    // JSON完全性チェック
+    const lastChar = aiResponse.trim().slice(-1)
+    if (lastChar !== '}' && lastChar !== ']') {
+      console.error('❌ JSON不完全（最後の文字）:', lastChar)
+      console.error('📄 JSON末尾100文字:', aiResponse.slice(-100))
+      throw new Error(`JSON不完全: 最後の文字が ${lastChar} です（期待: } または ]）`)
+    }
+    console.log('✅ JSON完全性チェック: 最後の文字 =', lastChar)
     
     // JSONをパース（複数の方法で試行）
     let courseData
