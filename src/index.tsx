@@ -5240,44 +5240,12 @@ app.post('/api/ai/generate-course', async (c) => {
       'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
     }[courseLevel] || '標準的なペースで学ぶコース'
 
-    // Gemini APIプロンプト（シンプル版 - トークン削減）
-    const prompt = `
-【${courseInfo.name}】コース用の学習カード3枚をJSON形式で生成してください。
+    // 超シンプルプロンプト - 最小限のトークン使用
+    const prompt = `${grade}${subject}「${unitName}」の学習カード3枚をJSON出力。
 
-学年: ${grade} | 教科: ${subject} | 単元: ${unitName}
-レベル: ${courseLevel} | ${difficultyDescription}
+{"course_name":"${courseInfo.name}","name":"${courseInfo.name}","label":"${courseInfo.label}","description":"${courseInfo.description}","color_code":"${courseInfo.color_code}","cards":[{"card_number":1,"card_title":"","card_type":"main","textbook_page":"","problem_description":"","new_terms":"","example_problem":"","example_solution":"","real_world_connection":"","answer":"","answer_explanation":"","hints":[{"hint_level":1,"hint_text":""},{"hint_level":2,"hint_text":""},{"hint_level":3,"hint_text":""}]},{"card_number":2,...},{"card_number":3,...}]}
 
-JSON形式:
-{
-  "course_name": "${courseInfo.name}",
-  "name": "${courseInfo.name}",
-  "label": "${courseInfo.label}",
-  "description": "${courseInfo.description}",
-  "color_code": "${courseInfo.color_code}",
-  "cards": [
-    {
-      "card_number": 1,
-      "card_title": "タイトル",
-      "card_type": "main",
-      "textbook_page": "p.XX",
-      "problem_description": "問題説明",
-      "new_terms": "用語",
-      "example_problem": "例題",
-      "example_solution": "解き方",
-      "real_world_connection": "実生活との関連",
-      "answer": "解答",
-      "answer_explanation": "解説",
-      "hints": [
-        {"hint_level": 1, "hint_text": "ヒント1"},
-        {"hint_level": 2, "hint_text": "ヒント2"},
-        {"hint_level": 3, "hint_text": "ヒント3"}
-      ]
-    }
-  ]
-}
-
-重要: 必ず3枚のカード、各カード3つのヒント、有効なJSONのみ出力。
-`
+必須: 3枚、各3ヒント、有効JSON。`
 
     // 【シンプル版】固定のモデル名を使用（動的検出をスキップ）
     const modelName = 'gemini-1.5-flash-001'
@@ -5313,12 +5281,14 @@ JSON形式:
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ Gemini API エラー:', {
+      console.error('❌ Gemini API エラー（詳細）:', {
         status: response.status,
         statusText: response.statusText,
-        errorBody: errorText
+        url: apiUrl.replace(apiKey, 'REDACTED'),
+        errorBody: errorText.substring(0, 500),
+        headers: Object.fromEntries(response.headers.entries())
       })
-      throw new Error(`Gemini API Error: ${response.status} - ${errorText.substring(0, 200)}`)
+      throw new Error(`Gemini API ${response.status}: ${errorText.substring(0, 200)}`)
     }
     
     const data = await response.json()
