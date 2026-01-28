@@ -5324,35 +5324,11 @@ ${customInfo}
 必ず上記のJSON形式で出力してください。
 `
 
-    // 【暫定対応】利用可能なモデルのリストを取得して使用
-    // まずモデルリストを取得
-    console.log('📋 利用可能なモデルを確認中...')
-    const modelsListUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
-    
-    let availableModel = 'gemini-1.5-flash'  // デフォルト
-    
-    try {
-      const modelsResponse = await fetch(modelsListUrl)
-      if (modelsResponse.ok) {
-        const modelsData = await modelsResponse.json()
-        const generateContentModels = modelsData.models?.filter((m: any) => 
-          m.supportedGenerationMethods?.includes('generateContent') &&
-          (m.name.includes('gemini-1.5') || m.name.includes('gemini-pro'))
-        )
-        
-        if (generateContentModels && generateContentModels.length > 0) {
-          // モデル名から "models/" プレフィックスを削除
-          availableModel = generateContentModels[0].name.replace('models/', '')
-          console.log('✅ 利用可能なモデル:', availableModel)
-          console.log('📋 全利用可能モデル:', generateContentModels.map((m: any) => m.name))
-        }
-      }
-    } catch (error) {
-      console.warn('⚠️ モデルリスト取得失敗、デフォルトモデルを使用:', availableModel)
-    }
-    
-    const modelName = availableModel
+    // 【シンプル版】固定のモデル名を使用（動的検出をスキップ）
+    const modelName = 'gemini-1.5-flash-001'
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
+    
+    console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
     
     console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
     console.log(`📋 コース情報:`, {
