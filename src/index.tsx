@@ -5326,8 +5326,8 @@ app.post('/api/ai/generate-course', async (c) => {
 
 必須: 3枚、各3ヒント、有効JSON。`
 
-    // 【確認済み】利用可能なモデルを使用
-    const modelName = 'gemini-2.5-flash'  // リストから確認した最新モデル
+    // 【代替案】より安定したモデルを使用
+    const modelName = 'gemini-1.5-pro'  // リストから確認済みの安定モデル
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
     
     console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
