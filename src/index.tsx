@@ -5319,12 +5319,10 @@ app.post('/api/ai/generate-course', async (c) => {
       'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
     }[courseLevel] || '標準的なペースで学ぶコース'
 
-    // 超シンプルプロンプト - 最小限のトークン使用
-    const prompt = `${grade}${subject}「${unitName}」の学習カード3枚をJSON出力。
-
+    // 極限までシンプル化したプロンプト
+    const prompt = `${grade}${subject}「${unitName}」学習カード3枚JSON:
 {"course_name":"${courseInfo.name}","name":"${courseInfo.name}","label":"${courseInfo.label}","description":"${courseInfo.description}","color_code":"${courseInfo.color_code}","cards":[{"card_number":1,"card_title":"","card_type":"main","textbook_page":"","problem_description":"","new_terms":"","example_problem":"","example_solution":"","real_world_connection":"","answer":"","answer_explanation":"","hints":[{"hint_level":1,"hint_text":""},{"hint_level":2,"hint_text":""},{"hint_level":3,"hint_text":""}]},{"card_number":2,...},{"card_number":3,...}]}
-
-必須: 3枚、各3ヒント、有効JSON。`
+3枚、各3ヒント必須。`
 
     // 【代替案】より安定したモデルを使用
     const modelName = 'gemini-1.5-pro'  // リストから確認済みの安定モデル
@@ -5351,7 +5349,7 @@ app.post('/api/ai/generate-course', async (c) => {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 16384,  // 8192 → 16384 に増加（JSON完全性を確保）
+          maxOutputTokens: 32768,  // 16384 → 32768 に増加（gemini-1.5-pro は最大32K対応）
           topP: 0.9,
           topK: 20
         }
