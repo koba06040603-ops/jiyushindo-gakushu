@@ -5186,7 +5186,7 @@ app.post('/api/ai/tts', async (c) => {
   }
 })
 
-// APIルート：段階的コース生成（1コース=6枚のカードを生成）
+// APIルート：段階的コース生成（1コース=3枚のカードを生成）
 app.post('/api/ai/generate-course', async (c) => {
   const { env } = c
   const { 
@@ -5240,29 +5240,14 @@ app.post('/api/ai/generate-course', async (c) => {
       'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
     }[courseLevel] || '標準的なペースで学ぶコース'
 
-    // Gemini APIプロンプト
+    // Gemini APIプロンプト（シンプル版 - トークン削減）
     const prompt = `
-あなたは小学校・中学校の優秀な教師です。
-以下の情報をもとに、「${courseInfo.name}」コースの学習カードを6枚生成してください。
+【${courseInfo.name}】コース用の学習カード3枚をJSON形式で生成してください。
 
-【基本情報】
-- 学年: ${grade}
-- 教科: ${subject}
-- 教科書会社: ${textbook}
-- 単元名: ${unitName}
-- 単元目標: ${unitGoal}
+学年: ${grade} | 教科: ${subject} | 単元: ${unitName}
+レベル: ${courseLevel} | ${difficultyDescription}
 
-【コース情報】
-- コース名: ${courseInfo.name}
-- コースレベル: ${courseLevel}
-- コース説明: ${courseInfo.description}
-- 難易度設定: ${difficultyDescription}
-
-${customInfo}
-
-【出力形式】
-以下のJSON形式で、6枚の学習カードを生成してください：
-
+JSON形式:
 {
   "course_name": "${courseInfo.name}",
   "name": "${courseInfo.name}",
@@ -5272,56 +5257,26 @@ ${customInfo}
   "cards": [
     {
       "card_number": 1,
-      "card_title": "カードのタイトル",
+      "card_title": "タイトル",
       "card_type": "main",
       "textbook_page": "p.XX",
-      "problem_description": "問題の説明（100文字程度）",
-      "new_terms": "新しく学ぶ用語（カンマ区切り）",
-      "example_problem": "例題（具体的な問題）",
-      "example_solution": "例題の解き方",
-      "real_world_connection": "実生活とのつながり（50文字以上）",
+      "problem_description": "問題説明",
+      "new_terms": "用語",
+      "example_problem": "例題",
+      "example_solution": "解き方",
+      "real_world_connection": "実生活との関連",
       "answer": "解答",
-      "answer_explanation": "解答の説明・考え方（100文字程度）",
+      "answer_explanation": "解説",
       "hints": [
-        {"hint_level": 1, "hint_text": "ヒント1の内容"},
-        {"hint_level": 2, "hint_text": "ヒント2の内容"},
-        {"hint_level": 3, "hint_text": "ヒント3の内容"}
+        {"hint_level": 1, "hint_text": "ヒント1"},
+        {"hint_level": 2, "hint_text": "ヒント2"},
+        {"hint_level": 3, "hint_text": "ヒント3"}
       ]
     }
-    // ... 残り5枚も同様の構造
   ]
 }
 
-【超重要：JSON構文エラーを防ぐルール】
-1. **必ず6枚のカードを生成**してください（2枚や3枚ではダメです）
-2. 各カードには**必ず3つのヒント**を含めてください
-3. すべての文字列は**ダブルクォーテーション**で囲む
-4. 配列やオブジェクトの要素間には**必ずカンマ**を入れる
-5. **特に重要**: カード間には必ずカンマを入れる（例：} , {）
-6. **特に重要**: ヒント間には必ずカンマを入れる（例：} , {）
-7. JSONコメント（//や/**/）は**絶対に使わない**
-8. 出力は**有効なJSONのみ**（説明文は不要）
-9. **文字列内の改行は \\n でエスケープ**してください
-10. **文字列内のダブルクォーテーションは \\" でエスケープ**してください
-
-【JSON構文の具体例】
-正しい例:
-{
-  "cards": [
-    { "card_number": 1, "card_title": "タイトル1" },
-    { "card_number": 2, "card_title": "タイトル2" }
-  ]
-}
-
-間違った例（カンマがない）:
-{
-  "cards": [
-    { "card_number": 1, "card_title": "タイトル1" }
-    { "card_number": 2, "card_title": "タイトル2" }
-  ]
-}
-
-必ず上記のJSON形式で出力してください。
+重要: 必ず3枚のカード、各カード3つのヒント、有効なJSONのみ出力。
 `
 
     // 【シンプル版】固定のモデル名を使用（動的検出をスキップ）
@@ -5431,12 +5386,12 @@ ${customInfo}
     }
     
     // バリデーション
-    if (!courseData.cards || courseData.cards.length < 6) {
+    if (!courseData.cards || courseData.cards.length < 3) {
       console.error('❌ バリデーションエラー:', {
         cards存在: !!courseData.cards,
         cards長さ: courseData.cards?.length || 0
       })
-      throw new Error(`カードが6枚未満です: ${courseData.cards?.length || 0}枚`)
+      throw new Error(`カードが3枚未満です: ${courseData.cards?.length || 0}枚`)
     }
     
     console.log('✅ バリデーション成功:', {
