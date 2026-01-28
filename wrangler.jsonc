@@ -12,20 +12,22 @@
       "database_name": "jiyushindo-gakushu-production",
       "database_id": "508ed099-e916-468a-acec-ae7025ad9569"
     }
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "PROGRESS_WEBSOCKET",
-        "class_name": "ProgressWebSocket",
-        "script_name": "jiyushindo-gakushu"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_classes": ["ProgressWebSocket"]
-    }
   ]
+  // Note: Durable Objects はローカル開発のみで使用。本番環境では別途設定が必要
+  // "durable_objects": {
+  //   "bindings": [
+  //     {
+  //       "name": "PROGRESS_WEBSOCKET",
+  //       "class_name": "ProgressWebSocket",
+  //       "script_name": "jiyushindo-gakushu"
+  //     }
+  //   ]
+  // }
+  // Note: migrations は Cloudflare Pagesではサポートされていません
+  // "migrations": [
+  //   {
+  //     "tag": "v1",
+  //     "new_classes": ["ProgressWebSocket"]
+  //   }
+  // ]
 }
