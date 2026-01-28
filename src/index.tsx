@@ -5324,8 +5324,8 @@ app.post('/api/ai/generate-course', async (c) => {
 {"course_name":"${courseInfo.name}","name":"${courseInfo.name}","label":"${courseInfo.label}","description":"${courseInfo.description}","color_code":"${courseInfo.color_code}","cards":[{"card_number":1,"card_title":"","card_type":"main","textbook_page":"","problem_description":"","new_terms":"","example_problem":"","example_solution":"","real_world_connection":"","answer":"","answer_explanation":"","hints":[{"hint_level":1,"hint_text":""},{"hint_level":2,"hint_text":""},{"hint_level":3,"hint_text":""}]},{"card_number":2,...},{"card_number":3,...}]}
 3枚、各3ヒント必須。`
 
-    // 【代替案】より安定したモデルを使用
-    const modelName = 'gemini-1.5-pro'  // リストから確認済みの安定モデル
+    // 【高速版】gemini-2.5-flash に戻す（タイムアウト対策）
+    const modelName = 'gemini-2.5-flash'  // 高速モデルでタイムアウトを回避
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
     
     console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
