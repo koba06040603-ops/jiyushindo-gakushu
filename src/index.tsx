@@ -5191,17 +5191,50 @@ app.get('/api/ai/list-models', async (c) => {
   const { env } = c
   const apiKey = env.GEMINI_API_KEY
   
+  console.log('🔍 モデルリスト取得開始')
+  
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    console.error('❌ APIキーが設定されていません')
     return c.json({ error: 'APIキーが設定されていません' }, 500)
   }
   
+  console.log('🔑 APIキー確認: 最初の10文字 =', apiKey.substring(0, 10))
+  
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
-    const data = await response.json()
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+    console.log('📡 Gemini API呼び出し:', apiUrl.replace(apiKey, 'REDACTED'))
+    
+    const response = await fetch(apiUrl)
+    console.log('📦 レスポンス受信:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok
+    })
+    
+    const responseText = await response.text()
+    console.log('📄 レスポンス本文（最初の500文字）:', responseText.substring(0, 500))
+    
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError: any) {
+      console.error('❌ JSONパースエラー:', parseError.message)
+      console.error('📄 レスポンス全文:', responseText)
+      return c.json({ 
+        error: 'JSONパース失敗', 
+        parseError: parseError.message,
+        responsePreview: responseText.substring(0, 200)
+      }, 500)
+    }
     
     if (!response.ok) {
+      console.error('❌ APIエラー:', data)
       return c.json({ error: 'モデルリスト取得失敗', details: data }, 500)
     }
+    
+    console.log('✅ データ取得成功:', {
+      modelsCount: data.models?.length || 0
+    })
     
     // generateContent をサポートするモデルのみをフィルター
     const supportedModels = data.models
@@ -5213,13 +5246,22 @@ app.get('/api/ai/list-models', async (c) => {
         supportedMethods: m.supportedGenerationMethods
       })) || []
     
+    console.log('✅ サポートされているモデル数:', supportedModels.length)
+    supportedModels.forEach((m: any) => {
+      console.log(`  - ${m.name}`)
+    })
+    
     return c.json({
       success: true,
       total: supportedModels.length,
       models: supportedModels
     })
   } catch (error: any) {
-    return c.json({ error: error.message }, 500)
+    console.error('❌ エラー発生:', error)
+    return c.json({ 
+      error: error.message,
+      stack: error.stack 
+    }, 500)
   }
 })
 
