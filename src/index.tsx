@@ -5134,8 +5134,23 @@ app.post('/api/ai/tts', async (c) => {
     
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ Google Cloud TTS API エラー:', response.status, errorText)
-      throw new Error(`Google Cloud TTS API エラー: ${response.status}`)
+      console.error('❌ Google Cloud TTS API エラー:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorBody: errorText
+      })
+      
+      let errorMessage = `Google Cloud TTS API エラー: ${response.status} ${response.statusText}`
+      
+      // エラーメッセージを詳細に解析
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage += ` - ${errorJson.error?.message || '詳細不明'}`
+      } catch (e) {
+        errorMessage += ` - ${errorText}`
+      }
+      
+      throw new Error(errorMessage)
     }
     
     const data = await response.json()
@@ -5153,10 +5168,20 @@ app.post('/api/ai/tts', async (c) => {
     
   } catch (error: any) {
     console.error('❌ TTSエラー:', error)
+    console.error('❌ TTSエラー詳細:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    })
+    
     return c.json({
       success: false,
       fallbackToWebSpeech: true,
-      error: error.message
+      error: error.message,
+      errorDetails: {
+        name: error.name,
+        message: error.message
+      }
     }, 500)
   }
 })
