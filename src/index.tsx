@@ -4143,7 +4143,6 @@ app.get('/', (c) => {
         <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
         <style>
           /* FontAwesome fa-spin animation */
           @keyframes fa-spin {
@@ -4181,7 +4180,7 @@ app.get('/', (c) => {
             console.log('📦 DOMContentLoaded: スクリプト読み込み開始')
             
             const scripts = [
-              '/static/ocr-handler.js',
+              '/static/ocr-simple.js',
               '/static/tts.js',
               '/static/visual-support.js', 
               '/static/realtime.js',
@@ -4899,7 +4898,7 @@ ${specificInstructions}
   }
 })
 
-// APIルート：OCR（手書き文字認識）- 3段階フォールバック対応
+// APIルート：OCR（手書き文字認識）- 2段階フォールバック
 app.post('/api/ai/ocr', async (c) => {
   const { env } = c
   const { imageData, language } = await c.req.json()
@@ -4909,7 +4908,7 @@ app.post('/api/ai/ocr', async (c) => {
   const geminiApiKey = env.GEMINI_API_KEY
   
   try {
-    console.log('🔍 OCR認識を開始（3段階フォールバック対応）...')
+    console.log('🔍 OCR認識を開始（2段階フォールバック）...')
     
     // Base64エンコードされた画像データからデータURL部分を削除
     const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '')
@@ -5041,14 +5040,14 @@ app.post('/api/ai/ocr', async (c) => {
       }
     }
     
-    // 【第3段階】最終フォールバック: クライアントサイドでTesseract.jsを使用するよう指示
-    console.log('⚠️ [第3段階] サーバーサイドOCR失敗 → クライアントサイドOCR（Tesseract.js）を推奨')
+    // 両方の段階で失敗
+    console.log('⚠️ OCR認識失敗: 両方のAPIで認識できませんでした')
     return c.json({
       success: false,
       text: null,
-      useTesseract: true,
-      message: 'サーバーサイドOCRが利用できません。クライアントサイドOCRを使用してください。',
-      stage: 3
+      error: 'テキストが検出されませんでした',
+      message: '両方のAPIで文字を認識できませんでした',
+      stage: 2
     })
     
   } catch (error: any) {
@@ -5057,8 +5056,7 @@ app.post('/api/ai/ocr', async (c) => {
       success: false,
       error: error.message,
       text: null,
-      useTesseract: true,
-      stage: 3
+      stage: 0
     }, 500)
   }
 })
