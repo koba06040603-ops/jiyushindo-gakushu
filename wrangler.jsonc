@@ -12,44 +12,20 @@
       "database_name": "jiyushindo-gakushu-production",
       "database_id": "508ed099-e916-468a-acec-ae7025ad9569"
     }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PROGRESS_WEBSOCKET",
+        "class_name": "ProgressWebSocket",
+        "script_name": "jiyushindo-gakushu"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["ProgressWebSocket"]
+    }
   ]
-  // Durable Objects configuration for Cloudflare Pages
-  // Note: Durable Objects require a separate Worker script
-  // For now, we'll deploy without WebSocket support to production
-  // WebSocket features will work in local development only
-  // 
-  // "durable_objects": {
-  //   "bindings": [
-  //     {
-  //       "name": "PROGRESS_WEBSOCKET",
-  //       "class_name": "ProgressWebSocket",
-  //       "script_name": "jiyushindo-gakushu"
-  //     }
-  //   ]
-  // }
-  // "vars": {
-  //   "MY_VAR": "my-variable"
-  // },
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "MY_KV_NAMESPACE",
-  //     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  //   }
-  // ],
-  // "r2_buckets": [
-  //   {
-  //     "binding": "MY_BUCKET",
-  //     "bucket_name": "my-bucket"
-  //   }
-  // ],
-  // "d1_databases": [
-  //   {
-  //     "binding": "MY_DB",
-  //     "database_name": "my-database",
-  //     "database_id": ""
-  //   }
-  // ],
-  // "ai": {
-  //   "binding": "AI"
-  // }
 }

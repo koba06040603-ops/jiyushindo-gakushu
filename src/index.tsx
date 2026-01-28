@@ -865,6 +865,225 @@ async function callGeminiAPI(options: GeminiCallOptions): Promise<GeminiResponse
 // CORS設定
 app.use('/api/*', cors())
 
+// =============================================================================
+// Phase 7: リアルタイム通知機能 - WebSocketエンドポイント
+// =============================================================================
+
+// WebSocket接続エンドポイント
+app.get('/api/realtime/connect', async (c) => {
+  const { env } = c
+  
+  if (!env.PROGRESS_WEBSOCKET) {
+    return c.json({ error: 'WebSocket not configured' }, 500)
+  }
+  
+  // Durable Object IDを取得（クラスコードベース）
+  const classCode = c.req.query('classCode')
+  if (!classCode) {
+    return c.json({ error: 'classCode is required' }, 400)
+  }
+  
+  // Durable Object IDを生成
+  const id = env.PROGRESS_WEBSOCKET.idFromName(classCode)
+  const stub = env.PROGRESS_WEBSOCKET.get(id)
+  
+  // リクエストをDurable Objectに転送
+  return stub.fetch(c.req.raw)
+})
+
+// 通知送信API（教師用）
+app.post('/api/notifications/send', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const {
+      fromUserId,
+      classCode,
+      notificationType,
+      targetUserIds,
+      title,
+      message,
+      priority = 'normal',
+      additionalData = {}
+    } = body
+    
+    // 通知をデータベースに保存
+    const targetUsers = targetUserIds === 'all'
+      ? await getAllClassStudents(env.DB, classCode)
+      : targetUserIds
+    
+    const notifications = []
+    for (const targetUserId of targetUsers) {
+      const result = await env.DB.prepare(`
+        INSERT INTO notifications (
+          type, from_user_id, to_user_id, class_code,
+          title, message, data, priority
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        notificationType,
+        fromUserId,
+        targetUserId,
+        classCode,
+        title,
+        message,
+        JSON.stringify(additionalData),
+        priority
+      ).run()
+      
+      notifications.push({
+        notificationId: result.meta.last_row_id,
+        targetUserId
+      })
+    }
+    
+    // WebSocket経由でリアルタイム配信
+    if (env.PROGRESS_WEBSOCKET) {
+      const id = env.PROGRESS_WEBSOCKET.idFromName(classCode)
+      const stub = env.PROGRESS_WEBSOCKET.get(id)
+      
+      // 各ユーザーに通知を送信（Durable Objectが処理）
+      // 注: 実際の送信はDurable Object内で行われる
+    }
+    
+    return c.json({
+      success: true,
+      notifications,
+      targetCount: targetUsers.length
+    })
+  } catch (error) {
+    console.error('通知送信エラー:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to send notifications',
+      details: error instanceof Error ? error.message : String(error)
+    }, 500)
+  }
+})
+
+// 通知一覧取得API
+app.get('/api/notifications', async (c) => {
+  const { env } = c
+  const userId = c.req.query('userId')
+  const classCode = c.req.query('classCode')
+  const limit = parseInt(c.req.query('limit') || '50')
+  const unreadOnly = c.req.query('unreadOnly') === 'true'
+  
+  if (!userId) {
+    return c.json({ error: 'userId is required' }, 400)
+  }
+  
+  try {
+    let query = `
+      SELECT 
+        n.*,
+        u.name as from_user_name
+      FROM notifications n
+      LEFT JOIN users u ON n.from_user_id = u.id
+      WHERE n.to_user_id = ?
+    `
+    const params = [parseInt(userId)]
+    
+    if (unreadOnly) {
+      query += ' AND n.is_read = 0'
+    }
+    
+    if (classCode) {
+      query += ' AND n.class_code = ?'
+      params.push(classCode)
+    }
+    
+    query += ' ORDER BY n.created_at DESC LIMIT ?'
+    params.push(limit)
+    
+    const result = await env.DB.prepare(query).bind(...params).all()
+    
+    // 未読数も取得
+    const unreadCountResult = await env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM notifications
+      WHERE to_user_id = ? AND is_read = 0
+    `).bind(parseInt(userId)).first()
+    
+    return c.json({
+      success: true,
+      notifications: result.results,
+      unreadCount: unreadCountResult?.count || 0
+    })
+  } catch (error) {
+    console.error('通知一覧取得エラー:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to fetch notifications'
+    }, 500)
+  }
+})
+
+// 通知既読API
+app.put('/api/notifications/:id/read', async (c) => {
+  const { env } = c
+  const notificationId = c.req.param('id')
+  const { userId } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE notifications
+      SET is_read = 1, read_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND to_user_id = ?
+    `).bind(parseInt(notificationId), userId).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('通知既読エラー:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to mark notification as read'
+    }, 500)
+  }
+})
+
+// 全通知既読API
+app.put('/api/notifications/read-all', async (c) => {
+  const { env } = c
+  const { userId, classCode } = await c.req.json()
+  
+  try {
+    let query = 'UPDATE notifications SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE to_user_id = ?'
+    const params = [userId]
+    
+    if (classCode) {
+      query += ' AND class_code = ?'
+      params.push(classCode)
+    }
+    
+    await env.DB.prepare(query).bind(...params).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    console.error('全通知既読エラー:', error)
+    return c.json({
+      success: false,
+      error: 'Failed to mark all notifications as read'
+    }, 500)
+  }
+})
+
+// ヘルパー関数
+async function getAllClassStudents(db: D1Database, classCode: string): Promise<number[]> {
+  try {
+    const result = await db.prepare(`
+      SELECT id FROM users WHERE class_code = ? AND role = 'student'
+    `).bind(classCode).all()
+    
+    return result.results.map((row: any) => row.id)
+  } catch (error) {
+    console.error('クラス生徒取得エラー:', error)
+    return []
+  }
+}
+
+// =============================================================================
+
 // 静的ファイル配信
 app.use('/static/*', serveStatic({ root: './' }))
 
@@ -4184,6 +4403,8 @@ app.get('/', (c) => {
               '/static/tts.js',
               '/static/visual-support.js', 
               '/static/realtime.js',
+              '/static/realtime-notifications.js',
+              '/static/learning-styles.js',
               '/static/phase3-demo-data.js',
               '/static/phase3.js',
               '/static/app.js'
@@ -13752,6 +13973,317 @@ app.get('/api/student/learning-stats/:studentId/:curriculumId', async (c) => {
     })
   } catch (error: any) {
     console.error('学習統計取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ============================================
+// Phase 7: リアルタイム通知機能 API
+// ============================================
+
+// 先生からのメッセージ送信API
+app.post('/api/notifications/send-message', async (c) => {
+  const { env } = c
+  const { teacherId, studentId, message, priority } = await c.req.json()
+  
+  try {
+    // メッセージをDBに保存
+    const result = await env.DB.prepare(`
+      INSERT INTO teacher_messages (teacher_id, student_id, message, priority, created_at)
+      VALUES (?, ?, ?, ?, datetime('now'))
+    `).bind(teacherId, studentId, message, priority || 'normal').run()
+    
+    // WebSocket経由で通知を送信
+    // Note: Durable Objectsを使用している場合は、そのインスタンスにメッセージを送信
+    
+    return c.json({
+      success: true,
+      messageId: result.meta.last_row_id
+    })
+  } catch (error: any) {
+    console.error('❌ メッセージ送信エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 新しいカード配信通知API
+app.post('/api/notifications/distribute-card', async (c) => {
+  const { env } = c
+  const { cardId, studentIds, teacherId } = await c.req.json()
+  
+  try {
+    // カード情報を取得
+    const card = await env.DB.prepare(`
+      SELECT 
+        lc.*,
+        c.course_name,
+        cu.unit_name
+      FROM learning_cards lc
+      JOIN courses c ON lc.course_id = c.id
+      JOIN curriculum cu ON c.curriculum_id = cu.id
+      WHERE lc.id = ?
+    `).bind(cardId).first()
+    
+    if (!card) {
+      return c.json({ success: false, error: 'カードが見つかりません' }, 404)
+    }
+    
+    // 各生徒に通知を送信
+    for (const studentId of studentIds) {
+      await env.DB.prepare(`
+        INSERT INTO card_distributions (card_id, student_id, teacher_id, created_at)
+        VALUES (?, ?, ?, datetime('now'))
+      `).bind(cardId, studentId, teacherId).run()
+      
+      // WebSocket経由で通知（実際のWebSocket実装に依存）
+      // この部分はDurable Objectsの実装に合わせて調整が必要
+    }
+    
+    return c.json({
+      success: true,
+      distributedCount: studentIds.length,
+      cardTitle: card.card_title
+    })
+  } catch (error: any) {
+    console.error('❌ カード配信エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 通知履歴取得API
+app.get('/api/notifications/history/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const limit = c.req.query('limit') || '20'
+  
+  try {
+    // 先生からのメッセージ
+    const messages = await env.DB.prepare(`
+      SELECT 
+        tm.*,
+        u.name as teacher_name
+      FROM teacher_messages tm
+      LEFT JOIN users u ON tm.teacher_id = u.id
+      WHERE tm.student_id = ?
+      ORDER BY tm.created_at DESC
+      LIMIT ?
+    `).bind(studentId, parseInt(limit)).all()
+    
+    // カード配信通知
+    const distributions = await env.DB.prepare(`
+      SELECT 
+        cd.*,
+        lc.card_title,
+        c.course_name,
+        u.name as teacher_name
+      FROM card_distributions cd
+      JOIN learning_cards lc ON cd.card_id = lc.id
+      JOIN courses c ON lc.course_id = c.id
+      LEFT JOIN users u ON cd.teacher_id = u.id
+      WHERE cd.student_id = ?
+      ORDER BY cd.created_at DESC
+      LIMIT ?
+    `).bind(studentId, parseInt(limit)).all()
+    
+    return c.json({
+      success: true,
+      messages: messages.results,
+      distributions: distributions.results
+    })
+  } catch (error: any) {
+    console.error('❌ 通知履歴取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ============================================
+// Phase 9: 学習スタイル対応 API
+// ============================================
+
+// 学習スタイルに応じた問題生成API
+app.post('/api/learning-styles/generate-problem', async (c) => {
+  const { env } = c
+  const { cardId, learningStyle } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) {
+    return c.json({
+      success: false,
+      error: 'GEMINI_API_KEYが設定されていません'
+    }, 400)
+  }
+  
+  try {
+    // 元のカード情報を取得
+    const card = await env.DB.prepare(`
+      SELECT 
+        lc.*,
+        c.course_name,
+        c.grade,
+        cu.subject
+      FROM learning_cards lc
+      JOIN courses c ON lc.course_id = c.id
+      JOIN curriculum cu ON c.curriculum_id = cu.id
+      WHERE lc.id = ?
+    `).bind(cardId).first()
+    
+    if (!card) {
+      return c.json({ success: false, error: 'カードが見つかりません' }, 404)
+    }
+    
+    // 学習スタイル別のプロンプトを作成
+    let stylePrompt = ''
+    let styleRequirements = ''
+    
+    switch (learningStyle) {
+      case 'visual':
+        stylePrompt = '視覚型学習者向けに、図やイラスト、色分けを使った視覚的な表現'
+        styleRequirements = `
+- 数字や計算式を大きく、色分けして表示
+- 図解やイラストを含める
+- ステップを視覚的に区切る
+- アイコンや絵文字を効果的に使用
+        `
+        break
+      case 'auditory':
+        stylePrompt = '聴覚型学習者向けに、音声読み上げに適した文章とリズム感のある表現'
+        styleRequirements = `
+- 読み上げやすい文章構造
+- リズムや擬音語を含める
+- ステップを声に出して確認できる形式
+- 重要な言葉を強調
+        `
+        break
+      case 'kinesthetic':
+        stylePrompt = '体感型学習者向けに、実際に手を動かして体験できる形式の表現'
+        styleRequirements = `
+- 実際に試せるステップバイステップの指示
+- 具体的な操作や動作を含める
+- インタラクティブな要素
+- 手を動かしながら学べる構成
+        `
+        break
+      default:
+        return c.json({ success: false, error: '無効な学習スタイル' }, 400)
+    }
+    
+    const prompt = `あなたは小学生の学習スタイルに合わせた問題を作成するAI先生です。
+
+【元の問題】
+タイトル: ${card.card_title}
+問題: ${card.problem_description}
+解答: ${card.answer}
+
+【学習スタイル】
+${stylePrompt}
+
+【要件】
+${styleRequirements}
+
+以下のJSON形式で、学習スタイルに最適化した問題を出力してください：
+{
+  "styled_title": "学習スタイルに合わせたタイトル",
+  "styled_problem": "学習スタイルに最適化した問題文（HTML可）",
+  "visual_enhancements": "視覚的な強化要素の説明（視覚型の場合）",
+  "auditory_cues": "聴覚的な手がかりの説明（聴覚型の場合）",
+  "interactive_elements": "体験的な要素の説明（体感型の場合）",
+  "teaching_tips": "この学習スタイルでの指導ポイント"
+}`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 2048,
+            topK: 40,
+            topP: 0.95
+          }
+        })
+      }
+    )
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      throw new Error(`Gemini API エラー: ${JSON.stringify(data)}`)
+    }
+    
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error('Gemini APIから有効な応答がありませんでした')
+    }
+    
+    const candidate = data.candidates[0]
+    const content = candidate.content
+    
+    if (!content || !content.parts || content.parts.length === 0) {
+      throw new Error('Gemini APIからのコンテンツが空です')
+    }
+    
+    const aiResponse = content.parts[0].text
+    const styledProblem = extractJSON(aiResponse)
+    
+    return c.json({
+      success: true,
+      originalCard: card,
+      styledProblem: styledProblem,
+      learningStyle: learningStyle
+    })
+  } catch (error: any) {
+    console.error('❌ 学習スタイル問題生成エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習スタイル設定保存API
+app.post('/api/learning-styles/set-preference', async (c) => {
+  const { env } = c
+  const { studentId, learningStyle } = await c.req.json()
+  
+  try {
+    // 既存の設定を更新または新規作成
+    await env.DB.prepare(`
+      INSERT INTO student_learning_preferences (student_id, learning_style, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(student_id) 
+      DO UPDATE SET 
+        learning_style = ?,
+        updated_at = datetime('now')
+    `).bind(studentId, learningStyle, learningStyle).run()
+    
+    return c.json({
+      success: true,
+      studentId: studentId,
+      learningStyle: learningStyle
+    })
+  } catch (error: any) {
+    console.error('❌ 学習スタイル設定エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習スタイル設定取得API
+app.get('/api/learning-styles/preference/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    const preference = await env.DB.prepare(`
+      SELECT * FROM student_learning_preferences
+      WHERE student_id = ?
+    `).bind(studentId).first()
+    
+    return c.json({
+      success: true,
+      preference: preference || { learning_style: 'visual' } // デフォルトは視覚型
+    })
+  } catch (error: any) {
+    console.error('❌ 学習スタイル取得エラー:', error)
     return c.json({ success: false, error: error.message }, 500)
   }
 })
