@@ -5265,7 +5265,7 @@ app.get('/api/ai/list-models', async (c) => {
   }
 })
 
-// APIルート：段階的コース生成（1コース=3枚のカードを生成）
+// APIルート：段階的コース生成（1コース=6枚のカードを生成）
 app.post('/api/ai/generate-course', async (c) => {
   const { env } = c
   const { 
@@ -5319,10 +5319,10 @@ app.post('/api/ai/generate-course', async (c) => {
       'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
     }[courseLevel] || '標準的なペースで学ぶコース'
 
-    // 極限までシンプル化したプロンプト（3枚に戻す）
-    const prompt = `${grade}${subject}「${unitName}」学習カード3枚JSON:
-{"course_name":"${courseInfo.name}","name":"${courseInfo.name}","label":"${courseInfo.label}","description":"${courseInfo.description}","color_code":"${courseInfo.color_code}","cards":[{"card_number":1,"card_title":"","card_type":"main","textbook_page":"","problem_description":"","new_terms":"","example_problem":"","example_solution":"","real_world_connection":"","answer":"","answer_explanation":"","hints":[{"hint_level":1,"hint_text":""},{"hint_level":2,"hint_text":""},{"hint_level":3,"hint_text":""}]},{"card_number":2,...},{"card_number":3,...}]}
-3枚、各3ヒント必須。`
+    // プロンプト（6枚のカード生成）
+    const prompt = `${grade}${subject}「${unitName}」学習カード6枚JSON:
+{"course_name":"${courseInfo.name}","name":"${courseInfo.name}","label":"${courseInfo.label}","description":"${courseInfo.description}","color_code":"${courseInfo.color_code}","cards":[{"card_number":1,"card_title":"","card_type":"main","textbook_page":"","problem_description":"","new_terms":"","example_problem":"","example_solution":"","real_world_connection":"","answer":"","answer_explanation":"","hints":[{"hint_level":1,"hint_text":""},{"hint_level":2,"hint_text":""},{"hint_level":3,"hint_text":""}]},{"card_number":2,...},{"card_number":3,...},{"card_number":4,...},{"card_number":5,...},{"card_number":6,...}]}
+6枚、各3ヒント必須。`
 
     // 【高速版】gemini-2.5-flash に戻す（タイムアウト対策）
     const modelName = 'gemini-2.5-flash'  // 高速モデルでタイムアウトを回避
@@ -5459,12 +5459,12 @@ app.post('/api/ai/generate-course', async (c) => {
     }
     
     // バリデーション
-    if (!courseData.cards || courseData.cards.length < 3) {
+    if (!courseData.cards || courseData.cards.length < 6) {
       console.error('❌ バリデーションエラー:', {
         cards存在: !!courseData.cards,
         cards長さ: courseData.cards?.length || 0
       })
-      throw new Error(`カードが3枚未満です: ${courseData.cards?.length || 0}枚`)
+      throw new Error(`カードが6枚未満です: ${courseData.cards?.length || 0}枚`)
     }
     
     console.log('✅ バリデーション成功:', {
