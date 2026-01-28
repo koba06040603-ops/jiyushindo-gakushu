@@ -5324,8 +5324,8 @@ ${customInfo}
 必ず上記のJSON形式で出力してください。
 `
 
-    // 【デバッグ用】以前動作していたモデルに戻す
-    const modelName = 'gemini-2.0-flash-exp'
+    // 【安定版】gemini-1.5-pro を使用（最も信頼性が高い）
+    const modelName = 'gemini-1.5-pro'
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
     
     console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
@@ -5347,7 +5347,7 @@ ${customInfo}
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2,  // より決定論的な出力のため低めに設定
-          maxOutputTokens: 16384,  // 6枚分のカードを確実に生成（約6000-10000トークン必要）
+          maxOutputTokens: 32768,  // gemini-1.5-pro は 32K まで対応（6枚分のカードを確実に生成）
           topP: 0.9,
           topK: 20,
           responseMimeType: 'application/json',
