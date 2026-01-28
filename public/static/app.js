@@ -1,3 +1,70 @@
+// ===== カーソス問題の完全修正 =====
+(function() {
+  console.log('🔧 カーソス修正システムを初期化...')
+  
+  // CSSでカーソスを強制的に修正
+  const cursorFixStyle = document.createElement('style')
+  cursorFixStyle.id = 'cursor-fix-ultimate'
+  cursorFixStyle.textContent = `
+    /* 究極のカーソス修正 */
+    *, *::before, *::after {
+      cursor: auto !important;
+    }
+    
+    /* ボタンやリンクは pointer に */
+    button, a, [role="button"], [onclick] {
+      cursor: pointer !important;
+    }
+    
+    /* テキスト入力は text に */
+    input[type="text"], input[type="email"], input[type="search"], textarea {
+      cursor: text !important;
+    }
+    
+    /* ドラッグ可能な要素 */
+    [draggable="true"] {
+      cursor: move !important;
+    }
+    
+    /* 待機カーソスを完全に無効化 */
+    html, body {
+      cursor: auto !important;
+    }
+    
+    /* オーバーレイ中も黒いカーソスを維持 */
+    #ocr-loading-overlay,
+    #test-overlay,
+    #ocr-loading-overlay *,
+    #test-overlay * {
+      cursor: auto !important;
+    }
+  `
+  document.head.appendChild(cursorFixStyle)
+  
+  // JavaScript側でも強制リセット
+  document.body.style.cursor = ''
+  document.documentElement.style.cursor = ''
+  
+  // MutationObserverでカーソス変更を監視して自動修正
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+        const target = mutation.target
+        if (target.style.cursor === 'wait' || target.style.cursor === 'progress') {
+          console.log('🔧 待機カーソスを自動リセット:', target.tagName)
+          target.style.cursor = ''
+        }
+      }
+    })
+  })
+  
+  // body と html を監視
+  observer.observe(document.body, { attributes: true, attributeFilter: ['style'] })
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] })
+  
+  console.log('✅ カーソス修正システム初期化完了')
+})();
+
 // 生徒別のデモデータ定義
 const STUDENT_DEMO_DATA = {
   // 山田太郎（studentId: 3）
