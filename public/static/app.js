@@ -4486,26 +4486,98 @@ async function sendHandwriting() {
         console.log('📊 認識方法:', result.method)
         console.log('📊 認識段階:', result.stageInfo)
         
-        // Update progress message
-        updateAIMessage(progressMessageId, `✅ ${result.stageInfo}で認識成功！`)
-        
-        // AI先生に送信
-        const input = document.getElementById('aiQuestionInput')
-        if (input) {
-          const originalText = input.value.trim()
-          // 認識されたテキストを質問に追加
-          if (originalText) {
-            input.value = `${recognizedText}\n（補足: ${originalText}）`
-          } else {
-            input.value = recognizedText
-          }
+        // Update progress message (認識成功のシステムメッセージを削除)
+        if (progressMessageId) {
+          const progressMsg = document.getElementById(progressMessageId)
+          if (progressMsg) progressMsg.remove()
         }
         
-        // 認識結果を表示
-        addAIMessage(`✅ 認識しました！\n📝 「${recognizedText}」\n\n認識方法: ${result.stageInfo}\n信頼度: ${result.confidence}%`, 'system')
+        // AI先生に送信する質問を設定
+        const input = document.getElementById('aiQuestionInput')
+        if (input) {
+          input.value = recognizedText  // 認識したテキストだけを質問とする
+        }
         
-        // 実際に質問を送信
-        askAI()
+        // 認識したテキストをユーザーメッセージとして表示
+        addAIMessage(`${recognizedText}`, 'user')
+        
+        // 会話履歴に追加（askAI内で重複追加されないように）
+        if (!window.aiConversationHistory) {
+          window.aiConversationHistory = []
+        }
+        window.aiConversationHistory.push({
+          role: 'user',
+          message: recognizedText
+        })
+        
+        // 入力欄をクリア（askAI内で addAIMessage(question, 'user') が実行されないようにする）
+        input.value = ''
+        
+        // AI先生に質問を送信（askAI内での addAIMessage をスキップ）
+        // askAI関数内で question が空なので return されるため、別の方法を使う
+        
+        // ローディング表示
+        const aiChat = document.getElementById('aiChat')
+        const loadingId = 'loading-' + Date.now()
+        addAIMessage('考えているよ... 💭', 'ai', loadingId)
+        
+        // セッションIDを生成または取得
+        if (!window.aiSessionId) {
+          window.aiSessionId = `session-${state.student.id}-${state.selectedCard}-${Date.now()}`
+        }
+        
+        // カード情報を取得
+        const card = window.currentCardData
+        const cardContext = card ? {
+          card_title: card.card_title,
+          problem_description: card.problem_description,
+          new_terms: card.new_terms
+        } : null
+        
+        // 会話履歴をAPIに送信する形式に変換
+        const conversationHistory = window.aiConversationHistory.map(conv => ({
+          role: conv.role,
+          text: conv.message
+        }))
+        
+        // AI先生APIを呼び出す
+        try {
+          const aiResponse = await axios.post('/api/ai-chat', {
+            message: recognizedText,
+            cardContext: cardContext,
+            conversationHistory: conversationHistory,
+            studentGrade: window.aiDetectedGrade || null
+          })
+          
+          // ローディングメッセージを削除
+          const loadingMsg = document.getElementById(loadingId)
+          if (loadingMsg) loadingMsg.remove()
+          
+          // AIの回答を追加
+          if (aiResponse.data.error) {
+            console.error('❌ AI先生のエラー:', aiResponse.data.error)
+            addAIMessage(`ごめんね、エラーが発生しました: ${aiResponse.data.error}`, 'ai')
+          } else {
+            const answer = aiResponse.data.answer || aiResponse.data.response || 'ごめんね、答えられませんでした。'
+            addAIMessage(answer, 'ai')
+            
+            // 会話履歴に回答を追加
+            window.aiConversationHistory.push({
+              role: 'assistant',
+              message: answer
+            })
+            
+            // 自動音声再生
+            if (window.autoPlayAIVoice) {
+              speakText(answer, 'female-friendly', 0.95, 0)
+            }
+          }
+        } catch (aiError) {
+          console.error('❌ AI APIエラー:', aiError)
+          const loadingMsg = document.getElementById(loadingId)
+          if (loadingMsg) loadingMsg.remove()
+          addAIMessage('ごめんね、AI先生に接続できませんでした。もう一度試してみてね！', 'ai')
+        }
       } else {
         console.warn('⚠️ OCR認識失敗:', result)
         
