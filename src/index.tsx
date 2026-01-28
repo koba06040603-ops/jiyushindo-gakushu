@@ -5247,8 +5247,8 @@ app.post('/api/ai/generate-course', async (c) => {
 
 必須: 3枚、各3ヒント、有効JSON。`
 
-    // 【シンプル版】固定のモデル名を使用（動的検出をスキップ）
-    const modelName = 'gemini-1.5-flash-001'
+    // 【修正】正しいモデル名を使用
+    const modelName = 'gemini-1.5-flash'  // -001 サフィックスを削除
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
     
     console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
