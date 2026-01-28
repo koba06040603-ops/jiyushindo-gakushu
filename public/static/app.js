@@ -3667,7 +3667,8 @@ ${response.data.details || 'Cloudflare Pagesの環境変数でGEMINI_API_KEYを�
 function addAIMessage(message, sender, loadingId = null) {
   const aiChat = document.getElementById('aiChat')
   const messageDiv = document.createElement('div')
-  if (loadingId) messageDiv.id = loadingId
+  const messageId = loadingId || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  messageDiv.id = messageId
   messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} mb-3`
   
   messageDiv.innerHTML = `
@@ -3683,6 +3684,27 @@ function addAIMessage(message, sender, loadingId = null) {
   // AI先生の回答を音声で読み上げ（オプション）
   if (sender === 'ai' && window.autoPlayAIVoice) {
     speakText(message)
+  }
+  
+  return messageId
+}
+
+// Update existing AI message
+function updateAIMessage(messageId, newMessage) {
+  const messageDiv = document.getElementById(messageId)
+  if (!messageDiv) {
+    console.warn('⚠️ メッセージが見つかりません:', messageId)
+    return
+  }
+  
+  const messageContent = messageDiv.querySelector('p')
+  if (messageContent) {
+    messageContent.textContent = newMessage
+  }
+  
+  const aiChat = document.getElementById('aiChat')
+  if (aiChat) {
+    aiChat.scrollTop = aiChat.scrollHeight
   }
 }
 
@@ -4274,25 +4296,43 @@ async function sendHandwriting() {
   }
   
   // 画像を表示
-  addAIMessage(`[手書きメモ${thinkingNote}を認識中...]\n\n📝 ${strokeCount}回のストローク、${totalPoints}個の点`, 'user')
+  const initialMessage = addAIMessage(`[手書きメモ${thinkingNote}を認識中...]\n\n📝 ${strokeCount}回のストローク、${totalPoints}個の点\n\n🔍 認識処理を開始します...`, 'user')
   
   try {
-    // OCR認識を実行
-    console.log('🔍 手書きOCR認識開始...')
+    // OCR認識を実行（3段階フォールバック対応）
+    console.log('🔍 手書きOCR認識開始（3段階フォールバック）...')
     console.log('📊 画像データサイズ:', imageData.length, 'bytes')
     
-    // Google Cloud Vision OCR（優先）
-    const response = await axios.post('/api/ai/ocr', {
-      imageData: imageData,
-      language: 'ja'
-    })
+    // Progress callback
+    let progressMessageId = null
+    const onProgress = (progressInfo) => {
+      console.log('📊 OCR進捗:', progressInfo)
+      
+      const stageEmoji = progressInfo.stage === 1 ? '🌐' : progressInfo.stage === 2 ? '🤖' : '💻'
+      const progressMessage = `${stageEmoji} ${progressInfo.message}`
+      
+      if (!progressMessageId) {
+        progressMessageId = addAIMessage(progressMessage, 'system')
+      } else {
+        // Update existing message
+        updateAIMessage(progressMessageId, progressMessage)
+      }
+    }
     
-    console.log('✅ OCR認識レスポンス:', response.data)
+    // Perform OCR with progress tracking
+    const result = await window.performOCR(imageData, 'ja', onProgress)
     
-    if (response.data.success && response.data.text) {
-      const recognizedText = response.data.text.trim()
+    console.log('✅ OCR認識完了:', result)
+    
+    if (result.success && result.text) {
+      const recognizedText = result.text.trim()
+      const stageInfo = result.stage === 1 ? '第1段階（Google Cloud Vision）' 
+                      : result.stage === 2 ? '第2段階（Gemini Vision）'
+                      : '第3段階（Tesseract.js）'
+      
       console.log('✅ 認識されたテキスト:', recognizedText)
-      console.log('📊 認識方法:', response.data.method)
+      console.log('📊 認識方法:', result.method)
+      console.log('📊 認識段階:', stageInfo)
       
       // AI先生に送信
       const input = document.getElementById('aiQuestionInput')
@@ -4307,21 +4347,21 @@ async function sendHandwriting() {
       }
       
       // 認識結果を表示
-      addAIMessage(`✅ 認識しました！\n📝 「${recognizedText}」\n\n認識方法: ${response.data.method}`, 'system')
+      addAIMessage(`✅ 認識しました！\n📝 「${recognizedText}」\n\n認識方法: ${stageInfo}\n信頼度: ${result.confidence}%`, 'system')
       
       // 実際に質問を送信
       askAI()
     } else {
-      console.error('⚠️ OCR認識失敗:', response.data)
+      console.error('⚠️ OCR認識失敗（全3段階）:', result)
       
       // フォールバック: 手書きの説明だけで送信
       const input = document.getElementById('aiQuestionInput')
       if (input) {
         const originalText = input.value.trim()
-        input.value = `[手書きメモ${thinkingNote}を送信（文字認識できませんでした）]\n${originalText || 'この手書きの内容について教えてください'}`
+        input.value = `[手書きメモ${thinkingNote}を送信（3段階すべての文字認識が失敗）]\n${originalText || 'この手書きの内容について教えてください'}`
       }
       
-      addAIMessage('⚠️ 文字認識に失敗しました。もう一度はっきり書いてみてください。', 'system')
+      addAIMessage('⚠️ 3段階すべての文字認識に失敗しました。もう一度はっきり書いてみてください。', 'system')
       
       // それでも質問を送信
       askAI()

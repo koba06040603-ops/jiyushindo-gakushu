@@ -4041,6 +4041,7 @@ app.get('/test-buttons.html', async (c) => {
         })
     </script>
     
+    <script src="/static/ocr-handler.js"></script>
     <script src="/static/app.js"></script>
     
     <script>
@@ -4897,156 +4898,156 @@ ${specificInstructions}
   }
 })
 
-// APIルート：OCR（手書き文字認識）
+// APIルート：OCR（手書き文字認識）- 3段階フォールバック対応
 app.post('/api/ai/ocr', async (c) => {
   const { env } = c
   const { imageData, language } = await c.req.json()
   
   // 環境変数からAPIキーを取得
-  // GOOGLE_CLOUD_API_KEYがあればVision API、なければGemini APIを使用
   const visionApiKey = env.GOOGLE_CLOUD_API_KEY
   const geminiApiKey = env.GEMINI_API_KEY
   
-  if (!visionApiKey && !geminiApiKey) {
-    console.error('❌ APIキーが設定されていません')
-    return c.json({
-      error: 'APIキーが設定されていません',
-      success: false,
-      text: null
-    }, 500)
-  }
-  
   try {
-    console.log('🔍 OCR認識を開始...')
+    console.log('🔍 OCR認識を開始（3段階フォールバック対応）...')
     
     // Base64エンコードされた画像データからデータURL部分を削除
     const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '')
     
-    // Google Cloud Vision APIが利用可能な場合はそれを優先
-    if (visionApiKey) {
-      console.log('📤 Google Cloud Vision API を使用します')
-      const visionApiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`
-      
-      const requestBody = {
-        requests: [
-          {
-            image: {
-              content: base64Image
-            },
-            features: [
-              {
-                type: 'TEXT_DETECTION',
-                maxResults: 1
-              }
-            ],
-            imageContext: {
-              languageHints: language === 'ja' ? ['ja', 'en'] : ['en']
-            }
-          }
-        ]
-      }
-      
-      const response = await fetch(visionApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ Vision API エラー:', response.status, errorText)
-        throw new Error(`Vision API エラー: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      console.log('✅ Vision API レスポンス受信')
-      
-      // テキストを抽出
-      const textAnnotations = data.responses[0]?.textAnnotations
-      
-      if (textAnnotations && textAnnotations.length > 0) {
-        const recognizedText = textAnnotations[0].description.trim()
-        console.log('✅ Vision API OCR認識成功:', recognizedText)
+    // 【第1段階】Google Cloud Vision APIが利用可能な場合はそれを優先
+    if (visionApiKey && visionApiKey !== 'your-google-cloud-api-key-here') {
+      try {
+        console.log('📤 [第1段階] Google Cloud Vision API を使用します')
+        const visionApiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`
         
-        return c.json({
-          success: true,
-          text: recognizedText,
-          confidence: 95,
-          method: 'google-cloud-vision'
-        })
-      }
-    }
-    
-    // フォールバック: Gemini Vision APIを使用
-    if (geminiApiKey) {
-      console.log('📤 Gemini Vision API を使用します（フォールバック）')
-      
-      const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`
-      
-      const requestBody = {
-        contents: [
-          {
-            parts: [
-              {
-                text: language === 'ja' 
-                  ? '画像に書かれている日本語のテキストを読み取ってください。手書き文字も含まれます。認識したテキストのみを出力してください。説明や補足は不要です。'
-                  : 'Read the text written in this image. Include handwritten text. Output only the recognized text without any explanation.'
+        const requestBody = {
+          requests: [
+            {
+              image: {
+                content: base64Image
               },
-              {
-                inline_data: {
-                  mime_type: 'image/png',
-                  data: base64Image
+              features: [
+                {
+                  type: 'TEXT_DETECTION',
+                  maxResults: 1
                 }
+              ],
+              imageContext: {
+                languageHints: language === 'ja' ? ['ja', 'en'] : ['en']
               }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 500
+            }
+          ]
         }
-      }
-      
-      const response = await fetch(geminiApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      })
-      
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('❌ Gemini Vision API エラー:', response.status, errorText)
-        throw new Error(`Gemini Vision API エラー: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      console.log('✅ Gemini Vision API レスポンス受信')
-      
-      // テキストを抽出
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-      
-      if (text) {
-        console.log('✅ Gemini Vision API OCR認識成功:', text)
         
-        return c.json({
-          success: true,
-          text: text,
-          confidence: 90,
-          method: 'gemini-vision'
+        const response = await fetch(visionApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
         })
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log('✅ Vision API レスポンス受信')
+          
+          // テキストを抽出
+          const textAnnotations = data.responses[0]?.textAnnotations
+          
+          if (textAnnotations && textAnnotations.length > 0) {
+            const recognizedText = textAnnotations[0].description.trim()
+            console.log('✅ [第1段階成功] Vision API OCR認識成功:', recognizedText)
+            
+            return c.json({
+              success: true,
+              text: recognizedText,
+              confidence: 95,
+              method: 'google-cloud-vision',
+              stage: 1
+            })
+          }
+        } else {
+          const errorText = await response.text()
+          console.warn('⚠️ [第1段階失敗] Vision API エラー:', response.status, errorText)
+        }
+      } catch (visionError: any) {
+        console.warn('⚠️ [第1段階失敗] Vision API 例外:', visionError.message)
       }
     }
     
-    // どちらのAPIでも結果が得られなかった場合
-    console.log('⚠️ テキストが検出されませんでした')
+    // 【第2段階】フォールバック: Gemini Vision APIを使用
+    if (geminiApiKey && geminiApiKey !== 'your-gemini-api-key-here') {
+      try {
+        console.log('📤 [第2段階] Gemini Vision API を使用します（フォールバック）')
+        
+        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiApiKey}`
+        
+        const requestBody = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: language === 'ja' 
+                    ? '画像に書かれている日本語のテキストを正確に読み取ってください。手書き文字も含まれます。認識したテキストのみを出力してください。説明や補足は一切不要です。'
+                    : 'Read the text written in this image accurately. Include handwritten text. Output only the recognized text without any explanation or additional commentary.'
+                },
+                {
+                  inline_data: {
+                    mime_type: 'image/png',
+                    data: base64Image
+                  }
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 500
+          }
+        }
+        
+        const response = await fetch(geminiApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log('✅ Gemini Vision API レスポンス受信')
+          
+          // テキストを抽出
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+          
+          if (text) {
+            console.log('✅ [第2段階成功] Gemini Vision API OCR認識成功:', text)
+            
+            return c.json({
+              success: true,
+              text: text,
+              confidence: 90,
+              method: 'gemini-vision',
+              stage: 2
+            })
+          }
+        } else {
+          const errorText = await response.text()
+          console.warn('⚠️ [第2段階失敗] Gemini Vision API エラー:', response.status, errorText)
+        }
+      } catch (geminiError: any) {
+        console.warn('⚠️ [第2段階失敗] Gemini Vision API 例外:', geminiError.message)
+      }
+    }
+    
+    // 【第3段階】最終フォールバック: クライアントサイドでTesseract.jsを使用するよう指示
+    console.log('⚠️ [第3段階] サーバーサイドOCR失敗 → クライアントサイドOCR（Tesseract.js）を推奨')
     return c.json({
       success: false,
       text: null,
-      error: 'テキストが検出されませんでした'
+      useTesseract: true,
+      message: 'サーバーサイドOCRが利用できません。クライアントサイドOCRを使用してください。',
+      stage: 3
     })
     
   } catch (error: any) {
@@ -5054,7 +5055,9 @@ app.post('/api/ai/ocr', async (c) => {
     return c.json({
       success: false,
       error: error.message,
-      text: null
+      text: null,
+      useTesseract: true,
+      stage: 3
     }, 500)
   }
 })
