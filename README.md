@@ -32,6 +32,24 @@
   - 曲調選択機能（4種類：明るいポップ、やさしいバラード、リズミカル、アコースティック）
   - **教師用進捗ボード**: トップページから簡単アクセス、カリキュラム選択で進捗表示
   - **児童向け友達助け合い機能**: クラス進捗確認、助けられる友達の自動判定、ヘルプ要請機能
+- **2026-01-29**: 分散学習スケジューラー実装 ✅ **完了**
+  - **科学的根拠**: Ebbinghaus忘却曲線、Leitnerシステム、SuperMemo SM-2アルゴリズム
+  - **Leitnerボックスシステム**: 5段階のボックスで習熟度管理（1日→3日→1週間→2週間→1ヶ月）
+  - **SuperMemo SM-2**: 学習品質に基づく最適復習間隔計算
+  - **自己調整学習統合**: SRLの3段階（予見・遂行・内省）と連動
+  - **復習推奨システム**: 
+    - 今日の復習カード自動抽出
+    - 週間復習スケジュール表示
+    - 忘却リスク検出と優先度計算
+  - **習熟度追跡**: 
+    - 学習段階管理（未学習・学習中・復習期・習得済み）
+    - リアルタイム習熟度更新
+    - 学習履歴の詳細記録
+  - **進捗ダッシュボード**: 
+    - 分散学習サマリー表示
+    - Leitnerボックス分布可視化
+    - 週間スケジュールグラフ
+  - **デモページ**: `/spaced-learning-progress-demo.html`
 
 ---
 
@@ -2045,6 +2063,22 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 | `/api/card/:cardId` | PUT | 学習カード更新（学習スタイル対応⭐⭐⭐NEW） | cardId: カードID, visual_support, auditory_support, kinesthetic_support, learning_style_notes |
 | `/api/card/:cardId/suggest-learning-styles` | POST | 学習スタイルAI提案⭐⭐⭐NEW | cardId: カードID |
 
+**分散学習スケジューラーAPI（2026-01-29実装完了✅）:**
+
+| エンドポイント | メソッド | 説明 | パラメータ |
+|--------------|---------|------|-----------|
+| `/api/spaced-learning/today-reviews/:studentId` | GET | 今日の復習カード取得 | studentId: 学生ID |
+| `/api/spaced-learning/review-count/:studentId` | GET | 今日の復習カード数取得 | studentId: 学生ID |
+| `/api/spaced-learning/weekly-schedule/:studentId` | GET | 週間復習スケジュール取得 | studentId: 学生ID |
+| `/api/spaced-learning/mastery-stats/:studentId` | GET | 習熟度統計取得 | studentId: 学生ID |
+| `/api/spaced-learning/record-review` | POST | 学習結果記録 | studentId, cardId, result, sessionType, responseTime, difficultyRating, confidenceLevel, srlStage, srlStrategyUsed, srlNotes |
+| `/api/spaced-learning/forgetting-risk/:studentId` | GET | 忘却リスクカード取得 | studentId: 学生ID, limit: 件数 |
+| `/api/spaced-learning/history/:studentId` | GET | 学習履歴取得 | studentId: 学生ID, cardId: カードID（任意）, limit: 件数 |
+| `/api/spaced-learning/schedule/:studentId/:cardId` | GET | スケジュール詳細取得 | studentId: 学生ID, cardId: カードID |
+| `/api/spaced-learning/mastery/:studentId/:cardId` | GET | 習熟度取得 | studentId: 学生ID, cardId: カードID |
+| `/api/spaced-learning/settings/:studentId` | GET | 設定取得 | studentId: 学生ID |
+| `/api/spaced-learning/settings/:studentId` | PUT | 設定更新 | studentId: 学生ID, settings: 設定データ |
+
 ### ページ一覧
 
 | ページ | 説明 | アクセス |
@@ -2057,6 +2091,7 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 | 進捗ボード | クラス全体の進捗 | 学習のてびきから |
 | **学習環境デザイン** | **6観点の環境設定** | **学習のてびき（教師用）** |
 | **指導・評価** | **3観点・非認知評価** | **学習のてびき（教師用）** |
+| **分散学習進捗** | **復習スケジュール・習熟度** | **/spaced-learning-progress-demo.html** |
 
 ## 実装済み機能の詳細
 
