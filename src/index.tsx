@@ -14554,4 +14554,639 @@ app.get('/api/spaced-learning/schedule/:studentId/:cardId', async (c) => {
   }
 })
 
+// ================================
+// 協働学習API (Collaborative Learning)
+// ================================
+
+// 1. 友達の回答一覧取得
+app.get('/api/collaborative/peer-answers/:cardId', async (c) => {
+  const { env } = c
+  const cardId = parseInt(c.req.param('cardId'))
+  const studentId = parseInt(c.req.query('studentId') || '0')
+  const classCode = c.req.query('classCode')
+  
+  if (!classCode) {
+    return c.json({ success: false, error: 'クラスコードが必要です' }, 400)
+  }
+  
+  try {
+    // 同じクラスの生徒の回答を取得
+    const result = await env.DB.prepare(`
+      SELECT 
+        pa.id,
+        pa.student_id,
+        u.name as student_name,
+        pa.answer_text,
+        pa.approach_type,
+        pa.is_public,
+        pa.created_at,
+        pa.updated_at,
+        COALESCE(AVG(pe.rating), 0) as average_rating,
+        COUNT(DISTINCT pe.id) as evaluation_count,
+        COUNT(DISTINCT pv.id) as view_count,
+        COUNT(DISTINCT ph.id) as helpful_count
+      FROM peer_answers pa
+      JOIN users u ON pa.student_id = u.id
+      LEFT JOIN peer_evaluations pe ON pa.id = pe.answer_id
+      LEFT JOIN peer_answer_views pv ON pa.id = pv.answer_id
+      LEFT JOIN peer_helpful_marks ph ON pa.id = ph.answer_id
+      WHERE pa.card_id = ? 
+        AND u.class_code = ?
+        AND pa.is_public = 1
+        AND pa.student_id != ?
+      GROUP BY pa.id
+      ORDER BY average_rating DESC, helpful_count DESC
+      LIMIT 20
+    `).bind(cardId, classCode, studentId).all()
+    
+    return c.json({
+      success: true,
+      answers: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 友達の回答取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 2. 回答を投稿
+app.post('/api/collaborative/submit-answer', async (c) => {
+  const { env } = c
+  const { studentId, cardId, answerText, approachType, isPublic = true } = await c.req.json()
+  
+  try {
+    // 既存の回答を確認
+    const existing = await env.DB.prepare(`
+      SELECT id FROM peer_answers 
+      WHERE student_id = ? AND card_id = ?
+    `).bind(studentId, cardId).first()
+    
+    if (existing) {
+      // 更新
+      await env.DB.prepare(`
+        UPDATE peer_answers 
+        SET answer_text = ?,
+            approach_type = ?,
+            is_public = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(answerText, approachType, isPublic ? 1 : 0, existing.id).run()
+      
+      return c.json({
+        success: true,
+        answerId: existing.id,
+        message: '回答を更新しました'
+      })
+    } else {
+      // 新規作成
+      const result = await env.DB.prepare(`
+        INSERT INTO peer_answers (student_id, card_id, answer_text, approach_type, is_public)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(studentId, cardId, answerText, approachType, isPublic ? 1 : 0).run()
+      
+      return c.json({
+        success: true,
+        answerId: result.meta.last_row_id,
+        message: '回答を投稿しました'
+      })
+    }
+  } catch (error: any) {
+    console.error('❌ 回答投稿エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 3. ピア評価を投稿
+app.post('/api/collaborative/submit-evaluation', async (c) => {
+  const { env } = c
+  const { 
+    evaluatorId, 
+    answerId, 
+    rating, 
+    feedbackText, 
+    helpfulAspects,
+    learningGained 
+  } = await c.req.json()
+  
+  try {
+    // 既存の評価を確認
+    const existing = await env.DB.prepare(`
+      SELECT id FROM peer_evaluations 
+      WHERE evaluator_id = ? AND answer_id = ?
+    `).bind(evaluatorId, answerId).first()
+    
+    if (existing) {
+      // 更新
+      await env.DB.prepare(`
+        UPDATE peer_evaluations 
+        SET rating = ?,
+            feedback_text = ?,
+            helpful_aspects = ?,
+            learning_gained = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(rating, feedbackText, helpfulAspects, learningGained, existing.id).run()
+      
+      return c.json({
+        success: true,
+        evaluationId: existing.id,
+        message: '評価を更新しました'
+      })
+    } else {
+      // 新規作成
+      const result = await env.DB.prepare(`
+        INSERT INTO peer_evaluations 
+        (evaluator_id, answer_id, rating, feedback_text, helpful_aspects, learning_gained)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(evaluatorId, answerId, rating, feedbackText, helpfulAspects, learningGained).run()
+      
+      return c.json({
+        success: true,
+        evaluationId: result.meta.last_row_id,
+        message: '評価を投稿しました'
+      })
+    }
+  } catch (error: any) {
+    console.error('❌ 評価投稿エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 4. 役に立ったマークを切り替え
+app.post('/api/collaborative/toggle-helpful', async (c) => {
+  const { env } = c
+  const { studentId, answerId } = await c.req.json()
+  
+  try {
+    // 既存のマークを確認
+    const existing = await env.DB.prepare(`
+      SELECT id FROM peer_helpful_marks 
+      WHERE student_id = ? AND answer_id = ?
+    `).bind(studentId, answerId).first()
+    
+    if (existing) {
+      // 削除（トグルOFF）
+      await env.DB.prepare(`
+        DELETE FROM peer_helpful_marks WHERE id = ?
+      `).bind(existing.id).run()
+      
+      return c.json({
+        success: true,
+        isHelpful: false,
+        message: '役に立ったマークを解除しました'
+      })
+    } else {
+      // 追加（トグルON）
+      await env.DB.prepare(`
+        INSERT INTO peer_helpful_marks (student_id, answer_id)
+        VALUES (?, ?)
+      `).bind(studentId, answerId).run()
+      
+      return c.json({
+        success: true,
+        isHelpful: true,
+        message: '役に立ったマークを追加しました'
+      })
+    }
+  } catch (error: any) {
+    console.error('❌ 役に立ったマーク切り替えエラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 5. 回答の閲覧記録
+app.post('/api/collaborative/record-view', async (c) => {
+  const { env } = c
+  const { viewerId, answerId, viewDuration } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO peer_answer_views (viewer_id, answer_id, view_duration)
+      VALUES (?, ?, ?)
+    `).bind(viewerId, answerId, viewDuration).run()
+    
+    return c.json({
+      success: true,
+      message: '閲覧記録を保存しました'
+    })
+  } catch (error: any) {
+    console.error('❌ 閲覧記録エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 6. 協働学習統計取得
+app.get('/api/collaborative/stats/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    // 自分の回答統計
+    const myAnswers = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_answers,
+        COUNT(CASE WHEN is_public = 1 THEN 1 END) as public_answers,
+        AVG(CASE WHEN is_public = 1 THEN (
+          SELECT AVG(rating) FROM peer_evaluations WHERE answer_id = peer_answers.id
+        ) END) as average_rating_received
+      FROM peer_answers
+      WHERE student_id = ?
+    `).bind(studentId).first()
+    
+    // 評価した回数
+    const evaluationsGiven = await env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM peer_evaluations
+      WHERE evaluator_id = ?
+    `).bind(studentId).first()
+    
+    // 閲覧した回答数
+    const answersViewed = await env.DB.prepare(`
+      SELECT COUNT(DISTINCT answer_id) as count
+      FROM peer_answer_views
+      WHERE viewer_id = ?
+    `).bind(studentId).first()
+    
+    // 役に立ったマークを受けた回数
+    const helpfulReceived = await env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM peer_helpful_marks phm
+      JOIN peer_answers pa ON phm.answer_id = pa.id
+      WHERE pa.student_id = ?
+    `).bind(studentId).first()
+    
+    return c.json({
+      success: true,
+      stats: {
+        totalAnswers: myAnswers?.total_answers || 0,
+        publicAnswers: myAnswers?.public_answers || 0,
+        averageRating: myAnswers?.average_rating_received || 0,
+        evaluationsGiven: evaluationsGiven?.count || 0,
+        answersViewed: answersViewed?.count || 0,
+        helpfulReceived: helpfulReceived?.count || 0
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 協働学習統計取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 7. クラス全体の協働学習活動取得
+app.get('/api/collaborative/class-activity/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  
+  try {
+    const result = await env.DB.prepare(`
+      SELECT 
+        u.id as student_id,
+        u.name as student_name,
+        COUNT(DISTINCT pa.id) as answers_shared,
+        COUNT(DISTINCT pe.id) as evaluations_given,
+        AVG(CASE WHEN pe2.answer_id IS NOT NULL THEN pe2.rating END) as avg_rating_received,
+        COUNT(DISTINCT phm.id) as helpful_marks_received
+      FROM users u
+      LEFT JOIN peer_answers pa ON u.id = pa.student_id AND pa.is_public = 1
+      LEFT JOIN peer_evaluations pe ON u.id = pe.evaluator_id
+      LEFT JOIN peer_answers pa2 ON u.id = pa2.student_id
+      LEFT JOIN peer_evaluations pe2 ON pa2.id = pe2.answer_id
+      LEFT JOIN peer_helpful_marks phm ON pa2.id = phm.answer_id
+      WHERE u.class_code = ?
+      GROUP BY u.id
+      ORDER BY (answers_shared + evaluations_given) DESC
+      LIMIT 50
+    `).bind(classCode).all()
+    
+    return c.json({
+      success: true,
+      activities: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ クラス活動取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ================================
+// 週次・月次レポートAPI (Weekly/Monthly Reports)
+// ================================
+
+// 1. 週次レポート生成
+app.post('/api/reports/weekly/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const { weekStart, weekEnd } = await c.req.json()
+  
+  try {
+    // レポートデータを集計
+    const reportData = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT slh.id) as total_reviews,
+        AVG(slh.quality_rating) as avg_quality,
+        COUNT(DISTINCT slh.card_id) as unique_cards,
+        AVG(slh.is_correct) as accuracy_rate,
+        SUM(slh.response_time) as total_study_time,
+        COUNT(DISTINCT CASE WHEN slh.srl_stage = 'foresee' THEN slh.id END) as foresee_count,
+        COUNT(DISTINCT CASE WHEN slh.srl_stage = 'performance' THEN slh.id END) as performance_count,
+        COUNT(DISTINCT CASE WHEN slh.srl_stage = 'reflection' THEN slh.id END) as reflection_count
+      FROM spaced_learning_history slh
+      WHERE slh.student_id = ?
+        AND slh.reviewed_at BETWEEN ? AND ?
+    `).bind(studentId, weekStart, weekEnd).first()
+    
+    // ScTNスコアの変化を取得
+    const sctnProgress = await env.DB.prepare(`
+      SELECT 
+        AVG(CASE WHEN dimension = 'metacognition' THEN score END) as metacognition_score,
+        AVG(CASE WHEN dimension = 'self_regulation' THEN score END) as self_regulation_score,
+        AVG(CASE WHEN dimension = 'motivation' THEN score END) as motivation_score
+      FROM sctn_survey_results
+      WHERE student_id = ?
+        AND survey_date BETWEEN ? AND ?
+    `).bind(studentId, weekStart, weekEnd).first()
+    
+    // 学習方略の効果
+    const strategyEffects = await env.DB.prepare(`
+      SELECT 
+        lsh.strategy_type,
+        AVG(lsh.effectiveness_rating) as avg_effectiveness,
+        COUNT(*) as usage_count
+      FROM learning_strategy_history lsh
+      WHERE lsh.student_id = ?
+        AND lsh.used_at BETWEEN ? AND ?
+      GROUP BY lsh.strategy_type
+      ORDER BY avg_effectiveness DESC
+    `).bind(studentId, weekStart, weekEnd).all()
+    
+    // レポートを保存
+    const result = await env.DB.prepare(`
+      INSERT INTO weekly_learning_reports 
+      (student_id, week_start_date, week_end_date, total_study_time, 
+       cards_reviewed, average_accuracy, sctn_metacognition_score, 
+       sctn_self_regulation_score, spaced_learning_reviews)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      studentId, weekStart, weekEnd,
+      reportData?.total_study_time || 0,
+      reportData?.unique_cards || 0,
+      reportData?.accuracy_rate || 0,
+      sctnProgress?.metacognition_score || null,
+      sctnProgress?.self_regulation_score || null,
+      reportData?.total_reviews || 0
+    ).run()
+    
+    return c.json({
+      success: true,
+      reportId: result.meta.last_row_id,
+      summary: {
+        totalReviews: reportData?.total_reviews || 0,
+        avgQuality: reportData?.avg_quality || 0,
+        uniqueCards: reportData?.unique_cards || 0,
+        accuracyRate: (reportData?.accuracy_rate || 0) * 100,
+        totalStudyTime: reportData?.total_study_time || 0,
+        srlBreakdown: {
+          foresee: reportData?.foresee_count || 0,
+          performance: reportData?.performance_count || 0,
+          reflection: reportData?.reflection_count || 0
+        },
+        sctnProgress: sctnProgress,
+        topStrategies: strategyEffects.results.slice(0, 3)
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 週次レポート生成エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 2. 月次レポート生成
+app.post('/api/reports/monthly/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const { monthStart, monthEnd } = await c.req.json()
+  
+  try {
+    // 月次統計
+    const monthlyStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT slh.id) as total_reviews,
+        COUNT(DISTINCT slh.card_id) as unique_cards,
+        AVG(slh.is_correct) as avg_accuracy,
+        SUM(slh.response_time) as total_time,
+        AVG(slh.quality_rating) as avg_quality
+      FROM spaced_learning_history slh
+      WHERE slh.student_id = ?
+        AND slh.reviewed_at BETWEEN ? AND ?
+    `).bind(studentId, monthStart, monthEnd).first()
+    
+    // 習熟度の推移
+    const masteryTrend = await env.DB.prepare(`
+      SELECT 
+        DATE(slh.reviewed_at) as review_date,
+        AVG(sls.mastery_level) as avg_mastery
+      FROM spaced_learning_history slh
+      JOIN spaced_learning_schedule sls ON slh.student_id = sls.student_id 
+        AND slh.card_id = sls.card_id
+      WHERE slh.student_id = ?
+        AND slh.reviewed_at BETWEEN ? AND ?
+      GROUP BY DATE(slh.reviewed_at)
+      ORDER BY review_date
+    `).bind(studentId, monthStart, monthEnd).all()
+    
+    // ScTN経年変化
+    const sctnTrend = await env.DB.prepare(`
+      SELECT 
+        survey_date,
+        AVG(CASE WHEN dimension = 'metacognition' THEN score END) as metacognition,
+        AVG(CASE WHEN dimension = 'self_regulation' THEN score END) as self_regulation,
+        AVG(CASE WHEN dimension = 'motivation' THEN score END) as motivation,
+        AVG(CASE WHEN dimension = 'collaboration' THEN score END) as collaboration
+      FROM sctn_survey_results
+      WHERE student_id = ?
+        AND survey_date BETWEEN ? AND ?
+      GROUP BY survey_date
+      ORDER BY survey_date
+    `).bind(studentId, monthStart, monthEnd).all()
+    
+    // 協働学習の参加状況
+    const collaborationStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT pa.id) as answers_shared,
+        COUNT(DISTINCT pe.id) as evaluations_given,
+        AVG(pe2.rating) as avg_rating_received
+      FROM users u
+      LEFT JOIN peer_answers pa ON u.id = pa.student_id
+      LEFT JOIN peer_evaluations pe ON u.id = pe.evaluator_id
+      LEFT JOIN peer_answers pa2 ON u.id = pa2.student_id
+      LEFT JOIN peer_evaluations pe2 ON pa2.id = pe2.answer_id
+      WHERE u.id = ?
+        AND pa.created_at BETWEEN ? AND ?
+    `).bind(studentId, monthStart, monthEnd).first()
+    
+    // レポートを保存
+    const result = await env.DB.prepare(`
+      INSERT INTO monthly_learning_reports 
+      (student_id, month_start_date, month_end_date, total_study_time,
+       cards_mastered, average_accuracy, sctn_overall_growth,
+       collaboration_score, spaced_learning_effectiveness)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      studentId, monthStart, monthEnd,
+      monthlyStats?.total_time || 0,
+      monthlyStats?.unique_cards || 0,
+      monthlyStats?.avg_accuracy || 0,
+      null, // 計算は後で実装
+      collaborationStats?.answers_shared || 0,
+      monthlyStats?.avg_quality || 0
+    ).run()
+    
+    return c.json({
+      success: true,
+      reportId: result.meta.last_row_id,
+      summary: {
+        totalReviews: monthlyStats?.total_reviews || 0,
+        uniqueCards: monthlyStats?.unique_cards || 0,
+        avgAccuracy: (monthlyStats?.avg_accuracy || 0) * 100,
+        totalTime: monthlyStats?.total_time || 0,
+        avgQuality: monthlyStats?.avg_quality || 0,
+        masteryTrend: masteryTrend.results,
+        sctnTrend: sctnTrend.results,
+        collaboration: collaborationStats
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 月次レポート生成エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 3. 週次レポート一覧取得
+app.get('/api/reports/weekly/:studentId/list', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const limit = parseInt(c.req.query('limit') || '12') // 直近12週間
+  
+  try {
+    const result = await env.DB.prepare(`
+      SELECT * FROM weekly_learning_reports
+      WHERE student_id = ?
+      ORDER BY week_start_date DESC
+      LIMIT ?
+    `).bind(studentId, limit).all()
+    
+    return c.json({
+      success: true,
+      reports: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 週次レポート一覧取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 4. 月次レポート一覧取得
+app.get('/api/reports/monthly/:studentId/list', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const limit = parseInt(c.req.query('limit') || '12') // 直近12ヶ月
+  
+  try {
+    const result = await env.DB.prepare(`
+      SELECT * FROM monthly_learning_reports
+      WHERE student_id = ?
+      ORDER BY month_start_date DESC
+      LIMIT ?
+    `).bind(studentId, limit).all()
+    
+    return c.json({
+      success: true,
+      reports: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 月次レポート一覧取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 5. ScTN経年変化データ取得
+app.get('/api/reports/sctn-trend/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const months = parseInt(c.req.query('months') || '12')
+  
+  try {
+    const startDate = new Date()
+    startDate.setMonth(startDate.getMonth() - months)
+    
+    const result = await env.DB.prepare(`
+      SELECT 
+        survey_date,
+        dimension,
+        score,
+        package_type
+      FROM sctn_survey_results
+      WHERE student_id = ?
+        AND survey_date >= ?
+      ORDER BY survey_date, dimension
+    `).bind(studentId, startDate.toISOString().split('T')[0]).all()
+    
+    // ディメンションごとに整理
+    const trendData: any = {}
+    result.results.forEach((row: any) => {
+      if (!trendData[row.dimension]) {
+        trendData[row.dimension] = []
+      }
+      trendData[row.dimension].push({
+        date: row.survey_date,
+        score: row.score,
+        packageType: row.package_type
+      })
+    })
+    
+    return c.json({
+      success: true,
+      trend: trendData
+    })
+  } catch (error: any) {
+    console.error('❌ ScTN経年変化取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 6. 習熟度推移データ取得
+app.get('/api/reports/mastery-trend/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const days = parseInt(c.req.query('days') || '30')
+  
+  try {
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    
+    const result = await env.DB.prepare(`
+      SELECT 
+        DATE(slh.reviewed_at) as review_date,
+        AVG(sls.mastery_level) as avg_mastery,
+        COUNT(DISTINCT slh.card_id) as cards_reviewed,
+        AVG(slh.is_correct) as accuracy
+      FROM spaced_learning_history slh
+      JOIN spaced_learning_schedule sls ON slh.student_id = sls.student_id 
+        AND slh.card_id = sls.card_id
+      WHERE slh.student_id = ?
+        AND slh.reviewed_at >= ?
+      GROUP BY DATE(slh.reviewed_at)
+      ORDER BY review_date
+    `).bind(studentId, startDate.toISOString().split('T')[0]).all()
+    
+    return c.json({
+      success: true,
+      trend: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 習熟度推移取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app
