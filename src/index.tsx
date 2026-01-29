@@ -4362,6 +4362,8 @@ app.get('/', (c) => {
         <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
         <style>
           /* FontAwesome fa-spin animation */
           @keyframes fa-spin {
@@ -4409,6 +4411,9 @@ app.get('/', (c) => {
               '/static/educational-media.js',
               '/static/advanced-speech.js',
               '/static/interactive-tools-level3.js',
+              '/static/advanced-3d-visualization.js',
+              '/static/music-generation-level3.js',
+              '/static/all-subjects-master.js',
               '/static/learning-styles.js',
               '/static/phase3-demo-data.js',
               '/static/phase3.js',
