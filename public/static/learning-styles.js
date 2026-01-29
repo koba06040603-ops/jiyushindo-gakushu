@@ -247,26 +247,41 @@ class LearningStyleManager {
   }
   
   /**
-   * 聴覚型の問題表現を生成
+   * 聴覚型の問題表現を生成（レベル3）
    * @param {Object} cardData
    * @returns {Object}
    */
   generateAuditoryProblem(cardData) {
     const { problem_description, answer, card_title } = cardData
     
-    // 音声読み上げ機能を含む表現
+    // 音声読み上げ機能を含む表現（レベル3強化版）
     let auditoryContent = `
       <div class="auditory-problem">
-        <div class="problem-title text-xl font-bold mb-4 text-green-600">
+        <div class="problem-title text-xl font-bold mb-4 text-green-600 flex items-center gap-2">
           ${card_title}
           <button 
-            class="read-aloud-btn ml-2 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition"
-            onclick="window.learningStyleManager.readAloud('${card_title}. ${problem_description.replace(/'/g, "\\'")}')">
+            class="read-aloud-btn px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition shadow-lg"
+            onclick="if(window.advancedSpeechManager) window.advancedSpeechManager.speak('${card_title}。${problem_description.replace(/'/g, "\\'")}', {emotion: 'gentle'})">
             🔊 読み上げ
           </button>
+          <button 
+            class="settings-btn px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+            onclick="if(window.advancedSpeechManager) window.advancedSpeechManager.showSettingsPanel()">
+            ⚙️ 音声設定
+          </button>
         </div>
-        <div class="problem-auditory bg-green-50 p-6 rounded-lg mb-4">
+        <div class="problem-auditory bg-green-50 p-6 rounded-lg mb-4 relative">
           ${this.addAuditoryEnhancements(problem_description)}
+        </div>
+        <div class="audio-controls mt-4 flex gap-2 justify-center">
+          <button onclick="if(window.enhancedSoundEffects) window.enhancedSoundEffects.playCorrectSound()"
+                  class="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition">
+            🎵 正解音
+          </button>
+          <button onclick="if(window.enhancedSoundEffects) window.enhancedSoundEffects.playClickSound()"
+                  class="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition">
+            🎶 クリック音
+          </button>
         </div>
       </div>
     `
@@ -275,19 +290,22 @@ class LearningStyleManager {
       title: card_title,
       content: auditoryContent,
       answer: answer,
-      enhancements: ['音声読み上げ', 'リズム', '擬音語']
+      enhancements: ['高度な音声合成', 'リズム', '効果音', '字幕表示']
     }
   }
   
   /**
-   * 体感型の問題表現を生成
+   * 体感型の問題表現を生成（レベル3）
    * @param {Object} cardData
    * @returns {Object}
    */
   generateKinestheticProblem(cardData) {
     const { problem_description, answer, card_title } = cardData
     
-    // インタラクティブな体験を含む表現
+    // ツールID生成
+    const toolId = `interactive-tool-${Date.now()}`
+    
+    // インタラクティブな体験を含む表現（レベル3強化版）
     let kinestheticContent = `
       <div class="kinesthetic-problem">
         <div class="problem-title text-xl font-bold mb-4 text-orange-600">
@@ -296,18 +314,28 @@ class LearningStyleManager {
         <div class="problem-kinesthetic bg-orange-50 p-6 rounded-lg mb-4">
           ${this.addKinestheticEnhancements(problem_description)}
         </div>
-        <div class="interactive-area mt-4 p-4 bg-white border-2 border-dashed border-orange-300 rounded-lg">
-          <p class="text-sm text-gray-600 mb-2">👆 ここで実際に試してみよう！</p>
-          ${this.createInteractiveElements(cardData)}
+        <div id="${toolId}" class="interactive-tool-container bg-white rounded-lg shadow-xl p-4 mt-4">
+          <div class="text-center text-gray-500 py-8">
+            <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+            <p>インタラクティブツールを読み込んでいます...</p>
+          </div>
         </div>
       </div>
     `
+    
+    // ツールを自動選択して表示
+    setTimeout(() => {
+      if (window.interactiveTools) {
+        const tool = window.interactiveTools.autoSelectTool(problem_description);
+        window.interactiveTools.showTool(tool, toolId);
+      }
+    }, 100);
     
     return {
       title: card_title,
       content: kinestheticContent,
       answer: answer,
-      enhancements: ['体験', 'インタラクティブ', '操作']
+      enhancements: ['仮想そろばん', '数字ブロック', 'インタラクティブ時計', '分数バー', '図形ツール']
     }
   }
   
