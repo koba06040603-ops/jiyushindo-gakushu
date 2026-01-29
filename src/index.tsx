@@ -4404,6 +4404,8 @@ app.get('/', (c) => {
               '/static/visual-support.js', 
               '/static/realtime.js',
               '/static/realtime-notifications.js',
+              '/static/visual-diagram-generator.js',
+              '/static/visual-feedback.js',
               '/static/learning-styles.js',
               '/static/phase3-demo-data.js',
               '/static/phase3.js',
