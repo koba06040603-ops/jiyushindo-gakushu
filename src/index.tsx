@@ -15189,4 +15189,662 @@ app.get('/api/reports/mastery-trend/:studentId', async (c) => {
   }
 })
 
+// ================================
+// 検索練習API (Retrieval Practice)
+// ================================
+
+// 1. 検索練習セッション開始
+app.post('/api/retrieval-practice/start-session', async (c) => {
+  const { env } = c
+  const { studentId, cardId, recallType } = await c.req.json()
+  
+  try {
+    // セッションを作成
+    const result = await env.DB.prepare(`
+      INSERT INTO retrieval_practice_sessions 
+      (student_id, card_id, recall_type, session_status)
+      VALUES (?, ?, ?, 'active')
+    `).bind(studentId, cardId, recallType).run()
+    
+    // カード情報を取得
+    const card = await env.DB.prepare(`
+      SELECT * FROM learning_cards WHERE id = ?
+    `).bind(cardId).first()
+    
+    return c.json({
+      success: true,
+      sessionId: result.meta.last_row_id,
+      card: card,
+      recallType: recallType
+    })
+  } catch (error: any) {
+    console.error('❌ 検索練習セッション開始エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 2. 検索練習回答送信
+app.post('/api/retrieval-practice/submit-answer', async (c) => {
+  const { env } = c
+  const { 
+    sessionId, 
+    studentAnswer, 
+    responseTime,
+    confidenceRating,
+    difficultyRating 
+  } = await c.req.json()
+  
+  try {
+    // セッション情報を取得
+    const session = await env.DB.prepare(`
+      SELECT * FROM retrieval_practice_sessions WHERE id = ?
+    `).bind(sessionId).first()
+    
+    if (!session) {
+      throw new Error('セッションが見つかりません')
+    }
+    
+    // カードの正解を取得
+    const card = await env.DB.prepare(`
+      SELECT answer FROM learning_cards WHERE id = ?
+    `).bind(session.card_id).first()
+    
+    // AI評価を実行（Gemini APIを使用）
+    let accuracyScore = 0
+    let completenessScore = 0
+    let precisionScore = 0
+    let aiDetailedFeedback = ''
+    
+    if (env.GEMINI_API_KEY) {
+      const prompt = `
+あなたは教育評価の専門家です。以下の学習者の回答を評価してください。
+
+【正解】
+${card?.answer}
+
+【学習者の回答】
+${studentAnswer}
+
+以下の観点で評価し、JSON形式で返してください：
+{
+  "accuracy_score": 0-100の数値（正確性）,
+  "completeness_score": 0-100の数値（完全性）,
+  "precision_score": 0-100の数値（精度）,
+  "detailed_feedback": "詳細なフィードバック文"
+}
+`
+      
+      try {
+        const geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 1000
+              }
+            })
+          }
+        )
+        
+        const geminiData = await geminiResponse.json()
+        const aiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+        const evaluation = JSON.parse(extractJSON(aiText))
+        
+        accuracyScore = evaluation.accuracy_score || 0
+        completenessScore = evaluation.completeness_score || 0
+        precisionScore = evaluation.precision_score || 0
+        aiDetailedFeedback = evaluation.detailed_feedback || ''
+      } catch (error) {
+        console.error('AI評価エラー:', error)
+      }
+    }
+    
+    // 回答を記録
+    await env.DB.prepare(`
+      UPDATE retrieval_practice_sessions
+      SET student_answer = ?,
+          response_time = ?,
+          confidence_rating = ?,
+          difficulty_rating = ?,
+          accuracy_score = ?,
+          completeness_score = ?,
+          precision_score = ?,
+          ai_detailed_feedback = ?,
+          session_status = 'completed',
+          completed_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      studentAnswer,
+      responseTime,
+      confidenceRating,
+      difficultyRating,
+      accuracyScore,
+      completenessScore,
+      precisionScore,
+      aiDetailedFeedback,
+      sessionId
+    ).run()
+    
+    // メタ認知ギャップを計算
+    const actualPerformance = (accuracyScore + completenessScore + precisionScore) / 3
+    const metacognitionGap = confidenceRating - actualPerformance
+    
+    // メタ認知追跡を記録
+    await env.DB.prepare(`
+      INSERT INTO metacognition_tracking
+      (student_id, card_id, session_id, predicted_performance, actual_performance, metacognition_gap)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      session.student_id,
+      session.card_id,
+      sessionId,
+      confidenceRating,
+      actualPerformance,
+      metacognitionGap
+    ).run()
+    
+    return c.json({
+      success: true,
+      evaluation: {
+        accuracyScore,
+        completenessScore,
+        precisionScore,
+        overallScore: actualPerformance,
+        feedback: aiDetailedFeedback,
+        metacognitionGap
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 検索練習回答送信エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 3. 検索練習セッション一覧取得
+app.get('/api/retrieval-practice/sessions/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const limit = parseInt(c.req.query('limit') || '20')
+  
+  try {
+    const result = await env.DB.prepare(`
+      SELECT 
+        rps.*,
+        lc.card_title,
+        lc.card_number,
+        (rps.accuracy_score + rps.completeness_score + rps.precision_score) / 3 as overall_score
+      FROM retrieval_practice_sessions rps
+      JOIN learning_cards lc ON rps.card_id = lc.id
+      WHERE rps.student_id = ?
+      ORDER BY rps.created_at DESC
+      LIMIT ?
+    `).bind(studentId, limit).all()
+    
+    return c.json({
+      success: true,
+      sessions: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 検索練習セッション一覧取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 4. 検索練習統計取得
+app.get('/api/retrieval-practice/stats/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    // 基本統計
+    const basicStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_sessions,
+        AVG(accuracy_score) as avg_accuracy,
+        AVG(completeness_score) as avg_completeness,
+        AVG(precision_score) as avg_precision,
+        AVG(response_time) as avg_response_time,
+        AVG(confidence_rating) as avg_confidence
+      FROM retrieval_practice_sessions
+      WHERE student_id = ? AND session_status = 'completed'
+    `).bind(studentId).first()
+    
+    // 想起タイプ別統計
+    const recallTypeStats = await env.DB.prepare(`
+      SELECT 
+        recall_type,
+        COUNT(*) as session_count,
+        AVG((accuracy_score + completeness_score + precision_score) / 3) as avg_score
+      FROM retrieval_practice_sessions
+      WHERE student_id = ? AND session_status = 'completed'
+      GROUP BY recall_type
+    `).bind(studentId).all()
+    
+    // メタ認知統計
+    const metacognitionStats = await env.DB.prepare(`
+      SELECT 
+        AVG(predicted_performance) as avg_predicted,
+        AVG(actual_performance) as avg_actual,
+        AVG(metacognition_gap) as avg_gap,
+        AVG(ABS(metacognition_gap)) as avg_abs_gap
+      FROM metacognition_tracking
+      WHERE student_id = ?
+    `).bind(studentId).first()
+    
+    return c.json({
+      success: true,
+      stats: {
+        basic: basicStats,
+        recallTypes: recallTypeStats.results,
+        metacognition: metacognitionStats
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 検索練習統計取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 5. 効果測定データ取得
+app.get('/api/retrieval-practice/effectiveness/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    const result = await env.DB.prepare(`
+      SELECT 
+        card_id,
+        AVG(immediate_recall_score) as avg_immediate,
+        AVG(retention_score) as avg_retention,
+        AVG(transfer_score) as avg_transfer,
+        AVG(retention_interval) as avg_interval,
+        COUNT(*) as measurement_count
+      FROM retrieval_practice_effectiveness
+      WHERE student_id = ?
+      GROUP BY card_id
+      ORDER BY avg_retention DESC
+    `).bind(studentId).all()
+    
+    return c.json({
+      success: true,
+      effectiveness: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 効果測定データ取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 6. 推奨カード取得（検索練習用）
+app.get('/api/retrieval-practice/recommended-cards/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const recallType = c.req.query('recallType') || 'free_recall'
+  
+  try {
+    // まだ検索練習をしていないカード、または効果が高かったカードを推奨
+    const result = await env.DB.prepare(`
+      SELECT 
+        lc.*,
+        COALESCE(rpe.avg_retention, 0) as retention_score,
+        COALESCE(rps.session_count, 0) as practice_count
+      FROM learning_cards lc
+      LEFT JOIN (
+        SELECT card_id, AVG(retention_score) as avg_retention
+        FROM retrieval_practice_effectiveness
+        WHERE student_id = ?
+        GROUP BY card_id
+      ) rpe ON lc.id = rpe.card_id
+      LEFT JOIN (
+        SELECT card_id, COUNT(*) as session_count
+        FROM retrieval_practice_sessions
+        WHERE student_id = ? AND recall_type = ?
+        GROUP BY card_id
+      ) rps ON lc.id = rps.card_id
+      WHERE lc.id IN (
+        SELECT DISTINCT card_id FROM student_progress WHERE student_id = ?
+      )
+      ORDER BY practice_count ASC, retention_score ASC
+      LIMIT 10
+    `).bind(studentId, studentId, recallType, studentId).all()
+    
+    return c.json({
+      success: true,
+      recommendedCards: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 推奨カード取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ================================
+// 交互配置練習API (Interleaved Practice)
+// ================================
+
+// 1. 交互配置セッション開始
+app.post('/api/interleaved-practice/start-session', async (c) => {
+  const { env } = c
+  const { studentId, interleavingStrategy } = await c.req.json()
+  
+  try {
+    // セッションを作成
+    const result = await env.DB.prepare(`
+      INSERT INTO interleaved_practice_sessions 
+      (student_id, interleaving_strategy, session_status)
+      VALUES (?, ?, 'active')
+    `).bind(studentId, interleavingStrategy).run()
+    
+    const sessionId = result.meta.last_row_id
+    
+    // カードを選択して問題リストを生成
+    const cards = await env.DB.prepare(`
+      SELECT lc.*, cc.concept_name
+      FROM learning_cards lc
+      LEFT JOIN curriculum_concepts cc ON lc.concept_id = cc.id
+      WHERE lc.id IN (
+        SELECT card_id FROM student_progress WHERE student_id = ?
+      )
+      ORDER BY RANDOM()
+      LIMIT 10
+    `).bind(studentId).all()
+    
+    // 交互配置戦略に基づいて問題順序を決定
+    let problemOrder = []
+    
+    if (interleavingStrategy === 'random_interleaving') {
+      // ランダム交互配置
+      problemOrder = cards.results.map((card: any) => card.id).sort(() => Math.random() - 0.5)
+    } else if (interleavingStrategy === 'blocked_interleaving') {
+      // ブロック交互配置（概念ごとにグループ化）
+      const conceptGroups: any = {}
+      cards.results.forEach((card: any) => {
+        const concept = card.concept_name || 'other'
+        if (!conceptGroups[concept]) conceptGroups[concept] = []
+        conceptGroups[concept].push(card.id)
+      })
+      problemOrder = Object.values(conceptGroups).flat() as number[]
+    } else if (interleavingStrategy === 'adaptive_interleaving') {
+      // 適応型交互配置（習熟度が低いものを優先）
+      problemOrder = cards.results
+        .sort((a: any, b: any) => (a.mastery_level || 0) - (b.mastery_level || 0))
+        .map((card: any) => card.id)
+    } else {
+      // 体系的交互配置（概念を均等に分散）
+      const conceptGroups: any = {}
+      cards.results.forEach((card: any) => {
+        const concept = card.concept_name || 'other'
+        if (!conceptGroups[concept]) conceptGroups[concept] = []
+        conceptGroups[concept].push(card.id)
+      })
+      
+      // 各概念から1つずつ順番に取り出す
+      const maxLength = Math.max(...Object.values(conceptGroups).map((arr: any) => arr.length))
+      for (let i = 0; i < maxLength; i++) {
+        Object.values(conceptGroups).forEach((arr: any) => {
+          if (arr[i]) problemOrder.push(arr[i])
+        })
+      }
+    }
+    
+    // 問題を記録
+    for (let i = 0; i < problemOrder.length; i++) {
+      await env.DB.prepare(`
+        INSERT INTO interleaved_practice_problems
+        (session_id, card_id, problem_order)
+        VALUES (?, ?, ?)
+      `).bind(sessionId, problemOrder[i], i + 1).run()
+    }
+    
+    return c.json({
+      success: true,
+      sessionId,
+      problemOrder,
+      totalProblems: problemOrder.length
+    })
+  } catch (error: any) {
+    console.error('❌ 交互配置セッション開始エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 2. 交互配置問題回答送信
+app.post('/api/interleaved-practice/submit-answer', async (c) => {
+  const { env } = c
+  const { 
+    sessionId, 
+    problemId,
+    isCorrect,
+    responseTime,
+    identifiedConcept,
+    confusedConcepts
+  } = await c.req.json()
+  
+  try {
+    // 問題を更新
+    await env.DB.prepare(`
+      UPDATE interleaved_practice_problems
+      SET is_correct = ?,
+          response_time = ?,
+          identified_concept = ?,
+          confused_concepts = ?,
+          answered_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(isCorrect, responseTime, identifiedConcept, confusedConcepts, problemId).run()
+    
+    // 概念識別追跡を記録
+    const problem = await env.DB.prepare(`
+      SELECT ipp.*, ips.student_id, lc.concept_id
+      FROM interleaved_practice_problems ipp
+      JOIN interleaved_practice_sessions ips ON ipp.session_id = ips.id
+      JOIN learning_cards lc ON ipp.card_id = lc.id
+      WHERE ipp.id = ?
+    `).bind(problemId).first()
+    
+    if (problem) {
+      await env.DB.prepare(`
+        INSERT INTO discrimination_ability_tracking
+        (student_id, session_id, source_concept, identified_concept, 
+         is_correct_identification, response_time)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(
+        problem.student_id,
+        sessionId,
+        problem.concept_id,
+        identifiedConcept,
+        isCorrect ? 1 : 0,
+        responseTime
+      ).run()
+    }
+    
+    // 次の問題を取得
+    const nextProblem = await env.DB.prepare(`
+      SELECT ipp.*, lc.*
+      FROM interleaved_practice_problems ipp
+      JOIN learning_cards lc ON ipp.card_id = lc.id
+      WHERE ipp.session_id = ? AND ipp.answered_at IS NULL
+      ORDER BY ipp.problem_order
+      LIMIT 1
+    `).bind(sessionId).first()
+    
+    if (!nextProblem) {
+      // セッション完了
+      await env.DB.prepare(`
+        UPDATE interleaved_practice_sessions
+        SET session_status = 'completed',
+            completed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(sessionId).run()
+      
+      return c.json({
+        success: true,
+        sessionCompleted: true,
+        message: '交互配置練習セッションが完了しました'
+      })
+    }
+    
+    return c.json({
+      success: true,
+      sessionCompleted: false,
+      nextProblem
+    })
+  } catch (error: any) {
+    console.error('❌ 交互配置問題回答送信エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 3. 交互配置セッション一覧取得
+app.get('/api/interleaved-practice/sessions/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const limit = parseInt(c.req.query('limit') || '20')
+  
+  try {
+    const result = await env.DB.prepare(`
+      SELECT 
+        ips.*,
+        COUNT(ipp.id) as total_problems,
+        SUM(CASE WHEN ipp.is_correct = 1 THEN 1 ELSE 0 END) as correct_answers,
+        AVG(ipp.response_time) as avg_response_time
+      FROM interleaved_practice_sessions ips
+      LEFT JOIN interleaved_practice_problems ipp ON ips.id = ipp.session_id
+      WHERE ips.student_id = ?
+      GROUP BY ips.id
+      ORDER BY ips.created_at DESC
+      LIMIT ?
+    `).bind(studentId, limit).all()
+    
+    return c.json({
+      success: true,
+      sessions: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 交互配置セッション一覧取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 4. 概念識別能力統計取得
+app.get('/api/interleaved-practice/discrimination-stats/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    // 概念ごとの識別能力
+    const conceptStats = await env.DB.prepare(`
+      SELECT 
+        source_concept,
+        COUNT(*) as total_attempts,
+        SUM(is_correct_identification) as correct_identifications,
+        AVG(is_correct_identification) as accuracy_rate,
+        AVG(response_time) as avg_response_time
+      FROM discrimination_ability_tracking
+      WHERE student_id = ?
+      GROUP BY source_concept
+      ORDER BY accuracy_rate ASC
+    `).bind(studentId).all()
+    
+    // 混同マトリックス
+    const confusionMatrix = await env.DB.prepare(`
+      SELECT 
+        source_concept,
+        identified_concept,
+        COUNT(*) as count
+      FROM discrimination_ability_tracking
+      WHERE student_id = ? AND is_correct_identification = 0
+      GROUP BY source_concept, identified_concept
+      ORDER BY count DESC
+      LIMIT 20
+    `).bind(studentId).all()
+    
+    return c.json({
+      success: true,
+      stats: {
+        conceptAccuracy: conceptStats.results,
+        confusionMatrix: confusionMatrix.results
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 概念識別能力統計取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 5. 転移学習効果測定
+app.get('/api/interleaved-practice/transfer-effects/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    const result = await env.DB.prepare(`
+      SELECT 
+        source_concept,
+        target_concept,
+        AVG(transfer_score) as avg_transfer_score,
+        AVG(improvement_rate) as avg_improvement,
+        COUNT(*) as measurement_count
+      FROM transfer_learning_effects
+      WHERE student_id = ?
+      GROUP BY source_concept, target_concept
+      ORDER BY avg_transfer_score DESC
+    `).bind(studentId).all()
+    
+    return c.json({
+      success: true,
+      transferEffects: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 転移学習効果測定エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 6. 交互配置練習統計取得
+app.get('/api/interleaved-practice/stats/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    // 基本統計
+    const basicStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT ips.id) as total_sessions,
+        COUNT(ipp.id) as total_problems,
+        AVG(CASE WHEN ipp.is_correct = 1 THEN 1.0 ELSE 0.0 END) as avg_accuracy,
+        AVG(ipp.response_time) as avg_response_time
+      FROM interleaved_practice_sessions ips
+      LEFT JOIN interleaved_practice_problems ipp ON ips.id = ipp.session_id
+      WHERE ips.student_id = ?
+    `).bind(studentId).first()
+    
+    // 戦略別統計
+    const strategyStats = await env.DB.prepare(`
+      SELECT 
+        ips.interleaving_strategy,
+        COUNT(DISTINCT ips.id) as session_count,
+        AVG(CASE WHEN ipp.is_correct = 1 THEN 1.0 ELSE 0.0 END) as avg_accuracy
+      FROM interleaved_practice_sessions ips
+      LEFT JOIN interleaved_practice_problems ipp ON ips.id = ipp.session_id
+      WHERE ips.student_id = ?
+      GROUP BY ips.interleaving_strategy
+    `).bind(studentId).all()
+    
+    return c.json({
+      success: true,
+      stats: {
+        basic: basicStats,
+        strategies: strategyStats.results
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 交互配置練習統計取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app

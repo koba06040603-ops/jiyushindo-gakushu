@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>統合学習ダッシュボード - 自由進度学習支援システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- ヘッダー -->
+    <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <h1 class="text-2xl font-bold">
+                    <i class="fas fa-graduation-cap mr-2"></i>
+                    統合学習ダッシュボード
+                </h1>
+                <div class="flex items-center space-x-4">
+                    <select id="student-select" class="px-4 py-2 bg-white text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="1">児童1（田中太郎）</option>
+                        <option value="2">児童2（佐藤花子）</option>
+                        <option value="3">児童3（鈴木一郎）</option>
+                    </select>
+                    <a href="/" class="text-white hover:text-gray-200">
+                        <i class="fas fa-home"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- サマリーカード -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-600">分散学習</h3>
+                    <i class="fas fa-calendar-alt text-blue-600 text-2xl"></i>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="spaced-review-count">0</div>
+                <p class="text-sm text-gray-500 mt-1">今日の復習カード</p>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-600">検索練習</h3>
+                    <i class="fas fa-brain text-green-600 text-2xl"></i>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="retrieval-sessions">0</div>
+                <p class="text-sm text-gray-500 mt-1">完了セッション数</p>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-600">交互配置</h3>
+                    <i class="fas fa-random text-purple-600 text-2xl"></i>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="interleaved-problems">0</div>
+                <p class="text-sm text-gray-500 mt-1">解いた問題数</p>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-600">協働学習</h3>
+                    <i class="fas fa-users text-orange-600 text-2xl"></i>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="collaboration-score">0</div>
+                <p class="text-sm text-gray-500 mt-1">協働学習スコア</p>
+            </div>
+        </div>
+
+        <!-- クイックアクション -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-bolt text-yellow-500 mr-2"></i>
+                クイックアクション
+            </h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button id="btn-start-spaced-review" class="p-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-center">
+                    <i class="fas fa-calendar-check text-2xl mb-2"></i>
+                    <div class="text-sm font-semibold">今日の復習</div>
+                </button>
+                <button id="btn-start-retrieval" class="p-4 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-center">
+                    <i class="fas fa-brain text-2xl mb-2"></i>
+                    <div class="text-sm font-semibold">検索練習</div>
+                </button>
+                <button id="btn-start-interleaved" class="p-4 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-center">
+                    <i class="fas fa-random text-2xl mb-2"></i>
+                    <div class="text-sm font-semibold">交互配置練習</div>
+                </button>
+                <button id="btn-view-reports" class="p-4 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-center">
+                    <i class="fas fa-chart-line text-2xl mb-2"></i>
+                    <div class="text-sm font-semibold">レポート</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- メインコンテンツエリア -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- 左カラム（2/3） -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- 今日の復習カード -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">
+                            <i class="fas fa-calendar-day text-blue-600 mr-2"></i>
+                            今日の復習カード
+                        </h2>
+                        <button id="btn-refresh-reviews" class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div id="today-reviews-list" class="space-y-3">
+                        <!-- 復習カードがここに表示されます -->
+                    </div>
+                </div>
+
+                <!-- 学習進捗グラフ -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">
+                        <i class="fas fa-chart-area text-green-600 mr-2"></i>
+                        習熟度推移
+                    </h2>
+                    <div style="height: 300px;">
+                        <canvas id="mastery-chart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 検索練習・交互配置練習エリア -->
+                <div id="practice-area" class="hidden">
+                    <!-- 練習問題がここに表示されます -->
+                </div>
+            </div>
+
+            <!-- 右カラム（1/3） -->
+            <div class="space-y-6">
+                <!-- ScTNスコア -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-award text-yellow-500 mr-2"></i>
+                        ScTNスコア
+                    </h3>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm text-gray-600">メタ認知</span>
+                                <span class="text-sm font-semibold text-blue-600" id="sctn-metacognition">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="sctn-metacognition-bar" class="bg-blue-500 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm text-gray-600">自己調整</span>
+                                <span class="text-sm font-semibold text-green-600" id="sctn-regulation">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="sctn-regulation-bar" class="bg-green-500 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm text-gray-600">動機づけ</span>
+                                <span class="text-sm font-semibold text-orange-600" id="sctn-motivation">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="sctn-motivation-bar" class="bg-orange-500 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm text-gray-600">協働学習</span>
+                                <span class="text-sm font-semibold text-pink-600" id="sctn-collaboration">0</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="sctn-collaboration-bar" class="bg-pink-500 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 学習統計 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-chart-pie text-purple-600 mr-2"></i>
+                        学習統計
+                    </h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">総学習時間</span>
+                            <span class="font-semibold text-gray-800" id="total-study-time">0h</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">習得カード数</span>
+                            <span class="font-semibold text-gray-800" id="mastered-cards">0</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">平均正答率</span>
+                            <span class="font-semibold text-gray-800" id="avg-accuracy">0%</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-600">今週の進捗</span>
+                            <span class="font-semibold text-gray-800" id="weekly-progress">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 忘却リスクカード -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-exclamation-triangle text-red-600 mr-2"></i>
+                        忘却リスク
+                    </h3>
+                    <div id="forgetting-risk-list" class="space-y-2">
+                        <!-- 忘却リスクカードがここに表示されます -->
+                    </div>
+                </div>
+
+                <!-- 最近の活動 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-history text-gray-600 mr-2"></i>
+                        最近の活動
+                    </h3>
+                    <div id="recent-activities" class="space-y-2 text-sm">
+                        <!-- 最近の活動がここに表示されます -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- スクリプト -->
+    <script src="/static/spaced-learning-progress.js"></script>
+    <script src="/static/retrieval-practice-ui.js"></script>
+    <script src="/static/interleaved-practice-ui.js"></script>
+    <script src="/static/collaborative-learning-ui.js"></script>
+    <script src="/static/learning-reports-ui.js"></script>
+    <script>
+        // グローバル変数
+        let currentStudentId = 1
+        let spacedLearningUI
+        let retrievalPracticeUI
+        let interleavedPracticeUI
+        let collaborativeLearningUI
+        let learningReportsUI
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', async () => {
+            // UIインスタンスを作成
+            retrievalPracticeUI = new RetrievalPracticeUI({
+                studentId: currentStudentId
+            })
+
+            interleavedPracticeUI = new InterleavedPracticeUI({
+                studentId: currentStudentId
+            })
+
+            collaborativeLearningUI = new CollaborativeLearningUI({
+                studentId: currentStudentId,
+                classCode: 'CLASS001'
+            })
+
+            learningReportsUI = new LearningReportsUI({
+                studentId: currentStudentId
+            })
+
+            // 生徒選択
+            document.getElementById('student-select').addEventListener('change', (e) => {
+                currentStudentId = parseInt(e.target.value)
+                refreshDashboard()
+            })
+
+            // クイックアクション
+            document.getElementById('btn-start-retrieval').addEventListener('click', () => {
+                startRetrievalPractice()
+            })
+
+            document.getElementById('btn-start-interleaved').addEventListener('click', () => {
+                startInterleavedPractice()
+            })
+
+            document.getElementById('btn-view-reports').addEventListener('click', () => {
+                window.location.href = '/collaborative-reports-demo.html'
+            })
+
+            // 初期データ読み込み
+            await refreshDashboard()
+        })
+
+        // ダッシュボード更新
+        async function refreshDashboard() {
+            await Promise.all([
+                loadSummaryCards(),
+                loadTodayReviews(),
+                loadMasteryChart(),
+                loadScTNScores(),
+                loadLearningStats(),
+                loadForgettingRisk(),
+                loadRecentActivities()
+            ])
+        }
+
+        // サマリーカード読み込み
+        async function loadSummaryCards() {
+            try {
+                // 分散学習
+                const spacedResponse = await fetch(`/api/spaced-learning/review-count/${currentStudentId}`)
+                const spacedData = await spacedResponse.json()
+                document.getElementById('spaced-review-count').textContent = spacedData.todayReviewCount || 0
+
+                // 検索練習
+                const retrievalResponse = await fetch(`/api/retrieval-practice/stats/${currentStudentId}`)
+                const retrievalData = await retrievalResponse.json()
+                document.getElementById('retrieval-sessions').textContent = 
+                    retrievalData.stats?.basic?.total_sessions || 0
+
+                // 交互配置
+                const interleavedResponse = await fetch(`/api/interleaved-practice/stats/${currentStudentId}`)
+                const interleavedData = await interleavedResponse.json()
+                document.getElementById('interleaved-problems').textContent = 
+                    interleavedData.stats?.basic?.total_problems || 0
+
+                // 協働学習
+                const collabResponse = await fetch(`/api/collaborative/stats/${currentStudentId}`)
+                const collabData = await collabResponse.json()
+                const collabScore = (collabData.stats?.totalAnswers || 0) + 
+                                   (collabData.stats?.evaluationsGiven || 0)
+                document.getElementById('collaboration-score').textContent = collabScore
+            } catch (error) {
+                console.error('サマリーカード読み込みエラー:', error)
+            }
+        }
+
+        // 今日の復習カード読み込み
+        async function loadTodayReviews() {
+            const container = document.getElementById('today-reviews-list')
+            try {
+                const response = await fetch(`/api/spaced-learning/today-reviews/${currentStudentId}`)
+                const data = await response.json()
+
+                if (!data.success || !data.reviews || data.reviews.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-sm">今日の復習カードはありません</p>'
+                    return
+                }
+
+                container.innerHTML = data.reviews.slice(0, 5).map(review => `
+                    <div class="p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer">
+                        <div class="font-semibold text-gray-800">${review.card_title}</div>
+                        <div class="text-xs text-gray-600 mt-1">
+                            優先度: ${review.priority_score?.toFixed(0)} | Box ${review.current_box}
+                        </div>
+                    </div>
+                `).join('')
+            } catch (error) {
+                console.error('復習カード読み込みエラー:', error)
+                container.innerHTML = '<p class="text-red-500 text-sm">読み込みに失敗しました</p>'
+            }
+        }
+
+        // 習熟度グラフ読み込み
+        async function loadMasteryChart() {
+            const canvas = document.getElementById('mastery-chart')
+            try {
+                learningReportsUI.renderMasteryTrendChart('mastery-chart', 30)
+            } catch (error) {
+                console.error('習熟度グラフ読み込みエラー:', error)
+            }
+        }
+
+        // ScTNスコア読み込み
+        async function loadScTNScores() {
+            // デモデータ（実際にはAPIから取得）
+            const scores = {
+                metacognition: 3.5,
+                regulation: 4.0,
+                motivation: 3.8,
+                collaboration: 4.2
+            }
+
+            Object.keys(scores).forEach(key => {
+                const value = scores[key]
+                const percentage = (value / 5) * 100
+                document.getElementById(`sctn-${key}`).textContent = value.toFixed(1)
+                document.getElementById(`sctn-${key}-bar`).style.width = `${percentage}%`
+            })
+        }
+
+        // 学習統計読み込み
+        async function loadLearningStats() {
+            // デモデータ（実際にはAPIから取得）
+            document.getElementById('total-study-time').textContent = '12.5h'
+            document.getElementById('mastered-cards').textContent = '45'
+            document.getElementById('avg-accuracy').textContent = '87%'
+            document.getElementById('weekly-progress').textContent = '23'
+        }
+
+        // 忘却リスク読み込み
+        async function loadForgettingRisk() {
+            const container = document.getElementById('forgetting-risk-list')
+            try {
+                const response = await fetch(`/api/spaced-learning/forgetting-risk/${currentStudentId}`)
+                const data = await response.json()
+
+                if (!data.success || !data.recommendations || data.recommendations.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-xs">リスクなし</p>'
+                    return
+                }
+
+                container.innerHTML = data.recommendations.slice(0, 3).map(rec => `
+                    <div class="text-xs p-2 bg-red-50 rounded">
+                        <div class="font-semibold text-red-700">${rec.card_title}</div>
+                        <div class="text-red-600">${rec.recommendation}</div>
+                    </div>
+                `).join('')
+            } catch (error) {
+                console.error('忘却リスク読み込みエラー:', error)
+            }
+        }
+
+        // 最近の活動読み込み
+        async function loadRecentActivities() {
+            const container = document.getElementById('recent-activities')
+            // デモデータ
+            container.innerHTML = `
+                <div class="text-xs text-gray-600 pb-2 border-b">
+                    <i class="fas fa-check-circle text-green-600 mr-1"></i>
+                    分散学習を完了しました
+                    <span class="text-gray-400 ml-2">2時間前</span>
+                </div>
+                <div class="text-xs text-gray-600 pb-2 border-b">
+                    <i class="fas fa-brain text-blue-600 mr-1"></i>
+                    検索練習セッション完了
+                    <span class="text-gray-400 ml-2">5時間前</span>
+                </div>
+                <div class="text-xs text-gray-600 pb-2 border-b">
+                    <i class="fas fa-users text-orange-600 mr-1"></i>
+                    友達の回答を評価しました
+                    <span class="text-gray-400 ml-2">昨日</span>
+                </div>
+            `
+        }
+
+        // 検索練習開始
+        async function startRetrievalPractice() {
+            const practiceArea = document.getElementById('practice-area')
+            practiceArea.classList.remove('hidden')
+            practiceArea.innerHTML = '<div id="retrieval-practice-container"></div>'
+            
+            const session = await retrievalPracticeUI.startSession(1, 'free_recall')
+            if (session) {
+                retrievalPracticeUI.renderPracticeQuestion('retrieval-practice-container')
+            }
+        }
+
+        // 交互配置練習開始
+        async function startInterleavedPractice() {
+            const practiceArea = document.getElementById('practice-area')
+            practiceArea.classList.remove('hidden')
+            practiceArea.innerHTML = '<div id="interleaved-practice-container"></div>'
+            
+            const session = await interleavedPracticeUI.startSession('adaptive_interleaving')
+            if (session) {
+                // 最初の問題を取得して表示（実装は省略）
+                alert('交互配置練習セッションを開始しました')
+            }
+        }
+    </script>
+</body>
+</html>
