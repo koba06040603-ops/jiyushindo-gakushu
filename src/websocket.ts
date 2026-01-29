@@ -171,6 +171,24 @@ export class ProgressWebSocket {
         await this.markNotificationAsRead(session.userId, data.notificationId)
         break
       
+      case 'check_spaced_review':
+        // 分散学習の復習チェック（生徒用）
+        await this.checkSpacedReview(session)
+        break
+      
+      case 'send_spaced_review_reminder':
+        // 分散学習の復習リマインダー送信（教師用）
+        if (session.role === 'teacher') {
+          await this.sendSpacedReviewReminder(session, data)
+        } else {
+          session.websocket.send(JSON.stringify({
+            type: 'error',
+            errorCode: 'UNAUTHORIZED',
+            message: '復習リマインダーを送信する権限がありません'
+          }))
+        }
+        break
+      
       default:
         session.websocket.send(JSON.stringify({
           type: 'error',
@@ -447,6 +465,208 @@ export class ProgressWebSocket {
     } catch (error) {
       console.error('カード取得エラー:', error)
       return null
+    }
+  }
+  
+  // =====================================================
+  // 分散学習復習通知機能
+  // =====================================================
+  
+  /**
+   * 生徒の復習状況をチェックして通知を送信
+   */
+  async checkSpacedReview(session: WebSocketSession) {
+    try {
+      // 今日の復習カード数を取得
+      const countResult = await this.env.DB.prepare(`
+        SELECT COUNT(*) as count
+        FROM spaced_learning_schedule
+        WHERE student_id = ?
+          AND DATE(next_review_date) <= DATE('now')
+          AND learning_stage != 'mastered'
+      `).bind(session.userId).first()
+      
+      const reviewCount = countResult?.count as number || 0
+      
+      // 復習が必要なカードがあれば詳細を取得
+      if (reviewCount > 0) {
+        const reviewsResult = await this.env.DB.prepare(`
+          SELECT 
+            s.card_id,
+            s.mastery_level,
+            s.leitner_box,
+            s.next_review_date,
+            JULIANDAY('now') - JULIANDAY(s.next_review_date) as days_overdue,
+            c.card_title,
+            c.card_number
+          FROM spaced_learning_schedule s
+          JOIN learning_cards c ON s.card_id = c.id
+          WHERE s.student_id = ?
+            AND DATE(s.next_review_date) <= DATE('now')
+            AND s.learning_stage != 'mastered'
+          ORDER BY days_overdue DESC
+          LIMIT 5
+        `).bind(session.userId).all()
+        
+        const reviews = reviewsResult.results
+        
+        // 優先度の高いカード（期限超過）を抽出
+        const overdueCards = reviews.filter((r: any) => r.days_overdue > 0)
+        
+        // 通知を送信
+        session.websocket.send(JSON.stringify({
+          type: 'spaced_review_notification',
+          data: {
+            totalReviewCount: reviewCount,
+            overdueCount: overdueCards.length,
+            topReviews: reviews.slice(0, 3).map((r: any) => ({
+              cardId: r.card_id,
+              cardTitle: r.card_title,
+              cardNumber: r.card_number,
+              masteryLevel: Math.round((r.mastery_level as number) * 100),
+              leitnerBox: r.leitner_box,
+              daysOverdue: Math.floor(r.days_overdue as number)
+            })),
+            message: overdueCards.length > 0
+              ? `${overdueCards.length}枚のカードが期限超過です！`
+              : `今日は${reviewCount}枚の復習があります`,
+            priority: overdueCards.length > 3 ? 'high' : 'normal',
+            timestamp: new Date().toISOString()
+          }
+        }))
+        
+        // データベースに通知記録
+        await this.env.DB.prepare(`
+          INSERT INTO notification_logs (
+            user_id,
+            notification_type,
+            title,
+            message,
+            priority,
+            is_read,
+            created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          session.userId,
+          'spaced_review',
+          '復習のお知らせ',
+          overdueCards.length > 0
+            ? `${overdueCards.length}枚のカードが期限超過です！復習しましょう。`
+            : `今日は${reviewCount}枚の復習があります。`,
+          overdueCards.length > 3 ? 'high' : 'normal',
+          0,
+          new Date().toISOString()
+        ).run()
+      } else {
+        // 復習なしの通知
+        session.websocket.send(JSON.stringify({
+          type: 'spaced_review_notification',
+          data: {
+            totalReviewCount: 0,
+            overdueCount: 0,
+            topReviews: [],
+            message: '今日の復習は完了しています！',
+            priority: 'low',
+            timestamp: new Date().toISOString()
+          }
+        }))
+      }
+    } catch (error) {
+      console.error('復習チェックエラー:', error)
+      session.websocket.send(JSON.stringify({
+        type: 'error',
+        errorCode: 'SPACED_REVIEW_CHECK_ERROR',
+        message: '復習状況の確認中にエラーが発生しました'
+      }))
+    }
+  }
+  
+  /**
+   * 教師からクラス全体に復習リマインダーを送信
+   */
+  async sendSpacedReviewReminder(session: WebSocketSession, data: any) {
+    try {
+      const { targetUserIds, customMessage } = data
+      
+      // 対象ユーザーのリストを取得
+      const users = targetUserIds === 'all' 
+        ? await this.getAllClassUsers(session.classCode)
+        : targetUserIds
+      
+      let sentCount = 0
+      
+      for (const userId of users) {
+        // 各生徒の復習状況を取得
+        const countResult = await this.env.DB.prepare(`
+          SELECT COUNT(*) as count
+          FROM spaced_learning_schedule
+          WHERE student_id = ?
+            AND DATE(next_review_date) <= DATE('now')
+            AND learning_stage != 'mastered'
+        `).bind(userId).first()
+        
+        const reviewCount = countResult?.count as number || 0
+        
+        if (reviewCount > 0) {
+          // 復習が必要な生徒に通知を送信
+          const targetSession = Array.from(this.sessions.values()).find(
+            s => s.userId === userId && s.role === 'student'
+          )
+          
+          if (targetSession) {
+            targetSession.websocket.send(JSON.stringify({
+              type: 'teacher_spaced_review_reminder',
+              data: {
+                reviewCount,
+                teacherMessage: customMessage || '先生から復習のお知らせです',
+                senderName: await this.getUserName(session.userId),
+                timestamp: new Date().toISOString()
+              }
+            }))
+            sentCount++
+          }
+          
+          // データベースに通知記録
+          await this.env.DB.prepare(`
+            INSERT INTO notification_logs (
+              user_id,
+              notification_type,
+              title,
+              message,
+              priority,
+              is_read,
+              additional_data,
+              created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            userId,
+            'teacher_spaced_review_reminder',
+            '先生からの復習リマインダー',
+            customMessage || `${reviewCount}枚の復習カードがあります。復習しましょう！`,
+            'normal',
+            0,
+            JSON.stringify({ reviewCount, teacherId: session.userId }),
+            new Date().toISOString()
+          ).run()
+        }
+      }
+      
+      // 教師に送信完了通知
+      session.websocket.send(JSON.stringify({
+        type: 'reminder_sent',
+        data: {
+          sentCount,
+          totalUsers: users.length,
+          timestamp: new Date().toISOString()
+        }
+      }))
+    } catch (error) {
+      console.error('復習リマインダー送信エラー:', error)
+      session.websocket.send(JSON.stringify({
+        type: 'error',
+        errorCode: 'REMINDER_SEND_ERROR',
+        message: '復習リマインダーの送信中にエラーが発生しました'
+      }))
     }
   }
 }
