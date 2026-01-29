@@ -37,6 +37,34 @@
 
 ## 📚 ドキュメント一覧
 
+### 🎓 理論・設計ドキュメント（NEW）
+
+- ⭐ **[FINAL_THEORY_INTEGRATION.md](./FINAL_THEORY_INTEGRATION.md)** - **6理論＋文科省方針 完全統合モデル**
+  - VARK・Gardner・Kolb・ATI・Zimmerman SRL・認知科学の6理論統合
+  - 文部科学省 次期学習指導要領（令和7年12月15日）完全対応
+  - 世界最高峰の個別最適化学習システム設計書
+
+- 📋 **[MOE_ALIGNMENT_REPORT.md](./MOE_ALIGNMENT_REPORT.md)** - **文科省資料との整合性確認レポート**
+  - 令和7年12月15日 教育課程部会 総則・評価特別部会 資料分析
+  - 令和7年9月25日 教育課程企画特別部会 論点整理 分析
+  - 「個に応じた学習過程の充実」「自己調整学習」「科学的学習方略」対応状況
+  - 整合性スコア: 73.6/100
+
+- 📖 **[COMPLETE_INTEGRATION_MODEL.md](./COMPLETE_INTEGRATION_MODEL.md)** - 完全統合モデル詳細
+  - 6理論統合の技術的実装
+  - 自己調整学習の3段階サイクル
+  - 学習の基盤となる資質・能力の統合
+
+- 📘 **[LEARNING_FLOW_INTEGRATION.md](./LEARNING_FLOW_INTEGRATION.md)** - 学習フロー全体への理論統合
+  - 学習のてびき → 学習カード → チェックテスト → 選択問題 → 振り返り
+  - 各フローへのVARK・Gardner・Kolb統合設計
+
+- 📗 **[ATI_INTEGRATION_MODEL.md](./ATI_INTEGRATION_MODEL.md)** - Cronbach ATI理論統合
+  - 適性処遇交互作用（ATI）の完全実装
+  - 5次元適性診断と処遇マッチング
+
+### 📘 一般向けドキュメント
+
 - 📘 **[README_SIMPLE.md](./README_SIMPLE.md)** - 一般向け・教育者向けの簡易ガイド
   - デモ動画の作り方
   - ブログ等での公開方法
