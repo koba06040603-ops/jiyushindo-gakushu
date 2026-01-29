@@ -67,6 +67,42 @@
 - **2026-01-29**: 検索練習システム データベース設計完了 ✅
   - **科学的根拠**: テスト効果（Roediger & Karpicke 2006）、生成効果（Slamecka & Graf 1978）
   - **4種類の想起タイプ**: 自由想起・手がかり想起・再認・精緻化想起
+- **2026-01-29**: 交互配置練習システム データベース設計完了 ✅
+  - **科学的根拠**: Kornell & Bjork (2008)、Rohrer & Taylor (2007)
+  - **4種類の交互配置戦略**: ランダム・ブロック・適応型・体系的
+- **2026-01-29**: 協働学習機能実装完了 ✅ **完了**
+  - **友達の回答比較システム**:
+    - 同じ問題への複数回答比較
+    - 解法の多様性理解
+    - 相互学習促進
+  - **ピア評価システム**:
+    - 5段階評価
+    - フィードバック交換
+    - 学んだこと記録
+  - **協働学習統計**:
+    - 投稿回答数
+    - 評価回数
+    - 役に立ったマーク数
+    - 平均評価スコア
+  - **科学的根拠**: Slavin (1996)協働学習の効果、Topping (1998)ピア評価の学習効果
+  - **デモページ**: `/collaborative-reports-demo.html`
+- **2026-01-29**: 週次・月次レポート機能実装完了 ✅ **完了**
+  - **週次レポート**:
+    - 学習時間・復習数・正答率
+    - ScTNスコア推移
+    - 分散学習進捗
+    - 学習方略効果
+  - **月次レポート**:
+    - 習得カード数
+    - 平均正答率
+    - 学習効果スコア
+    - 協働学習スコア
+  - **経年変化グラフ**:
+    - ScTNスコア推移（メタ認知・自己調整・動機づけ・協働学習）
+    - 習熟度推移
+    - Chart.jsによる可視化
+  - **科学的根拠**: Zimmerman (2002)自己調整学習とメタ認知
+  - **デモページ**: `/collaborative-reports-demo.html`
   - **AI評価指標**: 正確性・完全性・精度スコア
   - **メタ認知追跡**: 予測と実際の差分測定
   - **効果測定**: 即時・保持・転移効果の追跡
@@ -2097,6 +2133,34 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 | `/api/spaced-learning/review-count/:studentId` | GET | 今日の復習カード数取得 | studentId: 学生ID |
 | `/api/spaced-learning/weekly-schedule/:studentId` | GET | 週間復習スケジュール取得 | studentId: 学生ID |
 | `/api/spaced-learning/mastery-stats/:studentId` | GET | 習熟度統計取得 | studentId: 学生ID |
+| `/api/spaced-learning/record-review` | POST | 復習結果記録 | studentId, cardId, qualityRating, isCorrect, responseTime |
+| `/api/spaced-learning/forgetting-risk/:studentId` | GET | 忘却リスク検出 | studentId: 学生ID |
+| `/api/spaced-learning/history/:studentId` | GET | 学習履歴取得 | studentId: 学生ID, cardId (optional) |
+| `/api/spaced-learning/mastery/:studentId/:cardId` | GET | 習熟度取得 | studentId: 学生ID, cardId: カードID |
+| `/api/spaced-learning/settings/:studentId` | GET/PUT | 分散学習設定の取得・更新 | studentId: 学生ID |
+
+**協働学習API（2026-01-29実装完了✅）:**
+
+| エンドポイント | メソッド | 説明 | パラメータ |
+|--------------|---------|------|-----------|
+| `/api/collaborative/peer-answers/:cardId` | GET | 友達の回答一覧取得 | cardId: カードID, studentId, classCode |
+| `/api/collaborative/submit-answer` | POST | 回答投稿 | studentId, cardId, answerText, approachType, isPublic |
+| `/api/collaborative/submit-evaluation` | POST | ピア評価投稿 | evaluatorId, answerId, rating, feedbackText, helpfulAspects, learningGained |
+| `/api/collaborative/toggle-helpful` | POST | 役に立ったマーク切り替え | studentId, answerId |
+| `/api/collaborative/record-view` | POST | 閲覧記録 | viewerId, answerId, viewDuration |
+| `/api/collaborative/stats/:studentId` | GET | 協働学習統計取得 | studentId: 学生ID |
+| `/api/collaborative/class-activity/:classCode` | GET | クラス全体の協働学習活動 | classCode: クラスコード |
+
+**週次・月次レポートAPI（2026-01-29実装完了✅）:**
+
+| エンドポイント | メソッド | 説明 | パラメータ |
+|--------------|---------|------|-----------|
+| `/api/reports/weekly/:studentId` | POST | 週次レポート生成 | studentId: 学生ID, weekStart, weekEnd |
+| `/api/reports/monthly/:studentId` | POST | 月次レポート生成 | studentId: 学生ID, monthStart, monthEnd |
+| `/api/reports/weekly/:studentId/list` | GET | 週次レポート一覧取得 | studentId: 学生ID, limit (optional) |
+| `/api/reports/monthly/:studentId/list` | GET | 月次レポート一覧取得 | studentId: 学生ID, limit (optional) |
+| `/api/reports/sctn-trend/:studentId` | GET | ScTN経年変化データ取得 | studentId: 学生ID, months (optional) |
+| `/api/reports/mastery-trend/:studentId` | GET | 習熟度推移データ取得 | studentId: 学生ID, days (optional) |
 | `/api/spaced-learning/record-review` | POST | 学習結果記録 | studentId, cardId, result, sessionType, responseTime, difficultyRating, confidenceLevel, srlStage, srlStrategyUsed, srlNotes |
 | `/api/spaced-learning/forgetting-risk/:studentId` | GET | 忘却リスクカード取得 | studentId: 学生ID, limit: 件数 |
 | `/api/spaced-learning/history/:studentId` | GET | 学習履歴取得 | studentId: 学生ID, cardId: カードID（任意）, limit: 件数 |
