@@ -44,12 +44,20 @@
   - 文部科学省 次期学習指導要領（令和7年12月15日）完全対応
   - 世界最高峰の個別最適化学習システム設計書
 
-- 📊 **[SCTN_NATIONAL_SURVEY_INTEGRATION.md](./SCTN_NATIONAL_SURVEY_INTEGRATION.md)** - **ScTN質問紙と全国学力・学習状況調査の統合** ⭐⭐⭐NEW（2026-01-29作成）
+- 📊 **[SCTN_NATIONAL_SURVEY_INTEGRATION.md](./SCTN_NATIONAL_SURVEY_INTEGRATION.md)** - **ScTN質問紙と全国学力・学習状況調査の統合** ⭐⭐⭐NEW（2026-01-29作成・実装済み✅）
   - **ScTN質問紙の詳細分析**: 苫野一徳監修、3パッケージ、71問の質問項目
   - **全国学力・学習状況調査との対応関係**: 27項目が完全一致、相関分析の根拠
   - **指導と評価の一体化**: PDCAサイクル、形成的評価、3観点評価への反映
   - **学習カード・指導・評価への反映方針**: 自己調整学習の3段階サイクル、協働的な学び、科学的学習方略
   - **研究・論文執筆の根拠データ収集方法**: データベース設計、統計分析方法、論文構成例
+  - **✅ 実装完了（2026-01-29）**:
+    - ScTN質問紙結果テーブル（71問、3パッケージ対応）
+    - 全国学力・学習状況調査結果テーブル（63問対応）
+    - ScTN-全国学調対応関係テーブル（27項目完全一致）
+    - 自己調整学習プロファイルテーブル（予見・遂行・内省3段階）
+    - 学習方略使用履歴テーブル
+    - learning_cardsテーブルへの自己調整学習3段階フィールド追加
+    - student_progressテーブルへの自己調整学習記録フィールド追加
 
 - 📋 **[MOE_ALIGNMENT_REPORT.md](./MOE_ALIGNMENT_REPORT.md)** - **文科省資料との整合性確認レポート**
   - 令和7年12月15日 教育課程部会 総則・評価特別部会 資料分析
@@ -1934,6 +1942,37 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 - `learning_cards.auditory_support`: 聴覚優位サポート（JSON）
 - `learning_cards.kinesthetic_support`: 体感優位サポート（JSON）
 - `learning_cards.learning_style_notes`: 指導上の留意点（TEXT）
+
+**ScTN質問紙・全国学調統合テーブル（⭐⭐⭐NEW 2026-01-29）:**
+- `sctn_survey_results`: ScTN質問紙結果（71問、3パッケージ対応）
+  - 学校教育の経験（5観点10問）、成果の実感（3問）
+  - 学びに向かう力（34問：動機・自己調整・相互調整・粘り強さ）
+  - 人間性（24問：自己効力感・自己受容感・他者受容感・集合効力感）
+- `national_survey_results`: 全国学力・学習状況調査結果（63問）
+  - 基本的生活習慣（8問）、挑戦心・達成感・規範意識（11問）
+  - 学習習慣・環境（5問）、ICT活用状況（7小問）
+  - 主体的・対話的で深い学び（9問）、総合・学級活動・道徳（4問）
+  - 教科調査（国語・算数/数学正答率）
+- `sctn_national_mapping`: ScTN-全国学調対応関係（27項目完全一致）
+
+**自己調整学習（Zimmerman SRL）テーブル（⭐⭐⭐NEW 2026-01-29）:**
+- `srl_profiles`: 自己調整学習プロファイル（予見・遂行・内省の3段階診断）
+  - 予見段階（4項目）: 目標設定能力、計画能力、自己効力感、課題価値認識
+  - 遂行段階（3項目）: 注意制御、学習方略使用、メタ認知的モニタリング
+  - 内省段階（3項目）: 自己評価能力、原因帰属パターン、適応的反応
+  - 総合判定: novice（初歩）/ developing（発展中）/ proficient（熟達）
+- `learning_strategy_history`: 学習方略使用履歴（6種類の方略記録）
+  - 反復方略、精緻化方略、組織化方略、メタ認知的方略、動機づけ方略、環境調整方略
+
+**learning_cards追加カラム（自己調整学習3段階）⭐⭐⭐NEW 2026-01-29:**
+- 予見段階（学習前）: `foresight_goal`（目標）、`foresight_plan`（計画）、`foresight_motivation`（動機づけ）
+- 遂行段階（学習中）: `performance_strategies`（学習方略）、`performance_monitoring`（自己観察）
+- 内省段階（学習後）: `reflection_questions`（振り返り質問）、`reflection_attribution`（原因帰属）、`reflection_improvement`（改善計画）
+
+**student_progress追加カラム（自己調整学習記録）⭐⭐⭐NEW 2026-01-29:**
+- 予見段階記録: `srl_foresight_goal`、`srl_foresight_plan`、`srl_foresight_self_efficacy`
+- 遂行段階記録: `srl_performance_strategies`、`srl_performance_monitoring_count`、`srl_performance_attention_score`
+- 内省段階記録: `srl_reflection_depth`、`srl_reflection_attribution`、`srl_reflection_improvement_specificity`、`srl_reflection_next_motivation`
 
 ### ストレージサービス
 
