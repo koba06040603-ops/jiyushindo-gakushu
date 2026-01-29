@@ -103,15 +103,34 @@
     - Chart.jsによる可視化
   - **科学的根拠**: Zimmerman (2002)自己調整学習とメタ認知
   - **デモページ**: `/collaborative-reports-demo.html`
-  - **AI評価指標**: 正確性・完全性・精度スコア
-  - **メタ認知追跡**: 予測と実際の差分測定
-  - **効果測定**: 即時・保持・転移効果の追跡
-- **2026-01-29**: 交互配置練習システム データベース設計完了 ✅
-  - **科学的根拠**: 区別効果（Kornell & Bjork 2008）、転移促進（Rohrer & Taylor 2007）
-  - **4種類の交互配置戦略**: ランダム・ブロック化・適応的・系統的混合
-  - **概念識別能力追跡**: 混同マトリックス、識別正答率
-  - **転移学習効果測定**: ソース概念からターゲット概念への転移効率
+- **2026-01-29**: 検索練習（Retrieval Practice）完全実装完了 ✅ **完了**
+  - **セッション管理API**: 6エンドポイント
+  - **4種類の想起タイプ**: 自由想起・手がかり想起・再認・精緻化想起
+  - **AI評価システム**: Gemini API統合、正確性・完全性・精度スコア
+  - **メタ認知追跡**: 自信度vs実績、メタ認知ギャップ測定
+  - **効果測定フレームワーク**: 即時想起・保持・転移効果の追跡
+  - **科学的根拠**: Roediger & Karpicke (2006)テスト効果、Slamecka & Graf (1978)生成効果
+  - **UIコンポーネント**: RetrievalPracticeUI
+- **2026-01-29**: 交互配置練習（Interleaved Practice）完全実装完了 ✅ **完了**
+  - **セッション管理API**: 6エンドポイント
+  - **4種類の交互配置戦略**: ランダム・ブロック・適応型・体系的
+  - **概念識別能力追跡**: 混同マトリックス、識別正答率、概念別統計
+  - **転移学習効果測定**: ソース→ターゲット概念の転移効率
   - **効果分析ビュー**: 学生サマリー、混同マトリックス、効果分析
+  - **科学的根拠**: Kornell & Bjork (2008)識別効果、Rohrer & Taylor (2007)転移促進、Birnbaum et al. (2013)概念識別向上
+  - **UIコンポーネント**: InterleavedPracticeUI
+- **2026-01-29**: 統合学習ダッシュボード実装完了 ✅ **完了**
+  - **全機能の統合表示**: 分散学習・検索練習・交互配置・協働学習
+  - **サマリーカード**: 4種類の学習方略の進捗一覧
+  - **クイックアクション**: ワンクリックで各機能開始
+  - **学習状況の総合ビュー**:
+    - 今日の復習カード一覧
+    - 習熟度推移グラフ（Chart.js）
+    - ScTNスコア表示（4次元）
+    - 学習統計（時間・カード数・正答率）
+    - 忘却リスクアラート
+    - 最近の活動履歴
+  - **デモページ**: `/integrated-dashboard.html`
 
 ---
 
@@ -2161,6 +2180,29 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 | `/api/reports/monthly/:studentId/list` | GET | 月次レポート一覧取得 | studentId: 学生ID, limit (optional) |
 | `/api/reports/sctn-trend/:studentId` | GET | ScTN経年変化データ取得 | studentId: 学生ID, months (optional) |
 | `/api/reports/mastery-trend/:studentId` | GET | 習熟度推移データ取得 | studentId: 学生ID, days (optional) |
+
+**検索練習API（2026-01-29実装完了✅）:**
+
+| エンドポイント | メソッド | 説明 | パラメータ |
+|--------------|---------|------|-----------|
+| `/api/retrieval-practice/start-session` | POST | 検索練習セッション開始 | studentId, cardId, recallType |
+| `/api/retrieval-practice/submit-answer` | POST | 回答送信・AI評価 | sessionId, studentAnswer, responseTime, confidenceRating, difficultyRating |
+| `/api/retrieval-practice/sessions/:studentId` | GET | セッション一覧取得 | studentId: 学生ID, limit (optional) |
+| `/api/retrieval-practice/stats/:studentId` | GET | 検索練習統計取得 | studentId: 学生ID |
+| `/api/retrieval-practice/effectiveness/:studentId` | GET | 効果測定データ取得 | studentId: 学生ID |
+| `/api/retrieval-practice/recommended-cards/:studentId` | GET | 推奨カード取得 | studentId: 学生ID, recallType (optional) |
+
+**交互配置練習API（2026-01-29実装完了✅）:**
+
+| エンドポイント | メソッド | 説明 | パラメータ |
+|--------------|---------|------|-----------|
+| `/api/interleaved-practice/start-session` | POST | 交互配置セッション開始 | studentId, interleavingStrategy |
+| `/api/interleaved-practice/submit-answer` | POST | 問題回答送信 | sessionId, problemId, isCorrect, responseTime, identifiedConcept, confusedConcepts |
+| `/api/interleaved-practice/sessions/:studentId` | GET | セッション一覧取得 | studentId: 学生ID, limit (optional) |
+| `/api/interleaved-practice/discrimination-stats/:studentId` | GET | 概念識別能力統計 | studentId: 学生ID |
+| `/api/interleaved-practice/transfer-effects/:studentId` | GET | 転移学習効果測定 | studentId: 学生ID |
+| `/api/interleaved-practice/stats/:studentId` | GET | 交互配置練習統計 | studentId: 学生ID |
+
 | `/api/spaced-learning/record-review` | POST | 学習結果記録 | studentId, cardId, result, sessionType, responseTime, difficultyRating, confidenceLevel, srlStage, srlStrategyUsed, srlNotes |
 | `/api/spaced-learning/forgetting-risk/:studentId` | GET | 忘却リスクカード取得 | studentId: 学生ID, limit: 件数 |
 | `/api/spaced-learning/history/:studentId` | GET | 学習履歴取得 | studentId: 学生ID, cardId: カードID（任意）, limit: 件数 |
