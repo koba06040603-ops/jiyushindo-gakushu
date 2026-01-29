@@ -14298,4 +14298,260 @@ app.get('/api/learning-styles/preference/:studentId', async (c) => {
   }
 })
 
+// ========================================
+// 分散学習システム API
+// ========================================
+
+import { SpacedLearningEngine } from './lib/SpacedLearningEngine'
+
+// 今日の復習予定を取得
+app.get('/api/spaced-learning/today-reviews/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    const reviews = await engine.getTodayReviews(studentId)
+    const count = reviews.length
+    
+    return c.json({
+      success: true,
+      count,
+      reviews
+    })
+  } catch (error: any) {
+    console.error('❌ 今日の復習取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 復習予定数を取得
+app.get('/api/spaced-learning/review-count/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    const count = await engine.getTodayReviewCount(studentId)
+    
+    return c.json({
+      success: true,
+      count
+    })
+  } catch (error: any) {
+    console.error('❌ 復習予定数取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 週次スケジュールを取得
+app.get('/api/spaced-learning/weekly-schedule/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    const schedule = await engine.generateWeeklySchedule(studentId)
+    
+    return c.json({
+      success: true,
+      schedule
+    })
+  } catch (error: any) {
+    console.error('❌ 週次スケジュール取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 習熟度統計を取得
+app.get('/api/spaced-learning/mastery-stats/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    const stats = await engine.getMasteryStatistics(studentId)
+    
+    return c.json({
+      success: true,
+      stats
+    })
+  } catch (error: any) {
+    console.error('❌ 習熟度統計取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 復習結果を記録
+app.post('/api/spaced-learning/record-review', async (c) => {
+  const { env } = c
+  const { 
+    studentId, 
+    cardId, 
+    result,  // 'correct' | 'incorrect' | 'partial'
+    sessionType = 'review',  // 'initial' | 'review' | 'intensive' | 'test'
+    responseTime,
+    difficultyRating,  // 1-5
+    confidenceLevel,   // 1-5
+    srlStage,          // 'foresight' | 'performance' | 'reflection'
+    srlStrategyUsed,
+    srlNotes
+  } = await c.req.json()
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    
+    const updatedSchedule = await engine.recordStudyResult(
+      studentId,
+      cardId,
+      result,
+      sessionType,
+      responseTime,
+      difficultyRating,
+      confidenceLevel,
+      srlStage,
+      srlStrategyUsed,
+      srlNotes
+    )
+    
+    return c.json({
+      success: true,
+      schedule: updatedSchedule,
+      mastery: {
+        mastery_level: updatedSchedule.mastery_level,
+        leitner_box: updatedSchedule.leitner_box,
+        learning_stage: updatedSchedule.learning_stage,
+        next_review_date: updatedSchedule.next_review_date
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 復習記録エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 忘却リスク検出
+app.get('/api/spaced-learning/forgetting-risk/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const limit = parseInt(c.req.query('limit') || '10')
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    const recommendations = await engine.getForgettingRiskCards(studentId, limit)
+    
+    return c.json({
+      success: true,
+      recommendations
+    })
+  } catch (error: any) {
+    console.error('❌ 忘却リスク検出エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 設定を取得
+app.get('/api/spaced-learning/settings/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    const settings = await engine.getSettings(studentId)
+    
+    return c.json({
+      success: true,
+      settings: settings || {
+        daily_new_items: 5,
+        daily_review_limit: 20,
+        enable_daily_reminder: true,
+        reminder_time: '19:00'
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 設定取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 設定を更新
+app.put('/api/spaced-learning/settings/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const settings = await c.req.json()
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    await engine.updateSettings(studentId, settings)
+    
+    return c.json({
+      success: true
+    })
+  } catch (error: any) {
+    console.error('❌ 設定更新エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習項目の習熟度を取得または作成
+app.get('/api/spaced-learning/mastery/:studentId/:cardId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const cardId = parseInt(c.req.param('cardId'))
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    const mastery = await engine.getOrCreateMastery(studentId, cardId)
+    
+    return c.json({
+      success: true,
+      mastery
+    })
+  } catch (error: any) {
+    console.error('❌ 習熟度取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習履歴を取得
+app.get('/api/spaced-learning/history/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const cardId = c.req.query('cardId') ? parseInt(c.req.query('cardId')!) : undefined
+  const limit = parseInt(c.req.query('limit') || '50')
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    const history = await engine.getStudyHistory(studentId, cardId, limit)
+    
+    return c.json({
+      success: true,
+      history
+    })
+  } catch (error: any) {
+    console.error('❌ 学習履歴取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// スケジュールの直接取得（デバッグ用）
+app.get('/api/spaced-learning/schedule/:studentId/:cardId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const cardId = parseInt(c.req.param('cardId'))
+  
+  try {
+    const engine = new SpacedLearningEngine(env.DB)
+    const schedule = await engine.getOrCreateSchedule(studentId, cardId)
+    
+    return c.json({
+      success: true,
+      schedule
+    })
+  } catch (error: any) {
+    console.error('❌ スケジュール取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app
