@@ -969,7 +969,7 @@ async function renderTopPage() {
         <h2 class="text-2xl font-bold text-white mb-4 text-center">
           <i class="fas fa-chalkboard-teacher mr-2"></i>教師用メニュー
         </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button 
             onclick="window.showProgressBoardSelection()"
             class="bg-white text-blue-600 hover:bg-blue-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
@@ -982,6 +982,13 @@ async function renderTopPage() {
             class="bg-white text-indigo-600 hover:bg-indigo-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
             <i class="fas fa-calendar-week mr-2 text-xl"></i>
             週次レポート
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+          <button 
+            onclick="window.showParentReportMenu()"
+            class="bg-white text-purple-600 hover:bg-purple-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
+            <i class="fas fa-file-pdf mr-2 text-xl"></i>
+            学習レポート作成
             <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
           </button>
         </div>
@@ -17017,6 +17024,614 @@ async function exportReportToPDF(type, param1, param2) {
   }
 }
 window.exportReportToPDF = exportReportToPDF
+
+// ==============================================
+// 保護者向け詳細レポート（学習レポート自動生成）
+// ==============================================
+
+/**
+ * 保護者向け個別生徒詳細レポート表示
+ * @param {number} studentId - 生徒ID
+ * @param {string} reportType - レポート種類 ('weekly', 'monthly', 'term')
+ */
+async function showParentDetailedReport(studentId, reportType = 'weekly') {
+  showLoading(`${reportType === 'weekly' ? '週次' : reportType === 'monthly' ? '月次' : '学期'}レポートを生成中...`)
+  
+  try {
+    const response = await axios.get(`/api/reports/student/${studentId}/detailed?type=${reportType}`)
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      alert('レポートの取得に失敗しました: ' + response.data.error)
+      return
+    }
+    
+    const report = response.data.report
+    
+    // レポートモーダル表示
+    displayDetailedReportModal(report, reportType)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('詳細レポートエラー:', error)
+    alert('レポートの取得に失敗しました')
+  }
+}
+
+/**
+ * 詳細レポートモーダル表示
+ */
+function displayDetailedReportModal(report, reportType) {
+  const periodText = reportType === 'weekly' ? '週次レポート' : 
+                     reportType === 'monthly' ? '月次レポート' : '学期レポート'
+  
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.id = 'detailed-report-modal'
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white p-8 rounded-t-lg">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-3xl font-bold mb-2">
+              <i class="fas fa-chart-line mr-3"></i>${periodText}
+            </h1>
+            <p class="text-lg opacity-90">${report.student.name} さんの学習レポート</p>
+            <p class="text-sm mt-2 opacity-75">
+              期間: ${report.period.start_date} 〜 ${report.period.end_date}
+            </p>
+          </div>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="text-white hover:text-gray-200 text-4xl transition-transform hover:scale-110">
+            <i class="fas fa-times-circle"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-8 space-y-8">
+        
+        <!-- サマリーカード -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl shadow-md border border-blue-200">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-blue-600 text-3xl">
+                <i class="fas fa-clock"></i>
+              </div>
+              <div class="text-right">
+                <div class="text-sm text-blue-600 font-semibold">学習時間</div>
+                <div class="text-3xl font-bold text-blue-800">
+                  ${Math.floor(report.summary.total_learning_time_minutes / 60)}
+                  <span class="text-xl">時間</span>
+                </div>
+                <div class="text-xs text-blue-500">
+                  ${report.summary.total_learning_time_minutes % 60}分
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl shadow-md border border-green-200">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-green-600 text-3xl">
+                <i class="fas fa-check-circle"></i>
+              </div>
+              <div class="text-right">
+                <div class="text-sm text-green-600 font-semibold">完了カード数</div>
+                <div class="text-3xl font-bold text-green-800">
+                  ${report.summary.total_cards_completed}
+                  <span class="text-xl">枚</span>
+                </div>
+                <div class="text-xs text-green-500">
+                  ${report.summary.total_sessions}セッション
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl shadow-md border border-purple-200">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-purple-600 text-3xl">
+                <i class="fas fa-brain"></i>
+              </div>
+              <div class="text-right">
+                <div class="text-sm text-purple-600 font-semibold">平均習熟度</div>
+                <div class="text-3xl font-bold text-purple-800">
+                  ${report.summary.average_mastery_score}
+                  <span class="text-xl">点</span>
+                </div>
+                <div class="text-xs ${report.summary.average_mastery_score >= 80 ? 'text-green-600' : report.summary.average_mastery_score >= 60 ? 'text-blue-600' : 'text-orange-600'}">
+                  ${report.summary.average_mastery_score >= 80 ? '優秀' : report.summary.average_mastery_score >= 60 ? '良好' : '要努力'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-xl shadow-md border border-orange-200">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-orange-600 text-3xl">
+                <i class="fas fa-chart-line"></i>
+              </div>
+              <div class="text-right">
+                <div class="text-sm text-orange-600 font-semibold">成長率</div>
+                <div class="text-3xl font-bold ${report.summary.improvement_rate >= 0 ? 'text-green-800' : 'text-red-800'}">
+                  ${report.summary.improvement_rate >= 0 ? '+' : ''}${report.summary.improvement_rate}
+                  <span class="text-xl">%</span>
+                </div>
+                <div class="text-xs text-orange-500">
+                  前期間比
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 保護者向けメッセージ -->
+        ${report.parent_message ? `
+        <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 p-6 rounded-r-lg shadow-sm">
+          <div class="flex items-start">
+            <div class="text-blue-500 text-2xl mr-4">
+              <i class="fas fa-user-friends"></i>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-lg font-bold text-gray-800 mb-3">保護者の皆様へ</h3>
+              <p class="text-gray-700 whitespace-pre-line leading-relaxed">
+                ${report.parent_message}
+              </p>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- 学習スタイル分析 -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-md p-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-user-graduate mr-3 text-indigo-500"></i>
+            学習スタイル分析
+          </h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 優位な学習スタイル -->
+            <div>
+              <div class="text-center mb-4">
+                <div class="inline-block bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-3 rounded-full text-lg font-bold">
+                  ${getLearningStyleLabel(report.learning_style.dominant_style)}
+                </div>
+                <p class="text-sm text-gray-600 mt-2">あなたの優位な学習スタイル</p>
+              </div>
+            </div>
+
+            <!-- VARKスコア -->
+            <div>
+              <div class="space-y-3">
+                ${generateVARKBars(report.learning_style.vark_breakdown)}
+              </div>
+            </div>
+          </div>
+
+          <!-- 学習スタイル別推奨事項 -->
+          <div class="mt-6 bg-gradient-to-r from-yellow-50 to-orange-50 p-5 rounded-lg border border-yellow-200">
+            <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+              <i class="fas fa-lightbulb mr-2 text-yellow-500"></i>
+              おすすめの学習方法
+            </h4>
+            <ul class="space-y-2">
+              ${report.learning_style.recommendations.map(rec => `
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+                  <span class="text-gray-700">${rec}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        </div>
+
+        <!-- 教科別パフォーマンス -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-md p-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-book mr-3 text-blue-500"></i>
+            教科別パフォーマンス
+          </h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            ${report.performance.by_subject.length > 0 ? report.performance.by_subject.map(subject => `
+              <div class="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition">
+                <div class="text-lg font-bold text-gray-800 mb-2">${subject.subject}</div>
+                <div class="space-y-2">
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">完了カード:</span>
+                    <span class="font-bold text-blue-600">${subject.cards_completed}枚</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">平均スコア:</span>
+                    <span class="font-bold ${subject.average_score >= 80 ? 'text-green-600' : subject.average_score >= 60 ? 'text-blue-600' : 'text-orange-600'}">
+                      ${subject.average_score}点
+                    </span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="h-2 rounded-full ${subject.mastery_rate >= 80 ? 'bg-green-500' : subject.mastery_rate >= 60 ? 'bg-blue-500' : 'bg-orange-500'}"
+                         style="width: ${subject.mastery_rate}%"></div>
+                  </div>
+                  <div class="text-xs text-gray-500 text-center">習熟率: ${subject.mastery_rate}%</div>
+                </div>
+              </div>
+            `).join('') : '<div class="col-span-full text-center text-gray-500 py-8">データがありません</div>'}
+          </div>
+        </div>
+
+        <!-- 達成実績（バッジ） -->
+        ${report.achievements && report.achievements.length > 0 ? `
+        <div class="bg-white border border-gray-200 rounded-xl shadow-md p-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-trophy mr-3 text-yellow-500"></i>
+            達成実績・バッジ
+          </h3>
+          
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            ${report.achievements.map(achievement => `
+              <div class="text-center p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg border border-yellow-200 hover:shadow-lg transition">
+                <div class="text-4xl mb-2">${achievement.badge_icon}</div>
+                <div class="font-bold text-sm text-gray-800">${achievement.title}</div>
+                <div class="text-xs text-gray-600 mt-1">${achievement.description}</div>
+                <div class="text-xs text-gray-500 mt-2">${new Date(achievement.date).toLocaleDateString('ja-JP')}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- 課題エリアと改善提案 -->
+        ${report.challenges && report.challenges.length > 0 ? `
+        <div class="bg-orange-50 border border-orange-200 rounded-xl shadow-md p-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-exclamation-triangle mr-3 text-orange-500"></i>
+            改善ポイント
+          </h3>
+          
+          <div class="space-y-4">
+            ${report.challenges.map(challenge => `
+              <div class="bg-white p-5 rounded-lg border border-orange-200">
+                <div class="font-bold text-gray-800 mb-2 flex items-center">
+                  <i class="fas fa-bullseye mr-2 text-red-500"></i>
+                  ${challenge.area}
+                </div>
+                <p class="text-gray-700 mb-3">${challenge.description}</p>
+                
+                <div class="bg-blue-50 p-4 rounded-lg">
+                  <div class="font-semibold text-blue-800 mb-2">
+                    <i class="fas fa-lightbulb mr-2"></i>改善提案:
+                  </div>
+                  <ul class="space-y-1">
+                    ${challenge.suggestions.map(suggestion => `
+                      <li class="text-sm text-blue-700">• ${suggestion}</li>
+                    `).join('')}
+                  </ul>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- AI教師とのやりとり -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-md p-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-robot mr-3 text-purple-500"></i>
+            AI教師とのやりとり
+          </h3>
+          
+          <div class="bg-purple-50 p-5 rounded-lg border border-purple-200">
+            <div class="text-center">
+              <div class="text-5xl font-bold text-purple-600 mb-2">
+                ${report.ai_teacher_interactions.total_questions}
+              </div>
+              <div class="text-gray-700">質問回数</div>
+              <p class="text-sm text-gray-600 mt-3">
+                AI教師と積極的に対話することで、理解が深まります。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- アクションボタン -->
+        <div class="flex gap-4 pt-6 border-t">
+          <button onclick="exportDetailedReportToPDF('${reportType}')" 
+                  class="flex-1 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl flex items-center justify-center text-lg font-bold">
+            <i class="fas fa-file-pdf mr-3 text-2xl"></i>
+            PDFでダウンロード
+          </button>
+          <button onclick="this.closest('.fixed').remove()" 
+                  class="flex-1 bg-gray-300 text-gray-700 px-8 py-4 rounded-xl hover:bg-gray-400 transition-all shadow-lg hover:shadow-xl flex items-center justify-center text-lg font-bold">
+            <i class="fas fa-times mr-3 text-2xl"></i>
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(modal)
+}
+
+/**
+ * 学習スタイルラベル取得
+ */
+function getLearningStyleLabel(style) {
+  const labels = {
+    'visual': '視覚型 (Visual)',
+    'auditory': '聴覚型 (Auditory)',
+    'reading': '読書型 (Reading)',
+    'kinesthetic': '体感型 (Kinesthetic)',
+    'unknown': '分析中'
+  }
+  return labels[style] || '不明'
+}
+
+/**
+ * VARKスコアのプログレスバー生成
+ */
+function generateVARKBars(varkBreakdown) {
+  const varkLabels = {
+    visual: { label: '視覚 (Visual)', icon: 'fa-eye', color: 'blue' },
+    auditory: { label: '聴覚 (Auditory)', icon: 'fa-ear-listen', color: 'green' },
+    reading: { label: '読書 (Reading)', icon: 'fa-book-open', color: 'purple' },
+    kinesthetic: { label: '体感 (Kinesthetic)', icon: 'fa-hand-paper', color: 'orange' }
+  }
+  
+  return Object.entries(varkBreakdown).map(([key, value]) => {
+    const vark = varkLabels[key]
+    if (!vark) return ''
+    
+    const percentage = Math.round(value * 100)
+    
+    return `
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-sm font-semibold text-gray-700">
+            <i class="fas ${vark.icon} mr-2"></i>${vark.label}
+          </span>
+          <span class="text-sm font-bold text-${vark.color}-600">${percentage}%</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-3">
+          <div class="h-3 rounded-full bg-gradient-to-r from-${vark.color}-400 to-${vark.color}-600 transition-all" 
+               style="width: ${percentage}%"></div>
+        </div>
+      </div>
+    `
+  }).join('')
+}
+
+/**
+ * 詳細レポートをPDF出力
+ */
+async function exportDetailedReportToPDF(reportType) {
+  showLoading('PDFを生成中...')
+  
+  try {
+    const modal = document.getElementById('detailed-report-modal')
+    if (!modal) {
+      throw new Error('レポートが見つかりません')
+    }
+
+    const periodText = reportType === 'weekly' ? '週次レポート' : 
+                       reportType === 'monthly' ? '月次レポート' : '学期レポート'
+    const today = new Date().toISOString().split('T')[0]
+
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: `${periodText}_${today}.pdf`,
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait',
+        compress: true
+      },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    }
+
+    await html2pdf().set(opt).from(modal).save()
+    
+    hideLoading()
+    console.log('✅ 詳細レポートPDF生成完了')
+  } catch (error) {
+    hideLoading()
+    console.error('PDF生成エラー:', error)
+    alert('PDF生成に失敗しました')
+  }
+}
+
+// グローバルに関数を公開
+window.showParentDetailedReport = showParentDetailedReport
+window.displayDetailedReportModal = displayDetailedReportModal
+window.exportDetailedReportToPDF = exportDetailedReportToPDF
+
+/**
+ * 保護者向けレポートメニュー表示
+ */
+async function showParentReportMenu() {
+  showLoading('生徒一覧を読み込み中...')
+  
+  try {
+    // クラスの全生徒を取得
+    const response = await axios.get(`/api/reports/weekly/${state.student.classCode}`)
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      alert('生徒一覧の取得に失敗しました')
+      return
+    }
+    
+    const students = response.data.stats || []
+    
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-lg">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-2xl font-bold mb-2">
+                <i class="fas fa-file-pdf mr-2"></i>
+                学習レポート自動生成
+              </h2>
+              <p class="text-sm opacity-90">生徒を選択してレポートを作成</p>
+            </div>
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="text-white hover:text-gray-200 text-3xl">
+              <i class="fas fa-times-circle"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="p-8">
+          <!-- 説明 -->
+          <div class="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 p-5 rounded-r-lg mb-6">
+            <h3 class="font-bold text-gray-800 mb-2 flex items-center">
+              <i class="fas fa-info-circle mr-2 text-blue-500"></i>
+              機能の説明
+            </h3>
+            <ul class="text-gray-700 text-sm space-y-1">
+              <li>• 各生徒の学習状況を詳細にレポート化</li>
+              <li>• 学習時間、習熟度、成長率、教科別パフォーマンス</li>
+              <li>• 学習スタイル分析と推奨事項</li>
+              <li>• 保護者向けメッセージを自動生成</li>
+              <li>• PDFでダウンロード可能</li>
+            </ul>
+          </div>
+
+          <!-- レポート種類選択 -->
+          <div class="bg-gray-50 p-5 rounded-lg mb-6">
+            <h3 class="font-bold text-gray-800 mb-3">
+              <i class="fas fa-calendar mr-2"></i>
+              レポート種類を選択
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <label class="relative cursor-pointer">
+                <input type="radio" name="reportType" value="weekly" checked class="peer sr-only">
+                <div class="border-2 border-gray-300 peer-checked:border-blue-500 peer-checked:bg-blue-50 rounded-lg p-4 transition">
+                  <div class="text-center">
+                    <i class="fas fa-calendar-week text-2xl text-blue-600 mb-2"></i>
+                    <div class="font-bold text-gray-800">週次レポート</div>
+                    <div class="text-xs text-gray-600 mt-1">過去7日間</div>
+                  </div>
+                </div>
+              </label>
+              
+              <label class="relative cursor-pointer">
+                <input type="radio" name="reportType" value="monthly" class="peer sr-only">
+                <div class="border-2 border-gray-300 peer-checked:border-purple-500 peer-checked:bg-purple-50 rounded-lg p-4 transition">
+                  <div class="text-center">
+                    <i class="fas fa-calendar-alt text-2xl text-purple-600 mb-2"></i>
+                    <div class="font-bold text-gray-800">月次レポート</div>
+                    <div class="text-xs text-gray-600 mt-1">過去30日間</div>
+                  </div>
+                </div>
+              </label>
+              
+              <label class="relative cursor-pointer">
+                <input type="radio" name="reportType" value="term" class="peer sr-only">
+                <div class="border-2 border-gray-300 peer-checked:border-green-500 peer-checked:bg-green-50 rounded-lg p-4 transition">
+                  <div class="text-center">
+                    <i class="fas fa-calendar-check text-2xl text-green-600 mb-2"></i>
+                    <div class="font-bold text-gray-800">学期レポート</div>
+                    <div class="text-xs text-gray-600 mt-1">過去3ヶ月間</div>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- 生徒一覧 -->
+          <div>
+            <h3 class="font-bold text-gray-800 mb-3">
+              <i class="fas fa-users mr-2"></i>
+              生徒を選択してレポートを作成
+            </h3>
+            ${students.length > 0 ? `
+              <div class="space-y-2 max-h-96 overflow-y-auto">
+                ${students.map(student => `
+                  <button 
+                    onclick="generateStudentReport(${student.student_id || 0}, '${student.student_name}')"
+                    class="w-full bg-white border border-gray-200 hover:bg-blue-50 hover:border-blue-300 p-4 rounded-lg transition flex items-center justify-between group">
+                    <div class="flex items-center">
+                      <div class="bg-gradient-to-br from-blue-500 to-purple-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-bold mr-4">
+                        ${student.student_number || '?'}
+                      </div>
+                      <div class="text-left">
+                        <div class="font-bold text-gray-800">${student.student_name}</div>
+                        <div class="text-xs text-gray-600">
+                          完了: ${student.completed_cards || 0}枚 | 理解度: ${Math.round(student.avg_understanding || 0)}点
+                        </div>
+                      </div>
+                    </div>
+                    <div class="text-purple-600 group-hover:translate-x-2 transition-transform">
+                      <i class="fas fa-arrow-right text-xl"></i>
+                    </div>
+                  </button>
+                `).join('')}
+              </div>
+            ` : `
+              <div class="text-center py-12 text-gray-500">
+                <i class="fas fa-users text-6xl mb-4 text-gray-300"></i>
+                <p class="text-lg">生徒データがありません</p>
+              </div>
+            `}
+          </div>
+
+          <!-- 閉じるボタン -->
+          <div class="mt-6 flex justify-end">
+            <button onclick="this.closest('.fixed').remove()" 
+                    class="bg-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-400 transition-all">
+              <i class="fas fa-times mr-2"></i>閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('生徒一覧取得エラー:', error)
+    alert('生徒一覧の取得に失敗しました')
+  }
+}
+
+/**
+ * 生徒レポートを生成
+ */
+function generateStudentReport(studentId, studentName) {
+  if (!studentId || studentId === 0) {
+    alert('生徒IDが無効です')
+    return
+  }
+  
+  // レポート種類を取得
+  const selectedType = document.querySelector('input[name="reportType"]:checked')
+  const reportType = selectedType ? selectedType.value : 'weekly'
+  
+  // モーダルを閉じる
+  document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove())
+  
+  // 詳細レポート表示
+  window.showParentDetailedReport(studentId, reportType)
+}
+
+// グローバルに公開
+window.showParentReportMenu = showParentReportMenu
+window.generateStudentReport = generateStudentReport
 
 // ==============================================
 // 進捗ボード用ヘルパー関数（新）

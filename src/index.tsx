@@ -2630,7 +2630,172 @@ app.get('/api/reports/monthly/:classCode', async (c) => {
   }
 })
 
-// APIルート：AI先生（Gemini API）
+// =============================================================================
+// 学習レポート自動生成API（詳細版）
+// =============================================================================
+
+// 個別生徒の詳細レポート生成
+app.get('/api/reports/student/:studentId/detailed', async (c) => {
+  const { env } = c
+  const { generateLearningReport } = await import('./report-generator')
+  
+  try {
+    const studentId = parseInt(c.req.param('studentId'))
+    const reportType = c.req.query('type') || 'weekly' // weekly, monthly, term
+    const endDate = c.req.query('endDate') || new Date().toISOString().split('T')[0]
+    
+    // 期間計算
+    let startDate: string
+    const end = new Date(endDate)
+    
+    if (reportType === 'weekly') {
+      const start = new Date(end)
+      start.setDate(start.getDate() - 7)
+      startDate = start.toISOString().split('T')[0]
+    } else if (reportType === 'monthly') {
+      const start = new Date(end)
+      start.setMonth(start.getMonth() - 1)
+      startDate = start.toISOString().split('T')[0]
+    } else {
+      // term (3ヶ月)
+      const start = new Date(end)
+      start.setMonth(start.getMonth() - 3)
+      startDate = start.toISOString().split('T')[0]
+    }
+    
+    const report = await generateLearningReport(
+      env.DB,
+      studentId,
+      startDate,
+      endDate,
+      reportType as 'weekly' | 'monthly' | 'term'
+    )
+    
+    return c.json({
+      success: true,
+      report: report,
+      generated_at: new Date().toISOString()
+    })
+    
+  } catch (error: any) {
+    console.error('Failed to generate detailed report:', error)
+    return c.json({
+      success: false,
+      error: 'レポート生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// クラス全体のサマリーレポート
+app.get('/api/reports/class/:classCode/summary', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  const reportType = c.req.query('type') || 'weekly'
+  
+  try {
+    // クラスの全生徒取得
+    const students = await env.DB.prepare(`
+      SELECT s.student_id, s.name
+      FROM students s
+      JOIN class_enrollments ce ON s.student_id = ce.student_id
+      JOIN classes c ON ce.class_id = c.class_id
+      WHERE c.class_code = ? AND ce.is_active = TRUE
+    `).bind(classCode).all()
+    
+    if (students.results.length === 0) {
+      return c.json({
+        success: false,
+        error: 'クラスが見つかりません'
+      }, 404)
+    }
+    
+    // 各生徒のサマリーを生成
+    const { generateLearningReport } = await import('./report-generator')
+    const endDate = new Date().toISOString().split('T')[0]
+    let startDate: string
+    
+    const end = new Date(endDate)
+    if (reportType === 'weekly') {
+      const start = new Date(end)
+      start.setDate(start.getDate() - 7)
+      startDate = start.toISOString().split('T')[0]
+    } else {
+      const start = new Date(end)
+      start.setMonth(start.getMonth() - 1)
+      startDate = start.toISOString().split('T')[0]
+    }
+    
+    const studentReports = await Promise.all(
+      students.results.map(async (student: any) => {
+        try {
+          const report = await generateLearningReport(
+            env.DB,
+            student.student_id,
+            startDate,
+            endDate,
+            reportType as 'weekly' | 'monthly'
+          )
+          return {
+            student_id: student.student_id,
+            student_name: student.name,
+            summary: report.summary,
+            learning_style: report.learning_style.dominant_style
+          }
+        } catch (error) {
+          console.error(`Failed to generate report for student ${student.student_id}:`, error)
+          return null
+        }
+      })
+    )
+    
+    const validReports = studentReports.filter(r => r !== null)
+    
+    // クラス全体の統計
+    const classStats = {
+      total_students: validReports.length,
+      average_learning_time: Math.round(
+        validReports.reduce((sum, r: any) => sum + r.summary.total_learning_time_minutes, 0) / validReports.length
+      ),
+      average_mastery_score: Math.round(
+        validReports.reduce((sum, r: any) => sum + r.summary.average_mastery_score, 0) / validReports.length
+      ),
+      total_cards_completed: validReports.reduce((sum, r: any) => sum + r.summary.total_cards_completed, 0),
+      learning_style_distribution: {
+        visual: validReports.filter((r: any) => r.learning_style === 'visual').length,
+        auditory: validReports.filter((r: any) => r.learning_style === 'auditory').length,
+        reading: validReports.filter((r: any) => r.learning_style === 'reading').length,
+        kinesthetic: validReports.filter((r: any) => r.learning_style === 'kinesthetic').length
+      }
+    }
+    
+    return c.json({
+      success: true,
+      class_code: classCode,
+      period: {
+        start_date: startDate,
+        end_date: endDate,
+        type: reportType
+      },
+      class_stats: classStats,
+      student_reports: validReports,
+      generated_at: new Date().toISOString()
+    })
+    
+  } catch (error: any) {
+    console.error('Failed to generate class summary:', error)
+    return c.json({
+      success: false,
+      error: 'クラスサマリー生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// =============================================================================
+// AIルート：AI先生（Gemini API）
+// =============================================================================
+
 app.post('/api/ai/ask', async (c) => {
   const { env } = c
   const body = await c.req.json()
