@@ -24986,4 +24986,679 @@ window.removeComponent = removeComponent
 
 console.log('✅ Phase 12: レポートテンプレート管理UI 読み込み完了')
 
+// =============================================================================
+// Phase 13: 学習カードメディア管理UI
+// =============================================================================
+
+// 学習カードメディアエディタ状態
+const cardMediaEditorState = {
+  currentCardId: null,
+  currentImages: [],
+  currentVideos: [],
+  generatedImages: []
+}
+
+// 学習カードメディアエディタを表示
+async function showCardMediaEditor(cardId, cardTitle) {
+  try {
+    showLoading('メディアエディタを読み込み中...')
+    
+    cardMediaEditorState.currentCardId = cardId
+    
+    // 既存の画像を取得
+    const imagesResponse = await axios.get(`/api/cards/${cardId}/images`)
+    if (imagesResponse.data.success) {
+      cardMediaEditorState.currentImages = imagesResponse.data.images
+    }
+    
+    // 既存の動画を取得
+    const videosResponse = await axios.get(`/api/videos/card/${cardId}`)
+    if (videosResponse.data.success) {
+      cardMediaEditorState.currentVideos = videosResponse.data.videos || []
+    }
+    
+    hideLoading()
+    
+    // モーダル作成
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.id = 'card-media-editor-modal'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+          <div class="flex justify-between items-start">
+            <div>
+              <h3 class="text-2xl font-bold mb-2">
+                <i class="fas fa-images mr-2"></i>
+                メディアエディタ
+              </h3>
+              <p class="text-blue-100 text-sm">
+                <i class="fas fa-book mr-1"></i>
+                ${cardTitle}
+              </p>
+            </div>
+            <button onclick="closeCardMediaEditor()" class="text-white hover:text-gray-200 text-2xl font-bold">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- タブナビゲーション -->
+        <div class="bg-gray-100 border-b border-gray-300">
+          <div class="flex">
+            <button 
+              onclick="switchMediaTab('images')" 
+              id="tab-images"
+              class="flex-1 py-3 px-6 font-bold text-gray-700 hover:bg-white transition-all border-b-4 border-blue-600 bg-white"
+            >
+              <i class="fas fa-image mr-2"></i>
+              画像 (${cardMediaEditorState.currentImages.length})
+            </button>
+            <button 
+              onclick="switchMediaTab('videos')" 
+              id="tab-videos"
+              class="flex-1 py-3 px-6 font-bold text-gray-500 hover:bg-white transition-all border-b-4 border-transparent"
+            >
+              <i class="fas fa-video mr-2"></i>
+              動画 (${cardMediaEditorState.currentVideos.length})
+            </button>
+            <button 
+              onclick="switchMediaTab('ai-generate')" 
+              id="tab-ai-generate"
+              class="flex-1 py-3 px-6 font-bold text-gray-500 hover:bg-white transition-all border-b-4 border-transparent"
+            >
+              <i class="fas fa-magic mr-2"></i>
+              AI画像生成
+            </button>
+          </div>
+        </div>
+        
+        <!-- タブコンテンツ -->
+        <div class="flex-1 overflow-y-auto p-6">
+          <!-- 画像タブ -->
+          <div id="media-tab-images" class="space-y-4">
+            <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-plus-circle mr-2 text-blue-600"></i>
+                画像を追加
+              </h4>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">画像URL</label>
+                  <input 
+                    type="text" 
+                    id="new-image-url"
+                    placeholder="https://example.com/image.png"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">画像タイプ</label>
+                    <select 
+                      id="new-image-type"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="illustration">イラスト</option>
+                      <option value="diagram">図解</option>
+                      <option value="photo">写真</option>
+                      <option value="generated">AI生成</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">表示順序</label>
+                    <input 
+                      type="number" 
+                      id="new-image-order"
+                      value="0"
+                      min="0"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">説明文（alt text）</label>
+                  <input 
+                    type="text" 
+                    id="new-image-alt"
+                    placeholder="画像の説明"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">キャプション</label>
+                  <input 
+                    type="text" 
+                    id="new-image-caption"
+                    placeholder="画像のキャプション"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button 
+                  onclick="addImageToCard()"
+                  class="w-full bg-blue-500 text-white py-3 px-6 rounded-lg font-bold hover:bg-blue-600 transition-all"
+                >
+                  <i class="fas fa-plus mr-2"></i>
+                  画像を追加
+                </button>
+              </div>
+            </div>
+            
+            <!-- 既存画像一覧 -->
+            <div id="existing-images-list">
+              ${renderExistingImages()}
+            </div>
+          </div>
+          
+          <!-- 動画タブ -->
+          <div id="media-tab-videos" class="space-y-4 hidden">
+            <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-plus-circle mr-2 text-purple-600"></i>
+                動画を追加
+              </h4>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">動画URL</label>
+                  <input 
+                    type="text" 
+                    id="new-video-url"
+                    placeholder="YouTube, Vimeo, または直接URL"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">動画タイトル</label>
+                  <input 
+                    type="text" 
+                    id="new-video-title"
+                    placeholder="動画のタイトル"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-1">説明</label>
+                  <textarea 
+                    id="new-video-description"
+                    placeholder="動画の説明"
+                    rows="2"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  ></textarea>
+                </div>
+                <button 
+                  onclick="addVideoToCard()"
+                  class="w-full bg-purple-500 text-white py-3 px-6 rounded-lg font-bold hover:bg-purple-600 transition-all"
+                >
+                  <i class="fas fa-plus mr-2"></i>
+                  動画を追加
+                </button>
+              </div>
+            </div>
+            
+            <!-- 既存動画一覧 -->
+            <div id="existing-videos-list">
+              ${renderExistingVideos()}
+            </div>
+          </div>
+          
+          <!-- AI画像生成タブ -->
+          <div id="media-tab-ai-generate" class="space-y-4 hidden">
+            <div class="bg-gradient-to-br from-pink-50 to-purple-50 p-6 rounded-lg border border-pink-200">
+              <h4 class="font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-magic mr-2 text-pink-600"></i>
+                AI画像生成（Gemini Imagen）
+              </h4>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-lightbulb mr-1 text-yellow-500"></i>
+                    プロンプト（生成したい画像の説明）
+                  </label>
+                  <textarea 
+                    id="ai-image-prompt"
+                    placeholder="例：三角形の各辺の関係を示す図解、カラフルで分かりやすいスタイル"
+                    rows="3"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                  ></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">スタイル</label>
+                    <select 
+                      id="ai-image-style"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    >
+                      <option value="educational">教育的</option>
+                      <option value="illustration">イラスト</option>
+                      <option value="diagram">図解</option>
+                      <option value="realistic">リアル</option>
+                      <option value="cartoon">カートゥーン</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">ネガティブプロンプト</label>
+                    <input 
+                      type="text" 
+                      id="ai-image-negative-prompt"
+                      placeholder="例：低品質、ぼやけた"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    />
+                  </div>
+                </div>
+                <button 
+                  onclick="generateAIImage()"
+                  class="w-full bg-gradient-to-r from-pink-500 to-purple-500 text-white py-3 px-6 rounded-lg font-bold hover:from-pink-600 hover:to-purple-600 transition-all"
+                >
+                  <i class="fas fa-magic mr-2"></i>
+                  AI画像を生成
+                </button>
+              </div>
+            </div>
+            
+            <!-- AI生成画像履歴 -->
+            <div id="ai-generated-images-list">
+              <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-history mr-2 text-gray-600"></i>
+                生成履歴
+              </h4>
+              <div class="text-center text-gray-500 py-8">
+                <i class="fas fa-inbox text-4xl mb-2"></i>
+                <p>まだ画像を生成していません</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- フッター -->
+        <div class="bg-gray-50 border-t border-gray-200 p-4 flex justify-end">
+          <button onclick="closeCardMediaEditor()" class="bg-gray-500 text-white py-2 px-6 rounded-lg font-bold hover:bg-gray-600 transition-all">
+            <i class="fas fa-times mr-2"></i>
+            閉じる
+          </button>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ メディアエディタエラー:', error)
+    alert('メディアエディタの起動に失敗しました')
+  }
+}
+
+// タブ切り替え
+function switchMediaTab(tabName) {
+  // タブボタンのスタイル更新
+  const tabs = ['images', 'videos', 'ai-generate']
+  tabs.forEach(tab => {
+    const button = document.getElementById(`tab-${tab}`)
+    const content = document.getElementById(`media-tab-${tab}`)
+    
+    if (tab === tabName) {
+      button.className = 'flex-1 py-3 px-6 font-bold text-gray-700 hover:bg-white transition-all border-b-4 border-blue-600 bg-white'
+      content.classList.remove('hidden')
+    } else {
+      button.className = 'flex-1 py-3 px-6 font-bold text-gray-500 hover:bg-white transition-all border-b-4 border-transparent'
+      content.classList.add('hidden')
+    }
+  })
+}
+
+// 既存画像一覧レンダリング
+function renderExistingImages() {
+  if (cardMediaEditorState.currentImages.length === 0) {
+    return `
+      <div class="text-center text-gray-500 py-8">
+        <i class="fas fa-images text-4xl mb-2"></i>
+        <p>まだ画像が追加されていません</p>
+      </div>
+    `
+  }
+  
+  return `
+    <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+      <i class="fas fa-images mr-2 text-gray-600"></i>
+      追加済み画像 (${cardMediaEditorState.currentImages.length}枚)
+    </h4>
+    <div class="grid grid-cols-2 gap-4">
+      ${cardMediaEditorState.currentImages.map(image => `
+        <div class="bg-white p-4 rounded-lg border border-gray-200 hover:border-blue-400 transition-all">
+          <img 
+            src="${image.image_url}" 
+            alt="${image.alt_text || ''}"
+            class="w-full h-40 object-cover rounded-lg mb-3"
+            onerror="this.src='https://via.placeholder.com/400x300.png?text=Image+Error'"
+          />
+          <div class="space-y-2">
+            <div class="flex justify-between items-start">
+              <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">${image.image_type}</span>
+              <span class="text-xs text-gray-500">順序: ${image.display_order}</span>
+            </div>
+            ${image.alt_text ? `<p class="text-sm text-gray-700"><strong>説明:</strong> ${image.alt_text}</p>` : ''}
+            ${image.caption ? `<p class="text-xs text-gray-600">${image.caption}</p>` : ''}
+            <button 
+              onclick="deleteCardImage(${image.image_id})"
+              class="w-full bg-red-500 text-white py-2 px-4 rounded-lg text-sm font-bold hover:bg-red-600 transition-all"
+            >
+              <i class="fas fa-trash mr-1"></i>
+              削除
+            </button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `
+}
+
+// 既存動画一覧レンダリング
+function renderExistingVideos() {
+  if (cardMediaEditorState.currentVideos.length === 0) {
+    return `
+      <div class="text-center text-gray-500 py-8">
+        <i class="fas fa-video text-4xl mb-2"></i>
+        <p>まだ動画が追加されていません</p>
+      </div>
+    `
+  }
+  
+  return `
+    <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+      <i class="fas fa-video mr-2 text-gray-600"></i>
+      追加済み動画 (${cardMediaEditorState.currentVideos.length}本)
+    </h4>
+    <div class="space-y-3">
+      ${cardMediaEditorState.currentVideos.map(video => `
+        <div class="bg-white p-4 rounded-lg border border-gray-200 hover:border-purple-400 transition-all">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0">
+              <div class="w-32 h-20 bg-gray-200 rounded-lg flex items-center justify-center">
+                <i class="fas fa-play text-3xl text-gray-400"></i>
+              </div>
+            </div>
+            <div class="flex-1">
+              <h5 class="font-bold text-gray-800 mb-1">${video.video_title}</h5>
+              <p class="text-xs text-gray-600 mb-2">${video.description || '説明なし'}</p>
+              <div class="flex justify-between items-center">
+                <a href="${video.video_url}" target="_blank" class="text-xs text-blue-600 hover:underline">
+                  <i class="fas fa-external-link-alt mr-1"></i>
+                  動画を開く
+                </a>
+                <button 
+                  onclick="deleteCardVideo(${video.video_id})"
+                  class="bg-red-500 text-white py-1 px-3 rounded text-xs font-bold hover:bg-red-600 transition-all"
+                >
+                  <i class="fas fa-trash mr-1"></i>
+                  削除
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `
+}
+
+// 画像を学習カードに追加
+async function addImageToCard() {
+  try {
+    const imageUrl = document.getElementById('new-image-url').value.trim()
+    const imageType = document.getElementById('new-image-type').value
+    const displayOrder = parseInt(document.getElementById('new-image-order').value)
+    const altText = document.getElementById('new-image-alt').value.trim()
+    const caption = document.getElementById('new-image-caption').value.trim()
+    
+    if (!imageUrl) {
+      alert('画像URLを入力してください')
+      return
+    }
+    
+    showLoading('画像を追加中...')
+    
+    const response = await axios.post(`/api/cards/${cardMediaEditorState.currentCardId}/images`, {
+      image_url: imageUrl,
+      image_type: imageType,
+      alt_text: altText,
+      caption: caption,
+      display_order: displayOrder,
+      is_primary: cardMediaEditorState.currentImages.length === 0
+    })
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      alert('✅ 画像を追加しました！')
+      // モーダルを閉じて再表示
+      closeCardMediaEditor()
+      // カードIDとタイトルを保持して再表示（簡略化のため省略）
+    } else {
+      alert('❌ 追加に失敗しました: ' + response.data.error)
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 画像追加エラー:', error)
+    alert('画像の追加に失敗しました')
+  }
+}
+
+// 動画を学習カードに追加
+async function addVideoToCard() {
+  try {
+    const videoUrl = document.getElementById('new-video-url').value.trim()
+    const videoTitle = document.getElementById('new-video-title').value.trim()
+    const videoDescription = document.getElementById('new-video-description').value.trim()
+    
+    if (!videoUrl) {
+      alert('動画URLを入力してください')
+      return
+    }
+    
+    if (!videoTitle) {
+      alert('動画タイトルを入力してください')
+      return
+    }
+    
+    showLoading('動画を追加中...')
+    
+    // プラットフォーム判定
+    let platform = 'other'
+    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+      platform = 'youtube'
+    } else if (videoUrl.includes('vimeo.com')) {
+      platform = 'vimeo'
+    }
+    
+    const response = await axios.post('/api/videos', {
+      card_id: cardMediaEditorState.currentCardId,
+      video_title: videoTitle,
+      video_url: videoUrl,
+      video_platform: platform,
+      description: videoDescription
+    })
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      alert('✅ 動画を追加しました！')
+      closeCardMediaEditor()
+    } else {
+      alert('❌ 追加に失敗しました: ' + response.data.error)
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 動画追加エラー:', error)
+    alert('動画の追加に失敗しました')
+  }
+}
+
+// AI画像生成
+async function generateAIImage() {
+  try {
+    const prompt = document.getElementById('ai-image-prompt').value.trim()
+    const style = document.getElementById('ai-image-style').value
+    const negativePrompt = document.getElementById('ai-image-negative-prompt').value.trim()
+    
+    if (!prompt) {
+      alert('プロンプトを入力してください')
+      return
+    }
+    
+    showLoading('AI画像を生成中... (数秒かかります)')
+    
+    const response = await axios.post('/api/ai/generate-image', {
+      prompt,
+      card_id: cardMediaEditorState.currentCardId,
+      teacher_id: state.teacher?.teacher_id || 1,
+      negative_prompt: negativePrompt,
+      style
+    })
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      alert(`✅ AI画像を生成しました！\n\n${response.data.message}\n\n生成時間: ${response.data.generation_time_ms}ms`)
+      
+      // 生成画像をプレビュー表示
+      const listDiv = document.getElementById('ai-generated-images-list')
+      listDiv.innerHTML = `
+        <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+          <i class="fas fa-history mr-2 text-gray-600"></i>
+          生成履歴
+        </h4>
+        <div class="bg-white p-4 rounded-lg border border-pink-200">
+          <img 
+            src="${response.data.image_url}" 
+            alt="${prompt}"
+            class="w-full h-64 object-cover rounded-lg mb-3"
+          />
+          <p class="text-sm text-gray-700 mb-2"><strong>プロンプト:</strong> ${response.data.prompt}</p>
+          <button 
+            onclick="useGeneratedImage('${response.data.image_url}', '${prompt}')"
+            class="w-full bg-blue-500 text-white py-2 px-4 rounded-lg font-bold hover:bg-blue-600 transition-all"
+          >
+            <i class="fas fa-check mr-2"></i>
+            この画像を学習カードに追加
+          </button>
+        </div>
+      `
+    } else {
+      alert('❌ 生成に失敗しました: ' + response.data.error)
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ AI画像生成エラー:', error)
+    alert('AI画像の生成に失敗しました')
+  }
+}
+
+// 生成画像を学習カードに追加
+async function useGeneratedImage(imageUrl, prompt) {
+  try {
+    showLoading('画像を追加中...')
+    
+    const response = await axios.post(`/api/cards/${cardMediaEditorState.currentCardId}/images`, {
+      image_url: imageUrl,
+      image_type: 'generated',
+      alt_text: prompt,
+      caption: `AI生成画像: ${prompt}`,
+      display_order: cardMediaEditorState.currentImages.length,
+      is_primary: cardMediaEditorState.currentImages.length === 0,
+      generation_prompt: prompt,
+      generated_by: 'gemini-imagen'
+    })
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      alert('✅ AI生成画像を学習カードに追加しました！')
+      closeCardMediaEditor()
+    } else {
+      alert('❌ 追加に失敗しました: ' + response.data.error)
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 画像追加エラー:', error)
+    alert('画像の追加に失敗しました')
+  }
+}
+
+// 画像削除
+async function deleteCardImage(imageId) {
+  if (!confirm('この画像を削除しますか？')) return
+  
+  try {
+    showLoading('削除中...')
+    
+    const response = await axios.delete(`/api/cards/images/${imageId}`)
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      alert('✅ 画像を削除しました')
+      // 画像リストを更新
+      cardMediaEditorState.currentImages = cardMediaEditorState.currentImages.filter(img => img.image_id !== imageId)
+      document.getElementById('existing-images-list').innerHTML = renderExistingImages()
+    } else {
+      alert('❌ 削除に失敗しました')
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 画像削除エラー:', error)
+    alert('画像の削除に失敗しました')
+  }
+}
+
+// 動画削除（既存のvideo_contentsテーブル用）
+async function deleteCardVideo(videoId) {
+  if (!confirm('この動画を削除しますか？')) return
+  
+  try {
+    showLoading('削除中...')
+    
+    // 注意: 現在のAPIにはvideo削除エンドポイントがないため、is_activeをFALSEにする処理を追加する必要があります
+    alert('動画削除機能は実装中です')
+    hideLoading()
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 動画削除エラー:', error)
+    alert('動画の削除に失敗しました')
+  }
+}
+
+// メディアエディタを閉じる
+function closeCardMediaEditor() {
+  const modal = document.getElementById('card-media-editor-modal')
+  if (modal) {
+    modal.remove()
+  }
+  
+  cardMediaEditorState.currentCardId = null
+  cardMediaEditorState.currentImages = []
+  cardMediaEditorState.currentVideos = []
+  cardMediaEditorState.generatedImages = []
+}
+
+// グローバルスコープに登録
+window.showCardMediaEditor = showCardMediaEditor
+window.closeCardMediaEditor = closeCardMediaEditor
+window.switchMediaTab = switchMediaTab
+window.addImageToCard = addImageToCard
+window.addVideoToCard = addVideoToCard
+window.generateAIImage = generateAIImage
+window.useGeneratedImage = useGeneratedImage
+window.deleteCardImage = deleteCardImage
+window.deleteCardVideo = deleteCardVideo
+
+console.log('✅ Phase 13: 学習カードメディア管理UI 読み込み完了')
+
+
 

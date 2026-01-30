@@ -17086,4 +17086,260 @@ app.delete('/api/report-templates/:templateId', async (c) => {
   }
 })
 
+// =============================================================================
+// Phase 13: 学習カードメディア管理API
+// =============================================================================
+
+// 学習カードの画像一覧取得
+app.get('/api/cards/:cardId/images', async (c) => {
+  const { env } = c
+  const cardId = parseInt(c.req.param('cardId'))
+  
+  try {
+    const images = await env.DB.prepare(`
+      SELECT * FROM card_images
+      WHERE card_id = ? AND is_active = TRUE
+      ORDER BY display_order ASC, created_at DESC
+    `).bind(cardId).all()
+    
+    return c.json({
+      success: true,
+      images: images.results
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習カードに画像追加
+app.post('/api/cards/:cardId/images', async (c) => {
+  const { env } = c
+  const cardId = parseInt(c.req.param('cardId'))
+  const { image_url, image_type, alt_text, caption, display_order, is_primary, generation_prompt, generated_by } = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO card_images (
+        card_id, image_url, image_type, alt_text, caption, 
+        display_order, is_primary, generation_prompt, generated_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      cardId,
+      image_url,
+      image_type || 'illustration',
+      alt_text || null,
+      caption || null,
+      display_order || 0,
+      is_primary || false,
+      generation_prompt || null,
+      generated_by || null
+    ).run()
+    
+    return c.json({
+      success: true,
+      image_id: result.meta.last_row_id
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習カード画像更新
+app.put('/api/cards/images/:imageId', async (c) => {
+  const { env } = c
+  const imageId = parseInt(c.req.param('imageId'))
+  const { alt_text, caption, display_order, is_primary } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE card_images
+      SET alt_text = ?,
+          caption = ?,
+          display_order = ?,
+          is_primary = ?,
+          updated_at = datetime('now')
+      WHERE image_id = ?
+    `).bind(alt_text, caption, display_order, is_primary, imageId).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習カード画像削除
+app.delete('/api/cards/images/:imageId', async (c) => {
+  const { env } = c
+  const imageId = parseInt(c.req.param('imageId'))
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE card_images
+      SET is_active = FALSE,
+          updated_at = datetime('now')
+      WHERE image_id = ?
+    `).bind(imageId).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// AI画像生成API（Gemini Imagen使用）
+app.post('/api/ai/generate-image', async (c) => {
+  const { env } = c
+  const { prompt, card_id, teacher_id, negative_prompt, style } = await c.req.json()
+  
+  try {
+    const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
+    
+    if (!geminiApiKey) {
+      return c.json({ 
+        success: false, 
+        error: 'API キーが設定されていません' 
+      }, 500)
+    }
+    
+    // Gemini APIで画像生成（テキストからプロンプト生成）
+    const startTime = Date.now()
+    
+    // 画像生成プロンプトの最適化
+    const optimizedPrompt = `${prompt}${style ? `, style: ${style}` : ''}, high quality, detailed, educational illustration`
+    
+    // 注意: Gemini Pro Vision は画像分析用。画像生成にはGemini Imagen APIが必要
+    // ここではダミーURLを返す（実際の実装ではGemini Imagen APIを使用）
+    const dummyImageUrl = `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(prompt.substring(0, 50))}`
+    
+    const generationTime = Date.now() - startTime
+    
+    // 生成履歴を保存
+    const result = await env.DB.prepare(`
+      INSERT INTO ai_generated_images (
+        teacher_id, card_id, prompt, negative_prompt, 
+        ai_model, image_url, generation_time_ms, 
+        generation_params, is_used
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      teacher_id || null,
+      card_id || null,
+      prompt,
+      negative_prompt || null,
+      'gemini-imagen',
+      dummyImageUrl,
+      generationTime,
+      JSON.stringify({ style, optimized_prompt: optimizedPrompt }),
+      false
+    ).run()
+    
+    return c.json({
+      success: true,
+      generation_id: result.meta.last_row_id,
+      image_url: dummyImageUrl,
+      prompt: optimizedPrompt,
+      generation_time_ms: generationTime,
+      message: '画像生成完了（デモ版：実際のAI画像生成はGemini Imagen API統合が必要）'
+    })
+  } catch (error: any) {
+    console.error('❌ AI画像生成エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message,
+      details: 'AI画像生成に失敗しました'
+    }, 500)
+  }
+})
+
+// AI生成画像履歴取得
+app.get('/api/ai/generated-images', async (c) => {
+  const { env } = c
+  const teacherId = c.req.query('teacher_id')
+  const cardId = c.req.query('card_id')
+  
+  try {
+    let query = `
+      SELECT * FROM ai_generated_images
+      WHERE 1=1
+    `
+    const bindings: any[] = []
+    
+    if (teacherId) {
+      query += ` AND teacher_id = ?`
+      bindings.push(parseInt(teacherId))
+    }
+    
+    if (cardId) {
+      query += ` AND card_id = ?`
+      bindings.push(parseInt(cardId))
+    }
+    
+    query += ` ORDER BY created_at DESC LIMIT 50`
+    
+    const images = await env.DB.prepare(query).bind(...bindings).all()
+    
+    return c.json({
+      success: true,
+      images: images.results
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習カード編集履歴取得
+app.get('/api/cards/:cardId/edit-history', async (c) => {
+  const { env } = c
+  const cardId = parseInt(c.req.param('cardId'))
+  
+  try {
+    const history = await env.DB.prepare(`
+      SELECT 
+        ch.*,
+        t.name as edited_by_name
+      FROM card_edit_history ch
+      LEFT JOIN teachers t ON ch.edited_by = t.teacher_id
+      WHERE ch.card_id = ?
+      ORDER BY ch.edited_at DESC
+      LIMIT 50
+    `).bind(cardId).all()
+    
+    return c.json({
+      success: true,
+      history: history.results
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習カード編集履歴追加
+app.post('/api/cards/:cardId/edit-history', async (c) => {
+  const { env } = c
+  const cardId = parseInt(c.req.param('cardId'))
+  const { edited_by, edit_type, before_data, after_data, change_summary } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO card_edit_history (
+        card_id, edited_by, edit_type, before_data, 
+        after_data, change_summary
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      cardId,
+      edited_by,
+      edit_type,
+      JSON.stringify(before_data),
+      JSON.stringify(after_data),
+      change_summary
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app
