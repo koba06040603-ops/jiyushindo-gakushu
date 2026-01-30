@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://7bcc4d50.jiyushindo-gakushu.pages.dev** ✅ 最新版（学習レポート自動生成機能追加）
+**https://2cc07888.jiyushindo-gakushu.pages.dev** ✅ 最新版（学習レポート拡張機能：Chart.jsグラフ、比較分析、ML予測、動画学習統合）
 
 ### 🔐 デモアカウント
 
