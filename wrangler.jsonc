@@ -19,13 +19,14 @@
       "id": "16b07372f2b64723bd446163488b073b",
       "preview_id": "079df71d62784eaea3a22b0757072732"
     }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "MEDIA_BUCKET",
-      "bucket_name": "jiyushindo-gakushu-media"
-    }
   ]
+  // Note: R2バケットは本番環境で別途設定が必要（Cloudflare Dashboard経由）
+  // "r2_buckets": [
+  //   {
+  //     "binding": "MEDIA_BUCKET",
+  //     "bucket_name": "jiyushindo-gakushu-media"
+  //   }
+  // ]
   // Note: Durable Objects はローカル開発のみで使用。本番環境では別途設定が必要
   // "durable_objects": {
   //   "bindings": [

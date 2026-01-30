@@ -5,12 +5,12 @@
 ## 🌐 本番環境URL
 
 **本番デプロイ完了！** ✅  
-- **本番URL**: https://d9e59052.jiyushindo-gakushu.pages.dev
-- **API仕様書**: https://d9e59052.jiyushindo-gakushu.pages.dev/static/api-docs
+- **本番URL**: https://e58a32fd.jiyushindo-gakushu.pages.dev
+- **API仕様書**: https://e58a32fd.jiyushindo-gakushu.pages.dev/static/api-docs
 - **デプロイ日時**: 2026-01-30
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 🟢 Active
-- **最新機能**: 学習カードメディア管理 + AI画像生成
+- **最新機能**: ファイルアップロード機能（画像・動画）
 
 ## プロジェクト概要
 
@@ -234,6 +234,24 @@
     - ai_generated_imagesテーブル（AI生成履歴）
     - card_edit_historyテーブル（編集履歴）
   - **デプロイ**: https://d9e59052.jiyushindo-gakushu.pages.dev
+- **2026-01-30**: ファイルアップロード機能実装完了 ✅ **完了** (Phase 14)
+  - **画像アップロード**:
+    - ファイル選択UI（input[type=file]）
+    - ドラッグ&ドロップ対応
+    - 画像プレビュー表示
+    - ファイルサイズチェック（10MB制限）
+    - 対応形式：JPEG、PNG、GIF、WebP
+  - **動画アップロード**:
+    - ファイル選択UI
+    - ファイルサイズチェック（100MB制限）
+    - 対応形式：MP4、WebM、OGG、MOV
+  - **Cloudflare R2統合**:
+    - R2バケット設定（jiyushindo-gakushu-media）
+    - ファイルアップロードAPI
+    - メディアプロキシAPI（/api/media/*）
+    - キャッシュ制御（1年キャッシュ）
+  - **注意**: 本番環境でのR2バケットはCloudflare Dashboard経由で設定が必要
+  - **デプロイ**: https://e58a32fd.jiyushindo-gakushu.pages.dev
 - **2026-01-29**: 高優先度3機能完全実装完了 ✅ **完了**
   - **PDF出力機能** (jsPDF + autoTable + Chart.js統合):
     - 週次・月次レポートのPDF生成

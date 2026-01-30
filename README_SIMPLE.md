@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://d9e59052.jiyushindo-gakushu.pages.dev** ✅ 最新版（学習カードメディア管理 + AI画像生成機能）
+**https://e58a32fd.jiyushindo-gakushu.pages.dev** ✅ 最新版（ファイルアップロード機能：画像・動画を直接アップロード）
 
 ### 🔐 デモアカウント
 
