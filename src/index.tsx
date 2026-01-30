@@ -1,6 +1,22 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
+import { 
+  registerStudent, 
+  login, 
+  logout, 
+  getCurrentUser, 
+  changePassword,
+  authMiddleware,
+  requireRole,
+  requireUserType
+} from './auth'
+import { 
+  performHealthCheck, 
+  logger, 
+  requestLoggingMiddleware,
+  errorHandlingMiddleware
+} from './monitoring'
 
 type Bindings = {
   DB: D1Database
@@ -862,8 +878,72 @@ async function callGeminiAPI(options: GeminiCallOptions): Promise<GeminiResponse
   }
 }
 
+// グローバルミドルウェア設定
+app.use('*', errorHandlingMiddleware)
+app.use('/api/*', requestLoggingMiddleware)
+
 // CORS設定
 app.use('/api/*', cors())
+
+// =============================================================================
+// Phase 7: ヘルスチェック・監視エンドポイント
+// =============================================================================
+
+// ヘルスチェック（認証不要）
+app.get('/health', async (c) => {
+  const metrics = await performHealthCheck(c);
+  const statusCode = metrics.status === 'healthy' ? 200 : metrics.status === 'degraded' ? 200 : 503;
+  
+  return c.json(metrics, statusCode);
+});
+
+// 詳細なシステムステータス（認証必須・管理者のみ）
+app.get('/api/admin/system-status', authMiddleware, requireRole('admin'), async (c) => {
+  const metrics = await performHealthCheck(c);
+  
+  return c.json({
+    ...metrics,
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'production'
+  });
+});
+
+// =============================================================================
+// Phase 7: 認証・認可システム - JWT + RBAC
+// =============================================================================
+
+// ユーザー登録（学生）
+app.post('/api/auth/register/student', registerStudent)
+
+// ログイン（全ユーザータイプ）
+app.post('/api/auth/login', login)
+
+// ログアウト
+app.post('/api/auth/logout', logout)
+
+// 現在のユーザー情報取得（認証必須）
+app.get('/api/auth/me', authMiddleware, getCurrentUser)
+
+// パスワード変更（認証必須）
+app.post('/api/auth/change-password', authMiddleware, changePassword)
+
+// ロールベースアクセス制御のデモ
+app.get('/api/admin/dashboard', authMiddleware, requireRole('admin', 'teacher'), async (c) => {
+  return c.json({ 
+    message: 'Admin/Teacher Dashboard',
+    info: 'This endpoint is only accessible to admins and teachers'
+  })
+})
+
+// ユーザータイプベースアクセス制御のデモ
+app.get('/api/student/progress', authMiddleware, requireUserType('student'), async (c) => {
+  const user = c.get('user') as any;
+  return c.json({ 
+    message: 'Student Progress',
+    student_id: user.user_id 
+  })
+})
 
 // =============================================================================
 // Phase 7: リアルタイム通知機能 - WebSocketエンドポイント

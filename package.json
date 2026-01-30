@@ -9,10 +9,14 @@
     "deploy": "npm run build && wrangler pages deploy dist --project-name webapp",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "db:migrate:local": "wrangler d1 migrations apply jiyushindo-gakushu-production --local",
-    "db:migrate:prod": "wrangler d1 migrations apply jiyushindo-gakushu-production",
+    "db:migrate:prod": "wrangler d1 migrations apply jiyushindo-gakushu-production --local",
     "db:seed": "wrangler d1 execute jiyushindo-gakushu-production --local --file=./seed.sql && wrangler d1 execute jiyushindo-gakushu-production --local --file=./demo_progress_data.sql",
     "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed",
-    "clean-port": "fuser -k 3000/tcp 2>/dev/null || true"
+    "clean-port": "fuser -k 3000/tcp 2>/dev/null || true",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report test-results/html"
   },
   "dependencies": {
     "hono": "^4.11.3"
@@ -20,6 +24,7 @@
   "devDependencies": {
     "@hono/vite-build": "^1.2.0",
     "@hono/vite-dev-server": "^0.18.2",
+    "@playwright/test": "^1.58.0",
     "vite": "^6.3.5",
     "wrangler": "^4.4.0"
   }
