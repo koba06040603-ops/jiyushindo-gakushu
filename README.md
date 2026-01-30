@@ -127,10 +127,36 @@
     - 今日の復習カード一覧
     - 習熟度推移グラフ（Chart.js）
     - ScTNスコア表示（4次元）
+- **2026-01-29**: 高優先度3機能完全実装完了 ✅ **完了**
+  - **PDF出力機能** (jsPDF + autoTable + Chart.js統合):
+    - 週次・月次レポートのPDF生成
+    - グラフ画像埋め込み (Chart.js → PNG → PDF)
+    - 多言語対応 (日本語フォント埋め込み)
+    - UIコンポーネント: PDFGenerator
+  - **データ可視化強化** (Chart.js拡張):
+    - レーダーチャート (ScTN 6次元分析)
+    - ヒートマップ (時間帯別学習頻度)
+    - バブルチャート (難易度×習熟度×学習時間)
+    - ドーナツチャート (分野別配分)
+    - 散布図 (学習時間と成績の相関分析)
+    - UIコンポーネント: AdvancedVisualization
+  - **AI先生の強化** (Gemini 2.5 Flash統合):
+    - 対話履歴管理 (セッション管理)
+    - 段階的ヒント提供 (3段階: Hint → Explanation → Solution)
+    - メタ認知促進質問 (Before/During/After学習)
+    - 学習方略提案 (学習スタイル別)
+    - 自動問題生成 (難易度調整・要件対応)
+    - パーソナライズ学習計画 (学習状況分析)
+    - 感情的サポート (励まし・動機づけ)
+    - APIエンドポイント: 6個 (enhanced-dialogue, gradual-hints, metacognitive, learning-strategies, generate-problem, personalized-plan)
+    - **科学的根拠**: Flavell (1979), Schraw & Dennison (1994), Weinstein & Mayer (1986), VanLehn (2011), Kulik & Fletcher (2016)
+  - **デモページ**: `/advanced-features-demo.html`
     - 学習統計（時間・カード数・正答率）
     - 忘却リスクアラート
     - 最近の活動履歴
-  - **デモページ**: `/integrated-dashboard.html`
+  - **デモページ一覧**:
+    - `/integrated-dashboard.html` - 統合学習ダッシュボード
+    - `/advanced-features-demo.html` - 高度な機能デモ (PDF出力・データ可視化強化・AI先生)
 
 ---
 
