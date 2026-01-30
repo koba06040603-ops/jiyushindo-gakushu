@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://601ac8b7.jiyushindo-gakushu.pages.dev** ✅ 最新版（Excel互換CSV・完全動作）
+**https://7bcc4d50.jiyushindo-gakushu.pages.dev** ✅ 最新版（学習レポート自動生成機能追加）
 
 ### 🔐 デモアカウント
 
