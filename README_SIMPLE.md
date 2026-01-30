@@ -573,6 +573,7 @@ Email: xxx@school.jp
 - **Hono**：軽量で高速なWebフレームワーク
 - **Cloudflare Workers**：エッジコンピューティング
 - **Cloudflare D1**：SQLiteベースの分散データベース
+- **Cloudflare R2**：オブジェクトストレージ（画像・動画アップロード）
 
 ### AI機能
 - **Gemini 2.0 Flash Exp**：対話型AI
@@ -631,6 +632,6 @@ Email: xxx@school.jp
 ---
 
 **作成日**: 2026年1月20日  
-**最終更新**: 2026年1月20日  
-**バージョン**: 1.0.0  
+**最終更新**: 2026年1月30日  
+**バージョン**: 1.4.0  
 **ライセンス**: MIT License  
