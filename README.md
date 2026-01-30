@@ -2,6 +2,14 @@
 
 > 📘 **一般向けの簡易版READMEは [README_SIMPLE.md](./README_SIMPLE.md) をご覧ください**
 
+## 🌐 本番環境URL
+
+**本番デプロイ完了！** ✅  
+- **本番URL**: https://e8efc4f3.jiyushindo-gakushu.pages.dev
+- **デプロイ日時**: 2026-01-30
+- **プラットフォーム**: Cloudflare Pages
+- **ステータス**: 🟢 Active
+
 ## プロジェクト概要
 
 **名前**: 自由進度学習支援システム  
