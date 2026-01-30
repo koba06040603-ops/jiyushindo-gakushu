@@ -64,6 +64,50 @@ export interface LearningReportData {
   }
   parent_message: string
   teacher_comment: string
+  // 新規追加: グラフ・チャート用データ
+  charts: {
+    learning_time_trend: Array<{
+      date: string
+      minutes: number
+      cumulative_minutes: number
+    }>
+    mastery_radar: {
+      labels: string[]
+      scores: number[]
+    }
+    subject_performance_bar: Array<{
+      subject: string
+      score: number
+      class_average?: number
+    }>
+    daily_progress: Array<{
+      date: string
+      cards_completed: number
+      sessions: number
+    }>
+  }
+  // 新規追加: 比較分析データ
+  comparison: {
+    class_average: {
+      learning_time_minutes: number
+      cards_completed: number
+      mastery_score: number
+    }
+    previous_period: {
+      learning_time_minutes: number
+      cards_completed: number
+      mastery_score: number
+      improvement_rate: number
+    }
+    percentile_rank: number // クラス内順位（パーセンタイル）
+  }
+  // 新規追加: 予測データ
+  prediction: {
+    next_week_cards: number
+    next_week_mastery: number
+    goal_achievement_probability: number
+    recommended_study_time: number
+  }
 }
 
 /**
@@ -232,6 +276,112 @@ export async function generateLearningReport(
     reportType
   )
 
+  // 12. グラフ用データ: 学習時間推移
+  const learningTimeTrend = await db.prepare(`
+    SELECT 
+      DATE(session_start) as date,
+      SUM(actual_time_minutes) as minutes
+    FROM learning_sessions
+    WHERE student_id = ?
+      AND session_start >= ?
+      AND session_start <= ?
+    GROUP BY DATE(session_start)
+    ORDER BY DATE(session_start)
+  `).bind(studentId, startDate, endDate).all()
+
+  let cumulativeMinutes = 0
+  const learningTimeTrendData = learningTimeTrend.results.map((row: any) => {
+    cumulativeMinutes += row.minutes || 0
+    return {
+      date: row.date,
+      minutes: row.minutes || 0,
+      cumulative_minutes: cumulativeMinutes
+    }
+  })
+
+  // 13. グラフ用データ: 習熟度レーダーチャート（教科別）
+  const masteryRadarLabels = subjectPerformance.results.map((s: any) => s.subject)
+  const masteryRadarScores = subjectPerformance.results.map((s: any) => Math.round(s.average_score))
+
+  // 14. グラフ用データ: 日次進捗
+  const dailyProgress = await db.prepare(`
+    SELECT 
+      DATE(session_start) as date,
+      SUM(actual_cards_completed) as cards_completed,
+      COUNT(*) as sessions
+    FROM learning_sessions
+    WHERE student_id = ?
+      AND session_start >= ?
+      AND session_start <= ?
+    GROUP BY DATE(session_start)
+    ORDER BY DATE(session_start)
+  `).bind(studentId, startDate, endDate).all()
+
+  // 15. 比較分析: クラス平均
+  const classAverage = await db.prepare(`
+    SELECT 
+      AVG(ls.actual_time_minutes) as avg_time,
+      AVG(ls.actual_cards_completed) as avg_cards,
+      AVG(sp.mastery_score) as avg_mastery
+    FROM learning_sessions ls
+    JOIN students s ON ls.student_id = s.student_id
+    JOIN class_enrollments ce ON s.student_id = ce.student_id
+    JOIN classes c ON ce.class_id = c.class_id
+    LEFT JOIN student_progress sp ON s.student_id = sp.student_id
+    WHERE c.class_code = ?
+      AND ls.session_start >= ?
+      AND ls.session_start <= ?
+  `).bind(studentInfo.class_code, startDate, endDate).first()
+
+  // 16. 比較分析: 前期間データ
+  const previousPeriodData = await db.prepare(`
+    SELECT 
+      SUM(actual_time_minutes) as total_time,
+      SUM(actual_cards_completed) as total_cards
+    FROM learning_sessions
+    WHERE student_id = ?
+      AND session_start >= ?
+      AND session_start < ?
+  `).bind(studentId, previousPeriodStart, previousPeriodEnd).first()
+
+  // 17. パーセンタイル順位計算
+  const classRanking = await db.prepare(`
+    SELECT 
+      s.student_id,
+      AVG(sp.mastery_score) as avg_mastery
+    FROM students s
+    JOIN class_enrollments ce ON s.student_id = ce.student_id
+    JOIN classes c ON ce.class_id = c.class_id
+    LEFT JOIN student_progress sp ON s.student_id = sp.student_id
+    WHERE c.class_code = ?
+      AND sp.last_attempt_date >= ?
+      AND sp.last_attempt_date <= ?
+    GROUP BY s.student_id
+    ORDER BY avg_mastery DESC
+  `).bind(studentInfo.class_code, startDate, endDate).all()
+
+  const totalStudents = classRanking.results.length
+  const studentRank = classRanking.results.findIndex((r: any) => r.student_id === studentId) + 1
+  const percentileRank = totalStudents > 0 ? Math.round(((totalStudents - studentRank + 1) / totalStudents) * 100) : 50
+
+  // 18. 予測機能: 線形回帰による予測
+  const recentSessions = await db.prepare(`
+    SELECT 
+      DATE(session_start) as date,
+      SUM(actual_cards_completed) as cards,
+      AVG(sp.mastery_score) as mastery
+    FROM learning_sessions ls
+    LEFT JOIN student_progress sp ON ls.student_id = sp.student_id
+    WHERE ls.student_id = ?
+      AND ls.session_start >= ?
+      AND ls.session_start <= ?
+    GROUP BY DATE(session_start)
+    ORDER BY DATE(session_start)
+  `).bind(studentId, startDate, endDate).all()
+
+  // 簡易線形回帰
+  const predictions = predictLearningProgress(recentSessions.results)
+
   // レポートデータ構築
   const report: LearningReportData = {
     student: {
@@ -283,7 +433,47 @@ export async function generateLearningReport(
       most_helpful_answers: []
     },
     parent_message: parentMessage,
-    teacher_comment: ''
+    teacher_comment: '',
+    // グラフ・チャート用データ
+    charts: {
+      learning_time_trend: learningTimeTrendData,
+      mastery_radar: {
+        labels: masteryRadarLabels,
+        scores: masteryRadarScores
+      },
+      subject_performance_bar: subjectPerformance.results.map((s: any) => ({
+        subject: s.subject,
+        score: Math.round(s.average_score),
+        class_average: classAverage?.avg_mastery ? Math.round(classAverage.avg_mastery) : undefined
+      })),
+      daily_progress: dailyProgress.results.map((d: any) => ({
+        date: d.date,
+        cards_completed: d.cards_completed || 0,
+        sessions: d.sessions || 0
+      }))
+    },
+    // 比較分析データ
+    comparison: {
+      class_average: {
+        learning_time_minutes: Math.round(classAverage?.avg_time || 0),
+        cards_completed: Math.round(classAverage?.avg_cards || 0),
+        mastery_score: Math.round(classAverage?.avg_mastery || 0)
+      },
+      previous_period: {
+        learning_time_minutes: previousPeriodData?.total_time || 0,
+        cards_completed: previousPeriodData?.total_cards || 0,
+        mastery_score: Math.round(previousMastery?.avg_mastery || 0),
+        improvement_rate: Math.round(improvementRate * 10) / 10
+      },
+      percentile_rank: percentileRank
+    },
+    // 予測データ
+    prediction: {
+      next_week_cards: predictions.next_week_cards,
+      next_week_mastery: predictions.next_week_mastery,
+      goal_achievement_probability: predictions.goal_achievement_probability,
+      recommended_study_time: predictions.recommended_study_time
+    }
   }
 
   return report
@@ -356,4 +546,67 @@ function generateLearningStyleRecommendations(style: string): string[] {
   }
   
   return recommendations[style] || recommendations['visual']
+}
+
+/**
+ * 学習進捗予測（簡易線形回帰）
+ */
+function predictLearningProgress(recentSessions: any[]): {
+  next_week_cards: number
+  next_week_mastery: number
+  goal_achievement_probability: number
+  recommended_study_time: number
+} {
+  if (recentSessions.length === 0) {
+    return {
+      next_week_cards: 0,
+      next_week_mastery: 0,
+      goal_achievement_probability: 0,
+      recommended_study_time: 60
+    }
+  }
+
+  // 簡易線形回帰: y = mx + b
+  const n = recentSessions.length
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+  let sumMastery = 0
+
+  recentSessions.forEach((session: any, index: number) => {
+    const x = index + 1
+    const y = session.cards || 0
+    sumX += x
+    sumY += y
+    sumXY += x * y
+    sumX2 += x * x
+    sumMastery += session.mastery || 0
+  })
+
+  // 傾き (m) と切片 (b) を計算
+  const m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+  const b = (sumY - m * sumX) / n
+
+  // 次週の予測 (7日先)
+  const nextWeekCards = Math.round(Math.max(0, m * (n + 7) + b))
+  
+  // 平均習熟度から次週の習熟度を予測
+  const avgMastery = sumMastery / n
+  const masteryTrend = m > 0 ? 5 : m < 0 ? -3 : 0
+  const nextWeekMastery = Math.round(Math.min(100, Math.max(0, avgMastery + masteryTrend)))
+
+  // 目標達成確率（80点以上の習熟度を目標とする）
+  const goalAchievementProbability = nextWeekMastery >= 80 ? 85 : 
+                                      nextWeekMastery >= 70 ? 65 :
+                                      nextWeekMastery >= 60 ? 45 : 25
+
+  // 推奨学習時間（分）
+  const currentAvgCards = sumY / n
+  const recommendedStudyTime = currentAvgCards < 5 ? 90 :
+                                 currentAvgCards < 10 ? 60 : 45
+
+  return {
+    next_week_cards: nextWeekCards,
+    next_week_mastery: nextWeekMastery,
+    goal_achievement_probability: goalAchievementProbability,
+    recommended_study_time: recommendedStudyTime
+  }
 }

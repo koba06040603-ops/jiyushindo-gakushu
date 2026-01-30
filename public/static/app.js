@@ -17315,6 +17315,174 @@ function displayDetailedReportModal(report, reportType) {
         </div>
         ` : ''}
 
+        <!-- Chart.js グラフ・チャート -->
+        ${report.charts ? `
+        <div class="bg-white border border-gray-200 rounded-xl shadow-md p-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-chart-line mr-3 text-blue-500"></i>
+            学習データ可視化
+          </h3>
+          
+          <!-- グラフコンテナ -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 学習時間推移グラフ -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h4 class="font-bold text-gray-700 mb-3 text-center">学習時間推移</h4>
+              <canvas id="learningTimeChart-${report.student.id}" class="w-full" height="200"></canvas>
+            </div>
+            
+            <!-- 習熟度レーダーチャート -->
+            <div class="bg-gray-50 p-4 rounded-lg">
+              <h4 class="font-bold text-gray-700 mb-3 text-center">教科別習熟度</h4>
+              <canvas id="masteryRadarChart-${report.student.id}" class="w-full" height="200"></canvas>
+            </div>
+            
+            <!-- 教科別パフォーマンス棒グラフ -->
+            <div class="bg-gray-50 p-4 rounded-lg md:col-span-2">
+              <h4 class="font-bold text-gray-700 mb-3 text-center">教科別パフォーマンス（クラス平均比較）</h4>
+              <canvas id="subjectPerformanceChart-${report.student.id}" class="w-full" height="250"></canvas>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- 比較分析 -->
+        ${report.comparison ? `
+        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl shadow-md p-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-balance-scale mr-3 text-indigo-600"></i>
+            比較分析
+          </h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- クラス平均との比較 -->
+            <div class="bg-white p-5 rounded-lg border border-indigo-200">
+              <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-users mr-2 text-blue-600"></i>
+                クラス平均との比較
+              </h4>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">学習時間:</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-gray-800">${Math.floor(report.summary.total_learning_time_minutes / 60)}h ${report.summary.total_learning_time_minutes % 60}m</span>
+                    <span class="text-xs text-gray-500">vs</span>
+                    <span class="text-sm text-gray-600">${Math.floor(report.comparison.class_average.learning_time_minutes / 60)}h ${report.comparison.class_average.learning_time_minutes % 60}m</span>
+                  </div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">完了カード:</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-gray-800">${report.summary.total_cards_completed}枚</span>
+                    <span class="text-xs text-gray-500">vs</span>
+                    <span class="text-sm text-gray-600">${report.comparison.class_average.cards_completed}枚</span>
+                  </div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">習熟度:</span>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-gray-800">${report.summary.average_mastery_score}点</span>
+                    <span class="text-xs text-gray-500">vs</span>
+                    <span class="text-sm text-gray-600">${report.comparison.class_average.mastery_score}点</span>
+                  </div>
+                </div>
+                <div class="pt-3 border-t">
+                  <div class="text-center">
+                    <div class="text-3xl font-bold text-indigo-600 mb-1">${report.comparison.percentile_rank}%</div>
+                    <div class="text-xs text-gray-600">クラス内順位（パーセンタイル）</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 前期間との比較 -->
+            <div class="bg-white p-5 rounded-lg border border-purple-200">
+              <h4 class="font-bold text-gray-800 mb-3 flex items-center">
+                <i class="fas fa-history mr-2 text-purple-600"></i>
+                前期間との比較
+              </h4>
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">学習時間:</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-600">${Math.floor(report.comparison.previous_period.learning_time_minutes / 60)}h ${report.comparison.previous_period.learning_time_minutes % 60}m</span>
+                    <i class="fas fa-arrow-right text-gray-400"></i>
+                    <span class="font-bold text-gray-800">${Math.floor(report.summary.total_learning_time_minutes / 60)}h ${report.summary.total_learning_time_minutes % 60}m</span>
+                  </div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">完了カード:</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-600">${report.comparison.previous_period.cards_completed}枚</span>
+                    <i class="fas fa-arrow-right text-gray-400"></i>
+                    <span class="font-bold text-gray-800">${report.summary.total_cards_completed}枚</span>
+                  </div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-sm text-gray-600">習熟度:</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-600">${report.comparison.previous_period.mastery_score}点</span>
+                    <i class="fas fa-arrow-right text-gray-400"></i>
+                    <span class="font-bold text-gray-800">${report.summary.average_mastery_score}点</span>
+                  </div>
+                </div>
+                <div class="pt-3 border-t">
+                  <div class="text-center">
+                    <div class="text-3xl font-bold ${report.summary.improvement_rate >= 0 ? 'text-green-600' : 'text-red-600'} mb-1">
+                      ${report.summary.improvement_rate >= 0 ? '+' : ''}${report.summary.improvement_rate}%
+                    </div>
+                    <div class="text-xs text-gray-600">成長率</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- AI予測機能 -->
+        ${report.prediction ? `
+        <div class="bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl shadow-md p-6">
+          <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <i class="fas fa-crystal-ball mr-3 text-cyan-600"></i>
+            AI学習進捗予測
+          </h3>
+          
+          <div class="bg-white p-5 rounded-lg border border-cyan-200">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="text-center">
+                <div class="text-2xl font-bold text-blue-600 mb-1">${report.prediction.next_week_cards}</div>
+                <div class="text-xs text-gray-600">次週予測カード数</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-green-600 mb-1">${report.prediction.next_week_mastery}点</div>
+                <div class="text-xs text-gray-600">次週予測習熟度</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-purple-600 mb-1">${report.prediction.goal_achievement_probability}%</div>
+                <div class="text-xs text-gray-600">目標達成確率</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-orange-600 mb-1">${report.prediction.recommended_study_time}分</div>
+                <div class="text-xs text-gray-600">推奨学習時間/日</div>
+              </div>
+            </div>
+            <div class="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p class="text-sm text-gray-700">
+                <i class="fas fa-info-circle mr-2 text-blue-600"></i>
+                <strong>AIからのアドバイス:</strong> 
+                ${report.prediction.goal_achievement_probability >= 80 ? 
+                  '素晴らしいペースです！この調子で学習を続けましょう。' :
+                  report.prediction.goal_achievement_probability >= 60 ?
+                  '順調に進んでいます。毎日' + report.prediction.recommended_study_time + '分の学習を続けると目標達成できます。' :
+                  '少し努力が必要です。毎日' + report.prediction.recommended_study_time + '分の学習時間を確保しましょう。'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+        ` : ''}
+
         <!-- AI教師とのやりとり -->
         <div class="bg-white border border-gray-200 rounded-xl shadow-md p-6">
           <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
@@ -17353,6 +17521,168 @@ function displayDetailedReportModal(report, reportType) {
   `
   
   document.body.appendChild(modal)
+  
+  // Chart.jsグラフを描画（モーダル追加後）
+  if (report.charts) {
+    setTimeout(() => {
+      renderLearningCharts(report)
+    }, 100)
+  }
+}
+
+/**
+ * Chart.jsグラフ描画
+ */
+function renderLearningCharts(report) {
+  const studentId = report.student.id
+  
+  // 1. 学習時間推移グラフ（折れ線グラフ）
+  const timeCtx = document.getElementById(`learningTimeChart-${studentId}`)
+  if (timeCtx && report.charts.learning_time_trend) {
+    new Chart(timeCtx, {
+      type: 'line',
+      data: {
+        labels: report.charts.learning_time_trend.map(d => new Date(d.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })),
+        datasets: [
+          {
+            label: '学習時間（分）',
+            data: report.charts.learning_time_trend.map(d => d.minutes),
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            tension: 0.3,
+            fill: true
+          },
+          {
+            label: '累積学習時間（分）',
+            data: report.charts.learning_time_trend.map(d => d.cumulative_minutes),
+            borderColor: 'rgb(139, 92, 246)',
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            tension: 0.3,
+            fill: true,
+            borderDash: [5, 5]
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: '時間（分）'
+            }
+          }
+        }
+      }
+    })
+  }
+  
+  // 2. 習熟度レーダーチャート
+  const radarCtx = document.getElementById(`masteryRadarChart-${studentId}`)
+  if (radarCtx && report.charts.mastery_radar) {
+    new Chart(radarCtx, {
+      type: 'radar',
+      data: {
+        labels: report.charts.mastery_radar.labels,
+        datasets: [{
+          label: '習熟度スコア',
+          data: report.charts.mastery_radar.scores,
+          borderColor: 'rgb(34, 197, 94)',
+          backgroundColor: 'rgba(34, 197, 94, 0.2)',
+          pointBackgroundColor: 'rgb(34, 197, 94)',
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: 'rgb(34, 197, 94)'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          }
+        },
+        scales: {
+          r: {
+            beginAtZero: true,
+            max: 100,
+            ticks: {
+              stepSize: 20
+            }
+          }
+        }
+      }
+    })
+  }
+  
+  // 3. 教科別パフォーマンス棒グラフ（クラス平均比較）
+  const barCtx = document.getElementById(`subjectPerformanceChart-${studentId}`)
+  if (barCtx && report.charts.subject_performance_bar) {
+    const subjects = report.charts.subject_performance_bar.map(d => d.subject)
+    const studentScores = report.charts.subject_performance_bar.map(d => d.score)
+    const classAverages = report.charts.subject_performance_bar.map(d => d.class_average || 0)
+    
+    new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels: subjects,
+        datasets: [
+          {
+            label: '本人スコア',
+            data: studentScores,
+            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+            borderColor: 'rgb(59, 130, 246)',
+            borderWidth: 1
+          },
+          {
+            label: 'クラス平均',
+            data: classAverages,
+            backgroundColor: 'rgba(156, 163, 175, 0.5)',
+            borderColor: 'rgb(156, 163, 175)',
+            borderWidth: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            title: {
+              display: true,
+              text: 'スコア'
+            }
+          }
+        }
+      }
+    })
+  }
 }
 
 /**
