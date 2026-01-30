@@ -15847,4 +15847,421 @@ app.get('/api/interleaved-practice/stats/:studentId', async (c) => {
   }
 })
 
+// ================================
+// AI先生強化機能 (Enhanced AI Teacher)
+// ================================
+
+// 1. ソクラテス式対話（段階的なヒント）
+app.post('/api/ai-teacher/socratic-dialogue', async (c) => {
+  const { env } = c
+  const { studentId, cardId, currentUnderstanding, attemptCount } = await c.req.json()
+  
+  if (!env.GEMINI_API_KEY) {
+    return c.json({
+      success: false,
+      error: 'Gemini APIキーが設定されていません'
+    }, 500)
+  }
+
+  try {
+    // カード情報取得
+    const card = await env.DB.prepare(`
+      SELECT * FROM learning_cards WHERE id = ?
+    `).bind(cardId).first()
+
+    if (!card) {
+      throw new Error('カードが見つかりません')
+    }
+
+    // ソクラテス式対話プロンプト
+    const prompt = `
+あなたは優れた教師として、ソクラテス式対話法を使って児童の学習を支援します。
+
+【問題】
+${card.card_title}
+${card.problem_description || ''}
+
+【児童の現在の理解】
+${currentUnderstanding}
+
+【試行回数】
+${attemptCount}回目
+
+【あなたの役割】
+1. 直接答えは教えない
+2. 段階的な質問で思考を促す
+3. 児童が自分で気づけるようにヒントを出す
+4. 試行回数に応じてヒントの具体性を調整する
+
+【対話の方針】
+- 1-2回目: 非常に抽象的な質問
+- 3-4回目: やや具体的なヒント
+- 5回目以降: より直接的なヒントと励まし
+
+JSON形式で以下を返してください：
+{
+  "question": "児童への質問",
+  "hint_level": 1-5の数値（抽象→具体）,
+  "encouragement": "励ましのメッセージ",
+  "is_close_to_answer": true/false
+}
+`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000
+          }
+        })
+      }
+    )
+
+    const data = await response.json()
+    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    const dialogue = JSON.parse(extractJSON(aiText))
+
+    return c.json({
+      success: true,
+      dialogue
+    })
+  } catch (error: any) {
+    console.error('❌ ソクラテス式対話エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 2. 学習スタイル適応型説明
+app.post('/api/ai-teacher/adaptive-explanation', async (c) => {
+  const { env } = c
+  const { studentId, concept, learningStyle, priorKnowledge } = await c.req.json()
+  
+  if (!env.GEMINI_API_KEY) {
+    return c.json({
+      success: false,
+      error: 'Gemini APIキーが設定されていません'
+    }, 500)
+  }
+
+  try {
+    const styleDescriptions = {
+      'visual': '視覚的な図やイラストを多用した説明',
+      'auditory': '音や言葉で説明し、リズムや語呂合わせを活用',
+      'kinesthetic': '体を動かしたり実際に触れたりする体験的な説明',
+      'reading_writing': '文章や箇条書きでの詳細な説明'
+    }
+
+    const prompt = `
+あなたは個別最適化学習の専門家です。児童の学習スタイルに合わせて概念を説明してください。
+
+【概念】
+${concept}
+
+【学習スタイル】
+${learningStyle}: ${styleDescriptions[learningStyle] || ''}
+
+【事前知識】
+${priorKnowledge || 'なし'}
+
+【説明の要件】
+1. 学習スタイルに完全に適応した説明
+2. 既有知識と関連付ける
+3. 具体例を3つ以上含める
+4. 段階的な理解を促す構成
+
+JSON形式で以下を返してください：
+{
+  "explanation": "メインの説明文",
+  "examples": ["具体例1", "具体例2", "具体例3"],
+  "visual_suggestions": ["視覚的な表現方法の提案"],
+  "practice_activities": ["実践的な活動の提案"],
+  "connections": ["他の概念との関連性"]
+}
+`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 2000
+          }
+        })
+      }
+    )
+
+    const data = await response.json()
+    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    const explanation = JSON.parse(extractJSON(aiText))
+
+    return c.json({
+      success: true,
+      explanation
+    })
+  } catch (error: any) {
+    console.error('❌ 適応型説明エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 3. 誤答分析とフィードバック
+app.post('/api/ai-teacher/error-analysis', async (c) => {
+  const { env } = c
+  const { studentId, cardId, studentAnswer, correctAnswer, previousErrors } = await c.req.json()
+  
+  if (!env.GEMINI_API_KEY) {
+    return c.json({
+      success: false,
+      error: 'Gemini APIキーが設定されていません'
+    }, 500)
+  }
+
+  try {
+    const prompt = `
+あなたは教育心理学の専門家として、児童の誤答を分析してください。
+
+【正解】
+${correctAnswer}
+
+【児童の回答】
+${studentAnswer}
+
+【過去の類似エラー】
+${previousErrors || 'なし'}
+
+【分析の観点】
+1. 誤答の種類（概念の誤理解、計算ミス、読み間違いなど）
+2. 思考プロセスの推測
+3. 根本的な原因
+4. 改善のための具体的アドバイス
+
+JSON形式で以下を返してください：
+{
+  "error_type": "エラータイプ",
+  "root_cause": "根本原因の分析",
+  "thinking_process": "児童の思考プロセスの推測",
+  "improvement_advice": "具体的な改善アドバイス",
+  "recommended_practice": "推奨する練習方法",
+  "is_conceptual_error": true/false,
+  "severity": 1-5の数値（軽微→重大）
+}
+`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.5,
+            maxOutputTokens: 1500
+          }
+        })
+      }
+    )
+
+    const data = await response.json()
+    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    const analysis = JSON.parse(extractJSON(aiText))
+
+    // 誤答パターンをデータベースに記録
+    await env.DB.prepare(`
+      INSERT INTO error_patterns (student_id, card_id, error_type, root_cause, severity)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(
+      studentId,
+      cardId,
+      analysis.error_type,
+      analysis.root_cause,
+      analysis.severity
+    ).run().catch(() => {}) // テーブルが存在しない場合はスキップ
+
+    return c.json({
+      success: true,
+      analysis
+    })
+  } catch (error: any) {
+    console.error('❌ 誤答分析エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 4. 学習計画の自動生成
+app.post('/api/ai-teacher/generate-study-plan', async (c) => {
+  const { env } = c
+  const { studentId, goalDescription, availableTime, currentLevel } = await c.req.json()
+  
+  if (!env.GEMINI_API_KEY) {
+    return c.json({
+      success: false,
+      error: 'Gemini APIキーが設定されていません'
+    }, 500)
+  }
+
+  try {
+    // 学生の学習履歴を取得
+    const stats = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT card_id) as total_cards,
+        AVG(CASE WHEN is_correct = 1 THEN 1.0 ELSE 0.0 END) as avg_accuracy
+      FROM spaced_learning_history
+      WHERE student_id = ?
+    `).bind(studentId).first()
+
+    const prompt = `
+あなたは学習コーチとして、個別最適化された学習計画を作成してください。
+
+【目標】
+${goalDescription}
+
+【利用可能時間】
+週${availableTime}時間
+
+【現在のレベル】
+${currentLevel}
+
+【学習履歴】
+- 習得カード数: ${stats?.total_cards || 0}
+- 平均正答率: ${((stats?.avg_accuracy || 0) * 100).toFixed(1)}%
+
+【計画の要件】
+1. 週次の具体的な学習スケジュール
+2. 科学的学習方略の統合（分散学習、検索練習など）
+3. 達成可能なマイルストーン
+4. 定期的な振り返りポイント
+
+JSON形式で以下を返してください：
+{
+  "weekly_schedule": [
+    {
+      "day": "月曜日",
+      "activities": ["活動1", "活動2"],
+      "duration": 60,
+      "strategy": "使用する学習方略"
+    }
+  ],
+  "milestones": [
+    {
+      "week": 1,
+      "goal": "目標",
+      "success_criteria": "成功基準"
+    }
+  ],
+  "daily_routine": "日々の学習ルーティンの提案",
+  "reflection_points": ["週次の振り返りポイント"],
+  "motivation_tips": ["モチベーション維持のコツ"]
+}
+`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 3000
+          }
+        })
+      }
+    )
+
+    const data = await response.json()
+    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    const studyPlan = JSON.parse(extractJSON(aiText))
+
+    return c.json({
+      success: true,
+      studyPlan
+    })
+  } catch (error: any) {
+    console.error('❌ 学習計画生成エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 5. 励ましとモチベーション向上
+app.post('/api/ai-teacher/encouragement', async (c) => {
+  const { env } = c
+  const { studentId, context, emotion } = await c.req.json()
+  
+  if (!env.GEMINI_API_KEY) {
+    return c.json({
+      success: false,
+      error: 'Gemini APIキーが設定されていません'
+    }, 500)
+  }
+
+  try {
+    const prompt = `
+あなたは児童の心に寄り添う優しいAI先生です。
+
+【状況】
+${context}
+
+【児童の気持ち】
+${emotion}
+
+【あなたの役割】
+1. 共感を示す
+2. 具体的に褒める
+3. 成長を認める
+4. 次への意欲を高める
+
+【メッセージの要件】
+- 温かく励まし的なトーン
+- 具体的な成果を認める
+- 次の一歩を示唆する
+- 150文字以内で簡潔に
+
+JSON形式で以下を返してください：
+{
+  "message": "励ましのメッセージ",
+  "emoji": "適切な絵文字",
+  "actionable_advice": "次にできる具体的なアクション"
+}
+`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 500
+          }
+        })
+      }
+    )
+
+    const data = await response.json()
+    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    const encouragement = JSON.parse(extractJSON(aiText))
+
+    return c.json({
+      success: true,
+      encouragement
+    })
+  } catch (error: any) {
+    console.error('❌ 励ましメッセージ生成エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app
