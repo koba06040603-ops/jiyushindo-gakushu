@@ -16939,4 +16939,151 @@ app.get('/api/videos/history/student/:studentId', async (c) => {
   }
 })
 
+// =============================================================================
+// Phase 12: レポートテンプレート管理API
+// =============================================================================
+
+// テンプレート一覧取得
+app.get('/api/report-templates', async (c) => {
+  const { env } = c
+  const teacherId = c.req.query('teacher_id')
+  
+  try {
+    let query = `
+      SELECT 
+        rt.*,
+        t.name as created_by_name
+      FROM report_templates rt
+      LEFT JOIN teachers t ON rt.created_by = t.teacher_id
+      WHERE rt.is_active = TRUE
+    `
+    
+    const bindings: any[] = []
+    
+    if (teacherId) {
+      query += ` AND (rt.is_public = TRUE OR rt.created_by = ?)`
+      bindings.push(parseInt(teacherId))
+    } else {
+      query += ` AND rt.is_public = TRUE`
+    }
+    
+    query += ` ORDER BY rt.created_at DESC`
+    
+    const templates = await env.DB.prepare(query).bind(...bindings).all()
+    
+    return c.json({
+      success: true,
+      templates: templates.results
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// テンプレート詳細取得
+app.get('/api/report-templates/:templateId', async (c) => {
+  const { env } = c
+  const templateId = parseInt(c.req.param('templateId'))
+  
+  try {
+    const template = await env.DB.prepare(`
+      SELECT 
+        rt.*,
+        t.name as created_by_name
+      FROM report_templates rt
+      LEFT JOIN teachers t ON rt.created_by = t.teacher_id
+      WHERE rt.template_id = ?
+    `).bind(templateId).first()
+    
+    if (!template) {
+      return c.json({ success: false, error: 'テンプレートが見つかりません' }, 404)
+    }
+    
+    return c.json({
+      success: true,
+      template
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// テンプレート作成
+app.post('/api/report-templates', async (c) => {
+  const { env } = c
+  const { template_name, template_description, template_structure, report_type, created_by, is_public } = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO report_templates (
+        template_name, template_description, template_structure, 
+        report_type, created_by, is_public
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      template_name,
+      template_description || null,
+      JSON.stringify(template_structure),
+      report_type || 'custom',
+      created_by,
+      is_public || false
+    ).run()
+    
+    return c.json({
+      success: true,
+      template_id: result.meta.last_row_id
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// テンプレート更新
+app.put('/api/report-templates/:templateId', async (c) => {
+  const { env } = c
+  const templateId = parseInt(c.req.param('templateId'))
+  const { template_name, template_description, template_structure, is_public } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE report_templates
+      SET template_name = ?,
+          template_description = ?,
+          template_structure = ?,
+          is_public = ?,
+          updated_at = datetime('now')
+      WHERE template_id = ?
+    `).bind(
+      template_name,
+      template_description || null,
+      JSON.stringify(template_structure),
+      is_public,
+      templateId
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// テンプレート削除
+app.delete('/api/report-templates/:templateId', async (c) => {
+  const { env } = c
+  const templateId = parseInt(c.req.param('templateId'))
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE report_templates
+      SET is_active = FALSE,
+          updated_at = datetime('now')
+      WHERE template_id = ?
+    `).bind(templateId).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app

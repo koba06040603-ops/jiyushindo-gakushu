@@ -23972,3 +23972,1018 @@ console.log('  showLoading:', typeof window.showLoading)
 console.log('  hideLoading:', typeof window.hideLoading)
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
+// =============================================================================
+// Phase 11: 動画学習プレイヤーUI
+// =============================================================================
+
+// 動画プレイヤーグローバル状態
+const videoPlayerState = {
+  currentWatchId: null,
+  startTime: null,
+  pauseCount: 0,
+  rewindCount: 0,
+  lastPosition: 0
+}
+
+// 動画プレイヤーを表示
+async function showVideoPlayer(cardId, cardTitle) {
+  try {
+    showLoading('動画を読み込み中...')
+    
+    // 動画コンテンツ取得
+    const response = await axios.get(`/api/videos/card/${cardId}`)
+    hideLoading()
+    
+    if (!response.data.success || !response.data.videos || response.data.videos.length === 0) {
+      alert('この学習カードには動画がありません')
+      return
+    }
+    
+    const videos = response.data.videos
+    const video = videos[0] // 最初の動画を表示
+    
+    // モーダル作成
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg">
+          <div class="flex justify-between items-start">
+            <div class="flex-1">
+              <h3 class="text-2xl font-bold mb-2">
+                <i class="fas fa-video mr-2"></i>
+                ${video.video_title || cardTitle}
+              </h3>
+              <p class="text-blue-100 text-sm">
+                <i class="fas fa-book mr-1"></i>
+                ${cardTitle}
+              </p>
+            </div>
+            <button onclick="closeVideoPlayer()" class="text-white hover:text-gray-200 text-2xl font-bold">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- 動画プレイヤー -->
+        <div class="p-6">
+          <div class="aspect-video bg-black rounded-lg overflow-hidden mb-4">
+            ${renderVideoEmbed(video)}
+          </div>
+          
+          <!-- 視聴進捗バー -->
+          <div class="mb-4">
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-sm font-semibold text-gray-700">
+                <i class="fas fa-chart-line mr-1 text-blue-600"></i>
+                視聴進捗
+              </span>
+              <span id="video-progress-text" class="text-sm font-bold text-blue-600">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-3">
+              <div id="video-progress-bar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+          
+          <!-- 動画情報 -->
+          ${video.description ? `
+            <div class="bg-blue-50 p-4 rounded-lg mb-4">
+              <h4 class="font-bold text-gray-800 mb-2 flex items-center">
+                <i class="fas fa-info-circle mr-2 text-blue-600"></i>
+                動画について
+              </h4>
+              <p class="text-sm text-gray-700">${video.description}</p>
+            </div>
+          ` : ''}
+          
+          <!-- 視聴統計 -->
+          <div class="grid grid-cols-3 gap-4 mb-4">
+            <div class="bg-green-50 p-3 rounded-lg text-center">
+              <div class="text-2xl font-bold text-green-600" id="video-duration">
+                ${video.video_duration_seconds ? formatDuration(video.video_duration_seconds) : '--:--'}
+              </div>
+              <div class="text-xs text-gray-600 mt-1">動画の長さ</div>
+            </div>
+            <div class="bg-yellow-50 p-3 rounded-lg text-center">
+              <div class="text-2xl font-bold text-yellow-600" id="pause-count">0</div>
+              <div class="text-xs text-gray-600 mt-1">一時停止回数</div>
+            </div>
+            <div class="bg-red-50 p-3 rounded-lg text-center">
+              <div class="text-2xl font-bold text-red-600" id="rewind-count">0</div>
+              <div class="text-xs text-gray-600 mt-1">巻き戻し回数</div>
+            </div>
+          </div>
+          
+          <!-- 操作ボタン -->
+          <div class="flex gap-3">
+            <button onclick="markVideoComplete()" class="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-3 px-6 rounded-lg font-bold hover:from-green-600 hover:to-green-700 transition-all">
+              <i class="fas fa-check-circle mr-2"></i>
+              視聴完了
+            </button>
+            <button onclick="closeVideoPlayer()" class="bg-gray-500 text-white py-3 px-6 rounded-lg font-bold hover:bg-gray-600 transition-all">
+              <i class="fas fa-times mr-2"></i>
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+    
+    // 視聴開始記録
+    if (state.student) {
+      try {
+        const sessionId = `video_${Date.now()}_${Math.random().toString(36).substring(7)}`
+        const watchResponse = await axios.post(`/api/videos/${video.video_id}/watch/start`, {
+          student_id: state.student.student_id,
+          session_id: sessionId
+        })
+        
+        if (watchResponse.data.success) {
+          videoPlayerState.currentWatchId = watchResponse.data.watch_id
+          videoPlayerState.startTime = Date.now()
+          videoPlayerState.pauseCount = 0
+          videoPlayerState.rewindCount = 0
+          videoPlayerState.lastPosition = 0
+          
+          console.log('✅ 動画視聴開始記録:', watchResponse.data)
+        }
+      } catch (error) {
+        console.error('❌ 視聴開始記録エラー:', error)
+      }
+    }
+    
+    // YouTube iframeの場合、進捗追跡を設定
+    initVideoProgressTracking(video)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 動画プレイヤーエラー:', error)
+    alert('動画の読み込みに失敗しました')
+  }
+}
+
+// 動画埋め込みHTML生成
+function renderVideoEmbed(video) {
+  const platform = video.video_platform.toLowerCase()
+  
+  if (platform === 'youtube') {
+    // YouTube埋め込み（enablejsapi=1で進捗追跡可能）
+    const videoId = extractYouTubeId(video.video_url)
+    return `
+      <iframe 
+        id="video-player-iframe"
+        width="100%" 
+        height="100%" 
+        src="https://www.youtube.com/embed/${videoId}?enablejsapi=1&rel=0" 
+        frameborder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+        allowfullscreen
+      ></iframe>
+    `
+  } else if (platform === 'vimeo') {
+    // Vimeo埋め込み
+    const videoId = extractVimeoId(video.video_url)
+    return `
+      <iframe 
+        id="video-player-iframe"
+        src="https://player.vimeo.com/video/${videoId}" 
+        width="100%" 
+        height="100%" 
+        frameborder="0" 
+        allow="autoplay; fullscreen; picture-in-picture" 
+        allowfullscreen
+      ></iframe>
+    `
+  } else {
+    // HTML5 video
+    return `
+      <video 
+        id="video-player-native"
+        controls 
+        width="100%" 
+        height="100%"
+        src="${video.video_url}"
+      >
+        お使いのブラウザは動画再生に対応していません。
+      </video>
+    `
+  }
+}
+
+// YouTube Video ID抽出
+function extractYouTubeId(url) {
+  const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)
+  return match ? match[1] : ''
+}
+
+// Vimeo Video ID抽出
+function extractVimeoId(url) {
+  const match = url.match(/vimeo\.com\/(\d+)/)
+  return match ? match[1] : ''
+}
+
+// 動画進捗追跡初期化
+function initVideoProgressTracking(video) {
+  const iframe = document.getElementById('video-player-iframe')
+  const nativeVideo = document.getElementById('video-player-native')
+  
+  if (nativeVideo) {
+    // HTML5 video進捗追跡
+    nativeVideo.addEventListener('timeupdate', () => {
+      const progress = (nativeVideo.currentTime / nativeVideo.duration) * 100
+      updateVideoProgress(progress)
+      
+      // 巻き戻し検出
+      if (nativeVideo.currentTime < videoPlayerState.lastPosition - 5) {
+        videoPlayerState.rewindCount++
+        document.getElementById('rewind-count').textContent = videoPlayerState.rewindCount
+      }
+      videoPlayerState.lastPosition = nativeVideo.currentTime
+    })
+    
+    nativeVideo.addEventListener('pause', () => {
+      videoPlayerState.pauseCount++
+      document.getElementById('pause-count').textContent = videoPlayerState.pauseCount
+    })
+  }
+  
+  // 定期的に進捗を保存（30秒ごと）
+  setInterval(() => {
+    if (videoPlayerState.currentWatchId) {
+      saveVideoProgress()
+    }
+  }, 30000)
+}
+
+// 動画進捗更新
+function updateVideoProgress(percentage) {
+  const progressBar = document.getElementById('video-progress-bar')
+  const progressText = document.getElementById('video-progress-text')
+  
+  if (progressBar && progressText) {
+    const roundedProgress = Math.min(100, Math.max(0, Math.round(percentage)))
+    progressBar.style.width = `${roundedProgress}%`
+    progressText.textContent = `${roundedProgress}%`
+  }
+}
+
+// 動画進捗保存
+async function saveVideoProgress() {
+  if (!videoPlayerState.currentWatchId) return
+  
+  try {
+    const progressBar = document.getElementById('video-progress-bar')
+    const completionPercentage = progressBar ? 
+      parseInt(progressBar.style.width) : 0
+    
+    const watchDuration = Math.floor((Date.now() - videoPlayerState.startTime) / 1000)
+    
+    await axios.put(`/api/videos/watch/${videoPlayerState.currentWatchId}`, {
+      watch_duration_seconds: watchDuration,
+      completion_percentage: completionPercentage,
+      playback_speed: 1.0,
+      paused_count: videoPlayerState.pauseCount,
+      rewind_count: videoPlayerState.rewindCount
+    })
+    
+    console.log('✅ 動画進捗保存:', {
+      watchDuration,
+      completionPercentage,
+      pauseCount: videoPlayerState.pauseCount,
+      rewindCount: videoPlayerState.rewindCount
+    })
+  } catch (error) {
+    console.error('❌ 進捗保存エラー:', error)
+  }
+}
+
+// 動画視聴完了マーク
+async function markVideoComplete() {
+  updateVideoProgress(100)
+  await saveVideoProgress()
+  
+  alert('✅ 動画視聴を完了としてマークしました！')
+  closeVideoPlayer()
+}
+
+// 動画プレイヤーを閉じる
+function closeVideoPlayer() {
+  // 最終進捗保存
+  if (videoPlayerState.currentWatchId) {
+    saveVideoProgress()
+  }
+  
+  // モーダル削除
+  const modals = document.querySelectorAll('.fixed.inset-0.bg-black')
+  modals.forEach(modal => modal.remove())
+  
+  // 状態リセット
+  videoPlayerState.currentWatchId = null
+  videoPlayerState.startTime = null
+  videoPlayerState.pauseCount = 0
+  videoPlayerState.rewindCount = 0
+  videoPlayerState.lastPosition = 0
+}
+
+// 時間フォーマット（秒 → MM:SS）
+function formatDuration(seconds) {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// 学習カード視聴履歴表示
+async function showVideoHistory(studentId) {
+  try {
+    showLoading('視聴履歴を読み込み中...')
+    
+    const response = await axios.get(`/api/videos/history/student/${studentId}`)
+    hideLoading()
+    
+    if (!response.data.success) {
+      alert('視聴履歴の取得に失敗しました')
+      return
+    }
+    
+    const history = response.data.history
+    
+    if (history.length === 0) {
+      alert('まだ動画を視聴していません')
+      return
+    }
+    
+    // モーダル作成
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg">
+          <div class="flex justify-between items-start">
+            <h3 class="text-2xl font-bold">
+              <i class="fas fa-history mr-2"></i>
+              動画視聴履歴
+            </h3>
+            <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200 text-2xl font-bold">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- 視聴履歴リスト -->
+        <div class="p-6">
+          <div class="space-y-4">
+            ${history.map(record => `
+              <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 hover:border-blue-300 transition-all">
+                <div class="flex justify-between items-start mb-2">
+                  <h4 class="font-bold text-gray-800">
+                    <i class="fas fa-video mr-2 text-blue-600"></i>
+                    ${record.video_title}
+                  </h4>
+                  <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                    ${new Date(record.watch_start_time).toLocaleDateString('ja-JP')}
+                  </span>
+                </div>
+                
+                <!-- 進捗バー -->
+                <div class="mb-3">
+                  <div class="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>視聴進捗</span>
+                    <span class="font-bold">${record.completion_percentage || 0}%</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full" style="width: ${record.completion_percentage || 0}%"></div>
+                  </div>
+                </div>
+                
+                <!-- 統計情報 -->
+                <div class="grid grid-cols-3 gap-2">
+                  <div class="text-center">
+                    <div class="text-lg font-bold text-gray-800">${formatDuration(record.watch_duration_seconds || 0)}</div>
+                    <div class="text-xs text-gray-600">視聴時間</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="text-lg font-bold text-yellow-600">${record.paused_count || 0}</div>
+                    <div class="text-xs text-gray-600">一時停止</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="text-lg font-bold text-red-600">${record.rewind_count || 0}</div>
+                    <div class="text-xs text-gray-600">巻き戻し</div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="mt-6 text-center">
+            <button onclick="this.closest('.fixed').remove()" class="bg-gray-500 text-white py-3 px-8 rounded-lg font-bold hover:bg-gray-600 transition-all">
+              <i class="fas fa-times mr-2"></i>
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 視聴履歴取得エラー:', error)
+    alert('視聴履歴の読み込みに失敗しました')
+  }
+}
+
+// グローバルスコープに登録
+window.showVideoPlayer = showVideoPlayer
+window.closeVideoPlayer = closeVideoPlayer
+window.markVideoComplete = markVideoComplete
+window.showVideoHistory = showVideoHistory
+
+console.log('✅ Phase 11: 動画学習プレイヤーUI 読み込み完了')
+
+// =============================================================================
+// Phase 12: レポートテンプレート管理UI
+// =============================================================================
+
+// テンプレートエディタ状態
+const templateEditorState = {
+  currentTemplate: null,
+  selectedComponents: [],
+  isDragging: false
+}
+
+// 利用可能なコンポーネント
+const availableComponents = [
+  { id: 'summary', name: '学習サマリー', icon: 'fa-chart-pie', description: '学習時間、完了カード数、習熟度の概要' },
+  { id: 'time-chart', name: '学習時間推移', icon: 'fa-chart-line', description: '時系列での学習時間グラフ' },
+  { id: 'mastery-radar', name: '習熟度レーダー', icon: 'fa-spider', description: '教科別習熟度のレーダーチャート' },
+  { id: 'subject-performance', name: '教科別パフォーマンス', icon: 'fa-chart-bar', description: '教科ごとの成績棒グラフ' },
+  { id: 'learning-style', name: '学習スタイル分析', icon: 'fa-brain', description: 'VARK学習スタイル診断' },
+  { id: 'ai-interactions', name: 'AI教師やりとり', icon: 'fa-robot', description: 'AI教師との対話統計' },
+  { id: 'achievements', name: '達成バッジ', icon: 'fa-trophy', description: '獲得したバッジ一覧' },
+  { id: 'comparison', name: 'クラス比較', icon: 'fa-users', description: 'クラス平均との比較分析' },
+  { id: 'prediction', name: '学習予測', icon: 'fa-crystal-ball', description: '機械学習による進捗予測' },
+  { id: 'parent-message', name: '保護者向けメッセージ', icon: 'fa-envelope', description: '保護者へのメッセージ' }
+]
+
+// テンプレートエディタを表示
+async function showTemplateEditor(templateId = null) {
+  try {
+    showLoading('テンプレートエディタを開いています...')
+    
+    // 既存テンプレート読み込み
+    if (templateId) {
+      const response = await axios.get(`/api/report-templates/${templateId}`)
+      if (response.data.success) {
+        templateEditorState.currentTemplate = response.data.template
+        templateEditorState.selectedComponents = JSON.parse(response.data.template.template_structure || '[]')
+      }
+    } else {
+      templateEditorState.currentTemplate = null
+      templateEditorState.selectedComponents = []
+    }
+    
+    hideLoading()
+    
+    // モーダル作成
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.id = 'template-editor-modal'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
+          <div class="flex justify-between items-start">
+            <div>
+              <h3 class="text-2xl font-bold mb-2">
+                <i class="fas fa-palette mr-2"></i>
+                レポートテンプレートエディタ
+              </h3>
+              <p class="text-purple-100 text-sm">ドラッグ&ドロップでカスタムレポートを作成</p>
+            </div>
+            <button onclick="closeTemplateEditor()" class="text-white hover:text-gray-200 text-2xl font-bold">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- エディタコンテンツ -->
+        <div class="flex-1 overflow-hidden flex">
+          <!-- 左サイドバー：利用可能なコンポーネント -->
+          <div class="w-80 bg-gray-50 border-r border-gray-200 overflow-y-auto p-4">
+            <h4 class="font-bold text-gray-800 mb-4 flex items-center">
+              <i class="fas fa-cubes mr-2 text-purple-600"></i>
+              利用可能なコンポーネント
+            </h4>
+            <div class="space-y-2" id="available-components-list">
+              ${availableComponents.map(comp => `
+                <div 
+                  class="bg-white p-3 rounded-lg border-2 border-gray-300 cursor-move hover:border-purple-400 hover:shadow-md transition-all"
+                  draggable="true"
+                  ondragstart="handleComponentDragStart(event, '${comp.id}')"
+                  ondragend="handleComponentDragEnd(event)"
+                >
+                  <div class="flex items-start gap-3">
+                    <div class="text-purple-600 text-2xl">
+                      <i class="fas ${comp.icon}"></i>
+                    </div>
+                    <div class="flex-1">
+                      <div class="font-bold text-sm text-gray-800">${comp.name}</div>
+                      <div class="text-xs text-gray-600 mt-1">${comp.description}</div>
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <!-- 中央：テンプレートキャンバス -->
+          <div class="flex-1 overflow-y-auto p-6">
+            <div class="mb-4">
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-tag mr-1"></i>
+                テンプレート名
+              </label>
+              <input 
+                type="text" 
+                id="template-name-input"
+                value="${templateEditorState.currentTemplate?.template_name || ''}"
+                placeholder="例：保護者向け詳細レポート"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+            
+            <div class="mb-4">
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-align-left mr-1"></i>
+                説明
+              </label>
+              <textarea 
+                id="template-description-input"
+                placeholder="このテンプレートの用途や特徴を入力..."
+                rows="2"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >${templateEditorState.currentTemplate?.template_description || ''}</textarea>
+            </div>
+            
+            <div class="mb-2 flex items-center gap-2">
+              <label class="text-sm font-bold text-gray-700">
+                <i class="fas fa-layer-group mr-1"></i>
+                レポート構成
+              </label>
+              <span class="text-xs text-gray-500">(ドラッグしてコンポーネントを追加)</span>
+            </div>
+            
+            <!-- ドロップゾーン -->
+            <div 
+              id="template-canvas"
+              class="min-h-[500px] bg-white border-2 border-dashed border-gray-300 rounded-lg p-4"
+              ondragover="handleCanvasDragOver(event)"
+              ondrop="handleCanvasDrop(event)"
+            >
+              ${templateEditorState.selectedComponents.length === 0 ? `
+                <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                  <i class="fas fa-mouse-pointer text-6xl mb-4"></i>
+                  <p class="text-lg font-semibold">ここにコンポーネントをドラッグ</p>
+                  <p class="text-sm">左側からコンポーネントをドラッグ&ドロップしてください</p>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+          
+          <!-- 右サイドバー：プレビュー -->
+          <div class="w-80 bg-gray-50 border-l border-gray-200 overflow-y-auto p-4">
+            <h4 class="font-bold text-gray-800 mb-4 flex items-center">
+              <i class="fas fa-eye mr-2 text-blue-600"></i>
+              プレビュー
+            </h4>
+            <div id="template-preview" class="bg-white rounded-lg border border-gray-200 p-4 text-sm">
+              <p class="text-gray-500 text-center">コンポーネントを追加するとプレビューが表示されます</p>
+            </div>
+            
+            <div class="mt-4 space-y-2">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  id="template-public-checkbox"
+                  ${templateEditorState.currentTemplate?.is_public ? 'checked' : ''}
+                  class="w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
+                />
+                <span class="text-sm text-gray-700">
+                  <i class="fas fa-globe mr-1"></i>
+                  公開テンプレート（他の教師も使用可能）
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        <!-- フッター：アクションボタン -->
+        <div class="bg-gray-50 border-t border-gray-200 p-4 flex justify-between items-center">
+          <div class="flex gap-2">
+            <button onclick="clearTemplateCanvas()" class="bg-red-500 text-white py-2 px-4 rounded-lg font-bold hover:bg-red-600 transition-all">
+              <i class="fas fa-trash mr-2"></i>
+              クリア
+            </button>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="previewTemplate()" class="bg-blue-500 text-white py-2 px-4 rounded-lg font-bold hover:bg-blue-600 transition-all">
+              <i class="fas fa-eye mr-2"></i>
+              プレビュー
+            </button>
+            <button onclick="saveTemplate()" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2 px-6 rounded-lg font-bold hover:from-purple-600 hover:to-pink-600 transition-all">
+              <i class="fas fa-save mr-2"></i>
+              保存
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+    
+    // 既存コンポーネントをキャンバスに表示
+    if (templateEditorState.selectedComponents.length > 0) {
+      renderTemplateCanvas()
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ テンプレートエディタエラー:', error)
+    alert('テンプレートエディタの起動に失敗しました')
+  }
+}
+
+// コンポーネントドラッグ開始
+function handleComponentDragStart(event, componentId) {
+  event.dataTransfer.effectAllowed = 'copy'
+  event.dataTransfer.setData('text/plain', componentId)
+  templateEditorState.isDragging = true
+}
+
+// コンポーネントドラッグ終了
+function handleComponentDragEnd(event) {
+  templateEditorState.isDragging = false
+}
+
+// キャンバスドラッグオーバー
+function handleCanvasDragOver(event) {
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'copy'
+}
+
+// キャンバスドロップ
+function handleCanvasDrop(event) {
+  event.preventDefault()
+  
+  const componentId = event.dataTransfer.getData('text/plain')
+  const component = availableComponents.find(c => c.id === componentId)
+  
+  if (component) {
+    // コンポーネントを追加
+    templateEditorState.selectedComponents.push({
+      id: component.id,
+      name: component.name,
+      order: templateEditorState.selectedComponents.length
+    })
+    
+    renderTemplateCanvas()
+    updateTemplatePreview()
+  }
+}
+
+// テンプレートキャンバス描画
+function renderTemplateCanvas() {
+  const canvas = document.getElementById('template-canvas')
+  if (!canvas) return
+  
+  if (templateEditorState.selectedComponents.length === 0) {
+    canvas.innerHTML = `
+      <div class="flex flex-col items-center justify-center h-full text-gray-400">
+        <i class="fas fa-mouse-pointer text-6xl mb-4"></i>
+        <p class="text-lg font-semibold">ここにコンポーネントをドラッグ</p>
+        <p class="text-sm">左側からコンポーネントをドラッグ&ドロップしてください</p>
+      </div>
+    `
+    return
+  }
+  
+  canvas.innerHTML = `
+    <div class="space-y-3">
+      ${templateEditorState.selectedComponents.map((comp, index) => {
+        const component = availableComponents.find(c => c.id === comp.id)
+        return `
+          <div class="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-lg border border-purple-200 flex items-center gap-3">
+            <div class="text-2xl text-purple-600">
+              <i class="fas ${component.icon}"></i>
+            </div>
+            <div class="flex-1">
+              <div class="font-bold text-gray-800">${component.name}</div>
+              <div class="text-xs text-gray-600">${component.description}</div>
+            </div>
+            <div class="flex gap-1">
+              ${index > 0 ? `<button onclick="moveComponentUp(${index})" class="text-gray-500 hover:text-blue-600 p-2"><i class="fas fa-arrow-up"></i></button>` : ''}
+              ${index < templateEditorState.selectedComponents.length - 1 ? `<button onclick="moveComponentDown(${index})" class="text-gray-500 hover:text-blue-600 p-2"><i class="fas fa-arrow-down"></i></button>` : ''}
+              <button onclick="removeComponent(${index})" class="text-gray-500 hover:text-red-600 p-2"><i class="fas fa-times"></i></button>
+            </div>
+          </div>
+        `
+      }).join('')}
+    </div>
+  `
+}
+
+// コンポーネントを上に移動
+function moveComponentUp(index) {
+  if (index > 0) {
+    const temp = templateEditorState.selectedComponents[index]
+    templateEditorState.selectedComponents[index] = templateEditorState.selectedComponents[index - 1]
+    templateEditorState.selectedComponents[index - 1] = temp
+    renderTemplateCanvas()
+    updateTemplatePreview()
+  }
+}
+
+// コンポーネントを下に移動
+function moveComponentDown(index) {
+  if (index < templateEditorState.selectedComponents.length - 1) {
+    const temp = templateEditorState.selectedComponents[index]
+    templateEditorState.selectedComponents[index] = templateEditorState.selectedComponents[index + 1]
+    templateEditorState.selectedComponents[index + 1] = temp
+    renderTemplateCanvas()
+    updateTemplatePreview()
+  }
+}
+
+// コンポーネント削除
+function removeComponent(index) {
+  templateEditorState.selectedComponents.splice(index, 1)
+  renderTemplateCanvas()
+  updateTemplatePreview()
+}
+
+// キャンバスクリア
+function clearTemplateCanvas() {
+  if (confirm('すべてのコンポーネントをクリアしますか？')) {
+    templateEditorState.selectedComponents = []
+    renderTemplateCanvas()
+    updateTemplatePreview()
+  }
+}
+
+// プレビュー更新
+function updateTemplatePreview() {
+  const preview = document.getElementById('template-preview')
+  if (!preview) return
+  
+  if (templateEditorState.selectedComponents.length === 0) {
+    preview.innerHTML = '<p class="text-gray-500 text-center">コンポーネントを追加するとプレビューが表示されます</p>'
+    return
+  }
+  
+  preview.innerHTML = `
+    <div class="space-y-2">
+      <div class="font-bold text-gray-800 mb-3">レポート構成 (${templateEditorState.selectedComponents.length}項目)</div>
+      ${templateEditorState.selectedComponents.map((comp, index) => {
+        const component = availableComponents.find(c => c.id === comp.id)
+        return `
+          <div class="flex items-center gap-2 text-xs">
+            <span class="bg-purple-600 text-white rounded-full w-5 h-5 flex items-center justify-center">${index + 1}</span>
+            <span class="text-gray-700">${component.name}</span>
+          </div>
+        `
+      }).join('')}
+    </div>
+  `
+}
+
+// テンプレートプレビュー
+async function previewTemplate() {
+  alert('📊 プレビュー機能は開発中です。実際のレポート生成でプレビューできます。')
+}
+
+// テンプレート保存
+async function saveTemplate() {
+  try {
+    const nameInput = document.getElementById('template-name-input')
+    const descInput = document.getElementById('template-description-input')
+    const publicCheckbox = document.getElementById('template-public-checkbox')
+    
+    const templateName = nameInput.value.trim()
+    const templateDescription = descInput.value.trim()
+    const isPublic = publicCheckbox.checked
+    
+    if (!templateName) {
+      alert('テンプレート名を入力してください')
+      return
+    }
+    
+    if (templateEditorState.selectedComponents.length === 0) {
+      alert('少なくとも1つのコンポーネントを追加してください')
+      return
+    }
+    
+    showLoading('テンプレートを保存中...')
+    
+    const templateData = {
+      template_name: templateName,
+      template_description: templateDescription,
+      template_structure: templateEditorState.selectedComponents,
+      report_type: 'custom',
+      created_by: state.teacher?.teacher_id || 1,
+      is_public: isPublic
+    }
+    
+    let response
+    if (templateEditorState.currentTemplate) {
+      // 更新
+      response = await axios.put(`/api/report-templates/${templateEditorState.currentTemplate.template_id}`, templateData)
+    } else {
+      // 新規作成
+      response = await axios.post('/api/report-templates', templateData)
+    }
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      alert('✅ テンプレートを保存しました！')
+      closeTemplateEditor()
+    } else {
+      alert('❌ 保存に失敗しました: ' + response.data.error)
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ テンプレート保存エラー:', error)
+    alert('テンプレートの保存に失敗しました')
+  }
+}
+
+// エディタを閉じる
+function closeTemplateEditor() {
+  const modal = document.getElementById('template-editor-modal')
+  if (modal) {
+    modal.remove()
+  }
+  
+  templateEditorState.currentTemplate = null
+  templateEditorState.selectedComponents = []
+  templateEditorState.isDragging = false
+}
+
+// テンプレート一覧を表示
+async function showTemplateList() {
+  try {
+    showLoading('テンプレート一覧を読み込み中...')
+    
+    const teacherId = state.teacher?.teacher_id
+    const url = teacherId ? `/api/report-templates?teacher_id=${teacherId}` : '/api/report-templates'
+    const response = await axios.get(url)
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      alert('テンプレート一覧の取得に失敗しました')
+      return
+    }
+    
+    const templates = response.data.templates
+    
+    // モーダル作成
+    const modal = document.createElement('div')
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-lg">
+          <div class="flex justify-between items-start">
+            <div>
+              <h3 class="text-2xl font-bold mb-2">
+                <i class="fas fa-list mr-2"></i>
+                レポートテンプレート一覧
+              </h3>
+              <p class="text-purple-100 text-sm">${templates.length}件のテンプレート</p>
+            </div>
+            <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-200 text-2xl font-bold">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- テンプレート一覧 -->
+        <div class="p-6">
+          <div class="mb-4">
+            <button onclick="showTemplateEditor()" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 px-6 rounded-lg font-bold hover:from-purple-600 hover:to-pink-600 transition-all w-full">
+              <i class="fas fa-plus mr-2"></i>
+              新しいテンプレートを作成
+            </button>
+          </div>
+          
+          ${templates.length === 0 ? `
+            <div class="text-center py-12 text-gray-500">
+              <i class="fas fa-inbox text-6xl mb-4"></i>
+              <p class="text-lg font-semibold">テンプレートがありません</p>
+              <p class="text-sm">新しいテンプレートを作成してください</p>
+            </div>
+          ` : `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${templates.map(template => `
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 p-5 rounded-lg border border-purple-200 hover:shadow-lg transition-all">
+                  <div class="flex justify-between items-start mb-3">
+                    <h4 class="font-bold text-gray-800 text-lg flex-1">
+                      <i class="fas fa-file-alt mr-2 text-purple-600"></i>
+                      ${template.template_name}
+                    </h4>
+                    ${template.is_public ? '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">公開</span>' : '<span class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">非公開</span>'}
+                  </div>
+                  
+                  <p class="text-sm text-gray-600 mb-4">${template.template_description || '説明なし'}</p>
+                  
+                  <div class="flex items-center justify-between text-xs text-gray-500 mb-4">
+                    <span><i class="fas fa-user mr-1"></i>${template.created_by_name || '不明'}</span>
+                    <span><i class="fas fa-calendar mr-1"></i>${new Date(template.created_at).toLocaleDateString('ja-JP')}</span>
+                  </div>
+                  
+                  <div class="flex gap-2">
+                    <button onclick="showTemplateEditor(${template.template_id})" class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg font-bold hover:bg-blue-600 transition-all">
+                      <i class="fas fa-edit mr-1"></i>
+                      編集
+                    </button>
+                    <button onclick="deleteTemplate(${template.template_id})" class="bg-red-500 text-white py-2 px-4 rounded-lg font-bold hover:bg-red-600 transition-all">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+          
+          <div class="mt-6 text-center">
+            <button onclick="this.closest('.fixed').remove()" class="bg-gray-500 text-white py-3 px-8 rounded-lg font-bold hover:bg-gray-600 transition-all">
+              <i class="fas fa-times mr-2"></i>
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(modal)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ テンプレート一覧取得エラー:', error)
+    alert('テンプレート一覧の読み込みに失敗しました')
+  }
+}
+
+// テンプレート削除
+async function deleteTemplate(templateId) {
+  if (!confirm('このテンプレートを削除しますか？')) return
+  
+  try {
+    showLoading('削除中...')
+    
+    const response = await axios.delete(`/api/report-templates/${templateId}`)
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      alert('✅ テンプレートを削除しました')
+      // モーダルを閉じて再表示
+      document.querySelector('.fixed.inset-0.bg-black').remove()
+      showTemplateList()
+    } else {
+      alert('❌ 削除に失敗しました')
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ テンプレート削除エラー:', error)
+    alert('テンプレートの削除に失敗しました')
+  }
+}
+
+// グローバルスコープに登録
+window.showTemplateEditor = showTemplateEditor
+window.closeTemplateEditor = closeTemplateEditor
+window.showTemplateList = showTemplateList
+window.deleteTemplate = deleteTemplate
+window.saveTemplate = saveTemplate
+window.previewTemplate = previewTemplate
+window.clearTemplateCanvas = clearTemplateCanvas
+window.handleComponentDragStart = handleComponentDragStart
+window.handleComponentDragEnd = handleComponentDragEnd
+window.handleCanvasDragOver = handleCanvasDragOver
+window.handleCanvasDrop = handleCanvasDrop
+window.moveComponentUp = moveComponentUp
+window.moveComponentDown = moveComponentDown
+window.removeComponent = removeComponent
+
+console.log('✅ Phase 12: レポートテンプレート管理UI 読み込み完了')
+
+
