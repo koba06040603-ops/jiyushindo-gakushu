@@ -17517,4 +17517,84 @@ app.delete('/api/media/:fileName', async (c) => {
   }
 })
 
+// メディアライブラリ：アップロード済みファイル一覧取得
+app.get('/api/media-library', async (c) => {
+  const { env } = c
+  
+  try {
+    // R2バケット内のファイル一覧を取得
+    const list = await env.MEDIA_BUCKET.list()
+    
+    const files = list.objects.map((obj: any) => ({
+      key: obj.key,
+      size: obj.size,
+      uploaded: obj.uploaded,
+      url: `/api/media/${obj.key}`,
+      type: obj.key.startsWith('images/') ? 'image' : 'video',
+      thumbnail: obj.key.startsWith('images/') ? `/api/media/${obj.key}` : null
+    }))
+    
+    // 日付順（新しい順）にソート
+    files.sort((a: any, b: any) => new Date(b.uploaded).getTime() - new Date(a.uploaded).getTime())
+    
+    return c.json({ 
+      success: true, 
+      files,
+      total: files.length
+    })
+  } catch (error: any) {
+    console.error('❌ メディアライブラリ取得エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message 
+    }, 500)
+  }
+})
+
+// メディアライブラリ：ファイル検索
+app.get('/api/media-library/search', async (c) => {
+  const { env } = c
+  const query = c.req.query('q') || ''
+  const type = c.req.query('type') // 'image' or 'video'
+  
+  try {
+    const list = await env.MEDIA_BUCKET.list()
+    
+    let files = list.objects.map((obj: any) => ({
+      key: obj.key,
+      size: obj.size,
+      uploaded: obj.uploaded,
+      url: `/api/media/${obj.key}`,
+      type: obj.key.startsWith('images/') ? 'image' : 'video',
+      thumbnail: obj.key.startsWith('images/') ? `/api/media/${obj.key}` : null
+    }))
+    
+    // タイプフィルター
+    if (type) {
+      files = files.filter((f: any) => f.type === type)
+    }
+    
+    // 検索クエリフィルター
+    if (query) {
+      files = files.filter((f: any) => f.key.toLowerCase().includes(query.toLowerCase()))
+    }
+    
+    // 日付順（新しい順）にソート
+    files.sort((a: any, b: any) => new Date(b.uploaded).getTime() - new Date(a.uploaded).getTime())
+    
+    return c.json({ 
+      success: true, 
+      files,
+      total: files.length
+    })
+  } catch (error: any) {
+    console.error('❌ メディア検索エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message 
+    }, 500)
+  }
+})
+
+
 export default app

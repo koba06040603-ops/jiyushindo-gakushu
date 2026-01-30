@@ -25801,32 +25801,100 @@ function formatFileSize(bytes) {
 }
 
 // 画像ファイルアップロード
+// 進捗バー表示
+function showUploadProgress(fileName, fileSize) {
+  const modalHTML = `
+    <div id="upload-progress-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 w-96">
+        <h3 class="text-lg font-bold mb-4">📤 アップロード中</h3>
+        <p class="text-sm text-gray-600 mb-2">${fileName}</p>
+        <p class="text-xs text-gray-500 mb-4">${formatFileSize(fileSize)}</p>
+        
+        <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
+          <div id="upload-progress-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        
+        <div class="flex justify-between text-sm">
+          <span id="upload-progress-percent">0%</span>
+          <span id="upload-progress-speed"></span>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+}
+
+// 進捗バー更新
+function updateUploadProgress(percent, speed = '') {
+  const bar = document.getElementById('upload-progress-bar')
+  const percentText = document.getElementById('upload-progress-percent')
+  const speedText = document.getElementById('upload-progress-speed')
+  
+  if (bar) bar.style.width = percent + '%'
+  if (percentText) percentText.textContent = percent + '%'
+  if (speedText) speedText.textContent = speed
+}
+
+// 進捗バー非表示
+function hideUploadProgress() {
+  const modal = document.getElementById('upload-progress-modal')
+  if (modal) modal.remove()
+}
+
 async function uploadImageFile() {
   if (!fileUploadState.selectedImageFile) {
     alert('画像ファイルが選択されていません')
     return
   }
   
+  const file = fileUploadState.selectedImageFile
+  
   try {
-    showLoading('画像をアップロード中...')
+    // 進捗バー表示
+    showUploadProgress(file.name, file.size)
     
     // FormData作成
     const formData = new FormData()
-    formData.append('file', fileUploadState.selectedImageFile)
+    formData.append('file', file)
     
-    // アップロード実行
+    // アップロード開始時刻
+    const startTime = Date.now()
+    let lastLoaded = 0
+    let lastTime = startTime
+    
+    // アップロード実行（進捗監視付き）
     const response = await axios.post('/api/upload/image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          
+          // 速度計算
+          const now = Date.now()
+          const timeDiff = (now - lastTime) / 1000 // 秒
+          const loadedDiff = progressEvent.loaded - lastLoaded
+          
+          if (timeDiff > 0.5) { // 0.5秒ごとに速度更新
+            const speed = loadedDiff / timeDiff // バイト/秒
+            const speedMB = (speed / (1024 * 1024)).toFixed(2)
+            updateUploadProgress(percent, `${speedMB} MB/s`)
+            lastLoaded = progressEvent.loaded
+            lastTime = now
+          } else {
+            updateUploadProgress(percent)
+          }
+        }
       }
     })
     
-    hideLoading()
+    hideUploadProgress()
     
     if (response.data.success) {
       // アップロード成功 - 画像URLをフォームに設定
       document.getElementById('new-image-url').value = response.data.image_url
-      document.getElementById('new-image-alt').value = fileUploadState.selectedImageFile.name.split('.')[0]
+      document.getElementById('new-image-alt').value = file.name.split('.')[0]
       
       alert('✅ 画像をアップロードしました！\n\n「画像を追加」ボタンをクリックして学習カードに追加してください。')
       
@@ -25837,7 +25905,7 @@ async function uploadImageFile() {
     }
     
   } catch (error) {
-    hideLoading()
+    hideUploadProgress()
     console.error('❌ 画像アップロードエラー:', error)
     alert('画像のアップロードに失敗しました')
   }
@@ -25908,26 +25976,54 @@ async function uploadVideoFile() {
     return
   }
   
+  const file = fileUploadState.selectedVideoFile
+  
   try {
-    showLoading('動画をアップロード中... (大きなファイルは時間がかかります)')
+    // 進捗バー表示
+    showUploadProgress(file.name, file.size)
     
     // FormData作成
     const formData = new FormData()
-    formData.append('file', fileUploadState.selectedVideoFile)
+    formData.append('file', file)
     
-    // アップロード実行
+    // アップロード開始時刻
+    const startTime = Date.now()
+    let lastLoaded = 0
+    let lastTime = startTime
+    
+    // アップロード実行（進捗監視付き）
     const response = await axios.post('/api/upload/video', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          
+          // 速度計算
+          const now = Date.now()
+          const timeDiff = (now - lastTime) / 1000 // 秒
+          const loadedDiff = progressEvent.loaded - lastLoaded
+          
+          if (timeDiff > 0.5) { // 0.5秒ごとに速度更新
+            const speed = loadedDiff / timeDiff // バイト/秒
+            const speedMB = (speed / (1024 * 1024)).toFixed(2)
+            updateUploadProgress(percent, `${speedMB} MB/s`)
+            lastLoaded = progressEvent.loaded
+            lastTime = now
+          } else {
+            updateUploadProgress(percent)
+          }
+        }
       }
     })
     
-    hideLoading()
+    hideUploadProgress()
     
     if (response.data.success) {
       // アップロード成功 - 動画URLをフォームに設定
       document.getElementById('new-video-url').value = response.data.video_url
-      document.getElementById('new-video-title').value = fileUploadState.selectedVideoFile.name.split('.')[0]
+      document.getElementById('new-video-title').value = file.name.split('.')[0]
       
       alert('✅ 動画をアップロードしました！\n\n「動画を追加」ボタンをクリックして学習カードに追加してください。')
       
@@ -25938,7 +26034,7 @@ async function uploadVideoFile() {
     }
     
   } catch (error) {
-    hideLoading()
+    hideUploadProgress()
     console.error('❌ 動画アップロードエラー:', error)
     alert('動画のアップロードに失敗しました')
   }
@@ -25958,6 +26054,171 @@ window.clearVideoPreview = clearVideoPreview
 window.uploadVideoFile = uploadVideoFile
 
 console.log('✅ Phase 14: ファイルアップロード機能 読み込み完了')
+
+// ============================================
+// Phase 15: 高度なメディア管理機能
+// ============================================
+
+// メディアライブラリ表示
+async function showMediaLibrary(type = 'all') {
+  const modalHTML = `
+    <div id="media-library-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg w-full max-w-4xl max-h-screen overflow-hidden flex flex-col">
+        <div class="p-6 border-b flex justify-between items-center">
+          <h2 class="text-2xl font-bold">📚 メディアライブラリ</h2>
+          <button onclick="closeMediaLibrary()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <div class="p-4 border-b">
+          <div class="flex gap-4">
+            <input type="text" id="media-search-input" placeholder="ファイル名で検索..." 
+                   class="flex-1 px-4 py-2 border rounded-lg">
+            <select id="media-type-filter" class="px-4 py-2 border rounded-lg">
+              <option value="all">すべて</option>
+              <option value="image">画像のみ</option>
+              <option value="video">動画のみ</option>
+            </select>
+            <button onclick="loadMediaLibrary()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+              <i class="fas fa-search"></i> 検索
+            </button>
+          </div>
+        </div>
+        
+        <div id="media-library-content" class="flex-1 overflow-y-auto p-6">
+          <div class="text-center py-8">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-gray-600">読み込み中...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  await loadMediaLibrary()
+}
+
+// メディアライブラリ読み込み
+async function loadMediaLibrary() {
+  const contentDiv = document.getElementById('media-library-content')
+  if (!contentDiv) return
+  
+  const searchInput = document.getElementById('media-search-input')
+  const typeFilter = document.getElementById('media-type-filter')
+  
+  const query = searchInput ? searchInput.value : ''
+  const type = typeFilter && typeFilter.value !== 'all' ? typeFilter.value : null
+  
+  try {
+    let url = '/api/media-library'
+    if (query || type) {
+      url = `/api/media-library/search?q=${encodeURIComponent(query)}`
+      if (type) url += `&type=${type}`
+    }
+    
+    const response = await axios.get(url)
+    
+    if (response.data.success) {
+      const files = response.data.files
+      
+      if (files.length === 0) {
+        contentDiv.innerHTML = `
+          <div class="text-center py-12">
+            <i class="fas fa-folder-open text-6xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500">メディアファイルがありません</p>
+          </div>
+        `
+        return
+      }
+      
+      const filesHTML = files.map(file => `
+        <div class="border rounded-lg p-4 hover:shadow-lg transition">
+          ${file.type === 'image' ? `
+            <img src="${file.url}" alt="${file.key}" class="w-full h-40 object-cover rounded mb-2">
+          ` : `
+            <div class="w-full h-40 bg-gray-100 rounded mb-2 flex items-center justify-center">
+              <i class="fas fa-video text-4xl text-gray-400"></i>
+            </div>
+          `}
+          <p class="text-sm font-medium truncate mb-1">${file.key.split('/').pop()}</p>
+          <p class="text-xs text-gray-500 mb-2">${formatFileSize(file.size)}</p>
+          <p class="text-xs text-gray-400 mb-3">${new Date(file.uploaded).toLocaleString('ja-JP')}</p>
+          <div class="flex gap-2">
+            <button onclick="useMediaFile('${file.url}', '${file.type}')" 
+                    class="flex-1 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+              <i class="fas fa-check"></i> 使用
+            </button>
+            <button onclick="copyMediaUrl('${file.url}')" 
+                    class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+        </div>
+      `).join('')
+      
+      contentDiv.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          ${filesHTML}
+        </div>
+      `
+    }
+  } catch (error) {
+    console.error('❌ メディアライブラリ読み込みエラー:', error)
+    contentDiv.innerHTML = `
+      <div class="text-center py-12">
+        <i class="fas fa-exclamation-triangle text-6xl text-red-300 mb-4"></i>
+        <p class="text-red-500">読み込みに失敗しました</p>
+      </div>
+    `
+  }
+}
+
+// メディアライブラリを閉じる
+function closeMediaLibrary() {
+  const modal = document.getElementById('media-library-modal')
+  if (modal) modal.remove()
+}
+
+// メディアファイルを使用
+function useMediaFile(url, type) {
+  if (type === 'image') {
+    const urlInput = document.getElementById('new-image-url')
+    if (urlInput) {
+      urlInput.value = url
+      closeMediaLibrary()
+      alert('✅ 画像URLを設定しました！')
+    }
+  } else if (type === 'video') {
+    const urlInput = document.getElementById('new-video-url')
+    if (urlInput) {
+      urlInput.value = url
+      closeMediaLibrary()
+      alert('✅ 動画URLを設定しました！')
+    }
+  }
+}
+
+// メディアURLをコピー
+function copyMediaUrl(url) {
+  navigator.clipboard.writeText(window.location.origin + url).then(() => {
+    alert('✅ URLをコピーしました！')
+  }).catch(err => {
+    console.error('❌ コピー失敗:', err)
+    alert('❌ URLのコピーに失敗しました')
+  })
+}
+
+// グローバルスコープに登録
+window.showMediaLibrary = showMediaLibrary
+window.loadMediaLibrary = loadMediaLibrary
+window.closeMediaLibrary = closeMediaLibrary
+window.useMediaFile = useMediaFile
+window.copyMediaUrl = copyMediaUrl
+
+console.log('✅ Phase 15: 高度なメディア管理機能 読み込み完了')
+
 
 
 
