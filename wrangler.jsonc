@@ -12,6 +12,13 @@
       "database_name": "jiyushindo-gakushu-production",
       "database_id": "508ed099-e916-468a-acec-ae7025ad9569"
     }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "TO_BE_CREATED",
+      "preview_id": "TO_BE_CREATED"
+    }
   ]
   // Note: Durable Objects はローカル開発のみで使用。本番環境では別途設定が必要
   // "durable_objects": {

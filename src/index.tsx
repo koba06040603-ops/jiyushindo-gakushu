@@ -17,9 +17,18 @@ import {
   requestLoggingMiddleware,
   errorHandlingMiddleware
 } from './monitoring'
+import {
+  StudentProgressCache,
+  CurriculumCache,
+  ScTNScoreCache,
+  RankingCache,
+  ClassStatsCache,
+  getCacheStats
+} from './cache'
 
 type Bindings = {
   DB: D1Database
+  KV: KVNamespace
   GEMINI_API_KEY?: string
   SUNO_API_KEY?: string
   PROGRESS_WEBSOCKET?: DurableObjectNamespace
@@ -900,13 +909,24 @@ app.get('/health', async (c) => {
 // 詳細なシステムステータス（認証必須・管理者のみ）
 app.get('/api/admin/system-status', authMiddleware, requireRole('admin'), async (c) => {
   const metrics = await performHealthCheck(c);
+  const { KV } = c.env as { KV: KVNamespace };
+  const cacheStats = await getCacheStats(KV);
   
   return c.json({
     ...metrics,
+    cache: cacheStats,
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'production'
   });
+});
+
+// キャッシュ統計エンドポイント（管理者のみ）
+app.get('/api/admin/cache-stats', authMiddleware, requireRole('admin'), async (c) => {
+  const { KV } = c.env as { KV: KVNamespace };
+  const stats = await getCacheStats(KV);
+  
+  return c.json(stats);
 });
 
 // =============================================================================
