@@ -299,3 +299,157 @@ test.describe('パフォーマンステスト', () => {
     expect(loadTime).toBeLessThan(5000);
   });
 });
+
+// =============================================================================
+// Phase 9 & 10: 適応学習エンジン + 学校管理機能 テスト
+// =============================================================================
+
+test.describe('Phase 9: 適応学習エンジン E2Eテスト', () => {
+  test('学習スタイル自動検出 APIテスト', async ({ request }) => {
+    const testStudentId = 1;
+    const response = await request.get(`${BASE_URL}/api/adaptive/detect-learning-style/${testStudentId}`);
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(data.data).toHaveProperty('student_id');
+    expect(data.data).toHaveProperty('vark_scores');
+    expect(data.data).toHaveProperty('gardner_scores');
+    expect(data.data).toHaveProperty('dominant_style');
+    expect(data.data).toHaveProperty('confidence_level');
+    
+    // VARKスコア検証
+    expect(data.data.vark_scores).toHaveProperty('visual');
+    expect(data.data.vark_scores).toHaveProperty('auditory');
+    expect(data.data.vark_scores).toHaveProperty('reading');
+    expect(data.data.vark_scores).toHaveProperty('kinesthetic');
+    
+    // Gardnerスコア検証
+    expect(data.data.gardner_scores).toHaveProperty('linguistic');
+    expect(data.data.gardner_scores).toHaveProperty('logical');
+    expect(data.data.gardner_scores).toHaveProperty('spatial');
+  });
+
+  test('適応型カリキュラム推薦 APIテスト', async ({ request }) => {
+    const testStudentId = 1;
+    const response = await request.get(`${BASE_URL}/api/adaptive/recommend/${testStudentId}?count=5`);
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(data.data).toHaveProperty('student_id');
+    expect(data.data).toHaveProperty('learning_style');
+    expect(data.data).toHaveProperty('recommendations');
+    expect(Array.isArray(data.data.recommendations)).toBe(true);
+  });
+});
+
+test.describe('Phase 10: 学校管理機能 E2Eテスト', () => {
+  test('学校の全クラス進捗取得 APIテスト', async ({ request }) => {
+    const testSchoolId = 1;
+    const response = await request.get(`${BASE_URL}/api/school/${testSchoolId}/classes`);
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(Array.isArray(data.data)).toBe(true);
+    
+    if (data.data.length > 0) {
+      const classInfo = data.data[0];
+      expect(classInfo).toHaveProperty('class_code');
+      expect(classInfo).toHaveProperty('class_name');
+      expect(classInfo).toHaveProperty('grade');
+      expect(classInfo).toHaveProperty('student_count');
+      expect(classInfo).toHaveProperty('total_progress');
+    }
+  });
+
+  test('学年別サマリ取得 APIテスト', async ({ request }) => {
+    const testSchoolId = 1;
+    const response = await request.get(`${BASE_URL}/api/school/${testSchoolId}/grade-summary`);
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(Array.isArray(data.data)).toBe(true);
+    
+    if (data.data.length > 0) {
+      const gradeSummary = data.data[0];
+      expect(gradeSummary).toHaveProperty('grade');
+      expect(gradeSummary).toHaveProperty('total_students');
+      expect(gradeSummary).toHaveProperty('total_classes');
+      expect(gradeSummary).toHaveProperty('average_progress');
+    }
+  });
+
+  test('教師向けクラス分析 APIテスト', async ({ request }) => {
+    const testTeacherId = 1;
+    const testClassCode = 'CLASS001';
+    const response = await request.get(`${BASE_URL}/api/teacher/${testTeacherId}/class/${testClassCode}/analysis`);
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(data.data).toHaveProperty('class_info');
+    expect(data.data).toHaveProperty('student_details');
+    expect(data.data).toHaveProperty('summary');
+    expect(Array.isArray(data.data.student_details)).toBe(true);
+  });
+
+  test('保護者通知送信 APIテスト', async ({ request }) => {
+    const notification = {
+      student_id: 1,
+      parent_email: 'parent@example.com',
+      notification_type: 'email',
+      subject: 'テスト通知',
+      message: 'これはテスト通知です。'
+    };
+    
+    const response = await request.post(`${BASE_URL}/api/parent/notify`, {
+      data: notification
+    });
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(data.data).toHaveProperty('notification_id');
+    expect(data.data).toHaveProperty('status');
+  });
+
+  test('保護者通知履歴取得 APIテスト', async ({ request }) => {
+    const testStudentId = 1;
+    const response = await request.get(`${BASE_URL}/api/parent/notifications/${testStudentId}`);
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(Array.isArray(data.data)).toBe(true);
+  });
+
+  test('学校全体レポート取得 APIテスト', async ({ request }) => {
+    const testSchoolId = 1;
+    const startDate = '2026-01-01';
+    const endDate = '2026-01-30';
+    
+    const response = await request.get(
+      `${BASE_URL}/api/school/${testSchoolId}/report?start_date=${startDate}&end_date=${endDate}`
+    );
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(data.data).toHaveProperty('school_info');
+    expect(data.data).toHaveProperty('overall_stats');
+    expect(data.data).toHaveProperty('grade_stats');
+    expect(data.data).toHaveProperty('class_stats');
+    expect(data.data).toHaveProperty('report_period');
+  });
+});

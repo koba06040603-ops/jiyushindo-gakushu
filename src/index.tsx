@@ -25,6 +25,8 @@ import {
   ClassStatsCache,
   getCacheStats
 } from './cache'
+import { AdaptiveLearningEngine } from './adaptive-learning'
+import { SchoolManagementSystem } from './school-management'
 
 type Bindings = {
   DB: D1Database
@@ -963,6 +965,186 @@ app.get('/api/student/progress', authMiddleware, requireUserType('student'), asy
     message: 'Student Progress',
     student_id: user.user_id 
   })
+})
+
+// =============================================================================
+// Phase 9: 適応学習エンジン（学習スタイル自動検出）
+// =============================================================================
+
+// 学習スタイル自動検出
+app.get('/api/adaptive/detect-learning-style/:studentId', async (c) => {
+  const { env } = c;
+  const studentId = parseInt(c.req.param('studentId'));
+
+  try {
+    const adaptiveEngine = new AdaptiveLearningEngine(env.DB, env.LEARNING_CACHE);
+    const learningStyle = await adaptiveEngine.detectLearningStyle(studentId);
+
+    return c.json({
+      success: true,
+      data: learningStyle
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 適応型カリキュラム推薦
+app.get('/api/adaptive/recommend/:studentId', async (c) => {
+  const { env } = c;
+  const studentId = parseInt(c.req.param('studentId'));
+  const count = parseInt(c.req.query('count') || '5');
+
+  try {
+    const adaptiveEngine = new AdaptiveLearningEngine(env.DB, env.LEARNING_CACHE);
+    const recommendations = await adaptiveEngine.recommendCurriculum(studentId, count);
+
+    return c.json({
+      success: true,
+      data: recommendations
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// =============================================================================
+// Phase 10: 学校・自治体向け管理機能
+// =============================================================================
+
+// 学校の全クラス進捗取得
+app.get('/api/school/:schoolId/classes', async (c) => {
+  const { env } = c;
+  const schoolId = parseInt(c.req.param('schoolId'));
+
+  try {
+    const schoolSystem = new SchoolManagementSystem(env.DB, env.LEARNING_CACHE);
+    const classes = await schoolSystem.getMultiClassProgress(schoolId);
+
+    return c.json({
+      success: true,
+      data: classes
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 学年別サマリ取得
+app.get('/api/school/:schoolId/grade-summary', async (c) => {
+  const { env } = c;
+  const schoolId = parseInt(c.req.param('schoolId'));
+
+  try {
+    const schoolSystem = new SchoolManagementSystem(env.DB, env.LEARNING_CACHE);
+    const summary = await schoolSystem.getGradeSummary(schoolId);
+
+    return c.json({
+      success: true,
+      data: summary
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 教師向けクラス分析
+app.get('/api/teacher/:teacherId/class/:classCode/analysis', async (c) => {
+  const { env } = c;
+  const teacherId = parseInt(c.req.param('teacherId'));
+  const classCode = c.req.param('classCode');
+
+  try {
+    const schoolSystem = new SchoolManagementSystem(env.DB, env.LEARNING_CACHE);
+    const analysis = await schoolSystem.getTeacherClassAnalysis(teacherId, classCode);
+
+    return c.json({
+      success: true,
+      data: analysis
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 保護者通知送信
+app.post('/api/parent/notify', async (c) => {
+  const { env } = c;
+  const notification = await c.req.json();
+
+  try {
+    const schoolSystem = new SchoolManagementSystem(env.DB, env.LEARNING_CACHE);
+    const result = await schoolSystem.sendParentNotification(notification);
+
+    return c.json({
+      success: true,
+      data: result
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 保護者通知履歴取得
+app.get('/api/parent/notifications/:studentId', async (c) => {
+  const { env } = c;
+  const studentId = parseInt(c.req.param('studentId'));
+
+  try {
+    const schoolSystem = new SchoolManagementSystem(env.DB, env.LEARNING_CACHE);
+    const history = await schoolSystem.getParentNotificationHistory(studentId);
+
+    return c.json({
+      success: true,
+      data: history
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 学校全体のレポートデータ取得
+app.get('/api/school/:schoolId/report', async (c) => {
+  const { env } = c;
+  const schoolId = parseInt(c.req.param('schoolId'));
+  const startDate = c.req.query('start_date') || new Date(Date.now() - 30*24*60*60*1000).toISOString();
+  const endDate = c.req.query('end_date') || new Date().toISOString();
+
+  try {
+    const schoolSystem = new SchoolManagementSystem(env.DB, env.LEARNING_CACHE);
+    const reportData = await schoolSystem.getSchoolReportData(schoolId, startDate, endDate);
+
+    return c.json({
+      success: true,
+      data: reportData
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
 })
 
 // =============================================================================
