@@ -111,6 +111,25 @@ npx wrangler pages project create jiyushindo-gakushu \
 
 ## Step 4: 環境変数＆シークレット設定
 
+**⚠️ 重要: 環境変数はコードにハードコードせず、必ず以下の方法で管理してください**
+
+### 📦 ローカル開発環境
+`.dev.vars`ファイルに環境変数を記述（自動的にwranglerが読み込みます）:
+```bash
+# .dev.vars (このファイルはGitにコミットしないこと！)
+CLOUDFLARE_API_TOKEN=your-cloudflare-api-token
+GEMINI_API_KEY=your-gemini-api-key
+JWT_SECRET=your-jwt-secret
+```
+
+**確認事項:**
+- ✅ `.dev.vars` が `.gitignore` に含まれていること
+- ✅ `.dev.vars` をGitリポジトリにコミットしないこと
+- ✅ 本番環境のシークレットとは**別の値**を使用すること（セキュリティ向上）
+
+### 🌍 本番環境（Cloudflare Pages）
+Cloudflare Pagesのシークレット機能を使用:
+
 ### 4-1. Gemini API Key設定
 ```bash
 # Gemini API Keyをシークレットとして設定
@@ -151,7 +170,25 @@ openssl rand -base64 32
 # Length: 32, Digits: Yes, Uppercase: Yes, Lowercase: Yes
 ```
 
-### 4-3. シークレット確認
+### 4-3. Cloudflare API Token設定（デプロイ時のみ）
+```bash
+# デプロイ実行時に環境変数として指定
+export CLOUDFLARE_API_TOKEN=your-cloudflare-api-token
+npx wrangler pages deploy dist --project-name jiyushindo-gakushu
+
+# または、.dev.varsファイルに記載（ローカル開発用）
+# CLOUDFLARE_API_TOKEN=your-cloudflare-api-token
+```
+
+**注意:**
+- Cloudflare API Tokenは**デプロイ実行時にのみ必要**
+- 本番環境のランタイムでは使用しません（Pages Secretとして設定不要）
+- トークンは以下の権限が必要:
+  - `Account - Cloudflare Pages - Edit`
+  - `Zone - DNS - Edit`（カスタムドメイン使用時）
+  - `Account - Account Settings - Read`
+
+### 4-4. シークレット確認
 ```bash
 # 設定済みシークレット一覧確認
 npx wrangler pages secret list --project-name jiyushindo-gakushu
