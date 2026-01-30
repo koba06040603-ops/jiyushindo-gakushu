@@ -17964,6 +17964,199 @@ window.showParentReportMenu = showParentReportMenu
 window.generateStudentReport = generateStudentReport
 
 // ==============================================
+// Phase 11: 動画学習コンテンツ統合
+// ==============================================
+
+/**
+ * 学習カードに動画を表示
+ * @param {number} cardId - 学習カードID
+ */
+async function showVideoContent(cardId) {
+  try {
+    const response = await axios.get(`/api/videos/card/${cardId}`)
+    
+    if (!response.data.success || response.data.videos.length === 0) {
+      return null // 動画なし
+    }
+    
+    const video = response.data.videos[0]
+    return renderVideoPlayer(video)
+    
+  } catch (error) {
+    console.error('動画コンテンツ取得エラー:', error)
+    return null
+  }
+}
+
+/**
+ * 動画プレイヤーHTML生成
+ */
+function renderVideoPlayer(video) {
+  const videoId = extractVideoId(video.video_url, video.video_platform)
+  
+  let embedHtml = ''
+  
+  if (video.video_platform === 'youtube') {
+    embedHtml = `
+      <div class="video-container relative" style="padding-bottom: 56.25%; height: 0; overflow: hidden;">
+        <iframe 
+          id="video-player-${video.video_id}"
+          class="absolute top-0 left-0 w-full h-full"
+          src="https://www.youtube.com/embed/${videoId}?enablejsapi=1&rel=0"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+      </div>
+    `
+  } else if (video.video_platform === 'vimeo') {
+    embedHtml = `
+      <div class="video-container relative" style="padding-bottom: 56.25%; height: 0; overflow: hidden;">
+        <iframe 
+          id="video-player-${video.video_id}"
+          class="absolute top-0 left-0 w-full h-full"
+          src="https://player.vimeo.com/video/${videoId}"
+          frameborder="0"
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+      </div>
+    `
+  } else if (video.video_platform === 'custom') {
+    embedHtml = `
+      <div class="video-container">
+        <video 
+          id="video-player-${video.video_id}"
+          class="w-full rounded-lg"
+          controls
+          poster="${video.thumbnail_url || ''}"
+          onplay="trackVideoStart(${video.video_id})"
+          onpause="trackVideoProgress(${video.video_id})"
+          onended="trackVideoEnd(${video.video_id})">
+          <source src="${video.video_url}" type="video/mp4">
+          お使いのブラウザは動画タグをサポートしていません。
+        </video>
+      </div>
+    `
+  }
+  
+  return `
+    <div class="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-6 mb-6">
+      <div class="flex items-center mb-4">
+        <i class="fas fa-video text-2xl text-purple-600 mr-3"></i>
+        <div class="flex-1">
+          <h3 class="text-xl font-bold text-gray-800">${video.video_title}</h3>
+          ${video.description ? `<p class="text-sm text-gray-600 mt-1">${video.description}</p>` : ''}
+        </div>
+        ${video.video_duration_seconds ? `
+          <div class="text-sm text-gray-500">
+            <i class="fas fa-clock mr-1"></i>
+            ${formatDuration(video.video_duration_seconds)}
+          </div>
+        ` : ''}
+      </div>
+      ${embedHtml}
+      <div class="mt-4 text-xs text-gray-500 text-center">
+        💡 ヒント: 動画を見て理解を深めましょう。わからないところは一時停止して考えてみましょう。
+      </div>
+    </div>
+  `
+}
+
+/**
+ * 動画IDを抽出
+ */
+function extractVideoId(url, platform) {
+  if (platform === 'youtube') {
+    const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)
+    return match ? match[1] : ''
+  } else if (platform === 'vimeo') {
+    const match = url.match(/vimeo\.com\/(\d+)/)
+    return match ? match[1] : ''
+  }
+  return url
+}
+
+/**
+ * 秒数を時間表記に変換
+ */
+function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return `${hours}時間${mins}分${secs}秒`
+  }
+  return `${minutes}分${secs}秒`
+}
+
+/**
+ * 動画視聴開始追跡
+ */
+let currentWatchId = null
+
+async function trackVideoStart(videoId) {
+  if (!state.student || !state.student.id) return
+  
+  try {
+    const response = await axios.post(`/api/videos/${videoId}/watch/start`, {
+      student_id: state.student.id,
+      session_id: null
+    })
+    
+    if (response.data.success) {
+      currentWatchId = response.data.watch_id
+      console.log('✅ 動画視聴開始記録:', currentWatchId)
+    }
+  } catch (error) {
+    console.error('動画視聴開始記録エラー:', error)
+  }
+}
+
+/**
+ * 動画視聴進捗追跡
+ */
+async function trackVideoProgress(videoId) {
+  if (!currentWatchId) return
+  
+  const videoElement = document.getElementById(`video-player-${videoId}`)
+  if (!videoElement) return
+  
+  const currentTime = videoElement.currentTime || 0
+  const duration = videoElement.duration || 1
+  const completionPercentage = (currentTime / duration) * 100
+  
+  try {
+    await axios.put(`/api/videos/watch/${currentWatchId}`, {
+      watch_duration_seconds: Math.floor(currentTime),
+      completion_percentage: completionPercentage,
+      playback_speed: videoElement.playbackRate || 1.0,
+      paused_count: 0,
+      rewind_count: 0
+    })
+    
+    console.log(`📊 動画視聴進捗: ${completionPercentage.toFixed(1)}%`)
+  } catch (error) {
+    console.error('動画視聴進捗記録エラー:', error)
+  }
+}
+
+/**
+ * 動画視聴終了追跡
+ */
+async function trackVideoEnd(videoId) {
+  await trackVideoProgress(videoId)
+  console.log('✅ 動画視聴完了')
+}
+
+// グローバルに公開
+window.showVideoContent = showVideoContent
+window.trackVideoStart = trackVideoStart
+window.trackVideoProgress = trackVideoProgress
+window.trackVideoEnd = trackVideoEnd
+
+// ==============================================
 // 進捗ボード用ヘルパー関数（新）
 // ==============================================
 

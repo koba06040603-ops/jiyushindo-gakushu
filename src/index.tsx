@@ -16815,4 +16815,128 @@ JSON形式で以下を返してください：
   }
 })
 
+// =============================================================================
+// Phase 11: 動画学習コンテンツ統合API
+// =============================================================================
+
+// 学習カードの動画コンテンツ取得
+app.get('/api/videos/card/:cardId', async (c) => {
+  const { env } = c
+  const cardId = parseInt(c.req.param('cardId'))
+  
+  try {
+    const videos = await env.DB.prepare(`
+      SELECT * FROM video_contents
+      WHERE card_id = ? AND is_active = TRUE
+      ORDER BY created_at DESC
+    `).bind(cardId).all()
+    
+    return c.json({
+      success: true,
+      videos: videos.results
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 動画コンテンツ追加
+app.post('/api/videos', async (c) => {
+  const { env } = c
+  const { card_id, video_title, video_url, video_platform, video_duration_seconds, thumbnail_url, description } = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO video_contents (card_id, video_title, video_url, video_platform, video_duration_seconds, thumbnail_url, description)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(card_id, video_title, video_url, video_platform, video_duration_seconds || null, thumbnail_url || null, description || null).run()
+    
+    return c.json({
+      success: true,
+      video_id: result.meta.last_row_id
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 動画視聴開始記録
+app.post('/api/videos/:videoId/watch/start', async (c) => {
+  const { env } = c
+  const videoId = parseInt(c.req.param('videoId'))
+  const { student_id, session_id } = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO video_watch_history (video_id, student_id, session_id, watch_start_time)
+      VALUES (?, ?, ?, datetime('now'))
+    `).bind(videoId, student_id, session_id || null).run()
+    
+    return c.json({
+      success: true,
+      watch_id: result.meta.last_row_id
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 動画視聴終了・進捗更新
+app.put('/api/videos/watch/:watchId', async (c) => {
+  const { env } = c
+  const watchId = parseInt(c.req.param('watchId'))
+  const { watch_duration_seconds, completion_percentage, playback_speed, paused_count, rewind_count } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE video_watch_history
+      SET watch_end_time = datetime('now'),
+          watch_duration_seconds = ?,
+          completion_percentage = ?,
+          playback_speed = ?,
+          paused_count = ?,
+          rewind_count = ?
+      WHERE watch_id = ?
+    `).bind(
+      watch_duration_seconds,
+      completion_percentage,
+      playback_speed || 1.0,
+      paused_count || 0,
+      rewind_count || 0,
+      watchId
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 生徒の動画視聴履歴取得
+app.get('/api/videos/history/student/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    const history = await env.DB.prepare(`
+      SELECT 
+        wh.*,
+        vc.video_title,
+        vc.video_duration_seconds as total_duration
+      FROM video_watch_history wh
+      JOIN video_contents vc ON wh.video_id = vc.video_id
+      WHERE wh.student_id = ?
+      ORDER BY wh.watch_start_time DESC
+      LIMIT 50
+    `).bind(studentId).all()
+    
+    return c.json({
+      success: true,
+      history: history.results
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app
