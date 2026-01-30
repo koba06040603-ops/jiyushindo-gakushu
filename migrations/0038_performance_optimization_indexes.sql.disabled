@@ -5,9 +5,9 @@
 
 -- 学習履歴テーブルのINDEX強化
 CREATE INDEX IF NOT EXISTS idx_learning_history_student_card ON learning_history(student_id, card_id);
-CREATE INDEX IF NOT EXISTS idx_learning_history_timestamp ON learning_history(timestamp);
+CREATE INDEX IF NOT EXISTS idx_learning_history_timestamp ON learning_history(created_at);
 CREATE INDEX IF NOT EXISTS idx_learning_history_is_correct ON learning_history(is_correct);
-CREATE INDEX IF NOT EXISTS idx_learning_history_composite ON learning_history(student_id, is_correct, timestamp);
+CREATE INDEX IF NOT EXISTS idx_learning_history_composite ON learning_history(student_id, is_correct, created_at);
 
 -- 学習セッションテーブルのINDEX強化
 CREATE INDEX IF NOT EXISTS idx_learning_sessions_student_date ON learning_sessions(student_id, session_start_time);
@@ -64,7 +64,7 @@ CREATE INDEX IF NOT EXISTS idx_sctn_results_package ON sctn_questionnaire_result
 CREATE INDEX IF NOT EXISTS idx_national_survey_student_year ON national_survey_results(student_id, survey_year);
 
 -- AI会話履歴のINDEX強化
-CREATE INDEX IF NOT EXISTS idx_ai_conversations_student_timestamp ON ai_conversation_history(student_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_student_timestamp ON ai_conversation_history(student_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_ai_conversations_card ON ai_conversation_history(card_id);
 
 -- 多言語コンテンツのINDEX
@@ -92,7 +92,7 @@ CREATE INDEX IF NOT EXISTS idx_parent_notifications_created ON parent_notificati
 
 -- 複合INDEXの追加（頻繁に使用されるクエリパターン用）
 CREATE INDEX IF NOT EXISTS idx_progress_student_curriculum_status ON student_progress(student_id, curriculum_id, status);
-CREATE INDEX IF NOT EXISTS idx_history_student_card_timestamp ON learning_history(student_id, card_id, timestamp);
+CREATE INDEX IF NOT EXISTS idx_history_student_card_timestamp ON learning_history(student_id, card_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_student_start_end ON learning_sessions(student_id, session_start_time, session_end_time);
 
 -- ANALYZE コマンドでクエリプランナーの統計を更新
