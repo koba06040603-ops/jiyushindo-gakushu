@@ -894,6 +894,31 @@ async function callGeminiAPI(options: GeminiCallOptions): Promise<GeminiResponse
 app.use('*', errorHandlingMiddleware)
 app.use('/api/*', requestLoggingMiddleware)
 
+// セキュリティ & パフォーマンスヘッダー設定
+app.use('*', async (c, next) => {
+  await next()
+  
+  // セキュリティヘッダー
+  c.header('X-Content-Type-Options', 'nosniff')
+  c.header('X-Frame-Options', 'SAMEORIGIN')
+  c.header('X-XSS-Protection', '1; mode=block')
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
+  c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+  
+  // パフォーマンスヘッダー
+  const path = c.req.path
+  if (path.startsWith('/static/') || path.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2)$/)) {
+    // 静的リソースは長期キャッシュ（1年）
+    c.header('Cache-Control', 'public, max-age=31536000, immutable')
+  } else if (path === '/' || path.startsWith('/api/')) {
+    // HTML とAPIは短期キャッシュ（1時間）
+    c.header('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400')
+  }
+  
+  // Cloudflare のエッジキャッシュ設定
+  c.header('CDN-Cache-Control', 'max-age=86400')
+})
+
 // CORS設定
 app.use('/api/*', cors())
 
@@ -4688,16 +4713,31 @@ app.get('/', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="AI搭載の自由進度学習支援システム - 個別最適化された学習体験を提供">
         <title>自由進度学習支援システム</title>
+        
+        <!-- DNS Prefetch & Preconnect for faster CDN loading -->
+        <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
+        <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+        <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+        <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+        
+        <!-- Preload Critical Resources -->
+        <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
+        <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" as="style">
+        <link rel="preload" href="/static/styles.css" as="style">
+        <link rel="preload" href="/static/app.js" as="script">
+        
+        <!-- Stylesheets -->
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+        
+        <!-- Deferred Libraries (non-critical) -->
+        <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
         <style>
           /* FontAwesome fa-spin animation */
           @keyframes fa-spin {
