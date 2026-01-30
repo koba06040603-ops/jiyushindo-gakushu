@@ -191,6 +191,42 @@
     - `/gamification-demo.html` - ゲーミフィケーション機能デモ
     - `/parent-dashboard-demo.html` - 保護者ダッシュボードデモ
     - `/teacher-dashboard-demo.html` - 教師向けクラス分析ツールデモ
+- **2026-01-30**: Phase 6 低優先度機能+不登校支援完全実装完了 ✅ **NEW完了**
+  - **多言語対応 (i18n)**:
+    - 4言語サポート: 日本語・英語・中国語・韓国語
+    - i18nシステム (I18nクラス)
+    - 自動言語検出、ローカルストレージ保存
+    - 日付・数値・通貨フォーマット、複数形対応
+    - **科学的根拠**: Cummins (1979)、Thomas & Collier (1997)
+    - **実装ファイル**: `/static/i18n.js`
+  - **PWA対応 (Progressive Web App)**:
+    - Service Worker、オフラインキャッシュ
+    - Background Sync、Push通知
+    - App Manifest、ホーム画面に追加
+    - **実装ファイル**: `/service-worker.js`, `/manifest.json`
+  - **オフライン学習モード**:
+    - IndexedDBローカル保存
+    - オンライン復帰時自動同期
+    - **デモページ**: `/offline.html`
+  - **不登校児童生徒支援機能 ❤️ NEW**:
+    - 今日の気分チェック (5段階)
+    - 柔軟な学習スケジュール (5分から、時間自由)
+    - サポート体制 (AI先生・担任・カウンセラー・保護者)
+    - マイペース学習 (プレッシャーなし、小さな成功体験)
+    - 気持ちの記録 (日記機能)
+    - 復学支援 (段階的プラン)
+    - 小さな目標設定、保護者向けガイド
+    - **科学的根拠**: 文科省「不登校児童生徒への支援の在り方について（通知）」令和元年10月25日、Kearney (2008)
+    - **デモページ**: `/truancy-support-demo.html`
+  - **デモページ一覧**:
+    - `/integrated-dashboard.html` - 統合学習ダッシュボード
+    - `/advanced-features-demo.html` - 高度な機能デモ (PDF出力・データ可視化強化・AI先生)
+    - `/gamification-demo.html` - ゲーミフィケーション機能デモ
+    - `/parent-dashboard-demo.html` - 保護者ダッシュボードデモ
+    - `/teacher-dashboard-demo.html` - 教師向けクラス分析ツールデモ
+    - `/multilingual-pwa-demo.html` - 多言語対応・PWA機能デモ
+    - `/truancy-support-demo.html` - 不登校児童生徒支援デモ
+    - `/offline.html` - オフラインモードページ
 
 ---
 
