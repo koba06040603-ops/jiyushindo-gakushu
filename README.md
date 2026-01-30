@@ -218,7 +218,7 @@
     - 小さな目標設定、保護者向けガイド
     - **科学的根拠**: 文科省「不登校児童生徒への支援の在り方について（通知）」令和元年10月25日、Kearney (2008)
     - **デモページ**: `/truancy-support-demo.html`
-  - **デモページ一覧**:
+  - **デモページ一覧（15件）**:
     - `/integrated-dashboard.html` - 統合学習ダッシュボード
     - `/advanced-features-demo.html` - 高度な機能デモ (PDF出力・データ可視化強化・AI先生)
     - `/gamification-demo.html` - ゲーミフィケーション機能デモ
@@ -227,6 +227,13 @@
     - `/multilingual-pwa-demo.html` - 多言語対応・PWA機能デモ
     - `/truancy-support-demo.html` - 不登校児童生徒支援デモ
     - `/offline.html` - オフラインモードページ
+    - `/auth-demo.html` - 認証・認可システムデモ（Phase 7）
+    - `/adaptive-learning-demo.html` - 適応学習エンジンデモ（Phase 9）**NEW**
+    - `/school-management-demo.html` - 学校管理システムデモ（Phase 10）**NEW**
+    - `/spaced-learning-progress-demo.html` - 分散学習進捗デモ
+    - `/collaborative-reports-demo.html` - 協働学習レポートデモ
+    - `/health` - システムヘルスチェック
+    - `/` - トップページ
 - **2026-01-30**: Phase 7 本番環境整備3項目完全実装完了 ✅ **NEW完了**
   - **データベース統合マイグレーション** ✅:
     - 全テーブルスキーマを `0000_init_all_tables.sql` に統合（80コマンド）
@@ -322,6 +329,66 @@
     - 外部DNSプロバイダー設定（CNAME、ALIAS、Aレコード）
     - ルートドメイン（Apex Domain）設定
     - SSL/TLS設定（Let's Encrypt自動発行）
+
+- **2026-01-30**: Phase 9 & 10 完全実装完了 ✅ **NEW完了**
+  - **Phase 9: 適応学習エンジン** ✅:
+    - **学習スタイル自動検出システム**:
+      - VARKモデル分析（Visual, Auditory, Reading/Writing, Kinesthetic）
+      - Gardner多重知能理論分析（8種類の知能）
+      - 学習行動パターン収集（12指標）
+      - 信頼度スコア計算（データ量ベース）
+      - 主要スタイル・知能自動判定
+    - **適応型カリキュラム推薦**:
+      - 学習スタイルに基づく最適カリキュラム推薦
+      - 未完了カードの優先順位付け
+      - 推薦スコアリングアルゴリズム
+    - **APIエンドポイント**:
+      - `GET /api/adaptive/detect-learning-style/:studentId` - 学習スタイル検出
+      - `GET /api/adaptive/recommend/:studentId` - カリキュラム推薦
+    - **科学的根拠**:
+      - VARK Model (Fleming, 2001)
+      - Multiple Intelligences Theory (Gardner, 1983)
+      - Aptitude-Treatment Interaction (Cronbach & Snow, 1977)
+      - Learning Analytics (Siemens & Long, 2011)
+    - **実装ファイル**: `/src/adaptive-learning.ts`
+    - **デモページ**: `/adaptive-learning-demo.html`
+
+  - **Phase 10: 学校・自治体向け管理機能** ✅:
+    - **多クラス管理**:
+      - 学校内全クラスの進捗一覧表示
+      - クラス別統計（生徒数、平均進捗率、平均習熟度）
+      - 担任教師情報表示
+    - **学年別サマリ**:
+      - 学年単位の統計分析
+      - トップパフォーマンスクラス表示
+      - 支援必要生徒数カウント
+    - **教師向けクラス分析**:
+      - クラス全体統計（生徒数、平均進捗、習熟度分布）
+      - 生徒個別詳細（進捗率、学習スタイル、学習時間）
+      - 高達成者・支援必要生徒の自動分類
+    - **保護者通知システム**:
+      - メール・プッシュ通知・SMS対応
+      - 通知履歴管理
+      - 送信ステータス追跡（pending, sent, failed）
+    - **学校全体レポート**:
+      - 期間指定レポートデータ生成
+      - 学校基本情報・全体統計・学年別統計・クラス別統計
+      - PDF生成用データ構造化
+    - **APIエンドポイント**:
+      - `GET /api/school/:schoolId/classes` - 全クラス進捗
+      - `GET /api/school/:schoolId/grade-summary` - 学年別サマリ
+      - `GET /api/teacher/:teacherId/class/:classCode/analysis` - クラス分析
+      - `POST /api/parent/notify` - 保護者通知送信
+      - `GET /api/parent/notifications/:studentId` - 通知履歴
+      - `GET /api/school/:schoolId/report` - 学校レポート
+    - **実装ファイル**: `/src/school-management.ts`
+    - **デモページ**: `/school-management-demo.html`
+
+  - **統合E2Eテスト拡充** ✅:
+    - Phase 9テスト: 2ケース（学習スタイル検出、カリキュラム推薦）
+    - Phase 10テスト: 7ケース（クラス進捗、学年サマリ、教師分析、保護者通知×3、学校レポート）
+    - 総テストケース数: 75+（Phase 7-10統合）
+    - **実装ファイル**: `/tests/e2e.spec.ts`
     - パフォーマンス最適化（CDN、キャッシュレベル、Auto Minify）
     - セキュリティ設定（セキュリティヘッダー、HSTS）
     - DNS設定例まとめ（Cloudflare、お名前.com、ムームードメイン、Route 53）
