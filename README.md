@@ -292,6 +292,42 @@
     - トラブルシューティングガイド
     - パフォーマンス最適化（KVキャッシュ、INDEX）
     - **実装ファイル**: `/DEPLOYMENT_GUIDE.md`
+- **2026-01-30**: Phase 8 (Option A) 本番環境デプロイ準備完了 ✅ **NEW完了**
+  - **KVキャッシュシステム実装** ✅:
+    - Cloudflare KV統合（高速データキャッシング）
+    - 5種類のキャッシュ管理クラス:
+      - StudentProgressCache（学生進捗、TTL 5分）
+      - CurriculumCache（カリキュラム、TTL 1時間）
+      - ScTNScoreCache（ScTNスコア、TTL 1日）
+      - RankingCache（ランキング、TTL 10分）
+      - ClassStatsCache（クラス統計、TTL 5分）
+    - キャッシュ無効化パターンマッチング
+    - キャッシュ統計APIエンドポイント（`/api/admin/cache-stats`）
+    - **科学的根拠**: キャッシュ戦略は CDN Best Practices (Cloudflare, 2023) に準拠
+    - **実装ファイル**: `/src/cache.ts`
+  - **本番デプロイ完全ガイド** ✅:
+    - KV Namespace作成手順（本番＋プレビュー）
+    - D1データベース本番マイグレーション手順
+    - Cloudflare Pages プロジェクト作成手順
+    - 環境変数・シークレット設定（GEMINI_API_KEY, JWT_SECRET）
+    - KV Namespace バインディング設定（Webダッシュボード）
+    - ビルド＆デプロイコマンド
+    - 本番環境動作確認手順
+    - パフォーマンステスト基準（FCP < 1.5s, LCP < 2.5s, TTI < 3.5s, Lighthouse > 90）
+    - 定期メンテナンス手順
+    - トラブルシューティング（10種類の問題と解決策）
+    - **実装ファイル**: `/DEPLOYMENT_PRODUCTION.md`
+  - **カスタムドメイン設定ガイド** ✅:
+    - Cloudflare管理ドメイン設定（推奨、最も簡単）
+    - 外部DNSプロバイダー設定（CNAME、ALIAS、Aレコード）
+    - ルートドメイン（Apex Domain）設定
+    - SSL/TLS設定（Let's Encrypt自動発行）
+    - パフォーマンス最適化（CDN、キャッシュレベル、Auto Minify）
+    - セキュリティ設定（セキュリティヘッダー、HSTS）
+    - DNS設定例まとめ（Cloudflare、お名前.com、ムームードメイン、Route 53）
+    - 確認コマンド（DNS、SSL、HTTP/HTTPS）
+    - トラブルシューティング（DNS伝播、SSL証明書、リダイレクトループ）
+    - **実装ファイル**: `/CUSTOM_DOMAIN_GUIDE.md`
 
 ---
 
