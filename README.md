@@ -6,6 +6,7 @@
 
 **本番デプロイ完了！** ✅  
 - **本番URL**: https://e8efc4f3.jiyushindo-gakushu.pages.dev
+- **API仕様書**: https://e8efc4f3.jiyushindo-gakushu.pages.dev/static/api-docs
 - **デプロイ日時**: 2026-01-30
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 🟢 Active
@@ -2708,6 +2709,7 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 - **言語**: TypeScript
 - **実行環境**: Cloudflare Workers
 - **データベース**: Cloudflare D1 (SQLite)
+- **キャッシュ**: Cloudflare KV (TTL: 86400秒)
 - **AI**: Gemini API (Google)
 
 ### フロントエンド
@@ -2715,6 +2717,14 @@ app.get('/api/analytics/personalization-effect', async (c) => {
 - **スタイリング**: TailwindCSS (CDN)
 - **アイコン**: Font Awesome (CDN)
 - **HTTP Client**: Axios (CDN)
+
+### API仕様書 📚
+- **OpenAPI**: 3.0.3仕様
+- **ドキュメント**: Swagger UI 5.10.5
+- **エンドポイント数**: 244個
+- **カテゴリー**: 12分類
+- **認証**: JWT Bearer Token
+- **アクセス**: [/static/api-docs](https://e8efc4f3.jiyushindo-gakushu.pages.dev/static/api-docs)
 
 ### 開発環境
 - **ビルドツール**: Vite
