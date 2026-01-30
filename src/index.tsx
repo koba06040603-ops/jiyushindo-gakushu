@@ -27,6 +27,7 @@ import {
 } from './cache'
 import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
+import { AIContentGenerator } from './ai-content-generator'
 
 type Bindings = {
   DB: D1Database
@@ -1138,6 +1139,57 @@ app.get('/api/school/:schoolId/report', async (c) => {
     return c.json({
       success: true,
       data: reportData
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// =============================================================================
+// Option B: AI生成コンテンツ（学習スタイル別）
+// =============================================================================
+
+// AI生成コンテンツ - 学習スタイル別コンテンツ生成
+app.post('/api/ai/generate-content', async (c) => {
+  const { env } = c;
+  const request = await c.req.json();
+
+  try {
+    const aiGenerator = new AIContentGenerator(env.GEMINI_API_KEY, env.DB, env.LEARNING_CACHE);
+    const content = await aiGenerator.generateContent(request);
+
+    return c.json({
+      success: true,
+      data: content
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// AI生成コンテンツ履歴取得
+app.get('/api/ai/content-history', async (c) => {
+  const { env } = c;
+  const filters = {
+    topic: c.req.query('topic'),
+    learning_style: c.req.query('learning_style'),
+    content_type: c.req.query('content_type'),
+    limit: parseInt(c.req.query('limit') || '20')
+  };
+
+  try {
+    const aiGenerator = new AIContentGenerator(env.GEMINI_API_KEY, env.DB, env.LEARNING_CACHE);
+    const history = await aiGenerator.getGenerationHistory(filters);
+
+    return c.json({
+      success: true,
+      data: history
     });
   } catch (error: any) {
     return c.json({

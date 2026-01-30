@@ -453,3 +453,83 @@ test.describe('Phase 10: 学校管理機能 E2Eテスト', () => {
     expect(data.data).toHaveProperty('report_period');
   });
 });
+
+// =============================================================================
+// Option B: 追加機能テスト（AI生成コンテンツ・マルチモーダル）
+// =============================================================================
+
+test.describe('Option B: AI生成コンテンツ E2Eテスト', () => {
+  test('AI生成コンテンツ - 問題生成 APIテスト', async ({ request }) => {
+    const contentRequest = {
+      topic: '分数の足し算',
+      learning_style: 'visual',
+      grade_level: 5,
+      content_type: 'problem',
+      difficulty: 3,
+      language: 'ja'
+    };
+    
+    const response = await request.post(`${BASE_URL}/api/ai/generate-content`, {
+      data: contentRequest
+    });
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(data.data).toHaveProperty('topic');
+    expect(data.data).toHaveProperty('learning_style');
+    expect(data.data).toHaveProperty('content');
+    expect(data.data).toHaveProperty('metadata');
+    expect(data.data.learning_style).toBe('visual');
+  });
+
+  test('AI生成コンテンツ - 解説生成 APIテスト', async ({ request }) => {
+    const contentRequest = {
+      topic: '掛け算の九九',
+      learning_style: 'auditory',
+      grade_level: 3,
+      content_type: 'explanation',
+      difficulty: 2,
+      language: 'ja'
+    };
+    
+    const response = await request.post(`${BASE_URL}/api/ai/generate-content`, {
+      data: contentRequest
+    });
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(data.data).toHaveProperty('audio_script'); // 聴覚型向け
+  });
+
+  test('AI生成コンテンツ履歴取得 APIテスト', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/api/ai/content-history?limit=10`);
+    
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    
+    expect(data.success).toBe(true);
+    expect(Array.isArray(data.data)).toBe(true);
+  });
+});
+
+test.describe('Option B: マルチモーダル学習機能テスト', () => {
+  test('マルチモーダルJSライブラリ読み込みテスト', async ({ page }) => {
+    await page.goto(`${BASE_URL}/`);
+    
+    // multimodal-learning.js を読み込むページに移動
+    await page.addScriptTag({ path: './public/static/multimodal-learning.js' });
+    
+    // グローバルオブジェクトの存在確認
+    const hasTTS = await page.evaluate(() => typeof window.ttsController !== 'undefined');
+    const hasSTT = await page.evaluate(() => typeof window.sttController !== 'undefined');
+    const hasVisual = await page.evaluate(() => typeof window.visualController !== 'undefined');
+    
+    expect(hasTTS).toBe(true);
+    expect(hasSTT).toBe(true);
+    expect(hasVisual).toBe(true);
+  });
+});
