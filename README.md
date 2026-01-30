@@ -140,7 +140,8 @@
     - ドーナツチャート (分野別配分)
     - 散布図 (学習時間と成績の相関分析)
     - UIコンポーネント: AdvancedVisualization
-  - **AI先生の強化** (Gemini 2.5 Flash統合):
+  - **AI先生の強化** (Gemini 3.0 Flash統合 ⭐NEW):
+    - **Gemini 3.0 Flash**への完全移行 (gemini-2.5-flash → gemini-3.0-flash)
     - 対話履歴管理 (セッション管理)
     - 段階的ヒント提供 (3段階: Hint → Explanation → Solution)
     - メタ認知促進質問 (Before/During/After学習)
@@ -151,12 +152,45 @@
     - APIエンドポイント: 6個 (enhanced-dialogue, gradual-hints, metacognitive, learning-strategies, generate-problem, personalized-plan)
     - **科学的根拠**: Flavell (1979), Schraw & Dennison (1994), Weinstein & Mayer (1986), VanLehn (2011), Kulik & Fletcher (2016)
   - **デモページ**: `/advanced-features-demo.html`
-    - 学習統計（時間・カード数・正答率）
-    - 忘却リスクアラート
-    - 最近の活動履歴
+- **2026-01-30**: Phase 5 中優先度3機能完全実装完了 ✅ **NEW完了**
+  - **Gemini 3.0 Flash対応**:
+    - 全APIエンドポイントをGemini 3.0 Flashに更新
+    - フォールバック: gemini-3.0-flash → gemini-2.0-flash → gemini-2.5-pro
+    - より高速で効率的なAI応答
+  - **ゲーミフィケーション機能**:
+    - レベル&ポイントシステム (経験値・ランク)
+    - バッジコレクション (6種類: Bronze/Silver/Gold/Platinum)
+    - アチーブメント進捗 (3種類)
+    - ランキングシステム (ポイント・ストリーク)
+    - 連続学習ストリーク
+    - デイリークエスト (3種類)
+    - **科学的根拠**: Deci & Ryan (2000) 自己決定理論、Hamari et al. (2014)
+    - **デモページ**: `/gamification-demo.html`
+  - **保護者ダッシュボード**:
+    - 複数子供の管理
+    - 週次学習サマリー、学習活動グラフ (Chart.js)
+    - 分野別習熟度、今週の成果
+    - 学習方略使用状況
+    - 通知履歴、改善のヒント
+    - PDFレポート出力
+    - **科学的根拠**: Epstein (2001) 家庭と学校の連携、Fan & Chen (2001)
+    - **デモページ**: `/parent-dashboard-demo.html`
+  - **教師向けクラス分析ツール**:
+    - 複数クラス管理、クラス全体サマリー
+    - 学習方略採用率 (4種類)
+    - 習熟度分布・エンゲージメント推移グラフ
+    - 要支援生徒アラート (重要度別)
+    - 分野別クラス平均、苦手な単元の特定
+    - クラス間比較 (学年平均との比較)
+    - PDFレポート出力、保護者への一斉通知
+    - **科学的根拠**: Hattie (2009)、Black & Wiliam (1998) 形成的評価
+    - **デモページ**: `/teacher-dashboard-demo.html`
   - **デモページ一覧**:
     - `/integrated-dashboard.html` - 統合学習ダッシュボード
     - `/advanced-features-demo.html` - 高度な機能デモ (PDF出力・データ可視化強化・AI先生)
+    - `/gamification-demo.html` - ゲーミフィケーション機能デモ
+    - `/parent-dashboard-demo.html` - 保護者ダッシュボードデモ
+    - `/teacher-dashboard-demo.html` - 教師向けクラス分析ツールデモ
 
 ---
 
