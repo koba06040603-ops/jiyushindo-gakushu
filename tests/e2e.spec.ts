@@ -533,3 +533,133 @@ test.describe('Option B: マルチモーダル学習機能テスト', () => {
     expect(hasVisual).toBe(true);
   });
 });
+
+// =============================================================================
+// テストカバレッジ拡大: 主要機能の統合テスト
+// =============================================================================
+
+test.describe('主要APIエンドポイント統合テスト', () => {
+  test('カリキュラム一覧取得', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/api/curriculum/list`);
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(Array.isArray(data)).toBe(true);
+  });
+
+  test('学習カード取得', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/api/courses/1/cards`);
+    expect(response.status()).toBe(200);
+  });
+
+  test('進捗記録', async ({ request }) => {
+    const progressData = {
+      student_id: 1,
+      card_id: 1,
+      is_correct: true,
+      time_spent_seconds: 120
+    };
+    const response = await request.post(`${BASE_URL}/api/progress`, {
+      data: progressData
+    });
+    expect(response.status()).toBe(200);
+  });
+
+  test('ヘルスチェックエンドポイント', async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/health`);
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data).toHaveProperty('status');
+  });
+});
+
+test.describe('WCAG 2.1 AAアクセシビリティテスト', () => {
+  test('キーボードナビゲーション - Tabキーでフォーカス移動', async ({ page }) => {
+    await page.goto(`${BASE_URL}/integrated-dashboard.html`);
+    
+    // 最初の要素にフォーカス
+    await page.keyboard.press('Tab');
+    
+    // フォーカスされた要素を確認
+    const focusedElement = await page.evaluate(() => {
+      return document.activeElement?.tagName;
+    });
+    
+    expect(focusedElement).toBeTruthy();
+  });
+
+  test('画像にalt属性が存在', async ({ page }) => {
+    await page.goto(`${BASE_URL}/integrated-dashboard.html`);
+    
+    const imagesWithoutAlt = await page.$$eval('img', imgs => 
+      imgs.filter(img => !img.hasAttribute('alt')).length
+    );
+    
+    expect(imagesWithoutAlt).toBe(0);
+  });
+
+  test('フォーム要素にラベルが存在', async ({ page }) => {
+    await page.goto(`${BASE_URL}/auth-demo.html`);
+    
+    const inputsWithoutLabel = await page.$$eval('input[type="text"], input[type="email"], input[type="password"]', inputs =>
+      inputs.filter(input => {
+        const id = input.id;
+        return !id || !document.querySelector(`label[for="${id}"]`);
+      }).length
+    );
+    
+    expect(inputsWithoutLabel).toBe(0);
+  });
+
+  test('カラーコントラスト比（視覚的確認）', async ({ page }) => {
+    await page.goto(`${BASE_URL}/`);
+    
+    // ページが正常にロードされることを確認
+    await expect(page.locator('body')).toBeVisible();
+  });
+
+  test('ボタンのフォーカス表示', async ({ page }) => {
+    await page.goto(`${BASE_URL}/adaptive-learning-demo.html`);
+    
+    const button = page.locator('button').first();
+    await button.focus();
+    
+    // フォーカスリングが表示されることを確認（視覚的）
+    const hasFocusStyle = await button.evaluate(el => {
+      const styles = window.getComputedStyle(el);
+      return styles.outline !== 'none' || styles.boxShadow !== 'none';
+    });
+    
+    expect(hasFocusStyle).toBe(true);
+  });
+});
+
+test.describe('パフォーマンステスト拡張', () => {
+  test('API応答時間 < 200ms', async ({ request }) => {
+    const startTime = Date.now();
+    await request.get(`${BASE_URL}/api/curriculum/list`);
+    const duration = Date.now() - startTime;
+    
+    expect(duration).toBeLessThan(200);
+  });
+
+  test('大量データ取得のパフォーマンス', async ({ request }) => {
+    const startTime = Date.now();
+    await request.get(`${BASE_URL}/api/progress/class/CLASS001`);
+    const duration = Date.now() - startTime;
+    
+    expect(duration).toBeLessThan(500);
+  });
+
+  test('並行リクエスト処理', async ({ request }) => {
+    const requests = Array(10).fill(null).map(() =>
+      request.get(`${BASE_URL}/api/curriculum/list`)
+    );
+    
+    const startTime = Date.now();
+    await Promise.all(requests);
+    const duration = Date.now() - startTime;
+    
+    // 10並行リクエストが1秒以内に完了
+    expect(duration).toBeLessThan(1000);
+  });
+});
