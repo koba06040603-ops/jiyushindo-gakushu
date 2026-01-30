@@ -25084,6 +25084,61 @@ async function showCardMediaEditor(cardId, cardTitle) {
                 画像を追加
               </h4>
               <div class="space-y-3">
+                <!-- ファイルアップロードセクション -->
+                <div class="bg-white p-4 rounded-lg border-2 border-dashed border-blue-300">
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-upload mr-1 text-blue-600"></i>
+                    ファイルから画像をアップロード
+                  </label>
+                  <input 
+                    type="file" 
+                    id="image-file-input"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                    class="hidden"
+                    onchange="handleImageFileSelect(event)"
+                  />
+                  <div 
+                    id="image-drop-zone"
+                    class="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
+                    onclick="document.getElementById('image-file-input').click()"
+                    ondragover="handleDragOver(event)"
+                    ondrop="handleImageDrop(event)"
+                  >
+                    <i class="fas fa-cloud-upload-alt text-4xl text-blue-400 mb-2"></i>
+                    <p class="text-sm text-gray-600">クリックして画像を選択、またはドラッグ&ドロップ</p>
+                    <p class="text-xs text-gray-500 mt-1">JPEG, PNG, GIF, WebP（最大10MB）</p>
+                  </div>
+                  <!-- プレビューエリア -->
+                  <div id="image-upload-preview" class="mt-3 hidden">
+                    <img id="image-preview-img" class="w-full h-48 object-cover rounded-lg mb-2" />
+                    <div class="flex justify-between items-center">
+                      <span id="image-preview-name" class="text-sm text-gray-600"></span>
+                      <button 
+                        onclick="clearImagePreview()"
+                        class="text-red-500 hover:text-red-700 text-sm font-bold"
+                      >
+                        <i class="fas fa-times mr-1"></i>
+                        キャンセル
+                      </button>
+                    </div>
+                  </div>
+                  <button 
+                    id="upload-image-btn"
+                    onclick="uploadImageFile()"
+                    class="w-full bg-green-500 text-white py-2 px-4 rounded-lg font-bold hover:bg-green-600 transition-all mt-3 hidden"
+                  >
+                    <i class="fas fa-upload mr-2"></i>
+                    アップロードして追加
+                  </button>
+                </div>
+                
+                <!-- または区切り線 -->
+                <div class="flex items-center gap-3">
+                  <div class="flex-1 border-t border-gray-300"></div>
+                  <span class="text-xs text-gray-500 font-semibold">または</span>
+                  <div class="flex-1 border-t border-gray-300"></div>
+                </div>
+                
                 <div>
                   <label class="block text-sm font-semibold text-gray-700 mb-1">画像URL</label>
                   <input 
@@ -25659,6 +25714,251 @@ window.deleteCardImage = deleteCardImage
 window.deleteCardVideo = deleteCardVideo
 
 console.log('✅ Phase 13: 学習カードメディア管理UI 読み込み完了')
+
+// =============================================================================
+// Phase 14: ファイルアップロード機能
+// =============================================================================
+
+// ファイルアップロード状態
+const fileUploadState = {
+  selectedImageFile: null,
+  selectedVideoFile: null
+}
+
+// 画像ファイル選択ハンドラ
+function handleImageFileSelect(event) {
+  const file = event.target.files[0]
+  if (file) {
+    previewImageFile(file)
+  }
+}
+
+// 画像ドラッグオーバーハンドラ
+function handleDragOver(event) {
+  event.preventDefault()
+  event.stopPropagation()
+  event.dataTransfer.dropEffect = 'copy'
+}
+
+// 画像ドロップハンドラ
+function handleImageDrop(event) {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  const file = event.dataTransfer.files[0]
+  if (file && file.type.startsWith('image/')) {
+    previewImageFile(file)
+  } else {
+    alert('画像ファイルのみアップロード可能です')
+  }
+}
+
+// 画像ファイルプレビュー
+function previewImageFile(file) {
+  // ファイルサイズチェック（10MB）
+  const maxSize = 10 * 1024 * 1024
+  if (file.size > maxSize) {
+    alert('ファイルサイズが大きすぎます。10MB以下の画像を選択してください。')
+    return
+  }
+  
+  fileUploadState.selectedImageFile = file
+  
+  // プレビュー表示
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const previewDiv = document.getElementById('image-upload-preview')
+    const previewImg = document.getElementById('image-preview-img')
+    const previewName = document.getElementById('image-preview-name')
+    const uploadBtn = document.getElementById('upload-image-btn')
+    
+    previewImg.src = e.target.result
+    previewName.textContent = file.name + ' (' + formatFileSize(file.size) + ')'
+    previewDiv.classList.remove('hidden')
+    uploadBtn.classList.remove('hidden')
+  }
+  reader.readAsDataURL(file)
+}
+
+// 画像プレビュークリア
+function clearImagePreview() {
+  fileUploadState.selectedImageFile = null
+  
+  const previewDiv = document.getElementById('image-upload-preview')
+  const uploadBtn = document.getElementById('upload-image-btn')
+  const fileInput = document.getElementById('image-file-input')
+  
+  previewDiv.classList.add('hidden')
+  uploadBtn.classList.add('hidden')
+  fileInput.value = ''
+}
+
+// ファイルサイズフォーマット
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+}
+
+// 画像ファイルアップロード
+async function uploadImageFile() {
+  if (!fileUploadState.selectedImageFile) {
+    alert('画像ファイルが選択されていません')
+    return
+  }
+  
+  try {
+    showLoading('画像をアップロード中...')
+    
+    // FormData作成
+    const formData = new FormData()
+    formData.append('file', fileUploadState.selectedImageFile)
+    
+    // アップロード実行
+    const response = await axios.post('/api/upload/image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      // アップロード成功 - 画像URLをフォームに設定
+      document.getElementById('new-image-url').value = response.data.image_url
+      document.getElementById('new-image-alt').value = fileUploadState.selectedImageFile.name.split('.')[0]
+      
+      alert('✅ 画像をアップロードしました！\n\n「画像を追加」ボタンをクリックして学習カードに追加してください。')
+      
+      // プレビュークリア
+      clearImagePreview()
+    } else {
+      alert('❌ アップロードに失敗しました: ' + response.data.error)
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 画像アップロードエラー:', error)
+    alert('画像のアップロードに失敗しました')
+  }
+}
+
+// 動画ファイル選択ハンドラ
+function handleVideoFileSelect(event) {
+  const file = event.target.files[0]
+  if (file) {
+    previewVideoFile(file)
+  }
+}
+
+// 動画ドロップハンドラ
+function handleVideoDrop(event) {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  const file = event.dataTransfer.files[0]
+  if (file && file.type.startsWith('video/')) {
+    previewVideoFile(file)
+  } else {
+    alert('動画ファイルのみアップロード可能です')
+  }
+}
+
+// 動画ファイルプレビュー
+function previewVideoFile(file) {
+  // ファイルサイズチェック（100MB）
+  const maxSize = 100 * 1024 * 1024
+  if (file.size > maxSize) {
+    alert('ファイルサイズが大きすぎます。100MB以下の動画を選択してください。')
+    return
+  }
+  
+  fileUploadState.selectedVideoFile = file
+  
+  const previewDiv = document.getElementById('video-upload-preview')
+  const previewName = document.getElementById('video-preview-name')
+  const uploadBtn = document.getElementById('upload-video-btn')
+  
+  if (previewDiv && previewName && uploadBtn) {
+    previewName.textContent = file.name + ' (' + formatFileSize(file.size) + ')'
+    previewDiv.classList.remove('hidden')
+    uploadBtn.classList.remove('hidden')
+  }
+}
+
+// 動画プレビュークリア
+function clearVideoPreview() {
+  fileUploadState.selectedVideoFile = null
+  
+  const previewDiv = document.getElementById('video-upload-preview')
+  const uploadBtn = document.getElementById('upload-video-btn')
+  const fileInput = document.getElementById('video-file-input')
+  
+  if (previewDiv && uploadBtn && fileInput) {
+    previewDiv.classList.add('hidden')
+    uploadBtn.classList.add('hidden')
+    fileInput.value = ''
+  }
+}
+
+// 動画ファイルアップロード
+async function uploadVideoFile() {
+  if (!fileUploadState.selectedVideoFile) {
+    alert('動画ファイルが選択されていません')
+    return
+  }
+  
+  try {
+    showLoading('動画をアップロード中... (大きなファイルは時間がかかります)')
+    
+    // FormData作成
+    const formData = new FormData()
+    formData.append('file', fileUploadState.selectedVideoFile)
+    
+    // アップロード実行
+    const response = await axios.post('/api/upload/video', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      // アップロード成功 - 動画URLをフォームに設定
+      document.getElementById('new-video-url').value = response.data.video_url
+      document.getElementById('new-video-title').value = fileUploadState.selectedVideoFile.name.split('.')[0]
+      
+      alert('✅ 動画をアップロードしました！\n\n「動画を追加」ボタンをクリックして学習カードに追加してください。')
+      
+      // プレビュークリア
+      clearVideoPreview()
+    } else {
+      alert('❌ アップロードに失敗しました: ' + response.data.error)
+    }
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 動画アップロードエラー:', error)
+    alert('動画のアップロードに失敗しました')
+  }
+}
+
+// グローバルスコープに登録
+window.handleImageFileSelect = handleImageFileSelect
+window.handleDragOver = handleDragOver
+window.handleImageDrop = handleImageDrop
+window.previewImageFile = previewImageFile
+window.clearImagePreview = clearImagePreview
+window.uploadImageFile = uploadImageFile
+window.handleVideoFileSelect = handleVideoFileSelect
+window.handleVideoDrop = handleVideoDrop
+window.previewVideoFile = previewVideoFile
+window.clearVideoPreview = clearVideoPreview
+window.uploadVideoFile = uploadVideoFile
+
+console.log('✅ Phase 14: ファイルアップロード機能 読み込み完了')
+
 
 
 

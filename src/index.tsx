@@ -17342,4 +17342,179 @@ app.post('/api/cards/:cardId/edit-history', async (c) => {
   }
 })
 
+// =============================================================================
+// Phase 14: ファイルアップロード機能（Cloudflare R2）
+// =============================================================================
+
+// 画像ファイルアップロード
+app.post('/api/upload/image', async (c) => {
+  const { env } = c
+  
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    
+    if (!file) {
+      return c.json({ success: false, error: 'ファイルが選択されていません' }, 400)
+    }
+    
+    // ファイルタイプチェック
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      return c.json({ 
+        success: false, 
+        error: 'サポートされていない画像形式です。JPEG、PNG、GIF、WebPのみ対応しています。' 
+      }, 400)
+    }
+    
+    // ファイルサイズチェック（10MB制限）
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      return c.json({ 
+        success: false, 
+        error: 'ファイルサイズが大きすぎます。10MB以下の画像をアップロードしてください。' 
+      }, 400)
+    }
+    
+    // ファイル名生成（タイムスタンプ + ランダム文字列）
+    const timestamp = Date.now()
+    const randomStr = Math.random().toString(36).substring(7)
+    const extension = file.name.split('.').pop()
+    const fileName = `images/${timestamp}-${randomStr}.${extension}`
+    
+    // R2にアップロード
+    const arrayBuffer = await file.arrayBuffer()
+    await env.MEDIA_BUCKET.put(fileName, arrayBuffer, {
+      httpMetadata: {
+        contentType: file.type
+      }
+    })
+    
+    // 公開URLを生成（Cloudflare R2のカスタムドメイン設定が必要）
+    // 開発環境では /api/media/{fileName} 経由でアクセス
+    const imageUrl = `/api/media/${fileName}`
+    
+    return c.json({
+      success: true,
+      image_url: imageUrl,
+      file_name: fileName,
+      file_size: file.size,
+      mime_type: file.type
+    })
+  } catch (error: any) {
+    console.error('❌ 画像アップロードエラー:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message,
+      details: '画像のアップロードに失敗しました'
+    }, 500)
+  }
+})
+
+// 動画ファイルアップロード
+app.post('/api/upload/video', async (c) => {
+  const { env } = c
+  
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    
+    if (!file) {
+      return c.json({ success: false, error: 'ファイルが選択されていません' }, 400)
+    }
+    
+    // ファイルタイプチェック
+    const allowedTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']
+    if (!allowedTypes.includes(file.type)) {
+      return c.json({ 
+        success: false, 
+        error: 'サポートされていない動画形式です。MP4、WebM、OGG、MOVのみ対応しています。' 
+      }, 400)
+    }
+    
+    // ファイルサイズチェック（100MB制限）
+    const maxSize = 100 * 1024 * 1024 // 100MB
+    if (file.size > maxSize) {
+      return c.json({ 
+        success: false, 
+        error: 'ファイルサイズが大きすぎます。100MB以下の動画をアップロードしてください。' 
+      }, 400)
+    }
+    
+    // ファイル名生成
+    const timestamp = Date.now()
+    const randomStr = Math.random().toString(36).substring(7)
+    const extension = file.name.split('.').pop()
+    const fileName = `videos/${timestamp}-${randomStr}.${extension}`
+    
+    // R2にアップロード
+    const arrayBuffer = await file.arrayBuffer()
+    await env.MEDIA_BUCKET.put(fileName, arrayBuffer, {
+      httpMetadata: {
+        contentType: file.type
+      }
+    })
+    
+    // 公開URLを生成
+    const videoUrl = `/api/media/${fileName}`
+    
+    return c.json({
+      success: true,
+      video_url: videoUrl,
+      file_name: fileName,
+      file_size: file.size,
+      mime_type: file.type
+    })
+  } catch (error: any) {
+    console.error('❌ 動画アップロードエラー:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message,
+      details: '動画のアップロードに失敗しました'
+    }, 500)
+  }
+})
+
+// R2からメディアファイル取得（プロキシ）
+app.get('/api/media/*', async (c) => {
+  const { env } = c
+  const fileName = c.req.param('*')
+  
+  try {
+    const object = await env.MEDIA_BUCKET.get(fileName)
+    
+    if (!object) {
+      return c.notFound()
+    }
+    
+    const headers = new Headers()
+    object.writeHttpMetadata(headers)
+    headers.set('etag', object.httpEtag)
+    headers.set('Cache-Control', 'public, max-age=31536000') // 1年キャッシュ
+    
+    return new Response(object.body, { headers })
+  } catch (error: any) {
+    console.error('❌ メディア取得エラー:', error)
+    return c.notFound()
+  }
+})
+
+// R2からメディアファイル削除
+app.delete('/api/media/:fileName', async (c) => {
+  const { env } = c
+  const fileName = c.req.param('fileName')
+  
+  try {
+    await env.MEDIA_BUCKET.delete(fileName)
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('❌ メディア削除エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message 
+    }, 500)
+  }
+})
+
 export default app
