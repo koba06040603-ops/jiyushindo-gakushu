@@ -50,7 +50,7 @@
 ## 🚀 すぐに試す（デモ）
 
 ### 📱 本番URL
-**https://3058cd3c.jiyushindo-gakushu.pages.dev** ✅ 最新版（動画学習プレイヤー + レポートテンプレート管理システム）
+**https://d9e59052.jiyushindo-gakushu.pages.dev** ✅ 最新版（学習カードメディア管理 + AI画像生成機能）
 
 ### 🔐 デモアカウント
 

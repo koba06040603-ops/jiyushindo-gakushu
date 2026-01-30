@@ -5,12 +5,12 @@
 ## 🌐 本番環境URL
 
 **本番デプロイ完了！** ✅  
-- **本番URL**: https://3058cd3c.jiyushindo-gakushu.pages.dev
-- **API仕様書**: https://3058cd3c.jiyushindo-gakushu.pages.dev/static/api-docs
+- **本番URL**: https://d9e59052.jiyushindo-gakushu.pages.dev
+- **API仕様書**: https://d9e59052.jiyushindo-gakushu.pages.dev/static/api-docs
 - **デプロイ日時**: 2026-01-30
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 🟢 Active
-- **最新機能**: 動画学習プレイヤー + レポートテンプレート管理システム
+- **最新機能**: 学習カードメディア管理 + AI画像生成
 
 ## プロジェクト概要
 
@@ -216,6 +216,24 @@
     - 達成バッジ、クラス比較、学習予測
     - 保護者向けメッセージ
   - **デプロイ**: https://3058cd3c.jiyushindo-gakushu.pages.dev
+- **2026-01-30**: 学習カードメディア管理機能実装完了 ✅ **完了** (Phase 13)
+  - **メディア管理UI**:
+    - 学習カードに画像・動画を追加
+    - 画像URL入力、画像タイプ選択（イラスト、図解、写真、AI生成）
+    - 説明文、キャプション、表示順序設定
+    - 動画URL追加（YouTube、Vimeo、直接URL）
+  - **AI画像生成**:
+    - Gemini Imagen API統合（デモ版）
+    - プロンプト入力、スタイル選択
+    - ネガティブプロンプト対応
+    - 生成画像プレビュー、学習カードへの追加
+    - AI生成履歴管理
+  - **データベース拡張**:
+    - card_imagesテーブル（画像管理）
+    - card_media_metadataテーブル（メディアメタデータ）
+    - ai_generated_imagesテーブル（AI生成履歴）
+    - card_edit_historyテーブル（編集履歴）
+  - **デプロイ**: https://d9e59052.jiyushindo-gakushu.pages.dev
 - **2026-01-29**: 高優先度3機能完全実装完了 ✅ **完了**
   - **PDF出力機能** (jsPDF + autoTable + Chart.js統合):
     - 週次・月次レポートのPDF生成
