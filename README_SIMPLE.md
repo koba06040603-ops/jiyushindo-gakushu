@@ -594,6 +594,14 @@ Email: xxx@school.jp
 - **温かく忍耐強い教師スタイル**：答えを教えず、質問とヒントで導く
 - **マルチモーダル対話**：画像を見せながら質問可能
 
+### 次世代学習支援機能（Phase 19）
+- **学習データ分析ダッシュボード**：クラス統計・個人分析・Chart.js可視化
+- **音声認識による学習記録**：Web Speech API統合・音声メモ保存
+- **オフラインモード/PWA**：Service Worker対応準備完了
+- **ゲーミフィケーション**：ポイント・バッジ・レベルシステム
+- **カスタマイズ可能なテーマ**：フォントサイズ・カラー設定
+- **保護者向けダッシュボード**：週次レポート・コメント管理（基盤実装）
+
 ### デプロイ
 - **Cloudflare Pages**：グローバルエッジ配信
 - **自動デプロイ**：GitHubプッシュで即反映
@@ -606,7 +614,7 @@ Email: xxx@school.jp
 - 📘 [詳細README（技術者向け）](./README.md)
 - 📄 [紙学習対応ガイド](./PAPER_LEARNING_SUPPORT.md)
 - 🔗 [GitHub](https://github.com/koba06040603-ops/jiyushindo-gakushu)
-- 🌐 [本番環境](https://9f03ad4b.jiyushindo-gakushu.pages.dev)
+- 🌐 [本番環境](https://c95fed65.jiyushindo-gakushu.pages.dev)
 
 ### 🔒 セキュリティ・プライバシー関連
 - **[セキュリティ・プライバシーポリシー](./SECURITY_PRIVACY.md)** - 完全版
