@@ -25776,10 +25776,14 @@ function previewImageFile(file) {
     previewName.innerHTML = `
       <div class="flex items-center justify-between flex-wrap gap-2">
         <span class="font-medium">${file.name} (${formatFileSize(file.size)})</span>
-        <div class="flex gap-2">
+        <div class="flex gap-2 flex-wrap">
           <button onclick="showImageEditor(fileUploadState.selectedImageFile)" 
                   class="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition">
-            <i class="fas fa-edit"></i> 画像編集
+            <i class="fas fa-edit"></i> 簡易編集
+          </button>
+          <button onclick="openPhotopeaEditor(fileUploadState.selectedImageFile)" 
+                  class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition">
+            <i class="fas fa-paint-brush"></i> 高度な編集
           </button>
           <button onclick="handleFaceBlur()" 
                   class="px-3 py-1 bg-pink-600 text-white text-sm rounded hover:bg-pink-700 transition">
@@ -26094,7 +26098,7 @@ async function showMediaLibrary(type = 'all') {
         </div>
         
         <div class="p-4 border-b">
-          <div class="flex gap-4">
+          <div class="flex gap-4 flex-wrap">
             <input type="text" id="media-search-input" placeholder="ファイル名で検索..." 
                    class="flex-1 px-4 py-2 border rounded-lg">
             <select id="media-type-filter" class="px-4 py-2 border rounded-lg">
@@ -26104,6 +26108,10 @@ async function showMediaLibrary(type = 'all') {
             </select>
             <button onclick="loadMediaLibrary()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
               <i class="fas fa-search"></i> 検索
+            </button>
+            <button onclick="closeMediaLibrary(); showVideoMergeEditor()" 
+                    class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+              <i class="fas fa-film"></i> 動画結合
             </button>
           </div>
         </div>
@@ -26156,7 +26164,7 @@ async function loadMediaLibrary() {
       }
       
       const filesHTML = files.map(file => `
-        <div class="border rounded-lg p-4 hover:shadow-lg transition">
+        <div class="border rounded-lg p-4 hover:shadow-lg transition" data-media-key="${file.key}">
           ${file.type === 'image' ? `
             <img src="${file.url}" alt="${file.key}" class="w-full h-40 object-cover rounded mb-2">
           ` : `
@@ -26164,9 +26172,19 @@ async function loadMediaLibrary() {
               <i class="fas fa-video text-4xl text-gray-400"></i>
             </div>
           `}
-          <p class="text-sm font-medium truncate mb-1">${file.key.split('/').pop()}</p>
+          <p class="text-sm font-medium truncate mb-1" title="${file.key}">${file.key.split('/').pop()}</p>
           <p class="text-xs text-gray-500 mb-2">${formatFileSize(file.size)}</p>
-          <p class="text-xs text-gray-400 mb-3">${new Date(file.uploaded).toLocaleString('ja-JP')}</p>
+          <p class="text-xs text-gray-400 mb-2">${new Date(file.uploaded).toLocaleString('ja-JP')}</p>
+          
+          <div id="tags-${file.key.replace(/[^a-zA-Z0-9]/g, '_')}" class="mb-2 min-h-6">
+            <div class="flex items-center gap-1 flex-wrap">
+              <span class="text-xs text-gray-400">タグ:</span>
+              <button onclick="showTagEditor('${file.key}')" class="text-xs text-blue-600 hover:underline">
+                <i class="fas fa-plus"></i> 追加
+              </button>
+            </div>
+          </div>
+          
           <div class="flex gap-2">
             <button onclick="useMediaFile('${file.url}', '${file.type}')" 
                     class="flex-1 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
@@ -26175,6 +26193,10 @@ async function loadMediaLibrary() {
             <button onclick="copyMediaUrl('${file.url}')" 
                     class="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300">
               <i class="fas fa-copy"></i>
+            </button>
+            <button onclick="showTagEditor('${file.key}')" 
+                    class="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700">
+              <i class="fas fa-tags"></i>
             </button>
           </div>
         </div>
@@ -27179,6 +27201,863 @@ window.handleFaceBlur = handleFaceBlur
 
 console.log('✅ Phase 17E: face-api.js 顔認識機能 読み込み完了')
 console.log('🎉 Phase 17 全機能実装完了！')
+
+// ============================================================
+// Phase 18A-B: FFmpeg.wasm 動画結合・フィルター機能
+// ============================================================
+
+// 動画結合用のファイルリスト
+let videoMergeFiles = []
+
+// 動画結合エディタを表示
+function showVideoMergeEditor() {
+  const modalHTML = `
+    <div id="video-merge-modal" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg w-full max-w-5xl max-h-screen overflow-hidden flex flex-col">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h2 class="text-xl font-bold">🎬 動画結合エディタ</h2>
+          <button onclick="closeVideoMergeEditor()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <div class="flex-1 overflow-auto p-4">
+          <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
+            <h3 class="font-bold mb-2"><i class="fas fa-info-circle"></i> 使い方</h3>
+            <ol class="list-decimal list-inside space-y-1 text-sm">
+              <li>「動画を追加」ボタンで結合したい動画を複数選択</li>
+              <li>リスト内でドラッグ＆ドロップして順序を変更</li>
+              <li>「動画を結合」ボタンで処理開始</li>
+            </ol>
+          </div>
+          
+          <div class="mb-4">
+            <input type="file" id="merge-video-input" accept="video/*" multiple class="hidden" 
+                   onchange="handleMergeVideoSelect(event)">
+            <button onclick="document.getElementById('merge-video-input').click()" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              <i class="fas fa-plus"></i> 動画を追加
+            </button>
+          </div>
+          
+          <div id="merge-video-list" class="space-y-2 mb-4">
+            <p class="text-gray-500 text-center py-8">動画を追加してください</p>
+          </div>
+          
+          <div id="merge-progress" class="hidden mb-4">
+            <div class="bg-blue-100 border border-blue-300 rounded p-3">
+              <div class="flex items-center mb-2">
+                <i class="fas fa-spinner fa-spin mr-2"></i>
+                <span id="merge-status">処理中...</span>
+              </div>
+              <div class="bg-gray-200 rounded-full h-2">
+                <div id="merge-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <h3 class="font-bold mb-2">📹 フィルター適用（オプション）</h3>
+            <select id="merge-filter-select" class="w-full px-3 py-2 border rounded">
+              <option value="none">フィルターなし</option>
+              <option value="grayscale">グレースケール</option>
+              <option value="sepia">セピア</option>
+              <option value="brightness_1.2">明るく</option>
+              <option value="brightness_0.8">暗く</option>
+              <option value="contrast_1.5">コントラスト強</option>
+              <option value="saturation_1.5">彩度強</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="p-4 border-t bg-gray-50 flex gap-2 justify-end">
+          <button onclick="closeVideoMergeEditor()" class="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+            キャンセル
+          </button>
+          <button onclick="mergeVideos()" id="merge-execute-btn" disabled 
+                  class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
+            <i class="fas fa-magic"></i> 動画を結合
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  videoMergeFiles = []
+}
+
+// 動画結合エディタを閉じる
+function closeVideoMergeEditor() {
+  const modal = document.getElementById('video-merge-modal')
+  if (modal) {
+    modal.remove()
+  }
+  videoMergeFiles = []
+}
+
+// 結合用動画選択
+function handleMergeVideoSelect(event) {
+  const files = Array.from(event.target.files)
+  
+  files.forEach(file => {
+    if (file.type.startsWith('video/')) {
+      videoMergeFiles.push(file)
+    }
+  })
+  
+  updateMergeVideoList()
+  event.target.value = '' // リセット
+}
+
+// 結合動画リストを更新
+function updateMergeVideoList() {
+  const listDiv = document.getElementById('merge-video-list')
+  const executeBtn = document.getElementById('merge-execute-btn')
+  
+  if (videoMergeFiles.length === 0) {
+    listDiv.innerHTML = '<p class="text-gray-500 text-center py-8">動画を追加してください</p>'
+    executeBtn.disabled = true
+    return
+  }
+  
+  executeBtn.disabled = videoMergeFiles.length < 2
+  
+  listDiv.innerHTML = videoMergeFiles.map((file, index) => `
+    <div class="flex items-center justify-between p-3 bg-gray-50 border rounded hover:bg-gray-100" 
+         draggable="true" 
+         ondragstart="handleMergeDragStart(event, ${index})"
+         ondragover="handleMergeDragOver(event)"
+         ondrop="handleMergeDrop(event, ${index})">
+      <div class="flex items-center gap-3">
+        <i class="fas fa-grip-vertical text-gray-400 cursor-move"></i>
+        <span class="font-mono text-sm text-gray-500">${index + 1}.</span>
+        <i class="fas fa-film text-blue-600"></i>
+        <span class="font-medium">${file.name}</span>
+        <span class="text-sm text-gray-500">(${formatFileSize(file.size)})</span>
+      </div>
+      <button onclick="removeMergeVideo(${index})" class="text-red-600 hover:text-red-700">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+  `).join('')
+}
+
+// ドラッグ＆ドロップ関連
+let draggedMergeIndex = null
+
+function handleMergeDragStart(event, index) {
+  draggedMergeIndex = index
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+function handleMergeDragOver(event) {
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+}
+
+function handleMergeDrop(event, targetIndex) {
+  event.preventDefault()
+  
+  if (draggedMergeIndex === null || draggedMergeIndex === targetIndex) return
+  
+  // 配列の要素を入れ替え
+  const [removed] = videoMergeFiles.splice(draggedMergeIndex, 1)
+  videoMergeFiles.splice(targetIndex, 0, removed)
+  
+  draggedMergeIndex = null
+  updateMergeVideoList()
+}
+
+// 動画を削除
+function removeMergeVideo(index) {
+  videoMergeFiles.splice(index, 1)
+  updateMergeVideoList()
+}
+
+// 動画結合実行
+async function mergeVideos() {
+  if (videoMergeFiles.length < 2) {
+    alert('2つ以上の動画を追加してください')
+    return
+  }
+  
+  const progressDiv = document.getElementById('merge-progress')
+  const statusSpan = document.getElementById('merge-status')
+  const progressBar = document.getElementById('merge-progress-bar')
+  const filterSelect = document.getElementById('merge-filter-select')
+  const selectedFilter = filterSelect.value
+  
+  try {
+    progressDiv.classList.remove('hidden')
+    statusSpan.textContent = 'FFmpeg.wasmを初期化中...'
+    progressBar.style.width = '5%'
+    
+    // FFmpeg初期化
+    const ffmpeg = await initFFmpeg()
+    if (!ffmpeg) {
+      throw new Error('FFmpeg初期化失敗')
+    }
+    
+    statusSpan.textContent = '動画ファイルを読み込み中...'
+    progressBar.style.width = '15%'
+    
+    // 各動画をFFmpegに読み込み
+    const { fetchFile } = FFmpeg
+    const inputFiles = []
+    
+    for (let i = 0; i < videoMergeFiles.length; i++) {
+      const inputName = `input${i}.mp4`
+      await ffmpeg.FS('writeFile', inputName, await fetchFile(videoMergeFiles[i]))
+      inputFiles.push(inputName)
+      
+      const progress = 15 + (i + 1) / videoMergeFiles.length * 20
+      progressBar.style.width = `${progress}%`
+    }
+    
+    statusSpan.textContent = '結合リストを作成中...'
+    progressBar.style.width = '40%'
+    
+    // concat用リストファイル作成
+    const concatList = inputFiles.map(f => `file '${f}'`).join('\n')
+    await ffmpeg.FS('writeFile', 'concat_list.txt', new TextEncoder().encode(concatList))
+    
+    statusSpan.textContent = '動画を結合中...（時間がかかる場合があります）'
+    progressBar.style.width = '50%'
+    
+    // フィルター設定
+    let filterArgs = []
+    if (selectedFilter !== 'none') {
+      if (selectedFilter === 'grayscale') {
+        filterArgs = ['-vf', 'format=gray']
+      } else if (selectedFilter === 'sepia') {
+        filterArgs = ['-vf', 'colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131']
+      } else if (selectedFilter.startsWith('brightness_')) {
+        const value = selectedFilter.split('_')[1]
+        filterArgs = ['-vf', `eq=brightness=${parseFloat(value) - 1}`]
+      } else if (selectedFilter.startsWith('contrast_')) {
+        const value = selectedFilter.split('_')[1]
+        filterArgs = ['-vf', `eq=contrast=${value}`]
+      } else if (selectedFilter.startsWith('saturation_')) {
+        const value = selectedFilter.split('_')[1]
+        filterArgs = ['-vf', `eq=saturation=${value}`]
+      }
+    }
+    
+    // 動画結合実行
+    await ffmpeg.run(
+      '-f', 'concat',
+      '-safe', '0',
+      '-i', 'concat_list.txt',
+      '-c', 'copy',
+      ...filterArgs,
+      'merged_output.mp4'
+    )
+    
+    statusSpan.textContent = '出力ファイルを準備中...'
+    progressBar.style.width = '90%'
+    
+    // 出力ファイルを取得
+    const data = ffmpeg.FS('readFile', 'merged_output.mp4')
+    const blob = new Blob([data.buffer], { type: 'video/mp4' })
+    const file = new File([blob], 'merged-video.mp4', { type: 'video/mp4' })
+    
+    // クリーンアップ
+    inputFiles.forEach(f => {
+      try { ffmpeg.FS('unlink', f) } catch (e) {}
+    })
+    try { ffmpeg.FS('unlink', 'concat_list.txt') } catch (e) {}
+    try { ffmpeg.FS('unlink', 'merged_output.mp4') } catch (e) {}
+    
+    statusSpan.textContent = '完了！'
+    progressBar.style.width = '100%'
+    
+    // ファイルをアップロード状態に設定
+    fileUploadState.selectedVideoFile = file
+    
+    closeVideoMergeEditor()
+    previewVideoFile(file)
+    alert(`✅ ${videoMergeFiles.length}個の動画を結合しました。「アップロードして追加」をクリックしてください。`)
+    
+  } catch (error) {
+    console.error('❌ 動画結合エラー:', error)
+    alert(`動画の結合に失敗しました: ${error.message}`)
+  } finally {
+    progressDiv.classList.add('hidden')
+  }
+}
+
+// グローバルに関数を公開
+window.showVideoMergeEditor = showVideoMergeEditor
+window.closeVideoMergeEditor = closeVideoMergeEditor
+window.handleMergeVideoSelect = handleMergeVideoSelect
+window.handleMergeDragStart = handleMergeDragStart
+window.handleMergeDragOver = handleMergeDragOver
+window.handleMergeDrop = handleMergeDrop
+window.removeMergeVideo = removeMergeVideo
+window.mergeVideos = mergeVideos
+
+console.log('✅ Phase 18A-B: FFmpeg.wasm 動画結合・フィルター機能 読み込み完了')
+
+// ============================================================
+// Phase 18C: メディアタグUI
+// ============================================================
+
+// タグエディタを表示
+async function showTagEditor(mediaKey) {
+  try {
+    // 全タグを取得
+    const tagsResponse = await axios.get('/api/tags')
+    const allTags = tagsResponse.data.tags || []
+    
+    // 現在のメディアのタグを取得
+    const mediaTagsResponse = await axios.get(`/api/media/${encodeURIComponent(mediaKey)}/tags`)
+    const currentTags = mediaTagsResponse.data.tags || []
+    const currentTagIds = currentTags.map(t => t.id)
+    
+    // カテゴリ別にグループ化
+    const tagsByCategory = {}
+    allTags.forEach(tag => {
+      const category = tag.category || '未分類'
+      if (!tagsByCategory[category]) {
+        tagsByCategory[category] = []
+      }
+      tagsByCategory[category].push(tag)
+    })
+    
+    const categoryHTML = Object.entries(tagsByCategory).map(([category, tags]) => `
+      <div class="mb-4">
+        <h4 class="font-semibold text-sm mb-2 text-gray-700">${category}</h4>
+        <div class="flex flex-wrap gap-2">
+          ${tags.map(tag => {
+            const isSelected = currentTagIds.includes(tag.id)
+            return `
+              <button onclick="toggleTag(${tag.id}, '${mediaKey}')" 
+                      id="tag-btn-${tag.id}"
+                      class="px-3 py-1 text-sm rounded-full border transition
+                             ${isSelected ? 
+                               'bg-blue-600 text-white border-blue-600' : 
+                               'bg-white text-gray-700 border-gray-300 hover:border-blue-600'}"
+                      style="background-color: ${isSelected ? tag.color || '#3B82F6' : 'white'}">
+                ${tag.name}
+              </button>
+            `
+          }).join('')}
+        </div>
+      </div>
+    `).join('')
+    
+    const modalHTML = `
+      <div id="tag-editor-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg w-full max-w-2xl max-h-screen overflow-hidden flex flex-col">
+          <div class="p-4 border-b flex justify-between items-center">
+            <h2 class="text-xl font-bold">🏷️ タグ編集</h2>
+            <button onclick="closeTagEditor()" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+          
+          <div class="flex-1 overflow-y-auto p-6">
+            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <p class="text-sm"><strong>ファイル:</strong> ${mediaKey.split('/').pop()}</p>
+            </div>
+            
+            <div class="mb-4">
+              <div class="flex gap-2 mb-2">
+                <input type="text" id="new-tag-name" placeholder="新しいタグ名" 
+                       class="flex-1 px-3 py-2 border rounded">
+                <button onclick="createNewTag('${mediaKey}')" 
+                        class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                  <i class="fas fa-plus"></i> 作成
+                </button>
+              </div>
+            </div>
+            
+            <div id="tag-categories">
+              ${categoryHTML || '<p class="text-gray-500">タグがありません</p>'}
+            </div>
+          </div>
+          
+          <div class="p-4 border-t bg-gray-50 flex gap-2 justify-end">
+            <button onclick="closeTagEditor(); loadMediaLibrary()" 
+                    class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              <i class="fas fa-check"></i> 完了
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+  } catch (error) {
+    console.error('❌ タグエディタ表示エラー:', error)
+    alert('タグの読み込みに失敗しました')
+  }
+}
+
+// タグエディタを閉じる
+function closeTagEditor() {
+  const modal = document.getElementById('tag-editor-modal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+// タグのトグル
+async function toggleTag(tagId, mediaKey) {
+  const btn = document.getElementById(`tag-btn-${tagId}`)
+  if (!btn) return
+  
+  try {
+    const isSelected = btn.classList.contains('bg-blue-600')
+    
+    if (isSelected) {
+      // タグを削除（TODO: DELETE APIが必要）
+      console.log('タグ削除機能は未実装')
+      return
+    } else {
+      // タグを追加
+      await axios.post(`/api/media/${encodeURIComponent(mediaKey)}/tags`, {
+        tag_ids: [tagId]
+      })
+      
+      // UIを更新
+      btn.classList.remove('bg-white', 'text-gray-700', 'border-gray-300')
+      btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600')
+      
+      console.log('✅ タグを追加しました')
+    }
+  } catch (error) {
+    console.error('❌ タグ更新エラー:', error)
+    alert('タグの更新に失敗しました')
+  }
+}
+
+// 新しいタグを作成
+async function createNewTag(mediaKey) {
+  const input = document.getElementById('new-tag-name')
+  if (!input) return
+  
+  const tagName = input.value.trim()
+  if (!tagName) {
+    alert('タグ名を入力してください')
+    return
+  }
+  
+  try {
+    const response = await axios.post('/api/tags', {
+      name: tagName,
+      category: 'カスタム',
+      color: '#6B7280'
+    })
+    
+    if (response.data.success) {
+      alert('✅ タグを作成しました')
+      closeTagEditor()
+      showTagEditor(mediaKey) // 再表示
+    }
+  } catch (error) {
+    console.error('❌ タグ作成エラー:', error)
+    alert('タグの作成に失敗しました')
+  }
+}
+
+// グローバルに関数を公開
+window.showTagEditor = showTagEditor
+window.closeTagEditor = closeTagEditor
+window.toggleTag = toggleTag
+window.createNewTag = createNewTag
+
+console.log('✅ Phase 18C: メディアタグUI 読み込み完了')
+
+// ============================================================
+// Phase 18D: タグの自動推薦機能
+// ============================================================
+
+// AI自動タグ付けを実行して推薦
+async function recommendTags(imageUrl, mediaKey) {
+  try {
+    const response = await axios.post('/api/ai/auto-tag-image', {
+      image_url: imageUrl,
+      r2_key: mediaKey
+    })
+    
+    if (response.data.success) {
+      const recommendedTags = response.data.tags || []
+      const description = response.data.description
+      
+      // 推薦タグを表示
+      const confirmHTML = `
+        <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded">
+          <h4 class="font-bold mb-2"><i class="fas fa-lightbulb"></i> AI推薦タグ</h4>
+          <p class="text-sm mb-2">${description}</p>
+          <div class="flex flex-wrap gap-2">
+            ${recommendedTags.map(tag => `
+              <span class="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full">
+                ${tag}
+              </span>
+            `).join('')}
+          </div>
+          <button onclick="applyRecommendedTags('${mediaKey}', ${JSON.stringify(recommendedTags).replace(/"/g, '&quot;')})"
+                  class="mt-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+            <i class="fas fa-check"></i> これらのタグを追加
+          </button>
+        </div>
+      `
+      
+      return confirmHTML
+    }
+  } catch (error) {
+    console.error('❌ タグ推薦エラー:', error)
+    return ''
+  }
+}
+
+// 推薦タグを適用
+async function applyRecommendedTags(mediaKey, tagNames) {
+  try {
+    // タグ名からIDを取得
+    const tagsResponse = await axios.get('/api/tags')
+    const allTags = tagsResponse.data.tags || []
+    
+    const tagIds = []
+    for (const tagName of tagNames) {
+      let tag = allTags.find(t => t.name === tagName)
+      
+      // タグが存在しない場合は作成
+      if (!tag) {
+        const createResponse = await axios.post('/api/tags', {
+          name: tagName,
+          category: 'AI推薦',
+          color: '#10B981'
+        })
+        tag = createResponse.data.tag
+      }
+      
+      if (tag && tag.id) {
+        tagIds.push(tag.id)
+      }
+    }
+    
+    // タグを追加
+    if (tagIds.length > 0) {
+      await axios.post(`/api/media/${encodeURIComponent(mediaKey)}/tags`, {
+        tag_ids: tagIds
+      })
+      
+      alert(`✅ ${tagIds.length}個のタグを追加しました`)
+      closeTagEditor()
+      showTagEditor(mediaKey) // 再表示
+    }
+  } catch (error) {
+    console.error('❌ 推薦タグ適用エラー:', error)
+    alert('タグの追加に失敗しました')
+  }
+}
+
+// グローバルに関数を公開
+window.recommendTags = recommendTags
+window.applyRecommendedTags = applyRecommendedTags
+
+console.log('✅ Phase 18D: タグ自動推薦機能 読み込み完了')
+
+// ============================================================
+// Phase 18E: Photopea統合（高度な画像編集）
+// ============================================================
+
+// Photopeaエディタを開く
+async function openPhotopeaEditor(imageFile) {
+  if (!imageFile) {
+    alert('画像ファイルが選択されていません')
+    return
+  }
+  
+  // 画像をBase64に変換
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    const base64Image = e.target.result
+    
+    const modalHTML = `
+      <div id="photopea-modal" class="fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50">
+        <div class="w-full h-full flex flex-col">
+          <div class="p-4 bg-gray-900 flex justify-between items-center">
+            <div>
+              <h2 class="text-xl font-bold text-white">
+                <i class="fas fa-paint-brush"></i> Photopea - 高度な画像編集
+              </h2>
+              <p class="text-sm text-gray-400">編集完了後、「File > Export > Save as PNG」でダウンロードしてください</p>
+            </div>
+            <button onclick="closePhotopeaEditor()" class="text-white hover:text-gray-300">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+          
+          <div class="flex-1 bg-white relative">
+            <iframe id="photopea-iframe" 
+                    src="https://www.photopea.com" 
+                    class="w-full h-full border-0"
+                    allow="clipboard-write">
+            </iframe>
+            
+            <div id="photopea-loading" class="absolute inset-0 bg-white flex items-center justify-center">
+              <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
+                <p class="text-xl text-gray-700">Photopeaを読み込み中...</p>
+                <p class="text-sm text-gray-500 mt-2">数秒お待ちください</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="p-3 bg-gray-900 text-white text-sm">
+            <p>💡 <strong>ヒント:</strong> レイヤー、フィルター、調整、ブラシなど、Photoshop風の高度な編集が可能です</p>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+    // Photopeaが読み込まれるまで待つ
+    const iframe = document.getElementById('photopea-iframe')
+    iframe.onload = () => {
+      setTimeout(() => {
+        // 画像をPhotopeaに送信
+        const photopeaWindow = iframe.contentWindow
+        
+        // Photopeaのスクリプト実行（画像を開く）
+        const script = `
+          app.echoToOE = false;
+          app.open("${base64Image}", null, true);
+        `
+        
+        photopeaWindow.postMessage(script, '*')
+        
+        // ローディングを非表示
+        const loading = document.getElementById('photopea-loading')
+        if (loading) {
+          loading.style.display = 'none'
+        }
+      }, 2000) // 2秒待機してからスクリプト実行
+    }
+  }
+  
+  reader.readAsDataURL(imageFile)
+}
+
+// Photopeaエディタを閉じる
+function closePhotopeaEditor() {
+  const modal = document.getElementById('photopea-modal')
+  if (modal) {
+    const confirmed = confirm('編集内容は保存されません。閉じてもよろしいですか？')
+    if (confirmed) {
+      modal.remove()
+    }
+  }
+}
+
+// グローバルに関数を公開
+window.openPhotopeaEditor = openPhotopeaEditor
+window.closePhotopeaEditor = closePhotopeaEditor
+
+console.log('✅ Phase 18E: Photopea統合 読み込み完了')
+
+// ============================================================
+// Phase 18F: 画像の類似検索（実験的）
+// ============================================================
+
+// 画像から簡易ハッシュを生成（8x8グレースケール）
+async function generateImageHash(imageFile) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const reader = new FileReader()
+    
+    reader.onload = (e) => {
+      img.onload = () => {
+        // 8x8にリサイズ
+        const canvas = document.createElement('canvas')
+        canvas.width = 8
+        canvas.height = 8
+        const ctx = canvas.getContext('2d')
+        
+        // グレースケール化
+        ctx.drawImage(img, 0, 0, 8, 8)
+        const imageData = ctx.getImageData(0, 0, 8, 8)
+        const data = imageData.data
+        
+        // グレースケール値を計算
+        const grayValues = []
+        for (let i = 0; i < data.length; i += 4) {
+          const gray = (data[i] + data[i + 1] + data[i + 2]) / 3
+          grayValues.push(gray)
+        }
+        
+        // 平均値を計算
+        const average = grayValues.reduce((a, b) => a + b) / grayValues.length
+        
+        // ハッシュ生成（平均より大きいか小さいか）
+        const hash = grayValues.map(v => v > average ? 1 : 0).join('')
+        
+        resolve(hash)
+      }
+      
+      img.onerror = reject
+      img.src = e.target.result
+    }
+    
+    reader.onerror = reject
+    reader.readAsDataURL(imageFile)
+  })
+}
+
+// ハミング距離を計算（類似度）
+function hammingDistance(hash1, hash2) {
+  if (hash1.length !== hash2.length) return Infinity
+  
+  let distance = 0
+  for (let i = 0; i < hash1.length; i++) {
+    if (hash1[i] !== hash2[i]) {
+      distance++
+    }
+  }
+  return distance
+}
+
+// 類似画像を検索
+async function searchSimilarImages(imageFile) {
+  try {
+    // 画像ハッシュを生成
+    const queryHash = await generateImageHash(imageFile)
+    console.log('🔍 検索画像のハッシュ:', queryHash)
+    
+    // メディアライブラリから全画像を取得
+    const response = await axios.get('/api/media-library/search?type=image')
+    if (!response.data.success) {
+      throw new Error('メディア取得失敗')
+    }
+    
+    const allImages = response.data.files
+    console.log(`📊 比較対象: ${allImages.length}枚`)
+    
+    // 各画像のハッシュを計算して類似度を算出
+    const similarities = []
+    
+    for (const image of allImages.slice(0, 20)) { // 最大20枚に制限（パフォーマンス考慮）
+      try {
+        // 画像をダウンロード
+        const imgResponse = await fetch(image.url)
+        const imgBlob = await imgResponse.blob()
+        const imgFile = new File([imgBlob], image.key, { type: 'image/jpeg' })
+        
+        // ハッシュを生成
+        const imageHash = await generateImageHash(imgFile)
+        
+        // ハミング距離を計算
+        const distance = hammingDistance(queryHash, imageHash)
+        const similarity = (1 - distance / 64) * 100 // 64ビットハッシュ
+        
+        similarities.push({
+          ...image,
+          similarity: Math.round(similarity),
+          distance: distance
+        })
+      } catch (err) {
+        console.warn('画像処理エラー:', image.key, err)
+      }
+    }
+    
+    // 類似度でソート
+    similarities.sort((a, b) => b.similarity - a.similarity)
+    
+    // 結果を表示
+    showSimilarImagesModal(similarities.slice(0, 10))
+    
+  } catch (error) {
+    console.error('❌ 類似検索エラー:', error)
+    alert('類似画像の検索に失敗しました')
+  }
+}
+
+// 類似画像結果を表示
+function showSimilarImagesModal(results) {
+  const resultsHTML = results.map(img => `
+    <div class="border rounded-lg p-3">
+      <img src="${img.url}" alt="${img.key}" class="w-full h-32 object-cover rounded mb-2">
+      <p class="text-sm font-medium truncate mb-1" title="${img.key}">${img.key.split('/').pop()}</p>
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs text-gray-500">${formatFileSize(img.size)}</span>
+        <span class="px-2 py-1 text-xs font-bold rounded ${
+          img.similarity >= 80 ? 'bg-green-100 text-green-800' :
+          img.similarity >= 60 ? 'bg-yellow-100 text-yellow-800' :
+          'bg-gray-100 text-gray-800'
+        }">
+          ${img.similarity}% 類似
+        </span>
+      </div>
+      <button onclick="useMediaFile('${img.url}', 'image')" 
+              class="w-full px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+        <i class="fas fa-check"></i> 使用
+      </button>
+    </div>
+  `).join('')
+  
+  const modalHTML = `
+    <div id="similar-images-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg w-full max-w-4xl max-h-screen overflow-hidden flex flex-col">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h2 class="text-xl font-bold">🔍 類似画像検索結果</h2>
+          <button onclick="closeSimilarImagesModal()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-6">
+          ${results.length === 0 ? `
+            <div class="text-center py-12">
+              <i class="fas fa-search text-6xl text-gray-300 mb-4"></i>
+              <p class="text-gray-500">類似画像が見つかりませんでした</p>
+            </div>
+          ` : `
+            <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <p class="text-sm">
+                <i class="fas fa-info-circle"></i> 
+                <strong>実験的機能:</strong> 8x8グレースケールハッシュによる簡易的な類似度判定です。
+              </p>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              ${resultsHTML}
+            </div>
+          `}
+        </div>
+        
+        <div class="p-4 border-t bg-gray-50 flex justify-end">
+          <button onclick="closeSimilarImagesModal()" 
+                  class="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+}
+
+// 類似画像モーダルを閉じる
+function closeSimilarImagesModal() {
+  const modal = document.getElementById('similar-images-modal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+// グローバルに関数を公開
+window.generateImageHash = generateImageHash
+window.searchSimilarImages = searchSimilarImages
+window.closeSimilarImagesModal = closeSimilarImagesModal
+
+console.log('✅ Phase 18F: 画像の類似検索（実験的） 読み込み完了')
+console.log('🎉 Phase 18 全機能実装完了！')
 console.log('🎉 Phase 15 全機能実装完了！')
 
 // ============================================
