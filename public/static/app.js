@@ -10711,7 +10711,24 @@ async function suggestUnitNames() {
     
   } catch (error) {
     console.error('単元候補取得エラー:', error)
-    suggestionList.innerHTML = '<p class="text-sm text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i> エラーが発生しました。手動で入力してください。</p>'
+    
+    // エラーメッセージを改善
+    let errorMessage = 'エラーが発生しました。手動で入力してください。'
+    if (error.response && error.response.data) {
+      const data = error.response.data
+      if (data.message) {
+        errorMessage = data.message
+      } else if (data.error) {
+        errorMessage = data.error
+      }
+    }
+    
+    suggestionList.innerHTML = `
+      <div class="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
+        <p class="font-bold mb-1"><i class="fas fa-info-circle mr-1"></i>単元名を直接入力してください</p>
+        <p class="text-xs text-gray-600">例: かけ算の筆算、物語文の読解、分数のたし算、など</p>
+      </div>
+    `
     suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> AIで単元候補を表示'
     suggestBtn.disabled = false
   }

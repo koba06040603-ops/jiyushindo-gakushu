@@ -5712,9 +5712,10 @@ app.post('/api/ai/suggest-units', async (c) => {
   
   const apiKey = env.GEMINI_API_KEY
   
-  if (!apiKey) {
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
     return c.json({
-      error: '単元候補生成機能は現在利用できません。',
+      error: 'AI単元候補機能を使用するには、GEMINI_API_KEYの設定が必要です。',
+      message: '手動で単元名を入力してください。例: かけ算の筆算、物語文の読解、など',
       units: []
     })
   }
