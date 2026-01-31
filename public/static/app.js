@@ -26228,7 +26228,10 @@ let imageEditorState = {
   originalImage: null,
   editedCanvas: null,
   rotation: 0,
-  scale: 1.0
+  scale: 1.0,
+  brightness: 1.0,
+  contrast: 1.0,
+  filter: 'none'
 }
 
 // 画像編集モーダル表示
@@ -26240,10 +26243,13 @@ function showImageEditor(file) {
       imageEditorState.originalImage = img
       imageEditorState.rotation = 0
       imageEditorState.scale = 1.0
+      imageEditorState.brightness = 1.0
+      imageEditorState.contrast = 1.0
+      imageEditorState.filter = 'none'
       
       const modalHTML = `
         <div id="image-editor-modal" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
-          <div class="bg-white rounded-lg w-full max-w-4xl max-h-screen overflow-hidden flex flex-col">
+          <div class="bg-white rounded-lg w-full max-w-5xl max-h-screen overflow-hidden flex flex-col">
             <div class="p-4 border-b flex justify-between items-center">
               <h2 class="text-xl font-bold">🖼️ 画像編集</h2>
               <button onclick="closeImageEditor()" class="text-gray-500 hover:text-gray-700">
@@ -26257,21 +26263,45 @@ function showImageEditor(file) {
               </div>
             </div>
             
-            <div class="p-4 border-t bg-gray-50">
-              <div class="flex gap-2 mb-4">
-                <button onclick="rotateImage(-90)" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+            <div class="p-4 border-t bg-gray-50 max-h-64 overflow-y-auto">
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label class="block text-sm font-medium mb-2">明度: <span id="brightness-value">100</span>%</label>
+                  <input type="range" id="brightness-slider" min="0" max="200" value="100" 
+                         oninput="adjustBrightness(this.value)" class="w-full">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-2">コントラスト: <span id="contrast-value">100</span>%</label>
+                  <input type="range" id="contrast-slider" min="0" max="200" value="100" 
+                         oninput="adjustContrast(this.value)" class="w-full">
+                </div>
+              </div>
+              
+              <div class="mb-4">
+                <label class="block text-sm font-medium mb-2">フィルター</label>
+                <select id="filter-select" onchange="applyFilter(this.value)" class="w-full px-3 py-2 border rounded">
+                  <option value="none">なし</option>
+                  <option value="grayscale">グレースケール</option>
+                  <option value="sepia">セピア</option>
+                  <option value="invert">反転</option>
+                  <option value="blur">ぼかし</option>
+                </select>
+              </div>
+              
+              <div class="flex gap-2 mb-4 flex-wrap">
+                <button onclick="rotateImage(-90)" class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
                   <i class="fas fa-undo"></i> 左回転
                 </button>
-                <button onclick="rotateImage(90)" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                <button onclick="rotateImage(90)" class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
                   <i class="fas fa-redo"></i> 右回転
                 </button>
-                <button onclick="scaleImage(1.2)" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                <button onclick="scaleImage(1.2)" class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
                   <i class="fas fa-search-plus"></i> 拡大
                 </button>
-                <button onclick="scaleImage(0.8)" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                <button onclick="scaleImage(0.8)" class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
                   <i class="fas fa-search-minus"></i> 縮小
                 </button>
-                <button onclick="resetImageEditor()" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
+                <button onclick="resetImageEditor()" class="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm">
                   <i class="fas fa-sync"></i> リセット
                 </button>
               </div>
@@ -26327,6 +26357,20 @@ function renderImageEditor() {
   ctx.translate(canvas.width / 2, canvas.height / 2)
   ctx.rotate((imageEditorState.rotation * Math.PI) / 180)
   ctx.scale(imageEditorState.scale, imageEditorState.scale)
+  
+  // フィルター適用
+  ctx.filter = `brightness(${imageEditorState.brightness}) contrast(${imageEditorState.contrast})`
+  
+  if (imageEditorState.filter === 'grayscale') {
+    ctx.filter += ' grayscale(100%)'
+  } else if (imageEditorState.filter === 'sepia') {
+    ctx.filter += ' sepia(100%)'
+  } else if (imageEditorState.filter === 'invert') {
+    ctx.filter += ' invert(100%)'
+  } else if (imageEditorState.filter === 'blur') {
+    ctx.filter += ' blur(3px)'
+  }
+  
   ctx.drawImage(img, -width / 2, -height / 2, width, height)
   ctx.restore()
   
@@ -26350,6 +26394,41 @@ function scaleImage(factor) {
 function resetImageEditor() {
   imageEditorState.rotation = 0
   imageEditorState.scale = 1.0
+  imageEditorState.brightness = 1.0
+  imageEditorState.contrast = 1.0
+  imageEditorState.filter = 'none'
+  
+  const brightnessSlider = document.getElementById('brightness-slider')
+  const contrastSlider = document.getElementById('contrast-slider')
+  const filterSelect = document.getElementById('filter-select')
+  
+  if (brightnessSlider) brightnessSlider.value = 100
+  if (contrastSlider) contrastSlider.value = 100
+  if (filterSelect) filterSelect.value = 'none'
+  
+  document.getElementById('brightness-value').textContent = '100'
+  document.getElementById('contrast-value').textContent = '100'
+  
+  renderImageEditor()
+}
+
+// 明度調整
+function adjustBrightness(value) {
+  imageEditorState.brightness = value / 100
+  document.getElementById('brightness-value').textContent = value
+  renderImageEditor()
+}
+
+// コントラスト調整
+function adjustContrast(value) {
+  imageEditorState.contrast = value / 100
+  document.getElementById('contrast-value').textContent = value
+  renderImageEditor()
+}
+
+// フィルター適用
+function applyFilter(filterName) {
+  imageEditorState.filter = filterName
   renderImageEditor()
 }
 
@@ -26514,6 +26593,111 @@ window.uploadToCloudflareStream = uploadToCloudflareStream
 
 console.log('✅ Phase 15C: CDN統合（将来実装準備） 読み込み完了')
 console.log('🎉 Phase 15 全機能実装完了！')
+
+// ============================================
+// Phase 16: 高度な編集 & AI機能統合
+// ============================================
+
+// ドラッグ&ドロップ複数選択
+function handleMultipleFileDrop(event, type = 'image') {
+  event.preventDefault()
+  event.stopPropagation()
+  
+  const files = Array.from(event.dataTransfer.files)
+  const validFiles = files.filter(file => {
+    if (type === 'image') {
+      return file.type.startsWith('image/')
+    } else {
+      return file.type.startsWith('video/')
+    }
+  })
+  
+  if (validFiles.length === 0) {
+    alert(`有効な${type === 'image' ? '画像' : '動画'}ファイルがありません`)
+    return
+  }
+  
+  if (validFiles.length === 1) {
+    // 単一ファイル：既存の処理
+    if (type === 'image') {
+      previewImageFile(validFiles[0])
+    } else {
+      previewVideoFile(validFiles[0])
+    }
+  } else {
+    // 複数ファイル：一括アップロード
+    const confirm = window.confirm(`${validFiles.length}個のファイルを一括アップロードしますか？`)
+    if (confirm) {
+      uploadMultipleFiles(validFiles, type)
+    }
+  }
+}
+
+// AI自動タグ付け
+async function autoTagImage(imageUrl) {
+  try {
+    showLoading('AIで画像を分析中...')
+    
+    const response = await axios.post('/api/ai/auto-tag-image', {
+      image_url: imageUrl
+    })
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      const { tags, description, category, suggested_title, message } = response.data
+      
+      let resultHTML = `
+        <div class="space-y-2">
+          <p><strong>推奨タイトル:</strong> ${suggested_title}</p>
+          <p><strong>説明:</strong> ${description}</p>
+          <p><strong>カテゴリ:</strong> ${category}</p>
+          <p><strong>タグ:</strong> ${tags.join(', ')}</p>
+        </div>
+      `
+      
+      if (message) {
+        resultHTML += `<p class="text-sm text-gray-500 mt-2">${message}</p>`
+      }
+      
+      // モーダル表示
+      const modalHTML = `
+        <div id="auto-tag-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div class="bg-white rounded-lg max-w-md p-6">
+            <h3 class="text-lg font-bold mb-4">🤖 AI自動タグ付け結果</h3>
+            ${resultHTML}
+            <button onclick="document.getElementById('auto-tag-modal').remove()" 
+                    class="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              閉じる
+            </button>
+          </div>
+        </div>
+      `
+      document.body.insertAdjacentHTML('beforeend', modalHTML)
+      
+      return response.data
+    } else {
+      alert('❌ AI分析に失敗しました: ' + response.data.error)
+      return null
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('❌ AI自動タグ付けエラー:', error)
+    alert('AI分析に失敗しました')
+    return null
+  }
+}
+
+// グローバルスコープに登録
+window.handleMultipleFileDrop = handleMultipleFileDrop
+window.autoTagImage = autoTagImage
+window.adjustBrightness = adjustBrightness
+window.adjustContrast = adjustContrast
+window.applyFilter = applyFilter
+
+console.log('✅ Phase 16: 高度な編集 & AI機能統合 読み込み完了')
+console.log('🎉 Phase 16 完全実装完了！')
+
 
 
 

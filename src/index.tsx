@@ -17597,4 +17597,61 @@ app.get('/api/media-library/search', async (c) => {
 })
 
 
+// AI自動タグ付け（Gemini 3.0 Flash画像認識）
+app.post('/api/ai/auto-tag-image', async (c) => {
+  try {
+    const { image_url } = await c.req.json()
+    
+    if (!image_url) {
+      return c.json({ success: false, error: '画像URLが必要です' }, 400)
+    }
+    
+    // Gemini APIで画像認識（外部サービス）
+    const prompt = `この画像を分析して、以下の情報を日本語でJSON形式で返してください：
+{
+  "tags": ["タグ1", "タグ2", "タグ3"],
+  "description": "画像の説明",
+  "category": "カテゴリ",
+  "suggested_title": "推奨タイトル"
+}
+
+タグは画像の内容を表すキーワード5個以内。カテゴリは「教科・単元・テーマ」など。`
+    
+    // NOTE: 実際のGemini APIを使用する場合は、以下のようにAPIキーが必要
+    // const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=YOUR_API_KEY', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({
+    //     contents: [{
+    //       parts: [
+    //         { text: prompt },
+    //         { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
+    //       ]
+    //     }]
+    //   })
+    // })
+    
+    // デモ実装：ダミーデータを返す
+    const demoTags = {
+      tags: ['教育', '学習', '算数'],
+      description: '教材用の画像',
+      category: '算数・図形',
+      suggested_title: '学習教材'
+    }
+    
+    return c.json({ 
+      success: true, 
+      ...demoTags,
+      message: 'AI自動タグ付けは将来実装予定（現在はデモデータ）'
+    })
+    
+  } catch (error: any) {
+    console.error('❌ AI自動タグ付けエラー:', error)
+    return c.json({ 
+      success: false, 
+      error: error.message 
+    }, 500)
+  }
+})
+
 export default app
