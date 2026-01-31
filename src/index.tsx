@@ -2120,6 +2120,116 @@ app.get('/api/analytics/student/:studentId', async (c) => {
 })
 
 // =============================================================================
+// Phase 19B: 音声認識による学習記録API
+// =============================================================================
+
+// 音声メモ保存API
+app.post('/api/voice-memo', async (c) => {
+  const { env } = c
+  const { student_id, unit_id, transcription, duration_seconds } = await c.req.json()
+  
+  if (!student_id || !transcription) {
+    return c.json({ success: false, error: 'student_idとtranscriptionが必要です' }, 400)
+  }
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO voice_memos (student_id, unit_id, transcription, duration_seconds)
+      VALUES (?, ?, ?, ?)
+    `).bind(student_id, unit_id || null, transcription, duration_seconds || 0).run()
+    
+    return c.json({ success: true, memo_id: result.meta.last_row_id })
+  } catch (error) {
+    console.error('❌ 音声メモ保存エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 音声メモ一覧取得API
+app.get('/api/voice-memos/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    const memos = await env.DB.prepare(`
+      SELECT * FROM voice_memos
+      WHERE student_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).bind(studentId).all()
+    
+    return c.json({ success: true, memos: memos.results || [] })
+  } catch (error) {
+    console.error('❌ 音声メモ取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// =============================================================================
+// Phase 19C-19F用APIプレースホルダー
+// =============================================================================
+
+// ゲーミフィケーション: ポイント追加API
+app.post('/api/gamification/points/add', async (c) => {
+  const { env } = c
+  const { student_id, points, reason } = await c.req.json()
+  
+  try {
+    // ポイント加算
+    await env.DB.prepare(`
+      INSERT INTO student_points (student_id, points, reason)
+      VALUES (?, ?, ?)
+      ON CONFLICT(student_id) DO UPDATE SET
+        points = points + excluded.points,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(student_id, points, reason).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// テーマ設定API
+app.post('/api/theme/set', async (c) => {
+  const { env } = c
+  const { student_id, theme_name, primary_color, font_size } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      INSERT INTO user_preferences (student_id, theme_name, primary_color, font_size)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(student_id) DO UPDATE SET
+        theme_name = excluded.theme_name,
+        primary_color = excluded.primary_color,
+        font_size = excluded.font_size,
+        updated_at = CURRENT_TIMESTAMP
+    `).bind(student_id, theme_name, primary_color, font_size).run()
+    
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 保護者レポートAPI
+app.post('/api/parent-report/create', async (c) => {
+  const { env } = c
+  const { student_id, week_start, week_end, teacher_comment } = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO parent_reports (student_id, week_start, week_end, teacher_comment)
+      VALUES (?, ?, ?, ?)
+    `).bind(student_id, week_start, week_end, teacher_comment).run()
+    
+    return c.json({ success: true, report_id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// =============================================================================
 
 // APIルート：クラスの進捗取得
 app.get('/api/progress/class/:classCode', async (c) => {

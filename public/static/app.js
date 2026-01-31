@@ -1155,6 +1155,42 @@ async function renderTopPage() {
         </div>
       </div>
 
+      <!-- Phase 19: 次世代学習支援機能 -->
+      ${state.student && state.student.id ? `
+      <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg shadow-xl p-8 mb-8">
+        <div class="text-center mb-6">
+          <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
+            🚀 Phase 19: 次世代機能
+          </div>
+          <h2 class="text-2xl font-bold text-white mb-3">
+            <i class="fas fa-rocket mr-2"></i>
+            便利な機能
+          </h2>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button 
+            onclick="showVoiceMemoUI()"
+            class="bg-white text-red-600 hover:bg-red-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
+            <i class="fas fa-microphone mr-2 text-xl"></i>
+            音声メモ
+          </button>
+          <button 
+            onclick="showThemeSelector()"
+            class="bg-white text-purple-600 hover:bg-purple-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
+            <i class="fas fa-palette mr-2 text-xl"></i>
+            テーマ設定
+          </button>
+          <button 
+            onclick="showParentDashboard()"
+            class="bg-white text-indigo-600 hover:bg-indigo-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
+            <i class="fas fa-users mr-2 text-xl"></i>
+            保護者向け
+          </button>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- お問い合わせ・感想フォーム -->
       <div class="bg-gradient-to-r from-green-500 to-teal-500 rounded-lg shadow-xl p-8">
         <div class="text-center mb-6">
@@ -28494,6 +28530,287 @@ window.showAnalyticsDashboard = showAnalyticsDashboard
 window.showStudentAnalytics = showStudentAnalytics
 
 console.log('✅ Phase 19A: 学習データ分析ダッシュボード 読み込み完了')
+
+// =============================================================================
+// Phase 19B: 音声認識による学習記録
+// =============================================================================
+
+let voiceRecognition = null
+let voiceTranscript = ''
+
+function startVoiceRecognition() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert('このブラウザは音声認識に対応していません')
+    return
+  }
+  
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  voiceRecognition = new SpeechRecognition()
+  voiceRecognition.lang = 'ja-JP'
+  voiceRecognition.continuous = true
+  voiceRecognition.interimResults = true
+  
+  voiceRecognition.onresult = (event) => {
+    let interim = ''
+    let final = ''
+    
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript
+      if (event.results[i].isFinal) {
+        final += transcript + ' '
+      } else {
+        interim += transcript
+      }
+    }
+    
+    voiceTranscript += final
+    const display = document.getElementById('voice-transcript')
+    if (display) {
+      display.textContent = voiceTranscript + interim
+    }
+  }
+  
+  voiceRecognition.start()
+  console.log('🎤 音声認識開始')
+}
+
+function stopVoiceRecognition() {
+  if (voiceRecognition) {
+    voiceRecognition.stop()
+    console.log('🛑 音声認識停止')
+  }
+}
+
+async function saveVoiceMemo() {
+  if (!voiceTranscript || voiceTranscript.trim() === '') {
+    alert('音声メモがありません')
+    return
+  }
+  
+  try {
+    const response = await axios.post('/api/voice-memo', {
+      student_id: state.student.id,
+      unit_id: null,
+      transcription: voiceTranscript.trim(),
+      duration_seconds: 0
+    })
+    
+    if (response.data.success) {
+      alert('音声メモを保存しました！')
+      voiceTranscript = ''
+      const display = document.getElementById('voice-transcript')
+      if (display) display.textContent = ''
+    } else {
+      throw new Error(response.data.error)
+    }
+  } catch (error) {
+    console.error('❌ 音声メモ保存エラー:', error)
+    alert('音声メモの保存に失敗しました: ' + error.message)
+  }
+}
+
+function showVoiceMemoUI() {
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="container mx-auto px-4 py-8">
+      <div class="max-w-3xl mx-auto">
+        <div class="bg-white rounded-lg shadow-xl p-8">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-3xl font-bold text-gray-800">
+              <i class="fas fa-microphone mr-2 text-red-600"></i>
+              音声メモ
+            </h2>
+            <button onclick="renderTopPage()" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+          
+          <div class="bg-gray-50 p-6 rounded-lg mb-6">
+            <p class="text-sm text-gray-600 mb-4">マイクボタンを押して話してください</p>
+            <div class="flex gap-4 mb-4">
+              <button onclick="startVoiceRecognition()" 
+                class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition">
+                <i class="fas fa-microphone mr-2"></i>録音開始
+              </button>
+              <button onclick="stopVoiceRecognition()" 
+                class="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition">
+                <i class="fas fa-stop mr-2"></i>録音停止
+              </button>
+              <button onclick="saveVoiceMemo()" 
+                class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition">
+                <i class="fas fa-save mr-2"></i>保存
+              </button>
+            </div>
+            
+            <div class="bg-white p-4 rounded border min-h-[200px]">
+              <p class="text-sm text-gray-500 mb-2">音声認識結果:</p>
+              <p id="voice-transcript" class="text-gray-800"></p>
+            </div>
+          </div>
+          
+          <div class="text-center">
+            <button onclick="renderTopPage()" 
+              class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition">
+              <i class="fas fa-arrow-left mr-2"></i>トップページに戻る
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// =============================================================================
+// Phase 19C: オフラインモード/PWA（簡易実装）
+// =============================================================================
+
+if ('serviceWorker' in navigator) {
+  // Service Worker登録（将来実装）
+  console.log('✅ Service Worker サポートあり（Phase 19C実装準備完了）')
+}
+
+// =============================================================================
+// Phase 19D: ゲーミフィケーション
+// =============================================================================
+
+async function addPoints(studentId, points, reason) {
+  try {
+    await axios.post('/api/gamification/points/add', {
+      student_id: studentId,
+      points: points,
+      reason: reason
+    })
+    console.log(`✅ ポイント追加: ${points}pt (${reason})`)
+  } catch (error) {
+    console.error('❌ ポイント追加エラー:', error)
+  }
+}
+
+// 正解時にポイント付与
+function rewardCorrectAnswer() {
+  if (state.student && state.student.id) {
+    addPoints(state.student.id, 10, '問題正解')
+  }
+}
+
+// =============================================================================
+// Phase 19E: カスタマイズ可能なテーマ
+// =============================================================================
+
+async function setTheme(themeName, primaryColor, fontSize) {
+  try {
+    await axios.post('/api/theme/set', {
+      student_id: state.student.id,
+      theme_name: themeName,
+      primary_color: primaryColor,
+      font_size: fontSize
+    })
+    
+    // テーマを適用
+    document.body.style.fontSize = fontSize + 'px'
+    console.log(`✅ テーマ適用: ${themeName}`)
+  } catch (error) {
+    console.error('❌ テーマ設定エラー:', error)
+  }
+}
+
+function showThemeSelector() {
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="container mx-auto px-4 py-8">
+      <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow-xl p-8">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-3xl font-bold text-gray-800">
+              <i class="fas fa-palette mr-2 text-purple-600"></i>
+              テーマ設定
+            </h2>
+            <button onclick="renderTopPage()" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <button onclick="setTheme('default', '#3B82F6', 16)" 
+              class="bg-blue-500 text-white p-8 rounded-lg hover:bg-blue-600 transition">
+              <i class="fas fa-check-circle text-3xl mb-2"></i>
+              <p class="text-xl font-bold">デフォルト</p>
+            </button>
+            <button onclick="setTheme('large', '#10B981', 20)" 
+              class="bg-green-500 text-white p-8 rounded-lg hover:bg-green-600 transition">
+              <i class="fas fa-text-height text-3xl mb-2"></i>
+              <p class="text-xl font-bold">大きい文字</p>
+            </button>
+            <button onclick="setTheme('highcontrast', '#1F2937', 18)" 
+              class="bg-gray-800 text-white p-8 rounded-lg hover:bg-gray-900 transition">
+              <i class="fas fa-adjust text-3xl mb-2"></i>
+              <p class="text-xl font-bold">ハイコントラスト</p>
+            </button>
+          </div>
+          
+          <div class="text-center">
+            <button onclick="renderTopPage()" 
+              class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition">
+              <i class="fas fa-arrow-left mr-2"></i>トップページに戻る
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// =============================================================================
+// Phase 19F: 保護者向けダッシュボード（簡易実装）
+// =============================================================================
+
+async function showParentDashboard() {
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="container mx-auto px-4 py-8">
+      <div class="max-w-6xl mx-auto">
+        <div class="bg-white rounded-lg shadow-xl p-8">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-3xl font-bold text-gray-800">
+              <i class="fas fa-users mr-2 text-indigo-600"></i>
+              保護者向けダッシュボード
+            </h2>
+            <button onclick="renderTopPage()" class="text-gray-500 hover:text-gray-700">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+          </div>
+          
+          <div class="bg-blue-50 p-6 rounded-lg mb-6">
+            <p class="text-center text-gray-700">
+              <i class="fas fa-info-circle mr-2"></i>
+              保護者向け機能は今後実装予定です
+            </p>
+          </div>
+          
+          <div class="text-center">
+            <button onclick="renderTopPage()" 
+              class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition">
+              <i class="fas fa-arrow-left mr-2"></i>トップページに戻る
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// グローバルスコープに登録
+window.startVoiceRecognition = startVoiceRecognition
+window.stopVoiceRecognition = stopVoiceRecognition
+window.saveVoiceMemo = saveVoiceMemo
+window.showVoiceMemoUI = showVoiceMemoUI
+window.addPoints = addPoints
+window.rewardCorrectAnswer = rewardCorrectAnswer
+window.setTheme = setTheme
+window.showThemeSelector = showThemeSelector
+window.showParentDashboard = showParentDashboard
+
+console.log('✅ Phase 19B-F: 次世代学習支援機能 読み込み完了')
 
 
 
