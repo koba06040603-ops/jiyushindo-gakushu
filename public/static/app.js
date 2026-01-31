@@ -26217,7 +26217,304 @@ window.closeMediaLibrary = closeMediaLibrary
 window.useMediaFile = useMediaFile
 window.copyMediaUrl = copyMediaUrl
 
-console.log('✅ Phase 15: 高度なメディア管理機能 読み込み完了')
+console.log('✅ Phase 15A: メディアライブラリ＋進捗バー 読み込み完了')
+
+// ============================================
+// Phase 15B: 画像編集＋複数アップロード＋サムネイル
+// ============================================
+
+// 画像編集状態
+let imageEditorState = {
+  originalImage: null,
+  editedCanvas: null,
+  rotation: 0,
+  scale: 1.0
+}
+
+// 画像編集モーダル表示
+function showImageEditor(file) {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const img = new Image()
+    img.onload = () => {
+      imageEditorState.originalImage = img
+      imageEditorState.rotation = 0
+      imageEditorState.scale = 1.0
+      
+      const modalHTML = `
+        <div id="image-editor-modal" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+          <div class="bg-white rounded-lg w-full max-w-4xl max-h-screen overflow-hidden flex flex-col">
+            <div class="p-4 border-b flex justify-between items-center">
+              <h2 class="text-xl font-bold">🖼️ 画像編集</h2>
+              <button onclick="closeImageEditor()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+              </button>
+            </div>
+            
+            <div class="flex-1 overflow-auto p-4 bg-gray-100">
+              <div class="flex justify-center">
+                <canvas id="image-editor-canvas" class="max-w-full max-h-96 border-2 border-gray-300 bg-white"></canvas>
+              </div>
+            </div>
+            
+            <div class="p-4 border-t bg-gray-50">
+              <div class="flex gap-2 mb-4">
+                <button onclick="rotateImage(-90)" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                  <i class="fas fa-undo"></i> 左回転
+                </button>
+                <button onclick="rotateImage(90)" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                  <i class="fas fa-redo"></i> 右回転
+                </button>
+                <button onclick="scaleImage(1.2)" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                  <i class="fas fa-search-plus"></i> 拡大
+                </button>
+                <button onclick="scaleImage(0.8)" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                  <i class="fas fa-search-minus"></i> 縮小
+                </button>
+                <button onclick="resetImageEditor()" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700">
+                  <i class="fas fa-sync"></i> リセット
+                </button>
+              </div>
+              
+              <div class="flex gap-2 justify-end">
+                <button onclick="closeImageEditor()" class="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                  キャンセル
+                </button>
+                <button onclick="saveEditedImage()" class="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                  <i class="fas fa-check"></i> 編集を適用
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+      
+      document.body.insertAdjacentHTML('beforeend', modalHTML)
+      renderImageEditor()
+    }
+    img.src = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
+// 画像エディタをレンダリング
+function renderImageEditor() {
+  const canvas = document.getElementById('image-editor-canvas')
+  if (!canvas || !imageEditorState.originalImage) return
+  
+  const ctx = canvas.getContext('2d')
+  const img = imageEditorState.originalImage
+  
+  // Canvas サイズ設定
+  const maxSize = 800
+  let width = img.width
+  let height = img.height
+  
+  if (width > maxSize || height > maxSize) {
+    if (width > height) {
+      height = (height / width) * maxSize
+      width = maxSize
+    } else {
+      width = (width / height) * maxSize
+      height = maxSize
+    }
+  }
+  
+  canvas.width = width * imageEditorState.scale
+  canvas.height = height * imageEditorState.scale
+  
+  ctx.save()
+  ctx.translate(canvas.width / 2, canvas.height / 2)
+  ctx.rotate((imageEditorState.rotation * Math.PI) / 180)
+  ctx.scale(imageEditorState.scale, imageEditorState.scale)
+  ctx.drawImage(img, -width / 2, -height / 2, width, height)
+  ctx.restore()
+  
+  imageEditorState.editedCanvas = canvas
+}
+
+// 画像回転
+function rotateImage(degrees) {
+  imageEditorState.rotation += degrees
+  renderImageEditor()
+}
+
+// 画像拡大縮小
+function scaleImage(factor) {
+  imageEditorState.scale *= factor
+  imageEditorState.scale = Math.max(0.1, Math.min(3.0, imageEditorState.scale))
+  renderImageEditor()
+}
+
+// リセット
+function resetImageEditor() {
+  imageEditorState.rotation = 0
+  imageEditorState.scale = 1.0
+  renderImageEditor()
+}
+
+// 編集を保存
+async function saveEditedImage() {
+  if (!imageEditorState.editedCanvas) return
+  
+  imageEditorState.editedCanvas.toBlob(async (blob) => {
+    const file = new File([blob], 'edited-image.png', { type: 'image/png' })
+    fileUploadState.selectedImageFile = file
+    
+    closeImageEditor()
+    
+    // プレビュー更新
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const previewImg = document.getElementById('image-preview-img')
+      const previewName = document.getElementById('image-preview-name')
+      const previewDiv = document.getElementById('image-upload-preview')
+      const uploadBtn = document.getElementById('upload-image-btn')
+      
+      if (previewImg && previewName && previewDiv && uploadBtn) {
+        previewImg.src = e.target.result
+        previewName.textContent = file.name + ' (' + formatFileSize(file.size) + ')'
+        previewDiv.classList.remove('hidden')
+        uploadBtn.classList.remove('hidden')
+      }
+    }
+    reader.readAsDataURL(file)
+    
+    alert('✅ 画像編集を適用しました！\n\n「アップロード」ボタンでアップロードしてください。')
+  }, 'image/png', 0.9)
+}
+
+// 画像エディタを閉じる
+function closeImageEditor() {
+  const modal = document.getElementById('image-editor-modal')
+  if (modal) modal.remove()
+  imageEditorState = { originalImage: null, editedCanvas: null, rotation: 0, scale: 1.0 }
+}
+
+// 複数ファイル一括アップロード
+async function uploadMultipleFiles(files, type = 'image') {
+  if (!files || files.length === 0) {
+    alert('ファイルが選択されていません')
+    return
+  }
+  
+  showLoading(`${files.length}個のファイルをアップロード中...`)
+  
+  const results = []
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    
+    try {
+      showLoading(`アップロード中 (${i + 1}/${files.length}): ${file.name}`)
+      
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const endpoint = type === 'image' ? '/api/upload/image' : '/api/upload/video'
+      const response = await axios.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      
+      if (response.data.success) {
+        results.push({ success: true, file: file.name, url: response.data.image_url || response.data.video_url })
+      } else {
+        results.push({ success: false, file: file.name, error: response.data.error })
+      }
+    } catch (error) {
+      results.push({ success: false, file: file.name, error: error.message })
+    }
+  }
+  
+  hideLoading()
+  
+  const successCount = results.filter(r => r.success).length
+  const failCount = results.length - successCount
+  
+  alert(`✅ アップロード完了！\n\n成功: ${successCount}件\n失敗: ${failCount}件`)
+  
+  console.log('アップロード結果:', results)
+  return results
+}
+
+// 動画サムネイル生成
+async function generateVideoThumbnail(file) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.muted = true
+    video.playsInline = true
+    
+    video.onloadeddata = () => {
+      video.currentTime = 1.0 // 1秒目のフレームを取得
+    }
+    
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      
+      canvas.toBlob((blob) => {
+        const thumbnailFile = new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' })
+        resolve({
+          blob,
+          file: thumbnailFile,
+          dataUrl: canvas.toDataURL('image/jpeg', 0.8)
+        })
+      }, 'image/jpeg', 0.8)
+    }
+    
+    video.onerror = () => {
+      reject(new Error('動画の読み込みに失敗しました'))
+    }
+    
+    const url = URL.createObjectURL(file)
+    video.src = url
+  })
+}
+
+// グローバルスコープに登録
+window.showImageEditor = showImageEditor
+window.renderImageEditor = renderImageEditor
+window.rotateImage = rotateImage
+window.scaleImage = scaleImage
+window.resetImageEditor = resetImageEditor
+window.saveEditedImage = saveEditedImage
+window.closeImageEditor = closeImageEditor
+window.uploadMultipleFiles = uploadMultipleFiles
+window.generateVideoThumbnail = generateVideoThumbnail
+
+console.log('✅ Phase 15B: 画像編集＋複数アップロード＋サムネイル 読み込み完了')
+
+// ============================================
+// Phase 15C: Cloudflare Images/Stream 統合
+// ============================================
+
+// Cloudflare Images への最適化アップロード（将来実装用）
+async function uploadToCloudflareImages(file) {
+  // NOTE: Cloudflare Images は有料プランが必要
+  // 現在は R2 を使用しているため、将来の拡張として準備
+  console.log('Cloudflare Images統合は将来実装予定')
+  return { success: false, message: 'Not implemented yet' }
+}
+
+// Cloudflare Stream への動画アップロード（将来実装用）
+async function uploadToCloudflareStream(file) {
+  // NOTE: Cloudflare Stream は有料プランが必要
+  // 現在は R2 を使用しているため、将来の拡張として準備
+  console.log('Cloudflare Stream統合は将来実装予定')
+  return { success: false, message: 'Not implemented yet' }
+}
+
+window.uploadToCloudflareImages = uploadToCloudflareImages
+window.uploadToCloudflareStream = uploadToCloudflareStream
+
+console.log('✅ Phase 15C: CDN統合（将来実装準備） 読み込み完了')
+console.log('🎉 Phase 15 全機能実装完了！')
+
 
 
 
