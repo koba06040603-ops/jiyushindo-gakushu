@@ -575,15 +575,19 @@ Email: xxx@school.jp
 - **Cloudflare D1**：SQLiteベースの分散データベース
 - **Cloudflare R2**：オブジェクトストレージ（画像・動画アップロード）
 
-### メディア管理
+### メディア管理（Phase 15-17）
 - **アップロード進捗バー**：リアルタイム進捗・速度表示
 - **メディアライブラリ**：既存ファイル管理・検索・再利用
-- **画像編集**：Canvas API（回転・拡大縮小・明度・フィルター）
+- **画像編集**：Canvas API（回転・拡大縮小・明度・フィルター・トリミング）
 - **複数ファイル一括アップロード**：バッチ処理・ドラッグ&ドロップ対応
+- **動画編集**：FFmpeg.wasm（動画トリミング）
 - **動画サムネイル自動生成**：Canvas API
-- **AI自動タグ付け**：Gemini 3.0 Flash画像認識（準備完了）
+- **AI自動タグ付け**：Gemini 3.0 Flash画像認識（本番統合完了）
+- **メディアタグ管理**：D1データベース・タグ検索
+- **顔認識・モザイク処理**：face-api.js（プライバシー保護）
 
 ### AI機能
+- **Gemini 3.0 Flash**：画像認識・自動タグ付け
 - **Gemini 2.0 Flash Exp**：対話型AI
 - **温かく忍耐強い教師スタイル**：答えを教えず、質問とヒントで導く
 
@@ -599,7 +603,7 @@ Email: xxx@school.jp
 - 📘 [詳細README（技術者向け）](./README.md)
 - 📄 [紙学習対応ガイド](./PAPER_LEARNING_SUPPORT.md)
 - 🔗 [GitHub](https://github.com/koba06040603-ops/jiyushindo-gakushu)
-- 🌐 [本番環境](https://601ac8b7.jiyushindo-gakushu.pages.dev)
+- 🌐 [本番環境](https://73e669bd.jiyushindo-gakushu.pages.dev)
 
 ### 🔒 セキュリティ・プライバシー関連
 - **[セキュリティ・プライバシーポリシー](./SECURITY_PRIVACY.md)** - 完全版
