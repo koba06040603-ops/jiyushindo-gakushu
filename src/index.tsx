@@ -3327,7 +3327,7 @@ app.post('/api/ai/reflect', async (c) => {
   
   try {
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -4424,7 +4424,7 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5097,7 +5097,7 @@ ${progress.results.slice(0, 5).map((p: any) =>
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5211,7 +5211,7 @@ app.post('/api/ai/generate-problem', async (c) => {
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5308,7 +5308,7 @@ app.post('/api/ai/suggest-plan', async (c) => {
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5420,7 +5420,7 @@ ${helpCards.results.map((h: any) =>
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -5601,7 +5601,7 @@ ${specificInstructions}
 集合の概念`
 
     // 新しいヘルパー関数を使用（自動リトライ付き）
-    const models = ['gemini-3.0-flash', 'gemini-2.0-flash']
+    const models = ['gemini-3.0-flash', 'gemini-3.0-flash']
     let result: GeminiResponse | null = null
     
     for (const model of models) {
@@ -5763,7 +5763,7 @@ app.post('/api/ai/ocr', async (c) => {
       try {
         console.log('📤 [第2段階] Gemini Vision API を使用します（フォールバック）')
         
-        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiApiKey}`
+        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${geminiApiKey}`
         
         const requestBody = {
           contents: [
@@ -6157,7 +6157,7 @@ app.post('/api/ai/generate-course', async (c) => {
 5. 完全なJSON（{で始まり}で終わる）を出力すること`
 
     // 【最新】Gemini 3.0 Flash を使用
-    const modelName = 'gemini-3-flash-preview'  // 最新の Gemini 3.0 Flash
+    const modelName = 'gemini-3.0-flash'  // 最新の Gemini 3.0 Flash
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
     
     console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
@@ -6482,7 +6482,7 @@ ${customInfo}
     if (useHighQuality) {
       // 確実モード: Gemini 2.5 Pro のみを使用、より厳密な設定
       models = [
-        { name: 'gemini-2.5-pro', maxTokens: 16384 }  // Proのみ
+        { name: 'gemini-3.0-flash', maxTokens: 16384 }  // Proのみ
       ]
       generationConfig = {
         temperature: 0.5,   // より確実で一貫性のある出力
@@ -6559,8 +6559,8 @@ ${customInfo}
       // 標準モード: Flash優先、フォールバックあり
       models = [
         { name: 'gemini-3.0-flash', maxTokens: 16384 },     // 最新・最も安定
-        { name: 'gemini-2.0-flash', maxTokens: 16384 },     // 高速
-        { name: 'gemini-2.5-pro', maxTokens: 16384 }        // 最高品質（フォールバック）
+        { name: 'gemini-3.0-flash', maxTokens: 16384 },     // 高速
+        { name: 'gemini-3.0-flash', maxTokens: 16384 }        // 最高品質（フォールバック）
       ]
       generationConfig = {
         temperature: 0.7,
@@ -7024,7 +7024,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-3.0-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
+    const models = ['gemini-3.0-flash', 'gemini-3.0-flash', 'gemini-3.0-flash']
     let response
     let lastError
     
@@ -7164,7 +7164,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-3.0-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
+    const models = ['gemini-3.0-flash', 'gemini-3.0-flash', 'gemini-3.0-flash']
     let response
     let lastError
     
@@ -7313,7 +7313,7 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-3.0-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
+    const models = ['gemini-3.0-flash', 'gemini-3.0-flash', 'gemini-3.0-flash']
     let response
     let lastError
     
@@ -7616,7 +7616,7 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=' + apiKey,
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=' + apiKey,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -8606,7 +8606,7 @@ app.post('/api/card/:cardId/suggest-learning-styles', async (c) => {
 }`
 
     const result = await callGeminiAPI({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.0-flash',
       prompt,
       apiKey,
       maxOutputTokens: 4096,
@@ -8663,7 +8663,7 @@ app.post('/api/curriculum/:id/regenerate-check-test', async (c) => {
 {"sample_problems":[{"problem_number":1,"problem_text":"問題文","answer":"答え"}]}`
 
     const result = await callGeminiAPI({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.0-flash',
       prompt,
       apiKey,
       maxOutputTokens: 4096,
@@ -11732,7 +11732,7 @@ app.get('/api/coordinator/cross-school-analytics', async (c) => {
     const totalStudents = schoolsData.reduce((sum, s) => sum + s.total_students, 0)
     const overallAvgUnderstanding = schoolsData.reduce((sum, s) => sum + s.avg_understanding, 0) / schoolsData.length
     
-    // トップパフォーマンス校
+    // トップパフォーマンゃ�マンス校
     const topSchools = schoolsData
       .sort((a, b) => b.avg_understanding - a.avg_understanding)
       .slice(0, 3)
@@ -12170,7 +12170,7 @@ app.get('/proposal', (c) => {
                 <div class="bg-green-50 p-6 rounded-lg">
                     <h3 class="text-2xl font-bold text-green-700 mb-4">期待される成果</h3>
                     <ul class="space-y-3 text-lg">
-                        <li><i class="fas fa-arrow-up text-green-600 mr-2"></i>理解度: <strong>30-40%向上</strong></li>
+              <li><i class="fas fa-arrow-up text-green-600 mr-2"></i>理解度: <strong>30-40%向上</strong></li>
                         <li><i class="fas fa-clock text-green-600 mr-2"></i>教師負担: <strong>40-50%軽減</strong></li>
                         <li><i class="fas fa-heart text-green-600 mr-2"></i>不登校復帰率: <strong>60-70%向上</strong></li>
                         <li><i class="fas fa-trophy text-green-600 mr-2"></i>学会発表: <strong>年4-6回</strong></li>
@@ -14755,7 +14755,7 @@ ${styleRequirements}
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
