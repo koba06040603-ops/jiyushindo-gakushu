@@ -1985,6 +1985,141 @@ app.post('/api/learning/profile/update', async (c) => {
 })
 
 // =============================================================================
+// Phase 19A: 学習データ分析ダッシュボードAPI
+// =============================================================================
+
+// 学習統計データ取得API（教師向けダッシュボード）
+app.get('/api/analytics/class/:classCode', async (c) => {
+  const { env } = c
+  const classCode = c.req.param('classCode')
+  
+  try {
+    // クラス全体の学習統計
+    const classStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT student_id) as total_students,
+        COUNT(*) as total_sessions,
+        ROUND(AVG(CASE WHEN correct_problems > 0 THEN (correct_problems * 1.0 / total_problems) * 100 ELSE 0 END), 1) as avg_correct_rate,
+        SUM(total_problems) as total_problems_solved,
+        SUM(total_hints_used) as total_hints_used,
+        SUM(total_ai_requests) as total_ai_requests
+      FROM learning_sessions ls
+      JOIN students s ON ls.student_id = s.id
+      WHERE s.class_code = ?
+        AND ls.ended_at IS NOT NULL
+        AND DATE(ls.started_at) >= DATE('now', '-30 days')
+    `).bind(classCode).first()
+    
+    // 学生別パフォーマンス
+    const studentPerformance = await env.DB.prepare(`
+      SELECT 
+        s.id,
+        s.name,
+        s.student_number,
+        COUNT(ls.id) as session_count,
+        ROUND(AVG(CASE WHEN ls.correct_problems > 0 THEN (ls.correct_problems * 1.0 / ls.total_problems) * 100 ELSE 0 END), 1) as avg_correct_rate,
+        SUM(ls.total_problems) as problems_solved,
+        SUM(ls.total_hints_used) as hints_used
+      FROM students s
+      LEFT JOIN learning_sessions ls ON s.id = ls.student_id
+        AND ls.ended_at IS NOT NULL
+        AND DATE(ls.started_at) >= DATE('now', '-30 days')
+      WHERE s.class_code = ?
+      GROUP BY s.id, s.name, s.student_number
+      ORDER BY avg_correct_rate DESC
+    `).bind(classCode).all()
+    
+    // 日別学習時間推移（過去30日）
+    const dailyActivity = await env.DB.prepare(`
+      SELECT 
+        DATE(started_at) as date,
+        COUNT(*) as session_count,
+        COUNT(DISTINCT student_id) as active_students,
+        SUM(total_problems) as problems_solved
+      FROM learning_sessions ls
+      JOIN students s ON ls.student_id = s.id
+      WHERE s.class_code = ?
+        AND ended_at IS NOT NULL
+        AND DATE(started_at) >= DATE('now', '-30 days')
+      GROUP BY DATE(started_at)
+      ORDER BY date ASC
+    `).bind(classCode).all()
+    
+    return c.json({
+      success: true,
+      classStats,
+      studentPerformance: studentPerformance.results || [],
+      dailyActivity: dailyActivity.results || []
+    })
+  } catch (error) {
+    console.error('❌ クラス分析データ取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 個人学習履歴詳細API
+app.get('/api/analytics/student/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  
+  try {
+    // 基本統計
+    const basicStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_sessions,
+        ROUND(AVG(CASE WHEN correct_problems > 0 THEN (correct_problems * 1.0 / total_problems) * 100 ELSE 0 END), 1) as avg_correct_rate,
+        SUM(total_problems) as total_problems_solved,
+        SUM(total_hints_used) as total_hints_used,
+        SUM(total_ai_requests) as total_ai_requests,
+        ROUND(AVG(CAST((JULIANDAY(ended_at) - JULIANDAY(started_at)) * 24 * 60 AS REAL)), 1) as avg_session_minutes
+      FROM learning_sessions
+      WHERE student_id = ?
+        AND ended_at IS NOT NULL
+        AND DATE(started_at) >= DATE('now', '-90 days')
+    `).bind(studentId).first()
+    
+    // 週別学習時間推移
+    const weeklyProgress = await env.DB.prepare(`
+      SELECT 
+        strftime('%Y-W%W', started_at) as week,
+        COUNT(*) as session_count,
+        SUM(total_problems) as problems_solved,
+        ROUND(AVG(CASE WHEN correct_problems > 0 THEN (correct_problems * 1.0 / total_problems) * 100 ELSE 0 END), 1) as avg_correct_rate
+      FROM learning_sessions
+      WHERE student_id = ?
+        AND ended_at IS NOT NULL
+        AND DATE(started_at) >= DATE('now', '-90 days')
+      GROUP BY strftime('%Y-W%W', started_at)
+      ORDER BY week ASC
+    `).bind(studentId).all()
+    
+    // 科目別パフォーマンス
+    const subjectPerformance = await env.DB.prepare(`
+      SELECT 
+        ll.problem_type as subject,
+        COUNT(*) as attempt_count,
+        ROUND(AVG(CASE WHEN ll.is_correct THEN 100.0 ELSE 0.0 END), 1) as correct_rate,
+        ROUND(AVG(ll.answer_time_seconds), 1) as avg_time_seconds
+      FROM learning_logs ll
+      WHERE ll.student_id = ?
+        AND DATE(ll.created_at) >= DATE('now', '-90 days')
+      GROUP BY ll.problem_type
+      ORDER BY attempt_count DESC
+    `).bind(studentId).all()
+    
+    return c.json({
+      success: true,
+      basicStats,
+      weeklyProgress: weeklyProgress.results || [],
+      subjectPerformance: subjectPerformance.results || []
+    })
+  } catch (error) {
+    console.error('❌ 個人分析データ取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// =============================================================================
 
 // APIルート：クラスの進捗取得
 app.get('/api/progress/class/:classCode', async (c) => {

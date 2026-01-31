@@ -969,12 +969,19 @@ async function renderTopPage() {
         <h2 class="text-2xl font-bold text-white mb-4 text-center">
           <i class="fas fa-chalkboard-teacher mr-2"></i>教師用メニュー
         </h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <button 
             onclick="window.showProgressBoardSelection()"
             class="bg-white text-blue-600 hover:bg-blue-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
             <i class="fas fa-chart-bar mr-2 text-xl"></i>
             進捗ボードを見る
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+          <button 
+            onclick="window.showAnalyticsDashboard()"
+            class="bg-white text-green-600 hover:bg-green-50 py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group">
+            <i class="fas fa-chart-line mr-2 text-xl"></i>
+            学習データ分析
             <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
           </button>
           <button 
@@ -28163,6 +28170,330 @@ window.applyFilter = applyFilter
 
 console.log('✅ Phase 16: 高度な編集 & AI機能統合 読み込み完了')
 console.log('🎉 Phase 16 完全実装完了！')
+
+// =============================================================================
+// Phase 19A: 学習データ分析ダッシュボード
+// =============================================================================
+
+// 学習分析ダッシュボードを表示
+async function showAnalyticsDashboard() {
+  const classCode = localStorage.getItem('classCode')
+  if (!classCode) {
+    alert('クラスコードが設定されていません')
+    return
+  }
+  
+  try {
+    const response = await axios.get(`/api/analytics/class/${classCode}`)
+    if (!response.data.success) {
+      throw new Error(response.data.error)
+    }
+    
+    const { classStats, studentPerformance, dailyActivity } = response.data
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <div class="max-w-7xl mx-auto">
+          <div class="bg-white rounded-lg shadow-xl p-8">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-3xl font-bold text-gray-800">
+                <i class="fas fa-chart-line mr-2 text-blue-600"></i>
+                学習データ分析ダッシュボード
+              </h2>
+              <button onclick="renderTopPage()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+              </button>
+            </div>
+            
+            <!-- クラス全体統計 -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <div class="bg-blue-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">生徒数</p>
+                <p class="text-3xl font-bold text-blue-600">${classStats.total_students || 0}</p>
+              </div>
+              <div class="bg-green-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">平均正答率</p>
+                <p class="text-3xl font-bold text-green-600">${classStats.avg_correct_rate || 0}%</p>
+              </div>
+              <div class="bg-purple-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">解いた問題数</p>
+                <p class="text-3xl font-bold text-purple-600">${classStats.total_problems_solved || 0}</p>
+              </div>
+              <div class="bg-orange-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">学習セッション</p>
+                <p class="text-3xl font-bold text-orange-600">${classStats.total_sessions || 0}</p>
+              </div>
+            </div>
+            
+            <!-- 日別学習アクティビティグラフ -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-8">
+              <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-calendar-alt mr-2"></i>日別学習アクティビティ（過去30日）
+              </h3>
+              <canvas id="daily-activity-chart"></canvas>
+            </div>
+            
+            <!-- 生徒別パフォーマンス -->
+            <div class="bg-gray-50 p-6 rounded-lg">
+              <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-users mr-2"></i>生徒別パフォーマンス
+              </h3>
+              <div class="overflow-x-auto">
+                <table class="min-w-full bg-white rounded">
+                  <thead class="bg-gray-100">
+                    <tr>
+                      <th class="px-4 py-2 text-left">出席番号</th>
+                      <th class="px-4 py-2 text-left">名前</th>
+                      <th class="px-4 py-2 text-center">セッション数</th>
+                      <th class="px-4 py-2 text-center">正答率</th>
+                      <th class="px-4 py-2 text-center">解いた問題数</th>
+                      <th class="px-4 py-2 text-center">ヒント使用</th>
+                      <th class="px-4 py-2 text-center">詳細</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${studentPerformance.map(s => `
+                      <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-2">${s.student_number || '-'}</td>
+                        <td class="px-4 py-2 font-semibold">${s.name}</td>
+                        <td class="px-4 py-2 text-center">${s.session_count || 0}</td>
+                        <td class="px-4 py-2 text-center">
+                          <span class="px-2 py-1 rounded ${
+                            (s.avg_correct_rate || 0) >= 80 ? 'bg-green-100 text-green-800' :
+                            (s.avg_correct_rate || 0) >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }">
+                            ${s.avg_correct_rate || 0}%
+                          </span>
+                        </td>
+                        <td class="px-4 py-2 text-center">${s.problems_solved || 0}</td>
+                        <td class="px-4 py-2 text-center">${s.hints_used || 0}</td>
+                        <td class="px-4 py-2 text-center">
+                          <button onclick="showStudentAnalytics(${s.id})" 
+                            class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-chart-pie"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <div class="mt-6 text-center">
+              <button onclick="renderTopPage()" 
+                class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition">
+                <i class="fas fa-arrow-left mr-2"></i>トップページに戻る
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    
+    // Chart.js でグラフ描画
+    setTimeout(() => {
+      const ctx = document.getElementById('daily-activity-chart')
+      if (ctx && window.Chart) {
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: dailyActivity.map(d => d.date),
+            datasets: [
+              {
+                label: '学習セッション数',
+                data: dailyActivity.map(d => d.session_count),
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4
+              },
+              {
+                label: 'アクティブ生徒数',
+                data: dailyActivity.map(d => d.active_students),
+                borderColor: 'rgb(34, 197, 94)',
+                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                tension: 0.4
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { display: true, position: 'top' }
+            },
+            scales: {
+              y: { beginAtZero: true }
+            }
+          }
+        })
+      }
+    }, 100)
+    
+  } catch (error) {
+    console.error('❌ 分析データ取得エラー:', error)
+    alert('分析データの取得に失敗しました: ' + error.message)
+  }
+}
+
+// 個人学習分析を表示
+async function showStudentAnalytics(studentId) {
+  try {
+    const response = await axios.get(`/api/analytics/student/${studentId}`)
+    if (!response.data.success) {
+      throw new Error(response.data.error)
+    }
+    
+    const { basicStats, weeklyProgress, subjectPerformance } = response.data
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="container mx-auto px-4 py-8">
+        <div class="max-w-6xl mx-auto">
+          <div class="bg-white rounded-lg shadow-xl p-8">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-3xl font-bold text-gray-800">
+                <i class="fas fa-user-chart mr-2 text-blue-600"></i>
+                個人学習分析
+              </h2>
+              <button onclick="showAnalyticsDashboard()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-arrow-left text-2xl"></i>
+              </button>
+            </div>
+            
+            <!-- 基本統計 -->
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+              <div class="bg-blue-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">学習セッション</p>
+                <p class="text-3xl font-bold text-blue-600">${basicStats.total_sessions || 0}</p>
+              </div>
+              <div class="bg-green-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">平均正答率</p>
+                <p class="text-3xl font-bold text-green-600">${basicStats.avg_correct_rate || 0}%</p>
+              </div>
+              <div class="bg-purple-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">解いた問題数</p>
+                <p class="text-3xl font-bold text-purple-600">${basicStats.total_problems_solved || 0}</p>
+              </div>
+              <div class="bg-orange-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">AI質問回数</p>
+                <p class="text-3xl font-bold text-orange-600">${basicStats.total_ai_requests || 0}</p>
+              </div>
+              <div class="bg-pink-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">ヒント使用</p>
+                <p class="text-3xl font-bold text-pink-600">${basicStats.total_hints_used || 0}</p>
+              </div>
+              <div class="bg-indigo-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600">平均学習時間</p>
+                <p class="text-3xl font-bold text-indigo-600">${basicStats.avg_session_minutes || 0}分</p>
+              </div>
+            </div>
+            
+            <!-- 週別進捗グラフ -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-8">
+              <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-chart-line mr-2"></i>週別学習進捗（過去90日）
+              </h3>
+              <canvas id="weekly-progress-chart"></canvas>
+            </div>
+            
+            <!-- 科目別パフォーマンス -->
+            <div class="bg-gray-50 p-6 rounded-lg mb-8">
+              <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-book mr-2"></i>科目別パフォーマンス
+              </h3>
+              <canvas id="subject-performance-chart"></canvas>
+            </div>
+            
+            <div class="text-center">
+              <button onclick="showAnalyticsDashboard()" 
+                class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition">
+                <i class="fas fa-arrow-left mr-2"></i>ダッシュボードに戻る
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    
+    // グラフ描画
+    setTimeout(() => {
+      // 週別進捗
+      const weeklyCtx = document.getElementById('weekly-progress-chart')
+      if (weeklyCtx && window.Chart) {
+        new Chart(weeklyCtx, {
+          type: 'bar',
+          data: {
+            labels: weeklyProgress.map(w => w.week),
+            datasets: [
+              {
+                label: '正答率 (%)',
+                data: weeklyProgress.map(w => w.avg_correct_rate),
+                backgroundColor: 'rgba(34, 197, 94, 0.5)',
+                borderColor: 'rgb(34, 197, 94)',
+                borderWidth: 2,
+                yAxisID: 'y1'
+              },
+              {
+                label: '解いた問題数',
+                data: weeklyProgress.map(w => w.problems_solved),
+                backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                borderColor: 'rgb(59, 130, 246)',
+                borderWidth: 2,
+                yAxisID: 'y2'
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y1: { type: 'linear', position: 'left', beginAtZero: true, max: 100 },
+              y2: { type: 'linear', position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
+            }
+          }
+        })
+      }
+      
+      // 科目別パフォーマンス
+      const subjectCtx = document.getElementById('subject-performance-chart')
+      if (subjectCtx && window.Chart) {
+        new Chart(subjectCtx, {
+          type: 'radar',
+          data: {
+            labels: subjectPerformance.map(s => s.subject),
+            datasets: [{
+              label: '正答率 (%)',
+              data: subjectPerformance.map(s => s.correct_rate),
+              backgroundColor: 'rgba(147, 51, 234, 0.2)',
+              borderColor: 'rgb(147, 51, 234)',
+              pointBackgroundColor: 'rgb(147, 51, 234)',
+              pointBorderColor: '#fff',
+              pointHoverBackgroundColor: '#fff',
+              pointHoverBorderColor: 'rgb(147, 51, 234)'
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              r: { beginAtZero: true, max: 100 }
+            }
+          }
+        })
+      }
+    }, 100)
+    
+  } catch (error) {
+    console.error('❌ 個人分析データ取得エラー:', error)
+    alert('個人分析データの取得に失敗しました: ' + error.message)
+  }
+}
+
+// グローバルスコープに登録
+window.showAnalyticsDashboard = showAnalyticsDashboard
+window.showStudentAnalytics = showStudentAnalytics
+
+console.log('✅ Phase 19A: 学習データ分析ダッシュボード 読み込み完了')
 
 
 
