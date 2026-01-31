@@ -590,9 +590,9 @@ Email: xxx@school.jp
 - **画像類似検索**：ハッシュベース類似度判定（実験的）
 
 ### AI機能
-- **Gemini 3.0 Flash**：画像認識・自動タグ付け
-- **Gemini 2.0 Flash Exp**：対話型AI
+- **Gemini 3.0 Flash**：すべてのAI機能で使用（画像認識・自動タグ付け・対話型AI）
 - **温かく忍耐強い教師スタイル**：答えを教えず、質問とヒントで導く
+- **マルチモーダル対話**：画像を見せながら質問可能
 
 ### デプロイ
 - **Cloudflare Pages**：グローバルエッジ配信
@@ -606,7 +606,7 @@ Email: xxx@school.jp
 - 📘 [詳細README（技術者向け）](./README.md)
 - 📄 [紙学習対応ガイド](./PAPER_LEARNING_SUPPORT.md)
 - 🔗 [GitHub](https://github.com/koba06040603-ops/jiyushindo-gakushu)
-- 🌐 [本番環境](https://aa579b73.jiyushindo-gakushu.pages.dev)
+- 🌐 [本番環境](https://9f03ad4b.jiyushindo-gakushu.pages.dev)
 
 ### 🔒 セキュリティ・プライバシー関連
 - **[セキュリティ・プライバシーポリシー](./SECURITY_PRIVACY.md)** - 完全版
