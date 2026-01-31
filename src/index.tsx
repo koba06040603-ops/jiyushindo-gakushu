@@ -4915,6 +4915,8 @@ app.get('/', (c) => {
         <script defer src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <script defer src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.min.js"></script>
         <style>
           /* FontAwesome fa-spin animation */
           @keyframes fa-spin {
@@ -17596,53 +17598,345 @@ app.get('/api/media-library/search', async (c) => {
   }
 })
 
+// ============================================================
+// Phase 17A: メディアタグ管理API
+// ============================================================
 
-// AI自動タグ付け（Gemini 3.0 Flash画像認識）
-app.post('/api/ai/auto-tag-image', async (c) => {
+// タグ一覧取得
+app.get('/api/tags', async (c) => {
+  const { env } = c
+  const category = c.req.query('category')
+  
   try {
-    const { image_url } = await c.req.json()
+    let query = 'SELECT * FROM tags'
+    const params: string[] = []
+    
+    if (category) {
+      query += ' WHERE category = ?'
+      params.push(category)
+    }
+    
+    query += ' ORDER BY category, name'
+    
+    const result = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      tags: result.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ タグ一覧取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// タグ作成
+app.post('/api/tags', async (c) => {
+  const { env } = c
+  
+  try {
+    const { name, category, color } = await c.req.json()
+    
+    if (!name) {
+      return c.json({ success: false, error: 'タグ名が必要です' }, 400)
+    }
+    
+    const result = await env.DB.prepare(
+      'INSERT INTO tags (name, category, color) VALUES (?, ?, ?) RETURNING *'
+    ).bind(name, category || null, color || '#3B82F6').first()
+    
+    return c.json({
+      success: true,
+      tag: result
+    })
+  } catch (error: any) {
+    console.error('❌ タグ作成エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// メディアファイル登録（アップロード時に自動的に呼ばれる）
+app.post('/api/media-files', async (c) => {
+  const { env } = c
+  
+  try {
+    const { r2_key, file_name, file_type, file_size, mime_type, title, description } = await c.req.json()
+    
+    if (!r2_key || !file_name || !file_type) {
+      return c.json({ success: false, error: '必須パラメータが不足しています' }, 400)
+    }
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO media_files 
+        (r2_key, file_name, file_type, file_size, mime_type, title, description)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING *
+    `).bind(
+      r2_key, 
+      file_name, 
+      file_type, 
+      file_size || null, 
+      mime_type || null,
+      title || file_name,
+      description || null
+    ).first()
+    
+    return c.json({
+      success: true,
+      media: result
+    })
+  } catch (error: any) {
+    console.error('❌ メディアファイル登録エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// メディアにタグを追加
+app.post('/api/media/:mediaKey/tags', async (c) => {
+  const { env } = c
+  const mediaKey = c.req.param('mediaKey')
+  
+  try {
+    const { tag_ids } = await c.req.json()
+    
+    if (!Array.isArray(tag_ids) || tag_ids.length === 0) {
+      return c.json({ success: false, error: 'タグIDの配列が必要です' }, 400)
+    }
+    
+    // メディアファイルのIDを取得
+    const media = await env.DB.prepare(
+      'SELECT id FROM media_files WHERE r2_key = ?'
+    ).bind(decodeURIComponent(mediaKey)).first()
+    
+    if (!media) {
+      return c.json({ success: false, error: 'メディアが見つかりません' }, 404)
+    }
+    
+    // 各タグを追加（重複は無視される）
+    for (const tagId of tag_ids) {
+      await env.DB.prepare(
+        'INSERT OR IGNORE INTO media_tags (media_id, tag_id) VALUES (?, ?)'
+      ).bind(media.id, tagId).run()
+    }
+    
+    return c.json({
+      success: true,
+      message: `${tag_ids.length}個のタグを追加しました`
+    })
+  } catch (error: any) {
+    console.error('❌ タグ追加エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// メディアのタグを取得
+app.get('/api/media/:mediaKey/tags', async (c) => {
+  const { env } = c
+  const mediaKey = c.req.param('mediaKey')
+  
+  try {
+    const tags = await env.DB.prepare(`
+      SELECT t.* FROM tags t
+      JOIN media_tags mt ON t.id = mt.tag_id
+      JOIN media_files mf ON mf.id = mt.media_id
+      WHERE mf.r2_key = ?
+    `).bind(decodeURIComponent(mediaKey)).all()
+    
+    return c.json({
+      success: true,
+      tags: tags.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ タグ取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// タグで検索
+app.get('/api/media/search-by-tags', async (c) => {
+  const { env } = c
+  const tagNames = c.req.query('tags')?.split(',') || []
+  
+  try {
+    if (tagNames.length === 0) {
+      return c.json({ success: false, error: 'タグが指定されていません' }, 400)
+    }
+    
+    // タグ名からIDを取得
+    const placeholders = tagNames.map(() => '?').join(',')
+    const tagIds = await env.DB.prepare(
+      `SELECT id FROM tags WHERE name IN (${placeholders})`
+    ).bind(...tagNames).all()
+    
+    if (!tagIds.results || tagIds.results.length === 0) {
+      return c.json({ success: true, media: [] })
+    }
+    
+    // タグに紐づくメディアを取得
+    const idPlaceholders = tagIds.results.map(() => '?').join(',')
+    const media = await env.DB.prepare(`
+      SELECT DISTINCT mf.* FROM media_files mf
+      JOIN media_tags mt ON mf.id = mt.media_id
+      WHERE mt.tag_id IN (${idPlaceholders})
+      ORDER BY mf.uploaded_at DESC
+    `).bind(...tagIds.results.map((t: any) => t.id)).all()
+    
+    return c.json({
+      success: true,
+      media: media.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ タグ検索エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+
+// AI自動タグ付け（Gemini 3.0 Flash画像認識）本番実装
+app.post('/api/ai/auto-tag-image', async (c) => {
+  const { env } = c
+  
+  try {
+    const { image_url, r2_key } = await c.req.json()
     
     if (!image_url) {
       return c.json({ success: false, error: '画像URLが必要です' }, 400)
     }
     
-    // Gemini APIで画像認識（外部サービス）
-    const prompt = `この画像を分析して、以下の情報を日本語でJSON形式で返してください：
+    // GEMINI_API_KEYの確認
+    if (!env.GEMINI_API_KEY) {
+      console.warn('⚠️ GEMINI_API_KEY not configured, using demo data')
+      // デモデータを返す
+      const demoTags = {
+        tags: ['教育', '学習', '算数'],
+        description: '教材用の画像',
+        category: '算数・図形',
+        suggested_title: '学習教材',
+        educational_context: '小学校の算数教材として使用できます'
+      }
+      return c.json({ 
+        success: true, 
+        ...demoTags,
+        message: 'デモモード: GEMINI_API_KEYを設定すると実際のAI分析が使用できます'
+      })
+    }
+    
+    // 画像をBase64に変換
+    console.log('🖼️ 画像をダウンロード中:', image_url)
+    const imageResponse = await fetch(image_url)
+    if (!imageResponse.ok) {
+      throw new Error(`画像のダウンロードに失敗: ${imageResponse.statusText}`)
+    }
+    
+    const imageBuffer = await imageResponse.arrayBuffer()
+    const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)))
+    const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg'
+    
+    console.log('📤 Gemini 3.0にリクエスト送信中...')
+    
+    // Gemini 3.0 Flash APIにリクエスト
+    const prompt = `この画像を教育用教材として詳しく分析してください。以下の情報を日本語のJSON形式で返してください：
+
 {
-  "tags": ["タグ1", "タグ2", "タグ3"],
-  "description": "画像の説明",
-  "category": "カテゴリ",
-  "suggested_title": "推奨タイトル"
+  "tags": ["タグ1", "タグ2", "タグ3", "タグ4", "タグ5"],
+  "description": "画像の詳細な説明（2-3文）",
+  "category": "カテゴリ（教科名または単元名）",
+  "suggested_title": "推奨タイトル",
+  "educational_context": "教育的な使用方法や対象学年"
 }
 
-タグは画像の内容を表すキーワード5個以内。カテゴリは「教科・単元・テーマ」など。`
+【分析ポイント】
+- タグは5個以内、具体的なキーワード（例：「算数」「図形」「三角形」「面積」「計算」）
+- カテゴリは教科名または単元名（例：「算数・図形」「国語・漢字」「理科・実験」）
+- 教育的な観点から役立つ情報を含める
+- 対象学年や使用場面を明確に
+
+JSONのみを返してください。他の説明は不要です。`
+
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { 
+                inline_data: { 
+                  mime_type: mimeType,
+                  data: base64Image 
+                } 
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024
+          }
+        })
+      }
+    )
     
-    // NOTE: 実際のGemini APIを使用する場合は、以下のようにAPIキーが必要
-    // const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=YOUR_API_KEY', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     contents: [{
-    //       parts: [
-    //         { text: prompt },
-    //         { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
-    //       ]
-    //     }]
-    //   })
-    // })
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text()
+      console.error('❌ Gemini APIエラー:', errorText)
+      throw new Error(`Gemini API error: ${geminiResponse.statusText}`)
+    }
     
-    // デモ実装：ダミーデータを返す
-    const demoTags = {
-      tags: ['教育', '学習', '算数'],
-      description: '教材用の画像',
-      category: '算数・図形',
-      suggested_title: '学習教材'
+    const geminiData = await geminiResponse.json()
+    console.log('✅ Gemini応答受信')
+    
+    // Geminiからのテキスト応答を解析
+    const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    console.log('📝 Gemini応答テキスト:', responseText)
+    
+    // JSONを抽出（マークダウンコードブロックを除去）
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    const jsonText = jsonMatch ? jsonMatch[0] : responseText
+    
+    let aiResult
+    try {
+      aiResult = JSON.parse(jsonText)
+    } catch (parseError) {
+      console.error('❌ JSON解析エラー:', parseError)
+      // パースエラー時はデフォルト値
+      aiResult = {
+        tags: ['AI分析'],
+        description: 'AI分析結果の取得に失敗しました',
+        category: '未分類',
+        suggested_title: '画像',
+        educational_context: ''
+      }
+    }
+    
+    // DBに保存（r2_keyが提供されている場合）
+    if (r2_key) {
+      try {
+        await env.DB.prepare(`
+          UPDATE media_files 
+          SET 
+            ai_generated_tags = ?,
+            ai_description = ?,
+            ai_category = ?
+          WHERE r2_key = ?
+        `).bind(
+          JSON.stringify(aiResult.tags || []),
+          aiResult.description || '',
+          aiResult.category || '',
+          r2_key
+        ).run()
+        
+        console.log('✅ AI分析結果をDBに保存しました')
+      } catch (dbError) {
+        console.warn('⚠️ DB保存エラー（無視）:', dbError)
+      }
     }
     
     return c.json({ 
       success: true, 
-      ...demoTags,
-      message: 'AI自動タグ付けは将来実装予定（現在はデモデータ）'
+      ...aiResult,
+      message: 'Gemini 3.0によるAI分析が完了しました'
     })
     
   } catch (error: any) {

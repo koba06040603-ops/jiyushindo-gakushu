@@ -25773,7 +25773,21 @@ function previewImageFile(file) {
     const uploadBtn = document.getElementById('upload-image-btn')
     
     previewImg.src = e.target.result
-    previewName.textContent = file.name + ' (' + formatFileSize(file.size) + ')'
+    previewName.innerHTML = `
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <span class="font-medium">${file.name} (${formatFileSize(file.size)})</span>
+        <div class="flex gap-2">
+          <button onclick="showImageEditor(fileUploadState.selectedImageFile)" 
+                  class="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition">
+            <i class="fas fa-edit"></i> 画像編集
+          </button>
+          <button onclick="handleFaceBlur()" 
+                  class="px-3 py-1 bg-pink-600 text-white text-sm rounded hover:bg-pink-700 transition">
+            <i class="fas fa-user-secret"></i> 顔にモザイク
+          </button>
+        </div>
+      </div>
+    `
     previewDiv.classList.remove('hidden')
     uploadBtn.classList.remove('hidden')
   }
@@ -25948,7 +25962,15 @@ function previewVideoFile(file) {
   const uploadBtn = document.getElementById('upload-video-btn')
   
   if (previewDiv && previewName && uploadBtn) {
-    previewName.textContent = file.name + ' (' + formatFileSize(file.size) + ')'
+    previewName.innerHTML = `
+      <div class="flex items-center justify-between">
+        <span>${file.name} (${formatFileSize(file.size)})</span>
+        <button onclick="showVideoEditor(fileUploadState.selectedVideoFile)" 
+                class="ml-4 px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">
+          <i class="fas fa-cut"></i> 動画編集
+        </button>
+      </div>
+    `
     previewDiv.classList.remove('hidden')
     uploadBtn.classList.remove('hidden')
   }
@@ -26246,6 +26268,9 @@ function showImageEditor(file) {
       imageEditorState.brightness = 1.0
       imageEditorState.contrast = 1.0
       imageEditorState.filter = 'none'
+      imageEditorState.cropMode = false
+      imageEditorState.cropStart = null
+      imageEditorState.cropEnd = null
       
       const modalHTML = `
         <div id="image-editor-modal" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
@@ -26289,6 +26314,9 @@ function showImageEditor(file) {
               </div>
               
               <div class="flex gap-2 mb-4 flex-wrap">
+                <button onclick="toggleCropMode()" id="crop-toggle-btn" class="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">
+                  <i class="fas fa-crop"></i> トリミング
+                </button>
                 <button onclick="rotateImage(-90)" class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
                   <i class="fas fa-undo"></i> 左回転
                 </button>
@@ -26303,6 +26331,9 @@ function showImageEditor(file) {
                 </button>
                 <button onclick="resetImageEditor()" class="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm">
                   <i class="fas fa-sync"></i> リセット
+                </button>
+                <button onclick="applyCrop()" id="apply-crop-btn" class="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm hidden">
+                  <i class="fas fa-check"></i> トリミング適用
                 </button>
               </div>
               
@@ -26374,6 +26405,27 @@ function renderImageEditor() {
   ctx.drawImage(img, -width / 2, -height / 2, width, height)
   ctx.restore()
   
+  // トリミング矩形を描画
+  if (imageEditorState.cropMode && imageEditorState.cropStart && imageEditorState.cropEnd) {
+    const startX = Math.min(imageEditorState.cropStart.x, imageEditorState.cropEnd.x)
+    const startY = Math.min(imageEditorState.cropStart.y, imageEditorState.cropEnd.y)
+    const rectWidth = Math.abs(imageEditorState.cropEnd.x - imageEditorState.cropStart.x)
+    const rectHeight = Math.abs(imageEditorState.cropEnd.y - imageEditorState.cropStart.y)
+    
+    ctx.strokeStyle = '#FF0000'
+    ctx.lineWidth = 2
+    ctx.setLineDash([5, 5])
+    ctx.strokeRect(startX, startY, rectWidth, rectHeight)
+    ctx.setLineDash([])
+    
+    // 半透明オーバーレイ
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'
+    ctx.fillRect(0, 0, canvas.width, startY)
+    ctx.fillRect(0, startY, startX, rectHeight)
+    ctx.fillRect(startX + rectWidth, startY, canvas.width - (startX + rectWidth), rectHeight)
+    ctx.fillRect(0, startY + rectHeight, canvas.width, canvas.height - (startY + rectHeight))
+  }
+  
   imageEditorState.editedCanvas = canvas
 }
 
@@ -26434,6 +26486,146 @@ function applyFilter(filterName) {
 
 // 編集を保存
 async function saveEditedImage() {
+  if (!imageEditorState.editedCanvas) return
+  
+  imageEditorState.editedCanvas.toBlob(async (blob) => {
+    const file = new File([blob], 'edited-image.png', { type: 'image/png' })
+    fileUploadState.selectedImageFile = file
+    
+    closeImageEditor()
+    previewImageFile(file)
+    alert('✅ 編集が適用されました。「アップロードして追加」をクリックしてください。')
+  }, 'image/png')
+}
+
+// トリミングモード切り替え
+function toggleCropMode() {
+  imageEditorState.cropMode = !imageEditorState.cropMode
+  imageEditorState.cropStart = null
+  imageEditorState.cropEnd = null
+  
+  const canvas = document.getElementById('image-editor-canvas')
+  const toggleBtn = document.getElementById('crop-toggle-btn')
+  const applyBtn = document.getElementById('apply-crop-btn')
+  
+  if (imageEditorState.cropMode) {
+    toggleBtn.classList.add('bg-red-600', 'hover:bg-red-700')
+    toggleBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700')
+    toggleBtn.innerHTML = '<i class="fas fa-times"></i> キャンセル'
+    applyBtn.classList.remove('hidden')
+    
+    // Canvasにマウスイベントを追加
+    canvas.style.cursor = 'crosshair'
+    canvas.addEventListener('mousedown', startCrop)
+    canvas.addEventListener('mousemove', drawCropRect)
+    canvas.addEventListener('mouseup', endCrop)
+  } else {
+    toggleBtn.classList.remove('bg-red-600', 'hover:bg-red-700')
+    toggleBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700')
+    toggleBtn.innerHTML = '<i class="fas fa-crop"></i> トリミング'
+    applyBtn.classList.add('hidden')
+    
+    canvas.style.cursor = 'default'
+    canvas.removeEventListener('mousedown', startCrop)
+    canvas.removeEventListener('mousemove', drawCropRect)
+    canvas.removeEventListener('mouseup', endCrop)
+  }
+  
+  renderImageEditor()
+}
+
+// トリミング開始
+function startCrop(e) {
+  if (!imageEditorState.cropMode) return
+  
+  const canvas = document.getElementById('image-editor-canvas')
+  const rect = canvas.getBoundingClientRect()
+  
+  imageEditorState.cropStart = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  }
+  imageEditorState.cropEnd = null
+}
+
+// トリミング範囲描画
+function drawCropRect(e) {
+  if (!imageEditorState.cropMode || !imageEditorState.cropStart) return
+  
+  const canvas = document.getElementById('image-editor-canvas')
+  const rect = canvas.getBoundingClientRect()
+  
+  imageEditorState.cropEnd = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  }
+  
+  renderImageEditor()
+}
+
+// トリミング終了
+function endCrop(e) {
+  if (!imageEditorState.cropMode || !imageEditorState.cropStart) return
+  
+  const canvas = document.getElementById('image-editor-canvas')
+  const rect = canvas.getBoundingClientRect()
+  
+  imageEditorState.cropEnd = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top
+  }
+  
+  renderImageEditor()
+}
+
+// トリミング適用
+function applyCrop() {
+  if (!imageEditorState.cropStart || !imageEditorState.cropEnd) {
+    alert('トリミング範囲を選択してください')
+    return
+  }
+  
+  const canvas = document.getElementById('image-editor-canvas')
+  const ctx = canvas.getContext('2d')
+  
+  // トリミング範囲を計算
+  const startX = Math.min(imageEditorState.cropStart.x, imageEditorState.cropEnd.x)
+  const startY = Math.min(imageEditorState.cropStart.y, imageEditorState.cropEnd.y)
+  const width = Math.abs(imageEditorState.cropEnd.x - imageEditorState.cropStart.x)
+  const height = Math.abs(imageEditorState.cropEnd.y - imageEditorState.cropStart.y)
+  
+  if (width < 10 || height < 10) {
+    alert('トリミング範囲が小さすぎます')
+    return
+  }
+  
+  // トリミング範囲の画像データを取得
+  const imageData = ctx.getImageData(startX, startY, width, height)
+  
+  // 新しいCanvasに描画
+  const tempCanvas = document.createElement('canvas')
+  tempCanvas.width = width
+  tempCanvas.height = height
+  const tempCtx = tempCanvas.getContext('2d')
+  tempCtx.putImageData(imageData, 0, 0)
+  
+  // 新しい画像として設定
+  const newImg = new Image()
+  newImg.onload = () => {
+    imageEditorState.originalImage = newImg
+    imageEditorState.cropMode = false
+    imageEditorState.cropStart = null
+    imageEditorState.cropEnd = null
+    
+    toggleCropMode() // モード解除
+    renderImageEditor()
+    alert('✅ トリミングが適用されました')
+  }
+  newImg.src = tempCanvas.toDataURL()
+}
+
+// 編集を保存（元の関数）
+async function saveEditedImageOrig() {
   if (!imageEditorState.editedCanvas) return
   
   imageEditorState.editedCanvas.toBlob(async (blob) => {
@@ -26592,6 +26784,401 @@ window.uploadToCloudflareImages = uploadToCloudflareImages
 window.uploadToCloudflareStream = uploadToCloudflareStream
 
 console.log('✅ Phase 15C: CDN統合（将来実装準備） 読み込み完了')
+
+// ============================================================
+// Phase 17D: FFmpeg.wasm 動画編集機能
+// ============================================================
+
+let ffmpegInstance = null
+let ffmpegLoaded = false
+
+// FFmpeg.wasmの初期化
+async function initFFmpeg() {
+  if (ffmpegLoaded) return ffmpegInstance
+  
+  try {
+    console.log('⏳ FFmpeg.wasm を初期化中...')
+    
+    // FFmpeg.wasmをCDNから読み込み
+    const { createFFmpeg, fetchFile } = FFmpeg
+    
+    ffmpegInstance = createFFmpeg({
+      log: true,
+      corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+    })
+    
+    await ffmpegInstance.load()
+    ffmpegLoaded = true
+    
+    console.log('✅ FFmpeg.wasm 初期化完了')
+    return ffmpegInstance
+  } catch (error) {
+    console.error('❌ FFmpeg.wasm 初期化エラー:', error)
+    alert('動画編集機能の読み込みに失敗しました。ページをリロードしてください。')
+    return null
+  }
+}
+
+// 動画エディタを表示
+async function showVideoEditor(file) {
+  const modalHTML = `
+    <div id="video-editor-modal" class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-lg w-full max-w-4xl max-h-screen overflow-hidden flex flex-col">
+        <div class="p-4 border-b flex justify-between items-center">
+          <h2 class="text-xl font-bold">🎬 動画編集</h2>
+          <button onclick="closeVideoEditor()" class="text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times text-2xl"></i>
+          </button>
+        </div>
+        
+        <div class="flex-1 overflow-auto p-4">
+          <div class="mb-4">
+            <video id="video-preview" controls class="w-full max-h-96 bg-black rounded"></video>
+          </div>
+          
+          <div class="space-y-4">
+            <div>
+              <h3 class="font-bold mb-2">✂️ 動画トリミング</h3>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-sm mb-1">開始時間（秒）</label>
+                  <input type="number" id="trim-start" min="0" step="0.1" value="0" 
+                         class="w-full px-3 py-2 border rounded">
+                </div>
+                <div>
+                  <label class="block text-sm mb-1">終了時間（秒）</label>
+                  <input type="number" id="trim-end" min="0" step="0.1" 
+                         class="w-full px-3 py-2 border rounded">
+                </div>
+              </div>
+              <button onclick="trimVideo()" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                <i class="fas fa-cut"></i> トリミング実行
+              </button>
+            </div>
+            
+            <div id="trim-progress" class="hidden">
+              <div class="bg-blue-100 border border-blue-300 rounded p-3">
+                <div class="flex items-center">
+                  <i class="fas fa-spinner fa-spin mr-2"></i>
+                  <span id="trim-status">処理中...</span>
+                </div>
+                <div class="mt-2 bg-gray-200 rounded-full h-2">
+                  <div id="trim-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-4 border-t bg-gray-50 flex gap-2 justify-end">
+          <button onclick="closeVideoEditor()" class="px-6 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+            キャンセル
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  
+  const videoPreview = document.getElementById('video-preview')
+  const reader = new FileReader()
+  
+  reader.onload = (e) => {
+    videoPreview.src = e.target.result
+    
+    videoPreview.onloadedmetadata = () => {
+      document.getElementById('trim-end').value = videoPreview.duration.toFixed(1)
+    }
+  }
+  
+  reader.readAsDataURL(file)
+  
+  // ビデオファイルを保存
+  window.currentVideoFile = file
+}
+
+// 動画エディタを閉じる
+function closeVideoEditor() {
+  const modal = document.getElementById('video-editor-modal')
+  if (modal) {
+    modal.remove()
+  }
+  window.currentVideoFile = null
+}
+
+// 動画トリミング
+async function trimVideo() {
+  if (!window.currentVideoFile) {
+    alert('動画ファイルが見つかりません')
+    return
+  }
+  
+  const startTime = parseFloat(document.getElementById('trim-start').value) || 0
+  const endTime = parseFloat(document.getElementById('trim-end').value) || 0
+  
+  if (startTime >= endTime) {
+    alert('開始時間は終了時間より前である必要があります')
+    return
+  }
+  
+  const progressDiv = document.getElementById('trim-progress')
+  const statusSpan = document.getElementById('trim-status')
+  const progressBar = document.getElementById('trim-progress-bar')
+  
+  try {
+    progressDiv.classList.remove('hidden')
+    statusSpan.textContent = 'FFmpeg.wasmを初期化中...'
+    progressBar.style.width = '10%'
+    
+    // FFmpeg初期化
+    const ffmpeg = await initFFmpeg()
+    if (!ffmpeg) {
+      throw new Error('FFmpeg初期化失敗')
+    }
+    
+    statusSpan.textContent = '動画を読み込み中...'
+    progressBar.style.width = '30%'
+    
+    // 入力ファイルを準備
+    const { fetchFile } = FFmpeg
+    await ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(window.currentVideoFile))
+    
+    statusSpan.textContent = 'トリミング処理中...'
+    progressBar.style.width = '50%'
+    
+    // トリミング実行
+    const duration = endTime - startTime
+    await ffmpeg.run(
+      '-i', 'input.mp4',
+      '-ss', startTime.toString(),
+      '-t', duration.toString(),
+      '-c', 'copy',
+      'output.mp4'
+    )
+    
+    statusSpan.textContent = '出力ファイルを準備中...'
+    progressBar.style.width = '80%'
+    
+    // 出力ファイルを取得
+    const data = ffmpeg.FS('readFile', 'output.mp4')
+    const blob = new Blob([data.buffer], { type: 'video/mp4' })
+    const file = new File([blob], 'trimmed-video.mp4', { type: 'video/mp4' })
+    
+    // ファイルをアップロード状態に設定
+    fileUploadState.selectedVideoFile = file
+    
+    statusSpan.textContent = '完了！'
+    progressBar.style.width = '100%'
+    
+    // クリーンアップ
+    ffmpeg.FS('unlink', 'input.mp4')
+    ffmpeg.FS('unlink', 'output.mp4')
+    
+    closeVideoEditor()
+    previewVideoFile(file)
+    alert('✅ 動画のトリミングが完了しました。「アップロードして追加」をクリックしてください。')
+    
+  } catch (error) {
+    console.error('❌ 動画トリミングエラー:', error)
+    alert(`動画のトリミングに失敗しました: ${error.message}`)
+  } finally {
+    progressDiv.classList.add('hidden')
+  }
+}
+
+// グローバルに関数を公開
+window.showVideoEditor = showVideoEditor
+window.closeVideoEditor = closeVideoEditor
+window.trimVideo = trimVideo
+window.initFFmpeg = initFFmpeg
+
+console.log('✅ Phase 17D: FFmpeg.wasm 動画編集機能 読み込み完了')
+
+// ============================================================
+// Phase 17E: face-api.js 顔認識・モザイク機能
+// ============================================================
+
+let faceApiLoaded = false
+
+// face-api.jsの初期化
+async function initFaceApi() {
+  if (faceApiLoaded) return true
+  
+  try {
+    console.log('⏳ face-api.jsを初期化中...')
+    
+    // face-api.jsのモデルを読み込み（CDNから）
+    await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model')
+    
+    faceApiLoaded = true
+    console.log('✅ face-api.js 初期化完了')
+    return true
+  } catch (error) {
+    console.error('❌ face-api.js 初期化エラー:', error)
+    alert('顔認識機能の読み込みに失敗しました。')
+    return false
+  }
+}
+
+// 画像の顔検出とモザイク処理
+async function applyFaceBlur(imageFile) {
+  try {
+    // face-api.js初期化
+    const initialized = await initFaceApi()
+    if (!initialized) {
+      throw new Error('face-api.js初期化失敗')
+    }
+    
+    // 画像を読み込み
+    const img = await createImageBitmap(imageFile)
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(img, 0, 0)
+    
+    // 顔検出
+    const detections = await faceapi.detectAllFaces(
+      canvas,
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+    )
+    
+    if (detections.length === 0) {
+      alert('顔が検出されませんでした')
+      return null
+    }
+    
+    console.log(`✅ ${detections.length}個の顔を検出しました`)
+    
+    // 各顔にモザイク処理
+    detections.forEach(detection => {
+      const box = detection.box
+      const x = Math.max(0, box.x)
+      const y = Math.max(0, box.y)
+      const width = Math.min(box.width, canvas.width - x)
+      const height = Math.min(box.height, canvas.height - y)
+      
+      // モザイク処理
+      applyMosaicToArea(ctx, x, y, width, height)
+    })
+    
+    // Blobに変換
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        const file = new File([blob], 'face-blurred-image.png', { type: 'image/png' })
+        resolve(file)
+      }, 'image/png')
+    })
+    
+  } catch (error) {
+    console.error('❌ 顔認識エラー:', error)
+    alert(`顔認識処理に失敗しました: ${error.message}`)
+    return null
+  }
+}
+
+// モザイク処理を適用
+function applyMosaicToArea(ctx, x, y, width, height) {
+  const pixelSize = 15 // モザイクのピクセルサイズ
+  
+  // 顔領域を少し拡大（より広範囲にモザイク）
+  const padding = 20
+  x = Math.max(0, x - padding)
+  y = Math.max(0, y - padding)
+  width = width + padding * 2
+  height = height + padding * 2
+  
+  // 元の画像データを取得
+  const imageData = ctx.getImageData(x, y, width, height)
+  const data = imageData.data
+  
+  // モザイク処理
+  for (let py = 0; py < height; py += pixelSize) {
+    for (let px = 0; px < width; px += pixelSize) {
+      // ブロックの平均色を計算
+      let r = 0, g = 0, b = 0, count = 0
+      
+      for (let dy = 0; dy < pixelSize && py + dy < height; dy++) {
+        for (let dx = 0; dx < pixelSize && px + dx < width; dx++) {
+          const i = ((py + dy) * width + (px + dx)) * 4
+          r += data[i]
+          g += data[i + 1]
+          b += data[i + 2]
+          count++
+        }
+      }
+      
+      r = Math.floor(r / count)
+      g = Math.floor(g / count)
+      b = Math.floor(b / count)
+      
+      // ブロックを塗りつぶす
+      for (let dy = 0; dy < pixelSize && py + dy < height; dy++) {
+        for (let dx = 0; dx < pixelSize && px + dx < width; dx++) {
+          const i = ((py + dy) * width + (px + dx)) * 4
+          data[i] = r
+          data[i + 1] = g
+          data[i + 2] = b
+        }
+      }
+    }
+  }
+  
+  // 処理後の画像を描画
+  ctx.putImageData(imageData, x, y)
+}
+
+// 顔ぼかし機能をUIに追加
+function addFaceBlurButton() {
+  const previewDiv = document.getElementById('image-upload-preview')
+  if (!previewDiv) return
+  
+  const existingBtn = document.getElementById('face-blur-btn')
+  if (existingBtn) return // 既に追加済み
+  
+  const previewName = document.getElementById('image-preview-name')
+  if (!previewName) return
+  
+  previewName.innerHTML += `
+    <button id="face-blur-btn" onclick="handleFaceBlur()" 
+            class="ml-4 px-3 py-1 bg-pink-600 text-white text-sm rounded hover:bg-pink-700">
+      <i class="fas fa-user-secret"></i> 顔にモザイク
+    </button>
+  `
+}
+
+// 顔ぼかし処理実行
+async function handleFaceBlur() {
+  if (!fileUploadState.selectedImageFile) {
+    alert('画像ファイルが選択されていません')
+    return
+  }
+  
+  const confirmed = confirm('選択した画像の顔にモザイク処理を適用しますか？\n（処理には時間がかかる場合があります）')
+  if (!confirmed) return
+  
+  try {
+    const blurredFile = await applyFaceBlur(fileUploadState.selectedImageFile)
+    
+    if (blurredFile) {
+      fileUploadState.selectedImageFile = blurredFile
+      previewImageFile(blurredFile)
+      alert('✅ 顔にモザイク処理を適用しました。「アップロードして追加」をクリックしてください。')
+    }
+  } catch (error) {
+    console.error('❌ 顔ぼかし処理エラー:', error)
+    alert('顔ぼかし処理に失敗しました')
+  }
+}
+
+// グローバルに関数を公開
+window.initFaceApi = initFaceApi
+window.applyFaceBlur = applyFaceBlur
+window.handleFaceBlur = handleFaceBlur
+
+console.log('✅ Phase 17E: face-api.js 顔認識機能 読み込み完了')
+console.log('🎉 Phase 17 全機能実装完了！')
 console.log('🎉 Phase 15 全機能実装完了！')
 
 // ============================================
