@@ -2214,7 +2214,90 @@ async function loadGuidePage(curriculumId) {
   } catch (error) {
     console.error('学習のてびき読み込みエラー:', error)
     loadingManager.hide()
-    alert('データの読み込みに失敗しました')
+    
+    // エラーが発生しても、基本情報だけで表示を試みる
+    try {
+      const response = await axios.get(`/api/curriculum/${curriculumId}`)
+      const { curriculum, courses } = response.data
+      
+      if (!curriculum || !courses) {
+        throw new Error('カリキュラムデータが見つかりません')
+      }
+      
+      state.selectedCurriculum = curriculum
+      state.courses = courses
+      
+      // 簡易版の表示（追加問題なし）
+      const app = document.getElementById('app')
+      app.innerHTML = `
+        <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
+          <div class="container mx-auto px-4 max-w-5xl">
+            
+            <div class="flex justify-between items-center mb-4">
+              <button onclick="renderTopPage()" class="text-indigo-600 hover:text-indigo-800 flex items-center text-lg font-semibold transition">
+                <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
+              </button>
+            </div>
+
+            <div class="bg-yellow-100 border-l-4 border-yellow-600 p-4 mb-6 rounded">
+              <p class="text-yellow-800 font-semibold">
+                <i class="fas fa-info-circle mr-2"></i>
+                一部のデータの読み込みに失敗しましたが、学習カードは正常に表示されます。
+              </p>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-2xl p-8">
+              <div class="text-center mb-6 border-b-4 border-indigo-600 pb-6">
+                <h1 class="text-4xl font-bold text-indigo-700 mb-3">学習カリキュラム</h1>
+                <h2 class="text-3xl font-bold text-gray-800">${curriculum.unit_name}</h2>
+                <p class="text-lg text-gray-600 mt-2">${curriculum.grade} ${curriculum.subject}</p>
+              </div>
+
+              <div class="mb-6">
+                <div class="bg-blue-100 border-l-4 border-blue-600 p-4 rounded-r-lg">
+                  <h3 class="text-xl font-bold text-blue-800 mb-2">
+                    <i class="fas fa-bullseye mr-2"></i>単元の目標
+                  </h3>
+                  <p class="text-gray-800">${formatTextWithRuby(curriculum.unit_goal)}</p>
+                </div>
+              </div>
+
+              <div class="space-y-6">
+                ${courses.map((course, idx) => `
+                  <div class="border-2 border-${course.color_code || 'blue'}-300 rounded-lg p-6">
+                    <h3 class="text-2xl font-bold text-${course.color_code || 'blue'}-800 mb-4">
+                      ${course.course_display_name || course.course_name}
+                      <span class="text-sm text-gray-600 ml-2">(${course.cards?.length || 0}枚)</span>
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      ${(course.cards || []).map(card => `
+                        <button onclick="showLearningCard(${JSON.stringify(card).replace(/"/g, '&quot;')}, ${curriculumId}, ${course.course_id})"
+                                class="bg-white border-2 border-${course.color_code || 'blue'}-200 hover:border-${course.color_code || 'blue'}-400 rounded-lg p-4 text-left transition shadow hover:shadow-lg">
+                          <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                              <p class="text-sm text-${course.color_code || 'blue'}-600 font-bold mb-1">カード ${card.card_number}</p>
+                              <p class="font-bold text-gray-800">${card.card_title}</p>
+                            </div>
+                            <i class="fas fa-chevron-right text-${course.color_code || 'blue'}-400"></i>
+                          </div>
+                        </button>
+                      `).join('')}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+      
+      console.log('✅ 簡易版で表示しました')
+      
+    } catch (fallbackError) {
+      console.error('簡易版の表示も失敗しました:', fallbackError)
+      alert('データの読み込みに失敗しました。トップページに戻ります。')
+      renderTopPage()
+    }
   }
 }
 
