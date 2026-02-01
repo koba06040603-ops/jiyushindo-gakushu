@@ -7080,6 +7080,9 @@ app.post('/api/curriculum/save-generated', async (c) => {
       
       const courseId = courseResult.meta.last_row_id
       
+      // 外部キー制約を一時的に無効化
+      await env.DB.prepare('PRAGMA foreign_keys = OFF').run()
+      
       // 学習カードを保存
       for (const card of course.cards || []) {
         // card_type の値を検証（許可された値のみ）
@@ -7147,6 +7150,9 @@ app.post('/api/curriculum/save-generated', async (c) => {
           ).run()
         }
       }
+      
+      // 外部キー制約を再度有効化
+      await env.DB.prepare('PRAGMA foreign_keys = ON').run()
     }
     
     // 選択問題を保存
