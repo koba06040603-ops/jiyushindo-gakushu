@@ -950,8 +950,8 @@ async function renderTopPage() {
             <i class="fas fa-user-circle text-3xl text-indigo-500 mr-3"></i>
             <div>
               <p class="text-sm text-gray-500">ログイン中</p>
-              <p class="font-bold text-lg">${state.student.name}</p>
-              ${state.auth.user ? `<p class="text-xs text-gray-400">${state.auth.user.role === 'teacher' ? '教師' : state.auth.user.role === 'admin' ? '管理者' : '児童・生徒'} | クラス: ${state.student.classCode}</p>` : ''}
+              <p class="font-bold text-lg">${state.student?.name || state.auth?.user?.email || 'ゲスト'}</p>
+              ${state.auth?.user ? `<p class="text-xs text-gray-400">${state.auth.user.role === 'teacher' ? '教師' : state.auth.user.role === 'admin' ? '管理者' : '児童・生徒'} | クラス: ${state.student?.classCode || '未設定'}</p>` : ''}
             </div>
           </div>
           <button
