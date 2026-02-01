@@ -12093,9 +12093,14 @@ async function saveGeneratedUnit(unitData) {
         
         // 簡易版の学習カリキュラム表示（エラーハンドリング改善版）
         try {
-          showSimpleCurriculumView(curriculumId)
+          await showSimpleCurriculumView(curriculumId)
         } catch (transitionError) {
           console.error('❌ 画面遷移エラー:', transitionError)
+          console.error('エラー詳細:', {
+            message: transitionError.message,
+            stack: transitionError.stack,
+            response: transitionError.response?.data
+          })
           alert('画面遷移に失敗しました: ' + transitionError.message)
         }
       }, 1500)
@@ -12168,9 +12173,24 @@ async function showSimpleCurriculumView(curriculumId) {
     console.log('=' .repeat(80))
     const { curriculum, courses } = response.data
     
+    // データ検証
+    console.log('🔍 データ検証開始')
     if (!curriculum || !courses) {
+      console.error('❌ データが不完全です:', { curriculum, courses })
       throw new Error('カリキュラムデータが見つかりません')
     }
+    
+    // unit_nameの型チェック
+    if (typeof curriculum.unit_name !== 'string') {
+      console.warn('⚠️ unit_nameが文字列ではありません:', {
+        value: curriculum.unit_name,
+        type: typeof curriculum.unit_name
+      })
+      curriculum.unit_name = String(curriculum.unit_name || '(単元名なし)')
+    }
+    
+    console.log('✅ データ検証完了')
+    
     
     state.selectedCurriculum = curriculum
     state.courses = courses
@@ -12190,8 +12210,8 @@ async function showSimpleCurriculumView(curriculumId) {
           <div class="bg-white rounded-2xl shadow-2xl p-8">
             <div class="text-center mb-6 border-b-4 border-indigo-600 pb-6">
               <h1 class="text-4xl font-bold text-indigo-700 mb-3">学習カリキュラム</h1>
-              <h2 class="text-3xl font-bold text-gray-800">${curriculum.unit_name}</h2>
-              <p class="text-lg text-gray-600 mt-2">${curriculum.grade} ${curriculum.subject} / ${curriculum.textbook_company}</p>
+              <h2 class="text-3xl font-bold text-gray-800">${String(curriculum.unit_name || '単元')}</h2>
+              <p class="text-lg text-gray-600 mt-2">${curriculum.grade || ''} ${curriculum.subject || ''} / ${curriculum.textbook_company || ''}</p>
             </div>
 
             <div class="mb-6">
