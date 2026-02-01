@@ -964,9 +964,6 @@ app.get('/api/admin/cache-stats', authMiddleware, requireRole('admin'), async (c
 // ユーザー登録（学生）
 app.post('/api/auth/register/student', registerStudent)
 
-// ログイン（全ユーザータイプ）
-app.post('/api/auth/login', login)
-
 // ログアウト
 app.post('/api/auth/logout', logout)
 
