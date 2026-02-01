@@ -12053,9 +12053,35 @@ async function saveGeneratedUnit(unitData) {
         alert('❌ 追加問題の生成に失敗しました。\n\nもう一度新しい単元を生成してください。')
       }
       
-      // 学習のてびきページへ遷移
+      // 保存完了メッセージを表示して、プレビュー画面に残る
       setTimeout(() => {
-        loadGuidePage(curriculumId)
+        saveButton.innerHTML = `
+          <i class="fas fa-check-circle mr-2"></i>
+          保存完了！
+        `
+        saveButton.className = 'flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
+        
+        // 成功通知を表示
+        const notification = document.createElement('div')
+        notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-xl z-50 animate-bounce'
+        notification.innerHTML = `
+          <div class="flex items-center">
+            <i class="fas fa-check-circle text-2xl mr-3"></i>
+            <div>
+              <p class="font-bold">保存完了！</p>
+              <p class="text-sm">学習カードが正常に保存されました</p>
+            </div>
+          </div>
+        `
+        document.body.appendChild(notification)
+        
+        // 3秒後に通知を削除
+        setTimeout(() => {
+          notification.remove()
+        }, 3000)
+        
+        console.log('✅ 保存完了。curriculum_id:', curriculumId)
+        console.log('💡 カード一覧を展開して内容を確認できます')
       }, 1500)
     } else {
       const errorMsg = response.data.details || response.data.error || '保存に失敗しました'
