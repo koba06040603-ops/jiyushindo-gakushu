@@ -12071,7 +12071,7 @@ async function saveGeneratedUnit(unitData) {
       }
       
       // 学習のてびきページへ遷移（簡易版）
-      setTimeout(() => {
+      setTimeout(async () => {
         saveButton.innerHTML = `
           <i class="fas fa-check-circle mr-2"></i>
           保存完了！
