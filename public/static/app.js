@@ -11885,6 +11885,13 @@ function showUnitPreview(unitData, modelUsed) {
 
 // 生成した単元を保存
 async function saveGeneratedUnit(unitData) {
+  console.log('=' .repeat(80))
+  console.log('🚀 saveGeneratedUnit 開始')
+  console.log('=' .repeat(80))
+  console.log('📦 unitData:', unitData)
+  console.log('📦 curriculum:', unitData.curriculum)
+  console.log('📦 courses数:', unitData.courses?.length)
+  
   // ボタンを無効化してローディング表示
   const saveButton = event.target
   const originalHTML = saveButton.innerHTML
@@ -11895,10 +11902,20 @@ async function saveGeneratedUnit(unitData) {
   `
   
   try {
+    console.log('📡 API呼び出し: /api/curriculum/save-generated')
     const response = await axios.post('/api/curriculum/save-generated', unitData)
+    console.log('📥 APIレスポンス:', response.data)
     
     if (response.data.success) {
       const curriculumId = response.data.curriculum_id
+      
+      console.log('=' .repeat(80))
+      console.log('✅ 保存成功！')
+      console.log('🆔 curriculum_id:', curriculumId)
+      console.log('📊 curriculum_id の型:', typeof curriculumId)
+      console.log('📊 curriculum_id が数値:', !isNaN(curriculumId))
+      console.log('📊 curriculum_id が有効:', !!curriculumId)
+      console.log('=' .repeat(80))
       
       // 保存成功表示
       saveButton.innerHTML = `
@@ -12061,11 +12078,26 @@ async function saveGeneratedUnit(unitData) {
         `
         saveButton.className = 'flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
         
-        console.log('✅ 保存完了。curriculum_id:', curriculumId)
-        console.log('🔄 学習カリキュラム画面へ遷移中...')
+        console.log('=' .repeat(80))
+        console.log('🔄 学習カリキュラム画面へ遷移開始')
+        console.log('🆔 渡すcurriculum_id:', curriculumId)
+        console.log('📊 型:', typeof curriculumId)
+        console.log('📊 値:', curriculumId)
+        console.log('📊 有効性チェック:', {
+          exists: !!curriculumId,
+          notUndefined: curriculumId !== undefined,
+          notNull: curriculumId !== null,
+          isNumber: typeof curriculumId === 'number' || !isNaN(Number(curriculumId))
+        })
+        console.log('=' .repeat(80))
         
         // 簡易版の学習カリキュラム表示（エラーハンドリング改善版）
-        showSimpleCurriculumView(curriculumId)
+        try {
+          showSimpleCurriculumView(curriculumId)
+        } catch (transitionError) {
+          console.error('❌ 画面遷移エラー:', transitionError)
+          alert('画面遷移に失敗しました: ' + transitionError.message)
+        }
       }, 1500)
     } else {
       const errorMsg = response.data.details || response.data.error || '保存に失敗しました'
@@ -12095,11 +12127,24 @@ async function saveGeneratedUnit(unitData) {
 
 // 簡易版の学習カリキュラム表示（追加データなしでも動作）
 async function showSimpleCurriculumView(curriculumId) {
-  console.log('🔄 showSimpleCurriculumView 呼び出し, curriculumId:', curriculumId)
+  console.log('=' .repeat(80))
+  console.log('🎯 showSimpleCurriculumView 関数開始')
+  console.log('=' .repeat(80))
+  console.log('📥 受け取ったcurriculum_id:', curriculumId)
+  console.log('📊 型:', typeof curriculumId)
+  console.log('📊 値:', curriculumId)
+  console.log('📊 文字列表現:', String(curriculumId))
+  console.log('📊 数値変換:', Number(curriculumId))
+  console.log('=' .repeat(80))
   
   if (!curriculumId || curriculumId === 'undefined' || curriculumId === 'null') {
-    console.error('❌ curriculum_id が無効です:', curriculumId)
-    alert('カリキュラムIDが取得できませんでした。トップページに戻ります。')
+    console.error('=' .repeat(80))
+    console.error('❌ curriculum_id が無効です')
+    console.error('📊 curriculumId:', curriculumId)
+    console.error('📊 typeof:', typeof curriculumId)
+    console.error('📊 !!curriculumId:', !!curriculumId)
+    console.error('=' .repeat(80))
+    alert('カリキュラムIDが取得できませんでした。\n\n受け取った値: ' + curriculumId + '\n型: ' + typeof curriculumId + '\n\nトップページに戻ります。')
     renderTopPage()
     return
   }
@@ -12107,8 +12152,20 @@ async function showSimpleCurriculumView(curriculumId) {
   showLoading('学習カリキュラムを読み込み中...')
   
   try {
-    console.log('📡 API呼び出し: /api/curriculum/' + curriculumId)
-    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const apiUrl = `/api/curriculum/${curriculumId}`
+    console.log('📡 API呼び出し開始')
+    console.log('🔗 URL:', apiUrl)
+    console.log('🔗 完全なURL:', window.location.origin + apiUrl)
+    
+    const response = await axios.get(apiUrl)
+    
+    console.log('=' .repeat(80))
+    console.log('✅ API呼び出し成功')
+    console.log('📥 レスポンスステータス:', response.status)
+    console.log('📥 レスポンスデータ:', response.data)
+    console.log('📥 curriculum:', response.data.curriculum)
+    console.log('📥 courses数:', response.data.courses?.length)
+    console.log('=' .repeat(80))
     const { curriculum, courses } = response.data
     
     if (!curriculum || !courses) {
@@ -12213,7 +12270,13 @@ async function showSimpleCurriculumView(curriculumId) {
     console.log('✅ 学習カリキュラムを表示しました')
     
   } catch (error) {
-    console.error('カリキュラム表示エラー:', error)
+    console.error('❌ カリキュラム表示エラー:', error)
+    console.error('エラーメッセージ:', error.message)
+    console.error('エラースタック:', error.stack)
+    if (error.response) {
+      console.error('APIレスポンスエラー:', error.response.data)
+      console.error('ステータスコード:', error.response.status)
+    }
     hideLoading()
     alert('カリキュラムの読み込みに失敗しました。トップページに戻ります。')
     renderTopPage()
