@@ -6501,7 +6501,6 @@ app.post('/api/ai/generate-course', async (c) => {
     console.log('✅ JSON完全性チェック: 最後の文字 =', lastChar)
     
     // JSONをパース（複数の方法で試行）
-    let courseData
     try {
       // 1回目: 通常のJSON.parse
       courseData = JSON.parse(aiResponse)
