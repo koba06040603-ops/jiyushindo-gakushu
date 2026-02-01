@@ -12053,7 +12053,7 @@ async function saveGeneratedUnit(unitData) {
         alert('❌ 追加問題の生成に失敗しました。\n\nもう一度新しい単元を生成してください。')
       }
       
-      // 保存完了メッセージを表示して、プレビュー画面に残る
+      // 学習のてびきページへ遷移（簡易版）
       setTimeout(() => {
         saveButton.innerHTML = `
           <i class="fas fa-check-circle mr-2"></i>
@@ -12061,27 +12061,11 @@ async function saveGeneratedUnit(unitData) {
         `
         saveButton.className = 'flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
         
-        // 成功通知を表示
-        const notification = document.createElement('div')
-        notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-xl z-50 animate-bounce'
-        notification.innerHTML = `
-          <div class="flex items-center">
-            <i class="fas fa-check-circle text-2xl mr-3"></i>
-            <div>
-              <p class="font-bold">保存完了！</p>
-              <p class="text-sm">学習カードが正常に保存されました</p>
-            </div>
-          </div>
-        `
-        document.body.appendChild(notification)
-        
-        // 3秒後に通知を削除
-        setTimeout(() => {
-          notification.remove()
-        }, 3000)
-        
         console.log('✅ 保存完了。curriculum_id:', curriculumId)
-        console.log('💡 カード一覧を展開して内容を確認できます')
+        console.log('🔄 学習カリキュラム画面へ遷移中...')
+        
+        // 簡易版の学習カリキュラム表示（エラーハンドリング改善版）
+        showSimpleCurriculumView(curriculumId)
       }, 1500)
     } else {
       const errorMsg = response.data.details || response.data.error || '保存に失敗しました'
@@ -12109,12 +12093,130 @@ async function saveGeneratedUnit(unitData) {
   }
 }
 
+// 簡易版の学習カリキュラム表示（追加データなしでも動作）
+async function showSimpleCurriculumView(curriculumId) {
+  showLoading('学習カリキュラムを読み込み中...')
+  
+  try {
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum, courses } = response.data
+    
+    if (!curriculum || !courses) {
+      throw new Error('カリキュラムデータが見つかりません')
+    }
+    
+    state.selectedCurriculum = curriculum
+    state.courses = courses
+    state.currentView = 'curriculum'
+    
+    const app = document.getElementById('app')
+    app.innerHTML = `
+      <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
+        <div class="container mx-auto px-4 max-w-5xl">
+          
+          <div class="flex justify-between items-center mb-4">
+            <button onclick="renderTopPage()" class="text-indigo-600 hover:text-indigo-800 flex items-center text-lg font-semibold transition">
+              <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
+            </button>
+          </div>
+
+          <div class="bg-white rounded-2xl shadow-2xl p-8">
+            <div class="text-center mb-6 border-b-4 border-indigo-600 pb-6">
+              <h1 class="text-4xl font-bold text-indigo-700 mb-3">学習カリキュラム</h1>
+              <h2 class="text-3xl font-bold text-gray-800">${curriculum.unit_name}</h2>
+              <p class="text-lg text-gray-600 mt-2">${curriculum.grade} ${curriculum.subject} / ${curriculum.textbook_company}</p>
+            </div>
+
+            <div class="mb-6">
+              <div class="bg-blue-100 border-l-4 border-blue-600 p-4 rounded-r-lg mb-3">
+                <h3 class="text-xl font-bold text-blue-800 mb-2">
+                  <i class="fas fa-bullseye mr-2"></i>単元の目標
+                </h3>
+                <p class="text-gray-800">${formatTextWithRuby(curriculum.unit_goal)}</p>
+              </div>
+              
+              ${curriculum.non_cognitive_goal ? `
+              <div class="bg-green-100 border-l-4 border-green-600 p-4 rounded-r-lg">
+                <h3 class="text-xl font-bold text-green-800 mb-2">
+                  <i class="fas fa-heart mr-2"></i>心の成長目標
+                </h3>
+                <p class="text-gray-800">${curriculum.non_cognitive_goal}</p>
+              </div>
+              ` : ''}
+            </div>
+
+            <div class="space-y-6">
+              <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-route mr-2"></i>学習コース
+              </h2>
+              
+              ${courses.map((course, idx) => {
+                const colorMap = {
+                  'green': { border: 'border-green-300', bg: 'bg-green-50', text: 'text-green-800', badge: 'bg-green-100' },
+                  'blue': { border: 'border-blue-300', bg: 'bg-blue-50', text: 'text-blue-800', badge: 'bg-blue-100' },
+                  'red': { border: 'border-red-300', bg: 'bg-red-50', text: 'text-red-800', badge: 'bg-red-100' },
+                  'purple': { border: 'border-purple-300', bg: 'bg-purple-50', text: 'text-purple-800', badge: 'bg-purple-100' }
+                }
+                const colors = colorMap[course.color_code] || colorMap['blue']
+                
+                return `
+                <div class="border-2 ${colors.border} rounded-lg p-6 ${colors.bg}">
+                  <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-2xl font-bold ${colors.text}">
+                      ${course.course_display_name || course.course_name}
+                    </h3>
+                    <span class="${colors.badge} ${colors.text} px-3 py-1 rounded-full text-sm font-bold">
+                      ${(course.cards || []).length}枚
+                    </span>
+                  </div>
+                  <p class="text-gray-600 mb-3">${course.description || ''}</p>
+                  
+                  <details class="mt-3">
+                    <summary class="cursor-pointer ${colors.text} hover:underline font-semibold">
+                      ▼ カード一覧を表示
+                    </summary>
+                    <div class="mt-3 space-y-2">
+                      ${(course.cards || []).map(card => `
+                        <button onclick="showLearningCard(${JSON.stringify(card).replace(/"/g, '&quot;')}, ${curriculumId}, ${course.course_id})"
+                                class="w-full bg-white border-2 ${colors.border} hover:shadow-lg rounded-lg p-4 text-left transition">
+                          <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                              <p class="text-sm ${colors.text} font-bold mb-1">カード ${card.card_number}</p>
+                              <p class="font-bold text-gray-800">${card.card_title}</p>
+                              ${card.problem_description ? `<p class="text-sm text-gray-600 mt-1">${card.problem_description.substring(0, 50)}...</p>` : ''}
+                            </div>
+                            <i class="fas fa-chevron-right ${colors.text} ml-3"></i>
+                          </div>
+                        </button>
+                      `).join('')}
+                    </div>
+                  </details>
+                </div>
+              `}).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    
+    hideLoading()
+    console.log('✅ 学習カリキュラムを表示しました')
+    
+  } catch (error) {
+    console.error('カリキュラム表示エラー:', error)
+    hideLoading()
+    alert('カリキュラムの読み込みに失敗しました。トップページに戻ります。')
+    renderTopPage()
+  }
+}
+
 // Phase 7: グローバル関数
 window.showUnitGeneratorModal = showUnitGeneratorModal
 window.closeUnitGeneratorModal = closeUnitGeneratorModal
 window.startUnitGeneration = startUnitGeneration
 window.retryUnitGeneration = retryUnitGeneration
 window.saveGeneratedUnit = saveGeneratedUnit
+window.showSimpleCurriculumView = showSimpleCurriculumView
 window.submitFeedback = submitFeedback
 window.toggleFontSizePanel = toggleFontSizePanel
 window.updateFontSize = updateFontSize
