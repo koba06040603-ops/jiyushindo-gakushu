@@ -12095,9 +12095,19 @@ async function saveGeneratedUnit(unitData) {
 
 // 簡易版の学習カリキュラム表示（追加データなしでも動作）
 async function showSimpleCurriculumView(curriculumId) {
+  console.log('🔄 showSimpleCurriculumView 呼び出し, curriculumId:', curriculumId)
+  
+  if (!curriculumId || curriculumId === 'undefined' || curriculumId === 'null') {
+    console.error('❌ curriculum_id が無効です:', curriculumId)
+    alert('カリキュラムIDが取得できませんでした。トップページに戻ります。')
+    renderTopPage()
+    return
+  }
+  
   showLoading('学習カリキュラムを読み込み中...')
   
   try {
+    console.log('📡 API呼び出し: /api/curriculum/' + curriculumId)
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
     const { curriculum, courses } = response.data
     
