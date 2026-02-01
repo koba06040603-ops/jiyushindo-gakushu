@@ -720,14 +720,22 @@ function extractJSON(aiResponse: string): any {
 
 // card_type の値を検証する関数
 function validateCardType(cardType: string | undefined): string {
-  const allowedCardTypes = ['selection', 'main', 'check', 'optional']
+  // テーブルの CHECK 制約に合わせた許可値
+  const allowedCardTypes = ['standard', 'challenge', 'review', 'optional']
+  
+  // 'main' は 'standard' に変換
+  if (cardType === 'main' || cardType === 'selection' || cardType === 'check') {
+    return 'standard'
+  }
+  
   if (cardType && allowedCardTypes.includes(cardType)) {
     return cardType
   }
+  
   if (cardType && !allowedCardTypes.includes(cardType)) {
-    console.warn(`⚠️ 不正な card_type: '${cardType}' → 'main' に変更しました`)
+    console.warn(`⚠️ 不正な card_type: '${cardType}' → 'standard' に変更しました`)
   }
-  return 'main'
+  return 'standard'
 }
 
 // 学年別の言葉遣いルールを取得
