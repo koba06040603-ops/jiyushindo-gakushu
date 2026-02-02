@@ -13893,11 +13893,11 @@ app.post('/api/media/generate-image', async (c) => {
   })
 })
 
-// メディア生成API - 動画生成（アニメーションHTML）
+// メディア生成API - 動画生成（Canvas アニメーション）
 app.post('/api/media/generate-video', async (c) => {
   const { prompt, duration } = await c.req.json()
   
-  // 小学2年生向け：3×4のかけ算アニメーション（3つずつのまとまりが4セット）
+  // 小学2年生向け：3×4のかけ算アニメーション（Canvas版・リンゴが動く）
   const animationHtml = `
     <!DOCTYPE html>
     <html>
@@ -13907,184 +13907,179 @@ app.post('/api/media/generate-video', async (c) => {
         body { 
           width: 100%; 
           height: 100%; 
-          background: #f0f9ff;
-          font-family: 'Arial', sans-serif;
+          background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+          font-family: 'Arial', 'Hiragino Kaku Gothic Pro', 'Meiryo', sans-serif;
           overflow: hidden;
+          display: flex;
+          justify-content: center;
+          align-items: center;
         }
-        .animation-container { 
-          width: 100%; 
-          height: 100%; 
-          position: relative; 
+        canvas { 
           background: white; 
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          padding: 20px;
-        }
-        .title { 
-          text-align: center; 
-          font-size: 32px; 
-          font-weight: bold; 
-          color: #1e40af; 
-          margin-bottom: 20px;
-          animation: titleFade 0.5s ease-in;
-        }
-        .question {
-          font-size: 40px;
-          font-weight: bold;
-          color: #7c3aed;
-          margin-bottom: 40px;
-          animation: questionBounce 0.8s 0.5s ease-out forwards;
-          opacity: 0;
-        }
-        .groups-container {
-          display: flex;
-          gap: 30px;
-          margin-bottom: 40px;
-          flex-wrap: wrap;
-          justify-content: center;
-        }
-        .group {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          opacity: 0;
-        }
-        .group:nth-child(1) { animation: groupAppear 0.8s 1.5s ease-out forwards; }
-        .group:nth-child(2) { animation: groupAppear 0.8s 2.3s ease-out forwards; }
-        .group:nth-child(3) { animation: groupAppear 0.8s 3.1s ease-out forwards; }
-        .group:nth-child(4) { animation: groupAppear 0.8s 3.9s ease-out forwards; }
-        
-        .group-label {
-          font-size: 24px;
-          font-weight: bold;
-          color: #059669;
-          margin-bottom: 10px;
-        }
-        
-        .blocks {
-          display: flex;
-          gap: 8px;
-          padding: 15px;
-          background: rgba(16, 185, 129, 0.1);
-          border: 3px dashed #10b981;
           border-radius: 12px;
-        }
-        
-        .block { 
-          width: 50px; 
-          height: 50px; 
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
-          border-radius: 8px; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          color: white; 
-          font-size: 24px; 
-          font-weight: bold;
-          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-        }
-        
-        .explanation {
-          font-size: 28px;
-          color: #6b7280;
-          margin-bottom: 20px;
-          opacity: 0;
-          animation: fadeIn 0.8s 4.8s ease-in forwards;
-          text-align: center;
-        }
-        
-        .result { 
-          font-size: 64px; 
-          font-weight: bold; 
-          color: #3b82f6; 
-          opacity: 0; 
-          animation: resultAppear 1s 5.5s forwards, pulse 1s 6.5s infinite;
-          text-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
-        }
-        
-        @keyframes titleFade {
-          from { opacity: 0; transform: translateY(-20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes questionBounce {
-          0% { opacity: 0; transform: scale(0.5); }
-          50% { transform: scale(1.1); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        
-        @keyframes groupAppear {
-          0% { opacity: 0; transform: scale(0.3) rotate(-10deg); }
-          60% { transform: scale(1.1) rotate(5deg); }
-          100% { opacity: 1; transform: scale(1) rotate(0deg); }
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        @keyframes resultAppear { 
-          0% { opacity: 0; transform: scale(0.3); }
-          50% { transform: scale(1.2); }
-          100% { opacity: 1; transform: scale(1); } 
-        }
-        
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.08); }
+          box-shadow: 0 8px 32px rgba(0,0,0,0.1);
         }
       </style>
     </head>
     <body>
-      <div class="animation-container">
-        <div class="title">3 × 4 の けいさん</div>
-        <div class="question">3 × 4 = ?</div>
+      <canvas id="canvas" width="800" height="600"></canvas>
+      <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let time = 0;
         
-        <div class="groups-container">
-          <div class="group">
-            <div class="group-label">1つめ</div>
-            <div class="blocks">
-              <div class="block">●</div>
-              <div class="block">●</div>
-              <div class="block">●</div>
-            </div>
-          </div>
+        // リンゴを描く関数
+        function drawApple(x, y, size, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
           
-          <div class="group">
-            <div class="group-label">2つめ</div>
-            <div class="blocks">
-              <div class="block">●</div>
-              <div class="block">●</div>
-              <div class="block">●</div>
-            </div>
-          </div>
+          // リンゴの本体（赤）
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, Math.PI * 2);
+          ctx.fill();
           
-          <div class="group">
-            <div class="group-label">3つめ</div>
-            <div class="blocks">
-              <div class="block">●</div>
-              <div class="block">●</div>
-              <div class="block">●</div>
-            </div>
-          </div>
+          // ハイライト
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.beginPath();
+          ctx.arc(x - size * 0.3, y - size * 0.3, size * 0.3, 0, Math.PI * 2);
+          ctx.fill();
           
-          <div class="group">
-            <div class="group-label">4つめ</div>
-            <div class="blocks">
-              <div class="block">●</div>
-              <div class="block">●</div>
-              <div class="block">●</div>
-            </div>
-          </div>
-        </div>
+          // 葉っぱ（緑）
+          ctx.fillStyle = '#22c55e';
+          ctx.beginPath();
+          ctx.ellipse(x + size * 0.5, y - size * 0.8, size * 0.4, size * 0.2, -Math.PI / 6, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.restore();
+        }
         
-        <div class="explanation">3が 4つ → 3+3+3+3</div>
-        <div class="result">= 12</div>
-      </div>
+        // テキストを描く関数
+        function drawText(text, x, y, fontSize, color, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = color;
+          ctx.font = \`bold \${fontSize}px Arial, 'Hiragino Kaku Gothic Pro'\`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(text, x, y);
+          ctx.restore();
+        }
+        
+        // 囲み枠を描く関数
+        function drawBox(x, y, w, h, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 4;
+          ctx.setLineDash([10, 5]);
+          ctx.strokeRect(x, y, w, h);
+          ctx.restore();
+        }
+        
+        // イージング関数
+        function easeOutElastic(t) {
+          const p = 0.3;
+          return Math.pow(2, -10 * t) * Math.sin((t - p / 4) * (2 * Math.PI) / p) + 1;
+        }
+        
+        function easeOutBack(t) {
+          const c1 = 1.70158;
+          const c3 = c1 + 1;
+          return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+        }
+        
+        // アニメーション関数
+        function animate() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          time += 1 / 60;
+          
+          // フェーズ1: タイトル表示（0-1秒）
+          if (time < 1) {
+            const alpha = Math.min(time * 2, 1);
+            drawText('3 × 4 の けいさん', 400, 80, 48, '#1e40af', alpha);
+          } else {
+            drawText('3 × 4 の けいさん', 400, 80, 48, '#1e40af', 1);
+          }
+          
+          // フェーズ2: 問題表示（1-2秒）
+          if (time >= 1 && time < 2) {
+            const t = (time - 1);
+            const scale = easeOutBack(Math.min(t, 1));
+            ctx.save();
+            ctx.translate(400, 150);
+            ctx.scale(scale, scale);
+            drawText('3 × 4 = ?', 0, 0, 56, '#7c3aed', 1);
+            ctx.restore();
+          } else if (time >= 2) {
+            drawText('3 × 4 = ?', 400, 150, 56, '#7c3aed', 1);
+          }
+          
+          // フェーズ3-6: リンゴが4グループ登場（2-6秒）
+          const groups = [
+            { startTime: 2, label: '1つめ', x: 150, y: 300 },
+            { startTime: 3, label: '2つめ', x: 320, y: 300 },
+            { startTime: 4, label: '3つめ', x: 490, y: 300 },
+            { startTime: 5, label: '4つめ', x: 660, y: 300 }
+          ];
+          
+          groups.forEach((group, groupIdx) => {
+            if (time >= group.startTime) {
+              const t = Math.min((time - group.startTime) / 0.8, 1);
+              const ease = easeOutElastic(t);
+              const alpha = Math.min(t * 3, 1);
+              
+              // ラベル
+              drawText(group.label, group.x, group.y - 60, 24, '#059669', alpha);
+              
+              // 囲み枠
+              if (t > 0.5) {
+                drawBox(group.x - 65, group.y - 35, 130, 90, (t - 0.5) * 2);
+              }
+              
+              // リンゴ3個
+              for (let i = 0; i < 3; i++) {
+                const appleX = group.x + (i - 1) * 40;
+                const appleY = group.y + (1 - ease) * -50;
+                drawApple(appleX, appleY, 18, alpha);
+              }
+            }
+          });
+          
+          // フェーズ7: 説明表示（6-7秒）
+          if (time >= 6) {
+            const alpha = Math.min((time - 6) * 2, 1);
+            drawText('3が 4つ → 3+3+3+3', 400, 430, 32, '#6b7280', alpha);
+          }
+          
+          // フェーズ8: 答え表示（7-8秒）
+          if (time >= 7) {
+            const t = Math.min((time - 7) / 0.8, 1);
+            const scale = 0.5 + easeOutBack(t) * 0.5;
+            const pulseScale = 1 + Math.sin((time - 8) * 4) * 0.05;
+            
+            ctx.save();
+            ctx.translate(400, 520);
+            ctx.scale(scale * pulseScale, scale * pulseScale);
+            
+            // 影
+            ctx.shadowColor = 'rgba(59, 130, 246, 0.3)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetY = 5;
+            
+            drawText('= 12', 0, 0, 80, '#3b82f6', 1);
+            ctx.restore();
+          }
+          
+          // アニメーション継続
+          if (time < 10) {
+            requestAnimationFrame(animate);
+          }
+        }
+        
+        // アニメーション開始
+        animate();
+      </script>
     </body>
     </html>
   `
@@ -14093,8 +14088,8 @@ app.post('/api/media/generate-video', async (c) => {
     success: true,
     animationHtml: animationHtml,
     prompt: prompt,
-    duration: duration || 7,
-    note: '3×4=12の意味を視覚的に表現。3つのまとまりが4セット現れて、かけ算＝同じ数の繰り返しが理解できます'
+    duration: duration || 8,
+    note: 'Canvas アニメーション：リンゴが動いて登場！ 3つのまとまりが4セット、合計12個になる様子が視覚的に理解できます'
   })
 })
 
