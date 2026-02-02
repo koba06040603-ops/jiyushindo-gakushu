@@ -1574,6 +1574,9 @@ app.get('/api/curriculum/:id', async (c) => {
         // 各カードにヒントと解答を追加
         const cardsWithDetails = await Promise.all(
           (cards.results || []).map(async (card: any) => {
+            // card_idを使用（learning_cardsの主キー）
+            const cardId = card.card_id || card.id
+            
             // ヒント取得
             const hints = await env.DB.prepare(`
               SELECT 
@@ -1587,12 +1590,12 @@ app.get('/api/curriculum/:id', async (c) => {
               FROM hint_cards 
               WHERE learning_card_id = ?
               ORDER BY hint_number
-            `).bind(card.id).all()
+            `).bind(cardId).all()
             
             // 解答取得
             const answer = await env.DB.prepare(`
               SELECT * FROM answers WHERE learning_card_id = ?
-            `).bind(card.id).first()
+            `).bind(cardId).first()
             
             return {
               ...card,
