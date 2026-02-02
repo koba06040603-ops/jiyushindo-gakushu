@@ -1550,9 +1550,21 @@ app.get('/api/curriculum/:id', async (c) => {
         END
     `).bind(id).all()
     
+    console.log('Courses取得結果:', {
+      curriculum_id: id,
+      count: courses.results?.length || 0,
+      results: courses.results
+    })
+    
     // コースごとの学習カードを取得
     const coursesWithCards = await Promise.all(
       (courses.results || []).map(async (course: any) => {
+        console.log('コース処理中:', {
+          course_id: course.id,
+          course_name: course.course_name,
+          curriculum_id: course.curriculum_id
+        })
+        
         const cards = await env.DB.prepare(`
           SELECT * FROM learning_cards 
           WHERE course_id = ?
