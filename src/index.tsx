@@ -13994,6 +13994,11 @@ app.post('/api/media/generate-video', async (c) => {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           time += 1 / 60;
           
+          // デバッグ: 1秒ごとにログ出力
+          if (Math.floor(time) !== Math.floor(time - 1/60)) {
+            console.log('⏱️ Time:', Math.floor(time) + 's');
+          }
+          
           // フェーズ1: タイトル表示（0-1秒）
           if (time < 1) {
             const alpha = Math.min(time * 2, 1);
@@ -14017,10 +14022,10 @@ app.post('/api/media/generate-video', async (c) => {
           
           // フェーズ3-6: リンゴが4グループ登場（2-6秒）
           const groups = [
-            { startTime: 2, label: '1つめ', x: 150, y: 300 },
-            { startTime: 3, label: '2つめ', x: 320, y: 300 },
-            { startTime: 4, label: '3つめ', x: 490, y: 300 },
-            { startTime: 5, label: '4つめ', x: 660, y: 300 }
+            { startTime: 2, label: '1つめ', x: 140, y: 280 },
+            { startTime: 3, label: '2つめ', x: 290, y: 280 },
+            { startTime: 4, label: '3つめ', x: 440, y: 280 },
+            { startTime: 5, label: '4つめ', x: 590, y: 280 }
           ];
           
           groups.forEach((group, groupIdx) => {
@@ -14049,7 +14054,7 @@ app.post('/api/media/generate-video', async (c) => {
           // フェーズ7: 説明表示（6-7秒）
           if (time >= 6) {
             const alpha = Math.min((time - 6) * 2, 1);
-            drawText('3が 4つ → 3+3+3+3', 400, 430, 32, '#6b7280', alpha);
+            drawText('3が 4つ → 3+3+3+3', 400, 400, 28, '#6b7280', alpha);
           }
           
           // フェーズ8: 答え表示（7-8秒）
@@ -14059,7 +14064,7 @@ app.post('/api/media/generate-video', async (c) => {
             const pulseScale = 1 + Math.sin((time - 8) * 4) * 0.05;
             
             ctx.save();
-            ctx.translate(400, 520);
+            ctx.translate(400, 500);
             ctx.scale(scale * pulseScale, scale * pulseScale);
             
             // 影
@@ -14082,10 +14087,10 @@ app.post('/api/media/generate-video', async (c) => {
             
             // 全グループ表示
             const finalGroups = [
-              { label: '1つめ', x: 150, y: 300 },
-              { label: '2つめ', x: 320, y: 300 },
-              { label: '3つめ', x: 490, y: 300 },
-              { label: '4つめ', x: 660, y: 300 }
+              { label: '1つめ', x: 140, y: 280 },
+              { label: '2つめ', x: 290, y: 280 },
+              { label: '3つめ', x: 440, y: 280 },
+              { label: '4つめ', x: 590, y: 280 }
             ];
             
             finalGroups.forEach((group) => {
@@ -14097,8 +14102,8 @@ app.post('/api/media/generate-video', async (c) => {
               }
             });
             
-            drawText('3が 4つ → 3+3+3+3', 400, 430, 32, '#6b7280', 1);
-            drawText('= 12', 400, 520, 80, '#3b82f6', 1);
+            drawText('3が 4つ → 3+3+3+3', 400, 400, 28, '#6b7280', 1);
+            drawText('= 12', 400, 500, 80, '#3b82f6', 1);
           }
         }
         
