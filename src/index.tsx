@@ -1745,7 +1745,7 @@ app.get('/api/cards/:cardId', async (c) => {
   
   try {
     const card = await env.DB.prepare(`
-      SELECT * FROM learning_cards WHERE id = ?
+      SELECT * FROM learning_cards WHERE card_id = ?
     `).bind(cardId).first()
     
     const hints = await env.DB.prepare(`
