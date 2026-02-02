@@ -13897,7 +13897,7 @@ app.post('/api/media/generate-image', async (c) => {
 app.post('/api/media/generate-video', async (c) => {
   const { prompt, duration } = await c.req.json()
   
-  // 小学2年生向け：3×4のかけ算アニメーション
+  // 小学2年生向け：3×4のかけ算アニメーション（3つずつのまとまりが4セット）
   const animationHtml = `
     <!DOCTYPE html>
     <html>
@@ -13925,68 +13925,83 @@ app.post('/api/media/generate-video', async (c) => {
         }
         .title { 
           text-align: center; 
-          font-size: 28px; 
+          font-size: 32px; 
           font-weight: bold; 
           color: #1e40af; 
-          margin-bottom: 30px;
+          margin-bottom: 20px;
           animation: titleFade 0.5s ease-in;
         }
         .question {
-          font-size: 48px;
+          font-size: 40px;
           font-weight: bold;
           color: #7c3aed;
           margin-bottom: 40px;
           animation: questionBounce 0.8s 0.5s ease-out forwards;
           opacity: 0;
         }
-        .grid-container {
-          display: grid;
-          grid-template-columns: repeat(4, 80px);
-          gap: 10px;
+        .groups-container {
+          display: flex;
+          gap: 30px;
           margin-bottom: 40px;
+          flex-wrap: wrap;
+          justify-content: center;
         }
+        .group {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          opacity: 0;
+        }
+        .group:nth-child(1) { animation: groupAppear 0.8s 1.5s ease-out forwards; }
+        .group:nth-child(2) { animation: groupAppear 0.8s 2.3s ease-out forwards; }
+        .group:nth-child(3) { animation: groupAppear 0.8s 3.1s ease-out forwards; }
+        .group:nth-child(4) { animation: groupAppear 0.8s 3.9s ease-out forwards; }
+        
+        .group-label {
+          font-size: 24px;
+          font-weight: bold;
+          color: #059669;
+          margin-bottom: 10px;
+        }
+        
+        .blocks {
+          display: flex;
+          gap: 8px;
+          padding: 15px;
+          background: rgba(16, 185, 129, 0.1);
+          border: 3px dashed #10b981;
+          border-radius: 12px;
+        }
+        
         .block { 
-          width: 80px; 
-          height: 80px; 
-          background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); 
-          border-radius: 12px; 
+          width: 50px; 
+          height: 50px; 
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+          border-radius: 8px; 
           display: flex; 
           align-items: center; 
           justify-content: center; 
           color: white; 
-          font-size: 36px; 
-          font-weight: bold; 
-          opacity: 0;
-          box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
-          transform: scale(0) rotate(180deg);
+          font-size: 24px; 
+          font-weight: bold;
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
         }
-        .block:nth-child(1) { animation: popIn 0.5s 1.5s ease-out forwards; }
-        .block:nth-child(2) { animation: popIn 0.5s 1.7s ease-out forwards; }
-        .block:nth-child(3) { animation: popIn 0.5s 1.9s ease-out forwards; }
-        .block:nth-child(4) { animation: popIn 0.5s 2.1s ease-out forwards; }
-        .block:nth-child(5) { animation: popIn 0.5s 2.3s ease-out forwards; }
-        .block:nth-child(6) { animation: popIn 0.5s 2.5s ease-out forwards; }
-        .block:nth-child(7) { animation: popIn 0.5s 2.7s ease-out forwards; }
-        .block:nth-child(8) { animation: popIn 0.5s 2.9s ease-out forwards; }
-        .block:nth-child(9) { animation: popIn 0.5s 3.1s ease-out forwards; }
-        .block:nth-child(10) { animation: popIn 0.5s 3.3s ease-out forwards; }
-        .block:nth-child(11) { animation: popIn 0.5s 3.5s ease-out forwards; }
-        .block:nth-child(12) { animation: popIn 0.5s 3.7s ease-out forwards; }
         
         .explanation {
-          font-size: 24px;
+          font-size: 28px;
           color: #6b7280;
           margin-bottom: 20px;
           opacity: 0;
-          animation: fadeIn 0.8s 4.2s ease-in forwards;
+          animation: fadeIn 0.8s 4.8s ease-in forwards;
+          text-align: center;
         }
         
         .result { 
-          font-size: 56px; 
+          font-size: 64px; 
           font-weight: bold; 
           color: #3b82f6; 
           opacity: 0; 
-          animation: resultAppear 0.8s 4.8s forwards, pulse 1s 5.5s infinite;
+          animation: resultAppear 1s 5.5s forwards, pulse 1s 6.5s infinite;
           text-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
         }
         
@@ -14001,10 +14016,10 @@ app.post('/api/media/generate-video', async (c) => {
           100% { opacity: 1; transform: scale(1); }
         }
         
-        @keyframes popIn { 
-          0% { opacity: 0; transform: scale(0) rotate(180deg); }
-          70% { transform: scale(1.15) rotate(-10deg); }
-          100% { opacity: 1; transform: scale(1) rotate(0deg); } 
+        @keyframes groupAppear {
+          0% { opacity: 0; transform: scale(0.3) rotate(-10deg); }
+          60% { transform: scale(1.1) rotate(5deg); }
+          100% { opacity: 1; transform: scale(1) rotate(0deg); }
         }
         
         @keyframes fadeIn {
@@ -14013,14 +14028,14 @@ app.post('/api/media/generate-video', async (c) => {
         }
         
         @keyframes resultAppear { 
-          0% { opacity: 0; transform: scale(0.5); }
+          0% { opacity: 0; transform: scale(0.3); }
           50% { transform: scale(1.2); }
           100% { opacity: 1; transform: scale(1); } 
         }
         
         @keyframes pulse {
           0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.05); }
+          50% { transform: scale(1.08); }
         }
       </style>
     </head>
@@ -14028,21 +14043,46 @@ app.post('/api/media/generate-video', async (c) => {
       <div class="animation-container">
         <div class="title">3 × 4 の けいさん</div>
         <div class="question">3 × 4 = ?</div>
-        <div class="grid-container">
-          <div class="block">1</div>
-          <div class="block">2</div>
-          <div class="block">3</div>
-          <div class="block">4</div>
-          <div class="block">5</div>
-          <div class="block">6</div>
-          <div class="block">7</div>
-          <div class="block">8</div>
-          <div class="block">9</div>
-          <div class="block">10</div>
-          <div class="block">11</div>
-          <div class="block">12</div>
+        
+        <div class="groups-container">
+          <div class="group">
+            <div class="group-label">1つめ</div>
+            <div class="blocks">
+              <div class="block">●</div>
+              <div class="block">●</div>
+              <div class="block">●</div>
+            </div>
+          </div>
+          
+          <div class="group">
+            <div class="group-label">2つめ</div>
+            <div class="blocks">
+              <div class="block">●</div>
+              <div class="block">●</div>
+              <div class="block">●</div>
+            </div>
+          </div>
+          
+          <div class="group">
+            <div class="group-label">3つめ</div>
+            <div class="blocks">
+              <div class="block">●</div>
+              <div class="block">●</div>
+              <div class="block">●</div>
+            </div>
+          </div>
+          
+          <div class="group">
+            <div class="group-label">4つめ</div>
+            <div class="blocks">
+              <div class="block">●</div>
+              <div class="block">●</div>
+              <div class="block">●</div>
+            </div>
+          </div>
         </div>
-        <div class="explanation">3を 4かい たす = 3+3+3+3</div>
+        
+        <div class="explanation">3が 4つ → 3+3+3+3</div>
         <div class="result">= 12</div>
       </div>
     </body>
@@ -14053,8 +14093,8 @@ app.post('/api/media/generate-video', async (c) => {
     success: true,
     animationHtml: animationHtml,
     prompt: prompt,
-    duration: duration || 5,
-    note: '3×4=12を視覚的に表現。12個のブロックが1つずつ現れて、かけ算の意味を理解できます'
+    duration: duration || 7,
+    note: '3×4=12の意味を視覚的に表現。3つのまとまりが4セット現れて、かけ算＝同じ数の繰り返しが理解できます'
   })
 })
 
