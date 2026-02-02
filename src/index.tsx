@@ -13983,36 +13983,36 @@ app.post('/api/media/generate-video', async (c) => {
         function drawStatic() {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           
-          // タイトル
-          drawText('3 × 4 の けいさん', 400, 80, 48, '#1e40af', 1);
+          // タイトル（小さく）
+          drawText('3 × 4 の けいさん', 400, 50, 36, '#1e40af', 1);
           
-          // 問題
-          drawText('3 × 4 = ?', 400, 150, 56, '#7c3aed', 1);
+          // 問題（小さく）
+          drawText('3 × 4 = ?', 400, 110, 42, '#7c3aed', 1);
           
-          // 4グループのリンゴ
+          // 4グループのリンゴ（中央寄せ・間隔調整）
           const groups = [
-            { label: '1つめ', x: 140, y: 280 },
-            { label: '2つめ', x: 290, y: 280 },
-            { label: '3つめ', x: 440, y: 280 },
-            { label: '4つめ', x: 590, y: 280 }
+            { label: '1つめ', x: 160, y: 230 },
+            { label: '2つめ', x: 310, y: 230 },
+            { label: '3つめ', x: 460, y: 230 },
+            { label: '4つめ', x: 610, y: 230 }
           ];
           
           groups.forEach((group) => {
-            drawText(group.label, group.x, group.y - 60, 24, '#059669', 1);
-            drawBox(group.x - 65, group.y - 35, 130, 90, 1);
+            drawText(group.label, group.x, group.y - 50, 22, '#059669', 1);
+            drawBox(group.x - 60, group.y - 30, 120, 80, 1);
             for (let i = 0; i < 3; i++) {
-              const appleX = group.x + (i - 1) * 40;
-              drawApple(appleX, group.y, 18, 1);
+              const appleX = group.x + (i - 1) * 38;
+              drawApple(appleX, group.y, 17, 1);
             }
           });
           
-          // 説明
-          drawText('3が 4つ → 3+3+3+3', 400, 400, 28, '#6b7280', 1);
+          // 説明（位置を上に）
+          drawText('3が 4つ → 3+3+3+3', 400, 340, 30, '#6b7280', 1);
           
-          // 答え
-          drawText('= 12', 400, 500, 80, '#3b82f6', 1);
+          // 答え（位置を上に、サイズ調整）
+          drawText('= 12', 400, 430, 70, '#3b82f6', 1);
           
-          console.log('✅ Static render complete');
+          console.log('✅ Static render complete - All elements should be visible now');
         }
         
         // 静的描画を実行
