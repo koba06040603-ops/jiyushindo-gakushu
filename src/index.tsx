@@ -1525,9 +1525,19 @@ app.get('/api/curriculum/:id', async (c) => {
   
   try {
     // カリキュラム基本情報
-    const curriculum = await env.DB.prepare(`
+    const curriculumRaw = await env.DB.prepare(`
       SELECT * FROM curriculum WHERE id = ?
     `).bind(id).first()
+    
+    if (!curriculumRaw) {
+      return c.json({ error: 'Curriculum not found' }, 404)
+    }
+    
+    // id を curriculum_id にマッピング
+    const curriculum = {
+      ...curriculumRaw,
+      curriculum_id: curriculumRaw.id
+    }
     
     // コース情報
     const courses = await env.DB.prepare(`
