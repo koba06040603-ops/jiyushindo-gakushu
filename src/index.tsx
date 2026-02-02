@@ -1622,8 +1622,13 @@ app.get('/api/curriculum/:id', async (c) => {
       courses: coursesWithCards,
       optionalProblems: optionalProblems.results
     })
-  } catch (error) {
-    return c.json({ error: 'Database error' }, 500)
+  } catch (error: any) {
+    console.error('カリキュラム取得エラー:', error)
+    return c.json({ 
+      error: 'Database error',
+      details: error.message || String(error),
+      cause: error.cause?.message
+    }, 500)
   }
 })
 
