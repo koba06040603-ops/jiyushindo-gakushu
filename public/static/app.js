@@ -1420,15 +1420,23 @@ async function renderTopPage() {
             <div class="bg-purple-50 rounded-lg p-4 border-2 border-purple-200">
               <h4 class="font-bold text-purple-700 mb-3 flex items-center">
                 <i class="fas fa-rocket mr-2"></i>
-                ケース1: 得意な児童Aさん
+                ケース1: 得意な児童Aさん（小2・かけ算）
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 算数が得意、どんどん進みたい</p>
                 <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">どんどんコース</span></p>
                 <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 📹 <strong>AI生成動画</strong>: 「分数のかけ算」解説動画（Gemini Veo, 8秒）</li>
-                  <li>• 🎨 <strong>AI生成画像</strong>: 立体図形の展開図（Flux Pro）</li>
+                  <li>• 📹 <strong>AI生成動画</strong>: 「九九の計算手順」解説動画（Gemini Veo, 5秒）
+                    <button onclick="demoCase1Video()" class="ml-2 bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded">
+                      <i class="fas fa-play mr-1"></i>試す
+                    </button>
+                  </li>
+                  <li>• 🎨 <strong>AI生成画像</strong>: 「3×4の図解」（Flux Pro）
+                    <button onclick="demoCase1Image()" class="ml-2 bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded">
+                      <i class="fas fa-image mr-1"></i>試す
+                    </button>
+                  </li>
                   <li>• 📊 <strong>学習データ分析</strong>: 得意分野を可視化→次の挑戦</li>
                   <li>• ✅ 1週間でコース完了、選択問題もクリア</li>
                 </ul>
@@ -1445,16 +1453,28 @@ async function renderTopPage() {
             <div class="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
               <h4 class="font-bold text-blue-700 mb-3 flex items-center">
                 <i class="fas fa-seedling mr-2"></i>
-                ケース2: 苦手な児童Bさん
+                ケース2: 苦手な児童Bさん（小2・かけ算）
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 算数に苦手意識、じっくり学びたい</p>
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
                 <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 🎵 <strong>AI生成音楽</strong>: 「九九の歌」で暗記支援（ElevenLabs）</li>
-                  <li>• 🎤 <strong>AI音声読み上げ</strong>: やさしい言葉で説明（Minimax TTS）</li>
-                  <li>• 🤖 <strong>AI先生対話</strong>: 質問5回→300〜500文字で丁寧に回答</li>
+                  <li>• 🎵 <strong>AI生成音楽</strong>: 「九九の歌（3の段）」で暗記支援（ElevenLabs）
+                    <button onclick="demoCase2Music()" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded">
+                      <i class="fas fa-music mr-1"></i>試す
+                    </button>
+                  </li>
+                  <li>• 🎤 <strong>AI音声読み上げ</strong>: やさしい言葉で説明（Minimax TTS）
+                    <button onclick="demoCase2Voice()" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded">
+                      <i class="fas fa-volume-up mr-1"></i>試す
+                    </button>
+                  </li>
+                  <li>• 🤖 <strong>AI先生対話</strong>: 質問5回→300〜500文字で丁寧に回答
+                    <button onclick="demoCase2AI()" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded">
+                      <i class="fas fa-robot mr-1"></i>試す
+                    </button>
+                  </li>
                   <li>• ✅ 2週間でコース完了、苦手を克服し自信獲得</li>
                 </ul>
                 <div class="bg-blue-100 p-2 rounded mt-2">
@@ -1470,14 +1490,18 @@ async function renderTopPage() {
             <div class="bg-yellow-50 rounded-lg p-4 border-2 border-yellow-200">
               <h4 class="font-bold text-yellow-700 mb-3 flex items-center">
                 <i class="fas fa-home mr-2"></i>
-                ケース3: 欠席が多い児童Cさん
+                ケース3: 欠席が多い児童Cさん（小2・かけ算）
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 体調不良で欠席が多い</p>
                 <p><strong>学習コース:</strong> <span class="bg-blue-600 text-white px-2 py-1 rounded">しっかりコース</span></p>
                 <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 📹 <strong>AI解説動画</strong>: 授業の代わりに5〜8秒の要点動画（Gemini Veo）</li>
+                  <li>• 📹 <strong>AI解説動画</strong>: 授業の代わりに5秒の要点動画（Gemini Veo）
+                    <button onclick="demoCase3Video()" class="ml-2 bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-2 py-1 rounded">
+                      <i class="fas fa-play mr-1"></i>試す
+                    </button>
+                  </li>
                   <li>• 📊 <strong>進捗ボード</strong>: 教師がリアルタイムで見守り、励ましメッセージ</li>
                   <li>• 🎤 <strong>音声メモ機能</strong>: 気持ちを記録して孤立感を軽減</li>
                   <li>• ✅ 自宅から学習継続、遅れを取り戻しクラスに追いつく</li>
@@ -1495,15 +1519,27 @@ async function renderTopPage() {
             <div class="bg-pink-50 rounded-lg p-4 border-2 border-pink-200">
               <h4 class="font-bold text-pink-700 mb-3 flex items-center">
                 <i class="fas fa-brain mr-2"></i>
-                ケース4: 学習スタイル別対応（視覚・聴覚・体験優位版）
+                ケース4: 学習スタイル別対応（小2・かけ算）
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 一人ひとりの認知特性に合わせた学習</p>
                 <p><strong>🎯 実装されている機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• <span class="font-semibold text-red-600">視覚優位版</span>: AI生成画像・動画、図解、色分けされた説明</li>
-                  <li>• <span class="font-semibold text-green-600">聴覚優位版</span>: AI音声読み上げ、AI生成音楽、音声解説</li>
-                  <li>• <span class="font-semibold text-blue-600">体験優位版</span>: 具体物の提案、実験動画、身近な例</li>
+                  <li>• <span class="font-semibold text-red-600">視覚優位版</span>: AI生成画像・動画、図解、色分け
+                    <button onclick="demoCase4Visual()" class="ml-2 bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded">
+                      <i class="fas fa-eye mr-1"></i>試す
+                    </button>
+                  </li>
+                  <li>• <span class="font-semibold text-green-600">聴覚優位版</span>: AI音声読み上げ、AI生成音楽
+                    <button onclick="demoCase4Audio()" class="ml-2 bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded">
+                      <i class="fas fa-headphones mr-1"></i>試す
+                    </button>
+                  </li>
+                  <li>• <span class="font-semibold text-blue-600">体験優位版</span>: 具体物の提案、実験動画
+                    <button onclick="demoCase4Kinesthetic()" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded">
+                      <i class="fas fa-hand-paper mr-1"></i>試す
+                    </button>
+                  </li>
                   <li>• <span class="font-semibold text-purple-600">自動判定</span>: 学習履歴から認知特性を推定</li>
                 </ul>
                 <div class="bg-pink-100 p-2 rounded mt-2">
@@ -1797,6 +1833,21 @@ async function renderTopPage() {
                 </ul>
               </div>
             </div>
+          </div>
+
+          <!-- デモ体験ボタン -->
+          <div class="mt-6 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg p-6 text-center">
+            <h4 class="text-2xl font-bold text-white mb-3">
+              <i class="fas fa-play-circle mr-2"></i>
+              実際に体験してみよう！
+            </h4>
+            <p class="text-white mb-4">
+              12のケースすべてを、クリックして実際の機能を体験できます
+            </p>
+            <a href="/personalized-learning-demo.html" class="inline-block bg-white text-purple-700 px-8 py-4 rounded-lg font-bold text-lg hover:bg-purple-50 transition transform hover:scale-105 shadow-lg">
+              <i class="fas fa-mouse-pointer mr-2"></i>
+              個別最適化学習デモを体験する
+            </a>
           </div>
         </div>
 
@@ -29937,6 +29988,562 @@ window.showThemeSelector = showThemeSelector
 window.showParentDashboard = showParentDashboard
 
 console.log('✅ Phase 19B-F: 次世代学習支援機能 読み込み完了')
+
+// =================================================================
+// 個別最適化学習の具体例デモ機能（全12ケース）
+// 単元：小学2年生「かけ算（九九）」で統一
+// =================================================================
+
+// ケース1: 得意な児童Aさん - AI生成動画デモ
+function demoCase1Video() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-purple-700">
+          <i class="fas fa-rocket mr-2"></i>ケース1: AI生成動画（Gemini Veo）
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mb-4">
+        <p class="text-gray-700 mb-2">
+          <strong>生成内容:</strong> 「3×4の計算手順」解説動画（5秒）
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          得意な児童Aさん向けに、サクサク進める短時間動画を生成。
+        </p>
+      </div>
+      <div class="bg-purple-50 p-4 rounded-lg border-2 border-purple-200 mb-4">
+        <div class="text-center py-8">
+          <div class="animate-pulse mb-4">
+            <i class="fas fa-video text-6xl text-purple-600"></i>
+          </div>
+          <p class="text-purple-700 font-semibold mb-2">📹 AI生成動画デモ</p>
+          <p class="text-sm text-gray-600 mb-4">
+            3×4 = 3を4かいたす = 3+3+3+3 = 12<br>
+            （動画では図解付きで5秒でわかりやすく説明）
+          </p>
+          <div class="bg-white p-3 rounded border">
+            <p class="text-xs text-gray-500 mb-2">
+              <i class="fas fa-check-circle text-green-500 mr-1"></i>
+              Gemini Veo で生成（約30秒）
+            </p>
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-bolt text-yellow-500 mr-1"></i>
+              得意な子向け：テンポよく、次々進める
+            </p>
+          </div>
+        </div>
+      </div>
+      <button onclick="this.closest('.fixed').remove()" 
+        class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition">
+        閉じる
+      </button>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// ケース1: AI生成画像デモ
+function demoCase1Image() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-purple-700">
+          <i class="fas fa-rocket mr-2"></i>ケース1: AI生成画像（Flux Pro）
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mb-4">
+        <p class="text-gray-700 mb-2">
+          <strong>生成内容:</strong> 「3×4の図解」イラスト
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          視覚的に理解しやすい図解を瞬時に生成。
+        </p>
+      </div>
+      <div class="bg-purple-50 p-4 rounded-lg border-2 border-purple-200 mb-4">
+        <div class="text-center py-8">
+          <div class="mb-4">
+            <i class="fas fa-th text-6xl text-purple-600"></i>
+          </div>
+          <p class="text-purple-700 font-semibold mb-2">🎨 AI生成画像デモ</p>
+          <div class="grid grid-cols-4 gap-2 max-w-xs mx-auto mb-4">
+            ${Array(12).fill(0).map(() => '<div class="bg-purple-300 rounded h-8"></div>').join('')}
+          </div>
+          <p class="text-sm text-gray-700">3×4 = 12個のマス</p>
+          <div class="bg-white p-3 rounded border mt-4">
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-check-circle text-green-500 mr-1"></i>
+              Flux Pro で生成（約15秒）
+            </p>
+          </div>
+        </div>
+      </div>
+      <button onclick="this.closest('.fixed').remove()" 
+        class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition">
+        閉じる
+      </button>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// ケース2: 苦手な児童Bさん - AI生成音楽デモ
+function demoCase2Music() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-blue-700">
+          <i class="fas fa-seedling mr-2"></i>ケース2: AI生成音楽（ElevenLabs）
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mb-4">
+        <p class="text-gray-700 mb-2">
+          <strong>生成内容:</strong> 「九九の歌（3の段）」
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          苦手な児童Bさん向けに、楽しく覚えられる歌を生成。
+        </p>
+      </div>
+      <div class="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-4">
+        <div class="text-center py-8">
+          <div class="animate-pulse mb-4">
+            <i class="fas fa-music text-6xl text-blue-600"></i>
+          </div>
+          <p class="text-blue-700 font-semibold mb-4">🎵 九九の歌（3の段）</p>
+          <div class="bg-white p-4 rounded border text-left max-w-md mx-auto">
+            <p class="text-sm leading-relaxed">
+              ♪ さん いち が さん<br>
+              ♪ さん に が ろく<br>
+              ♪ さん さん が きゅう<br>
+              ♪ さん し が じゅうに
+            </p>
+          </div>
+          <div class="bg-white p-3 rounded border mt-4">
+            <p class="text-xs text-gray-500 mb-2">
+              <i class="fas fa-check-circle text-green-500 mr-1"></i>
+              ElevenLabs Music で生成（約45秒）
+            </p>
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-heart text-red-500 mr-1"></i>
+              明るく楽しいメロディで暗記を支援
+            </p>
+          </div>
+        </div>
+      </div>
+      <button onclick="this.closest('.fixed').remove()" 
+        class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition">
+        閉じる
+      </button>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// ケース2: AI音声読み上げデモ
+function demoCase2Voice() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-blue-700">
+          <i class="fas fa-seedling mr-2"></i>ケース2: AI音声読み上げ（Minimax TTS）
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mb-4">
+        <p class="text-gray-700 mb-2">
+          <strong>読み上げ内容:</strong> 「3×4の説明」（小学2年生向け）
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          やさしい言葉で、ゆっくり丁寧に説明。
+        </p>
+      </div>
+      <div class="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-4">
+        <div class="py-8">
+          <div class="text-center mb-4">
+            <i class="fas fa-volume-up text-6xl text-blue-600"></i>
+          </div>
+          <div class="bg-white p-4 rounded border max-w-md mx-auto">
+            <p class="text-sm leading-relaxed text-gray-700">
+              「3×4は、3を4かいたすという いみだよ。<br><br>
+              
+              3+3+3+3 と かけば、こたえは 12に なるよ。<br><br>
+              
+              4このはこに リンゴが3こずつ はいっているとき、ぜんぶで なんこかな？<br><br>
+              
+              そう、12こだね！」
+            </p>
+          </div>
+          <div class="bg-white p-3 rounded border mt-4 max-w-md mx-auto">
+            <p class="text-xs text-gray-500 mb-2">
+              <i class="fas fa-check-circle text-green-500 mr-1"></i>
+              Minimax TTS（小学2年生モード）で生成
+            </p>
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-heart text-red-500 mr-1"></i>
+              ゆっくり、やさしい言葉で説明
+            </p>
+          </div>
+        </div>
+      </div>
+      <button onclick="this.closest('.fixed').remove()" 
+        class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition">
+        閉じる
+      </button>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// ケース2: AI先生対話デモ
+function demoCase2AI() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-blue-700">
+          <i class="fas fa-seedling mr-2"></i>ケース2: AI先生対話デモ
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mb-4">
+        <p class="text-gray-700 mb-2">
+          <strong>対話内容:</strong> 3×4がわからない児童への丁寧な説明
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          300〜500文字で、具体例を2〜3個含めて説明。
+        </p>
+      </div>
+      <div class="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-4 max-h-96 overflow-y-auto">
+        <div class="space-y-3">
+          <div class="bg-gray-100 rounded-lg p-3">
+            <p class="text-xs text-gray-600 mb-1">👦 児童Bさん:</p>
+            <p class="text-sm">「3×4って、どうやってけいさんするの？」</p>
+          </div>
+          <div class="bg-white rounded-lg p-4 border-2 border-blue-200">
+            <p class="text-xs text-blue-600 mb-2">🤖 AI先生:</p>
+            <p class="text-sm leading-relaxed text-gray-800">
+              3×4は「3を4かいたす」という いみだよ！<br><br>
+              
+              見てみよう：<br>
+              ① 3+3+3+3 = 12<br>
+              ② 4このはこに リンゴが3こずつ → ぜんぶで12こ<br>
+              ③ 3れつ×4れつの せき → ぜんぶで12せき<br><br>
+              
+              「かける」というのは、「なんかいも たす」ことなんだ。<br><br>
+              
+              3×4なら、「3を4かい たす」から、3+3+3+3で、こたえは12だよ。<br><br>
+              
+              わかったかな？もっと しりたいことは ある？
+            </p>
+            <div class="mt-3 pt-3 border-t">
+              <p class="text-xs text-gray-500">
+                <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                文字数: 約350文字 | 具体例: 3個 | 小学2年生の言葉で説明
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button onclick="this.closest('.fixed').remove()" 
+        class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition">
+        閉じる
+      </button>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// ケース3: 欠席が多い児童Cさん - AI解説動画デモ
+function demoCase3Video() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-yellow-700">
+          <i class="fas fa-home mr-2"></i>ケース3: AI解説動画（Gemini Veo）
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mb-4">
+        <p class="text-gray-700 mb-2">
+          <strong>生成内容:</strong> 授業の代わりになる「3×4の要点」解説動画（5秒）
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          欠席が多い児童Cさん向けに、自宅で学習できる要点動画。
+        </p>
+      </div>
+      <div class="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-200 mb-4">
+        <div class="text-center py-8">
+          <div class="animate-pulse mb-4">
+            <i class="fas fa-chalkboard-teacher text-6xl text-yellow-600"></i>
+          </div>
+          <p class="text-yellow-700 font-semibold mb-2">📹 授業代替動画デモ</p>
+          <p class="text-sm text-gray-600 mb-4">
+            3×4の計算方法を、5秒で要点をまとめて説明。<br>
+            「3を4かいたす = 3+3+3+3 = 12」
+          </p>
+          <div class="bg-white p-3 rounded border">
+            <p class="text-xs text-gray-500 mb-2">
+              <i class="fas fa-check-circle text-green-500 mr-1"></i>
+              Gemini Veo で生成（約30秒）
+            </p>
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-home text-yellow-500 mr-1"></i>
+              自宅で何度でも見返せる
+            </p>
+          </div>
+        </div>
+      </div>
+      <button onclick="this.closest('.fixed').remove()" 
+        class="w-full px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition">
+        閉じる
+      </button>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// ケース4: 学習スタイル別対応 - 視覚優位版デモ
+function demoCase4Visual() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-red-700">
+          <i class="fas fa-eye mr-2"></i>ケース4: 視覚優位版
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mb-4">
+        <p class="text-gray-700 mb-2">
+          <strong>特徴:</strong> 図解・色分け・動画で視覚的に理解
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          視覚優位の児童向けに最適化した表現。
+        </p>
+      </div>
+      <div class="bg-red-50 p-4 rounded-lg border-2 border-red-200 mb-4">
+        <div class="py-8">
+          <div class="text-center mb-4">
+            <i class="fas fa-th-large text-6xl text-red-600"></i>
+          </div>
+          <p class="text-red-700 font-semibold mb-4 text-center">👁️ 視覚優位版: 3×4</p>
+          <div class="bg-white p-4 rounded border max-w-md mx-auto">
+            <div class="grid grid-cols-3 gap-2 mb-4">
+              ${Array(12).fill(0).map((_, i) => 
+                `<div class="bg-gradient-to-br from-red-400 to-red-600 rounded h-12 flex items-center justify-center text-white font-bold">${i+1}</div>`
+              ).join('')}
+            </div>
+            <p class="text-center text-sm text-gray-700">
+              <span class="bg-red-200 px-2 py-1 rounded">3列</span> × 
+              <span class="bg-blue-200 px-2 py-1 rounded">4行</span> = 
+              <span class="bg-green-200 px-2 py-1 rounded font-bold">12個</span>
+            </p>
+          </div>
+          <div class="bg-white p-3 rounded border mt-4 max-w-md mx-auto">
+            <p class="text-xs text-gray-500 mb-1">
+              <i class="fas fa-palette text-red-500 mr-1"></i>
+              色分けと配置で視覚的に理解
+            </p>
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-check-circle text-green-500 mr-1"></i>
+              AI画像生成 + 動画で動きを見せる
+            </p>
+          </div>
+        </div>
+      </div>
+      <button onclick="this.closest('.fixed').remove()" 
+        class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition">
+        閉じる
+      </button>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// ケース4: 聴覚優位版デモ
+function demoCase4Audio() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-green-700">
+          <i class="fas fa-headphones mr-2"></i>ケース4: 聴覚優位版
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mb-4">
+        <p class="text-gray-700 mb-2">
+          <strong>特徴:</strong> 音楽・リズム・音声で聴覚的に理解
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          聴覚優位の児童向けに最適化した表現。
+        </p>
+      </div>
+      <div class="bg-green-50 p-4 rounded-lg border-2 border-green-200 mb-4">
+        <div class="py-8">
+          <div class="text-center mb-4">
+            <i class="fas fa-music text-6xl text-green-600"></i>
+          </div>
+          <p class="text-green-700 font-semibold mb-4 text-center">🎧 聴覚優位版: 3×4</p>
+          <div class="bg-white p-4 rounded border max-w-md mx-auto">
+            <div class="space-y-3">
+              <div class="bg-green-100 p-3 rounded">
+                <p class="font-semibold text-green-800 mb-2">🎵 リズムで覚える</p>
+                <p class="text-sm">
+                  ♪ さん・かける・よん（タン・タン・タン）<br>
+                  ♪ さん・たす・さん・たす・さん・たす・さん（タタタタ）<br>
+                  ♪ じゅう・に！（ジャーン！）
+                </p>
+              </div>
+              <div class="bg-blue-100 p-3 rounded">
+                <p class="font-semibold text-blue-800 mb-2">🎤 音声解説</p>
+                <p class="text-sm">
+                  「さんを、よんかい、たすんだよ。<br>
+                  さん、さん、さん、さんで、じゅうに！」
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white p-3 rounded border mt-4 max-w-md mx-auto">
+            <p class="text-xs text-gray-500 mb-1">
+              <i class="fas fa-music text-green-500 mr-1"></i>
+              AI生成音楽でリズムを作成
+            </p>
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-volume-up text-green-500 mr-1"></i>
+              AI音声でゆっくり丁寧に説明
+            </p>
+          </div>
+        </div>
+      </div>
+      <button onclick="this.closest('.fixed').remove()" 
+        class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition">
+        閉じる
+      </button>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// ケース4: 体験優位版デモ
+function demoCase4Kinesthetic() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold text-blue-700">
+          <i class="fas fa-hand-paper mr-2"></i>ケース4: 体験優位版
+        </h3>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times text-2xl"></i>
+        </button>
+      </div>
+      <div class="mb-4">
+        <p class="text-gray-700 mb-2">
+          <strong>特徴:</strong> 具体物・実験・手を動かして理解
+        </p>
+        <p class="text-sm text-gray-600 mb-4">
+          体験優位（身体運動知能）の児童向けに最適化。
+        </p>
+      </div>
+      <div class="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-4">
+        <div class="py-8">
+          <div class="text-center mb-4">
+            <i class="fas fa-cubes text-6xl text-blue-600"></i>
+          </div>
+          <p class="text-blue-700 font-semibold mb-4 text-center">✋ 体験優位版: 3×4</p>
+          <div class="bg-white p-4 rounded border max-w-md mx-auto">
+            <div class="space-y-3">
+              <div class="bg-orange-100 p-3 rounded">
+                <p class="font-semibold text-orange-800 mb-2">📦 準備する物</p>
+                <ul class="text-sm space-y-1">
+                  <li>• おはじき 12個</li>
+                  <li>• 紙コップ 4個</li>
+                  <li>• または積み木 12個</li>
+                </ul>
+              </div>
+              <div class="bg-green-100 p-3 rounded">
+                <p class="font-semibold text-green-800 mb-2">🎯 やってみよう</p>
+                <p class="text-sm">
+                  ① 紙コップを4個ならべる<br>
+                  ② 各コップに おはじきを3個ずつ入れる<br>
+                  ③ ぜんぶで何個か数えてみよう<br>
+                  → 答え: 12個！
+                </p>
+              </div>
+              <div class="bg-purple-100 p-3 rounded">
+                <p class="font-semibold text-purple-800 mb-2">📹 AI生成実験動画</p>
+                <p class="text-sm">
+                  実際にやってみる様子を5秒動画で確認できます
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white p-3 rounded border mt-4 max-w-md mx-auto">
+            <p class="text-xs text-gray-500 mb-1">
+              <i class="fas fa-hands text-blue-500 mr-1"></i>
+              手を動かして体験的に理解
+            </p>
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-video text-blue-500 mr-1"></i>
+              AI動画で手順を視覚的に確認
+            </p>
+          </div>
+        </div>
+      </div>
+      <button onclick="this.closest('.fixed').remove()" 
+        class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition">
+        閉じる
+      </button>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// グローバルスコープに登録
+window.demoCase1Video = demoCase1Video
+window.demoCase1Image = demoCase1Image
+window.demoCase2Music = demoCase2Music
+window.demoCase2Voice = demoCase2Voice
+window.demoCase2AI = demoCase2AI
+window.demoCase3Video = demoCase3Video
+window.demoCase4Visual = demoCase4Visual
+window.demoCase4Audio = demoCase4Audio
+window.demoCase4Kinesthetic = demoCase4Kinesthetic
+
+console.log('✅ 個別最適化学習デモ機能 読み込み完了（ケース1-4）')
 
 
 
