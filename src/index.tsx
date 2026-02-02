@@ -13923,7 +13923,7 @@ app.post('/api/media/generate-video', async (c) => {
       </style>
     </head>
     <body>
-      <canvas id="canvas" width="800" height="600"></canvas>
+      <canvas id="canvas" width="800" height="500"></canvas>
       <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
@@ -14006,11 +14006,11 @@ app.post('/api/media/generate-video', async (c) => {
             }
           });
           
-          // 説明（位置を上に）
-          drawText('3が 4つ → 3+3+3+3', 400, 340, 30, '#6b7280', 1);
+          // 説明（位置を調整）
+          drawText('3が 4つ → 3+3+3+3', 400, 320, 28, '#6b7280', 1);
           
-          // 答え（位置を上に、サイズ調整）
-          drawText('= 12', 400, 430, 70, '#3b82f6', 1);
+          // 答え（位置を調整）
+          drawText('= 12', 400, 400, 70, '#3b82f6', 1);
           
           console.log('✅ Static render complete - All elements should be visible now');
         }

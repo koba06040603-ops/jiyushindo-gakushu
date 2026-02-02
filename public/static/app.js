@@ -30042,7 +30042,7 @@ async function generateVideoDemo() {
     resultDiv.innerHTML = `
       <div class="py-4">
         <div class="mb-4">
-          <div class="bg-white rounded-lg overflow-hidden aspect-video border-2 border-purple-300">
+          <div class="bg-white rounded-lg overflow-hidden border-2 border-purple-300" style="height: 500px;">
             <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
               class="w-full h-full" frameborder="0" 
               sandbox="allow-scripts"
