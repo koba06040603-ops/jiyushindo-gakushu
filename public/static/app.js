@@ -2043,7 +2043,7 @@ async function loadGuidePage(curriculumId) {
                         </div>
                       `}
                       
-                      <button class="w-full mt-2 py-2 ${badgeClasses} text-white rounded-lg font-bold text-sm hover:opacity-90 shadow-md">
+                      <button onclick="startCourseStudy(${curriculumId}, ${course.course_id || course.id})" class="w-full mt-2 py-2 ${badgeClasses} text-white rounded-lg font-bold text-sm hover:opacity-90 shadow-md">
                         このコースで学しゅうする
                       </button>
                     </div>
@@ -3100,9 +3100,47 @@ async function loadTeacherOverview(curriculumId) {
   }
 }
 
+// コース学習開始関数
+async function startCourseStudy(curriculumId, courseId) {
+  try {
+    loadingManager.show('学習のてびきを読み込み中...')
+    
+    // カリキュラムデータを取得
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum, courses } = response.data
+    
+    // 指定されたコースを探す
+    const selectedCourse = courses.find(c => (c.course_id || c.id) === courseId)
+    
+    if (!selectedCourse) {
+      throw new Error('コースが見つかりません')
+    }
+    
+    if (!selectedCourse.cards || selectedCourse.cards.length === 0) {
+      throw new Error('このコースにはまだ学習カードがありません')
+    }
+    
+    // state を更新
+    state.selectedCurriculum = curriculum
+    state.courses = courses
+    
+    // 最初のカードを表示
+    const firstCard = selectedCourse.cards[0]
+    showLearningCard(firstCard, curriculumId, courseId)
+    
+    loadingManager.hide()
+    
+  } catch (error) {
+    console.error('コース学習開始エラー:', error)
+    loadingManager.hide()
+    alert('学習カードの読み込みに失敗しました: ' + error.message)
+  }
+}
+
 // グローバルスコープに関数を登録
 window.renderTopPage = renderTopPage
 window.loadGuidePage = loadGuidePage
+window.startCourseStudy = startCourseStudy
 window.loadTeacherOverview = loadTeacherOverview
 window.loadLearningPlanPage = loadLearningPlanPage
 window.updatePlanHours = updatePlanHours
