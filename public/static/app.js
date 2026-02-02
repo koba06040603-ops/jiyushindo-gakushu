@@ -30045,6 +30045,7 @@ async function generateVideoDemo() {
           <div class="bg-white rounded-lg overflow-hidden aspect-video border-2 border-purple-300">
             <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
               class="w-full h-full" frameborder="0" 
+              sandbox="allow-scripts"
               style="background: white;"
               onload="console.log('✅ iframe loaded')"></iframe>
           </div>
