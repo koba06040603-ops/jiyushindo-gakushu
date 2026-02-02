@@ -1216,11 +1216,11 @@ async function renderTopPage() {
           </p>
         </div>
 
-        <!-- 0. 6つの教育理論に基づく設計 -->
+        <!-- 0. 8つの教育理論に基づく設計 -->
         <div class="bg-white rounded-lg p-6 mb-6 shadow-lg border-4 border-yellow-400">
           <h3 class="text-2xl font-bold text-yellow-700 mb-4 text-center">
             <i class="fas fa-book-open mr-2"></i>
-            🌟 6つの教育理論に基づく科学的アプローチ
+            🌟 8つの教育理論に基づく科学的アプローチ
           </h3>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             <!-- 理論1: VARK理論 -->
@@ -1282,12 +1282,35 @@ async function renderTopPage() {
               <p class="text-sm text-gray-700 mb-2">文部科学省推奨</p>
               <p class="text-xs text-gray-600">分散学習・検索練習・交互配置・精緻化・具体例・二重符号化の6つの科学的方略</p>
             </div>
+
+            <!-- 理論7: 足場かけ理論 -->
+            <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border-2 border-red-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">7</div>
+                <h4 class="font-bold text-red-800">足場かけ理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">Vygotsky提唱</p>
+              <p class="text-xs text-gray-600">最近接発達領域（ZPD）：児童の現在の力と支援により到達できる力の間を段階的にサポート</p>
+            </div>
+
+            <!-- 理論8: 自己決定理論 -->
+            <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 border-2 border-indigo-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-indigo-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">8</div>
+                <h4 class="font-bold text-indigo-800">自己決定理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">Deci & Ryan提唱</p>
+              <p class="text-xs text-gray-600">自律性・有能感・関係性の3要素を満たし内発的動機づけを促進（コース選択・達成感・AI先生との対話）</p>
+            </div>
           </div>
           <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 text-center">
             <p class="text-yellow-900 font-bold text-lg">
               <i class="fas fa-star mr-2"></i>
-              これら6つの理論を統合し、科学的根拠に基づいた個別最適化学習を実現
+              これら8つの理論を統合し、科学的根拠に基づいた個別最適化学習を実現
               <i class="fas fa-star ml-2"></i>
+            </p>
+            <p class="text-yellow-800 text-sm mt-2">
+              💡 3段階ヒント（足場かけ理論）× コース選択自由（自己決定理論）で主体的な学びを促進
             </p>
           </div>
         </div>

@@ -528,8 +528,8 @@
 
 ### 🎓 理論・設計ドキュメント（NEW）
 
-- ⭐ **[FINAL_THEORY_INTEGRATION.md](./FINAL_THEORY_INTEGRATION.md)** - **6理論＋文科省方針 完全統合モデル**
-  - VARK・Gardner・Kolb・ATI・Zimmerman SRL・認知科学の6理論統合
+- ⭐ **[FINAL_THEORY_INTEGRATION.md](./FINAL_THEORY_INTEGRATION.md)** - **8理論＋文科省方針 完全統合モデル**
+  - VARK・Gardner・Kolb・ATI・Zimmerman SRL・認知科学・足場かけ理論（Vygotsky）・自己決定理論（Deci & Ryan）の8理論統合
   - 文部科学省 次期学習指導要領（令和7年12月15日）完全対応
   - 世界最高峰の個別最適化学習システム設計書
 
