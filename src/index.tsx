@@ -14072,8 +14072,33 @@ app.post('/api/media/generate-video', async (c) => {
           }
           
           // アニメーション継続
-          if (time < 10) {
+          if (time < 12) {
             requestAnimationFrame(animate);
+          } else {
+            // 最終フレームを固定表示
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawText('3 × 4 の けいさん', 400, 80, 48, '#1e40af', 1);
+            drawText('3 × 4 = ?', 400, 150, 56, '#7c3aed', 1);
+            
+            // 全グループ表示
+            const finalGroups = [
+              { label: '1つめ', x: 150, y: 300 },
+              { label: '2つめ', x: 320, y: 300 },
+              { label: '3つめ', x: 490, y: 300 },
+              { label: '4つめ', x: 660, y: 300 }
+            ];
+            
+            finalGroups.forEach((group) => {
+              drawText(group.label, group.x, group.y - 60, 24, '#059669', 1);
+              drawBox(group.x - 65, group.y - 35, 130, 90, 1);
+              for (let i = 0; i < 3; i++) {
+                const appleX = group.x + (i - 1) * 40;
+                drawApple(appleX, group.y, 18, 1);
+              }
+            });
+            
+            drawText('3が 4つ → 3+3+3+3', 400, 430, 32, '#6b7280', 1);
+            drawText('= 12', 400, 520, 80, '#3b82f6', 1);
           }
         }
         
