@@ -1402,11 +1402,12 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 算数が得意、どんどん進みたい</p>
                 <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">どんどんコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 1週間でコース完了（6枚+チェックテスト+選択問題）</li>
-                  <li>• ヒント使用率: 10%（自力で解決）</li>
-                  <li>• チェックテスト満点、選択問題もクリア</li>
+                  <li>• 📹 <strong>AI生成動画</strong>: 「分数のかけ算」解説動画（Gemini Veo, 8秒）</li>
+                  <li>• 🎨 <strong>AI生成画像</strong>: 立体図形の展開図（Flux Pro）</li>
+                  <li>• 📊 <strong>学習データ分析</strong>: 得意分野を可視化→次の挑戦</li>
+                  <li>• ✅ 1週間でコース完了、選択問題もクリア</li>
                 </ul>
                 <div class="bg-purple-100 p-2 rounded mt-2">
                   <p class="text-purple-800 font-semibold">
@@ -1426,11 +1427,12 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 算数に苦手意識、じっくり学びたい</p>
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 2週間でコース完了（6枚+チェックテスト+選択問題）</li>
-                  <li>• ヒント使用率: 80%（段階的に理解）</li>
-                  <li>• AI先生に質問5回→理解度向上</li>
+                  <li>• 🎵 <strong>AI生成音楽</strong>: 「九九の歌」で暗記支援（ElevenLabs）</li>
+                  <li>• 🎤 <strong>AI音声読み上げ</strong>: やさしい言葉で説明（Minimax TTS）</li>
+                  <li>• 🤖 <strong>AI先生対話</strong>: 質問5回→300〜500文字で丁寧に回答</li>
+                  <li>• ✅ 2週間でコース完了、苦手を克服し自信獲得</li>
                 </ul>
                 <div class="bg-blue-100 p-2 rounded mt-2">
                   <p class="text-blue-800 font-semibold">
@@ -1450,16 +1452,17 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 体調不良で欠席が多い</p>
                 <p><strong>学習コース:</strong> <span class="bg-blue-600 text-white px-2 py-1 rounded">しっかりコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 自宅から学習カードにアクセス</li>
-                  <li>• AI先生が24時間サポート</li>
-                  <li>• 遅れを取り戻し、クラスに追いつく</li>
+                  <li>• 📹 <strong>AI解説動画</strong>: 授業の代わりに5〜8秒の要点動画（Gemini Veo）</li>
+                  <li>• 📊 <strong>進捗ボード</strong>: 教師がリアルタイムで見守り、励ましメッセージ</li>
+                  <li>• 🎤 <strong>音声メモ機能</strong>: 気持ちを記録して孤立感を軽減</li>
+                  <li>• ✅ 自宅から学習継続、遅れを取り戻しクラスに追いつく</li>
                 </ul>
                 <div class="bg-yellow-100 p-2 rounded mt-2">
                   <p class="text-yellow-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    場所を選ばず学習継続が可能
+                    <i class="fas fa-home mr-1"></i>
+                    場所を選ばず、24時間いつでも学習継続が可能
                   </p>
                 </div>
               </div>
