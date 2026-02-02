@@ -13897,7 +13897,7 @@ app.post('/api/media/generate-image', async (c) => {
 app.post('/api/media/generate-video', async (c) => {
   const { prompt, duration } = await c.req.json()
   
-  // CSSアニメーションを使った小数のかけ算アニメーション
+  // 小学2年生向け：3×4のかけ算アニメーション
   const animationHtml = `
     <!DOCTYPE html>
     <html>
@@ -13907,7 +13907,7 @@ app.post('/api/media/generate-video', async (c) => {
         body { 
           width: 100%; 
           height: 100%; 
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+          background: #f0f9ff;
           font-family: 'Arial', sans-serif;
           overflow: hidden;
         }
@@ -13917,27 +13917,39 @@ app.post('/api/media/generate-video', async (c) => {
           position: relative; 
           background: white; 
           overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          padding: 20px;
         }
         .title { 
           text-align: center; 
-          padding: 5px; 
-          font-size: 20px; 
+          font-size: 28px; 
           font-weight: bold; 
           color: #1e40af; 
-          margin-bottom: 10px;
+          margin-bottom: 30px;
+          animation: titleFade 0.5s ease-in;
         }
-        .stage {
-          position: relative;
-          width: 100%;
-          height: 560px;
-          padding: 5px 10px;
+        .question {
+          font-size: 48px;
+          font-weight: bold;
+          color: #7c3aed;
+          margin-bottom: 40px;
+          animation: questionBounce 0.8s 0.5s ease-out forwards;
+          opacity: 0;
+        }
+        .grid-container {
+          display: grid;
+          grid-template-columns: repeat(4, 80px);
+          gap: 10px;
+          margin-bottom: 40px;
         }
         .block { 
-          width: 100px; 
-          height: 100px; 
+          width: 80px; 
+          height: 80px; 
           background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); 
-          border-radius: 16px; 
-          position: absolute; 
+          border-radius: 12px; 
           display: flex; 
           align-items: center; 
           justify-content: center; 
@@ -13945,68 +13957,93 @@ app.post('/api/media/generate-video', async (c) => {
           font-size: 36px; 
           font-weight: bold; 
           opacity: 0;
-          box-shadow: 0 10px 30px rgba(34, 197, 94, 0.4);
+          box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+          transform: scale(0) rotate(180deg);
         }
-        .block1 { top: 40px; left: 5%; animation: appear 0.5s 0.5s forwards, move1 1.2s 2.5s forwards; }
-        .block2 { top: 40px; left: 27%; animation: appear 0.5s 1s forwards, move2 1.2s 2.5s forwards; }
-        .block3 { top: 40px; left: 49%; animation: appear 0.5s 1.5s forwards, move3 1.2s 2.5s forwards; }
-        .block4 { top: 40px; left: 71%; animation: appear 0.5s 2s forwards, move4 1.2s 2.5s forwards; }
-        .equation {
-          position: absolute;
-          top: 280px;
-          left: 50%;
-          transform: translateX(-50%);
-          font-size: 36px;
-          font-weight: bold;
+        .block:nth-child(1) { animation: popIn 0.5s 1.5s ease-out forwards; }
+        .block:nth-child(2) { animation: popIn 0.5s 1.7s ease-out forwards; }
+        .block:nth-child(3) { animation: popIn 0.5s 1.9s ease-out forwards; }
+        .block:nth-child(4) { animation: popIn 0.5s 2.1s ease-out forwards; }
+        .block:nth-child(5) { animation: popIn 0.5s 2.3s ease-out forwards; }
+        .block:nth-child(6) { animation: popIn 0.5s 2.5s ease-out forwards; }
+        .block:nth-child(7) { animation: popIn 0.5s 2.7s ease-out forwards; }
+        .block:nth-child(8) { animation: popIn 0.5s 2.9s ease-out forwards; }
+        .block:nth-child(9) { animation: popIn 0.5s 3.1s ease-out forwards; }
+        .block:nth-child(10) { animation: popIn 0.5s 3.3s ease-out forwards; }
+        .block:nth-child(11) { animation: popIn 0.5s 3.5s ease-out forwards; }
+        .block:nth-child(12) { animation: popIn 0.5s 3.7s ease-out forwards; }
+        
+        .explanation {
+          font-size: 24px;
           color: #6b7280;
+          margin-bottom: 20px;
           opacity: 0;
-          animation: equationAppear 0.5s 3.8s forwards;
+          animation: fadeIn 0.8s 4.2s ease-in forwards;
         }
+        
         .result { 
-          position: absolute; 
-          top: 400px; 
-          left: 50%; 
-          transform: translateX(-50%); 
           font-size: 56px; 
           font-weight: bold; 
           color: #3b82f6; 
           opacity: 0; 
-          animation: resultAppear 0.8s 4.5s forwards, pulse 0.5s 5s infinite;
+          animation: resultAppear 0.8s 4.8s forwards, pulse 1s 5.5s infinite;
           text-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
         }
-        @keyframes appear { 
+        
+        @keyframes titleFade {
+          from { opacity: 0; transform: translateY(-20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes questionBounce {
+          0% { opacity: 0; transform: scale(0.5); }
+          50% { transform: scale(1.1); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        
+        @keyframes popIn { 
           0% { opacity: 0; transform: scale(0) rotate(180deg); }
+          70% { transform: scale(1.15) rotate(-10deg); }
           100% { opacity: 1; transform: scale(1) rotate(0deg); } 
         }
-        @keyframes move1 { to { top: 180px; left: 12%; } }
-        @keyframes move2 { to { top: 180px; left: 34%; } }
-        @keyframes move3 { to { top: 180px; left: 56%; } }
-        @keyframes move4 { to { top: 180px; left: 78%; } }
-        @keyframes equationAppear { 
-          0% { opacity: 0; transform: translateX(-50%) scale(0.5); }
-          100% { opacity: 1; transform: translateX(-50%) scale(1); } 
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
+        
         @keyframes resultAppear { 
-          0% { opacity: 0; transform: translateX(-50%) translateY(50px); }
-          100% { opacity: 1; transform: translateX(-50%) translateY(0); } 
+          0% { opacity: 0; transform: scale(0.5); }
+          50% { transform: scale(1.2); }
+          100% { opacity: 1; transform: scale(1); } 
         }
+        
         @keyframes pulse {
-          0%, 100% { transform: translateX(-50%) scale(1); }
-          50% { transform: translateX(-50%) scale(1.05); }
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
         }
       </style>
     </head>
     <body>
       <div class="animation-container">
-        <div class="title">小数のかけ算アニメーション</div>
-        <div class="stage">
-          <div class="block block1">0.3</div>
-          <div class="block block2">0.3</div>
-          <div class="block block3">0.3</div>
-          <div class="block block4">0.3</div>
-          <div class="equation">0.3 + 0.3 + 0.3 + 0.3</div>
-          <div class="result">= 1.2</div>
+        <div class="title">3 × 4 の けいさん</div>
+        <div class="question">3 × 4 = ?</div>
+        <div class="grid-container">
+          <div class="block">1</div>
+          <div class="block">2</div>
+          <div class="block">3</div>
+          <div class="block">4</div>
+          <div class="block">5</div>
+          <div class="block">6</div>
+          <div class="block">7</div>
+          <div class="block">8</div>
+          <div class="block">9</div>
+          <div class="block">10</div>
+          <div class="block">11</div>
+          <div class="block">12</div>
         </div>
+        <div class="explanation">3を 4かい たす = 3+3+3+3</div>
+        <div class="result">= 12</div>
       </div>
     </body>
     </html>
@@ -14017,7 +14054,7 @@ app.post('/api/media/generate-video', async (c) => {
     animationHtml: animationHtml,
     prompt: prompt,
     duration: duration || 5,
-    note: '0.3が4つ集まって1.2になる様子をアニメーションで表現しました'
+    note: '3×4=12を視覚的に表現。12個のブロックが1つずつ現れて、かけ算の意味を理解できます'
   })
 })
 
