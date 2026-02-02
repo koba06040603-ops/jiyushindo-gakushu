@@ -29995,11 +29995,11 @@ console.log('✅ Phase 19B-F: 次世代学習支援機能 読み込み完了')
 // =================================================================
 
 // ケース1: 得意な児童Aさん - AI生成動画デモ
-function demoCase1Video() {
+async function demoCase1Video() {
   const modal = document.createElement('div')
-  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
-    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-purple-700">
           <i class="fas fa-rocket mr-2"></i>ケース1: AI生成動画（Gemini Veo）
@@ -30013,33 +30013,28 @@ function demoCase1Video() {
           <strong>生成内容:</strong> 「3×4の計算手順」解説動画（5秒）
         </p>
         <p class="text-sm text-gray-600 mb-4">
-          得意な児童Aさん向けに、サクサク進める短時間動画を生成。
+          得意な児童Aさん向けに、サクサク進める短時間動画を生成します。
         </p>
       </div>
-      <div class="bg-purple-50 p-4 rounded-lg border-2 border-purple-200 mb-4">
+      
+      <div id="videoResult" class="bg-purple-50 p-4 rounded-lg border-2 border-purple-200 mb-4">
         <div class="text-center py-8">
-          <div class="animate-pulse mb-4">
+          <div class="mb-4">
             <i class="fas fa-video text-6xl text-purple-600"></i>
           </div>
-          <p class="text-purple-700 font-semibold mb-2">📹 AI生成動画デモ</p>
-          <p class="text-sm text-gray-600 mb-4">
-            3×4 = 3を4かいたす = 3+3+3+3 = 12<br>
-            （動画では図解付きで5秒でわかりやすく説明）
+          <p class="text-purple-700 font-semibold mb-4">📹 動画生成デモ</p>
+          <button onclick="generateVideoDemo()" 
+            class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-semibold">
+            <i class="fas fa-play-circle mr-2"></i>動画を生成する
+          </button>
+          <p class="text-xs text-gray-500 mt-4">
+            ※ 実際のAI生成には時間がかかるため、デモでは即座に結果を表示します
           </p>
-          <div class="bg-white p-3 rounded border">
-            <p class="text-xs text-gray-500 mb-2">
-              <i class="fas fa-check-circle text-green-500 mr-1"></i>
-              Gemini Veo で生成（約30秒）
-            </p>
-            <p class="text-xs text-gray-500">
-              <i class="fas fa-bolt text-yellow-500 mr-1"></i>
-              得意な子向け：テンポよく、次々進める
-            </p>
-          </div>
         </div>
       </div>
+      
       <button onclick="this.closest('.fixed').remove()" 
-        class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition">
+        class="w-full px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition">
         閉じる
       </button>
     </div>
@@ -30047,12 +30042,88 @@ function demoCase1Video() {
   document.body.appendChild(modal)
 }
 
+// 動画生成デモ実行（実際のAPI統合版）
+async function generateVideoDemo() {
+  const resultDiv = document.getElementById('videoResult')
+  
+  // ローディング表示
+  resultDiv.innerHTML = `
+    <div class="text-center py-8">
+      <div class="animate-spin mb-4 mx-auto">
+        <i class="fas fa-spinner text-6xl text-purple-600"></i>
+      </div>
+      <p class="text-purple-700 font-semibold mb-2">AI動画生成中...</p>
+      <p class="text-sm text-gray-600">内蔵アニメーションエンジンで解説動画を生成しています</p>
+      <div class="mt-4 bg-white rounded-lg p-3">
+        <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div class="h-full bg-purple-600 rounded-full animate-pulse" style="width: 60%"></div>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">生成中... 約2秒</p>
+      </div>
+    </div>
+  `
+  
+  try {
+    // API呼び出し（実際の動画生成）
+    const response = await fetch('/api/media/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: '小学2年生向け: 3×4の計算手順を視覚的に解説する動画',
+        duration: 5
+      })
+    })
+    
+    if (!response.ok) throw new Error('動画生成に失敗しました')
+    
+    const data = await response.json()
+    
+    // 生成結果表示（HTMLアニメーション埋め込み）
+    resultDiv.innerHTML = `
+      <div class="py-4">
+        <div class="mb-4">
+          <div class="bg-white rounded-lg overflow-hidden aspect-video border-2 border-purple-300">
+            <iframe srcdoc='${data.animation_html.replace(/'/g, "\\'")}' 
+              class="w-full h-full" frameborder="0"></iframe>
+          </div>
+        </div>
+        
+        <div class="space-y-2">
+          <div class="bg-white p-3 rounded border flex items-start">
+            <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-gray-800">生成完了！</p>
+              <p class="text-xs text-gray-600">CSSアニメーションで生成（実装済み）</p>
+            </div>
+          </div>
+          
+          <div class="bg-purple-100 p-3 rounded">
+            <p class="text-sm font-semibold text-purple-800 mb-2">
+              <i class="fas fa-info-circle mr-1"></i>生成された動画の特徴
+            </p>
+            <ul class="text-xs text-gray-700 space-y-1">
+            <li>• 5秒の短時間で要点を説明</li>
+            <li>• 図解とアニメーションで視覚的に理解</li>
+            <li>• 得意な児童向けにテンポよく進行</li>
+            <li>• 繰り返し視聴可能</li>
+          </ul>
+        </div>
+        
+        <button onclick="generateVideoDemo()" 
+          class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm">
+          <i class="fas fa-redo mr-2"></i>別の動画を生成する
+        </button>
+      </div>
+    </div>
+  `
+}
+
 // ケース1: AI生成画像デモ
-function demoCase1Image() {
+async function demoCase1Image() {
   const modal = document.createElement('div')
-  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
-    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+    <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-purple-700">
           <i class="fas fa-rocket mr-2"></i>ケース1: AI生成画像（Flux Pro）
@@ -30066,29 +30137,28 @@ function demoCase1Image() {
           <strong>生成内容:</strong> 「3×4の図解」イラスト
         </p>
         <p class="text-sm text-gray-600 mb-4">
-          視覚的に理解しやすい図解を瞬時に生成。
+          視覚的に理解しやすい図解を瞬時に生成します。
         </p>
       </div>
-      <div class="bg-purple-50 p-4 rounded-lg border-2 border-purple-200 mb-4">
+      
+      <div id="imageResult" class="bg-purple-50 p-4 rounded-lg border-2 border-purple-200 mb-4">
         <div class="text-center py-8">
           <div class="mb-4">
-            <i class="fas fa-th text-6xl text-purple-600"></i>
+            <i class="fas fa-image text-6xl text-purple-600"></i>
           </div>
-          <p class="text-purple-700 font-semibold mb-2">🎨 AI生成画像デモ</p>
-          <div class="grid grid-cols-4 gap-2 max-w-xs mx-auto mb-4">
-            ${Array(12).fill(0).map(() => '<div class="bg-purple-300 rounded h-8"></div>').join('')}
-          </div>
-          <p class="text-sm text-gray-700">3×4 = 12個のマス</p>
-          <div class="bg-white p-3 rounded border mt-4">
-            <p class="text-xs text-gray-500">
-              <i class="fas fa-check-circle text-green-500 mr-1"></i>
-              Flux Pro で生成（約15秒）
-            </p>
-          </div>
+          <p class="text-purple-700 font-semibold mb-4">🎨 画像生成デモ</p>
+          <button onclick="generateImageDemo()" 
+            class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-semibold">
+            <i class="fas fa-magic mr-2"></i>画像を生成する
+          </button>
+          <p class="text-xs text-gray-500 mt-4">
+            ※ 実際のAI生成には時間がかかるため、デモでは即座に結果を表示します
+          </p>
         </div>
       </div>
+      
       <button onclick="this.closest('.fixed').remove()" 
-        class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition">
+        class="w-full px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition">
         閉じる
       </button>
     </div>
@@ -30096,12 +30166,87 @@ function demoCase1Image() {
   document.body.appendChild(modal)
 }
 
-// ケース2: 苦手な児童Bさん - AI生成音楽デモ
-function demoCase2Music() {
+// 画像生成デモ実行（実際のAPI統合版）
+async function generateImageDemo() {
+  const resultDiv = document.getElementById('imageResult')
+  
+  // ローディング表示
+  resultDiv.innerHTML = `
+    <div class="text-center py-8">
+      <div class="animate-spin mb-4 mx-auto">
+        <i class="fas fa-cog text-6xl text-purple-600"></i>
+      </div>
+      <p class="text-purple-700 font-semibold mb-2">AI画像生成中...</p>
+      <p class="text-sm text-gray-600">SVG形式で図解を生成しています</p>
+      <div class="mt-4 bg-white rounded-lg p-3">
+        <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div class="h-full bg-purple-600 rounded-full animate-pulse" style="width: 75%"></div>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">生成中... 約1秒</p>
+      </div>
+    </div>
+  `
+  
+  try {
+    // API呼び出し（実際の画像生成）
+    const response = await fetch('/api/media/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: '小学2年生向け: 3×4のかけ算を視覚的に説明する図解',
+        style: 'educational'
+      })
+    })
+    
+    if (!response.ok) throw new Error('画像生成に失敗しました')
+    
+    const data = await response.json()
+    
+    // 生成結果表示（SVG画像表示）
+    resultDiv.innerHTML = `
+      <div class="py-4">
+        <div class="mb-4">
+          <div class="bg-white rounded-lg p-2 border-2 border-purple-300">
+            <img src="${data.imageUrl}" alt="3×4の図解" class="w-full rounded" />
+          </div>
+        </div>
+        
+        <div class="space-y-2">
+          <div class="bg-white p-3 rounded border flex items-start">
+            <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-gray-800">生成完了！</p>
+              <p class="text-xs text-gray-600">SVG形式で生成（実装済み）</p>
+            </div>
+          </div>
+          
+          <div class="bg-purple-100 p-3 rounded">
+            <p class="text-sm font-semibold text-purple-800 mb-2">
+              <i class="fas fa-info-circle mr-1"></i>生成された画像の特徴
+            </p>
+            <ul class="text-xs text-gray-700 space-y-1">
+              <li>• 視覚的に分かりやすい配置</li>
+              <li>• 色分けで理解をサポート</li>
+              <li>• SVG形式で拡大しても鮮明</li>
+              <li>• 小学2年生に適した表現</li>
+            </ul>
+          </div>
+        
+        <button onclick="generateImageDemo()" 
+          class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition text-sm">
+          <i class="fas fa-redo mr-2"></i>別の画像を生成する
+        </button>
+      </div>
+    </div>
+  `
+}
+
+// ケース2: 苦手な児童Bさん - AI生成音楽デモ（実際のAPI統合版）
+async function demoCase2Music() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
   modal.innerHTML = `
-    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-blue-700">
           <i class="fas fa-seedling mr-2"></i>ケース2: AI生成音楽（ElevenLabs）
@@ -30118,30 +30263,16 @@ function demoCase2Music() {
           苦手な児童Bさん向けに、楽しく覚えられる歌を生成。
         </p>
       </div>
-      <div class="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-4">
+      <div id="musicResult" class="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-4">
         <div class="text-center py-8">
-          <div class="animate-pulse mb-4">
+          <div class="mb-4">
             <i class="fas fa-music text-6xl text-blue-600"></i>
           </div>
-          <p class="text-blue-700 font-semibold mb-4">🎵 九九の歌（3の段）</p>
-          <div class="bg-white p-4 rounded border text-left max-w-md mx-auto">
-            <p class="text-sm leading-relaxed">
-              ♪ さん いち が さん<br>
-              ♪ さん に が ろく<br>
-              ♪ さん さん が きゅう<br>
-              ♪ さん し が じゅうに
-            </p>
-          </div>
-          <div class="bg-white p-3 rounded border mt-4">
-            <p class="text-xs text-gray-500 mb-2">
-              <i class="fas fa-check-circle text-green-500 mr-1"></i>
-              ElevenLabs Music で生成（約45秒）
-            </p>
-            <p class="text-xs text-gray-500">
-              <i class="fas fa-heart text-red-500 mr-1"></i>
-              明るく楽しいメロディで暗記を支援
-            </p>
-          </div>
+          <p class="text-blue-700 font-semibold mb-4">🎵 音楽生成デモ</p>
+          <button onclick="generateMusicDemo()" 
+            class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold">
+            <i class="fas fa-play-circle mr-2"></i>歌詞を生成する
+          </button>
         </div>
       </div>
       <button onclick="this.closest('.fixed').remove()" 
@@ -30153,12 +30284,72 @@ function demoCase2Music() {
   document.body.appendChild(modal)
 }
 
-// ケース2: AI音声読み上げデモ
-function demoCase2Voice() {
+// 音楽生成デモ実行
+async function generateMusicDemo() {
+  const resultDiv = document.getElementById('musicResult')
+  
+  resultDiv.innerHTML = `
+    <div class="text-center py-8">
+      <div class="animate-spin mb-4 mx-auto">
+        <i class="fas fa-spinner text-6xl text-blue-600"></i>
+      </div>
+      <p class="text-blue-700 font-semibold">歌詞生成中...</p>
+    </div>
+  `
+  
+  try {
+    const response = await fetch('/api/media/generate-music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lyrics: '九九の歌（3の段）',
+        style: 'educational'
+      })
+    })
+    
+    if (!response.ok) throw new Error('音楽生成に失敗しました')
+    
+    const data = await response.json()
+    
+    resultDiv.innerHTML = `
+      <div class="py-4">
+        <div class="text-center mb-4">
+          <div class="animate-pulse">
+            <i class="fas fa-music text-6xl text-blue-600"></i>
+          </div>
+          <p class="text-blue-700 font-semibold mt-4 mb-4">🎵 九九の歌（3の段）</p>
+        </div>
+        <div class="bg-white p-4 rounded border max-w-md mx-auto mb-4">
+          <pre class="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">${data.lyrics}</pre>
+        </div>
+        <div class="bg-white p-3 rounded border max-w-md mx-auto">
+          <p class="text-xs text-gray-500 mb-2">
+            <i class="fas fa-check-circle text-green-500 mr-1"></i>
+            ${data.note}
+          </p>
+          <p class="text-xs text-gray-500">
+            <i class="fas fa-heart text-red-500 mr-1"></i>
+            明るく楽しいメロディで暗記を支援
+          </p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+        <p>エラー: ${error.message}</p>
+      </div>
+    `
+  }
+}
+
+// ケース2: AI音声読み上げデモ（実際のAPI統合版）
+async function demoCase2Voice() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
   modal.innerHTML = `
-    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-blue-700">
           <i class="fas fa-seedling mr-2"></i>ケース2: AI音声読み上げ（Minimax TTS）
@@ -30175,32 +30366,16 @@ function demoCase2Voice() {
           やさしい言葉で、ゆっくり丁寧に説明。
         </p>
       </div>
-      <div class="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-4">
-        <div class="py-8">
-          <div class="text-center mb-4">
+      <div id="voiceResult" class="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-4">
+        <div class="text-center py-8">
+          <div class="mb-4">
             <i class="fas fa-volume-up text-6xl text-blue-600"></i>
           </div>
-          <div class="bg-white p-4 rounded border max-w-md mx-auto">
-            <p class="text-sm leading-relaxed text-gray-700">
-              「3×4は、3を4かいたすという いみだよ。<br><br>
-              
-              3+3+3+3 と かけば、こたえは 12に なるよ。<br><br>
-              
-              4このはこに リンゴが3こずつ はいっているとき、ぜんぶで なんこかな？<br><br>
-              
-              そう、12こだね！」
-            </p>
-          </div>
-          <div class="bg-white p-3 rounded border mt-4 max-w-md mx-auto">
-            <p class="text-xs text-gray-500 mb-2">
-              <i class="fas fa-check-circle text-green-500 mr-1"></i>
-              Minimax TTS（小学2年生モード）で生成
-            </p>
-            <p class="text-xs text-gray-500">
-              <i class="fas fa-heart text-red-500 mr-1"></i>
-              ゆっくり、やさしい言葉で説明
-            </p>
-          </div>
+          <p class="text-blue-700 font-semibold mb-4">🎤 音声生成デモ</p>
+          <button onclick="generateVoiceDemo()" 
+            class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold">
+            <i class="fas fa-play-circle mr-2"></i>音声スクリプトを生成する
+          </button>
         </div>
       </div>
       <button onclick="this.closest('.fixed').remove()" 
@@ -30210,6 +30385,63 @@ function demoCase2Voice() {
     </div>
   `
   document.body.appendChild(modal)
+}
+
+// 音声生成デモ実行
+async function generateVoiceDemo() {
+  const resultDiv = document.getElementById('voiceResult')
+  
+  resultDiv.innerHTML = `
+    <div class="text-center py-8">
+      <div class="animate-spin mb-4 mx-auto">
+        <i class="fas fa-spinner text-6xl text-blue-600"></i>
+      </div>
+      <p class="text-blue-700 font-semibold">音声スクリプト生成中...</p>
+    </div>
+  `
+  
+  try {
+    const response = await fetch('/api/media/generate-audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: '3×4のけいさんについて、小学2年生にやさしく説明してください',
+        voice: 'female-teacher'
+      })
+    })
+    
+    if (!response.ok) throw new Error('音声生成に失敗しました')
+    
+    const data = await response.json()
+    
+    resultDiv.innerHTML = `
+      <div class="py-4">
+        <div class="text-center mb-4">
+          <i class="fas fa-volume-up text-6xl text-blue-600"></i>
+        </div>
+        <div class="bg-white p-4 rounded border max-w-md mx-auto mb-4">
+          <pre class="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">${data.scriptText}</pre>
+        </div>
+        <div class="bg-white p-3 rounded border max-w-md mx-auto">
+          <p class="text-xs text-gray-500 mb-2">
+            <i class="fas fa-check-circle text-green-500 mr-1"></i>
+            Minimax TTS（小学2年生モード）で生成
+          </p>
+          <p class="text-xs text-gray-500">
+            <i class="fas fa-heart text-red-500 mr-1"></i>
+            ${data.note}
+          </p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+        <p>エラー: ${error.message}</p>
+      </div>
+    `
+  }
 }
 
 // ケース2: AI先生対話デモ
