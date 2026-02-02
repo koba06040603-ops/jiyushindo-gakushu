@@ -1191,6 +1191,365 @@ async function renderTopPage() {
       </div>
       ` : ''}
 
+      <!-- 村長・教育長向けデモセクション -->
+      <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg shadow-2xl p-8 mb-8">
+        <div class="text-center mb-8">
+          <div class="inline-block bg-white bg-opacity-20 px-6 py-3 rounded-full text-white text-sm font-bold mb-4">
+            🎯 教育関係者向けシステム紹介
+          </div>
+          <h2 class="text-3xl font-bold text-white mb-3">
+            <i class="fas fa-graduation-cap mr-3"></i>
+            自由進度学習システムの実例
+          </h2>
+          <p class="text-blue-100 text-lg max-w-3xl mx-auto">
+            AIを活用した個別最適化学習の実現 - 村長・教育長の皆様へのご紹介
+          </p>
+        </div>
+
+        <!-- 1. AI先生機能 -->
+        <div class="bg-white rounded-lg p-6 mb-6 shadow-lg">
+          <h3 class="text-2xl font-bold text-blue-700 mb-4">
+            <i class="fas fa-robot mr-2"></i>
+            1. AI先生による24時間サポート
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 class="font-bold text-lg mb-2 text-gray-800">✨ 主な機能</h4>
+              <ul class="space-y-2 text-gray-700">
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+                  <span>児童の質問に300〜500文字で丁寧に回答</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+                  <span>具体例を2〜3個含めた分かりやすい説明</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+                  <span>学年に応じた言葉遣いと表現の自動調整</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+                  <span>対話履歴を保持し、継続的な学習支援</span>
+                </li>
+              </ul>
+            </div>
+            <div class="bg-blue-50 rounded-lg p-4">
+              <h4 class="font-bold text-lg mb-2 text-blue-700">💬 対話例</h4>
+              <div class="space-y-3 text-sm">
+                <div class="bg-white rounded-lg p-3 shadow-sm">
+                  <p class="text-gray-600 font-semibold mb-1">👦 児童：</p>
+                  <p class="text-gray-800">「3×4ってどうやって計算するの？」</p>
+                </div>
+                <div class="bg-blue-100 rounded-lg p-3">
+                  <p class="text-blue-600 font-semibold mb-1">🤖 AI先生：</p>
+                  <p class="text-gray-800 text-xs leading-relaxed">
+                    3×4は「3を4回たす」という意味だよ！<br>
+                    具体例を見てみよう：<br>
+                    ① 3+3+3+3 = 12<br>
+                    ② 4個の箱にリンゴが3個ずつ → 全部で12個<br>
+                    ③ 3列×4列の座席 → 全部で12席<br>
+                    分かったかな？もっと知りたいことはある？
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 3段階ヒントシステム -->
+        <div class="bg-white rounded-lg p-6 mb-6 shadow-lg">
+          <h3 class="text-2xl font-bold text-green-700 mb-4">
+            <i class="fas fa-lightbulb mr-2"></i>
+            2. 3段階ヒントで自律的な学び
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-green-50 rounded-lg p-4 border-2 border-green-200">
+              <div class="flex items-center mb-2">
+                <span class="bg-green-500 text-white font-bold px-3 py-1 rounded-full text-sm mr-2">ヒント1</span>
+                <span class="text-green-700 font-bold">考え方の方向性</span>
+              </div>
+              <p class="text-gray-700 text-sm">
+                「まず、問題に出てくる数字を見てみよう」
+              </p>
+            </div>
+            <div class="bg-yellow-50 rounded-lg p-4 border-2 border-yellow-200">
+              <div class="flex items-center mb-2">
+                <span class="bg-yellow-500 text-white font-bold px-3 py-1 rounded-full text-sm mr-2">ヒント2</span>
+                <span class="text-yellow-700 font-bold">具体的な手順</span>
+              </div>
+              <p class="text-gray-700 text-sm">
+                「図を書いてみると分かりやすいよ。3つのグループに分けてみよう」
+              </p>
+            </div>
+            <div class="bg-orange-50 rounded-lg p-4 border-2 border-orange-200">
+              <div class="flex items-center mb-2">
+                <span class="bg-orange-500 text-white font-bold px-3 py-1 rounded-full text-sm mr-2">ヒント3</span>
+                <span class="text-orange-700 font-bold">ほぼ答えに近い</span>
+              </div>
+              <p class="text-gray-700 text-sm">
+                「12÷3をすると、1つのグループの数が分かるよ」
+              </p>
+            </div>
+          </div>
+          <div class="mt-4 bg-green-100 border-l-4 border-green-500 p-4">
+            <p class="text-green-800 font-semibold">
+              <i class="fas fa-star mr-2"></i>
+              段階的なサポートで「自分で考える力」を育成
+            </p>
+          </div>
+        </div>
+
+        <!-- 3. 個別最適化学習の実例 -->
+        <div class="bg-white rounded-lg p-6 mb-6 shadow-lg">
+          <h3 class="text-2xl font-bold text-purple-700 mb-4">
+            <i class="fas fa-user-friends mr-2"></i>
+            3. 個別最適化学習の具体例
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- ケース1: 得意な児童 -->
+            <div class="bg-purple-50 rounded-lg p-4 border-2 border-purple-200">
+              <h4 class="font-bold text-purple-700 mb-3 flex items-center">
+                <i class="fas fa-rocket mr-2"></i>
+                ケース1: 得意な児童Aさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 算数が得意、どんどん進みたい</p>
+                <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">どんどんコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 1週間で18枚のカードを完了</li>
+                  <li>• ヒント使用率: 10%（自力で解決）</li>
+                  <li>• 発展問題にも挑戦中</li>
+                </ul>
+                <div class="bg-purple-100 p-2 rounded mt-2">
+                  <p class="text-purple-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    システムが自動で次の単元を提案
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース2: 苦手な児童 -->
+            <div class="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
+              <h4 class="font-bold text-blue-700 mb-3 flex items-center">
+                <i class="fas fa-seedling mr-2"></i>
+                ケース2: 苦手な児童Bさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 算数に苦手意識、じっくり学びたい</p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 2週間で18枚のカードをマイペースで学習</li>
+                  <li>• ヒント使用率: 80%（段階的に理解）</li>
+                  <li>• AI先生に質問5回→理解度向上</li>
+                </ul>
+                <div class="bg-blue-100 p-2 rounded mt-2">
+                  <p class="text-blue-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    苦手を克服し、自信を持って学習
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース3: 欠席が多い児童 -->
+            <div class="bg-yellow-50 rounded-lg p-4 border-2 border-yellow-200">
+              <h4 class="font-bold text-yellow-700 mb-3 flex items-center">
+                <i class="fas fa-home mr-2"></i>
+                ケース3: 欠席が多い児童Cさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 体調不良で欠席が多い</p>
+                <p><strong>学習コース:</strong> <span class="bg-blue-600 text-white px-2 py-1 rounded">しっかりコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 自宅から学習カードにアクセス</li>
+                  <li>• AI先生が24時間サポート</li>
+                  <li>• 遅れを取り戻し、クラスに追いつく</li>
+                </ul>
+                <div class="bg-yellow-100 p-2 rounded mt-2">
+                  <p class="text-yellow-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    場所を選ばず学習継続が可能
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース4: 外国籍の児童 -->
+            <div class="bg-pink-50 rounded-lg p-4 border-2 border-pink-200">
+              <h4 class="font-bold text-pink-700 mb-3 flex items-center">
+                <i class="fas fa-globe mr-2"></i>
+                ケース4: 外国籍の児童Dさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 日本語学習中、視覚的な理解が得意</p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 図やイラストで内容を理解</li>
+                  <li>• やさしい言葉での説明を活用</li>
+                  <li>• 繰り返し学習で着実に進歩</li>
+                </ul>
+                <div class="bg-pink-100 p-2 rounded mt-2">
+                  <p class="text-pink-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    多様な背景の児童にも対応
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 教師用進捗ボード -->
+        <div class="bg-white rounded-lg p-6 mb-6 shadow-lg">
+          <h3 class="text-2xl font-bold text-indigo-700 mb-4">
+            <i class="fas fa-chart-line mr-2"></i>
+            4. 教師用進捗ボード
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 class="font-bold text-lg mb-3 text-gray-800">📊 リアルタイム把握</h4>
+              <ul class="space-y-2 text-gray-700">
+                <li class="flex items-start">
+                  <i class="fas fa-chart-bar text-indigo-500 mr-2 mt-1"></i>
+                  <span>クラス全体の学習進捗を一目で確認</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-user-clock text-indigo-500 mr-2 mt-1"></i>
+                  <span>個別の学習時間と理解度を把握</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-exclamation-triangle text-orange-500 mr-2 mt-1"></i>
+                  <span>つまずいている児童を即座に発見</span>
+                </li>
+                <li class="flex items-start">
+                  <i class="fas fa-hands-helping text-indigo-500 mr-2 mt-1"></i>
+                  <span>AIサポート回数・ヒント使用状況</span>
+                </li>
+              </ul>
+            </div>
+            <div class="bg-indigo-50 rounded-lg p-4">
+              <h4 class="font-bold text-lg mb-2 text-indigo-700">🎯 実際の画面イメージ</h4>
+              <div class="bg-white rounded-lg p-3 shadow-sm text-xs">
+                <table class="w-full">
+                  <thead class="bg-indigo-100">
+                    <tr>
+                      <th class="p-2 text-left">児童名</th>
+                      <th class="p-2 text-center">進捗</th>
+                      <th class="p-2 text-center">状況</th>
+                    </tr>
+                  </thead>
+                  <tbody class="text-gray-700">
+                    <tr class="border-b">
+                      <td class="p-2">Aさん</td>
+                      <td class="p-2 text-center">18/18</td>
+                      <td class="p-2 text-center"><span class="text-green-600 font-bold">✓ 完了</span></td>
+                    </tr>
+                    <tr class="border-b">
+                      <td class="p-2">Bさん</td>
+                      <td class="p-2 text-center">9/18</td>
+                      <td class="p-2 text-center"><span class="text-blue-600 font-bold">→ 学習中</span></td>
+                    </tr>
+                    <tr class="border-b">
+                      <td class="p-2">Cさん</td>
+                      <td class="p-2 text-center">3/18</td>
+                      <td class="p-2 text-center"><span class="text-orange-600 font-bold">⚠ 要支援</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="text-indigo-700 font-semibold mt-3 text-sm">
+                <i class="fas fa-info-circle mr-1"></i>
+                支援が必要な児童を早期発見
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. 学習データ分析 -->
+        <div class="bg-white rounded-lg p-6 shadow-lg">
+          <h3 class="text-2xl font-bold text-teal-700 mb-4">
+            <i class="fas fa-analytics mr-2"></i>
+            5. 学習データ分析機能
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="bg-teal-50 rounded-lg p-4 text-center">
+              <i class="fas fa-chart-pie text-teal-600 text-3xl mb-2"></i>
+              <h4 class="font-bold text-teal-700 mb-2">学習傾向分析</h4>
+              <p class="text-gray-700 text-sm">単元ごとの理解度、苦手分野の可視化</p>
+            </div>
+            <div class="bg-blue-50 rounded-lg p-4 text-center">
+              <i class="fas fa-clock text-blue-600 text-3xl mb-2"></i>
+              <h4 class="font-bold text-blue-700 mb-2">学習時間分析</h4>
+              <p class="text-gray-700 text-sm">効果的な学習時間帯、集中力の推移</p>
+            </div>
+            <div class="bg-purple-50 rounded-lg p-4 text-center">
+              <i class="fas fa-graduation-cap text-purple-600 text-3xl mb-2"></i>
+              <h4 class="font-bold text-purple-700 mb-2">成長レポート</h4>
+              <p class="text-gray-700 text-sm">週次・月次での成長記録、保護者共有</p>
+            </div>
+          </div>
+          <div class="bg-teal-100 border-l-4 border-teal-500 p-4">
+            <h4 class="font-bold text-teal-800 mb-2">
+              <i class="fas fa-lightbulb mr-2"></i>
+              データに基づく教育改善
+            </h4>
+            <ul class="text-teal-800 text-sm space-y-1">
+              <li>• エビデンスに基づく指導計画の立案</li>
+              <li>• 効果的な支援タイミングの把握</li>
+              <li>• 学習カリキュラムの継続的改善</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- まとめ -->
+        <div class="bg-white bg-opacity-90 rounded-lg p-6 mt-6 border-4 border-blue-300">
+          <h3 class="text-2xl font-bold text-center text-blue-800 mb-4">
+            <i class="fas fa-award mr-2"></i>
+            導入効果のまとめ
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-green-50 rounded-lg p-4">
+              <h4 class="font-bold text-green-700 mb-2">
+                <i class="fas fa-child mr-2"></i>
+                児童にとって
+              </h4>
+              <ul class="text-gray-700 text-sm space-y-1">
+                <li>✓ 自分のペースで安心して学習</li>
+                <li>✓ つまずきを即座に解消</li>
+                <li>✓ 自律的な学習習慣の形成</li>
+                <li>✓ 学習意欲の向上</li>
+              </ul>
+            </div>
+            <div class="bg-blue-50 rounded-lg p-4">
+              <h4 class="font-bold text-blue-700 mb-2">
+                <i class="fas fa-chalkboard-teacher mr-2"></i>
+                教師にとって
+              </h4>
+              <ul class="text-gray-700 text-sm space-y-1">
+                <li>✓ 個別支援の効率化</li>
+                <li>✓ 客観的なデータに基づく指導</li>
+                <li>✓ 教材作成の負担軽減</li>
+                <li>✓ より質の高い対話的指導が可能</li>
+              </ul>
+            </div>
+          </div>
+          <div class="text-center mt-6">
+            <p class="text-gray-800 font-bold text-lg mb-2">
+              🌟 一人ひとりの可能性を最大限に引き出す教育の実現 🌟
+            </p>
+            <p class="text-gray-600 text-sm">
+              AIと教師の協働による、未来の教育のかたち
+            </p>
+          </div>
+        </div>
+      </div>
+
       <!-- お問い合わせ・感想フォーム -->
       <div class="bg-gradient-to-r from-green-500 to-teal-500 rounded-lg shadow-xl p-8">
         <div class="text-center mb-6">
