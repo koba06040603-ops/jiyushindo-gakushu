@@ -1580,7 +1580,8 @@ app.get('/api/curriculum/:id', async (c) => {
             // ヒント取得
             const hints = await env.DB.prepare(`
               SELECT 
-                id,
+                hint_id,
+                hint_id AS id,
                 learning_card_id,
                 hint_number,
                 hint_number AS hint_level,
@@ -1737,7 +1738,8 @@ app.get('/api/cards/:cardId', async (c) => {
     
     const hints = await env.DB.prepare(`
       SELECT 
-        id,
+        hint_id,
+        hint_id AS id,
         learning_card_id,
         hint_number,
         hint_number AS hint_level,
@@ -4491,7 +4493,7 @@ app.delete('/api/hints/:hintId', async (c) => {
   
   try {
     await env.DB.prepare(`
-      DELETE FROM hint_cards WHERE id = ?
+      DELETE FROM hint_cards WHERE hint_id = ?
     `).bind(hintId).run()
     
     return c.json({ success: true })
