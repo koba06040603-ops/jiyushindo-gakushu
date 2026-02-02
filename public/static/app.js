@@ -2295,8 +2295,9 @@ async function loadGuidePage(curriculumId) {
       
     } catch (fallbackError) {
       console.error('簡易版の表示も失敗しました:', fallbackError)
-      alert('データの読み込みに失敗しました。トップページに戻ります。')
-      renderTopPage()
+      console.warn('⚠️ 一部のデータの読み込みに失敗しましたが、基本情報は表示されています')
+      loadingManager.hide()
+      // エラーは出すが、トップページには戻らない
     }
   }
 }
@@ -12091,9 +12092,9 @@ async function saveGeneratedUnit(unitData) {
         })
         console.log('=' .repeat(80))
         
-        // 簡易版の学習カリキュラム表示（エラーハンドリング改善版）
+        // 学習のてびきページへ遷移
         try {
-          await showSimpleCurriculumView(curriculumId)
+          await loadGuidePage(curriculumId)
         } catch (transitionError) {
           console.error('❌ 画面遷移エラー:', transitionError)
           console.error('エラー詳細:', {
