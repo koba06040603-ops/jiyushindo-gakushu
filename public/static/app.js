@@ -30035,14 +30035,18 @@ async function generateVideoDemo() {
     if (!response.ok) throw new Error('動画生成に失敗しました')
     
     const data = await response.json()
+    console.log('✅ API Response:', data)
+    console.log('📹 Animation HTML length:', data.animationHtml?.length)
     
     // 生成結果表示（HTMLアニメーション埋め込み）
     resultDiv.innerHTML = `
       <div class="py-4">
         <div class="mb-4">
           <div class="bg-white rounded-lg overflow-hidden aspect-video border-2 border-purple-300">
-            <iframe srcdoc='${data.animationHtml.replace(/'/g, "\\'")}' 
-              class="w-full h-full" frameborder="0"></iframe>
+            <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+              class="w-full h-full" frameborder="0" 
+              style="background: white;"
+              onload="console.log('✅ iframe loaded')"></iframe>
           </div>
         </div>
         
