@@ -3159,7 +3159,7 @@ window.getUnitReflectionAI = getUnitReflectionAI
 window.saveLearningPlan = saveLearningPlan
 window.showIntegratedPrintPreview = showIntegratedPrintPreview
 window.selectCourse = selectCourse
-window.loadCardPage = loadCardPage
+// window.loadCardPage will be registered after its definition
 
 // ============================================
 // 学習カードページ
@@ -3642,6 +3642,9 @@ async function loadCardPage(cardId) {
     alert('データの読み込みに失敗しました')
   }
 }
+
+// loadCardPage をグローバルスコープに登録
+window.loadCardPage = loadCardPage
 
 // ヘルプメニュー表示
 function showHelpMenu() {
