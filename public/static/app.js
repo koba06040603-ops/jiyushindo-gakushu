@@ -1045,6 +1045,16 @@ async function renderTopPage() {
             <p class="text-white font-bold">54個のヒント</p>
             <p class="text-white text-sm opacity-75">3段階で自律学習</p>
           </div>
+          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
+            <i class="fas fa-clipboard-check text-3xl text-white mb-2"></i>
+            <p class="text-white font-bold">チェックテスト</p>
+            <p class="text-white text-sm opacity-75">理解度を確認</p>
+          </div>
+          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
+            <i class="fas fa-tasks text-3xl text-white mb-2"></i>
+            <p class="text-white font-bold">選択問題</p>
+            <p class="text-white text-sm opacity-75">発展的学習</p>
+          </div>
         </div>
       </div>
 
@@ -1318,9 +1328,9 @@ async function renderTopPage() {
                 <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">どんどんコース</span></p>
                 <p><strong>学習状況:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 1週間で18枚のカードを完了</li>
+                  <li>• 1週間でコース完了（6枚+チェックテスト+選択問題）</li>
                   <li>• ヒント使用率: 10%（自力で解決）</li>
-                  <li>• 発展問題にも挑戦中</li>
+                  <li>• チェックテスト満点、選択問題もクリア</li>
                 </ul>
                 <div class="bg-purple-100 p-2 rounded mt-2">
                   <p class="text-purple-800 font-semibold">
@@ -1342,7 +1352,7 @@ async function renderTopPage() {
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
                 <p><strong>学習状況:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 2週間で18枚のカードをマイペースで学習</li>
+                  <li>• 2週間でコース完了（6枚+チェックテスト+選択問題）</li>
                   <li>• ヒント使用率: 80%（段階的に理解）</li>
                   <li>• AI先生に質問5回→理解度向上</li>
                 </ul>
