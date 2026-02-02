@@ -1216,6 +1216,82 @@ async function renderTopPage() {
           </p>
         </div>
 
+        <!-- 0. 6つの教育理論に基づく設計 -->
+        <div class="bg-white rounded-lg p-6 mb-6 shadow-lg border-4 border-yellow-400">
+          <h3 class="text-2xl font-bold text-yellow-700 mb-4 text-center">
+            <i class="fas fa-book-open mr-2"></i>
+            🌟 6つの教育理論に基づく科学的アプローチ
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <!-- 理論1: 多重知能理論 -->
+            <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border-2 border-purple-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-purple-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">1</div>
+                <h4 class="font-bold text-purple-800">多重知能理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">ガードナー博士提唱</p>
+              <p class="text-xs text-gray-600">言語的・論理数学的・視覚空間的・身体運動的・音楽的・対人的・内省的・博物学的知能に対応</p>
+            </div>
+
+            <!-- 理論2: 認知特性理論 -->
+            <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border-2 border-blue-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">2</div>
+                <h4 class="font-bold text-blue-800">認知特性理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">VAKT理論</p>
+              <p class="text-xs text-gray-600">視覚優位・聴覚優位・体験優位（触覚・運動）に応じた学習方法の提供</p>
+            </div>
+
+            <!-- 理論3: 足場かけ理論 -->
+            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">3</div>
+                <h4 class="font-bold text-green-800">足場かけ理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">ヴィゴツキーの最近接発達領域</p>
+              <p class="text-xs text-gray-600">3段階ヒントによる段階的支援で、自力解決を促進</p>
+            </div>
+
+            <!-- 理論4: 自己決定理論 -->
+            <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border-2 border-orange-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-orange-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">4</div>
+                <h4 class="font-bold text-orange-800">自己決定理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">デシ&ライアン</p>
+              <p class="text-xs text-gray-600">自律性・有能感・関係性を満たし、内発的動機づけを促進</p>
+            </div>
+
+            <!-- 理論5: 個別最適化学習理論 -->
+            <div class="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-4 border-2 border-pink-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-pink-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">5</div>
+                <h4 class="font-bold text-pink-800">個別最適化学習</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">適応学習システム</p>
+              <p class="text-xs text-gray-600">一人ひとりの進度・理解度に応じた学習内容とペースの調整</p>
+            </div>
+
+            <!-- 理論6: ユニバーサルデザイン -->
+            <div class="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg p-4 border-2 border-teal-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-teal-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">6</div>
+                <h4 class="font-bold text-teal-800">UDL理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">学びのユニバーサルデザイン</p>
+              <p class="text-xs text-gray-600">多様な表現方法・多様な行動方法・多様な参加方法を提供</p>
+            </div>
+          </div>
+          <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 text-center">
+            <p class="text-yellow-900 font-bold text-lg">
+              <i class="fas fa-star mr-2"></i>
+              これら6つの理論を統合し、科学的根拠に基づいた個別最適化学習を実現
+              <i class="fas fa-star ml-2"></i>
+            </p>
+          </div>
+        </div>
+
         <!-- 1. AI先生機能 -->
         <div class="bg-white rounded-lg p-6 mb-6 shadow-lg">
           <h3 class="text-2xl font-bold text-blue-700 mb-4">
@@ -1457,6 +1533,233 @@ async function renderTopPage() {
                     多様な背景の児童にも対応
                   </p>
                 </div>
+              </div>
+            </div>
+
+            <!-- ケース7: 発達障害のある児童 -->
+            <div class="bg-amber-50 rounded-lg p-4 border-2 border-amber-200">
+              <h4 class="font-bold text-amber-700 mb-3 flex items-center">
+                <i class="fas fa-hand-holding-heart mr-2"></i>
+                ケース7: 発達障害のある児童Fさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> ADHD、集中が続きにくい</p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 短時間集中型の学習（10分×3回）</li>
+                  <li>• 動画やゲーム的要素で興味を維持</li>
+                  <li>• 達成感を得やすい小ステップ設計</li>
+                </ul>
+                <div class="bg-amber-100 p-2 rounded mt-2">
+                  <p class="text-amber-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    特性に配慮した学習環境を提供
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース8: ギフテッド児童 -->
+            <div class="bg-violet-50 rounded-lg p-4 border-2 border-violet-200">
+              <h4 class="font-bold text-violet-700 mb-3 flex items-center">
+                <i class="fas fa-star mr-2"></i>
+                ケース8: ギフテッド児童Gさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 高い学習能力、探究心旺盛</p>
+                <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">どんどんコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 3日でコース完了、次々に新単元へ</li>
+                  <li>• 選択問題で発展的内容に挑戦</li>
+                  <li>• 上位学年の内容も自主学習</li>
+                </ul>
+                <div class="bg-violet-100 p-2 rounded mt-2">
+                  <p class="text-violet-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    能力に応じた挑戦的課題を提供
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース9: 不登校の児童 -->
+            <div class="bg-cyan-50 rounded-lg p-4 border-2 border-cyan-200">
+              <h4 class="font-bold text-cyan-700 mb-3 flex items-center">
+                <i class="fas fa-heart mr-2"></i>
+                ケース9: 不登校の児童Hさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 学校に行けない、自宅で学習</p>
+                <p><strong>学習コース:</strong> <span class="bg-blue-600 text-white px-2 py-1 rounded">しっかりコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• オンラインで完全に学習継続</li>
+                  <li>• AI先生が心理的サポートも提供</li>
+                  <li>• 自分のペースで少しずつ前進</li>
+                </ul>
+                <div class="bg-cyan-100 p-2 rounded mt-2">
+                  <p class="text-cyan-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    学びの機会を保障し、孤立を防ぐ
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース10: 音楽知能が高い児童 -->
+            <div class="bg-rose-50 rounded-lg p-4 border-2 border-rose-200">
+              <h4 class="font-bold text-rose-700 mb-3 flex items-center">
+                <i class="fas fa-music mr-2"></i>
+                ケース10: 音楽知能が高い児童Iさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 音楽を通じた学習が得意</p>
+                <p><strong>学習コース:</strong> <span class="bg-blue-600 text-white px-2 py-1 rounded">しっかりコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 聴覚優位版で音声解説を活用</li>
+                  <li>• AI生成音楽で九九や公式を暗記</li>
+                  <li>• リズムに乗せて学習内容を記憶</li>
+                </ul>
+                <div class="bg-rose-100 p-2 rounded mt-2">
+                  <p class="text-rose-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    多重知能理論に基づく学習支援
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース11: 身体運動知能が高い児童 -->
+            <div class="bg-lime-50 rounded-lg p-4 border-2 border-lime-200">
+              <h4 class="font-bold text-lime-700 mb-3 flex items-center">
+                <i class="fas fa-running mr-2"></i>
+                ケース11: 身体運動知能が高い児童Jさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 体を動かして学ぶのが得意</p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 体験優位版で具体物を使った学習</li>
+                  <li>• 動画で実演を見て理解</li>
+                  <li>• 実際に手を動かして問題を解く</li>
+                </ul>
+                <div class="bg-lime-100 p-2 rounded mt-2">
+                  <p class="text-lime-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    身体的学習スタイルに対応
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース12: 複合的支援が必要な児童 -->
+            <div class="bg-fuchsia-50 rounded-lg p-4 border-2 border-fuchsia-200">
+              <h4 class="font-bold text-fuchsia-700 mb-3 flex items-center">
+                <i class="fas fa-hands-helping mr-2"></i>
+                ケース12: 複合的支援が必要な児童Kさん
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 学習障害＋家庭環境の課題</p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習状況:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 視覚・聴覚・体験優位版を組み合わせ</li>
+                  <li>• AI先生＋教師の丁寧な個別支援</li>
+                  <li>• 小さな成功体験を積み重ね</li>
+                </ul>
+                <div class="bg-fuchsia-100 p-2 rounded mt-2">
+                  <p class="text-fuchsia-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    複雑なニーズにも柔軟に対応
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 実装機能の一覧 -->
+          <div class="mt-6 bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg p-6 border-2 border-purple-300">
+            <h4 class="text-xl font-bold text-purple-800 mb-4 text-center">
+              <i class="fas fa-cogs mr-2"></i>
+              システムに実装されている主な機能
+            </h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div class="bg-white rounded-lg p-3 shadow-sm">
+                <h5 class="font-bold text-purple-700 mb-2 text-sm">📝 学習カード機能</h5>
+                <ul class="text-xs text-gray-600 space-y-1">
+                  <li>• 3コース選択</li>
+                  <li>• 3段階ヒント</li>
+                  <li>• チェックテスト</li>
+                  <li>• 選択問題</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-3 shadow-sm">
+                <h5 class="font-bold text-blue-700 mb-2 text-sm">🤖 AI機能</h5>
+                <ul class="text-xs text-gray-600 space-y-1">
+                  <li>• AI先生（対話型）</li>
+                  <li>• AI学習カード生成</li>
+                  <li>• AI画像生成</li>
+                  <li>• AI動画生成</li>
+                  <li>• AI音楽生成</li>
+                  <li>• AI音声生成</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-3 shadow-sm">
+                <h5 class="font-bold text-green-700 mb-2 text-sm">🎨 認知特性対応</h5>
+                <ul class="text-xs text-gray-600 space-y-1">
+                  <li>• 視覚優位版</li>
+                  <li>• 聴覚優位版</li>
+                  <li>• 体験優位版</li>
+                  <li>• 自動判定機能</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-3 shadow-sm">
+                <h5 class="font-bold text-orange-700 mb-2 text-sm">📊 教師用機能</h5>
+                <ul class="text-xs text-gray-600 space-y-1">
+                  <li>• 進捗ボード</li>
+                  <li>• 学習データ分析</li>
+                  <li>• 週次レポート</li>
+                  <li>• 印刷機能</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-3 shadow-sm">
+                <h5 class="font-bold text-teal-700 mb-2 text-sm">🌐 多言語対応</h5>
+                <ul class="text-xs text-gray-600 space-y-1">
+                  <li>• やさしい日本語</li>
+                  <li>• ルビ振り機能</li>
+                  <li>• 多言語翻訳準備中</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-3 shadow-sm">
+                <h5 class="font-bold text-pink-700 mb-2 text-sm">🎯 個別最適化</h5>
+                <ul class="text-xs text-gray-600 space-y-1">
+                  <li>• 自動進度調整</li>
+                  <li>• 理解度分析</li>
+                  <li>• つまずき検出</li>
+                  <li>• 推奨コース提示</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-3 shadow-sm">
+                <h5 class="font-bold text-indigo-700 mb-2 text-sm">♿ アクセシビリティ</h5>
+                <ul class="text-xs text-gray-600 space-y-1">
+                  <li>• 音声読み上げ</li>
+                  <li>• フォントサイズ調整</li>
+                  <li>• テーマカラー選択</li>
+                  <li>• UDフォント対応準備</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-lg p-3 shadow-sm">
+                <h5 class="font-bold text-red-700 mb-2 text-sm">🔒 セキュリティ</h5>
+                <ul class="text-xs text-gray-600 space-y-1">
+                  <li>• ユーザー認証</li>
+                  <li>• データ暗号化</li>
+                  <li>• プライバシー保護</li>
+                  <li>• ログ管理</li>
+                </ul>
               </div>
             </div>
           </div>
