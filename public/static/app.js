@@ -1223,64 +1223,64 @@ async function renderTopPage() {
             🌟 6つの教育理論に基づく科学的アプローチ
           </h3>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-            <!-- 理論1: 多重知能理論 -->
+            <!-- 理論1: VARK理論 -->
             <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border-2 border-purple-300">
               <div class="flex items-center mb-2">
                 <div class="bg-purple-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">1</div>
-                <h4 class="font-bold text-purple-800">多重知能理論</h4>
+                <h4 class="font-bold text-purple-800">VARK理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">ガードナー博士提唱</p>
-              <p class="text-xs text-gray-600">言語的・論理数学的・視覚空間的・身体運動的・音楽的・対人的・内省的・博物学的知能に対応</p>
+              <p class="text-sm text-gray-700 mb-2">Fleming提唱</p>
+              <p class="text-xs text-gray-600">視覚・聴覚・読み書き・体験の4つの学習スタイルに応じた最適な提示方法</p>
             </div>
 
-            <!-- 理論2: 認知特性理論 -->
+            <!-- 理論2: 多重知能理論 -->
             <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border-2 border-blue-300">
               <div class="flex items-center mb-2">
                 <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">2</div>
-                <h4 class="font-bold text-blue-800">認知特性理論</h4>
+                <h4 class="font-bold text-blue-800">多重知能理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">VAKT理論</p>
-              <p class="text-xs text-gray-600">視覚優位・聴覚優位・体験優位（触覚・運動）に応じた学習方法の提供</p>
+              <p class="text-sm text-gray-700 mb-2">Gardner博士提唱</p>
+              <p class="text-xs text-gray-600">言語的・論理数学的・視覚空間的・身体運動的・音楽的・対人的・内省的・博物学的知能に対応</p>
             </div>
 
-            <!-- 理論3: 足場かけ理論 -->
+            <!-- 理論3: 経験学習理論 -->
             <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300">
               <div class="flex items-center mb-2">
                 <div class="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">3</div>
-                <h4 class="font-bold text-green-800">足場かけ理論</h4>
+                <h4 class="font-bold text-green-800">経験学習理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">ヴィゴツキーの最近接発達領域</p>
-              <p class="text-xs text-gray-600">3段階ヒントによる段階的支援で、自力解決を促進</p>
+              <p class="text-sm text-gray-700 mb-2">Kolb提唱</p>
+              <p class="text-xs text-gray-600">具体的経験→内省的観察→抽象的概念化→能動的実験の4段階サイクル</p>
             </div>
 
-            <!-- 理論4: 自己決定理論 -->
+            <!-- 理論4: ATI理論 -->
             <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border-2 border-orange-300">
               <div class="flex items-center mb-2">
                 <div class="bg-orange-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">4</div>
-                <h4 class="font-bold text-orange-800">自己決定理論</h4>
+                <h4 class="font-bold text-orange-800">ATI理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">デシ&ライアン</p>
-              <p class="text-xs text-gray-600">自律性・有能感・関係性を満たし、内発的動機づけを促進</p>
+              <p class="text-sm text-gray-700 mb-2">Cronbach & Snow提唱</p>
+              <p class="text-xs text-gray-600">適性処遇交互作用：学習者の適性と指導方法の最適な組み合わせ</p>
             </div>
 
-            <!-- 理論5: 個別最適化学習理論 -->
+            <!-- 理論5: 自己調整学習理論 -->
             <div class="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-4 border-2 border-pink-300">
               <div class="flex items-center mb-2">
                 <div class="bg-pink-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">5</div>
-                <h4 class="font-bold text-pink-800">個別最適化学習</h4>
+                <h4 class="font-bold text-pink-800">自己調整学習理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">適応学習システム</p>
-              <p class="text-xs text-gray-600">一人ひとりの進度・理解度に応じた学習内容とペースの調整</p>
+              <p class="text-sm text-gray-700 mb-2">Zimmerman提唱</p>
+              <p class="text-xs text-gray-600">予見→遂行→内省の3段階サイクル（次期学習指導要領で重視）</p>
             </div>
 
-            <!-- 理論6: ユニバーサルデザイン -->
+            <!-- 理論6: 認知科学の学習方略 -->
             <div class="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg p-4 border-2 border-teal-300">
               <div class="flex items-center mb-2">
                 <div class="bg-teal-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">6</div>
-                <h4 class="font-bold text-teal-800">UDL理論</h4>
+                <h4 class="font-bold text-teal-800">認知科学の学習方略</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">学びのユニバーサルデザイン</p>
-              <p class="text-xs text-gray-600">多様な表現方法・多様な行動方法・多様な参加方法を提供</p>
+              <p class="text-sm text-gray-700 mb-2">文部科学省推奨</p>
+              <p class="text-xs text-gray-600">分散学習・検索練習・交互配置・精緻化・具体例・二重符号化の6つの科学的方略</p>
             </div>
           </div>
           <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 text-center">
