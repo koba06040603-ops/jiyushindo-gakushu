@@ -1467,7 +1467,13 @@ app.get('/api/curriculum', async (c) => {
       ORDER BY grade, unit_order
     `).all()
     
-    return c.json(result.results)
+    // Map id to curriculum_id for frontend compatibility
+    const curriculums = result.results.map(c => ({
+      ...c,
+      curriculum_id: c.id
+    }))
+    
+    return c.json(curriculums)
   } catch (error) {
     return c.json({ error: 'Database error' }, 500)
   }
@@ -1479,13 +1485,19 @@ app.get('/api/curriculum/list', async (c) => {
   const { env } = c
   
   try {
-    const curriculums = await env.DB.prepare(`
+    const result = await env.DB.prepare(`
       SELECT id, grade, subject, unit_name, textbook_company as textbook, created_at
       FROM curriculum
       ORDER BY created_at DESC
     `).all()
     
-    return c.json(curriculums.results)
+    // Map id to curriculum_id for frontend compatibility
+    const curriculums = result.results.map(c => ({
+      ...c,
+      curriculum_id: c.id
+    }))
+    
+    return c.json(curriculums)
   } catch (error) {
     console.error('Curriculum list error:', error)
     return c.json({ error: 'Database error' }, 500)
