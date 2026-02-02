@@ -1248,18 +1248,18 @@ async function renderTopPage() {
               <h4 class="font-bold text-lg mb-2 text-blue-700">💬 対話例</h4>
               <div class="space-y-3 text-sm">
                 <div class="bg-white rounded-lg p-3 shadow-sm">
-                  <p class="text-gray-600 font-semibold mb-1">👦 児童：</p>
-                  <p class="text-gray-800">「3×4ってどうやって計算するの？」</p>
+                  <p class="text-gray-600 font-semibold mb-1">👦 じどう：</p>
+                  <p class="text-gray-800">「3×4ってどうやってけいさんするの？」</p>
                 </div>
                 <div class="bg-blue-100 rounded-lg p-3">
                   <p class="text-blue-600 font-semibold mb-1">🤖 AI先生：</p>
                   <p class="text-gray-800 text-xs leading-relaxed">
-                    3×4は「3を4回たす」という意味だよ！<br>
-                    具体例を見てみよう：<br>
+                    3×4は「3を4かいたす」といういみだよ！<br>
+                    見てみよう：<br>
                     ① 3+3+3+3 = 12<br>
-                    ② 4個の箱にリンゴが3個ずつ → 全部で12個<br>
-                    ③ 3列×4列の座席 → 全部で12席<br>
-                    分かったかな？もっと知りたいことはある？
+                    ② 4このはこにリンゴが3こずつ → ぜんぶで12こ<br>
+                    ③ 3れつ×4れつのせき → ぜんぶで12せき<br>
+                    わかったかな？もっとしりたいことはある？
                   </p>
                 </div>
               </div>
@@ -1335,7 +1335,7 @@ async function renderTopPage() {
                 <div class="bg-purple-100 p-2 rounded mt-2">
                   <p class="text-purple-800 font-semibold">
                     <i class="fas fa-check-circle mr-1"></i>
-                    システムが自動で次の単元を提案
+                    別のコースや単元にも挑戦中
                   </p>
                 </div>
               </div>
@@ -1389,11 +1389,58 @@ async function renderTopPage() {
               </div>
             </div>
 
-            <!-- ケース4: 外国籍の児童 -->
+            <!-- ケース4: 学習スタイル別対応 -->
             <div class="bg-pink-50 rounded-lg p-4 border-2 border-pink-200">
               <h4 class="font-bold text-pink-700 mb-3 flex items-center">
+                <i class="fas fa-brain mr-2"></i>
+                ケース4: 学習スタイル別対応（視覚・聴覚・体験優位版）
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 一人ひとりの認知特性に合わせた学習</p>
+                <p><strong>3つのスタイル:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• <span class="font-semibold text-red-600">視覚優位版</span>: 図解・動画で視覚的に理解</li>
+                  <li>• <span class="font-semibold text-green-600">聴覚優位版</span>: 音声・音楽で聴覚的に理解</li>
+                  <li>• <span class="font-semibold text-blue-600">体験優位版</span>: 実物・具体物で体験的に理解</li>
+                </ul>
+                <div class="bg-pink-100 p-2 rounded mt-2">
+                  <p class="text-pink-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    認知特性に応じた最適な学習方法を提供
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース5: AI生成コンテンツ -->
+            <div class="bg-indigo-50 rounded-lg p-4 border-2 border-indigo-200">
+              <h4 class="font-bold text-indigo-700 mb-3 flex items-center">
+                <i class="fas fa-magic mr-2"></i>
+                ケース5: AI生成コンテンツ活用
+              </h4>
+              <div class="space-y-2 text-sm text-gray-700">
+                <p><strong>特徴:</strong> 教師がAIで教材を瞬時に作成</p>
+                <p><strong>生成可能なコンテンツ:</strong></p>
+                <ul class="ml-4 space-y-1">
+                  <li>• 📹 <span class="font-semibold">動画生成</span>: 学習内容の解説動画</li>
+                  <li>• 🎵 <span class="font-semibold">音楽生成</span>: 学習用BGM・歌</li>
+                  <li>• 🎨 <span class="font-semibold">画像生成</span>: 図解・イラスト</li>
+                  <li>• 🎤 <span class="font-semibold">音声生成</span>: ナレーション・読み上げ</li>
+                </ul>
+                <div class="bg-indigo-100 p-2 rounded mt-2">
+                  <p class="text-indigo-800 font-semibold">
+                    <i class="fas fa-check-circle mr-1"></i>
+                    教材作成時間を大幅削減、教師の働き方改革
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ケース6: 外国籍の児童 -->
+            <div class="bg-teal-50 rounded-lg p-4 border-2 border-teal-200">
+              <h4 class="font-bold text-teal-700 mb-3 flex items-center">
                 <i class="fas fa-globe mr-2"></i>
-                ケース4: 外国籍の児童Dさん
+                ケース6: 外国籍の児童Eさん
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 日本語学習中、視覚的な理解が得意</p>
@@ -1402,10 +1449,10 @@ async function renderTopPage() {
                 <ul class="ml-4 space-y-1">
                   <li>• 図やイラストで内容を理解</li>
                   <li>• やさしい言葉での説明を活用</li>
-                  <li>• 繰り返し学習で着実に進歩</li>
+                  <li>• 動画・音声で繰り返し学習</li>
                 </ul>
-                <div class="bg-pink-100 p-2 rounded mt-2">
-                  <p class="text-pink-800 font-semibold">
+                <div class="bg-teal-100 p-2 rounded mt-2">
+                  <p class="text-teal-800 font-semibold">
                     <i class="fas fa-check-circle mr-1"></i>
                     多様な背景の児童にも対応
                   </p>
@@ -1457,17 +1504,17 @@ async function renderTopPage() {
                   <tbody class="text-gray-700">
                     <tr class="border-b">
                       <td class="p-2">Aさん</td>
-                      <td class="p-2 text-center">18/18</td>
+                      <td class="p-2 text-center">6/6</td>
                       <td class="p-2 text-center"><span class="text-green-600 font-bold">✓ 完了</span></td>
                     </tr>
                     <tr class="border-b">
                       <td class="p-2">Bさん</td>
-                      <td class="p-2 text-center">9/18</td>
+                      <td class="p-2 text-center">4/6</td>
                       <td class="p-2 text-center"><span class="text-blue-600 font-bold">→ 学習中</span></td>
                     </tr>
                     <tr class="border-b">
                       <td class="p-2">Cさん</td>
-                      <td class="p-2 text-center">3/18</td>
+                      <td class="p-2 text-center">1/6</td>
                       <td class="p-2 text-center"><span class="text-orange-600 font-bold">⚠ 要支援</span></td>
                     </tr>
                   </tbody>
