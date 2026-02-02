@@ -1473,16 +1473,17 @@ async function renderTopPage() {
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 一人ひとりの認知特性に合わせた学習</p>
-                <p><strong>3つのスタイル:</strong></p>
+                <p><strong>🎯 実装されている機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• <span class="font-semibold text-red-600">視覚優位版</span>: 図解・動画で視覚的に理解</li>
-                  <li>• <span class="font-semibold text-green-600">聴覚優位版</span>: 音声・音楽で聴覚的に理解</li>
-                  <li>• <span class="font-semibold text-blue-600">体験優位版</span>: 実物・具体物で体験的に理解</li>
+                  <li>• <span class="font-semibold text-red-600">視覚優位版</span>: AI生成画像・動画、図解、色分けされた説明</li>
+                  <li>• <span class="font-semibold text-green-600">聴覚優位版</span>: AI音声読み上げ、AI生成音楽、音声解説</li>
+                  <li>• <span class="font-semibold text-blue-600">体験優位版</span>: 具体物の提案、実験動画、身近な例</li>
+                  <li>• <span class="font-semibold text-purple-600">自動判定</span>: 学習履歴から認知特性を推定</li>
                 </ul>
                 <div class="bg-pink-100 p-2 rounded mt-2">
                   <p class="text-pink-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    認知特性に応じた最適な学習方法を提供
+                    <i class="fas fa-magic mr-1"></i>
+                    AI が児童の特性を自動分析し、最適な表現方法を提供
                   </p>
                 </div>
               </div>
@@ -1496,17 +1497,18 @@ async function renderTopPage() {
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 教師がAIで教材を瞬時に作成</p>
-                <p><strong>生成可能なコンテンツ:</strong></p>
+                <p><strong>🎯 実装されている生成機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 📹 <span class="font-semibold">動画生成</span>: 学習内容の解説動画</li>
-                  <li>• 🎵 <span class="font-semibold">音楽生成</span>: 学習用BGM・歌</li>
-                  <li>• 🎨 <span class="font-semibold">画像生成</span>: 図解・イラスト</li>
-                  <li>• 🎤 <span class="font-semibold">音声生成</span>: ナレーション・読み上げ</li>
+                  <li>• 📹 <span class="font-semibold">動画生成</span>: Gemini Veo で5〜8秒の解説動画（例: 分数の計算手順）</li>
+                  <li>• 🎵 <span class="font-semibold">音楽生成</span>: ElevenLabs で九九の歌、集中BGM</li>
+                  <li>• 🎨 <span class="font-semibold">画像生成</span>: Flux で図解、イラスト（例: 立体図形）</li>
+                  <li>• 🎤 <span class="font-semibold">音声生成</span>: Minimax TTS で学年別読み上げ</li>
+                  <li>• 📝 <span class="font-semibold">学習カード自動生成</span>: 3コース×6枚+ヒント54個を約1分で作成</li>
                 </ul>
                 <div class="bg-indigo-100 p-2 rounded mt-2">
                   <p class="text-indigo-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    教材作成時間を大幅削減、教師の働き方改革
+                    <i class="fas fa-robot mr-1"></i>
+                    教材作成時間を1/10に削減！従来3時間→今は20分
                   </p>
                 </div>
               </div>
@@ -1521,16 +1523,17 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 日本語学習中、視覚的な理解が得意</p>
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 図やイラストで内容を理解</li>
-                  <li>• やさしい言葉での説明を活用</li>
-                  <li>• 動画・音声で繰り返し学習</li>
+                  <li>• <span class="font-semibold">AI生成画像</span>で視覚的に理解（文字が読めなくても OK）</li>
+                  <li>• <span class="font-semibold">やさしい日本語モード</span>とルビ振り機能</li>
+                  <li>• <span class="font-semibold">AI音声読み上げ</span>で聞いて学習（漢字の読みを確認）</li>
+                  <li>• <span class="font-semibold">多言語翻訳機能</span>（準備中: 母語でヒントを確認）</li>
                 </ul>
                 <div class="bg-teal-100 p-2 rounded mt-2">
                   <p class="text-teal-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    多様な背景の児童にも対応
+                    <i class="fas fa-globe mr-1"></i>
+                    言語の壁を超えて、すべての子どもに学びの機会を保障
                   </p>
                 </div>
               </div>
@@ -1545,16 +1548,17 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> ADHD、集中が続きにくい</p>
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 短時間集中型の学習（10分×3回）</li>
-                  <li>• 動画やゲーム的要素で興味を維持</li>
-                  <li>• 達成感を得やすい小ステップ設計</li>
+                  <li>• <span class="font-semibold">短時間動画</span>（AI生成5〜8秒）で飽きずに学習</li>
+                  <li>• <span class="font-semibold">音楽BGM</span>（AI生成）で集中力を持続</li>
+                  <li>• <span class="font-semibold">学習時間データ分析</span>: 集中できる時間帯を AI が自動検出</li>
+                  <li>• <span class="font-semibold">小ステップ設計</span>: 6枚×10分＝1時間で達成感</li>
                 </ul>
                 <div class="bg-amber-100 p-2 rounded mt-2">
                   <p class="text-amber-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    特性に配慮した学習環境を提供
+                    <i class="fas fa-brain mr-1"></i>
+                    発達特性に配慮し、無理なく学べる環境を AI がサポート
                   </p>
                 </div>
               </div>
@@ -1569,16 +1573,17 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 高い学習能力、探究心旺盛</p>
                 <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">どんどんコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 3日でコース完了、次々に新単元へ</li>
-                  <li>• 選択問題で発展的内容に挑戦</li>
-                  <li>• 上位学年の内容も自主学習</li>
+                  <li>• <span class="font-semibold">選択問題</span>で発展的内容に挑戦（AIが上位学年の問題も自動生成）</li>
+                  <li>• <span class="font-semibold">学習データ分析</span>: 得意分野を可視化→さらに伸ばす</li>
+                  <li>• <span class="font-semibold">複数コース同時進行</span>: 単元内自由進度で自分のペース</li>
+                  <li>• <span class="font-semibold">週次レポート</span>で成長を振り返り、次の目標設定</li>
                 </ul>
                 <div class="bg-violet-100 p-2 rounded mt-2">
                   <p class="text-violet-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    能力に応じた挑戦的課題を提供
+                    <i class="fas fa-trophy mr-1"></i>
+                    能力を最大限に引き出し、才能を開花させる
                   </p>
                 </div>
               </div>
@@ -1593,16 +1598,17 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 学校に行けない、自宅で学習</p>
                 <p><strong>学習コース:</strong> <span class="bg-blue-600 text-white px-2 py-1 rounded">しっかりコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• オンラインで完全に学習継続</li>
-                  <li>• AI先生が心理的サポートも提供</li>
-                  <li>• 自分のペースで少しずつ前進</li>
+                  <li>• <span class="font-semibold">24時間 AI 先生</span>がいつでも質問に回答（深夜でも安心）</li>
+                  <li>• <span class="font-semibold">進捗ボード</span>で教師がリアルタイムに見守り、励ましメッセージ</li>
+                  <li>• <span class="font-semibold">学習履歴データ</span>が出席の記録として活用可能</li>
+                  <li>• <span class="font-semibold">音声メモ機能</span>で孤立感を軽減、気持ちを記録</li>
                 </ul>
                 <div class="bg-cyan-100 p-2 rounded mt-2">
                   <p class="text-cyan-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    学びの機会を保障し、孤立を防ぐ
+                    <i class="fas fa-heart mr-1"></i>
+                    教室に行けなくても、学びと繋がりを途切れさせない
                   </p>
                 </div>
               </div>
@@ -1617,16 +1623,17 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 音楽を通じた学習が得意</p>
                 <p><strong>学習コース:</strong> <span class="bg-blue-600 text-white px-2 py-1 rounded">しっかりコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 聴覚優位版で音声解説を活用</li>
-                  <li>• AI生成音楽で九九や公式を暗記</li>
-                  <li>• リズムに乗せて学習内容を記憶</li>
+                  <li>• <span class="font-semibold">AI生成音楽</span>: ElevenLabs で「九九の歌」を自動作成</li>
+                  <li>• <span class="font-semibold">聴覚優位版</span>: Minimax TTS で音声解説（歌うように読み上げ）</li>
+                  <li>• <span class="font-semibold">集中BGM生成</span>: 学習内容に合わせた最適な音楽</li>
+                  <li>• <span class="font-semibold">リズムパターン分析</span>: 効果的な記憶リズムを AI が提案</li>
                 </ul>
                 <div class="bg-rose-100 p-2 rounded mt-2">
                   <p class="text-rose-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    多重知能理論に基づく学習支援
+                    <i class="fas fa-music mr-1"></i>
+                    ガードナーの多重知能理論：音楽知能を最大限に活用
                   </p>
                 </div>
               </div>
@@ -1641,16 +1648,17 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 体を動かして学ぶのが得意</p>
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 体験優位版で具体物を使った学習</li>
-                  <li>• 動画で実演を見て理解</li>
-                  <li>• 実際に手を動かして問題を解く</li>
+                  <li>• <span class="font-semibold">体験優位版</span>: 具体物（積み木、お金）を使った実演提案</li>
+                  <li>• <span class="font-semibold">AI生成動画</span>: Gemini Veo で手を動かす様子を撮影・生成</li>
+                  <li>• <span class="font-semibold">実験動画</span>: 実際にやってみる様子を5〜8秒で確認</li>
+                  <li>• <span class="font-semibold">ペットボトル・紙コップ</span>などの準備物リストも自動提示</li>
                 </ul>
                 <div class="bg-lime-100 p-2 rounded mt-2">
                   <p class="text-lime-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    身体的学習スタイルに対応
+                    <i class="fas fa-hand-paper mr-1"></i>
+                    多重知能理論：身体運動知能を活かした学び
                   </p>
                 </div>
               </div>
@@ -1665,16 +1673,17 @@ async function renderTopPage() {
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 学習障害＋家庭環境の課題</p>
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
-                <p><strong>学習状況:</strong></p>
+                <p><strong>🎯 活用している全機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 視覚・聴覚・体験優位版を組み合わせ</li>
-                  <li>• AI先生＋教師の丁寧な個別支援</li>
-                  <li>• 小さな成功体験を積み重ね</li>
+                  <li>• <span class="font-semibold">3スタイル統合</span>: 視覚・聴覚・体験を組み合わせた UDL 設計</li>
+                  <li>• <span class="font-semibold">AI 先生＋教師</span>: 二重の見守りで取りこぼしゼロ</li>
+                  <li>• <span class="font-semibold">つまずき自動検出</span>: データ分析で早期発見→即座に介入</li>
+                  <li>• <span class="font-semibold">週次レポート</span>を保護者と共有、家庭連携を強化</li>
                 </ul>
                 <div class="bg-fuchsia-100 p-2 rounded mt-2">
                   <p class="text-fuchsia-800 font-semibold">
-                    <i class="fas fa-check-circle mr-1"></i>
-                    複雑なニーズにも柔軟に対応
+                    <i class="fas fa-hands-helping mr-1"></i>
+                    複雑なニーズも、AI とヒトの協働でしっかりサポート
                   </p>
                 </div>
               </div>
