@@ -3126,9 +3126,18 @@ async function startCourseStudy(curriculumId, courseId) {
     
     // 最初のカードを表示
     const firstCard = selectedCourse.cards[0]
-    showLearningCard(firstCard, curriculumId, courseId)
+    const cardId = firstCard.card_id || firstCard.id
+    
+    if (!cardId) {
+      throw new Error('カードIDが取得できませんでした')
+    }
+    
+    console.log('🎴 カード表示開始:', { cardId, card_title: firstCard.card_title })
     
     loadingManager.hide()
+    
+    // loadCardPage を使用してカードを表示
+    loadCardPage(cardId)
     
   } catch (error) {
     console.error('コース学習開始エラー:', error)
