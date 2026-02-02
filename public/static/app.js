@@ -30041,7 +30041,7 @@ async function generateVideoDemo() {
       <div class="py-4">
         <div class="mb-4">
           <div class="bg-white rounded-lg overflow-hidden aspect-video border-2 border-purple-300">
-            <iframe srcdoc='${data.animation_html.replace(/'/g, "\\'")}' 
+            <iframe srcdoc='${data.animationHtml.replace(/'/g, "\\'")}' 
               class="w-full h-full" frameborder="0"></iframe>
           </div>
         </div>
