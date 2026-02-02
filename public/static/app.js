@@ -334,7 +334,7 @@ STUDENT_DEMO_DATA['鈴木次郎'] = STUDENT_DEMO_DATA[5]
 window.STUDENT_DEMO_DATA = STUDENT_DEMO_DATA
 
 // この定義を使ってレポートを生成する共通関数を作成
-function generateStudentReport(studentId, studentName) {
+function generateStudentReportDemo(studentId, studentName) {
   const data = STUDENT_DEMO_DATA[studentId] || STUDENT_DEMO_DATA[studentName]
   if (!data) {
     return null // デモデータがない場合
@@ -343,7 +343,7 @@ function generateStudentReport(studentId, studentName) {
   return data
 }
 
-window.generateStudentReport = generateStudentReport
+window.generateStudentReportDemo = generateStudentReportDemo
 // グローバルエラーハンドラー（詳細ログ付き）
 window.addEventListener('error', (event) => {
   console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
@@ -5286,24 +5286,6 @@ function redrawHandwriting(canvasId, strokes) {
   })
 }
 
-function clearHandwriting() {
-  const canvas = document.getElementById('handwritingCanvas')
-  if (!canvas) return
-  
-  const ctx = canvas.getContext('2d')
-  
-  // 白い背景を再描画
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  
-  // ストローク履歴もクリア
-  handwritingStrokes = []
-  
-  // カーソルをcrosshairに強制設定
-  canvas.style.cursor = 'crosshair'
-  console.log('✅ AI先生手書きをクリアしました（カーソル: crosshair）')
-}
-
 function clearAnswerHandwriting() {
   const canvas = document.getElementById('answerCanvas')
   if (!canvas) return
@@ -5811,24 +5793,6 @@ function answerStopDrawing() {
   if (canvas) {
     canvas.style.cursor = 'crosshair'
   }
-}
-
-// 回答手書きをクリア
-function clearAnswerHandwriting() {
-  const canvas = document.getElementById('answerCanvas')
-  if (!canvas) return
-  
-  const ctx = canvas.getContext('2d')
-  
-  // 白い背景を再描画
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  
-  answerStrokes = []
-  
-  // カーソルをcrosshairに強制設定
-  canvas.style.cursor = 'crosshair'
-  console.log('✅ 回答用手書きをクリアしました（カーソル: crosshair）')
 }
 
 // 手書き認識（統合版）
@@ -7672,7 +7636,7 @@ async function loadCards(courseId) {
 }
 
 // カード順序を保存
-async function saveCardOrder() {
+async function saveCardOrderSimple() {
   try {
     const cardItems = document.querySelectorAll('.card-item')
     const cardIds = Array.from(cardItems).map(item => parseInt(item.dataset.cardId))
@@ -7700,7 +7664,7 @@ async function saveCardOrder() {
 }
 
 // カード削除
-async function deleteCard(cardId) {
+async function deleteCardSimple(cardId) {
   if (!confirm('このカードを削除しますか？\n削除すると元に戻せません。')) {
     return
   }
@@ -9128,7 +9092,7 @@ async function loadCardManagementPage(courseId) {
 }
 
 // カード削除
-async function deleteCard(cardId, courseId) {
+async function deleteCardWithCourse(cardId, courseId) {
   if (!confirm('このカードを削除してもよろしいですか？')) {
     return
   }
@@ -9144,7 +9108,7 @@ async function deleteCard(cardId, courseId) {
 }
 
 // 新規カード追加（プレースホルダー）
-function addNewCard(courseId) {
+function addNewCardSimple(courseId) {
   alert('新規カード追加機能は準備中です。\n現在は既存のカードの編集のみ対応しています。')
 }
 
@@ -9586,7 +9550,7 @@ async function generateProblem() {
 }
 
 // 答えを表示/非表示
-function toggleAnswer() {
+function toggleAnswerV1() {
   const answerSection = document.getElementById('answerSection')
   answerSection.classList.toggle('hidden')
 }
@@ -15326,7 +15290,7 @@ function handleDragStart(e) {
   e.dataTransfer.effectAllowed = 'move'
 }
 
-function handleDragOver(e) {
+function handleDragOverV1(e) {
   if (e.preventDefault) {
     e.preventDefault()
   }
@@ -15969,7 +15933,7 @@ function removeHint(courseIndex, cardIndex, hintIndex) {
 window.removeHint = removeHint
 
 // ヒント編集の保存
-async function saveHintsEdit(courseIndex, cardIndex, cardId) {
+async function saveHintsEditV1(courseIndex, cardIndex, cardId) {
   try {
     const editorDiv = document.getElementById(`hints-editor-${courseIndex}-${cardIndex}`)
     if (!editorDiv) return
@@ -16530,7 +16494,7 @@ window.closeAddCardModal = closeAddCardModal
 window.saveNewCard = saveNewCard
 
 // チェックテスト問題削除機能
-async function deleteCheckTestProblem(problemIndex) {
+async function deleteCheckTestProblemV1(problemIndex) {
   if (!confirm('このチェックテスト問題を削除してもよろしいですか？\n※この操作は取り消せません')) {
     return
   }
@@ -16719,7 +16683,7 @@ window.closeAddCheckTestModal = closeAddCheckTestModal
 window.saveNewCheckTestProblem = saveNewCheckTestProblem
 
 // 選択問題削除機能
-async function deleteOptionalProblem(problemId, problemIndex) {
+async function deleteOptionalProblemV1(problemId, problemIndex) {
   if (!confirm('この選択問題を削除してもよろしいですか？\n※この操作は取り消せません')) {
     return
   }
@@ -24030,7 +23994,7 @@ async function generateVisualDemo() {
   }
 }
 
-async function generateVideoDemo() {
+async function generateVideoDemoOld() {
   const demoArea = document.getElementById('visual-demo-area')
   if (!demoArea) return
   
@@ -24244,7 +24208,7 @@ function stopAudioScript() {
   currentLineIndex = 0
 }
 
-async function generateMusicDemo() {
+async function generateMusicDemoOld() {
   const demoArea = document.getElementById('auditory-demo-area')
   if (!demoArea) return
   
@@ -25509,12 +25473,6 @@ function closeVideoPlayer() {
 }
 
 // 時間フォーマット（秒 → MM:SS）
-function formatDuration(seconds) {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
 // 学習カード視聴履歴表示
 async function showVideoHistory(studentId) {
   try {
@@ -30116,6 +30074,14 @@ async function generateVideoDemo() {
       </div>
     </div>
   `
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+        <p>エラー: ${error.message}</p>
+      </div>
+    `
+  }
 }
 
 // ケース1: AI生成画像デモ
@@ -30239,6 +30205,14 @@ async function generateImageDemo() {
       </div>
     </div>
   `
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+        <p>エラー: ${error.message}</p>
+      </div>
+    `
+  }
 }
 
 // ケース2: 苦手な児童Bさん - AI生成音楽デモ（実際のAPI統合版）
