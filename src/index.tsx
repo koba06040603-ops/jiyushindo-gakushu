@@ -13898,6 +13898,7 @@ app.post('/api/media/generate-video', async (c) => {
   const { prompt, duration } = await c.req.json()
   
   // 小学2年生向け：3×4のかけ算アニメーション（Canvas版・リンゴが動く）
+  // デバッグ: まず静的版で全要素が表示されるか確認
   const animationHtml = `
     <!DOCTYPE html>
     <html>
@@ -13926,7 +13927,8 @@ app.post('/api/media/generate-video', async (c) => {
       <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        let time = 0;
+        
+        console.log('🎬 Canvas initialized');
         
         // リンゴを描く関数
         function drawApple(x, y, size, alpha = 1) {
@@ -13977,117 +13979,44 @@ app.post('/api/media/generate-video', async (c) => {
           ctx.restore();
         }
         
-        // イージング関数
-        function easeOutElastic(t) {
-          const p = 0.3;
-          return Math.pow(2, -10 * t) * Math.sin((t - p / 4) * (2 * Math.PI) / p) + 1;
-        }
-        
-        function easeOutBack(t) {
-          const c1 = 1.70158;
-          const c3 = c1 + 1;
-          return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-        }
-        
-        // アニメーション関数
-        function render() {
+        // まず静的に全要素を描画してテスト
+        function drawStatic() {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           
-          // デバッグ: 1秒ごとにログ出力
-          if (Math.floor(time) !== Math.floor(time - 1/60)) {
-            console.log('⏱️ Time:', Math.floor(time) + 's');
-          }
+          // タイトル
+          drawText('3 × 4 の けいさん', 400, 80, 48, '#1e40af', 1);
           
-          // フェーズ1: タイトル表示（0-1秒）
-          if (time < 1) {
-            const alpha = Math.min(time * 2, 1);
-            drawText('3 × 4 の けいさん', 400, 80, 48, '#1e40af', alpha);
-          } else {
-            drawText('3 × 4 の けいさん', 400, 80, 48, '#1e40af', 1);
-          }
+          // 問題
+          drawText('3 × 4 = ?', 400, 150, 56, '#7c3aed', 1);
           
-          // フェーズ2: 問題表示（1-2秒）
-          if (time >= 1 && time < 2) {
-            const t = (time - 1);
-            const scale = easeOutBack(Math.min(t, 1));
-            ctx.save();
-            ctx.translate(400, 150);
-            ctx.scale(scale, scale);
-            drawText('3 × 4 = ?', 0, 0, 56, '#7c3aed', 1);
-            ctx.restore();
-          } else if (time >= 2) {
-            drawText('3 × 4 = ?', 400, 150, 56, '#7c3aed', 1);
-          }
-          
-          // フェーズ3-6: リンゴが4グループ登場（2-6秒）
+          // 4グループのリンゴ
           const groups = [
-            { startTime: 2, label: '1つめ', x: 140, y: 280 },
-            { startTime: 3, label: '2つめ', x: 290, y: 280 },
-            { startTime: 4, label: '3つめ', x: 440, y: 280 },
-            { startTime: 5, label: '4つめ', x: 590, y: 280 }
+            { label: '1つめ', x: 140, y: 280 },
+            { label: '2つめ', x: 290, y: 280 },
+            { label: '3つめ', x: 440, y: 280 },
+            { label: '4つめ', x: 590, y: 280 }
           ];
           
-          groups.forEach((group, groupIdx) => {
-            if (time >= group.startTime) {
-              const t = Math.min((time - group.startTime) / 0.8, 1);
-              const ease = easeOutElastic(t);
-              const alpha = Math.min(t * 3, 1);
-              
-              // ラベル
-              drawText(group.label, group.x, group.y - 60, 24, '#059669', alpha);
-              
-              // 囲み枠
-              if (t > 0.5) {
-                drawBox(group.x - 65, group.y - 35, 130, 90, (t - 0.5) * 2);
-              }
-              
-              // リンゴ3個
-              for (let i = 0; i < 3; i++) {
-                const appleX = group.x + (i - 1) * 40;
-                const appleY = group.y + (1 - ease) * -50;
-                drawApple(appleX, appleY, 18, alpha);
-              }
+          groups.forEach((group) => {
+            drawText(group.label, group.x, group.y - 60, 24, '#059669', 1);
+            drawBox(group.x - 65, group.y - 35, 130, 90, 1);
+            for (let i = 0; i < 3; i++) {
+              const appleX = group.x + (i - 1) * 40;
+              drawApple(appleX, group.y, 18, 1);
             }
           });
           
-          // フェーズ7: 説明表示（6-7秒）
-          if (time >= 6) {
-            const alpha = Math.min((time - 6) * 2, 1);
-            drawText('3が 4つ → 3+3+3+3', 400, 400, 28, '#6b7280', alpha);
-          }
+          // 説明
+          drawText('3が 4つ → 3+3+3+3', 400, 400, 28, '#6b7280', 1);
           
-          // フェーズ8: 答え表示（7-8秒）
-          if (time >= 7) {
-            const t = Math.min((time - 7) / 0.8, 1);
-            const scale = 0.5 + easeOutBack(t) * 0.5;
-            const pulseScale = 1 + Math.sin((time - 8) * 4) * 0.05;
-            
-            ctx.save();
-            ctx.translate(400, 500);
-            ctx.scale(scale * pulseScale, scale * pulseScale);
-            
-            // 影
-            ctx.shadowColor = 'rgba(59, 130, 246, 0.3)';
-            ctx.shadowBlur = 20;
-            ctx.shadowOffsetY = 5;
-            
-            drawText('= 12', 0, 0, 80, '#3b82f6', 1);
-            ctx.restore();
-          }
+          // 答え
+          drawText('= 12', 400, 500, 80, '#3b82f6', 1);
           
-          // 時間を進める
-          time += 1 / 60;
+          console.log('✅ Static render complete');
         }
         
-        // アニメーション開始（setIntervalで確実に実行）
-        console.log('🎬 Animation started');
-        const interval = setInterval(() => {
-          render();
-          if (time >= 12) {
-            clearInterval(interval);
-            console.log('✅ Animation complete');
-          }
-        }, 1000 / 60); // 60fps
+        // 静的描画を実行
+        drawStatic();
       </script>
     </body>
     </html>
