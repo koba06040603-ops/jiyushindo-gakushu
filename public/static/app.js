@@ -31461,20 +31461,242 @@ console.log('✅ ケース4-12動画生成機能 読み込み完了')
 
 
 // =============================================================================
-// ケース5-12: 学習スタイル・特別支援・テスト準備 モーダル実装
+// ケース5-12: タブ付きインタラクティブモーダル実装（新バージョン）
 // =============================================================================
 
-// ケース5: 聴覚優位 - 音とリズムで覚える
+// 共通タブ切り替え関数
+function switchTab(tabName, casePrefix) {
+  const tabs = document.querySelectorAll(`[data-tab-target^="${casePrefix}-"]`)
+  const contents = document.querySelectorAll(`[data-tab-content^="${casePrefix}-"]`)
+  
+  tabs.forEach(tab => {
+    if (tab.dataset.tabTarget === `${casePrefix}-${tabName}`) {
+      tab.classList.add('border-b-4', 'border-blue-600', 'text-blue-600')
+      tab.classList.remove('text-gray-600')
+    } else {
+      tab.classList.remove('border-b-4', 'border-blue-600', 'text-blue-600')
+      tab.classList.add('text-gray-600')
+    }
+  })
+  
+  contents.forEach(content => {
+    if (content.dataset.tabContent === `${casePrefix}-${tabName}`) {
+      content.classList.remove('hidden')
+    } else {
+      content.classList.add('hidden')
+    }
+  })
+}
+
+// ケース5: 聴覚優位 - 音とリズムで覚える（タブ付き）
 function demoCase5Audio() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
-    <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 w-[95vw] h-[95vh] relative shadow-2xl overflow-y-auto">
+    <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 w-[95vw] h-[95vh] relative shadow-2xl overflow-hidden flex flex-col">
       <!-- ×ボタン -->
       <button onclick="this.closest('.fixed').remove()" 
-        class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 transition-colors z-10 bg-white rounded-full p-2 shadow-lg">
+        class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 transition-colors z-50 bg-white rounded-full p-2 shadow-lg">
         <i class="fas fa-times text-2xl"></i>
       </button>
+      
+      <!-- タイトルエリア -->
+      <div class="text-center mb-4">
+        <h3 class="text-2xl font-bold text-gray-800 mb-2">
+          <i class="fas fa-music mr-2 text-purple-600"></i>
+          ケース5: 音とリズムで覚える
+        </h3>
+        <p class="text-base text-purple-600">
+          聴覚優位（音楽リズム知能）の児童向けに最適化
+        </p>
+      </div>
+      
+      <!-- タブナビゲーション -->
+      <div class="flex border-b border-gray-300 mb-4">
+        <button onclick="switchTab('learn', 'case5')" 
+          data-tab-target="case5-learn"
+          class="flex-1 py-3 text-base font-semibold border-b-4 border-purple-600 text-purple-600 transition-all hover:bg-purple-50">
+          <i class="fas fa-book mr-2"></i>学習内容
+        </button>
+        <button onclick="switchTab('experience', 'case5')" 
+          data-tab-target="case5-experience"
+          class="flex-1 py-3 text-base font-semibold text-gray-600 transition-all hover:bg-gray-50">
+          <i class="fas fa-hand-pointer mr-2"></i>体験してみる
+        </button>
+        <button onclick="switchTab('video', 'case5')" 
+          data-tab-target="case5-video"
+          class="flex-1 py-3 text-base font-semibold text-gray-600 transition-all hover:bg-gray-50">
+          <i class="fas fa-film mr-2"></i>AI動画
+        </button>
+      </div>
+      
+      <!-- コンテンツエリア（スクロール可能） -->
+      <div class="flex-1 overflow-y-auto px-2">
+        
+        <!-- タブ1: 学習内容 -->
+        <div data-tab-content="case5-learn" class="bg-white rounded-xl p-6 shadow-inner">
+          <div class="text-center mb-6">
+            <i class="fas fa-music text-6xl text-purple-600"></i>
+            <p class="text-purple-700 font-bold text-2xl mt-3">
+              🎵 聴覚優位版: 3×4
+            </p>
+          </div>
+          
+          <!-- リズムで覚えるセクション -->
+          <div class="bg-purple-50 border-l-4 border-purple-400 p-5 rounded-lg mb-4">
+            <div class="flex items-center mb-3">
+              <span class="text-3xl mr-2">🎤</span>
+              <h4 class="font-bold text-purple-800 text-xl">リズムで覚える</h4>
+            </div>
+            <div class="ml-12 space-y-2 text-base text-gray-700">
+              <p class="font-bold text-purple-700">♪ さん・さん・さん・さん ♪</p>
+              <p>👏 手拍子に合わせて4回言ってみよう</p>
+              <p class="mt-2 text-lg font-bold text-purple-800">3 + 3 + 3 + 3 = ?</p>
+            </div>
+          </div>
+          
+          <!-- 歌で覚えるセクション -->
+          <div class="bg-pink-50 border-l-4 border-pink-400 p-5 rounded-lg mb-4">
+            <div class="flex items-center mb-3">
+              <span class="text-3xl mr-2">🎼</span>
+              <h4 class="font-bold text-pink-800 text-xl">歌で覚えよう</h4>
+            </div>
+            <div class="ml-12 space-y-2 text-base text-gray-700">
+              <p>🎶 「さんが よっつ」</p>
+              <p>🎶 「さん たす さん たす さん たす さん」</p>
+              <p>🎶 「ぜんぶで じゅうに！」</p>
+              <p class="font-bold text-pink-700 mt-3 text-xl">→ 答え: 12！</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- タブ2: 体験してみる -->
+        <div data-tab-content="case5-experience" class="bg-white rounded-xl p-6 shadow-inner hidden">
+          <div class="text-center mb-6">
+            <i class="fas fa-drum text-6xl text-purple-600"></i>
+            <p class="text-purple-700 font-bold text-2xl mt-3">
+              リズムタップ体験
+            </p>
+            <p class="text-gray-600 mt-2">ボタンをクリックしてリズムを刻もう！</p>
+          </div>
+          
+          <!-- リズムタップボタン -->
+          <div class="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-8 mb-6">
+            <div class="text-center mb-6">
+              <p class="text-xl font-bold text-purple-800 mb-3">3 を 4回 リズムよく叩こう！</p>
+              <div class="text-6xl font-bold text-purple-600" id="case5-tap-count">0</div>
+              <p class="text-gray-600 mt-2">回タップしました</p>
+            </div>
+            
+            <div class="grid grid-cols-4 gap-4 mb-6">
+              <button onclick="tapRhythm(1)" 
+                class="bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold text-3xl py-12 rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95">
+                3
+              </button>
+              <button onclick="tapRhythm(2)" 
+                class="bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold text-3xl py-12 rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95">
+                3
+              </button>
+              <button onclick="tapRhythm(3)" 
+                class="bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold text-3xl py-12 rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95">
+                3
+              </button>
+              <button onclick="tapRhythm(4)" 
+                class="bg-gradient-to-br from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold text-3xl py-12 rounded-xl shadow-lg transform transition-all hover:scale-105 active:scale-95">
+                3
+              </button>
+            </div>
+            
+            <div class="text-center">
+              <div id="case5-result" class="text-2xl font-bold text-purple-700 min-h-[2rem]"></div>
+              <button onclick="resetTapCount()" 
+                class="mt-4 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg transition-all">
+                リセット
+              </button>
+            </div>
+          </div>
+          
+          <!-- リズムパターン表示 -->
+          <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-6">
+            <div class="flex items-center mb-3">
+              <i class="fas fa-lightbulb text-2xl text-yellow-600 mr-2"></i>
+              <h4 class="font-bold text-yellow-800 text-xl">リズムのコツ</h4>
+            </div>
+            <div class="ml-10">
+              <p class="text-gray-700 mb-2">👏 タン・タン・タン・タン（一定のリズムで）</p>
+              <p class="text-gray-700 mb-2">🎵 「3・3・3・3」と声に出すとさらに良い！</p>
+              <p class="text-purple-700 font-bold text-lg mt-3">全部で 12 になるよ！</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- タブ3: AI動画 -->
+        <div data-tab-content="case5-video" class="bg-white rounded-xl p-6 shadow-inner hidden">
+          <div class="text-center mb-6">
+            <i class="fas fa-video text-6xl text-purple-600"></i>
+            <p class="text-purple-700 font-bold text-2xl mt-3">
+              AI生成リズム動画
+            </p>
+            <p class="text-gray-600 mt-2">音とリズムで理解する動画を生成します</p>
+          </div>
+          
+          <div class="text-center mb-6">
+            <button onclick="generateAudioVideoDemo()" 
+              class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-4 px-10 rounded-lg transition-all shadow-md hover:shadow-lg text-lg">
+              <i class="fas fa-play-circle mr-2"></i>動画を生成する
+            </button>
+          </div>
+          
+          <div id="audioVideoPreview"></div>
+        </div>
+        
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+  
+  // リズムタップのカウンター
+  window.case5TapCount = 0
+  window.case5TapSequence = []
+}
+
+// リズムタップ関数
+function tapRhythm(num) {
+  window.case5TapCount = (window.case5TapCount || 0) + 3
+  window.case5TapSequence = window.case5TapSequence || []
+  window.case5TapSequence.push(num)
+  
+  const countEl = document.getElementById('case5-tap-count')
+  const resultEl = document.getElementById('case5-result')
+  
+  if (countEl) {
+    countEl.textContent = window.case5TapCount
+    countEl.classList.add('animate-pulse')
+    setTimeout(() => countEl.classList.remove('animate-pulse'), 300)
+  }
+  
+  // 4回タップしたら結果表示
+  if (window.case5TapSequence.length === 4) {
+    if (resultEl) {
+      resultEl.innerHTML = `
+        <div class="bg-green-100 border-2 border-green-400 rounded-lg p-4 inline-block">
+          <i class="fas fa-check-circle text-green-600 mr-2"></i>
+          正解！ 3 × 4 = ${window.case5TapCount}
+        </div>
+      `
+    }
+  }
+}
+
+// リズムタップリセット
+function resetTapCount() {
+  window.case5TapCount = 0
+  window.case5TapSequence = []
+  const countEl = document.getElementById('case5-tap-count')
+  const resultEl = document.getElementById('case5-result')
+  if (countEl) countEl.textContent = '0'
+  if (resultEl) resultEl.innerHTML = ''
+}
       
       <!-- タイトルエリア -->
       <div class="text-center mb-6">
