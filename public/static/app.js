@@ -14332,9 +14332,14 @@ function showTeacherOverview(unitData) {
     <div class="container mx-auto px-4 py-8">
       <!-- ヘッダー -->
       <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg shadow-lg p-6 mb-6">
-        <button onclick="loadGuidePage(${curriculum.id})" class="text-white hover:text-gray-200 mb-4">
-          <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
-        </button>
+        <div class="flex items-center justify-between mb-4">
+          <button onclick="loadGuidePage(${curriculum.id})" class="text-white hover:text-gray-200">
+            <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
+          </button>
+          <button onclick="showTeacherClassDashboard(${curriculum.id})" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg font-bold transition">
+            <i class="fas fa-chart-line mr-2"></i>クラス統計ダッシュボード
+          </button>
+        </div>
         <h1 class="text-3xl font-bold mb-2">
           <i class="fas fa-chalkboard-teacher mr-2"></i>
           教師用：全体確認・編集
@@ -35885,3 +35890,328 @@ window.showLearningDashboard = showLearningDashboard
 window.closeLearningDashboard = closeLearningDashboard
 
 console.log('✅ 学習効果ダッシュボード機能を読み込みました')
+
+// =============================================================================
+// Phase 3-6: 教師向けダッシュボード
+// =============================================================================
+
+// 教師向けクラス統計ダッシュボードを表示
+async function showTeacherClassDashboard(curriculumId) {
+  try {
+    // クラス全体の統計を取得
+    const classStatsResponse = await axios.get(`/api/teacher/class-stats/${curriculumId}`)
+    const { class_overview, students_count, student_stats } = classStatsResponse.data
+    
+    // 学生別に統計を整理
+    const studentMap = new Map()
+    student_stats.forEach(stat => {
+      if (!studentMap.has(stat.student_id)) {
+        studentMap.set(stat.student_id, {
+          student_id: stat.student_id,
+          stats: {}
+        })
+      }
+      studentMap.get(stat.student_id).stats[stat.content_type] = stat
+    })
+    
+    const students = Array.from(studentMap.values())
+    
+    const modalHTML = `
+      <div id="teacherDashboardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeTeacherDashboard(event)">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+          <!-- ヘッダー -->
+          <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-2xl font-bold">
+                  <i class="fas fa-chalkboard-teacher mr-2"></i>教師向けクラスダッシュボード
+                </h2>
+                <p class="text-sm opacity-90 mt-1">クラス全体の学習状況を確認</p>
+              </div>
+              <button onclick="closeTeacherDashboard()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+                <i class="fas fa-times text-2xl"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- コンテンツ -->
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- クラス全体サマリー -->
+            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-xl p-6 mb-6">
+              <h3 class="text-xl font-bold text-indigo-800 mb-4">
+                <i class="fas fa-users mr-2"></i>クラス全体の統計
+              </h3>
+              <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div class="bg-white rounded-lg p-4 text-center">
+                  <p class="text-sm text-gray-600 mb-1">学習者数</p>
+                  <p class="text-3xl font-bold text-indigo-600">${students_count}</p>
+                </div>
+                <div class="bg-white rounded-lg p-4 text-center">
+                  <p class="text-sm text-gray-600 mb-1">総挑戦回数</p>
+                  <p class="text-3xl font-bold text-blue-600">${class_overview?.total_attempts || 0}</p>
+                </div>
+                <div class="bg-white rounded-lg p-4 text-center">
+                  <p class="text-sm text-gray-600 mb-1">平均正答率</p>
+                  <p class="text-3xl font-bold text-green-600">${class_overview?.avg_accuracy || 0}%</p>
+                </div>
+                <div class="bg-white rounded-lg p-4 text-center">
+                  <p class="text-sm text-gray-600 mb-1">平均時間</p>
+                  <p class="text-3xl font-bold text-orange-600">${class_overview?.avg_time || 0}秒</p>
+                </div>
+                <div class="bg-white rounded-lg p-4 text-center">
+                  <p class="text-sm text-gray-600 mb-1">ヒント使用</p>
+                  <p class="text-3xl font-bold text-yellow-600">${class_overview?.total_hints || 0}</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 個別学生リスト -->
+            <div class="bg-white border-2 border-gray-200 rounded-xl p-6">
+              <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-user-graduate mr-2"></i>個別学習者の進捗
+              </h3>
+              ${students.length > 0 ? `
+                <div class="space-y-3 max-h-96 overflow-y-auto">
+                  ${students.map((student, index) => {
+                    const freq = student.stats.frequent_problems || {}
+                    const app = student.stats.application_problems || {}
+                    const rev = student.stats.review_checklist || {}
+                    
+                    const avgAccuracy = [freq.accuracy_rate, app.accuracy_rate, rev.accuracy_rate]
+                      .filter(a => a != null)
+                      .reduce((sum, a) => sum + a, 0) / 
+                      [freq, app, rev].filter(s => s.accuracy_rate != null).length || 0
+                    
+                    const totalAttempts = (freq.total_attempts || 0) + (app.total_attempts || 0) + (rev.total_attempts || 0)
+                    
+                    return `
+                      <div class="border-2 border-gray-200 rounded-lg p-4 hover:shadow-lg transition">
+                        <div class="flex items-center justify-between">
+                          <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xl">
+                              ${index + 1}
+                            </div>
+                            <div>
+                              <p class="font-bold text-gray-800">学習者 ${student.student_id}</p>
+                              <p class="text-sm text-gray-600">挑戦回数: ${totalAttempts}回</p>
+                            </div>
+                          </div>
+                          <div class="flex items-center gap-4">
+                            <div class="text-right">
+                              <p class="text-sm text-gray-600">平均正答率</p>
+                              <p class="text-2xl font-bold ${
+                                avgAccuracy >= 80 ? 'text-green-600' : 
+                                avgAccuracy >= 60 ? 'text-yellow-600' : 
+                                'text-red-600'
+                              }">${avgAccuracy.toFixed(1)}%</p>
+                            </div>
+                            <button onclick="showStudentDetailReport(${student.student_id}, ${curriculumId})" 
+                                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition">
+                              <i class="fas fa-chart-line mr-2"></i>詳細
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <!-- ミニ統計 -->
+                        <div class="mt-3 grid grid-cols-3 gap-2">
+                          <div class="bg-red-50 rounded p-2 text-center">
+                            <p class="text-xs text-gray-600">よく出る問題</p>
+                            <p class="text-lg font-bold text-red-600">${freq.accuracy_rate || 0}%</p>
+                          </div>
+                          <div class="bg-orange-50 rounded p-2 text-center">
+                            <p class="text-xs text-gray-600">応用問題</p>
+                            <p class="text-lg font-bold text-orange-600">${app.accuracy_rate || 0}%</p>
+                          </div>
+                          <div class="bg-yellow-50 rounded p-2 text-center">
+                            <p class="text-xs text-gray-600">総復習</p>
+                            <p class="text-lg font-bold text-yellow-600">${rev.accuracy_rate || 0}%</p>
+                          </div>
+                        </div>
+                      </div>
+                    `
+                  }).join('')}
+                </div>
+              ` : `
+                <p class="text-center text-gray-500 py-8">学習データがありません</p>
+              `}
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+  } catch (error) {
+    console.error('教師ダッシュボード表示エラー:', error)
+    alert('クラス統計の読み込みに失敗しました')
+  }
+}
+
+// 個別学生の詳細レポートを表示
+async function showStudentDetailReport(studentId, curriculumId) {
+  try {
+    // 学生の詳細レポートを取得
+    const reportResponse = await axios.get(`/api/teacher/student-report/${studentId}?curriculum_id=${curriculumId}`)
+    const { stats, problem_stats, daily_activity } = reportResponse.data
+    
+    // 苦手分野を取得
+    const weakAreasResponse = await axios.get(`/api/teacher/weak-areas/${studentId}?curriculum_id=${curriculumId}`)
+    const { weak_problems, summary, recommendations } = weakAreasResponse.data
+    
+    const modalHTML = `
+      <div id="studentReportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeStudentReport(event)">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+          <!-- ヘッダー -->
+          <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-2xl font-bold">
+                  <i class="fas fa-user-graduate mr-2"></i>学習者 ${studentId} の詳細レポート
+                </h2>
+                <p class="text-sm opacity-90 mt-1">個別の学習状況と推奨事項</p>
+              </div>
+              <button onclick="closeStudentReport()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+                <i class="fas fa-times text-2xl"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- コンテンツ -->
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- 基本統計 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              ${stats.map(stat => {
+                const typeLabel = {
+                  'frequent_problems': 'よく出る問題',
+                  'application_problems': '応用問題',
+                  'review_checklist': '総復習'
+                }[stat.content_type] || stat.content_type
+                
+                const bgColor = {
+                  'frequent_problems': 'from-red-50 to-orange-50 border-red-300',
+                  'application_problems': 'from-orange-50 to-yellow-50 border-orange-300',
+                  'review_checklist': 'from-yellow-50 to-green-50 border-yellow-300'
+                }[stat.content_type] || 'from-gray-50 to-gray-100 border-gray-300'
+                
+                return `
+                  <div class="bg-gradient-to-br ${bgColor} border-2 rounded-xl p-4">
+                    <h4 class="font-bold text-gray-800 mb-3">${typeLabel}</h4>
+                    <div class="space-y-2">
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">正答率</span>
+                        <span class="font-bold text-lg">${stat.accuracy_rate}%</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">挑戦回数</span>
+                        <span class="font-bold">${stat.total_attempts}回</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">平均時間</span>
+                        <span class="font-bold">${stat.avg_answer_time || 0}秒</span>
+                      </div>
+                    </div>
+                  </div>
+                `
+              }).join('')}
+            </div>
+            
+            <!-- 苦手分野分析 -->
+            <div class="bg-red-50 border-2 border-red-300 rounded-xl p-6 mb-6">
+              <h3 class="text-xl font-bold text-red-800 mb-4">
+                <i class="fas fa-exclamation-triangle mr-2"></i>苦手分野の分析
+              </h3>
+              
+              <div class="grid grid-cols-4 gap-4 mb-4">
+                <div class="bg-white rounded-lg p-3 text-center">
+                  <p class="text-sm text-gray-600">苦手な問題</p>
+                  <p class="text-2xl font-bold text-red-600">${summary.total_weak_problems}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 text-center">
+                  <p class="text-sm text-gray-600">要復習</p>
+                  <p class="text-2xl font-bold text-orange-600">${summary.needs_review}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 text-center">
+                  <p class="text-sm text-gray-600">要練習</p>
+                  <p class="text-2xl font-bold text-yellow-600">${summary.needs_practice}</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 text-center">
+                  <p class="text-sm text-gray-600">ヒント依存</p>
+                  <p class="text-2xl font-bold text-blue-600">${summary.high_hint_usage}</p>
+                </div>
+              </div>
+              
+              <!-- 推奨事項 -->
+              <div class="bg-white rounded-lg p-4">
+                <h4 class="font-bold text-gray-800 mb-3">
+                  <i class="fas fa-lightbulb mr-2"></i>推奨事項
+                </h4>
+                <div class="space-y-2">
+                  ${recommendations.map(rec => `
+                    <div class="flex items-start gap-3 p-3 rounded-lg ${
+                      rec.priority === 'high' ? 'bg-red-100' :
+                      rec.priority === 'medium' ? 'bg-yellow-100' :
+                      'bg-green-100'
+                    }">
+                      <i class="fas ${
+                        rec.priority === 'high' ? 'fa-exclamation-circle text-red-600' :
+                        rec.priority === 'medium' ? 'fa-info-circle text-yellow-600' :
+                        'fa-check-circle text-green-600'
+                      } text-xl mt-1"></i>
+                      <p class="text-sm text-gray-800">${rec.message}</p>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+            
+            <!-- 学習ペース -->
+            ${daily_activity.length > 0 ? `
+              <div class="bg-white border-2 border-gray-200 rounded-xl p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">
+                  <i class="fas fa-calendar-alt mr-2"></i>最近の学習ペース
+                </h3>
+                <div class="space-y-2 max-h-60 overflow-y-auto">
+                  ${daily_activity.slice(0, 10).map(day => `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <span class="font-medium text-gray-700">${day.date}</span>
+                      <div class="flex gap-4">
+                        <span class="text-sm text-gray-600">挑戦: ${day.activities}回</span>
+                        <span class="text-sm font-bold text-green-600">正解: ${day.correct}回</span>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+  } catch (error) {
+    console.error('学生レポート表示エラー:', error)
+    alert('学生レポートの読み込みに失敗しました')
+  }
+}
+
+function closeTeacherDashboard(event) {
+  if (event && event.target.id !== 'teacherDashboardModal') return
+  const modal = document.getElementById('teacherDashboardModal')
+  if (modal) modal.remove()
+}
+
+function closeStudentReport(event) {
+  if (event && event.target.id !== 'studentReportModal') return
+  const modal = document.getElementById('studentReportModal')
+  if (modal) modal.remove()
+}
+
+window.showTeacherClassDashboard = showTeacherClassDashboard
+window.showStudentDetailReport = showStudentDetailReport
+window.closeTeacherDashboard = closeTeacherDashboard
+window.closeStudentReport = closeStudentReport
+
+console.log('✅ 教師向けダッシュボード機能を読み込みました')

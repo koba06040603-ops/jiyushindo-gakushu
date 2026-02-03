@@ -7765,6 +7765,239 @@ app.get('/api/retrieval-practice/history/:studentId', async (c) => {
   }
 })
 
+// =============================================================================
+// Phase 3-6: 教師向けダッシュボードAPI
+// =============================================================================
+
+// APIルート：クラス全体の学習統計を取得（教師向け）
+app.get('/api/teacher/class-stats/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    // 全学生の統計を取得
+    const allStudentsStats = await env.DB.prepare(`
+      SELECT 
+        student_id,
+        content_type,
+        COUNT(*) as total_attempts,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        ROUND(AVG(CASE WHEN is_correct IS NOT NULL THEN is_correct ELSE 0 END) * 100, 2) as accuracy_rate,
+        ROUND(AVG(answer_time_seconds), 1) as avg_answer_time,
+        SUM(hint_used) as total_hints_used,
+        MIN(created_at) as first_attempt,
+        MAX(created_at) as last_attempt
+      FROM retrieval_practice_log
+      WHERE curriculum_id = ?
+      GROUP BY student_id, content_type
+    `).bind(curriculumId).all()
+    
+    // クラス全体の集計
+    const classOverview = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT student_id) as total_students,
+        COUNT(*) as total_attempts,
+        ROUND(AVG(CASE WHEN is_correct IS NOT NULL THEN is_correct ELSE 0 END) * 100, 2) as avg_accuracy,
+        ROUND(AVG(answer_time_seconds), 1) as avg_time,
+        SUM(hint_used) as total_hints
+      FROM retrieval_practice_log
+      WHERE curriculum_id = ?
+    `).bind(curriculumId).first()
+    
+    // 学生リストを取得
+    const students = await env.DB.prepare(`
+      SELECT DISTINCT student_id
+      FROM retrieval_practice_log
+      WHERE curriculum_id = ?
+    `).bind(curriculumId).all()
+    
+    return c.json({
+      success: true,
+      curriculum_id: curriculumId,
+      class_overview: classOverview,
+      students_count: students.results?.length || 0,
+      student_stats: allStudentsStats.results || []
+    })
+    
+  } catch (error: any) {
+    console.error('クラス統計取得エラー:', error)
+    return c.json({
+      success: false,
+      error: 'クラス統計の取得に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：個別学生の詳細レポート取得（教師向け）
+app.get('/api/teacher/student-report/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.query('curriculum_id')
+  
+  try {
+    // 学生の基本統計
+    let statsQuery = `
+      SELECT 
+        content_type,
+        COUNT(*) as total_attempts,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        ROUND(AVG(CASE WHEN is_correct IS NOT NULL THEN is_correct ELSE 0 END) * 100, 2) as accuracy_rate,
+        ROUND(AVG(answer_time_seconds), 1) as avg_answer_time,
+        SUM(hint_used) as hints_used,
+        MIN(created_at) as first_activity,
+        MAX(created_at) as last_activity
+      FROM retrieval_practice_log
+      WHERE student_id = ?
+    `
+    
+    const bindings: any[] = [studentId]
+    
+    if (curriculumId) {
+      statsQuery += ' AND curriculum_id = ?'
+      bindings.push(curriculumId)
+    }
+    
+    statsQuery += ' GROUP BY content_type'
+    
+    const stats = await env.DB.prepare(statsQuery).bind(...bindings).all()
+    
+    // 問題別の正答率
+    const problemStats = await env.DB.prepare(`
+      SELECT 
+        problem_id,
+        content_type,
+        COUNT(*) as attempts,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
+        ROUND(AVG(CASE WHEN is_correct IS NOT NULL THEN is_correct ELSE 0 END) * 100, 2) as accuracy
+      FROM retrieval_practice_log
+      WHERE student_id = ? ${curriculumId ? 'AND curriculum_id = ?' : ''}
+        AND problem_id IS NOT NULL
+      GROUP BY problem_id, content_type
+      ORDER BY accuracy ASC
+    `).bind(curriculumId ? [studentId, curriculumId] : [studentId]).all()
+    
+    // 学習ペース分析（日別）
+    const dailyActivity = await env.DB.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as activities,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+      FROM retrieval_practice_log
+      WHERE student_id = ? ${curriculumId ? 'AND curriculum_id = ?' : ''}
+      GROUP BY DATE(created_at)
+      ORDER BY date DESC
+      LIMIT 30
+    `).bind(curriculumId ? [studentId, curriculumId] : [studentId]).all()
+    
+    return c.json({
+      success: true,
+      student_id: studentId,
+      stats: stats.results || [],
+      problem_stats: problemStats.results || [],
+      daily_activity: dailyActivity.results || []
+    })
+    
+  } catch (error: any) {
+    console.error('学生レポート取得エラー:', error)
+    return c.json({
+      success: false,
+      error: '学生レポートの取得に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// APIルート：苦手分野を自動検出（AI分析）
+app.get('/api/teacher/weak-areas/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.query('curriculum_id')
+  
+  try {
+    // 正答率が低い問題を特定
+    const weakProblems = await env.DB.prepare(`
+      SELECT 
+        problem_id,
+        content_type,
+        COUNT(*) as attempts,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
+        ROUND(AVG(CASE WHEN is_correct IS NOT NULL THEN is_correct ELSE 0 END) * 100, 2) as accuracy,
+        AVG(answer_time_seconds) as avg_time,
+        SUM(hint_used) as hints_used
+      FROM retrieval_practice_log
+      WHERE student_id = ? ${curriculumId ? 'AND curriculum_id = ?' : ''}
+        AND problem_id IS NOT NULL
+      GROUP BY problem_id, content_type
+      HAVING accuracy < 60 OR attempts >= 3
+      ORDER BY accuracy ASC, attempts DESC
+    `).bind(curriculumId ? [studentId, curriculumId] : [studentId]).all()
+    
+    // 苦手分野の傾向を分析
+    const weakAreaSummary = {
+      total_weak_problems: weakProblems.results?.length || 0,
+      needs_review: (weakProblems.results || []).filter((p: any) => p.accuracy < 50).length,
+      needs_practice: (weakProblems.results || []).filter((p: any) => p.accuracy >= 50 && p.accuracy < 70).length,
+      high_hint_usage: (weakProblems.results || []).filter((p: any) => p.hints_used >= 2).length
+    }
+    
+    return c.json({
+      success: true,
+      student_id: studentId,
+      weak_problems: weakProblems.results || [],
+      summary: weakAreaSummary,
+      recommendations: generateRecommendations(weakAreaSummary)
+    })
+    
+  } catch (error: any) {
+    console.error('苦手分野検出エラー:', error)
+    return c.json({
+      success: false,
+      error: '苦手分野の検出に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// 推奨事項を生成
+function generateRecommendations(summary: any) {
+  const recommendations = []
+  
+  if (summary.needs_review > 0) {
+    recommendations.push({
+      priority: 'high',
+      type: 'review',
+      message: `正答率50%未満の問題が${summary.needs_review}問あります。基礎から復習することをお勧めします。`
+    })
+  }
+  
+  if (summary.needs_practice > 0) {
+    recommendations.push({
+      priority: 'medium',
+      type: 'practice',
+      message: `正答率50-70%の問題が${summary.needs_practice}問あります。追加練習で理解を深めましょう。`
+    })
+  }
+  
+  if (summary.high_hint_usage > 0) {
+    recommendations.push({
+      priority: 'medium',
+      type: 'hint_dependency',
+      message: `ヒントを多く使用している問題が${summary.high_hint_usage}問あります。自力で解く練習が必要です。`
+    })
+  }
+  
+  if (summary.total_weak_problems === 0) {
+    recommendations.push({
+      priority: 'low',
+      type: 'good',
+      message: '苦手な問題は見つかりませんでした。この調子で学習を続けましょう！'
+    })
+  }
+  
+  return recommendations
+}
+
 // APIルート：評価問題を生成（チェックテスト・選択問題）
 app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c) => {
   const { env } = c
