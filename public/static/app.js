@@ -30759,9 +30759,9 @@ function demoCase4Audio() {
 // ケース4: 体験優位版デモ
 function demoCase4Kinesthetic() {
   const modal = document.createElement('div')
-  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4 overflow-y-auto'
   modal.innerHTML = `
-    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 max-w-lg mx-4 relative shadow-2xl">
+    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 max-w-lg w-full my-8 relative shadow-2xl">
       <!-- ×ボタン（右上・絶対配置） -->
       <button onclick="this.closest('.fixed').remove()" 
         class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 transition-colors z-10">
@@ -30889,7 +30889,7 @@ async function generateKinestheticVideoDemo() {
     
     previewDiv.innerHTML = `
       <div class="bg-white rounded-lg p-4 shadow-lg">
-        <div class="bg-gray-900 rounded-lg overflow-hidden mb-3" style="height: 400px;">
+        <div class="bg-gray-900 rounded-lg overflow-hidden mb-3" style="height: 300px;">
           <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
             class="w-full h-full" frameborder="0" 
             sandbox="allow-scripts"
