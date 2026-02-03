@@ -7550,6 +7550,221 @@ app.get('/api/curriculum/:curriculumId/retrieval-practice', async (c) => {
   }
 })
 
+// =============================================================================
+// Phase 3: 学習履歴記録と分析システム
+// =============================================================================
+
+// APIルート：検索練習学習活動を記録
+app.post('/api/retrieval-practice/log', async (c) => {
+  const { env } = c
+  
+  try {
+    const body = await c.req.json()
+    const {
+      student_id,
+      curriculum_id,
+      content_type,
+      problem_id,
+      item_id,
+      is_correct,
+      answer_time_seconds,
+      hint_used,
+      attempt_count,
+      session_id,
+      device_type
+    } = body
+    
+    // 必須パラメータの検証
+    if (!student_id || !curriculum_id || !content_type) {
+      return c.json({ 
+        success: false, 
+        error: '必須パラメータが不足しています（student_id, curriculum_id, content_type）' 
+      }, 400)
+    }
+    
+    // content_typeの検証
+    const validContentTypes = ['frequent_problems', 'application_problems', 'review_checklist']
+    if (!validContentTypes.includes(content_type)) {
+      return c.json({ 
+        success: false, 
+        error: `無効なcontent_typeです。有効な値: ${validContentTypes.join(', ')}` 
+      }, 400)
+    }
+    
+    // データベースに記録
+    const result = await env.DB.prepare(`
+      INSERT INTO retrieval_practice_log (
+        student_id, curriculum_id, content_type, problem_id, item_id,
+        is_correct, answer_time_seconds, hint_used, attempt_count,
+        session_id, device_type, created_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      student_id,
+      curriculum_id,
+      content_type,
+      problem_id || null,
+      item_id || null,
+      is_correct !== undefined ? (is_correct ? 1 : 0) : null,
+      answer_time_seconds || null,
+      hint_used ? 1 : 0,
+      attempt_count || 1,
+      session_id || null,
+      device_type || null
+    ).run()
+    
+    console.log(`✅ 学習活動記録: student=${student_id}, curriculum=${curriculum_id}, type=${content_type}`)
+    
+    return c.json({ 
+      success: true,
+      log_id: result.meta.last_row_id,
+      message: '学習活動を記録しました'
+    })
+    
+  } catch (error: any) {
+    console.error('学習活動記録エラー:', error)
+    return c.json({ 
+      success: false,
+      error: '学習活動の記録に失敗しました', 
+      details: error.message 
+    }, 500)
+  }
+})
+
+// APIルート：学生別学習統計を取得
+app.get('/api/retrieval-practice/stats/student/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.query('curriculum_id')
+  
+  try {
+    let query = `
+      SELECT 
+        content_type,
+        COUNT(*) as total_attempts,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        ROUND(AVG(CASE WHEN is_correct IS NOT NULL THEN is_correct ELSE 0 END) * 100, 2) as accuracy_rate,
+        ROUND(AVG(answer_time_seconds), 1) as avg_answer_time,
+        SUM(hint_used) as total_hints_used,
+        MIN(created_at) as first_attempt,
+        MAX(created_at) as last_attempt
+      FROM retrieval_practice_log
+      WHERE student_id = ?
+    `
+    
+    const bindings: any[] = [studentId]
+    
+    if (curriculumId) {
+      query += ' AND curriculum_id = ?'
+      bindings.push(curriculumId)
+    }
+    
+    query += ' GROUP BY content_type'
+    
+    const stats = await env.DB.prepare(query).bind(...bindings).all()
+    
+    return c.json({ 
+      success: true,
+      student_id: studentId,
+      curriculum_id: curriculumId || 'all',
+      stats: stats.results || []
+    })
+    
+  } catch (error: any) {
+    console.error('学習統計取得エラー:', error)
+    return c.json({ 
+      success: false,
+      error: '学習統計の取得に失敗しました', 
+      details: error.message 
+    }, 500)
+  }
+})
+
+// APIルート：カリキュラム別学習統計を取得
+app.get('/api/retrieval-practice/stats/curriculum/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    const stats = await env.DB.prepare(`
+      SELECT 
+        content_type,
+        COUNT(DISTINCT student_id) as unique_students,
+        COUNT(*) as total_attempts,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        ROUND(AVG(CASE WHEN is_correct IS NOT NULL THEN is_correct ELSE 0 END) * 100, 2) as avg_accuracy,
+        ROUND(AVG(answer_time_seconds), 1) as avg_time,
+        MIN(created_at) as first_activity,
+        MAX(created_at) as last_activity
+      FROM retrieval_practice_log
+      WHERE curriculum_id = ?
+      GROUP BY content_type
+    `).bind(curriculumId).all()
+    
+    return c.json({ 
+      success: true,
+      curriculum_id: curriculumId,
+      stats: stats.results || []
+    })
+    
+  } catch (error: any) {
+    console.error('カリキュラム統計取得エラー:', error)
+    return c.json({ 
+      success: false,
+      error: 'カリキュラム統計の取得に失敗しました', 
+      details: error.message 
+    }, 500)
+  }
+})
+
+// APIルート：学習履歴詳細を取得
+app.get('/api/retrieval-practice/history/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const curriculumId = c.req.query('curriculum_id')
+  const contentType = c.req.query('content_type')
+  const limit = parseInt(c.req.query('limit') || '50')
+  
+  try {
+    let query = `
+      SELECT *
+      FROM retrieval_practice_log
+      WHERE student_id = ?
+    `
+    
+    const bindings: any[] = [studentId]
+    
+    if (curriculumId) {
+      query += ' AND curriculum_id = ?'
+      bindings.push(curriculumId)
+    }
+    
+    if (contentType) {
+      query += ' AND content_type = ?'
+      bindings.push(contentType)
+    }
+    
+    query += ' ORDER BY created_at DESC LIMIT ?'
+    bindings.push(limit)
+    
+    const history = await env.DB.prepare(query).bind(...bindings).all()
+    
+    return c.json({ 
+      success: true,
+      student_id: studentId,
+      history: history.results || []
+    })
+    
+  } catch (error: any) {
+    console.error('学習履歴取得エラー:', error)
+    return c.json({ 
+      success: false,
+      error: '学習履歴の取得に失敗しました', 
+      details: error.message 
+    }, 500)
+  }
+})
+
 // APIルート：評価問題を生成（チェックテスト・選択問題）
 app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c) => {
   const { env } = c

@@ -829,6 +829,65 @@ async function updateLearningProfile() {
 }
 
 // =============================================================================
+// Phase 3: 検索練習学習記録機能
+// =============================================================================
+
+// 検索練習学習ログ記録関数
+async function logRetrievalPracticeActivity(data) {
+  try {
+    const logData = {
+      student_id: state.student?.id || 1,
+      curriculum_id: data.curriculumId || state.selectedCurriculum?.id,
+      content_type: data.contentType, // 'frequent_problems' | 'application_problems' | 'review_checklist'
+      problem_id: data.problemId || null,
+      item_id: data.itemId || null,
+      is_correct: data.isCorrect,
+      answer_time_seconds: data.answerTime || null,
+      hint_used: data.hintUsed || false,
+      attempt_count: data.attemptCount || 1,
+      session_id: state.sessionId || null,
+      device_type: getDeviceType()
+    }
+    
+    console.log('📝 検索練習ログ記録:', logData)
+    
+    const response = await axios.post('/api/retrieval-practice/log', logData)
+    
+    if (response.data.success) {
+      console.log('✅ 検索練習ログ記録成功:', response.data.log_id)
+    }
+  } catch (error) {
+    console.error('検索練習ログ記録エラー:', error)
+  }
+}
+
+// デバイスタイプ判定
+function getDeviceType() {
+  const width = window.innerWidth
+  if (width < 768) return 'mobile'
+  if (width < 1024) return 'tablet'
+  return 'desktop'
+}
+
+// 学習タイマー管理
+const learningTimer = {
+  startTime: null,
+  
+  start() {
+    this.startTime = Date.now()
+  },
+  
+  getElapsedSeconds() {
+    if (!this.startTime) return 0
+    return Math.floor((Date.now() - this.startTime) / 1000)
+  },
+  
+  reset() {
+    this.startTime = null
+  }
+}
+
+// =============================================================================
 
 // グローバルローディング管理
 const loadingManager = {
@@ -34949,7 +35008,20 @@ async function showCase10FrequentProblems(curriculumId) {
                           <p class="text-sm font-bold text-green-800 mb-1">
                             <i class="fas fa-check-circle mr-2"></i>答え
                           </p>
-                          <p class="text-gray-800">${problem.answer}</p>
+                          <p class="text-gray-800 mb-3">${problem.answer}</p>
+                          
+                          <!-- 自己評価ボタン -->
+                          <div id="self-eval-10-${index}" class="hidden mt-3 pt-3 border-t-2 border-green-300">
+                            <p class="text-xs text-gray-600 mb-2">この問題は解けましたか？</p>
+                            <div class="flex gap-2">
+                              <button onclick="recordCase10SelfEval(${index}, true)" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded text-xs font-bold transition">
+                                <i class="fas fa-smile mr-1"></i>できた！
+                              </button>
+                              <button onclick="recordCase10SelfEval(${index}, false)" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-xs font-bold transition">
+                                <i class="fas fa-redo mr-1"></i>もう一度
+                              </button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                       
@@ -35012,14 +35084,71 @@ function closeFrequentProblemsModal(event) {
 function toggleAnswer10(index) {
   const answerDiv = document.getElementById(`answer10-${index}`)
   if (answerDiv) {
+    const wasHidden = answerDiv.classList.contains('hidden')
     answerDiv.classList.toggle('hidden')
+    
+    // 答えを表示した場合、学習記録（正解判定なし）
+    if (wasHidden) {
+      learningTimer.start()
+      
+      // 答え確認後にユーザーに自己評価を促す
+      setTimeout(() => {
+        const elapsedTime = learningTimer.getElapsedSeconds()
+        
+        // モーダル内に自己評価ボタンを追加
+        const selfEvalDiv = document.getElementById(`self-eval-10-${index}`)
+        if (selfEvalDiv && selfEvalDiv.classList.contains('hidden')) {
+          selfEvalDiv.classList.remove('hidden')
+        }
+        
+        learningTimer.reset()
+      }, 1000)
+    }
   }
 }
 
 function toggleHints10(index) {
   const hintsDiv = document.getElementById(`hints10-${index}`)
   if (hintsDiv) {
+    const wasHidden = hintsDiv.classList.contains('hidden')
     hintsDiv.classList.toggle('hidden')
+    
+    // ヒントを表示した場合、学習記録
+    if (wasHidden) {
+      logRetrievalPracticeActivity({
+        contentType: 'frequent_problems',
+        problemId: index + 1,
+        hintUsed: true,
+        answerTime: null,
+        isCorrect: null
+      })
+    }
+  }
+}
+
+// ケース10自己評価記録
+function recordCase10SelfEval(index, isCorrect) {
+  const elapsedTime = learningTimer.getElapsedSeconds() || 30
+  const hintsDiv = document.getElementById(`hints10-${index}`)
+  const hintUsed = hintsDiv && !hintsDiv.classList.contains('hidden')
+  
+  logRetrievalPracticeActivity({
+    contentType: 'frequent_problems',
+    problemId: index + 1,
+    isCorrect: isCorrect,
+    answerTime: elapsedTime,
+    hintUsed: hintUsed
+  })
+  
+  // 自己評価ボタンを非表示
+  const selfEvalDiv = document.getElementById(`self-eval-10-${index}`)
+  if (selfEvalDiv) {
+    selfEvalDiv.innerHTML = `
+      <p class="text-sm font-bold ${isCorrect ? 'text-green-700' : 'text-orange-700'}">
+        <i class="fas ${isCorrect ? 'fa-check-circle' : 'fa-redo'} mr-1"></i>
+        ${isCorrect ? '記録しました！' : 'もう一度がんばろう！'}
+      </p>
+    `
   }
 }
 
