@@ -5,8 +5,8 @@
 ## 🌐 本番環境URL
 
 **本番デプロイ完了！** ✅  
-- **本番URL**: https://90db059c.jiyushindo-gakushu.pages.dev
-- **API仕様書**: https://90db059c.jiyushindo-gakushu.pages.dev/static/api-docs
+- **本番URL**: https://6cef01f8.jiyushindo-gakushu.pages.dev
+- **API仕様書**: https://6cef01f8.jiyushindo-gakushu.pages.dev/static/api-docs
 - **管理者プレビュー**: ローカル環境で `dist/admin-preview.html` を直接開く（実装済み、498行）
 - **デプロイ日時**: 2026-02-03
 - **プラットフォーム**: Cloudflare Pages
@@ -30,7 +30,7 @@
 ### ケース5-12 タブ機能＋インタラクティブ体験実装完了 ✨
 
 **実装完了日**: 2026-02-03  
-**デプロイURL**: https://90db059c.jiyushindo-gakushu.pages.dev
+**デプロイURL**: https://6cef01f8.jiyushindo-gakushu.pages.dev
 
 #### 📋 実装概要
 
