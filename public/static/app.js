@@ -30490,10 +30490,10 @@ function demoCase3Video() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
   modal.innerHTML = `
-    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
+    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-yellow-700">
-          <i class="fas fa-home mr-2"></i>ケース3: AI解説動画（Gemini Veo）
+          <i class="fas fa-home mr-2"></i>ケース3: AI解説動画（Canvas）
         </h3>
         <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
           <i class="fas fa-times text-2xl"></i>
@@ -30501,32 +30501,22 @@ function demoCase3Video() {
       </div>
       <div class="mb-4">
         <p class="text-gray-700 mb-2">
-          <strong>生成内容:</strong> 授業の代わりになる「3×4の要点」解説動画（5秒）
+          <strong>生成内容:</strong> 授業の代わりになる「3×4の要点」解説動画（10秒）
         </p>
         <p class="text-sm text-gray-600 mb-4">
           欠席が多い児童Cさん向けに、自宅で学習できる要点動画。
         </p>
       </div>
-      <div class="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-200 mb-4">
+      <div id="case3VideoResult" class="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-200 mb-4">
         <div class="text-center py-8">
-          <div class="animate-pulse mb-4">
+          <div class="mb-4">
             <i class="fas fa-chalkboard-teacher text-6xl text-yellow-600"></i>
           </div>
-          <p class="text-yellow-700 font-semibold mb-2">📹 授業代替動画デモ</p>
-          <p class="text-sm text-gray-600 mb-4">
-            3×4の計算方法を、5秒で要点をまとめて説明。<br>
-            「3を4かいたす = 3+3+3+3 = 12」
-          </p>
-          <div class="bg-white p-3 rounded border">
-            <p class="text-xs text-gray-500 mb-2">
-              <i class="fas fa-check-circle text-green-500 mr-1"></i>
-              Gemini Veo で生成（約30秒）
-            </p>
-            <p class="text-xs text-gray-500">
-              <i class="fas fa-home text-yellow-500 mr-1"></i>
-              自宅で何度でも見返せる
-            </p>
-          </div>
+          <p class="text-yellow-700 font-semibold mb-4">📹 授業代替動画デモ</p>
+          <button onclick="generateCase3Video()" 
+            class="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition font-semibold">
+            <i class="fas fa-play-circle mr-2"></i>動画を生成する
+          </button>
         </div>
       </div>
       <button onclick="this.closest('.fixed').remove()" 
@@ -30536,6 +30526,79 @@ function demoCase3Video() {
     </div>
   `
   document.body.appendChild(modal)
+}
+
+// ケース3動画生成実行
+async function generateCase3Video() {
+  const resultDiv = document.getElementById('case3VideoResult')
+  
+  resultDiv.innerHTML = `
+    <div class="text-center py-8">
+      <div class="animate-spin mb-4 mx-auto">
+        <i class="fas fa-spinner text-6xl text-yellow-600"></i>
+      </div>
+      <p class="text-yellow-700 font-semibold mb-2">AI動画生成中...</p>
+      <p class="text-sm text-gray-600">要点をまとめた解説動画を生成しています</p>
+    </div>
+  `
+  
+  try {
+    const response = await fetch('/api/media/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: '欠席児童向け: 3×4の要点解説（簡潔版）',
+        duration: 10
+      })
+    })
+    
+    if (!response.ok) throw new Error('動画生成に失敗しました')
+    
+    const data = await response.json()
+    
+    resultDiv.innerHTML = `
+      <div class="py-4">
+        <div class="mb-4">
+          <div class="bg-white rounded-lg overflow-hidden border-2 border-yellow-300" style="height: 500px;">
+            <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+              class="w-full h-full" frameborder="0" 
+              sandbox="allow-scripts"
+              style="background: white;"></iframe>
+          </div>
+        </div>
+        
+        <div class="space-y-2">
+          <div class="bg-white p-3 rounded border flex items-start">
+            <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-gray-800">生成完了！</p>
+              <p class="text-xs text-gray-600">Canvas アニメーションで生成</p>
+            </div>
+          </div>
+          
+          <div class="bg-yellow-100 p-3 rounded">
+            <h4 class="font-bold text-sm text-gray-800 mb-2">
+              <i class="fas fa-info-circle text-yellow-600 mr-1"></i>
+              生成された動画の特徴
+            </h4>
+            <ul class="text-xs text-gray-700 space-y-1">
+              <li>• 10秒の短時間で要点を説明</li>
+              <li>• リンゴが動いて視覚的に理解</li>
+              <li>• 自宅で何度でも見返せる</li>
+              <li>• ${data.note}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+        <p>エラー: ${error.message}</p>
+      </div>
+    `
+  }
 }
 
 // ケース4: 学習スタイル別対応 - 視覚優位版デモ
