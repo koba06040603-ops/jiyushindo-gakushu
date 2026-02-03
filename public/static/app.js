@@ -31727,3 +31727,494 @@ window.generateTestPrepVideo = generateTestPrepVideo
 
 console.log('✅ ケース5, 7, 10 実装完了')
 console.log('📝 残りのケース8, 9, 11, 12は同様のパターンで実装可能')
+
+// ケース8: 特別支援 - 視覚重視
+function demoCase8Visual() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 w-[95vw] h-[95vh] relative shadow-2xl overflow-y-auto">
+      <button onclick="this.closest('.fixed').remove()" 
+        class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 transition-colors z-10 bg-white rounded-full p-2 shadow-lg">
+        <i class="fas fa-times text-2xl"></i>
+      </button>
+      
+      <div class="text-center mb-6">
+        <h3 class="text-3xl font-bold text-gray-800 mb-3">
+          特徴: 図・色・イラストで理解
+        </h3>
+        <p class="text-lg text-blue-600">
+          特別支援：視覚情報を最大限に活用
+        </p>
+      </div>
+      
+      <div class="bg-white rounded-xl p-8 shadow-inner">
+        <div class="text-center mb-8">
+          <div class="inline-block mb-4">
+            <i class="fas fa-eye text-8xl text-blue-600"></i>
+          </div>
+          <p class="text-blue-700 font-bold text-3xl">
+            👁️ 視覚重視版: 3×4
+          </p>
+        </div>
+        
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">🎨</span>
+            <h4 class="font-bold text-blue-800 text-2xl">色で区別</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p>🔴 赤グループ: 3個</p>
+            <p>🔵 青グループ: 3個</p>
+            <p>🟢 緑グループ: 3個</p>
+            <p>🟡 黄グループ: 3個</p>
+            <p class="font-bold text-blue-700 mt-3 text-xl">全部で 4グループ = 12個</p>
+          </div>
+        </div>
+        
+        <div class="bg-indigo-50 border-l-4 border-indigo-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">📊</span>
+            <h4 class="font-bold text-indigo-800 text-2xl">図で確認</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p>✓ 4つのグループに分ける</p>
+            <p>✓ 各グループ3個ずつ</p>
+            <p>✓ 図を見ながら数える</p>
+            <p class="font-bold text-indigo-700 mt-3 text-2xl">→ 答え: 12個！</p>
+          </div>
+        </div>
+        
+        <div class="bg-purple-50 border-l-4 border-purple-400 p-6 rounded-lg">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">📹</span>
+            <h4 class="font-bold text-purple-800 text-2xl">AI生成視覚動画</h4>
+          </div>
+          <p class="ml-16 text-lg text-gray-700 mb-4">
+            色と図形で理解する視覚的な動画
+          </p>
+          <button onclick="generateVisualSupportVideo()" 
+            class="ml-16 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 px-10 rounded-lg transition-all shadow-md hover:shadow-lg text-lg">
+            <i class="fas fa-play-circle mr-2"></i>動画を生成する
+          </button>
+        </div>
+        
+        <div id="visualSupportVideoPreview" class="hidden mt-6"></div>
+      </div>
+      
+      <div class="mt-6 flex justify-center text-lg text-blue-600">
+        <div class="flex items-center">
+          <i class="fas fa-palette mr-2 text-2xl"></i>
+          <span>色と図形で視覚的に理解</span>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+async function generateVisualSupportVideo() {
+  const previewDiv = document.getElementById('visualSupportVideoPreview')
+  if (!previewDiv) return
+  
+  previewDiv.classList.remove('hidden')
+  previewDiv.innerHTML = '<div class="bg-white rounded-lg p-6 shadow-lg text-center"><div class="animate-spin mb-4 mx-auto inline-block"><i class="fas fa-spinner text-5xl text-blue-600"></i></div><p class="text-blue-700 font-semibold mb-2">AI動画生成中...</p></div>'
+  
+  try {
+    const response = await fetch('/api/media/generate-video-support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caseNumber: 8 })
+    })
+    
+    const data = await response.json()
+    
+    previewDiv.innerHTML = `
+      <div class="bg-white rounded-lg p-6 shadow-lg">
+        <div class="bg-gray-900 rounded-lg overflow-hidden mb-4" style="height: 500px;">
+          <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+            class="w-full h-full" frameborder="0" sandbox="allow-scripts" style="background: white;"></iframe>
+        </div>
+        <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
+          <p class="text-lg text-green-800"><i class="fas fa-check-circle mr-2"></i><strong>生成完了！</strong> ${data.note}</p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    previewDiv.innerHTML = '<div class="bg-white rounded-lg p-6 text-center text-red-600"><i class="fas fa-exclamation-circle text-6xl mb-4"></i><p class="font-semibold">エラーが発生しました</p></div>'
+  }
+}
+
+window.demoCase8Visual = demoCase8Visual
+window.generateVisualSupportVideo = generateVisualSupportVideo
+
+// ケース9: 特別支援 - 繰り返し強化
+function demoCase9Repetition() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl p-8 w-[95vw] h-[95vh] relative shadow-2xl overflow-y-auto">
+      <button onclick="this.closest('.fixed').remove()" 
+        class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 transition-colors z-10 bg-white rounded-full p-2 shadow-lg">
+        <i class="fas fa-times text-2xl"></i>
+      </button>
+      
+      <div class="text-center mb-6">
+        <h3 class="text-3xl font-bold text-gray-800 mb-3">
+          特徴: 何度も繰り返して定着
+        </h3>
+        <p class="text-lg text-amber-600">
+          特別支援：反復練習で確実に身につける
+        </p>
+      </div>
+      
+      <div class="bg-white rounded-xl p-8 shadow-inner">
+        <div class="text-center mb-8">
+          <div class="inline-block mb-4">
+            <i class="fas fa-redo text-8xl text-amber-600"></i>
+          </div>
+          <p class="text-amber-700 font-bold text-3xl">
+            🔄 繰り返し版: 3×4
+          </p>
+        </div>
+        
+        <div class="bg-amber-50 border-l-4 border-amber-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">1️⃣</span>
+            <h4 class="font-bold text-amber-800 text-2xl">1回目: 声に出す</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p>「さん かける よん は じゅうに」</p>
+          </div>
+        </div>
+        
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">2️⃣</span>
+            <h4 class="font-bold text-yellow-800 text-2xl">2回目: 書いてみる</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p>3 × 4 = 12</p>
+          </div>
+        </div>
+        
+        <div class="bg-orange-50 border-l-4 border-orange-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">3️⃣</span>
+            <h4 class="font-bold text-orange-800 text-2xl">3回目: 確認する</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p>3 + 3 + 3 + 3 = 12 ✓</p>
+            <p class="font-bold text-orange-700 mt-3 text-2xl">完璧！</p>
+          </div>
+        </div>
+        
+        <div class="bg-red-50 border-l-4 border-red-400 p-6 rounded-lg">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">📹</span>
+            <h4 class="font-bold text-red-800 text-2xl">AI生成反復動画</h4>
+          </div>
+          <p class="ml-16 text-lg text-gray-700 mb-4">
+            繰り返し練習で確実に定着させる動画
+          </p>
+          <button onclick="generateRepetitionVideo()" 
+            class="ml-16 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold py-4 px-10 rounded-lg transition-all shadow-md hover:shadow-lg text-lg">
+            <i class="fas fa-play-circle mr-2"></i>動画を生成する
+          </button>
+        </div>
+        
+        <div id="repetitionVideoPreview" class="hidden mt-6"></div>
+      </div>
+      
+      <div class="mt-6 flex justify-center text-lg text-amber-600">
+        <div class="flex items-center">
+          <i class="fas fa-sync-alt mr-2 text-2xl"></i>
+          <span>繰り返して確実に習得</span>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+async function generateRepetitionVideo() {
+  const previewDiv = document.getElementById('repetitionVideoPreview')
+  if (!previewDiv) return
+  
+  previewDiv.classList.remove('hidden')
+  previewDiv.innerHTML = '<div class="bg-white rounded-lg p-6 shadow-lg text-center"><div class="animate-spin mb-4 mx-auto inline-block"><i class="fas fa-spinner text-5xl text-amber-600"></i></div><p class="text-amber-700 font-semibold mb-2">AI動画生成中...</p></div>'
+  
+  try {
+    const response = await fetch('/api/media/generate-video-support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caseNumber: 9 })
+    })
+    
+    const data = await response.json()
+    
+    previewDiv.innerHTML = `
+      <div class="bg-white rounded-lg p-6 shadow-lg">
+        <div class="bg-gray-900 rounded-lg overflow-hidden mb-4" style="height: 500px;">
+          <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+            class="w-full h-full" frameborder="0" sandbox="allow-scripts" style="background: white;"></iframe>
+        </div>
+        <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
+          <p class="text-lg text-green-800"><i class="fas fa-check-circle mr-2"></i><strong>生成完了！</strong> ${data.note}</p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    previewDiv.innerHTML = '<div class="bg-white rounded-lg p-6 text-center text-red-600"><i class="fas fa-exclamation-circle text-6xl mb-4"></i><p class="font-semibold">エラーが発生しました</p></div>'
+  }
+}
+
+window.demoCase9Repetition = demoCase9Repetition
+window.generateRepetitionVideo = generateRepetitionVideo
+
+// ケース11: テスト準備 - 応用問題
+function demoCase11Advanced() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-gradient-to-br from-purple-50 to-violet-50 rounded-2xl p-8 w-[95vw] h-[95vh] relative shadow-2xl overflow-y-auto">
+      <button onclick="this.closest('.fixed').remove()" 
+        class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 transition-colors z-10 bg-white rounded-full p-2 shadow-lg">
+        <i class="fas fa-times text-2xl"></i>
+      </button>
+      
+      <div class="text-center mb-6">
+        <h3 class="text-3xl font-bold text-gray-800 mb-3">
+          テスト対策: 応用問題にチャレンジ
+        </h3>
+        <p class="text-lg text-purple-600">
+          高得点を目指す：応用力を鍛える
+        </p>
+      </div>
+      
+      <div class="bg-white rounded-xl p-8 shadow-inner">
+        <div class="text-center mb-8">
+          <div class="inline-block mb-4">
+            <i class="fas fa-puzzle-piece text-8xl text-purple-600"></i>
+          </div>
+          <p class="text-purple-700 font-bold text-3xl">
+            🧩 応用問題: 3×4
+          </p>
+        </div>
+        
+        <div class="bg-purple-50 border-l-4 border-purple-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">🎯</span>
+            <h4 class="font-bold text-purple-800 text-2xl">文章題への応用</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p>問: 1箱に3個入ったお菓子が4箱あります。全部で何個？</p>
+            <p class="font-bold text-purple-700 mt-2">→ 3 × 4 = 12個</p>
+          </div>
+        </div>
+        
+        <div class="bg-violet-50 border-l-4 border-violet-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">💡</span>
+            <h4 class="font-bold text-violet-800 text-2xl">考え方のコツ</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p>① 何が「1つ分」か見つける → 3個</p>
+            <p>② 何個分か確認する → 4箱分</p>
+            <p>③ かけ算で計算 → 3×4=12</p>
+          </div>
+        </div>
+        
+        <div class="bg-indigo-50 border-l-4 border-indigo-400 p-6 rounded-lg">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">📹</span>
+            <h4 class="font-bold text-indigo-800 text-2xl">AI生成応用問題動画</h4>
+          </div>
+          <p class="ml-16 text-lg text-gray-700 mb-4">
+            応用力を鍛える問題パターン
+          </p>
+          <button onclick="generateAdvancedVideo()" 
+            class="ml-16 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-semibold py-4 px-10 rounded-lg transition-all shadow-md hover:shadow-lg text-lg">
+            <i class="fas fa-play-circle mr-2"></i>動画を生成する
+          </button>
+        </div>
+        
+        <div id="advancedVideoPreview" class="hidden mt-6"></div>
+      </div>
+      
+      <div class="mt-6 flex justify-center text-lg text-purple-600">
+        <div class="flex items-center">
+          <i class="fas fa-brain mr-2 text-2xl"></i>
+          <span>応用力で高得点を狙う</span>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+async function generateAdvancedVideo() {
+  const previewDiv = document.getElementById('advancedVideoPreview')
+  if (!previewDiv) return
+  
+  previewDiv.classList.remove('hidden')
+  previewDiv.innerHTML = '<div class="bg-white rounded-lg p-6 shadow-lg text-center"><div class="animate-spin mb-4 mx-auto inline-block"><i class="fas fa-spinner text-5xl text-purple-600"></i></div><p class="text-purple-700 font-semibold mb-2">AI動画生成中...</p></div>'
+  
+  try {
+    const response = await fetch('/api/media/generate-video-practice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caseNumber: 11 })
+    })
+    
+    const data = await response.json()
+    
+    previewDiv.innerHTML = `
+      <div class="bg-white rounded-lg p-6 shadow-lg">
+        <div class="bg-gray-900 rounded-lg overflow-hidden mb-4" style="height: 500px;">
+          <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+            class="w-full h-full" frameborder="0" sandbox="allow-scripts" style="background: white;"></iframe>
+        </div>
+        <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
+          <p class="text-lg text-green-800"><i class="fas fa-check-circle mr-2"></i><strong>生成完了！</strong> ${data.note}</p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    previewDiv.innerHTML = '<div class="bg-white rounded-lg p-6 text-center text-red-600"><i class="fas fa-exclamation-circle text-6xl mb-4"></i><p class="font-semibold">エラーが発生しました</p></div>'
+  }
+}
+
+window.demoCase11Advanced = demoCase11Advanced
+window.generateAdvancedVideo = generateAdvancedVideo
+
+// ケース12: テスト準備 - 復習問題
+function demoCase12Review() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-gradient-to-br from-emerald-50 to-green-50 rounded-2xl p-8 w-[95vw] h-[95vh] relative shadow-2xl overflow-y-auto">
+      <button onclick="this.closest('.fixed').remove()" 
+        class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 transition-colors z-10 bg-white rounded-full p-2 shadow-lg">
+        <i class="fas fa-times text-2xl"></i>
+      </button>
+      
+      <div class="text-center mb-6">
+        <h3 class="text-3xl font-bold text-gray-800 mb-3">
+          テスト対策: 総復習で完璧に
+        </h3>
+        <p class="text-lg text-emerald-600">
+          テスト前の最終確認：全部おさらい
+        </p>
+      </div>
+      
+      <div class="bg-white rounded-xl p-8 shadow-inner">
+        <div class="text-center mb-8">
+          <div class="inline-block mb-4">
+            <i class="fas fa-check-circle text-8xl text-emerald-600"></i>
+          </div>
+          <p class="text-emerald-700 font-bold text-3xl">
+            ✅ 総復習: 3×4
+          </p>
+        </div>
+        
+        <div class="bg-emerald-50 border-l-4 border-emerald-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">📖</span>
+            <h4 class="font-bold text-emerald-800 text-2xl">基本を確認</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p>✓ 3×4 の意味: 3が4つ</p>
+            <p>✓ たし算: 3+3+3+3</p>
+            <p>✓ 答え: 12</p>
+          </div>
+        </div>
+        
+        <div class="bg-green-50 border-l-4 border-green-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">🔍</span>
+            <h4 class="font-bold text-green-800 text-2xl">間違えやすいポイント</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p>✓ 3×4 と 4×3 は同じ12</p>
+            <p>✓ かける数とかけられる数を確認</p>
+            <p>✓ 図で確かめる癖をつける</p>
+          </div>
+        </div>
+        
+        <div class="bg-teal-50 border-l-4 border-teal-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">🎯</span>
+            <h4 class="font-bold text-teal-800 text-2xl">最終チェック</h4>
+          </div>
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
+            <p class="font-bold text-2xl text-teal-700">3 × 4 = 12 ✓</p>
+            <p class="text-xl">準備完璧！自信を持って！</p>
+          </div>
+        </div>
+        
+        <div class="bg-cyan-50 border-l-4 border-cyan-400 p-6 rounded-lg">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">📹</span>
+            <h4 class="font-bold text-cyan-800 text-2xl">AI生成総復習動画</h4>
+          </div>
+          <p class="ml-16 text-lg text-gray-700 mb-4">
+            最終確認で自信をつける動画
+          </p>
+          <button onclick="generateReviewVideo()" 
+            class="ml-16 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold py-4 px-10 rounded-lg transition-all shadow-md hover:shadow-lg text-lg">
+            <i class="fas fa-play-circle mr-2"></i>動画を生成する
+          </button>
+        </div>
+        
+        <div id="reviewVideoPreview" class="hidden mt-6"></div>
+      </div>
+      
+      <div class="mt-6 flex justify-center text-lg text-emerald-600">
+        <div class="flex items-center">
+          <i class="fas fa-clipboard-check mr-2 text-2xl"></i>
+          <span>総復習で万全の準備</span>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+async function generateReviewVideo() {
+  const previewDiv = document.getElementById('reviewVideoPreview')
+  if (!previewDiv) return
+  
+  previewDiv.classList.remove('hidden')
+  previewDiv.innerHTML = '<div class="bg-white rounded-lg p-6 shadow-lg text-center"><div class="animate-spin mb-4 mx-auto inline-block"><i class="fas fa-spinner text-5xl text-emerald-600"></i></div><p class="text-emerald-700 font-semibold mb-2">AI動画生成中...</p></div>'
+  
+  try {
+    const response = await fetch('/api/media/generate-video-practice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caseNumber: 12 })
+    })
+    
+    const data = await response.json()
+    
+    previewDiv.innerHTML = `
+      <div class="bg-white rounded-lg p-6 shadow-lg">
+        <div class="bg-gray-900 rounded-lg overflow-hidden mb-4" style="height: 500px;">
+          <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+            class="w-full h-full" frameborder="0" sandbox="allow-scripts" style="background: white;"></iframe>
+        </div>
+        <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
+          <p class="text-lg text-green-800"><i class="fas fa-check-circle mr-2"></i><strong>生成完了！</strong> ${data.note}</p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    previewDiv.innerHTML = '<div class="bg-white rounded-lg p-6 text-center text-red-600"><i class="fas fa-exclamation-circle text-6xl mb-4"></i><p class="font-semibold">エラーが発生しました</p></div>'
+  }
+}
+
+window.demoCase12Review = demoCase12Review
+window.generateReviewVideo = generateReviewVideo
+
+console.log('✅ 全ケース（4-12）モーダル実装完了！')
+console.log('📊 実装完了: ケース4,5,6,7,8,9,10,11,12')
