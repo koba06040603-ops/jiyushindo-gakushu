@@ -30823,10 +30823,17 @@ function demoCase4Kinesthetic() {
             <span class="text-xl mr-2">📹</span>
             <h4 class="font-bold text-purple-800">AI生成実験動画</h4>
           </div>
-          <p class="ml-8 text-sm text-gray-700">
+          <p class="ml-8 text-sm text-gray-700 mb-3">
             実際にやってみる様子を5秒動画で確認できます
           </p>
+          <button onclick="generateKinestheticVideoDemo()" 
+            class="ml-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-md hover:shadow-lg text-sm">
+            <i class="fas fa-play-circle mr-2"></i>動画を生成する
+          </button>
         </div>
+        
+        <!-- 動画プレビューエリア -->
+        <div id="kinestheticVideoPreview" class="hidden mt-4"></div>
       </div>
       
       <!-- 下部アイコン説明 -->
@@ -30847,6 +30854,70 @@ function demoCase4Kinesthetic() {
   document.body.appendChild(modal)
 }
 
+// ケース4体験優位版の動画生成関数
+async function generateKinestheticVideoDemo() {
+  const previewDiv = document.getElementById('kinestheticVideoPreview')
+  
+  if (!previewDiv) {
+    console.error('Preview div not found')
+    return
+  }
+  
+  previewDiv.classList.remove('hidden')
+  previewDiv.innerHTML = `
+    <div class="bg-white rounded-lg p-6 shadow-lg text-center">
+      <div class="animate-spin mb-4 mx-auto inline-block">
+        <i class="fas fa-spinner text-5xl text-blue-600"></i>
+      </div>
+      <p class="text-blue-700 font-semibold mb-2">AI動画生成中...</p>
+      <p class="text-sm text-gray-600">体験学習動画を作成しています（約2秒）</p>
+    </div>
+  `
+  
+  try {
+    const response = await fetch('/api/media/generate-video-case', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caseNumber: 6, duration: 10 })
+    })
+    
+    if (!response.ok) {
+      throw new Error('API呼び出しに失敗しました')
+    }
+    
+    const data = await response.json()
+    
+    previewDiv.innerHTML = `
+      <div class="bg-white rounded-lg p-4 shadow-lg">
+        <div class="bg-gray-900 rounded-lg overflow-hidden mb-3" style="height: 400px;">
+          <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+            class="w-full h-full" frameborder="0" 
+            sandbox="allow-scripts"
+            style="background: white;"></iframe>
+        </div>
+        <div class="bg-green-50 border border-green-200 p-3 rounded-lg">
+          <p class="text-sm text-green-800">
+            <i class="fas fa-check-circle mr-2"></i>
+            <strong>生成完了！</strong> ${data.note}
+          </p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    previewDiv.innerHTML = `
+      <div class="bg-white rounded-lg p-6 text-center">
+        <i class="fas fa-exclamation-circle text-5xl text-red-600 mb-3"></i>
+        <p class="font-semibold text-red-600">エラーが発生しました</p>
+        <p class="text-sm text-gray-600 mt-2">${error.message}</p>
+        <button onclick="generateKinestheticVideoDemo()" 
+          class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+          再試行
+        </button>
+      </div>
+    `
+  }
+}
+
 // グローバルスコープに登録
 window.demoCase1Video = demoCase1Video
 window.demoCase1Image = demoCase1Image
@@ -30857,6 +30928,7 @@ window.demoCase3Video = demoCase3Video
 window.demoCase4Visual = demoCase4Visual
 window.demoCase4Audio = demoCase4Audio
 window.demoCase4Kinesthetic = demoCase4Kinesthetic
+window.generateKinestheticVideoDemo = generateKinestheticVideoDemo
 
 console.log('✅ 個別最適化学習デモ機能 読み込み完了（ケース1-4）')
 
