@@ -3151,7 +3151,7 @@ async function loadGuidePage(curriculumId) {
               </div>
             </div>
 
-            ${generateLearningSupportSection(curriculumId, null)}
+            ${await generateLearningSupportSectionWithData(curriculumId)}
 
             <!-- 印刷・ツールボタン -->
             <div class="border-t-2 border-gray-300 pt-6 print:hidden">
@@ -34402,8 +34402,28 @@ window.markCase3Day = markCase3Day
 
 console.log('✅ ケース1-3（基本の個別最適化）タブ付きモーダル実装完了')
 // ============================================
+// ============================================
 // Phase 2-3: 学習サポートセクション（ケース10-12）
 // ============================================
+
+/**
+ * 学習サポートセクションのHTMLを生成（APIデータ取得版）
+ * @param {number} curriculumId - カリキュラムID
+ * @returns {Promise<string>} HTML文字列
+ */
+async function generateLearningSupportSectionWithData(curriculumId) {
+  try {
+    // APIからコンテンツを取得
+    const response = await axios.get(`/api/curriculum/${curriculumId}/retrieval-practice`)
+    const retrievalPracticeContent = response.data.data
+    
+    // データが存在する場合はそれを使用、なければデフォルトを使用
+    return generateLearningSupportSection(curriculumId, retrievalPracticeContent)
+  } catch (error) {
+    console.log('検索練習コンテンツの取得に失敗、デフォルトを使用:', error)
+    return generateLearningSupportSection(curriculumId, null)
+  }
+}
 
 /**
  * 学習サポートセクションのHTMLを生成
@@ -34642,38 +34662,58 @@ function generateLearningSupportSection(curriculumId, retrievalPracticeContent =
 // ============================================
 async function showCase10FrequentProblems(curriculumId) {
   try {
-    // APIからコンテンツを取得（実装済みの場合）
-    let content = null
+    // APIからコンテンツを取得
+    let problems = null
     try {
-      const response = await axios.get(`/api/retrieval-practice/frequent-problems/${curriculumId}`)
-      content = response.data
+      const response = await axios.get(`/api/curriculum/${curriculumId}/retrieval-practice`)
+      problems = response.data.data?.frequent_problems
+      console.log('✅ よく出る問題をAPIから取得:', problems)
     } catch (apiError) {
-      console.log('API未実装、デフォルトコンテンツを使用')
+      console.log('⚠️ API取得失敗、デフォルトコンテンツを使用')
     }
     
-    const problems = content?.frequent_problems || [
-      {
-        problem_number: 1,
-        problem_title: '3×4の計算',
-        problem_content: '3×4はいくつですか？',
-        answer: '12',
-        hints: ['3を4回たす', '3+3+3+3', '答えは12']
-      },
-      {
-        problem_number: 2,
-        problem_title: '絵を見て式を作る',
-        problem_content: 'りんごが3個ずつ4つのお皿に乗っています。かけ算の式を書きましょう。',
-        answer: '3×4または4×3',
-        hints: ['1つのお皿に3個', 'お皿が4つ', '3×4']
-      },
-      {
-        problem_number: 3,
-        problem_title: '文章題',
-        problem_content: '1箱に3個入ったチョコレートが4箱あります。全部で何個ですか？',
-        answer: '12個',
-        hints: ['1箱3個', '4箱ある', '3×4=12']
-      }
-    ]
+    // データが取得できなかった場合はデフォルトを使用
+    if (!problems || problems.length === 0) {
+      problems = [
+        {
+          problem_number: 1,
+          problem_title: '3×4の計算',
+          problem_content: '3×4はいくつですか？',
+          answer: '12',
+          explanation: '3を4回たすと、3+3+3+3=12になります。',
+          time_limit: 10,
+          difficulty: 'easy'
+        },
+        {
+          problem_number: 2,
+          problem_title: '絵を見て式を作る',
+          problem_content: 'りんごが3個ずつ4つのお皿に乗っています。かけ算の式を書きましょう。',
+          answer: '3×4または4×3',
+          explanation: '1つのお皿に3個、お皿が4つなので3×4です。',
+          time_limit: 10,
+          difficulty: 'easy'
+        },
+        {
+          problem_number: 3,
+          problem_title: '文章題',
+          problem_content: '1箱に3個入ったチョコレートが4箱あります。全部で何個ですか？',
+          answer: '12個',
+          explanation: '1箱3個が4箱なので、3×4=12個です。',
+          time_limit: 10,
+          difficulty: 'easy'
+        }
+      ]
+    }
+    
+    // ヒントを追加（APIから来ていない場合）
+    problems = problems.map(p => ({
+      ...p,
+      hints: p.hints || [
+        p.explanation ? p.explanation.split('。')[0] : 'ヒント1',
+        'もう少し考えてみましょう',
+        p.answer ? `答えは${p.answer}です` : 'ヒント3'
+      ]
+    }))
     
     const modalHTML = `
       <div id="frequentProblemsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeFrequentProblemsModal(event)">
@@ -34802,40 +34842,57 @@ function toggleHints10(index) {
 // ============================================
 async function showCase11ApplicationProblems(curriculumId) {
   try {
-    let content = null
+    // APIからコンテンツを取得
+    let problems = null
     try {
-      const response = await axios.get(`/api/retrieval-practice/application-problems/${curriculumId}`)
-      content = response.data
+      const response = await axios.get(`/api/curriculum/${curriculumId}/retrieval-practice`)
+      problems = response.data.data?.application_problems
+      console.log('✅ 応用問題をAPIから取得:', problems)
     } catch (apiError) {
-      console.log('API未実装、デフォルトコンテンツを使用')
+      console.log('⚠️ API取得失敗、デフォルトコンテンツを使用')
     }
     
-    const problems = content?.application_problems || [
-      {
-        problem_number: 1,
-        problem_title: '逆算問題',
-        problem_content: '□×4=12 のとき、□にあてはまる数は何ですか？',
-        answer: '3',
-        explanation: '12÷4=3で求められます。かけ算の逆はわり算です。',
-        hints: ['12÷4で求める', '答えは3']
-      },
-      {
-        problem_number: 2,
-        problem_title: '式の意味を考える',
-        problem_content: '3×4と4×3の違いを、言葉で説明しましょう。',
-        answer: '3×4は「3を4回たす」、4×3は「4を3回たす」。意味は違うが答えは同じ12。',
-        explanation: 'かける数とかけられる数の意味を理解することが大切です。',
-        hints: ['かける数とかけられる数', '意味は違うが答えは同じ']
-      },
-      {
-        problem_number: 3,
-        problem_title: '応用文章題',
-        problem_content: '1本30円の鉛筆を4本買うのと、1本40円の鉛筆を3本買うのでは、どちらが高いですか？',
-        answer: '同じ120円',
-        explanation: '30×4=120円、40×3=120円で同じ値段です。',
-        hints: ['30×4と40×3を計算', '120円と120円で同じ']
-      }
-    ]
+    // データが取得できなかった場合はデフォルトを使用
+    if (!problems || problems.length === 0) {
+      problems = [
+        {
+          problem_number: 1,
+          problem_title: '逆算問題',
+          problem_content: '□×4=12 のとき、□にあてはまる数は何ですか？',
+          answer: '3',
+          explanation: '12÷4=3で求められます。かけ算の逆はわり算です。',
+          thinking_points: ['12÷4で求める', '答えは3'],
+          difficulty: 'medium'
+        },
+        {
+          problem_number: 2,
+          problem_title: '式の意味を考える',
+          problem_content: '3×4と4×3の違いを、言葉で説明しましょう。',
+          answer: '3×4は「3を4回たす」、4×3は「4を3回たす」。意味は違うが答えは同じ12。',
+          explanation: 'かける数とかけられる数の意味を理解することが大切です。',
+          thinking_points: ['かける数とかけられる数', '意味は違うが答えは同じ'],
+          difficulty: 'medium'
+        },
+        {
+          problem_number: 3,
+          problem_title: '応用文章題',
+          problem_content: '1本30円の鉛筆を4本買うのと、1本40円の鉛筆を3本買うのでは、どちらが高いですか？',
+          answer: '同じ120円',
+          explanation: '30×4=120円、40×3=120円で同じ値段です。',
+          thinking_points: ['30×4と40×3を計算', '120円と120円で同じ'],
+          difficulty: 'hard'
+        }
+      ]
+    }
+    
+    // ヒントを追加（APIから来ていない場合）
+    problems = problems.map(p => ({
+      ...p,
+      hints: p.hints || p.thinking_points || [
+        p.explanation ? p.explanation.split('。')[0] : 'ヒント1',
+        'もう少し考えてみましょう'
+      ]
+    }))
     
     const modalHTML = `
       <div id="applicationProblemsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeApplicationProblemsModal(event)">
@@ -34971,22 +35028,76 @@ function toggleHints11(index) {
 // ============================================
 async function showCase12ReviewChecklist(curriculumId) {
   try {
-    let content = null
+    // APIからコンテンツを取得
+    let checklist = null
     try {
-      const response = await axios.get(`/api/retrieval-practice/review-checklist/${curriculumId}`)
-      content = response.data
+      const response = await axios.get(`/api/curriculum/${curriculumId}/retrieval-practice`)
+      checklist = response.data.data?.review_checklist
+      console.log('✅ 総復習チェックリストをAPIから取得:', checklist)
     } catch (apiError) {
-      console.log('API未実装、デフォルトコンテンツを使用')
+      console.log('⚠️ API取得失敗、デフォルトコンテンツを使用')
     }
     
-    const checklist = content?.review_checklist || [
-      { item_number: 1, item_text: 'かけ算の意味（同じ数をたし算する）を説明できる', completed: false },
-      { item_number: 2, item_text: '3×4の式を正しく書ける', completed: false },
-      { item_number: 3, item_text: '3×4=12を暗記している', completed: false },
-      { item_number: 4, item_text: '図を見てかけ算の式を作れる', completed: false },
-      { item_number: 5, item_text: '文章題をかけ算の式にできる', completed: false },
-      { item_number: 6, item_text: '実際の場面でかけ算を使える', completed: false }
-    ]
+    // データが取得できなかった場合はデフォルトを使用
+    if (!checklist || checklist.length === 0) {
+      checklist = [
+        { 
+          item_number: 1, 
+          check_point: 'かけ算の意味',
+          item_text: 'かけ算の意味（同じ数をたし算する）を説明できる',
+          description: '「3×4」は「3を4回たす」という意味です',
+          example: '例: 3×4=3+3+3+3',
+          completed: false 
+        },
+        { 
+          item_number: 2, 
+          check_point: '式を書く',
+          item_text: '3×4の式を正しく書ける',
+          description: 'かけ算の記号×を使って式を書けます',
+          example: '例: 3×4=12',
+          completed: false 
+        },
+        { 
+          item_number: 3, 
+          check_point: '九九の暗記',
+          item_text: '3×4=12を暗記している',
+          description: '九九を覚えて素早く答えられます',
+          example: '例: さんし じゅうに',
+          completed: false 
+        },
+        { 
+          item_number: 4, 
+          check_point: '図から式へ',
+          item_text: '図を見てかけ算の式を作れる',
+          description: '絵を見て適切な式が作れます',
+          example: '例: ○が3個ずつ4つ → 3×4',
+          completed: false 
+        },
+        { 
+          item_number: 5, 
+          check_point: '文章題',
+          item_text: '文章題をかけ算の式にできる',
+          description: '文章を読んで式を立てられます',
+          example: '例: 1箱3個が4箱 → 3×4',
+          completed: false 
+        },
+        { 
+          item_number: 6, 
+          check_point: '実生活での活用',
+          item_text: '実際の場面でかけ算を使える',
+          description: '日常生活でかけ算を活用できます',
+          example: '例: お菓子の数を数える',
+          completed: false 
+        }
+      ]
+    }
+    
+    // item_textがない場合はcheck_pointから生成
+    checklist = checklist.map(item => ({
+      ...item,
+      item_text: item.item_text || item.check_point || `学習項目${item.item_number}`,
+      completed: false
+    }))
     
     const modalHTML = `
       <div id="reviewChecklistModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeReviewChecklistModal(event)">
@@ -35130,6 +35241,7 @@ function updateChecklistProgress() {
 }
 
 // グローバルに公開
+window.generateLearningSupportSectionWithData = generateLearningSupportSectionWithData
 window.generateLearningSupportSection = generateLearningSupportSection
 window.showCase10FrequentProblems = showCase10FrequentProblems
 window.closeFrequentProblemsModal = closeFrequentProblemsModal
