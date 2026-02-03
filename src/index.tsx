@@ -13989,12 +13989,12 @@ app.post('/api/media/generate-video', async (c) => {
           // 問題（小さく）
           drawText('3 × 4 = ?', 400, 110, 42, '#7c3aed', 1);
           
-          // 4グループのリンゴ（完全中央寄せ・均等配置）
+          // 4グループのリンゴ（間隔を詰めて余裕を持たせる）
           const groups = [
-            { label: '1つめ', x: 170, y: 230 },
-            { label: '2つめ', x: 320, y: 230 },
-            { label: '3つめ', x: 470, y: 230 },
-            { label: '4つめ', x: 620, y: 230 }
+            { label: '1つめ', x: 175, y: 230 },
+            { label: '2つめ', x: 315, y: 230 },
+            { label: '3つめ', x: 455, y: 230 },
+            { label: '4つめ', x: 595, y: 230 }
           ];
           
           groups.forEach((group) => {
