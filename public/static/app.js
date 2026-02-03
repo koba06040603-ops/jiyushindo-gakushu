@@ -30759,74 +30759,89 @@ function demoCase4Audio() {
 // ケース4: 体験優位版デモ
 function demoCase4Kinesthetic() {
   const modal = document.createElement('div')
-  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
-    <div class="bg-white rounded-lg p-6 max-w-2xl mx-4">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-xl font-bold text-blue-700">
-          <i class="fas fa-hand-paper mr-2"></i>ケース4: 体験優位版
+    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 max-w-lg mx-4 relative shadow-2xl">
+      <!-- ×ボタン（右上・絶対配置） -->
+      <button onclick="this.closest('.fixed').remove()" 
+        class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 transition-colors z-10">
+        <i class="fas fa-times text-3xl"></i>
+      </button>
+      
+      <!-- タイトルエリア -->
+      <div class="text-center mb-4">
+        <h3 class="text-xl font-bold text-gray-800 mb-1">
+          特徴: 具体物・実験・手を動かして理解
         </h3>
-        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
-          <i class="fas fa-times text-2xl"></i>
-        </button>
-      </div>
-      <div class="mb-4">
-        <p class="text-gray-700 mb-2">
-          <strong>特徴:</strong> 具体物・実験・手を動かして理解
-        </p>
-        <p class="text-sm text-gray-600 mb-4">
+        <p class="text-sm text-blue-600">
           体験優位（身体運動知能）の児童向けに最適化。
         </p>
       </div>
-      <div class="bg-blue-50 p-4 rounded-lg border-2 border-blue-200 mb-4">
-        <div class="py-8">
-          <div class="text-center mb-4">
+      
+      <!-- メインコンテンツエリア -->
+      <div class="bg-white rounded-xl p-6 shadow-inner">
+        <!-- キューブアイコンとタイトル -->
+        <div class="text-center mb-6">
+          <div class="inline-block mb-3">
             <i class="fas fa-cubes text-6xl text-blue-600"></i>
           </div>
-          <p class="text-blue-700 font-semibold mb-4 text-center">✋ 体験優位版: 3×4</p>
-          <div class="bg-white p-4 rounded border max-w-md mx-auto">
-            <div class="space-y-3">
-              <div class="bg-orange-100 p-3 rounded">
-                <p class="font-semibold text-orange-800 mb-2">📦 準備する物</p>
-                <ul class="text-sm space-y-1">
-                  <li>• おはじき 12個</li>
-                  <li>• 紙コップ 4個</li>
-                  <li>• または積み木 12個</li>
-                </ul>
-              </div>
-              <div class="bg-green-100 p-3 rounded">
-                <p class="font-semibold text-green-800 mb-2">🎯 やってみよう</p>
-                <p class="text-sm">
-                  ① 紙コップを4個ならべる<br>
-                  ② 各コップに おはじきを3個ずつ入れる<br>
-                  ③ ぜんぶで何個か数えてみよう<br>
-                  → 答え: 12個！
-                </p>
-              </div>
-              <div class="bg-purple-100 p-3 rounded">
-                <p class="font-semibold text-purple-800 mb-2">📹 AI生成実験動画</p>
-                <p class="text-sm">
-                  実際にやってみる様子を5秒動画で確認できます
-                </p>
-              </div>
-            </div>
+          <p class="text-blue-700 font-bold text-lg">
+            ✋ 体験優位版: 3×4
+          </p>
+        </div>
+        
+        <!-- 準備する物セクション -->
+        <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-lg mb-4">
+          <div class="flex items-center mb-2">
+            <span class="text-xl mr-2">📦</span>
+            <h4 class="font-bold text-orange-800">準備する物</h4>
           </div>
-          <div class="bg-white p-3 rounded border mt-4 max-w-md mx-auto">
-            <p class="text-xs text-gray-500 mb-1">
-              <i class="fas fa-hands text-blue-500 mr-1"></i>
-              手を動かして体験的に理解
-            </p>
-            <p class="text-xs text-gray-500">
-              <i class="fas fa-video text-blue-500 mr-1"></i>
-              AI動画で手順を視覚的に確認
-            </p>
+          <ul class="ml-8 space-y-1 text-sm text-gray-700">
+            <li>• おはじき 12個</li>
+            <li>• 紙コップ 4個</li>
+            <li>• または積み木 12個</li>
+          </ul>
+        </div>
+        
+        <!-- やってみようセクション -->
+        <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg mb-4">
+          <div class="flex items-center mb-2">
+            <span class="text-xl mr-2">🎯</span>
+            <h4 class="font-bold text-green-800">やってみよう</h4>
+          </div>
+          <div class="ml-8 space-y-1 text-sm text-gray-700">
+            <p>① 紙コップを4個ならべる</p>
+            <p>② 各コップに おはじきを3個ずつ入れる</p>
+            <p>③ ぜんぶで何個か数えてみよう</p>
+            <p class="font-bold text-green-700 mt-2">→ 答え: 12個！</p>
           </div>
         </div>
+        
+        <!-- AI生成実験動画セクション -->
+        <div class="bg-purple-50 border-l-4 border-purple-400 p-4 rounded-lg">
+          <div class="flex items-center mb-2">
+            <span class="text-xl mr-2">📹</span>
+            <h4 class="font-bold text-purple-800">AI生成実験動画</h4>
+          </div>
+          <p class="ml-8 text-sm text-gray-700">
+            実際にやってみる様子を5秒動画で確認できます
+          </p>
+        </div>
       </div>
-      <button onclick="this.closest('.fixed').remove()" 
-        class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition">
-        閉じる
-      </button>
+      
+      <!-- 下部アイコン説明 -->
+      <div class="mt-4 flex justify-center space-x-8 text-sm text-blue-600">
+        <div class="flex items-center">
+          <i class="fas fa-hand-pointer mr-2"></i>
+          <span>手を動かして体験的に理解</span>
+        </div>
+      </div>
+      <div class="flex justify-center mt-2 text-sm text-blue-600">
+        <div class="flex items-center">
+          <i class="fas fa-video mr-2"></i>
+          <span>AI動画で手順を視覚的に確認</span>
+        </div>
+      </div>
     </div>
   `
   document.body.appendChild(modal)
