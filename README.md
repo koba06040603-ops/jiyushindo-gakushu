@@ -5,7 +5,7 @@
 ## 🌐 本番環境URL
 
 **本番デプロイ完了！** ✅  
-- **本番URL**: https://9490df37.jiyushindo-gakushu.pages.dev
+- **本番URL**: https://ba125f1f.jiyushindo-gakushu.pages.dev
 - **API仕様書**: https://6cef01f8.jiyushindo-gakushu.pages.dev/static/api-docs
 - **管理者プレビュー**: ローカル環境で `dist/admin-preview.html` を直接開く（実装済み、498行）
 - **デプロイ日時**: 2026-02-03
