@@ -13312,6 +13312,9 @@ window.saveFontSize = saveFontSize
 
 // 学習カード詳細表示モーダル
 function showCardDetail(card) {
+  // カード情報を state に保存
+  state.selectedCard = card
+  
   // デバッグログ（開発時のみ）
   if (window.location.hostname === 'localhost' || window.location.hostname.includes('dev')) {
     console.log('📋 カード詳細:', card)
@@ -13364,6 +13367,10 @@ function showCardDetail(card) {
           <button onclick="switchCardTab('explanation')" id="tab-explanation" 
                   class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
             <i class="fas fa-book-open mr-2"></i>解説
+          </button>
+          <button onclick="switchCardTab('history')" id="tab-history" 
+                  class="flex-1 px-6 py-4 font-bold text-center transition border-b-4 border-transparent hover:bg-gray-50 text-gray-600">
+            <i class="fas fa-history mr-2"></i>編集履歴
           </button>
         </div>
 
@@ -13542,6 +13549,15 @@ function showCardDetail(card) {
               </div>
             ` : ''}
           </div>
+
+          <!-- 編集履歴タブ -->
+          <div id="content-history" class="tab-content space-y-4 hidden">
+            <div id="history-loading" class="text-center py-12">
+              <i class="fas fa-spinner fa-spin text-4xl text-gray-400 mb-4"></i>
+              <p class="text-gray-600">編集履歴を読み込み中...</p>
+            </div>
+            <div id="history-content" class="hidden"></div>
+          </div>
         </div>
 
         <!-- フッター -->
@@ -13580,7 +13596,8 @@ function switchCardTab(tabName) {
       problem: 'border-blue-600 bg-white text-blue-600',
       hints: 'border-yellow-600 bg-white text-yellow-600',
       answer: 'border-green-600 bg-white text-green-600',
-      explanation: 'border-purple-600 bg-white text-purple-600'
+      explanation: 'border-purple-600 bg-white text-purple-600',
+      history: 'border-orange-600 bg-white text-orange-600'
     }
     activeTab.className = `flex-1 px-6 py-4 font-bold text-center transition border-b-4 ${colors[tabName]}`
   }
@@ -13594,6 +13611,134 @@ function switchCardTab(tabName) {
   const activeContent = document.getElementById(`content-${tabName}`)
   if (activeContent) {
     activeContent.classList.remove('hidden')
+    
+    // 編集履歴タブの場合は履歴を読み込む
+    if (tabName === 'history') {
+      loadCardEditHistory()
+    }
+  }
+}
+
+// 編集履歴を読み込む関数
+async function loadCardEditHistory() {
+  const historyContent = document.getElementById('history-content')
+  const historyLoading = document.getElementById('history-loading')
+  
+  if (!state.selectedCard || !state.selectedCard.id) {
+    historyContent.innerHTML = `
+      <div class="text-center py-12 text-gray-500">
+        <i class="fas fa-exclamation-circle text-6xl mb-4 text-gray-300"></i>
+        <p class="text-lg">カード情報が見つかりません</p>
+      </div>
+    `
+    historyLoading.classList.add('hidden')
+    historyContent.classList.remove('hidden')
+    return
+  }
+  
+  const cardId = state.selectedCard.id
+  
+  try {
+    const response = await axios.get(`/api/cards/${cardId}/edit-history`)
+    
+    if (!response.data.success) {
+      throw new Error('履歴の取得に失敗しました')
+    }
+    
+    const history = response.data.history || []
+    
+    historyLoading.classList.add('hidden')
+    
+    if (history.length === 0) {
+      historyContent.innerHTML = `
+        <div class="text-center py-12 text-gray-500">
+          <i class="fas fa-history text-6xl mb-4 text-gray-300"></i>
+          <p class="text-lg">編集履歴がありません</p>
+          <p class="text-sm mt-2 text-gray-400">このカードはまだ編集されていません</p>
+        </div>
+      `
+    } else {
+      historyContent.innerHTML = `
+        <div class="space-y-4">
+          ${history.map((record, index) => {
+            const beforeData = record.before_data ? JSON.parse(record.before_data) : null
+            const afterData = record.after_data ? JSON.parse(record.after_data) : null
+            
+            return `
+              <div class="border rounded-lg p-4 hover:bg-gray-50 transition border-gray-200 bg-white">
+                <div class="flex items-start justify-between mb-3">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="px-3 py-1 rounded-full text-xs font-bold ${
+                        record.edit_type === 'create' ? 'bg-green-100 text-green-700' :
+                        record.edit_type === 'update' ? 'bg-blue-100 text-blue-700' :
+                        record.edit_type === 'delete' ? 'bg-red-100 text-red-700' :
+                        'bg-gray-100 text-gray-700'
+                      }">
+                        ${record.edit_type === 'create' ? '新規作成' :
+                          record.edit_type === 'update' ? '更新' :
+                          record.edit_type === 'delete' ? '削除' :
+                          record.edit_type || '変更'}
+                      </span>
+                      ${index === 0 ? '<span class="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-bold">最新</span>' : ''}
+                    </div>
+                    <div class="text-sm text-gray-600">
+                      <i class="fas fa-clock mr-2"></i>
+                      ${new Date(record.edited_at).toLocaleString('ja-JP')}
+                    </div>
+                    ${record.edited_by_name ? `
+                      <div class="text-sm text-gray-600 mt-1">
+                        <i class="fas fa-user mr-2"></i>
+                        編集者: ${record.edited_by_name}
+                      </div>
+                    ` : ''}
+                    ${record.change_summary ? `
+                      <div class="text-sm text-gray-700 mt-2 font-medium">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        ${record.change_summary}
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+                
+                ${beforeData && afterData ? `
+                  <div class="mt-3 p-3 bg-gray-50 rounded text-xs">
+                    <div class="font-bold text-gray-700 mb-2">変更内容:</div>
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <div class="text-gray-500 mb-1 font-bold">変更前:</div>
+                        <div class="text-gray-800 bg-white p-2 rounded border border-red-200">
+                          ${beforeData.card_title || beforeData.problem_description || '不明'}
+                        </div>
+                      </div>
+                      <div>
+                        <div class="text-gray-500 mb-1 font-bold">変更後:</div>
+                        <div class="text-gray-800 bg-white p-2 rounded border border-green-200 font-bold">
+                          ${afterData.card_title || afterData.problem_description || '不明'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            `
+          }).join('')}
+        </div>
+      `
+    }
+    
+    historyContent.classList.remove('hidden')
+  } catch (error) {
+    console.error('編集履歴読み込みエラー:', error)
+    historyLoading.classList.add('hidden')
+    historyContent.innerHTML = `
+      <div class="text-center py-12 text-red-500">
+        <i class="fas fa-exclamation-triangle text-6xl mb-4"></i>
+        <p class="text-lg">編集履歴の読み込みに失敗しました</p>
+        <p class="text-sm mt-2 text-gray-600">${error.message}</p>
+      </div>
+    `
+    historyContent.classList.remove('hidden')
   }
 }
 
