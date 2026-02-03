@@ -2971,6 +2971,9 @@ async function loadGuidePage(curriculumId) {
               <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
             </button>
             <div class="flex gap-2">
+              <button onclick="showAIRecommendedProblems(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-robot mr-2"></i>AIおすすめ
+              </button>
               <button onclick="showLearningDashboard(${curriculumId})" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chart-line mr-2"></i>学習統計
               </button>
@@ -36215,3 +36218,461 @@ window.closeTeacherDashboard = closeTeacherDashboard
 window.closeStudentReport = closeStudentReport
 
 console.log('✅ 教師向けダッシュボード機能を読み込みました')
+
+// =============================================================================
+// Phase 3-7: AI自動問題選定機能
+// =============================================================================
+
+// AI推奨問題を表示
+async function showAIRecommendedProblems(curriculumId) {
+  const studentId = state.currentStudent?.id || 1 // デモ用: 実際は認証システムから取得
+  
+  try {
+    showLoading('AI が最適な問題を選んでいます...')
+    
+    const response = await axios.post(`/api/ai/recommend-problems/${studentId}`, {
+      curriculumId: curriculumId
+    })
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'AI推奨の取得に失敗しました')
+    }
+    
+    const { learning_stats, weak_areas, recommendations } = response.data
+    const { analysis, recommended_problems, study_plan, motivation_message } = recommendations
+    
+    const modalHTML = `
+      <div id="aiRecommendModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeAIRecommendModal(event)">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+          <!-- ヘッダー -->
+          <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-2xl font-bold">
+                  <i class="fas fa-robot mr-2"></i>AIおすすめ問題
+                </h2>
+                <p class="text-sm opacity-90 mt-1">あなたにぴったりの問題を選びました</p>
+              </div>
+              <button onclick="closeAIRecommendModal()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- コンテンツ -->
+          <div class="flex-1 overflow-y-auto p-6 space-y-6">
+            
+            <!-- 応援メッセージ -->
+            <div class="bg-gradient-to-r from-yellow-50 to-orange-50 border-l-4 border-yellow-400 p-4 rounded">
+              <p class="text-lg font-bold text-gray-800 mb-2">
+                <i class="fas fa-star text-yellow-500 mr-2"></i>AIからのメッセージ
+              </p>
+              <p class="text-gray-700">${motivation_message}</p>
+            </div>
+            
+            <!-- 学習分析 -->
+            <div class="bg-blue-50 rounded-lg p-4">
+              <h3 class="text-lg font-bold text-gray-800 mb-3">
+                <i class="fas fa-chart-pie mr-2 text-blue-600"></i>あなたの学習スタイル
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p class="text-sm text-gray-600 mb-1">レベル</p>
+                  <p class="font-bold text-blue-600">${analysis.learning_level}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-600 mb-1">学習スタイル</p>
+                  <p class="text-sm text-gray-700">${analysis.study_style}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-600 mb-1">強み</p>
+                  <div class="flex flex-wrap gap-2">
+                    ${analysis.strengths.map(s => `
+                      <span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">✓ ${s}</span>
+                    `).join('')}
+                  </div>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-600 mb-1">がんばりポイント</p>
+                  <div class="flex flex-wrap gap-2">
+                    ${analysis.weaknesses.map(w => `
+                      <span class="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded">📝 ${w}</span>
+                    `).join('')}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- おすすめ問題 -->
+            <div>
+              <h3 class="text-lg font-bold text-gray-800 mb-3">
+                <i class="fas fa-lightbulb mr-2 text-yellow-500"></i>おすすめの問題 (${recommended_problems.length}問)
+              </h3>
+              <div class="space-y-4">
+                ${recommended_problems.map((problem, index) => {
+                  const typeLabels = {
+                    'frequent_problems': 'よく出る問題',
+                    'application_problems': '応用問題',
+                    'review_checklist': '復習チェック'
+                  }
+                  const difficultyLabels = {
+                    'easy': { text: 'やさしい', color: 'green' },
+                    'medium': { text: 'ふつう', color: 'blue' },
+                    'hard': { text: 'むずかしい', color: 'red' }
+                  }
+                  const diff = difficultyLabels[problem.difficulty]
+                  
+                  return `
+                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow bg-white">
+                      <div class="flex items-start justify-between mb-3">
+                        <div class="flex-1">
+                          <div class="flex items-center gap-2 mb-2">
+                            <span class="bg-purple-100 text-purple-800 text-xs font-bold px-2 py-1 rounded">
+                              問題 ${index + 1}
+                            </span>
+                            <span class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                              ${typeLabels[problem.problem_type]}
+                            </span>
+                            <span class="bg-${diff.color}-100 text-${diff.color}-800 text-xs px-2 py-1 rounded">
+                              ${diff.text}
+                            </span>
+                          </div>
+                          <h4 class="font-bold text-gray-800 text-lg">${problem.title}</h4>
+                        </div>
+                      </div>
+                      
+                      <div class="bg-gray-50 p-3 rounded mb-3">
+                        <p class="text-gray-700 leading-relaxed">${problem.content}</p>
+                      </div>
+                      
+                      <div class="bg-blue-50 border-l-4 border-blue-400 p-3 rounded mb-3">
+                        <p class="text-sm text-gray-700">
+                          <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+                          <strong>なぜこの問題？</strong> ${problem.reason}
+                        </p>
+                      </div>
+                      
+                      <!-- ヒント -->
+                      <div id="ai-hints-${index}" class="hidden mb-3">
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                          <p class="text-sm font-bold text-gray-800 mb-2">
+                            <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>ヒント
+                          </p>
+                          <ul class="space-y-1">
+                            ${problem.hints.map(hint => `
+                              <li class="text-sm text-gray-700">• ${hint}</li>
+                            `).join('')}
+                          </ul>
+                        </div>
+                      </div>
+                      
+                      <!-- 解答 -->
+                      <div id="ai-answer-${index}" class="hidden mb-3">
+                        <div class="bg-green-50 border-l-4 border-green-400 p-3 rounded">
+                          <p class="text-sm font-bold text-gray-800 mb-2">
+                            <i class="fas fa-check-circle text-green-600 mr-1"></i>解答
+                          </p>
+                          <p class="text-gray-700">${problem.answer}</p>
+                        </div>
+                        <div class="bg-indigo-50 border-l-4 border-indigo-400 p-3 rounded mt-2">
+                          <p class="text-sm font-bold text-gray-800 mb-2">
+                            <i class="fas fa-book-open text-indigo-600 mr-1"></i>解説
+                          </p>
+                          <p class="text-sm text-gray-700">${problem.explanation}</p>
+                        </div>
+                      </div>
+                      
+                      <!-- ボタン -->
+                      <div class="flex gap-2">
+                        <button onclick="toggleAIHints(${index})" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded transition-colors">
+                          <i class="fas fa-lightbulb mr-1"></i>ヒントを見る
+                        </button>
+                        <button onclick="toggleAIAnswer(${index})" class="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition-colors">
+                          <i class="fas fa-check-circle mr-1"></i>解答を見る
+                        </button>
+                      </div>
+                    </div>
+                  `
+                }).join('')}
+              </div>
+            </div>
+            
+            <!-- 学習計画 -->
+            <div class="bg-purple-50 rounded-lg p-4">
+              <h3 class="text-lg font-bold text-gray-800 mb-3">
+                <i class="fas fa-calendar-alt mr-2 text-purple-600"></i>学習プラン
+              </h3>
+              <div class="space-y-3">
+                <div class="bg-white p-3 rounded border border-purple-200">
+                  <p class="text-sm font-bold text-gray-700 mb-1">今すぐやること</p>
+                  <p class="text-gray-600">${study_plan.immediate_focus}</p>
+                </div>
+                <div class="bg-white p-3 rounded border border-purple-200">
+                  <p class="text-sm font-bold text-gray-700 mb-1">今週の目標</p>
+                  <p class="text-gray-600">${study_plan.weekly_goal}</p>
+                </div>
+                <div class="bg-white p-3 rounded border border-purple-200">
+                  <p class="text-sm font-bold text-gray-700 mb-1">長期目標</p>
+                  <p class="text-gray-600">${study_plan.long_term_goal}</p>
+                </div>
+                <div class="bg-white p-3 rounded border border-purple-200">
+                  <p class="text-sm font-bold text-gray-700 mb-1">推奨学習時間</p>
+                  <p class="text-2xl font-bold text-purple-600">${study_plan.estimated_time}分</p>
+                </div>
+              </div>
+            </div>
+            
+          </div>
+          
+          <!-- フッター -->
+          <div class="bg-gray-50 border-t border-gray-200 p-4 flex justify-between">
+            <button onclick="generateStudyPlan(${curriculumId})" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded transition-colors">
+              <i class="fas fa-calendar-check mr-2"></i>詳しい学習計画を作る
+            </button>
+            <button onclick="closeAIRecommendModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded transition-colors">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ AI推奨問題取得エラー:', error)
+    alert('AI推奨問題の取得に失敗しました。')
+  }
+}
+
+// AIヒント表示トグル
+function toggleAIHints(index) {
+  const hintsEl = document.getElementById(`ai-hints-${index}`)
+  if (hintsEl) {
+    hintsEl.classList.toggle('hidden')
+  }
+}
+
+// AI解答表示トグル
+function toggleAIAnswer(index) {
+  const answerEl = document.getElementById(`ai-answer-${index}`)
+  if (answerEl) {
+    answerEl.classList.toggle('hidden')
+  }
+}
+
+// 学習計画生成
+async function generateStudyPlan(curriculumId) {
+  const studentId = state.currentStudent?.id || 1
+  
+  // 目標日を入力
+  const targetDate = prompt('目標達成日を入力してください（例: 2026-03-01）:', 
+    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+  
+  if (!targetDate) return
+  
+  try {
+    showLoading('学習計画を作成しています...')
+    
+    const response = await axios.post(`/api/ai/generate-study-plan/${studentId}`, {
+      curriculumId: curriculumId,
+      targetDate: targetDate
+    })
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error || '学習計画の作成に失敗しました')
+    }
+    
+    const { study_pace, study_plan } = response.data
+    
+    // 新しいモーダルで学習計画を表示
+    showStudyPlanModal(study_pace, study_plan, targetDate)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 学習計画生成エラー:', error)
+    alert('学習計画の作成に失敗しました。')
+  }
+}
+
+// 学習計画モーダル表示
+function showStudyPlanModal(studyPace, studyPlan, targetDate) {
+  const modalHTML = `
+    <div id="studyPlanModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeStudyPlanModal(event)">
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-green-600 to-teal-600 text-white p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-2xl font-bold">
+                <i class="fas fa-calendar-check mr-2"></i>あなただけの学習計画
+              </h2>
+              <p class="text-sm opacity-90 mt-1">目標達成日: ${targetDate}</p>
+            </div>
+            <button onclick="closeStudyPlanModal()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- コンテンツ -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-6">
+          
+          <!-- 計画概要 -->
+          <div class="bg-gradient-to-r from-green-50 to-teal-50 border-l-4 border-green-400 p-4 rounded">
+            <h3 class="font-bold text-gray-800 mb-2">
+              <i class="fas fa-info-circle text-green-600 mr-2"></i>計画の概要
+            </h3>
+            <p class="text-gray-700">${studyPlan.plan_summary}</p>
+          </div>
+          
+          <!-- 学習ペース -->
+          <div class="bg-blue-50 rounded-lg p-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">
+              <i class="fas fa-running mr-2 text-blue-600"></i>あなたの学習ペース
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="bg-white p-3 rounded text-center">
+                <p class="text-sm text-gray-600 mb-1">学習日数</p>
+                <p class="text-3xl font-bold text-blue-600">${studyPace.total_days}</p>
+                <p class="text-xs text-gray-500">日</p>
+              </div>
+              <div class="bg-white p-3 rounded text-center">
+                <p class="text-sm text-gray-600 mb-1">1日平均</p>
+                <p class="text-3xl font-bold text-green-600">${Math.round(studyPace.avg_problems_per_day)}</p>
+                <p class="text-xs text-gray-500">問</p>
+              </div>
+              <div class="bg-white p-3 rounded text-center">
+                <p class="text-sm text-gray-600 mb-1">最近の活動</p>
+                <p class="text-3xl font-bold text-purple-600">${studyPace.recent_activity.length}</p>
+                <p class="text-xs text-gray-500">日間</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 週別目標 -->
+          <div>
+            <h3 class="text-lg font-bold text-gray-800 mb-3">
+              <i class="fas fa-calendar-week mr-2 text-purple-600"></i>週別の目標
+            </h3>
+            <div class="space-y-3">
+              ${studyPlan.weekly_milestones.map((milestone, index) => `
+                <div class="bg-white border border-purple-200 rounded-lg p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-bold text-purple-600">第${milestone.week}週</h4>
+                  </div>
+                  <p class="text-gray-700 mb-2">${milestone.goal}</p>
+                  <div class="flex flex-wrap gap-2">
+                    ${milestone.focus_areas.map(area => `
+                      <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded">
+                        ⭐ ${area}
+                      </span>
+                    `).join('')}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <!-- 復習スケジュール -->
+          <div>
+            <h3 class="text-lg font-bold text-gray-800 mb-3">
+              <i class="fas fa-redo mr-2 text-orange-600"></i>復習スケジュール
+            </h3>
+            <div class="space-y-2">
+              ${studyPlan.review_schedule.map(review => {
+                const typeLabels = {
+                  'short_term': { text: '短期復習', color: 'yellow' },
+                  'long_term': { text: '長期復習', color: 'orange' }
+                }
+                const type = typeLabels[review.review_type]
+                return `
+                  <div class="bg-${type.color}-50 border-l-4 border-${type.color}-400 p-3 rounded flex items-center justify-between">
+                    <div>
+                      <span class="bg-${type.color}-100 text-${type.color}-800 text-xs px-2 py-1 rounded mr-2">
+                        ${type.text}
+                      </span>
+                      <span class="text-gray-700">${review.content}</span>
+                    </div>
+                    <span class="text-sm text-gray-600">${review.date}</span>
+                  </div>
+                `
+              }).join('')}
+            </div>
+          </div>
+          
+          <!-- 学習のコツ -->
+          <div class="bg-yellow-50 rounded-lg p-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">
+              <i class="fas fa-lightbulb mr-2 text-yellow-600"></i>学習のコツ
+            </h3>
+            <ul class="space-y-2">
+              ${studyPlan.tips.map(tip => `
+                <li class="flex items-start">
+                  <i class="fas fa-check-circle text-green-600 mr-2 mt-1"></i>
+                  <span class="text-gray-700">${tip}</span>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+          
+          <!-- モチベーションメッセージ -->
+          <div class="bg-gradient-to-r from-pink-50 to-red-50 border-l-4 border-pink-400 p-4 rounded">
+            <p class="text-lg font-bold text-gray-800 mb-2">
+              <i class="fas fa-heart text-pink-500 mr-2"></i>がんばって！
+            </p>
+            <p class="text-gray-700">${studyPlan.motivation}</p>
+          </div>
+          
+        </div>
+        
+        <!-- フッター -->
+        <div class="bg-gray-50 border-t border-gray-200 p-4 flex justify-end gap-2">
+          <button onclick="printStudyPlan()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded transition-colors">
+            <i class="fas fa-print mr-2"></i>印刷する
+          </button>
+          <button onclick="closeStudyPlanModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded transition-colors">
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  // 既存のモーダルを閉じる
+  closeAIRecommendModal()
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+}
+
+function closeAIRecommendModal(event) {
+  if (event && event.target.id !== 'aiRecommendModal') return
+  const modal = document.getElementById('aiRecommendModal')
+  if (modal) modal.remove()
+}
+
+function closeStudyPlanModal(event) {
+  if (event && event.target.id !== 'studyPlanModal') return
+  const modal = document.getElementById('studyPlanModal')
+  if (modal) modal.remove()
+}
+
+function printStudyPlan() {
+  window.print()
+}
+
+window.showAIRecommendedProblems = showAIRecommendedProblems
+window.toggleAIHints = toggleAIHints
+window.toggleAIAnswer = toggleAIAnswer
+window.generateStudyPlan = generateStudyPlan
+window.showStudyPlanModal = showStudyPlanModal
+window.closeAIRecommendModal = closeAIRecommendModal
+window.closeStudyPlanModal = closeStudyPlanModal
+window.printStudyPlan = printStudyPlan
+
+console.log('✅ AI自動問題選定機能を読み込みました')

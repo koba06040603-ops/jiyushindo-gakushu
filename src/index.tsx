@@ -7998,6 +7998,376 @@ function generateRecommendations(summary: any) {
   return recommendations
 }
 
+// =============================================================================
+// Phase 3-7: AI自動問題選定API
+// =============================================================================
+
+// AI推奨問題生成API
+app.post('/api/ai/recommend-problems/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const { curriculumId } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    return c.json({ error: 'Gemini APIキーが設定されていません' }, 500)
+  }
+  
+  try {
+    console.log(`🤖 AI推奨問題生成開始: 学生ID=${studentId}, カリキュラムID=${curriculumId}`)
+    
+    // 1. カリキュラム情報を取得
+    const curriculum = await env.DB.prepare(
+      'SELECT * FROM curriculum WHERE id = ?'
+    ).bind(curriculumId).first()
+    
+    if (!curriculum) {
+      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    }
+    
+    // 2. 学習履歴を取得（最新50件）
+    const learningHistory = await env.DB.prepare(`
+      SELECT 
+        content_type,
+        problem_id,
+        is_correct,
+        answer_time_seconds,
+        hint_used,
+        created_at
+      FROM retrieval_practice_log
+      WHERE student_id = ? AND curriculum_id = ?
+      ORDER BY created_at DESC
+      LIMIT 50
+    `).bind(studentId, curriculumId).all()
+    
+    // 3. 統計分析
+    const history = learningHistory.results || []
+    const stats = {
+      total_attempts: history.length,
+      correct_count: history.filter((h: any) => h.is_correct === 1).length,
+      accuracy: history.length > 0 
+        ? Math.round((history.filter((h: any) => h.is_correct === 1).length / history.length) * 100) 
+        : 0,
+      avg_time: history.length > 0
+        ? Math.round(history.reduce((sum: number, h: any) => sum + (h.answer_time_seconds || 0), 0) / history.length)
+        : 0,
+      hint_usage: history.filter((h: any) => h.hint_used === 1).length,
+      by_content_type: {} as any
+    }
+    
+    // コンテンツタイプ別統計
+    const contentTypes = ['frequent_problems', 'application_problems', 'review_checklist']
+    contentTypes.forEach(type => {
+      const typeData = history.filter((h: any) => h.content_type === type)
+      if (typeData.length > 0) {
+        stats.by_content_type[type] = {
+          attempts: typeData.length,
+          correct: typeData.filter((h: any) => h.is_correct === 1).length,
+          accuracy: Math.round((typeData.filter((h: any) => h.is_correct === 1).length / typeData.length) * 100),
+          avg_time: Math.round(typeData.reduce((sum: number, h: any) => sum + (h.answer_time_seconds || 0), 0) / typeData.length)
+        }
+      }
+    })
+    
+    // 4. 苦手分野を特定
+    const weakAreas = []
+    if (stats.by_content_type['frequent_problems']?.accuracy < 60) {
+      weakAreas.push('頻出問題')
+    }
+    if (stats.by_content_type['application_problems']?.accuracy < 60) {
+      weakAreas.push('応用問題')
+    }
+    if (stats.by_content_type['review_checklist']?.accuracy < 60) {
+      weakAreas.push('復習チェックリスト')
+    }
+    
+    // 5. AIプロンプト生成
+    const aiPrompt = `
+あなたは小学生の学習を支援する教育AIです。以下の学習データを分析し、個別最適化された問題推奨を行ってください。
+
+【カリキュラム情報】
+- 学年: 小学${curriculum.grade}年
+- 教科: ${curriculum.subject}
+- 単元名: ${curriculum.unit_name}
+
+【学習履歴】
+- 総挑戦回数: ${stats.total_attempts}回
+- 正答数: ${stats.correct_count}回
+- 正答率: ${stats.accuracy}%
+- 平均回答時間: ${stats.avg_time}秒
+- ヒント使用回数: ${stats.hint_usage}回
+
+【コンテンツタイプ別パフォーマンス】
+${Object.entries(stats.by_content_type).map(([type, data]: [string, any]) => 
+  `- ${type}: ${data.attempts}回挑戦、正答率${data.accuracy}%、平均${data.avg_time}秒`
+).join('\n')}
+
+【苦手分野】
+${weakAreas.length > 0 ? weakAreas.join('、') : 'なし'}
+
+【タスク】
+上記のデータを分析し、この児童に最適な学習推奨を生成してください。
+
+【出力形式】
+以下のJSON形式で出力してください：
+
+{
+  "analysis": {
+    "learning_level": "初級 / 中級 / 上級",
+    "study_style": "学習スタイルの特徴（2-3文）",
+    "strengths": ["強み1", "強み2"],
+    "weaknesses": ["課題1", "課題2"]
+  },
+  "recommended_problems": [
+    {
+      "problem_type": "frequent_problems / application_problems / review_checklist",
+      "difficulty": "easy / medium / hard",
+      "title": "問題タイトル（20文字以内）",
+      "content": "問題内容（80-150文字）",
+      "reason": "この問題を推奨する理由（50文字以内）",
+      "hints": ["ヒント1", "ヒント2"],
+      "answer": "解答（50-100文字）",
+      "explanation": "解説（100-200文字）"
+    }
+  ],
+  "study_plan": {
+    "immediate_focus": "今すぐ取り組むべき内容",
+    "weekly_goal": "今週の目標",
+    "long_term_goal": "長期的な目標",
+    "estimated_time": "推奨学習時間（分）"
+  },
+  "motivation_message": "児童へのメッセージ（50-100文字、ポジティブで励ます内容）"
+}
+
+※ recommended_problems は3-5問を推奨してください
+※ 苦手分野がある場合は、その分野を重点的にカバーする問題を含めてください
+※ 正答率が高い場合は、より難易度の高い問題を推奨してください
+`
+    
+    // 6. Gemini API呼び出し
+    console.log('🤖 Gemini APIを呼び出し中...')
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: aiPrompt }]
+          }],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 2000
+          }
+        })
+      }
+    )
+    
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text()
+      console.error('❌ Gemini APIエラー:', errorText)
+      throw new Error('AI推奨生成に失敗しました')
+    }
+    
+    const geminiData = await geminiResponse.json()
+    const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    console.log('✅ Gemini APIレスポンス受信')
+    
+    // 7. JSONを抽出
+    const jsonMatch = geminiText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.error('❌ JSONパースエラー:', geminiText)
+      throw new Error('AI推奨のパースに失敗しました')
+    }
+    
+    const recommendations = JSON.parse(jsonMatch[0])
+    
+    console.log(`✅ AI推奨問題生成完了: ${recommendations.recommended_problems?.length}問`)
+    
+    return c.json({
+      success: true,
+      student_id: studentId,
+      curriculum_id: curriculumId,
+      learning_stats: stats,
+      weak_areas: weakAreas,
+      recommendations: recommendations,
+      generated_at: new Date().toISOString()
+    })
+    
+  } catch (error: any) {
+    console.error('❌ AI推奨問題生成エラー:', error)
+    return c.json({
+      success: false,
+      error: 'AI推奨問題の生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+// 学習計画生成API
+app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  const { curriculumId, targetDate } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    return c.json({ error: 'Gemini APIキーが設定されていません' }, 500)
+  }
+  
+  try {
+    console.log(`📅 学習計画生成開始: 学生ID=${studentId}, 目標日=${targetDate}`)
+    
+    // カリキュラム情報取得
+    const curriculum = await env.DB.prepare(
+      'SELECT * FROM curriculum WHERE id = ?'
+    ).bind(curriculumId).first()
+    
+    if (!curriculum) {
+      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    }
+    
+    // 学習履歴統計
+    const stats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_attempts,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        AVG(answer_time_seconds) as avg_time,
+        COUNT(DISTINCT DATE(created_at)) as study_days
+      FROM retrieval_practice_log
+      WHERE student_id = ? AND curriculum_id = ?
+    `).bind(studentId, curriculumId).first()
+    
+    // 学習ペース分析
+    const recentActivity = await env.DB.prepare(`
+      SELECT 
+        DATE(created_at) as study_date,
+        COUNT(*) as problems_solved
+      FROM retrieval_practice_log
+      WHERE student_id = ? AND curriculum_id = ?
+        AND created_at >= datetime('now', '-30 days')
+      GROUP BY DATE(created_at)
+      ORDER BY study_date DESC
+      LIMIT 30
+    `).bind(studentId, curriculumId).all()
+    
+    const studyPace = {
+      total_days: stats?.study_days || 0,
+      avg_problems_per_day: (stats?.total_attempts || 0) / (stats?.study_days || 1),
+      recent_activity: recentActivity.results || []
+    }
+    
+    // AIプロンプト
+    const aiPrompt = `
+あなたは小学生の学習計画を立てる教育AIです。以下のデータから最適な学習計画を作成してください。
+
+【カリキュラム情報】
+- 学年: 小学${curriculum.grade}年
+- 教科: ${curriculum.subject}
+- 単元名: ${curriculum.unit_name}
+- 総学習時間: ${curriculum.total_hours}時間
+
+【学習実績】
+- 総学習日数: ${studyPace.total_days}日
+- 総問題数: ${stats?.total_attempts || 0}問
+- 正答数: ${stats?.correct_count || 0}問
+- 正答率: ${stats ? Math.round((stats.correct_count / stats.total_attempts) * 100) : 0}%
+- 1日あたり平均: ${Math.round(studyPace.avg_problems_per_day)}問
+
+【目標】
+- 目標達成日: ${targetDate || '未設定'}
+
+【タスク】
+上記データから、目標達成に向けた学習計画を作成してください。
+
+【出力形式】
+{
+  "plan_summary": "計画の概要（2-3文）",
+  "daily_schedule": [
+    {
+      "day": 1,
+      "date": "YYYY-MM-DD",
+      "tasks": [
+        {
+          "time": "10:00-10:30",
+          "activity": "活動内容",
+          "content_type": "frequent_problems / application_problems / review_checklist",
+          "estimated_minutes": 30
+        }
+      ],
+      "daily_goal": "今日の目標"
+    }
+  ],
+  "weekly_milestones": [
+    {
+      "week": 1,
+      "goal": "週の目標",
+      "focus_areas": ["重点分野1", "重点分野2"]
+    }
+  ],
+  "review_schedule": [
+    {
+      "date": "YYYY-MM-DD",
+      "review_type": "short_term / long_term",
+      "content": "復習内容"
+    }
+  ],
+  "tips": ["学習のコツ1", "学習のコツ2", "学習のコツ3"],
+  "motivation": "目標達成に向けたメッセージ"
+}
+`
+    
+    // Gemini API呼び出し
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: aiPrompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 2500 }
+        })
+      }
+    )
+    
+    if (!geminiResponse.ok) {
+      throw new Error('AI学習計画生成に失敗しました')
+    }
+    
+    const geminiData = await geminiResponse.json()
+    const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    const jsonMatch = geminiText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('学習計画のパースに失敗しました')
+    }
+    
+    const studyPlan = JSON.parse(jsonMatch[0])
+    
+    console.log('✅ 学習計画生成完了')
+    
+    return c.json({
+      success: true,
+      student_id: studentId,
+      curriculum_id: curriculumId,
+      study_pace: studyPace,
+      study_plan: studyPlan,
+      generated_at: new Date().toISOString()
+    })
+    
+  } catch (error: any) {
+    console.error('❌ 学習計画生成エラー:', error)
+    return c.json({
+      success: false,
+      error: '学習計画の生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
 // APIルート：評価問題を生成（チェックテスト・選択問題）
 app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c) => {
   const { env } = c
