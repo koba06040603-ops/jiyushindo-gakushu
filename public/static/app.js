@@ -30845,6 +30845,199 @@ window.demoCase4Kinesthetic = demoCase4Kinesthetic
 
 console.log('✅ 個別最適化学習デモ機能 読み込み完了（ケース1-4）')
 
+// ========================================
+// ケース4-12: Canvas動画生成機能拡張
+// ========================================
+
+// ケース4-6: 学習スタイル別動画生成
+async function generateStyleVideo(caseNumber) {
+  const resultDivId = `case${caseNumber}Result`
+  const resultDiv = document.getElementById(resultDivId)
+  
+  if (!resultDiv) {
+    console.error(`Result div not found: ${resultDivId}`)
+    return
+  }
+  
+  resultDiv.innerHTML = `
+    <div class="text-center py-8">
+      <div class="animate-spin mb-4 mx-auto">
+        <i class="fas fa-spinner text-6xl text-purple-600"></i>
+      </div>
+      <p class="text-purple-700 font-semibold mb-2">AI動画生成中...</p>
+      <p class="text-sm text-gray-600">学習スタイル別に最適化した動画を生成しています</p>
+    </div>
+  `
+  
+  try {
+    const response = await fetch('/api/media/generate-video-case', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        caseNumber: caseNumber,
+        duration: 10
+      })
+    })
+    
+    if (!response.ok) throw new Error('動画生成に失敗しました')
+    
+    const data = await response.json()
+    
+    resultDiv.innerHTML = `
+      <div class="py-4">
+        <div class="mb-4">
+          <div class="bg-white rounded-lg overflow-hidden border-2 border-purple-300" style="height: 500px;">
+            <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+              class="w-full h-full" frameborder="0" 
+              sandbox="allow-scripts"
+              style="background: white;"></iframe>
+          </div>
+        </div>
+        
+        <div class="space-y-2">
+          <div class="bg-white p-3 rounded border flex items-start">
+            <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-gray-800">生成完了！</p>
+              <p class="text-xs text-gray-600">${data.note}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+        <p>エラー: ${error.message}</p>
+      </div>
+    `
+  }
+}
+
+// ケース7-9: 特別支援・保護者・教師用動画生成
+async function generateSupportVideo(caseNumber) {
+  const resultDivId = `case${caseNumber}Result`
+  const resultDiv = document.getElementById(resultDivId)
+  
+  if (!resultDiv) {
+    console.error(`Result div not found: ${resultDivId}`)
+    return
+  }
+  
+  resultDiv.innerHTML = `
+    <div class="text-center py-8">
+      <div class="animate-spin mb-4 mx-auto">
+        <i class="fas fa-spinner text-6xl text-blue-600"></i>
+      </div>
+      <p class="text-blue-700 font-semibold mb-2">AI動画生成中...</p>
+    </div>
+  `
+  
+  try {
+    const response = await fetch('/api/media/generate-video-support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        caseNumber: caseNumber
+      })
+    })
+    
+    if (!response.ok) throw new Error('動画生成に失敗しました')
+    
+    const data = await response.json()
+    
+    resultDiv.innerHTML = `
+      <div class="py-4">
+        <div class="mb-4">
+          <div class="bg-white rounded-lg overflow-hidden border-2 border-blue-300" style="height: 500px;">
+            <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+              class="w-full h-full" frameborder="0" 
+              sandbox="allow-scripts"
+              style="background: white;"></iframe>
+          </div>
+        </div>
+        
+        <div class="bg-white p-3 rounded border">
+          <p class="text-sm font-semibold text-gray-800">✅ ${data.note}</p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+        <p>エラー: ${error.message}</p>
+      </div>
+    `
+  }
+}
+
+// ケース10-12: テスト準備・予習・復習動画生成
+async function generatePracticeVideo(caseNumber) {
+  const resultDivId = `case${caseNumber}Result`
+  const resultDiv = document.getElementById(resultDivId)
+  
+  if (!resultDiv) {
+    console.error(`Result div not found: ${resultDivId}`)
+    return
+  }
+  
+  resultDiv.innerHTML = `
+    <div class="text-center py-8">
+      <div class="animate-spin mb-4 mx-auto">
+        <i class="fas fa-spinner text-6xl text-green-600"></i>
+      </div>
+      <p class="text-green-700 font-semibold mb-2">AI動画生成中...</p>
+    </div>
+  `
+  
+  try {
+    const response = await fetch('/api/media/generate-video-practice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        caseNumber: caseNumber
+      })
+    })
+    
+    if (!response.ok) throw new Error('動画生成に失敗しました')
+    
+    const data = await response.json()
+    
+    resultDiv.innerHTML = `
+      <div class="py-4">
+        <div class="mb-4">
+          <div class="bg-white rounded-lg overflow-hidden border-2 border-green-300" style="height: 500px;">
+            <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+              class="w-full h-full" frameborder="0" 
+              sandbox="allow-scripts"
+              style="background: white;"></iframe>
+          </div>
+        </div>
+        
+        <div class="bg-white p-3 rounded border">
+          <p class="text-sm font-semibold text-gray-800">✅ ${data.note}</p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div class="text-center py-8 text-red-600">
+        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+        <p>エラー: ${error.message}</p>
+      </div>
+    `
+  }
+}
+
+// グローバルスコープに登録
+window.generateStyleVideo = generateStyleVideo
+window.generateSupportVideo = generateSupportVideo
+window.generatePracticeVideo = generatePracticeVideo
+
+console.log('✅ ケース4-12動画生成機能 読み込み完了')
+
 
 
 

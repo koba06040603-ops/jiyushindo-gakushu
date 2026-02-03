@@ -14114,6 +14114,428 @@ app.post('/api/media/generate-video', async (c) => {
   })
 })
 
+// メディア生成API - ケース4-12: 学習スタイル別動画生成
+app.post('/api/media/generate-video-case', async (c) => {
+  const { caseNumber, duration } = await c.req.json()
+  
+  // ケース別の設定
+  const caseConfigs: Record<number, any> = {
+    4: { // 視覚優位型
+      title: '色と図形で理解',
+      colors: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b'], // 赤・青・緑・黄
+      style: 'カラフル',
+      targetStudent: '視覚情報に強いDさん'
+    },
+    5: { // 聴覚優位型
+      title: '音とリズムで覚える',
+      colors: ['#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6'], // 紫統一
+      style: 'バウンドリズム',
+      targetStudent: '音で覚えるEさん'
+    },
+    6: { // 体感優位型
+      title: '動きで体得',
+      colors: ['#06b6d4', '#06b6d4', '#06b6d4', '#06b6d4'], // 水色統一
+      style: '手の動き',
+      targetStudent: '体を動かして学ぶFさん'
+    }
+  }
+  
+  const config = caseConfigs[caseNumber] || caseConfigs[4]
+  
+  const animationHtml = `
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8">
+      <title>ケース${caseNumber}: ${config.title}</title>
+      <style>
+        body { margin: 0; padding: 0; background: white; }
+        canvas { display: block; }
+      </style>
+    </head>
+    <body>
+      <canvas id="canvas" width="800" height="500"></canvas>
+      <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let time = 0;
+        
+        console.log('🎬 Canvas initialized for Case ${caseNumber}');
+        
+        // ヘルパー関数
+        function drawText(text, x, y, size, color, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = color;
+          ctx.font = 'bold ' + size + 'px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(text, x, y);
+          ctx.restore();
+        }
+        
+        function drawBox(x, y, w, h, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = '#9ca3af';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, w, h);
+          ctx.restore();
+        }
+        
+        function drawColorBlock(x, y, size, color, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          
+          // グラデーション
+          const gradient = ctx.createRadialGradient(x, y - size/4, size/8, x, y, size);
+          gradient.addColorStop(0, color);
+          gradient.addColorStop(1, adjustBrightness(color, -20));
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // 境界線
+          ctx.strokeStyle = adjustBrightness(color, -40);
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.restore();
+        }
+        
+        function adjustBrightness(color, amount) {
+          const num = parseInt(color.replace('#',''), 16);
+          const r = Math.min(255, Math.max(0, (num >> 16) + amount));
+          const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + amount));
+          const b = Math.min(255, Math.max(0, (num & 0x0000FF) + amount));
+          return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+        }
+        
+        function easeOutElastic(t) {
+          const c4 = (2 * Math.PI) / 3;
+          return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+        }
+        
+        function easeOutBack(t) {
+          const c1 = 1.70158;
+          const c3 = c1 + 1;
+          return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+        }
+        
+        const colors = ${JSON.stringify(config.colors)};
+        const groups = [
+          { x: 185, y: 230, label: '①' },
+          { x: 325, y: 230, label: '②' },
+          { x: 465, y: 230, label: '③' },
+          { x: 605, y: 230, label: '④' }
+        ];
+        
+        function animate() {
+          // クリア
+          ctx.clearRect(0, 0, 800, 500);
+          
+          // フェーズ1: タイトル表示（0-1秒）
+          if (time < 1) {
+            const alpha = Math.min(time * 2, 1);
+            drawText('${config.title}', 400, 40, 32, '#1f2937', alpha);
+            drawText('対象: ${config.targetStudent}', 400, 75, 18, '#6b7280', alpha * 0.8);
+          } else {
+            drawText('${config.title}', 400, 40, 32, '#1f2937', 1);
+            drawText('対象: ${config.targetStudent}', 400, 75, 18, '#6b7280', 0.8);
+          }
+          
+          // フェーズ2: 問題表示（1-2秒）
+          if (time >= 1) {
+            const t = Math.min((time - 1) * 2, 1);
+            const bounceY = time >= 2 ? 0 : -20 * (1 - easeOutBack(t));
+            drawText('3 × 4 = ?', 400, 120 + bounceY, 42, '#4b5563', t);
+          }
+          
+          // フェーズ3-6: 4グループの登場（2-6秒、1秒ごと）
+          groups.forEach((group, index) => {
+            const startTime = 2 + index;
+            if (time >= startTime) {
+              const t = Math.min(time - startTime, 1);
+              const ease = easeOutElastic(t);
+              const alpha = Math.min(t * 2, 1);
+              
+              // ラベル
+              drawText(group.label, group.x, 180, 24, '#9ca3af', alpha);
+              
+              // 囲み枠
+              if (t > 0.3) {
+                drawBox(group.x - 55, group.y - 30, 110, 80, (t - 0.3) / 0.7);
+              }
+              
+              // ブロック3個（上から落ちてくる）
+              for (let i = 0; i < 3; i++) {
+                const blockX = group.x + (i - 1) * 35;
+                const blockY = group.y - 100 + ease * 100;
+                drawColorBlock(blockX, blockY, 17, colors[index], alpha);
+              }
+            }
+          });
+          
+          // フェーズ7: 説明表示（6-7秒）
+          if (time >= 6) {
+            const alpha = Math.min((time - 6) * 2, 1);
+            drawText('3が 4つ → 3+3+3+3', 400, 320, 28, '#6b7280', alpha);
+          }
+          
+          // フェーズ8: 答え表示（7秒以降）
+          if (time >= 7) {
+            const t = Math.min((time - 7) / 0.8, 1);
+            const scale = 0.5 + easeOutBack(t) * 0.5;
+            const pulseScale = time >= 8 ? 1 + Math.sin((time - 8) * 4) * 0.05 : 1;
+            
+            ctx.save();
+            ctx.translate(400, 400);
+            ctx.scale(scale * pulseScale, scale * pulseScale);
+            
+            // 影
+            ctx.shadowColor = 'rgba(59, 130, 246, 0.3)';
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetY = 5;
+            
+            drawText('= 12', 0, 0, 70, '#3b82f6', 1);
+            ctx.restore();
+          }
+          
+          // 時間を進める
+          time += 1 / 60;
+          
+          // アニメーション継続（10秒まで）
+          if (time < 10) {
+            requestAnimationFrame(animate);
+          } else {
+            console.log('✅ Animation complete');
+          }
+        }
+        
+        // アニメーション開始
+        animate();
+      </script>
+    </body>
+    </html>
+  `
+  
+  return c.json({
+    success: true,
+    animationHtml: animationHtml,
+    caseNumber: caseNumber,
+    duration: duration || 10,
+    note: \`ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向けの個別最適化された学習動画\`
+  })
+})
+
+// メディア生成API - ケース7-9: 特別支援・保護者・教師用
+app.post('/api/media/generate-video-support', async (c) => {
+  const { caseNumber } = await c.req.json()
+  
+  const supportConfigs: Record<number, any> = {
+    7: {
+      title: 'スモールステップで理解',
+      speed: 'ゆっくり',
+      fontSize: 80,
+      targetStudent: 'ゆっくり丁寧に学ぶGさん'
+    },
+    8: {
+      title: '家庭学習サポート',
+      speed: '標準',
+      fontSize: 32,
+      targetStudent: '保護者の方'
+    },
+    9: {
+      title: 'クラス全体の理解度分析',
+      speed: '速い',
+      fontSize: 28,
+      targetStudent: '教師の方'
+    }
+  }
+  
+  const config = supportConfigs[caseNumber] || supportConfigs[7]
+  
+  const animationHtml = \`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8">
+      <title>ケース\${caseNumber}: \${config.title}</title>
+      <style>
+        body { margin: 0; padding: 0; background: white; }
+        canvas { display: block; }
+      </style>
+    </head>
+    <body>
+      <canvas id="canvas" width="800" height="500"></canvas>
+      <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let time = 0;
+        
+        function drawText(text, x, y, size, color, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = color;
+          ctx.font = 'bold ' + size + 'px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(text, x, y);
+          ctx.restore();
+        }
+        
+        function animate() {
+          ctx.clearRect(0, 0, 800, 500);
+          
+          // タイトル
+          drawText('\${config.title}', 400, 50, 36, '#1f2937', 1);
+          drawText('対象: \${config.targetStudent}', 400, 90, 20, '#6b7280', 0.8);
+          
+          // 内容（ケース別）
+          if (\${caseNumber} === 7) {
+            // ケース7: 特別支援 - 超スローペース
+            const step = Math.floor(time * 0.5); // 2秒に1ステップ
+            if (step >= 0) drawText('1個目', 400, 180, 60, '#4b5563', 1);
+            if (step >= 1) drawText('2個目', 400, 250, 60, '#4b5563', 1);
+            if (step >= 2) drawText('3個目', 400, 320, 60, '#4b5563', 1);
+            if (step >= 3) drawText('これを 4回', 400, 390, 50, '#3b82f6', 1);
+            if (step >= 4) drawText('= 12', 400, 450, 70, '#10b981', 1);
+          } else if (\${caseNumber} === 8) {
+            // ケース8: 保護者向け
+            if (time >= 1) drawText('お子さんへの声かけ例:', 400, 150, 28, '#6b7280', 1);
+            if (time >= 2) drawText('「3個ずつあるね」', 400, 200, 32, '#4b5563', 1);
+            if (time >= 3) drawText('「それが4つあるよ」', 400, 250, 32, '#4b5563', 1);
+            if (time >= 4) drawText('「全部で何個かな？」', 400, 300, 32, '#4b5563', 1);
+            if (time >= 5) drawText('一緒に数えましょう！', 400, 370, 36, '#3b82f6', 1);
+          } else if (\${caseNumber} === 9) {
+            // ケース9: 教師用分析
+            if (time >= 1) drawText('クラス平均正答率: 78%', 400, 170, 32, '#6b7280', 1);
+            if (time >= 2) drawText('つまずきポイント:', 400, 230, 28, '#ef4444', 1);
+            if (time >= 3) drawText('• くり上がりの理解', 400, 270, 24, '#4b5563', 1);
+            if (time >= 4) drawText('• 式の立て方', 400, 310, 24, '#4b5563', 1);
+            if (time >= 5) drawText('→ 復習推奨', 400, 370, 32, '#f59e0b', 1);
+          }
+          
+          time += 1 / 60;
+          if (time < 10) requestAnimationFrame(animate);
+        }
+        
+        animate();
+      </script>
+    </body>
+    </html>
+  \`
+  
+  return c.json({
+    success: true,
+    animationHtml: animationHtml,
+    caseNumber: caseNumber,
+    duration: 10,
+    note: \`ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向け\`
+  })
+})
+
+// メディア生成API - ケース10-12: テスト準備・予習・復習
+app.post('/api/media/generate-video-practice', async (c) => {
+  const { caseNumber } = await c.req.json()
+  
+  const practiceConfigs: Record<number, any> = {
+    10: {
+      title: 'テスト準備 - よく出る問題',
+      targetStudent: 'テスト前のHさん'
+    },
+    11: {
+      title: '予習 - 次の単元へ',
+      targetStudent: '先取り学習のIさん'
+    },
+    12: {
+      title: '復習 - 要点再確認',
+      targetStudent: '忘れかけているJさん'
+    }
+  }
+  
+  const config = practiceConfigs[caseNumber] || practiceConfigs[10]
+  
+  const animationHtml = \`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8">
+      <title>ケース\${caseNumber}: \${config.title}</title>
+      <style>
+        body { margin: 0; padding: 0; background: white; }
+        canvas { display: block; }
+      </style>
+    </head>
+    <body>
+      <canvas id="canvas" width="800" height="500"></canvas>
+      <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let time = 0;
+        
+        function drawText(text, x, y, size, color, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = color;
+          ctx.font = 'bold ' + size + 'px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(text, x, y);
+          ctx.restore();
+        }
+        
+        function animate() {
+          ctx.clearRect(0, 0, 800, 500);
+          
+          // タイトル
+          drawText('\${config.title}', 400, 50, 36, '#1f2937', 1);
+          drawText('対象: \${config.targetStudent}', 400, 90, 20, '#6b7280', 0.8);
+          
+          // 内容（ケース別）
+          if (\${caseNumber} === 10) {
+            // ケース10: テスト準備
+            if (time >= 1) drawText('問題1: 3 × 4 = ?', 400, 170, 32, '#4b5563', 1);
+            if (time >= 3) drawText('→ 答え: 12', 400, 220, 28, '#10b981', 1);
+            if (time >= 4) drawText('問題2: 5 × 3 = ?', 400, 290, 32, '#4b5563', 1);
+            if (time >= 6) drawText('→ 答え: 15', 400, 340, 28, '#10b981', 1);
+            if (time >= 7) drawText('ポイント: まとまりで考える', 400, 410, 26, '#3b82f6', 1);
+          } else if (\${caseNumber} === 11) {
+            // ケース11: 予習
+            if (time >= 1) drawText('3 × 4 = 12 から', 400, 170, 32, '#6b7280', 1);
+            if (time >= 2) drawText('4 × 4 = ?', 400, 240, 42, '#4b5563', 1);
+            if (time >= 4) drawText('4が4つ = 16', 400, 310, 36, '#10b981', 1);
+            if (time >= 6) drawText('パターンを見つけよう！', 400, 390, 32, '#3b82f6', 1);
+          } else if (\${caseNumber} === 12) {
+            // ケース12: 復習
+            if (time >= 0.5) drawText('3 × 4 = ?', 400, 200, 56, '#4b5563', 1);
+            if (time >= 2) {
+              const alpha = Math.min((time - 2) * 2, 1);
+              drawText('= 12', 400, 300, 80, '#10b981', alpha);
+            }
+            if (time >= 4) drawText('覚えてたかな？', 400, 400, 32, '#3b82f6', 1);
+          }
+          
+          time += 1 / 60;
+          if (time < 10) requestAnimationFrame(animate);
+        }
+        
+        animate();
+      </script>
+    </body>
+    </html>
+  \`
+  
+  return c.json({
+    success: true,
+    animationHtml: animationHtml,
+    caseNumber: caseNumber,
+    duration: 10,
+    note: \`ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向け\`
+  })
+})
+
 // メディア生成API - 音声生成（読み上げテキスト）
 app.post('/api/media/generate-audio', async (c) => {
   const { text, voice } = await c.req.json()
