@@ -14138,8 +14138,9 @@ app.post('/api/media/generate-video-case', async (c) => {
     },
     6: { // 体感優位型
       title: '動きで体得',
-      colors: ['#06b6d4', '#06b6d4', '#06b6d4', '#06b6d4'], // 水色統一
-      style: '手の動き',
+      colors: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b'], // おはじきの色（赤・青・緑・黄）
+      cupColor: '#f3f4f6', // 紙コップの色（グレー）
+      style: '紙コップとおはじき',
       targetStudent: '体を動かして学ぶFさん'
     }
   }
@@ -14228,12 +14229,77 @@ app.post('/api/media/generate-video-case', async (c) => {
         }
         
         const colors = ${JSON.stringify(config.colors)};
+        const cupColor = '${config.cupColor || '#f3f4f6'}';
         const groups = [
-          { x: 185, y: 230, label: '①' },
-          { x: 325, y: 230, label: '②' },
-          { x: 465, y: 230, label: '③' },
-          { x: 605, y: 230, label: '④' }
+          { x: 185, y: 280, label: '①' },
+          { x: 325, y: 280, label: '②' },
+          { x: 465, y: 280, label: '③' },
+          { x: 605, y: 280, label: '④' }
         ];
+        
+        // 紙コップを描画する関数
+        function drawCup(x, y, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          
+          // 紙コップの台形形状
+          ctx.fillStyle = cupColor;
+          ctx.strokeStyle = '#d1d5db';
+          ctx.lineWidth = 2;
+          
+          ctx.beginPath();
+          ctx.moveTo(x - 30, y - 40); // 上左
+          ctx.lineTo(x + 30, y - 40); // 上右
+          ctx.lineTo(x + 35, y + 20);  // 下右
+          ctx.lineTo(x - 35, y + 20);  // 下左
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          
+          // コップの縁（楕円）
+          ctx.fillStyle = '#e5e7eb';
+          ctx.beginPath();
+          ctx.ellipse(x, y - 40, 30, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          
+          // 内側の影
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+          ctx.beginPath();
+          ctx.ellipse(x, y - 38, 28, 7, 0, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.restore();
+        }
+        
+        // おはじき（カラフルな丸）を描画する関数
+        function drawMarble(x, y, radius, color, alpha = 1) {
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          
+          // グラデーション
+          const gradient = ctx.createRadialGradient(x - radius/3, y - radius/3, 0, x, y, radius);
+          gradient.addColorStop(0, adjustBrightness(color, 60));
+          gradient.addColorStop(1, color);
+          
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // 境界線
+          ctx.strokeStyle = adjustBrightness(color, -40);
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          
+          // ハイライト
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.beginPath();
+          ctx.arc(x - radius/3, y - radius/3, radius/3, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.restore();
+        }
         
         function animate() {
           // クリア
@@ -14256,45 +14322,66 @@ app.post('/api/media/generate-video-case', async (c) => {
             drawText('3 × 4 = ?', 400, 120 + bounceY, 42, '#4b5563', t);
           }
           
-          // フェーズ3-6: 4グループの登場（2-6秒、1秒ごと）
-          groups.forEach((group, index) => {
-            const startTime = 2 + index;
-            if (time >= startTime) {
-              const t = Math.min(time - startTime, 1);
-              const ease = easeOutElastic(t);
-              const alpha = Math.min(t * 2, 1);
+          // フェーズ3: 紙コップ4個を配置（2-3秒）
+          if (time >= 2) {
+            const t = Math.min((time - 2) * 2, 1);
+            const ease = easeOutBack(t);
+            
+            groups.forEach((group, index) => {
+              const delay = index * 0.15; // 順番に登場
+              const cupT = Math.max(0, Math.min((t - delay) * 1.5, 1));
+              const cupY = group.y - 50 + ease * 50;
               
-              // ラベル
-              drawText(group.label, group.x, 180, 24, '#9ca3af', alpha);
-              
-              // 囲み枠
-              if (t > 0.3) {
-                drawBox(group.x - 55, group.y - 30, 110, 80, (t - 0.3) / 0.7);
+              if (cupT > 0) {
+                drawCup(group.x, cupY, cupT);
+                // ラベル
+                drawText(group.label, group.x, group.y - 100, 24, '#9ca3af', cupT);
               }
-              
-              // ブロック3個（上から落ちてくる）
-              for (let i = 0; i < 3; i++) {
-                const blockX = group.x + (i - 1) * 35;
-                const blockY = group.y - 100 + ease * 100;
-                drawColorBlock(blockX, blockY, 17, colors[index], alpha);
-              }
-            }
-          });
-          
-          // フェーズ7: 説明表示（6-7秒）
-          if (time >= 6) {
-            const alpha = Math.min((time - 6) * 2, 1);
-            drawText('3が 4つ → 3+3+3+3', 400, 320, 28, '#6b7280', alpha);
+            });
           }
           
-          // フェーズ8: 答え表示（7秒以降）
+          // フェーズ4: 紙コップが完全に配置された状態を維持（3秒以降）
+          if (time >= 3) {
+            groups.forEach((group, index) => {
+              drawCup(group.x, group.y, 1);
+              drawText(group.label, group.x, group.y - 100, 24, '#9ca3af', 1);
+            });
+          }
+          
+          // フェーズ5-8: おはじきが1個ずつ入っていく（3-7秒、各コップに3個ずつ）
+          if (time >= 3) {
+            groups.forEach((group, groupIndex) => {
+              for (let marbleIndex = 0; marbleIndex < 3; marbleIndex++) {
+                const startTime = 3 + groupIndex + marbleIndex * 0.3;
+                if (time >= startTime) {
+                  const t = Math.min((time - startTime) * 3, 1);
+                  const ease = easeOutElastic(t);
+                  
+                  // おはじきの最終位置（コップの中）
+                  const finalY = group.y - 20 + marbleIndex * 18;
+                  const marbleY = group.y - 120 + ease * (finalY - (group.y - 120));
+                  
+                  drawMarble(group.x, marbleY, 10, colors[groupIndex], Math.min(t * 2, 1));
+                }
+              }
+            });
+          }
+          
+          // フェーズ9: 説明表示（7-8秒）
           if (time >= 7) {
-            const t = Math.min((time - 7) / 0.8, 1);
+            const alpha = Math.min((time - 7) * 2, 1);
+            drawText('3個ずつ × 4つのコップ', 400, 360, 26, '#6b7280', alpha);
+            drawText('= 3+3+3+3', 400, 390, 24, '#8b5cf6', alpha);
+          }
+          
+          // フェーズ10: 答え表示（8秒以降）
+          if (time >= 8) {
+            const t = Math.min((time - 8) / 0.8, 1);
             const scale = 0.5 + easeOutBack(t) * 0.5;
-            const pulseScale = time >= 8 ? 1 + Math.sin((time - 8) * 4) * 0.05 : 1;
+            const pulseScale = time >= 9 ? 1 + Math.sin((time - 9) * 4) * 0.05 : 1;
             
             ctx.save();
-            ctx.translate(400, 400);
+            ctx.translate(400, 440);
             ctx.scale(scale * pulseScale, scale * pulseScale);
             
             // 影
@@ -14302,7 +14389,7 @@ app.post('/api/media/generate-video-case', async (c) => {
             ctx.shadowBlur = 20;
             ctx.shadowOffsetY = 5;
             
-            drawText('= 12', 0, 0, 70, '#3b82f6', 1);
+            drawText('= 12個！', 0, 0, 60, '#3b82f6', 1);
             ctx.restore();
           }
           
@@ -14313,7 +14400,7 @@ app.post('/api/media/generate-video-case', async (c) => {
           if (time < 10) {
             requestAnimationFrame(animate);
           } else {
-            console.log('✅ Animation complete');
+            console.log('✅ Animation complete: 紙コップとおはじき');
           }
         }
         
