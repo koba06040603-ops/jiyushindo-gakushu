@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>動画生成プレビュー - 管理者用</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-6xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <h1 class="text-3xl font-bold text-gray-800 mb-2">
+        <i class="fas fa-video text-purple-600 mr-2"></i>
+        動画生成プレビュー（管理者用）
+      </h1>
+      <p class="text-gray-600 mb-4">
+        本番デプロイ前に、生成される動画の品質を確認できます。
+      </p>
+      
+      <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
+        <div class="flex">
+          <i class="fas fa-exclamation-triangle text-yellow-500 mr-2 mt-1"></i>
+          <div>
+            <p class="font-semibold text-yellow-800">確認ポイント</p>
+            <ul class="text-sm text-yellow-700 mt-2 space-y-1">
+              <li>• 4つのグループが画面内に収まっているか</li>
+              <li>• 説明「3が4つ → 3+3+3+3」が表示されるか</li>
+              <li>• 答え「=12」が表示されるか</li>
+              <li>• アニメーションがスムーズか（10秒間）</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- プレビュー1: ケース1（得意な児童） -->
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-purple-700 mb-4">
+          <i class="fas fa-rocket mr-2"></i>ケース1: 得意な児童Aさん向け
+        </h2>
+        <button onclick="generatePreview('case1')" 
+          class="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case1" class="bg-gray-50 rounded-lg p-4 min-h-[300px]">
+          <div class="text-center text-gray-500 py-20">
+            <i class="fas fa-video text-6xl mb-4"></i>
+            <p>ボタンをクリックして動画をプレビュー</p>
+          </div>
+        </div>
+        <div id="info-case1" class="mt-4 hidden">
+          <div class="bg-blue-50 p-3 rounded border border-blue-200">
+            <p class="text-xs text-gray-600 mb-2">
+              <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+              <strong>生成パラメータ:</strong>
+            </p>
+            <pre class="text-xs text-gray-700 bg-white p-2 rounded" id="params-case1"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- プレビュー2: ケース3（欠席が多い児童） -->
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-yellow-700 mb-4">
+          <i class="fas fa-home mr-2"></i>ケース3: 欠席が多い児童Cさん向け
+        </h2>
+        <button onclick="generatePreview('case3')" 
+          class="w-full px-6 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case3" class="bg-gray-50 rounded-lg p-4 min-h-[300px]">
+          <div class="text-center text-gray-500 py-20">
+            <i class="fas fa-video text-6xl mb-4"></i>
+            <p>ボタンをクリックして動画をプレビュー</p>
+          </div>
+        </div>
+        <div id="info-case3" class="mt-4 hidden">
+          <div class="bg-blue-50 p-3 rounded border border-blue-200">
+            <p class="text-xs text-gray-600 mb-2">
+              <i class="fas fa-info-circle text-blue-600 mr-1"></i>
+              <strong>生成パラメータ:</strong>
+            </p>
+            <pre class="text-xs text-gray-700 bg-white p-2 rounded" id="params-case3"></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- APIレスポンス確認 -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">
+        <i class="fas fa-code mr-2"></i>API レスポンス確認
+      </h2>
+      <div class="bg-gray-900 rounded-lg p-4">
+        <pre id="api-response" class="text-green-400 text-xs overflow-x-auto">API呼び出しを実行すると、レスポンスがここに表示されます</pre>
+      </div>
+    </div>
+
+    <!-- 座標確認ツール -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">
+        <i class="fas fa-ruler-combined mr-2"></i>座標確認ツール
+      </h2>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-green-50 p-4 rounded border border-green-200">
+          <p class="text-xs text-gray-600 mb-1">1つめ X座標</p>
+          <p class="text-2xl font-bold text-green-700" id="coord-1">-</p>
+        </div>
+        <div class="bg-green-50 p-4 rounded border border-green-200">
+          <p class="text-xs text-gray-600 mb-1">2つめ X座標</p>
+          <p class="text-2xl font-bold text-green-700" id="coord-2">-</p>
+        </div>
+        <div class="bg-green-50 p-4 rounded border border-green-200">
+          <p class="text-xs text-gray-600 mb-1">3つめ X座標</p>
+          <p class="text-2xl font-bold text-green-700" id="coord-3">-</p>
+        </div>
+        <div class="bg-green-50 p-4 rounded border border-green-200">
+          <p class="text-xs text-gray-600 mb-1">4つめ X座標</p>
+          <p class="text-2xl font-bold text-green-700" id="coord-4">-</p>
+        </div>
+      </div>
+      <div class="mt-4 p-4 bg-gray-50 rounded">
+        <p class="text-sm text-gray-700">
+          <i class="fas fa-check-circle text-green-500 mr-2"></i>
+          <strong>期待値:</strong> 185, 325, 465, 605（左右に余白がある配置）
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function generatePreview(caseType) {
+      const previewDiv = document.getElementById(`preview-${caseType}`)
+      const infoDiv = document.getElementById(`info-${caseType}`)
+      const paramsDiv = document.getElementById(`params-${caseType}`)
+      const apiResponseDiv = document.getElementById('api-response')
+      
+      // ローディング表示
+      previewDiv.innerHTML = `
+        <div class="text-center py-20">
+          <div class="animate-spin mb-4 mx-auto">
+            <i class="fas fa-spinner text-6xl text-purple-600"></i>
+          </div>
+          <p class="text-purple-700 font-semibold">動画生成中...</p>
+          <p class="text-sm text-gray-600 mt-2">約2秒</p>
+        </div>
+      `
+      
+      try {
+        const params = {
+          prompt: caseType === 'case1' ? 
+            '小学2年生向け: 3×4の計算手順を視覚的に解説する動画' : 
+            '欠席児童向け: 3×4の要点解説（簡潔版）',
+          duration: 10
+        }
+        
+        const response = await fetch('/api/media/generate-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        })
+        
+        if (!response.ok) throw new Error('API呼び出しに失敗しました')
+        
+        const data = await response.json()
+        
+        // APIレスポンス表示
+        apiResponseDiv.textContent = JSON.stringify(data, null, 2)
+        
+        // パラメータ表示
+        paramsDiv.textContent = JSON.stringify(params, null, 2)
+        infoDiv.classList.remove('hidden')
+        
+        // 座標抽出
+        const coordMatches = data.animationHtml.match(/x: (\d+)/g)
+        if (coordMatches && coordMatches.length >= 4) {
+          for (let i = 0; i < 4; i++) {
+            const coord = coordMatches[i].match(/\d+/)[0]
+            document.getElementById(`coord-${i+1}`).textContent = coord
+          }
+        }
+        
+        // 動画プレビュー表示
+        previewDiv.innerHTML = `
+          <div class="bg-white rounded-lg overflow-hidden border-2 border-purple-300" style="height: 500px;">
+            <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+              class="w-full h-full" frameborder="0" 
+              sandbox="allow-scripts"
+              style="background: white;"></iframe>
+          </div>
+          <div class="mt-4 space-y-2">
+            <div class="bg-green-50 p-3 rounded border border-green-200">
+              <p class="text-sm text-green-800">
+                <i class="fas fa-check-circle mr-2"></i>
+                <strong>生成成功！</strong> - ${data.note}
+              </p>
+            </div>
+            <div class="bg-blue-50 p-3 rounded border border-blue-200">
+              <p class="text-xs text-gray-700 mb-2">
+                <strong>確認項目:</strong>
+              </p>
+              <ul class="text-xs text-gray-600 space-y-1">
+                <li>✓ タイトルと問題が表示される</li>
+                <li>✓ 4つのリンゴグループが画面内に収まる</li>
+                <li>✓ リンゴが上から落ちてバウンスする</li>
+                <li>✓ 説明「3が4つ → 3+3+3+3」が表示される</li>
+                <li>✓ 答え「=12」が表示される</li>
+                <li>✓ アニメーションが10秒間続く</li>
+              </ul>
+            </div>
+          </div>
+        `
+      } catch (error) {
+        previewDiv.innerHTML = `
+          <div class="text-center py-20 text-red-600">
+            <i class="fas fa-exclamation-circle text-6xl mb-4"></i>
+            <p class="font-semibold">エラーが発生しました</p>
+            <p class="text-sm mt-2">${error.message}</p>
+          </div>
+        `
+        apiResponseDiv.textContent = `エラー: ${error.message}`
+      }
+    }
+  </script>
+</body>
+</html>
