@@ -30290,6 +30290,31 @@ async function generateMusicDemo() {
     
     const data = await response.json()
     
+    // YouTubeリンクHTML生成
+    let youtubeLinksHtml = ''
+    if (data.youtubeLinks && data.youtubeLinks.length > 0) {
+      youtubeLinksHtml = `
+        <div class="bg-red-50 p-4 rounded border border-red-200 max-w-md mx-auto mb-4">
+          <h4 class="font-bold text-sm text-red-800 mb-3 flex items-center">
+            <i class="fab fa-youtube text-red-600 mr-2"></i>
+            実際の歌を聴く（YouTube）
+          </h4>
+          <div class="space-y-2">
+            ${data.youtubeLinks.map(link => `
+              <a href="${link.url}" target="_blank" 
+                class="block p-3 bg-white rounded border hover:border-red-400 transition">
+                <p class="text-sm font-semibold text-gray-800 mb-1">
+                  <i class="fas fa-play-circle text-red-600 mr-1"></i>
+                  ${link.title}
+                </p>
+                <p class="text-xs text-gray-600">${link.description}</p>
+              </a>
+            `).join('')}
+          </div>
+        </div>
+      `
+    }
+    
     resultDiv.innerHTML = `
       <div class="py-4">
         <div class="text-center mb-4">
@@ -30301,6 +30326,7 @@ async function generateMusicDemo() {
         <div class="bg-white p-4 rounded border max-w-md mx-auto mb-4">
           <pre class="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">${data.lyrics}</pre>
         </div>
+        ${youtubeLinksHtml}
         <div class="bg-white p-3 rounded border max-w-md mx-auto">
           <p class="text-xs text-gray-500 mb-2">
             <i class="fas fa-check-circle text-green-500 mr-1"></i>

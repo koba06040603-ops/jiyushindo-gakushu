@@ -14148,38 +14148,49 @@ app.post('/api/media/generate-music', async (c) => {
   const { lyrics, style } = await c.req.json()
   
   const songLyrics = `
-🎵 小数のかけ算のうた 🎵
+🎵 九九の歌（3の段） 🎵
 
 (1番)
-れいてんさん が よんこ
-ならんで いるよ
+さんいちが さん
+さんにが ろく
+さざんが きゅう
+さんしが じゅうに
 
-たしてみよう ひとつずつ
-れいてんさん れいてんろく
+(2番)
+さんごが じゅうご
+さぶろく じゅうはち
+さんしちが にじゅういち
+さんぱが にじゅうし
 
-(2番)  
-もういっこ たすと
-れいてんきゅう になるね
-
-さいごに もういっこ
-いってんに だよ！
-
-(サビ)
-かけざんは たしざんだ
-おなじかずを なんかいも
-
-れいてんさん かける よん
-こたえは いってんに！
-
-れいてんさん かける よん
-こたえは いってんに！
+(3番)
+さんくが にじゅうしち
   `
+  
+  // YouTube九九の歌のリンク集（実用的な検索URL）
+  const youtubeLinks = [
+    {
+      title: '九九のうた【3の段】を探す',
+      url: 'https://www.youtube.com/results?search_query=九九の歌+3の段+小学生',
+      description: 'YouTubeで「3の段」の歌を検索（複数の動画から選べます）'
+    },
+    {
+      title: '九九のうた【全段】を探す',
+      url: 'https://www.youtube.com/results?search_query=九九の歌+全段+子供向け',
+      description: '1の段～9の段まですべて聞ける動画を検索'
+    },
+    {
+      title: 'NHK for School かけざん九九',
+      url: 'https://www.youtube.com/results?search_query=NHK+for+School+九九',
+      description: 'NHK教育番組の九九学習コンテンツを検索'
+    }
+  ]
   
   return c.json({
     success: true,
     lyrics: songLyrics.trim(),
     style: style || 'educational-pop',
-    note: 'リズムに乗って覚えやすい学習ソングを作成しました'
+    youtubeLinks: youtubeLinks,
+    note: 'リズムに乗って覚えやすい九九の歌です。YouTubeで実際の歌を聞くことができます。'
   })
 })
 
