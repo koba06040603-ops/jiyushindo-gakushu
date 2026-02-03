@@ -31036,6 +31036,162 @@ window.generateStyleVideo = generateStyleVideo
 window.generateSupportVideo = generateSupportVideo
 window.generatePracticeVideo = generatePracticeVideo
 
+// ケース6: 体験優位版（実際の体験デモ）
+function demoCase6Kinesthetic() {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
+  modal.innerHTML = `
+    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 max-w-lg w-full relative shadow-2xl">
+      <!-- ×ボタン（右上） -->
+      <button onclick="this.closest('.fixed').remove()" 
+        class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 transition-colors">
+        <i class="fas fa-times text-3xl"></i>
+      </button>
+      
+      <!-- タイトル -->
+      <div class="mb-6">
+        <div class="text-center mb-4">
+          <div class="inline-block bg-blue-100 rounded-full p-4 mb-3">
+            <i class="fas fa-cubes text-5xl text-blue-600"></i>
+          </div>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 text-center mb-2">
+          特徴: 具体物・実験・手を動かして理解
+        </h2>
+        <p class="text-center text-gray-600 text-sm">
+          体験優位（身体運動知能）の児童向けに最適化。
+        </p>
+      </div>
+      
+      <!-- 体験優位版: 3×4 -->
+      <div class="bg-white rounded-xl p-6 shadow-lg mb-4">
+        <div class="flex items-center justify-center mb-4">
+          <span class="text-4xl mr-2">✋</span>
+          <span class="text-xl font-bold text-blue-700">体験優位版: 3×4</span>
+        </div>
+        
+        <!-- 準備する物 -->
+        <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-lg mb-4">
+          <div class="flex items-center mb-2">
+            <span class="text-2xl mr-2">📦</span>
+            <h3 class="font-bold text-orange-800">準備する物</h3>
+          </div>
+          <ul class="space-y-1 text-gray-700 ml-8">
+            <li>• おはじき 12個</li>
+            <li>• 紙コップ 4個</li>
+            <li>• または積み木 12個</li>
+          </ul>
+        </div>
+        
+        <!-- やってみよう -->
+        <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg mb-4">
+          <div class="flex items-center mb-2">
+            <span class="text-2xl mr-2">🎯</span>
+            <h3 class="font-bold text-green-800">やってみよう</h3>
+          </div>
+          <div class="text-gray-700 ml-8 space-y-1 text-sm">
+            <p>① 紙コップを4個ならべる</p>
+            <p>② 各コップに おはじきを3個ずつ入れる</p>
+            <p>③ ぜんぶで何個か数えてみよう</p>
+            <p class="font-bold text-green-700 mt-2">→ 答え: 12個！</p>
+          </div>
+        </div>
+        
+        <!-- AI生成実験動画 -->
+        <div class="bg-purple-50 border-l-4 border-purple-400 p-4 rounded-lg">
+          <div class="flex items-center mb-3">
+            <span class="text-2xl mr-2">📹</span>
+            <h3 class="font-bold text-purple-800">AI生成実験動画</h3>
+          </div>
+          <p class="text-sm text-gray-700 mb-3 ml-8">
+            実際にやってみる様子を5秒動画で確認できます
+          </p>
+          <button onclick="generateKinestheticVideo()" 
+            class="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-md hover:shadow-lg">
+            <i class="fas fa-play-circle mr-2"></i>動画を生成する
+          </button>
+        </div>
+      </div>
+      
+      <!-- 動画プレビューエリア -->
+      <div id="kinestheticVideoResult" class="hidden mt-4"></div>
+      
+      <!-- 特徴説明 -->
+      <div class="mt-4 bg-blue-100 rounded-lg p-4">
+        <div class="flex items-start">
+          <i class="fas fa-hand-pointer text-blue-600 text-2xl mr-3 mt-1"></i>
+          <div class="text-sm">
+            <p class="font-semibold text-blue-800 mb-1">手を動かして体験的に理解</p>
+            <p class="text-blue-700">AI動画で手順を視覚的に確認</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+
+// ケース6の動画生成関数
+async function generateKinestheticVideo() {
+  const resultDiv = document.getElementById('kinestheticVideoResult')
+  
+  if (!resultDiv) {
+    console.error('Result div not found')
+    return
+  }
+  
+  resultDiv.classList.remove('hidden')
+  resultDiv.innerHTML = `
+    <div class="bg-white rounded-lg p-6 text-center">
+      <div class="animate-spin mb-4 mx-auto">
+        <i class="fas fa-spinner text-6xl text-blue-600"></i>
+      </div>
+      <p class="text-blue-700 font-semibold mb-2">AI動画生成中...</p>
+      <p class="text-sm text-gray-600">体験学習動画を作成しています</p>
+    </div>
+  `
+  
+  try {
+    const response = await fetch('/api/media/generate-video-case', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caseNumber: 6, duration: 10 })
+    })
+    
+    if (!response.ok) throw new Error('API呼び出しに失敗しました')
+    
+    const data = await response.json()
+    
+    resultDiv.innerHTML = `
+      <div class="bg-white rounded-lg p-4 shadow-lg">
+        <div class="bg-gray-900 rounded-lg overflow-hidden mb-4" style="height: 400px;">
+          <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+            class="w-full h-full" frameborder="0" 
+            sandbox="allow-scripts"
+            style="background: white;"></iframe>
+        </div>
+        <div class="bg-green-50 p-3 rounded border border-green-200">
+          <p class="text-sm text-green-800">
+            <i class="fas fa-check-circle mr-2"></i>
+            <strong>生成完了！</strong> ${data.note}
+          </p>
+        </div>
+      </div>
+    `
+  } catch (error) {
+    resultDiv.innerHTML = `
+      <div class="bg-white rounded-lg p-6 text-center text-red-600">
+        <i class="fas fa-exclamation-circle text-6xl mb-4"></i>
+        <p class="font-semibold">エラーが発生しました</p>
+        <p class="text-sm mt-2">${error.message}</p>
+      </div>
+    `
+  }
+}
+
+window.demoCase6Kinesthetic = demoCase6Kinesthetic
+window.generateKinestheticVideo = generateKinestheticVideo
+
 console.log('✅ ケース4-12動画生成機能 読み込み完了')
 
 
