@@ -1451,6 +1451,9 @@ async function getAllClassStudents(db: D1Database, classCode: string): Promise<n
 // 静的ファイル配信
 app.use('/static/*', serveStatic({ root: './' }))
 
+// 管理者プレビューページ（明示的ルート）
+app.get('/admin-preview', serveStatic({ path: './admin-preview.html' }))
+
 // HTMLファイル配信
 app.use('/*.html', serveStatic({ root: './' }))
 
