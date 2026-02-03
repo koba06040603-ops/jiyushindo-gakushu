@@ -33087,7 +33087,7 @@ console.log('✅ ケース9（繰り返し強化）タブ付きバージョン�
 // ============================================================================
 // ケース10: テスト準備（タブ付き）
 // ============================================================================
-function demoCase10TestPrep_OLD_DISABLED() {
+function demoCase10TestPrep() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
@@ -33300,7 +33300,7 @@ console.log('✅ ケース10（テスト準備）タブ付きバージョン実�
 // ============================================================================
 // ケース11: 応用問題（タブ付き）
 // ============================================================================
-function demoCase11Advanced_OLD_DISABLED() {
+function demoCase11Advanced() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
@@ -33508,7 +33508,7 @@ console.log('✅ ケース11（応用問題）タブ付きバージョン実装�
 // ============================================================================
 // ケース12: 復習（タブ付き）
 // ============================================================================
-function demoCase12Review_OLD_DISABLED() {
+function demoCase12Review() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
