@@ -30,7 +30,7 @@
 ### ケース5-12 タブ機能＋インタラクティブ体験実装完了 ✨
 
 **実装完了日**: 2026-02-03  
-**デプロイURL**: https://6cef01f8.jiyushindo-gakushu.pages.dev
+**デプロイURL**: https://b6e6da73.jiyushindo-gakushu.pages.dev
 
 #### 📋 実装概要
 
