@@ -2971,6 +2971,9 @@ async function loadGuidePage(curriculumId) {
               <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
             </button>
             <div class="flex gap-2">
+              <button onclick="showLearningDashboard(${curriculumId})" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-chart-line mr-2"></i>学習統計
+              </button>
               <button onclick="printGuide()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-print mr-2"></i>印刷
               </button>
@@ -35569,6 +35572,7 @@ window.showCase10FrequentProblems = showCase10FrequentProblems
 window.closeFrequentProblemsModal = closeFrequentProblemsModal
 window.toggleAnswer10 = toggleAnswer10
 window.toggleHints10 = toggleHints10
+window.recordCase10SelfEval = recordCase10SelfEval
 window.showCase11ApplicationProblems = showCase11ApplicationProblems
 window.closeApplicationProblemsModal = closeApplicationProblemsModal
 window.toggleAnswer11 = toggleAnswer11
@@ -35579,3 +35583,305 @@ window.toggleChecklistItem = toggleChecklistItem
 window.updateChecklistProgress = updateChecklistProgress
 
 console.log('✅ 学習サポートセクション（ケース10-12）モジュールを読み込みました')
+
+// =============================================================================
+// Phase 3-5: 学習効果ダッシュボード
+// =============================================================================
+
+// 学習統計ダッシュボードを表示
+async function showLearningDashboard(curriculumId) {
+  try {
+    const studentId = state.student?.id || 1
+    
+    // 統計データを取得
+    const statsResponse = await axios.get(`/api/retrieval-practice/stats/student/${studentId}?curriculum_id=${curriculumId}`)
+    const stats = statsResponse.data.stats || []
+    
+    // 履歴データを取得
+    const historyResponse = await axios.get(`/api/retrieval-practice/history/${studentId}?curriculum_id=${curriculumId}&limit=20`)
+    const history = historyResponse.data.history || []
+    
+    // コンテンツタイプ別の統計を整理
+    const statsByType = {
+      frequent_problems: stats.find(s => s.content_type === 'frequent_problems') || null,
+      application_problems: stats.find(s => s.content_type === 'application_problems') || null,
+      review_checklist: stats.find(s => s.content_type === 'review_checklist') || null
+    }
+    
+    const modalHTML = `
+      <div id="learningDashboardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeLearningDashboard(event)">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+          <!-- ヘッダー -->
+          <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-2xl font-bold">
+                  <i class="fas fa-chart-line mr-2"></i>学習効果ダッシュボード
+                </h2>
+                <p class="text-sm opacity-90 mt-1">あなたの学習記録と成長を確認しよう</p>
+              </div>
+              <button onclick="closeLearningDashboard()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition">
+                <i class="fas fa-times text-2xl"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- コンテンツ -->
+          <div class="flex-1 overflow-y-auto p-6">
+            <!-- 統計サマリー -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <!-- ケース10統計 -->
+              <div class="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="font-bold text-red-800">よく出る問題</h3>
+                  <i class="fas fa-fire text-red-500 text-2xl"></i>
+                </div>
+                ${statsByType.frequent_problems ? `
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-gray-600">正答率</span>
+                      <span class="text-2xl font-bold text-red-600">${statsByType.frequent_problems.accuracy_rate}%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-gray-600">挑戦回数</span>
+                      <span class="text-lg font-bold text-gray-700">${statsByType.frequent_problems.total_attempts}回</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-gray-600">平均時間</span>
+                      <span class="text-lg font-bold text-gray-700">${statsByType.frequent_problems.avg_answer_time || 0}秒</span>
+                    </div>
+                  </div>
+                ` : `
+                  <p class="text-sm text-gray-500 text-center py-4">まだ学習記録がありません</p>
+                `}
+              </div>
+              
+              <!-- ケース11統計 -->
+              <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="font-bold text-orange-800">応用問題</h3>
+                  <i class="fas fa-puzzle-piece text-orange-500 text-2xl"></i>
+                </div>
+                ${statsByType.application_problems ? `
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-gray-600">正答率</span>
+                      <span class="text-2xl font-bold text-orange-600">${statsByType.application_problems.accuracy_rate}%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-gray-600">挑戦回数</span>
+                      <span class="text-lg font-bold text-gray-700">${statsByType.application_problems.total_attempts}回</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-gray-600">平均時間</span>
+                      <span class="text-lg font-bold text-gray-700">${statsByType.application_problems.avg_answer_time || 0}秒</span>
+                    </div>
+                  </div>
+                ` : `
+                  <p class="text-sm text-gray-500 text-center py-4">まだ学習記録がありません</p>
+                `}
+              </div>
+              
+              <!-- ケース12統計 -->
+              <div class="bg-gradient-to-br from-yellow-50 to-green-50 border-2 border-yellow-300 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="font-bold text-yellow-800">総復習</h3>
+                  <i class="fas fa-check-double text-yellow-500 text-2xl"></i>
+                </div>
+                ${statsByType.review_checklist ? `
+                  <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-gray-600">完了率</span>
+                      <span class="text-2xl font-bold text-yellow-600">${statsByType.review_checklist.accuracy_rate}%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="text-sm text-gray-600">チェック回数</span>
+                      <span class="text-lg font-bold text-gray-700">${statsByType.review_checklist.total_attempts}回</span>
+                    </div>
+                  </div>
+                ` : `
+                  <p class="text-sm text-gray-500 text-center py-4">まだ学習記録がありません</p>
+                `}
+              </div>
+            </div>
+            
+            <!-- グラフエリア -->
+            <div class="bg-gray-50 rounded-xl p-6 mb-6">
+              <h3 class="text-lg font-bold text-gray-800 mb-4">
+                <i class="fas fa-chart-bar mr-2"></i>学習進捗グラフ
+              </h3>
+              <div class="bg-white rounded-lg p-4 border-2 border-gray-200" style="height: 300px;">
+                <canvas id="learningProgressChart"></canvas>
+              </div>
+            </div>
+            
+            <!-- 最近の学習履歴 -->
+            <div class="bg-white border-2 border-gray-200 rounded-xl p-6">
+              <h3 class="text-lg font-bold text-gray-800 mb-4">
+                <i class="fas fa-history mr-2"></i>最近の学習履歴
+              </h3>
+              ${history.length > 0 ? `
+                <div class="space-y-2 max-h-60 overflow-y-auto">
+                  ${history.map(record => {
+                    const contentTypeLabel = {
+                      'frequent_problems': 'よく出る問題',
+                      'application_problems': '応用問題',
+                      'review_checklist': '総復習'
+                    }[record.content_type] || record.content_type
+                    
+                    const date = new Date(record.created_at)
+                    const dateStr = date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    
+                    return `
+                      <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                        <div class="flex items-center gap-3">
+                          ${record.is_correct === 1 ? 
+                            '<i class="fas fa-check-circle text-green-500 text-xl"></i>' :
+                            record.is_correct === 0 ?
+                            '<i class="fas fa-times-circle text-red-500 text-xl"></i>' :
+                            '<i class="fas fa-circle text-gray-400 text-xl"></i>'
+                          }
+                          <div>
+                            <p class="font-medium text-gray-800">${contentTypeLabel}</p>
+                            <p class="text-xs text-gray-500">${dateStr}</p>
+                          </div>
+                        </div>
+                        <div class="text-right">
+                          ${record.answer_time_seconds ? `<p class="text-sm text-gray-600">${record.answer_time_seconds}秒</p>` : ''}
+                          ${record.hint_used ? '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded">ヒント使用</span>' : ''}
+                        </div>
+                      </div>
+                    `
+                  }).join('')}
+                </div>
+              ` : `
+                <p class="text-center text-gray-500 py-8">まだ学習履歴がありません</p>
+              `}
+            </div>
+            
+            <!-- 応援メッセージ -->
+            <div class="mt-6 bg-gradient-to-r from-blue-100 to-purple-100 border-2 border-blue-300 rounded-xl p-4 text-center">
+              <p class="text-lg font-bold text-blue-800 mb-2">
+                <i class="fas fa-trophy mr-2"></i>よくがんばっています！
+              </p>
+              <p class="text-sm text-gray-700">
+                毎日コツコツ続けることが大切です。この調子で学習を続けましょう！
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+    // Chart.jsでグラフを描画
+    setTimeout(() => {
+      renderLearningProgressChart(stats)
+    }, 100)
+    
+  } catch (error) {
+    console.error('学習ダッシュボード表示エラー:', error)
+    alert('学習統計の読み込みに失敗しました')
+  }
+}
+
+// Chart.jsでグラフを描画
+function renderLearningProgressChart(stats) {
+  const canvas = document.getElementById('learningProgressChart')
+  if (!canvas) return
+  
+  const ctx = canvas.getContext('2d')
+  
+  // データ準備
+  const labels = []
+  const accuracyData = []
+  const attemptData = []
+  
+  stats.forEach(stat => {
+    const typeLabel = {
+      'frequent_problems': 'よく出る問題',
+      'application_problems': '応用問題',
+      'review_checklist': '総復習'
+    }[stat.content_type] || stat.content_type
+    
+    labels.push(typeLabel)
+    accuracyData.push(stat.accuracy_rate || 0)
+    attemptData.push(stat.total_attempts || 0)
+  })
+  
+  // Chart.js未読み込みの場合は簡易表示
+  if (typeof Chart === 'undefined') {
+    canvas.parentElement.innerHTML = `
+      <div class="flex items-center justify-center h-full">
+        <p class="text-gray-500">グラフを表示するにはChart.jsが必要です</p>
+      </div>
+    `
+    return
+  }
+  
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '正答率 (%)',
+        data: accuracyData,
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        borderColor: 'rgb(59, 130, 246)',
+        borderWidth: 2,
+        yAxisID: 'y'
+      }, {
+        label: '挑戦回数',
+        data: attemptData,
+        backgroundColor: 'rgba(168, 85, 247, 0.5)',
+        borderColor: 'rgb(168, 85, 247)',
+        borderWidth: 2,
+        yAxisID: 'y1'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      scales: {
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: '正答率 (%)'
+          },
+          max: 100
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: {
+            display: true,
+            text: '挑戦回数'
+          },
+          grid: {
+            drawOnChartArea: false
+          }
+        }
+      }
+    }
+  })
+}
+
+function closeLearningDashboard(event) {
+  if (event && event.target.id !== 'learningDashboardModal') return
+  const modal = document.getElementById('learningDashboardModal')
+  if (modal) modal.remove()
+}
+
+window.showLearningDashboard = showLearningDashboard
+window.closeLearningDashboard = closeLearningDashboard
+
+console.log('✅ 学習効果ダッシュボード機能を読み込みました')
