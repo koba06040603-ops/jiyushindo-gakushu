@@ -34,7 +34,30 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- ケース選択タブ -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <div class="flex space-x-2 overflow-x-auto pb-2">
+        <button onclick="showCategory('basic')" id="tab-basic" 
+          class="px-6 py-2 bg-purple-600 text-white rounded-lg whitespace-nowrap font-semibold">
+          ケース1-3（基本）
+        </button>
+        <button onclick="showCategory('style')" id="tab-style" 
+          class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg whitespace-nowrap font-semibold hover:bg-gray-300">
+          ケース4-6（学習スタイル）
+        </button>
+        <button onclick="showCategory('support')" id="tab-support" 
+          class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg whitespace-nowrap font-semibold hover:bg-gray-300">
+          ケース7-9（特別支援）
+        </button>
+        <button onclick="showCategory('practice')" id="tab-practice" 
+          class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg whitespace-nowrap font-semibold hover:bg-gray-300">
+          ケース10-12（テスト準備）
+        </button>
+      </div>
+    </div>
+
+    <!-- ケース1-3: 基本 -->
+    <div id="category-basic" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- プレビュー1: ケース1（得意な児童） -->
       <div class="bg-white rounded-lg shadow-lg p-6">
         <h2 class="text-xl font-bold text-purple-700 mb-4">
@@ -88,6 +111,114 @@
       </div>
     </div>
 
+    <!-- ケース4-6: 学習スタイル -->
+    <div id="category-style" class="grid grid-cols-1 lg:grid-cols-3 gap-6 hidden">
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-red-700 mb-4">
+          <i class="fas fa-eye mr-2"></i>ケース4: 視覚優位（Dさん）
+        </h2>
+        <button onclick="generateCase4_6(4)" 
+          class="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case4" class="bg-gray-50 rounded-lg p-4 min-h-[250px]"></div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-green-700 mb-4">
+          <i class="fas fa-headphones mr-2"></i>ケース5: 聴覚優位（Eさん）
+        </h2>
+        <button onclick="generateCase4_6(5)" 
+          class="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case5" class="bg-gray-50 rounded-lg p-4 min-h-[250px]"></div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-blue-700 mb-4">
+          <i class="fas fa-hand-pointer mr-2"></i>ケース6: 体感優位（Fさん）
+        </h2>
+        <button onclick="generateCase4_6(6)" 
+          class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case6" class="bg-gray-50 rounded-lg p-4 min-h-[250px]"></div>
+      </div>
+    </div>
+
+    <!-- ケース7-9: 特別支援 -->
+    <div id="category-support" class="grid grid-cols-1 lg:grid-cols-3 gap-6 hidden">
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-indigo-700 mb-4">
+          <i class="fas fa-user-graduate mr-2"></i>ケース7: 特別支援（Gさん）
+        </h2>
+        <button onclick="generateCase7_9(7)" 
+          class="w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case7" class="bg-gray-50 rounded-lg p-4 min-h-[250px]"></div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-pink-700 mb-4">
+          <i class="fas fa-users mr-2"></i>ケース8: 保護者サポート
+        </h2>
+        <button onclick="generateCase7_9(8)" 
+          class="w-full px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case8" class="bg-gray-50 rounded-lg p-4 min-h-[250px]"></div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-teal-700 mb-4">
+          <i class="fas fa-chalkboard-teacher mr-2"></i>ケース9: 教師向け分析
+        </h2>
+        <button onclick="generateCase7_9(9)" 
+          class="w-full px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case9" class="bg-gray-50 rounded-lg p-4 min-h-[250px]"></div>
+      </div>
+    </div>
+
+    <!-- ケース10-12: テスト準備 -->
+    <div id="category-practice" class="grid grid-cols-1 lg:grid-cols-3 gap-6 hidden">
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-orange-700 mb-4">
+          <i class="fas fa-clipboard-check mr-2"></i>ケース10: テスト準備（Hさん）
+        </h2>
+        <button onclick="generateCase10_12(10)" 
+          class="w-full px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case10" class="bg-gray-50 rounded-lg p-4 min-h-[250px]"></div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-cyan-700 mb-4">
+          <i class="fas fa-arrow-up mr-2"></i>ケース11: 予習（Iさん）
+        </h2>
+        <button onclick="generateCase10_12(11)" 
+          class="w-full px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case11" class="bg-gray-50 rounded-lg p-4 min-h-[250px]"></div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-lg p-6">
+        <h2 class="text-xl font-bold text-violet-700 mb-4">
+          <i class="fas fa-history mr-2"></i>ケース12: 復習（Jさん）
+        </h2>
+        <button onclick="generateCase10_12(12)" 
+          class="w-full px-6 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition font-semibold mb-4">
+          <i class="fas fa-play-circle mr-2"></i>プレビュー生成
+        </button>
+        <div id="preview-case12" class="bg-gray-50 rounded-lg p-4 min-h-[250px]"></div>
+      </div>
+    </div>
+
     <!-- APIレスポンス確認 -->
     <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
       <h2 class="text-xl font-bold text-gray-800 mb-4">
@@ -131,13 +262,26 @@
   </div>
 
   <script>
+    // タブ切り替え
+    function showCategory(category) {
+      const categories = ['basic', 'style', 'support', 'practice']
+      categories.forEach(cat => {
+        document.getElementById(`category-${cat}`).classList.add('hidden')
+        document.getElementById(`tab-${cat}`).classList.remove('bg-purple-600', 'text-white')
+        document.getElementById(`tab-${cat}`).classList.add('bg-gray-200', 'text-gray-700')
+      })
+      document.getElementById(`category-${category}`).classList.remove('hidden')
+      document.getElementById(`tab-${category}`).classList.remove('bg-gray-200', 'text-gray-700')
+      document.getElementById(`tab-${category}`).classList.add('bg-purple-600', 'text-white')
+    }
+
+    // ケース1-3生成（既存）
     async function generatePreview(caseType) {
       const previewDiv = document.getElementById(`preview-${caseType}`)
       const infoDiv = document.getElementById(`info-${caseType}`)
       const paramsDiv = document.getElementById(`params-${caseType}`)
       const apiResponseDiv = document.getElementById('api-response')
       
-      // ローディング表示
       previewDiv.innerHTML = `
         <div class="text-center py-20">
           <div class="animate-spin mb-4 mx-auto">
@@ -166,14 +310,10 @@
         
         const data = await response.json()
         
-        // APIレスポンス表示
         apiResponseDiv.textContent = JSON.stringify(data, null, 2)
-        
-        // パラメータ表示
         paramsDiv.textContent = JSON.stringify(params, null, 2)
         infoDiv.classList.remove('hidden')
         
-        // 座標抽出
         const coordMatches = data.animationHtml.match(/x: (\d+)/g)
         if (coordMatches && coordMatches.length >= 4) {
           for (let i = 0; i < 4; i++) {
@@ -182,7 +322,6 @@
           }
         }
         
-        // 動画プレビュー表示
         previewDiv.innerHTML = `
           <div class="bg-white rounded-lg overflow-hidden border-2 border-purple-300" style="height: 500px;">
             <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
@@ -197,19 +336,6 @@
                 <strong>生成成功！</strong> - ${data.note}
               </p>
             </div>
-            <div class="bg-blue-50 p-3 rounded border border-blue-200">
-              <p class="text-xs text-gray-700 mb-2">
-                <strong>確認項目:</strong>
-              </p>
-              <ul class="text-xs text-gray-600 space-y-1">
-                <li>✓ タイトルと問題が表示される</li>
-                <li>✓ 4つのリンゴグループが画面内に収まる</li>
-                <li>✓ リンゴが上から落ちてバウンスする</li>
-                <li>✓ 説明「3が4つ → 3+3+3+3」が表示される</li>
-                <li>✓ 答え「=12」が表示される</li>
-                <li>✓ アニメーションが10秒間続く</li>
-              </ul>
-            </div>
           </div>
         `
       } catch (error) {
@@ -218,6 +344,150 @@
             <i class="fas fa-exclamation-circle text-6xl mb-4"></i>
             <p class="font-semibold">エラーが発生しました</p>
             <p class="text-sm mt-2">${error.message}</p>
+          </div>
+        `
+        apiResponseDiv.textContent = `エラー: ${error.message}`
+      }
+    }
+
+    // ケース4-6生成（学習スタイル）
+    async function generateCase4_6(caseNumber) {
+      const previewDiv = document.getElementById(`preview-case${caseNumber}`)
+      const apiResponseDiv = document.getElementById('api-response')
+      
+      previewDiv.innerHTML = `
+        <div class="text-center py-16">
+          <div class="animate-spin mb-4 mx-auto">
+            <i class="fas fa-spinner text-4xl text-blue-600"></i>
+          </div>
+          <p class="text-blue-700 font-semibold">生成中...</p>
+        </div>
+      `
+      
+      try {
+        const response = await fetch('/api/media/generate-video-case', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ caseNumber, duration: 10 })
+        })
+        
+        if (!response.ok) throw new Error('API呼び出しに失敗しました')
+        
+        const data = await response.json()
+        apiResponseDiv.textContent = JSON.stringify(data, null, 2)
+        
+        previewDiv.innerHTML = `
+          <div class="bg-white rounded-lg overflow-hidden border-2 border-blue-300" style="height: 350px;">
+            <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+              class="w-full h-full" frameborder="0" 
+              sandbox="allow-scripts"></iframe>
+          </div>
+          <div class="mt-3 bg-green-50 p-2 rounded border border-green-200 text-xs text-green-800">
+            ✓ ${data.note}
+          </div>
+        `
+      } catch (error) {
+        previewDiv.innerHTML = `
+          <div class="text-center py-16 text-red-600">
+            <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+            <p class="font-semibold">エラー</p>
+            <p class="text-xs mt-1">${error.message}</p>
+          </div>
+        `
+        apiResponseDiv.textContent = `エラー: ${error.message}`
+      }
+    }
+
+    // ケース7-9生成（特別支援）
+    async function generateCase7_9(caseNumber) {
+      const previewDiv = document.getElementById(`preview-case${caseNumber}`)
+      const apiResponseDiv = document.getElementById('api-response')
+      
+      previewDiv.innerHTML = `
+        <div class="text-center py-16">
+          <div class="animate-spin mb-4 mx-auto">
+            <i class="fas fa-spinner text-4xl text-indigo-600"></i>
+          </div>
+          <p class="text-indigo-700 font-semibold">生成中...</p>
+        </div>
+      `
+      
+      try {
+        const response = await fetch('/api/media/generate-video-support', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ caseNumber })
+        })
+        
+        if (!response.ok) throw new Error('API呼び出しに失敗しました')
+        
+        const data = await response.json()
+        apiResponseDiv.textContent = JSON.stringify(data, null, 2)
+        
+        previewDiv.innerHTML = `
+          <div class="bg-white rounded-lg overflow-hidden border-2 border-indigo-300" style="height: 350px;">
+            <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+              class="w-full h-full" frameborder="0" 
+              sandbox="allow-scripts"></iframe>
+          </div>
+          <div class="mt-3 bg-green-50 p-2 rounded border border-green-200 text-xs text-green-800">
+            ✓ ${data.note}
+          </div>
+        `
+      } catch (error) {
+        previewDiv.innerHTML = `
+          <div class="text-center py-16 text-red-600">
+            <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+            <p class="font-semibold">エラー</p>
+            <p class="text-xs mt-1">${error.message}</p>
+          </div>
+        `
+        apiResponseDiv.textContent = `エラー: ${error.message}`
+      }
+    }
+
+    // ケース10-12生成（テスト準備）
+    async function generateCase10_12(caseNumber) {
+      const previewDiv = document.getElementById(`preview-case${caseNumber}`)
+      const apiResponseDiv = document.getElementById('api-response')
+      
+      previewDiv.innerHTML = `
+        <div class="text-center py-16">
+          <div class="animate-spin mb-4 mx-auto">
+            <i class="fas fa-spinner text-4xl text-orange-600"></i>
+          </div>
+          <p class="text-orange-700 font-semibold">生成中...</p>
+        </div>
+      `
+      
+      try {
+        const response = await fetch('/api/media/generate-video-practice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ caseNumber })
+        })
+        
+        if (!response.ok) throw new Error('API呼び出しに失敗しました')
+        
+        const data = await response.json()
+        apiResponseDiv.textContent = JSON.stringify(data, null, 2)
+        
+        previewDiv.innerHTML = `
+          <div class="bg-white rounded-lg overflow-hidden border-2 border-orange-300" style="height: 350px;">
+            <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
+              class="w-full h-full" frameborder="0" 
+              sandbox="allow-scripts"></iframe>
+          </div>
+          <div class="mt-3 bg-green-50 p-2 rounded border border-green-200 text-xs text-green-800">
+            ✓ ${data.note}
+          </div>
+        `
+      } catch (error) {
+        previewDiv.innerHTML = `
+          <div class="text-center py-16 text-red-600">
+            <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
+            <p class="font-semibold">エラー</p>
+            <p class="text-xs mt-1">${error.message}</p>
           </div>
         `
         apiResponseDiv.textContent = `エラー: ${error.message}`
