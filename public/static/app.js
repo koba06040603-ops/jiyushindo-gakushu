@@ -2803,6 +2803,21 @@ async function loadGuidePage(curriculumId) {
     const missingIntroProblems = courses.filter(c => !c.introduction_problem)
     if (missingIntroProblems.length > 0) {
       console.warn(`⚠️ 導入問題が${missingIntroProblems.length}件欠落しています。自動生成を開始します...`)
+      
+      // ユーザーに通知
+      const notificationDiv = document.createElement('div')
+      notificationDiv.className = 'fixed top-4 right-4 bg-yellow-100 border-2 border-yellow-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
+      notificationDiv.innerHTML = `
+        <div class="flex items-start gap-3">
+          <i class="fas fa-spinner fa-spin text-yellow-600 text-2xl"></i>
+          <div>
+            <p class="font-bold text-yellow-800">導入問題を生成中...</p>
+            <p class="text-sm text-yellow-700 mt-1">AIが${missingIntroProblems.length}件の導入問題を作成しています</p>
+          </div>
+        </div>
+      `
+      document.body.appendChild(notificationDiv)
+      
       try {
         // 導入問題を自動生成
         console.log(`🔄 導入問題自動生成開始: curriculum_id=${curriculumId}`)
@@ -2813,14 +2828,40 @@ async function loadGuidePage(curriculumId) {
         const reloadResponse = await axios.get(`/api/curriculum/${curriculumId}`)
         courses.splice(0, courses.length, ...reloadResponse.data.courses)
         console.log('✅ データ再取得完了。導入問題数:', courses.filter(c => c.introduction_problem).length)
+        
+        // 成功通知を更新
+        notificationDiv.className = 'fixed top-4 right-4 bg-green-100 border-2 border-green-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
+        notificationDiv.innerHTML = `
+          <div class="flex items-start gap-3">
+            <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+            <div>
+              <p class="font-bold text-green-800">導入問題生成完了！</p>
+              <p class="text-sm text-green-700 mt-1">${missingIntroProblems.length}件の導入問題を追加しました</p>
+            </div>
+          </div>
+        `
+        setTimeout(() => notificationDiv.remove(), 3000)
       } catch (autoGenError) {
         console.error('❌ 導入問題の自動生成に失敗:', autoGenError)
         console.error('エラー詳細:', autoGenError.response?.data || autoGenError.message)
         
-        // エラーをユーザーに通知（オプション）
-        if (autoGenError.response?.data?.error) {
-          console.error('サーバーエラーメッセージ:', autoGenError.response.data.error)
-        }
+        // エラー通知を更新
+        notificationDiv.className = 'fixed top-4 right-4 bg-red-100 border-2 border-red-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
+        notificationDiv.innerHTML = `
+          <div class="flex items-start gap-3">
+            <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+            <div>
+              <p class="font-bold text-red-800">導入問題生成エラー</p>
+              <p class="text-sm text-red-700 mt-1">導入問題を追加できませんでした</p>
+              ${autoGenError.response?.data?.error ? `
+                <p class="text-xs text-red-600 mt-1">${autoGenError.response.data.error}</p>
+              ` : ''}
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="text-red-600 hover:text-red-800">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        `
       }
     }
     
