@@ -14433,7 +14433,7 @@ app.post('/api/media/generate-video-support', async (c) => {
     animationHtml: animationHtml,
     caseNumber: caseNumber,
     duration: 10,
-    note: `ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向け`
+    note: `ケース${caseNumber}: ${config.title} - ${config.targetStudent}向け`
   })
 })
 
@@ -14533,7 +14533,7 @@ app.post('/api/media/generate-video-practice', async (c) => {
     animationHtml: animationHtml,
     caseNumber: caseNumber,
     duration: 10,
-    note: `ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向け`
+    note: `ケース${caseNumber}: ${config.title} - ${config.targetStudent}向け`
   })
 })
 
