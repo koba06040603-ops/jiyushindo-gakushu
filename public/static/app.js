@@ -1165,6 +1165,178 @@ async function renderTopPage() {
         </div>
       </div>
 
+      <!-- ケース4-12: 個別最適化学習デモ -->
+      <div class="bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg shadow-xl p-8 mb-8">
+        <div class="text-center mb-8">
+          <div class="inline-block bg-white bg-opacity-20 px-6 py-3 rounded-full text-white text-sm font-bold mb-4">
+            🎨 個別最適化学習
+          </div>
+          <h2 class="text-3xl font-bold text-white mb-3">
+            <i class="fas fa-palette mr-3"></i>
+            ケース別学習動画デモ（3×4の計算）
+          </h2>
+          <p class="text-white text-lg opacity-90 mb-2">
+            児童一人ひとりの学習スタイルに合わせた動画を自動生成
+          </p>
+          <p class="text-white text-sm opacity-75">
+            体験優位・聴覚優位・特別支援・テスト対策など9パターン
+          </p>
+        </div>
+
+        <!-- 学習スタイル別（ケース4-6） -->
+        <div class="mb-6">
+          <h3 class="text-white font-bold text-xl mb-4 flex items-center">
+            <i class="fas fa-user-graduate mr-2"></i>
+            学習スタイル別
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button 
+              onclick="demoCase4Kinesthetic()"
+              class="bg-white hover:bg-blue-50 p-6 rounded-lg transition shadow-lg group text-left">
+              <div class="flex items-center justify-between mb-3">
+                <div class="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center">
+                  <i class="fas fa-cubes text-2xl text-blue-600"></i>
+                </div>
+                <span class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-bold">ケース4</span>
+              </div>
+              <h4 class="font-bold text-gray-800 text-lg mb-2">体験優位</h4>
+              <p class="text-gray-600 text-sm mb-2">手を動かして理解</p>
+              <p class="text-gray-500 text-xs">具体物・実験で学ぶ</p>
+            </button>
+
+            <button 
+              onclick="demoCase5Audio()"
+              class="bg-white hover:bg-purple-50 p-6 rounded-lg transition shadow-lg group text-left">
+              <div class="flex items-center justify-between mb-3">
+                <div class="bg-purple-100 w-12 h-12 rounded-full flex items-center justify-center">
+                  <i class="fas fa-music text-2xl text-purple-600"></i>
+                </div>
+                <span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-bold">ケース5</span>
+              </div>
+              <h4 class="font-bold text-gray-800 text-lg mb-2">聴覚優位</h4>
+              <p class="text-gray-600 text-sm mb-2">音とリズムで記憶</p>
+              <p class="text-gray-500 text-xs">歌・リズムで学ぶ</p>
+            </button>
+
+            <button 
+              onclick="demoCase6Kinesthetic()"
+              class="bg-white hover:bg-cyan-50 p-6 rounded-lg transition shadow-lg group text-left">
+              <div class="flex items-center justify-between mb-3">
+                <div class="bg-cyan-100 w-12 h-12 rounded-full flex items-center justify-center">
+                  <i class="fas fa-hand-pointer text-2xl text-cyan-600"></i>
+                </div>
+                <span class="bg-cyan-100 text-cyan-700 text-xs px-2 py-1 rounded-full font-bold">ケース6</span>
+              </div>
+              <h4 class="font-bold text-gray-800 text-lg mb-2">体験優位（紙コップ）</h4>
+              <p class="text-gray-600 text-sm mb-2">紙コップとおはじき</p>
+              <p class="text-gray-500 text-xs">具体物で視覚的に</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- 特別支援（ケース7-9） -->
+        <div class="mb-6">
+          <h3 class="text-white font-bold text-xl mb-4 flex items-center">
+            <i class="fas fa-hands-helping mr-2"></i>
+            特別支援
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button 
+              onclick="demoCase7SmallSteps()"
+              class="bg-white hover:bg-green-50 p-6 rounded-lg transition shadow-lg group text-left">
+              <div class="flex items-center justify-between mb-3">
+                <div class="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center">
+                  <i class="fas fa-shoe-prints text-2xl text-green-600"></i>
+                </div>
+                <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">ケース7</span>
+              </div>
+              <h4 class="font-bold text-gray-800 text-lg mb-2">スモールステップ</h4>
+              <p class="text-gray-600 text-sm mb-2">ゆっくりていねいに</p>
+              <p class="text-gray-500 text-xs">段階的に理解</p>
+            </button>
+
+            <button 
+              onclick="demoCase8Visual()"
+              class="bg-white hover:bg-indigo-50 p-6 rounded-lg transition shadow-lg group text-left">
+              <div class="flex items-center justify-between mb-3">
+                <div class="bg-indigo-100 w-12 h-12 rounded-full flex items-center justify-center">
+                  <i class="fas fa-eye text-2xl text-indigo-600"></i>
+                </div>
+                <span class="bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded-full font-bold">ケース8</span>
+              </div>
+              <h4 class="font-bold text-gray-800 text-lg mb-2">視覚重視</h4>
+              <p class="text-gray-600 text-sm mb-2">図・色・イラスト</p>
+              <p class="text-gray-500 text-xs">視覚情報で理解</p>
+            </button>
+
+            <button 
+              onclick="demoCase9Repetition()"
+              class="bg-white hover:bg-amber-50 p-6 rounded-lg transition shadow-lg group text-left">
+              <div class="flex items-center justify-between mb-3">
+                <div class="bg-amber-100 w-12 h-12 rounded-full flex items-center justify-center">
+                  <i class="fas fa-redo text-2xl text-amber-600"></i>
+                </div>
+                <span class="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full font-bold">ケース9</span>
+              </div>
+              <h4 class="font-bold text-gray-800 text-lg mb-2">繰り返し強化</h4>
+              <p class="text-gray-600 text-sm mb-2">反復練習で定着</p>
+              <p class="text-gray-500 text-xs">何度も繰り返す</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- テスト準備（ケース10-12） -->
+        <div class="mb-2">
+          <h3 class="text-white font-bold text-xl mb-4 flex items-center">
+            <i class="fas fa-clipboard-check mr-2"></i>
+            テスト準備
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button 
+              onclick="demoCase10TestPrep()"
+              class="bg-white hover:bg-yellow-50 p-6 rounded-lg transition shadow-lg group text-left">
+              <div class="flex items-center justify-between mb-3">
+                <div class="bg-yellow-100 w-12 h-12 rounded-full flex items-center justify-center">
+                  <i class="fas fa-star text-2xl text-yellow-600"></i>
+                </div>
+                <span class="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded-full font-bold">ケース10</span>
+              </div>
+              <h4 class="font-bold text-gray-800 text-lg mb-2">よく出る問題</h4>
+              <p class="text-gray-600 text-sm mb-2">頻出パターン</p>
+              <p class="text-gray-500 text-xs">効率的な復習</p>
+            </button>
+
+            <button 
+              onclick="demoCase11Advanced()"
+              class="bg-white hover:bg-violet-50 p-6 rounded-lg transition shadow-lg group text-left">
+              <div class="flex items-center justify-between mb-3">
+                <div class="bg-violet-100 w-12 h-12 rounded-full flex items-center justify-center">
+                  <i class="fas fa-puzzle-piece text-2xl text-violet-600"></i>
+                </div>
+                <span class="bg-violet-100 text-violet-700 text-xs px-2 py-1 rounded-full font-bold">ケース11</span>
+              </div>
+              <h4 class="font-bold text-gray-800 text-lg mb-2">応用問題</h4>
+              <p class="text-gray-600 text-sm mb-2">文章題対策</p>
+              <p class="text-gray-500 text-xs">応用力を鍛える</p>
+            </button>
+
+            <button 
+              onclick="demoCase12Review()"
+              class="bg-white hover:bg-emerald-50 p-6 rounded-lg transition shadow-lg group text-left">
+              <div class="flex items-center justify-between mb-3">
+                <div class="bg-emerald-100 w-12 h-12 rounded-full flex items-center justify-center">
+                  <i class="fas fa-check-circle text-2xl text-emerald-600"></i>
+                </div>
+                <span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded-full font-bold">ケース12</span>
+              </div>
+              <h4 class="font-bold text-gray-800 text-lg mb-2">総復習</h4>
+              <p class="text-gray-600 text-sm mb-2">最終確認</p>
+              <p class="text-gray-500 text-xs">万全の準備</p>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Phase 19: 次世代学習支援機能 -->
       ${state.student && state.student.id ? `
       <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg shadow-xl p-8 mb-8">
