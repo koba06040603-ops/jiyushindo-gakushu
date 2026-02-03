@@ -5102,7 +5102,8 @@ app.get('/test-buttons.html', async (c) => {
                 const exists = typeof window[fname] === 'function'
                 const status = exists ? '✅' : '❌'
                 const color = exists ? 'text-green-600' : 'text-red-600'
-                checkDiv.innerHTML += \`<div class="\${color}">\${status} window.\${fname} = \${typeof window[fname]}</div>\`
+                const windowCheck = typeof window[fname]
+                checkDiv.innerHTML += '<div class="' + color + '">' + status + ' window.' + fname + ' = ' + windowCheck + '</div>'
             })
             
             console.log('✅ グローバル関数チェック完了')
@@ -13962,7 +13963,7 @@ app.post('/api/media/generate-video', async (c) => {
           ctx.save();
           ctx.globalAlpha = alpha;
           ctx.fillStyle = color;
-          ctx.font = \`bold \${fontSize}px Arial, 'Hiragino Kaku Gothic Pro'\`;
+          ctx.font = 'bold ' + fontSize + 'px Arial, Hiragino Kaku Gothic Pro';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(text, x, y);
@@ -14325,7 +14326,7 @@ app.post('/api/media/generate-video-case', async (c) => {
     animationHtml: animationHtml,
     caseNumber: caseNumber,
     duration: duration || 10,
-    note: \`ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向けの個別最適化された学習動画\`
+    note: `ケース${caseNumber}: ${config.title} - ${config.targetStudent}向けの個別最適化された学習動画`
   })
 })
 
@@ -14356,12 +14357,12 @@ app.post('/api/media/generate-video-support', async (c) => {
   
   const config = supportConfigs[caseNumber] || supportConfigs[7]
   
-  const animationHtml = \`
+  const animationHtml = `
     <!DOCTYPE html>
     <html lang="ja">
     <head>
       <meta charset="UTF-8">
-      <title>ケース\${caseNumber}: \${config.title}</title>
+      <title>ケース${caseNumber}: ${config.title}</title>
       <style>
         body { margin: 0; padding: 0; background: white; }
         canvas { display: block; }
@@ -14425,14 +14426,14 @@ app.post('/api/media/generate-video-support', async (c) => {
       </script>
     </body>
     </html>
-  \`
+  `
   
   return c.json({
     success: true,
     animationHtml: animationHtml,
     caseNumber: caseNumber,
     duration: 10,
-    note: \`ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向け\`
+    note: `ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向け`
   })
 })
 
@@ -14457,7 +14458,7 @@ app.post('/api/media/generate-video-practice', async (c) => {
   
   const config = practiceConfigs[caseNumber] || practiceConfigs[10]
   
-  const animationHtml = \`
+  const animationHtml = `
     <!DOCTYPE html>
     <html lang="ja">
     <head>
@@ -14525,14 +14526,14 @@ app.post('/api/media/generate-video-practice', async (c) => {
       </script>
     </body>
     </html>
-  \`
+  `
   
   return c.json({
     success: true,
     animationHtml: animationHtml,
     caseNumber: caseNumber,
     duration: 10,
-    note: \`ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向け\`
+    note: `ケース\${caseNumber}: \${config.title} - \${config.targetStudent}向け`
   })
 })
 
