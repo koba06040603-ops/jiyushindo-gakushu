@@ -5,12 +5,19 @@
 ## 🌐 本番環境URL
 
 **本番デプロイ完了！** ✅  
-- **本番URL**: https://e58a32fd.jiyushindo-gakushu.pages.dev
-- **API仕様書**: https://e58a32fd.jiyushindo-gakushu.pages.dev/static/api-docs
-- **デプロイ日時**: 2026-01-30
+- **本番URL**: https://730caa8c.jiyushindo-gakushu.pages.dev
+- **API仕様書**: https://730caa8c.jiyushindo-gakushu.pages.dev/static/api-docs
+- **管理者プレビュー**: ローカル環境で `dist/admin-preview.html` を直接開く（実装済み、498行）
+- **デプロイ日時**: 2026-02-03
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 🟢 Active
-- **最新機能**: ファイルアップロード機能（画像・動画）
+- **最新機能**: 
+  - ✅ ケース1-3: 基本個別最適化（得意・苦手・欠席対応）
+  - ✅ ケース4-6: 学習スタイル別動画生成（視覚・聴覚・体感優位型対応）
+  - ✅ ケース7-9: 特別支援・保護者サポート・教師向け分析
+  - ✅ ケース10-12: テスト準備・予習・復習動画生成
+  - 🎨 Canvas動画生成（完全無料、API不要）
+  - 🎵 YouTube音楽リンク統合（九九の歌など）
 
 ## プロジェクト概要
 
