@@ -35364,21 +35364,28 @@ function toggleChecklistItem(index) {
 }
 
 function updateChecklistProgress() {
-  const checkboxes = document.querySelectorAll('[id^="checklist-"]')
+  // モーダル内のチェックボックスのみを対象にする
+  const modal = document.getElementById('reviewChecklistModal')
+  if (!modal) return
+  
+  const checkboxes = modal.querySelectorAll('input[type="checkbox"][id^="checklist-"]')
   const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length
   const totalCount = checkboxes.length
-  const percentage = Math.round((checkedCount / totalCount) * 100)
+  const percentage = (checkedCount / totalCount) * 100
   
-  const progressText = document.getElementById('checklist-progress')
-  const progressBar = document.getElementById('checklist-progress-bar')
-  const message = document.getElementById('checklist-message')
+  const progressText = modal.querySelector('#checklist-progress')
+  const progressBar = modal.querySelector('#checklist-progress-bar')
+  const message = modal.querySelector('#checklist-message')
   
   if (progressText) progressText.textContent = checkedCount
   if (progressBar) progressBar.style.width = `${percentage}%`
   
+  console.log(`✅ チェックリスト進捗: ${checkedCount}/${totalCount} = ${percentage}%`)
+  
   if (message) {
-    if (checkedCount === totalCount) {
+    if (checkedCount === totalCount && totalCount > 0) {
       message.classList.remove('hidden')
+      console.log('🎉 チェックリスト完了！')
     } else {
       message.classList.add('hidden')
     }
