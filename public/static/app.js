@@ -31697,94 +31697,8 @@ function resetTapCount() {
   if (countEl) countEl.textContent = '0'
   if (resultEl) resultEl.innerHTML = ''
 }
-      
-      <!-- タイトルエリア -->
-      <div class="text-center mb-6">
-        <h3 class="text-3xl font-bold text-gray-800 mb-3">
-          特徴: 音・リズム・声に出して理解
-        </h3>
-        <p class="text-lg text-purple-600">
-          聴覚優位（音楽リズム知能）の児童向けに最適化。
-        </p>
-      </div>
-      
-      <!-- メインコンテンツエリア -->
-      <div class="bg-white rounded-xl p-8 shadow-inner">
-        <!-- 音符アイコンとタイトル -->
-        <div class="text-center mb-8">
-          <div class="inline-block mb-4">
-            <i class="fas fa-music text-8xl text-purple-600"></i>
-          </div>
-          <p class="text-purple-700 font-bold text-3xl">
-            🎵 聴覚優位版: 3×4
-          </p>
-        </div>
-        
-        <!-- リズムで覚えるセクション -->
-        <div class="bg-purple-50 border-l-4 border-purple-400 p-6 rounded-lg mb-6">
-          <div class="flex items-center mb-4">
-            <span class="text-4xl mr-3">🎤</span>
-            <h4 class="font-bold text-purple-800 text-2xl">リズムで覚える</h4>
-          </div>
-          <div class="ml-16 space-y-2 text-lg text-gray-700">
-            <p class="font-bold text-purple-700">♪ さん・さん・さん・さん ♪</p>
-            <p>👏 手拍子に合わせて4回言ってみよう</p>
-            <p class="mt-3 text-xl font-bold text-purple-800">3 + 3 + 3 + 3 = ?</p>
-          </div>
-        </div>
-        
-        <!-- 歌で覚えるセクション -->
-        <div class="bg-pink-50 border-l-4 border-pink-400 p-6 rounded-lg mb-6">
-          <div class="flex items-center mb-4">
-            <span class="text-4xl mr-3">🎼</span>
-            <h4 class="font-bold text-pink-800 text-2xl">歌で覚えよう</h4>
-          </div>
-          <div class="ml-16 space-y-2 text-lg text-gray-700">
-            <p>🎶 「さんが よっつ」</p>
-            <p>🎶 「さん たす さん たす さん たす さん」</p>
-            <p>🎶 「ぜんぶで じゅうに！」</p>
-            <p class="font-bold text-pink-700 mt-4 text-2xl">→ 答え: 12！</p>
-          </div>
-        </div>
-        
-        <!-- AI生成動画セクション -->
-        <div class="bg-indigo-50 border-l-4 border-indigo-400 p-6 rounded-lg">
-          <div class="flex items-center mb-4">
-            <span class="text-4xl mr-3">📹</span>
-            <h4 class="font-bold text-indigo-800 text-2xl">AI生成リズム動画</h4>
-          </div>
-          <p class="ml-16 text-lg text-gray-700 mb-4">
-            リズムと音で理解する動画を生成します
-          </p>
-          <button onclick="generateAudioVideoDemo()" 
-            class="ml-16 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-4 px-10 rounded-lg transition-all shadow-md hover:shadow-lg text-lg">
-            <i class="fas fa-play-circle mr-2"></i>動画を生成する
-          </button>
-        </div>
-        
-        <!-- 動画プレビューエリア -->
-        <div id="audioVideoPreview" class="hidden mt-6"></div>
-      </div>
-      
-      <!-- 下部アイコン説明 -->
-      <div class="mt-6 flex justify-center space-x-12 text-lg text-purple-600">
-        <div class="flex items-center">
-          <i class="fas fa-headphones mr-2 text-2xl"></i>
-          <span>音とリズムで記憶に定着</span>
-        </div>
-      </div>
-      <div class="flex justify-center mt-3 text-lg text-purple-600">
-        <div class="flex items-center">
-          <i class="fas fa-microphone mr-2 text-2xl"></i>
-          <span>声に出して理解を深める</span>
-        </div>
-      </div>
-    </div>
-  `
-  document.body.appendChild(modal)
-}
 
-// ケース5の動画生成関数
+// AI動画生成（聴覚優位版）
 async function generateAudioVideoDemo() {
   const previewDiv = document.getElementById('audioVideoPreview')
   
@@ -32087,7 +32001,7 @@ function demoCase10TestPrep_OLD() {
   document.body.appendChild(modal)
 }
 
-async function generateTestPrepVideo() {
+async function generateTestPrepVideo_OLD_DISABLED() {
   const previewDiv = document.getElementById('testPrepVideoPreview')
   if (!previewDiv) return
   
@@ -32246,7 +32160,7 @@ window.demoCase8Visual = demoCase8Visual
 window.generateVisualSupportVideo = generateVisualSupportVideo
 
 // ケース9: 特別支援 - 繰り返し強化（旧バージョン - 無効化）
-function demoCase9Repetition_OLD() {
+function demoCase9Repetition_OLD_DISABLED() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
@@ -32334,7 +32248,7 @@ function demoCase9Repetition_OLD() {
   document.body.appendChild(modal)
 }
 
-async function generateRepetitionVideo() {
+async function generateRepetitionVideo_OLD_DISABLED() {
   const previewDiv = document.getElementById('repetitionVideoPreview')
   if (!previewDiv) return
   
@@ -32450,7 +32364,7 @@ function demoCase11Advanced_OLD() {
   document.body.appendChild(modal)
 }
 
-async function generateAdvancedVideo() {
+async function generateAdvancedVideo_OLD_DISABLED() {
   const previewDiv = document.getElementById('advancedVideoPreview')
   if (!previewDiv) return
   
@@ -32578,7 +32492,7 @@ function demoCase12Review_OLD() {
   document.body.appendChild(modal)
 }
 
-async function generateReviewVideo() {
+async function generateReviewVideo_OLD_DISABLED() {
   const previewDiv = document.getElementById('reviewVideoPreview')
   if (!previewDiv) return
   
@@ -33170,7 +33084,7 @@ console.log('✅ ケース9（繰り返し強化）タブ付きバージョン�
 // ============================================================================
 // ケース10: テスト準備（タブ付き）
 // ============================================================================
-function demoCase10TestPrep() {
+function demoCase10TestPrep_OLD_DISABLED() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
@@ -33383,7 +33297,7 @@ console.log('✅ ケース10（テスト準備）タブ付きバージョン実�
 // ============================================================================
 // ケース11: 応用問題（タブ付き）
 // ============================================================================
-function demoCase11Advanced() {
+function demoCase11Advanced_OLD_DISABLED() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
@@ -33591,7 +33505,7 @@ console.log('✅ ケース11（応用問題）タブ付きバージョン実装�
 // ============================================================================
 // ケース12: 復習（タブ付き）
 // ============================================================================
-function demoCase12Review() {
+function demoCase12Review_OLD_DISABLED() {
   const modal = document.createElement('div')
   modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
