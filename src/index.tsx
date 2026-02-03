@@ -7306,13 +7306,18 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
       return c.json({ error: 'カリキュラムが見つかりません' }, 404)
     }
     
-    // AIプロンプト：コース関連問題のみ
-    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の問題を生成。
+    // AIプロンプト：コース関連問題 + 検索練習コンテンツ
+    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の問題と学習サポートコンテンツを生成。
 
 【必須：3つのコース】
 1. ${courses.results[0]?.course_name || 'ゆっくりコース'}
 2. ${courses.results[1]?.course_name || 'しっかりコース'}  
 3. ${courses.results[2]?.course_name || 'ぐんぐんコース'}
+
+【教育理論に基づく検索練習コンテンツ】
+- よく出る問題（検索練習: Roediger & Karpicke 2006）
+- 応用問題（交互配置: Rohrer & Taylor 2007）
+- 総復習チェックリスト（分散学習: Cepeda et al. 2006）
 
 【必須：JSONのみ出力】
 {
@@ -7325,7 +7330,31 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
     {"course_number": 1, "problem_title": "導入問題1", "problem_content": "具体的な数字を含む問題文（50字以上）", "answer": "解答と解説（30字以上）"},
     {"course_number": 2, "problem_title": "導入問題2", "problem_content": "具体的な数字を含む問題文（50字以上）", "answer": "解答と解説（30字以上）"},
     {"course_number": 3, "problem_title": "導入問題3", "problem_content": "具体的な数字を含む問題文（50字以上）", "answer": "解答と解説（30字以上）"}
-  ]
+  ],
+  "retrieval_practice": {
+    "frequent_problems": [
+      {"problem_number": 1, "problem_title": "基本パターン1", "problem_content": "テストによく出る問題（具体的な数字）", "answer": "正解", "explanation": "解説（なぜこの答えか）", "time_limit": 10, "difficulty": "easy"},
+      {"problem_number": 2, "problem_title": "基本パターン2", "problem_content": "テストによく出る問題", "answer": "正解", "explanation": "解説", "time_limit": 10, "difficulty": "easy"},
+      {"problem_number": 3, "problem_title": "基本パターン3", "problem_content": "テストによく出る問題", "answer": "正解", "explanation": "解説", "time_limit": 10, "difficulty": "easy"},
+      {"problem_number": 4, "problem_title": "基本パターン4", "problem_content": "テストによく出る問題", "answer": "正解", "explanation": "解説", "time_limit": 10, "difficulty": "easy"},
+      {"problem_number": 5, "problem_title": "基本パターン5", "problem_content": "テストによく出る問題", "answer": "正解", "explanation": "解説", "time_limit": 10, "difficulty": "easy"}
+    ],
+    "application_problems": [
+      {"problem_number": 1, "problem_title": "応用問題1", "problem_content": "複数の概念を組み合わせた問題", "answer": "正解", "explanation": "解説（思考プロセス含む）", "thinking_points": ["考え方のポイント1", "ポイント2"], "difficulty": "medium"},
+      {"problem_number": 2, "problem_title": "応用問題2", "problem_content": "複数の概念を組み合わせた問題", "answer": "正解", "explanation": "解説", "thinking_points": ["ポイント1", "ポイント2"], "difficulty": "medium"},
+      {"problem_number": 3, "problem_title": "応用問題3", "problem_content": "複数の概念を組み合わせた問題", "answer": "正解", "explanation": "解説", "thinking_points": ["ポイント1", "ポイント2"], "difficulty": "hard"},
+      {"problem_number": 4, "problem_title": "応用問題4", "problem_content": "複数の概念を組み合わせた問題", "answer": "正解", "explanation": "解説", "thinking_points": ["ポイント1", "ポイント2"], "difficulty": "hard"},
+      {"problem_number": 5, "problem_title": "応用問題5", "problem_content": "複数の概念を組み合わせた問題", "answer": "正解", "explanation": "解説", "thinking_points": ["ポイント1", "ポイント2"], "difficulty": "hard"}
+    ],
+    "review_checklist": [
+      {"item_number": 1, "check_point": "この単元で学んだこと1", "description": "具体的な確認内容", "example": "例: 〇〇の意味を説明できる"},
+      {"item_number": 2, "check_point": "この単元で学んだこと2", "description": "具体的な確認内容", "example": "例: 〇〇を計算できる"},
+      {"item_number": 3, "check_point": "この単元で学んだこと3", "description": "具体的な確認内容", "example": "例: 図を見て〇〇できる"},
+      {"item_number": 4, "check_point": "この単元で学んだこと4", "description": "具体的な確認内容", "example": "例: 文章題から〇〇できる"},
+      {"item_number": 5, "check_point": "この単元で学んだこと5", "description": "具体的な確認内容", "example": "例: 〇〇を使った問題を作れる"},
+      {"item_number": 6, "check_point": "この単元で学んだこと6", "description": "具体的な確認内容", "example": "例: 実生活で〇〇を活用できる"}
+    ]
+  }
 }`
 
     // フォールバック機能付きAPI呼び出し
@@ -7405,12 +7434,54 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
       console.warn('introduction_problemsが見つかりません')
     }
     
+    // 検索練習コンテンツを保存（新規追加）
+    if (problems.retrieval_practice) {
+      console.log('🎯 検索練習コンテンツを保存開始')
+      
+      // よく出る問題（ケース10）
+      if (problems.retrieval_practice.frequent_problems) {
+        console.log(`よく出る問題を保存: ${problems.retrieval_practice.frequent_problems.length}件`)
+        const frequentJSON = JSON.stringify(problems.retrieval_practice.frequent_problems)
+        await env.DB.prepare(`
+          INSERT OR REPLACE INTO retrieval_practice_content (curriculum_id, content_type, problem_data)
+          VALUES (?, ?, ?)
+        `).bind(curriculumId, 'frequent_problems', frequentJSON).run()
+      }
+      
+      // 応用問題（ケース11）
+      if (problems.retrieval_practice.application_problems) {
+        console.log(`応用問題を保存: ${problems.retrieval_practice.application_problems.length}件`)
+        const applicationJSON = JSON.stringify(problems.retrieval_practice.application_problems)
+        await env.DB.prepare(`
+          INSERT OR REPLACE INTO retrieval_practice_content (curriculum_id, content_type, problem_data)
+          VALUES (?, ?, ?)
+        `).bind(curriculumId, 'application_problems', applicationJSON).run()
+      }
+      
+      // 総復習チェックリスト（ケース12）
+      if (problems.retrieval_practice.review_checklist) {
+        console.log(`総復習チェックリストを保存: ${problems.retrieval_practice.review_checklist.length}件`)
+        const reviewJSON = JSON.stringify(problems.retrieval_practice.review_checklist)
+        await env.DB.prepare(`
+          INSERT OR REPLACE INTO retrieval_practice_content (curriculum_id, content_type, problem_data)
+          VALUES (?, ?, ?)
+        `).bind(curriculumId, 'review_checklist', reviewJSON).run()
+      }
+      
+      console.log('✅ 検索練習コンテンツの保存完了')
+    } else {
+      console.warn('retrieval_practiceが見つかりません')
+    }
+    
     return c.json({ 
       success: true, 
-      message: 'コース関連問題を生成・保存しました',
+      message: 'コース関連問題と検索練習コンテンツを生成・保存しました',
       details: {
         course_selection_count: problems.course_selection_problems?.length || 0,
-        introduction_count: problems.introduction_problems?.length || 0
+        introduction_count: problems.introduction_problems?.length || 0,
+        frequent_problems_count: problems.retrieval_practice?.frequent_problems?.length || 0,
+        application_problems_count: problems.retrieval_practice?.application_problems?.length || 0,
+        review_checklist_count: problems.retrieval_practice?.review_checklist?.length || 0
       }
     })
     
@@ -7421,6 +7492,60 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
       error: 'コース関連問題の生成に失敗しました', 
       details: error.message,
       stack: error.stack?.substring(0, 200)
+    }, 500)
+  }
+})
+
+// APIルート：検索練習コンテンツ取得
+app.get('/api/curriculum/:curriculumId/retrieval-practice', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    // 全てのコンテンツタイプを取得
+    const contents = await env.DB.prepare(`
+      SELECT content_type, problem_data, created_at
+      FROM retrieval_practice_content
+      WHERE curriculum_id = ?
+      ORDER BY content_type
+    `).bind(curriculumId).all()
+    
+    if (!contents.results || contents.results.length === 0) {
+      return c.json({ 
+        success: true,
+        message: '検索練習コンテンツが見つかりません',
+        data: null
+      })
+    }
+    
+    // データを整形
+    const result = {
+      frequent_problems: null,
+      application_problems: null,
+      review_checklist: null
+    }
+    
+    for (const content of contents.results) {
+      const data = JSON.parse(content.problem_data)
+      if (content.content_type === 'frequent_problems') {
+        result.frequent_problems = data
+      } else if (content.content_type === 'application_problems') {
+        result.application_problems = data
+      } else if (content.content_type === 'review_checklist') {
+        result.review_checklist = data
+      }
+    }
+    
+    return c.json({ 
+      success: true,
+      data: result
+    })
+    
+  } catch (error: any) {
+    console.error('検索練習コンテンツ取得エラー:', error)
+    return c.json({ 
+      error: 'コンテンツの取得に失敗しました', 
+      details: error.message 
     }, 500)
   }
 })
