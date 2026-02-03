@@ -32033,8 +32033,9 @@ async function generateTestPrepVideo_OLD_DISABLED() {
   }
 }
 
-window.demoCase10TestPrep = demoCase10TestPrep
-window.generateTestPrepVideo = generateTestPrepVideo
+// 旧バージョンのグローバル登録（無効化）
+// window.demoCase10TestPrep = demoCase10TestPrep
+// window.generateTestPrepVideo = generateTestPrepVideo
 
 console.log('✅ ケース5, 7, 10 実装完了')
 console.log('📝 残りのケース8, 9, 11, 12は同様のパターンで実装可能')
@@ -32396,8 +32397,9 @@ async function generateAdvancedVideo_OLD_DISABLED() {
   }
 }
 
-window.demoCase11Advanced = demoCase11Advanced
-window.generateAdvancedVideo = generateAdvancedVideo
+// 旧バージョンのグローバル登録（無効化）
+// window.demoCase11Advanced = demoCase11Advanced
+// window.generateAdvancedVideo = generateAdvancedVideo
 
 // ケース12: テスト準備 - 復習問題（旧バージョン - 無効化）
 function demoCase12Review_OLD() {
@@ -32524,8 +32526,9 @@ async function generateReviewVideo_OLD_DISABLED() {
   }
 }
 
-window.demoCase12Review = demoCase12Review
-window.generateReviewVideo = generateReviewVideo
+// 旧バージョンのグローバル登録（無効化）
+// window.demoCase12Review = demoCase12Review
+// window.generateReviewVideo = generateReviewVideo
 
 console.log('✅ 全ケース（4-12）モーダル実装完了！')
 console.log('📊 実装完了: ケース4,5,6,7,8,9,10,11,12')
