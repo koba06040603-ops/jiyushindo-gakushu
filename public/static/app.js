@@ -30759,9 +30759,9 @@ function demoCase4Audio() {
 // ケース4: 体験優位版デモ
 function demoCase4Kinesthetic() {
   const modal = document.createElement('div')
-  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-8 overflow-y-auto'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4'
   modal.innerHTML = `
-    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 max-w-5xl w-full my-auto relative shadow-2xl">
+    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-8 w-[95vw] h-[95vh] relative shadow-2xl overflow-y-auto">
       <!-- ×ボタン（右上・絶対配置） -->
       <button onclick="this.closest('.fixed').remove()" 
         class="absolute top-4 right-4 text-gray-600 hover:text-gray-900 transition-colors z-10 bg-white rounded-full p-2 shadow-lg">
@@ -30769,34 +30769,34 @@ function demoCase4Kinesthetic() {
       </button>
       
       <!-- タイトルエリア -->
-      <div class="text-center mb-4">
-        <h3 class="text-xl font-bold text-gray-800 mb-1">
+      <div class="text-center mb-6">
+        <h3 class="text-3xl font-bold text-gray-800 mb-3">
           特徴: 具体物・実験・手を動かして理解
         </h3>
-        <p class="text-sm text-blue-600">
+        <p class="text-lg text-blue-600">
           体験優位（身体運動知能）の児童向けに最適化。
         </p>
       </div>
       
       <!-- メインコンテンツエリア -->
-      <div class="bg-white rounded-xl p-6 shadow-inner">
+      <div class="bg-white rounded-xl p-8 shadow-inner">
         <!-- キューブアイコンとタイトル -->
-        <div class="text-center mb-5">
-          <div class="inline-block mb-2">
-            <i class="fas fa-cubes text-5xl text-blue-600"></i>
+        <div class="text-center mb-8">
+          <div class="inline-block mb-4">
+            <i class="fas fa-cubes text-8xl text-blue-600"></i>
           </div>
-          <p class="text-blue-700 font-bold text-xl">
+          <p class="text-blue-700 font-bold text-3xl">
             ✋ 体験優位版: 3×4
           </p>
         </div>
         
         <!-- 準備する物セクション -->
-        <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-lg mb-4">
-          <div class="flex items-center mb-2">
-            <span class="text-2xl mr-2">📦</span>
-            <h4 class="font-bold text-orange-800 text-base">準備する物</h4>
+        <div class="bg-orange-50 border-l-4 border-orange-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">📦</span>
+            <h4 class="font-bold text-orange-800 text-2xl">準備する物</h4>
           </div>
-          <ul class="ml-10 space-y-1 text-sm text-gray-700">
+          <ul class="ml-16 space-y-2 text-lg text-gray-700">
             <li>• おはじき 12個</li>
             <li>• 紙コップ 4個</li>
             <li>• または積み木 12個</li>
@@ -30804,48 +30804,48 @@ function demoCase4Kinesthetic() {
         </div>
         
         <!-- やってみようセクション -->
-        <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded-lg mb-4">
-          <div class="flex items-center mb-2">
-            <span class="text-2xl mr-2">🎯</span>
-            <h4 class="font-bold text-green-800 text-base">やってみよう</h4>
+        <div class="bg-green-50 border-l-4 border-green-400 p-6 rounded-lg mb-6">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">🎯</span>
+            <h4 class="font-bold text-green-800 text-2xl">やってみよう</h4>
           </div>
-          <div class="ml-10 space-y-1 text-sm text-gray-700">
+          <div class="ml-16 space-y-2 text-lg text-gray-700">
             <p>① 紙コップを4個ならべる</p>
             <p>② 各コップに おはじきを3個ずつ入れる</p>
             <p>③ ぜんぶで何個か数えてみよう</p>
-            <p class="font-bold text-green-700 mt-2 text-base">→ 答え: 12個！</p>
+            <p class="font-bold text-green-700 mt-4 text-2xl">→ 答え: 12個！</p>
           </div>
         </div>
         
         <!-- AI生成実験動画セクション -->
-        <div class="bg-purple-50 border-l-4 border-purple-400 p-4 rounded-lg">
-          <div class="flex items-center mb-2">
-            <span class="text-2xl mr-2">📹</span>
-            <h4 class="font-bold text-purple-800 text-base">AI生成実験動画</h4>
+        <div class="bg-purple-50 border-l-4 border-purple-400 p-6 rounded-lg">
+          <div class="flex items-center mb-4">
+            <span class="text-4xl mr-3">📹</span>
+            <h4 class="font-bold text-purple-800 text-2xl">AI生成実験動画</h4>
           </div>
-          <p class="ml-10 text-sm text-gray-700 mb-3">
+          <p class="ml-16 text-lg text-gray-700 mb-4">
             実際にやってみる様子を5秒動画で確認できます
           </p>
           <button onclick="generateKinestheticVideoDemo()" 
-            class="ml-10 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-all shadow-md hover:shadow-lg">
+            class="ml-16 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 px-10 rounded-lg transition-all shadow-md hover:shadow-lg text-lg">
             <i class="fas fa-play-circle mr-2"></i>動画を生成する
           </button>
         </div>
         
         <!-- 動画プレビューエリア -->
-        <div id="kinestheticVideoPreview" class="hidden mt-4"></div>
+        <div id="kinestheticVideoPreview" class="hidden mt-6"></div>
       </div>
       
       <!-- 下部アイコン説明 -->
-      <div class="mt-4 flex justify-center space-x-8 text-sm text-blue-600">
+      <div class="mt-6 flex justify-center space-x-12 text-lg text-blue-600">
         <div class="flex items-center">
-          <i class="fas fa-hand-pointer mr-2"></i>
+          <i class="fas fa-hand-pointer mr-2 text-2xl"></i>
           <span>手を動かして体験的に理解</span>
         </div>
       </div>
-      <div class="flex justify-center mt-2 text-sm text-blue-600">
+      <div class="flex justify-center mt-3 text-lg text-blue-600">
         <div class="flex items-center">
-          <i class="fas fa-video mr-2"></i>
+          <i class="fas fa-video mr-2 text-2xl"></i>
           <span>AI動画で手順を視覚的に確認</span>
         </div>
       </div>
@@ -30888,15 +30888,15 @@ async function generateKinestheticVideoDemo() {
     const data = await response.json()
     
     previewDiv.innerHTML = `
-      <div class="bg-white rounded-lg p-4 shadow-lg">
-        <div class="bg-gray-900 rounded-lg overflow-hidden mb-3" style="height: 360px;">
+      <div class="bg-white rounded-lg p-6 shadow-lg">
+        <div class="bg-gray-900 rounded-lg overflow-hidden mb-4" style="height: 500px;">
           <iframe srcdoc="${data.animationHtml.replace(/"/g, '&quot;')}" 
             class="w-full h-full" frameborder="0" 
             sandbox="allow-scripts"
             style="background: white;"></iframe>
         </div>
-        <div class="bg-green-50 border border-green-200 p-3 rounded-lg">
-          <p class="text-sm text-green-800">
+        <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
+          <p class="text-lg text-green-800">
             <i class="fas fa-check-circle mr-2"></i>
             <strong>生成完了！</strong> ${data.note}
           </p>
