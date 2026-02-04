@@ -1466,20 +1466,11 @@ async function getAllClassStudents(db: D1Database, classCode: string): Promise<n
 // 静的ファイル配信
 app.use('/static/*', serveStatic({ root: './' }))
 
-// 管理者プレビューページ（明示的ルート）
-app.get('/admin-preview', serveStatic({ path: './admin-preview.html' }))
-
-// 主要ページへの直接配信（.htmlなしでもアクセス可能に）
-app.get('/problem-generator', serveStatic({ path: './problem-generator.html' }))
-app.get('/ai-tutor', serveStatic({ path: './ai-tutor.html' }))
-app.get('/dashboard', serveStatic({ path: './dashboard.html' }))
-app.get('/parent-dashboard', serveStatic({ path: './parent-dashboard.html' }))
-app.get('/cache-dashboard', serveStatic({ path: './cache-dashboard.html' }))
-app.get('/security-dashboard', serveStatic({ path: './security-dashboard.html' }))
-app.get('/performance-dashboard', serveStatic({ path: './performance-dashboard.html' }))
-
 // HTMLファイル配信
 app.use('/*.html', serveStatic({ root: './' }))
+
+// 管理者プレビューページ
+app.get('/admin-preview', serveStatic({ path: './admin-preview.html' }))
 
 // APIルート：カリキュラム一覧取得（マルチテナント対応）
 app.get('/api/curriculum', authMiddleware, async (c) => {
