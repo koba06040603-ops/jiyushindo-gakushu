@@ -1466,11 +1466,30 @@ async function getAllClassStudents(db: D1Database, classCode: string): Promise<n
 // 静的ファイル配信
 app.use('/static/*', serveStatic({ root: './' }))
 
-// HTMLファイル配信（Cloudflare Pagesが直接配信するため不要）
-// app.use('/*.html', serveStatic({ root: './' }))
+// HTMLページへのリダイレクト（.html拡張子なしのURLを.html付きにリダイレクト）
+const htmlRedirects: Record<string, string> = {
+  '/problem-generator': '/problem-generator.html',
+  '/ai-tutor': '/ai-tutor.html',
+  '/dashboard': '/dashboard.html',
+  '/parent-dashboard': '/parent-dashboard.html',
+  '/cache-dashboard': '/cache-dashboard.html',
+  '/security-dashboard': '/security-dashboard.html',
+  '/performance-dashboard': '/performance-dashboard.html',
+  '/auth-demo': '/auth-demo.html',
+  '/admin-preview': '/admin-preview.html',
+}
 
-// 管理者プレビューページ
-app.get('/admin-preview', serveStatic({ path: './admin-preview.html' }))
+// リダイレクト処理
+app.get('*', async (c, next) => {
+  const path = new URL(c.req.url).pathname
+  if (htmlRedirects[path]) {
+    return c.redirect(htmlRedirects[path], 301)
+  }
+  await next()
+})
+
+// HTMLファイル配信（Cloudflare Pagesが直接配信）
+app.use('/*.html', serveStatic({ root: './' }))
 
 // APIルート：カリキュラム一覧取得（マルチテナント対応）
 app.get('/api/curriculum', authMiddleware, async (c) => {
