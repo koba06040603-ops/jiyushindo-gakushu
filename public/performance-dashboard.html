@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>パフォーマンス監視 - 自由進度学習支援システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <style>
+        .metric-card {
+            transition: all 0.3s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        .health-indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .health-healthy { background-color: #10b981; }
+        .health-degraded { background-color: #f59e0b; }
+        .health-down { background-color: #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center">
+                    <i class="fas fa-tachometer-alt text-3xl text-indigo-600 mr-3"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">パフォーマンス監視</h1>
+                        <p class="text-sm text-gray-500">リアルタイムシステム監視</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="refreshData()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        <i class="fas fa-sync-alt mr-2"></i>更新
+                    </button>
+                    <button onclick="window.location.href='/dashboard.html'" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                        <i class="fas fa-arrow-left mr-2"></i>戻る
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        <!-- システムステータス -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="metric-card bg-white rounded-lg shadow-sm p-6 border-l-4 border-green-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-700">平均応答時間</h3>
+                    <i class="fas fa-clock text-green-500 text-xl"></i>
+                </div>
+                <p class="text-3xl font-bold text-gray-900" id="avgResponseTime">-</p>
+                <p class="text-xs text-gray-500 mt-1">過去24時間</p>
+            </div>
+
+            <div class="metric-card bg-white rounded-lg shadow-sm p-6 border-l-4 border-blue-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-700">エラー率</h3>
+                    <i class="fas fa-exclamation-triangle text-blue-500 text-xl"></i>
+                </div>
+                <p class="text-3xl font-bold text-gray-900" id="errorRate">-</p>
+                <p class="text-xs text-gray-500 mt-1">過去24時間</p>
+            </div>
+
+            <div class="metric-card bg-white rounded-lg shadow-sm p-6 border-l-4 border-purple-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-700">総リクエスト数</h3>
+                    <i class="fas fa-chart-line text-purple-500 text-xl"></i>
+                </div>
+                <p class="text-3xl font-bold text-gray-900" id="totalRequests">-</p>
+                <p class="text-xs text-gray-500 mt-1">過去24時間</p>
+            </div>
+
+            <div class="metric-card bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-700">システム状態</h3>
+                    <span class="health-indicator health-healthy" id="systemHealthIndicator"></span>
+                </div>
+                <p class="text-3xl font-bold text-gray-900" id="systemStatus">正常</p>
+                <p class="text-xs text-gray-500 mt-1">すべてのサービス</p>
+            </div>
+        </div>
+
+        <!-- グラフエリア -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- エンドポイント別パフォーマンス -->
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">
+                    <i class="fas fa-chart-bar text-blue-500 mr-2"></i>エンドポイント別パフォーマンス
+                </h3>
+                <canvas id="endpointChart" height="250"></canvas>
+            </div>
+
+            <!-- エラー分布 -->
+            <div class="bg-white rounded-lg shadow-sm p-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">
+                    <i class="fas fa-pie-chart text-red-500 mr-2"></i>エラー分布
+                </h3>
+                <canvas id="errorChart" height="250"></canvas>
+            </div>
+        </div>
+
+        <!-- エラーログ -->
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-bug text-red-500 mr-2"></i>最近のエラーログ
+            </h2>
+            <div id="errorLogs" class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">時刻</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">タイプ</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">メッセージ</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">重要度</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">エンドポイント</th>
+                        </tr>
+                    </thead>
+                    <tbody id="errorLogsBody" class="bg-white divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">読み込み中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let endpointChartInstance = null;
+        let errorChartInstance = null;
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await loadDashboardData();
+            await checkSystemHealth();
+            
+            // 30秒ごとに自動更新
+            setInterval(refreshData, 30000);
+        });
+
+        // 認証チェック
+        async function checkAuth() {
+            try {
+                const response = await axios.get('/api/auth/verify');
+                const user = response.data.user;
+                
+                if (user.user_role !== 'admin') {
+                    alert('管理者権限が必要です');
+                    window.location.href = '/dashboard.html';
+                }
+            } catch (error) {
+                console.error('認証エラー:', error);
+                window.location.href = '/';
+            }
+        }
+
+        // ダッシュボードデータ読み込み
+        async function loadDashboardData() {
+            try {
+                const response = await axios.get('/api/performance/dashboard');
+                const { metrics } = response.data;
+                
+                // メトリクス表示
+                document.getElementById('avgResponseTime').textContent = 
+                    `${Math.round(metrics.avgResponseTime || 0)}ms`;
+                document.getElementById('errorRate').textContent = 
+                    `${(metrics.errorRate || 0).toFixed(2)}%`;
+                
+                const totalRequests = metrics.endpointPerformance.reduce((sum, ep) => sum + ep.request_count, 0);
+                document.getElementById('totalRequests').textContent = totalRequests.toLocaleString();
+                
+                // グラフ描画
+                renderEndpointChart(metrics.endpointPerformance);
+                renderErrorChart(metrics.errorSummary);
+                
+                // エラーログ読み込み
+                await loadErrorLogs();
+            } catch (error) {
+                console.error('ダッシュボードデータ読み込みエラー:', error);
+            }
+        }
+
+        // エンドポイント別パフォーマンスグラフ
+        function renderEndpointChart(data) {
+            const ctx = document.getElementById('endpointChart').getContext('2d');
+            
+            if (endpointChartInstance) {
+                endpointChartInstance.destroy();
+            }
+            
+            endpointChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.endpoint.substring(0, 30)),
+                    datasets: [{
+                        label: '平均応答時間 (ms)',
+                        data: data.map(d => d.avg_time),
+                        backgroundColor: 'rgba(99, 102, 241, 0.6)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: '応答時間 (ms)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // エラー分布グラフ
+        function renderErrorChart(data) {
+            const ctx = document.getElementById('errorChart').getContext('2d');
+            
+            if (errorChartInstance) {
+                errorChartInstance.destroy();
+            }
+            
+            if (!data || data.length === 0) {
+                ctx.fillText('エラーデータがありません', 10, 50);
+                return;
+            }
+            
+            errorChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => `${d.error_type} (${d.severity})`),
+                    datasets: [{
+                        data: data.map(d => d.count),
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.6)',
+                            'rgba(245, 158, 11, 0.6)',
+                            'rgba(59, 130, 246, 0.6)',
+                            'rgba(16, 185, 129, 0.6)',
+                            'rgba(139, 92, 246, 0.6)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        // エラーログ読み込み
+        async function loadErrorLogs() {
+            try {
+                const response = await axios.get('/api/performance/error-logs?limit=10');
+                const logs = response.data.logs || [];
+                
+                const tbody = document.getElementById('errorLogsBody');
+                
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">エラーログがありません</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = logs.map(log => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ${new Date(log.created_at).toLocaleString()}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ${log.error_type}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-700">
+                            ${log.error_message.substring(0, 80)}${log.error_message.length > 80 ? '...' : ''}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full ${getSeverityClass(log.severity)}">
+                                ${log.severity}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${log.endpoint || '-'}
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('エラーログ読み込みエラー:', error);
+            }
+        }
+
+        // システムヘルスチェック
+        async function checkSystemHealth() {
+            try {
+                const response = await axios.get('/api/performance/health');
+                const health = response.data;
+                
+                const indicator = document.getElementById('systemHealthIndicator');
+                const status = document.getElementById('systemStatus');
+                
+                if (health.status === 'healthy') {
+                    indicator.className = 'health-indicator health-healthy';
+                    status.textContent = '正常';
+                    status.className = 'text-3xl font-bold text-green-600';
+                } else {
+                    indicator.className = 'health-indicator health-down';
+                    status.textContent = '異常';
+                    status.className = 'text-3xl font-bold text-red-600';
+                }
+            } catch (error) {
+                console.error('ヘルスチェックエラー:', error);
+                document.getElementById('systemHealthIndicator').className = 'health-indicator health-down';
+                document.getElementById('systemStatus').textContent = 'エラー';
+            }
+        }
+
+        // 重要度に応じたCSSクラス
+        function getSeverityClass(severity) {
+            const classes = {
+                'info': 'bg-blue-100 text-blue-800',
+                'warning': 'bg-yellow-100 text-yellow-800',
+                'error': 'bg-red-100 text-red-800',
+                'critical': 'bg-purple-100 text-purple-800'
+            };
+            return classes[severity] || 'bg-gray-100 text-gray-800';
+        }
+
+        // データ更新
+        async function refreshData() {
+            await loadDashboardData();
+            await checkSystemHealth();
+        }
+
+        // グローバルスコープに公開
+        window.refreshData = refreshData;
+    </script>
+</body>
+</html>

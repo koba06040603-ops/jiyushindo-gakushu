@@ -21542,4 +21542,223 @@ app.get('/api/security/scan', requireAuth, async (c) => {
 globalThis.sanitizeInput = sanitizeInput
 globalThis.validateSQLParam = validateSQLParam
 
+// ============================================
+// Phase 10-2: パフォーマンス監視
+// ============================================
+
+// パフォーマンスメトリクス記録API
+app.post('/api/performance/metrics', async (c) => {
+  try {
+    const { env } = c
+    const { metric_type, endpoint, response_time_ms, status_code } = await c.req.json()
+    
+    await env.DB.prepare(`
+      INSERT INTO performance_metrics (metric_type, endpoint, response_time_ms, status_code, ip_address, user_agent, school_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      metric_type,
+      endpoint,
+      response_time_ms,
+      status_code,
+      c.req.header('cf-connecting-ip') || 'unknown',
+      c.req.header('user-agent') || 'unknown',
+      1
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('❌ パフォーマンスメトリクス記録エラー:', error)
+    return c.json({ success: false, error: 'メトリクスの記録に失敗しました' }, 500)
+  }
+})
+
+// エラーログ記録API
+app.post('/api/performance/error-log', async (c) => {
+  try {
+    const { env } = c
+    const { error_type, error_message, stack_trace, endpoint, severity } = await c.req.json()
+    
+    await env.DB.prepare(`
+      INSERT INTO error_logs (error_type, error_message, stack_trace, endpoint, ip_address, user_agent, severity, school_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      error_type,
+      sanitizeInput(error_message || ''),
+      sanitizeInput(stack_trace || ''),
+      endpoint,
+      c.req.header('cf-connecting-ip') || 'unknown',
+      c.req.header('user-agent') || 'unknown',
+      severity || 'error',
+      1
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('❌ エラーログ記録エラー:', error)
+    return c.json({ success: false, error: 'エラーログの記録に失敗しました' }, 500)
+  }
+})
+
+// パフォーマンスダッシュボードデータ取得API
+app.get('/api/performance/dashboard', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const user = c.get('user')
+    
+    if (user.user_role !== 'admin') {
+      return c.json({ success: false, error: '管理者権限が必要です' }, 403)
+    }
+    
+    // 過去24時間の平均応答時間
+    const avgResponseTime = await env.DB.prepare(`
+      SELECT AVG(response_time_ms) as avg_time
+      FROM performance_metrics
+      WHERE created_at >= datetime('now', '-24 hours')
+    `).first()
+    
+    // エラー率（過去24時間）
+    const errorRate = await env.DB.prepare(`
+      SELECT 
+        COUNT(CASE WHEN status_code >= 400 THEN 1 END) * 100.0 / COUNT(*) as error_rate
+      FROM performance_metrics
+      WHERE created_at >= datetime('now', '-24 hours')
+    `).first()
+    
+    // エンドポイント別パフォーマンス（トップ10）
+    const endpointPerformance = await env.DB.prepare(`
+      SELECT 
+        endpoint,
+        COUNT(*) as request_count,
+        AVG(response_time_ms) as avg_time,
+        MIN(response_time_ms) as min_time,
+        MAX(response_time_ms) as max_time
+      FROM performance_metrics
+      WHERE created_at >= datetime('now', '-24 hours')
+      GROUP BY endpoint
+      ORDER BY request_count DESC
+      LIMIT 10
+    `).all()
+    
+    // エラーログサマリー（過去24時間）
+    const errorSummary = await env.DB.prepare(`
+      SELECT 
+        error_type,
+        severity,
+        COUNT(*) as count
+      FROM error_logs
+      WHERE created_at >= datetime('now', '-24 hours')
+      GROUP BY error_type, severity
+      ORDER BY count DESC
+    `).all()
+    
+    // システムヘルス状態
+    const systemHealth = await env.DB.prepare(`
+      SELECT *
+      FROM system_health_checks
+      ORDER BY checked_at DESC
+      LIMIT 5
+    `).all()
+    
+    return c.json({
+      success: true,
+      metrics: {
+        avgResponseTime: avgResponseTime?.avg_time || 0,
+        errorRate: errorRate?.error_rate || 0,
+        endpointPerformance: endpointPerformance.results || [],
+        errorSummary: errorSummary.results || [],
+        systemHealth: systemHealth.results || []
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ パフォーマンスダッシュボードデータ取得エラー:', error)
+    return c.json({ success: false, error: 'データの取得に失敗しました' }, 500)
+  }
+})
+
+// システムヘルスチェックAPI
+app.get('/api/performance/health', async (c) => {
+  try {
+    const { env } = c
+    const startTime = Date.now()
+    
+    // データベースヘルスチェック
+    const dbCheck = await env.DB.prepare('SELECT 1').first()
+    const dbResponseTime = Date.now() - startTime
+    
+    const healthStatus = {
+      status: 'healthy',
+      checks: {
+        database: {
+          status: dbCheck ? 'healthy' : 'down',
+          responseTime: dbResponseTime
+        },
+        api: {
+          status: 'healthy',
+          responseTime: Date.now() - startTime
+        }
+      },
+      timestamp: new Date().toISOString()
+    }
+    
+    // ヘルスチェック結果を記録
+    await env.DB.prepare(`
+      INSERT INTO system_health_checks (check_type, status, response_time_ms, details)
+      VALUES ('database', ?, ?, ?)
+    `).bind(
+      healthStatus.checks.database.status,
+      dbResponseTime,
+      JSON.stringify(healthStatus)
+    ).run()
+    
+    return c.json(healthStatus)
+  } catch (error: any) {
+    console.error('❌ ヘルスチェックエラー:', error)
+    return c.json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    }, 500)
+  }
+})
+
+// エラーログ一覧取得API（管理者のみ）
+app.get('/api/performance/error-logs', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const user = c.get('user')
+    
+    if (user.user_role !== 'admin') {
+      return c.json({ success: false, error: '管理者権限が必要です' }, 403)
+    }
+    
+    const limit = c.req.query('limit') || '50'
+    const severity = c.req.query('severity')
+    
+    let query = `
+      SELECT *
+      FROM error_logs
+      WHERE 1=1
+    `
+    const params: any[] = []
+    
+    if (severity) {
+      query += ' AND severity = ?'
+      params.push(severity)
+    }
+    
+    query += ' ORDER BY created_at DESC LIMIT ?'
+    params.push(limit)
+    
+    const logs = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      logs: logs.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ エラーログ取得エラー:', error)
+    return c.json({ success: false, error: 'エラーログの取得に失敗しました' }, 500)
+  }
+})
+
 export default app
