@@ -24,11 +24,7 @@ CREATE TABLE IF NOT EXISTS retrieval_practice_log (
   
   -- タイムスタンプ
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  
-  -- 外部キー制約
-  FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-  FOREIGN KEY (curriculum_id) REFERENCES curriculum(id) ON DELETE CASCADE
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- インデックス作成（クエリパフォーマンス向上）
