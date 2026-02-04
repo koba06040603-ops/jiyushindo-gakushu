@@ -5,13 +5,14 @@
 ## 🌐 本番環境URL
 
 **Phase 11完全実装完了！** ✅  
-- **本番URL**: https://c4596b97.jiyushindo-gakushu.pages.dev
-- **ダッシュボード**: https://c4596b97.jiyushindo-gakushu.pages.dev/dashboard.html
-- **保護者ダッシュボード**: https://c4596b97.jiyushindo-gakushu.pages.dev/parent-dashboard.html
+- **本番URL**: https://58d02ef7.jiyushindo-gakushu.pages.dev
+- **ダッシュボード**: https://58d02ef7.jiyushindo-gakushu.pages.dev/dashboard.html
+- **保護者ダッシュボード**: https://58d02ef7.jiyushindo-gakushu.pages.dev/parent-dashboard.html
 - **セキュリティダッシュボード**: https://bc1dbae8.jiyushindo-gakushu.pages.dev/security-dashboard.html
 - **パフォーマンスダッシュボード**: https://bc1dbae8.jiyushindo-gakushu.pages.dev/performance-dashboard.html
-- **キャッシュダッシュボード**: https://c4596b97.jiyushindo-gakushu.pages.dev/cache-dashboard.html
-- **AIチューター**: https://c4596b97.jiyushindo-gakushu.pages.dev/ai-tutor.html
+- **キャッシュダッシュボード**: https://58d02ef7.jiyushindo-gakushu.pages.dev/cache-dashboard.html
+- **AIチューター**: https://58d02ef7.jiyushindo-gakushu.pages.dev/ai-tutor.html
+- **AI問題生成**: https://58d02ef7.jiyushindo-gakushu.pages.dev/problem-generator.html
 - **PWA対応**: ✅ オフライン機能、ホーム画面追加、プッシュ通知
 - **セキュリティ**: ✅ CSRF保護、レート制限、セキュリティヘッダー
 - **パフォーマンス監視**: ✅ リアルタイムメトリクス、エラートラッキング
@@ -247,10 +248,72 @@
 - コスト: **完全無料**（Workers AI + HuggingFace無料枠）
 - 信頼性: 3段階フォールバック（99.9%可用性）
 
-### Phase 12-2: 自動問題生成（予定）
-- 🔲 難易度別問題自動生成
-- 🔲 教科別・単元別対応
-- 🔲 学習履歴ベースの最適化
+### Phase 12-2: 自動問題生成システム（完了）✅
+
+**🎯 AI + ルールベース問題生成**
+- ✅ **Workers AI問題生成**
+  - `@cf/meta/llama-3.1-8b-instruct`で高品質な問題生成
+  - プロンプトエンジニアリングによる最適化
+  - 学習履歴に基づくパーソナライズ
+  
+- ✅ **ルールベース問題ジェネレーター**
+  - 数学: 計算問題、文章題、図形問題
+  - 国語: 漢字読み書き、文法、読解
+  - 理科: 観察問題、実験問題、分類問題
+  - 社会: 歴史問題、地理問題、公民問題
+  - 英語: 単語、リスニング、文法
+  
+- ✅ **難易度別生成**
+  - 基礎（easy）: 正答率0-60%向け
+  - 標準（medium）: 正答率60-80%向け
+  - 発展（hard）: 正答率80-100%向け
+  - 学習履歴から自動推奨
+
+**📊 学習履歴分析エンジン**
+- ✅ **パフォーマンス分析**
+  - 総挑戦問題数の追跡
+  - 正答率の計算
+  - 苦手分野の自動検出（正答率50%未満）
+  - 推奨難易度の自動決定
+  
+- ✅ **適応的問題生成**
+  - 学習者の苦手分野に焦点
+  - 習得済み概念の復習
+  - 段階的な難易度調整
+
+**🎨 問題生成ダッシュボード**
+- `/problem-generator.html`
+  - インタラクティブな問題生成UI
+  - 教科・単元・難易度・問題数の選択
+  - リアルタイムパフォーマンス統計
+  - クイック生成ボタン
+  - 問題履歴ブラウザ
+  - モーダル式問題解答UI
+  - ヒント表示機能
+
+**💾 データベース**
+- `generated_problems` テーブル
+  - 全生成問題の永続化
+  - 回答記録と正誤判定
+  - ヒント・解説の保存
+
+**📈 APIエンドポイント**
+- `POST /api/problems/generate` - 問題自動生成（1-10問）
+- `GET /api/problems/history` - 生成済み問題履歴
+- `POST /api/problems/:id/submit` - 問題回答提出
+- `GET /api/problems/performance` - 学習パフォーマンス分析
+- `GET /api/problems/metadata` - 問題生成メタデータ
+
+**🚀 生成戦略**
+1. AI生成（30%）: Workers AIで新規問題生成
+2. ルールベース（70%）: 確実に動作する問題生成
+3. マルチプロバイダーフォールバック
+
+**📊 実装統計**
+- 新規ファイル: 3（problem-generator.ts、problem-generator.html、マイグレーション）
+- 新規API: 5エンドポイント
+- コード行数: 約2,000行
+- 問題テンプレート: 教科別×難易度別 = 15種類以上
 
 ### Phase 12-3: 学習経路の動的最適化（予定）
 - 🔲 適応的カリキュラム
