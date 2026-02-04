@@ -1464,24 +1464,36 @@ app.get('/admin-preview', serveStatic({ path: './admin-preview.html' }))
 // HTMLファイル配信
 app.use('/*.html', serveStatic({ root: './' }))
 
-// APIルート：カリキュラム一覧取得
-app.get('/api/curriculum', async (c) => {
+// APIルート：カリキュラム一覧取得（マルチテナント対応）
+app.get('/api/curriculum', authMiddleware, async (c) => {
   const { env } = c
+  const user = c.get('user')
   
   try {
+    // school_idでキャッシュキーを分ける
+    const cacheKey = `curriculum:all:${user.school_id}`
+    
     // キャッシュを使用
     const cached = await getCachedOrFetch(
       env.KV,
-      'curriculum:all',
+      cacheKey,
       CACHE_TTL.CURRICULUM,
       async () => {
-        const result = await env.DB.prepare(`
+        let query = `
           SELECT 
-            id, grade, subject, textbook_company, unit_name, 
+            id, school_id, grade, subject, textbook_company, unit_name, 
             unit_order, total_hours, unit_goal, non_cognitive_goal
           FROM curriculum
-          ORDER BY grade, unit_order
-        `).all()
+        `
+        
+        // 管理者以外はschool_idでフィルタ
+        if (user.role !== 'admin') {
+          query += ` WHERE school_id = ${user.school_id}`
+        }
+        
+        query += ` ORDER BY grade, unit_order`
+        
+        const result = await env.DB.prepare(query).all()
         
         // Map id to curriculum_id for frontend compatibility
         return result.results.map(c => ({
@@ -1493,26 +1505,39 @@ app.get('/api/curriculum', async (c) => {
     
     return c.json(cached)
   } catch (error) {
+    console.error('❌ カリキュラム取得エラー:', error)
     return c.json({ error: 'Database error' }, 500)
   }
 })
 
-// APIルート：全カリキュラム一覧取得
-app.get('/api/curriculum/list', async (c) => {
+// APIルート：全カリキュラム一覧取得（マルチテナント対応）
+app.get('/api/curriculum/list', authMiddleware, async (c) => {
   const { env } = c
+  const user = c.get('user')
   
   try {
+    // school_idでキャッシュキーを分ける
+    const cacheKey = `curriculum:list:${user.school_id}`
+    
     // キャッシュを使用
     const cached = await getCachedOrFetch(
       env.KV,
-      'curriculum:list',
+      cacheKey,
       CACHE_TTL.CURRICULUM,
       async () => {
-        const result = await env.DB.prepare(`
-          SELECT id, grade, subject, unit_name, textbook_company as textbook, created_at
+        let query = `
+          SELECT id, school_id, grade, subject, unit_name, textbook_company as textbook, created_at
           FROM curriculum
-          ORDER BY created_at DESC
-        `).all()
+        `
+        
+        // 管理者以外はschool_idでフィルタ
+        if (user.role !== 'admin') {
+          query += ` WHERE school_id = ${user.school_id}`
+        }
+        
+        query += ` ORDER BY created_at DESC`
+        
+        const result = await env.DB.prepare(query).all()
         
         // Map id to curriculum_id for frontend compatibility
         return result.results.map(c => ({
@@ -1835,19 +1860,21 @@ app.post('/api/progress', async (c) => {
 // =============================================================================
 
 // 学習ログ記録API - 学習カード個別最適化のためのデータ収集
-app.post('/api/learning/log', async (c) => {
+app.post('/api/learning/log', authMiddleware, async (c) => {
   const { env } = c
+  const user = c.get('user')
   const logData = await c.req.json()
   
   try {
-    // 学習ログを記録
+    // 学習ログを記録（school_id追加）
     await env.DB.prepare(`
       INSERT INTO learning_logs (
-        student_id, unit_id, card_id, course_type,
+        school_id, student_id, unit_id, card_id, course_type,
         is_correct, answer_time_seconds, hint_count, retry_count,
         difficulty_level, problem_type, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `).bind(
+      user.school_id,
       logData.student_id,
       logData.unit_id || logData.curriculum_id,  // 互換性のため
       logData.card_id,
@@ -20207,6 +20234,230 @@ app.get('/api/auth/user-permissions/:userId', authMiddleware, async (c) => {
   } catch (error: any) {
     console.error('❌ ユーザー権限取得エラー:', error)
     return c.json({ success: false, error: 'ユーザー権限の取得に失敗しました' }, 500)
+  }
+})
+
+// ============================================
+// Phase 5-5: 通知システムAPI
+// ============================================
+
+// 通知一覧取得API
+app.get('/api/notifications', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    // 通知テーブルを作成（存在しない場合）
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        school_id INTEGER NOT NULL DEFAULT 1,
+        user_id INTEGER NOT NULL,
+        notification_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        link_url TEXT,
+        is_read INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    // インデックス作成
+    await env.DB.prepare(`
+      CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)
+    `).run()
+    
+    // ユーザーの通知を取得
+    let query = `
+      SELECT * FROM notifications
+      WHERE user_id = ?
+    `
+    
+    // 管理者以外はschool_idでもフィルタ
+    if (user.role !== 'admin') {
+      query += ` AND school_id = ${user.school_id}`
+    }
+    
+    query += ` ORDER BY created_at DESC LIMIT 50`
+    
+    const notifications = await env.DB.prepare(query).bind(user.user_id).all()
+    
+    return c.json({
+      success: true,
+      notifications: notifications.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ 通知取得エラー:', error)
+    return c.json({ success: false, error: '通知の取得に失敗しました' }, 500)
+  }
+})
+
+// 通知作成API
+app.post('/api/notifications', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const { user_id, notification_type, title, message, link_url } = await c.req.json()
+  
+  try {
+    // 通知を作成
+    const result = await env.DB.prepare(`
+      INSERT INTO notifications (school_id, user_id, notification_type, title, message, link_url)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      user.school_id,
+      user_id,
+      notification_type,
+      title,
+      message,
+      link_url || null
+    ).run()
+    
+    return c.json({
+      success: true,
+      notification_id: result.meta.last_row_id
+    })
+  } catch (error: any) {
+    console.error('❌ 通知作成エラー:', error)
+    return c.json({ success: false, error: '通知の作成に失敗しました' }, 500)
+  }
+})
+
+// 通知既読API
+app.put('/api/notifications/:id/read', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const notificationId = c.req.param('id')
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE notifications
+      SET is_read = 1
+      WHERE id = ? AND user_id = ?
+    `).bind(notificationId, user.user_id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('❌ 通知既読エラー:', error)
+    return c.json({ success: false, error: '通知の既読処理に失敗しました' }, 500)
+  }
+})
+
+// 全通知既読API
+app.put('/api/notifications/read-all', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    await env.DB.prepare(`
+      UPDATE notifications
+      SET is_read = 1
+      WHERE user_id = ? AND school_id = ?
+    `).bind(user.user_id, user.school_id).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('❌ 全通知既読エラー:', error)
+    return c.json({ success: false, error: '全通知の既読処理に失敗しました' }, 500)
+  }
+})
+
+// ============================================
+// Phase 5-6: データエクスポート機能
+// ============================================
+
+// 学習ログCSVエクスポート
+app.get('/api/export/learning-logs', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const { student_id } = c.req.query()
+  
+  try {
+    let query = `
+      SELECT 
+        ll.id,
+        ll.student_id,
+        au.full_name as student_name,
+        ll.problem_id,
+        ll.is_correct,
+        ll.time_spent,
+        ll.hint_used,
+        ll.created_at
+      FROM learning_logs ll
+      JOIN auth_users au ON ll.student_id = au.user_id
+      WHERE ll.school_id = ?
+    `
+    
+    const params = [user.school_id]
+    
+    if (student_id) {
+      query += ` AND ll.student_id = ?`
+      params.push(student_id)
+    }
+    
+    query += ` ORDER BY ll.created_at DESC LIMIT 1000`
+    
+    const result = await env.DB.prepare(query).bind(...params).all()
+    const logs = result.results || []
+    
+    // CSV生成
+    let csv = 'ID,学生ID,学生名,問題ID,正解,所要時間,ヒント使用,日時\n'
+    
+    for (const log of logs) {
+      csv += `${log.id},${log.student_id},${log.student_name},${log.problem_id},${log.is_correct ? '正解' : '不正解'},${log.time_spent || 0},${log.hint_used || 0},${log.created_at}\n`
+    }
+    
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="learning-logs.csv"'
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ CSVエクスポートエラー:', error)
+    return c.json({ success: false, error: 'CSVエクスポートに失敗しました' }, 500)
+  }
+})
+
+// カリキュラムCSVエクスポート
+app.get('/api/export/curriculum', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    let query = `
+      SELECT 
+        id,
+        grade,
+        subject,
+        textbook_company,
+        unit_name,
+        unit_order,
+        total_hours,
+        created_at
+      FROM curriculum
+      WHERE school_id = ?
+      ORDER BY grade, unit_order
+    `
+    
+    const result = await env.DB.prepare(query).bind(user.school_id).all()
+    const curriculums = result.results || []
+    
+    // CSV生成
+    let csv = 'ID,学年,教科,教科書会社,単元名,単元順序,総時数,作成日時\n'
+    
+    for (const curr of curriculums) {
+      csv += `${curr.id},${curr.grade},${curr.subject},${curr.textbook_company || ''},${curr.unit_name},${curr.unit_order},${curr.total_hours},${curr.created_at}\n`
+    }
+    
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="curriculum.csv"'
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ CSVエクスポートエラー:', error)
+    return c.json({ success: false, error: 'CSVエクスポートに失敗しました' }, 500)
   }
 })
 

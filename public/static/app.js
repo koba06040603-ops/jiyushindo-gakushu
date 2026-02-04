@@ -38,6 +38,98 @@
     #test-overlay * {
       cursor: auto !important;
     }
+    
+    /* ============================================
+     * Phase 5-2: レスポンシブデザイン
+     * スマホ/タブレット対応
+     * ============================================ */
+    
+    /* ベース: モバイルファースト */
+    @media (max-width: 768px) {
+      /* ナビゲーション */
+      #app-header {
+        padding: 0.5rem 1rem !important;
+      }
+      
+      /* コンテンツエリア */
+      #main-content {
+        padding: 0.5rem !important;
+      }
+      
+      /* カードグリッド */
+      .card-grid, .curriculum-grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.5rem !important;
+      }
+      
+      /* ボタン */
+      button {
+        padding: 0.75rem 1rem !important;
+        font-size: 0.875rem !important;
+      }
+      
+      /* モーダル */
+      .modal-content {
+        width: 95vw !important;
+        max-height: 90vh !important;
+        padding: 1rem !important;
+      }
+      
+      /* テーブル */
+      table {
+        font-size: 0.75rem !important;
+      }
+      
+      th, td {
+        padding: 0.5rem !important;
+      }
+    }
+    
+    /* タブレット */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .card-grid, .curriculum-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+      
+      .modal-content {
+        width: 85vw !important;
+      }
+    }
+    
+    /* デスクトップ */
+    @media (min-width: 1025px) {
+      .card-grid, .curriculum-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+      }
+      
+      .modal-content {
+        max-width: 900px !important;
+      }
+    }
+    
+    /* Phase 5-2: スムーズなアニメーション */
+    * {
+      transition: all 0.2s ease-in-out !important;
+    }
+    
+    /* ローディングアニメーション */
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .loading-spinner {
+      animation: spin 1s linear infinite !important;
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.3s ease-out !important;
+    }
   `
   document.head.appendChild(cursorFixStyle)
   
