@@ -45,8 +45,10 @@ import { AIContentGenerator } from './ai-content-generator'
 type Bindings = {
   DB: D1Database
   KV: KVNamespace
+  AI?: any // Cloudflare Workers AI
   GEMINI_API_KEY?: string
   SUNO_API_KEY?: string
+  HUGGINGFACE_API_KEY?: string // HuggingFace Inference API (optional)
   PROGRESS_WEBSOCKET?: DurableObjectNamespace
 }
 
@@ -21896,6 +21898,217 @@ app.post('/api/cache/metrics/reset', requireAuth, async (c) => {
   } catch (error: any) {
     console.error('❌ メトリクスリセットエラー:', error)
     return c.json({ success: false, error: 'メトリクスのリセットに失敗しました' }, 500)
+  }
+})
+
+// ========================================
+// Phase 12-1: AIチューター API（完全無料版）
+// ========================================
+
+import { AITutorEngine, type AITutorRequest, type ConversationMessage } from './ai-tutor'
+
+// AIチューターエンジン初期化
+let aiTutorEngine: AITutorEngine | null = null
+
+function getAITutorEngine(huggingFaceApiKey?: string): AITutorEngine {
+  if (!aiTutorEngine) {
+    aiTutorEngine = new AITutorEngine(huggingFaceApiKey)
+  }
+  return aiTutorEngine
+}
+
+/**
+ * POST /api/ai-tutor/ask - AIチューターに質問
+ */
+app.post('/api/ai-tutor/ask', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    const body = await c.req.json()
+    const { question, subject, unitName, context, conversationHistory } = body
+    
+    if (!question || question.trim().length === 0) {
+      return c.json({ success: false, error: '質問を入力してください' }, 400)
+    }
+    
+    // リクエスト構築
+    const request: AITutorRequest = {
+      studentId: user.user_id,
+      question: question.trim(),
+      subject,
+      unitName,
+      context,
+      conversationHistory: conversationHistory || []
+    }
+    
+    // AIチューターエンジン取得
+    const engine = getAITutorEngine(env.HUGGINGFACE_API_KEY)
+    
+    // 学習コンテキスト取得
+    const learningContext = await engine.getLearningContext(env.DB, user.user_id)
+    
+    // コンテキストを質問に追加
+    if (learningContext.struggleAreas.length > 0) {
+      request.context = `苦手分野: ${learningContext.struggleAreas.join(', ')}\n${request.context || ''}`
+    }
+    
+    // AI回答生成（Workers AIバインディングを渡す）
+    const response = await engine.generateAnswer(request, env.AI)
+    
+    // 会話履歴をDBに保存
+    await env.DB.prepare(`
+      INSERT INTO ai_tutor_conversations 
+      (student_id, question, answer, subject, unit_name, ai_source, confidence, school_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      user.user_id,
+      question,
+      response.answer,
+      subject || null,
+      unitName || null,
+      response.source,
+      response.confidence,
+      user.school_id || 1
+    ).run()
+    
+    return c.json({
+      success: true,
+      response
+    })
+  } catch (error: any) {
+    console.error('❌ AIチューターエラー:', error)
+    return c.json({ 
+      success: false, 
+      error: 'AIチューターの応答に失敗しました',
+      details: error.message 
+    }, 500)
+  }
+})
+
+/**
+ * GET /api/ai-tutor/history - AIチューター会話履歴取得
+ */
+app.get('/api/ai-tutor/history', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    const limit = parseInt(c.req.query('limit') || '20')
+    
+    const conversations = await env.DB.prepare(`
+      SELECT 
+        conversation_id,
+        question,
+        answer,
+        subject,
+        unit_name,
+        ai_source,
+        confidence,
+        created_at
+      FROM ai_tutor_conversations
+      WHERE student_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `).bind(user.user_id, limit).all()
+    
+    return c.json({
+      success: true,
+      conversations: conversations.results
+    })
+  } catch (error: any) {
+    console.error('❌ 会話履歴取得エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '会話履歴の取得に失敗しました' 
+    }, 500)
+  }
+})
+
+/**
+ * GET /api/ai-tutor/suggestions - パーソナライズされた学習提案
+ */
+app.get('/api/ai-tutor/suggestions', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    // AIチューターエンジン取得
+    const engine = getAITutorEngine(env.HUGGINGFACE_API_KEY)
+    
+    // 学習コンテキスト取得
+    const learningContext = await engine.getLearningContext(env.DB, user.user_id)
+    
+    // 提案生成
+    const suggestions = []
+    
+    // 苦手分野の提案
+    if (learningContext.struggleAreas.length > 0) {
+      suggestions.push({
+        type: 'struggle',
+        title: '復習が必要な単元',
+        items: learningContext.struggleAreas,
+        priority: 'high',
+        message: 'これらの単元を重点的に復習しましょう！'
+      })
+    }
+    
+    // 次のステップ提案
+    if (learningContext.masteredConcepts.length > 0) {
+      suggestions.push({
+        type: 'next-step',
+        title: '次に学ぶのにおすすめ',
+        items: learningContext.masteredConcepts.slice(0, 3),
+        priority: 'medium',
+        message: '習得した内容を活かして、次のステップに進みましょう！'
+      })
+    }
+    
+    return c.json({
+      success: true,
+      learningContext,
+      suggestions
+    })
+  } catch (error: any) {
+    console.error('❌ 学習提案エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '学習提案の取得に失敗しました' 
+    }, 500)
+  }
+})
+
+/**
+ * POST /api/ai-tutor/feedback - AIチューター回答へのフィードバック
+ */
+app.post('/api/ai-tutor/feedback', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    const { conversationId, rating, comment } = await c.req.json()
+    
+    if (!conversationId) {
+      return c.json({ success: false, error: '会話IDが必要です' }, 400)
+    }
+    
+    // フィードバック保存
+    await env.DB.prepare(`
+      UPDATE ai_tutor_conversations
+      SET feedback_rating = ?, feedback_comment = ?
+      WHERE conversation_id = ? AND student_id = ?
+    `).bind(rating, comment || null, conversationId, user.user_id).run()
+    
+    return c.json({
+      success: true,
+      message: 'フィードバックを保存しました'
+    })
+  } catch (error: any) {
+    console.error('❌ フィードバック保存エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: 'フィードバックの保存に失敗しました' 
+    }, 500)
   }
 })
 
