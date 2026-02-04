@@ -11,20 +11,20 @@ VALUES
   (2, 'CLASS2024B', '4年2組', 4, 2024, TRUE);
 
 -- ユーザーデータ（auth_users）
--- パスワードハッシュは仮の値（実際にはbcryptでハッシュ化されたもの）
-INSERT OR IGNORE INTO auth_users (user_id, username, password_hash, full_name, user_role, school_id, is_active)
+-- パスワードハッシュは bcrypt でハッシュ化（password123）
+INSERT OR REPLACE INTO auth_users (user_id, username, password_hash, full_name, user_role, school_id, is_active)
 VALUES
   -- 教師（password: password123）
-  (1, 'teacher1', 'dummy_hash_teacher1', '山田 太郎', 'teacher', 1, TRUE),
-  (2, 'teacher2', 'dummy_hash_teacher2', '佐藤 花子', 'teacher', 1, TRUE),
+  (1, 'teacher1', '$2b$10$zDwYCyH74.LhE8XaoZlJ1uY5/4/WeTqjEk77aWWaZ7wnZUZUPKN2q', '山田 太郎', 'teacher', 1, TRUE),
+  (2, 'teacher2', '$2b$10$zDwYCyH74.LhE8XaoZlJ1uY5/4/WeTqjEk77aWWaZ7wnZUZUPKN2q', '佐藤 花子', 'teacher', 1, TRUE),
   
   -- 学生（password: password123）
-  (3, 'student1', 'dummy_hash_student1', '田中 一郎', 'student', 1, TRUE),
-  (4, 'student2', 'dummy_hash_student2', '鈴木 二郎', 'student', 1, TRUE),
-  (5, 'student3', 'dummy_hash_student3', '高橋 三郎', 'student', 1, TRUE),
+  (3, 'student1', '$2b$10$zDwYCyH74.LhE8XaoZlJ1uY5/4/WeTqjEk77aWWaZ7wnZUZUPKN2q', '田中 一郎', 'student', 1, TRUE),
+  (4, 'student2', '$2b$10$zDwYCyH74.LhE8XaoZlJ1uY5/4/WeTqjEk77aWWaZ7wnZUZUPKN2q', '鈴木 二郎', 'student', 1, TRUE),
+  (5, 'student3', '$2b$10$zDwYCyH74.LhE8XaoZlJ1uY5/4/WeTqjEk77aWWaZ7wnZUZUPKN2q', '高橋 三郎', 'student', 1, TRUE),
   
   -- 管理者（password: password123）
-  (7, 'admin1', 'dummy_hash_admin1', '管理者', 'admin', 1, TRUE);
+  (7, 'admin1', '$2b$10$zDwYCyH74.LhE8XaoZlJ1uY5/4/WeTqjEk77aWWaZ7wnZUZUPKN2q', '管理者', 'admin', 1, TRUE);
 
 -- 学生とクラスの関連付け（students テーブルにデータを追加）
 INSERT OR IGNORE INTO students (student_id, student_name, grade_level, role, is_active)

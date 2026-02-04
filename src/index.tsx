@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
+import bcrypt from 'bcryptjs'
 import { 
   registerStudent, 
   login, 
@@ -10186,33 +10187,6 @@ async function requireAuth(c: any, next: any) {
 }
 
 // ミドルウェア: 権限チェック
-function requirePermission(resource: string, action: string) {
-  return async (c: any, next: any) => {
-    const user = c.get('user')
-    if (!user) {
-      return c.json({ error: '認証が必要です' }, 401)
-    }
-    
-    const { env } = c
-    
-    try {
-      const permission = await env.DB.prepare(`
-        SELECT * FROM role_permissions
-        WHERE role = ? AND resource = ? AND action = ?
-      `).bind(user.role, resource, action).first()
-      
-      if (!permission) {
-        return c.json({ error: '権限がありません' }, 403)
-      }
-      
-      await next()
-    } catch (error) {
-      console.error('権限チェックエラー:', error)
-      return c.json({ error: '権限チェックに失敗しました' }, 500)
-    }
-  }
-}
-
 // APIルート: ユーザー登録
 app.post('/api/auth/register', async (c) => {
   const { env } = c
@@ -19828,9 +19802,8 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
     }
     
-    // 簡易版: パスワードチェック（本番環境ではbcryptを使用）
-    // デモ用パスワード: password123
-    const isValidPassword = password === 'password123'
+    // パスワード検証（bcrypt）
+    const isValidPassword = await bcrypt.compare(password, user.password_hash as string)
     
     if (!isValidPassword) {
       return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
@@ -19838,13 +19811,15 @@ app.post('/api/auth/login', async (c) => {
     
     // セッショントークン生成
     const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
+    const refreshToken = `refresh_${Date.now()}_${Math.random().toString(36).substring(7)}`
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24時間後
+    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7日間後
     
     // セッション保存
     await env.DB.prepare(`
-      INSERT INTO auth_sessions (user_id, session_token, expires_at)
-      VALUES (?, ?, ?)
-    `).bind(user.user_id, sessionToken, expiresAt).run()
+      INSERT INTO auth_sessions (user_id, session_token, refresh_token, expires_at, refresh_expires_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(user.user_id, sessionToken, refreshToken, expiresAt, refreshExpiresAt).run()
     
     // ログイン成功
     return c.json({
@@ -19857,7 +19832,9 @@ app.post('/api/auth/login', async (c) => {
         school_id: user.school_id
       },
       session_token: sessionToken,
-      expires_at: expiresAt
+      refresh_token: refreshToken,
+      expires_at: expiresAt,
+      refresh_expires_at: refreshExpiresAt
     })
     
   } catch (error: any) {
@@ -19880,6 +19857,60 @@ app.post('/api/auth/logout', async (c) => {
   } catch (error: any) {
     console.error('❌ ログアウトエラー:', error)
     return c.json({ success: false, error: 'ログアウトに失敗しました' }, 500)
+  }
+})
+
+// リフレッシュトークンAPI
+app.post('/api/auth/refresh', async (c) => {
+  const { env } = c
+  const { refresh_token } = await c.req.json()
+  
+  if (!refresh_token) {
+    return c.json({ success: false, error: 'リフレッシュトークンが必要です' }, 400)
+  }
+  
+  try {
+    // リフレッシュトークン検証
+    const session = await env.DB.prepare(`
+      SELECT 
+        s.*, 
+        u.user_id, u.username, u.full_name, u.user_role, u.school_id
+      FROM auth_sessions s
+      JOIN auth_users u ON s.user_id = u.user_id
+      WHERE s.refresh_token = ? AND s.refresh_expires_at > datetime('now')
+    `).bind(refresh_token).first()
+    
+    if (!session) {
+      return c.json({ success: false, error: 'リフレッシュトークンが無効または期限切れです' }, 401)
+    }
+    
+    // 新しいセッショントークンを生成
+    const newSessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
+    const newExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    
+    // セッション更新
+    await env.DB.prepare(`
+      UPDATE auth_sessions
+      SET session_token = ?, expires_at = ?
+      WHERE session_id = ?
+    `).bind(newSessionToken, newExpiresAt, session.session_id).run()
+    
+    return c.json({
+      success: true,
+      session_token: newSessionToken,
+      expires_at: newExpiresAt,
+      user: {
+        user_id: session.user_id,
+        username: session.username,
+        full_name: session.full_name,
+        role: session.user_role,
+        school_id: session.school_id
+      }
+    })
+    
+  } catch (error: any) {
+    console.error('❌ リフレッシュトークンエラー:', error)
+    return c.json({ success: false, error: 'トークンのリフレッシュに失敗しました' }, 500)
   }
 })
 
@@ -19919,8 +19950,116 @@ app.post('/api/auth/verify', async (c) => {
   }
 })
 
+// =============================================================================
+// Phase 4-3: 認証ミドルウェア
+// =============================================================================
+
+// 認証ミドルウェア: セッション検証
+async function authMiddleware(c: any, next: () => Promise<void>) {
+  const { env } = c
+  
+  // Authorization ヘッダーから session_token を取得
+  const authHeader = c.req.header('Authorization')
+  const sessionToken = authHeader?.replace('Bearer ', '')
+  
+  if (!sessionToken) {
+    return c.json({ success: false, error: '認証が必要です' }, 401)
+  }
+  
+  try {
+    // セッション検証
+    const session = await env.DB.prepare(`
+      SELECT 
+        s.*, 
+        u.user_id, u.username, u.full_name, u.user_role, u.school_id
+      FROM auth_sessions s
+      JOIN auth_users u ON s.user_id = u.user_id
+      WHERE s.session_token = ? AND s.expires_at > datetime('now')
+    `).bind(sessionToken).first()
+    
+    if (!session) {
+      return c.json({ success: false, error: 'セッションが無効または期限切れです' }, 401)
+    }
+    
+    // ユーザー情報をコンテキストに保存
+    c.set('user', {
+      user_id: session.user_id,
+      username: session.username,
+      full_name: session.full_name,
+      role: session.user_role,
+      school_id: session.school_id
+    })
+    
+    // 次のハンドラーへ
+    await next()
+    
+  } catch (error: any) {
+    console.error('❌ 認証ミドルウェアエラー:', error)
+    return c.json({ success: false, error: '認証に失敗しました' }, 500)
+  }
+}
+
+// ロールベース認証ミドルウェア
+function requireRole(...allowedRoles: string[]) {
+  return async (c: any, next: () => Promise<void>) => {
+    const user = c.get('user')
+    
+    if (!user) {
+      return c.json({ success: false, error: '認証が必要です' }, 401)
+    }
+    
+    if (!allowedRoles.includes(user.role)) {
+      return c.json({ 
+        success: false, 
+        error: 'このリソースへのアクセス権限がありません',
+        required_roles: allowedRoles,
+        your_role: user.role
+      }, 403)
+    }
+    
+    await next()
+  }
+}
+
+// 権限ベース認証ミドルウェア
+function requirePermission(resource: string, action: string) {
+  return async (c: any, next: () => Promise<void>) => {
+    const { env } = c
+    const user = c.get('user')
+    
+    if (!user) {
+      return c.json({ success: false, error: '認証が必要です' }, 401)
+    }
+    
+    try {
+      // ユーザーのロールに紐づく権限をチェック
+      const permission = await env.DB.prepare(`
+        SELECT p.permission_name
+        FROM permissions p
+        JOIN role_permissions rp ON p.permission_id = rp.permission_id
+        WHERE rp.user_role = ? AND p.resource = ? AND p.action = ?
+      `).bind(user.role, resource, action).first()
+      
+      if (!permission) {
+        return c.json({ 
+          success: false, 
+          error: 'この操作を行う権限がありません',
+          required_permission: `${resource}:${action}`,
+          your_role: user.role
+        }, 403)
+      }
+      
+      await next()
+      
+    } catch (error: any) {
+      console.error('❌ 権限チェックエラー:', error)
+      return c.json({ success: false, error: '権限チェックに失敗しました' }, 500)
+    }
+  }
+}
+
 // ユーザー一覧取得（管理者・教師用）
-app.get('/api/auth/users', async (c) => {
+app.get('/api/auth/users', authMiddleware, requireRole('admin', 'teacher'), async (c) => {
   const { env } = c
   const school_id = c.req.query('school_id') || '1'
   const role = c.req.query('role')
@@ -19946,6 +20085,67 @@ app.get('/api/auth/users', async (c) => {
   } catch (error: any) {
     console.error('❌ ユーザー一覧取得エラー:', error)
     return c.json({ success: false, error: 'ユーザー一覧の取得に失敗しました' }, 500)
+  }
+})
+
+// 権限一覧取得API（管理者のみ）
+app.get('/api/auth/permissions', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  
+  try {
+    const permissions = await env.DB.prepare(`
+      SELECT * FROM permissions ORDER BY resource, action
+    `).all()
+    
+    return c.json({
+      success: true,
+      permissions: permissions.results || []
+    })
+    
+  } catch (error: any) {
+    console.error('❌ 権限一覧取得エラー:', error)
+    return c.json({ success: false, error: '権限一覧の取得に失敗しました' }, 500)
+  }
+})
+
+// ユーザーの権限取得API
+app.get('/api/auth/user-permissions/:userId', authMiddleware, async (c) => {
+  const { env } = c
+  const userId = c.req.param('userId')
+  const currentUser = c.get('user')
+  
+  // 自分自身または管理者のみ閲覧可能
+  if (currentUser.user_id !== parseInt(userId) && currentUser.role !== 'admin') {
+    return c.json({ success: false, error: 'アクセス権限がありません' }, 403)
+  }
+  
+  try {
+    const user = await env.DB.prepare(`
+      SELECT user_role FROM auth_users WHERE user_id = ?
+    `).bind(userId).first()
+    
+    if (!user) {
+      return c.json({ success: false, error: 'ユーザーが見つかりません' }, 404)
+    }
+    
+    const permissions = await env.DB.prepare(`
+      SELECT p.permission_name, p.description, p.resource, p.action
+      FROM permissions p
+      JOIN role_permissions rp ON p.permission_id = rp.permission_id
+      WHERE rp.user_role = ?
+      ORDER BY p.resource, p.action
+    `).bind(user.user_role).all()
+    
+    return c.json({
+      success: true,
+      user_id: parseInt(userId),
+      role: user.user_role,
+      permissions: permissions.results || []
+    })
+    
+  } catch (error: any) {
+    console.error('❌ ユーザー権限取得エラー:', error)
+    return c.json({ success: false, error: 'ユーザー権限の取得に失敗しました' }, 500)
   }
 })
 

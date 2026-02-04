@@ -954,28 +954,33 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedUser = localStorage.getItem('user')
   
   if (savedSession && savedUser) {
-    state.auth.sessionToken = savedSession
-    state.auth.refreshToken = localStorage.getItem('refresh_token')
-    state.auth.user = JSON.parse(savedUser)
-    state.auth.isAuthenticated = true
-    
-    // ユーザー情報をstateに反映
-    state.student.id = state.auth.user.id
-    state.student.name = state.auth.user.name
-    state.student.classCode = state.auth.user.class_code
-    
-    // WebSocketに接続
-    websocket.connect()
-    
-    // セッションの有効性を確認
-    verifySession()
+    // セッション検証
+    verifySession().then(isValid => {
+      if (isValid) {
+        state.auth.sessionToken = savedSession
+        state.auth.refreshToken = localStorage.getItem('refresh_token')
+        state.auth.user = JSON.parse(savedUser)
+        state.auth.isAuthenticated = true
+        
+        // ユーザー情報をstateに反映
+        if (state.auth.user.role === 'student') {
+          state.currentStudent = {
+            id: state.auth.user.user_id,
+            name: state.auth.user.full_name
+          }
+        }
+        
+        // トップページを表示
+        renderTopPage()
+      } else {
+        // セッションが無効な場合はログイン画面
+        renderLoginPage()
+      }
+    })
   } else {
-    // 未ログインの場合はログイン画面へ
+    // セッションがない場合はログイン画面
     renderLoginPage()
-    return
   }
-  
-  renderTopPage()
 })
 
 // ============================================
@@ -20840,13 +20845,25 @@ function renderLoginPage() {
           </p>
         </div>
         
-        <!-- デモログイン -->
+        <!-- テストアカウント情報 -->
+        <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p class="text-sm font-bold text-blue-800 mb-2">
+            <i class="fas fa-info-circle mr-2"></i>テストアカウント
+          </p>
+          <div class="text-xs text-gray-700 space-y-1">
+            <p><strong>教師:</strong> teacher1 / password123</p>
+            <p><strong>学生:</strong> student1 / password123</p>
+            <p><strong>管理者:</strong> admin1 / password123</p>
+          </div>
+        </div>
+        
+        <!-- デモモード（認証なし） -->
         <div class="mt-4 text-center">
           <button
-            onclick="demoLogin()"
+            onclick="renderTopPage()"
             class="text-sm text-gray-500 hover:text-gray-700 underline"
           >
-            <i class="fas fa-user-secret mr-1"></i>デモアカウントでログイン
+            <i class="fas fa-eye mr-1"></i>デモモード（認証なし）
           </button>
         </div>
       </div>
@@ -20887,9 +20904,11 @@ async function handleLogin(event) {
     // 認証情報を保存
     state.auth.isAuthenticated = true
     state.auth.sessionToken = data.session_token
+    state.auth.refreshToken = data.refresh_token
     state.auth.user = data.user
     
     localStorage.setItem('session_token', data.session_token)
+    localStorage.setItem('refresh_token', data.refresh_token)
     localStorage.setItem('user', JSON.stringify(data.user))
     
     // ユーザー情報をstateに反映
