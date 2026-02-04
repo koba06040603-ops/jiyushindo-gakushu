@@ -583,19 +583,25 @@ export class LearningHistoryAnalyzer {
     subject: string
   ): Promise<StudentPerformance> {
     try {
-      // 学習履歴取得
-      const history = await db.prepare(`
-        SELECT 
-          lc.subject,
-          lc.unit_name,
-          sp.status,
-          sp.mastery_score,
-          sp.attempt_count,
-          sp.correct_count
-        FROM student_progress sp
-        JOIN learning_cards lc ON sp.card_id = lc.card_id
-        WHERE sp.student_id = ? AND lc.subject = ?
-      `).bind(studentId, subject).all()
+      // 学習履歴取得（テーブルが存在しない場合もエラーを抑制）
+      let history: any
+      try {
+        history = await db.prepare(`
+          SELECT 
+            lc.subject,
+            lc.unit_name,
+            sp.status,
+            sp.mastery_score,
+            sp.attempt_count,
+            sp.correct_count
+          FROM student_progress sp
+          JOIN learning_cards lc ON sp.card_id = lc.card_id
+          WHERE sp.student_id = ? AND lc.subject = ?
+        `).bind(studentId, subject).all()
+      } catch (dbError) {
+        console.warn('⚠️ 学習履歴テーブルが見つかりません。デフォルト設定を使用します。')
+        history = { results: [] }
+      }
       
       if (history.results.length === 0) {
         return {
@@ -698,12 +704,27 @@ export class ProblemGeneratorEngine {
   ): Promise<GeneratedProblem[]> {
     const problems: GeneratedProblem[] = []
     
-    // 学習履歴分析
-    const performance = await this.historyAnalyzer.analyzePerformance(
-      db,
-      request.studentId,
-      request.subject
-    )
+    // 学習履歴分析（エラーが発生してもデフォルト値を使用）
+    let performance: StudentPerformance
+    try {
+      performance = await this.historyAnalyzer.analyzePerformance(
+        db,
+        request.studentId,
+        request.subject
+      )
+    } catch (error) {
+      console.warn('⚠️ 学習履歴分析エラー。デフォルト設定を使用します:', error)
+      performance = {
+        studentId: request.studentId,
+        subject: request.subject,
+        unitName: '',
+        totalAttempts: 0,
+        correctAttempts: 0,
+        averageScore: 0,
+        weakPoints: [],
+        recommendedDifficulty: 'easy'
+      }
+    }
     
     // 難易度の自動調整
     if (!request.difficulty) {
@@ -715,16 +736,24 @@ export class ProblemGeneratorEngine {
       
       // 1. AI生成を試行（30%の確率）
       if (ai && Math.random() < 0.3) {
-        problem = await this.aiGenerator.generateWithAI(ai, request, performance)
+        try {
+          problem = await this.aiGenerator.generateWithAI(ai, request, performance)
+        } catch (error) {
+          console.warn('⚠️ AI生成失敗。ルールベースにフォールバック:', error)
+        }
       }
       
       // 2. ルールベース生成（フォールバック）
       if (!problem) {
-        problem = this.ruleBasedGenerator.generate(
-          request.subject,
-          request.difficulty,
-          request.unitName
-        )
+        try {
+          problem = this.ruleBasedGenerator.generate(
+            request.subject,
+            request.difficulty,
+            request.unitName
+          )
+        } catch (error) {
+          console.error('❌ ルールベース生成エラー:', error)
+        }
       }
       
       if (problem) {

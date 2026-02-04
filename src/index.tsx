@@ -22164,6 +22164,18 @@ app.post('/api/problems/generate', authMiddleware, async (c) => {
     // 問題生成
     const problems = await engine.generateProblems(request, env.DB, env.AI)
     
+    // 問題が生成されなかった場合
+    if (!problems || problems.length === 0) {
+      console.warn('⚠️ 問題が生成されませんでした。リクエスト:', request)
+      return c.json({
+        success: false,
+        error: '問題の生成に失敗しました。もう一度お試しください。',
+        details: '生成された問題が0件でした'
+      }, 500)
+    }
+    
+    console.log(`✅ ${problems.length}問の問題を生成しました`)
+    
     // 生成した問題をDBに保存
     const savedProblems: GeneratedProblem[] = []
     
