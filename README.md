@@ -4,10 +4,12 @@
 
 ## 🌐 本番環境URL
 
-**Phase 8デプロイ完了！** ✅  
-- **本番URL**: https://0f87f106.jiyushindo-gakushu.pages.dev
-- **ダッシュボード**: https://0f87f106.jiyushindo-gakushu.pages.dev/dashboard.html
-- **API仕様書**: https://0f87f106.jiyushindo-gakushu.pages.dev/static/api-docs
+**Phase 9デプロイ完了！** ✅  
+- **本番URL**: https://225d2391.jiyushindo-gakushu.pages.dev
+- **ダッシュボード**: https://225d2391.jiyushindo-gakushu.pages.dev/dashboard.html
+- **保護者ダッシュボード**: https://225d2391.jiyushindo-gakushu.pages.dev/parent-dashboard.html
+- **PWA対応**: ✅ オフライン機能、ホーム画面追加、プッシュ通知
+- **API仕様書**: https://225d2391.jiyushindo-gakushu.pages.dev/static/api-docs
 - **デプロイ日時**: 2026-02-04
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 🟢 Active
@@ -16,6 +18,60 @@
 - **Phase 6完了**: ✅ 100% - 高度な機能実装完了
 - **Phase 7完了**: ✅ 100% - 超高度な機能実装完了
 - **Phase 8完了**: ✅ 100% - DBスキーマ同期 + 統合ダッシュボード完了
+- **Phase 9完了**: ✅ 100% - 保護者機能 + PWA対応完了
+
+## Phase 9: 保護者機能とPWA対応 🎉📱
+
+### Phase 9-1: 保護者ダッシュボード（完了）
+- ✅ 複数子ども管理機能
+  - 子ども一覧表示（カード形式）
+  - 子ども選択で詳細表示
+  - 学年・クラス情報表示
+- ✅ 学習進捗確認
+  - 4つの統計カード（学習日数、問題数、正答率、学習時間）
+  - 週間学習傾向グラフ（Chart.js）
+  - 教科別正答率グラフ（Chart.js）
+  - 学習進捗リスト（進行状況バー）
+- ✅ 最近の学習記録
+  - 最近の学習ログ表示（正解/不正解）
+  - 時系列での学習履歴
+- ✅ 教師からのコメント
+  - 評価コメント表示
+  - 教師名・日時表示
+  - スコア情報表示
+- ✅ 保護者用API実装
+  - `GET /api/parent/children` - 子ども一覧取得
+  - `GET /api/parent/teacher-comments/:studentId` - 教師コメント取得
+  - `GET /api/parent/weekly-summary/:studentId` - 週間学習サマリー
+
+### Phase 9-2: PWA対応（完了）
+- ✅ Service Worker実装
+  - 静的リソースキャッシュ（オフライン対応）
+  - APIレスポンスキャッシュ（5分有効期限）
+  - ネットワーク優先戦略
+  - キャッシュ優先戦略（静的ファイル）
+  - 自動キャッシュ更新
+- ✅ Web App Manifest
+  - アプリ名・説明文
+  - スタンドアロンモード
+  - アイコン設定（192px, 512px）
+  - テーマカラー設定
+  - ショートカット定義
+- ✅ PWA機能
+  - ホーム画面追加プロンプト
+  - インストールボタン対応
+  - アプリインストール検知
+  - スタンドアロンモード判定
+- ✅ オフライン機能
+  - オンライン/オフライン検知
+  - オフライン時の通知表示
+  - バックグラウンド同期サポート
+  - オフライン時のフォールバックレスポンス
+- ✅ プッシュ通知サポート
+  - 通知許可リクエスト
+  - プッシュ通知表示
+  - 通知クリックイベント処理
+  - Service Worker経由の通知
 
 ## Phase 8: DBスキーマ同期 + 統合ダッシュボードUI 🎉
 
