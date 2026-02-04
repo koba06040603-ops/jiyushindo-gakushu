@@ -12,6 +12,7 @@ cat > dist/_routes.json << 'EOF'
   "version": 1,
   "include": ["/*"],
   "exclude": [
+    "/404.html",
     "/adaptive-learning-demo.html",
     "/admin-preview.html",
     "/advanced-features-demo.html",
