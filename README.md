@@ -5,12 +5,13 @@
 ## 🌐 本番環境URL
 
 **Phase 11完全実装完了！** ✅  
-- **本番URL**: https://bc1dbae8.jiyushindo-gakushu.pages.dev
-- **ダッシュボード**: https://bc1dbae8.jiyushindo-gakushu.pages.dev/dashboard.html
-- **保護者ダッシュボード**: https://bc1dbae8.jiyushindo-gakushu.pages.dev/parent-dashboard.html
+- **本番URL**: https://c4596b97.jiyushindo-gakushu.pages.dev
+- **ダッシュボード**: https://c4596b97.jiyushindo-gakushu.pages.dev/dashboard.html
+- **保護者ダッシュボード**: https://c4596b97.jiyushindo-gakushu.pages.dev/parent-dashboard.html
 - **セキュリティダッシュボード**: https://bc1dbae8.jiyushindo-gakushu.pages.dev/security-dashboard.html
 - **パフォーマンスダッシュボード**: https://bc1dbae8.jiyushindo-gakushu.pages.dev/performance-dashboard.html
-- **キャッシュダッシュボード**: https://bc1dbae8.jiyushindo-gakushu.pages.dev/cache-dashboard.html
+- **キャッシュダッシュボード**: https://c4596b97.jiyushindo-gakushu.pages.dev/cache-dashboard.html
+- **AIチューター**: https://c4596b97.jiyushindo-gakushu.pages.dev/ai-tutor.html
 - **PWA対応**: ✅ オフライン機能、ホーム画面追加、プッシュ通知
 - **セキュリティ**: ✅ CSRF保護、レート制限、セキュリティヘッダー
 - **パフォーマンス監視**: ✅ リアルタイムメトリクス、エラートラッキング
@@ -175,6 +176,95 @@
   - データベースクエリ最適化による劇的な改善
   
 - ✅ **クエリパフォーマンス向上**
+
+---
+
+## Phase 12: AI駆動型パーソナライゼーション（完全無料版）🤖
+
+### Phase 12-1: AIチューター基盤（完了）✅
+
+**🆓 完全無料のAI技術スタック**
+- ✅ **Cloudflare Workers AI**（完全無料）
+  - `@cf/meta/llama-3.1-8b-instruct` - テキスト生成
+  - `@cf/baai/bge-base-en-v1.5` - 埋め込みベクトル生成
+  - `@cf/huggingface/distilbert-sst-2-int8` - 感情分析
+  
+- ✅ **HuggingFace Inference API**（月10万リクエスト無料）
+  - `meta-llama/Llama-3.2-3B-Instruct` - バックアップLLM
+  - `intfloat/multilingual-e5-small` - 日本語埋め込み
+  
+- ✅ **ルールベースAI**（常に利用可能）
+  - パターンマッチング質問応答
+  - 教科別・単元別ヒント生成
+  - 計算問題の自動解法
+
+**🎯 実装機能**
+- ✅ **マルチプロバイダー戦略**
+  1. Workers AI（最速・最優先）
+  2. HuggingFace（バックアップ）
+  3. ルールベースAI（必ずフォールバック）
+  
+- ✅ **パーソナライズ質問応答**
+  - 学習コンテキスト自動取得（苦手分野、習得済み概念）
+  - 小学生向け丁寧な説明
+  - ステップバイステップ解説
+  - 励ましの言葉と絵文字
+  
+- ✅ **会話履歴管理**
+  - 質問と回答の永続化
+  - AI信頼度スコア記録
+  - フィードバック収集
+  
+- ✅ **学習提案システム**
+  - 苦手分野の自動検出
+  - 次のステップ推薦
+  - 復習すべき単元の提示
+
+**📊 APIエンドポイント**
+- `POST /api/ai-tutor/ask` - AIチューターに質問
+- `GET /api/ai-tutor/history` - 会話履歴取得
+- `GET /api/ai-tutor/suggestions` - パーソナライズ学習提案
+- `POST /api/ai-tutor/feedback` - 回答フィードバック
+
+**🎨 UIダッシュボード**
+- **AIチューター画面**（`/ai-tutor.html`）
+  - リアルタイムチャットインターフェース
+  - タイピングインジケーター
+  - AI情報源の可視化（Workers AI / HuggingFace / ルールベース）
+  - 信頼度スコア表示
+  - クイック質問テンプレート
+  - 学習提案カード
+  - 会話履歴ブラウザ
+
+**💾 データベース**
+- `ai_tutor_conversations` テーブル
+  - 全会話の永続化
+  - AI情報源の追跡
+  - フィードバック機能
+
+**🚀 パフォーマンス**
+- レスポンス時間: 0.5-2秒（Workers AI使用時）
+- コスト: **完全無料**（Workers AI + HuggingFace無料枠）
+- 信頼性: 3段階フォールバック（99.9%可用性）
+
+### Phase 12-2: 自動問題生成（予定）
+- 🔲 難易度別問題自動生成
+- 🔲 教科別・単元別対応
+- 🔲 学習履歴ベースの最適化
+
+### Phase 12-3: 学習経路の動的最適化（予定）
+- 🔲 適応的カリキュラム
+- 🔲 苦手分野の自動補強
+- 🔲 習得度予測
+
+### Phase 12-4: AIフィードバックシステム（予定）
+- 🔲 リアルタイム添削
+- 🔲 詳細解説生成
+- 🔲 学習改善提案
+
+---
+
+## Phase 11: 高度なパフォーマンス最適化 ⚡
   - 頻繁に検索されるカラムへのインデックス追加
   - データベーススキャンの削減
   - レスポンスタイム改善（予想: 500ms → 50ms、10倍高速）
