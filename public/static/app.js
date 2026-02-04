@@ -36892,3 +36892,224 @@ window.closeStudyPlanModal = closeStudyPlanModal
 window.printStudyPlan = printStudyPlan
 
 console.log('✅ AI自動問題選定機能を読み込みました')
+
+// ============================================
+// Phase 6: 高度な機能 - 分析レポート・リアルタイム協働
+// ============================================
+
+// 学習傾向分析表示
+async function showLearningTrends(studentId, period = 'week') {
+  try {
+    showLoadingWithRetry('学習傾向を分析中...')
+    
+    const response = await fetchWithRetry(`/api/analytics/learning-trends/${studentId}?period=${period}`)
+    const data = await response.json()
+    
+    hideLoading()
+    
+    if (!data.success) {
+      showNotification('学習傾向の取得に失敗しました', 'error')
+      return
+    }
+    
+    // モーダル表示
+    const modalHTML = `
+      <div id="trendsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 fade-in" onclick="closeTrendsModal(event)">
+        <div class="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+          <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 rounded-t-lg">
+            <h2 class="text-2xl font-bold flex items-center gap-2">
+              <i class="fas fa-chart-line"></i>
+              学習傾向分析（${period === 'month' ? '月次' : '週次'}）
+            </h2>
+          </div>
+          
+          <div class="p-6 space-y-6">
+            <!-- 日別統計 -->
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-calendar-alt text-blue-500"></i>
+                日別学習状況
+              </h3>
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <thead>
+                    <tr class="bg-gray-100">
+                      <th class="p-2 text-left">日付</th>
+                      <th class="p-2 text-right">問題数</th>
+                      <th class="p-2 text-right">正解数</th>
+                      <th class="p-2 text-right">正答率</th>
+                      <th class="p-2 text-right">平均時間</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${data.daily_stats.map(stat => `
+                      <tr class="border-b hover:bg-gray-50">
+                        <td class="p-2">${stat.date}</td>
+                        <td class="p-2 text-right">${stat.total_problems}</td>
+                        <td class="p-2 text-right">${stat.correct_count}</td>
+                        <td class="p-2 text-right">${((stat.correct_count / stat.total_problems) * 100).toFixed(1)}%</td>
+                        <td class="p-2 text-right">${(stat.avg_time || 0).toFixed(0)}秒</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <!-- 教科別統計 -->
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-book text-green-500"></i>
+                教科別統計
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${data.subject_stats.map(stat => `
+                  <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-lg">
+                    <h4 class="font-bold text-lg text-gray-800 mb-2">${stat.subject}</h4>
+                    <div class="space-y-1 text-sm">
+                      <p>問題数: <span class="font-semibold">${stat.total_problems}</span></p>
+                      <p>正解数: <span class="font-semibold">${stat.correct_count}</span></p>
+                      <p>正答率: <span class="font-semibold text-lg ${stat.accuracy >= 70 ? 'text-green-600' : 'text-red-600'}">${stat.accuracy.toFixed(1)}%</span></p>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            
+            <!-- 時間帯別パターン -->
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="fas fa-clock text-orange-500"></i>
+                時間帯別学習パターン
+              </h3>
+              <div class="grid grid-cols-6 md:grid-cols-12 gap-2">
+                ${Array.from({length: 24}, (_, i) => {
+                  const hourData = data.hourly_pattern.find(h => h.hour === i)
+                  const count = hourData ? hourData.problem_count : 0
+                  const accuracy = hourData ? hourData.avg_accuracy : 0
+                  return `
+                    <div class="text-center">
+                      <div class="h-16 bg-gray-200 rounded relative overflow-hidden">
+                        <div class="absolute bottom-0 w-full bg-blue-500 transition-all" style="height: ${count > 0 ? Math.min(count * 10, 100) : 0}%"></div>
+                      </div>
+                      <p class="text-xs mt-1">${i}時</p>
+                      ${count > 0 ? `<p class="text-xs text-gray-600">${count}問</p>` : ''}
+                    </div>
+                  `
+                }).join('')}
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-gray-50 border-t border-gray-200 p-4 flex justify-end gap-2">
+            <button onclick="showLearningTrends(${studentId}, '${period === 'week' ? 'month' : 'week'}')" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded transition-colors">
+              ${period === 'week' ? '月次表示' : '週次表示'}
+            </button>
+            <button onclick="closeTrendsModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded transition-colors">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+  } catch (error) {
+    hideLoading()
+    console.error('学習傾向分析エラー:', error)
+    showNotification('学習傾向の表示に失敗しました', 'error')
+  }
+}
+
+function closeTrendsModal(event) {
+  if (event && event.target.id !== 'trendsModal') return
+  const modal = document.getElementById('trendsModal')
+  if (modal) modal.remove()
+}
+
+// オンラインユーザー表示
+async function showOnlineUsers() {
+  try {
+    const response = await fetchWithRetry('/api/collaboration/online-users')
+    const data = await response.json()
+    
+    if (!data.success) {
+      showNotification('オンラインユーザーの取得に失敗しました', 'error')
+      return
+    }
+    
+    const modalHTML = `
+      <div id="onlineUsersModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 fade-in" onclick="closeOnlineUsersModal(event)">
+        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+          <div class="bg-gradient-to-r from-green-500 to-teal-500 text-white p-6 rounded-t-lg">
+            <h2 class="text-2xl font-bold flex items-center gap-2">
+              <i class="fas fa-users"></i>
+              オンラインユーザー（${data.online_users.length}人）
+            </h2>
+          </div>
+          
+          <div class="p-6">
+            <div class="space-y-3">
+              ${data.online_users.map(user => `
+                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div class="w-3 h-3 rounded-full ${user.status === 'online' ? 'bg-green-500' : 'bg-yellow-500'} animate-pulse"></div>
+                  <div class="flex-1">
+                    <p class="font-semibold text-gray-800">${user.user_name}</p>
+                    <p class="text-sm text-gray-600">${user.user_role === 'teacher' ? '教師' : user.user_role === 'student' ? '学生' : '管理者'}</p>
+                    ${user.current_page ? `<p class="text-xs text-gray-500">${user.current_page}</p>` : ''}
+                  </div>
+                  <div class="text-xs text-gray-500">
+                    ${new Date(user.last_seen).toLocaleTimeString('ja-JP')}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="bg-gray-50 border-t border-gray-200 p-4 flex justify-end">
+            <button onclick="closeOnlineUsersModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded transition-colors">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+  } catch (error) {
+    console.error('オンラインユーザー取得エラー:', error)
+    showNotification('オンラインユーザーの表示に失敗しました', 'error')
+  }
+}
+
+function closeOnlineUsersModal(event) {
+  if (event && event.target.id !== 'onlineUsersModal') return
+  const modal = document.getElementById('onlineUsersModal')
+  if (modal) modal.remove()
+}
+
+// オンライン状態を定期的に更新
+setInterval(async () => {
+  if (!state.auth.isAuthenticated) return
+  
+  try {
+    await fetchWithRetry('/api/collaboration/presence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'online',
+        current_page: window.location.pathname
+      })
+    })
+  } catch (error) {
+    console.error('オンライン状態更新エラー:', error)
+  }
+}, 60000) // 1分ごと
+
+// グローバルに公開
+window.showLearningTrends = showLearningTrends
+window.showOnlineUsers = showOnlineUsers
+window.closeTrendsModal = closeTrendsModal
+window.closeOnlineUsersModal = closeOnlineUsersModal
+
+console.log('✅ Phase 6: 高度な機能を読み込みました')

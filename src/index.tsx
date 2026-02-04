@@ -20461,4 +20461,585 @@ app.get('/api/export/curriculum', authMiddleware, requireRole('teacher', 'admin'
   }
 })
 
+// ============================================
+// Phase 6-1: Email通知システム
+// ============================================
+
+// Email設定テーブル作成ヘルパー
+async function ensureEmailTables(db: D1Database) {
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS email_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      school_id INTEGER NOT NULL DEFAULT 1,
+      user_id INTEGER NOT NULL,
+      email_address TEXT NOT NULL,
+      receive_learning_updates INTEGER DEFAULT 1,
+      receive_achievements INTEGER DEFAULT 1,
+      receive_teacher_comments INTEGER DEFAULT 1,
+      receive_system_notices INTEGER DEFAULT 1,
+      is_verified INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(school_id, user_id)
+    )
+  `).run()
+  
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS email_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      school_id INTEGER NOT NULL DEFAULT 1,
+      user_id INTEGER NOT NULL,
+      email_to TEXT NOT NULL,
+      email_subject TEXT NOT NULL,
+      email_body TEXT NOT NULL,
+      email_type TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      error_message TEXT,
+      sent_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run()
+}
+
+// Email送信関数（Resend API）
+async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  resendApiKey?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!resendApiKey) {
+    console.log('⚠️ RESEND_API_KEY not configured, skipping email send')
+    return { success: false, error: 'Email API key not configured' }
+  }
+  
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'noreply@jiyushindo-gakushu.com',
+        to: [to],
+        subject: subject,
+        html: html
+      })
+    })
+    
+    if (!response.ok) {
+      const error = await response.text()
+      console.error('❌ Email送信エラー:', error)
+      return { success: false, error: error }
+    }
+    
+    return { success: true }
+  } catch (error: any) {
+    console.error('❌ Email送信エラー:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Email設定取得API
+app.get('/api/email/settings', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    await ensureEmailTables(env.DB)
+    
+    const settings = await env.DB.prepare(`
+      SELECT * FROM email_settings
+      WHERE user_id = ? AND school_id = ?
+    `).bind(user.user_id, user.school_id).first()
+    
+    return c.json({
+      success: true,
+      settings: settings || {
+        email_address: user.email || '',
+        receive_learning_updates: 1,
+        receive_achievements: 1,
+        receive_teacher_comments: 1,
+        receive_system_notices: 1,
+        is_verified: 0
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ Email設定取得エラー:', error)
+    return c.json({ success: false, error: 'Email設定の取得に失敗しました' }, 500)
+  }
+})
+
+// Email設定更新API
+app.post('/api/email/settings', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const settings = await c.req.json()
+  
+  try {
+    await ensureEmailTables(env.DB)
+    
+    await env.DB.prepare(`
+      INSERT OR REPLACE INTO email_settings (
+        school_id, user_id, email_address,
+        receive_learning_updates, receive_achievements,
+        receive_teacher_comments, receive_system_notices,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      user.school_id,
+      user.user_id,
+      settings.email_address,
+      settings.receive_learning_updates ? 1 : 0,
+      settings.receive_achievements ? 1 : 0,
+      settings.receive_teacher_comments ? 1 : 0,
+      settings.receive_system_notices ? 1 : 0
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('❌ Email設定更新エラー:', error)
+    return c.json({ success: false, error: 'Email設定の更新に失敗しました' }, 500)
+  }
+})
+
+// Email送信API（管理者・教師のみ）
+app.post('/api/email/send', authMiddleware, requireRole('admin', 'teacher'), async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const { to, subject, html, email_type } = await c.req.json()
+  
+  try {
+    await ensureEmailTables(env.DB)
+    
+    // Email送信
+    const result = await sendEmail(to, subject, html, env.RESEND_API_KEY)
+    
+    // ログ記録
+    await env.DB.prepare(`
+      INSERT INTO email_logs (
+        school_id, user_id, email_to, email_subject, email_body,
+        email_type, status, error_message, sent_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      user.school_id,
+      user.user_id,
+      to,
+      subject,
+      html,
+      email_type || 'custom',
+      result.success ? 'sent' : 'failed',
+      result.error || null
+    ).run()
+    
+    return c.json({
+      success: result.success,
+      error: result.error
+    })
+  } catch (error: any) {
+    console.error('❌ Email送信エラー:', error)
+    return c.json({ success: false, error: 'Emailの送信に失敗しました' }, 500)
+  }
+})
+
+// 学習完了通知Email送信
+app.post('/api/email/notify-learning-complete', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const { student_id, curriculum_name } = await c.req.json()
+  
+  try {
+    await ensureEmailTables(env.DB)
+    
+    // 学生のEmail設定取得
+    const settings = await env.DB.prepare(`
+      SELECT email_address, receive_learning_updates
+      FROM email_settings
+      WHERE user_id = ? AND school_id = ? AND receive_learning_updates = 1
+    `).bind(student_id, user.school_id).first()
+    
+    if (!settings) {
+      return c.json({ success: false, error: 'Email設定が見つかりません' })
+    }
+    
+    const subject = `【学習完了】${curriculum_name}を完了しました`
+    const html = `
+      <h2>🎉 学習完了おめでとうございます！</h2>
+      <p>「${curriculum_name}」を完了しました。</p>
+      <p>次の単元に進みましょう！</p>
+      <br>
+      <p><a href="https://a70d8344.jiyushindo-gakushu.pages.dev">学習サイトへ</a></p>
+    `
+    
+    const result = await sendEmail(settings.email_address, subject, html, env.RESEND_API_KEY)
+    
+    // ログ記録
+    await env.DB.prepare(`
+      INSERT INTO email_logs (
+        school_id, user_id, email_to, email_subject, email_body,
+        email_type, status, error_message, sent_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      user.school_id,
+      student_id,
+      settings.email_address,
+      subject,
+      html,
+      'learning_complete',
+      result.success ? 'sent' : 'failed',
+      result.error || null
+    ).run()
+    
+    return c.json({
+      success: result.success,
+      error: result.error
+    })
+  } catch (error: any) {
+    console.error('❌ Email送信エラー:', error)
+    return c.json({ success: false, error: 'Emailの送信に失敗しました' }, 500)
+  }
+})
+
+// ============================================
+// Phase 6-2: 高度な分析レポート
+// ============================================
+
+// 学習傾向分析API（週次・月次）
+app.get('/api/analytics/learning-trends/:studentId', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const studentId = c.req.param('studentId')
+  const { period } = c.req.query() // 'week' or 'month'
+  
+  try {
+    const days = period === 'month' ? 30 : 7
+    
+    // 日別の学習データ取得
+    const dailyStats = await env.DB.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as total_problems,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        AVG(time_spent) as avg_time,
+        SUM(hint_used) as total_hints
+      FROM learning_logs
+      WHERE student_id = ?
+        AND school_id = ?
+        AND created_at >= DATE('now', '-${days} days')
+      GROUP BY DATE(created_at)
+      ORDER BY date DESC
+    `).bind(studentId, user.school_id).all()
+    
+    // 教科別統計
+    const subjectStats = await env.DB.prepare(`
+      SELECT 
+        c.subject,
+        COUNT(*) as total_problems,
+        SUM(CASE WHEN ll.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        CAST(SUM(CASE WHEN ll.is_correct = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 as accuracy
+      FROM learning_logs ll
+      JOIN problems p ON ll.problem_id = p.id
+      JOIN learning_cards lc ON p.card_id = lc.id
+      JOIN courses co ON lc.course_id = co.id
+      JOIN curriculum c ON co.curriculum_id = c.id
+      WHERE ll.student_id = ?
+        AND ll.school_id = ?
+        AND ll.created_at >= DATE('now', '-${days} days')
+      GROUP BY c.subject
+      ORDER BY accuracy DESC
+    `).bind(studentId, user.school_id).all()
+    
+    // 時間帯別学習パターン
+    const hourlyPattern = await env.DB.prepare(`
+      SELECT 
+        CAST(strftime('%H', created_at) AS INTEGER) as hour,
+        COUNT(*) as problem_count,
+        AVG(CASE WHEN is_correct = 1 THEN 100 ELSE 0 END) as avg_accuracy
+      FROM learning_logs
+      WHERE student_id = ?
+        AND school_id = ?
+        AND created_at >= DATE('now', '-${days} days')
+      GROUP BY hour
+      ORDER BY hour
+    `).bind(studentId, user.school_id).all()
+    
+    return c.json({
+      success: true,
+      period: period || 'week',
+      daily_stats: dailyStats.results || [],
+      subject_stats: subjectStats.results || [],
+      hourly_pattern: hourlyPattern.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ 学習傾向分析エラー:', error)
+    return c.json({ success: false, error: '学習傾向分析に失敗しました' }, 500)
+  }
+})
+
+// クラス比較分析API
+app.get('/api/analytics/class-comparison', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    // クラス別統計
+    const classStats = await env.DB.prepare(`
+      SELECT 
+        au.user_id as student_id,
+        au.full_name as student_name,
+        COUNT(ll.id) as total_problems,
+        SUM(CASE WHEN ll.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        CAST(SUM(CASE WHEN ll.is_correct = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(ll.id) * 100 as accuracy,
+        AVG(ll.time_spent) as avg_time
+      FROM auth_users au
+      LEFT JOIN learning_logs ll ON au.user_id = ll.student_id AND ll.school_id = au.school_id
+      WHERE au.school_id = ?
+        AND au.user_role = 'student'
+        AND ll.created_at >= DATE('now', '-30 days')
+      GROUP BY au.user_id, au.full_name
+      ORDER BY accuracy DESC
+    `).bind(user.school_id).all()
+    
+    // 教科別クラス平均
+    const subjectAverages = await env.DB.prepare(`
+      SELECT 
+        c.subject,
+        COUNT(DISTINCT ll.student_id) as student_count,
+        AVG(CASE WHEN ll.is_correct = 1 THEN 100 ELSE 0 END) as avg_accuracy,
+        COUNT(ll.id) as total_problems
+      FROM learning_logs ll
+      JOIN problems p ON ll.problem_id = p.id
+      JOIN learning_cards lc ON p.card_id = lc.id
+      JOIN courses co ON lc.course_id = co.id
+      JOIN curriculum c ON co.curriculum_id = c.id
+      WHERE ll.school_id = ?
+        AND ll.created_at >= DATE('now', '-30 days')
+      GROUP BY c.subject
+      ORDER BY avg_accuracy DESC
+    `).bind(user.school_id).all()
+    
+    return c.json({
+      success: true,
+      class_stats: classStats.results || [],
+      subject_averages: subjectAverages.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ クラス比較分析エラー:', error)
+    return c.json({ success: false, error: 'クラス比較分析に失敗しました' }, 500)
+  }
+})
+
+// 弱点分析API
+app.get('/api/analytics/weak-points/:studentId', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const studentId = c.req.param('studentId')
+  
+  try {
+    // 正答率が低い単元を特定
+    const weakUnits = await env.DB.prepare(`
+      SELECT 
+        c.unit_name,
+        c.subject,
+        COUNT(ll.id) as attempt_count,
+        SUM(CASE WHEN ll.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        CAST(SUM(CASE WHEN ll.is_correct = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(ll.id) * 100 as accuracy,
+        AVG(ll.time_spent) as avg_time,
+        SUM(ll.hint_used) as total_hints
+      FROM learning_logs ll
+      JOIN problems p ON ll.problem_id = p.id
+      JOIN learning_cards lc ON p.card_id = lc.id
+      JOIN courses co ON lc.course_id = co.id
+      JOIN curriculum c ON co.curriculum_id = c.id
+      WHERE ll.student_id = ?
+        AND ll.school_id = ?
+        AND ll.created_at >= DATE('now', '-30 days')
+      GROUP BY c.id, c.unit_name, c.subject
+      HAVING accuracy < 70
+      ORDER BY accuracy ASC, attempt_count DESC
+      LIMIT 10
+    `).bind(studentId, user.school_id).all()
+    
+    // 問題タイプ別の正答率
+    const problemTypeStats = await env.DB.prepare(`
+      SELECT 
+        p.problem_type,
+        COUNT(ll.id) as attempt_count,
+        SUM(CASE WHEN ll.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        CAST(SUM(CASE WHEN ll.is_correct = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(ll.id) * 100 as accuracy
+      FROM learning_logs ll
+      JOIN problems p ON ll.problem_id = p.id
+      WHERE ll.student_id = ?
+        AND ll.school_id = ?
+        AND ll.created_at >= DATE('now', '-30 days')
+      GROUP BY p.problem_type
+      ORDER BY accuracy ASC
+    `).bind(studentId, user.school_id).all()
+    
+    return c.json({
+      success: true,
+      weak_units: weakUnits.results || [],
+      problem_type_stats: problemTypeStats.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ 弱点分析エラー:', error)
+    return c.json({ success: false, error: '弱点分析に失敗しました' }, 500)
+  }
+})
+
+// ============================================
+// Phase 6-3: リアルタイム協働機能
+// ============================================
+
+// オンライン状態管理テーブル作成
+async function ensureCollaborationTables(db: D1Database) {
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS user_presence (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      school_id INTEGER NOT NULL DEFAULT 1,
+      user_id INTEGER NOT NULL,
+      user_name TEXT NOT NULL,
+      user_role TEXT NOT NULL,
+      status TEXT DEFAULT 'online' CHECK(status IN ('online', 'away', 'offline')),
+      last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+      current_page TEXT,
+      UNIQUE(school_id, user_id)
+    )
+  `).run()
+  
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS collaboration_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      school_id INTEGER NOT NULL DEFAULT 1,
+      session_type TEXT NOT NULL,
+      session_data TEXT,
+      created_by INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run()
+}
+
+// オンライン状態更新API
+app.post('/api/collaboration/presence', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const { status, current_page } = await c.req.json()
+  
+  try {
+    await ensureCollaborationTables(env.DB)
+    
+    await env.DB.prepare(`
+      INSERT OR REPLACE INTO user_presence (
+        school_id, user_id, user_name, user_role, status, current_page, last_seen
+      ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      user.school_id,
+      user.user_id,
+      user.full_name,
+      user.role,
+      status || 'online',
+      current_page || null
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('❌ オンライン状態更新エラー:', error)
+    return c.json({ success: false, error: 'オンライン状態の更新に失敗しました' }, 500)
+  }
+})
+
+// オンラインユーザー一覧API
+app.get('/api/collaboration/online-users', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    await ensureCollaborationTables(env.DB)
+    
+    // 5分以内にアクティブなユーザーをオンラインとみなす
+    const onlineUsers = await env.DB.prepare(`
+      SELECT 
+        user_id,
+        user_name,
+        user_role,
+        status,
+        current_page,
+        last_seen
+      FROM user_presence
+      WHERE school_id = ?
+        AND last_seen >= DATETIME('now', '-5 minutes')
+      ORDER BY last_seen DESC
+    `).bind(user.school_id).all()
+    
+    return c.json({
+      success: true,
+      online_users: onlineUsers.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ オンラインユーザー取得エラー:', error)
+    return c.json({ success: false, error: 'オンラインユーザーの取得に失敗しました' }, 500)
+  }
+})
+
+// 協働セッション作成API
+app.post('/api/collaboration/sessions', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const { session_type, session_data } = await c.req.json()
+  
+  try {
+    await ensureCollaborationTables(env.DB)
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO collaboration_sessions (
+        school_id, session_type, session_data, created_by
+      ) VALUES (?, ?, ?, ?)
+    `).bind(
+      user.school_id,
+      session_type,
+      JSON.stringify(session_data),
+      user.user_id
+    ).run()
+    
+    return c.json({
+      success: true,
+      session_id: result.meta.last_row_id
+    })
+  } catch (error: any) {
+    console.error('❌ 協働セッション作成エラー:', error)
+    return c.json({ success: false, error: '協働セッションの作成に失敗しました' }, 500)
+  }
+})
+
+// 協働セッション一覧API
+app.get('/api/collaboration/sessions', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    await ensureCollaborationTables(env.DB)
+    
+    const sessions = await env.DB.prepare(`
+      SELECT 
+        cs.*,
+        au.full_name as creator_name
+      FROM collaboration_sessions cs
+      JOIN auth_users au ON cs.created_by = au.user_id
+      WHERE cs.school_id = ?
+      ORDER BY cs.updated_at DESC
+      LIMIT 50
+    `).bind(user.school_id).all()
+    
+    return c.json({
+      success: true,
+      sessions: sessions.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ 協働セッション取得エラー:', error)
+    return c.json({ success: false, error: '協働セッションの取得に失敗しました' }, 500)
+  }
+})
+
 export default app
