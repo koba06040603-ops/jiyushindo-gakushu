@@ -1466,8 +1466,8 @@ async function getAllClassStudents(db: D1Database, classCode: string): Promise<n
 // 静的ファイル配信
 app.use('/static/*', serveStatic({ root: './' }))
 
-// HTMLファイル配信
-app.use('/*.html', serveStatic({ root: './' }))
+// HTMLファイル配信（Cloudflare Pagesが直接配信するため不要）
+// app.use('/*.html', serveStatic({ root: './' }))
 
 // 管理者プレビューページ
 app.get('/admin-preview', serveStatic({ path: './admin-preview.html' }))
