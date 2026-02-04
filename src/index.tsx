@@ -19809,4 +19809,144 @@ JSONのみを返してください。他の説明は不要です。`
   }
 })
 
+// =============================================================================
+// Phase 4: 認証システムAPI
+// =============================================================================
+
+// ログインAPI
+app.post('/api/auth/login', async (c) => {
+  const { env } = c
+  const { username, password } = await c.req.json()
+  
+  try {
+    // ユーザーを取得
+    const user = await env.DB.prepare(`
+      SELECT * FROM auth_users WHERE username = ? AND is_active = 1
+    `).bind(username).first()
+    
+    if (!user) {
+      return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
+    }
+    
+    // 簡易版: パスワードチェック（本番環境ではbcryptを使用）
+    // デモ用パスワード: password123
+    const isValidPassword = password === 'password123'
+    
+    if (!isValidPassword) {
+      return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
+    }
+    
+    // セッショントークン生成
+    const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24時間後
+    
+    // セッション保存
+    await env.DB.prepare(`
+      INSERT INTO auth_sessions (user_id, session_token, expires_at)
+      VALUES (?, ?, ?)
+    `).bind(user.user_id, sessionToken, expiresAt).run()
+    
+    // ログイン成功
+    return c.json({
+      success: true,
+      user: {
+        user_id: user.user_id,
+        username: user.username,
+        full_name: user.full_name,
+        role: user.user_role,
+        school_id: user.school_id
+      },
+      session_token: sessionToken,
+      expires_at: expiresAt
+    })
+    
+  } catch (error: any) {
+    console.error('❌ ログインエラー:', error)
+    return c.json({ success: false, error: 'ログインに失敗しました' }, 500)
+  }
+})
+
+// ログアウトAPI
+app.post('/api/auth/logout', async (c) => {
+  const { env } = c
+  const { session_token } = await c.req.json()
+  
+  try {
+    await env.DB.prepare(`
+      DELETE FROM auth_sessions WHERE session_token = ?
+    `).bind(session_token).run()
+    
+    return c.json({ success: true, message: 'ログアウトしました' })
+  } catch (error: any) {
+    console.error('❌ ログアウトエラー:', error)
+    return c.json({ success: false, error: 'ログアウトに失敗しました' }, 500)
+  }
+})
+
+// セッション検証API
+app.post('/api/auth/verify', async (c) => {
+  const { env } = c
+  const { session_token } = await c.req.json()
+  
+  try {
+    const session = await env.DB.prepare(`
+      SELECT 
+        s.*, 
+        u.user_id, u.username, u.full_name, u.user_role, u.school_id
+      FROM auth_sessions s
+      JOIN auth_users u ON s.user_id = u.user_id
+      WHERE s.session_token = ? AND s.expires_at > datetime('now')
+    `).bind(session_token).first()
+    
+    if (!session) {
+      return c.json({ success: false, error: 'セッションが無効です' }, 401)
+    }
+    
+    return c.json({
+      success: true,
+      user: {
+        user_id: session.user_id,
+        username: session.username,
+        full_name: session.full_name,
+        role: session.user_role,
+        school_id: session.school_id
+      }
+    })
+    
+  } catch (error: any) {
+    console.error('❌ セッション検証エラー:', error)
+    return c.json({ success: false, error: 'セッション検証に失敗しました' }, 500)
+  }
+})
+
+// ユーザー一覧取得（管理者・教師用）
+app.get('/api/auth/users', async (c) => {
+  const { env } = c
+  const school_id = c.req.query('school_id') || '1'
+  const role = c.req.query('role')
+  
+  try {
+    let query = 'SELECT user_id, username, full_name, user_role, school_id, is_active, created_at FROM auth_users WHERE school_id = ?'
+    const params = [parseInt(school_id)]
+    
+    if (role) {
+      query += ' AND user_role = ?'
+      params.push(role)
+    }
+    
+    query += ' ORDER BY created_at DESC'
+    
+    const users = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      users: users.results || []
+    })
+    
+  } catch (error: any) {
+    console.error('❌ ユーザー一覧取得エラー:', error)
+    return c.json({ success: false, error: 'ユーザー一覧の取得に失敗しました' }, 500)
+  }
+})
+
 export default app

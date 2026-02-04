@@ -20788,16 +20788,16 @@ function renderLoginPage() {
         <!-- ログインフォーム -->
         <form id="loginForm" class="space-y-6">
           <div>
-            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
-              <i class="fas fa-envelope mr-2"></i>メールアドレス
+            <label for="username" class="block text-sm font-medium text-gray-700 mb-2">
+              <i class="fas fa-user mr-2"></i>ユーザー名
             </label>
             <input
-              type="email"
-              id="email"
-              name="email"
+              type="text"
+              id="username"
+              name="username"
               required
               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="example@school.jp"
+              placeholder="teacher1 または student1"
             />
           </div>
           
@@ -20811,7 +20811,7 @@ function renderLoginPage() {
               name="password"
               required
               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="パスワードを入力"
+              placeholder="password123"
             />
           </div>
           
@@ -20861,7 +20861,7 @@ function renderLoginPage() {
 async function handleLogin(event) {
   event.preventDefault()
   
-  const email = document.getElementById('email').value
+  const username = document.getElementById('username').value
   const password = document.getElementById('password').value
   const errorDiv = document.getElementById('loginError')
   const errorMessage = document.getElementById('loginErrorMessage')
@@ -20870,15 +20870,14 @@ async function handleLogin(event) {
   errorDiv.classList.add('hidden')
   
   try {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+    const response = await axios.post('/api/auth/login', {
+      username,
+      password
     })
     
-    const data = await response.json()
+    const data = response.data
     
-    if (!response.ok) {
+    if (!data.success) {
       loadingManager.hide()
       errorMessage.textContent = data.error || 'ログインに失敗しました'
       errorDiv.classList.remove('hidden')
@@ -20888,29 +20887,24 @@ async function handleLogin(event) {
     // 認証情報を保存
     state.auth.isAuthenticated = true
     state.auth.sessionToken = data.session_token
-    state.auth.refreshToken = data.refresh_token
     state.auth.user = data.user
     
     localStorage.setItem('session_token', data.session_token)
-    localStorage.setItem('refresh_token', data.refresh_token)
     localStorage.setItem('user', JSON.stringify(data.user))
     
     // ユーザー情報をstateに反映
-    state.student.id = data.user.id
-    state.student.name = data.user.name
-    state.student.classCode = data.user.class_code
+    if (data.user.role === 'student') {
+      state.currentStudent = { id: data.user.user_id, name: data.user.full_name }
+    }
     
     loadingManager.hide()
-    
-    // WebSocketに接続
-    websocket.connect()
     
     // トップページへ遷移
     renderTopPage()
   } catch (error) {
     loadingManager.hide()
     console.error('ログインエラー:', error)
-    errorMessage.textContent = 'ログインに失敗しました。もう一度お試しください。'
+    errorMessage.textContent = error.response?.data?.error || 'ログインに失敗しました。もう一度お試しください。'
     errorDiv.classList.remove('hidden')
   }
 }
