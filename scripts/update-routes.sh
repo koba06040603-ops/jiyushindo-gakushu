@@ -5,11 +5,8 @@ cd "$(dirname "$0")/.."
 
 echo "🔧 _routes.jsonを更新中..."
 
-# Get all HTML files in public directory
-HTML_FILES=$(find public -name "*.html" -type f | sed 's|public/|/|' | tr '\n' ',' | sed 's/,$//')
-
 # Create updated _routes.json
-cat > dist/_routes.json << EOF
+cat > dist/_routes.json << 'EOF'
 {
   "version": 1,
   "include": ["/*"],

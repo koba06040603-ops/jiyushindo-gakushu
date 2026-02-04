@@ -1469,14 +1469,14 @@ app.use('/static/*', serveStatic({ root: './' }))
 // 管理者プレビューページ（明示的ルート）
 app.get('/admin-preview', serveStatic({ path: './admin-preview.html' }))
 
-// 主要ページへのリダイレクト（.htmlなしでもアクセス可能に）
-app.get('/problem-generator', (c) => c.redirect('/problem-generator.html'))
-app.get('/ai-tutor', (c) => c.redirect('/ai-tutor.html'))
-app.get('/dashboard', (c) => c.redirect('/dashboard.html'))
-app.get('/parent-dashboard', (c) => c.redirect('/parent-dashboard.html'))
-app.get('/cache-dashboard', (c) => c.redirect('/cache-dashboard.html'))
-app.get('/security-dashboard', (c) => c.redirect('/security-dashboard.html'))
-app.get('/performance-dashboard', (c) => c.redirect('/performance-dashboard.html'))
+// 主要ページへの直接配信（.htmlなしでもアクセス可能に）
+app.get('/problem-generator', serveStatic({ path: './problem-generator.html' }))
+app.get('/ai-tutor', serveStatic({ path: './ai-tutor.html' }))
+app.get('/dashboard', serveStatic({ path: './dashboard.html' }))
+app.get('/parent-dashboard', serveStatic({ path: './parent-dashboard.html' }))
+app.get('/cache-dashboard', serveStatic({ path: './cache-dashboard.html' }))
+app.get('/security-dashboard', serveStatic({ path: './security-dashboard.html' }))
+app.get('/performance-dashboard', serveStatic({ path: './performance-dashboard.html' }))
 
 // HTMLファイル配信
 app.use('/*.html', serveStatic({ root: './' }))
