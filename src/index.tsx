@@ -21042,4 +21042,166 @@ app.get('/api/collaboration/sessions', authMiddleware, async (c) => {
   }
 })
 
+// ============================================
+// Phase 8-1: ダッシュボードAPI
+// ============================================
+
+// 教師用クラス統計API
+app.get('/api/teacher/class-stats', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const user = c.get('user')
+
+    // 総学生数
+    const totalStudents = await env.DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM students 
+      WHERE school_id = ?
+    `).bind(user.school_id).first()
+
+    // 今日の学習数
+    const todayLearning = await env.DB.prepare(`
+      SELECT COUNT(*) as count 
+      FROM learning_logs
+      WHERE school_id = ? AND DATE(created_at) = DATE('now')
+    `).bind(user.school_id).first()
+
+    // 平均正答率
+    const avgAccuracy = await env.DB.prepare(`
+      SELECT AVG(CASE WHEN is_correct = 1 THEN 100.0 ELSE 0.0 END) as avg
+      FROM learning_logs
+      WHERE school_id = ?
+    `).bind(user.school_id).first()
+
+    // 完了コース数
+    const completedCourses = await env.DB.prepare(`
+      SELECT COUNT(DISTINCT curriculum_id) as count
+      FROM student_progress
+      WHERE school_id = ? AND status = 'completed'
+    `).bind(user.school_id).first()
+
+    return c.json({
+      totalStudents: totalStudents?.count || 0,
+      todayLearning: todayLearning?.count || 0,
+      avgAccuracy: avgAccuracy?.avg || 0,
+      completedCourses: completedCourses?.count || 0
+    })
+  } catch (error: any) {
+    console.error('❌ クラス統計取得エラー:', error)
+    return c.json({ success: false, error: 'クラス統計の取得に失敗しました' }, 500)
+  }
+})
+
+// 学生用統計API
+app.get('/api/learning/stats/:studentId', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const studentId = c.req.param('studentId')
+    const user = c.get('user')
+
+    // 学習日数
+    const totalDays = await env.DB.prepare(`
+      SELECT COUNT(DISTINCT DATE(created_at)) as count
+      FROM learning_logs
+      WHERE student_id = ? AND school_id = ?
+    `).bind(studentId, user.school_id).first()
+
+    // 総問題数
+    const totalProblems = await env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM learning_logs
+      WHERE student_id = ? AND school_id = ?
+    `).bind(studentId, user.school_id).first()
+
+    // 正答率
+    const accuracy = await env.DB.prepare(`
+      SELECT AVG(CASE WHEN is_correct = 1 THEN 100.0 ELSE 0.0 END) as avg
+      FROM learning_logs
+      WHERE student_id = ? AND school_id = ?
+    `).bind(studentId, user.school_id).first()
+
+    // バッジ数
+    const badges = await env.DB.prepare(`
+      SELECT COUNT(*) as count
+      FROM student_badges
+      WHERE student_id = ? AND school_id = ?
+    `).bind(studentId, user.school_id).first()
+
+    return c.json({
+      totalDays: totalDays?.count || 0,
+      totalProblems: totalProblems?.count || 0,
+      accuracy: accuracy?.avg || 0,
+      badges: badges?.count || 0
+    })
+  } catch (error: any) {
+    console.error('❌ 学生統計取得エラー:', error)
+    return c.json({ success: false, error: '学生統計の取得に失敗しました' }, 500)
+  }
+})
+
+// 最近の学習ログAPI
+app.get('/api/learning/recent-logs', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const user = c.get('user')
+    const limit = c.req.query('limit') || '10'
+    const studentId = c.req.query('studentId')
+
+    let query = `
+      SELECT 
+        ll.*,
+        s.student_name,
+        c.unit_name
+      FROM learning_logs ll
+      LEFT JOIN students s ON ll.student_id = s.student_id
+      LEFT JOIN curriculum c ON ll.curriculum_id = c.id
+      WHERE ll.school_id = ?
+    `
+    const params = [user.school_id]
+
+    if (studentId) {
+      query += ' AND ll.student_id = ?'
+      params.push(studentId)
+    }
+
+    query += ' ORDER BY ll.created_at DESC LIMIT ?'
+    params.push(limit)
+
+    const logs = await env.DB.prepare(query).bind(...params).all()
+
+    return c.json(logs.results || [])
+  } catch (error: any) {
+    console.error('❌ 最近の学習ログ取得エラー:', error)
+    return c.json({ success: false, error: '学習ログの取得に失敗しました' }, 500)
+  }
+})
+
+// 学生進捗API
+app.get('/api/learning/progress/:studentId', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const studentId = c.req.param('studentId')
+    const user = c.get('user')
+
+    const progress = await env.DB.prepare(`
+      SELECT 
+        c.id,
+        c.unit_name,
+        c.subject,
+        sp.status,
+        sp.started_at,
+        sp.completed_at
+      FROM student_progress sp
+      JOIN curriculum c ON sp.curriculum_id = c.id
+      WHERE sp.student_id = ? AND sp.school_id = ?
+      ORDER BY sp.started_at DESC
+    `).bind(studentId, user.school_id).all()
+
+    return c.json(progress.results || [])
+  } catch (error: any) {
+    console.error('❌ 進捗取得エラー:', error)
+    return c.json({ success: false, error: '進捗の取得に失敗しました' }, 500)
+  }
+})
+
 export default app
