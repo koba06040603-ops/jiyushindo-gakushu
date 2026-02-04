@@ -26,7 +26,13 @@ import {
   ClassStatsCache,
   getCacheStats,
   getCachedOrFetch,
+  getCachedOrFetchWithMetrics,
+  smartInvalidateCache,
+  prewarmCriticalCaches,
+  checkCacheHealth,
+  cacheMetrics,
   CACHE_TTL,
+  EXTENDED_CACHE_TTL,
   generateCacheKey,
   setToCache,
   deleteFromCache,
@@ -1473,8 +1479,8 @@ app.get('/api/curriculum', authMiddleware, async (c) => {
     // school_idでキャッシュキーを分ける
     const cacheKey = `curriculum:all:${user.school_id}`
     
-    // キャッシュを使用
-    const cached = await getCachedOrFetch(
+    // Phase 11-1: メトリクス付きキャッシュを使用
+    const { data: cached, cached: fromCache } = await getCachedOrFetchWithMetrics(
       env.KV,
       cacheKey,
       CACHE_TTL.CURRICULUM,
@@ -1503,7 +1509,13 @@ app.get('/api/curriculum', authMiddleware, async (c) => {
       }
     )
     
-    return c.json(cached)
+    // キャッシュステータスをヘッダーに追加
+    return c.json(cached, {
+      headers: {
+        'X-Cache-Status': fromCache ? 'HIT' : 'MISS',
+        'Cache-Control': 'private, max-age=3600'
+      }
+    })
   } catch (error) {
     console.error('❌ カリキュラム取得エラー:', error)
     return c.json({ error: 'Database error' }, 500)
@@ -21758,6 +21770,132 @@ app.get('/api/performance/error-logs', requireAuth, async (c) => {
   } catch (error: any) {
     console.error('❌ エラーログ取得エラー:', error)
     return c.json({ success: false, error: 'エラーログの取得に失敗しました' }, 500)
+  }
+})
+
+// ============================================
+// Phase 11-1: エッジキャッシュ管理API
+// ============================================
+
+// キャッシュ統計取得API
+app.get('/api/cache/stats', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const user = c.get('user')
+    
+    if (user.user_role !== 'admin') {
+      return c.json({ success: false, error: '管理者権限が必要です' }, 403)
+    }
+    
+    const stats = await getCacheStats(env.KV)
+    const metrics = cacheMetrics.getStats()
+    
+    return c.json({
+      success: true,
+      cache_stats: stats,
+      performance_metrics: metrics
+    })
+  } catch (error: any) {
+    console.error('❌ キャッシュ統計取得エラー:', error)
+    return c.json({ success: false, error: 'キャッシュ統計の取得に失敗しました' }, 500)
+  }
+})
+
+// キャッシュヘルスチェックAPI
+app.get('/api/cache/health', async (c) => {
+  try {
+    const { env } = c
+    const health = await checkCacheHealth(env.KV)
+    
+    const statusCode = health.status === 'healthy' ? 200 : 
+                       health.status === 'degraded' ? 200 : 503
+    
+    return c.json(health, statusCode)
+  } catch (error: any) {
+    console.error('❌ キャッシュヘルスチェックエラー:', error)
+    return c.json({
+      status: 'down',
+      details: { error: error.message }
+    }, 503)
+  }
+})
+
+// キャッシュ無効化API（管理者のみ）
+app.post('/api/cache/invalidate', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const user = c.get('user')
+    
+    if (user.user_role !== 'admin') {
+      return c.json({ success: false, error: '管理者権限が必要です' }, 403)
+    }
+    
+    const { entity_type, entity_id } = await c.req.json()
+    
+    if (!entity_type || !entity_id) {
+      return c.json({ 
+        success: false, 
+        error: 'entity_typeとentity_idが必要です' 
+      }, 400)
+    }
+    
+    const deletedCount = await smartInvalidateCache(
+      env.KV, 
+      entity_type as any, 
+      entity_id
+    )
+    
+    return c.json({
+      success: true,
+      deleted_keys: deletedCount,
+      message: `${deletedCount}個のキャッシュを削除しました`
+    })
+  } catch (error: any) {
+    console.error('❌ キャッシュ無効化エラー:', error)
+    return c.json({ success: false, error: 'キャッシュの無効化に失敗しました' }, 500)
+  }
+})
+
+// キャッシュプリウォームAPI（管理者のみ）
+app.post('/api/cache/prewarm', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const user = c.get('user')
+    
+    if (user.user_role !== 'admin') {
+      return c.json({ success: false, error: '管理者権限が必要です' }, 403)
+    }
+    
+    await prewarmCriticalCaches(env.KV, env.DB)
+    
+    return c.json({
+      success: true,
+      message: '重要なキャッシュのプリウォームが完了しました'
+    })
+  } catch (error: any) {
+    console.error('❌ キャッシュプリウォームエラー:', error)
+    return c.json({ success: false, error: 'キャッシュのプリウォームに失敗しました' }, 500)
+  }
+})
+
+// キャッシュメトリクスリセットAPI（管理者のみ）
+app.post('/api/cache/metrics/reset', requireAuth, async (c) => {
+  try {
+    const user = c.get('user')
+    
+    if (user.user_role !== 'admin') {
+      return c.json({ success: false, error: '管理者権限が必要です' }, 403)
+    }
+    
+    cacheMetrics.reset()
+    
+    return c.json({
+      success: true,
+      message: 'キャッシュメトリクスをリセットしました'
+    })
+  } catch (error: any) {
+    console.error('❌ メトリクスリセットエラー:', error)
+    return c.json({ success: false, error: 'メトリクスのリセットに失敗しました' }, 500)
   }
 })
 

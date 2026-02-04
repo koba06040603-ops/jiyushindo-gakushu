@@ -434,3 +434,271 @@ export async function getCacheStats(KV: KVNamespace | undefined) {
     };
   }
 }
+
+/**
+ * Phase 11-1: 高度なエッジキャッシュ戦略
+ */
+
+// 拡張されたキャッシュTTL設定
+export const EXTENDED_CACHE_TTL = {
+  // 超静的データ（ほとんど変わらない）
+  SYSTEM_CONFIG: 86400 * 7,   // 1週間
+  SCHOOL_INFO: 86400 * 3,      // 3日
+  GRADE_LEVELS: 86400 * 7,     // 1週間
+  SUBJECTS: 86400 * 7,         // 1週間
+  
+  // 静的データ（たまに変わる）
+  CURRICULUM_FULL: 86400,      // 1日
+  LEARNING_CARDS_LIST: 3600,   // 1時間
+  TEACHERS_LIST: 3600,         // 1時間
+  
+  // 動的データ（よく変わる）
+  STUDENT_LIST: 300,           // 5分
+  RECENT_SESSIONS: 60,         // 1分
+  NOTIFICATIONS: 30,           // 30秒
+} as const;
+
+/**
+ * キャッシュヒット率追跡
+ */
+export class CacheMetrics {
+  private hits = 0;
+  private misses = 0;
+
+  recordHit() {
+    this.hits++;
+  }
+
+  recordMiss() {
+    this.misses++;
+  }
+
+  getHitRate(): number {
+    const total = this.hits + this.misses;
+    return total > 0 ? (this.hits / total) * 100 : 0;
+  }
+
+  getStats() {
+    return {
+      hits: this.hits,
+      misses: this.misses,
+      total: this.hits + this.misses,
+      hit_rate: this.getHitRate().toFixed(2) + '%'
+    };
+  }
+
+  reset() {
+    this.hits = 0;
+    this.misses = 0;
+  }
+}
+
+// グローバルメトリクス
+export const cacheMetrics = new CacheMetrics();
+
+/**
+ * 階層的キャッシュ取得（メトリクス付き）
+ */
+export async function getCachedOrFetchWithMetrics<T>(
+  KV: KVNamespace | undefined,
+  cacheKey: string,
+  ttl: number,
+  fetchFunction: () => Promise<T>
+): Promise<{ data: T; cached: boolean }> {
+  // キャッシュチェック
+  const cached = await getFromCache<T>(KV, cacheKey);
+  if (cached !== null) {
+    cacheMetrics.recordHit();
+    return { data: cached, cached: true };
+  }
+
+  cacheMetrics.recordMiss();
+
+  // DBから取得
+  const data = await fetchFunction();
+
+  // キャッシュに保存
+  await setToCache(KV, cacheKey, data, ttl);
+
+  return { data, cached: false };
+}
+
+/**
+ * 条件付きキャッシュ（データの鮮度チェック）
+ */
+export async function getCachedWithFreshness<T>(
+  KV: KVNamespace | undefined,
+  cacheKey: string,
+  ttl: number,
+  fetchFunction: () => Promise<T>,
+  freshnessCheck?: (cached: T) => boolean
+): Promise<T> {
+  const cached = await getFromCache<T>(KV, cacheKey);
+  
+  if (cached !== null) {
+    // 鮮度チェック関数があれば実行
+    if (freshnessCheck && !freshnessCheck(cached)) {
+      console.log(`Cache stale for key: ${cacheKey}, refreshing...`);
+      // キャッシュが古い場合は再取得
+      const fresh = await fetchFunction();
+      await setToCache(KV, cacheKey, fresh, ttl);
+      return fresh;
+    }
+    return cached;
+  }
+
+  const data = await fetchFunction();
+  await setToCache(KV, cacheKey, data, ttl);
+  return data;
+}
+
+/**
+ * バルクキャッシュ無効化（複数パターン一括削除）
+ */
+export async function invalidateMultiplePatterns(
+  KV: KVNamespace | undefined,
+  patterns: string[]
+): Promise<number> {
+  if (!KV) return 0;
+
+  let totalDeleted = 0;
+  for (const pattern of patterns) {
+    const deleted = await invalidateCachePattern(KV, pattern);
+    totalDeleted += deleted;
+  }
+
+  return totalDeleted;
+}
+
+/**
+ * スマートキャッシュ無効化（関連データの自動検出）
+ */
+export async function smartInvalidateCache(
+  KV: KVNamespace | undefined,
+  entityType: 'student' | 'teacher' | 'curriculum' | 'class',
+  entityId: number | string
+): Promise<number> {
+  if (!KV) return 0;
+
+  const patterns: string[] = [];
+
+  switch (entityType) {
+    case 'student':
+      patterns.push(
+        `student_progress:${entityId}`,
+        `ranking:student:${entityId}`,
+        `weekly_report:${entityId}`,
+        `monthly_report:${entityId}`,
+        `sctn_score:${entityId}`
+      );
+      break;
+    
+    case 'teacher':
+      patterns.push(
+        `class_stats:teacher:${entityId}`,
+        `teacher_dashboard:${entityId}`
+      );
+      break;
+    
+    case 'curriculum':
+      patterns.push(
+        `curriculum:${entityId}`,
+        `learning_cards:curriculum:${entityId}`,
+        `curriculum_list`
+      );
+      break;
+    
+    case 'class':
+      patterns.push(
+        `class_stats:${entityId}`,
+        `ranking:class:${entityId}`,
+        `class_progress:${entityId}`
+      );
+      break;
+  }
+
+  return await invalidateMultiplePatterns(KV, patterns);
+}
+
+/**
+ * キャッシュプリウォーム（事前キャッシュ生成）
+ */
+export async function prewarmCriticalCaches(
+  KV: KVNamespace | undefined,
+  DB: D1Database
+): Promise<void> {
+  if (!KV) return;
+
+  console.log('🔥 Prewarming critical caches...');
+
+  try {
+    // 1. カリキュラムリストをキャッシュ
+    const curriculumKey = generateCacheKey('curriculum_list');
+    const curriculum = await DB.prepare('SELECT * FROM curriculum ORDER BY grade, subject').all();
+    await setToCache(KV, curriculumKey, curriculum.results, EXTENDED_CACHE_TTL.CURRICULUM_FULL);
+    console.log('✅ Curriculum list cached');
+
+    // 2. 教科リストをキャッシュ
+    const subjectsKey = generateCacheKey('subjects_list');
+    const subjects = await DB.prepare('SELECT DISTINCT subject FROM curriculum ORDER BY subject').all();
+    await setToCache(KV, subjectsKey, subjects.results, EXTENDED_CACHE_TTL.SUBJECTS);
+    console.log('✅ Subjects list cached');
+
+    // 3. 学年リストをキャッシュ
+    const gradesKey = generateCacheKey('grades_list');
+    const grades = await DB.prepare('SELECT DISTINCT grade FROM curriculum ORDER BY grade').all();
+    await setToCache(KV, gradesKey, grades.results, EXTENDED_CACHE_TTL.GRADE_LEVELS);
+    console.log('✅ Grades list cached');
+
+    console.log('🎉 Cache prewarm completed successfully');
+  } catch (error) {
+    console.error('❌ Cache prewarm failed:', error);
+  }
+}
+
+/**
+ * キャッシュヘルスチェック
+ */
+export async function checkCacheHealth(KV: KVNamespace | undefined): Promise<{
+  status: 'healthy' | 'degraded' | 'down';
+  details: any;
+}> {
+  if (!KV) {
+    return {
+      status: 'down',
+      details: { error: 'KV namespace not configured' }
+    };
+  }
+
+  try {
+    // テストキーで書き込み・読み取りテスト
+    const testKey = 'health_check:' + Date.now();
+    const testValue = { timestamp: Date.now() };
+    
+    await KV.put(testKey, JSON.stringify(testValue), { expirationTtl: 10 });
+    const retrieved = await KV.get(testKey);
+    await KV.delete(testKey);
+
+    if (retrieved && JSON.parse(retrieved).timestamp === testValue.timestamp) {
+      return {
+        status: 'healthy',
+        details: {
+          read: true,
+          write: true,
+          delete: true,
+          latency_ms: Date.now() - testValue.timestamp
+        }
+      };
+    }
+
+    return {
+      status: 'degraded',
+      details: { error: 'Read/write mismatch' }
+    };
+  } catch (error: any) {
+    return {
+      status: 'down',
+      details: { error: error.message }
+    };
+  }
+}
