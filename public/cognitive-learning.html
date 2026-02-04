@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>認知科学学習 - 自由進度学習システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- ヘッダー -->
+        <header class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-6">
+                <h1 class="text-3xl font-bold">
+                    <i class="fas fa-brain mr-2"></i>
+                    認知科学ベースの学習
+                </h1>
+                <p class="text-purple-100 mt-2">科学的に証明された5つの学習テクニック</p>
+            </div>
+        </header>
+
+        <div class="container mx-auto px-4 py-8">
+            <!-- 統計カード -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">今日の復習</p>
+                            <p class="text-3xl font-bold text-purple-600" id="dueToday">-</p>
+                        </div>
+                        <i class="fas fa-calendar-day text-4xl text-purple-200"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">学習中</p>
+                            <p class="text-3xl font-bold text-blue-600" id="reviewing">-</p>
+                        </div>
+                        <i class="fas fa-book-reader text-4xl text-blue-200"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">習得済み</p>
+                            <p class="text-3xl font-bold text-green-600" id="learned">-</p>
+                        </div>
+                        <i class="fas fa-check-circle text-4xl text-green-200"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">総カード数</p>
+                            <p class="text-3xl font-bold text-gray-600" id="totalCards">-</p>
+                        </div>
+                        <i class="fas fa-layer-group text-4xl text-gray-200"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5つのテクニック -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- 1. 間隔反復学習 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-clock text-3xl text-purple-600 mr-3"></i>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">間隔反復学習</h2>
+                            <p class="text-sm text-gray-500">Spaced Repetition</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 mb-4">
+                        忘却曲線に基づいて最適なタイミングで復習。長期記憶への定着率が大幅に向上します。
+                    </p>
+                    <button onclick="startReview()" class="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">
+                        <i class="fas fa-play mr-2"></i>今日の復習を開始
+                    </button>
+                    <div id="reviewArea" class="mt-4 hidden"></div>
+                </div>
+
+                <!-- 2. 検索練習 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-search text-3xl text-blue-600 mr-3"></i>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">検索練習</h2>
+                            <p class="text-sm text-gray-500">Retrieval Practice</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 mb-4">
+                        思い出す練習をすることで記憶が強化されます。テスト効果を活用した学習法です。
+                    </p>
+                    <div class="mb-3">
+                        <input type="text" id="retrievalTopic" placeholder="トピック名（例：平方根）" 
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500">
+                    </div>
+                    <button onclick="startRetrievalPractice()" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-brain mr-2"></i>検索練習を開始
+                    </button>
+                </div>
+
+                <!-- 3. 交互学習 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-random text-3xl text-green-600 mr-3"></i>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">交互学習</h2>
+                            <p class="text-sm text-gray-500">Interleaving</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 mb-4">
+                        異なるトピックを混ぜて学習することで、識別能力と応用力が向上します。
+                    </p>
+                    <div class="mb-3">
+                        <div class="flex flex-wrap gap-2">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" class="interleaving-subject" value="数学" checked>
+                                <span class="ml-2">数学</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" class="interleaving-subject" value="国語">
+                                <span class="ml-2">国語</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" class="interleaving-subject" value="理科">
+                                <span class="ml-2">理科</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" class="interleaving-subject" value="社会">
+                                <span class="ml-2">社会</span>
+                            </label>
+                        </div>
+                    </div>
+                    <button onclick="startInterleaving()" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-shuffle mr-2"></i>交互学習を開始
+                    </button>
+                </div>
+
+                <!-- 4. 精緻化 -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-comment-dots text-3xl text-yellow-600 mr-3"></i>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">精緻化</h2>
+                            <p class="text-sm text-gray-500">Elaboration</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-600 mb-4">
+                        「なぜ？」「どのように？」と問いかけることで理解が深まります。
+                    </p>
+                    <div class="mb-3">
+                        <input type="text" id="elaborationConcept" placeholder="学習した概念（例：光合成）" 
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-yellow-500">
+                    </div>
+                    <button onclick="startElaboration()" class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">
+                        <i class="fas fa-question-circle mr-2"></i>精緻化質問を取得
+                    </button>
+                    <div id="elaborationArea" class="mt-4 hidden"></div>
+                </div>
+            </div>
+
+            <!-- 二重符号化の説明 -->
+            <div class="bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg shadow-md p-6">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-image text-3xl text-pink-600 mr-3"></i>
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">二重符号化</h2>
+                        <p class="text-sm text-gray-500">Dual Coding</p>
+                    </div>
+                </div>
+                <p class="text-gray-700 mb-4">
+                    言葉と画像の両方で情報を処理することで、記憶の定着が向上します。
+                    学習カードには必ず図解やイラストを追加しましょう。
+                </p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-white p-4 rounded-lg text-center">
+                        <i class="fas fa-pencil-ruler text-3xl text-pink-400 mb-2"></i>
+                        <p class="text-sm text-gray-600">図を描く</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg text-center">
+                        <i class="fas fa-chart-bar text-3xl text-pink-400 mb-2"></i>
+                        <p class="text-sm text-gray-600">グラフ化</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg text-center">
+                        <i class="fas fa-project-diagram text-3xl text-pink-400 mb-2"></i>
+                        <p class="text-sm text-gray-600">マインドマップ</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg text-center">
+                        <i class="fas fa-sticky-note text-3xl text-pink-400 mb-2"></i>
+                        <p class="text-sm text-gray-600">フラッシュカード</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script>
+        const API_BASE = '/api'
+        let currentUser = null
+        let todayReviews = []
+        let currentReviewIndex = 0
+
+        // 認証チェック
+        async function checkAuth() {
+            const token = localStorage.getItem('token')
+            if (!token) {
+                window.location.href = '/auth-demo.html'
+                return false
+            }
+
+            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+
+            try {
+                const response = await axios.get(`${API_BASE}/auth/me`)
+                currentUser = response.data.user
+                return true
+            } catch (error) {
+                console.error('認証エラー:', error)
+                localStorage.removeItem('token')
+                window.location.href = '/auth-demo.html'
+                return false
+            }
+        }
+
+        // 統計を読み込み
+        async function loadStats() {
+            try {
+                const response = await axios.get(`${API_BASE}/cognitive/stats`)
+                const stats = response.data.stats
+
+                document.getElementById('dueToday').textContent = stats.due_today
+                document.getElementById('reviewing').textContent = stats.reviewing
+                document.getElementById('learned').textContent = stats.learned
+                document.getElementById('totalCards').textContent = stats.total_cards
+            } catch (error) {
+                console.error('統計読み込みエラー:', error)
+            }
+        }
+
+        // 今日の復習を開始
+        async function startReview() {
+            try {
+                const response = await axios.get(`${API_BASE}/cognitive/today`)
+                todayReviews = response.data.cards
+                currentReviewIndex = 0
+
+                if (todayReviews.length === 0) {
+                    alert('今日の復習はありません！🎉')
+                    return
+                }
+
+                showReviewCard()
+            } catch (error) {
+                console.error('復習開始エラー:', error)
+                alert('復習の開始に失敗しました')
+            }
+        }
+
+        // 復習カードを表示
+        function showReviewCard() {
+            const reviewArea = document.getElementById('reviewArea')
+            reviewArea.classList.remove('hidden')
+
+            const card = todayReviews[currentReviewIndex]
+            reviewArea.innerHTML = `
+                <div class="border-t border-gray-200 pt-4">
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-500">カード ${currentReviewIndex + 1} / ${todayReviews.length}</p>
+                        <h3 class="text-lg font-bold text-gray-800 mt-2">${card.content_title}</h3>
+                        <p class="text-sm text-gray-600 mt-1">${card.content_type}</p>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-600 mb-2">どのくらい思い出せましたか？</p>
+                        <div class="grid grid-cols-6 gap-2">
+                            ${[0, 1, 2, 3, 4, 5].map(quality => `
+                                <button onclick="submitReview('${card.card_id}', ${quality})" 
+                                        class="bg-gray-100 hover:bg-purple-100 px-3 py-2 rounded text-center transition">
+                                    <div class="text-lg font-bold">${quality}</div>
+                                    <div class="text-xs text-gray-600">${getQualityLabel(quality)}</div>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `
+        }
+
+        function getQualityLabel(quality) {
+            const labels = ['全く', '困難', '難しい', '普通', '容易', '完璧']
+            return labels[quality]
+        }
+
+        // 復習を送信
+        async function submitReview(cardId, quality) {
+            try {
+                await axios.post(`${API_BASE}/cognitive/review`, {
+                    card_id: cardId,
+                    quality: quality
+                })
+
+                currentReviewIndex++
+
+                if (currentReviewIndex < todayReviews.length) {
+                    showReviewCard()
+                } else {
+                    document.getElementById('reviewArea').innerHTML = `
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                            <i class="fas fa-check-circle text-4xl text-green-600 mb-2"></i>
+                            <p class="text-lg font-bold text-green-800">復習完了！🎉</p>
+                            <p class="text-sm text-green-600 mt-1">お疲れ様でした</p>
+                        </div>
+                    `
+                    loadStats()
+                }
+            } catch (error) {
+                console.error('復習送信エラー:', error)
+                alert('復習の送信に失敗しました')
+            }
+        }
+
+        // 検索練習を開始
+        async function startRetrievalPractice() {
+            const topic = document.getElementById('retrievalTopic').value.trim()
+            if (!topic) {
+                alert('トピックを入力してください')
+                return
+            }
+
+            try {
+                await axios.post(`${API_BASE}/cognitive/retrieval-practice`, { topic })
+                alert(`検索練習「${topic}」を開始しました！\n\nノートを閉じて、覚えていることを書き出してみましょう。`)
+            } catch (error) {
+                console.error('検索練習開始エラー:', error)
+                alert('検索練習の開始に失敗しました')
+            }
+        }
+
+        // 交互学習を開始
+        async function startInterleaving() {
+            const checkboxes = document.querySelectorAll('.interleaving-subject:checked')
+            const subjects = Array.from(checkboxes).map(cb => cb.value)
+
+            if (subjects.length < 2) {
+                alert('2つ以上の教科を選択してください')
+                return
+            }
+
+            try {
+                const response = await axios.post(`${API_BASE}/cognitive/interleaving`, {
+                    subjects: subjects,
+                    count: 10
+                })
+
+                alert(`交互学習を開始しました！\n${response.data.count}問の問題が生成されました。`)
+                // TODO: 問題表示画面に遷移
+            } catch (error) {
+                console.error('交互学習開始エラー:', error)
+                alert('交互学習の開始に失敗しました')
+            }
+        }
+
+        // 精緻化を開始
+        async function startElaboration() {
+            const concept = document.getElementById('elaborationConcept').value.trim()
+            if (!concept) {
+                alert('概念を入力してください')
+                return
+            }
+
+            try {
+                const response = await axios.get(`${API_BASE}/cognitive/elaboration-prompts?concept=${encodeURIComponent(concept)}`)
+                const prompts = response.data.prompts
+
+                const elaborationArea = document.getElementById('elaborationArea')
+                elaborationArea.classList.remove('hidden')
+                elaborationArea.innerHTML = `
+                    <div class="border-t border-gray-200 pt-4 space-y-4">
+                        ${prompts.map((prompt, index) => `
+                            <div class="bg-yellow-50 p-4 rounded-lg">
+                                <p class="font-bold text-gray-800 mb-2">${index + 1}. ${prompt.description}</p>
+                                <p class="text-gray-700 mb-3">${prompt.question}</p>
+                                <textarea id="elaboration-${index}" 
+                                          class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-yellow-500"
+                                          rows="3" placeholder="あなたの回答..."></textarea>
+                            </div>
+                        `).join('')}
+                        <button onclick="saveElaboration('${concept}')" 
+                                class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition">
+                            回答を保存
+                        </button>
+                    </div>
+                `
+            } catch (error) {
+                console.error('精緻化開始エラー:', error)
+                alert('精緻化質問の取得に失敗しました')
+            }
+        }
+
+        // 精緻化回答を保存
+        async function saveElaboration(concept) {
+            const responses = []
+            const promptTypes = ['explain', 'example', 'analogy', 'application']
+
+            for (let i = 0; i < 4; i++) {
+                const response = document.getElementById(`elaboration-${i}`).value.trim()
+                if (response) {
+                    try {
+                        await axios.post(`${API_BASE}/cognitive/elaboration`, {
+                            concept: concept,
+                            prompt_type: promptTypes[i],
+                            student_response: response
+                        })
+                    } catch (error) {
+                        console.error('精緻化保存エラー:', error)
+                    }
+                }
+            }
+
+            alert('回答を保存しました！素晴らしい精緻化です 👍')
+            document.getElementById('elaborationArea').classList.add('hidden')
+        }
+
+        // 初期化
+        async function init() {
+            const authenticated = await checkAuth()
+            if (authenticated) {
+                await loadStats()
+            }
+        }
+
+        init()
+    </script>
+</body>
+</html>

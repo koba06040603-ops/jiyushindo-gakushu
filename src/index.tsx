@@ -22393,4 +22393,306 @@ app.get('/api/problems/metadata', authMiddleware, async (c) => {
   })
 })
 
+/**
+ * ========================================
+ * Phase 15: 認知科学ベースの学習最適化API
+ * ========================================
+ */
+
+import {
+  createReviewCard,
+  reviewCard,
+  getTodayReviews,
+  getReviewStats,
+  startRetrievalPractice,
+  getInterleavedProblems,
+  type ReviewQuality,
+} from './spaced-repetition'
+
+/**
+ * POST /api/cognitive/cards - 復習カードを作成
+ */
+app.post('/api/cognitive/cards', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { content_type, content_id, content_title } = await c.req.json()
+
+    if (!content_type || !content_id || !content_title) {
+      return c.json({ success: false, error: '必須フィールドが不足しています' }, 400)
+    }
+
+    if (!['concept', 'problem', 'vocabulary'].includes(content_type)) {
+      return c.json({ success: false, error: '無効なコンテンツタイプです' }, 400)
+    }
+
+    const card = await createReviewCard(
+      env.DB,
+      user.id,
+      content_type as 'concept' | 'problem' | 'vocabulary',
+      content_id,
+      content_title
+    )
+
+    return c.json({
+      success: true,
+      card,
+    })
+  } catch (error: any) {
+    console.error('❌ 復習カード作成エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '復習カードの作成に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * POST /api/cognitive/review - 復習を実行
+ */
+app.post('/api/cognitive/review', authMiddleware, async (c) => {
+  try {
+    const { env } = c.var
+    const { card_id, quality } = await c.req.json()
+
+    if (!card_id || quality === undefined) {
+      return c.json({ success: false, error: '必須フィールドが不足しています' }, 400)
+    }
+
+    if (quality < 0 || quality > 5) {
+      return c.json({ success: false, error: '品質は0-5の範囲で指定してください' }, 400)
+    }
+
+    const result = await reviewCard(env.DB, card_id, quality as ReviewQuality)
+
+    return c.json({
+      success: true,
+      result,
+    })
+  } catch (error: any) {
+    console.error('❌ 復習実行エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '復習の実行に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * GET /api/cognitive/today - 今日の復習カードを取得
+ */
+app.get('/api/cognitive/today', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+
+    const cards = await getTodayReviews(env.DB, user.id)
+
+    return c.json({
+      success: true,
+      cards,
+      count: cards.length,
+    })
+  } catch (error: any) {
+    console.error('❌ 今日の復習取得エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '今日の復習の取得に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * GET /api/cognitive/stats - 復習統計を取得
+ */
+app.get('/api/cognitive/stats', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+
+    const stats = await getReviewStats(env.DB, user.id)
+
+    return c.json({
+      success: true,
+      stats,
+    })
+  } catch (error: any) {
+    console.error('❌ 復習統計取得エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '復習統計の取得に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * POST /api/cognitive/retrieval-practice - 検索練習セッション開始
+ */
+app.post('/api/cognitive/retrieval-practice', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { topic } = await c.req.json()
+
+    if (!topic) {
+      return c.json({ success: false, error: 'トピックを指定してください' }, 400)
+    }
+
+    const session = await startRetrievalPractice(env.DB, user.id, topic)
+
+    return c.json({
+      success: true,
+      session,
+    })
+  } catch (error: any) {
+    console.error('❌ 検索練習開始エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '検索練習の開始に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * POST /api/cognitive/interleaving - 交互学習問題を取得
+ */
+app.post('/api/cognitive/interleaving', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { subjects, count = 10 } = await c.req.json()
+
+    if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
+      return c.json({ success: false, error: '教科を指定してください' }, 400)
+    }
+
+    const problems = await getInterleavedProblems(env.DB, user.id, subjects, count)
+
+    return c.json({
+      success: true,
+      problems,
+      count: problems.length,
+    })
+  } catch (error: any) {
+    console.error('❌ 交互学習問題取得エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '交互学習問題の取得に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * POST /api/cognitive/elaboration - 精緻化プロンプトを保存
+ */
+app.post('/api/cognitive/elaboration', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { concept, prompt_type, student_response } = await c.req.json()
+
+    if (!concept || !prompt_type) {
+      return c.json({ success: false, error: '必須フィールドが不足しています' }, 400)
+    }
+
+    if (!['explain', 'example', 'analogy', 'application'].includes(prompt_type)) {
+      return c.json({ success: false, error: '無効なプロンプトタイプです' }, 400)
+    }
+
+    await env.DB.prepare(
+      `INSERT INTO elaboration_prompts 
+       (student_id, concept, prompt_type, student_response)
+       VALUES (?, ?, ?, ?)`
+    )
+      .bind(user.id, concept, prompt_type, student_response || null)
+      .run()
+
+    return c.json({
+      success: true,
+      message: '精緻化プロンプトを保存しました',
+    })
+  } catch (error: any) {
+    console.error('❌ 精緻化プロンプト保存エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '精緻化プロンプトの保存に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * GET /api/cognitive/elaboration-prompts - 精緻化プロンプトを取得
+ */
+app.get('/api/cognitive/elaboration-prompts', authMiddleware, async (c) => {
+  try {
+    const { env } = c.var
+    const concept = c.req.query('concept')
+
+    if (!concept) {
+      return c.json({ success: false, error: 'コンセプトを指定してください' }, 400)
+    }
+
+    // 4種類のプロンプトを生成
+    const prompts = [
+      {
+        type: 'explain',
+        question: `「${concept}」を自分の言葉で説明してください。`,
+        description: '説明する（Explain）',
+      },
+      {
+        type: 'example',
+        question: `「${concept}」の具体例を3つ挙げてください。`,
+        description: '例を挙げる（Example）',
+      },
+      {
+        type: 'analogy',
+        question: `「${concept}」を身近なものに例えると何ですか？`,
+        description: '類推する（Analogy）',
+      },
+      {
+        type: 'application',
+        question: `「${concept}」は実生活でどのように使えますか？`,
+        description: '応用する（Application）',
+      },
+    ]
+
+    return c.json({
+      success: true,
+      prompts,
+    })
+  } catch (error: any) {
+    console.error('❌ 精緻化プロンプト取得エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '精緻化プロンプトの取得に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
 export default app
