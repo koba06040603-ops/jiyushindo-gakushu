@@ -5,25 +5,57 @@
 ## 🌐 本番環境URL
 
 **本番デプロイ完了！** ✅  
-- **本番URL**: https://470652b9.jiyushindo-gakushu.pages.dev
+- **本番URL**: https://57db13d5.jiyushindo-gakushu.pages.dev
+- **最新デプロイURL**: https://57db13d5.jiyushindo-gakushu.pages.dev
 - **API仕様書**: https://6cef01f8.jiyushindo-gakushu.pages.dev/static/api-docs
 - **管理者プレビュー**: ローカル環境で `dist/admin-preview.html` を直接開く（実装済み、498行）
-- **デプロイ日時**: 2026-02-03
+- **デプロイ日時**: 2026-02-04
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 🟢 Active
 - **最新機能**: 
+  - ✅ **Phase 4-1**: 認証システムのデータベース設計完了（auth_users, auth_sessions, schools テーブル）
+  - ✅ ログインAPI・ログアウトAPI・セッション検証API実装
+  - ✅ テストデータ挿入（教師・学生・管理者アカウント）
   - ✅ ケース1-3: 基本個別最適化（得意・苦手・欠席対応）
   - ✅ ケース4-6: 学習スタイル別動画生成（視覚・聴覚・体感優位型対応）
   - ✅ ケース7-9: 特別支援・保護者サポート・教師向け分析
   - ✅ ケース10-12: テスト準備・予習・復習動画生成
   - 🎨 Canvas動画生成（完全無料、API不要）
   - 🎵 YouTube音楽リンク統合（九九の歌など）
-  - ✨ **NEW (2026-02-03)**: ケース5-12 タブ機能＋インタラクティブ体験実装完了
 
 ## プロジェクト概要
 
 **名前**: 自由進度学習支援システム  
 **目標**: 子どもたちが自ら考え実行する力を育み、個別最適な学びを実現する  
+
+## 🔐 認証システム（Phase 4-1 完了）
+
+### テストアカウント
+
+本番環境では以下のテストアカウントでログインできます：
+
+| ロール | ユーザー名 | パスワード | 氏名 |
+|--------|-----------|-----------|------|
+| 教師 | teacher1 | password123 | 山田 太郎 |
+| 教師 | teacher2 | password123 | 佐藤 花子 |
+| 学生 | student1 | password123 | 田中 一郎 |
+| 学生 | student2 | password123 | 鈴木 二郎 |
+| 学生 | student3 | password123 | 高橋 三郎 |
+| 管理者 | admin1 | password123 | 管理者 |
+
+### 認証API
+
+- **POST /api/auth/login**: ログイン
+- **POST /api/auth/logout**: ログアウト
+- **POST /api/auth/verify**: セッション検証
+- **GET /api/auth/users**: ユーザー一覧（管理者・教師用）
+
+### データベース構造
+
+- **auth_users**: ユーザー情報（username, full_name, user_role, school_id）
+- **auth_sessions**: セッション管理（session_token, expires_at）
+- **schools**: 学校情報
+- **classes**: クラス情報
 
 ## 🎉 最新アップデート（2026-02-03）
 
