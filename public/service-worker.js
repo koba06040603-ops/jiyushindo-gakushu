@@ -1,267 +1,238 @@
-// Service Worker for PWA with Offline Support
-// Version 1.0.0
-
-const CACHE_NAME = 'jiyushindo-gakushu-v1.0.0';
-const OFFLINE_URL = '/offline.html';
+// Service Worker for PWA - 自由進度学習支援システム
+const CACHE_VERSION = 'v1.0.0';
+const CACHE_NAME = `jiyushindo-gakushu-${CACHE_VERSION}`;
 
 // キャッシュするリソース
-const urlsToCache = [
+const STATIC_CACHE_URLS = [
   '/',
-  '/offline.html',
-  '/integrated-dashboard.html',
-  '/gamification-demo.html',
-  '/parent-dashboard-demo.html',
-  '/teacher-dashboard-demo.html',
-  '/static/i18n.js',
-  '/static/pdf-generator.js',
-  '/static/advanced-visualization.js',
-  '/static/retrieval-practice-ui.js',
-  '/static/interleaved-practice-ui.js',
-  '/static/collaborative-learning-ui.js',
-  '/static/learning-reports-ui.js',
-  // CDN resources (cache with network fallback)
+  '/dashboard.html',
+  '/parent-dashboard.html',
+  '/static/app.js',
+  '/static/styles.css',
   'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css',
-  'https://cdn.jsdelivr.net/npm/chart.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
   'https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js'
 ];
 
-// インストール時
+// APIキャッシュの有効期限（ミリ秒）
+const API_CACHE_DURATION = 5 * 60 * 1000; // 5分
+
+// インストールイベント
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing...');
+  console.log('[Service Worker] インストール中...');
   
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[Service Worker] Caching app shell');
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('[Service Worker] 静的リソースをキャッシュ中...');
+      return cache.addAll(STATIC_CACHE_URLS.map(url => new Request(url, { cache: 'no-cache' })))
+        .catch(err => {
+          console.warn('[Service Worker] 一部のリソースのキャッシュに失敗:', err);
+          // 失敗しても続行
+          return Promise.resolve();
+        });
+    }).then(() => {
+      console.log('[Service Worker] インストール完了');
+      return self.skipWaiting();
+    })
   );
 });
 
-// アクティベート時
+// アクティベーションイベント
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activating...');
+  console.log('[Service Worker] アクティベーション中...');
   
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
+            console.log('[Service Worker] 古いキャッシュを削除:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => {
+      console.log('[Service Worker] アクティベーション完了');
+      return self.clients.claim();
+    })
   );
 });
 
-// フェッチ時 (Network First with Cache Fallback)
+// フェッチイベント - ネットワーク優先、フォールバックでキャッシュ
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // API requests: Network First
+  // APIリクエストの場合
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Clone the response before caching
-          const responseToCache = response.clone();
-          
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
-          
-          return response;
-        })
-        .catch(() => {
-          // Return cached response if network fails
-          return caches.match(request);
-        })
-    );
+    event.respondWith(handleApiRequest(request));
     return;
   }
 
-  // Static assets: Cache First
-  if (url.pathname.startsWith('/static/') || 
-      url.pathname.endsWith('.html') ||
-      url.pathname.endsWith('.css') ||
-      url.pathname.endsWith('.js')) {
-    event.respondWith(
-      caches.match(request)
-        .then((response) => {
-          if (response) {
-            return response;
-          }
-          
-          return fetch(request).then((response) => {
-            // Cache the fetched resource
-            const responseToCache = response.clone();
-            
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseToCache);
-            });
-            
-            return response;
-          });
-        })
-        .catch(() => {
-          // Return offline page for navigation requests
-          if (request.mode === 'navigate') {
-            return caches.match(OFFLINE_URL);
-          }
-        })
-    );
+  // 静的リソースの場合 - キャッシュ優先
+  if (request.method === 'GET' && isStaticResource(url)) {
+    event.respondWith(handleStaticRequest(request));
     return;
   }
 
-  // CDN resources: Network First with Cache Fallback
-  if (url.hostname !== self.location.hostname) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const responseToCache = response.clone();
-          
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseToCache);
-          });
-          
-          return response;
-        })
-        .catch(() => {
-          return caches.match(request);
-        })
-    );
-    return;
-  }
-
-  // Default: Network First
+  // その他のリクエスト - ネットワーク優先
   event.respondWith(
-    fetch(request)
-      .catch(() => {
-        return caches.match(request).then((response) => {
-          if (response) {
-            return response;
-          }
-          
-          if (request.mode === 'navigate') {
-            return caches.match(OFFLINE_URL);
-          }
+    fetch(request).catch(() => {
+      return caches.match(request).then(response => {
+        return response || new Response('オフラインです', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: new Headers({ 'Content-Type': 'text/plain; charset=utf-8' })
         });
-      })
+      });
+    })
   );
 });
 
-// Background Sync for offline data
-self.addEventListener('sync', (event) => {
-  console.log('[Service Worker] Background Sync:', event.tag);
-  
-  if (event.tag === 'sync-learning-progress') {
-    event.waitUntil(syncLearningProgress());
+// 静的リソースの判定
+function isStaticResource(url) {
+  const staticExtensions = ['.html', '.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.woff', '.woff2'];
+  return staticExtensions.some(ext => url.pathname.endsWith(ext)) ||
+         url.hostname.includes('cdn.tailwindcss.com') ||
+         url.hostname.includes('cdn.jsdelivr.net');
+}
+
+// 静的リソースのハンドリング（キャッシュ優先）
+async function handleStaticRequest(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cachedResponse = await cache.match(request);
+
+  if (cachedResponse) {
+    console.log('[Service Worker] キャッシュから取得:', request.url);
+    // バックグラウンドで更新
+    fetch(request).then(response => {
+      if (response && response.status === 200) {
+        cache.put(request, response.clone());
+      }
+    }).catch(() => {});
+    return cachedResponse;
   }
-});
 
-// Push通知
-self.addEventListener('push', (event) => {
-  console.log('[Service Worker] Push notification received');
-  
-  const data = event.data ? event.data.json() : {};
-  const title = data.title || '自由進度学習';
-  const options = {
-    body: data.body || '新しい通知があります',
-    icon: '/static/icon-192x192.png',
-    badge: '/static/icon-72x72.png',
-    vibrate: [200, 100, 200],
-    tag: data.tag || 'default',
-    data: data,
-    actions: data.actions || []
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
-});
-
-// 通知クリック時
-self.addEventListener('notificationclick', (event) => {
-  console.log('[Service Worker] Notification clicked');
-  
-  event.notification.close();
-  
-  event.waitUntil(
-    clients.openWindow(event.notification.data.url || '/')
-  );
-});
-
-// オフラインデータの同期
-async function syncLearningProgress() {
   try {
-    // IndexedDBからオフラインで保存したデータを取得
-    const db = await openDB();
-    const offlineData = await getOfflineData(db);
-    
-    if (offlineData.length > 0) {
-      // サーバーに送信
-      for (const data of offlineData) {
-        await fetch('/api/spaced-learning/record-review', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(data)
-        });
-        
-        // 送信成功したら削除
-        await deleteOfflineData(db, data.id);
-      }
-      
-      console.log('[Service Worker] Synced', offlineData.length, 'offline records');
+    const networkResponse = await fetch(request);
+    if (networkResponse && networkResponse.status === 200) {
+      cache.put(request, networkResponse.clone());
     }
+    return networkResponse;
   } catch (error) {
-    console.error('[Service Worker] Sync failed:', error);
-    throw error;
+    console.error('[Service Worker] ネットワークエラー:', error);
+    return new Response('リソースの取得に失敗しました', {
+      status: 503,
+      statusText: 'Service Unavailable'
+    });
   }
 }
 
-// IndexedDB操作 (簡易版)
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open('JiyushindoGakushuDB', 1);
+// APIリクエストのハンドリング（ネットワーク優先、期限付きキャッシュ）
+async function handleApiRequest(request) {
+  const cache = await caches.open(CACHE_NAME);
+
+  try {
+    // ネットワークから取得を試みる
+    const networkResponse = await fetch(request);
     
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
+    // GETリクエストでステータスが200の場合のみキャッシュ
+    if (request.method === 'GET' && networkResponse && networkResponse.status === 200) {
+      const responseToCache = networkResponse.clone();
+      const cacheEntry = {
+        response: await responseToCache.text(),
+        timestamp: Date.now(),
+        headers: Object.fromEntries(networkResponse.headers.entries())
+      };
       
-      if (!db.objectStoreNames.contains('offlineData')) {
-        db.createObjectStore('offlineData', { keyPath: 'id', autoIncrement: true });
+      // カスタムレスポンスとしてキャッシュ
+      const cacheResponse = new Response(JSON.stringify(cacheEntry), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      cache.put(request, cacheResponse);
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.warn('[Service Worker] APIリクエスト失敗、キャッシュを確認:', request.url);
+    
+    // キャッシュから取得
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
+      const cacheEntry = await cachedResponse.json();
+      
+      // キャッシュの有効期限チェック
+      if (Date.now() - cacheEntry.timestamp < API_CACHE_DURATION) {
+        console.log('[Service Worker] 有効なキャッシュを返却:', request.url);
+        return new Response(cacheEntry.response, {
+          headers: cacheEntry.headers
+        });
+      } else {
+        console.log('[Service Worker] キャッシュが期限切れ:', request.url);
       }
-    };
-  });
+    }
+    
+    // オフライン用のフォールバックレスポンス
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'オフラインです。ネットワーク接続を確認してください。',
+      offline: true
+    }), {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' }
+    });
+  }
 }
 
-function getOfflineData(db) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['offlineData'], 'readonly');
-    const store = transaction.objectStore('offlineData');
-    const request = store.getAll();
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-  });
-}
+// メッセージイベント - クライアントからの指示を受け取る
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  
+  if (event.data && event.data.type === 'CACHE_URLS') {
+    const urls = event.data.urls || [];
+    caches.open(CACHE_NAME).then(cache => {
+      urls.forEach(url => {
+        cache.add(url).catch(err => console.warn('キャッシュ追加失敗:', url, err));
+      });
+    });
+  }
+});
 
-function deleteOfflineData(db, id) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(['offlineData'], 'readwrite');
-    const store = transaction.objectStore('offlineData');
-    const request = store.delete(id);
-    
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve();
-  });
-}
+// プッシュ通知イベント
+self.addEventListener('push', (event) => {
+  const options = {
+    body: event.data ? event.data.text() : 'プッシュ通知',
+    icon: '/static/icon-192.png',
+    badge: '/static/icon-192.png',
+    vibrate: [200, 100, 200],
+    data: {
+      dateOfArrival: Date.now(),
+      primaryKey: 1
+    },
+    actions: [
+      { action: 'explore', title: '確認する' },
+      { action: 'close', title: '閉じる' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification('自由進度学習', options)
+  );
+});
+
+// 通知クリックイベント
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'explore') {
+    event.waitUntil(
+      clients.openWindow('/dashboard.html')
+    );
+  }
+});
+
+console.log('[Service Worker] スクリプト読み込み完了');

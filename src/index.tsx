@@ -21204,4 +21204,117 @@ app.get('/api/learning/progress/:studentId', requireAuth, async (c) => {
   }
 })
 
+// ============================================
+// Phase 9-1: 保護者用API
+// ============================================
+
+// 保護者の子ども一覧取得
+app.get('/api/parent/children', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const user = c.get('user')
+
+    // parent_student_relationsから子ども一覧を取得
+    const children = await env.DB.prepare(`
+      SELECT 
+        s.student_id,
+        s.student_name,
+        s.grade_level,
+        s.email,
+        psr.relationship_type,
+        psr.created_at as relation_created_at
+      FROM parent_student_relations psr
+      JOIN students s ON psr.student_id = s.student_id
+      WHERE psr.parent_id = ? AND s.school_id = ?
+      ORDER BY s.grade_level DESC, s.student_name
+    `).bind(user.user_id, user.school_id).all()
+
+    return c.json({
+      success: true,
+      children: children.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ 子ども一覧取得エラー:', error)
+    return c.json({ success: false, error: '子ども一覧の取得に失敗しました' }, 500)
+  }
+})
+
+// 教師からのコメント取得
+app.get('/api/parent/teacher-comments/:studentId', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const studentId = c.req.param('studentId')
+    const user = c.get('user')
+
+    // 評価テーブルからコメントを取得
+    const comments = await env.DB.prepare(`
+      SELECT 
+        e.evaluation_id,
+        e.comments as comment,
+        e.score,
+        e.max_score,
+        e.subject,
+        e.evaluated_at as created_at,
+        t.teacher_name
+      FROM evaluations e
+      LEFT JOIN teachers t ON e.teacher_id = t.teacher_id
+      WHERE e.student_id = ? AND e.school_id = ? AND e.comments IS NOT NULL
+      ORDER BY e.evaluated_at DESC
+      LIMIT 10
+    `).bind(studentId, user.school_id).all()
+
+    return c.json(comments.results || [])
+  } catch (error: any) {
+    console.error('❌ 教師コメント取得エラー:', error)
+    return c.json({ success: false, error: '教師コメントの取得に失敗しました' }, 500)
+  }
+})
+
+// 週間学習サマリー取得
+app.get('/api/parent/weekly-summary/:studentId', requireAuth, async (c) => {
+  try {
+    const { env } = c
+    const studentId = c.req.param('studentId')
+    const user = c.get('user')
+
+    // 過去7日間の学習データ
+    const weeklyData = await env.DB.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as problem_count,
+        AVG(CASE WHEN is_correct = 1 THEN 100.0 ELSE 0.0 END) as accuracy,
+        SUM(time_spent) as total_time
+      FROM learning_logs
+      WHERE student_id = ? 
+        AND school_id = ?
+        AND created_at >= DATE('now', '-7 days')
+      GROUP BY DATE(created_at)
+      ORDER BY date
+    `).bind(studentId, user.school_id).all()
+
+    // 教科別統計
+    const subjectStats = await env.DB.prepare(`
+      SELECT 
+        c.subject,
+        COUNT(*) as problem_count,
+        AVG(CASE WHEN ll.is_correct = 1 THEN 100.0 ELSE 0.0 END) as accuracy
+      FROM learning_logs ll
+      JOIN curriculum c ON ll.curriculum_id = c.id
+      WHERE ll.student_id = ? 
+        AND ll.school_id = ?
+        AND ll.created_at >= DATE('now', '-7 days')
+      GROUP BY c.subject
+    `).bind(studentId, user.school_id).all()
+
+    return c.json({
+      success: true,
+      weeklyData: weeklyData.results || [],
+      subjectStats: subjectStats.results || []
+    })
+  } catch (error: any) {
+    console.error('❌ 週間サマリー取得エラー:', error)
+    return c.json({ success: false, error: '週間サマリーの取得に失敗しました' }, 500)
+  }
+})
+
 export default app

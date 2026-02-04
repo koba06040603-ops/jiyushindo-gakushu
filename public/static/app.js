@@ -37929,3 +37929,143 @@ window.generateDetailedReport = generateDetailedReport
 
 console.log('✅ Phase 7-3: PDFレポート生成を読み込みました')
 console.log('🎉 Phase 7: すべての高度な機能を読み込みました！')
+
+// ============================================
+// Phase 9-2: PWA対応
+// ============================================
+
+// Service Worker登録
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(registration => {
+        console.log('✅ Service Worker登録成功:', registration.scope)
+        
+        // 更新チェック
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing
+          console.log('🔄 Service Worker更新検出')
+          
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // 新しいバージョンが利用可能
+              if (confirm('新しいバージョンが利用可能です。更新しますか？')) {
+                newWorker.postMessage({ type: 'SKIP_WAITING' })
+                window.location.reload()
+              }
+            }
+          })
+        })
+      })
+      .catch(error => {
+        console.error('❌ Service Worker登録失敗:', error)
+      })
+  })
+}
+
+// PWAインストールプロンプト
+let deferredPrompt
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault()
+  deferredPrompt = e
+  console.log('📱 PWAインストール可能')
+  
+  // インストールボタンを表示（存在する場合）
+  const installBtn = document.getElementById('pwa-install-btn')
+  if (installBtn) {
+    installBtn.style.display = 'block'
+    installBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt()
+        const { outcome } = await deferredPrompt.userChoice
+        console.log(`PWAインストール結果: ${outcome}`)
+        deferredPrompt = null
+        installBtn.style.display = 'none'
+      }
+    })
+  }
+})
+
+// PWAインストール完了時
+window.addEventListener('appinstalled', () => {
+  console.log('✅ PWAインストール完了')
+  deferredPrompt = null
+  showNotification('アプリをインストールしました！', 'success')
+})
+
+// オンライン/オフライン検知
+window.addEventListener('online', () => {
+  console.log('🌐 オンラインに復帰')
+  showNotification('インターネットに接続されました', 'success')
+})
+
+window.addEventListener('offline', () => {
+  console.log('📵 オフライン')
+  showNotification('オフラインモードで動作中です', 'warning')
+})
+
+// プッシュ通知サポート確認
+function checkPushNotificationSupport() {
+  if (!('Notification' in window)) {
+    console.warn('このブラウザは通知をサポートしていません')
+    return false
+  }
+  
+  if (!('serviceWorker' in navigator)) {
+    console.warn('このブラウザはService Workerをサポートしていません')
+    return false
+  }
+  
+  return true
+}
+
+// プッシュ通知許可をリクエスト
+async function requestPushNotificationPermission() {
+  if (!checkPushNotificationSupport()) {
+    return false
+  }
+  
+  try {
+    const permission = await Notification.requestPermission()
+    console.log('通知許可状態:', permission)
+    return permission === 'granted'
+  } catch (error) {
+    console.error('通知許可リクエストエラー:', error)
+    return false
+  }
+}
+
+// バックグラウンド同期（オフライン時のデータ送信）
+async function registerBackgroundSync(tag) {
+  if ('serviceWorker' in navigator && 'sync' in ServiceWorkerRegistration.prototype) {
+    try {
+      const registration = await navigator.serviceWorker.ready
+      await registration.sync.register(tag)
+      console.log('✅ バックグラウンド同期登録:', tag)
+    } catch (error) {
+      console.error('❌ バックグラウンド同期登録失敗:', error)
+    }
+  }
+}
+
+// アプリがスタンドアロンモードで実行中かチェック
+function isStandalone() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  )
+}
+
+if (isStandalone()) {
+  console.log('📱 スタンドアロンモードで実行中（PWAとしてインストール済み）')
+} else {
+  console.log('🌐 ブラウザモードで実行中')
+}
+
+// グローバルに公開
+window.requestPushNotificationPermission = requestPushNotificationPermission
+window.registerBackgroundSync = registerBackgroundSync
+window.isStandalone = isStandalone
+window.checkPushNotificationSupport = checkPushNotificationSupport
+
+console.log('✅ Phase 9-2 PWA機能初期化完了')
