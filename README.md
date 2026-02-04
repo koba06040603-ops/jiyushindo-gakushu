@@ -4,14 +4,16 @@
 
 ## 🌐 本番環境URL
 
-**Phase 10-1デプロイ完了！** ✅  
-- **本番URL**: https://8f268ac8.jiyushindo-gakushu.pages.dev
-- **ダッシュボード**: https://8f268ac8.jiyushindo-gakushu.pages.dev/dashboard.html
-- **保護者ダッシュボード**: https://8f268ac8.jiyushindo-gakushu.pages.dev/parent-dashboard.html
-- **セキュリティダッシュボード**: https://8f268ac8.jiyushindo-gakushu.pages.dev/security-dashboard.html
+**Phase 10-2デプロイ完了！** ✅  
+- **本番URL**: https://5e724f58.jiyushindo-gakushu.pages.dev
+- **ダッシュボード**: https://5e724f58.jiyushindo-gakushu.pages.dev/dashboard.html
+- **保護者ダッシュボード**: https://5e724f58.jiyushindo-gakushu.pages.dev/parent-dashboard.html
+- **セキュリティダッシュボード**: https://5e724f58.jiyushindo-gakushu.pages.dev/security-dashboard.html
+- **パフォーマンスダッシュボード**: https://5e724f58.jiyushindo-gakushu.pages.dev/performance-dashboard.html
 - **PWA対応**: ✅ オフライン機能、ホーム画面追加、プッシュ通知
 - **セキュリティ**: ✅ CSRF保護、レート制限、セキュリティヘッダー
-- **API仕様書**: https://8f268ac8.jiyushindo-gakushu.pages.dev/static/api-docs
+- **パフォーマンス監視**: ✅ リアルタイムメトリクス、エラートラッキング
+- **API仕様書**: https://5e724f58.jiyushindo-gakushu.pages.dev/static/api-docs
 - **デプロイ日時**: 2026-02-04
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 🟢 Active
@@ -22,6 +24,8 @@
 - **Phase 8完了**: ✅ 100% - DBスキーマ同期 + 統合ダッシュボード完了
 - **Phase 9完了**: ✅ 100% - 保護者機能 + PWA対応完了
 - **Phase 10-1完了**: ✅ 100% - セキュリティ強化完了
+- **Phase 10-2完了**: ✅ 100% - パフォーマンス監視完了
+- **Phase 10-3完了**: ✅ 100% - 運用ドキュメント整備完了
 
 ## Phase 10-1: セキュリティ強化 🔒
 
@@ -72,6 +76,106 @@
   - 監査ログ閲覧
   - ステータス監視
   - API: `GET /api/security/scan`
+
+## Phase 10-2: パフォーマンス監視 📊
+
+### パフォーマンス監視機能（完了）
+- ✅ **パフォーマンスメトリクス収集**
+  - 新規テーブル: performance_metrics
+  - API: `POST /api/performance/metrics`
+  - メトリクス項目: エンドポイント、レスポンス時間、ステータスコード、IPアドレス、User-Agent
+  - 自動記録: すべてのAPIリクエスト
+  
+- ✅ **エラーログ収集システム**
+  - 新規テーブル: error_logs
+  - API: `POST /api/performance/error-log`
+  - エラー情報: エラータイプ、メッセージ、スタックトレース、エンドポイント、重大度
+  - 重大度レベル: info, warning, error, critical
+  
+- ✅ **システムヘルスチェック**
+  - 新規テーブル: system_health_checks
+  - API: `GET /api/performance/health`
+  - チェック項目: データベース接続、API応答時間
+  - 自動記録: ヘルスチェック実行時
+  
+- ✅ **パフォーマンスダッシュボード**
+  - 管理者専用画面: `/performance-dashboard.html`
+  - リアルタイムメトリクス表示
+    - 平均応答時間（過去24時間）
+    - エラー率（過去24時間）
+    - リクエスト数（過去24時間）
+    - アクティブユーザー数
+  - エンドポイント別パフォーマンス（トップ10）
+    - リクエスト数、平均応答時間、最小/最大時間
+  - エラーログサマリー（過去24時間）
+    - エラータイプ別集計
+    - 重大度別集計
+  - システムヘルス履歴表示
+  - リアルタイムグラフ（Chart.js）
+    - 応答時間トレンド
+    - エラー率トレンド
+  
+- ✅ **パフォーマンスAPI実装**
+  - `POST /api/performance/metrics` - メトリクス記録
+  - `POST /api/performance/error-log` - エラーログ記録
+  - `GET /api/performance/dashboard` - ダッシュボードデータ取得（管理者のみ）
+  - `GET /api/performance/health` - システムヘルスチェック
+  - `GET /api/performance/error-logs` - エラーログ一覧取得（管理者のみ）
+
+### リアルタイムアラート設定
+- ✅ エラー率が10%を超えた場合の通知
+- ✅ 平均応答時間が1000msを超えた場合の通知
+- ✅ システムヘルスチェック失敗時の通知
+- ✅ 管理者ダッシュボードでの視覚的アラート表示
+
+## Phase 10-3: 運用ドキュメント整備 📚
+
+### 完全版ドキュメント作成（完了）
+- ✅ **API仕様書完全版**
+  - ファイル: `docs/API_SPECIFICATION.md`
+  - 全APIエンドポイント詳細
+  - リクエスト/レスポンス例
+  - 認証方法、エラーハンドリング
+  - レート制限、セキュリティ要件
+  
+- ✅ **運用マニュアル**
+  - ファイル: `docs/OPERATIONS_MANUAL.md`
+  - 日常運用タスク
+  - 監視項目とアラート対応
+  - トラブルシューティング手順
+  - パフォーマンスチューニング
+  
+- ✅ **トラブルシューティングガイド**
+  - ファイル: `docs/TROUBLESHOOTING.md`
+  - よくある問題と解決策
+  - エラーメッセージ別対処法
+  - 緊急時の対応手順
+  - エスカレーション基準
+  
+- ✅ **バックアップ・リストア手順書**
+  - ファイル: `docs/BACKUP_RESTORE.md`
+  - 自動バックアップ設定（Cloudflare Workers Cron）
+  - 手動バックアップ手順（ローカル/本番）
+  - フルリストア手順
+  - 特定テーブルのリストア
+  - バックアップ検証方法
+  - 災害復旧計画（DR Plan）
+  - RTO: 1時間以内、RPO: 6時間以内
+  
+- ✅ **デプロイメント手順書**
+  - ファイル: `docs/DEPLOYMENT_GUIDE.md`
+  - ローカル開発環境セットアップ
+  - 本番環境デプロイ手順（6ステップ）
+  - ロールバック手順（アプリ/DB/Git）
+  - CI/CDパイプライン設定（GitHub Actions）
+  - デプロイ前後チェックリスト
+  - トラブルシューティング
+
+### ドキュメント保守
+- 📅 **更新頻度**: 月次レビュー
+- 👤 **担当者**: システム管理者
+- 📍 **保存場所**: `/home/user/webapp/docs/`
+- 🔗 **GitHub**: https://github.com/koba06040603-ops/jiyushindo-gakushu/tree/main/docs
 
 ## Phase 9: 保護者機能とPWA対応 🎉📱
 
@@ -3373,24 +3477,48 @@ Initial commit: Hono project setup
 
 ## 最終更新日
 
-2026-01-18
+2026-02-04 - Phase 10完全実装完了（セキュリティ強化・パフォーマンス監視・運用ドキュメント整備）
 
 ---
 
 **開発者へ**: このシステムは、子どもたちの自律的な学びと先生方の働き方改革を両立させることを目指しています。一つひとつの機能が、子どもたちの成長と先生方の支援につながることを常に意識して開発を進めてください。
 
-**Phase 9 学習スタイル対応機能が完了しました！🎉✨**
-**視覚優位・聴覚優位・体感優位の3つの学習スタイルに応じた個別最適化サポートを実現！**
-**すべてのコア機能が実装完了しました！総合完成度100%達成！🎊🎊🎊**
+---
+
+## 🎉 プロジェクト完成！Phase 10まで全機能実装完了！
+
+**Phase 9 学習スタイル対応機能が完了しました！🎉✨**  
+視覚優位・聴覚優位・体感優位の3つの学習スタイルに応じた個別最適化サポートを実現！
+
+**Phase 10 運用体制整備が完了しました！🎊🎊🎊**
+- ✅ Phase 10-1: セキュリティ強化完了（CSRF保護、レート制限、監査ログ）
+- ✅ Phase 10-2: パフォーマンス監視完了（メトリクス収集、エラートラッキング、リアルタイムダッシュボード）
+- ✅ Phase 10-3: 運用ドキュメント整備完了（API仕様書、運用マニュアル、バックアップ手順書、デプロイメント手順書）
+
+**すべてのコア機能が実装完了し、本番運用準備が整いました！総合完成度100%達成！🏆✨**
 
 ---
 
 ## 📚 関連ドキュメント
 
+### 🎯 ユーザー向けドキュメント
 - [学習スタイル対応 実装ガイド](./LEARNING_STYLES_IMPLEMENTATION.md)
 - [学習スタイル対応 使い方ガイド](./LEARNING_STYLES_USER_GUIDE.md)
 - [学習スタイル別サポート例](./LEARNING_STYLES_EXAMPLES.md)
 - [Gemini API セットアップ](./SETUP_GEMINI_API.md)
 - [ログイン情報](./LOGIN_INFO.md)
 - [教育改革ガイド](./EDUCATIONAL_REFORM_GUIDE.md)
+
+### 🔧 運用・管理者向けドキュメント（Phase 10-3完成）
+- **[API仕様書完全版](./docs/API_SPECIFICATION.md)** - 全APIエンドポイントの詳細仕様
+- **[運用マニュアル](./docs/OPERATIONS_MANUAL.md)** - 日常運用タスクと監視手順
+- **[トラブルシューティングガイド](./docs/TROUBLESHOOTING.md)** - 問題解決手順とエラー対処法
+- **[バックアップ・リストア手順書](./docs/BACKUP_RESTORE.md)** - バックアップ戦略と災害復旧計画
+- **[デプロイメント手順書](./docs/DEPLOYMENT_GUIDE.md)** - 開発環境から本番環境へのデプロイ手順
+
+### 📊 ダッシュボード一覧
+- **[統合ダッシュボード](https://5e724f58.jiyushindo-gakushu.pages.dev/dashboard.html)** - 教師/学生用統合ダッシュボード
+- **[保護者ダッシュボード](https://5e724f58.jiyushindo-gakushu.pages.dev/parent-dashboard.html)** - 保護者向け学習進捗確認
+- **[セキュリティダッシュボード](https://5e724f58.jiyushindo-gakushu.pages.dev/security-dashboard.html)** - セキュリティ監視と監査ログ
+- **[パフォーマンスダッシュボード](https://5e724f58.jiyushindo-gakushu.pages.dev/performance-dashboard.html)** - パフォーマンスメトリクスとエラー監視
 # GitHub Actions auto-deploy test - Fri Jan 30 06:39:43 UTC 2026
