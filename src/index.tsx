@@ -24,7 +24,13 @@ import {
   ScTNScoreCache,
   RankingCache,
   ClassStatsCache,
-  getCacheStats
+  getCacheStats,
+  getCachedOrFetch,
+  CACHE_TTL,
+  generateCacheKey,
+  setToCache,
+  deleteFromCache,
+  invalidateCachePattern
 } from './cache'
 import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
@@ -1463,45 +1469,60 @@ app.get('/api/curriculum', async (c) => {
   const { env } = c
   
   try {
-    const result = await env.DB.prepare(`
-      SELECT 
-        id, grade, subject, textbook_company, unit_name, 
-        unit_order, total_hours, unit_goal, non_cognitive_goal
-      FROM curriculum
-      ORDER BY grade, unit_order
-    `).all()
+    // キャッシュを使用
+    const cached = await getCachedOrFetch(
+      env.KV,
+      'curriculum:all',
+      CACHE_TTL.CURRICULUM,
+      async () => {
+        const result = await env.DB.prepare(`
+          SELECT 
+            id, grade, subject, textbook_company, unit_name, 
+            unit_order, total_hours, unit_goal, non_cognitive_goal
+          FROM curriculum
+          ORDER BY grade, unit_order
+        `).all()
+        
+        // Map id to curriculum_id for frontend compatibility
+        return result.results.map(c => ({
+          ...c,
+          curriculum_id: c.id
+        }))
+      }
+    )
     
-    // Map id to curriculum_id for frontend compatibility
-    const curriculums = result.results.map(c => ({
-      ...c,
-      curriculum_id: c.id
-    }))
-    
-    return c.json(curriculums)
+    return c.json(cached)
   } catch (error) {
     return c.json({ error: 'Database error' }, 500)
   }
 })
 
-// APIルート：学年と教科の一覧取得
 // APIルート：全カリキュラム一覧取得
 app.get('/api/curriculum/list', async (c) => {
   const { env } = c
   
   try {
-    const result = await env.DB.prepare(`
-      SELECT id, grade, subject, unit_name, textbook_company as textbook, created_at
-      FROM curriculum
-      ORDER BY created_at DESC
-    `).all()
+    // キャッシュを使用
+    const cached = await getCachedOrFetch(
+      env.KV,
+      'curriculum:list',
+      CACHE_TTL.CURRICULUM,
+      async () => {
+        const result = await env.DB.prepare(`
+          SELECT id, grade, subject, unit_name, textbook_company as textbook, created_at
+          FROM curriculum
+          ORDER BY created_at DESC
+        `).all()
+        
+        // Map id to curriculum_id for frontend compatibility
+        return result.results.map(c => ({
+          ...c,
+          curriculum_id: c.id
+        }))
+      }
+    )
     
-    // Map id to curriculum_id for frontend compatibility
-    const curriculums = result.results.map(c => ({
-      ...c,
-      curriculum_id: c.id
-    }))
-    
-    return c.json(curriculums)
+    return c.json(cached)
   } catch (error) {
     console.error('Curriculum list error:', error)
     return c.json({ error: 'Database error' }, 500)
