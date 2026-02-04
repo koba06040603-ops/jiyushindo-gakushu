@@ -10,6 +10,3 @@
 /performance-dashboard  /performance-dashboard.html  200
 /auth-demo  /auth-demo.html  200
 /admin-preview  /admin-preview.html  200
-
-# Fallback for any .html file
-/*.html  /:splat.html  200
