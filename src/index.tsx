@@ -22112,4 +22112,276 @@ app.post('/api/ai-tutor/feedback', authMiddleware, async (c) => {
   }
 })
 
+// ========================================
+// Phase 12-2: 自動問題生成API
+// ========================================
+
+import { 
+  ProblemGeneratorEngine, 
+  type ProblemGenerationRequest,
+  type GeneratedProblem,
+  DIFFICULTY_LEVELS,
+  PROBLEM_TYPES
+} from './problem-generator'
+
+// 問題生成エンジン初期化
+let problemGeneratorEngine: ProblemGeneratorEngine | null = null
+
+function getProblemGeneratorEngine(): ProblemGeneratorEngine {
+  if (!problemGeneratorEngine) {
+    problemGeneratorEngine = new ProblemGeneratorEngine()
+  }
+  return problemGeneratorEngine
+}
+
+/**
+ * POST /api/problems/generate - 問題自動生成
+ */
+app.post('/api/problems/generate', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    const body = await c.req.json()
+    const { subject, unitName, difficulty, count, problemType } = body
+    
+    if (!subject) {
+      return c.json({ success: false, error: '教科を指定してください' }, 400)
+    }
+    
+    const request: ProblemGenerationRequest = {
+      studentId: user.user_id,
+      subject,
+      unitName,
+      difficulty: difficulty || 'medium',
+      count: Math.min(count || 5, 10), // 最大10問
+      problemType
+    }
+    
+    // 問題生成エンジン取得
+    const engine = getProblemGeneratorEngine()
+    
+    // 問題生成
+    const problems = await engine.generateProblems(request, env.DB, env.AI)
+    
+    // 生成した問題をDBに保存
+    const savedProblems: GeneratedProblem[] = []
+    
+    for (const problem of problems) {
+      const result = await env.DB.prepare(`
+        INSERT INTO generated_problems 
+        (student_id, question, correct_answer, explanation, difficulty, subject, unit_name, problem_type, hints, school_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        user.user_id,
+        problem.question,
+        problem.correctAnswer,
+        problem.explanation,
+        problem.difficulty,
+        problem.subject,
+        problem.unitName,
+        problem.problemType,
+        JSON.stringify(problem.hints || []),
+        user.school_id || 1
+      ).run()
+      
+      savedProblems.push({
+        ...problem,
+        problemId: result.meta.last_row_id as number
+      })
+    }
+    
+    return c.json({
+      success: true,
+      problems: savedProblems,
+      count: savedProblems.length
+    })
+  } catch (error: any) {
+    console.error('❌ 問題生成エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '問題の生成に失敗しました',
+      details: error.message 
+    }, 500)
+  }
+})
+
+/**
+ * GET /api/problems/history - 生成済み問題履歴
+ */
+app.get('/api/problems/history', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    const limit = parseInt(c.req.query('limit') || '20')
+    const subject = c.req.query('subject')
+    
+    let query = `
+      SELECT 
+        problem_id,
+        question,
+        correct_answer,
+        explanation,
+        difficulty,
+        subject,
+        unit_name,
+        problem_type,
+        hints,
+        is_attempted,
+        is_correct,
+        created_at
+      FROM generated_problems
+      WHERE student_id = ?
+    `
+    
+    const params: any[] = [user.user_id]
+    
+    if (subject) {
+      query += ` AND subject = ?`
+      params.push(subject)
+    }
+    
+    query += ` ORDER BY created_at DESC LIMIT ?`
+    params.push(limit)
+    
+    const problems = await env.DB.prepare(query).bind(...params).all()
+    
+    // JSONパース
+    const parsedProblems = problems.results.map((p: any) => ({
+      ...p,
+      hints: p.hints ? JSON.parse(p.hints) : []
+    }))
+    
+    return c.json({
+      success: true,
+      problems: parsedProblems
+    })
+  } catch (error: any) {
+    console.error('❌ 問題履歴取得エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '問題履歴の取得に失敗しました' 
+    }, 500)
+  }
+})
+
+/**
+ * POST /api/problems/:problemId/submit - 問題の回答提出
+ */
+app.post('/api/problems/:problemId/submit', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  const problemId = c.req.param('problemId')
+  
+  try {
+    const { userAnswer } = await c.req.json()
+    
+    if (!userAnswer) {
+      return c.json({ success: false, error: '回答を入力してください' }, 400)
+    }
+    
+    // 問題取得
+    const problem = await env.DB.prepare(`
+      SELECT * FROM generated_problems
+      WHERE problem_id = ? AND student_id = ?
+    `).bind(problemId, user.user_id).first()
+    
+    if (!problem) {
+      return c.json({ success: false, error: '問題が見つかりません' }, 404)
+    }
+    
+    // 正誤判定（柔軟なマッチング）
+    const correctAnswer = (problem.correct_answer as string).toLowerCase().trim()
+    const userAnswerNormalized = userAnswer.toLowerCase().trim()
+    const isCorrect = 
+      correctAnswer === userAnswerNormalized ||
+      correctAnswer.includes(userAnswerNormalized) ||
+      userAnswerNormalized.includes(correctAnswer)
+    
+    // 結果保存
+    await env.DB.prepare(`
+      UPDATE generated_problems
+      SET is_attempted = 1, is_correct = ?, user_answer = ?, attempted_at = CURRENT_TIMESTAMP
+      WHERE problem_id = ?
+    `).bind(isCorrect ? 1 : 0, userAnswer, problemId).run()
+    
+    return c.json({
+      success: true,
+      isCorrect,
+      correctAnswer: problem.correct_answer,
+      explanation: problem.explanation,
+      hints: problem.hints ? JSON.parse(problem.hints as string) : []
+    })
+  } catch (error: any) {
+    console.error('❌ 回答提出エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '回答の提出に失敗しました' 
+    }, 500)
+  }
+})
+
+/**
+ * GET /api/problems/performance - 学習パフォーマンス分析
+ */
+app.get('/api/problems/performance', authMiddleware, async (c) => {
+  const { env } = c
+  const user = c.get('user')
+  
+  try {
+    const subject = c.req.query('subject') || '数学'
+    
+    // 問題生成エンジン取得
+    const engine = getProblemGeneratorEngine()
+    
+    // パフォーマンス分析
+    const performance = await engine.analyzeStudentPerformance(
+      env.DB,
+      user.user_id,
+      subject
+    )
+    
+    // 生成済み問題の統計
+    const generatedStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_generated,
+        SUM(CASE WHEN is_attempted = 1 THEN 1 ELSE 0 END) as attempted,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
+        subject,
+        difficulty
+      FROM generated_problems
+      WHERE student_id = ? AND subject = ?
+      GROUP BY subject, difficulty
+    `).bind(user.user_id, subject).all()
+    
+    return c.json({
+      success: true,
+      performance,
+      generatedStats: generatedStats.results,
+      recommendedDifficulty: performance.recommendedDifficulty
+    })
+  } catch (error: any) {
+    console.error('❌ パフォーマンス分析エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: 'パフォーマンス分析に失敗しました' 
+    }, 500)
+  }
+})
+
+/**
+ * GET /api/problems/metadata - 問題生成メタデータ
+ */
+app.get('/api/problems/metadata', authMiddleware, async (c) => {
+  return c.json({
+    success: true,
+    metadata: {
+      difficulties: DIFFICULTY_LEVELS,
+      problemTypes: PROBLEM_TYPES,
+      subjects: ['数学', '国語', '理科', '社会', '英語']
+    }
+  })
+})
+
 export default app
