@@ -22695,4 +22695,310 @@ app.get('/api/cognitive/elaboration-prompts', authMiddleware, async (c) => {
   }
 })
 
+/**
+ * ========================================
+ * Phase 12-4: AIフィードバックシステムAPI
+ * ========================================
+ */
+
+import {
+  gradeAnswer,
+  generateDetailedExplanation,
+  generateLearningAdvice,
+  generateWeeklyReport,
+  generateMonthlyReport,
+} from './ai-feedback'
+
+/**
+ * POST /api/feedback/grade - 解答を採点してフィードバックを生成
+ */
+app.post('/api/feedback/grade', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { problem_id, student_answer } = await c.req.json()
+
+    if (!problem_id || !student_answer) {
+      return c.json({ success: false, error: '問題IDと解答が必要です' }, 400)
+    }
+
+    // 問題情報を取得
+    const problem = await env.DB.prepare(
+      `SELECT * FROM generated_problems WHERE id = ? AND student_id = ?`
+    ).bind(problem_id, user.id).first()
+
+    if (!problem) {
+      return c.json({ success: false, error: '問題が見つかりません' }, 404)
+    }
+
+    // AI自動添削
+    const feedback = await gradeAnswer(
+      env,
+      problem.question,
+      problem.correct_answer,
+      student_answer,
+      problem.subject,
+      problem.difficulty
+    )
+
+    // 解答履歴を保存
+    await env.DB.prepare(`
+      INSERT INTO answer_history (
+        student_id, problem_id, student_answer, is_correct, 
+        feedback_text, feedback_score, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      user.id,
+      problem_id,
+      student_answer,
+      feedback.isCorrect ? 1 : 0,
+      feedback.feedback,
+      feedback.score
+    ).run()
+
+    // 問題の解答済みフラグと正誤を更新
+    await env.DB.prepare(`
+      UPDATE generated_problems 
+      SET is_attempted = 1, is_correct = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).bind(feedback.isCorrect ? 1 : 0, problem_id).run()
+
+    return c.json({
+      success: true,
+      feedback
+    })
+  } catch (error: any) {
+    console.error('❌ 自動添削エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '自動添削に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * POST /api/feedback/explanation - 詳細解説を生成
+ */
+app.post('/api/feedback/explanation', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { problem_id } = await c.req.json()
+
+    if (!problem_id) {
+      return c.json({ success: false, error: '問題IDが必要です' }, 400)
+    }
+
+    // 問題情報と解答履歴を取得
+    const problem = await env.DB.prepare(
+      `SELECT * FROM generated_problems WHERE id = ? AND student_id = ?`
+    ).bind(problem_id, user.id).first()
+
+    if (!problem) {
+      return c.json({ success: false, error: '問題が見つかりません' }, 404)
+    }
+
+    const answerHistory = await env.DB.prepare(
+      `SELECT * FROM answer_history WHERE problem_id = ? AND student_id = ? ORDER BY created_at DESC LIMIT 1`
+    ).bind(problem_id, user.id).first()
+
+    // 詳細解説を生成
+    const explanation = await generateDetailedExplanation(
+      env,
+      problem.question,
+      problem.correct_answer,
+      answerHistory?.student_answer,
+      problem.subject,
+      problem.difficulty
+    )
+
+    return c.json({
+      success: true,
+      explanation
+    })
+  } catch (error: any) {
+    console.error('❌ 詳細解説生成エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '詳細解説の生成に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * GET /api/feedback/advice - 学習改善提案を取得
+ */
+app.get('/api/feedback/advice', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+
+    // 学習履歴を取得
+    const recentHistory = await env.DB.prepare(`
+      SELECT 
+        gp.subject,
+        gp.difficulty,
+        ah.is_correct,
+        ah.feedback_score,
+        ah.created_at
+      FROM answer_history ah
+      JOIN generated_problems gp ON ah.problem_id = gp.id
+      WHERE ah.student_id = ?
+      ORDER BY ah.created_at DESC
+      LIMIT 50
+    `).bind(user.id).all()
+
+    if (recentHistory.results.length === 0) {
+      return c.json({
+        success: true,
+        advice: {
+          generalAdvice: 'まだ学習履歴がありません。問題を解いて学習を始めましょう！',
+          specificAdvice: [],
+          encouragement: '新しい学習の旅を始めましょう！'
+        }
+      })
+    }
+
+    // AI学習改善提案を生成
+    const advice = await generateLearningAdvice(
+      env,
+      recentHistory.results
+    )
+
+    return c.json({
+      success: true,
+      advice
+    })
+  } catch (error: any) {
+    console.error('❌ 学習改善提案生成エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '学習改善提案の生成に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * GET /api/feedback/weekly-report - 週次レポートを取得
+ */
+app.get('/api/feedback/weekly-report', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+
+    // 過去7日間の学習履歴を取得
+    const weekHistory = await env.DB.prepare(`
+      SELECT 
+        gp.subject,
+        gp.difficulty,
+        ah.is_correct,
+        ah.feedback_score,
+        ah.created_at
+      FROM answer_history ah
+      JOIN generated_problems gp ON ah.problem_id = gp.id
+      WHERE ah.student_id = ? 
+        AND ah.created_at >= datetime('now', '-7 days')
+      ORDER BY ah.created_at DESC
+    `).bind(user.id).all()
+
+    if (weekHistory.results.length === 0) {
+      return c.json({
+        success: true,
+        report: {
+          summary: '今週の学習記録がありません',
+          achievements: [],
+          improvements: [],
+          nextSteps: ['学習を始めましょう！']
+        }
+      })
+    }
+
+    // 週次レポートを生成
+    const report = await generateWeeklyReport(
+      env,
+      weekHistory.results
+    )
+
+    return c.json({
+      success: true,
+      report
+    })
+  } catch (error: any) {
+    console.error('❌ 週次レポート生成エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '週次レポートの生成に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * GET /api/feedback/monthly-report - 月次レポートを取得
+ */
+app.get('/api/feedback/monthly-report', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+
+    // 過去30日間の学習履歴を取得
+    const monthHistory = await env.DB.prepare(`
+      SELECT 
+        gp.subject,
+        gp.difficulty,
+        ah.is_correct,
+        ah.feedback_score,
+        ah.created_at
+      FROM answer_history ah
+      JOIN generated_problems gp ON ah.problem_id = gp.id
+      WHERE ah.student_id = ? 
+        AND ah.created_at >= datetime('now', '-30 days')
+      ORDER BY ah.created_at DESC
+    `).bind(user.id).all()
+
+    if (monthHistory.results.length === 0) {
+      return c.json({
+        success: true,
+        report: {
+          summary: '今月の学習記録がありません',
+          achievements: [],
+          trends: [],
+          longTermGoals: ['学習習慣を確立しましょう']
+        }
+      })
+    }
+
+    // 月次レポートを生成
+    const report = await generateMonthlyReport(
+      env,
+      monthHistory.results
+    )
+
+    return c.json({
+      success: true,
+      report
+    })
+  } catch (error: any) {
+    console.error('❌ 月次レポート生成エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '月次レポートの生成に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
 export default app

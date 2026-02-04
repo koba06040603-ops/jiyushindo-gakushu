@@ -60,6 +60,9 @@
                 <a href="/ai-tutor.html" class="px-4 py-2 bg-purple-500 hover:bg-purple-700 rounded-lg transition">
                     <i class="fas fa-robot mr-2"></i>AIチューター
                 </a>
+                <a href="/feedback-dashboard.html" class="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 rounded-lg transition">
+                    <i class="fas fa-chart-line mr-2"></i>フィードバック
+                </a>
                 <button id="logoutBtn" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition">
                     <i class="fas fa-sign-out-alt mr-2"></i>ログアウト
                 </button>
@@ -491,12 +494,66 @@
                 return
             }
             
+            // ローディング表示
+            resultArea.classList.remove('hidden')
+            resultArea.innerHTML = `
+                <div class="text-center py-4">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                    <p class="mt-2 text-gray-600">AIが採点中...</p>
+                </div>
+            `
+            
             try {
-                const response = await axios.post(`/api/problems/${problemId}/submit`, {
-                    userAnswer
+                // AIフィードバックAPIを呼び出し
+                const response = await axios.post('/api/feedback/grade', {
+                    problem_id: problemId,
+                    student_answer: userAnswer
                 })
                 
                 if (response.data.success) {
+                    const { feedback } = response.data
+                    
+                    // フィードバック表示
+                    resultArea.innerHTML = `
+                        <div class="${feedback.isCorrect ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'} border-l-4 p-4 rounded">
+                            <div class="flex items-start mb-3">
+                                <i class="fas ${feedback.isCorrect ? 'fa-check-circle text-green-500' : 'fa-times-circle text-red-500'} text-3xl mr-3"></i>
+                                <div class="flex-1">
+                                    <h4 class="text-xl font-bold ${feedback.isCorrect ? 'text-green-800' : 'text-red-800'} mb-2">
+                                        ${feedback.isCorrect ? '正解です！' : '不正解です'}
+                                    </h4>
+                                    <div class="flex items-center mb-2">
+                                        <span class="text-sm font-semibold ${feedback.isCorrect ? 'text-green-700' : 'text-red-700'} mr-2">得点:</span>
+                                        <div class="flex-1 bg-gray-200 rounded-full h-2 mr-2">
+                                            <div class="bg-gradient-to-r ${feedback.isCorrect ? 'from-green-400 to-green-600' : 'from-red-400 to-red-600'} h-2 rounded-full" 
+                                                style="width: ${feedback.score}%"></div>
+                                        </div>
+                                        <span class="text-sm font-bold ${feedback.isCorrect ? 'text-green-700' : 'text-red-700'}">${feedback.score}点</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded p-3 mb-3">
+                                <p class="text-sm font-semibold text-gray-700 mb-1">フィードバック:</p>
+                                <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(feedback.feedback)}</p>
+                            </div>
+                            ${!feedback.isCorrect ? `
+                                <button 
+                                    onclick="showDetailedExplanation(${problemId})"
+                                    class="w-full mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                                >
+                                    <i class="fas fa-book-open mr-2"></i>詳しい解説を見る
+                                </button>
+                            ` : ''}
+                        </div>
+                    `
+                    
+                    // 提出ボタンを無効化
+                    document.getElementById('submitAnswer').disabled = true
+                    document.getElementById('submitAnswer').classList.add('opacity-50', 'cursor-not-allowed')
+                    
+                    // 問題生成履歴を更新
+                    loadHistory()
+                } else {
                     const isCorrect = response.data.isCorrect
                     const correctAnswer = response.data.correctAnswer
                     const explanation = response.data.explanation
@@ -523,7 +580,86 @@
                 }
             } catch (error) {
                 console.error('❌ 回答提出エラー:', error)
-                showError('エラーが発生しました')
+                resultArea.innerHTML = `
+                    <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                        <p class="text-red-700">エラーが発生しました</p>
+                    </div>
+                `
+            }
+        }
+
+        // 詳しい解説を表示
+        async function showDetailedExplanation(problemId) {
+            const resultArea = document.getElementById('resultArea')
+            
+            // ローディング表示
+            resultArea.innerHTML += `
+                <div id="explanationLoading" class="mt-4 text-center py-4">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <p class="mt-2 text-gray-600">AI解説を生成中...</p>
+                </div>
+            `
+            
+            try {
+                const response = await axios.post('/api/feedback/explanation', {
+                    problem_id: problemId
+                })
+                
+                if (response.data.success) {
+                    const { explanation } = response.data
+                    
+                    // ローディングを削除
+                    document.getElementById('explanationLoading').remove()
+                    
+                    // 解説を表示
+                    resultArea.innerHTML += `
+                        <div class="mt-4 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                            <h4 class="font-bold text-blue-800 mb-3 flex items-center">
+                                <i class="fas fa-book-open mr-2"></i>
+                                詳しい解説
+                            </h4>
+                            
+                            <div class="space-y-3">
+                                <div class="bg-white rounded p-3">
+                                    <p class="text-sm font-semibold text-gray-700 mb-1">🎯 正しい答え:</p>
+                                    <p class="text-gray-800">${escapeHtml(explanation.correctAnswer)}</p>
+                                </div>
+                                
+                                <div class="bg-white rounded p-3">
+                                    <p class="text-sm font-semibold text-gray-700 mb-1">📝 解説:</p>
+                                    <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(explanation.explanation)}</p>
+                                </div>
+                                
+                                ${explanation.commonMistakes ? `
+                                    <div class="bg-white rounded p-3">
+                                        <p class="text-sm font-semibold text-gray-700 mb-1">⚠️ よくある間違い:</p>
+                                        <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(explanation.commonMistakes)}</p>
+                                    </div>
+                                ` : ''}
+                                
+                                ${explanation.hints && explanation.hints.length > 0 ? `
+                                    <div class="bg-white rounded p-3">
+                                        <p class="text-sm font-semibold text-gray-700 mb-2">💡 解き方のヒント:</p>
+                                        <ul class="list-disc list-inside space-y-1">
+                                            ${explanation.hints.map(hint => `
+                                                <li class="text-gray-700">${escapeHtml(hint)}</li>
+                                            `).join('')}
+                                        </ul>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `
+                } else {
+                    document.getElementById('explanationLoading').innerHTML = `
+                        <p class="text-red-600">解説の生成に失敗しました</p>
+                    `
+                }
+            } catch (error) {
+                console.error('❌ 解説生成エラー:', error)
+                document.getElementById('explanationLoading').innerHTML = `
+                    <p class="text-red-600">エラーが発生しました</p>
+                `
             }
         }
 
