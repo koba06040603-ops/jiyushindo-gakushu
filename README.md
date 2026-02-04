@@ -5,17 +5,21 @@
 ## 🌐 本番環境URL
 
 **本番デプロイ完了！** ✅  
-- **本番URL**: https://57db13d5.jiyushindo-gakushu.pages.dev
-- **最新デプロイURL**: https://57db13d5.jiyushindo-gakushu.pages.dev
+- **本番URL**: https://c0d409c4.jiyushindo-gakushu.pages.dev
+- **最新デプロイURL**: https://c0d409c4.jiyushindo-gakushu.pages.dev
 - **API仕様書**: https://6cef01f8.jiyushindo-gakushu.pages.dev/static/api-docs
 - **管理者プレビュー**: ローカル環境で `dist/admin-preview.html` を直接開く（実装済み、498行）
 - **デプロイ日時**: 2026-02-04
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 🟢 Active
 - **最新機能**: 
-  - ✅ **Phase 4-1**: 認証システムのデータベース設計完了（auth_users, auth_sessions, schools テーブル）
-  - ✅ ログインAPI・ログアウトAPI・セッション検証API実装
-  - ✅ テストデータ挿入（教師・学生・管理者アカウント）
+  - ✅ **Phase 4完了**: 完全な認証・権限管理システム
+    - Phase 4-1: データベース設計（auth_users, auth_sessions, schools）
+    - Phase 4-2: フロントエンドログイン画面統合
+    - Phase 4-3: 認証ミドルウェア（authMiddleware, requireRole, requirePermission）
+    - Phase 4-4: bcryptパスワードハッシュ化
+    - Phase 4-5: リフレッシュトークン（7日間有効）
+    - Phase 4-6: 権限管理システム（permissions, role_permissions）
   - ✅ ケース1-3: 基本個別最適化（得意・苦手・欠席対応）
   - ✅ ケース4-6: 学習スタイル別動画生成（視覚・聴覚・体感優位型対応）
   - ✅ ケース7-9: 特別支援・保護者サポート・教師向け分析
@@ -28,7 +32,52 @@
 **名前**: 自由進度学習支援システム  
 **目標**: 子どもたちが自ら考え実行する力を育み、個別最適な学びを実現する  
 
-## 🔐 認証システム（Phase 4-1 完了）
+## 🔐 認証システム（Phase 4 完了）
+
+### Phase 4実装内容
+
+#### Phase 4-1: データベース設計
+- **auth_users**: ユーザー情報（username, password_hash, full_name, user_role, school_id）
+- **auth_sessions**: セッション管理（session_token, refresh_token, expires_at, refresh_expires_at）
+- **schools**: 学校情報
+- **classes**: クラス情報
+
+#### Phase 4-2: フロントエンドログイン画面
+- ログイン画面UI実装
+- セッション検証機能
+- 自動ログイン（セッション復元）
+- デモモード（認証なし）
+
+#### Phase 4-3: 認証ミドルウェア
+- **authMiddleware**: セッショントークン検証
+- **requireRole**: ロールベースアクセス制御
+- **requirePermission**: 権限ベースアクセス制御
+
+#### Phase 4-4: パスワードハッシュ化
+- bcryptjsによる安全なパスワードハッシュ化
+- テストデータ全アカウントのパスワードハッシュ更新
+
+#### Phase 4-5: リフレッシュトークン
+- セッショントークン（24時間有効）
+- リフレッシュトークン（7日間有効）
+- リフレッシュAPI実装
+
+#### Phase 4-6: 権限管理システム
+- **permissions**: 権限定義テーブル
+- **role_permissions**: ロール権限マッピング
+- デフォルト権限設定（admin, teacher, student）
+
+### 認証API
+
+| エンドポイント | メソッド | 説明 | 認証 |
+|--------------|---------|------|------|
+| /api/auth/login | POST | ログイン | - |
+| /api/auth/logout | POST | ログアウト | ✅ |
+| /api/auth/verify | POST | セッション検証 | - |
+| /api/auth/refresh | POST | トークンリフレッシュ | - |
+| /api/auth/users | GET | ユーザー一覧 | ✅ Admin/Teacher |
+| /api/auth/permissions | GET | 権限一覧 | ✅ Admin |
+| /api/auth/user-permissions/:userId | GET | ユーザー権限取得 | ✅ |
 
 ### テストアカウント
 
@@ -43,19 +92,20 @@
 | 学生 | student3 | password123 | 高橋 三郎 |
 | 管理者 | admin1 | password123 | 管理者 |
 
-### 認証API
+### 権限体系
 
-- **POST /api/auth/login**: ログイン
-- **POST /api/auth/logout**: ログアウト
-- **POST /api/auth/verify**: セッション検証
-- **GET /api/auth/users**: ユーザー一覧（管理者・教師用）
+#### 管理者（admin）
+- すべての権限を保持
 
-### データベース構造
+#### 教師（teacher）
+- curriculum:read, curriculum:write
+- students:read, students:write
+- reports:read, reports:write
+- learning:read, learning:write
 
-- **auth_users**: ユーザー情報（username, full_name, user_role, school_id）
-- **auth_sessions**: セッション管理（session_token, expires_at）
-- **schools**: 学校情報
-- **classes**: クラス情報
+#### 学生（student）
+- curriculum:read
+- learning:read, learning:write
 
 ## 🎉 最新アップデート（2026-02-03）
 
