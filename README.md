@@ -4,12 +4,14 @@
 
 ## 🌐 本番環境URL
 
-**Phase 9デプロイ完了！** ✅  
-- **本番URL**: https://225d2391.jiyushindo-gakushu.pages.dev
-- **ダッシュボード**: https://225d2391.jiyushindo-gakushu.pages.dev/dashboard.html
-- **保護者ダッシュボード**: https://225d2391.jiyushindo-gakushu.pages.dev/parent-dashboard.html
+**Phase 10-1デプロイ完了！** ✅  
+- **本番URL**: https://8f268ac8.jiyushindo-gakushu.pages.dev
+- **ダッシュボード**: https://8f268ac8.jiyushindo-gakushu.pages.dev/dashboard.html
+- **保護者ダッシュボード**: https://8f268ac8.jiyushindo-gakushu.pages.dev/parent-dashboard.html
+- **セキュリティダッシュボード**: https://8f268ac8.jiyushindo-gakushu.pages.dev/security-dashboard.html
 - **PWA対応**: ✅ オフライン機能、ホーム画面追加、プッシュ通知
-- **API仕様書**: https://225d2391.jiyushindo-gakushu.pages.dev/static/api-docs
+- **セキュリティ**: ✅ CSRF保護、レート制限、セキュリティヘッダー
+- **API仕様書**: https://8f268ac8.jiyushindo-gakushu.pages.dev/static/api-docs
 - **デプロイ日時**: 2026-02-04
 - **プラットフォーム**: Cloudflare Pages
 - **ステータス**: 🟢 Active
@@ -19,6 +21,57 @@
 - **Phase 7完了**: ✅ 100% - 超高度な機能実装完了
 - **Phase 8完了**: ✅ 100% - DBスキーマ同期 + 統合ダッシュボード完了
 - **Phase 9完了**: ✅ 100% - 保護者機能 + PWA対応完了
+- **Phase 10-1完了**: ✅ 100% - セキュリティ強化完了
+
+## Phase 10-1: セキュリティ強化 🔒
+
+### セキュリティ機能（完了）
+- ✅ **CSRF保護**
+  - トークン生成API: `GET /api/security/csrf-token`
+  - CSRFミドルウェアによる自動検証
+  - POST/PUT/DELETE リクエストで必須
+  - トークン有効期限: 1時間
+  
+- ✅ **レート制限**
+  - 全APIエンドポイントに適用
+  - デフォルト: 100リクエスト/分
+  - IPアドレスベースの制限
+  - 制限超過時: HTTP 429エラー
+  
+- ✅ **セキュリティヘッダー**
+  - Content-Security-Policy (CSP)
+  - X-Content-Type-Options: nosniff
+  - X-Frame-Options: DENY
+  - X-XSS-Protection: 1; mode=block
+  - Strict-Transport-Security (HSTS)
+  - Referrer-Policy
+  - Permissions-Policy
+  
+- ✅ **入力サニタイゼーション**
+  - XSS対策: HTMLタグ、JavaScriptプロトコル除去
+  - 最大文字数制限: 10,000文字
+  - グローバル関数: `sanitizeInput()`
+  
+- ✅ **SQLインジェクション対策**
+  - パラメータ検証関数
+  - 危険なSQLキーワード検出
+  - プリペアドステートメント使用
+  - グローバル関数: `validateSQLParam()`
+  
+- ✅ **セキュリティ監査ログ**
+  - 4つの新規テーブル
+    - security_audit_logs（監査ログ）
+    - security_settings（セキュリティ設定）
+    - rate_limit_logs（レート制限ログ）
+    - failed_login_attempts（ログイン失敗記録）
+  - API: `POST /api/security/audit-log`
+  
+- ✅ **セキュリティダッシュボード**
+  - 管理者専用画面
+  - セキュリティスキャン機能
+  - 監査ログ閲覧
+  - ステータス監視
+  - API: `GET /api/security/scan`
 
 ## Phase 9: 保護者機能とPWA対応 🎉📱
 
