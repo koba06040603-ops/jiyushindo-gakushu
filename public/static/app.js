@@ -37113,3 +37113,819 @@ window.closeTrendsModal = closeTrendsModal
 window.closeOnlineUsersModal = closeOnlineUsersModal
 
 console.log('✅ Phase 6: 高度な機能を読み込みました')
+
+// ============================================
+// Phase 7-1: データ可視化（Chart.js統合）
+// ============================================
+
+// Chart.js CDN読み込み確認
+function ensureChartJS() {
+  return new Promise((resolve) => {
+    if (window.Chart) {
+      resolve()
+      return
+    }
+    
+    const script = document.createElement('script')
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
+    script.onload = () => resolve()
+    document.head.appendChild(script)
+  })
+}
+
+// 学習統計ダッシュボード表示
+async function showStatsDashboard(studentId) {
+  try {
+    await ensureChartJS()
+    showLoadingWithRetry('統計ダッシュボードを読み込み中...')
+    
+    // 複数のAPIからデータ取得
+    const [trendsRes, weakRes] = await Promise.all([
+      fetchWithRetry(`/api/analytics/learning-trends/${studentId}?period=month`),
+      fetchWithRetry(`/api/analytics/weak-points/${studentId}`)
+    ])
+    
+    const trendsData = await trendsRes.json()
+    const weakData = await weakRes.json()
+    
+    hideLoading()
+    
+    if (!trendsData.success || !weakData.success) {
+      showNotification('統計データの取得に失敗しました', 'error')
+      return
+    }
+    
+    // モーダルHTML
+    const modalHTML = `
+      <div id="dashboardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 fade-in" onclick="closeDashboard(event)">
+        <div class="bg-white rounded-lg max-w-7xl w-full max-h-[95vh] overflow-y-auto" onclick="event.stopPropagation()">
+          <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-lg sticky top-0 z-10">
+            <h2 class="text-3xl font-bold flex items-center gap-3">
+              <i class="fas fa-chart-bar"></i>
+              学習統計ダッシュボード
+            </h2>
+            <p class="text-blue-100 mt-2">過去30日間の詳細分析</p>
+          </div>
+          
+          <div class="p-6 space-y-6">
+            <!-- サマリーカード -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-blue-100 text-sm">総学習問題数</p>
+                    <p class="text-4xl font-bold mt-2">${trendsData.daily_stats.reduce((sum, d) => sum + d.total_problems, 0)}</p>
+                  </div>
+                  <i class="fas fa-book-open text-5xl opacity-20"></i>
+                </div>
+              </div>
+              
+              <div class="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-lg shadow-lg">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-green-100 text-sm">平均正答率</p>
+                    <p class="text-4xl font-bold mt-2">${(trendsData.daily_stats.reduce((sum, d) => sum + (d.correct_count / d.total_problems * 100), 0) / trendsData.daily_stats.length).toFixed(1)}%</p>
+                  </div>
+                  <i class="fas fa-check-circle text-5xl opacity-20"></i>
+                </div>
+              </div>
+              
+              <div class="bg-gradient-to-br from-orange-500 to-orange-600 text-white p-6 rounded-lg shadow-lg">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-orange-100 text-sm">学習日数</p>
+                    <p class="text-4xl font-bold mt-2">${trendsData.daily_stats.length}</p>
+                  </div>
+                  <i class="fas fa-calendar-check text-5xl opacity-20"></i>
+                </div>
+              </div>
+              
+              <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-lg shadow-lg">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-purple-100 text-sm">苦手単元</p>
+                    <p class="text-4xl font-bold mt-2">${weakData.weak_units.length}</p>
+                  </div>
+                  <i class="fas fa-exclamation-triangle text-5xl opacity-20"></i>
+                </div>
+              </div>
+            </div>
+            
+            <!-- グラフエリア -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <!-- 日別正答率推移 -->
+              <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <i class="fas fa-chart-line text-blue-500"></i>
+                  日別正答率推移
+                </h3>
+                <canvas id="dailyAccuracyChart" height="200"></canvas>
+              </div>
+              
+              <!-- 教科別正答率 -->
+              <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <i class="fas fa-chart-pie text-green-500"></i>
+                  教科別正答率
+                </h3>
+                <canvas id="subjectAccuracyChart" height="200"></canvas>
+              </div>
+              
+              <!-- 時間帯別学習量 -->
+              <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <i class="fas fa-clock text-orange-500"></i>
+                  時間帯別学習量
+                </h3>
+                <canvas id="hourlyChart" height="200"></canvas>
+              </div>
+              
+              <!-- 苦手単元ランキング -->
+              <div class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <i class="fas fa-list-ol text-red-500"></i>
+                  苦手単元トップ5
+                </h3>
+                <canvas id="weakUnitsChart" height="200"></canvas>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-gray-50 border-t border-gray-200 p-6 flex justify-between items-center sticky bottom-0">
+            <div class="flex gap-2">
+              <button onclick="exportDashboardPDF()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-colors flex items-center gap-2">
+                <i class="fas fa-file-pdf"></i>
+                PDFエクスポート
+              </button>
+              <button onclick="exportDashboardImage()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors flex items-center gap-2">
+                <i class="fas fa-image"></i>
+                画像保存
+              </button>
+            </div>
+            <button onclick="closeDashboard()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg transition-colors">
+              閉じる
+            </button>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+    // グラフ描画
+    setTimeout(() => {
+      renderDashboardCharts(trendsData, weakData)
+    }, 100)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('ダッシュボード表示エラー:', error)
+    showNotification('ダッシュボードの表示に失敗しました', 'error')
+  }
+}
+
+// ダッシュボードグラフ描画
+function renderDashboardCharts(trendsData, weakData) {
+  // 日別正答率推移（折れ線グラフ）
+  const dailyCtx = document.getElementById('dailyAccuracyChart')
+  if (dailyCtx) {
+    new Chart(dailyCtx, {
+      type: 'line',
+      data: {
+        labels: trendsData.daily_stats.map(d => d.date.substring(5)).reverse(),
+        datasets: [{
+          label: '正答率',
+          data: trendsData.daily_stats.map(d => (d.correct_count / d.total_problems * 100).toFixed(1)).reverse(),
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `正答率: ${context.parsed.y}%`
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 100,
+            ticks: {
+              callback: (value) => value + '%'
+            }
+          }
+        }
+      }
+    })
+  }
+  
+  // 教科別正答率（ドーナツグラフ）
+  const subjectCtx = document.getElementById('subjectAccuracyChart')
+  if (subjectCtx) {
+    new Chart(subjectCtx, {
+      type: 'doughnut',
+      data: {
+        labels: trendsData.subject_stats.map(s => s.subject),
+        datasets: [{
+          data: trendsData.subject_stats.map(s => s.accuracy.toFixed(1)),
+          backgroundColor: [
+            'rgba(59, 130, 246, 0.8)',
+            'rgba(16, 185, 129, 0.8)',
+            'rgba(251, 146, 60, 0.8)',
+            'rgba(168, 85, 247, 0.8)',
+            'rgba(236, 72, 153, 0.8)'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: (context) => `${context.label}: ${context.parsed}%`
+            }
+          }
+        }
+      }
+    })
+  }
+  
+  // 時間帯別学習量（棒グラフ）
+  const hourlyCtx = document.getElementById('hourlyChart')
+  if (hourlyCtx) {
+    const hourlyData = Array.from({length: 24}, (_, i) => {
+      const hourData = trendsData.hourly_pattern.find(h => h.hour === i)
+      return hourData ? hourData.problem_count : 0
+    })
+    
+    new Chart(hourlyCtx, {
+      type: 'bar',
+      data: {
+        labels: Array.from({length: 24}, (_, i) => i + '時'),
+        datasets: [{
+          label: '問題数',
+          data: hourlyData,
+          backgroundColor: 'rgba(251, 146, 60, 0.8)',
+          borderColor: 'rgb(251, 146, 60)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    })
+  }
+  
+  // 苦手単元ランキング（横棒グラフ）
+  const weakCtx = document.getElementById('weakUnitsChart')
+  if (weakCtx) {
+    const topWeak = weakData.weak_units.slice(0, 5)
+    
+    new Chart(weakCtx, {
+      type: 'bar',
+      data: {
+        labels: topWeak.map(w => w.unit_name),
+        datasets: [{
+          label: '正答率',
+          data: topWeak.map(w => w.accuracy.toFixed(1)),
+          backgroundColor: 'rgba(239, 68, 68, 0.8)',
+          borderColor: 'rgb(239, 68, 68)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `正答率: ${context.parsed.x}%`
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            max: 100,
+            ticks: {
+              callback: (value) => value + '%'
+            }
+          }
+        }
+      }
+    })
+  }
+}
+
+function closeDashboard(event) {
+  if (event && event.target.id !== 'dashboardModal') return
+  const modal = document.getElementById('dashboardModal')
+  if (modal) modal.remove()
+}
+
+// グローバルに公開
+window.showStatsDashboard = showStatsDashboard
+window.closeDashboard = closeDashboard
+
+console.log('✅ Phase 7-1: データ可視化を読み込みました')
+
+// ============================================
+// Phase 7-2: Push通知（Web Push API）
+// ============================================
+
+// Push通知権限リクエスト
+async function requestPushNotification() {
+  if (!('Notification' in window)) {
+    showNotification('このブラウザはプッシュ通知に対応していません', 'warning')
+    return false
+  }
+  
+  try {
+    const permission = await Notification.requestPermission()
+    
+    if (permission === 'granted') {
+      showNotification('プッシュ通知が有効になりました', 'success')
+      // 権限状態を保存
+      localStorage.setItem('push_notification_enabled', 'true')
+      return true
+    } else if (permission === 'denied') {
+      showNotification('プッシュ通知が拒否されました。ブラウザ設定から変更できます', 'warning')
+      localStorage.setItem('push_notification_enabled', 'false')
+      return false
+    }
+    
+    return false
+  } catch (error) {
+    console.error('Push通知権限エラー:', error)
+    showNotification('プッシュ通知の設定に失敗しました', 'error')
+    return false
+  }
+}
+
+// ブラウザ通知を表示
+function showBrowserNotification(title, options = {}) {
+  if (!('Notification' in window)) return
+  
+  if (Notification.permission === 'granted') {
+    const notification = new Notification(title, {
+      icon: '/static/icon.png',
+      badge: '/static/badge.png',
+      vibrate: [200, 100, 200],
+      ...options
+    })
+    
+    // 通知クリック時の動作
+    notification.onclick = function(event) {
+      event.preventDefault()
+      window.focus()
+      if (options.url) {
+        window.location.href = options.url
+      }
+      notification.close()
+    }
+    
+    // 5秒後に自動で閉じる
+    setTimeout(() => notification.close(), 5000)
+    
+    return notification
+  } else if (Notification.permission !== 'denied') {
+    requestPushNotification().then(granted => {
+      if (granted) {
+        showBrowserNotification(title, options)
+      }
+    })
+  }
+}
+
+// 学習完了通知
+function notifyLearningComplete(curriculumName) {
+  showBrowserNotification('🎉 学習完了！', {
+    body: `「${curriculumName}」を完了しました！\n次の単元に進みましょう。`,
+    tag: 'learning-complete',
+    requireInteraction: false
+  })
+}
+
+// 達成度アップ通知
+function notifyAchievement(achievement) {
+  showBrowserNotification('🏆 達成度アップ！', {
+    body: achievement,
+    tag: 'achievement',
+    requireInteraction: false
+  })
+}
+
+// 教師コメント通知
+function notifyTeacherComment(teacherName, comment) {
+  showBrowserNotification('💬 先生からのコメント', {
+    body: `${teacherName}先生:\n${comment}`,
+    tag: 'teacher-comment',
+    requireInteraction: true,
+    url: '/messages'
+  })
+}
+
+// 通知設定画面表示
+function showNotificationSettings() {
+  const currentPermission = Notification.permission
+  const isEnabled = localStorage.getItem('push_notification_enabled') === 'true'
+  
+  const modalHTML = `
+    <div id="notificationSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 fade-in" onclick="closeNotificationSettings(event)">
+      <div class="bg-white rounded-lg max-w-2xl w-full" onclick="event.stopPropagation()">
+        <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-lg">
+          <h2 class="text-2xl font-bold flex items-center gap-2">
+            <i class="fas fa-bell"></i>
+            通知設定
+          </h2>
+        </div>
+        
+        <div class="p-6 space-y-6">
+          <!-- Push通知状態 -->
+          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="font-bold text-gray-800">ブラウザ通知</h3>
+                <p class="text-sm text-gray-600">現在の状態: 
+                  <span class="font-semibold ${currentPermission === 'granted' ? 'text-green-600' : currentPermission === 'denied' ? 'text-red-600' : 'text-yellow-600'}">
+                    ${currentPermission === 'granted' ? '有効' : currentPermission === 'denied' ? '拒否' : '未設定'}
+                  </span>
+                </p>
+              </div>
+              ${currentPermission !== 'granted' ? `
+                <button onclick="requestPushNotification(); setTimeout(() => showNotificationSettings(), 500)" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded transition-colors">
+                  有効にする
+                </button>
+              ` : ''}
+            </div>
+          </div>
+          
+          <!-- 通知タイプ設定 -->
+          <div class="space-y-3">
+            <h3 class="font-bold text-gray-800">通知タイプ</h3>
+            
+            <label class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+              <input type="checkbox" id="notify_learning" class="w-5 h-5" ${isEnabled ? 'checked' : ''}>
+              <div class="flex-1">
+                <p class="font-semibold text-gray-800">学習完了通知</p>
+                <p class="text-sm text-gray-600">単元を完了したときに通知</p>
+              </div>
+            </label>
+            
+            <label class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+              <input type="checkbox" id="notify_achievement" class="w-5 h-5" ${isEnabled ? 'checked' : ''}>
+              <div class="flex-1">
+                <p class="font-semibold text-gray-800">達成度アップ通知</p>
+                <p class="text-sm text-gray-600">目標を達成したときに通知</p>
+              </div>
+            </label>
+            
+            <label class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+              <input type="checkbox" id="notify_comment" class="w-5 h-5" ${isEnabled ? 'checked' : ''}>
+              <div class="flex-1">
+                <p class="font-semibold text-gray-800">先生のコメント通知</p>
+                <p class="text-sm text-gray-600">先生からコメントがあったときに通知</p>
+              </div>
+            </label>
+          </div>
+          
+          <!-- テスト通知ボタン -->
+          <div class="border-t border-gray-200 pt-4">
+            <button onclick="testPushNotification()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center gap-2">
+              <i class="fas fa-paper-plane"></i>
+              テスト通知を送信
+            </button>
+          </div>
+        </div>
+        
+        <div class="bg-gray-50 border-t border-gray-200 p-4 flex justify-end gap-2">
+          <button onclick="saveNotificationSettings()" class="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded transition-colors">
+            保存
+          </button>
+          <button onclick="closeNotificationSettings()" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded transition-colors">
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+}
+
+function saveNotificationSettings() {
+  const settings = {
+    learning: document.getElementById('notify_learning')?.checked || false,
+    achievement: document.getElementById('notify_achievement')?.checked || false,
+    comment: document.getElementById('notify_comment')?.checked || false
+  }
+  
+  localStorage.setItem('notification_settings', JSON.stringify(settings))
+  showNotification('通知設定を保存しました', 'success')
+  closeNotificationSettings()
+}
+
+function testPushNotification() {
+  showBrowserNotification('🧪 テスト通知', {
+    body: '通知が正常に動作しています！',
+    tag: 'test'
+  })
+}
+
+function closeNotificationSettings(event) {
+  if (event && event.target.id !== 'notificationSettingsModal') return
+  const modal = document.getElementById('notificationSettingsModal')
+  if (modal) modal.remove()
+}
+
+// 初回アクセス時に通知権限をリクエスト（ユーザーアクションが必要）
+if (localStorage.getItem('push_notification_prompted') !== 'true') {
+  setTimeout(() => {
+    if (state.auth.isAuthenticated) {
+      const shouldPrompt = confirm('学習の進捗や達成度をプッシュ通知で受け取りますか？')
+      if (shouldPrompt) {
+        requestPushNotification()
+      }
+      localStorage.setItem('push_notification_prompted', 'true')
+    }
+  }, 3000)
+}
+
+// グローバルに公開
+window.requestPushNotification = requestPushNotification
+window.showBrowserNotification = showBrowserNotification
+window.notifyLearningComplete = notifyLearningComplete
+window.notifyAchievement = notifyAchievement
+window.notifyTeacherComment = notifyTeacherComment
+window.showNotificationSettings = showNotificationSettings
+window.closeNotificationSettings = closeNotificationSettings
+
+console.log('✅ Phase 7-2: Push通知を読み込みました')
+
+// ============================================
+// Phase 7-3: PDFレポート生成（jsPDF）
+// ============================================
+
+// jsPDF CDN読み込み確認
+function ensureJSPDF() {
+  return new Promise((resolve) => {
+    if (window.jspdf?.jsPDF) {
+      resolve()
+      return
+    }
+    
+    const script = document.createElement('script')
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+    script.onload = () => resolve()
+    document.head.appendChild(script)
+  })
+}
+
+// 学習レポートPDF生成
+async function exportDashboardPDF() {
+  try {
+    await ensureJSPDF()
+    showLoadingWithRetry('PDFを生成中...')
+    
+    const { jsPDF } = window.jspdf
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    })
+    
+    // 日本語フォント対応（代替として英数字のみ）
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    
+    // ヘッダー
+    doc.setFillColor(59, 130, 246)
+    doc.rect(0, 0, pageWidth, 40, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(24)
+    doc.text('Learning Report', pageWidth / 2, 20, { align: 'center' })
+    doc.setFontSize(12)
+    doc.text(`Generated: ${new Date().toLocaleDateString('ja-JP')}`, pageWidth / 2, 30, { align: 'center' })
+    
+    // 本文
+    doc.setTextColor(0, 0, 0)
+    let y = 50
+    
+    // サマリー情報（英数字のみ）
+    doc.setFontSize(16)
+    doc.setFont(undefined, 'bold')
+    doc.text('Summary', 20, y)
+    y += 10
+    
+    doc.setFontSize(12)
+    doc.setFont(undefined, 'normal')
+    
+    const summary = [
+      'Period: Last 30 days',
+      `Total Problems: ${document.querySelector('.bg-gradient-to-br.from-blue-500 .text-4xl')?.textContent || 'N/A'}`,
+      `Average Accuracy: ${document.querySelector('.bg-gradient-to-br.from-green-500 .text-4xl')?.textContent || 'N/A'}`,
+      `Study Days: ${document.querySelector('.bg-gradient-to-br.from-orange-500 .text-4xl')?.textContent || 'N/A'}`,
+      `Weak Units: ${document.querySelector('.bg-gradient-to-br.from-purple-500 .text-4xl')?.textContent || 'N/A'}`
+    ]
+    
+    summary.forEach(line => {
+      doc.text(line, 20, y)
+      y += 7
+    })
+    
+    // フッター
+    doc.setFontSize(10)
+    doc.setTextColor(128, 128, 128)
+    doc.text('Jiyushindo Learning Support System', pageWidth / 2, pageHeight - 10, { align: 'center' })
+    doc.text('https://jiyushindo-gakushu.pages.dev', pageWidth / 2, pageHeight - 5, { align: 'center' })
+    
+    // PDF保存
+    doc.save(`learning-report-${new Date().toISOString().split('T')[0]}.pdf`)
+    
+    hideLoading()
+    showNotification('PDFを生成しました', 'success')
+    
+  } catch (error) {
+    hideLoading()
+    console.error('PDF生成エラー:', error)
+    showNotification('PDFの生成に失敗しました', 'error')
+  }
+}
+
+// ダッシュボードを画像として保存
+async function exportDashboardImage() {
+  try {
+    showLoadingWithRetry('画像を生成中...')
+    
+    // html2canvas CDN読み込み
+    if (!window.html2canvas) {
+      const script = document.createElement('script')
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'
+      await new Promise(resolve => {
+        script.onload = resolve
+        document.head.appendChild(script)
+      })
+    }
+    
+    const dashboard = document.getElementById('dashboardModal')?.querySelector('.bg-white')
+    if (!dashboard) {
+      throw new Error('Dashboard not found')
+    }
+    
+    const canvas = await html2canvas(dashboard, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff'
+    })
+    
+    // ダウンロード
+    const link = document.createElement('a')
+    link.download = `dashboard-${new Date().toISOString().split('T')[0]}.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+    
+    hideLoading()
+    showNotification('画像を保存しました', 'success')
+    
+  } catch (error) {
+    hideLoading()
+    console.error('画像保存エラー:', error)
+    showNotification('画像の保存に失敗しました', 'error')
+  }
+}
+
+// 詳細レポートPDF生成（教師用）
+async function generateDetailedReport(studentId, studentName) {
+  try {
+    await ensureJSPDF()
+    showLoadingWithRetry('詳細レポートを生成中...')
+    
+    // データ取得
+    const [trendsRes, weakRes] = await Promise.all([
+      fetchWithRetry(`/api/analytics/learning-trends/${studentId}?period=month`),
+      fetchWithRetry(`/api/analytics/weak-points/${studentId}`)
+    ])
+    
+    const trendsData = await trendsRes.json()
+    const weakData = await weakRes.json()
+    
+    const { jsPDF } = window.jspdf
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    
+    // ページ1: カバーページ
+    doc.setFillColor(59, 130, 246)
+    doc.rect(0, 0, pageWidth, 80, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(28)
+    doc.text('Detailed Learning Report', pageWidth / 2, 30, { align: 'center' })
+    doc.setFontSize(16)
+    doc.text(`Student: ${studentName}`, pageWidth / 2, 45, { align: 'center' })
+    doc.text(`Period: ${new Date().toLocaleDateString('ja-JP')}`, pageWidth / 2, 55, { align: 'center' })
+    
+    // 統計情報
+    doc.setTextColor(0, 0, 0)
+    let y = 100
+    
+    doc.setFontSize(18)
+    doc.setFont(undefined, 'bold')
+    doc.text('Monthly Statistics', 20, y)
+    y += 10
+    
+    doc.setFontSize(12)
+    doc.setFont(undefined, 'normal')
+    
+    const totalProblems = trendsData.daily_stats.reduce((sum, d) => sum + d.total_problems, 0)
+    const avgAccuracy = (trendsData.daily_stats.reduce((sum, d) => sum + (d.correct_count / d.total_problems * 100), 0) / trendsData.daily_stats.length).toFixed(1)
+    
+    doc.text(`Total Problems Solved: ${totalProblems}`, 20, y)
+    y += 7
+    doc.text(`Average Accuracy: ${avgAccuracy}%`, 20, y)
+    y += 7
+    doc.text(`Study Days: ${trendsData.daily_stats.length}`, 20, y)
+    y += 7
+    doc.text(`Weak Units: ${weakData.weak_units.length}`, 20, y)
+    y += 15
+    
+    // 教科別統計
+    doc.setFontSize(18)
+    doc.setFont(undefined, 'bold')
+    doc.text('Subject Performance', 20, y)
+    y += 10
+    
+    doc.setFontSize(12)
+    doc.setFont(undefined, 'normal')
+    
+    trendsData.subject_stats.forEach(subject => {
+      doc.text(`${subject.subject}: ${subject.accuracy.toFixed(1)}% (${subject.total_problems} problems)`, 20, y)
+      y += 7
+    })
+    
+    // ページ2: 弱点分析
+    if (weakData.weak_units.length > 0) {
+      doc.addPage()
+      y = 20
+      
+      doc.setFontSize(18)
+      doc.setFont(undefined, 'bold')
+      doc.text('Areas for Improvement', 20, y)
+      y += 10
+      
+      doc.setFontSize(12)
+      doc.setFont(undefined, 'normal')
+      
+      weakData.weak_units.forEach((unit, index) => {
+        doc.text(`${index + 1}. ${unit.unit_name}`, 20, y)
+        y += 7
+        doc.text(`   Accuracy: ${unit.accuracy.toFixed(1)}% (${unit.attempt_count} attempts)`, 20, y)
+        y += 10
+        
+        if (y > 270) {
+          doc.addPage()
+          y = 20
+        }
+      })
+    }
+    
+    // PDF保存
+    doc.save(`detailed-report-${studentName}-${new Date().toISOString().split('T')[0]}.pdf`)
+    
+    hideLoading()
+    showNotification('詳細レポートを生成しました', 'success')
+    
+  } catch (error) {
+    hideLoading()
+    console.error('詳細レポート生成エラー:', error)
+    showNotification('詳細レポートの生成に失敗しました', 'error')
+  }
+}
+
+// グローバルに公開
+window.ensureJSPDF = ensureJSPDF
+window.exportDashboardPDF = exportDashboardPDF
+window.exportDashboardImage = exportDashboardImage
+window.generateDetailedReport = generateDetailedReport
+
+console.log('✅ Phase 7-3: PDFレポート生成を読み込みました')
+console.log('🎉 Phase 7: すべての高度な機能を読み込みました！')
