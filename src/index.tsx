@@ -1466,8 +1466,22 @@ async function getAllClassStudents(db: D1Database, classCode: string): Promise<n
 // 静的ファイル配信
 app.use('/static/*', serveStatic({ root: './' }))
 
-// HTMLファイル配信（Cloudflare Pagesが直接配信）
-// .html拡張子必須でアクセスしてください
+// 主要HTMLページの直接配信（Workers経由）
+// .html拡張子なしでもアクセス可能にする
+app.get('/problem-generator', serveStatic({ path: './problem-generator.html' }))
+app.get('/problem-generator.html', serveStatic({ path: './problem-generator.html' }))
+app.get('/ai-tutor', serveStatic({ path: './ai-tutor.html' }))
+app.get('/ai-tutor.html', serveStatic({ path: './ai-tutor.html' }))
+app.get('/dashboard', serveStatic({ path: './dashboard.html' }))
+app.get('/dashboard.html', serveStatic({ path: './dashboard.html' }))
+app.get('/parent-dashboard', serveStatic({ path: './parent-dashboard.html' }))
+app.get('/parent-dashboard.html', serveStatic({ path: './parent-dashboard.html' }))
+app.get('/cache-dashboard', serveStatic({ path: './cache-dashboard.html' }))
+app.get('/cache-dashboard.html', serveStatic({ path: './cache-dashboard.html' }))
+app.get('/security-dashboard', serveStatic({ path: './security-dashboard.html' }))
+app.get('/security-dashboard.html', serveStatic({ path: './security-dashboard.html' }))
+app.get('/performance-dashboard', serveStatic({ path: './performance-dashboard.html' }))
+app.get('/performance-dashboard.html', serveStatic({ path: './performance-dashboard.html' }))
 
 // APIルート：カリキュラム一覧取得（マルチテナント対応）
 app.get('/api/curriculum', authMiddleware, async (c) => {
