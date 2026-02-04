@@ -1,5 +1,5 @@
 # Cloudflare Pages Redirects
-# Redirect .html-less URLs to .html versions
+# Rewrite .html-less URLs to .html versions (200 = rewrite, not redirect)
 
 /problem-generator  /problem-generator.html  200
 /ai-tutor  /ai-tutor.html  200
@@ -10,3 +10,6 @@
 /performance-dashboard  /performance-dashboard.html  200
 /auth-demo  /auth-demo.html  200
 /admin-preview  /admin-preview.html  200
+
+# Fallback for any .html file
+/*.html  /:splat.html  200
