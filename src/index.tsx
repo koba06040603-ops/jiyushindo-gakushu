@@ -20020,6 +20020,46 @@ async function authMiddleware(c: any, next: () => Promise<void>) {
   }
 }
 
+// =============================================================================
+// Phase 5-4: マルチテナント - school_idフィルタリング
+// =============================================================================
+
+// school_idによるデータフィルタリングミドルウェア
+function requireSchoolAccess(c: any, next: () => Promise<void>) {
+  const user = c.get('user')
+  
+  if (!user) {
+    return c.json({ success: false, error: '認証が必要です' }, 401)
+  }
+  
+  // school_idをコンテキストに保存
+  c.set('school_id', user.school_id)
+  
+  return next()
+}
+
+// カリキュラムにschool_idフィルタを自動適用するヘルパー
+function buildSchoolFilteredQuery(baseQuery: string, user: any): string {
+  // 管理者は全データアクセス可能
+  if (user.role === 'admin') {
+    return baseQuery
+  }
+  
+  // 教師・学生は自分の学校のデータのみ
+  if (baseQuery.includes('WHERE')) {
+    return `${baseQuery} AND school_id = ${user.school_id}`
+  } else {
+    return `${baseQuery} WHERE school_id = ${user.school_id}`
+  }
+}
+
+// グローバルに公開
+declare global {
+  var buildSchoolFilteredQuery: typeof buildSchoolFilteredQuery
+}
+
+globalThis.buildSchoolFilteredQuery = buildSchoolFilteredQuery
+
 // ロールベース認証ミドルウェア
 function requireRole(...allowedRoles: string[]) {
   return async (c: any, next: () => Promise<void>) => {

@@ -393,6 +393,117 @@ const state = {
   }
 }
 
+// =============================================================================
+// Phase 5-3: エラーハンドリングユーティリティ
+// =============================================================================
+
+// エラーメッセージの日本語変換マップ
+const ERROR_MESSAGES = {
+  // ネットワークエラー
+  'Network Error': 'ネットワーク接続に失敗しました。インターネット接続を確認してください。',
+  'Failed to fetch': 'サーバーとの通信に失敗しました。しばらく待ってから再度お試しください。',
+  'timeout': 'サーバーからの応答がありません。時間をおいて再度お試しください。',
+  
+  // 認証エラー
+  '401': 'ログインセッションが切れました。再度ログインしてください。',
+  'Unauthorized': '認証エラーが発生しました。ログイン情報を確認してください。',
+  
+  // 権限エラー
+  '403': 'この操作を実行する権限がありません。',
+  'Forbidden': 'アクセスが拒否されました。',
+  
+  // データエラー
+  '404': '指定されたデータが見つかりませんでした。',
+  'Not Found': 'データが見つかりません。',
+  
+  // サーバーエラー
+  '500': 'サーバーエラーが発生しました。管理者に連絡してください。',
+  'Internal Server Error': 'サーバー内部エラーが発生しました。',
+  
+  // デフォルト
+  'default': '予期しないエラーが発生しました。もう一度お試しください。'
+}
+
+// ユーザーフレンドリーなエラーメッセージに変換
+function getFriendlyErrorMessage(error) {
+  if (!error) return ERROR_MESSAGES.default
+  
+  // エラーメッセージから該当するキーを検索
+  const errorString = error.toString()
+  
+  for (const [key, message] of Object.entries(ERROR_MESSAGES)) {
+    if (errorString.includes(key) || (error.response && error.response.status === parseInt(key))) {
+      return message
+    }
+  }
+  
+  // カスタムエラーメッセージがある場合
+  if (error.response && error.response.data && error.response.data.error) {
+    return error.response.data.error
+  }
+  
+  return ERROR_MESSAGES.default
+}
+
+// 自動リトライ機能付きAPI呼び出し
+async function fetchWithRetry(url, options = {}, maxRetries = 3) {
+  const { retryDelay = 1000, ...fetchOptions } = options
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await axios(url, fetchOptions)
+      return response
+    } catch (error) {
+      console.log(`🔄 リトライ ${attempt}/${maxRetries}: ${url}`)
+      
+      // 最後の試行でもエラーの場合
+      if (attempt === maxRetries) {
+        // ユーザーフレンドリーなエラーメッセージを表示
+        const friendlyMessage = getFriendlyErrorMessage(error)
+        showNotification(friendlyMessage, 'error')
+        throw error
+      }
+      
+      // 401エラー（認証切れ）の場合はリトライしない
+      if (error.response && error.response.status === 401) {
+        const friendlyMessage = getFriendlyErrorMessage(error)
+        showNotification(friendlyMessage, 'error')
+        
+        // ログイン画面へリダイレクト
+        setTimeout(() => {
+          renderLoginPage()
+        }, 2000)
+        throw error
+      }
+      
+      // 次のリトライまで待機
+      await new Promise(resolve => setTimeout(resolve, retryDelay * attempt))
+    }
+  }
+}
+
+// オフライン検知
+let isOnline = navigator.onLine
+
+window.addEventListener('online', () => {
+  isOnline = true
+  showNotification('インターネットに再接続しました', 'success')
+  console.log('✅ オンライン復帰')
+})
+
+window.addEventListener('offline', () => {
+  isOnline = false
+  showNotification('インターネット接続が切断されました。オフラインモードです。', 'warning')
+  console.log('⚠️ オフライン')
+})
+
+// グローバルに公開
+window.fetchWithRetry = fetchWithRetry
+window.getFriendlyErrorMessage = getFriendlyErrorMessage
+window.isOnline = () => isOnline
+
+console.log('✅ Phase 5-3: エラーハンドリング機能を読み込みました')
+
 // ローディング表示関数
 function showLoading(message = '読み込み中...') {
   // 既存のローディングを削除
