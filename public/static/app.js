@@ -12143,16 +12143,23 @@ function selectSuggestedUnit(unitName, index) {
 }
 
 async function startUnitGeneration() {
+  console.log('🚀 startUnitGeneration が呼び出されました')
+  
   const grade = document.getElementById('genGrade').value
   const subject = document.getElementById('genSubject').value
   const textbook = document.getElementById('genTextbook').value
   const unitName = document.getElementById('genUnitName').value
 
+  console.log('📝 入力値:', { grade, subject, textbook, unitName })
+
   // 必須項目チェック
   if (!grade || !subject || !textbook || !unitName) {
+    console.error('❌ 必須項目が不足しています')
     alert('学年、教科、教科書会社、単元名は必須です')
     return
   }
+  
+  console.log('✅ 必須項目チェック完了')
   
   // AI品質モードを取得（ラジオボタンから）
   const selectedQualityMode = document.querySelector('input[name="qualityMode"]:checked')
@@ -12172,11 +12179,16 @@ async function startUnitGeneration() {
   }
   
   // 実際の生成処理を実行
+  console.log('🎯 executeUnitGeneration を呼び出します')
   await executeUnitGeneration(lastGenerationParams)
+  console.log('✅ executeUnitGeneration 完了')
 }
 
 // 単元生成の実際の処理（段階的生成）
 async function executeUnitGeneration(params) {
+  console.log('📦 executeUnitGeneration が開始されました')
+  console.log('📋 パラメータ:', params)
+  
   const { grade, subject, textbook, unitName, studentNeeds, teacherGoals, learningStyle, specialSupport, qualityMode } = params
   
   // カスタマイズ情報
@@ -12300,8 +12312,10 @@ async function executeUnitGeneration(params) {
     showUnitPreview(unitData, modelUsed)
 
   } catch (error) {
-    console.error('単元生成エラー:', error)
+    console.error('❌❌❌ 単元生成エラー:', error)
+    console.error('エラータイプ:', typeof error)
     console.error('エラー詳細:', error.response?.data)
+    console.error('エラースタック:', error.stack)
     
     // エラー詳細を取得
     const errorDetails = error.response?.data?.details || error.message || '不明なエラー'
