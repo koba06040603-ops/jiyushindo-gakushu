@@ -6084,6 +6084,77 @@ ${specificInstructions}
   }
 })
 
+// デバッグ用: Gemini API接続テスト
+app.get('/api/ai/test-gemini', async (c) => {
+  const { env } = c
+  const apiKey = env.GEMINI_API_KEY
+  
+  try {
+    console.log('🧪 Gemini APIテスト開始...')
+    console.log('APIキー存在:', !!apiKey)
+    console.log('APIキー先頭:', apiKey?.substring(0, 10) + '...')
+    
+    if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+      return c.json({
+        success: false,
+        error: 'GEMINI_API_KEYが設定されていません',
+        apiKey: apiKey?.substring(0, 10) + '...'
+      })
+    }
+    
+    const testPrompt = '日本語で「こんにちは」と返答してください。'
+    const model = 'gemini-1.5-flash-latest'
+    
+    console.log('📤 テストリクエスト送信:', model)
+    
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: testPrompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 100 }
+        })
+      }
+    )
+    
+    console.log('📥 レスポンスステータス:', response.status)
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('❌ APIエラー:', errorText)
+      return c.json({
+        success: false,
+        error: `HTTP ${response.status}`,
+        details: errorText,
+        model
+      }, response.status)
+    }
+    
+    const data = await response.json()
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text
+    
+    console.log('✅ テスト成功:', content)
+    
+    return c.json({
+      success: true,
+      message: 'Gemini API接続成功',
+      model,
+      response: content,
+      apiKeyPrefix: apiKey.substring(0, 10) + '...'
+    })
+    
+  } catch (error: any) {
+    console.error('❌ テスト失敗:', error)
+    return c.json({
+      success: false,
+      error: 'テスト実行エラー',
+      details: error.message
+    }, 500)
+  }
+})
+
 // APIルート：OCR（手書き文字認識）- 2段階フォールバック
 app.post('/api/ai/ocr', async (c) => {
   const { env } = c
