@@ -8741,12 +8741,11 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
       try {
         console.log(`🔄 導入問題モデル試行中: ${model}`)
         response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
