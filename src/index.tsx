@@ -22761,6 +22761,79 @@ app.post('/api/feedback/grade', authMiddleware, async (c) => {
       SET is_attempted = 1, is_correct = ?, updated_at = datetime('now')
       WHERE id = ?
     `).bind(feedback.isCorrect ? 1 : 0, problem_id).run()
+    
+    // ============================================
+    // ゲーミフィケーション統合
+    // ============================================
+    
+    // 1. 問題を解いたらポイント付与
+    await addPoints(env.DB, user.id, 10, 'problem_solved', '問題に挑戦')
+    
+    // 2. 正解ならボーナスポイント
+    if (feedback.isCorrect) {
+      await addPoints(env.DB, user.id, 20, 'correct_answer', '問題正解')
+      
+      // 正解メッセージ生成
+      await generateCorrectMessage(env.DB, user.id)
+      
+      // バッジチェック: 初正解
+      await checkAndAwardBadge(env.DB, user.id, 'solve_first_correct')
+      
+      // 正解数チェック
+      const correctCount = await env.DB.prepare(`
+        SELECT COUNT(*) as count FROM answer_history 
+        WHERE student_id = ? AND is_correct = 1
+      `).bind(user.id).first<{count: number}>()
+      
+      if (correctCount) {
+        if (correctCount.count === 10) {
+          await checkAndAwardBadge(env.DB, user.id, 'solve_10')
+        } else if (correctCount.count === 50) {
+          await checkAndAwardBadge(env.DB, user.id, 'solve_50')
+        } else if (correctCount.count === 100) {
+          await checkAndAwardBadge(env.DB, user.id, 'solve_100')
+        }
+      }
+      
+      // 難問チャレンジバッジ
+      if (problem.difficulty === 'hard') {
+        await checkAndAwardBadge(env.DB, user.id, 'challenge_hard_first')
+        
+        const hardCorrectCount = await env.DB.prepare(`
+          SELECT COUNT(*) as count FROM answer_history ah
+          JOIN generated_problems gp ON ah.problem_id = gp.id
+          WHERE ah.student_id = ? AND ah.is_correct = 1 AND gp.difficulty = 'hard'
+        `).bind(user.id).first<{count: number}>()
+        
+        if (hardCorrectCount && hardCorrectCount.count === 10) {
+          await checkAndAwardBadge(env.DB, user.id, 'challenge_hard_10')
+        }
+      }
+      
+      // 教科別バッジ
+      const subjectCorrectCount = await env.DB.prepare(`
+        SELECT COUNT(*) as count FROM answer_history ah
+        JOIN generated_problems gp ON ah.problem_id = gp.id
+        WHERE ah.student_id = ? AND ah.is_correct = 1 AND gp.subject = ?
+      `).bind(user.id, problem.subject).first<{count: number}>()
+      
+      if (subjectCorrectCount && subjectCorrectCount.count === 100) {
+        const badgeKeys: Record<string, string> = {
+          '数学': 'subject_math_100',
+          '国語': 'subject_japanese_100',
+          '理科': 'subject_science_100',
+          '社会': 'subject_social_100',
+          '英語': 'subject_english_100'
+        }
+        const badgeKey = badgeKeys[problem.subject]
+        if (badgeKey) {
+          await checkAndAwardBadge(env.DB, user.id, badgeKey)
+        }
+      }
+    } else {
+      // 不正解メッセージ生成
+      await generateIncorrectMessage(env.DB, user.id)
+    }
 
     return c.json({
       success: true,
@@ -23228,6 +23301,204 @@ app.get('/api/learning-path/weak-areas', authMiddleware, async (c) => {
       },
       500
     )
+  }
+})
+
+// ============================================
+// Phase 14: ゲーミフィケーションAPI
+// ============================================
+
+import {
+  getAllBadges,
+  checkAndAwardBadge,
+  addPoints,
+  getStudentLevel,
+  updateLearningStreak,
+  getLearningStreak,
+  getUnreadMessages,
+  generateStartMessage,
+  generateCorrectMessage,
+  generateIncorrectMessage,
+  generateLongStudyMessage
+} from './gamification'
+
+/**
+ * GET /api/gamification/badges - バッジ一覧と獲得状況を取得
+ */
+app.get('/api/gamification/badges', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const badges = await getAllBadges(env.DB, user.id)
+    
+    return c.json({
+      success: true,
+      badges
+    })
+  } catch (error: any) {
+    console.error('❌ バッジ取得エラー:', error)
+    return c.json({ success: false, error: 'バッジの取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/gamification/level - 学生のレベル情報を取得
+ */
+app.get('/api/gamification/level', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const level = await getStudentLevel(env.DB, user.id)
+    
+    return c.json({
+      success: true,
+      level
+    })
+  } catch (error: any) {
+    console.error('❌ レベル取得エラー:', error)
+    return c.json({ success: false, error: 'レベル情報の取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/gamification/streak - 学習ストリーク情報を取得
+ */
+app.get('/api/gamification/streak', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const streak = await getLearningStreak(env.DB, user.id)
+    
+    return c.json({
+      success: true,
+      streak
+    })
+  } catch (error: any) {
+    console.error('❌ ストリーク取得エラー:', error)
+    return c.json({ success: false, error: 'ストリーク情報の取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/gamification/activity - 学習活動を記録（ストリーク更新）
+ */
+app.post('/api/gamification/activity', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const updated = await updateLearningStreak(env.DB, user.id)
+    
+    if (updated) {
+      await addPoints(env.DB, user.id, 50, 'login', '今日のログイン')
+    }
+    
+    return c.json({
+      success: true,
+      updated,
+      streak: await getLearningStreak(env.DB, user.id)
+    })
+  } catch (error: any) {
+    console.error('❌ 活動記録エラー:', error)
+    return c.json({ success: false, error: '活動の記録に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/gamification/messages - 未読の励ましメッセージを取得
+ */
+app.get('/api/gamification/messages', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const messages = await getUnreadMessages(env.DB, user.id)
+    
+    return c.json({
+      success: true,
+      messages
+    })
+  } catch (error: any) {
+    console.error('❌ メッセージ取得エラー:', error)
+    return c.json({ success: false, error: 'メッセージの取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/gamification/encourage - 励ましメッセージを生成
+ */
+app.post('/api/gamification/encourage', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { type } = await c.req.json()
+    
+    let message = ''
+    switch(type) {
+      case 'start':
+        message = await generateStartMessage(env.DB, user.id)
+        break
+      case 'correct':
+        message = await generateCorrectMessage(env.DB, user.id)
+        break
+      case 'incorrect':
+        message = await generateIncorrectMessage(env.DB, user.id)
+        break
+      case 'long_study':
+        message = await generateLongStudyMessage(env.DB, user.id)
+        break
+      default:
+        return c.json({ success: false, error: '不正なメッセージタイプです' }, 400)
+    }
+    
+    return c.json({
+      success: true,
+      message
+    })
+  } catch (error: any) {
+    console.error('❌ メッセージ生成エラー:', error)
+    return c.json({ success: false, error: 'メッセージの生成に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/gamification/award-points - ポイントを付与
+ */
+app.post('/api/gamification/award-points', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { points, source, description } = await c.req.json()
+    
+    if (!points || !source || !description) {
+      return c.json({ success: false, error: 'ポイント、ソース、説明が必要です' }, 400)
+    }
+    
+    await addPoints(env.DB, user.id, points, source, description)
+    const level = await getStudentLevel(env.DB, user.id)
+    
+    return c.json({
+      success: true,
+      level
+    })
+  } catch (error: any) {
+    console.error('❌ ポイント付与エラー:', error)
+    return c.json({ success: false, error: 'ポイントの付与に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/gamification/check-badge - バッジ獲得チェック
+ */
+app.post('/api/gamification/check-badge', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { badge_key } = await c.req.json()
+    
+    if (!badge_key) {
+      return c.json({ success: false, error: 'バッジキーが必要です' }, 400)
+    }
+    
+    const awarded = await checkAndAwardBadge(env.DB, user.id, badge_key)
+    
+    return c.json({
+      success: true,
+      awarded
+    })
+  } catch (error: any) {
+    console.error('❌ バッジチェックエラー:', error)
+    return c.json({ success: false, error: 'バッジチェックに失敗しました', details: error.message }, 500)
   }
 })
 

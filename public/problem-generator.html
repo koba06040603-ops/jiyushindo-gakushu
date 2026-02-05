@@ -102,6 +102,204 @@
         .confetti-purple { background: #8B5CF6; }
         .confetti-pink { background: #EC4899; }
         
+        /* ============================================
+           新しいアニメーション（5種類）
+           ============================================ */
+        
+        /* 2. 星キラキラ ⭐ */
+        .star-particle {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 999;
+            animation: starTwinkle 1.5s ease-out forwards;
+        }
+        
+        .star-particle::before {
+            content: '⭐';
+            font-size: 20px;
+            position: absolute;
+        }
+        
+        @keyframes starTwinkle {
+            0% {
+                transform: scale(0) rotate(0deg);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.5) rotate(180deg);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(0) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        /* 3. ハート舞い 💖 */
+        .heart-particle {
+            position: fixed;
+            width: 30px;
+            height: 30px;
+            pointer-events: none;
+            z-index: 999;
+            animation: heartFloat 2.5s ease-out forwards;
+        }
+        
+        .heart-particle::before {
+            content: '💖';
+            font-size: 30px;
+            position: absolute;
+        }
+        
+        @keyframes heartFloat {
+            0% {
+                transform: translateY(0) scale(0) rotate(0deg);
+                opacity: 0;
+            }
+            20% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh) scale(1) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        /* 4. 虹アーチ 🌈 */
+        .rainbow-arc {
+            position: fixed;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 300px;
+            border-radius: 0 0 50% 50%;
+            background: linear-gradient(
+                to right,
+                #FF0000 0%,
+                #FF7F00 14%,
+                #FFFF00 28%,
+                #00FF00 42%,
+                #0000FF 56%,
+                #4B0082 70%,
+                #9400D3 84%,
+                transparent 100%
+            );
+            opacity: 0;
+            pointer-events: none;
+            z-index: 999;
+            animation: rainbowAppear 2s ease-in-out forwards;
+        }
+        
+        @keyframes rainbowAppear {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-100px) scale(0.5);
+            }
+            30% {
+                opacity: 0.9;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+            70% {
+                opacity: 0.9;
+                transform: translateX(-50%) translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-50px) scale(1.1);
+            }
+        }
+        
+        /* 5. 光の輪 ✨ */
+        .light-ring {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: radial-gradient(
+                circle,
+                rgba(255, 215, 0, 0.8) 0%,
+                rgba(255, 215, 0, 0.4) 40%,
+                transparent 70%
+            );
+            pointer-events: none;
+            z-index: 999;
+            animation: lightExpand 1.5s ease-out forwards;
+        }
+        
+        @keyframes lightExpand {
+            0% {
+                width: 50px;
+                height: 50px;
+                opacity: 1;
+            }
+            100% {
+                width: 800px;
+                height: 800px;
+                opacity: 0;
+            }
+        }
+        
+        /* 光のパーティクル */
+        .light-particle {
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            background: gold;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 999;
+            box-shadow: 0 0 10px gold;
+            animation: particleSpread 1.2s ease-out forwards;
+        }
+        
+        @keyframes particleSpread {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--tx), var(--ty)) scale(0);
+                opacity: 0;
+            }
+        }
+        
+        /* 6. バルーン上昇 🎈 */
+        .balloon-particle {
+            position: fixed;
+            width: 40px;
+            height: 50px;
+            pointer-events: none;
+            z-index: 999;
+            animation: balloonRise 3s ease-out forwards;
+        }
+        
+        .balloon-particle::before {
+            content: '🎈';
+            font-size: 40px;
+            position: absolute;
+        }
+        
+        @keyframes balloonRise {
+            0% {
+                transform: translateY(0) translateX(0) scale(0);
+                opacity: 0;
+            }
+            20% {
+                opacity: 1;
+                transform: translateY(-20vh) translateX(10px) scale(1);
+            }
+            100% {
+                transform: translateY(-120vh) translateX(-20px) scale(0.8);
+                opacity: 0;
+            }
+        }
+        
         /* 正解時の背景フラッシュ */
         .flash-correct {
             animation: flashGreen 0.5s ease-in-out;
@@ -981,7 +1179,10 @@
         // ========================================
         
         function showCorrectAnimation() {
-            // 1. 大きな赤丸を表示
+            // アニメーションの種類をランダムに選択（1-6）
+            const animationType = Math.floor(Math.random() * 6) + 1
+            
+            // 1. 大きな赤丸を表示（全アニメーション共通）
             const circle = document.createElement('div')
             circle.className = 'correct-circle'
             document.body.appendChild(circle)
@@ -991,15 +1192,49 @@
                 circle.remove()
             }, 600)
             
-            // 2. 花吹雪を生成（50個）
+            // 2. アニメーションタイプに応じて演出を実行
+            switch(animationType) {
+                case 1:
+                    // 花吹雪 🎊
+                    createConfettiAnimation()
+                    break
+                case 2:
+                    // 星キラキラ ⭐
+                    createStarAnimation()
+                    break
+                case 3:
+                    // ハート舞い 💖
+                    createHeartAnimation()
+                    break
+                case 4:
+                    // 虹アーチ 🌈
+                    createRainbowAnimation()
+                    break
+                case 5:
+                    // 光の輪 ✨
+                    createLightRingAnimation()
+                    break
+                case 6:
+                    // バルーン上昇 🎈
+                    createBalloonAnimation()
+                    break
+            }
+            
+            // 3. 正解音を再生
+            playCorrectSound()
+        }
+        
+        // ========================================
+        // アニメーション関数群
+        // ========================================
+        
+        // 1. 花吹雪アニメーション
+        function createConfettiAnimation() {
             for (let i = 0; i < 50; i++) {
                 setTimeout(() => {
                     createConfetti()
-                }, i * 30) // 30msずつずらして生成
+                }, i * 30)
             }
-            
-            // 3. 正解音を再生（容量が許せば）
-            playCorrectSound()
         }
         
         function createConfetti() {
@@ -1007,7 +1242,7 @@
             confetti.className = 'confetti'
             
             // ランダムな色を選択
-            const colors = ['confetti-red', 'confetti-yellow', 'confetti-green']
+            const colors = ['confetti-red', 'confetti-yellow', 'confetti-green', 'confetti-blue', 'confetti-purple', 'confetti-pink']
             const randomColor = colors[Math.floor(Math.random() * colors.length)]
             confetti.classList.add(randomColor)
             
@@ -1035,6 +1270,136 @@
             setTimeout(() => {
                 confetti.remove()
             }, duration * 1000)
+        }
+        
+        // 2. 星キラキラアニメーション ⭐
+        function createStarAnimation() {
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const star = document.createElement('div')
+                    star.className = 'star-particle'
+                    
+                    // ランダムな位置に配置
+                    star.style.left = (Math.random() * 80 + 10) + '%'
+                    star.style.top = (Math.random() * 80 + 10) + '%'
+                    
+                    // ランダムなサイズ
+                    const size = Math.random() * 15 + 15
+                    star.style.fontSize = size + 'px'
+                    
+                    document.body.appendChild(star)
+                    
+                    // 1.5秒後に削除
+                    setTimeout(() => {
+                        star.remove()
+                    }, 1500)
+                }, i * 70)
+            }
+        }
+        
+        // 3. ハート舞いアニメーション 💖
+        function createHeartAnimation() {
+            for (let i = 0; i < 15; i++) {
+                setTimeout(() => {
+                    const heart = document.createElement('div')
+                    heart.className = 'heart-particle'
+                    
+                    // ランダムな横位置に配置（下から上昇）
+                    heart.style.left = (Math.random() * 80 + 10) + '%'
+                    heart.style.top = '100vh'
+                    
+                    // ランダムなサイズ
+                    const size = Math.random() * 15 + 20
+                    heart.style.fontSize = size + 'px'
+                    
+                    document.body.appendChild(heart)
+                    
+                    // 2.5秒後に削除
+                    setTimeout(() => {
+                        heart.remove()
+                    }, 2500)
+                }, i * 100)
+            }
+        }
+        
+        // 4. 虹アーチアニメーション 🌈
+        function createRainbowAnimation() {
+            const rainbow = document.createElement('div')
+            rainbow.className = 'rainbow-arc'
+            document.body.appendChild(rainbow)
+            
+            // 2秒後に削除
+            setTimeout(() => {
+                rainbow.remove()
+            }, 2000)
+        }
+        
+        // 5. 光の輪アニメーション ✨
+        function createLightRingAnimation() {
+            // 中心の光の輪
+            const ring = document.createElement('div')
+            ring.className = 'light-ring'
+            document.body.appendChild(ring)
+            
+            setTimeout(() => {
+                ring.remove()
+            }, 1500)
+            
+            // 光のパーティクル（30個）
+            for (let i = 0; i < 30; i++) {
+                setTimeout(() => {
+                    const particle = document.createElement('div')
+                    particle.className = 'light-particle'
+                    
+                    // 中心から放射状に広がる方向を計算
+                    const angle = (Math.PI * 2 * i) / 30
+                    const distance = 300 + Math.random() * 200
+                    const tx = Math.cos(angle) * distance
+                    const ty = Math.sin(angle) * distance
+                    
+                    particle.style.setProperty('--tx', tx + 'px')
+                    particle.style.setProperty('--ty', ty + 'px')
+                    
+                    // 中心に配置
+                    particle.style.left = '50%'
+                    particle.style.top = '50%'
+                    
+                    document.body.appendChild(particle)
+                    
+                    setTimeout(() => {
+                        particle.remove()
+                    }, 1200)
+                }, i * 20)
+            }
+        }
+        
+        // 6. バルーン上昇アニメーション 🎈
+        function createBalloonAnimation() {
+            const balloons = ['🎈', '🎈', '🎈', '🎈', '🎈']
+            const colors = ['red', 'blue', 'green', 'yellow', 'purple']
+            
+            for (let i = 0; i < 12; i++) {
+                setTimeout(() => {
+                    const balloon = document.createElement('div')
+                    balloon.className = 'balloon-particle'
+                    balloon.textContent = balloons[Math.floor(Math.random() * balloons.length)]
+                    
+                    // ランダムな横位置に配置（下から開始）
+                    balloon.style.left = (Math.random() * 80 + 10) + '%'
+                    balloon.style.top = '100vh'
+                    
+                    // ランダムなサイズ
+                    const size = Math.random() * 20 + 30
+                    balloon.style.fontSize = size + 'px'
+                    
+                    document.body.appendChild(balloon)
+                    
+                    // 3秒後に削除
+                    setTimeout(() => {
+                        balloon.remove()
+                    }, 3000)
+                }, i * 150)
+            }
         }
         
         function playCorrectSound() {
