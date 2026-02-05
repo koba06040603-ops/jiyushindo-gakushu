@@ -11985,6 +11985,7 @@ function showUnitGeneratorModal() {
             キャンセル
           </button>
           <button id="generateUnitBtn"
+                  onclick="window.startUnitGeneration()"
                   class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition">
             <i class="fas fa-wand-magic-sparkles mr-2"></i>
             AIで生成開始
@@ -11995,64 +11996,13 @@ function showUnitGeneratorModal() {
   `
   document.body.appendChild(modal)
   
-  // モーダルのDOMが完全に構築されるまで待機
+  // ボタンが正しく動作するか確認
   setTimeout(() => {
-    console.log('🎯 生成ボタンにイベントリスナーを追加します（遅延実行）')
+    console.log('✅ モーダル表示完了')
     const generateBtn = document.getElementById('generateUnitBtn')
-    console.log('🔍 ボタン要素:', generateBtn)
-    
-    if (generateBtn) {
-      console.log('✅ ボタンが見つかりました')
-      
-      // onclickを削除して、イベントリスナーのみに統一
-      generateBtn.removeAttribute('onclick')
-      
-      // クリックイベントリスナーを追加
-      generateBtn.addEventListener('click', async (event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        console.log('🖱️🖱️🖱️ 生成ボタンがクリックされました!!!')
-        
-        // デバッグ情報を画面に表示
-        const debugDiv = document.createElement('div')
-        debugDiv.className = 'fixed top-4 right-4 bg-green-100 border-2 border-green-500 p-4 rounded-lg shadow-lg z-[100]'
-        debugDiv.innerHTML = `
-          <div class="text-green-800 font-bold">
-            <i class="fas fa-check-circle mr-2"></i>
-            ボタンクリック検出！
-          </div>
-          <div class="text-sm mt-2">実行中...</div>
-        `
-        document.body.appendChild(debugDiv)
-        
-        try {
-          await startUnitGeneration()
-          debugDiv.innerHTML = `
-            <div class="text-green-800 font-bold">
-              <i class="fas fa-check-circle mr-2"></i>
-              生成処理完了！
-            </div>
-          `
-        } catch (error) {
-          console.error('❌❌❌ 生成エラー:', error)
-          debugDiv.innerHTML = `
-            <div class="text-red-800 font-bold">
-              <i class="fas fa-exclamation-triangle mr-2"></i>
-              エラー発生
-            </div>
-            <div class="text-xs mt-2">${error.message}</div>
-          `
-        }
-        
-        setTimeout(() => debugDiv.remove(), 5000)
-      }, { once: false })
-      
-      console.log('✅ イベントリスナー追加完了')
-    } else {
-      console.error('❌ 生成ボタンが見つかりません')
-      console.log('📋 モーダル内の全ボタン:', document.querySelectorAll('#unitGeneratorModal button'))
-      alert('ERROR: 生成ボタンが見つかりません！コンソールを確認してください。')
-    }
+    console.log('🔍 生成ボタン:', generateBtn)
+    console.log('🔍 onclick属性:', generateBtn?.getAttribute('onclick'))
+    console.log('🔍 window.startUnitGeneration:', typeof window.startUnitGeneration)
   }, 100)
   
   // 学年・教科・教科書会社が選択されたら単元候補ボタンを有効化
