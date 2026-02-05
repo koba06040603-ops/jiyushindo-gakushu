@@ -11995,50 +11995,65 @@ function showUnitGeneratorModal() {
   `
   document.body.appendChild(modal)
   
-  // 生成ボタンにイベントリスナーを追加
-  console.log('🎯 生成ボタンにイベントリスナーを追加します')
-  const generateBtn = document.getElementById('generateUnitBtn')
-  if (generateBtn) {
-    // onclickを削除して、イベントリスナーのみに統一
-    generateBtn.removeAttribute('onclick')
+  // モーダルのDOMが完全に構築されるまで待機
+  setTimeout(() => {
+    console.log('🎯 生成ボタンにイベントリスナーを追加します（遅延実行）')
+    const generateBtn = document.getElementById('generateUnitBtn')
+    console.log('🔍 ボタン要素:', generateBtn)
     
-    generateBtn.addEventListener('click', async (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      console.log('🖱️🖱️🖱️ 生成ボタンがクリックされました!!!')
+    if (generateBtn) {
+      console.log('✅ ボタンが見つかりました')
       
-      // デバッグ情報を画面に表示
-      const debugDiv = document.createElement('div')
-      debugDiv.className = 'fixed top-4 right-4 bg-green-100 border-2 border-green-500 p-4 rounded-lg shadow-lg z-[100]'
-      debugDiv.innerHTML = `
-        <div class="text-green-800 font-bold">
-          <i class="fas fa-check-circle mr-2"></i>
-          ボタンクリック検出！
-        </div>
-        <div class="text-sm mt-2">実行中...</div>
-      `
-      document.body.appendChild(debugDiv)
+      // onclickを削除して、イベントリスナーのみに統一
+      generateBtn.removeAttribute('onclick')
       
-      try {
-        await startUnitGeneration()
-      } catch (error) {
-        console.error('❌❌❌ 生成エラー:', error)
+      // クリックイベントリスナーを追加
+      generateBtn.addEventListener('click', async (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        console.log('🖱️🖱️🖱️ 生成ボタンがクリックされました!!!')
+        
+        // デバッグ情報を画面に表示
+        const debugDiv = document.createElement('div')
+        debugDiv.className = 'fixed top-4 right-4 bg-green-100 border-2 border-green-500 p-4 rounded-lg shadow-lg z-[100]'
         debugDiv.innerHTML = `
-          <div class="text-red-800 font-bold">
-            <i class="fas fa-exclamation-triangle mr-2"></i>
-            エラー発生
+          <div class="text-green-800 font-bold">
+            <i class="fas fa-check-circle mr-2"></i>
+            ボタンクリック検出！
           </div>
-          <div class="text-xs mt-2">${error.message}</div>
+          <div class="text-sm mt-2">実行中...</div>
         `
-      }
+        document.body.appendChild(debugDiv)
+        
+        try {
+          await startUnitGeneration()
+          debugDiv.innerHTML = `
+            <div class="text-green-800 font-bold">
+              <i class="fas fa-check-circle mr-2"></i>
+              生成処理完了！
+            </div>
+          `
+        } catch (error) {
+          console.error('❌❌❌ 生成エラー:', error)
+          debugDiv.innerHTML = `
+            <div class="text-red-800 font-bold">
+              <i class="fas fa-exclamation-triangle mr-2"></i>
+              エラー発生
+            </div>
+            <div class="text-xs mt-2">${error.message}</div>
+          `
+        }
+        
+        setTimeout(() => debugDiv.remove(), 5000)
+      }, { once: false })
       
-      setTimeout(() => debugDiv.remove(), 5000)
-    })
-    console.log('✅ イベントリスナー追加完了')
-  } else {
-    console.error('❌ 生成ボタンが見つかりません')
-    alert('ERROR: 生成ボタンが見つかりません！')
-  }
+      console.log('✅ イベントリスナー追加完了')
+    } else {
+      console.error('❌ 生成ボタンが見つかりません')
+      console.log('📋 モーダル内の全ボタン:', document.querySelectorAll('#unitGeneratorModal button'))
+      alert('ERROR: 生成ボタンが見つかりません！コンソールを確認してください。')
+    }
+  }, 100)
   
   // 学年・教科・教科書会社が選択されたら単元候補ボタンを有効化
   const updateSuggestButton = () => {
