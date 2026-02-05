@@ -12154,6 +12154,10 @@ async function startUnitGeneration() {
     return
   }
   
+  // AI品質モードを取得（ラジオボタンから）
+  const selectedQualityMode = document.querySelector('input[name="qualityMode"]:checked')
+  const qualityMode = selectedQualityMode ? selectedQualityMode.value : 'standard'
+  
   // 生成パラメータを保存（再生成用）
   lastGenerationParams = {
     grade,
@@ -12164,7 +12168,7 @@ async function startUnitGeneration() {
     teacherGoals: document.getElementById('genTeacherGoals')?.value || '',
     learningStyle: document.getElementById('genLearningStyle')?.value || '',
     specialSupport: document.getElementById('genSpecialSupport')?.value || '',
-    qualityMode: document.getElementById('genQualityMode')?.value || 'standard'
+    qualityMode: qualityMode
   }
   
   // 実際の生成処理を実行
