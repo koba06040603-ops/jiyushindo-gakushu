@@ -8495,6 +8495,60 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
       recent_activity: recentActivity.results || []
     }
     
+    // 学習履歴が0件の場合はデフォルト学習計画を返す
+    if ((stats?.total_attempts || 0) === 0) {
+      console.log('📊 学習履歴が0件のため、デフォルト学習計画を返します')
+      
+      const today = new Date()
+      const target = targetDate ? new Date(targetDate) : new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
+      const daysUntilTarget = Math.ceil((target.getTime() - today.getTime()) / (24 * 60 * 60 * 1000))
+      
+      return c.json({
+        success: true,
+        student_id: studentId,
+        curriculum_id: curriculumId,
+        target_date: targetDate,
+        days_until_target: daysUntilTarget,
+        study_plan: {
+          plan_summary: `${curriculum.unit_name}の学習を${daysUntilTarget}日間で完了する計画です。まずは基礎から始めて、徐々にステップアップしていきましょう。`,
+          daily_schedule: [
+            {
+              day: 1,
+              date: today.toISOString().split('T')[0],
+              tasks: [
+                {
+                  time: "15:00-15:30",
+                  activity: "「ゆっくりコース」の学習カード1-2枚",
+                  content_type: "frequent_problems",
+                  estimated_minutes: 30
+                }
+              ],
+              daily_goal: "まずは学習カードで基礎を学ぶ"
+            }
+          ],
+          weekly_milestones: [
+            {
+              week: 1,
+              goal: "基礎固め：ゆっくりコースを完了",
+              focus_areas: ["基本的な概念の理解", "学習習慣の定着"]
+            },
+            {
+              week: 2,
+              goal: "応用力：しっかりコースに挑戦",
+              focus_areas: ["応用問題への挑戦", "復習の習慣化"]
+            }
+          ],
+          study_tips: [
+            "毎日決まった時間に勉強しましょう",
+            "わからないところは先生に質問しましょう",
+            "復習を忘れずに！"
+          ],
+          motivation_message: "新しい学習の始まりです。焦らず、一歩ずつ進んでいきましょう！"
+        },
+        generated_at: new Date().toISOString()
+      })
+    }
+    
     // AIプロンプト
     const aiPrompt = `
 あなたは小学生の学習計画を立てる教育AIです。以下のデータから最適な学習計画を作成してください。
@@ -8563,7 +8617,11 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: aiPrompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 2500 }
+          generationConfig: { 
+            temperature: 0.7, 
+            maxOutputTokens: 4000,
+            responseMimeType: 'application/json'
+          }
         })
       }
     )
@@ -8575,12 +8633,15 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
     const geminiData = await geminiResponse.json()
     const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
     
-    const jsonMatch = geminiText.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('学習計画のパースに失敗しました')
+    if (!geminiText) {
+      throw new Error('Gemini APIから空のレスポンスが返されました')
     }
     
-    const studyPlan = JSON.parse(jsonMatch[0])
+    console.log('📝 Geminiレスポンス長さ:', geminiText.length)
+    console.log('📝 Geminiレスポンス（最初の300文字）:', geminiText.substring(0, 300))
+    
+    // extractJSON関数を使って堅牢にJSONを抽出
+    const studyPlan = extractJSON(geminiText)
     
     console.log('✅ 学習計画生成完了')
     
