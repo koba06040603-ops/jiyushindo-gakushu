@@ -12055,9 +12055,13 @@ function closeUnitGeneratorModal() {
 // AI単元生成を開始
 // AIで単元名候補を取得
 async function suggestUnitNames() {
+  console.log('🎯 suggestUnitNames が呼び出されました')
+  
   const grade = document.getElementById('genGrade').value
   const subject = document.getElementById('genSubject').value
   const textbook = document.getElementById('genTextbook').value
+  
+  console.log('📝 選択された値:', { grade, subject, textbook })
   
   if (!grade || !subject || !textbook) {
     alert('学年・教科・教科書会社を選択してください')
@@ -12068,6 +12072,8 @@ async function suggestUnitNames() {
   const suggestionArea = document.getElementById('unitSuggestions')
   const suggestionList = document.getElementById('unitSuggestionList')
   
+  console.log('🔍 DOM要素:', { suggestBtn, suggestionArea, suggestionList })
+  
   // ローディング表示
   suggestBtn.disabled = true
   suggestBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> 生成中...'
@@ -12075,6 +12081,8 @@ async function suggestUnitNames() {
   suggestionArea.classList.remove('hidden')
   
   try {
+    console.log('📡 APIリクエスト送信中...')
+    
     // Gemini APIで単元候補を取得
     const response = await axios.post('/api/ai/suggest-units', {
       grade,
@@ -12082,14 +12090,22 @@ async function suggestUnitNames() {
       textbook
     })
     
+    console.log('📥 APIレスポンス:', response.data)
+    
     if (response.data.error) {
       throw new Error(response.data.error)
     }
     
     const units = response.data.units || []
     
+    console.log('✅ 取得した単元数:', units.length)
+    console.log('📋 単元リスト:', units)
+    
     if (units.length === 0) {
+      console.warn('⚠️ 単元が0件です')
       suggestionList.innerHTML = '<p class="text-sm text-gray-600">候補が見つかりませんでした。手動で入力してください。</p>'
+      suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> AIで単元候補を表示'
+      suggestBtn.disabled = false
       return
     }
     
@@ -12106,14 +12122,19 @@ async function suggestUnitNames() {
       </button>
     `).join('')
     
+    console.log('✅ 単元候補を表示しました')
     suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> 再生成'
     suggestBtn.disabled = false
     
   } catch (error) {
-    console.error('単元候補取得エラー:', error)
+    console.error('❌❌❌ 単元候補取得エラー:', error)
+    console.error('エラー詳細:', error.response?.data)
+    console.error('エラーメッセージ:', error.message)
     
     // エラーメッセージを改善
     let errorMessage = 'エラーが発生しました。手動で入力してください。'
+    let detailMessage = ''
+    
     if (error.response && error.response.data) {
       const data = error.response.data
       if (data.message) {
@@ -12121,12 +12142,18 @@ async function suggestUnitNames() {
       } else if (data.error) {
         errorMessage = data.error
       }
+      if (data.details) {
+        detailMessage = `<p class="text-xs mt-1 text-gray-600">詳細: ${data.details}</p>`
+      }
+    } else if (error.message) {
+      detailMessage = `<p class="text-xs mt-1 text-gray-600">詳細: ${error.message}</p>`
     }
     
     suggestionList.innerHTML = `
       <div class="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
-        <p class="font-bold mb-1"><i class="fas fa-info-circle mr-1"></i>単元名を直接入力してください</p>
-        <p class="text-xs text-gray-600">例: かけ算の筆算、物語文の読解、分数のたし算、など</p>
+        <p class="font-bold mb-1"><i class="fas fa-exclamation-triangle mr-1"></i>${errorMessage}</p>
+        ${detailMessage}
+        <p class="text-xs text-gray-600 mt-2">例: かけ算の筆算、物語文の読解、分数のたし算、正の数・負の数、など</p>
       </div>
     `
     suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> AIで単元候補を表示'
