@@ -38,7 +38,7 @@ export interface SimpleReportResult {
 }
 
 /**
- * AI自動添削エンジン（簡易版）
+ * AI自動添削エンジン（簡易版）- 3段階フォールバック対応
  */
 export async function gradeAnswer(
   env: any,
@@ -58,7 +58,37 @@ export async function gradeAnswer(
     difficulty,
   }
 
+  // 教科別の厳密採点を先に試行
+  const strictCheck = checkAnswerStrict(correctAnswer, studentAnswer, subject)
+  if (strictCheck) {
+    // 厳密採点で判定できた場合
+    try {
+      // AIでフィードバックのみ生成
+      const result = await generateFeedback(env.AI, request)
+      return {
+        isCorrect: strictCheck.isCorrect,
+        score: strictCheck.score,
+        feedback: result.feedback_text,
+        hints: result.suggestions,
+      }
+    } catch (error) {
+      // AI失敗時はシンプルなフィードバック
+      return {
+        isCorrect: strictCheck.isCorrect,
+        score: strictCheck.score,
+        feedback: strictCheck.isCorrect 
+          ? '正解です！よくできました 🎉' 
+          : '惜しい！もう一度考えてみましょう。',
+        hints: strictCheck.isCorrect 
+          ? ['次のレベルの問題に挑戦しましょう！']
+          : ['もう一度問題文を読んでみましょう', '教科書の該当ページを確認してみましょう'],
+      }
+    }
+  }
+
+  // 厳密採点で判定できない場合、AI採点を試行
   try {
+    // Stage 1: Workers AI
     const result = await generateFeedback(env.AI, request)
     return {
       isCorrect: result.is_correct,
@@ -67,14 +97,294 @@ export async function gradeAnswer(
       hints: result.suggestions,
     }
   } catch (error) {
-    console.error('❌ AI添削エラー:', error)
-    const fallback = generateRuleBasedFeedback(request)
-    return {
-      isCorrect: fallback.is_correct,
-      score: fallback.score,
-      feedback: fallback.feedback_text,
-      hints: fallback.suggestions,
+    console.error('❌ Workers AI採点エラー:', error)
+    
+    try {
+      // Stage 2: HuggingFace API
+      const hfResult = await generateFeedbackHuggingFace(request)
+      return {
+        isCorrect: hfResult.is_correct,
+        score: hfResult.score,
+        feedback: hfResult.feedback_text,
+        hints: hfResult.suggestions,
+      }
+    } catch (hfError) {
+      console.error('❌ HuggingFace採点エラー:', hfError)
+      
+      // Stage 3: Rule-based fallback
+      const fallback = generateRuleBasedFeedback(request)
+      return {
+        isCorrect: fallback.is_correct,
+        score: fallback.score,
+        feedback: fallback.feedback_text,
+        hints: fallback.suggestions,
+      }
     }
+  }
+}
+
+/**
+ * ========================================
+ * 教科別厳密採点
+ * ========================================
+ */
+
+interface StrictCheckResult {
+  isCorrect: boolean
+  score: number
+}
+
+/**
+ * 教科別の厳密採点
+ */
+function checkAnswerStrict(
+  correctAnswer: string,
+  studentAnswer: string,
+  subject: string
+): StrictCheckResult | null {
+  switch (subject) {
+    case '数学':
+      return checkMathAnswer(correctAnswer, studentAnswer)
+    case '英語':
+      return checkEnglishAnswer(correctAnswer, studentAnswer)
+    case '国語':
+      return checkJapaneseAnswer(correctAnswer, studentAnswer)
+    default:
+      return null // 他の教科は厳密採点しない
+  }
+}
+
+/**
+ * 数学の厳密採点
+ */
+function checkMathAnswer(correctAnswer: string, studentAnswer: string): StrictCheckResult | null {
+  // 数値抽出と正規化
+  const correctNum = extractNumber(correctAnswer)
+  const studentNum = extractNumber(studentAnswer)
+  
+  if (correctNum === null || studentNum === null) {
+    return null // 数値として解釈できない場合は厳密採点不可
+  }
+  
+  // 数値比較（誤差許容: 0.001）
+  const isCorrect = Math.abs(correctNum - studentNum) < 0.001
+  const score = isCorrect ? 100 : Math.max(0, 100 - Math.abs(correctNum - studentNum) * 10)
+  
+  return { isCorrect, score: Math.round(score) }
+}
+
+/**
+ * 数値抽出と正規化
+ */
+function extractNumber(text: string): number | null {
+  // 全角数字を半角に変換
+  text = text.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
+  
+  // カンマを削除
+  text = text.replace(/,/g, '')
+  
+  // 単位を削除（個、本、円、cm、m、kg、g など）
+  text = text.replace(/[個本円台枚人匹羽頭冊台枚人足頭冊cmkmgkgmLl]+$/g, '')
+  
+  // 分数を小数に変換（例: "1/2" → 0.5）
+  const fractionMatch = text.match(/^(\d+)\/(\d+)$/)
+  if (fractionMatch) {
+    const numerator = parseInt(fractionMatch[1])
+    const denominator = parseInt(fractionMatch[2])
+    return numerator / denominator
+  }
+  
+  // 数値抽出
+  const numMatch = text.match(/-?\d+\.?\d*/)
+  if (numMatch) {
+    return parseFloat(numMatch[0])
+  }
+  
+  return null
+}
+
+/**
+ * 英語の厳密採点
+ */
+function checkEnglishAnswer(correctAnswer: string, studentAnswer: string): StrictCheckResult | null {
+  // 前後の空白を削除、小文字化
+  const correct = correctAnswer.trim().toLowerCase()
+  const student = studentAnswer.trim().toLowerCase()
+  
+  // 複数の正解候補をサポート（カンマ区切り）
+  const correctVariants = correct.split(/[,、]/).map(s => s.trim())
+  
+  // いずれかに完全一致
+  const isExactMatch = correctVariants.some(variant => variant === student)
+  if (isExactMatch) {
+    return { isCorrect: true, score: 100 }
+  }
+  
+  // スペルチェック（編集距離）
+  const minDistance = Math.min(...correctVariants.map(variant => {
+    return levenshteinDistance(variant, student)
+  }))
+  
+  const maxLength = Math.max(...correctVariants.map(v => v.length))
+  const similarity = 1 - (minDistance / maxLength)
+  
+  // 類似度80%以上で正解
+  const isCorrect = similarity >= 0.8
+  const score = Math.round(similarity * 100)
+  
+  return { isCorrect, score }
+}
+
+/**
+ * 国語の厳密採点
+ */
+function checkJapaneseAnswer(correctAnswer: string, studentAnswer: string): StrictCheckResult | null {
+  // 前後の空白を削除
+  const correct = correctAnswer.trim()
+  const student = studentAnswer.trim()
+  
+  // 複数の正解候補をサポート（カンマ・句点区切り）
+  const correctVariants = correct.split(/[,、。]/).map(s => s.trim()).filter(s => s.length > 0)
+  
+  // ひらがな・カタカナの統一
+  const normalizeJapanese = (text: string) => {
+    // カタカナをひらがなに変換
+    return text.replace(/[\u30a1-\u30f6]/g, (match) => {
+      const chr = match.charCodeAt(0) - 0x60
+      return String.fromCharCode(chr)
+    })
+  }
+  
+  const normalizedStudent = normalizeJapanese(student)
+  const normalizedVariants = correctVariants.map(v => normalizeJapanese(v))
+  
+  // いずれかに完全一致
+  const isExactMatch = normalizedVariants.some(variant => variant === normalizedStudent)
+  if (isExactMatch) {
+    return { isCorrect: true, score: 100 }
+  }
+  
+  // 部分一致チェック（70%以上含む）
+  const maxSimilarity = Math.max(...normalizedVariants.map(variant => {
+    if (normalizedStudent.includes(variant) || variant.includes(normalizedStudent)) {
+      return Math.min(normalizedStudent.length, variant.length) / Math.max(normalizedStudent.length, variant.length)
+    }
+    return 0
+  }))
+  
+  const isCorrect = maxSimilarity >= 0.7
+  const score = Math.round(maxSimilarity * 100)
+  
+  return { isCorrect, score }
+}
+
+/**
+ * Levenshtein距離
+ */
+function levenshteinDistance(str1: string, str2: string): number {
+  const len1 = str1.length
+  const len2 = str2.length
+  const matrix: number[][] = []
+
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i]
+  }
+
+  for (let j = 0; j <= len2; j++) {
+    matrix[0][j] = j
+  }
+
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1]
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        )
+      }
+    }
+  }
+
+  return matrix[len1][len2]
+}
+
+/**
+ * ========================================
+ * HuggingFace API統合
+ * ========================================
+ */
+
+/**
+ * HuggingFace APIを使用した自動添削
+ */
+async function generateFeedbackHuggingFace(request: FeedbackRequest): Promise<FeedbackResult> {
+  const HF_API_URL = 'https://api-inference.huggingface.co/models/meta-llama/Llama-3.2-3B-Instruct'
+  const HF_API_KEY = 'hf_placeholder' // 環境変数から取得すべき
+  
+  const prompt = `あなたは小学生向けの優しい先生です。以下の解答を添削してください。
+
+【問題】
+${request.problem_text}
+
+【正解】
+${request.correct_answer}
+
+【生徒の解答】
+${request.student_answer}
+
+【教科】${request.subject}
+
+JSON形式で回答してください：
+{
+  "is_correct": true/false,
+  "score": 0-100の点数,
+  "feedback_text": "励ましの言葉",
+  "suggestions": ["改善提案"],
+  "explanation": "解説"
+}`
+
+  try {
+    const response = await fetch(HF_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${HF_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: prompt,
+        parameters: {
+          max_new_tokens: 500,
+          temperature: 0.7,
+        },
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HuggingFace API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const generatedText = data[0]?.generated_text || ''
+    
+    // JSONを抽出
+    const jsonMatch = generatedText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('Invalid JSON response from HuggingFace')
+    }
+
+    const result: FeedbackResult = JSON.parse(jsonMatch[0])
+    return {
+      ...result,
+      common_mistakes: result.common_mistakes || [],
+      related_concepts: result.related_concepts || [],
+      next_steps: result.next_steps || [],
+    }
+  } catch (error) {
+    console.error('HuggingFace API error:', error)
+    throw error
   }
 }
 

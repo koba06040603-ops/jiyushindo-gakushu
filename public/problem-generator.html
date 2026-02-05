@@ -40,6 +40,77 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        
+        /* 正解演出 - 赤丸 */
+        .correct-circle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            width: 200px;
+            height: 200px;
+            border: 10px solid #EF4444;
+            border-radius: 50%;
+            animation: circleAppear 0.6s ease-out forwards;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        
+        @keyframes circleAppear {
+            0% {
+                transform: translate(-50%, -50%) scale(0) rotate(0deg);
+                opacity: 0;
+            }
+            60% {
+                transform: translate(-50%, -50%) scale(1.2) rotate(180deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1) rotate(360deg);
+                opacity: 1;
+            }
+        }
+        
+        /* 花吹雪アニメーション */
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: #f00;
+            position: absolute;
+            animation: confetti-fall 3s linear forwards;
+            pointer-events: none;
+            z-index: 999;
+        }
+        
+        @keyframes confetti-fall {
+            0% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        
+        /* 花吹雪の色バリエーション */
+        .confetti-red { background: #EF4444; }
+        .confetti-yellow { background: #FBBF24; }
+        .confetti-green { background: #10B981; }
+        .confetti-blue { background: #3B82F6; }
+        .confetti-purple { background: #8B5CF6; }
+        .confetti-pink { background: #EC4899; }
+        
+        /* 正解時の背景フラッシュ */
+        .flash-correct {
+            animation: flashGreen 0.5s ease-in-out;
+        }
+        
+        @keyframes flashGreen {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(16, 185, 129, 0.1); }
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -513,6 +584,11 @@
                 if (response.data.success) {
                     const { feedback } = response.data
                     
+                    // ✅ 正解時は演出を表示
+                    if (feedback.isCorrect) {
+                        showCorrectAnimation()
+                    }
+                    
                     // フィードバック表示
                     resultArea.innerHTML = `
                         <div class="${feedback.isCorrect ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'} border-l-4 p-4 rounded">
@@ -898,6 +974,97 @@
             const div = document.createElement('div')
             div.textContent = text
             return div.innerHTML
+        }
+        
+        // ========================================
+        // 正解演出
+        // ========================================
+        
+        function showCorrectAnimation() {
+            // 1. 大きな赤丸を表示
+            const circle = document.createElement('div')
+            circle.className = 'correct-circle'
+            document.body.appendChild(circle)
+            
+            // 赤丸は0.6秒後に消す
+            setTimeout(() => {
+                circle.remove()
+            }, 600)
+            
+            // 2. 花吹雪を生成（50個）
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    createConfetti()
+                }, i * 30) // 30msずつずらして生成
+            }
+            
+            // 3. 正解音を再生（容量が許せば）
+            playCorrectSound()
+        }
+        
+        function createConfetti() {
+            const confetti = document.createElement('div')
+            confetti.className = 'confetti'
+            
+            // ランダムな色を選択
+            const colors = ['confetti-red', 'confetti-yellow', 'confetti-green']
+            const randomColor = colors[Math.floor(Math.random() * colors.length)]
+            confetti.classList.add(randomColor)
+            
+            // ランダムな位置から降らせる
+            confetti.style.left = Math.random() * 100 + '%'
+            confetti.style.top = '-10px'
+            
+            // ランダムなサイズ（8-15px）
+            const size = Math.random() * 7 + 8
+            confetti.style.width = size + 'px'
+            confetti.style.height = size + 'px'
+            
+            // ランダムな形状（丸 or 四角）
+            if (Math.random() > 0.5) {
+                confetti.style.borderRadius = '50%'
+            }
+            
+            // アニメーション時間を少しずつ変える（2.5-3.5秒）
+            const duration = Math.random() + 2.5
+            confetti.style.animationDuration = duration + 's'
+            
+            document.body.appendChild(confetti)
+            
+            // アニメーション終了後に削除
+            setTimeout(() => {
+                confetti.remove()
+            }, duration * 1000)
+        }
+        
+        function playCorrectSound() {
+            // 正解音（base64エンコードされた短い効果音）
+            // 容量制限を考慮して、AudioContext APIで簡単な音を生成
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+                
+                // 「ピンポーン」のような2音階の音
+                const frequencies = [523.25, 659.25] // C5, E5
+                frequencies.forEach((freq, index) => {
+                    const oscillator = audioContext.createOscillator()
+                    const gainNode = audioContext.createGain()
+                    
+                    oscillator.connect(gainNode)
+                    gainNode.connect(audioContext.destination)
+                    
+                    oscillator.frequency.value = freq
+                    oscillator.type = 'sine'
+                    
+                    // 音量フェードアウト
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + index * 0.2)
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + index * 0.2 + 0.3)
+                    
+                    oscillator.start(audioContext.currentTime + index * 0.2)
+                    oscillator.stop(audioContext.currentTime + index * 0.2 + 0.3)
+                })
+            } catch (error) {
+                console.log('音声再生に対応していないブラウザです')
+            }
         }
 
         // 初期化実行
