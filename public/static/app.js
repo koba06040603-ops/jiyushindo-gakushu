@@ -11996,6 +11996,19 @@ function showUnitGeneratorModal() {
   `
   document.body.appendChild(modal)
   
+  // 生成ボタンにイベントリスナーを追加
+  console.log('🎯 生成ボタンにイベントリスナーを追加します')
+  const generateBtn = document.getElementById('generateUnitBtn')
+  if (generateBtn) {
+    generateBtn.addEventListener('click', () => {
+      console.log('🖱️ 生成ボタンがクリックされました（イベントリスナー経由）')
+      startUnitGeneration()
+    })
+    console.log('✅ イベントリスナー追加完了')
+  } else {
+    console.error('❌ 生成ボタンが見つかりません')
+  }
+  
   // 学年・教科・教科書会社が選択されたら単元候補ボタンを有効化
   const updateSuggestButton = () => {
     const grade = document.getElementById('genGrade').value
