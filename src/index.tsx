@@ -8768,7 +8768,7 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: { 
                 temperature: 0.7, 
-                maxOutputTokens: 2000,
+                maxOutputTokens: 4000,
                 responseMimeType: 'application/json'
               }
             })
@@ -8796,13 +8796,23 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
     const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
     
     if (!aiResponse) {
+      console.error('❌ AIレスポンスが空です:', data)
       throw new Error('AI response is empty')
     }
     
     // JSONを抽出
-    console.log('AIレスポンス（導入問題）:', aiResponse)
-    const problems = extractJSON(aiResponse)
-    console.log('パース結果（導入問題）:', JSON.stringify(problems, null, 2))
+    console.log('AIレスポンス（導入問題）長さ:', aiResponse.length)
+    console.log('AIレスポンス（最初の200文字）:', aiResponse.substring(0, 200))
+    
+    let problems
+    try {
+      problems = extractJSON(aiResponse)
+      console.log('✅ パース成功（導入問題）:', JSON.stringify(problems, null, 2))
+    } catch (parseError: any) {
+      console.error('❌ JSONパースエラー:', parseError.message)
+      console.error('パース失敗レスポンス全体:', aiResponse)
+      throw new Error(`JSON parse failed: ${parseError.message}`)
+    }
     
     // データベースに保存
     if (problems.introduction_problems && problems.introduction_problems.length === 3) {
