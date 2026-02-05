@@ -8215,6 +8215,64 @@ app.post('/api/ai/recommend-problems/:studentId', async (c) => {
     
     // 3. 統計分析
     const history = learningHistory.results || []
+    
+    // 学習履歴が0件の場合はデフォルト推奨を返す
+    if (history.length === 0) {
+      console.log('📊 学習履歴が0件のため、デフォルト推奨を返します')
+      return c.json({
+        success: true,
+        student_id: studentId,
+        curriculum_id: curriculumId,
+        learning_stats: {
+          total_attempts: 0,
+          correct_count: 0,
+          accuracy: 0,
+          avg_time: 0,
+          hint_usage: 0,
+          by_content_type: {}
+        },
+        weak_areas: [],
+        recommendations: {
+          analysis: {
+            learning_level: "初級",
+            study_style: "これから学習を始める段階です。基礎からしっかり学んでいきましょう。",
+            strengths: ["新しいことに挑戦する意欲"],
+            weaknesses: ["学習データがまだありません"]
+          },
+          recommended_problems: [
+            {
+              problem_type: "frequent_problems",
+              difficulty: "easy",
+              title: `${curriculum.unit_name}の基礎問題`,
+              content: `まずは${curriculum.unit_name}の基本的な内容から始めましょう。教科書の例題を確認しながら取り組んでください。`,
+              reason: "学習の第一歩として基礎を固めるため",
+              hints: ["教科書の説明をよく読みましょう", "わからないときは先生に聞きましょう"],
+              answer: "基礎問題は、学習カードの「ゆっくりコース」から始めることをおすすめします。",
+              explanation: "まずは基本をしっかり理解することが大切です。焦らず一つずつ進めていきましょう。"
+            },
+            {
+              problem_type: "review_checklist",
+              difficulty: "easy",
+              title: "復習チェック",
+              content: "学習カードで学んだ内容を復習して、理解を深めましょう。",
+              reason: "学習内容の定着のため",
+              hints: ["学習カードを見返しましょう", "ノートにまとめると覚えやすいです"],
+              answer: "復習は学習の翌日と1週間後に行うと効果的です。",
+              explanation: "定期的な復習が学習の定着につながります。"
+            }
+          ],
+          study_plan: {
+            immediate_focus: "まずは「ゆっくりコース」の学習カードから始めましょう",
+            weekly_goal: "学習カードを1日2-3枚のペースで進める",
+            long_term_goal: `${curriculum.unit_name}の基礎をしっかり理解する`,
+            estimated_time: "30"
+          },
+          motivation_message: "新しい学習の始まりです！一緒にがんばりましょう！"
+        },
+        generated_at: new Date().toISOString()
+      })
+    }
+    
     const stats = {
       total_attempts: history.length,
       correct_count: history.filter((h: any) => h.is_correct === 1).length,
