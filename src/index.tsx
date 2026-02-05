@@ -24054,4 +24054,367 @@ app.get('/api/teacher/classes', authMiddleware, requireRole(['teacher', 'admin']
   }
 })
 
+// ================================================
+// Phase 21: 保護者向けダッシュボード（基本API）
+// ================================================
+
+// 保護者ログイン（簡易版）
+app.post('/api/parent/login', async (c) => {
+  try {
+    const { env } = c
+    const { email, password } = await c.req.json()
+    
+    const parent = await env.DB.prepare(`
+      SELECT * FROM parents WHERE email = ?
+    `).bind(email).first()
+    
+    if (!parent) {
+      return c.json({ success: false, error: 'メールアドレスまたはパスワードが正しくありません' }, 401)
+    }
+    
+    // 簡易認証（本番環境ではbcrypt使用）
+    return c.json({
+      success: true,
+      parent: {
+        id: parent.id,
+        name: parent.name,
+        email: parent.email
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 保護者ログインエラー:', error)
+    return c.json({ success: false, error: 'ログインに失敗しました' }, 500)
+  }
+})
+
+// 子どもの学習状況取得
+app.get('/api/parent/student/:student_id/progress', async (c) => {
+  try {
+    const { env } = c
+    const student_id = parseInt(c.req.param('student_id'))
+    
+    // 基本情報
+    const student = await env.DB.prepare(`
+      SELECT name, email, current_streak, total_points 
+      FROM students WHERE id = ?
+    `).bind(student_id).first()
+    
+    // 今週の学習時間
+    const weeklyStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT DATE(answered_at)) as study_days,
+        COUNT(*) as problems_solved,
+        AVG(CASE WHEN is_correct = 1 THEN 1.0 ELSE 0.0 END) * 100 as correct_rate
+      FROM problem_answers
+      WHERE student_id = ? AND answered_at >= datetime('now', '-7 days')
+    `).bind(student_id).first()
+    
+    return c.json({
+      success: true,
+      student,
+      weekly_stats: weeklyStats
+    })
+  } catch (error: any) {
+    console.error('❌ 学習状況取得エラー:', error)
+    return c.json({ success: false, error: '学習状況の取得に失敗しました' }, 500)
+  }
+})
+
+// ================================================
+// Phase 21: リアルタイム協働学習（基本API）
+// ================================================
+
+// セッション一覧取得
+app.get('/api/collaborative/sessions', authMiddleware, async (c) => {
+  try {
+    const { env } = c
+    
+    const sessions = await env.DB.prepare(`
+      SELECT 
+        cs.*,
+        s.name as creator_name,
+        COUNT(DISTINCT sp.student_id) as participant_count
+      FROM collaborative_sessions cs
+      JOIN students s ON cs.creator_student_id = s.id
+      LEFT JOIN session_participants sp ON cs.id = sp.session_id AND sp.is_active = 1
+      WHERE cs.status IN ('waiting', 'active')
+      GROUP BY cs.id
+      ORDER BY cs.created_at DESC
+      LIMIT 20
+    `).all()
+    
+    return c.json({
+      success: true,
+      sessions: sessions.results
+    })
+  } catch (error: any) {
+    console.error('❌ セッション一覧取得エラー:', error)
+    return c.json({ success: false, error: 'セッション一覧の取得に失敗しました' }, 500)
+  }
+})
+
+// セッション作成
+app.post('/api/collaborative/sessions', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { session_name, session_type, subject, difficulty } = await c.req.json()
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO collaborative_sessions (session_name, session_type, creator_student_id, subject, difficulty, status)
+      VALUES (?, ?, ?, ?, ?, 'waiting')
+      RETURNING id
+    `).bind(session_name, session_type, user.id, subject, difficulty || 'medium').run()
+    
+    const session_id = result.results[0]?.id
+    
+    // 作成者を参加者として追加
+    await env.DB.prepare(`
+      INSERT INTO session_participants (session_id, student_id)
+      VALUES (?, ?)
+    `).bind(session_id, user.id).run()
+    
+    return c.json({
+      success: true,
+      session_id
+    })
+  } catch (error: any) {
+    console.error('❌ セッション作成エラー:', error)
+    return c.json({ success: false, error: 'セッションの作成に失敗しました' }, 500)
+  }
+})
+
+// ================================================
+// Phase 21: AI学習アシスタント（チャットボット）
+// ================================================
+
+import {
+  generateChatResponse,
+  getConversationHistory,
+  createConversation,
+  saveMessage,
+  getStudentAssistantSettings,
+  searchFAQ,
+  recordChatAnalytics,
+  getStudentLearningContext
+} from './ai-assistant'
+
+// チャット送信
+app.post('/api/chat/send', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { message, conversation_id } = await c.req.json()
+    
+    if (!message || message.trim().length === 0) {
+      return c.json({ success: false, error: 'メッセージを入力してください' }, 400)
+    }
+    
+    console.log('💬 チャットメッセージ受信:', { student_id: user.id, message })
+    
+    // APIキーを確認
+    const apiKey = env.GEMINI_API_KEY
+    if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+      return c.json({ success: false, error: 'AI機能が利用できません' }, 500)
+    }
+    
+    // 会話IDがない場合は新規作成
+    let conv_id = conversation_id
+    if (!conv_id) {
+      conv_id = await createConversation(env.DB, user.id)
+      console.log('✅ 新しい会話を作成:', conv_id)
+    }
+    
+    // ユーザーメッセージを保存
+    await saveMessage(env.DB, conv_id, 'user', message)
+    
+    // アシスタント設定を取得
+    const settings = await getStudentAssistantSettings(env.DB, user.id)
+    console.log('⚙️ アシスタント設定:', settings)
+    
+    // 会話履歴を取得
+    const history = await getConversationHistory(env.DB, user.id, conv_id, 10)
+    
+    // 生徒の学習コンテキストを取得
+    const learningContext = await getStudentLearningContext(env.DB, user.id)
+    console.log('📊 学習コンテキスト:', learningContext)
+    
+    // コンテキストを構築
+    const context = {
+      student_id: user.id,
+      conversation_id: conv_id,
+      personality: {
+        name: settings.name || 'まなぶくん',
+        system_prompt: settings.system_prompt || '',
+        tone: settings.tone || 'friendly',
+        emoji_usage: settings.emoji_usage || 1
+      },
+      recent_messages: history as any[],
+      student_progress: learningContext
+    }
+    
+    // AI応答を生成
+    console.log('🤖 AI応答生成中...')
+    const response = await generateChatResponse(context, message, apiKey)
+    console.log('✅ AI応答:', response.content.substring(0, 100) + '...')
+    
+    // アシスタントの応答を保存
+    await saveMessage(env.DB, conv_id, 'assistant', response.content, response.message_type)
+    
+    // 分析データを記録
+    await recordChatAnalytics(env.DB, user.id, response.message_type)
+    
+    return c.json({
+      success: true,
+      conversation_id: conv_id,
+      message: {
+        role: 'assistant',
+        content: response.content,
+        message_type: response.message_type,
+        timestamp: new Date().toISOString()
+      }
+    })
+    
+  } catch (error: any) {
+    console.error('❌ チャット送信エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: 'メッセージの送信に失敗しました',
+      details: error.message 
+    }, 500)
+  }
+})
+
+// 会話履歴を取得
+app.get('/api/chat/conversations', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    
+    const conversations = await env.DB.prepare(`
+      SELECT 
+        id,
+        conversation_title,
+        started_at,
+        last_message_at,
+        is_active,
+        (SELECT COUNT(*) FROM chat_messages WHERE conversation_id = chat_conversations.id) as message_count
+      FROM chat_conversations
+      WHERE student_id = ?
+      ORDER BY last_message_at DESC
+      LIMIT 50
+    `).bind(user.id).all()
+    
+    return c.json({
+      success: true,
+      conversations: conversations.results
+    })
+    
+  } catch (error: any) {
+    console.error('❌ 会話履歴取得エラー:', error)
+    return c.json({ success: false, error: '会話履歴の取得に失敗しました' }, 500)
+  }
+})
+
+// 特定の会話のメッセージを取得
+app.get('/api/chat/messages/:conversation_id', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const conversation_id = parseInt(c.req.param('conversation_id'))
+    
+    const messages = await getConversationHistory(env.DB, user.id, conversation_id, 100)
+    
+    return c.json({
+      success: true,
+      messages
+    })
+    
+  } catch (error: any) {
+    console.error('❌ メッセージ取得エラー:', error)
+    return c.json({ success: false, error: 'メッセージの取得に失敗しました' }, 500)
+  }
+})
+
+// FAQ検索
+app.get('/api/chat/faq', async (c) => {
+  try {
+    const { env } = c
+    const query = c.req.query('q') || ''
+    
+    if (query.length === 0) {
+      // 全FAQ取得
+      const faqs = await env.DB.prepare(`
+        SELECT * FROM assistant_faq
+        ORDER BY category, usage_count DESC
+        LIMIT 20
+      `).all()
+      
+      return c.json({
+        success: true,
+        faqs: faqs.results
+      })
+    }
+    
+    // 検索
+    const faqs = await searchFAQ(env.DB, query, 5)
+    
+    return c.json({
+      success: true,
+      faqs
+    })
+    
+  } catch (error: any) {
+    console.error('❌ FAQ検索エラー:', error)
+    return c.json({ success: false, error: 'FAQの取得に失敗しました' }, 500)
+  }
+})
+
+// アシスタント設定を取得
+app.get('/api/chat/settings', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    
+    const settings = await getStudentAssistantSettings(env.DB, user.id)
+    
+    // パーソナリティ一覧も取得
+    const personalities = await env.DB.prepare(`
+      SELECT * FROM assistant_personalities
+      ORDER BY is_default DESC, id
+    `).all()
+    
+    return c.json({
+      success: true,
+      settings,
+      personalities: personalities.results
+    })
+    
+  } catch (error: any) {
+    console.error('❌ 設定取得エラー:', error)
+    return c.json({ success: false, error: '設定の取得に失敗しました' }, 500)
+  }
+})
+
+// アシスタント設定を更新
+app.post('/api/chat/settings', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { personality_id, help_level, motivation_frequency } = await c.req.json()
+    
+    await env.DB.prepare(`
+      INSERT INTO student_assistant_settings (student_id, personality_id, help_level, motivation_frequency)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(student_id) DO UPDATE SET
+        personality_id = excluded.personality_id,
+        help_level = excluded.help_level,
+        motivation_frequency = excluded.motivation_frequency
+    `).bind(user.id, personality_id, help_level, motivation_frequency).run()
+    
+    return c.json({
+      success: true,
+      message: '設定を更新しました'
+    })
+    
+  } catch (error: any) {
+    console.error('❌ 設定更新エラー:', error)
+    return c.json({ success: false, error: '設定の更新に失敗しました' }, 500)
+  }
+})
+
 export default app
