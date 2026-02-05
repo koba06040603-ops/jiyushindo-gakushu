@@ -8330,7 +8330,8 @@ ${weakAreas.length > 0 ? weakAreas.join('、') : 'なし'}
           }],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 2000
+            maxOutputTokens: 4000,
+            responseMimeType: 'application/json'
           }
         })
       }
@@ -8346,15 +8347,19 @@ ${weakAreas.length > 0 ? weakAreas.join('、') : 'なし'}
     const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
     
     console.log('✅ Gemini APIレスポンス受信')
+    console.log('📝 レスポンス長さ:', geminiText.length)
+    console.log('📝 レスポンス（最初の300文字）:', geminiText.substring(0, 300))
     
-    // 7. JSONを抽出
-    const jsonMatch = geminiText.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      console.error('❌ JSONパースエラー:', geminiText)
-      throw new Error('AI推奨のパースに失敗しました')
+    // 7. JSONを抽出（extractJSON関数を使用）
+    let recommendations
+    try {
+      recommendations = extractJSON(geminiText)
+      console.log('✅ JSON抽出成功')
+    } catch (parseError: any) {
+      console.error('❌ JSONパースエラー:', parseError.message)
+      console.error('📝 パース失敗したテキスト:', geminiText)
+      throw new Error(`AI推奨のパースに失敗しました: ${parseError.message}`)
     }
-    
-    const recommendations = JSON.parse(jsonMatch[0])
     
     console.log(`✅ AI推奨問題生成完了: ${recommendations.recommended_problems?.length}問`)
     
