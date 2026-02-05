@@ -8449,12 +8449,34 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
   
   const apiKey = env.GEMINI_API_KEY
   
+  // 詳細なエラーメッセージ
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-    return c.json({ error: 'Gemini APIキーが設定されていません' }, 500)
+    return c.json({ 
+      error: 'Gemini APIキーが設定されていません',
+      details: 'システム管理者にGEMINI_API_KEYの設定を依頼してください',
+      help: 'Cloudflare PagesのSettings > Environment variables から設定可能です'
+    }, 500)
+  }
+  
+  // 入力バリデーション
+  if (!studentId || isNaN(studentId)) {
+    return c.json({
+      error: '無効な学生IDです',
+      details: `学生ID: ${studentId}`,
+      help: '正しい学生IDを指定してください'
+    }, 400)
+  }
+  
+  if (!curriculumId) {
+    return c.json({
+      error: 'カリキュラムIDが指定されていません',
+      details: 'curriculumIdパラメータが必要です',
+      help: 'リクエストボディに{"curriculumId": 1}を含めてください'
+    }, 400)
   }
   
   try {
-    console.log(`📅 学習計画生成開始: 学生ID=${studentId}, 目標日=${targetDate}`)
+    console.log(`📅 学習計画生成開始: 学生ID=${studentId}, カリキュラムID=${curriculumId}, 目標日=${targetDate}`)
     
     // カリキュラム情報取得
     const curriculum = await env.DB.prepare(
@@ -8462,8 +8484,14 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
     ).bind(curriculumId).first()
     
     if (!curriculum) {
-      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+      return c.json({ 
+        error: 'カリキュラムが見つかりません',
+        details: `カリキュラムID: ${curriculumId}`,
+        help: '正しいカリキュラムIDを指定するか、新しいカリキュラムを作成してください'
+      }, 404)
     }
+    
+    console.log(`📚 カリキュラム情報: ${curriculum.grade} ${curriculum.subject} ${curriculum.unit_name}`)
     
     // 学習履歴統計
     const stats = await env.DB.prepare(`
@@ -8475,6 +8503,8 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
       FROM retrieval_practice_log
       WHERE student_id = ? AND curriculum_id = ?
     `).bind(studentId, curriculumId).first()
+    
+    console.log(`📊 学習統計: 総学習日=${stats?.study_days || 0}日, 総問題数=${stats?.total_attempts || 0}問`)
     
     // 学習ペース分析
     const recentActivity = await env.DB.prepare(`
@@ -8609,6 +8639,8 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
 }
 `
     
+    console.log('🤖 Gemini API呼び出し開始...')
+    
     // Gemini API呼び出し
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -8627,7 +8659,9 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
     )
     
     if (!geminiResponse.ok) {
-      throw new Error('AI学習計画生成に失敗しました')
+      const errorText = await geminiResponse.text()
+      console.error('❌ Gemini APIエラー:', errorText)
+      throw new Error(`Gemini APIエラー: ステータス ${geminiResponse.status}`)
     }
     
     const geminiData = await geminiResponse.json()
@@ -8656,10 +8690,16 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
     
   } catch (error: any) {
     console.error('❌ 学習計画生成エラー:', error)
+    console.error('エラースタック:', error.stack?.substring(0, 500))
+    
+    // 詳細なエラーメッセージを返す
     return c.json({
       success: false,
       error: '学習計画の生成に失敗しました',
-      details: error.message
+      details: error.message,
+      error_type: error.name || 'UnknownError',
+      stack_trace: error.stack?.substring(0, 200),
+      help: 'Gemini APIの応答が不正な形式である可能性があります。しばらく時間をおいて再試行してください。'
     }, 500)
   }
 })

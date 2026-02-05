@@ -3470,6 +3470,11 @@ async function loadGuidePage(curriculumId) {
             <!-- 印刷・ツールボタン -->
             <div class="border-t-2 border-gray-300 pt-6 print:hidden">
               <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button onclick="loadAIStudyPlanPage(${curriculum.id})" 
+                        class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:from-blue-600 hover:to-indigo-700 transition shadow-lg flex items-center justify-center">
+                  <i class="fas fa-robot mr-2"></i>
+                  AI学習計画
+                </button>
                 <button onclick="loadLearningPlanPage(${curriculum.id})" 
                         class="bg-gradient-to-r from-green-500 to-teal-600 text-white py-3 px-4 rounded-xl font-bold hover:from-green-600 hover:to-teal-700 transition shadow-lg flex items-center justify-center">
                   <i class="fas fa-calendar-alt mr-2"></i>
@@ -38136,5 +38141,341 @@ window.requestPushNotificationPermission = requestPushNotificationPermission
 window.registerBackgroundSync = registerBackgroundSync
 window.isStandalone = isStandalone
 window.checkPushNotificationSupport = checkPushNotificationSupport
+
+// ===================================
+// AI学習計画生成（新UI）
+// ===================================
+
+// AI学習計画生成ページを読み込む
+async function loadAIStudyPlanPage(curriculumId) {
+  state.currentView = 'ai-study-plan'
+  state.selectedCurriculum = state.selectedCurriculum || { id: curriculumId }
+  
+  const app = document.getElementById('app')
+  app.innerHTML = `
+    <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
+      <div class="container mx-auto px-4 max-w-6xl">
+        
+        <!-- ヘッダー -->
+        <button onclick="loadGuidePage(${curriculumId})" 
+                class="mb-6 text-blue-600 hover:text-blue-800 flex items-center text-lg font-semibold transition">
+          <i class="fas fa-arrow-left mr-2"></i>学習のてびきにもどる
+        </button>
+
+        <div class="bg-white rounded-2xl shadow-2xl p-8">
+          
+          <!-- タイトル -->
+          <div class="text-center mb-8 border-b-4 border-blue-600 pb-6">
+            <h1 class="text-4xl font-bold text-blue-700 mb-3">
+              <i class="fas fa-robot mr-3"></i>AI学習計画
+            </h1>
+            <p class="text-gray-600 text-lg">
+              あなたの学習履歴をAIが分析して、最適な学習計画を提案します
+            </p>
+          </div>
+
+          <!-- 目標日設定 -->
+          <div class="bg-gradient-to-r from-green-100 to-blue-100 rounded-xl p-6 mb-6">
+            <h3 class="text-xl font-bold text-green-800 mb-4 flex items-center">
+              <i class="fas fa-calendar-check mr-2"></i>学習目標日を設定
+            </h3>
+            <div class="flex items-center gap-4">
+              <input type="date" 
+                     id="targetDate" 
+                     class="px-4 py-3 border-2 border-green-300 rounded-lg font-semibold text-lg"
+                     min="${new Date().toISOString().split('T')[0]}"
+                     value="${new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
+              <button onclick="generateAIStudyPlan(${curriculumId})" 
+                      class="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition transform hover:scale-105">
+                <i class="fas fa-magic mr-2"></i>AI学習計画を作成
+              </button>
+            </div>
+            <p class="text-sm text-gray-600 mt-3">
+              <i class="fas fa-info-circle mr-1"></i>
+              目標日までにどのように学習を進めるか、AIが最適なプランを提案します
+            </p>
+          </div>
+
+          <!-- ローディング -->
+          <div id="planLoading" class="hidden text-center py-12">
+            <i class="fas fa-spinner fa-spin text-6xl text-blue-500 mb-4"></i>
+            <p class="text-gray-700 text-xl font-semibold">AIが学習計画を作成しています...</p>
+            <p class="text-gray-500 mt-2">少々お待ちください（30秒〜1分）</p>
+          </div>
+
+          <!-- 結果エリア -->
+          <div id="planResult" class="hidden space-y-6"></div>
+
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// AI学習計画を生成
+async function generateAIStudyPlan(curriculumId) {
+  const studentId = state.currentStudent?.id || state.student?.id || 1
+  const targetDate = document.getElementById('targetDate').value
+  
+  if (!targetDate) {
+    alert('❌ 目標日を設定してください')
+    return
+  }
+  
+  // ローディング表示
+  document.getElementById('planLoading').classList.remove('hidden')
+  document.getElementById('planResult').classList.add('hidden')
+  
+  try {
+    console.log(`📅 AI学習計画生成開始: 学生ID=${studentId}, カリキュラムID=${curriculumId}, 目標日=${targetDate}`)
+    
+    const response = await axios.post(`/api/ai/generate-study-plan/${studentId}`, {
+      curriculumId,
+      targetDate
+    })
+    
+    console.log('✅ AI学習計画生成成功:', response.data)
+    
+    const data = response.data
+    
+    // ローディングを隠して結果を表示
+    document.getElementById('planLoading').classList.add('hidden')
+    const resultArea = document.getElementById('planResult')
+    resultArea.classList.remove('hidden')
+    
+    // 学習計画を表示
+    displayStudyPlan(data)
+    
+  } catch (error) {
+    console.error('❌ AI学習計画生成エラー:', error)
+    console.error('エラー詳細:', error.response?.data)
+    
+    document.getElementById('planLoading').classList.add('hidden')
+    
+    // 詳細なエラー情報を取得
+    const errorData = error.response?.data || {}
+    const errorMessage = errorData.error || error.message || 'エラーが発生しました'
+    const errorDetails = errorData.details || ''
+    const errorType = errorData.error_type || 'Unknown'
+    const help = errorData.help || ''
+    
+    // エラー表示エリアを作成
+    const resultArea = document.getElementById('planResult')
+    resultArea.classList.remove('hidden')
+    resultArea.innerHTML = `
+      <div class="bg-red-50 border-2 border-red-500 rounded-xl p-6 shadow-lg">
+        <div class="flex items-start gap-4">
+          <i class="fas fa-exclamation-triangle text-red-600 text-4xl"></i>
+          <div class="flex-1">
+            <h3 class="text-xl font-bold text-red-800 mb-3">
+              学習計画の生成に失敗しました
+            </h3>
+            
+            <div class="space-y-3">
+              <!-- エラーメッセージ -->
+              <div class="bg-white rounded-lg p-4">
+                <p class="text-sm font-semibold text-gray-700 mb-1">エラー:</p>
+                <p class="text-gray-900">${errorMessage}</p>
+              </div>
+              
+              ${errorDetails ? `
+                <div class="bg-white rounded-lg p-4">
+                  <p class="text-sm font-semibold text-gray-700 mb-1">詳細:</p>
+                  <p class="text-gray-800 text-sm">${errorDetails}</p>
+                </div>
+              ` : ''}
+              
+              ${errorType ? `
+                <div class="bg-white rounded-lg p-4">
+                  <p class="text-sm font-semibold text-gray-700 mb-1">エラータイプ:</p>
+                  <p class="text-gray-800 text-sm font-mono">${errorType}</p>
+                </div>
+              ` : ''}
+              
+              ${help ? `
+                <div class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
+                  <p class="text-sm font-semibold text-blue-800 mb-1">
+                    <i class="fas fa-info-circle mr-2"></i>対処方法:
+                  </p>
+                  <p class="text-blue-900 text-sm">${help}</p>
+                </div>
+              ` : ''}
+            </div>
+            
+            <!-- 再試行ボタン -->
+            <div class="mt-6 flex gap-3">
+              <button onclick="generateAIStudyPlan(${curriculumId})" 
+                      class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg transition">
+                <i class="fas fa-redo mr-2"></i>再試行
+              </button>
+              <button onclick="document.getElementById('planResult').classList.add('hidden')" 
+                      class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg transition">
+                <i class="fas fa-times mr-2"></i>閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+  }
+}
+
+// 学習計画を表示
+function displayStudyPlan(data) {
+  const resultArea = document.getElementById('planResult')
+  const plan = data.study_plan
+  
+  if (!plan) {
+    resultArea.innerHTML = `
+      <div class="bg-red-100 border-l-4 border-red-500 p-6 rounded">
+        <p class="text-red-800 font-semibold">学習計画を表示できませんでした</p>
+      </div>
+    `
+    return
+  }
+  
+  resultArea.innerHTML = `
+    <!-- 計画概要 -->
+    <div class="bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl p-6 text-white shadow-lg">
+      <h2 class="text-2xl font-bold mb-3 flex items-center">
+        <i class="fas fa-lightbulb mr-2"></i>あなたの学習計画
+      </h2>
+      <p class="text-lg leading-relaxed">${plan.plan_summary || 'まずは基礎から始めましょう！'}</p>
+      ${data.days_until_target ? `
+        <p class="mt-4 text-sm bg-white/20 rounded-lg px-4 py-2 inline-block">
+          <i class="fas fa-calendar-alt mr-2"></i>
+          目標まで: <strong>${data.days_until_target}日間</strong>
+        </p>
+      ` : ''}
+    </div>
+
+    <!-- 日別スケジュール -->
+    ${plan.daily_schedule && plan.daily_schedule.length > 0 ? `
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+          <i class="fas fa-calendar-day mr-2 text-blue-600"></i>
+          日別スケジュール
+        </h3>
+        <div class="space-y-4">
+          ${plan.daily_schedule.map((day, index) => `
+            <div class="border-l-4 border-blue-400 pl-6 py-4 bg-blue-50 rounded-r hover:shadow-md transition">
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-lg font-bold text-gray-800">
+                  ${day.day ? `Day ${day.day}` : `${index + 1}日目`}
+                </h4>
+                <span class="text-sm text-gray-600">${day.date || ''}</span>
+              </div>
+              
+              ${day.tasks && day.tasks.length > 0 ? `
+                <div class="space-y-2 mb-3">
+                  ${day.tasks.map(task => `
+                    <div class="bg-white rounded-lg p-3 shadow-sm">
+                      <div class="flex items-center gap-2 mb-1">
+                        <i class="fas fa-clock text-blue-500"></i>
+                        <span class="font-semibold text-gray-700">${task.time || '予定時刻'}</span>
+                      </div>
+                      <p class="text-gray-800 ml-6">${task.activity || task.content || 'タスク内容'}</p>
+                      ${task.estimated_minutes ? `
+                        <p class="text-sm text-gray-500 ml-6 mt-1">
+                          ⏱️ 所要時間: ${task.estimated_minutes}分
+                        </p>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+              
+              ${day.daily_goal ? `
+                <div class="bg-yellow-100 rounded-lg p-3 border-l-4 border-yellow-400">
+                  <p class="text-gray-800">
+                    <i class="fas fa-star text-yellow-500 mr-2"></i>
+                    <strong>今日の目標:</strong> ${day.daily_goal}
+                  </p>
+                </div>
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- 週間マイルストーン -->
+    ${plan.weekly_milestones && plan.weekly_milestones.length > 0 ? `
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+          <i class="fas fa-flag-checkered mr-2 text-purple-600"></i>
+          週間マイルストーン
+        </h3>
+        <div class="space-y-4">
+          ${plan.weekly_milestones.map((milestone, index) => `
+            <div class="border rounded-lg p-5 hover:shadow-md transition bg-gradient-to-r from-purple-50 to-pink-50">
+              <h4 class="text-lg font-bold text-purple-800 mb-2">
+                ${milestone.week ? `Week ${milestone.week}` : `第${index + 1}週`}
+              </h4>
+              <p class="text-gray-800 font-semibold mb-3">${milestone.goal || 'マイルストーン'}</p>
+              ${milestone.focus_areas && milestone.focus_areas.length > 0 ? `
+                <div class="mt-3">
+                  <p class="text-sm font-semibold text-gray-700 mb-2">重点分野:</p>
+                  <div class="flex flex-wrap gap-2">
+                    ${milestone.focus_areas.map(area => `
+                      <span class="bg-purple-200 text-purple-800 text-sm px-3 py-1 rounded-full">
+                        ${area}
+                      </span>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+
+    <!-- 学習のコツ -->
+    ${plan.study_tips && plan.study_tips.length > 0 ? `
+      <div class="bg-yellow-50 rounded-xl shadow-lg p-6">
+        <h3 class="text-2xl font-bold text-yellow-800 mb-6 flex items-center">
+          <i class="fas fa-lightbulb mr-2"></i>
+          学習のコツ
+        </h3>
+        <ul class="space-y-3">
+          ${plan.study_tips.map(tip => `
+            <li class="flex items-start bg-white rounded-lg p-4 shadow-sm">
+              <i class="fas fa-check-circle text-yellow-500 mt-1 mr-3 text-xl"></i>
+              <span class="text-gray-800 text-lg">${tip}</span>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
+    ` : ''}
+
+    <!-- 応援メッセージ -->
+    ${plan.motivation_message ? `
+      <div class="bg-gradient-to-r from-pink-100 to-purple-100 rounded-xl p-6 text-center">
+        <i class="fas fa-heart text-pink-500 text-3xl mb-3"></i>
+        <p class="text-gray-800 text-xl font-semibold leading-relaxed">
+          ${plan.motivation_message}
+        </p>
+      </div>
+    ` : ''}
+
+    <!-- アクションボタン -->
+    <div class="flex justify-center gap-4 pt-6">
+      <button onclick="window.print()" 
+              class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">
+        <i class="fas fa-print mr-2"></i>印刷する
+      </button>
+      <button onclick="loadGuidePage(${state.selectedCurriculum.id})" 
+              class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">
+        <i class="fas fa-book mr-2"></i>学習を始める
+      </button>
+    </div>
+  `
+}
+
+// グローバルに公開
+window.loadAIStudyPlanPage = loadAIStudyPlanPage
+window.generateAIStudyPlan = generateAIStudyPlan
+window.displayStudyPlan = displayStudyPlan
 
 console.log('✅ Phase 9-2 PWA機能初期化完了')
