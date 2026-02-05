@@ -12143,45 +12143,56 @@ function selectSuggestedUnit(unitName, index) {
 }
 
 async function startUnitGeneration() {
-  console.log('🚀 startUnitGeneration が呼び出されました')
-  
-  const grade = document.getElementById('genGrade').value
-  const subject = document.getElementById('genSubject').value
-  const textbook = document.getElementById('genTextbook').value
-  const unitName = document.getElementById('genUnitName').value
+  try {
+    console.log('🚀 startUnitGeneration が呼び出されました')
+    
+    const grade = document.getElementById('genGrade')?.value
+    const subject = document.getElementById('genSubject')?.value
+    const textbook = document.getElementById('genTextbook')?.value
+    const unitName = document.getElementById('genUnitName')?.value
 
-  console.log('📝 入力値:', { grade, subject, textbook, unitName })
+    console.log('📝 入力値:', { grade, subject, textbook, unitName })
 
-  // 必須項目チェック
-  if (!grade || !subject || !textbook || !unitName) {
-    console.error('❌ 必須項目が不足しています')
-    alert('学年、教科、教科書会社、単元名は必須です')
-    return
+    // 必須項目チェック
+    if (!grade || !subject || !textbook || !unitName) {
+      console.error('❌ 必須項目が不足しています')
+      alert('学年、教科、教科書会社、単元名は必須です')
+      return
+    }
+    
+    console.log('✅ 必須項目チェック完了')
+  
+    // AI品質モードを取得（ラジオボタンから）
+    const selectedQualityMode = document.querySelector('input[name="qualityMode"]:checked')
+    const qualityMode = selectedQualityMode ? selectedQualityMode.value : 'standard'
+    
+    console.log('🎨 品質モード:', qualityMode)
+    
+    // 生成パラメータを保存（再生成用）
+    lastGenerationParams = {
+      grade,
+      subject,
+      textbook,
+      unitName,
+      studentNeeds: document.getElementById('genStudentNeeds')?.value || '',
+      teacherGoals: document.getElementById('genTeacherGoals')?.value || '',
+      learningStyle: document.getElementById('genLearningStyle')?.value || '',
+      specialSupport: document.getElementById('genSpecialSupport')?.value || '',
+      qualityMode: qualityMode
+    }
+    
+    console.log('💾 保存されたパラメータ:', lastGenerationParams)
+    
+    // 実際の生成処理を実行
+    console.log('🎯 executeUnitGeneration を呼び出します')
+    await executeUnitGeneration(lastGenerationParams)
+    console.log('✅ executeUnitGeneration 完了')
+  } catch (error) {
+    console.error('💥💥💥 startUnitGeneration でエラーが発生:', error)
+    console.error('エラーメッセージ:', error.message)
+    console.error('エラースタック:', error.stack)
+    alert('エラーが発生しました: ' + error.message)
   }
-  
-  console.log('✅ 必須項目チェック完了')
-  
-  // AI品質モードを取得（ラジオボタンから）
-  const selectedQualityMode = document.querySelector('input[name="qualityMode"]:checked')
-  const qualityMode = selectedQualityMode ? selectedQualityMode.value : 'standard'
-  
-  // 生成パラメータを保存（再生成用）
-  lastGenerationParams = {
-    grade,
-    subject,
-    textbook,
-    unitName,
-    studentNeeds: document.getElementById('genStudentNeeds')?.value || '',
-    teacherGoals: document.getElementById('genTeacherGoals')?.value || '',
-    learningStyle: document.getElementById('genLearningStyle')?.value || '',
-    specialSupport: document.getElementById('genSpecialSupport')?.value || '',
-    qualityMode: qualityMode
-  }
-  
-  // 実際の生成処理を実行
-  console.log('🎯 executeUnitGeneration を呼び出します')
-  await executeUnitGeneration(lastGenerationParams)
-  console.log('✅ executeUnitGeneration 完了')
 }
 
 // 単元生成の実際の処理（段階的生成）
