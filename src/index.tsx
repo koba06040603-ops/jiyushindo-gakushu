@@ -8708,12 +8708,29 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
   
   try {
     // カリキュラムと3コースの情報を取得
+    console.log(`🔍 導入問題生成: カリキュラムID=${curriculumId}`)
     const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first()
-    const courses = await env.DB.prepare('SELECT * FROM courses WHERE curriculum_id = ?').bind(curriculumId).all()
+    console.log('📚 カリキュラム情報:', curriculum ? `${curriculum.grade} ${curriculum.subject} ${curriculum.unit_name}` : 'null')
     
-    if (!curriculum || !courses.results || courses.results.length < 3) {
-      return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    const courses = await env.DB.prepare('SELECT * FROM courses WHERE curriculum_id = ?').bind(curriculumId).all()
+    console.log(`📊 コース数: ${courses.results?.length || 0}件`)
+    
+    if (!curriculum) {
+      console.error('❌ カリキュラムが存在しません')
+      return c.json({ error: 'カリキュラムが見つかりません', details: 'カリキュラムレコードがデータベースに存在しません' }, 404)
     }
+    
+    if (!courses.results || courses.results.length < 3) {
+      console.error(`❌ コースが不足しています: ${courses.results?.length || 0}/3件`)
+      return c.json({ 
+        error: 'カリキュラムが見つかりません', 
+        details: `3つのコースが必要ですが、${courses.results?.length || 0}件しか見つかりませんでした`,
+        curriculum_id: curriculumId,
+        courses_found: courses.results?.length || 0
+      }, 404)
+    }
+    
+    console.log('✅ カリキュラムとコースの検証完了')
     
     // 軽量なプロンプト（導入問題3題のみ）
     const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の3つのコースの導入問題を生成。
