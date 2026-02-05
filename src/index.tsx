@@ -23001,4 +23001,234 @@ app.get('/api/feedback/monthly-report', authMiddleware, async (c) => {
   }
 })
 
+/**
+ * ========================================
+ * Phase 12-3: 学習経路の動的最適化API
+ * ========================================
+ */
+
+import {
+  calculateMasteryScore,
+  calculateAllMasteryScores,
+  generateAdaptiveCurriculum,
+  predictMastery,
+  predictMultipleMastery,
+  generateReinforcementPlan,
+} from './learning-path'
+
+/**
+ * GET /api/learning-path/mastery - 習熟度スコアを取得
+ */
+app.get('/api/learning-path/mastery', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { subject, unit_id } = c.req.query()
+
+    if (unit_id) {
+      // 特定単元の習熟度
+      const score = await calculateMasteryScore(env.DB, user.id, parseInt(unit_id))
+      return c.json({
+        success: true,
+        score,
+      })
+    } else {
+      // 全単元または教科別の習熟度
+      const scores = await calculateAllMasteryScores(env.DB, user.id, subject)
+      return c.json({
+        success: true,
+        scores,
+      })
+    }
+  } catch (error: any) {
+    console.error('❌ 習熟度取得エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '習熟度の取得に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * GET /api/learning-path/curriculum - 適応的カリキュラムを取得
+ */
+app.get('/api/learning-path/curriculum', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { subject, grade } = c.req.query()
+
+    if (!subject) {
+      return c.json({ success: false, error: '教科が必要です' }, 400)
+    }
+
+    const curriculum = await generateAdaptiveCurriculum(
+      env.DB,
+      user.id,
+      subject,
+      grade ? parseInt(grade) : undefined
+    )
+
+    // 履歴を保存
+    await env.DB.prepare(
+      `
+      INSERT INTO learning_path_history (student_id, subject, recommended_units, weak_areas, next_milestone_id)
+      VALUES (?, ?, ?, ?, ?)
+    `
+    )
+      .bind(
+        user.id,
+        subject,
+        JSON.stringify(curriculum.recommended_path.map((u) => u.unit_id)),
+        JSON.stringify(curriculum.weak_areas.map((u) => u.unit_id)),
+        curriculum.next_milestone.unit_id
+      )
+      .run()
+
+    return c.json({
+      success: true,
+      curriculum,
+    })
+  } catch (error: any) {
+    console.error('❌ カリキュラム生成エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: 'カリキュラムの生成に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * GET /api/learning-path/prediction - 習得度予測を取得
+ */
+app.get('/api/learning-path/prediction', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { unit_ids } = c.req.query()
+
+    if (!unit_ids) {
+      return c.json({ success: false, error: '単元IDが必要です' }, 400)
+    }
+
+    const unitIdArray = unit_ids.split(',').map((id) => parseInt(id.trim()))
+
+    const predictions = await predictMultipleMastery(env.DB, user.id, unitIdArray)
+
+    return c.json({
+      success: true,
+      predictions,
+    })
+  } catch (error: any) {
+    console.error('❌ 習得度予測エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '習得度予測に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * POST /api/learning-path/reinforcement - 補強計画を生成
+ */
+app.post('/api/learning-path/reinforcement', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { weak_unit_id } = await c.req.json()
+
+    if (!weak_unit_id) {
+      return c.json({ success: false, error: '苦手単元IDが必要です' }, 400)
+    }
+
+    const plan = await generateReinforcementPlan(env.DB, user.id, weak_unit_id)
+
+    // 計画を保存
+    await env.DB.prepare(
+      `
+      INSERT INTO reinforcement_plans (student_id, weak_unit_id, root_causes, actions, status)
+      VALUES (?, ?, ?, ?, 'active')
+    `
+    )
+      .bind(user.id, weak_unit_id, JSON.stringify(plan.root_causes), JSON.stringify(plan.reinforcement_actions))
+      .run()
+
+    return c.json({
+      success: true,
+      plan,
+    })
+  } catch (error: any) {
+    console.error('❌ 補強計画生成エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '補強計画の生成に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
+/**
+ * GET /api/learning-path/weak-areas - 苦手分野を取得
+ */
+app.get('/api/learning-path/weak-areas', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { subject } = c.req.query()
+
+    // 全単元の習熟度を取得
+    const scores = await calculateAllMasteryScores(env.DB, user.id, subject)
+
+    // 苦手分野（習熟度50%未満）を抽出
+    const weakAreas = scores
+      .filter((score) => score.mastery_level < 50)
+      .sort((a, b) => a.mastery_level - b.mastery_level)
+
+    // 単元名を取得
+    const weakAreasWithNames = await Promise.all(
+      weakAreas.map(async (score) => {
+        const unit = await env.DB.prepare(`SELECT id, unit_name, subject, grade FROM curriculum WHERE id = ?`)
+          .bind(score.unit_id)
+          .first()
+
+        return {
+          unit_id: score.unit_id,
+          unit_name: unit?.unit_name || '不明',
+          subject: unit?.subject || '',
+          grade: unit?.grade || 0,
+          mastery_level: score.mastery_level,
+          practice_count: score.practice_count,
+          correct_rate: score.correct_rate,
+          reinforcement_needed: score.mastery_level < 30,
+        }
+      })
+    )
+
+    return c.json({
+      success: true,
+      weak_areas: weakAreasWithNames,
+    })
+  } catch (error: any) {
+    console.error('❌ 苦手分野取得エラー:', error)
+    return c.json(
+      {
+        success: false,
+        error: '苦手分野の取得に失敗しました',
+        details: error.message,
+      },
+      500
+    )
+  }
+})
+
 export default app
