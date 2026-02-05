@@ -5840,15 +5840,20 @@ app.post('/api/ai/suggest-units', async (c) => {
   const { env } = c
   const { grade, subject, textbook } = await c.req.json()
   
+  console.log('🔍 単元候補API呼び出し:', { grade, subject, textbook })
+  
   const apiKey = env.GEMINI_API_KEY
   
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    console.error('❌ GEMINI_API_KEYが設定されていません')
     return c.json({
       error: 'AI単元候補機能を使用するには、GEMINI_API_KEYの設定が必要です。',
       message: '手動で単元名を入力してください。例: かけ算の筆算、物語文の読解、など',
       units: []
     })
   }
+  
+  console.log('✅ GEMINI_API_KEY設定確認完了')
   
   try {
     // 学年・科目別の詳細な指示を追加
@@ -5980,7 +5985,10 @@ ${specificInstructions}
     const models = ['gemini-3-flash-preview', 'gemini-3-pro-preview']
     let result: GeminiResponse | null = null
     
+    console.log('🤖 Gemini API呼び出し開始...')
+    
     for (const model of models) {
+      console.log(`  モデル試行: ${model}`)
       result = await callGeminiAPI({
         model,
         prompt,
@@ -5990,10 +5998,16 @@ ${specificInstructions}
         retries: 2
       })
       
-      if (result.success) break
+      if (result.success) {
+        console.log(`  ✅ ${model} で成功`)
+        break
+      } else {
+        console.log(`  ❌ ${model} で失敗:`, result.error)
+      }
     }
     
     if (!result || !result.success || !result.content) {
+      console.error('❌ すべてのモデルで失敗')
       throw new Error('すべてのモデルで単元候補の生成に失敗しました')
     }
     
@@ -6049,8 +6063,14 @@ ${specificInstructions}
     })
     
   } catch (error: any) {
-    console.error('単元候補生成エラー:', error)
+    console.error('❌❌❌ 単元候補生成エラー:', error)
+    console.error('エラー詳細:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    })
     return c.json({
+      success: false,
       error: '単元候補の生成に失敗しました。',
       details: error.message,
       units: []
@@ -8637,7 +8657,7 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-3-flash-preview', 'gemini-3-flash-preview', 'gemini-3-flash-preview']
+    const models = ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro']
     let response
     let lastError
     
@@ -8645,13 +8665,20 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
       try {
         console.log(`🔄 導入問題モデル試行中: ${model}`)
         response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
+              generationConfig: { 
+                temperature: 0.7, 
+                maxOutputTokens: 2000,
+                responseMimeType: 'application/json'
+              }
             })
           }
         )

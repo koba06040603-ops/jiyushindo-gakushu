@@ -12130,6 +12130,9 @@ async function suggestUnitNames() {
     console.error('❌❌❌ 単元候補取得エラー:', error)
     console.error('エラー詳細:', error.response?.data)
     console.error('エラーメッセージ:', error.message)
+    console.error('エラースタック:', error.stack)
+    console.error('HTTPステータス:', error.response?.status)
+    console.error('レスポンス全体:', error.response)
     
     // エラーメッセージを改善
     let errorMessage = 'エラーが発生しました。手動で入力してください。'
@@ -12137,6 +12140,7 @@ async function suggestUnitNames() {
     
     if (error.response && error.response.data) {
       const data = error.response.data
+      console.error('サーバーエラーデータ:', data)
       if (data.message) {
         errorMessage = data.message
       } else if (data.error) {
