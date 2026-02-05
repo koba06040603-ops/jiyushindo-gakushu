@@ -533,6 +533,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script src="/ui-components.js"></script>
+    <script src="/text-to-speech.js"></script>
     <script>
         // 認証確認
         const token = localStorage.getItem('token')
@@ -707,7 +708,16 @@
                     
                     modalContent.innerHTML = `
                         <div class="mb-6">
-                            <h4 class="text-xl font-bold text-gray-800 mb-4">問題</h4>
+                            <div class="flex justify-between items-start mb-4">
+                                <h4 class="text-xl font-bold text-gray-800">問題</h4>
+                                <button 
+                                    onclick="speakText('${escapeHtml(problem.question).replace(/'/g, "\\'")}'); return false;"
+                                    class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-sm"
+                                    title="問題文を読み上げ"
+                                >
+                                    🔊 読み上げ
+                                </button>
+                            </div>
                             <p class="text-lg text-gray-700 whitespace-pre-wrap">${escapeHtml(problem.question)}</p>
                         </div>
 
