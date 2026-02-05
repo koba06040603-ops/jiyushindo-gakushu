@@ -4,11 +4,12 @@
 
 ## 🌐 本番環境URL
 
-**Phase 12-4完全実装完了！** ✅  
+**Phase 12-3完全実装完了！** ✅  
 - **本番URL**: https://jiyushindo-learning.pages.dev
 - **AI問題生成**: https://jiyushindo-learning.pages.dev/problem-generator.html
 - **AIチューター**: https://jiyushindo-learning.pages.dev/ai-tutor.html
-- **AIフィードバック**: https://jiyushindo-learning.pages.dev/feedback-dashboard.html ⭐NEW
+- **AIフィードバック**: https://jiyushindo-learning.pages.dev/feedback-dashboard.html
+- **学習経路最適化**: https://jiyushindo-learning.pages.dev/learning-path.html ⭐NEW
 - **認知科学学習**: https://jiyushindo-learning.pages.dev/cognitive-learning.html
 - **ダッシュボード**: https://jiyushindo-learning.pages.dev/dashboard.html
 - **保護者ダッシュボード**: https://jiyushindo-learning.pages.dev/parent-dashboard.html
@@ -20,7 +21,7 @@
 - **パフォーマンス監視**: ✅ リアルタイムメトリクス、エラートラッキング
 - **エッジキャッシュ**: ✅ KVキャッシュ、メトリクス追跡、スマート無効化
 - **DB最適化**: ✅ インデックス最適化、クエリ高速化
-- **AI機能**: ✅ AIチューター、AI問題生成、AIフィードバック
+- **AI機能**: ✅ AIチューター、AI問題生成、AIフィードバック、学習経路最適化
 - **認知科学最適化**: ✅ 間隔反復学習、検索練習、交互学習、精緻化、二重符号化
 - **アセット最適化**: ✅ preload/preconnect、defer、リソース最適化
 - **API仕様書**: https://bc1dbae8.jiyushindo-gakushu.pages.dev/static/api-docs
@@ -319,10 +320,104 @@
 - コード行数: 約2,000行
 - 問題テンプレート: 教科別×難易度別 = 15種類以上
 
-### Phase 12-3: 学習経路の動的最適化（保留）
-- ⏸️ 適応的カリキュラム（Phase 15を優先）
-- ⏸️ 苦手分野の自動補強
-- ⏸️ 習得度予測
+### Phase 12-3: 学習経路の動的最適化（完了）✅
+
+**🎯 適応的カリキュラム生成**
+- ✅ **学習グラフエンジン**
+  - 単元間の依存関係管理
+  - トポロジカルソート（学習順序決定）
+  - 最短学習経路計算
+  - 前提知識チェック
+
+- ✅ **習熟度スコアリングシステム**
+  - 0-100スケールの習熟度計算
+  - 正答率×練習回数×時間減衰
+  - 信頼度スコア（サンプル数ベース）
+  - 教科別・単元別の追跡
+
+- ✅ **適応的カリキュラム生成**
+  - 学習者の理解度に応じた自動調整
+  - 優先度ベースの推奨学習経路（1-10）
+  - 理由付き推奨（「なぜこの単元を学ぶべきか」）
+  - 次のマイルストーン設定
+
+**🔧 苦手分野の自動補強**
+- ✅ **弱点自動検出**
+  - 習熟度50%未満を苦手分野と判定
+  - 30%未満は「要補強」フラグ
+  - 前提単元の習熟度確認
+  - 根本原因の特定
+
+- ✅ **補強計画生成**
+  - 前提単元の復習推奨
+  - 対象単元の練習問題推奨
+  - AIチューターへの質問推奨
+  - 優先度付きアクションリスト
+
+- ✅ **練習問題の最適化**
+  - 難易度自動調整
+  - 推奨問題数の計算
+  - 教科別・単元別の練習問題
+
+**📈 習得度予測エンジン**
+- ✅ **学習速度推定**
+  - 過去30日間の学習履歴分析
+  - 1日あたりの習熟度向上率計算
+  - 個人差を考慮した予測
+
+- ✅ **予測モデル**
+  - 7日後の習熟度予測
+  - 30日後の習熟度予測
+  - 習得（90%）までの推定日数
+  - 推奨練習問題数の算出
+
+**📊 新規APIエンドポイント**
+- `GET /api/learning-path/mastery` - 習熟度スコアを取得
+- `GET /api/learning-path/curriculum` - 適応的カリキュラムを生成
+- `GET /api/learning-path/prediction` - 習得度予測を取得
+- `POST /api/learning-path/reinforcement` - 補強計画を生成
+- `GET /api/learning-path/weak-areas` - 苦手分野を取得
+
+**🎨 UIダッシュボード**
+- **学習経路ダッシュボード**（`/learning-path.html`）
+  - 教科選択（数学、国語、理科、社会、英語）
+  - 次のマイルストーン表示
+    - 進捗バー
+    - 習熟度パーセンテージ
+  - 推奨学習経路
+    - 優先度順リスト（1-10）
+    - 習熟度バー
+    - 推奨理由
+    - 推定学習時間
+  - 苦手分野リスト
+    - 習熟度表示
+    - 「要補強」フラグ
+    - 補強計画作成ボタン
+  - 習得度予測
+    - 現在の習熟度
+    - 7日後/30日後の予測
+    - 習得までの推定期間
+    - 推奨練習問題数
+
+**💾 データベース**
+- `mastery_scores` テーブル - 習熟度スコア保存
+- `learning_path_history` テーブル - 学習経路履歴
+- `reinforcement_plans` テーブル - 補強計画管理
+
+**🚀 実装規模**
+- 新規ファイル: 3個
+  - `src/learning-path.ts` (約630行) - 学習経路エンジン
+  - `public/learning-path.html` (約440行) - ダッシュボードUI
+  - `migrations/0060_learning_path_optimization.sql` - DBマイグレーション
+- 新規API: 5エンドポイント
+- 新規DBテーブル: 3個
+- バンドルサイズ: 681.50 kB（10MB制限の6.8%）
+
+**📈 期待効果**
+- 学習効率: 30-50%向上（最適経路による）
+- モチベーション: マイルストーンの明確化で継続率向上
+- 弱点克服: 補強計画により苦手分野を効果的に克服
+- 学習時間: 最短経路により学習時間を最適化
 
 ### Phase 12-4: AIフィードバックシステム（完了）✅
 
