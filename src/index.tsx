@@ -41,6 +41,15 @@ import {
 import { AdaptiveLearningEngine } from './adaptive-learning'
 import { SchoolManagementSystem } from './school-management'
 import { AIContentGenerator } from './ai-content-generator'
+import { 
+  addToMistakeNotebook, 
+  getMistakeNotebook, 
+  getTodayReviewProblems,
+  recordReview,
+  getMasteryStatistics,
+  generateSimilarProblem
+} from './mistake-notebook'
+import { EssayGradingEngine } from './essay-grading'
 
 type Bindings = {
   DB: D1Database
@@ -23499,6 +23508,306 @@ app.post('/api/gamification/check-badge', authMiddleware, async (c) => {
   } catch (error: any) {
     console.error('❌ バッジチェックエラー:', error)
     return c.json({ success: false, error: 'バッジチェックに失敗しました', details: error.message }, 500)
+  }
+})
+
+// ============================================
+// Phase 20: 間違いノート＆記述問題採点API
+// ============================================
+
+/**
+ * GET /api/mistake-notebook - 間違いノート一覧取得
+ */
+app.get('/api/mistake-notebook', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { subject, is_mastered, limit } = c.req.query()
+    
+    const filters: any = {}
+    if (subject) filters.subject = subject
+    if (is_mastered !== undefined) filters.isMastered = is_mastered === 'true'
+    if (limit) filters.limit = parseInt(limit)
+    
+    const mistakes = await getMistakeNotebook(env.DB, user.id, filters)
+    
+    return c.json({
+      success: true,
+      mistakes,
+      count: mistakes.length
+    })
+  } catch (error: any) {
+    console.error('❌ 間違いノート取得エラー:', error)
+    return c.json({ success: false, error: '間違いノートの取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/mistake-notebook - 間違いノートに追加
+ */
+app.post('/api/mistake-notebook', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const body = await c.req.json()
+    
+    const result = await addToMistakeNotebook(env.DB, {
+      student_id: user.id,
+      problem_id: body.problem_id,
+      original_question: body.original_question,
+      original_answer: body.original_answer,
+      correct_answer: body.correct_answer,
+      student_answer: body.student_answer,
+      subject: body.subject,
+      unit_name: body.unit_name,
+      difficulty: body.difficulty,
+      mistake_type: body.mistake_type
+    })
+    
+    return c.json(result)
+  } catch (error: any) {
+    console.error('❌ 間違いノート追加エラー:', error)
+    return c.json({ success: false, error: '間違いノートへの追加に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/mistake-notebook/today - 今日の復習問題
+ */
+app.get('/api/mistake-notebook/today', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    
+    const problems = await getTodayReviewProblems(env.DB, user.id)
+    
+    return c.json({
+      success: true,
+      problems,
+      count: problems.length
+    })
+  } catch (error: any) {
+    console.error('❌ 今日の復習問題取得エラー:', error)
+    return c.json({ success: false, error: '今日の復習問題の取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/mistake-notebook/:id/review - 復習を記録
+ */
+app.post('/api/mistake-notebook/:id/review', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const mistakeId = parseInt(c.req.param('id'))
+    const { is_correct, confidence_level, time_spent } = await c.req.json()
+    
+    const result = await recordReview(
+      env.DB,
+      mistakeId,
+      user.id,
+      is_correct,
+      confidence_level,
+      time_spent
+    )
+    
+    return c.json(result)
+  } catch (error: any) {
+    console.error('❌ 復習記録エラー:', error)
+    return c.json({ success: false, error: '復習の記録に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/mistake-notebook/statistics - 克服度統計
+ */
+app.get('/api/mistake-notebook/statistics', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { subject } = c.req.query()
+    
+    const statistics = await getMasteryStatistics(env.DB, user.id, subject)
+    
+    return c.json({
+      success: true,
+      statistics
+    })
+  } catch (error: any) {
+    console.error('❌ 克服度統計取得エラー:', error)
+    return c.json({ success: false, error: '克服度統計の取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/mistake-notebook/:id/similar - 類似問題生成
+ */
+app.post('/api/mistake-notebook/:id/similar', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const mistakeId = parseInt(c.req.param('id'))
+    
+    // 間違いノートを取得
+    const mistake = await env.DB.prepare(`
+      SELECT * FROM mistake_notebook WHERE id = ? AND student_id = ?
+    `).bind(mistakeId, user.id).first()
+    
+    if (!mistake) {
+      return c.json({ success: false, error: '間違いノートが見つかりません' }, 404)
+    }
+    
+    // 類似問題を生成
+    const similarProblem = await generateSimilarProblem(mistake as any, env.AI)
+    
+    // 類似問題をgenerated_problemsに保存
+    const result = await env.DB.prepare(`
+      INSERT INTO generated_problems (
+        student_id, question, correct_answer, explanation,
+        difficulty, subject, unit_name, problem_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'similar')
+    `).bind(
+      user.id,
+      similarProblem.question,
+      similarProblem.answer,
+      similarProblem.explanation,
+      mistake.difficulty,
+      mistake.subject,
+      mistake.unit_name
+    ).run()
+    
+    // 類似問題生成履歴に記録
+    await env.DB.prepare(`
+      INSERT INTO similar_problems_generated (
+        mistake_id, student_id, generated_problem_id, generation_method, similarity_score
+      ) VALUES (?, ?, ?, 'ai', 0.85)
+    `).bind(mistakeId, user.id, result.meta.last_row_id).run()
+    
+    return c.json({
+      success: true,
+      problem: {
+        id: result.meta.last_row_id,
+        ...similarProblem
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 類似問題生成エラー:', error)
+    return c.json({ success: false, error: '類似問題の生成に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/essay/grade - 記述問題を採点
+ */
+app.post('/api/essay/grade', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const body = await c.req.json()
+    
+    // 問題情報
+    const problem = {
+      student_id: user.id,
+      problem_type: body.problem_type || 'essay',
+      subject: body.subject,
+      unit_name: body.unit_name,
+      question: body.question,
+      reference_answer: body.reference_answer,
+      max_score: body.max_score || 100
+    }
+    
+    // 解答情報
+    const answer = {
+      problem_id: body.problem_id,
+      student_id: user.id,
+      answer_text: body.answer_text,
+      answer_length: body.answer_text.length,
+      writing_time: body.writing_time
+    }
+    
+    // 採点エンジンを初期化
+    const gradingEngine = new EssayGradingEngine(env.AI, env.DB)
+    
+    // 採点実行
+    const result = await gradingEngine.gradeEssay(problem as any, answer as any, true)
+    
+    // 解答を保存
+    const answerResult = await env.DB.prepare(`
+      INSERT INTO essay_answers (
+        problem_id, student_id, answer_text, answer_length, writing_time, is_submitted
+      ) VALUES (?, ?, ?, ?, ?, 1)
+    `).bind(
+      body.problem_id || null,
+      user.id,
+      body.answer_text,
+      body.answer_text.length,
+      body.writing_time || null
+    ).run()
+    
+    // 採点結果を保存
+    await gradingEngine.saveGradingResult(
+      answerResult.meta.last_row_id as number,
+      user.id,
+      result,
+      'cloudflare-workers-ai'
+    )
+    
+    // 不正解の場合は間違いノートに追加
+    if (result.total_score < 60) {
+      await addToMistakeNotebook(env.DB, {
+        student_id: user.id,
+        problem_id: body.problem_id,
+        original_question: body.question,
+        original_answer: body.reference_answer,
+        correct_answer: body.reference_answer,
+        student_answer: body.answer_text,
+        subject: body.subject,
+        unit_name: body.unit_name,
+        difficulty: body.difficulty || 'medium',
+        mistake_type: 'essay_low_score'
+      })
+    }
+    
+    return c.json({
+      success: true,
+      result
+    })
+  } catch (error: any) {
+    console.error('❌ 記述問題採点エラー:', error)
+    return c.json({ success: false, error: '記述問題の採点に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/essay/history - 記述問題の採点履歴
+ */
+app.get('/api/essay/history', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const { limit = '20', subject } = c.req.query()
+    
+    let query = `
+      SELECT 
+        ea.id, ea.problem_id, ea.answer_text, ea.answer_length,
+        ea.writing_time, ea.submitted_at,
+        eg.total_score, eg.grade_level, eg.overall_feedback,
+        eg.improvement_suggestions
+      FROM essay_answers ea
+      JOIN essay_grading eg ON ea.id = eg.answer_id
+      WHERE ea.student_id = ?
+    `
+    const params: any[] = [user.id]
+    
+    if (subject) {
+      query += ` AND eg.subject = ?`
+      params.push(subject)
+    }
+    
+    query += ` ORDER BY ea.submitted_at DESC LIMIT ?`
+    params.push(parseInt(limit as string))
+    
+    const result = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      history: result.results
+    })
+  } catch (error: any) {
+    console.error('❌ 記述問題履歴取得エラー:', error)
+    return c.json({ success: false, error: '記述問題履歴の取得に失敗しました', details: error.message }, 500)
   }
 })
 
