@@ -50,6 +50,13 @@ import {
   generateSimilarProblem
 } from './mistake-notebook'
 import { EssayGradingEngine } from './essay-grading'
+import {
+  generateClassSummary,
+  generateStudentReport,
+  createHomework,
+  getHomeworkSubmissions,
+  compareClasses
+} from './teacher-dashboard'
 
 type Bindings = {
   DB: D1Database
@@ -23808,6 +23815,242 @@ app.get('/api/essay/history', authMiddleware, async (c) => {
   } catch (error: any) {
     console.error('❌ 記述問題履歴取得エラー:', error)
     return c.json({ success: false, error: '記述問題履歴の取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+// ============================================
+// Phase 20-3: 教師向け管理ダッシュボードAPI
+// ============================================
+
+/**
+ * GET /api/teacher/class/:classId/summary - クラス学習状況サマリー
+ */
+app.get('/api/teacher/class/:classId/summary', authMiddleware, requireRole(['teacher', 'admin']), async (c) => {
+  try {
+    const { env, user } = c.var
+    const classId = parseInt(c.req.param('classId'))
+    
+    const summary = await generateClassSummary(env.DB, classId, user.id)
+    
+    // サマリーをDBに保存
+    await env.DB.prepare(`
+      INSERT OR REPLACE INTO class_learning_summary (
+        class_id, teacher_id, summary_date, total_students, active_students,
+        total_problems_solved, average_accuracy, average_study_time,
+        on_track_count, behind_count, ahead_count,
+        subject_statistics, students_needing_attention
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      summary.class_id,
+      summary.teacher_id,
+      summary.summary_date,
+      summary.total_students,
+      summary.active_students,
+      summary.total_problems_solved,
+      summary.average_accuracy,
+      summary.average_study_time,
+      summary.on_track_count,
+      summary.behind_count,
+      summary.ahead_count,
+      JSON.stringify(summary.subject_statistics),
+      JSON.stringify(summary.students_needing_attention)
+    ).run()
+    
+    return c.json({
+      success: true,
+      summary
+    })
+  } catch (error: any) {
+    console.error('❌ クラスサマリー取得エラー:', error)
+    return c.json({ success: false, error: 'クラスサマリーの取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/teacher/student/:studentId/report - 生徒詳細レポート
+ */
+app.get('/api/teacher/student/:studentId/report', authMiddleware, requireRole(['teacher', 'admin']), async (c) => {
+  try {
+    const { env, user } = c.var
+    const studentId = parseInt(c.req.param('studentId'))
+    
+    const report = await generateStudentReport(env.DB, studentId, user.id)
+    
+    // レポートをDBに保存
+    await env.DB.prepare(`
+      INSERT OR REPLACE INTO student_detail_reports (
+        student_id, teacher_id, report_date, total_study_time, problems_solved,
+        correct_rate, streak_days, strong_subjects, weak_subjects,
+        study_pattern, consistency_score, engagement_level,
+        predicted_performance, recommended_actions
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      report.student_id,
+      user.id,
+      new Date().toISOString().split('T')[0],
+      report.total_study_time,
+      report.problems_solved,
+      report.correct_rate,
+      report.streak_days,
+      JSON.stringify(report.strong_subjects),
+      JSON.stringify(report.weak_subjects),
+      report.study_pattern,
+      report.consistency_score,
+      report.engagement_level,
+      report.predicted_performance,
+      JSON.stringify(report.recommended_actions)
+    ).run()
+    
+    return c.json({
+      success: true,
+      report
+    })
+  } catch (error: any) {
+    console.error('❌ 生徒レポート取得エラー:', error)
+    return c.json({ success: false, error: '生徒レポートの取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/teacher/homework - 宿題を作成
+ */
+app.post('/api/teacher/homework', authMiddleware, requireRole(['teacher', 'admin']), async (c) => {
+  try {
+    const { env, user } = c.var
+    const body = await c.req.json()
+    
+    const result = await createHomework(env.DB, {
+      teacher_id: user.id,
+      class_id: body.class_id,
+      assignment_name: body.assignment_name,
+      description: body.description,
+      subject: body.subject,
+      unit_name: body.unit_name,
+      problem_type: body.problem_type,
+      difficulty: body.difficulty,
+      problem_count: body.problem_count,
+      problem_ids: body.problem_ids,
+      assigned_date: body.assigned_date,
+      due_date: body.due_date,
+      estimated_time: body.estimated_time,
+      target_students: body.target_students
+    })
+    
+    if (result.success) {
+      // 宿題を公開
+      await env.DB.prepare(`
+        UPDATE homework_assignments
+        SET is_published = 1, published_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(result.homeworkId).run()
+    }
+    
+    return c.json(result)
+  } catch (error: any) {
+    console.error('❌ 宿題作成エラー:', error)
+    return c.json({ success: false, error: '宿題の作成に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/teacher/homework/:homeworkId/submissions - 宿題提出状況
+ */
+app.get('/api/teacher/homework/:homeworkId/submissions', authMiddleware, requireRole(['teacher', 'admin']), async (c) => {
+  try {
+    const { env } = c.var
+    const homeworkId = parseInt(c.req.param('homeworkId'))
+    
+    const submissions = await getHomeworkSubmissions(env.DB, homeworkId)
+    
+    // 統計情報
+    const total = submissions.length
+    const submitted = submissions.filter(s => s.status === 'submitted' || s.status === 'graded').length
+    const notStarted = submissions.filter(s => !s.status || s.status === 'not_started').length
+    const inProgress = submissions.filter(s => s.status === 'in_progress').length
+    
+    return c.json({
+      success: true,
+      submissions,
+      statistics: {
+        total,
+        submitted,
+        not_started: notStarted,
+        in_progress: inProgress,
+        submission_rate: (submitted / total * 100).toFixed(1) + '%'
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 宿題提出状況取得エラー:', error)
+    return c.json({ success: false, error: '宿題提出状況の取得に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * POST /api/teacher/classes/compare - クラス比較分析
+ */
+app.post('/api/teacher/classes/compare', authMiddleware, requireRole(['teacher', 'admin']), async (c) => {
+  try {
+    const { env, user } = c.var
+    const { class_ids } = await c.req.json()
+    
+    if (!class_ids || class_ids.length < 2) {
+      return c.json({ success: false, error: '2つ以上のクラスを指定してください' }, 400)
+    }
+    
+    const comparison = await compareClasses(env.DB, user.id, class_ids)
+    
+    // 比較結果をDBに保存
+    await env.DB.prepare(`
+      INSERT INTO class_comparison (
+        teacher_id, comparison_date, class_ids, metrics_json, insights, recommendations
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+      user.id,
+      new Date().toISOString().split('T')[0],
+      JSON.stringify(class_ids),
+      JSON.stringify(comparison.comparisons),
+      JSON.stringify(comparison.insights),
+      JSON.stringify(comparison.recommendations)
+    ).run()
+    
+    return c.json({
+      success: true,
+      comparison
+    })
+  } catch (error: any) {
+    console.error('❌ クラス比較エラー:', error)
+    return c.json({ success: false, error: 'クラス比較に失敗しました', details: error.message }, 500)
+  }
+})
+
+/**
+ * GET /api/teacher/classes - 担当クラス一覧
+ */
+app.get('/api/teacher/classes', authMiddleware, requireRole(['teacher', 'admin']), async (c) => {
+  try {
+    const { env, user } = c.var
+    
+    const classes = await env.DB.prepare(`
+      SELECT 
+        c.id,
+        c.class_name,
+        c.grade,
+        c.class_code,
+        COUNT(s.id) as student_count
+      FROM classes c
+      LEFT JOIN students s ON c.id = s.class_id
+      WHERE c.school_id = ?
+      GROUP BY c.id
+      ORDER BY c.grade, c.class_name
+    `).bind(user.school_id || 1).all()
+    
+    return c.json({
+      success: true,
+      classes: classes.results
+    })
+  } catch (error: any) {
+    console.error('❌ クラス一覧取得エラー:', error)
+    return c.json({ success: false, error: 'クラス一覧の取得に失敗しました', details: error.message }, 500)
   }
 })
 

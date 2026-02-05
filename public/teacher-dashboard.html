@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教師ダッシュボード - 自由進度学習支援システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .stat-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- ヘッダー -->
+        <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold">
+                            <i class="fas fa-chalkboard-teacher mr-2"></i>
+                            教師ダッシュボード
+                        </h1>
+                        <p class="text-indigo-100 mt-1">クラスと生徒の学習状況を一目で把握</p>
+                    </div>
+                    <div>
+                        <button onclick="logout()" class="bg-white text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-50 transition">
+                            <i class="fas fa-sign-out-alt mr-2"></i>ログアウト
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="container mx-auto px-4 py-8">
+            <!-- クラス選択 -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">
+                    <i class="fas fa-users mr-2 text-indigo-600"></i>
+                    クラス選択
+                </h2>
+                <select id="classSelect" class="w-full p-3 border border-gray-300 rounded-lg" onchange="loadClassSummary()">
+                    <option value="">クラスを選択してください</option>
+                </select>
+            </div>
+
+            <!-- クラスサマリー -->
+            <div id="classSummary" class="hidden">
+                <!-- 統計カード -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="stat-card bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-blue-100 rounded-lg p-3">
+                                <i class="fas fa-user-graduate text-blue-600 text-2xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-gray-500 text-sm">総生徒数</p>
+                                <p id="totalStudents" class="text-2xl font-bold text-gray-800">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-green-100 rounded-lg p-3">
+                                <i class="fas fa-user-check text-green-600 text-2xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-gray-500 text-sm">今週活動</p>
+                                <p id="activeStudents" class="text-2xl font-bold text-gray-800">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-purple-100 rounded-lg p-3">
+                                <i class="fas fa-tasks text-purple-600 text-2xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-gray-500 text-sm">解答問題数</p>
+                                <p id="totalProblems" class="text-2xl font-bold text-gray-800">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-yellow-100 rounded-lg p-3">
+                                <i class="fas fa-chart-line text-yellow-600 text-2xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-gray-500 text-sm">平均正答率</p>
+                                <p id="avgAccuracy" class="text-2xl font-bold text-gray-800">0%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 進捗状況 -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-chart-pie mr-2 text-indigo-600"></i>
+                        学習進捗状況
+                    </h3>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                            <p class="text-3xl font-bold text-green-600" id="aheadCount">0</p>
+                            <p class="text-gray-600 mt-2">進んでいる</p>
+                        </div>
+                        <div class="text-center p-4 bg-blue-50 rounded-lg">
+                            <p class="text-3xl font-bold text-blue-600" id="onTrackCount">0</p>
+                            <p class="text-gray-600 mt-2">順調</p>
+                        </div>
+                        <div class="text-center p-4 bg-red-50 rounded-lg">
+                            <p class="text-3xl font-bold text-red-600" id="behindCount">0</p>
+                            <p class="text-gray-600 mt-2">遅れている</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 教科別統計 -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-book mr-2 text-indigo-600"></i>
+                        教科別統計
+                    </h3>
+                    <div id="subjectStats" class="space-y-4">
+                        <!-- 動的に追加 -->
+                    </div>
+                </div>
+
+                <!-- 注意が必要な生徒 -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-exclamation-triangle mr-2 text-red-600"></i>
+                        注意が必要な生徒
+                    </h3>
+                    <div id="needsAttention" class="space-y-2">
+                        <!-- 動的に追加 -->
+                    </div>
+                </div>
+
+                <!-- アクションボタン -->
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="showHomeworkModal()" class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition">
+                        <i class="fas fa-plus mr-2"></i>宿題を作成
+                    </button>
+                    <button onclick="showCompareModal()" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition">
+                        <i class="fas fa-balance-scale mr-2"></i>クラスを比較
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script>
+        // 認証チェック
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/auth-demo.html';
+        }
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+        let currentClassId = null;
+
+        // クラス一覧を読み込み
+        async function loadClasses() {
+            try {
+                const response = await axios.get('/api/teacher/classes');
+                const classes = response.data.classes;
+                
+                const select = document.getElementById('classSelect');
+                classes.forEach(cls => {
+                    const option = document.createElement('option');
+                    option.value = cls.id;
+                    option.textContent = `${cls.class_name} (${cls.student_count}名)`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('クラス一覧取得エラー:', error);
+                alert('クラス一覧の取得に失敗しました');
+            }
+        }
+
+        // クラスサマリーを読み込み
+        async function loadClassSummary() {
+            const classId = document.getElementById('classSelect').value;
+            if (!classId) {
+                document.getElementById('classSummary').classList.add('hidden');
+                return;
+            }
+
+            currentClassId = classId;
+
+            try {
+                const response = await axios.get(`/api/teacher/class/${classId}/summary`);
+                const summary = response.data.summary;
+                
+                // 統計を表示
+                document.getElementById('totalStudents').textContent = summary.total_students;
+                document.getElementById('activeStudents').textContent = summary.active_students;
+                document.getElementById('totalProblems').textContent = summary.total_problems_solved;
+                document.getElementById('avgAccuracy').textContent = summary.average_accuracy.toFixed(1) + '%';
+                
+                // 進捗状況
+                document.getElementById('aheadCount').textContent = summary.ahead_count;
+                document.getElementById('onTrackCount').textContent = summary.on_track_count;
+                document.getElementById('behindCount').textContent = summary.behind_count;
+                
+                // 教科別統計
+                const subjectStatsDiv = document.getElementById('subjectStats');
+                subjectStatsDiv.innerHTML = '';
+                summary.subject_statistics.forEach(stat => {
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center justify-between';
+                    div.innerHTML = `
+                        <span class="text-gray-700 font-medium">${stat.subject}</span>
+                        <div class="flex items-center space-x-4">
+                            <span class="text-sm text-gray-500">${stat.problem_count}問</span>
+                            <div class="w-32 bg-gray-200 rounded-full h-2">
+                                <div class="progress-bar bg-indigo-600 h-2 rounded-full" style="width: ${stat.accuracy}%"></div>
+                            </div>
+                            <span class="text-sm font-medium text-gray-700 w-12 text-right">${stat.accuracy.toFixed(1)}%</span>
+                        </div>
+                    `;
+                    subjectStatsDiv.appendChild(div);
+                });
+                
+                // 注意が必要な生徒
+                const needsAttentionDiv = document.getElementById('needsAttention');
+                needsAttentionDiv.innerHTML = '';
+                if (summary.students_needing_attention.length === 0) {
+                    needsAttentionDiv.innerHTML = '<p class="text-gray-500 text-center py-4">現在、特に注意が必要な生徒はいません</p>';
+                } else {
+                    summary.students_needing_attention.forEach(student => {
+                        const div = document.createElement('div');
+                        div.className = 'flex items-center justify-between p-3 bg-red-50 rounded-lg';
+                        div.innerHTML = `
+                            <div class="flex items-center">
+                                <i class="fas fa-user-circle text-red-600 text-2xl mr-3"></i>
+                                <div>
+                                    <p class="font-medium text-gray-800">${student.name}</p>
+                                    <p class="text-sm text-gray-600">問題数: ${student.problem_count}問 / 正答率: ${student.accuracy ? student.accuracy.toFixed(1) : 0}%</p>
+                                </div>
+                            </div>
+                            <button onclick="viewStudentReport(${student.id})" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition text-sm">
+                                詳細を見る
+                            </button>
+                        `;
+                        needsAttentionDiv.appendChild(div);
+                    });
+                }
+                
+                document.getElementById('classSummary').classList.remove('hidden');
+            } catch (error) {
+                console.error('クラスサマリー取得エラー:', error);
+                alert('クラスサマリーの取得に失敗しました');
+            }
+        }
+
+        // 生徒詳細レポートを表示
+        async function viewStudentReport(studentId) {
+            try {
+                const response = await axios.get(`/api/teacher/student/${studentId}/report`);
+                const report = response.data.report;
+                
+                alert(`【生徒詳細レポート】\n\n名前: ${report.student_name}\n\n学習状況:\n- 解答数: ${report.problems_solved}問\n- 正答率: ${report.correct_rate.toFixed(1)}%\n- 連続日数: ${report.streak_days}日\n\n強い教科: ${report.strong_subjects.join(', ') || 'なし'}\n弱い教科: ${report.weak_subjects.join(', ') || 'なし'}\n\n学習パターン: ${report.study_pattern}\nエンゲージメント: ${report.engagement_level}\n予測成績: ${report.predicted_performance}\n\n推奨アクション:\n${report.recommended_actions.join('\n')}`);
+            } catch (error) {
+                console.error('生徒レポート取得エラー:', error);
+                alert('生徒レポートの取得に失敗しました');
+            }
+        }
+
+        // 宿題作成モーダル
+        function showHomeworkModal() {
+            alert('宿題作成機能は実装中です');
+        }
+
+        // クラス比較モーダル
+        function showCompareModal() {
+            alert('クラス比較機能は実装中です');
+        }
+
+        // ログアウト
+        function logout() {
+            localStorage.removeItem('token');
+            window.location.href = '/auth-demo.html';
+        }
+
+        // 初期化
+        loadClasses();
+    </script>
+</body>
+</html>
