@@ -11984,8 +11984,7 @@ function showUnitGeneratorModal() {
             <i class="fas fa-times mr-2"></i>
             キャンセル
           </button>
-          <button onclick="startUnitGeneration()" 
-                  id="generateUnitBtn"
+          <button id="generateUnitBtn"
                   class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition">
             <i class="fas fa-wand-magic-sparkles mr-2"></i>
             AIで生成開始
@@ -12000,13 +11999,45 @@ function showUnitGeneratorModal() {
   console.log('🎯 生成ボタンにイベントリスナーを追加します')
   const generateBtn = document.getElementById('generateUnitBtn')
   if (generateBtn) {
-    generateBtn.addEventListener('click', () => {
-      console.log('🖱️ 生成ボタンがクリックされました（イベントリスナー経由）')
-      startUnitGeneration()
+    // onclickを削除して、イベントリスナーのみに統一
+    generateBtn.removeAttribute('onclick')
+    
+    generateBtn.addEventListener('click', async (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      console.log('🖱️🖱️🖱️ 生成ボタンがクリックされました!!!')
+      
+      // デバッグ情報を画面に表示
+      const debugDiv = document.createElement('div')
+      debugDiv.className = 'fixed top-4 right-4 bg-green-100 border-2 border-green-500 p-4 rounded-lg shadow-lg z-[100]'
+      debugDiv.innerHTML = `
+        <div class="text-green-800 font-bold">
+          <i class="fas fa-check-circle mr-2"></i>
+          ボタンクリック検出！
+        </div>
+        <div class="text-sm mt-2">実行中...</div>
+      `
+      document.body.appendChild(debugDiv)
+      
+      try {
+        await startUnitGeneration()
+      } catch (error) {
+        console.error('❌❌❌ 生成エラー:', error)
+        debugDiv.innerHTML = `
+          <div class="text-red-800 font-bold">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            エラー発生
+          </div>
+          <div class="text-xs mt-2">${error.message}</div>
+        `
+      }
+      
+      setTimeout(() => debugDiv.remove(), 5000)
     })
     console.log('✅ イベントリスナー追加完了')
   } else {
     console.error('❌ 生成ボタンが見つかりません')
+    alert('ERROR: 生成ボタンが見つかりません！')
   }
   
   // 学年・教科・教科書会社が選択されたら単元候補ボタンを有効化
@@ -12157,7 +12188,7 @@ function selectSuggestedUnit(unitName, index) {
 
 async function startUnitGeneration() {
   try {
-    console.log('🚀 startUnitGeneration が呼び出されました')
+    console.log('🚀🚀🚀 startUnitGeneration が呼び出されました!!!')
     
     const grade = document.getElementById('genGrade')?.value
     const subject = document.getElementById('genSubject')?.value
