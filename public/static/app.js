@@ -39,6 +39,22 @@
       cursor: auto !important;
     }
     
+    /* アニメーション定義 */
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .animate-fade-in {
+      animation: fade-in 0.3s ease-out;
+    }
+    
     /* ============================================
      * Phase 5-2: レスポンシブデザイン
      * スマホ/タブレット対応
@@ -3896,10 +3912,104 @@ function generateLearningPlanRows(totalHours, existingPlans, curriculum) {
   return rows
 }
 
-function updatePlanHours() {
+async function updatePlanHours() {
   const totalHours = parseInt(document.getElementById('totalHours').value)
   const planHours = totalHours - 2
+  
+  // 表示を更新
   document.getElementById('planHours').textContent = planHours
+  
+  // カリキュラムIDを取得
+  const curriculumId = state.selectedCurriculum?.id
+  
+  if (!curriculumId) {
+    console.warn('カリキュラムIDが見つかりません')
+    return
+  }
+  
+  try {
+    // データベースに保存
+    console.log(`📝 総時数を更新: カリキュラムID=${curriculumId}, 総時数=${totalHours}`)
+    
+    const response = await axios.post('/api/curriculum/update-total-hours', {
+      curriculumId,
+      totalHours
+    })
+    
+    if (response.data.success) {
+      console.log('✅ 総時数の更新成功')
+      
+      // テーブルを再生成
+      await reloadLearningPlanTable(curriculumId, totalHours)
+      
+      // 成功通知
+      showNotification('success', '総時数を更新しました', `新しい総時数: ${totalHours}時間（自由計画: ${planHours}時間）`)
+    }
+  } catch (error) {
+    console.error('❌ 総時数の更新エラー:', error)
+    
+    // エラー通知
+    showNotification('error', '総時数の更新に失敗しました', error.response?.data?.error || error.message)
+  }
+}
+
+// 学習計画表のテーブルを再読み込み
+async function reloadLearningPlanTable(curriculumId, totalHours) {
+  try {
+    console.log(`🔄 学習計画表を再読み込み: カリキュラムID=${curriculumId}, 総時数=${totalHours}`)
+    
+    // カリキュラム情報を再取得
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum } = response.data
+    
+    // 既存の計画を取得
+    let existingPlans = []
+    try {
+      const planResponse = await axios.get(`/api/learning-plan/${state.student.id}/${curriculumId}`)
+      existingPlans = planResponse.data.plans || []
+    } catch (error) {
+      console.log('既存の計画なし')
+    }
+    
+    // テーブルを再生成
+    const tableBody = document.getElementById('learningPlanTable')
+    tableBody.innerHTML = generateLearningPlanRows(totalHours, existingPlans, curriculum)
+    
+    console.log('✅ 学習計画表の再読み込み完了')
+  } catch (error) {
+    console.error('❌ 学習計画表の再読み込みエラー:', error)
+    throw error
+  }
+}
+
+// 通知を表示する関数
+function showNotification(type, title, message) {
+  const notificationDiv = document.createElement('div')
+  
+  const bgColor = type === 'success' ? 'bg-green-100 border-green-500' : 'bg-red-100 border-red-500'
+  const iconColor = type === 'success' ? 'text-green-600' : 'text-red-600'
+  const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'
+  
+  notificationDiv.className = `fixed top-4 right-4 ${bgColor} border-2 rounded-lg p-4 shadow-lg z-50 max-w-md animate-fade-in`
+  notificationDiv.innerHTML = `
+    <div class="flex items-start gap-3">
+      <i class="fas ${icon} ${iconColor} text-2xl"></i>
+      <div class="flex-1">
+        <p class="font-bold ${iconColor}">${title}</p>
+        <p class="text-sm text-gray-700 mt-1">${message}</p>
+      </div>
+      <button onclick="this.parentElement.parentElement.remove()" class="${iconColor} hover:opacity-70">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  `
+  
+  document.body.appendChild(notificationDiv)
+  
+  // 3秒後に自動削除
+  setTimeout(() => {
+    notificationDiv.remove()
+  }, 3000)
 }
 
 function toggleSubject2() {

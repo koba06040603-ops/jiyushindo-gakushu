@@ -9404,6 +9404,74 @@ app.put('/api/curriculum/:id', async (c) => {
   }
 })
 
+// APIルート：カリキュラムの総時数を更新
+app.post('/api/curriculum/update-total-hours', async (c) => {
+  const { env } = c
+  const { curriculumId, totalHours } = await c.req.json()
+  
+  // 入力バリデーション
+  if (!curriculumId || !totalHours) {
+    return c.json({
+      success: false,
+      error: '必須パラメータが不足しています',
+      details: 'curriculumIdとtotalHoursが必要です'
+    }, 400)
+  }
+  
+  if (totalHours < 3 || totalHours > 50) {
+    return c.json({
+      success: false,
+      error: '総時数は3〜50の範囲で設定してください',
+      details: `指定された総時数: ${totalHours}`
+    }, 400)
+  }
+  
+  try {
+    console.log(`📝 総時数更新開始: カリキュラムID=${curriculumId}, 総時数=${totalHours}`)
+    
+    // カリキュラムが存在するか確認
+    const curriculum = await env.DB.prepare(`
+      SELECT id, total_hours FROM curriculum WHERE id = ?
+    `).bind(curriculumId).first()
+    
+    if (!curriculum) {
+      return c.json({
+        success: false,
+        error: 'カリキュラムが見つかりません',
+        details: `カリキュラムID: ${curriculumId}`
+      }, 404)
+    }
+    
+    const oldTotalHours = curriculum.total_hours
+    
+    // 総時数を更新
+    await env.DB.prepare(`
+      UPDATE curriculum
+      SET total_hours = ?
+      WHERE id = ?
+    `).bind(totalHours, curriculumId).run()
+    
+    console.log(`✅ 総時数更新完了: ${oldTotalHours}時間 → ${totalHours}時間`)
+    
+    return c.json({
+      success: true,
+      message: '総時数を更新しました',
+      data: {
+        curriculum_id: curriculumId,
+        old_total_hours: oldTotalHours,
+        new_total_hours: totalHours
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 総時数更新エラー:', error)
+    return c.json({
+      success: false,
+      error: '総時数の更新に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
 // APIルート：単元の削除（カスケード削除）
 app.delete('/api/curriculum/:id', async (c) => {
   const { env } = c
