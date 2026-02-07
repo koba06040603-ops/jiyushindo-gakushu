@@ -24831,6 +24831,15 @@ app.route('/api/ml', mlPredictionEngine)
 import abTestFramework from './ab-test-framework'
 app.route('/api/ab-test', abTestFramework)
 
+// ============================================================
+// Phase 18-3: パフォーマンス最適化 & 学習開始実装
+// ============================================================
+import performanceOptimizationApp from './performance-optimization'
+app.route('/api/performance', performanceOptimizationApp)
+
+import learningSessionApiApp from './learning-session-api'
+app.route('/api/learning-session', learningSessionApiApp)
+
 export default app
 
 // ============================================================
