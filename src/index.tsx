@@ -24778,4 +24778,9 @@ app.post('/api/chat/settings', authMiddleware, async (c) => {
   }
 })
 
+// ============================================================
+// レベル5理論体系: 12理論適性診断API
+// ============================================================
+app.route('/api/theory-assessment', theoryAssessmentApp)
+
 export default app
