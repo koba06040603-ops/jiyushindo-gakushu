@@ -24819,6 +24819,18 @@ app.route('/api/parent-report', parentTheoryReportApp)
 import realtimeLearningApi from './realtime-learning-api'
 app.route('/api/realtime', realtimeLearningApi)
 
+// ============================================================
+// Phase 18-2-1: 機械学習予測エンジンAPI
+// ============================================================
+import mlPredictionEngine from './ml-prediction-engine'
+app.route('/api/ml', mlPredictionEngine)
+
+// ============================================================
+// Phase 18-2-2: A/BテストフレームワークAPI
+// ============================================================
+import abTestFramework from './ab-test-framework'
+app.route('/api/ab-test', abTestFramework)
+
 export default app
 
 // ============================================================
