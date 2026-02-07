@@ -24783,4 +24783,16 @@ app.post('/api/chat/settings', authMiddleware, async (c) => {
 // ============================================================
 app.route('/api/theory-assessment', theoryAssessmentApp)
 
+// ============================================================
+// Phase 16-1: 学習カードへの12理論統合API
+// ============================================================
+import cardTheoryIntegrationApp from './card-theory-integration'
+app.route('/api', cardTheoryIntegrationApp)
+
+// ============================================================
+// Phase 16-2: AI問題生成のレベル5対応拡張API
+// ============================================================
+import aiProblemTheoryIntegrationApp from './ai-problem-theory-integration'
+app.route('/api', aiProblemTheoryIntegrationApp)
+
 export default app
