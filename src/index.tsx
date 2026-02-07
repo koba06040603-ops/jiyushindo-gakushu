@@ -24813,4 +24813,15 @@ app.route('/api/effect-measurement', longTermEffectMeasurementApp)
 import parentTheoryReportApp from './parent-theory-report'
 app.route('/api/parent-report', parentTheoryReportApp)
 
+// ============================================================
+// Phase 18-1: リアルタイム適応学習API
+// ============================================================
+import realtimeLearningApi from './realtime-learning-api'
+app.route('/api/realtime', realtimeLearningApi)
+
 export default app
+
+// ============================================================
+// Durable Objects エクスポート
+// ============================================================
+export { RealtimeLearningSession } from './realtime-learning-session'

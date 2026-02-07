@@ -28,5 +28,14 @@
   ],
   "ai": {
     "binding": "AI"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REALTIME_LEARNING",
+        "class_name": "RealtimeLearningSession",
+        "script_name": "jiyushindo-gakushu"
+      }
+    ]
   }
 }
