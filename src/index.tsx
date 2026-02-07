@@ -24840,6 +24840,12 @@ app.route('/api/performance', performanceOptimizationApp)
 import learningSessionApiApp from './learning-session-api'
 app.route('/api/learning-session', learningSessionApiApp)
 
+// ============================================================
+// Phase 18-4: 12理論システムAPI（効果量最適化版）
+// ============================================================
+import theorySystemApiApp from './theory-system-api'
+app.route('/api/theory-system', theorySystemApiApp)
+
 export default app
 
 // ============================================================
