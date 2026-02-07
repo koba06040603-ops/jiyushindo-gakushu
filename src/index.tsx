@@ -24795,4 +24795,22 @@ app.route('/api', cardTheoryIntegrationApp)
 import aiProblemTheoryIntegrationApp from './ai-problem-theory-integration'
 app.route('/api', aiProblemTheoryIntegrationApp)
 
+// ============================================================
+// Phase 17-1: 12理論学習パスの動的最適化API
+// ============================================================
+import dynamicTheoryOptimizerApp from './dynamic-theory-optimizer'
+app.route('/api/theory', dynamicTheoryOptimizerApp)
+
+// ============================================================
+// Phase 17-2: 長期効果測定システムAPI
+// ============================================================
+import longTermEffectMeasurementApp from './long-term-effect-measurement'
+app.route('/api/effect-measurement', longTermEffectMeasurementApp)
+
+// ============================================================
+// Phase 17-3: 保護者向け12理論レポートAPI
+// ============================================================
+import parentTheoryReportApp from './parent-theory-report'
+app.route('/api/parent-report', parentTheoryReportApp)
+
 export default app
