@@ -22,6 +22,9 @@ cat > dist/_routes.json << 'EOF'
     "/cache-dashboard.html",
     "/collaborative-reports-demo.html",
     "/dashboard.html",
+    "/download-correct-pdf.html",
+    "/download-pptx.html",
+    "/download-slides.html",
     "/gamification-demo.html",
     "/integrated-dashboard.html",
     "/integrated-features-demo.html",
@@ -43,7 +46,9 @@ cat > dist/_routes.json << 'EOF'
     "/static/*",
     "/teacher-dashboard-demo.html",
     "/test-buttons.html",
-    "/truancy-support-demo.html"
+    "/truancy-support-demo.html",
+    "/*.pptx",
+    "/*.pdf"
   ]
 }
 EOF

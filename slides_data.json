@@ -1,0 +1,278 @@
+[
+  {
+    "num": 1,
+    "title": "タイトルスライド",
+    "url": "UjpjgWGy",
+    "content": "自由進度学習システム 教育長・校長向け説明資料"
+  },
+  {
+    "num": 2,
+    "title": "現状の課題",
+    "url": "1QVsdgI2",
+    "content": "学校現場の3つの深刻な課題"
+  },
+  {
+    "num": 3,
+    "title": "本システムの解決策",
+    "url": "nchqL6pn",
+    "content": "科学的エビデンスによる3つの解決策"
+  },
+  {
+    "num": 4,
+    "title": "世界最先端の3つの強み",
+    "url": "zNoBn2E3",
+    "content": "世界トップ水準のエビデンス（d=0.83）"
+  },
+  {
+    "num": 5,
+    "title": "12理論エビデンス一覧（F1-F4）",
+    "url": "p3ZVmyGZ",
+    "content": "F1-F4の理論、F3を赤枠強調"
+  },
+  {
+    "num": 6,
+    "title": "12理論エビデンス一覧（F5-F8）",
+    "url": "OiT172mH",
+    "content": "F5-F8の理論、F5とF6を赤枠強調"
+  },
+  {
+    "num": 7,
+    "title": "12理論エビデンス一覧（F9-F12）",
+    "url": "OAvRW9bu",
+    "content": "F9-F12の追加4理論、F10を赤枠強調"
+  },
+  {
+    "num": 8,
+    "title": "超高効果量研究トップ5",
+    "url": "dLE562yk",
+    "content": "トップ5研究（d=1.44, 0.92, 0.85, 0.82, 0.80）"
+  },
+  {
+    "num": 9,
+    "title": "12理論エビデンスの信頼性",
+    "url": "olzgwdg2",
+    "content": "50,000以上の研究統合、主要研究者の業績"
+  },
+  {
+    "num": 10,
+    "title": "導入効果の科学的予測",
+    "url": "i0rUJigi",
+    "content": "松川村での導入効果（d=0.83、学力向上）"
+  },
+  {
+    "num": 11,
+    "title": "国際的評価と整合性",
+    "url": "zQd0f2Kw",
+    "content": "OECD（経済協力開発機構）、UNESCO"
+  },
+  {
+    "num": 12,
+    "title": "システム構成（Gemini 3 Flash）",
+    "url": "q2UNaxq4",
+    "content": "クラウドフレア、Google Gemini 3 Flash"
+  },
+  {
+    "num": 13,
+    "title": "セキュリティとプライバシー",
+    "url": "k86CNWl0",
+    "content": "AES-256暗号化、RBAC（役割別アクセス制御）"
+  },
+  {
+    "num": 14,
+    "title": "他システムとの比較",
+    "url": "91RbH6VG",
+    "content": "8項目の比較表、本システムの優位性"
+  },
+  {
+    "num": 15,
+    "title": "導入実績と将来展望",
+    "url": "FJkah4OV",
+    "content": "Phase 1-18完了、松川村実証実験2026年4月"
+  },
+  {
+    "num": 16,
+    "title": "第1部まとめ",
+    "url": "KfpFIvuR",
+    "content": "5つの特徴のまとめ、松川村の特別条件"
+  },
+  {
+    "num": 17,
+    "title": "第2部イントロダクション",
+    "url": "bO8G6yKV",
+    "content": "3つのユーザー視点（児童・教員・保護者）"
+  },
+  {
+    "num": 18,
+    "title": "シンプルで安全なログイン",
+    "url": "OQJfiI9K",
+    "content": "3種類のログイン方式、AES-256暗号化"
+  },
+  {
+    "num": 19,
+    "title": "学習開始画面",
+    "url": "2W172Ksm",
+    "content": "ワンクリックで学習スタート、3コース制"
+  },
+  {
+    "num": 20,
+    "title": "学習カード（3コース制）",
+    "url": "2W172Ksm",
+    "content": "学習プリント・学習カード・発展問題"
+  },
+  {
+    "num": 21,
+    "title": "AI先生のソクラテス対話（Gemini 3 Flash）",
+    "url": "EDobbnfm",
+    "content": "ソクラテス対話法、効果量 d=0.75-0.80"
+  },
+  {
+    "num": 22,
+    "title": "学習スタイル自動判定",
+    "url": "nUAhT7W5",
+    "content": "3つのスタイル（視覚・聴覚・体感）、d=0.72"
+  },
+  {
+    "num": 23,
+    "title": "児童用進捗ダッシュボード",
+    "url": "m4qn0l1W",
+    "content": "ゲーミフィケーション、12理論プロファイル"
+  },
+  {
+    "num": 24,
+    "title": "教員用進捗ボード",
+    "url": "D2Wglfph",
+    "content": "リアルタイム監視、クラス全体を一目で把握"
+  },
+  {
+    "num": 25,
+    "title": "間違いノートと復習",
+    "url": "avI78lbX",
+    "content": "分散学習、d=0.61-0.75 (Cepeda et al. 2006)"
+  },
+  {
+    "num": 26,
+    "title": "学習計画表と振り返り",
+    "url": "EASfx4gY",
+    "content": "自己調整学習、d=1.44 (Hattie 2009)"
+  },
+  {
+    "num": 27,
+    "title": "保護者向けレポート",
+    "url": "EgdygdwT",
+    "content": "週次レポートと12理論プロファイル"
+  },
+  {
+    "num": 28,
+    "title": "AI問題生成（Gemini 3 Flash）",
+    "url": "1pZxhP5u",
+    "content": "無限の問題生成、教員による品質保証"
+  },
+  {
+    "num": 29,
+    "title": "1秒以内に適応",
+    "url": "94FNIoNF",
+    "content": "リアルタイム適応学習、d=0.64-0.71"
+  },
+  {
+    "num": 30,
+    "title": "予測分析とリスク検知",
+    "url": "Hf15A8X9",
+    "content": "機械学習による早期介入、14種類のデータ分析"
+  },
+  {
+    "num": 31,
+    "title": "第2部まとめ",
+    "url": "Nn4veBRi",
+    "content": "全機能まとめ、1秒以内応答"
+  },
+  {
+    "num": 32,
+    "title": "第3部イントロダクション",
+    "url": "J95Lws5o",
+    "content": "松川村実証計画、即日開始可能"
+  },
+  {
+    "num": 33,
+    "title": "5ステップ導入プロセス",
+    "url": "HS2G4H9o",
+    "content": "5ステップ、最短3日で開始可能"
+  },
+  {
+    "num": 34,
+    "title": "事前準備の詳細",
+    "url": "NTPnjr1t",
+    "content": "必要なものはCSVファイルのみ"
+  },
+  {
+    "num": 35,
+    "title": "初期設定の詳細",
+    "url": "w3VGl6Pm",
+    "content": "30分で完了、生徒・教員・保護者の登録"
+  },
+  {
+    "num": 36,
+    "title": "教員研修の詳細",
+    "url": "wUpMFmxU",
+    "content": "4時間の実践型研修、教員マニュアル提供"
+  },
+  {
+    "num": 37,
+    "title": "パイロット運用の詳細",
+    "url": "3jZhIWNg",
+    "content": "1-2ヶ月の試行期間、週1回の訪問サポート"
+  },
+  {
+    "num": 38,
+    "title": "本格導入の詳細",
+    "url": "2j3QCVzG",
+    "content": "全校展開、定期的なフォローアップ"
+  },
+  {
+    "num": 39,
+    "title": "成功のポイント1：教員の巻き込み",
+    "url": "Hh0834X7",
+    "content": "週約20時間の負担軽減（OECD TALIS 2018）"
+  },
+  {
+    "num": 40,
+    "title": "成功のポイント2：児童の動機づけ",
+    "url": "hwQ74o8y",
+    "content": "ゲーミフィケーション、AI対話（d=0.75-0.80）"
+  },
+  {
+    "num": 41,
+    "title": "成功のポイント3：保護者の理解",
+    "url": "Ss0MWTAZ",
+    "content": "週次レポート、個別面談サポート"
+  },
+  {
+    "num": 42,
+    "title": "成功のポイント4：定着サポート",
+    "url": "mxYsV3JD",
+    "content": "毎週の訪問サポート、技術的トラブル対応"
+  },
+  {
+    "num": 43,
+    "title": "成功のポイント5：PDCA",
+    "url": "YgVVhWDn",
+    "content": "月次レビュー、データ分析と改善提案"
+  },
+  {
+    "num": 44,
+    "title": "効果測定と成果指標",
+    "url": "VLdT1I44",
+    "content": "学力テスト、学習意欲調査、教員アンケート"
+  },
+  {
+    "num": 45,
+    "title": "松川村の特別条件（完全無償）",
+    "url": "DYJqpHGK",
+    "content": "開発費数百万円相当、完全無償の3つの理由"
+  },
+  {
+    "num": 46,
+    "title": "まとめと次のアクション",
+    "url": "u3eVM2r0",
+    "content": "5つの特徴のまとめ、デモURL・QRコード"
+  }
+]

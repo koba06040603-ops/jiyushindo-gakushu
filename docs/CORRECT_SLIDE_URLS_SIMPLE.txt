@@ -1,0 +1,66 @@
+# 正しいスライドURL一覧（全46枚）
+
+## 第1部（スライド1-16）✅ PDFのURLは正しい
+
+スライド1: https://www.genspark.ai/api/files/s/UjpjgWGy?cache_control=3600
+スライド2: https://www.genspark.ai/api/files/s/1QVsdgI2?cache_control=3600
+スライド3: https://www.genspark.ai/api/files/s/nchqL6pn?cache_control=3600
+スライド4: https://www.genspark.ai/api/files/s/zNoBn2E3?cache_control=3600
+スライド5: https://www.genspark.ai/api/files/s/p3ZVmyGZ?cache_control=3600
+スライド6: https://www.genspark.ai/api/files/s/OiT172mH?cache_control=3600
+スライド7: https://www.genspark.ai/api/files/s/OAvRW9bu?cache_control=3600
+スライド8: https://www.genspark.ai/api/files/s/dLE562yk?cache_control=3600
+スライド9: https://www.genspark.ai/api/files/s/olzgwdg2?cache_control=3600
+スライド10: https://www.genspark.ai/api/files/s/i0rUJigi?cache_control=3600
+スライド11: https://www.genspark.ai/api/files/s/zQd0f2Kw?cache_control=3600
+スライド12: https://www.genspark.ai/api/files/s/q2UNaxq4?cache_control=3600
+スライド13: https://www.genspark.ai/api/files/s/k86CNWl0?cache_control=3600
+スライド14: https://www.genspark.ai/api/files/s/91RbH6VG?cache_control=3600
+スライド15: https://www.genspark.ai/api/files/s/FJkah4OV?cache_control=3600
+スライド16: https://www.genspark.ai/api/files/s/KfpFIvuR?cache_control=3600
+
+## 第2部（スライド17-30）⚠️ PDFのURLは間違い - 以下を使用
+
+スライド17: https://www.genspark.ai/api/files/s/bO8G6yKV?cache_control=3600
+スライド18: https://www.genspark.ai/api/files/s/OQJfiI9K?cache_control=3600
+スライド19: https://www.genspark.ai/api/files/s/2W172Ksm?cache_control=3600
+スライド20: https://www.genspark.ai/api/files/s/2W172Ksm?cache_control=3600
+スライド21: https://www.genspark.ai/api/files/s/EDobbnfm?cache_control=3600
+スライド22: https://www.genspark.ai/api/files/s/m4qn0l1W?cache_control=3600
+スライド23: https://www.genspark.ai/api/files/s/avI78lbX?cache_control=3600
+スライド24: https://www.genspark.ai/api/files/s/5wJ15iXS?cache_control=3600
+スライド25: https://www.genspark.ai/api/files/s/gUcQGJjq?cache_control=3600
+スライド26: https://www.genspark.ai/api/files/s/TqnPT61m?cache_control=3600
+スライド27: https://www.genspark.ai/api/files/s/1pZxhP5u?cache_control=3600
+スライド28: https://www.genspark.ai/api/files/s/w0NVcm6f?cache_control=3600
+スライド29: https://www.genspark.ai/api/files/s/0s1F37BZ?cache_control=3600
+スライド30: https://www.genspark.ai/api/files/s/N0NKZcB0?cache_control=3600
+
+## 第3部（スライド31-46）⚠️ PDFのURLは間違い - 以下を使用
+
+スライド31: https://www.genspark.ai/api/files/s/NZYWbhHi?cache_control=3600
+スライド32: https://www.genspark.ai/api/files/s/qQnE7Clc?cache_control=3600
+スライド33: https://www.genspark.ai/api/files/s/2He0hfW5?cache_control=3600
+スライド34: https://www.genspark.ai/api/files/s/UmlBiwez?cache_control=3600
+スライド35: https://www.genspark.ai/api/files/s/TDjih9d4?cache_control=3600
+スライド36: https://www.genspark.ai/api/files/s/mcejUMSg?cache_control=3600
+スライド37: https://www.genspark.ai/api/files/s/zUGcqFM6?cache_control=3600
+スライド38: https://www.genspark.ai/api/files/s/Hh0834X7?cache_control=3600
+スライド39: https://www.genspark.ai/api/files/s/hwQ74o8y?cache_control=3600
+スライド40: https://www.genspark.ai/api/files/s/RyEiHHh2?cache_control=3600
+スライド41: https://www.genspark.ai/api/files/s/6Pn1NXQ5?cache_control=3600
+スライド42: https://www.genspark.ai/api/files/s/Clk4ZjGr?cache_control=3600
+スライド43: https://www.genspark.ai/api/files/s/HFQbZPw6?cache_control=3600
+スライド44: https://www.genspark.ai/api/files/s/DYJqpHGK?cache_control=3600
+スライド45: https://www.genspark.ai/api/files/s/u3eVM2r0?cache_control=3600
+スライド46: https://www.genspark.ai/api/files/s/xT0Yl4GH?cache_control=3600
+
+---
+
+新しく生成した画像（認証不要）:
+
+スライド22（児童用進捗ダッシュボード）:
+https://www.genspark.ai/api/files/s/ZvSq0iD1?cache_control=3600
+
+スライド23（間違いノート）:
+https://www.genspark.ai/api/files/s/YhpJuL3I?cache_control=3600

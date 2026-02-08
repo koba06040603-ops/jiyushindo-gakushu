@@ -1,0 +1,57 @@
+# 全スライドURL一覧（コピペ用）
+
+## 第1部（スライド1-15）- アクセス可能
+
+https://www.genspark.ai/api/files/s/UjpjgWGy?cache_control=3600
+https://www.genspark.ai/api/files/s/1QVsdgI2?cache_control=3600
+https://www.genspark.ai/api/files/s/nchqL6pn?cache_control=3600
+https://www.genspark.ai/api/files/s/zNoBn2E3?cache_control=3600
+https://www.genspark.ai/api/files/s/p3ZVmyGZ?cache_control=3600
+https://www.genspark.ai/api/files/s/OiT172mH?cache_control=3600
+https://www.genspark.ai/api/files/s/OAvRW9bu?cache_control=3600
+https://www.genspark.ai/api/files/s/dLE562yk?cache_control=3600
+https://www.genspark.ai/api/files/s/olzgwdg2?cache_control=3600
+https://www.genspark.ai/api/files/s/i0rUJigi?cache_control=3600
+https://www.genspark.ai/api/files/s/zQd0f2Kw?cache_control=3600
+https://www.genspark.ai/api/files/s/q2UNaxq4?cache_control=3600
+https://www.genspark.ai/api/files/s/k86CNWl0?cache_control=3600
+https://www.genspark.ai/api/files/s/91RbH6VG?cache_control=3600
+https://www.genspark.ai/api/files/s/FJkah4OV?cache_control=3600
+https://www.genspark.ai/api/files/s/KfpFIvuR?cache_control=3600
+
+## 第2部（スライド16-30）- 要ログイン
+
+https://www.genspark.ai/api/files/s/bO8G6yKV?cache_control=3600
+https://www.genspark.ai/api/files/s/OQJfiI9K?cache_control=3600
+https://www.genspark.ai/api/files/s/2W172Ksm?cache_control=3600
+https://www.genspark.ai/api/files/s/2W172Ksm?cache_control=3600
+https://www.genspark.ai/api/files/s/EDobbnfm?cache_control=3600
+https://www.genspark.ai/api/files/s/nUAhT7W5?cache_control=3600
+https://www.genspark.ai/api/files/s/EDobbnfm?cache_control=3600
+https://www.genspark.ai/api/files/s/D2Wglfph?cache_control=3600
+https://www.genspark.ai/api/files/s/pHSXlP6n?cache_control=3600
+https://www.genspark.ai/api/files/s/gUcQGJjq?cache_control=3600
+https://www.genspark.ai/api/files/s/TqnPT61m?cache_control=3600
+https://www.genspark.ai/api/files/s/1pZxhP5u?cache_control=3600
+https://www.genspark.ai/api/files/s/w0NVcm6f?cache_control=3600
+https://www.genspark.ai/api/files/s/0s1F37BZ?cache_control=3600
+https://www.genspark.ai/api/files/s/N0NKZcB0?cache_control=3600
+
+## 第3部（スライド31-46）- 要ログイン
+
+https://www.genspark.ai/api/files/s/NZYWbhHi?cache_control=3600
+https://www.genspark.ai/api/files/s/qQnE7Clc?cache_control=3600
+https://www.genspark.ai/api/files/s/2He0hfW5?cache_control=3600
+https://www.genspark.ai/api/files/s/UmlBiwez?cache_control=3600
+https://www.genspark.ai/api/files/s/TDjih9d4?cache_control=3600
+https://www.genspark.ai/api/files/s/mcejUMSg?cache_control=3600
+https://www.genspark.ai/api/files/s/zUGcqFM6?cache_control=3600
+https://www.genspark.ai/api/files/s/by7iyMYa?cache_control=3600
+https://www.genspark.ai/api/files/s/o7MP1idV?cache_control=3600
+https://www.genspark.ai/api/files/s/RyEiHHh2?cache_control=3600
+https://www.genspark.ai/api/files/s/6Pn1NXQ5?cache_control=3600
+https://www.genspark.ai/api/files/s/Clk4ZjGr?cache_control=3600
+https://www.genspark.ai/api/files/s/HFQbZPw6?cache_control=3600
+https://www.genspark.ai/api/files/s/xTOa8YXl?cache_control=3600
+https://www.genspark.ai/api/files/s/e6lUa5H5?cache_control=3600
+https://www.genspark.ai/api/files/s/xT0Yl4GH?cache_control=3600
