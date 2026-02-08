@@ -13394,28 +13394,6 @@ app.get('/api/research/export/:classCode', async (c) => {
   }
 })
 
-// ヘルパー: CSV変換
-function convertToCSV(data: any[]): string {
-  if (data.length === 0) return ''
-  
-  const headers = Object.keys(data[0])
-  const csvRows = [
-    headers.join(','),
-    ...data.map(row => 
-      headers.map(header => {
-        const value = row[header]
-        if (value === null || value === undefined) return ''
-        if (typeof value === 'string' && value.includes(',')) {
-          return `"${value.replace(/"/g, '""')}"`
-        }
-        return value
-      }).join(',')
-    )
-  ]
-  
-  return csvRows.join('\n')
-}
-
 // 統計サマリー取得（研究用）
 app.get('/api/research/summary/:classCode', async (c) => {
   const { env } = c
@@ -25811,6 +25789,490 @@ app.route('/api/learning-session', learningSessionApiApp)
 // ============================================================
 import theorySystemApiApp from './theory-system-api'
 app.route('/api/theory-system', theorySystemApiApp)
+
+// ============================================================
+// Phase 24: 学習履歴の長期分析とデータエクスポート
+// ============================================================
+import {
+  getYearlyLearningHistory,
+  getMonthlyStats,
+  getGrowthCurve,
+  analyzeLearningPattern,
+  getSeasonalTrends,
+  compareWithPeers,
+  getImprovementRate
+} from './learning-analytics'
+
+import {
+  fetchExportData,
+  anonymizeData,
+  convertToCSV,
+  convertToJSON,
+  convertToExcel,
+  recordExport,
+  generateStatisticsSummary
+} from './data-export'
+
+// 年間学習履歴
+app.get('/api/analytics/yearly-history', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const year = parseInt(c.req.query('year') || new Date().getFullYear().toString())
+    
+    const history = await getYearlyLearningHistory(env.DB, user.id, year)
+    
+    return c.json({
+      success: true,
+      year,
+      history
+    })
+  } catch (error: any) {
+    console.error('年間履歴取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 月別統計
+app.get('/api/analytics/monthly-stats', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const months = parseInt(c.req.query('months') || '12')
+    
+    const stats = await getMonthlyStats(env.DB, user.id, months)
+    
+    return c.json({
+      success: true,
+      stats
+    })
+  } catch (error: any) {
+    console.error('月別統計取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 成長曲線
+app.get('/api/analytics/growth-curve', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const subject = c.req.query('subject')
+    const days = parseInt(c.req.query('days') || '365')
+    
+    const curve = await getGrowthCurve(env.DB, user.id, subject || undefined, days)
+    
+    return c.json({
+      success: true,
+      curve
+    })
+  } catch (error: any) {
+    console.error('成長曲線取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習パターン分析
+app.get('/api/analytics/learning-pattern', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const days = parseInt(c.req.query('days') || '90')
+    
+    const pattern = await analyzeLearningPattern(env.DB, user.id, days)
+    
+    return c.json({
+      success: true,
+      pattern
+    })
+  } catch (error: any) {
+    console.error('学習パターン分析エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 季節別傾向
+app.get('/api/analytics/seasonal-trends', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const year = parseInt(c.req.query('year') || new Date().getFullYear().toString())
+    
+    const trends = await getSeasonalTrends(env.DB, user.id, year)
+    
+    return c.json({
+      success: true,
+      trends
+    })
+  } catch (error: any) {
+    console.error('季節別傾向取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// ピア比較
+app.get('/api/analytics/peer-comparison', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const days = parseInt(c.req.query('days') || '30')
+    
+    if (!user.class_code) {
+      return c.json({ success: false, error: 'クラスが設定されていません' }, 400)
+    }
+    
+    const comparison = await compareWithPeers(env.DB, user.id, user.class_code, days)
+    
+    return c.json({
+      success: true,
+      comparison
+    })
+  } catch (error: any) {
+    console.error('ピア比較エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 改善率
+app.get('/api/analytics/improvement-rate', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const subject = c.req.query('subject')
+    
+    const improvement = await getImprovementRate(env.DB, user.id, subject || undefined)
+    
+    return c.json({
+      success: true,
+      improvement
+    })
+  } catch (error: any) {
+    console.error('改善率取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// サマリーデータ（ダッシュボード用）
+app.get('/api/analytics/summary', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const days = parseInt(c.req.query('days') || '365')
+    const subject = c.req.query('subject') || ''
+    
+    // 現在期間のデータ
+    const currentPeriodStart = new Date()
+    currentPeriodStart.setDate(currentPeriodStart.getDate() - days)
+    
+    // 前期間のデータ（比較用）
+    const previousPeriodStart = new Date()
+    previousPeriodStart.setDate(previousPeriodStart.getDate() - days * 2)
+    const previousPeriodEnd = currentPeriodStart
+    
+    // 現在期間の統計
+    let currentQuery = `
+      SELECT 
+        COUNT(*) as total_problems,
+        AVG(CASE WHEN ah.is_correct = 1 THEN 1.0 ELSE 0.0 END) * 100 as avg_accuracy,
+        SUM(ah.time_spent_seconds) as total_time_seconds,
+        MAX(ah.current_streak) as max_streak,
+        (SELECT current_streak FROM answer_history WHERE student_id = ? ORDER BY answered_at DESC LIMIT 1) as current_streak
+      FROM answer_history ah
+      JOIN learning_cards lc ON ah.card_id = lc.id
+      JOIN courses c ON lc.course_id = c.id
+      WHERE ah.student_id = ? 
+        AND ah.answered_at >= ?
+    `
+    const params: any[] = [user.id, user.id, currentPeriodStart.toISOString()]
+    
+    if (subject) {
+      currentQuery += ' AND c.subject = ?'
+      params.push(subject)
+    }
+    
+    const currentResult = await env.DB.prepare(currentQuery).bind(...params).first()
+    
+    // 前期間の統計
+    const previousParams = [user.id, previousPeriodStart.toISOString(), previousPeriodEnd.toISOString()]
+    if (subject) previousParams.push(subject)
+    
+    const previousResult = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total_problems,
+        AVG(CASE WHEN ah.is_correct = 1 THEN 1.0 ELSE 0.0 END) * 100 as avg_accuracy,
+        SUM(ah.time_spent_seconds) as total_time_seconds
+      FROM answer_history ah
+      JOIN learning_cards lc ON ah.card_id = lc.id
+      JOIN courses c ON lc.course_id = c.id
+      WHERE ah.student_id = ? 
+        AND ah.answered_at >= ? 
+        AND ah.answered_at < ?
+        ${subject ? 'AND c.subject = ?' : ''}
+    `).bind(...previousParams).first()
+    
+    // 変化率計算
+    const problemsChange = previousResult?.total_problems ? 
+      ((currentResult?.total_problems || 0) - (previousResult.total_problems || 0)) / (previousResult.total_problems || 1) * 100 : 0
+    const accuracyChange = (currentResult?.avg_accuracy || 0) - (previousResult?.avg_accuracy || 0)
+    const timeChange = previousResult?.total_time_seconds ? 
+      ((currentResult?.total_time_seconds || 0) - (previousResult.total_time_seconds || 0)) / (previousResult.total_time_seconds || 1) * 100 : 0
+    
+    return c.json({
+      success: true,
+      data: {
+        total_problems: currentResult?.total_problems || 0,
+        avg_accuracy: currentResult?.avg_accuracy || 0,
+        total_time_seconds: currentResult?.total_time_seconds || 0,
+        max_streak: currentResult?.max_streak || 0,
+        current_streak: currentResult?.current_streak || 0,
+        problems_change: Math.round(problemsChange),
+        accuracy_change: Math.round(accuracyChange * 10) / 10,
+        time_change: Math.round(timeChange)
+      }
+    })
+  } catch (error: any) {
+    console.error('サマリーデータ取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 教科別統計
+app.get('/api/analytics/subject-stats', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const days = parseInt(c.req.query('days') || '365')
+    
+    const periodStart = new Date()
+    periodStart.setDate(periodStart.getDate() - days)
+    
+    const results = await env.DB.prepare(`
+      SELECT 
+        c.subject,
+        COUNT(*) as total_problems,
+        AVG(CASE WHEN ah.is_correct = 1 THEN 1.0 ELSE 0.0 END) * 100 as avg_accuracy,
+        SUM(ah.time_spent_seconds) / 60.0 as total_time_minutes
+      FROM answer_history ah
+      JOIN learning_cards lc ON ah.card_id = lc.id
+      JOIN courses c ON lc.course_id = c.id
+      WHERE ah.student_id = ? 
+        AND ah.answered_at >= ?
+      GROUP BY c.subject
+      ORDER BY total_problems DESC
+    `).bind(user.id, periodStart.toISOString()).all()
+    
+    return c.json({
+      success: true,
+      data: results.results || []
+    })
+  } catch (error: any) {
+    console.error('教科別統計取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 学習パターン（詳細版）
+app.get('/api/analytics/learning-patterns', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const days = parseInt(c.req.query('days') || '90')
+    
+    const pattern = await analyzeLearningPattern(env.DB, user.id, days)
+    
+    return c.json({
+      success: true,
+      data: pattern
+    })
+  } catch (error: any) {
+    console.error('学習パターン取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// データエクスポート
+app.post('/api/export/create', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const body = await c.req.json()
+    
+    const {
+      export_type,
+      format,
+      date_from,
+      date_to,
+      subjects,
+      anonymization_level,
+      purpose
+    } = body
+    
+    // データ取得オプション
+    const options = {
+      student_id: user.id,
+      school_id: user.school_id || 1,
+      date_from,
+      date_to,
+      subjects: subjects || [],
+      anonymize: export_type === 'anonymized',
+      anonymizationLevel: anonymization_level || 'standard',
+      format: format || 'csv'
+    }
+    
+    // データ取得
+    const data = await fetchExportData(env.DB, options)
+    
+    if (data.length === 0) {
+      return c.json({ success: false, error: 'エクスポートするデータがありません' }, 400)
+    }
+    
+    let finalData = data
+    
+    // 匿名化処理
+    if (options.anonymize) {
+      const exportId = Date.now()
+      const anonymized = await anonymizeData(
+        env.DB,
+        data,
+        exportId,
+        options.anonymizationLevel
+      )
+      finalData = anonymized.data
+    }
+    
+    // フォーマット変換
+    let fileContent: string
+    let contentType: string
+    let fileName: string
+    
+    switch (format) {
+      case 'csv':
+        fileContent = convertToCSV(finalData)
+        contentType = 'text/csv; charset=utf-8'
+        fileName = `learning_data_${Date.now()}.csv`
+        break
+      case 'json':
+        fileContent = convertToJSON(finalData)
+        contentType = 'application/json'
+        fileName = `learning_data_${Date.now()}.json`
+        break
+      case 'excel':
+        fileContent = convertToExcel(finalData)
+        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        fileName = `learning_data_${Date.now()}.xlsx`
+        break
+      default:
+        return c.json({ success: false, error: '不正なフォーマット' }, 400)
+    }
+    
+    // エクスポート履歴を記録
+    const fileSize = new TextEncoder().encode(fileContent).length
+    const fileUrl = `data:${contentType};base64,${btoa(unescape(encodeURIComponent(fileContent)))}`
+    
+    await recordExport(
+      env.DB,
+      user.school_id || 1,
+      user.id,
+      {
+        ...options,
+        export_type,
+        grade: user.grade,
+        class_code: user.class_code,
+        purpose
+      },
+      finalData.length,
+      fileSize,
+      fileUrl
+    )
+    
+    // Base64エンコードしたデータURLを返す
+    return c.json({
+      success: true,
+      data: {
+        download_url: fileUrl,
+        file_name: fileName,
+        file_size: fileSize,
+        record_count: finalData.length
+      }
+    })
+    
+  } catch (error: any) {
+    console.error('データエクスポートエラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// エクスポート統計
+app.get('/api/export/stats', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const dateFrom = c.req.query('date_from') || ''
+    const dateTo = c.req.query('date_to') || ''
+    const subjectsStr = c.req.query('subjects') || ''
+    const subjects = subjectsStr ? subjectsStr.split(',') : []
+    
+    // レコード数カウント
+    let query = `
+      SELECT COUNT(*) as count
+      FROM answer_history ah
+      JOIN learning_cards lc ON ah.card_id = lc.id
+      JOIN courses c ON lc.course_id = c.id
+      WHERE ah.student_id = ?
+    `
+    const params: any[] = [user.id]
+    
+    if (dateFrom) {
+      query += ' AND DATE(ah.answered_at) >= ?'
+      params.push(dateFrom)
+    }
+    if (dateTo) {
+      query += ' AND DATE(ah.answered_at) <= ?'
+      params.push(dateTo)
+    }
+    if (subjects.length > 0) {
+      query += ` AND c.subject IN (${subjects.map(() => '?').join(',')})`
+      params.push(...subjects)
+    }
+    
+    const result = await env.DB.prepare(query).bind(...params).first()
+    const recordCount = result?.count || 0
+    
+    // 推定ファイルサイズ（1レコード約500バイトと仮定）
+    const estimatedSize = recordCount * 500
+    
+    return c.json({
+      success: true,
+      data: {
+        record_count: recordCount,
+        estimated_size: estimatedSize
+      }
+    })
+  } catch (error: any) {
+    console.error('エクスポート統計取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// エクスポート履歴
+app.get('/api/export/history', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    
+    const history = await env.DB.prepare(`
+      SELECT 
+        export_id,
+        export_type,
+        format,
+        date_from,
+        date_to,
+        record_count,
+        file_size,
+        file_url,
+        created_at
+      FROM export_history
+      WHERE exported_by = ?
+      ORDER BY created_at DESC
+      LIMIT 20
+    `).bind(user.id).all()
+    
+    return c.json({
+      success: true,
+      data: history.results || []
+    })
+  } catch (error: any) {
+    console.error('エクスポート履歴取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
 
 export default app
 
