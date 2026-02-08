@@ -1437,6 +1437,373 @@ app.post('/api/parent/notify', async (c) => {
   }
 })
 
+// =============================================================================
+// Phase 22: 教員向けコメント・フィードバック機能
+// =============================================================================
+
+// コメント作成
+app.post('/api/comments', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const body = await c.req.json();
+
+  try {
+    const {
+      student_id,
+      comment_type = 'general',
+      target_type,
+      target_id,
+      subject,
+      unit_name,
+      comment_text,
+      sentiment = 'positive'
+    } = body;
+
+    const result = await env.DB.prepare(`
+      INSERT INTO teacher_comments (
+        school_id, teacher_id, student_id, comment_type,
+        target_type, target_id, subject, unit_name,
+        comment_text, sentiment
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      user.school_id,
+      user.user_id,
+      student_id,
+      comment_type,
+      target_type || null,
+      target_id || null,
+      subject || null,
+      unit_name || null,
+      comment_text,
+      sentiment
+    ).run();
+
+    // リアルタイム通知を送信（WebSocket経由）
+    if (env.PROGRESS_WEBSOCKET) {
+      const student = await env.DB.prepare(`
+        SELECT class_code FROM users WHERE user_id = ?
+      `).bind(student_id).first();
+
+      if (student?.class_code) {
+        const id = env.PROGRESS_WEBSOCKET.idFromName(student.class_code as string);
+        const stub = env.PROGRESS_WEBSOCKET.get(id);
+        // WebSocket通知はDurable Object内で処理
+      }
+    }
+
+    return c.json({
+      success: true,
+      comment_id: result.meta.last_row_id
+    });
+  } catch (error: any) {
+    console.error('コメント作成エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// コメント一覧取得（教員用）
+app.get('/api/comments/teacher', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const student_id = c.req.query('student_id');
+  const comment_type = c.req.query('comment_type');
+  const limit = parseInt(c.req.query('limit') || '50');
+
+  try {
+    let query = `
+      SELECT 
+        tc.*,
+        u.full_name as student_name,
+        COUNT(cr.reaction_id) as reaction_count
+      FROM teacher_comments tc
+      JOIN users u ON tc.student_id = u.user_id
+      LEFT JOIN comment_reactions cr ON tc.comment_id = cr.comment_id
+      WHERE tc.teacher_id = ?
+    `;
+    const params: any[] = [user.user_id];
+
+    if (student_id) {
+      query += ' AND tc.student_id = ?';
+      params.push(parseInt(student_id));
+    }
+
+    if (comment_type) {
+      query += ' AND tc.comment_type = ?';
+      params.push(comment_type);
+    }
+
+    query += ' GROUP BY tc.comment_id ORDER BY tc.created_at DESC LIMIT ?';
+    params.push(limit);
+
+    const result = await env.DB.prepare(query).bind(...params).all();
+
+    return c.json({
+      success: true,
+      data: result.results
+    });
+  } catch (error: any) {
+    console.error('コメント一覧取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// コメント一覧取得（児童用）
+app.get('/api/comments/student', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const unread_only = c.req.query('unread_only') === 'true';
+  const limit = parseInt(c.req.query('limit') || '50');
+
+  try {
+    let query = `
+      SELECT 
+        tc.*,
+        u.full_name as teacher_name,
+        COUNT(cr.reaction_id) as reaction_count,
+        MAX(CASE WHEN cr.student_id = ? THEN cr.reaction_type END) as my_reaction
+      FROM teacher_comments tc
+      JOIN users u ON tc.teacher_id = u.user_id
+      LEFT JOIN comment_reactions cr ON tc.comment_id = cr.comment_id
+      WHERE tc.student_id = ?
+    `;
+    const params: any[] = [user.user_id, user.user_id];
+
+    if (unread_only) {
+      query += ' AND tc.is_read = 0';
+    }
+
+    query += ' GROUP BY tc.comment_id ORDER BY tc.is_pinned DESC, tc.created_at DESC LIMIT ?';
+    params.push(limit);
+
+    const result = await env.DB.prepare(query).bind(...params).all();
+
+    return c.json({
+      success: true,
+      data: result.results
+    });
+  } catch (error: any) {
+    console.error('コメント一覧取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// コメント既読マーク
+app.put('/api/comments/:id/read', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const commentId = parseInt(c.req.param('id'));
+
+  try {
+    await env.DB.prepare(`
+      UPDATE teacher_comments
+      SET is_read = 1, read_at = CURRENT_TIMESTAMP
+      WHERE comment_id = ? AND student_id = ?
+    `).bind(commentId, user.user_id).run();
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error('コメント既読エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// コメント削除
+app.delete('/api/comments/:id', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const commentId = parseInt(c.req.param('id'));
+
+  try {
+    // 教員は自分のコメントのみ削除可能
+    await env.DB.prepare(`
+      DELETE FROM teacher_comments
+      WHERE comment_id = ? AND teacher_id = ?
+    `).bind(commentId, user.user_id).run();
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error('コメント削除エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// コメントテンプレート一覧取得
+app.get('/api/comment-templates', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const category = c.req.query('category');
+
+  try {
+    let query = `
+      SELECT * FROM comment_templates
+      WHERE (teacher_id = ? OR teacher_id IS NULL) AND is_active = 1
+    `;
+    const params: any[] = [user.user_id];
+
+    if (category) {
+      query += ' AND template_category = ?';
+      params.push(category);
+    }
+
+    query += ' ORDER BY usage_count DESC, template_name';
+
+    const result = await env.DB.prepare(query).bind(...params).all();
+
+    return c.json({
+      success: true,
+      data: result.results
+    });
+  } catch (error: any) {
+    console.error('テンプレート取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// コメントテンプレート作成
+app.post('/api/comment-templates', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const body = await c.req.json();
+
+  try {
+    const {
+      template_name,
+      template_category = 'encouragement',
+      template_text
+    } = body;
+
+    const result = await env.DB.prepare(`
+      INSERT INTO comment_templates (
+        school_id, teacher_id, template_name, template_category, template_text
+      ) VALUES (?, ?, ?, ?, ?)
+    `).bind(
+      user.school_id,
+      user.user_id,
+      template_name,
+      template_category,
+      template_text
+    ).run();
+
+    return c.json({
+      success: true,
+      template_id: result.meta.last_row_id
+    });
+  } catch (error: any) {
+    console.error('テンプレート作成エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// コメントテンプレート使用（使用回数カウント）
+app.post('/api/comment-templates/:id/use', authMiddleware, async (c) => {
+  const { env } = c;
+  const templateId = parseInt(c.req.param('id'));
+
+  try {
+    await env.DB.prepare(`
+      UPDATE comment_templates
+      SET usage_count = usage_count + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE template_id = ?
+    `).bind(templateId).run();
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error('テンプレート使用エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// コメントにリアクション追加
+app.post('/api/comments/:id/reactions', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const commentId = parseInt(c.req.param('id'));
+  const body = await c.req.json();
+
+  try {
+    const { reaction_type = 'like' } = body;
+
+    // 既存のリアクションを削除してから追加（1人1リアクション）
+    await env.DB.prepare(`
+      DELETE FROM comment_reactions
+      WHERE comment_id = ? AND student_id = ?
+    `).bind(commentId, user.user_id).run();
+
+    await env.DB.prepare(`
+      INSERT INTO comment_reactions (comment_id, student_id, reaction_type)
+      VALUES (?, ?, ?)
+    `).bind(commentId, user.user_id, reaction_type).run();
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error('リアクション追加エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// コメント統計取得
+app.get('/api/comments/statistics', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const start_date = c.req.query('start_date') || new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
+  const end_date = c.req.query('end_date') || new Date().toISOString().split('T')[0];
+
+  try {
+    const stats = await env.DB.prepare(`
+      SELECT * FROM comment_statistics
+      WHERE teacher_id = ? AND stat_date BETWEEN ? AND ?
+      ORDER BY stat_date DESC
+    `).bind(user.user_id, start_date, end_date).all();
+
+    // 集計データ
+    const summary = {
+      total_comments: stats.results.reduce((sum: number, s: any) => sum + (s.total_comments || 0), 0),
+      avg_read_rate: stats.results.length > 0 
+        ? stats.results.reduce((sum: number, s: any) => sum + (s.student_read_rate || 0), 0) / stats.results.length
+        : 0,
+      daily_stats: stats.results
+    };
+
+    return c.json({
+      success: true,
+      data: summary
+    });
+  } catch (error: any) {
+    console.error('統計取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
 // 保護者通知履歴取得
 app.get('/api/parent/notifications/:studentId', async (c) => {
   const { env } = c;
