@@ -1,21 +1,43 @@
 -- Phase 23: AI チャットボット - 既存テーブルの拡張
 -- 全教科対応のAIアシスタント
 
--- chat_messagesテーブルに新しいカラムを追加
-ALTER TABLE chat_messages ADD COLUMN subject TEXT;
-ALTER TABLE chat_messages ADD COLUMN topic TEXT;
-ALTER TABLE chat_messages ADD COLUMN question_type TEXT;
-ALTER TABLE chat_messages ADD COLUMN ai_model TEXT DEFAULT 'gemini-2.0-flash-exp';
-ALTER TABLE chat_messages ADD COLUMN tokens_used INTEGER;
-ALTER TABLE chat_messages ADD COLUMN response_time_ms INTEGER;
-ALTER TABLE chat_messages ADD COLUMN has_attachment INTEGER DEFAULT 0;
-ALTER TABLE chat_messages ADD COLUMN attachment_url TEXT;
-ALTER TABLE chat_messages ADD COLUMN is_helpful INTEGER DEFAULT 0;
+-- 1. chat_conversations テーブル（会話セッション）
+CREATE TABLE IF NOT EXISTS chat_conversations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  school_id INTEGER NOT NULL DEFAULT 1,
+  student_id INTEGER NOT NULL,
+  title TEXT,
+  subject TEXT,
+  grade TEXT,
+  message_count INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (student_id) REFERENCES users(user_id),
+  FOREIGN KEY (school_id) REFERENCES schools(id)
+);
 
--- chat_conversationsテーブルに新しいカラムを追加
-ALTER TABLE chat_conversations ADD COLUMN subject TEXT;
-ALTER TABLE chat_conversations ADD COLUMN grade TEXT;
-ALTER TABLE chat_conversations ADD COLUMN message_count INTEGER DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_student ON chat_conversations(student_id, updated_at DESC);
+
+-- 2. chat_messages テーブル（メッセージ）
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  subject TEXT,
+  topic TEXT,
+  question_type TEXT,
+  ai_model TEXT DEFAULT 'gemini-2.0-flash-exp',
+  tokens_used INTEGER,
+  response_time_ms INTEGER,
+  has_attachment INTEGER DEFAULT 0,
+  attachment_url TEXT,
+  is_helpful INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON chat_messages(conversation_id, created_at);
 
 -- 3. chat_quick_replies テーブル（クイック返信テンプレート）
 CREATE TABLE IF NOT EXISTS chat_quick_replies (
@@ -162,9 +184,3 @@ INSERT OR IGNORE INTO chat_knowledge_base (school_id, subject, grade, topic, con
   (1, '英語', '4年', '挨拶', '英語の挨拶：Hello（こんにちは）、Good morning（おはよう）、Thank you（ありがとう）など。', '挨拶,会話,英会話,基本表現', 'basic', '学習指導要領', 1),
   (1, '英語', '5年', '自己紹介', 'I am ~（私は～です）、My name is ~（私の名前は～です）という表現で自己紹介ができます。', '自己紹介,英会話,be動詞', 'standard', '学習指導要領', 1),
   (1, '英語', '6年', '現在進行形', '現在進行形はbe動詞+動詞のing形で「～しているところです」という意味を表します。', '現在進行形,文法,be動詞,ing形', 'advanced', '学習指導要領', 1);
-
--- デフォルトのアシスタントパーソナリティを追加（assistant_personalitiesテーブルが存在する場合）
-INSERT OR IGNORE INTO assistant_personalities (id, name, description, system_prompt, tone, emoji_usage, is_default) VALUES
-  (1, 'まなぶくん', '優しく教えてくれるお兄さん先生', 'あなたは小学生の学習を支援する優しいお兄さん先生です。生徒が自分で考える力を育てることを大切にしています。', 'friendly', 1, 1),
-  (2, 'さくら先生', '励ましてくれる先生', 'あなたは小学生を励まし、やる気を引き出す先生です。できたことをしっかり褒めます。', 'encouraging', 2, 0),
-  (3, 'ロジカル先生', '論理的に説明する先生', 'あなたは論理的に順序立てて説明する先生です。ステップバイステップで理解を深めます。', 'logical', 0, 0);
