@@ -25528,13 +25528,13 @@ import {
 app.post('/api/chat/send', authMiddleware, async (c) => {
   try {
     const { env, user } = c.var
-    const { message, conversation_id } = await c.req.json()
+    const { message, conversation_id, grade } = await c.req.json()
     
     if (!message || message.trim().length === 0) {
       return c.json({ success: false, error: 'メッセージを入力してください' }, 400)
     }
     
-    console.log('💬 チャットメッセージ受信:', { student_id: user.id, message })
+    console.log('💬 チャットメッセージ受信:', { student_id: user.id, message, grade })
     
     // APIキーを確認
     const apiKey = env.GEMINI_API_KEY
@@ -25563,10 +25563,11 @@ app.post('/api/chat/send', authMiddleware, async (c) => {
     const learningContext = await getStudentLearningContext(env.DB, user.id)
     console.log('📊 学習コンテキスト:', learningContext)
     
-    // コンテキストを構築
+    // コンテキストを構築（学年情報を追加）
     const context = {
       student_id: user.id,
       conversation_id: conv_id,
+      grade: grade || user.grade || '3年', // 学年情報を追加
       personality: {
         name: settings.name || 'まなぶくん',
         system_prompt: settings.system_prompt || '',
@@ -25578,7 +25579,7 @@ app.post('/api/chat/send', authMiddleware, async (c) => {
     }
     
     // AI応答を生成
-    console.log('🤖 AI応答生成中...')
+    console.log('🤖 AI応答生成中...（学年: ' + context.grade + '）')
     const response = await generateChatResponse(context, message, apiKey)
     console.log('✅ AI応答:', response.content.substring(0, 100) + '...')
     

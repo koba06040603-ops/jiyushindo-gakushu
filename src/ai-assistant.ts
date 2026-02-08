@@ -1,4 +1,4 @@
-// AI学習アシスタント（チャットボット）モジュール - 全教科対応版
+// AI学習アシスタント（チャットボット）モジュール - 全教科対応版 + 音声認識対応
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -9,6 +9,7 @@ interface ChatMessage {
 interface ConversationContext {
   student_id: number
   conversation_id: number
+  grade?: string // 学年情報を追加
   personality: {
     name: string
     system_prompt: string
@@ -17,6 +18,159 @@ interface ConversationContext {
   }
   recent_messages: ChatMessage[]
   student_progress?: any
+}
+
+// 学年別の言葉遣いガイド
+const GRADE_LANGUAGE_GUIDE = {
+  '1年': {
+    vocabulary_level: 'basic',
+    sentence_structure: 'simple',
+    examples: [
+      'かんたんなことばをつかう',
+      'みじかいぶんでせつめいする',
+      'ひらがなをおおくつかう'
+    ],
+    instructions: `
+- 1年生レベルの言葉遣い: ひらがなを多く使う、漢字は習った範囲のみ
+- 短い文で説明（1文10〜15文字程度）
+- 「〜だよ」「〜だね」など親しみやすい語尾
+- 具体的な例えを使う（おはじき、ブロックなど）
+`
+  },
+  '2年': {
+    vocabulary_level: 'basic',
+    sentence_structure: 'simple',
+    examples: [
+      'かんたんな言葉を使う',
+      '短い文で説明する',
+      'ならった漢字を使う'
+    ],
+    instructions: `
+- 2年生レベルの言葉遣い: 習った漢字を適度に使う、ふりがな付き
+- 短い文で説明（1文15〜20文字程度）
+- 「〜だよ」「〜だね」など親しみやすい語尾
+- 身近な例えを使う（おもちゃ、動物など）
+`
+  },
+  '3年': {
+    vocabulary_level: 'standard',
+    sentence_structure: 'moderate',
+    examples: [
+      '3年生で習う言葉を使う',
+      'わかりやすい文で説明',
+      '漢字とひらがなをバランスよく'
+    ],
+    instructions: `
+- 3年生レベルの言葉遣い: 基本的な漢字を使う、難しい言葉には説明を添える
+- 適度な長さの文（1文20〜25文字程度）
+- 「〜です」「〜ます」と「〜だよ」を使い分け
+- 日常生活の例を使う（買い物、料理など）
+`
+  },
+  '4年': {
+    vocabulary_level: 'standard',
+    sentence_structure: 'moderate',
+    examples: [
+      '4年生レベルの言葉で説明',
+      '論理的な文章構成',
+      '適切な漢字の使用'
+    ],
+    instructions: `
+- 4年生レベルの言葉遣い: 学年相応の漢字を使う、専門用語は簡単に説明
+- 適度な長さの文（1文25〜30文字程度）
+- 丁寧語を基本とする
+- 理由や根拠を示す説明
+`
+  },
+  '5年': {
+    vocabulary_level: 'advanced',
+    sentence_structure: 'complex',
+    examples: [
+      '5年生レベルの語彙で説明',
+      '複雑な文章でも理解可能',
+      '抽象的な概念も扱える'
+    ],
+    instructions: `
+- 5年生レベルの言葉遣い: やや難しい言葉も使用可能、接続詞を適切に使う
+- やや長い文も可（1文30〜40文字程度）
+- 丁寧語を基本とする
+- 抽象的な概念も段階的に説明
+`
+  },
+  '6年': {
+    vocabulary_level: 'advanced',
+    sentence_structure: 'complex',
+    examples: [
+      '6年生レベルの語彙で説明',
+      '論理的で詳しい説明',
+      '中学準備レベルの内容'
+    ],
+    instructions: `
+- 6年生レベルの言葉遣い: 高度な語彙も使用可能、論理的な文章構成
+- 長い文も適切に使用（1文40〜50文字程度）
+- 丁寧語を基本とする
+- 中学校内容も少し先取りして説明可能
+`
+  },
+  '中1': {
+    vocabulary_level: 'advanced',
+    sentence_structure: 'complex',
+    examples: [
+      '中学1年生レベルの語彙',
+      '論理的な説明',
+      '抽象的概念の理解'
+    ],
+    instructions: `
+- 中学1年生レベルの言葉遣い: 専門用語も適切に使用、論理的な説明
+- 複雑な文章も使用可能（1文50文字程度）
+- 丁寧語を基本とする
+- 抽象的な概念も扱える
+- 理由や根拠を明確に示す
+`
+  },
+  '中2': {
+    vocabulary_level: 'advanced',
+    sentence_structure: 'complex',
+    examples: [
+      '中学2年生レベルの語彙',
+      '高度な論理展開',
+      '複数の視点からの説明'
+    ],
+    instructions: `
+- 中学2年生レベルの言葉遣い: 高度な専門用語、複雑な論理展開
+- 長い文章も適切に使用（1文50〜60文字程度）
+- 丁寧語を基本とする
+- 複数の視点や考え方を提示
+- 批判的思考を促す
+`
+  },
+  '中3': {
+    vocabulary_level: 'advanced',
+    sentence_structure: 'complex',
+    examples: [
+      '中学3年生レベルの語彙',
+      '高校準備レベルの内容',
+      '論理的・批判的思考'
+    ],
+    instructions: `
+- 中学3年生レベルの言葉遣い: 高度な語彙、高校準備レベルの内容
+- 複雑な文章構成（1文60文字程度まで）
+- 丁寧語を基本とする
+- 高校内容も適宜先取り
+- 論理的・批判的思考を重視
+- 受験対策も意識
+`
+  },
+  'default': {
+    vocabulary_level: 'standard',
+    sentence_structure: 'moderate',
+    examples: [],
+    instructions: `
+- 小中学生全般向けの言葉遣い: わかりやすい言葉、適度な漢字
+- 適度な長さの文（1文20〜30文字程度）
+- 丁寧語と親しみやすい語尾を使い分け
+`
+  }
 }
 
 // 全教科対応: 学習指導要領ベースの知識ベース
@@ -235,11 +389,15 @@ ${subject.teaching_tips.map(t => `- ${t}`).join('\n')}
 `
   }
   
+  // 学年別の言葉遣いガイドを取得
+  const gradeGuide = GRADE_LANGUAGE_GUIDE[context.grade || 'default'] || GRADE_LANGUAGE_GUIDE['default']
+  
   // コンテキストに基づいたシステムプロンプトを構築
   const systemPrompt = `${context.personality.system_prompt}
 
 【生徒の情報】
 - 生徒ID: ${context.student_id}
+${context.grade ? `- 学年: ${context.grade}` : ''}
 ${context.student_progress ? `- 最近の学習状況: ${JSON.stringify(context.student_progress)}` : ''}
 
 【会話の履歴】
@@ -248,7 +406,7 @@ ${subjectContext}
 
 【重要な指示】
 - あなたは小学生向けの学習支援AIアシスタントです
-- 生徒の年齢や学年に合わせた言葉遣いで話してください（小学3〜6年生レベル）
+${gradeGuide.instructions}
 - ${context.personality.emoji_usage ? '絵文字を適度に使って親しみやすく（😊📚✨など）' : '絵文字は使わずに丁寧に'}
 - トーン: ${context.personality.tone}
 - 質問には段階的に答え、理解を確認しながら進めてください
@@ -256,7 +414,8 @@ ${subjectContext}
 - 励ましの言葉を忘れずに（「よくできたね！」「いい質問だね！」など）
 - 学習のモチベーションを高めることを意識してください
 - 難しい用語は避け、具体例や身近な例えを使って説明
-- 回答は200文字以内で簡潔に（長すぎると読みづらい）`
+- 回答は200文字以内で簡潔に（長すぎると読みづらい）
+- 音声読み上げを考慮し、句読点を適切に配置してください`
 
   // Gemini APIリクエスト
   const response = await fetch(
