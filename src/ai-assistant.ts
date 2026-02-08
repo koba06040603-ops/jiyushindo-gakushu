@@ -1,4 +1,4 @@
-// AI学習アシスタント（チャットボット）モジュール
+// AI学習アシスタント（チャットボット）モジュール - 全教科対応版
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -19,12 +19,221 @@ interface ConversationContext {
   student_progress?: any
 }
 
-// Gemini APIを使ってチャット応答を生成
+// 全教科対応: 学習指導要領ベースの知識ベース
+const SUBJECT_KNOWLEDGE_BASE = {
+  math: {
+    name: '算数・数学',
+    key_concepts: [
+      '数と計算: 四則演算、分数、小数、百分率',
+      '図形: 面積、体積、角度、合同、相似',
+      '測定: 長さ、重さ、時間、単位換算',
+      '変化と関係: 比例、反比例、グラフ',
+      'データの活用: 平均、割合、表とグラフ'
+    ],
+    teaching_tips: [
+      '具体物や図を使って視覚的に理解させる',
+      '段階的に難易度を上げる（スモールステップ）',
+      '日常生活との関連を示す',
+      '間違いを恐れずチャレンジさせる',
+      '計算ミスのパターンを分析する'
+    ]
+  },
+  japanese: {
+    name: '国語',
+    key_concepts: [
+      '読解: 主語・述語、指示語、接続語、段落構成',
+      '文法: 品詞、敬語、文の構造',
+      '語彙: 漢字、ことわざ、慣用句、四字熟語',
+      '作文: 構成、表現技法、推敲',
+      '読書: 物語文、説明文、詩、短歌、俳句'
+    ],
+    teaching_tips: [
+      '音読で文章の流れを掴む',
+      'キーワードに線を引きながら読む',
+      '5W1Hで内容を整理する',
+      '語彙力を増やすため辞書を活用',
+      '日記や感想文で表現力を鍛える'
+    ]
+  },
+  science: {
+    name: '理科',
+    key_concepts: [
+      '物理: 力、運動、エネルギー、電気、磁石',
+      '化学: 物質の性質、水溶液、燃焼、酸性・アルカリ性',
+      '生物: 植物、動物、人体、生命の連続性',
+      '地学: 天気、地層、天体、季節の変化',
+      '実験・観察: 仮説、観察、記録、考察'
+    ],
+    teaching_tips: [
+      '実験や観察を通じて体験的に学ぶ',
+      '身近な現象と結びつける',
+      '予想→実験→結果→考察の流れを大切に',
+      '図や表で整理する習慣をつける',
+      '疑問を持つ姿勢を育てる'
+    ]
+  },
+  social_studies: {
+    name: '社会',
+    key_concepts: [
+      '地理: 地図の見方、日本の地形・気候、世界の国々',
+      '歴史: 古代から現代までの日本の歴史、重要人物',
+      '公民: 政治のしくみ、憲法、国際社会',
+      '産業: 農業、工業、商業、情報産業',
+      '資料活用: 地図、グラフ、年表の読み取り'
+    ],
+    teaching_tips: [
+      '地図や年表を活用して視覚的に理解',
+      '歴史の流れを物語として捉える',
+      '現代社会との関連を意識する',
+      '資料から情報を読み取る訓練',
+      'ニュースと関連づけて考える'
+    ]
+  },
+  english: {
+    name: '英語',
+    key_concepts: [
+      '語彙: 基本単語、熟語、慣用表現',
+      '文法: 文型、時制、助動詞、前置詞',
+      '会話: 挨拶、自己紹介、日常会話',
+      '読解: 短文、物語、説明文',
+      '作文: 英作文、メール、手紙'
+    ],
+    teaching_tips: [
+      '音読とリスニングで英語のリズムを体得',
+      '簡単な文から少しずつ長い文へ',
+      '間違いを恐れず話す・書く練習',
+      '日本語に訳さず英語のまま理解',
+      '実際のコミュニケーションを意識'
+    ]
+  },
+  home_economics: {
+    name: '家庭科',
+    key_concepts: [
+      '衣生活: 衣服の手入れ、裁縫、素材の特徴',
+      '食生活: 栄養、調理、食事マナー、食の安全',
+      '住生活: 住まいの役割、掃除、整理整頓',
+      '家族: 家族の役割、コミュニケーション',
+      '消費生活: お金の使い方、買い物の工夫'
+    ],
+    teaching_tips: [
+      '実習を通じて実践的に学ぶ',
+      '家庭での実践を促す',
+      '安全と衛生に配慮する習慣',
+      '家族との協力を意識',
+      '持続可能な生活を考える'
+    ]
+  },
+  music: {
+    name: '音楽',
+    key_concepts: [
+      '歌唱: 発声、リズム、音程、表現',
+      '器楽: リコーダー、鍵盤楽器、打楽器',
+      '鑑賞: クラシック、日本の伝統音楽、世界の音楽',
+      '音楽の要素: 旋律、リズム、和音、形式',
+      '創作: 簡単な作曲、リズム創作'
+    ],
+    teaching_tips: [
+      '楽しく音楽に親しむことを第一に',
+      '表現する喜びを感じさせる',
+      '聴く力を育てる',
+      '様々なジャンルの音楽に触れる',
+      '仲間と協力して演奏する経験'
+    ]
+  },
+  art: {
+    name: '図画工作・美術',
+    key_concepts: [
+      '絵画: デッサン、着彩、構図、色彩',
+      '工作: 立体造形、素材の加工、工具の使い方',
+      'デザイン: レイアウト、ポスター、パッケージ',
+      '鑑賞: 作品の見方、美術史、作家の意図',
+      '表現: 想像力、創造力、表現の工夫'
+    ],
+    teaching_tips: [
+      '自由な発想を大切にする',
+      '失敗を恐れず試行錯誤させる',
+      '作品を通じて自己表現する喜び',
+      '他者の作品を尊重する態度',
+      '様々な素材や技法に挑戦'
+    ]
+  },
+  physical_education: {
+    name: '体育',
+    key_concepts: [
+      '体つくり運動: 体ほぐし、体力向上',
+      '器械運動: マット、跳び箱、鉄棒',
+      '陸上運動: 走る、跳ぶ、投げる',
+      '球技: ボール運動、ゲーム',
+      '表現運動: ダンス、リズム遊び'
+    ],
+    teaching_tips: [
+      '安全に配慮した指導',
+      '個人の能力に応じた目標設定',
+      '仲間と協力する態度',
+      '運動の楽しさを体感',
+      '健康的な生活習慣の形成'
+    ]
+  },
+  programming: {
+    name: 'プログラミング',
+    key_concepts: [
+      '順次処理: 命令を順番に実行',
+      '反復処理: 繰り返しの考え方',
+      '条件分岐: 条件によって処理を変える',
+      '変数: データの保存と利用',
+      '論理的思考: 問題を分解して解決'
+    ],
+    teaching_tips: [
+      '身近な問題をプログラミングで解決',
+      '試行錯誤を繰り返しながら学ぶ',
+      'ビジュアルプログラミングから始める',
+      '創造的な作品づくり',
+      'アルゴリズムの考え方を育てる'
+    ]
+  }
+}
+
+// 教科を自動検出
+function detectSubject(message: string): string | null {
+  const lowerMessage = message.toLowerCase()
+  
+  if (lowerMessage.match(/算数|数学|計算|面積|体積|図形|分数|小数|掛け算|割り算|足し算|引き算/)) return 'math'
+  if (lowerMessage.match(/国語|読解|漢字|文法|作文|読書|物語|説明文/)) return 'japanese'
+  if (lowerMessage.match(/理科|実験|観察|化学|物理|生物|地学|植物|動物|天気/)) return 'science'
+  if (lowerMessage.match(/社会|歴史|地理|公民|地図|年表/)) return 'social_studies'
+  if (lowerMessage.match(/英語|english|英会話|単語|文法/)) return 'english'
+  if (lowerMessage.match(/家庭科|料理|裁縫|栄養/)) return 'home_economics'
+  if (lowerMessage.match(/音楽|楽器|歌|リコーダー/)) return 'music'
+  if (lowerMessage.match(/図工|美術|絵|工作|デザイン/)) return 'art'
+  if (lowerMessage.match(/体育|運動|スポーツ|体操/)) return 'physical_education'
+  if (lowerMessage.match(/プログラミング|コード|scratch|スクラッチ/i)) return 'programming'
+  
+  return null
+}
+
+// Gemini APIを使ってチャット応答を生成（全教科対応版）
 export async function generateChatResponse(
   context: ConversationContext,
   userMessage: string,
   apiKey: string
 ): Promise<{ content: string; message_type: string }> {
+  
+  // 教科を検出
+  const detectedSubject = detectSubject(userMessage)
+  let subjectContext = ''
+  
+  if (detectedSubject && SUBJECT_KNOWLEDGE_BASE[detectedSubject]) {
+    const subject = SUBJECT_KNOWLEDGE_BASE[detectedSubject]
+    subjectContext = `
+
+【${subject.name}に関する指導のポイント】
+重要概念:
+${subject.key_concepts.map(c => `- ${c}`).join('\n')}
+
+指導のコツ:
+${subject.teaching_tips.map(t => `- ${t}`).join('\n')}
+`
+  }
   
   // コンテキストに基づいたシステムプロンプトを構築
   const systemPrompt = `${context.personality.system_prompt}
@@ -34,15 +243,20 @@ export async function generateChatResponse(
 ${context.student_progress ? `- 最近の学習状況: ${JSON.stringify(context.student_progress)}` : ''}
 
 【会話の履歴】
-${context.recent_messages.map(m => `${m.role}: ${m.content}`).join('\n')}
+${context.recent_messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n')}
+${subjectContext}
 
 【重要な指示】
-- 生徒の年齢や学年に合わせた言葉遣いで話してください
-- ${context.personality.emoji_usage ? '絵文字を適度に使って親しみやすく' : '絵文字は使わずに丁寧に'}
+- あなたは小学生向けの学習支援AIアシスタントです
+- 生徒の年齢や学年に合わせた言葉遣いで話してください（小学3〜6年生レベル）
+- ${context.personality.emoji_usage ? '絵文字を適度に使って親しみやすく（😊📚✨など）' : '絵文字は使わずに丁寧に'}
 - トーン: ${context.personality.tone}
 - 質問には段階的に答え、理解を確認しながら進めてください
-- 励ましの言葉を忘れずに
-- 学習のモチベーションを高めることを意識してください`
+- まず生徒が自分で考えられるようにヒントを出し、それでもわからなければ詳しく説明
+- 励ましの言葉を忘れずに（「よくできたね！」「いい質問だね！」など）
+- 学習のモチベーションを高めることを意識してください
+- 難しい用語は避け、具体例や身近な例えを使って説明
+- 回答は200文字以内で簡潔に（長すぎると読みづらい）`
 
   // Gemini APIリクエスト
   const response = await fetch(
@@ -57,15 +271,33 @@ ${context.recent_messages.map(m => `${m.role}: ${m.content}`).join('\n')}
         contents: [
           {
             role: 'user',
-            parts: [{ text: `${systemPrompt}\n\n生徒: ${userMessage}` }]
+            parts: [{ text: `${systemPrompt}\n\n生徒の質問: ${userMessage}` }]
           }
         ],
         generationConfig: {
           temperature: 0.8,
           topP: 0.95,
           topK: 40,
-          maxOutputTokens: 1024
-        }
+          maxOutputTokens: 512
+        },
+        safetySettings: [
+          {
+            category: 'HARM_CATEGORY_HARASSMENT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            category: 'HARM_CATEGORY_HATE_SPEECH',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+          },
+          {
+            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE'
+          }
+        ]
       })
     }
   )
@@ -75,16 +307,18 @@ ${context.recent_messages.map(m => `${m.role}: ${m.content}`).join('\n')}
   }
 
   const data = await response.json()
-  const content = data.candidates[0]?.content?.parts[0]?.text || 'すみません、もう一度質問していただけますか？'
+  const content = data.candidates[0]?.content?.parts[0]?.text || 'すみません、もう一度質問していただけますか？ 😊'
 
   // メッセージタイプを判定
   let message_type = 'text'
-  if (userMessage.includes('わからない') || userMessage.includes('教えて')) {
+  if (userMessage.includes('わからない') || userMessage.includes('教えて') || userMessage.includes('どうやって') || userMessage.includes('なぜ')) {
     message_type = 'problem_help'
-  } else if (userMessage.includes('やる気') || userMessage.includes('頑張') || userMessage.includes('モチベ')) {
+  } else if (userMessage.includes('やる気') || userMessage.includes('頑張') || userMessage.includes('モチベ') || userMessage.includes('疲れ')) {
     message_type = 'motivation'
-  } else if (userMessage.includes('どうすれば') || userMessage.includes('方法')) {
+  } else if (userMessage.includes('どうすれば') || userMessage.includes('方法') || userMessage.includes('コツ')) {
     message_type = 'advice'
+  } else if (detectedSubject) {
+    message_type = `subject_${detectedSubject}`
   }
 
   return { content, message_type }

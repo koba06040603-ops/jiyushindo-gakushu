@@ -1804,6 +1804,332 @@ app.get('/api/comments/statistics', authMiddleware, requireRole('teacher', 'admi
   }
 })
 
+// =============================================================================
+// Phase 23: AIチャットボット（24時間質問対応） - 全教科対応
+// =============================================================================
+
+// 新規会話開始
+app.post('/api/chat/conversations', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const body = await c.req.json();
+
+  try {
+    const { subject, grade } = body;
+
+    const result = await env.DB.prepare(`
+      INSERT INTO chat_conversations (school_id, student_id, subject, grade)
+      VALUES (?, ?, ?, ?)
+    `).bind(user.school_id, user.user_id, subject || null, grade || null).run();
+
+    return c.json({
+      success: true,
+      conversation_id: result.meta.last_row_id
+    });
+  } catch (error: any) {
+    console.error('会話作成エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 会話一覧取得
+app.get('/api/chat/conversations', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const limit = parseInt(c.req.query('limit') || '20');
+
+  try {
+    const conversations = await env.DB.prepare(`
+      SELECT * FROM chat_conversations
+      WHERE student_id = ?
+      ORDER BY last_message_at DESC
+      LIMIT ?
+    `).bind(user.user_id, limit).all();
+
+    return c.json({
+      success: true,
+      data: conversations.results
+    });
+  } catch (error: any) {
+    console.error('会話一覧取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// メッセージ送信
+app.post('/api/chat/messages', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const body = await c.req.json();
+
+  try {
+    const { conversation_id, message_text, subject } = body;
+
+    // 生徒のメッセージを保存
+    const studentMsg = await env.DB.prepare(`
+      INSERT INTO chat_messages (
+        conversation_id, sender_type, message_text, subject
+      ) VALUES (?, 'student', ?, ?)
+    `).bind(conversation_id, message_text, subject || null).run();
+
+    // 会話履歴を取得（最新10件）
+    const history = await env.DB.prepare(`
+      SELECT sender_type, message_text
+      FROM chat_messages
+      WHERE conversation_id = ?
+      ORDER BY created_at DESC
+      LIMIT 10
+    `).bind(conversation_id).all();
+
+    // 会話情報を取得
+    const conversation = await env.DB.prepare(`
+      SELECT subject, grade FROM chat_conversations WHERE conversation_id = ?
+    `).bind(conversation_id).first();
+
+    // Gemini APIでAI応答を生成
+    const startTime = Date.now();
+    const aiResponse = await generateAIResponse(
+      env.GEMINI_API_KEY,
+      message_text,
+      history.results.reverse(),
+      conversation?.subject as string || null,
+      conversation?.grade as string || null
+    );
+    const responseTime = Date.now() - startTime;
+
+    // AI応答を保存
+    await env.DB.prepare(`
+      INSERT INTO chat_messages (
+        conversation_id, sender_type, message_text, subject, 
+        ai_model, response_time_ms
+      ) VALUES (?, 'ai', ?, ?, 'gemini-3-flash', ?)
+    `).bind(conversation_id, aiResponse, subject || null, responseTime).run();
+
+    return c.json({
+      success: true,
+      ai_response: aiResponse,
+      response_time_ms: responseTime
+    });
+  } catch (error: any) {
+    console.error('メッセージ送信エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 会話のメッセージ履歴取得
+app.get('/api/chat/conversations/:id/messages', authMiddleware, async (c) => {
+  const { env } = c;
+  const conversationId = parseInt(c.req.param('id'));
+  const limit = parseInt(c.req.query('limit') || '50');
+
+  try {
+    const messages = await env.DB.prepare(`
+      SELECT * FROM chat_messages
+      WHERE conversation_id = ?
+      ORDER BY created_at
+      LIMIT ?
+    `).bind(conversationId, limit).all();
+
+    return c.json({
+      success: true,
+      data: messages.results
+    });
+  } catch (error: any) {
+    console.error('メッセージ履歴取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// クイック返信取得
+app.get('/api/chat/quick-replies', authMiddleware, async (c) => {
+  const { env } = c;
+  const subject = c.req.query('subject') || '総合';
+  const grade = c.req.query('grade');
+
+  try {
+    let query = `
+      SELECT * FROM chat_quick_replies
+      WHERE subject = ? AND is_active = 1
+    `;
+    const params: any[] = [subject];
+
+    if (grade) {
+      query += ' AND (grade = ? OR grade IS NULL)';
+      params.push(grade);
+    }
+
+    query += ' ORDER BY display_order, usage_count DESC';
+
+    const replies = await env.DB.prepare(query).bind(...params).all();
+
+    return c.json({
+      success: true,
+      data: replies.results
+    });
+  } catch (error: any) {
+    console.error('クイック返信取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// メッセージフィードバック
+app.post('/api/chat/messages/:id/feedback', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const messageId = parseInt(c.req.param('id'));
+  const body = await c.req.json();
+
+  try {
+    const { is_helpful, rating, feedback_type, feedback_text } = body;
+
+    // メッセージの is_helpful を更新
+    if (is_helpful !== undefined) {
+      await env.DB.prepare(`
+        UPDATE chat_messages
+        SET is_helpful = ?
+        WHERE message_id = ?
+      `).bind(is_helpful ? 1 : -1, messageId).run();
+    }
+
+    // フィードバックを保存
+    if (rating || feedback_type) {
+      await env.DB.prepare(`
+        INSERT INTO chat_feedback (
+          message_id, student_id, rating, feedback_type, feedback_text
+        ) VALUES (?, ?, ?, ?, ?)
+      `).bind(
+        messageId,
+        user.user_id,
+        rating || null,
+        feedback_type || null,
+        feedback_text || null
+      ).run();
+    }
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error('フィードバック保存エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// チャット統計取得
+app.get('/api/chat/statistics', authMiddleware, async (c) => {
+  const { env } = c;
+  const user = c.get('user');
+  const days = parseInt(c.req.query('days') || '30');
+
+  try {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const stats = await env.DB.prepare(`
+      SELECT * FROM chat_statistics
+      WHERE student_id = ? AND stat_date >= ?
+      ORDER BY stat_date DESC
+    `).bind(user.user_id, startDate.toISOString().split('T')[0]).all();
+
+    // 集計
+    const summary = {
+      total_conversations: stats.results.reduce((sum: number, s: any) => sum + (s.total_conversations || 0), 0),
+      total_messages: stats.results.reduce((sum: number, s: any) => sum + (s.total_messages || 0), 0),
+      avg_helpful_rate: stats.results.length > 0
+        ? stats.results.reduce((sum: number, s: any) => sum + (s.helpful_rate || 0), 0) / stats.results.length
+        : 0,
+      daily_stats: stats.results
+    };
+
+    return c.json({
+      success: true,
+      data: summary
+    });
+  } catch (error: any) {
+    console.error('統計取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// AI応答生成関数
+async function generateAIResponse(
+  apiKey: string,
+  userMessage: string,
+  conversationHistory: any[],
+  subject: string | null,
+  grade: string | null
+): Promise<string> {
+  // システムプロンプト
+  const systemPrompt = `あなたは小学生向けの優しい学習アシスタントAIです。
+
+【あなたの役割】
+- 小学生の質問に、わかりやすく丁寧に答える
+- 全教科（算数、国語、理科、社会、英語）に対応する
+- 答えを直接教えるのではなく、考え方やヒントを提供する
+- 励ましの言葉を忘れずに入れる
+
+【回答ルール】
+1. 小学${grade || '3-4年'}生にわかる言葉を使う
+2. 1回の回答は200文字以内に収める
+3. 難しい言葉には（ ）で説明を加える
+4. 絵文字を適度に使って親しみやすくする 😊
+5. 「〜だよ」「〜してみようね」など優しい口調で話す
+
+【現在の教科】: ${subject || '不明'}
+【学年】: ${grade || '不明'}
+
+生徒の質問に、優しく丁寧に答えてください。`;
+
+  // 会話履歴をフォーマット
+  const historyText = conversationHistory
+    .map((msg: any) => `${msg.sender_type === 'student' ? '生徒' : 'AI'}: ${msg.message_text}`)
+    .join('\n');
+
+  const prompt = `${systemPrompt}
+
+【これまでの会話】
+${historyText}
+
+【新しい質問】
+生徒: ${userMessage}
+
+AI:`;
+
+  // Gemini API呼び出し
+  const response = await callGeminiAPI({
+    model: 'gemini-1.5-flash',
+    prompt: prompt,
+    apiKey: apiKey,
+    maxOutputTokens: 500,
+    temperature: 0.7
+  });
+
+  if (response.success && response.content) {
+    return response.content;
+  } else {
+    throw new Error(response.error || 'AI応答生成に失敗しました');
+  }
+}
+
 // 保護者通知履歴取得
 app.get('/api/parent/notifications/:studentId', async (c) => {
   const { env } = c;
