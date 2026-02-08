@@ -91,7 +91,7 @@
 - グローバルスタンダードの教育
 
 ### 強み3: 最新AI技術の活用
-- Google Gemini 2.0 Flash 搭載
+- Google Gemini 3 Flash 搭載
 - Cloudflare Workers による高速配信
 - 応答時間 1秒以内を保証
 
@@ -326,7 +326,7 @@
 - **Cloudflare Durable Objects** でリアルタイム通信
 
 ### AI エンジン
-- **Google Gemini 2.0 Flash** 搭載
+- **Google Gemini 3 Flash** 搭載
 - 最新の大規模言語モデル(LLM)による高度な対話
 - 自然な日本語でのソクラテス対話
 
@@ -385,7 +385,7 @@
 |:---|:---|:---|
 | **エビデンス** | 一部のみ | **12理論すべてA+評価**<br>**平均効果量 d=0.83** |
 | **国際標準** | 未対応 | **OECD/UNESCO完全準拠** |
-| **AI対話** | なし | **Google Gemini 2.0 Flash搭載** |
+| **AI対話** | なし | **Google Gemini 3 Flash搭載** |
 | **応答速度** | 3-5秒 | **1秒以内保証** |
 | **個別最適化** | 限定的 | **12理論による完全個別化** |
 | **費用** | 月額1,000円/児童 | **完全無償**（松川村実証実験） |
@@ -453,7 +453,7 @@
    OECD/UNESCO完全準拠、グローバルスタンダード
 
 4. **最新AI技術**  
-   Google Gemini 2.0 Flash、Cloudflare Workers
+   Google Gemini 3 Flash、Cloudflare Workers
 
 5. **最高水準のセキュリティ**  
    AES-256暗号化、GDPR準拠
@@ -537,7 +537,7 @@
 - タイトル: 本システムの3つの強み
 - 強み1: 世界トップ水準のエビデンス（12理論A+評価、平均効果量d=0.83、教育介入平均の約2倍）
 - 強み2: 国際標準への完全整合（OECD/UNESCO完全準拠）
-- 強み3: 最新AI技術（Google Gemini 2.0 Flash、応答1秒以内）
+- 強み3: 最新AI技術（Google Gemini 3 Flash、応答1秒以内）
 - ビジュアル: ロゴ、アイコン
 
 ### スライド5: 12理論エビデンス一覧（前半 F1-F4）
@@ -608,7 +608,7 @@
 - タイトル: 最新技術による高速・安定システム
 - フロントエンド: HTML5+TailwindCSS、応答1秒以内
 - バックエンド: Cloudflare Workers（世界300都市+）、D1 Database、Durable Objects
-- AI: Google Gemini 2.0 Flash
+- AI: Google Gemini 3 Flash
 - 性能: 稼働率99.99%、API応答100-200ms、キャッシュヒット率60-80%
 - ビジュアル: システム構成図、世界地図、技術ロゴ
 
@@ -625,7 +625,7 @@
 - 表: 項目、既存システム、本システム
   - エビデンス: 一部のみ vs 12理論A+評価・d=0.83
   - 国際標準: 未対応 vs OECD/UNESCO完全準拠
-  - AI対話: なし vs Google Gemini 2.0 Flash
+  - AI対話: なし vs Google Gemini 3 Flash
   - 応答速度: 3-5秒 vs 1秒以内
   - 個別最適化: 限定的 vs 12理論による完全個別化
   - 費用: 月額1,000円 vs 完全無償
@@ -648,7 +648,7 @@
   1. 世界トップ水準のエビデンス（12理論A+、d=0.83）
   2. 超高効果量研究の統合（d=1.44, 0.92, 0.85）
   3. 国際標準完全整合（OECD/UNESCO）
-  4. 最新AI技術（Gemini 2.0 Flash、Cloudflare）
+  4. 最新AI技術（Gemini 3 Flash、Cloudflare）
   5. 最高水準セキュリティ（AES-256、GDPR）
 - 松川村特別条件: 完全無償、職員配属、実証実験
 - 第2部へ: 実際の画面と使い方をご紹介

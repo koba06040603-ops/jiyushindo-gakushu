@@ -493,7 +493,7 @@
    自己評価(d=1.44)、領域固有知識(d=0.92)、実例学習(d=0.85)
 
 3. **最新AI技術**  
-   Google Gemini 2.0 Flash、Cloudflare Workers
+   Google Gemini 3 Flash、Cloudflare Workers
 
 4. **直感的なUI/UX**  
    1秒以内応答、ワンクリック学習開始
