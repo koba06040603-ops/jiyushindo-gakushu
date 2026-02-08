@@ -1144,6 +1144,278 @@ app.get('/api/teacher/:teacherId/class/:classCode/analysis', async (c) => {
   }
 })
 
+// =============================================================================
+// Phase 22: クラス全体の学習進捗比較ビュー
+// =============================================================================
+
+// クラス全体の進捗サマリー取得
+app.get('/api/class/:classId/progress-summary', async (c) => {
+  const { env } = c;
+  const classId = parseInt(c.req.param('classId'));
+
+  try {
+    const summary = await generateClassSummary(env.DB, classId, 0);
+    return c.json({
+      success: true,
+      data: summary
+    });
+  } catch (error: any) {
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// クラスの生徒別進捗ヒートマップデータ取得
+app.get('/api/class/:classId/heatmap', async (c) => {
+  const { env } = c;
+  const classId = parseInt(c.req.param('classId'));
+  const subject = c.req.query('subject') || 'all';
+
+  try {
+    // クラスの生徒一覧を取得
+    const students = await env.DB.prepare(`
+      SELECT id, name FROM students WHERE class_id = ? ORDER BY name
+    `).bind(classId).all();
+
+    // 単元一覧を取得
+    let unitQuery = `
+      SELECT DISTINCT c.id, c.unit_name
+      FROM curriculum c
+      JOIN learning_cards lc ON c.id = lc.curriculum_id
+      WHERE 1=1
+    `;
+    const unitParams: any[] = [];
+    
+    if (subject !== 'all') {
+      unitQuery += ' AND c.subject = ?';
+      unitParams.push(subject);
+    }
+    
+    unitQuery += ' ORDER BY c.unit_order LIMIT 5';
+    
+    const units = await env.DB.prepare(unitQuery).bind(...unitParams).all();
+
+    // 各生徒×単元の習熟度を取得
+    const heatmapData = [];
+    for (const student of students.results) {
+      const studentData: any = {
+        student_id: student.id,
+        student_name: student.name,
+        units: [],
+        overall: 0
+      };
+
+      let totalScore = 0;
+      let unitCount = 0;
+
+      for (const unit of units.results) {
+        // 単元ごとの正答率を計算
+        const stats = await env.DB.prepare(`
+          SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+          FROM answer_history
+          WHERE student_id = ? AND curriculum_id = ?
+        `).bind(student.id, unit.id).first();
+
+        const accuracy = stats && stats.total > 0 
+          ? Math.round((stats.correct / stats.total) * 100)
+          : 0;
+
+        studentData.units.push({
+          unit_id: unit.id,
+          unit_name: unit.unit_name,
+          accuracy
+        });
+
+        totalScore += accuracy;
+        unitCount++;
+      }
+
+      studentData.overall = unitCount > 0 ? Math.round(totalScore / unitCount) : 0;
+
+      // ステータス判定
+      if (studentData.overall >= 80) {
+        studentData.status = 'ahead';
+      } else if (studentData.overall >= 60) {
+        studentData.status = 'on-track';
+      } else {
+        studentData.status = 'behind';
+      }
+
+      // 最終学習日時を取得
+      const lastActivity = await env.DB.prepare(`
+        SELECT MAX(created_at) as last_activity
+        FROM answer_history
+        WHERE student_id = ?
+      `).bind(student.id).first();
+
+      studentData.last_activity = lastActivity?.last_activity || null;
+
+      heatmapData.push(studentData);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        students: heatmapData,
+        units: units.results
+      }
+    });
+  } catch (error: any) {
+    console.error('ヒートマップデータ取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 習熟度分布データ取得
+app.get('/api/class/:classId/distribution', async (c) => {
+  const { env } = c;
+  const classId = parseInt(c.req.param('classId'));
+
+  try {
+    const students = await env.DB.prepare(`
+      SELECT id FROM students WHERE class_id = ?
+    `).bind(classId).all();
+
+    const studentIds = students.results.map((s: any) => s.id);
+
+    // 正答率分布
+    const accuracyDistribution = {
+      '0-40': 0,
+      '41-60': 0,
+      '61-70': 0,
+      '71-80': 0,
+      '81-90': 0,
+      '91-100': 0
+    };
+
+    // 進捗状況分布
+    const progressDistribution = {
+      ahead: 0,
+      'on-track': 0,
+      behind: 0
+    };
+
+    for (const studentId of studentIds) {
+      const stats = await env.DB.prepare(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+        FROM answer_history
+        WHERE student_id = ?
+      `).bind(studentId).first();
+
+      const accuracy = stats && stats.total > 0 
+        ? Math.round((stats.correct / stats.total) * 100)
+        : 0;
+
+      // 正答率分布にカウント
+      if (accuracy <= 40) accuracyDistribution['0-40']++;
+      else if (accuracy <= 60) accuracyDistribution['41-60']++;
+      else if (accuracy <= 70) accuracyDistribution['61-70']++;
+      else if (accuracy <= 80) accuracyDistribution['71-80']++;
+      else if (accuracy <= 90) accuracyDistribution['81-90']++;
+      else accuracyDistribution['91-100']++;
+
+      // 進捗状況分布にカウント
+      if (accuracy >= 80) progressDistribution.ahead++;
+      else if (accuracy >= 60) progressDistribution['on-track']++;
+      else progressDistribution.behind++;
+    }
+
+    // 単元別平均正答率
+    const unitStats = await env.DB.prepare(`
+      SELECT 
+        c.unit_name,
+        AVG(CASE WHEN ah.is_correct = 1 THEN 100.0 ELSE 0.0 END) as avg_accuracy
+      FROM curriculum c
+      JOIN answer_history ah ON c.id = ah.curriculum_id
+      WHERE ah.student_id IN (${studentIds.map(() => '?').join(',')})
+      GROUP BY c.id, c.unit_name
+      ORDER BY c.unit_order
+      LIMIT 5
+    `).bind(...studentIds).all();
+
+    return c.json({
+      success: true,
+      data: {
+        accuracyDistribution,
+        progressDistribution,
+        unitStats: unitStats.results
+      }
+    });
+  } catch (error: any) {
+    console.error('分布データ取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
+// 要サポート生徒リスト取得
+app.get('/api/class/:classId/needs-attention', async (c) => {
+  const { env } = c;
+  const classId = parseInt(c.req.param('classId'));
+
+  try {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const needsAttention = await env.DB.prepare(`
+      SELECT 
+        s.id,
+        s.name,
+        COUNT(ah.id) as problem_count,
+        AVG(CASE WHEN ah.is_correct = 1 THEN 100.0 ELSE 0.0 END) as accuracy,
+        MAX(ah.created_at) as last_activity
+      FROM students s
+      LEFT JOIN answer_history ah ON s.id = ah.student_id AND ah.created_at >= ?
+      WHERE s.class_id = ?
+      GROUP BY s.id, s.name
+      HAVING problem_count < 5 OR accuracy < 60 OR last_activity IS NULL
+      ORDER BY accuracy ASC
+    `).bind(oneWeekAgo.toISOString(), classId).all();
+
+    // 推奨アクションを追加
+    const studentsWithActions = needsAttention.results.map((student: any) => {
+      const actions = [];
+      
+      if (!student.last_activity) {
+        actions.push('学習活動が確認できません。保護者への連絡を推奨');
+      }
+      if (student.accuracy < 50) {
+        actions.push('基礎単元の復習から始めることを推奨');
+      }
+      if (student.problem_count < 5) {
+        actions.push('学習習慣の確立をサポート');
+      }
+      
+      return {
+        ...student,
+        recommended_actions: actions
+      };
+    });
+
+    return c.json({
+      success: true,
+      data: studentsWithActions
+    });
+  } catch (error: any) {
+    console.error('要サポート生徒取得エラー:', error);
+    return c.json({
+      success: false,
+      error: error.message
+    }, 500);
+  }
+})
+
 // 保護者通知送信
 app.post('/api/parent/notify', async (c) => {
   const { env } = c;
