@@ -5110,7 +5110,8 @@ function showAITeacher() {
   // 初回メッセージ
   const aiChat = document.getElementById('aiChat')
   if (aiChat.children.length === 0) {
-    const card = window.currentCardData
+    const cardData = window.currentCardData
+    const card = cardData?.card || cardData // 構造に対応
     const cardTitle = card?.card_title || '学習カード'
     const problemDesc = card?.problem_description || ''
     
@@ -5228,7 +5229,8 @@ async function askAI() {
     }
     
     // カード情報を取得
-    const card = window.currentCardData
+    const cardData = window.currentCardData
+    const card = cardData?.card || cardData // 構造に対応
     const cardContext = card ? {
       card_title: card.card_title,
       problem_description: card.problem_description,

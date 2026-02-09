@@ -7916,13 +7916,15 @@ ${customInfo}
     "unit_name": "${unitName}",
     "total_hours": 8,
     "unit_goal": "学習目標（100文字以内。難しい漢字には直後に（ひらがな）をつける。例：国会（こっかい））",
-    "non_cognitive_goal": "非認知目標（80文字以内）"
+    "non_cognitive_goal": "非認知目標（80文字以内。漢字のみ使用、ふりがな・括弧は一切含めない）"
   }
 }
 
 注意：
 - コース（courses）は含めないでください
 - 基本情報（curriculum）のみを生成してください
+- unit_goal には漢字のふりがなを含めてください
+- non_cognitive_goal には絶対にふりがなや括弧を含めないでください
 - 簡潔なJSON出力をお願いします
 `
     
