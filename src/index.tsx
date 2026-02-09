@@ -5722,11 +5722,7 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
     // カード情報を取得
     try {
       card = await env.DB.prepare(`
-        SELECT lc.*, c.course_name, curr.grade, curr.subject, curr.unit_name
-        FROM learning_cards lc
-        JOIN courses c ON lc.course_id = c.id
-        JOIN curriculum curr ON c.curriculum_id = curr.id
-        WHERE lc.card_id = ?
+        SELECT * FROM learning_cards WHERE card_id = ?
       `).bind(cardId).first()
       
       console.log('📊 取得したカード情報:', {
@@ -5734,9 +5730,28 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
         card_id: card?.card_id,
         card_title: card?.card_title,
         has_problem_description: !!card?.problem_description,
-        grade: card?.grade,
-        subject: card?.subject
+        course_id: card?.course_id
       })
+      
+      // コース情報を別途取得
+      if (card && card.course_id) {
+        const course = await env.DB.prepare(`
+          SELECT * FROM courses WHERE id = ?
+        `).bind(card.course_id).first()
+        
+        if (course) {
+          card.course_name = course.course_name
+          card.grade = course.grade || '小学3年'
+          card.subject = course.subject || '算数'
+          card.unit_name = course.unit_name || ''
+          
+          console.log('📚 コース情報:', {
+            course_name: course.course_name,
+            grade: course.grade,
+            subject: course.subject
+          })
+        }
+      }
     } catch (dbError) {
       console.error('❌ データベースエラー:', dbError)
       return c.json({ 
