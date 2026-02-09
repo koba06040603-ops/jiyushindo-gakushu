@@ -12630,6 +12630,7 @@ function initModalDrag(headerId, contentId) {
   let initialY = 0
   let xOffset = 0
   let yOffset = 0
+  let animationFrameId = null
   
   header.addEventListener('mousedown', dragStart)
   document.addEventListener('mousemove', drag)
@@ -12656,6 +12657,7 @@ function initModalDrag(headerId, contentId) {
     
     isDragging = true
     header.style.cursor = 'grabbing'
+    content.style.transition = 'none' // ドラッグ中はtransitionを無効化
   }
   
   function drag(e) {
@@ -12674,12 +12676,23 @@ function initModalDrag(headerId, contentId) {
     xOffset = currentX
     yOffset = currentY
     
-    setTranslate(currentX, currentY, content)
+    // requestAnimationFrameで滑らかに更新
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId)
+    }
+    animationFrameId = requestAnimationFrame(() => {
+      setTranslate(currentX, currentY, content)
+    })
   }
   
   function dragEnd(e) {
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId)
+      animationFrameId = null
+    }
     isDragging = false
     header.style.cursor = 'move'
+    content.style.transition = '' // transitionを復元
   }
   
   function setTranslate(xPos, yPos, el) {
