@@ -3685,7 +3685,7 @@ app.get('/api/progress/class-peer/:classCode/:curriculumId', async (c) => {
     // クラスの全生徒と進捗状況を取得（シンプル版）
     const classPeers = await env.DB.prepare(`
       SELECT 
-        u.user_id as id,
+        u.id,
         u.username as name,
         u.student_number,
         COUNT(DISTINCT sp.learning_card_id) as completed_cards,
@@ -3693,11 +3693,11 @@ app.get('/api/progress/class-peer/:classCode/:curriculumId', async (c) => {
         MAX(sp.created_at) as last_activity,
         SUM(CASE WHEN sp.status = 'help_requested' THEN 1 ELSE 0 END) as is_asking_help
       FROM users u
-      LEFT JOIN student_progress sp ON u.user_id = sp.student_id 
+      LEFT JOIN student_progress sp ON u.id = sp.student_id 
         AND sp.curriculum_id = ? 
         AND sp.status = 'completed'
       WHERE u.class_code = ? AND u.role = 'student'
-      GROUP BY u.user_id, u.username, u.student_number
+      GROUP BY u.id, u.username, u.student_number
       ORDER BY u.student_number
     `).bind(curriculumId, classCode).all()
     
@@ -3739,23 +3739,23 @@ app.get('/api/help/available-helpers/:classCode/:curriculumId/:cardId', async (c
     // このカードをすでにクリアしている友達を検索
     const helpers = await env.DB.prepare(`
       SELECT 
-        u.user_id as id,
+        u.id,
         u.username as name,
         u.student_number,
         sp.understanding_level,
         sp.created_at as completed_at,
         COUNT(DISTINCT sp2.learning_card_id) as total_completed
       FROM users u
-      INNER JOIN student_progress sp ON u.user_id = sp.student_id
+      INNER JOIN student_progress sp ON u.id = sp.student_id
         AND sp.curriculum_id = ?
         AND sp.learning_card_id = ?
         AND sp.status = 'completed'
         AND sp.understanding_level >= 60
-      LEFT JOIN student_progress sp2 ON u.user_id = sp2.student_id
+      LEFT JOIN student_progress sp2 ON u.id = sp2.student_id
         AND sp2.curriculum_id = ?
         AND sp2.status = 'completed'
       WHERE u.class_code = ? AND u.role = 'student'
-      GROUP BY u.user_id, u.username, u.student_number, sp.understanding_level, sp.created_at
+      GROUP BY u.id, u.username, u.student_number, sp.understanding_level, sp.created_at
       HAVING total_completed >= 3
       ORDER BY sp.understanding_level DESC, sp.created_at ASC
       LIMIT 10
