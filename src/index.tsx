@@ -3715,7 +3715,16 @@ app.get('/api/progress/class-peer/:classCode/:curriculumId', async (c) => {
     return c.json({ success: true, peers: simplifiedPeers })
   } catch (error) {
     console.error('クラス進捗取得エラー:', error)
-    return c.json({ success: false, error: 'データ取得に失敗しました' }, 500)
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      classCode,
+      curriculumId
+    })
+    return c.json({ 
+      success: false, 
+      error: 'データ取得に失敗しました',
+      details: error instanceof Error ? error.message : String(error)
+    }, 500)
   }
 })
 

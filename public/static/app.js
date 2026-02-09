@@ -25764,8 +25764,17 @@ async function showClassProgress() {
     hideLoading()
   } catch (error) {
     console.error('クラス進捗取得エラー:', error)
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url
+    })
     hideLoading()
-    alert('クラス進捗の読み込みに失敗しました')
+    
+    // エラーメッセージを詳細化
+    const errorMsg = error.response?.data?.error || error.message || 'Unknown error'
+    alert('クラス進捗の読み込みに失敗しました\n\n詳細: ' + errorMsg)
   }
 }
 
