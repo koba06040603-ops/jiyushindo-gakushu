@@ -6947,11 +6947,11 @@ ${specificInstructions}
 集合の概念`
 
     // 新しいヘルパー関数を使用（自動リトライ付き）
-    // 正しいGemini 3.0/2.5/2.0モデル名を使用
+    // 正しいGemini 3.0/2.5/2.0モデル名を使用（2026年2月時点）
     const models = [
-      'gemini-3-flash',          // 最新・最も高速（2025年リリース）
-      'gemini-2.5-flash',        // 推奨モデル（最良のコストパフォーマンス）
-      'gemini-2.0-flash-exp'     // フォールバック
+      'gemini-3-flash-preview',  // 最新・最も高速（2025年12月リリース）
+      'gemini-2.5-flash',        // 安定版・推奨（最良のコストパフォーマンス）
+      'gemini-2.5-flash-lite'    // フォールバック（最もコスト効率が良い）
     ]
     let result: GeminiResponse | null = null
     
@@ -7067,7 +7067,7 @@ app.get('/api/ai/test-gemini', async (c) => {
     }
     
     const testPrompt = '日本語で「こんにちは」と返答してください。'
-    const model = 'gemini-3-flash'
+    const model = 'gemini-3-flash-preview'
     
     console.log('📤 テストリクエスト送信:', model)
     
