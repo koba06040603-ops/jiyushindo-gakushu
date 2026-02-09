@@ -5724,8 +5724,8 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
       card = await env.DB.prepare(`
         SELECT lc.*, c.course_name, curr.grade, curr.subject, curr.unit_name
         FROM learning_cards lc
-        JOIN courses c ON lc.course_id = c.course_id
-        JOIN curriculum curr ON c.curriculum_id = curr.curriculum_id
+        JOIN courses c ON lc.course_id = c.id
+        JOIN curriculum curr ON c.curriculum_id = curr.id
         WHERE lc.card_id = ?
       `).bind(cardId).first()
       
