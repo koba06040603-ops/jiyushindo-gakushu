@@ -5736,7 +5736,7 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
       // コース情報を別途取得
       if (card && card.course_id) {
         const course = await env.DB.prepare(`
-          SELECT * FROM courses WHERE id = ?
+          SELECT * FROM courses WHERE course_id = ?
         `).bind(card.course_id).first()
         
         if (course) {
@@ -5750,6 +5750,12 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
             grade: course.grade,
             subject: course.subject
           })
+        } else {
+          console.warn('⚠️ コースが見つかりません - course_id:', card.course_id)
+          // デフォルト値を設定
+          card.grade = '小学3年'
+          card.subject = '算数'
+          card.unit_name = card.card_title || ''
         }
       }
     } catch (dbError) {
