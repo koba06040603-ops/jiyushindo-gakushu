@@ -5011,7 +5011,7 @@ async function loadCardPage(cardId) {
               <h3 class="text-lg font-bold text-purple-800 mb-3">
                 <i class="fas fa-redo mr-2"></i>もっと練習する
               </h3>
-              <button onclick="generateAndShowSimilarProblem(${card.id})" 
+              <button onclick="generateAndShowSimilarProblem()" 
                       id="generateSimilarBtn"
                       class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-lg">
                 <i class="fas fa-magic mr-2"></i>
@@ -14322,6 +14322,18 @@ async function generateSimilarProblem(cardId) {
 
 // 学習カード画面用の類似問題生成関数
 async function generateAndShowSimilarProblem(cardId) {
+  // cardIdが渡されていない場合はstate.selectedCardを使用
+  if (!cardId) {
+    cardId = state.selectedCard || window.currentCardData?.id
+  }
+  
+  if (!cardId) {
+    alert('❌ カードIDが見つかりません。ページを再読み込みしてください。')
+    return
+  }
+  
+  console.log('🔄 類似問題生成開始 - カードID:', cardId)
+  
   // フルスクリーンローディング表示
   showLoadingOverlay('AIが新しい問題を生成中...')
   

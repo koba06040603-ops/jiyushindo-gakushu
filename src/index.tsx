@@ -5714,18 +5714,45 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
   const { env } = c
   const cardId = c.req.param('cardId')
   
+  console.log('🔄 類似問題生成開始 - カードID:', cardId)
+  
+  let card = null
+  
   try {
     // カード情報を取得
-    const card = await env.DB.prepare(`
-      SELECT lc.*, c.course_name, curr.grade, curr.subject, curr.unit_name
-      FROM learning_cards lc
-      JOIN courses c ON lc.course_id = c.id
-      JOIN curriculum curr ON c.curriculum_id = curr.id
-      WHERE lc.id = ?
-    `).bind(cardId).first()
+    try {
+      card = await env.DB.prepare(`
+        SELECT lc.*, c.course_name, curr.grade, curr.subject, curr.unit_name
+        FROM learning_cards lc
+        JOIN courses c ON lc.course_id = c.id
+        JOIN curriculum curr ON c.curriculum_id = curr.id
+        WHERE lc.id = ?
+      `).bind(cardId).first()
+      
+      console.log('📊 取得したカード情報:', {
+        found: !!card,
+        id: card?.id,
+        card_title: card?.card_title,
+        has_problem_description: !!card?.problem_description,
+        grade: card?.grade,
+        subject: card?.subject
+      })
+    } catch (dbError) {
+      console.error('❌ データベースエラー:', dbError)
+      return c.json({ 
+        success: false,
+        error: 'データベースエラー',
+        details: dbError instanceof Error ? dbError.message : String(dbError)
+      }, 500)
+    }
     
     if (!card) {
-      return c.json({ error: 'Card not found' }, 404)
+      console.error('❌ カードが見つかりません - ID:', cardId)
+      return c.json({ 
+        success: false,
+        error: 'カードが見つかりません',
+        cardId: cardId
+      }, 404)
     }
     
     // Gemini Flashで類似問題を生成
@@ -5793,20 +5820,25 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
     })
     
   } catch (error) {
-    console.error('類似問題生成エラー:', error)
-    console.error('カード情報:', {
-      id: cardId,
+    console.error('❌ 類似問題生成エラー:', error)
+    console.error('エラー詳細:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      cardId: cardId,
       card_title: card?.card_title,
-      has_problem_description: !!card?.problem_description,
-      has_answer: !!card?.answer
+      has_problem_description: !!card?.problem_description
     })
+    
     return c.json({ 
+      success: false,
       error: '類似問題の生成に失敗しました',
       details: error instanceof Error ? error.message : String(error),
       cardInfo: card ? {
+        id: cardId,
         title: card.card_title,
-        hasProblem: !!card.problem_description
-      } : null
+        hasProblem: !!card.problem_description,
+        hasAnswer: !!card.answer
+      } : { id: cardId, notFound: true }
     }, 500)
   }
 })
