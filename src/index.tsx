@@ -5724,14 +5724,14 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
       card = await env.DB.prepare(`
         SELECT lc.*, c.course_name, curr.grade, curr.subject, curr.unit_name
         FROM learning_cards lc
-        JOIN courses c ON lc.course_id = c.id
-        JOIN curriculum curr ON c.curriculum_id = curr.id
-        WHERE lc.id = ?
+        JOIN courses c ON lc.course_id = c.course_id
+        JOIN curriculum curr ON c.curriculum_id = curr.curriculum_id
+        WHERE lc.card_id = ?
       `).bind(cardId).first()
       
       console.log('📊 取得したカード情報:', {
         found: !!card,
-        id: card?.id,
+        card_id: card?.card_id,
         card_title: card?.card_title,
         has_problem_description: !!card?.problem_description,
         grade: card?.grade,
