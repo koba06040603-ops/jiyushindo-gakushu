@@ -6766,8 +6766,7 @@ function callTeacher() {
   window.currentHelpType = 'teacher'
   window.helpCount++
   
-  // 進捗に記録（先生呼び出しフラグ）
-  saveProgress(true)
+  // 進捗保存は行わない（先生呼び出しは単なる通知）
   
   // WebSocket通知を送信
   if (state.selectedCard && state.selectedCurriculum) {
@@ -6899,7 +6898,8 @@ function toggleHintPanel() {
 
 // 学習進捗保存
 async function saveProgress(teacherCall = false) {
-  const answerInput = document.getElementById('answerInput').value
+  const answerInputElement = document.getElementById('answerInput')
+  const answerInput = answerInputElement ? answerInputElement.value : ''
   
   if (!answerInput && !teacherCall) {
     alert('答えを書いてから保存してください。')
@@ -6963,7 +6963,15 @@ async function saveProgress(teacherCall = false) {
     }
   } catch (error) {
     console.error('進捗保存エラー:', error)
-    alert('保存に失敗しました')
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    })
+    // teacherCallの場合はアラートを表示しない（先生呼び出しは進捗保存不要）
+    if (!teacherCall) {
+      alert('保存に失敗しました: ' + (error.response?.data?.error || error.message))
+    }
   }
 }
 
