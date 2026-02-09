@@ -5192,6 +5192,22 @@ async function askAI() {
   
   if (!question) return
   
+  // 学習内容以外の質問をフィルタリング（クライアント側での事前チェック）
+  const offTopicKeywords = [
+    '恋愛', '好き', '告白', '彼氏', '彼女', 'デート', '付き合',
+    'いじめ', '友達', '喧嘩', 'ケンカ', '仲直り',
+    '悩み', '相談', '困って', '助けて'
+  ]
+  
+  const isOffTopic = offTopicKeywords.some(keyword => question.includes(keyword))
+  
+  if (isOffTopic) {
+    // 学習内容以外の質問には警告メッセージを表示
+    const warningMsg = 'ごめんね、ぼくは勉強を教える先生だから、学習の質問にだけ答えることができるよ。😊\n\n算数や国語、理科や社会の勉強で困っていることはある？'
+    addAIMessage(warningMsg, 'ai')
+    return
+  }
+  
   // 送信中フラグを設定
   window.aiSending = true
   
