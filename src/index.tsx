@@ -6947,11 +6947,11 @@ ${specificInstructions}
 集合の概念`
 
     // 新しいヘルパー関数を使用（自動リトライ付き）
-    // 正しいGemini 2.5/2.0モデル名を使用
+    // 正しいGemini 3.0/2.5/2.0モデル名を使用
     const models = [
-      'gemini-2.0-flash-exp',    // 最新・最も高速
-      'gemini-1.5-flash',        // 安定版
-      'gemini-1.5-pro'           // 高品質フォールバック
+      'gemini-3-flash',          // 最新・最も高速（2025年リリース）
+      'gemini-2.5-flash',        // 推奨モデル（最良のコストパフォーマンス）
+      'gemini-2.0-flash-exp'     // フォールバック
     ]
     let result: GeminiResponse | null = null
     
