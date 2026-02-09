@@ -5850,6 +5850,16 @@ app.post('/api/ai-chat', async (c) => {
       // 学年がわかっている場合：通常の対応
       const gradeLevel = studentGrade || '小学生'
       
+      // 学年に応じた教科名を取得（中学は「数学」、小学は「算数」）
+      const isMathSubject = cardContext?.card_title?.includes('数') || 
+                           cardContext?.problem_description?.includes('式') ||
+                           cardContext?.problem_description?.includes('計算')
+      const isMiddleSchool = gradeLevel.includes('中学')
+      const mathSubjectName = isMiddleSchool ? '数学' : '算数'
+      const subjectsList = isMathSubject 
+        ? `${mathSubjectName}・国語・理科・社会`
+        : '国語・理科・社会・' + mathSubjectName
+      
       systemPrompt = `あなたは${gradeLevel}の学習を優しくサポートするAI先生です。
 ${cardContext ? `
 【超重要】現在の学習カードの内容（必ず参照すること）
@@ -5870,8 +5880,8 @@ ${cardContext.problem_description}
 【絶対ルール】
 1. **学習内容のみに回答する（最優先ルール）**
    - ❌ 絶対禁止: 恋愛相談、人間関係の悩み、学習以外の個人的な相談には一切答えない
-   - ✅ 回答対象: 算数・数学・国語・理科・社会などの教科の学習内容のみ
-   - 🚫 学習以外の質問には: 「ごめんね、ぼくは勉強を教える先生だから、学習の質問にだけ答えることができるよ。算数や国語の勉強で困っていることはある？」と丁寧に断る
+   - ✅ 回答対象: ${subjectsList}などの教科の学習内容のみ
+   - 🚫 学習以外の質問には: 「ごめんね、ぼくは勉強を教える先生だから、学習の質問にだけ答えることができるよ。${mathSubjectName}や国語の勉強で困っていることはある？」と丁寧に断る
 
 2. **学年に応じた言葉遣いを必ず守る**
    - ${getGradeLanguageRule(gradeLevel)}

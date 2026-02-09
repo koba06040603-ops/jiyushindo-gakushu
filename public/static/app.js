@@ -5203,7 +5203,11 @@ async function askAI() {
   
   if (isOffTopic) {
     // 学習内容以外の質問には警告メッセージを表示
-    const warningMsg = 'ごめんね、ぼくは勉強を教える先生だから、学習の質問にだけ答えることができるよ。😊\n\n算数や国語、理科や社会の勉強で困っていることはある？'
+    // 学年に応じて教科名を調整（中学は「数学」、小学は「算数」）
+    const grade = window.aiDetectedGrade || state?.student?.grade || ''
+    const isMiddleSchool = grade.includes('中学')
+    const mathSubject = isMiddleSchool ? '数学' : '算数'
+    const warningMsg = `ごめんね、ぼくは勉強を教える先生だから、学習の質問にだけ答えることができるよ。😊\n\n${mathSubject}や国語、理科や社会の勉強で困っていることはある？`
     addAIMessage(warningMsg, 'ai')
     return
   }
