@@ -12640,14 +12640,17 @@ function initModalDrag(headerId, contentId) {
   let yOffset = 0
   let animationFrameId = null
   
-  header.addEventListener('mousedown', dragStart)
-  document.addEventListener('mousemove', drag)
-  document.addEventListener('mouseup', dragEnd)
+  // GPU加速を有効化
+  content.style.willChange = 'transform'
+  
+  header.addEventListener('mousedown', dragStart, { passive: false })
+  document.addEventListener('mousemove', drag, { passive: false })
+  document.addEventListener('mouseup', dragEnd, { passive: true })
   
   // タッチイベント対応
-  header.addEventListener('touchstart', dragStart)
-  document.addEventListener('touchmove', drag)
-  document.addEventListener('touchend', dragEnd)
+  header.addEventListener('touchstart', dragStart, { passive: false })
+  document.addEventListener('touchmove', drag, { passive: false })
+  document.addEventListener('touchend', dragEnd, { passive: true })
   
   function dragStart(e) {
     // ボタンクリックの場合はドラッグしない
@@ -12666,6 +12669,7 @@ function initModalDrag(headerId, contentId) {
     isDragging = true
     header.style.cursor = 'grabbing'
     content.style.transition = 'none' // ドラッグ中はtransitionを無効化
+    document.body.style.userSelect = 'none' // テキスト選択を無効化
   }
   
   function drag(e) {
@@ -12684,13 +12688,13 @@ function initModalDrag(headerId, contentId) {
     xOffset = currentX
     yOffset = currentY
     
-    // requestAnimationFrameで滑らかに更新
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId)
+    // requestAnimationFrameで滑らかに更新（デバウンス不要）
+    if (!animationFrameId) {
+      animationFrameId = requestAnimationFrame(() => {
+        setTranslate(currentX, currentY, content)
+        animationFrameId = null
+      })
     }
-    animationFrameId = requestAnimationFrame(() => {
-      setTranslate(currentX, currentY, content)
-    })
   }
   
   function dragEnd(e) {
@@ -12701,10 +12705,12 @@ function initModalDrag(headerId, contentId) {
     isDragging = false
     header.style.cursor = 'move'
     content.style.transition = '' // transitionを復元
+    document.body.style.userSelect = '' // テキスト選択を復元
   }
   
   function setTranslate(xPos, yPos, el) {
-    el.style.transform = `translate(${xPos}px, ${yPos}px)`
+    // translate3dを使用してGPU加速を有効化
+    el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`
   }
 }
 
