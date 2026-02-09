@@ -5114,15 +5114,17 @@ function showAITeacher() {
     const cardTitle = card?.card_title || '学習カード'
     const problemDesc = card?.problem_description || ''
     
-    let welcomeMsg = `こんにちは！AI先生です。😊\n\n今は「${cardTitle}」を学習していますね。\n\n`
+    let welcomeMsg = `こんにちは！AI先生です。😊\n\n`
     
     if (problemDesc) {
       // 問題文を要約して表示（長すぎる場合は最初の100文字）
       const shortDesc = problemDesc.length > 100 ? problemDesc.substring(0, 100) + '...' : problemDesc
-      welcomeMsg += `【今の問題】\n${shortDesc}\n\n`
+      welcomeMsg += `📝 **${cardTitle}**\n\n${shortDesc}\n\n`
+    } else {
+      welcomeMsg += `📝 **${cardTitle}**\n\n`
     }
     
-    welcomeMsg += `わからないことや、もっと知りたいことがあったら、なんでも聞いてください！\n\n例えば：\n• 「どこから解けばいいの？」\n• 「〇〇って何？」\n• 「ヒントをください」\n\n一緒に考えましょう！`
+    welcomeMsg += `わからないことがあったら、なんでも聞いてください！\n\n例えば：\n• 「どこから解けばいいの？」\n• 「この問題は何を聞いているの？」\n• 「〇〇って何？」\n• 「ヒントをください」\n\n一緒に考えましょう！`
     
     addAIMessage(welcomeMsg, 'ai')
   }
