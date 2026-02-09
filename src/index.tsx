@@ -26274,6 +26274,171 @@ app.get('/api/export/history', authMiddleware, async (c) => {
   }
 })
 
+// ============================================================
+// Phase 26-28: クラス進捗比較・教員フィードバック・音声認識
+// ============================================================
+import {
+  getClassStatistics,
+  getStudentProgressComparison,
+  getClassHeatmapData,
+  getMasteryDistribution,
+  getSubjectAverages,
+  getClassProgressTrend
+} from './class-progress-comparison'
+
+import {
+  createTeacherFeedback,
+  getStudentFeedback,
+  getFeedbackTemplates,
+  markFeedbackAsRead
+} from './teacher-feedback'
+
+import {
+  recordVoiceInput,
+  getVoiceCommands,
+  getVoiceSettings,
+  updateVoiceSettings,
+  recordVoiceError,
+  getVoiceStatistics
+} from './voice-recognition'
+
+// クラス進捗比較API
+app.get('/api/class/statistics', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const classCode = c.req.query('class_code') || user.class_code
+    const days = parseInt(c.req.query('days') || '30')
+    
+    if (!classCode) {
+      return c.json({ success: false, error: 'クラスコードが必要です' }, 400)
+    }
+    
+    const stats = await getClassStatistics(env.DB, classCode, days)
+    return c.json({ success: true, data: stats })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+app.get('/api/class/progress-comparison', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const classCode = c.req.query('class_code') || user.class_code
+    const anonymize = c.req.query('anonymize') === 'true'
+    
+    if (!classCode) {
+      return c.json({ success: false, error: 'クラスコードが必要です' }, 400)
+    }
+    
+    const comparison = await getStudentProgressComparison(env.DB, classCode, anonymize)
+    return c.json({ success: true, data: comparison })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+app.get('/api/class/heatmap', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const classCode = c.req.query('class_code') || user.class_code
+    const subject = c.req.query('subject') || '算数'
+    const anonymize = c.req.query('anonymize') === 'true'
+    
+    if (!classCode) {
+      return c.json({ success: false, error: 'クラスコードが必要です' }, 400)
+    }
+    
+    const heatmap = await getClassHeatmapData(env.DB, classCode, subject, anonymize)
+    return c.json({ success: true, data: heatmap })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 教員フィードバックAPI
+app.post('/api/feedback/create', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const body = await c.req.json()
+    
+    const feedbackId = await createTeacherFeedback(env.DB, user.id, body.student_id, body)
+    return c.json({ success: true, feedback_id: feedbackId })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+app.get('/api/feedback/student', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const limit = parseInt(c.req.query('limit') || '20')
+    
+    const feedback = await getStudentFeedback(env.DB, user.id, limit)
+    return c.json({ success: true, data: feedback })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+app.get('/api/feedback/templates', authMiddleware, async (c) => {
+  try {
+    const { env } = c.var
+    const category = c.req.query('category')
+    
+    const templates = await getFeedbackTemplates(env.DB, category)
+    return c.json({ success: true, data: templates })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 音声認識API
+app.post('/api/voice/input', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const body = await c.req.json()
+    
+    const inputId = await recordVoiceInput(env.DB, user.id, body)
+    return c.json({ success: true, input_id: inputId })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+app.get('/api/voice/commands', authMiddleware, async (c) => {
+  try {
+    const { env } = c.var
+    
+    const commands = await getVoiceCommands(env.DB)
+    return c.json({ success: true, data: commands })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+app.get('/api/voice/settings', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    
+    const settings = await getVoiceSettings(env.DB, user.id)
+    return c.json({ success: true, data: settings })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+app.post('/api/voice/settings', authMiddleware, async (c) => {
+  try {
+    const { env, user } = c.var
+    const body = await c.req.json()
+    
+    await updateVoiceSettings(env.DB, user.id, body)
+    return c.json({ success: true })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 export default app
 
 // ============================================================
