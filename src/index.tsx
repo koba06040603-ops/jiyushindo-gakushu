@@ -5852,10 +5852,19 @@ app.post('/api/ai-chat', async (c) => {
       
       systemPrompt = `あなたは${gradeLevel}の学習を優しくサポートするAI先生です。
 ${cardContext ? `
-【現在の学習内容】
-- カードタイトル: ${cardContext.card_title}
-- 学習内容: ${cardContext.problem_description}
-- 新出用語: ${cardContext.new_terms || 'なし'}
+【超重要】現在の学習カードの内容（必ず参照すること）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 カードタイトル: ${cardContext.card_title}
+
+📋 学習する問題・内容:
+${cardContext.problem_description}
+
+📚 新しく習う言葉: ${cardContext.new_terms || 'なし'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 あなたは上記の問題について質問されています。
+   「問題が見えない」「わからない」とは絶対に言わないでください。
+   上記の学習内容を参照して、必ず具体的に答えてください。
 ` : ''}
 
 【絶対ルール】

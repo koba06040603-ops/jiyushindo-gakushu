@@ -4912,7 +4912,7 @@ async function loadCardPage(cardId) {
                   <span id="autoVoiceStatus">読み上げOFF</span>
                 </button>
               </div>
-              <div id="aiChat" class="space-y-3 mb-4 max-h-96 overflow-y-auto">
+              <div id="aiChat" class="space-y-3 mb-4 max-h-[32rem] md:max-h-[40rem] overflow-y-auto">
                 <!-- チャットメッセージがここに表示されます -->
               </div>
               
@@ -5110,8 +5110,20 @@ function showAITeacher() {
   // 初回メッセージ
   const aiChat = document.getElementById('aiChat')
   if (aiChat.children.length === 0) {
-    const cardTitle = window.currentCardData?.card?.card_title || '学習カード'
-    const welcomeMsg = `こんにちは！AI先生です。\n\n今は「${cardTitle}」を学習していますね。\n\nわからないことや、もっと知りたいことがあったら、なんでも聞いてください！一緒に考えましょう！ 😊`
+    const card = window.currentCardData
+    const cardTitle = card?.card_title || '学習カード'
+    const problemDesc = card?.problem_description || ''
+    
+    let welcomeMsg = `こんにちは！AI先生です。😊\n\n今は「${cardTitle}」を学習していますね。\n\n`
+    
+    if (problemDesc) {
+      // 問題文を要約して表示（長すぎる場合は最初の100文字）
+      const shortDesc = problemDesc.length > 100 ? problemDesc.substring(0, 100) + '...' : problemDesc
+      welcomeMsg += `【今の問題】\n${shortDesc}\n\n`
+    }
+    
+    welcomeMsg += `わからないことや、もっと知りたいことがあったら、なんでも聞いてください！\n\n例えば：\n• 「どこから解けばいいの？」\n• 「〇〇って何？」\n• 「ヒントをください」\n\n一緒に考えましょう！`
+    
     addAIMessage(welcomeMsg, 'ai')
   }
   
@@ -5331,9 +5343,9 @@ function addAIMessage(message, sender, loadingId = null) {
   messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} mb-3`
   
   messageDiv.innerHTML = `
-    <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border-2 border-gray-200'} rounded-lg p-3 max-w-[80%] shadow">
-      ${sender === 'ai' ? '<div class="flex items-center mb-1"><i class="fas fa-robot text-blue-500 mr-2"></i><span class="font-bold text-xs">AI先生</span></div>' : ''}
-      <p class="text-sm whitespace-pre-wrap">${message}</p>
+    <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border-2 border-gray-200'} rounded-lg p-4 ${sender === 'user' ? 'max-w-[80%]' : 'max-w-[95%]'} shadow">
+      ${sender === 'ai' ? '<div class="flex items-center mb-2"><i class="fas fa-robot text-blue-500 mr-2"></i><span class="font-bold text-sm">AI先生</span></div>' : ''}
+      <p class="text-sm whitespace-pre-wrap leading-relaxed">${message}</p>
     </div>
   `
   
