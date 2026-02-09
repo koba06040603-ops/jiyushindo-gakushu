@@ -5736,7 +5736,7 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
       // コース情報とカリキュラム情報を取得
       if (card && card.course_id) {
         const course = await env.DB.prepare(`
-          SELECT * FROM courses WHERE course_id = ?
+          SELECT * FROM courses WHERE id = ?
         `).bind(card.course_id).first()
         
         console.log('📚 コース情報取得:', {
@@ -5752,7 +5752,7 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
           // カリキュラム情報から学年・教科・単元名を取得
           if (course.curriculum_id) {
             const curriculum = await env.DB.prepare(`
-              SELECT * FROM curriculum WHERE curriculum_id = ?
+              SELECT * FROM curriculum WHERE id = ?
             `).bind(course.curriculum_id).first()
             
             console.log('📖 カリキュラム情報取得:', {
