@@ -5366,10 +5366,29 @@ function addAIMessage(message, sender, loadingId = null) {
   messageDiv.id = messageId
   messageDiv.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'} mb-3`
   
+  // LaTeX記号をプレーンテキストに変換
+  let cleanMessage = message
+  if (sender === 'ai') {
+    // $...$ 形式のLaTeX記号を変換
+    cleanMessage = cleanMessage.replace(/\$([^$]+)\$/g, (match, content) => {
+      // 基本的な数式記号を変換
+      return content
+        .replace(/\\times/g, '×')
+        .replace(/\\div/g, '÷')
+        .replace(/\\pm/g, '±')
+        .replace(/\\leq/g, '≤')
+        .replace(/\\geq/g, '≥')
+        .replace(/\\neq/g, '≠')
+        .replace(/\\cdot/g, '·')
+        .replace(/\^(\d+)/g, (m, exp) => '^' + exp)  // 上付き文字
+        .replace(/_(\d+)/g, (m, sub) => '_' + sub)   // 下付き文字
+    })
+  }
+  
   messageDiv.innerHTML = `
     <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border-2 border-gray-200'} rounded-lg p-4 ${sender === 'user' ? 'max-w-[80%]' : 'max-w-[95%]'} shadow">
       ${sender === 'ai' ? '<div class="flex items-center mb-2"><i class="fas fa-robot text-blue-500 mr-2"></i><span class="font-bold text-sm">AI先生</span></div>' : ''}
-      <p class="text-sm whitespace-pre-wrap leading-relaxed">${message}</p>
+      <p class="text-sm whitespace-pre-wrap leading-relaxed">${cleanMessage}</p>
     </div>
   `
   

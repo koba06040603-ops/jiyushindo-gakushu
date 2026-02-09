@@ -5734,7 +5734,7 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
       return c.json({ error: 'API key not configured' }, 500)
     }
     
-    const prompt = `あなたは小学校の優秀な教師です。以下の学習カードの問題に基づいて、類似問題を1問生成してください。
+    const prompt = `あなたは${card.grade}の優秀な教師です。以下の学習カードの問題に基づいて、類似問題を1問生成してください。
 
 【元の学習カード情報】
 - 学年: ${card.grade}
@@ -5742,7 +5742,7 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
 - 単元: ${card.unit_name}
 - コース: ${card.course_name}
 - カードタイトル: ${card.card_title}
-- 元の問題: ${card.problem_content}
+- 元の問題: ${card.problem_description || card.problem_content || card.card_content || '問題情報なし'}
 - 解答例: ${card.answer || card.example_solution || ''}
 
 【類似問題の条件】
@@ -5794,9 +5794,19 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
     
   } catch (error) {
     console.error('類似問題生成エラー:', error)
+    console.error('カード情報:', {
+      id: cardId,
+      card_title: card?.card_title,
+      has_problem_description: !!card?.problem_description,
+      has_answer: !!card?.answer
+    })
     return c.json({ 
       error: '類似問題の生成に失敗しました',
-      details: error instanceof Error ? error.message : String(error)
+      details: error instanceof Error ? error.message : String(error),
+      cardInfo: card ? {
+        title: card.card_title,
+        hasProblem: !!card.problem_description
+      } : null
     }, 500)
   }
 })
@@ -5908,6 +5918,8 @@ ${cardContext.problem_description}
    - **300〜500文字程度で、丁寧に説明し、途中で切れないように完結した回答をする**
    - **説明は具体例を2〜3個入れて、分かりやすくする**
    - 最後に「〜は分かったかな？」「もっと知りたいことはある？」と理解確認・追加質問を促す
+   - **LaTeX記号（$記号$など）は使わず、プレーンテキストで記述する**
+   - **数式は日本語と算用数字で表現する（例：n+1、2×3、x=5 など）**
 
 【良い回答例】
 
