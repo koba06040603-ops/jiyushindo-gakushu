@@ -26677,6 +26677,318 @@ app.post('/api/voice/settings', authMiddleware, async (c) => {
   }
 })
 
+// ============================================================
+// 家庭学習・テスト対策モード
+// ============================================================
+
+// APIルート：テスト対策プランを生成（複数教科・単元対応）
+app.post('/api/ai/generate-test-plan/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    return c.json({ 
+      success: false, 
+      error: 'Gemini APIキーが設定されていません',
+      details: 'APIキーを設定してください'
+    }, 500)
+  }
+  
+  try {
+    const body = await c.req.json()
+    const { testDate, targetScore, currentLevel, subjects } = body
+    
+    console.log(`🎯 テスト対策プラン生成開始 - 学生ID: ${studentId}`)
+    console.log(`📋 リクエスト内容:`, { testDate, targetScore, currentLevel, subjects: subjects?.length })
+    
+    if (!testDate || !subjects || subjects.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: 'テスト日程と対象範囲を指定してください',
+        details: 'testDateとsubjectsは必須です'
+      }, 400)
+    }
+    
+    // 各教科・単元のカリキュラム情報と学習履歴を取得
+    const subjectDetails = []
+    
+    for (const subject of subjects) {
+      const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?')
+        .bind(subject.curriculumId).first()
+      
+      if (!curriculum) {
+        console.warn(`⚠️ カリキュラムID ${subject.curriculumId} が見つかりません`)
+        continue
+      }
+      
+      // 学習履歴を取得
+      const history = await env.DB.prepare(`
+        SELECT 
+          content_type,
+          problem_id,
+          is_correct,
+          answer_time_seconds,
+          hint_used,
+          created_at
+        FROM retrieval_practice_log
+        WHERE student_id = ? AND curriculum_id = ?
+        ORDER BY created_at DESC
+        LIMIT 50
+      `).bind(studentId, subject.curriculumId).all()
+      
+      const historyData = history.results || []
+      
+      // 統計を計算
+      const stats = {
+        total_attempts: historyData.length,
+        correct_count: historyData.filter((h: any) => h.is_correct === 1).length,
+        accuracy: historyData.length > 0 
+          ? Math.round((historyData.filter((h: any) => h.is_correct === 1).length / historyData.length) * 100)
+          : 0,
+        avg_time: historyData.length > 0
+          ? Math.round(historyData.reduce((sum: number, h: any) => sum + (h.answer_time_seconds || 0), 0) / historyData.length)
+          : 0,
+        hint_usage: historyData.filter((h: any) => h.hint_used === 1).length
+      }
+      
+      subjectDetails.push({
+        curriculumId: subject.curriculumId,
+        subject: curriculum.subject,
+        unitName: curriculum.unit_name,
+        grade: curriculum.grade,
+        unitGoal: curriculum.unit_goal,
+        stats
+      })
+    }
+    
+    if (subjectDetails.length === 0) {
+      return c.json({ 
+        success: false, 
+        error: '対象範囲が見つかりません',
+        details: '選択した教科・単元が存在しません'
+      }, 404)
+    }
+    
+    // 目標日までの日数を計算
+    const today = new Date()
+    const testDateObj = new Date(testDate)
+    const daysUntilTest = Math.ceil((testDateObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    
+    // 現在の理解度レベルのマッピング
+    const levelLabels = {
+      'beginner': '初級：まだよくわからない',
+      'intermediate': '中級：だいたいわかる',
+      'advanced': '上級：しっかり理解している'
+    }
+    
+    // AIプロンプト（複数教科・単元に対応）
+    const aiPrompt = `
+あなたは児童生徒のテスト対策を支援する教育AIです。以下のデータから、**複数教科・単元を統合した**最適なテスト対策プランを作成してください。
+
+【基本情報】
+- 学生ID: ${studentId}
+- テスト日: ${testDate}（あと${daysUntilTest}日）
+${targetScore ? `- 目標点数: ${targetScore}点` : ''}
+- 現在の理解度: ${levelLabels[currentLevel] || currentLevel}
+
+【対象範囲】（${subjectDetails.length}教科・単元）
+${subjectDetails.map((detail, index) => `
+${index + 1}. ${detail.subject} - ${detail.unitName}（${detail.grade}年）
+   - 単元目標: ${detail.unitGoal || '未設定'}
+   - 学習実績: ${detail.stats.total_attempts}問挑戦、正答率${detail.stats.accuracy}%、平均${detail.stats.avg_time}秒
+   - ヒント使用: ${detail.stats.hint_usage}回
+`).join('\n')}
+
+【重要：複数教科・単元の統合プランニングのポイント】
+
+1. **バランスの取れた時間配分**
+   - 各教科・単元の理解度に応じて学習時間を配分
+   - 苦手分野には多めの時間を確保
+   - 得意分野は効率的に復習
+
+2. **優先度の自動調整**
+   - 正答率が低い（<60%）教科・単元を優先
+   - テスト日までの日数を考慮した現実的な計画
+   - 最初の数日で全範囲を一通り学習
+
+3. **効果的な学習順序**
+   - 基礎的な内容から応用へ
+   - 関連する単元は連続して学習
+   - 定期的な復習を組み込む
+
+4. **目標点数を考慮した戦略**
+${targetScore ? `
+   - 目標${targetScore}点を達成するための重点分野を特定
+   - 配点の高い単元を優先的に学習
+   - 確実に得点できる基礎問題をまず固める
+` : `
+   - 全範囲を均等に学習
+   - 基礎を固めてから応用へ
+`}
+
+5. **学習特性への配慮**
+   - 理解度レベル（${currentLevel}）に応じた難易度調整
+   - 無理のないペース設定
+   - 達成感を得られる小さな目標設定
+
+【タスク】
+上記の情報を深く考慮し、テスト当日までの個別最適化されたテスト対策プランを作成してください。
+
+【出力形式】
+{
+  "plan_summary": "計画の概要（3-5文、複数教科を統合した学習アプローチを説明）",
+  "priority_subjects": [
+    {
+      "subject": "教科名",
+      "unit_name": "単元名",
+      "priority": "high / medium / low",
+      "reason": "優先度の理由（50文字以内）",
+      "estimated_hours": "推奨学習時間（時間）"
+    }
+  ],
+  "daily_schedule": [
+    {
+      "day": 1,
+      "date": "YYYY-MM-DD",
+      "theme": "今日のテーマ（例: 全範囲の基礎確認）",
+      "tasks": [
+        {
+          "time": "15:00-15:45",
+          "subject": "教科名",
+          "unit_name": "単元名",
+          "activity": "活動内容",
+          "content_type": "frequent_problems / application_problems / review_checklist",
+          "estimated_minutes": 45,
+          "learning_tip": "学習のコツ"
+        }
+      ],
+      "daily_goal": "今日の目標",
+      "review_items": ["復習すべき項目1", "項目2"]
+    }
+  ],
+  "weekly_milestones": [
+    {
+      "week": 1,
+      "goal": "週の目標",
+      "subjects_focus": ["重点教科1", "教科2"],
+      "expected_progress": "期待される進捗"
+    }
+  ],
+  "study_tips": [
+    "複数教科を学ぶ際のコツ1",
+    "効果的な復習方法",
+    "テスト当日の心構え"
+  ],
+  "time_management": {
+    "total_available_hours": "利用可能な総学習時間",
+    "daily_average": "1日の平均学習時間",
+    "breakdown_by_subject": [
+      {
+        "subject": "教科名",
+        "unit_name": "単元名",
+        "allocated_hours": "配分時間"
+      }
+    ]
+  },
+  "motivation_message": "テストに向けた励ましのメッセージ（100文字以内）"
+}
+
+※ daily_scheduleは最低${Math.min(daysUntilTest, 7)}日分、最大${Math.min(daysUntilTest, 14)}日分を生成してください
+※ 各教科・単元をバランスよく組み込んでください
+※ 苦手分野（正答率<60%）には多めの時間を配分してください
+※ 最後の1-2日は総復習の時間を確保してください
+※ 無理のない現実的な計画にしてください
+`
+    
+    console.log('🤖 Gemini API呼び出し開始...')
+    
+    // Gemini API呼び出し
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: aiPrompt }] }],
+          generationConfig: { 
+            temperature: 0.7, 
+            maxOutputTokens: 6000,
+            responseMimeType: 'application/json'
+          }
+        })
+      }
+    )
+    
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text()
+      console.error('❌ Gemini APIエラー:', errorText)
+      throw new Error(`Gemini APIエラー: ステータス ${geminiResponse.status}`)
+    }
+    
+    const geminiData = await geminiResponse.json()
+    const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    if (!geminiText) {
+      throw new Error('Gemini APIから空のレスポンスが返されました')
+    }
+    
+    console.log('📝 Geminiレスポンス長さ:', geminiText.length)
+    
+    // JSONを抽出
+    const testPlan = extractJSON(geminiText)
+    
+    console.log('✅ テスト対策プラン生成完了')
+    
+    return c.json({
+      success: true,
+      student_id: studentId,
+      test_date: testDate,
+      days_until_test: daysUntilTest,
+      target_score: targetScore,
+      current_level: currentLevel,
+      subjects: subjectDetails.map(d => ({
+        subject: d.subject,
+        unitName: d.unitName,
+        grade: d.grade,
+        stats: d.stats
+      })),
+      test_plan: testPlan,
+      generated_at: new Date().toISOString()
+    })
+    
+  } catch (error: any) {
+    console.error('❌ テスト対策プラン生成エラー:', error)
+    console.error('エラースタック:', error.stack?.substring(0, 500))
+    
+    return c.json({
+      success: false,
+      error: 'テスト対策プランの生成に失敗しました',
+      details: error.message,
+      error_type: error.name || 'UnknownError',
+      help: 'Gemini APIの応答が不正な形式である可能性があります。しばらく時間をおいて再試行してください。'
+    }, 500)
+  }
+})
+
+// APIルート：カリキュラム一覧を取得
+app.get('/api/curriculum/list', async (c) => {
+  const { env } = c
+  
+  try {
+    const curricula = await env.DB.prepare(`
+      SELECT id, subject, grade, unit_name, unit_goal, total_hours
+      FROM curriculum
+      ORDER BY grade ASC, subject ASC, unit_name ASC
+    `).all()
+    
+    return c.json(curricula.results || [])
+  } catch (error: any) {
+    console.error('❌ カリキュラム一覧取得エラー:', error)
+    return c.json({ error: 'カリキュラム一覧の取得に失敗しました' }, 500)
+  }
+})
+
 export default app
 
 // ============================================================

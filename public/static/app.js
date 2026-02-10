@@ -3194,12 +3194,15 @@ async function loadGuidePage(curriculumId) {
             <button onclick="renderTopPage()" class="text-indigo-600 hover:text-indigo-800 flex items-center text-lg font-semibold transition">
               <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
             </button>
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
               <button onclick="showClassProgress()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-users mr-2"></i>クラス進捗
               </button>
               <button onclick="showAIRecommendedProblems(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-robot mr-2"></i>AIおすすめ
+              </button>
+              <button onclick="showTestPrepModal()" class="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-graduation-cap mr-2"></i>テスト対策プラン
               </button>
               <button onclick="showLearningDashboard(${curriculumId})" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chart-line mr-2"></i>学習統計
@@ -38756,5 +38759,449 @@ function displayStudyPlan(data) {
 window.loadAIStudyPlanPage = loadAIStudyPlanPage
 window.generateAIStudyPlan = generateAIStudyPlan
 window.displayStudyPlan = displayStudyPlan
+
+// ==========================================
+// Phase 10: 家庭学習・テスト対策モード
+// ==========================================
+
+// テスト対策プランモーダルを表示
+async function showTestPrepModal() {
+  console.log('📚 テスト対策プランモーダルを表示')
+  
+  try {
+    // 利用可能なカリキュラム（教科・単元）を取得
+    const curriculaResponse = await axios.get('/api/curriculum/list')
+    const curricula = curriculaResponse.data
+    
+    const modalHTML = `
+      <div id="testPrepModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeTestPrepModal(event)">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+          
+          <!-- ヘッダー -->
+          <div class="bg-gradient-to-r from-orange-500 to-red-500 text-white p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-2xl font-bold">
+                  <i class="fas fa-graduation-cap mr-2"></i>テスト対策プランを作成
+                </h2>
+                <p class="text-sm opacity-90 mt-1">目標点数と期日を設定して、最適な学習計画を作成します</p>
+              </div>
+              <button onclick="closeTestPrepModal()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- コンテンツ -->
+          <div class="flex-1 overflow-y-auto p-6 space-y-6">
+            
+            <!-- ステップ1: 基本情報 -->
+            <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded">
+              <h3 class="font-bold text-gray-800 mb-3 text-lg">
+                <i class="fas fa-bullseye text-orange-600 mr-2"></i>ステップ1：目標を設定
+              </h3>
+              
+              <div class="space-y-4">
+                <!-- テスト日程 -->
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">
+                    <i class="fas fa-calendar-alt mr-1 text-orange-600"></i>テスト日程
+                  </label>
+                  <input type="date" id="testDate" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" 
+                         value="${new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
+                  <p class="text-xs text-gray-500 mt-1">デフォルトは2週間後です</p>
+                </div>
+                
+                <!-- 目標点数 -->
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">
+                    <i class="fas fa-star mr-1 text-orange-600"></i>目標点数（任意）
+                  </label>
+                  <div class="flex items-center gap-4">
+                    <input type="number" id="targetScore" min="0" max="100" class="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent" 
+                           placeholder="80">
+                    <span class="text-gray-700 font-bold">点</span>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">目標点数を入力すると、より個別最適化された計画が作成されます</p>
+                </div>
+                
+                <!-- 現在の理解度 -->
+                <div>
+                  <label class="block text-sm font-bold text-gray-700 mb-2">
+                    <i class="fas fa-thermometer-half mr-1 text-orange-600"></i>現在の理解度（自己評価）
+                  </label>
+                  <select id="currentLevel" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+                    <option value="beginner">初級：まだよくわからない</option>
+                    <option value="intermediate" selected>中級：だいたいわかる</option>
+                    <option value="advanced">上級：しっかり理解している</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            <!-- ステップ2: 対象範囲 -->
+            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+              <h3 class="font-bold text-gray-800 mb-3 text-lg">
+                <i class="fas fa-list-check text-blue-600 mr-2"></i>ステップ2：対象範囲を選択
+              </h3>
+              
+              <div class="space-y-3" id="curriculumSelection">
+                ${curricula.map((curr, index) => `
+                  <div class="bg-white border border-blue-200 rounded-lg p-3 hover:shadow-md transition">
+                    <label class="flex items-start cursor-pointer">
+                      <input type="checkbox" class="curriculum-checkbox mt-1 mr-3 w-5 h-5 text-blue-600 rounded focus:ring-blue-500" 
+                             data-curriculum-id="${curr.id}"
+                             data-subject="${curr.subject}"
+                             data-unit-name="${curr.unit_name}"
+                             data-grade="${curr.grade}"
+                             ${index === 0 ? 'checked' : ''}>
+                      <div class="flex-1">
+                        <div class="font-bold text-gray-800">${curr.subject} - ${curr.unit_name}</div>
+                        <div class="text-sm text-gray-600 mt-1">
+                          <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs mr-2">
+                            <i class="fas fa-graduation-cap mr-1"></i>${curr.grade}年
+                          </span>
+                          <span class="text-gray-500">${curr.unit_goal || '単元目標'}</span>
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                `).join('')}
+              </div>
+              
+              <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p class="text-sm text-yellow-800">
+                  <i class="fas fa-lightbulb mr-2"></i>
+                  <strong>複数選択可能：</strong>複数の教科・単元を選択すると、バランスの取れた学習計画が作成されます
+                </p>
+              </div>
+            </div>
+            
+            <!-- 選択サマリー -->
+            <div id="selectionSummary" class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h4 class="font-bold text-gray-800 mb-2">
+                <i class="fas fa-clipboard-list mr-2 text-gray-600"></i>選択内容の確認
+              </h4>
+              <div id="summaryContent" class="text-sm text-gray-600">
+                選択した内容がここに表示されます
+              </div>
+            </div>
+            
+          </div>
+          
+          <!-- フッター -->
+          <div class="border-t border-gray-200 p-4 bg-gray-50">
+            <div class="flex justify-between items-center">
+              <button onclick="closeTestPrepModal()" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-bold text-gray-700">
+                <i class="fas fa-times mr-2"></i>キャンセル
+              </button>
+              <button onclick="generateTestPrepPlan()" class="px-6 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-magic mr-2"></i>計画を作成する
+              </button>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+    // チェックボックスの変更を監視
+    document.querySelectorAll('.curriculum-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', updateSelectionSummary)
+    })
+    
+    // 初期サマリーを更新
+    updateSelectionSummary()
+    
+  } catch (error) {
+    console.error('❌ テスト対策モーダル表示エラー:', error)
+    alert('モーダルの表示に失敗しました。\n\n' + error.message)
+  }
+}
+
+// 選択内容のサマリーを更新
+function updateSelectionSummary() {
+  const checkboxes = document.querySelectorAll('.curriculum-checkbox:checked')
+  const summaryContent = document.getElementById('summaryContent')
+  
+  if (checkboxes.length === 0) {
+    summaryContent.innerHTML = `
+      <p class="text-orange-600 font-bold">
+        <i class="fas fa-exclamation-triangle mr-2"></i>少なくとも1つの教科・単元を選択してください
+      </p>
+    `
+    return
+  }
+  
+  const testDate = document.getElementById('testDate')?.value || '未設定'
+  const targetScore = document.getElementById('targetScore')?.value || '未設定'
+  const currentLevel = document.getElementById('currentLevel')?.value || 'intermediate'
+  
+  const levelLabels = {
+    'beginner': '初級',
+    'intermediate': '中級',
+    'advanced': '上級'
+  }
+  
+  const selectedSubjects = Array.from(checkboxes).map(cb => ({
+    subject: cb.dataset.subject,
+    unitName: cb.dataset.unitName,
+    grade: cb.dataset.grade
+  }))
+  
+  const daysUntil = Math.ceil((new Date(testDate) - new Date()) / (1000 * 60 * 60 * 24))
+  
+  summaryContent.innerHTML = `
+    <div class="space-y-2">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-calendar-alt text-orange-600"></i>
+        <span class="font-bold">テスト日：</span>
+        <span>${testDate}（あと${daysUntil}日）</span>
+      </div>
+      ${targetScore !== '未設定' ? `
+        <div class="flex items-center gap-2">
+          <i class="fas fa-star text-orange-600"></i>
+          <span class="font-bold">目標点数：</span>
+          <span>${targetScore}点</span>
+        </div>
+      ` : ''}
+      <div class="flex items-center gap-2">
+        <i class="fas fa-thermometer-half text-orange-600"></i>
+        <span class="font-bold">現在の理解度：</span>
+        <span>${levelLabels[currentLevel]}</span>
+      </div>
+      <div class="flex items-start gap-2">
+        <i class="fas fa-book text-blue-600 mt-1"></i>
+        <div>
+          <span class="font-bold">対象範囲（${selectedSubjects.length}件）：</span>
+          <ul class="ml-4 mt-1 space-y-1">
+            ${selectedSubjects.map(s => `
+              <li class="text-sm">
+                <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs mr-1">${s.grade}年</span>
+                ${s.subject} - ${s.unitName}
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      </div>
+    </div>
+  `
+}
+
+// テスト対策プランを生成
+async function generateTestPrepPlan() {
+  console.log('🎯 テスト対策プラン生成開始')
+  
+  try {
+    // フォームデータを取得
+    const testDate = document.getElementById('testDate')?.value
+    const targetScore = document.getElementById('targetScore')?.value || null
+    const currentLevel = document.getElementById('currentLevel')?.value
+    
+    if (!testDate) {
+      alert('テスト日程を入力してください')
+      return
+    }
+    
+    // 選択されたカリキュラムを取得
+    const selectedCurricula = []
+    document.querySelectorAll('.curriculum-checkbox:checked').forEach(checkbox => {
+      selectedCurricula.push({
+        curriculumId: parseInt(checkbox.dataset.curriculumId),
+        subject: checkbox.dataset.subject,
+        unitName: checkbox.dataset.unitName,
+        grade: checkbox.dataset.grade
+      })
+    })
+    
+    if (selectedCurricula.length === 0) {
+      alert('少なくとも1つの教科・単元を選択してください')
+      return
+    }
+    
+    // モーダルを閉じる
+    closeTestPrepModal()
+    
+    // ローディング表示
+    showLoading('テスト対策プランを作成しています...')
+    
+    // 学生IDを取得
+    const studentId = state.currentStudent?.id || state.student?.id || 1
+    
+    console.log('📤 APIリクエスト:', {
+      studentId,
+      testDate,
+      targetScore,
+      currentLevel,
+      subjects: selectedCurricula
+    })
+    
+    // バックエンドAPIを呼び出し
+    const response = await axios.post(`/api/ai/generate-test-plan/${studentId}`, {
+      testDate,
+      targetScore: targetScore ? parseInt(targetScore) : null,
+      currentLevel,
+      subjects: selectedCurricula
+    })
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'テスト対策プランの作成に失敗しました')
+    }
+    
+    console.log('✅ テスト対策プラン生成成功')
+    
+    // プランを表示
+    displayTestPrepPlan(response.data)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ テスト対策プラン生成エラー:', error)
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      stack: error.stack
+    })
+    
+    const errorMessage = error.response?.data?.details || error.message || 'テスト対策プランの作成に失敗しました'
+    alert(`テスト対策プランの作成に失敗しました。\n\n詳細: ${errorMessage}`)
+  }
+}
+
+// テスト対策プランを表示
+function displayTestPrepPlan(planData) {
+  console.log('📊 テスト対策プラン表示:', planData)
+  
+  const { test_plan, test_date, target_score, subjects, days_until_test } = planData
+  
+  const planHTML = `
+    <div class="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 py-8">
+      <div class="container mx-auto px-4 max-w-5xl">
+        
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg p-6 mb-6 shadow-xl">
+          <button onclick="loadGuidePage(${state.selectedCurriculum?.id || 1})" class="text-white hover:bg-white hover:bg-opacity-20 rounded px-3 py-1 mb-4 transition">
+            <i class="fas fa-arrow-left mr-2"></i>学習の手引きに戻る
+          </button>
+          <h1 class="text-3xl font-bold mb-2">
+            <i class="fas fa-graduation-cap mr-3"></i>あなた専用のテスト対策プラン
+          </h1>
+          <div class="flex flex-wrap gap-4 text-sm">
+            <div class="flex items-center">
+              <i class="fas fa-calendar-alt mr-2"></i>
+              テスト日：${test_date}（あと${days_until_test}日）
+            </div>
+            ${target_score ? `
+              <div class="flex items-center">
+                <i class="fas fa-star mr-2"></i>
+                目標点数：${target_score}点
+              </div>
+            ` : ''}
+            <div class="flex items-center">
+              <i class="fas fa-book mr-2"></i>
+              対象：${subjects.length}教科・単元
+            </div>
+          </div>
+        </div>
+        
+        <!-- 計画概要 -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 class="text-xl font-bold text-gray-800 mb-3">
+            <i class="fas fa-lightbulb text-orange-500 mr-2"></i>計画の概要
+          </h2>
+          <p class="text-gray-700 leading-relaxed">${test_plan.plan_summary || '計画を作成しました'}</p>
+        </div>
+        
+        <!-- 対象範囲 -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 class="text-xl font-bold text-gray-800 mb-4">
+            <i class="fas fa-list-check text-blue-500 mr-2"></i>対象範囲
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            ${subjects.map(subject => `
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div class="font-bold text-blue-800">${subject.subject}</div>
+                <div class="text-sm text-gray-600 mt-1">${subject.unitName}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <!-- 日別スケジュール -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 class="text-xl font-bold text-gray-800 mb-4">
+            <i class="fas fa-calendar-week text-green-500 mr-2"></i>日別スケジュール
+          </h2>
+          <div class="space-y-4">
+            ${(test_plan.daily_schedule || []).map(day => `
+              <div class="bg-gradient-to-r from-green-50 to-blue-50 border-l-4 border-green-400 rounded-lg p-4">
+                <div class="flex justify-between items-center mb-3">
+                  <h3 class="font-bold text-green-800">Day ${day.day} - ${day.date}</h3>
+                  <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">
+                    ${day.daily_goal || '今日の目標'}
+                  </span>
+                </div>
+                <div class="space-y-2">
+                  ${(day.tasks || []).map(task => `
+                    <div class="bg-white rounded p-3 shadow-sm">
+                      <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-bold text-gray-700">
+                          <i class="fas fa-clock text-blue-500 mr-1"></i>${task.time || '未設定'}
+                        </span>
+                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          ${task.estimated_minutes || 30}分
+                        </span>
+                      </div>
+                      <p class="text-gray-800">${task.activity}</p>
+                      ${task.learning_tip ? `
+                        <p class="text-xs text-gray-600 mt-2 italic">
+                          <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>${task.learning_tip}
+                        </p>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        
+        <!-- アクションボタン -->
+        <div class="flex gap-4 justify-center">
+          <button onclick="loadGuidePage(${state.selectedCurriculum?.id || 1})" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white px-6 py-3 rounded-lg font-bold transition shadow-lg">
+            <i class="fas fa-book mr-2"></i>学習を始める
+          </button>
+          <button onclick="window.print()" class="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-6 py-3 rounded-lg font-bold transition shadow-lg">
+            <i class="fas fa-print mr-2"></i>印刷する
+          </button>
+        </div>
+        
+      </div>
+    </div>
+  `
+  
+  document.getElementById('app').innerHTML = planHTML
+}
+
+// モーダルを閉じる
+function closeTestPrepModal(event) {
+  if (event && event.target.id !== 'testPrepModal') return
+  const modal = document.getElementById('testPrepModal')
+  if (modal) {
+    modal.remove()
+  }
+}
+
+// グローバルに公開
+window.showTestPrepModal = showTestPrepModal
+window.closeTestPrepModal = closeTestPrepModal
+window.generateTestPrepPlan = generateTestPrepPlan
+window.displayTestPrepPlan = displayTestPrepPlan
+window.updateSelectionSummary = updateSelectionSummary
+
+console.log('✅ Phase 10 家庭学習・テスト対策モード初期化完了')
 
 console.log('✅ Phase 9-2 PWA機能初期化完了')
