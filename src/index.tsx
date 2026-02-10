@@ -3682,24 +3682,22 @@ app.get('/api/progress/class-peer/:classCode/:curriculumId', async (c) => {
   const curriculumId = c.req.param('curriculumId')
   
   try {
-    // クラスの全生徒と進捗状況を取得（シンプル版）
+    // クラスの全生徒と進捗状況を取得（正しいテーブル構造に基づく）
     const classPeers = await env.DB.prepare(`
       SELECT 
-        u.id,
-        u.id as name,
-        u.student_number,
-        COUNT(DISTINCT sp.learning_card_id) as completed_cards,
-        AVG(sp.understanding_level) as avg_understanding,
-        MAX(sp.created_at) as last_activity,
-        SUM(CASE WHEN sp.status = 'help_requested' THEN 1 ELSE 0 END) as is_asking_help
+        u.user_id as id,
+        u.full_name as name,
+        u.username as student_number,
+        COUNT(DISTINCT CASE WHEN sp.status = 'completed' THEN sp.card_id END) as completed_cards,
+        AVG(CASE WHEN sp.status = 'completed' THEN sp.mastery_score ELSE NULL END) as avg_understanding,
+        MAX(sp.updated_at) as last_activity,
+        SUM(CASE WHEN sp.status IN ('in_progress', 'not_started') THEN 1 ELSE 0 END) as is_asking_help
       FROM users u
-      LEFT JOIN student_progress sp ON u.id = sp.student_id 
-        AND sp.curriculum_id = ? 
-        AND sp.status = 'completed'
-      WHERE u.class_code = ? AND u.role = 'student'
-      GROUP BY u.id, u.student_number
-      ORDER BY u.student_number
-    `).bind(curriculumId, classCode).all()
+      LEFT JOIN student_progress sp ON u.user_id = sp.student_id
+      WHERE u.user_type = 'student' AND u.is_active = 1
+      GROUP BY u.user_id, u.full_name, u.username
+      ORDER BY u.username
+    `).bind().all()
     
     // プライバシー配慮：理解度の詳細は隠して、完了カード数のみ表示
     const simplifiedPeers = classPeers.results.map(peer => ({
@@ -3736,30 +3734,28 @@ app.get('/api/help/available-helpers/:classCode/:curriculumId/:cardId', async (c
   const cardId = c.req.param('cardId')
   
   try {
-    // このカードをすでにクリアしている友達を検索
+    // このカードをすでにクリアしている友達を検索（正しいテーブル構造に基づく）
     const helpers = await env.DB.prepare(`
       SELECT 
-        u.id,
-        u.id as name,
-        u.student_number,
-        sp.understanding_level,
-        sp.created_at as completed_at,
-        COUNT(DISTINCT sp2.learning_card_id) as total_completed
+        u.user_id as id,
+        u.full_name as name,
+        u.username as student_number,
+        sp.mastery_score as understanding_level,
+        sp.updated_at as completed_at,
+        COUNT(DISTINCT sp2.card_id) as total_completed
       FROM users u
-      INNER JOIN student_progress sp ON u.id = sp.student_id
-        AND sp.curriculum_id = ?
-        AND sp.learning_card_id = ?
-        AND sp.status = 'completed'
-        AND sp.understanding_level >= 60
-      LEFT JOIN student_progress sp2 ON u.id = sp2.student_id
-        AND sp2.curriculum_id = ?
-        AND sp2.status = 'completed'
-      WHERE u.class_code = ? AND u.role = 'student'
-      GROUP BY u.id, u.student_number, sp.understanding_level, sp.created_at
+      INNER JOIN student_progress sp ON u.user_id = sp.student_id
+        AND sp.card_id = ?
+        AND sp.status IN ('completed', 'mastered')
+        AND sp.mastery_score >= 60
+      LEFT JOIN student_progress sp2 ON u.user_id = sp2.student_id
+        AND sp2.status IN ('completed', 'mastered')
+      WHERE u.user_type = 'student' AND u.is_active = 1
+      GROUP BY u.user_id, u.full_name, u.username, sp.mastery_score, sp.updated_at
       HAVING total_completed >= 3
-      ORDER BY sp.understanding_level DESC, sp.created_at ASC
+      ORDER BY sp.mastery_score DESC, sp.updated_at ASC
       LIMIT 10
-    `).bind(curriculumId, cardId, curriculumId, classCode).all()
+    `).bind(cardId).all()
     
     return c.json({ 
       success: true, 
