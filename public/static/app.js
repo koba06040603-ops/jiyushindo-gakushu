@@ -3195,6 +3195,9 @@ async function loadGuidePage(curriculumId) {
               <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
             </button>
             <div class="flex gap-2">
+              <button onclick="showClassProgress()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-users mr-2"></i>クラス進捗
+              </button>
               <button onclick="showAIRecommendedProblems(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-robot mr-2"></i>AIおすすめ
               </button>
