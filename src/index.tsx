@@ -3676,7 +3676,8 @@ app.post('/api/progress/activity', async (c) => {
 // =============================================================================
 
 // 児童向けクラス進捗取得API（シンプル版・プライバシー配慮）
-app.get('/api/progress/class-peer/:classCode/:curriculumId', async (c) => {
+// パラメータなしでも動作（全生徒の進捗を返す）
+app.get('/api/progress/class-peer/:classCode?/:curriculumId?', async (c) => {
   const { env } = c
   const classCode = c.req.param('classCode')
   const curriculumId = c.req.param('curriculumId')
@@ -3718,6 +3719,50 @@ app.get('/api/progress/class-peer/:classCode/:curriculumId', async (c) => {
       classCode,
       curriculumId
     })
+    return c.json({ 
+      success: false, 
+      error: 'データ取得に失敗しました',
+      details: error instanceof Error ? error.message : String(error)
+    }, 500)
+  }
+})
+
+// シンプルなクラス進捗取得API（パラメータなし）
+app.get('/api/progress/class-peer', async (c) => {
+  const { env } = c
+  
+  try {
+    // 全アクティブ生徒の進捗状況を取得
+    const classPeers = await env.DB.prepare(`
+      SELECT 
+        u.user_id as id,
+        u.full_name as name,
+        u.username as student_number,
+        COUNT(DISTINCT CASE WHEN sp.status IN ('completed', 'mastered') THEN sp.card_id END) as completed_cards,
+        AVG(CASE WHEN sp.status IN ('completed', 'mastered') THEN sp.mastery_score ELSE NULL END) as avg_understanding,
+        MAX(sp.updated_at) as last_activity,
+        SUM(CASE WHEN sp.status IN ('in_progress', 'not_started') THEN 1 ELSE 0 END) as is_asking_help
+      FROM users u
+      LEFT JOIN student_progress sp ON u.user_id = sp.student_id
+      WHERE u.user_type = 'student' AND u.is_active = 1
+      GROUP BY u.user_id, u.full_name, u.username
+      ORDER BY u.username
+    `).bind().all()
+    
+    // プライバシー配慮：理解度の詳細は隠して、完了カード数のみ表示
+    const simplifiedPeers = classPeers.results.map(peer => ({
+      id: peer.id,
+      name: peer.name,
+      student_number: peer.student_number,
+      completed_cards: peer.completed_cards || 0,
+      can_help: (peer.completed_cards || 0) >= 3 && (peer.avg_understanding || 0) >= 60,
+      is_asking_help: (peer.is_asking_help || 0) > 0,
+      last_activity: peer.last_activity
+    }))
+    
+    return c.json({ success: true, peers: simplifiedPeers })
+  } catch (error) {
+    console.error('クラス進捗取得エラー:', error)
     return c.json({ 
       success: false, 
       error: 'データ取得に失敗しました',
