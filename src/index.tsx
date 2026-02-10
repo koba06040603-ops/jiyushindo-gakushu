@@ -3686,7 +3686,7 @@ app.get('/api/progress/class-peer/:classCode/:curriculumId', async (c) => {
     const classPeers = await env.DB.prepare(`
       SELECT 
         u.id,
-        u.username as name,
+        u.id as name,
         u.student_number,
         COUNT(DISTINCT sp.learning_card_id) as completed_cards,
         AVG(sp.understanding_level) as avg_understanding,
@@ -3697,7 +3697,7 @@ app.get('/api/progress/class-peer/:classCode/:curriculumId', async (c) => {
         AND sp.curriculum_id = ? 
         AND sp.status = 'completed'
       WHERE u.class_code = ? AND u.role = 'student'
-      GROUP BY u.id, u.username, u.student_number
+      GROUP BY u.id, u.student_number
       ORDER BY u.student_number
     `).bind(curriculumId, classCode).all()
     
@@ -3740,7 +3740,7 @@ app.get('/api/help/available-helpers/:classCode/:curriculumId/:cardId', async (c
     const helpers = await env.DB.prepare(`
       SELECT 
         u.id,
-        u.username as name,
+        u.id as name,
         u.student_number,
         sp.understanding_level,
         sp.created_at as completed_at,
@@ -3755,7 +3755,7 @@ app.get('/api/help/available-helpers/:classCode/:curriculumId/:cardId', async (c
         AND sp2.curriculum_id = ?
         AND sp2.status = 'completed'
       WHERE u.class_code = ? AND u.role = 'student'
-      GROUP BY u.id, u.username, u.student_number, sp.understanding_level, sp.created_at
+      GROUP BY u.id, u.student_number, sp.understanding_level, sp.created_at
       HAVING total_completed >= 3
       ORDER BY sp.understanding_level DESC, sp.created_at ASC
       LIMIT 10
