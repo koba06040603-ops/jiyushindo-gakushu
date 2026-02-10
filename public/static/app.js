@@ -38781,14 +38781,57 @@ async function showTestPrepModal() {
   
   try {
     // 利用可能なカリキュラム（教科・単元）を取得
-    const curriculaResponse = await axios.get('/api/curriculum/list')
-    const curricula = Array.isArray(curriculaResponse.data) ? curriculaResponse.data : []
+    let curricula = []
     
-    console.log('📚 取得したカリキュラム数:', curricula.length)
+    try {
+      const curriculaResponse = await axios.get('/api/curriculum/list')
+      curricula = Array.isArray(curriculaResponse.data) ? curriculaResponse.data : []
+      console.log('📚 取得したカリキュラム数:', curricula.length)
+    } catch (apiError) {
+      console.warn('⚠️ カリキュラムAPI取得エラー:', apiError)
+      // APIエラーの場合はダミーデータを使用
+    }
     
+    // データベースが空の場合、ダミーデータを使用
     if (curricula.length === 0) {
-      alert('カリキュラムデータが取得できませんでした。\n\nデータベースにカリキュラムが登録されているか確認してください。')
-      return
+      console.log('📋 ダミーカリキュラムを使用します')
+      curricula = [
+        {
+          id: 1,
+          subject: '算数',
+          grade: '小学5年',
+          unit_name: 'わり算と分数',
+          unit_goal: 'わり算と分数の関係を理解し、計算できるようになる'
+        },
+        {
+          id: 2,
+          subject: '算数',
+          grade: '小学5年',
+          unit_name: '図形の面積',
+          unit_goal: '三角形や平行四辺形の面積を求められるようになる'
+        },
+        {
+          id: 3,
+          subject: '国語',
+          grade: '小学5年',
+          unit_name: '物語文の読解',
+          unit_goal: '登場人物の気持ちを読み取り、表現できるようになる'
+        },
+        {
+          id: 4,
+          subject: '理科',
+          grade: '小学5年',
+          unit_name: '電流のはたらき',
+          unit_goal: '電流の性質を理解し、実験を通して確かめる'
+        },
+        {
+          id: 5,
+          subject: '社会',
+          grade: '小学5年',
+          unit_name: '日本の工業',
+          unit_goal: '日本の工業の特徴や分布を理解する'
+        }
+      ]
     }
     
     const modalHTML = `

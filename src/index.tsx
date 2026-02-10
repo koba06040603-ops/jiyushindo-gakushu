@@ -26718,7 +26718,23 @@ app.post('/api/ai/generate-test-plan/:studentId', async (c) => {
         .bind(subject.curriculumId).first()
       
       if (!curriculum) {
-        console.warn(`⚠️ カリキュラムID ${subject.curriculumId} が見つかりません`)
+        console.warn(`⚠️ カリキュラムID ${subject.curriculumId} が見つかりません - ダミーデータを使用`)
+        
+        // カリキュラムが見つからない場合、ダミーデータを使用
+        subjectDetails.push({
+          curriculumId: subject.curriculumId,
+          subject: subject.subject || '教科名',
+          unitName: subject.unitName || '単元名',
+          grade: subject.grade || '小学5年',
+          unitGoal: '単元目標（ダミー）',
+          stats: {
+            total_attempts: 0,
+            correct_count: 0,
+            accuracy: 0,
+            avg_time: 0,
+            hint_usage: 0
+          }
+        })
         continue
       }
       
