@@ -36991,7 +36991,18 @@ async function showAIRecommendedProblems(curriculumId) {
   } catch (error) {
     hideLoading()
     console.error('❌ AI推奨問題取得エラー:', error)
-    alert('AI推奨問題の取得に失敗しました。')
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url
+    })
+    
+    // 詳細なエラーメッセージを表示
+    const errorMsg = error.response?.data?.error || error.message || 'Unknown error'
+    const errorDetails = error.response?.data?.details || ''
+    
+    alert(`AI推奨問題の取得に失敗しました。\n\n詳細: ${errorMsg}\n${errorDetails}`)
   }
 }
 
@@ -37043,7 +37054,18 @@ async function generateStudyPlan(curriculumId) {
   } catch (error) {
     hideLoading()
     console.error('❌ 学習計画生成エラー:', error)
-    alert('学習計画の作成に失敗しました。')
+    console.error('Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url
+    })
+    
+    // 詳細なエラーメッセージを表示
+    const errorMsg = error.response?.data?.error || error.message || 'Unknown error'
+    const errorDetails = error.response?.data?.details || ''
+    
+    alert(`学習計画の作成に失敗しました。\n\n詳細: ${errorMsg}\n${errorDetails}`)
   }
 }
 
