@@ -9409,32 +9409,73 @@ app.post('/api/ai/recommend-problems/:studentId', async (c) => {
       weakAreas.push('復習チェックリスト')
     }
     
-    // 5. AIプロンプト生成
+    // 5. 学習特性の分析
+    const learningCharacteristics = {
+      understanding_speed: stats.avg_time < 30 ? '速習型' : stats.avg_time < 60 ? '標準型' : 'ゆっくり型',
+      hint_dependency: stats.total_attempts > 0 ? Math.round((stats.hint_usage / stats.total_attempts) * 100) : 0,
+      learning_pattern: stats.accuracy >= 80 ? '安定型' : stats.accuracy >= 60 ? '成長型' : '基礎強化型',
+      problem_solving_approach: stats.avg_time < 30 ? '直感的・速断型' : stats.avg_time > 90 ? '慎重・熟考型' : 'バランス型'
+    }
+
+    // 6. AIプロンプト生成（学習特性を考慮）
     const aiPrompt = `
-あなたは小学生の学習を支援する教育AIです。以下の学習データを分析し、個別最適化された問題推奨を行ってください。
+あなたは児童生徒の学習を支援する教育AIです。以下の学習データを分析し、**個々の学習特性**を深く理解した上で、個別最適化された問題推奨を行ってください。
 
 【カリキュラム情報】
 - 学年: 小学${curriculum.grade}年
 - 教科: ${curriculum.subject}
 - 単元名: ${curriculum.unit_name}
+- 単元目標: ${curriculum.unit_goal || '未設定'}
 
-【学習履歴】
+【学習履歴の基本データ】
 - 総挑戦回数: ${stats.total_attempts}回
 - 正答数: ${stats.correct_count}回
 - 正答率: ${stats.accuracy}%
 - 平均回答時間: ${stats.avg_time}秒
-- ヒント使用回数: ${stats.hint_usage}回
+- ヒント使用回数: ${stats.hint_usage}回（依存度: ${learningCharacteristics.hint_dependency}%）
 
 【コンテンツタイプ別パフォーマンス】
 ${Object.entries(stats.by_content_type).map(([type, data]: [string, any]) => 
   `- ${type}: ${data.attempts}回挑戦、正答率${data.accuracy}%、平均${data.avg_time}秒`
 ).join('\n')}
 
+【学習特性の分析】
+- 理解速度: ${learningCharacteristics.understanding_speed}（平均${stats.avg_time}秒/問）
+- ヒント依存度: ${learningCharacteristics.hint_dependency}%
+- 学習パターン: ${learningCharacteristics.learning_pattern}（正答率${stats.accuracy}%）
+- 問題解決アプローチ: ${learningCharacteristics.problem_solving_approach}
+
 【苦手分野】
 ${weakAreas.length > 0 ? weakAreas.join('、') : 'なし'}
 
+【重要：学習特性を考慮した推奨のポイント】
+1. **理解速度に応じた難易度調整**
+   - ゆっくり型: 基礎を丁寧に、1ステップずつ進む問題
+   - 標準型: バランスの取れた問題構成
+   - 速習型: チャレンジングな発展問題を含める
+
+2. **ヒント依存度に応じたサポート**
+   - 高依存（>50%）: より詳細なヒント、段階的な誘導
+   - 中依存（30-50%）: 適度なヒント、自力解決を促す
+   - 低依存（<30%）: 最小限のヒント、自主性を尊重
+
+3. **学習パターンに応じた内容**
+   - 基礎強化型（<60%）: 基礎の反復、スモールステップ
+   - 成長型（60-79%）: 基礎+応用のバランス
+   - 安定型（≧80%）: 応用・発展問題中心
+
+4. **問題解決アプローチに応じた問題形式**
+   - 直感的・速断型: 複数の解法を試す問題、深い理解を促す
+   - バランス型: 多様な問題形式
+   - 慎重・熟考型: 思考過程を重視、じっくり考える問題
+
+5. **非認知能力（心の成長）の育成**
+   - 粘り強さ: 段階的に難易度を上げる
+   - 自己調整力: 自分のペースで学べる選択肢
+   - メタ認知: 「なぜ間違えたか」を考える問題
+
 【タスク】
-上記のデータを分析し、この児童に最適な学習推奨を生成してください。
+上記の学習特性を深く考慮し、この児童生徒に最適な学習推奨を生成してください。
 
 【出力形式】
 以下のJSON形式で出力してください：
@@ -9442,34 +9483,45 @@ ${weakAreas.length > 0 ? weakAreas.join('、') : 'なし'}
 {
   "analysis": {
     "learning_level": "初級 / 中級 / 上級",
-    "study_style": "学習スタイルの特徴（2-3文）",
+    "study_style": "学習スタイルの特徴（3-5文、学習特性を具体的に説明）",
+    "learning_characteristics": {
+      "understanding_speed": "理解速度の評価",
+      "hint_dependency": "ヒント依存度の評価",
+      "problem_solving_style": "問題解決スタイルの評価",
+      "recommended_approach": "推奨される学習アプローチ"
+    },
     "strengths": ["強み1", "強み2"],
-    "weaknesses": ["課題1", "課題2"]
+    "weaknesses": ["課題1", "課題2"],
+    "growth_areas": ["心の成長・非認知能力の育成ポイント1", "育成ポイント2"]
   },
   "recommended_problems": [
     {
       "problem_type": "frequent_problems / application_problems / review_checklist",
       "difficulty": "easy / medium / hard",
       "title": "問題タイトル（20文字以内）",
-      "content": "問題内容（80-150文字）",
-      "reason": "この問題を推奨する理由（50文字以内）",
-      "hints": ["ヒント1", "ヒント2"],
+      "content": "問題内容（80-150文字、学習特性に合わせた内容）",
+      "reason": "この問題を推奨する理由（学習特性との関連を明記、70文字以内）",
+      "learning_support": "この児童に合った学び方のヒント（50文字以内）",
+      "hints": ["ヒント1（学習特性を考慮）", "ヒント2"],
       "answer": "解答（50-100文字）",
-      "explanation": "解説（100-200文字）"
+      "explanation": "解説（100-200文字、理解を深める説明）",
+      "non_cognitive_focus": "この問題で育てる非認知能力（例: 粘り強さ、メタ認知）"
     }
   ],
   "study_plan": {
-    "immediate_focus": "今すぐ取り組むべき内容",
+    "immediate_focus": "今すぐ取り組むべき内容（学習特性に基づく）",
     "weekly_goal": "今週の目標",
-    "long_term_goal": "長期的な目標",
-    "estimated_time": "推奨学習時間（分）"
+    "long_term_goal": "長期的な目標（学力+非認知能力）",
+    "estimated_time": "推奨学習時間（分）",
+    "personalized_tips": ["個別化された学習のコツ1", "コツ2"]
   },
-  "motivation_message": "児童へのメッセージ（50-100文字、ポジティブで励ます内容）"
+  "motivation_message": "児童生徒へのメッセージ（80-120文字、学習特性を踏まえた励まし）"
 }
 
 ※ recommended_problems は3-5問を推奨してください
-※ 苦手分野がある場合は、その分野を重点的にカバーする問題を含めてください
-※ 正答率が高い場合は、より難易度の高い問題を推奨してください
+※ 各問題は児童の学習特性（理解速度、ヒント依存度、問題解決スタイル）に合わせて調整してください
+※ 苦手分野がある場合は、その分野を重点的にカバーしつつ、学習特性に配慮した問題を含めてください
+※ 非認知能力（粘り強さ、自己調整力、メタ認知）の育成も意識してください
 `
     
     // 6. Gemini API呼び出し
@@ -9681,14 +9733,24 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
       })
     }
     
-    // AIプロンプト
+    // 学習特性の分析
+    const learningCharacteristics = {
+      understanding_speed: (stats?.total_attempts || 0) > 0 && stats?.avg_time 
+        ? (stats.avg_time < 30 ? '速習型' : stats.avg_time < 60 ? '標準型' : 'ゆっくり型')
+        : '不明',
+      accuracy_level: stats ? (stats.accuracy >= 80 ? '安定型' : stats.accuracy >= 60 ? '成長型' : '基礎強化型') : '不明',
+      study_consistency: studyPace.recent_activity.length >= 7 ? '継続的' : studyPace.recent_activity.length >= 3 ? '定期的' : '不規則'
+    }
+
+    // AIプロンプト（学習特性を考慮）
     const aiPrompt = `
-あなたは小学生の学習計画を立てる教育AIです。以下のデータから最適な学習計画を作成してください。
+あなたは児童生徒の学習計画を立てる教育AIです。以下のデータから、**個々の学習特性を深く考慮した**最適な学習計画を作成してください。
 
 【カリキュラム情報】
 - 学年: 小学${curriculum.grade}年
 - 教科: ${curriculum.subject}
 - 単元名: ${curriculum.unit_name}
+- 単元目標: ${curriculum.unit_goal || '未設定'}
 - 総学習時間: ${curriculum.total_hours}時間
 
 【学習実績】
@@ -9696,17 +9758,46 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
 - 総問題数: ${stats?.total_attempts || 0}問
 - 正答数: ${stats?.correct_count || 0}問
 - 正答率: ${stats ? Math.round((stats.correct_count / stats.total_attempts) * 100) : 0}%
+- 平均回答時間: ${stats?.avg_time || 0}秒
 - 1日あたり平均: ${Math.round(studyPace.avg_problems_per_day)}問
+
+【学習特性の分析】
+- 理解速度: ${learningCharacteristics.understanding_speed}
+- 正答率レベル: ${learningCharacteristics.accuracy_level}
+- 学習の継続性: ${learningCharacteristics.study_consistency}
 
 【目標】
 - 目標達成日: ${targetDate || '未設定'}
 
+【重要：学習特性を考慮した計画立案のポイント】
+1. **理解速度に応じた進度調整**
+   - ゆっくり型: 無理のないペース、1日の学習量を少なめに
+   - 標準型: バランスの取れた進度
+   - 速習型: チャレンジングな目標設定、発展内容も含める
+
+2. **正答率レベルに応じた内容配分**
+   - 基礎強化型（<60%）: 基礎の徹底反復、復習時間を多めに
+   - 成長型（60-79%）: 基礎と応用のバランス
+   - 安定型（≧80%）: 応用・発展問題を多めに
+
+3. **学習の継続性に応じた計画設計**
+   - 不規則: 学習習慣の定着を優先、短時間の学習から
+   - 定期的: 習慣を維持しつつ、徐々に学習量を増やす
+   - 継続的: 現在のペースを維持、質の向上を目指す
+
+4. **非認知能力（心の成長）の育成**
+   - 粘り強さ: 段階的な難易度アップ
+   - 自己調整力: 自分で学習計画を調整できる余地
+   - メタ認知: 振り返りの時間を組み込む
+   - 達成感: 小さな成功体験を積み重ねる
+
 【タスク】
-上記データから、目標達成に向けた学習計画を作成してください。
+上記の学習特性を深く考慮し、目標達成に向けた個別最適化された学習計画を作成してください。
 
 【出力形式】
 {
-  "plan_summary": "計画の概要（2-3文）",
+  "plan_summary": "計画の概要（3-5文、学習特性を踏まえた説明）",
+  "learning_approach": "この児童生徒に合った学習アプローチ（2-3文）",
   "daily_schedule": [
     {
       "day": 1,
@@ -9714,31 +9805,41 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
       "tasks": [
         {
           "time": "10:00-10:30",
-          "activity": "活動内容",
+          "activity": "活動内容（学習特性に配慮）",
           "content_type": "frequent_problems / application_problems / review_checklist",
-          "estimated_minutes": 30
+          "estimated_minutes": 30,
+          "learning_tip": "この児童に合った取り組み方のヒント"
         }
       ],
-      "daily_goal": "今日の目標"
+      "daily_goal": "今日の目標",
+      "non_cognitive_focus": "今日育てる非認知能力（例: 粘り強さ）"
     }
   ],
   "weekly_milestones": [
     {
       "week": 1,
-      "goal": "週の目標",
-      "focus_areas": ["重点分野1", "重点分野2"]
+      "goal": "週の目標（学習特性に基づく）",
+      "focus_areas": ["重点分野1", "重点分野2"],
+      "growth_target": "心の成長目標（非認知能力）"
     }
   ],
   "review_schedule": [
     {
       "date": "YYYY-MM-DD",
       "review_type": "short_term / long_term",
-      "content": "復習内容"
+      "content": "復習内容",
+      "why_important": "なぜこのタイミングで復習するのか"
     }
   ],
-  "tips": ["学習のコツ1", "学習のコツ2", "学習のコツ3"],
-  "motivation": "目標達成に向けたメッセージ"
+  "tips": ["学習のコツ1（学習特性に基づく）", "コツ2", "コツ3"],
+  "personalized_advice": ["個別化されたアドバイス1", "アドバイス2"],
+  "motivation": "目標達成に向けたメッセージ（学習特性を踏まえた励まし、100文字以内）"
 }
+
+※ 学習特性（理解速度、正答率レベル、学習の継続性）を深く考慮してください
+※ 無理のない計画にしつつ、成長を促す内容にしてください
+※ 非認知能力（心の成長）の育成も意識してください
+※ daily_scheduleは最低3日分、最大7日分を生成してください
 `
     
     console.log('🤖 Gemini API呼び出し開始...')
