@@ -37074,6 +37074,17 @@ async function generateStudyPlan(curriculumId) {
 
 // 学習計画モーダル表示
 function showStudyPlanModal(studyPace, studyPlan, targetDate) {
+  // 安全性チェック
+  if (!studyPlan) {
+    alert('学習計画データが不正です')
+    return
+  }
+  
+  // 配列データの安全性チェック
+  const weeklyMilestones = Array.isArray(studyPlan.weekly_milestones) ? studyPlan.weekly_milestones : []
+  const reviewSchedule = Array.isArray(studyPlan.review_schedule) ? studyPlan.review_schedule : []
+  const tips = Array.isArray(studyPlan.tips) ? studyPlan.tips : []
+  
   const modalHTML = `
     <div id="studyPlanModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeStudyPlanModal(event)">
       <div class="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
@@ -37133,14 +37144,14 @@ function showStudyPlanModal(studyPace, studyPlan, targetDate) {
               <i class="fas fa-calendar-week mr-2 text-purple-600"></i>週別の目標
             </h3>
             <div class="space-y-3">
-              ${studyPlan.weekly_milestones.map((milestone, index) => `
+              ${weeklyMilestones.map((milestone, index) => `
                 <div class="bg-white border border-purple-200 rounded-lg p-4">
                   <div class="flex items-center justify-between mb-2">
                     <h4 class="font-bold text-purple-600">第${milestone.week}週</h4>
                   </div>
                   <p class="text-gray-700 mb-2">${milestone.goal}</p>
                   <div class="flex flex-wrap gap-2">
-                    ${milestone.focus_areas.map(area => `
+                    ${(Array.isArray(milestone.focus_areas) ? milestone.focus_areas : []).map(area => `
                       <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded">
                         ⭐ ${area}
                       </span>
@@ -37157,7 +37168,7 @@ function showStudyPlanModal(studyPace, studyPlan, targetDate) {
               <i class="fas fa-redo mr-2 text-orange-600"></i>復習スケジュール
             </h3>
             <div class="space-y-2">
-              ${studyPlan.review_schedule.map(review => {
+              ${reviewSchedule.map(review => {
                 const typeLabels = {
                   'short_term': { text: '短期復習', color: 'yellow' },
                   'long_term': { text: '長期復習', color: 'orange' }
@@ -37184,7 +37195,7 @@ function showStudyPlanModal(studyPace, studyPlan, targetDate) {
               <i class="fas fa-lightbulb mr-2 text-yellow-600"></i>学習のコツ
             </h3>
             <ul class="space-y-2">
-              ${studyPlan.tips.map(tip => `
+              ${tips.map(tip => `
                 <li class="flex items-start">
                   <i class="fas fa-check-circle text-green-600 mr-2 mt-1"></i>
                   <span class="text-gray-700">${tip}</span>
@@ -38771,7 +38782,14 @@ async function showTestPrepModal() {
   try {
     // 利用可能なカリキュラム（教科・単元）を取得
     const curriculaResponse = await axios.get('/api/curriculum/list')
-    const curricula = curriculaResponse.data
+    const curricula = Array.isArray(curriculaResponse.data) ? curriculaResponse.data : []
+    
+    console.log('📚 取得したカリキュラム数:', curricula.length)
+    
+    if (curricula.length === 0) {
+      alert('カリキュラムデータが取得できませんでした。\n\nデータベースにカリキュラムが登録されているか確認してください。')
+      return
+    }
     
     const modalHTML = `
       <div id="testPrepModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="closeTestPrepModal(event)">
