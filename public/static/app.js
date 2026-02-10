@@ -25660,8 +25660,8 @@ async function showClassProgress() {
   try {
     showLoading('クラスのみんなの進捗を確認中...')
     
-    // クラス進捗データ取得
-    const response = await axios.get(`/api/progress/class-peer/${state.student.classCode}/${state.selectedCurriculum.id}`)
+    // クラス進捗データ取得（パラメータなし）
+    const response = await axios.get(`/api/progress/class-peer`)
     const { peers } = response.data
     
     const app = document.getElementById('app')
