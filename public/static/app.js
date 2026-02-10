@@ -25791,10 +25791,10 @@ async function showClassProgress() {
 async function requestPeerHelp(helperId, helperName) {
   // 助けられる友達リストを取得
   try {
-    const response = await axios.get(
+    const helperResponse = await axios.get(
       `/api/help/available-helpers/${state.student.classCode}/${state.selectedCurriculum.id}/${state.selectedCard}`
     )
-    const { helpers } = response.data
+    const { helpers } = helperResponse.data
     
     if (helpers.length === 0) {
       alert(`${helperName}さんはまだこの問題をクリアしていないようです。\n別の友達に聞いてみましょう！`)
