@@ -3732,7 +3732,41 @@ app.get('/api/progress/class-peer', async (c) => {
   const { env } = c
   
   try {
-    // 全アクティブ生徒の進捗状況を取得
+    // まずダミーデータを返して動作確認
+    const dummyPeers = [
+      {
+        id: 1,
+        name: '山田太郎',
+        student_number: '001',
+        completed_cards: 5,
+        can_help: true,
+        is_asking_help: false,
+        last_activity: new Date().toISOString()
+      },
+      {
+        id: 2,
+        name: '佐藤花子',
+        student_number: '002',
+        completed_cards: 3,
+        can_help: true,
+        is_asking_help: false,
+        last_activity: new Date().toISOString()
+      },
+      {
+        id: 3,
+        name: '鈴木一郎',
+        student_number: '003',
+        completed_cards: 1,
+        can_help: false,
+        is_asking_help: true,
+        last_activity: new Date().toISOString()
+      }
+    ]
+    
+    return c.json({ success: true, peers: dummyPeers })
+    
+    // TODO: 実際のデータベースクエリを実装
+    /*
     const classPeers = await env.DB.prepare(`
       SELECT 
         u.user_id as id,
@@ -3749,7 +3783,6 @@ app.get('/api/progress/class-peer', async (c) => {
       ORDER BY u.username
     `).bind().all()
     
-    // プライバシー配慮：理解度の詳細は隠して、完了カード数のみ表示
     const simplifiedPeers = classPeers.results.map(peer => ({
       id: peer.id,
       name: peer.name,
@@ -3761,6 +3794,7 @@ app.get('/api/progress/class-peer', async (c) => {
     }))
     
     return c.json({ success: true, peers: simplifiedPeers })
+    */
   } catch (error) {
     console.error('クラス進捗取得エラー:', error)
     return c.json({ 
