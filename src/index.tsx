@@ -9636,6 +9636,11 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
         curriculum_id: curriculumId,
         target_date: targetDate,
         days_until_target: daysUntilTarget,
+        study_pace: {
+          total_days: 0,
+          avg_problems_per_day: 0,
+          recent_activity: []
+        },
         study_plan: {
           plan_summary: `${curriculum.unit_name}の学習を${daysUntilTarget}日間で完了する計画です。まずは基礎から始めて、徐々にステップアップしていきましょう。`,
           daily_schedule: [
