@@ -37091,15 +37091,20 @@ function showStudyPlanModal(studyPace, studyPlan, targetDate) {
         <!-- ヘッダー -->
         <div class="bg-gradient-to-r from-green-600 to-teal-600 text-white p-6">
           <div class="flex items-center justify-between">
-            <div>
+            <div class="flex-1">
               <h2 class="text-2xl font-bold">
                 <i class="fas fa-calendar-check mr-2"></i>あなただけの学習計画
               </h2>
               <p class="text-sm opacity-90 mt-1">目標達成日: ${targetDate}</p>
             </div>
-            <button onclick="closeStudyPlanModal()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all">
-              <i class="fas fa-times text-xl"></i>
-            </button>
+            <div class="flex items-center gap-3">
+              <button id="toggleEditButton" onclick="toggleEditMode()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow">
+                <i class="fas fa-edit mr-2"></i>編集モード
+              </button>
+              <button onclick="closeStudyPlanModal()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
           </div>
         </div>
         
@@ -39264,5 +39269,297 @@ window.displayTestPrepPlan = displayTestPrepPlan
 window.updateSelectionSummary = updateSelectionSummary
 
 console.log('✅ Phase 10 家庭学習・テスト対策モード初期化完了')
+
+// ============================================================
+// Phase 11: 編集可能な学習計画表
+// ============================================================
+
+// 学習計画データの保存
+function saveStudyPlanToStorage(planId, planData) {
+  try {
+    const storageKey = `study_plan_${planId}`
+    localStorage.setItem(storageKey, JSON.stringify(planData))
+    console.log('💾 学習計画を保存しました:', storageKey)
+    return true
+  } catch (error) {
+    console.error('❌ 学習計画の保存エラー:', error)
+    return false
+  }
+}
+
+// 学習計画データの読み込み
+function loadStudyPlanFromStorage(planId) {
+  try {
+    const storageKey = `study_plan_${planId}`
+    const data = localStorage.getItem(storageKey)
+    if (data) {
+      console.log('📂 学習計画を読み込みました:', storageKey)
+      return JSON.parse(data)
+    }
+    return null
+  } catch (error) {
+    console.error('❌ 学習計画の読み込みエラー:', error)
+    return null
+  }
+}
+
+// 編集モードの切り替え
+let isEditMode = false
+
+function toggleEditMode() {
+  isEditMode = !isEditMode
+  const editButton = document.getElementById('toggleEditButton')
+  const allEditButtons = document.querySelectorAll('.edit-action-button')
+  
+  if (isEditMode) {
+    // 編集モードON
+    editButton.innerHTML = '<i class="fas fa-save mr-2"></i>編集完了'
+    editButton.classList.remove('bg-blue-600', 'hover:bg-blue-700')
+    editButton.classList.add('bg-green-600', 'hover:bg-green-700')
+    
+    // 編集ボタンを表示
+    allEditButtons.forEach(btn => {
+      btn.classList.remove('hidden')
+    })
+    
+    showNotification('編集モードON：タスクをクリックして編集できます', 'info')
+  } else {
+    // 編集モードOFF
+    editButton.innerHTML = '<i class="fas fa-edit mr-2"></i>編集モード'
+    editButton.classList.remove('bg-green-600', 'hover:bg-green-700')
+    editButton.classList.add('bg-blue-600', 'hover:bg-blue-700')
+    
+    // 編集ボタンを非表示
+    allEditButtons.forEach(btn => {
+      btn.classList.add('hidden')
+    })
+    
+    // データを保存
+    saveCurrentPlanData()
+    showNotification('変更を保存しました', 'success')
+  }
+}
+
+// 現在の計画データを保存
+function saveCurrentPlanData() {
+  const planId = state.currentPlanId || 'default'
+  
+  // DOMから現在のデータを収集
+  const dailySchedule = []
+  const dayElements = document.querySelectorAll('[data-day-index]')
+  
+  dayElements.forEach((dayEl, index) => {
+    const tasks = []
+    const taskElements = dayEl.querySelectorAll('[data-task-index]')
+    
+    taskElements.forEach(taskEl => {
+      const timeInput = taskEl.querySelector('.task-time')
+      const activityInput = taskEl.querySelector('.task-activity')
+      const minutesInput = taskEl.querySelector('.task-minutes')
+      const checkbox = taskEl.querySelector('.task-complete-checkbox')
+      
+      tasks.push({
+        time: timeInput ? timeInput.value : taskEl.querySelector('[data-task-time]')?.textContent,
+        activity: activityInput ? activityInput.value : taskEl.querySelector('[data-task-activity]')?.textContent,
+        estimated_minutes: minutesInput ? parseInt(minutesInput.value) : parseInt(taskEl.querySelector('[data-task-minutes]')?.textContent || 30),
+        completed: checkbox ? checkbox.checked : false
+      })
+    })
+    
+    const dailyGoalInput = dayEl.querySelector('.daily-goal-input')
+    
+    dailySchedule.push({
+      day: index + 1,
+      date: dayEl.querySelector('[data-day-date]')?.textContent || '',
+      tasks: tasks,
+      daily_goal: dailyGoalInput ? dailyGoalInput.value : dayEl.querySelector('[data-daily-goal]')?.textContent || ''
+    })
+  })
+  
+  const planData = {
+    daily_schedule: dailySchedule,
+    last_updated: new Date().toISOString()
+  }
+  
+  saveStudyPlanToStorage(planId, planData)
+}
+
+// タスクの時間を編集
+function editTaskTime(dayIndex, taskIndex) {
+  const taskEl = document.querySelector(`[data-day-index="${dayIndex}"] [data-task-index="${taskIndex}"]`)
+  if (!taskEl) return
+  
+  const timeSpan = taskEl.querySelector('[data-task-time]')
+  const currentTime = timeSpan.textContent
+  
+  // インライン編集UIに切り替え
+  const timeInput = document.createElement('input')
+  timeInput.type = 'time'
+  timeInput.value = currentTime.includes(':') ? currentTime : '15:00'
+  timeInput.className = 'task-time px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500'
+  
+  timeInput.addEventListener('blur', function() {
+    timeSpan.textContent = this.value
+    timeSpan.classList.remove('hidden')
+    this.remove()
+  })
+  
+  timeInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      this.blur()
+    }
+  })
+  
+  timeSpan.classList.add('hidden')
+  timeSpan.parentNode.insertBefore(timeInput, timeSpan)
+  timeInput.focus()
+}
+
+// タスクの内容を編集
+function editTaskActivity(dayIndex, taskIndex) {
+  const taskEl = document.querySelector(`[data-day-index="${dayIndex}"] [data-task-index="${taskIndex}"]`)
+  if (!taskEl) return
+  
+  const activityP = taskEl.querySelector('[data-task-activity]')
+  const currentActivity = activityP.textContent
+  
+  const textarea = document.createElement('textarea')
+  textarea.value = currentActivity
+  textarea.className = 'task-activity w-full px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500'
+  textarea.rows = 2
+  
+  textarea.addEventListener('blur', function() {
+    activityP.textContent = this.value
+    activityP.classList.remove('hidden')
+    this.remove()
+  })
+  
+  textarea.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      this.blur()
+    }
+  })
+  
+  activityP.classList.add('hidden')
+  activityP.parentNode.insertBefore(textarea, activityP)
+  textarea.focus()
+}
+
+// タスクを削除
+function deleteTask(dayIndex, taskIndex) {
+  if (!confirm('このタスクを削除しますか？')) return
+  
+  const taskEl = document.querySelector(`[data-day-index="${dayIndex}"] [data-task-index="${taskIndex}"]`)
+  if (taskEl) {
+    taskEl.remove()
+    showNotification('タスクを削除しました', 'success')
+  }
+}
+
+// タスクを追加
+function addNewTask(dayIndex) {
+  const dayEl = document.querySelector(`[data-day-index="${dayIndex}"]`)
+  if (!dayEl) return
+  
+  const tasksContainer = dayEl.querySelector('.tasks-container')
+  if (!tasksContainer) return
+  
+  const taskCount = tasksContainer.querySelectorAll('[data-task-index]').length
+  
+  const newTaskHTML = `
+    <div class="bg-white rounded-lg p-3 shadow-sm relative" data-task-index="${taskCount}">
+      <input type="checkbox" class="task-complete-checkbox absolute top-3 right-3 w-5 h-5 text-blue-600 rounded">
+      <div class="flex items-center gap-2 mb-1">
+        <i class="fas fa-clock text-blue-500"></i>
+        <span class="font-semibold text-gray-700 cursor-pointer hover:text-blue-600" 
+              data-task-time 
+              onclick="editTaskTime(${dayIndex}, ${taskCount})">15:00</span>
+        <span class="text-xs text-gray-500" data-task-minutes>30</span>分
+      </div>
+      <p class="text-gray-800 ml-6 cursor-pointer hover:text-blue-600" 
+         data-task-activity
+         onclick="editTaskActivity(${dayIndex}, ${taskCount})">新しいタスク</p>
+      <button onclick="deleteTask(${dayIndex}, ${taskCount})" 
+              class="edit-action-button hidden absolute bottom-2 right-2 text-red-500 hover:text-red-700 text-xs">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+  `
+  
+  tasksContainer.insertAdjacentHTML('beforeend', newTaskHTML)
+  showNotification('タスクを追加しました', 'success')
+}
+
+// タスクの完了/未完了を切り替え
+function toggleTaskComplete(checkbox, dayIndex, taskIndex) {
+  const taskEl = checkbox.closest('[data-task-index]')
+  if (!taskEl) return
+  
+  if (checkbox.checked) {
+    taskEl.classList.add('opacity-50', 'line-through')
+    showNotification('タスクを完了にしました', 'success')
+  } else {
+    taskEl.classList.remove('opacity-50', 'line-through')
+    showNotification('タスクを未完了に戻しました', 'info')
+  }
+  
+  // 進捗を更新
+  updateProgress(dayIndex)
+}
+
+// 進捗を更新
+function updateProgress(dayIndex) {
+  const dayEl = document.querySelector(`[data-day-index="${dayIndex}"]`)
+  if (!dayEl) return
+  
+  const checkboxes = dayEl.querySelectorAll('.task-complete-checkbox')
+  const total = checkboxes.length
+  const completed = Array.from(checkboxes).filter(cb => cb.checked).length
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
+  
+  const progressBar = dayEl.querySelector('.progress-bar')
+  const progressText = dayEl.querySelector('.progress-text')
+  
+  if (progressBar) {
+    progressBar.style.width = `${percentage}%`
+  }
+  
+  if (progressText) {
+    progressText.textContent = `${completed}/${total} (${percentage}%)`
+  }
+}
+
+// 通知を表示
+function showNotification(message, type = 'info') {
+  const colors = {
+    'success': 'bg-green-500',
+    'error': 'bg-red-500',
+    'info': 'bg-blue-500',
+    'warning': 'bg-yellow-500'
+  }
+  
+  const notification = document.createElement('div')
+  notification.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all`
+  notification.textContent = message
+  
+  document.body.appendChild(notification)
+  
+  setTimeout(() => {
+    notification.style.opacity = '0'
+    setTimeout(() => notification.remove(), 300)
+  }, 3000)
+}
+
+// グローバルに公開
+window.toggleEditMode = toggleEditMode
+window.editTaskTime = editTaskTime
+window.editTaskActivity = editTaskActivity
+window.deleteTask = deleteTask
+window.addNewTask = addNewTask
+window.toggleTaskComplete = toggleTaskComplete
+window.saveStudyPlanToStorage = saveStudyPlanToStorage
+window.loadStudyPlanFromStorage = loadStudyPlanFromStorage
+
+console.log('✅ Phase 11 編集可能な学習計画表初期化完了')
 
 console.log('✅ Phase 9-2 PWA機能初期化完了')
