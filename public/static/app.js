@@ -4638,7 +4638,7 @@ async function loadCardPage(cardId) {
               <h1 class="text-3xl font-bold text-indigo-600 mb-2">
                 学習カード ${card.card_number}
               </h1>
-              <h2 class="card-title text-gray-800">${card.card_title}</h2>
+              <h2 class="card-title text-gray-800">${formatText(card.card_title)}</h2>
             </div>
             <div class="flex items-center gap-3">
               ${state.auth.user?.role === 'teacher' ? `
@@ -4702,14 +4702,14 @@ async function loadCardPage(cardId) {
                   <i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題
                 </h3>
                 <div class="bg-yellow-50 rounded-lg p-4 mb-4">
-                  <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${card.example_problem}</pre>
+                  <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${formatText(card.example_problem)}</pre>
                 </div>
                 ${card.example_solution ? `
                   <div class="bg-green-50 rounded-lg p-4">
                     <h4 class="card-heading font-bold text-green-800 mb-2">
                       <i class="fas fa-check-circle mr-2"></i>解き方
                     </h4>
-                    <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans">${card.example_solution}</pre>
+                    <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans">${formatText(card.example_solution)}</pre>
                   </div>
                 ` : ''}
               </div>
@@ -4727,7 +4727,7 @@ async function loadCardPage(cardId) {
                 </div>
               ` : ''}
               <div class="bg-gray-50 rounded-lg p-6">
-                <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">${card.problem_content}</pre>
+                <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">${formatText(card.problem_content)}</pre>
               </div>
               
               <!-- 回答欄 -->
@@ -8835,6 +8835,29 @@ function formatTextWithRuby(text) {
   // 漢字（ひらがな）の形式から読み仮名を削除
   // 例：国会（こっかい） → 国会
   return text.replace(/([一-龯々]+)（[ぁ-ん]+）/g, '$1')
+}
+
+// 数式の^記号を上付き文字（<sup>）に変換
+function formatMathNotation(text) {
+  if (!text) return ''
+  
+  // x^2 → x<sup>2</sup>
+  // x^3 → x<sup>3</sup>
+  // など、^の後の数字を上付き文字に変換
+  return text.replace(/(\w)\^(\d+)/g, '$1<sup>$2</sup>')
+}
+
+// テキストをフォーマット（ふりがな削除 + 数式変換）
+function formatText(text) {
+  if (!text) return ''
+  
+  // まずふりがなを削除
+  let formatted = formatTextWithRuby(text)
+  
+  // 次に数式記号を変換
+  formatted = formatMathNotation(formatted)
+  
+  return formatted
 }
 
 // ==================== Phase 5: 先生カスタマイズモード ====================
