@@ -39143,15 +39143,23 @@ function displayTestPrepPlan(planData) {
   
   const { test_plan, test_date, target_score, subjects, days_until_test } = planData
   
+  // 計画IDを設定（LocalStorage用）
+  state.currentPlanId = `test_prep_${test_date}_${Date.now()}`
+  
   const planHTML = `
     <div class="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 py-8">
       <div class="container mx-auto px-4 max-w-5xl">
         
         <!-- ヘッダー -->
         <div class="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg p-6 mb-6 shadow-xl">
-          <button onclick="loadGuidePage(${state.selectedCurriculum?.id || 1})" class="text-white hover:bg-white hover:bg-opacity-20 rounded px-3 py-1 mb-4 transition">
-            <i class="fas fa-arrow-left mr-2"></i>学習の手引きに戻る
-          </button>
+          <div class="flex items-center justify-between mb-4">
+            <button onclick="loadGuidePage(${state.selectedCurriculum?.id || 1})" class="text-white hover:bg-white hover:bg-opacity-20 rounded px-3 py-1 transition">
+              <i class="fas fa-arrow-left mr-2"></i>学習の手引きに戻る
+            </button>
+            <button id="toggleEditButton" onclick="toggleEditMode()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow">
+              <i class="fas fa-edit mr-2"></i>編集モード
+            </button>
+          </div>
           <h1 class="text-3xl font-bold mb-2">
             <i class="fas fa-graduation-cap mr-3"></i>あなた専用のテスト対策プラン
           </h1>
@@ -39196,32 +39204,72 @@ function displayTestPrepPlan(planData) {
           </div>
         </div>
         
-        <!-- 日別スケジュール -->
+        <!-- 日別スケジュール（編集可能） -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <h2 class="text-xl font-bold text-gray-800 mb-4">
-            <i class="fas fa-calendar-week text-green-500 mr-2"></i>日別スケジュール
-          </h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-bold text-gray-800">
+              <i class="fas fa-calendar-week text-green-500 mr-2"></i>日別スケジュール
+            </h2>
+          </div>
           <div class="space-y-4">
-            ${(test_plan.daily_schedule || []).map(day => `
-              <div class="bg-gradient-to-r from-green-50 to-blue-50 border-l-4 border-green-400 rounded-lg p-4">
+            ${(test_plan.daily_schedule || []).map((day, dayIndex) => `
+              <div class="bg-gradient-to-r from-green-50 to-blue-50 border-l-4 border-green-400 rounded-lg p-4" data-day-index="${dayIndex}">
                 <div class="flex justify-between items-center mb-3">
-                  <h3 class="font-bold text-green-800">Day ${day.day} - ${day.date}</h3>
-                  <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">
-                    ${day.daily_goal || '今日の目標'}
-                  </span>
+                  <h3 class="font-bold text-green-800">
+                    Day ${day.day} - <span data-day-date>${day.date}</span>
+                  </h3>
+                  <div class="flex items-center gap-3">
+                    <!-- 進捗表示 -->
+                    <div class="text-xs text-gray-600">
+                      進捗: <span class="progress-text font-bold">0/0 (0%)</span>
+                    </div>
+                    <!-- 進捗バー -->
+                    <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div class="progress-bar h-full bg-green-500 transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold" data-daily-goal>
+                      ${day.daily_goal || '今日の目標'}
+                    </span>
+                    <!-- タスク追加ボタン -->
+                    <button onclick="addNewTask(${dayIndex})" class="edit-action-button hidden text-green-600 hover:text-green-800 text-sm font-bold">
+                      <i class="fas fa-plus-circle mr-1"></i>タスク追加
+                    </button>
+                  </div>
                 </div>
-                <div class="space-y-2">
-                  ${(day.tasks || []).map(task => `
-                    <div class="bg-white rounded p-3 shadow-sm">
+                <div class="space-y-2 tasks-container">
+                  ${(day.tasks || []).map((task, taskIndex) => `
+                    <div class="bg-white rounded p-3 shadow-sm relative hover:shadow-md transition" data-task-index="${taskIndex}">
+                      <!-- 完了チェックボックス -->
+                      <input type="checkbox" 
+                             class="task-complete-checkbox absolute top-3 right-3 w-5 h-5 text-green-600 rounded cursor-pointer"
+                             onchange="toggleTaskComplete(this, ${dayIndex}, ${taskIndex})">
+                      
                       <div class="flex items-center justify-between mb-1">
-                        <span class="text-sm font-bold text-gray-700">
-                          <i class="fas fa-clock text-blue-500 mr-1"></i>${task.time || '未設定'}
-                        </span>
-                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          ${task.estimated_minutes || 30}分
-                        </span>
+                        <div class="flex items-center gap-2">
+                          <i class="fas fa-clock text-blue-500"></i>
+                          <span class="text-sm font-bold text-gray-700 cursor-pointer hover:text-blue-600" 
+                                data-task-time
+                                onclick="editTaskTime(${dayIndex}, ${taskIndex})">${task.time || '未設定'}</span>
+                          <span class="text-xs text-gray-500">
+                            <span data-task-minutes>${task.estimated_minutes || 30}</span>分
+                          </span>
+                          ${task.subject ? `
+                            <span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                              ${task.subject}
+                            </span>
+                          ` : ''}
+                        </div>
+                        <!-- 削除ボタン -->
+                        <button onclick="deleteTask(${dayIndex}, ${taskIndex})" 
+                                class="edit-action-button hidden text-red-500 hover:text-red-700 text-xs">
+                          <i class="fas fa-trash"></i>
+                        </button>
                       </div>
-                      <p class="text-gray-800">${task.activity}</p>
+                      
+                      <p class="text-gray-800 cursor-pointer hover:text-blue-600 pr-8" 
+                         data-task-activity
+                         onclick="editTaskActivity(${dayIndex}, ${taskIndex})">${task.activity}</p>
+                      
                       ${task.learning_tip ? `
                         <p class="text-xs text-gray-600 mt-2 italic">
                           <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>${task.learning_tip}
@@ -39250,6 +39298,14 @@ function displayTestPrepPlan(planData) {
   `
   
   document.getElementById('app').innerHTML = planHTML
+  
+  // 各日の進捗を初期化
+  setTimeout(() => {
+    const dayElements = document.querySelectorAll('[data-day-index]')
+    dayElements.forEach((dayEl, index) => {
+      updateProgress(index)
+    })
+  }, 100)
 }
 
 // モーダルを閉じる
