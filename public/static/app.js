@@ -35447,6 +35447,15 @@ function generateLearningSupportSection(curriculumId, retrievalPracticeContent =
 // ============================================
 async function showCase10FrequentProblems(curriculumId) {
   try {
+    // curriculumIdの検証
+    if (!curriculumId) {
+      console.error('❌ curriculumIdが未定義です')
+      alert('カリキュラムIDが取得できませんでした。\nページを再読み込みしてください。')
+      return
+    }
+    
+    console.log('📊 よく出る問題を表示 - curriculumId:', curriculumId)
+    
     // APIからコンテンツを取得
     let problems = null
     try {
@@ -35454,7 +35463,7 @@ async function showCase10FrequentProblems(curriculumId) {
       problems = response.data.data?.frequent_problems
       console.log('✅ よく出る問題をAPIから取得:', problems)
     } catch (apiError) {
-      console.log('⚠️ API取得失敗、デフォルトコンテンツを使用')
+      console.log('⚠️ API取得失敗、デフォルトコンテンツを使用', apiError.message)
     }
     
     // データが取得できなかった場合はデフォルトを使用
@@ -35697,6 +35706,15 @@ function recordCase10SelfEval(index, isCorrect) {
 // ============================================
 async function showCase11ApplicationProblems(curriculumId) {
   try {
+    // curriculumIdの検証
+    if (!curriculumId) {
+      console.error('❌ curriculumIdが未定義です')
+      alert('カリキュラムIDが取得できませんでした。\nページを再読み込みしてください。')
+      return
+    }
+    
+    console.log('📊 応用問題を表示 - curriculumId:', curriculumId)
+    
     // APIからコンテンツを取得
     let problems = null
     try {
@@ -35704,7 +35722,7 @@ async function showCase11ApplicationProblems(curriculumId) {
       problems = response.data.data?.application_problems
       console.log('✅ 応用問題をAPIから取得:', problems)
     } catch (apiError) {
-      console.log('⚠️ API取得失敗、デフォルトコンテンツを使用')
+      console.log('⚠️ API取得失敗、デフォルトコンテンツを使用', apiError.message)
     }
     
     // データが取得できなかった場合はデフォルトを使用
