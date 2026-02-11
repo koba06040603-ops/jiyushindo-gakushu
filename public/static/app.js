@@ -12306,9 +12306,11 @@ async function suggestUnitNames() {
     }
     
     const units = response.data.units || []
+    const source = response.data.source || 'unknown'
     
     console.log('✅ 取得した単元数:', units.length)
     console.log('📋 単元リスト:', units)
+    console.log('📊 データソース:', source)
     
     if (units.length === 0) {
       console.warn('⚠️ 単元が0件です')
@@ -12316,15 +12318,15 @@ async function suggestUnitNames() {
       const dummyUnits = generateDummyUnits(grade, subject)
       
       suggestionList.innerHTML = `
-        <div class="bg-amber-50 border border-amber-300 rounded-lg p-3 mb-3">
+        <div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-3">
           <div class="flex items-start">
-            <i class="fas fa-info-circle text-amber-600 mt-0.5 mr-2"></i>
+            <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 mr-2"></i>
             <div class="flex-1">
-              <p class="text-sm font-semibold text-amber-800 mb-1">
-                ⚠️ 指定された教科書会社のデータが見つかりませんでした
+              <p class="text-sm font-semibold text-red-800 mb-1">
+                ⚠️ 単元データの取得に失敗しました
               </p>
-              <p class="text-xs text-amber-700">
-                以下は一般的な${grade}・${subject}の単元例です。実際の教科書会社の単元とは異なる場合があります。正確な単元名は教科書をご確認ください。
+              <p class="text-xs text-red-700">
+                サーバーエラーが発生しました。以下は一般的な${grade}・${subject}の単元例です。実際の${textbook}の単元とは異なる場合があります。
               </p>
             </div>
           </div>
@@ -12346,11 +12348,44 @@ async function suggestUnitNames() {
       return
     }
     
+    // データソースに応じてメッセージを表示
+    let sourceMessage = ''
+    if (source === 'ai_generated') {
+      sourceMessage = `
+        <div class="bg-blue-50 border border-blue-300 rounded-lg p-3 mb-3">
+          <div class="flex items-start">
+            <i class="fas fa-robot text-blue-600 mt-0.5 mr-2"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-blue-800 mb-1">
+                🤖 AIが${textbook}の単元を生成しました
+              </p>
+              <p class="text-xs text-blue-700">
+                以下は${textbook}の${grade}・${subject}の教科書に基づく単元です。実際の教科書と異なる場合は、正確な単元名を手動で入力してください。
+              </p>
+            </div>
+          </div>
+        </div>
+      `
+    } else if (source === 'database') {
+      sourceMessage = `
+        <div class="bg-green-50 border border-green-300 rounded-lg p-3 mb-3">
+          <div class="flex items-start">
+            <i class="fas fa-check-circle text-green-600 mt-0.5 mr-2"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-green-800">
+                ✅ ${textbook}の${grade}・${subject}の単元データを取得しました
+              </p>
+            </div>
+          </div>
+        </div>
+      `
+    }
+    
     // 単元名を重複なしで取得
     const uniqueUnits = [...new Set(units.map(u => u.unit_name))]
     
     // 単元候補を表示
-    suggestionList.innerHTML = uniqueUnits.map((unit, index) => `
+    suggestionList.innerHTML = sourceMessage + uniqueUnits.map((unit, index) => `
       <button 
         onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
         class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">

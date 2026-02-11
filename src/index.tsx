@@ -26690,47 +26690,124 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
   
   try {
     // データベースが存在し、接続可能な場合のみクエリを実行
-    if (!env.DB) {
-      console.warn('Database not available, returning empty result')
+    if (env.DB) {
+      let query = `
+        SELECT DISTINCT unit_name, id, grade, subject, textbook_company
+        FROM curriculum
+        WHERE 1=1
+      `
+      const params: any[] = []
+      
+      if (grade) {
+        query += ` AND grade = ?`
+        params.push(grade)
+      }
+      
+      if (subject) {
+        query += ` AND subject = ?`
+        params.push(subject)
+      }
+      
+      if (textbook) {
+        query += ` AND textbook_company = ?`
+        params.push(textbook)
+      }
+      
+      query += ` ORDER BY id ASC`
+      
+      const stmt = env.DB.prepare(query)
+      const result = await stmt.bind(...params).all()
+      
+      // データベースに結果がある場合は返す
+      if (result.results && result.results.length > 0) {
+        return c.json({
+          success: true,
+          units: result.results,
+          fromDatabase: true,
+          source: 'database'
+        })
+      }
+    }
+    
+    // データベースが空、または接続できない場合はAIで生成
+    console.log('🤖 Generating units with AI for:', { grade, subject, textbook })
+    
+    if (!env.GEMINI_API_KEY || env.GEMINI_API_KEY === 'your-gemini-api-key-here') {
+      console.warn('Gemini API key not configured')
       return c.json({
         success: true,
         units: [],
-        fromDatabase: false
+        fromDatabase: false,
+        source: 'none',
+        error: 'AI generation not available'
       })
     }
     
-    let query = `
-      SELECT DISTINCT unit_name, id, grade, subject, textbook_company
-      FROM curriculum
-      WHERE 1=1
-    `
-    const params: any[] = []
+    // Gemini APIで単元を生成
+    const prompt = `あなたは日本の教育カリキュラムの専門家です。
+
+以下の条件に基づいて、実際の教科書に記載されている単元名を30個リストアップしてください：
+
+- 学年: ${grade}
+- 教科: ${subject}
+- 教科書会社: ${textbook}
+
+重要な指示：
+1. 必ず実際の${textbook}の${grade}${subject}教科書に記載されている単元名を使用してください
+2. 単元名は正式名称を使用してください
+3. 30個の単元を、教科書の順番通りにリストアップしてください
+4. 各単元名は簡潔に（50文字以内）
+
+回答は以下のJSON形式のみで返してください（他の説明は不要）：
+{
+  "units": [
+    {"unit_name": "単元名1"},
+    {"unit_name": "単元名2"},
+    ...
+  ]
+}`
+
+    const apiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2000
+          }
+        })
+      }
+    )
     
-    if (grade) {
-      query += ` AND grade = ?`
-      params.push(grade)
+    if (!apiResponse.ok) {
+      throw new Error(`Gemini API error: ${apiResponse.status}`)
     }
     
-    if (subject) {
-      query += ` AND subject = ?`
-      params.push(subject)
+    const data = await apiResponse.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSONを抽出
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('Failed to parse AI response')
     }
     
-    if (textbook) {
-      query += ` AND textbook_company = ?`
-      params.push(textbook)
-    }
-    
-    query += ` ORDER BY id ASC`
-    
-    const stmt = env.DB.prepare(query)
-    const result = await stmt.bind(...params).all()
+    const aiResult = JSON.parse(jsonMatch[0])
+    const units = aiResult.units || []
     
     return c.json({
       success: true,
-      units: result.results || [],
-      fromDatabase: true
+      units: units,
+      fromDatabase: false,
+      source: 'ai_generated',
+      textbook_company: textbook
     })
+    
   } catch (error) {
     console.error('Unit suggestions error:', error)
     // エラーが発生しても、success: trueを返してフロントエンドでダミーデータを表示させる
@@ -26738,6 +26815,7 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
       success: true, 
       units: [],
       fromDatabase: false,
+      source: 'error',
       errorMessage: error instanceof Error ? error.message : 'Unknown error'
     })
   }
