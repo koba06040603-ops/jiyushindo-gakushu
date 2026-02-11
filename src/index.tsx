@@ -26768,7 +26768,7 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
 }`
 
     const apiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -26778,7 +26778,7 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
           }],
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 2000
+            maxOutputTokens: 4000
           }
         })
       }
