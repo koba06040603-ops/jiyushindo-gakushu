@@ -12315,14 +12315,7 @@ async function suggestUnitNames() {
       // ダミーデータを使用
       const dummyUnits = generateDummyUnits(grade, subject)
       
-      suggestionList.innerHTML = `
-        <div class="bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
-          <p class="text-xs text-yellow-800">
-            <i class="fas fa-info-circle mr-1"></i>
-            データベースに単元が見つかりませんでした。サンプル単元を表示します。
-          </p>
-        </div>
-      ` + dummyUnits.map((unit, index) => `
+      suggestionList.innerHTML = dummyUnits.map((unit, index) => `
         <button 
           onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
           class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
@@ -12367,14 +12360,7 @@ async function suggestUnitNames() {
     const dummyUnits = generateDummyUnits(grade, subject)
     
     if (dummyUnits && dummyUnits.length > 0) {
-      suggestionList.innerHTML = `
-        <div class="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
-          <p class="text-xs text-blue-800">
-            <i class="fas fa-info-circle mr-1"></i>
-            データベースに接続できませんでした。サンプル単元を表示します。
-          </p>
-        </div>
-      ` + dummyUnits.map((unit, index) => `
+      suggestionList.innerHTML = dummyUnits.map((unit, index) => `
         <button 
           onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
           class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
