@@ -12315,7 +12315,21 @@ async function suggestUnitNames() {
       // ダミーデータを使用
       const dummyUnits = generateDummyUnits(grade, subject)
       
-      suggestionList.innerHTML = dummyUnits.map((unit, index) => `
+      suggestionList.innerHTML = `
+        <div class="bg-amber-50 border border-amber-300 rounded-lg p-3 mb-3">
+          <div class="flex items-start">
+            <i class="fas fa-info-circle text-amber-600 mt-0.5 mr-2"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-amber-800 mb-1">
+                ⚠️ 指定された教科書会社のデータが見つかりませんでした
+              </p>
+              <p class="text-xs text-amber-700">
+                以下は一般的な${grade}・${subject}の単元例です。実際の教科書会社の単元とは異なる場合があります。正確な単元名は教科書をご確認ください。
+              </p>
+            </div>
+          </div>
+        </div>
+      ` + dummyUnits.map((unit, index) => `
         <button 
           onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
           class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
@@ -12360,7 +12374,21 @@ async function suggestUnitNames() {
     const dummyUnits = generateDummyUnits(grade, subject)
     
     if (dummyUnits && dummyUnits.length > 0) {
-      suggestionList.innerHTML = dummyUnits.map((unit, index) => `
+      suggestionList.innerHTML = `
+        <div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-3">
+          <div class="flex items-start">
+            <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 mr-2"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-red-800 mb-1">
+                データ取得エラー
+              </p>
+              <p class="text-xs text-red-700">
+                サーバーへの接続に失敗しました。以下は一般的な${grade}・${subject}の単元例です。実際の教科書会社の単元とは異なる場合があります。
+              </p>
+            </div>
+          </div>
+        </div>
+      ` + dummyUnits.map((unit, index) => `
         <button 
           onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
           class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
@@ -12373,7 +12401,7 @@ async function suggestUnitNames() {
       `).join('')
     } else {
       suggestionList.innerHTML = `
-        <div class="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
+        <div class="text-sm text-red-700 bg-red-50 p-3 rounded border border-red-200">
           <p class="font-bold mb-1"><i class="fas fa-exclamation-triangle mr-1"></i>単元データを取得できませんでした</p>
           <p class="text-xs text-gray-600 mt-2">単元名を手動で入力してください。例: かけ算の筆算、物語文の読解、分数のたし算、など</p>
         </div>
