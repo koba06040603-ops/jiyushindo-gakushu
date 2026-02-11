@@ -12357,10 +12357,13 @@ async function suggestUnitNames() {
             <i class="fas fa-robot text-blue-600 mt-0.5 mr-2"></i>
             <div class="flex-1">
               <p class="text-sm font-semibold text-blue-800 mb-1">
-                🤖 AIが${textbook}の単元を生成しました
+                🤖 ${textbook}の単元を生成しました
               </p>
-              <p class="text-xs text-blue-700">
-                以下は${textbook}の${grade}・${subject}の教科書に基づく単元です。実際の教科書と異なる場合は、正確な単元名を手動で入力してください。
+              <p class="text-xs text-blue-700 mb-1">
+                ${grade}・${subject}の教科書に基づいて単元を生成しています。
+              </p>
+              <p class="text-xs text-blue-600 font-semibold">
+                ⚠️ 実際の教科書で単元名をご確認の上、必要に応じて修正してください。
               </p>
             </div>
           </div>
@@ -12372,8 +12375,11 @@ async function suggestUnitNames() {
           <div class="flex items-start">
             <i class="fas fa-check-circle text-green-600 mt-0.5 mr-2"></i>
             <div class="flex-1">
-              <p class="text-sm font-semibold text-green-800">
+              <p class="text-sm font-semibold text-green-800 mb-1">
                 ✅ ${textbook}の${grade}・${subject}の単元データを取得しました
+              </p>
+              <p class="text-xs text-green-700">
+                データベースに登録されている正確な単元名です。
               </p>
             </div>
           </div>
