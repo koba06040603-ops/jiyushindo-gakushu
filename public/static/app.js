@@ -39455,7 +39455,28 @@ function editTaskTime(dayIndex, taskIndex) {
   timeInput.className = 'task-time px-2 py-1 border rounded focus:ring-2 focus:ring-blue-500'
   
   timeInput.addEventListener('blur', function() {
-    timeSpan.textContent = this.value
+    const newTime = this.value
+    // 通常の学習計画のデータを更新
+    if (window.currentStudyPlan && window.currentStudyPlan.daily_schedule) {
+      const day = window.currentStudyPlan.daily_schedule[dayIndex]
+      if (day && day.tasks && day.tasks[taskIndex]) {
+        day.tasks[taskIndex].time = newTime
+        // LocalStorageに保存（planIdを追加）
+        const planId = window.currentStudyPlan.curriculum_id || 'default'
+        saveStudyPlanToStorage(planId, window.currentStudyPlan)
+      }
+    }
+    // テスト対策プランのデータを更新
+    if (window.currentTestPrepPlan && window.currentTestPrepPlan.test_plan && window.currentTestPrepPlan.test_plan.daily_schedule) {
+      const day = window.currentTestPrepPlan.test_plan.daily_schedule[dayIndex]
+      if (day && day.tasks && day.tasks[taskIndex]) {
+        day.tasks[taskIndex].time = newTime
+        // LocalStorageに保存
+        saveTestPrepPlanToStorage(window.currentTestPrepPlan)
+      }
+    }
+    // UIを更新
+    timeSpan.textContent = newTime
     timeSpan.classList.remove('hidden')
     this.remove()
   })
@@ -39485,7 +39506,28 @@ function editTaskActivity(dayIndex, taskIndex) {
   textarea.rows = 2
   
   textarea.addEventListener('blur', function() {
-    activityP.textContent = this.value
+    const newActivity = this.value
+    // 通常の学習計画のデータを更新
+    if (window.currentStudyPlan && window.currentStudyPlan.daily_schedule) {
+      const day = window.currentStudyPlan.daily_schedule[dayIndex]
+      if (day && day.tasks && day.tasks[taskIndex]) {
+        day.tasks[taskIndex].activity = newActivity
+        // LocalStorageに保存（planIdを追加）
+        const planId = window.currentStudyPlan.curriculum_id || 'default'
+        saveStudyPlanToStorage(planId, window.currentStudyPlan)
+      }
+    }
+    // テスト対策プランのデータを更新
+    if (window.currentTestPrepPlan && window.currentTestPrepPlan.test_plan && window.currentTestPrepPlan.test_plan.daily_schedule) {
+      const day = window.currentTestPrepPlan.test_plan.daily_schedule[dayIndex]
+      if (day && day.tasks && day.tasks[taskIndex]) {
+        day.tasks[taskIndex].activity = newActivity
+        // LocalStorageに保存
+        saveTestPrepPlanToStorage(window.currentTestPrepPlan)
+      }
+    }
+    // UIを更新
+    activityP.textContent = newActivity
     activityP.classList.remove('hidden')
     this.remove()
   })
@@ -39604,6 +39646,19 @@ function showNotification(message, type = 'info') {
     notification.style.opacity = '0'
     setTimeout(() => notification.remove(), 300)
   }, 3000)
+}
+
+// テスト対策プランをLocalStorageに保存
+function saveTestPrepPlanToStorage(planData) {
+  try {
+    const storageKey = `test_prep_plan_${planData.student_id || 'default'}`
+    localStorage.setItem(storageKey, JSON.stringify(planData))
+    console.log('💾 テスト対策プランを保存しました:', storageKey)
+    return true
+  } catch (error) {
+    console.error('❌ テスト対策プランの保存エラー:', error)
+    return false
+  }
 }
 
 // グローバルに公開
