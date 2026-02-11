@@ -12360,40 +12360,41 @@ async function suggestUnitNames() {
     suggestBtn.disabled = false
     
   } catch (error) {
-    console.error('❌❌❌ 単元候補取得エラー:', error)
-    console.error('エラー詳細:', error.response?.data)
-    console.error('エラーメッセージ:', error.message)
-    console.error('エラースタック:', error.stack)
-    console.error('HTTPステータス:', error.response?.status)
-    console.error('レスポンス全体:', error.response)
+    console.error('❌ 単元候補取得エラー:', error)
+    console.warn('⚠️ データベースエラーのため、サンプル単元を表示します')
     
-    // エラーメッセージを改善
-    let errorMessage = 'エラーが発生しました。手動で入力してください。'
-    let detailMessage = ''
+    // エラーが発生した場合でも、ダミーデータを表示
+    const dummyUnits = generateDummyUnits(grade, subject)
     
-    if (error.response && error.response.data) {
-      const data = error.response.data
-      console.error('サーバーエラーデータ:', data)
-      if (data.message) {
-        errorMessage = data.message
-      } else if (data.error) {
-        errorMessage = data.error
-      }
-      if (data.details) {
-        detailMessage = `<p class="text-xs mt-1 text-gray-600">詳細: ${data.details}</p>`
-      }
-    } else if (error.message) {
-      detailMessage = `<p class="text-xs mt-1 text-gray-600">詳細: ${error.message}</p>`
+    if (dummyUnits && dummyUnits.length > 0) {
+      suggestionList.innerHTML = `
+        <div class="bg-blue-50 border border-blue-200 rounded p-2 mb-2">
+          <p class="text-xs text-blue-800">
+            <i class="fas fa-info-circle mr-1"></i>
+            データベースに接続できませんでした。サンプル単元を表示します。
+          </p>
+        </div>
+      ` + dummyUnits.map((unit, index) => `
+        <button 
+          onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
+          class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
+          <span class="text-sm text-gray-800">
+            <span class="font-bold text-purple-600 mr-2">${index + 1}.</span>
+            ${unit}
+          </span>
+          <i class="fas fa-chevron-right text-purple-400 opacity-0 group-hover:opacity-100 transition"></i>
+        </button>
+      `).join('')
+    } else {
+      suggestionList.innerHTML = `
+        <div class="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
+          <p class="font-bold mb-1"><i class="fas fa-exclamation-triangle mr-1"></i>単元データを取得できませんでした</p>
+          <p class="text-xs text-gray-600 mt-2">単元名を手動で入力してください。例: かけ算の筆算、物語文の読解、分数のたし算、など</p>
+        </div>
+      `
     }
     
-    suggestionList.innerHTML = `
-      <div class="text-sm text-amber-700 bg-amber-50 p-3 rounded border border-amber-200">
-        <p class="font-bold mb-1"><i class="fas fa-exclamation-triangle mr-1"></i>${errorMessage}</p>
-        ${detailMessage}
-        <p class="text-xs text-gray-600 mt-2">例: かけ算の筆算、物語文の読解、分数のたし算、正の数・負の数、など</p>
-      </div>
-    `
-    suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> AIで単元候補を表示'
+    suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> 再生成'
     suggestBtn.disabled = false
   }
 }
