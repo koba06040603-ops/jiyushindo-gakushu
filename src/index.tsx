@@ -26681,6 +26681,55 @@ app.post('/api/voice/settings', authMiddleware, async (c) => {
 // 家庭学習・テスト対策モード
 // ============================================================
 
+// APIルート：学年・教科・教科書会社に基づく単元候補を取得
+app.get('/api/curriculum/unit-suggestions', async (c) => {
+  const { env } = c
+  const grade = c.req.query('grade')
+  const subject = c.req.query('subject')
+  const textbook = c.req.query('textbook')
+  
+  try {
+    let query = `
+      SELECT DISTINCT unit_name, id, grade, subject, textbook_company
+      FROM curriculum
+      WHERE 1=1
+    `
+    const params: any[] = []
+    
+    if (grade) {
+      query += ` AND grade = ?`
+      params.push(grade)
+    }
+    
+    if (subject) {
+      query += ` AND subject = ?`
+      params.push(subject)
+    }
+    
+    if (textbook) {
+      query += ` AND textbook_company = ?`
+      params.push(textbook)
+    }
+    
+    query += ` ORDER BY id ASC`
+    
+    const stmt = env.DB.prepare(query)
+    const result = await stmt.bind(...params).all()
+    
+    return c.json({
+      success: true,
+      units: result.results || []
+    })
+  } catch (error) {
+    console.error('Unit suggestions error:', error)
+    return c.json({ 
+      success: false, 
+      error: 'データベースエラー',
+      units: []
+    }, 500)
+  }
+})
+
 // APIルート：テスト対策プランを生成（複数教科・単元対応）
 app.post('/api/ai/generate-test-plan/:studentId', async (c) => {
   const { env } = c

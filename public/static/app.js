@@ -12290,11 +12290,13 @@ async function suggestUnitNames() {
   try {
     console.log('📡 APIリクエスト送信中...')
     
-    // Gemini APIで単元候補を取得
-    const response = await axios.post('/api/ai/suggest-units', {
-      grade,
-      subject,
-      textbook
+    // データベースから実際のカリキュラムデータを取得
+    const response = await axios.get('/api/curriculum/unit-suggestions', {
+      params: {
+        grade,
+        subject,
+        textbook
+      }
     })
     
     console.log('📥 APIレスポンス:', response.data)
@@ -12310,14 +12312,38 @@ async function suggestUnitNames() {
     
     if (units.length === 0) {
       console.warn('⚠️ 単元が0件です')
-      suggestionList.innerHTML = '<p class="text-sm text-gray-600">候補が見つかりませんでした。手動で入力してください。</p>'
-      suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> AIで単元候補を表示'
+      // ダミーデータを使用
+      const dummyUnits = generateDummyUnits(grade, subject)
+      
+      suggestionList.innerHTML = `
+        <div class="bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
+          <p class="text-xs text-yellow-800">
+            <i class="fas fa-info-circle mr-1"></i>
+            データベースに単元が見つかりませんでした。サンプル単元を表示します。
+          </p>
+        </div>
+      ` + dummyUnits.map((unit, index) => `
+        <button 
+          onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
+          class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
+          <span class="text-sm text-gray-800">
+            <span class="font-bold text-purple-600 mr-2">${index + 1}.</span>
+            ${unit}
+          </span>
+          <i class="fas fa-chevron-right text-purple-400 opacity-0 group-hover:opacity-100 transition"></i>
+        </button>
+      `).join('')
+      
+      suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> 再生成'
       suggestBtn.disabled = false
       return
     }
     
+    // 単元名を重複なしで取得
+    const uniqueUnits = [...new Set(units.map(u => u.unit_name))]
+    
     // 単元候補を表示
-    suggestionList.innerHTML = units.map((unit, index) => `
+    suggestionList.innerHTML = uniqueUnits.map((unit, index) => `
       <button 
         onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
         class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
@@ -12370,6 +12396,76 @@ async function suggestUnitNames() {
     suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> AIで単元候補を表示'
     suggestBtn.disabled = false
   }
+}
+
+// ダミー単元を生成
+function generateDummyUnits(grade, subject) {
+  const unitTemplates = {
+    '算数': {
+      '小学1年': ['たし算', 'ひき算', '10までの数', '大きな数', '形づくり', '時計の読み方'],
+      '小学2年': ['かけ算', 'たし算とひき算の筆算', '長さ', '時刻と時間', '三角形と四角形', '1000までの数'],
+      '小学3年': ['わり算', 'かけ算の筆算', '円と球', '分数', '重さ', 'あまりのあるわり算'],
+      '小学4年': ['大きな数', 'わり算の筆算', '角の大きさ', '面積', '分数のたし算とひき算', '小数のかけ算とわり算'],
+      '小学5年': ['小数のかけ算', '小数のわり算', '合同な図形', '偶数と奇数', '分数と小数', '平均'],
+      '小学6年': ['分数のかけ算', '分数のわり算', '比とその利用', '拡大図と縮図', '円の面積', '速さ'],
+      '中学1年': ['正の数・負の数', '文字と式', '方程式', '比例と反比例', '平面図形', '空間図形'],
+      '中学2年': ['式の計算', '連立方程式', '一次関数', '平行と合同', '三角形と四角形', '確率'],
+      '中学3年': ['多項式', '平方根', '二次方程式', '関数y=ax²', '相似な図形', '円周角'],
+    },
+    '数学': {
+      '中学1年': ['正の数・負の数', '文字と式', '方程式', '比例と反比例', '平面図形', '空間図形', 'データの活用'],
+      '中学2年': ['式の計算', '連立方程式', '一次関数', '平行と合同', '三角形と四角形', '確率', 'データの分布'],
+      '中学3年': ['多項式', '平方根', '二次方程式', '関数y=ax²', '相似な図形', '円周角', '三平方の定理', '標本調査'],
+    },
+    '国語': {
+      '小学1年': ['ひらがな', 'カタカナ', '漢字', '物語を読む', '説明文を読む', '詩を楽しむ'],
+      '小学2年': ['物語の読解', '説明文の読解', '詩の音読', '漢字の読み書き', '作文', 'お話の組み立て'],
+      '小学3年': ['物語文の読解', '説明文の読解', '詩の鑑賞', '漢字', '段落の役割', '報告文'],
+      '小学4年': ['物語文', '説明文', '詩', '漢字', '文の組み立て', '要約'],
+      '小学5年': ['物語文の読解', '説明文の読解', '古典入門', '漢字', '敬語', '意見文'],
+      '小学6年': ['物語文', '説明文', '随筆', '古典', '漢字', '話し合い', '討論'],
+      '中学1年': ['詩の世界', '随筆', '物語', '説明的文章', '古典入門', '文法', '漢字'],
+      '中学2年': ['詩歌', '小説', '説明的文章', '古文', '漢文', '文法', '漢字'],
+      '中学3年': ['詩歌', '小説', '論説文', '古典', '文法', '漢字', '話し合い・発表'],
+    },
+    '理科': {
+      '小学3年': ['しぜんのかんさつ', '植物の育ち方', '昆虫の育ち方', '太陽の光', '風やゴムの力', '光の性質', '電気の通り道', '磁石の性質'],
+      '小学4年': ['季節と生き物', '天気と気温', '月と星', '電気のはたらき', '水のすがた', 'もののあたたまり方'],
+      '小学5年': ['植物の発芽と成長', '天気の変化', 'メダカの誕生', '花のつくり', 'もののとけ方', '電流のはたらき', 'ふりこのきまり'],
+      '小学6年': ['燃焼のしくみ', '水溶液の性質', 'てこのはたらき', '電気の利用', '人の体のつくり', '植物の養分', '生物と環境', '月と太陽'],
+      '中学1年': ['身近な生物の観察', '植物の体のつくり', '身のまわりの物質', '光・音・力', '火山・地震', '大地の変化'],
+      '中学2年': ['化学変化と原子・分子', '生物の体のつくり', '電流とその利用', '天気とその変化', '動物の分類'],
+      '中学3年': ['化学変化とイオン', '生命の連続性', '運動とエネルギー', '地球と宇宙', '自然と人間'],
+    },
+    '社会': {
+      '小学3年': ['わたしたちの市', '市の様子', '店ではたらく人', '農家の仕事', '工場の仕事', '市の移り変わり'],
+      '小学4年': ['都道府県', '自然災害', 'くらしと水', 'ごみのしょり', '特色ある地いき', '県内の伝統と文化'],
+      '小学5年': ['日本の国土', '日本の農業', '日本の水産業', '日本の工業', '情報化した社会', '環境を守る'],
+      '小学6年': ['縄文時代・弥生時代の暮らし', '古墳時代と大和朝廷', '奈良時代の政治と文化', '平安時代の貴族の暮らし', '鎌倉時代の武士の政治', '室町時代の文化と政治', '戦国時代から天下統一', '江戸幕府の政治', '明治維新', '世界に歩み出した日本', '長く続いた戦争と人々のくらし', '新しい日本へ'],
+      '中学1年': ['世界の地域構成', '世界各地の人々の生活と環境', 'アジア州', 'ヨーロッパ州', 'アフリカ州', '北アメリカ州', '南アメリカ州', 'オセアニア州', '日本の地域構成'],
+      '中学2年': ['世界から見た日本の姿', '日本の地形と気候', '日本の諸地域', '古代までの日本', '中世の日本', '近世の日本'],
+      '中学3年': ['近代の日本と世界', '二度の世界大戦と日本', '現代の日本と世界', '現代社会と私たちの生活', '人権の尊重と日本国憲法', '民主政治と政治参加', '市場の働きと経済', '国民の生活と政府の役割'],
+    },
+    '英語': {
+      '中学1年': ['アルファベット', 'be動詞', '一般動詞', '複数形', '命令文', 'can', '現在進行形', '過去形'],
+      '中学2年': ['過去形の復習', 'be going to', '未来の文', '助動詞', '接続詞', '不定詞', '動名詞', '比較'],
+      '中学3年': ['受動態', '現在完了形', '不定詞の応用', '関係代名詞', '分詞', '間接疑問文', '仮定法'],
+    }
+  }
+  
+  // 学年から年数を抽出（例：「小学3年」→「小学3年」）
+  const gradeKey = grade
+  const subjectKey = subject
+  
+  if (unitTemplates[subjectKey] && unitTemplates[subjectKey][gradeKey]) {
+    return unitTemplates[subjectKey][gradeKey]
+  }
+  
+  // デフォルト候補
+  return [
+    '第1単元', '第2単元', '第3単元', '第4単元', '第5単元',
+    '第6単元', '第7単元', '第8単元', '第9単元', '第10単元'
+  ]
 }
 
 // 候補から単元を選択
