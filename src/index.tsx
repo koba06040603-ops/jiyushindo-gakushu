@@ -2572,6 +2572,85 @@ app.get('/api/curriculum/options', async (c) => {
   }
 })
 
+// APIルート：学年・教科・教科書会社に基づく単元候補を取得
+app.get('/api/curriculum/unit-suggestions', async (c) => {
+  const { env } = c
+  const grade = c.req.query('grade')
+  const subject = c.req.query('subject')
+  const textbook = c.req.query('textbook')
+  
+  try {
+    // データベースが存在し、接続可能な場合のみクエリを実行
+    if (env.DB) {
+      let query = `
+        SELECT DISTINCT unit_name, id, grade, subject, textbook_company
+        FROM curriculum
+        WHERE 1=1
+      `
+      const params: any[] = []
+      
+      if (grade) {
+        query += ` AND grade = ?`
+        params.push(grade)
+      }
+      
+      if (subject) {
+        query += ` AND subject = ?`
+        params.push(subject)
+      }
+      
+      if (textbook) {
+        query += ` AND textbook_company = ?`
+        params.push(textbook)
+      }
+      
+      query += ` ORDER BY id ASC`
+      
+      const stmt = env.DB.prepare(query)
+      const result = await stmt.bind(...params).all()
+      
+      // データベースに結果がある場合は返す
+      if (result.results && result.results.length > 0) {
+        return c.json({
+          success: true,
+          units: result.results,
+          fromDatabase: true,
+          source: 'database'
+        })
+      }
+      
+      // データベースが空の場合は、空の配列を返す（フロントエンドでダミーデータ表示）
+      console.log('⚠️  Database is empty, returning empty array for frontend dummy data display')
+      return c.json({
+        success: true,
+        units: [],
+        fromDatabase: false,
+        source: 'database_empty'
+      })
+    }
+    
+    // データベース接続エラーの場合も空の配列を返す
+    return c.json({
+      success: true,
+      units: [],
+      fromDatabase: false,
+      source: 'database_error'
+    })
+  } catch (error) {
+    console.error('Unit suggestions error:', error)
+    
+    // エラーが発生しても、success: trueを返してフロントエンドでダミーデータを表示させる
+    return c.json({ 
+      success: true, 
+      units: [],
+      fromDatabase: false,
+      source: 'error',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error'
+    })
+  }
+})
+
+
 // APIルート：特定カリキュラムの詳細取得（学習のてびき用）
 app.get('/api/curriculum/:id', async (c) => {
   const { env } = c
@@ -26682,82 +26761,6 @@ app.post('/api/voice/settings', authMiddleware, async (c) => {
 // ============================================================
 
 // APIルート：学年・教科・教科書会社に基づく単元候補を取得
-app.get('/api/curriculum/unit-suggestions', async (c) => {
-  const { env } = c
-  const grade = c.req.query('grade')
-  const subject = c.req.query('subject')
-  const textbook = c.req.query('textbook')
-  
-  try {
-    // データベースが存在し、接続可能な場合のみクエリを実行
-    if (env.DB) {
-      let query = `
-        SELECT DISTINCT unit_name, id, grade, subject, textbook_company
-        FROM curriculum
-        WHERE 1=1
-      `
-      const params: any[] = []
-      
-      if (grade) {
-        query += ` AND grade = ?`
-        params.push(grade)
-      }
-      
-      if (subject) {
-        query += ` AND subject = ?`
-        params.push(subject)
-      }
-      
-      if (textbook) {
-        query += ` AND textbook_company = ?`
-        params.push(textbook)
-      }
-      
-      query += ` ORDER BY id ASC`
-      
-      const stmt = env.DB.prepare(query)
-      const result = await stmt.bind(...params).all()
-      
-      // データベースに結果がある場合は返す
-      if (result.results && result.results.length > 0) {
-        return c.json({
-          success: true,
-          units: result.results,
-          fromDatabase: true,
-          source: 'database'
-        })
-      }
-      
-      // データベースが空の場合は、空の配列を返す（フロントエンドでダミーデータ表示）
-      console.log('⚠️  Database is empty, returning empty array for frontend dummy data display')
-      return c.json({
-        success: true,
-        units: [],
-        fromDatabase: false,
-        source: 'database_empty'
-      })
-    }
-    
-    // データベース接続エラーの場合も空の配列を返す
-    return c.json({
-      success: true,
-      units: [],
-      fromDatabase: false,
-      source: 'database_error'
-    })
-  } catch (error) {
-    console.error('Unit suggestions error:', error)
-    
-    // エラーが発生しても、success: trueを返してフロントエンドでダミーデータを表示させる
-    return c.json({ 
-      success: true, 
-      units: [],
-      fromDatabase: false,
-      source: 'error',
-      errorMessage: error instanceof Error ? error.message : 'Unknown error'
-    })
-  }
-})
 
 // APIルート：テスト対策プランを生成（複数教科・単元対応）
 app.post('/api/ai/generate-test-plan/:studentId', async (c) => {
