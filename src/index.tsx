@@ -26727,64 +26727,24 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
           source: 'database'
         })
       }
-    }
-    
-    // データベースが空、または接続できない場合はCloudflare AIで生成
-    console.log('🤖 Generating units with Cloudflare AI for:', { grade, subject, textbook })
-    
-    if (!env.AI) {
-      console.warn('Cloudflare AI not available')
+      
+      // データベースが空の場合は、空の配列を返す（フロントエンドでダミーデータ表示）
+      console.log('⚠️  Database is empty, returning empty array for frontend dummy data display')
       return c.json({
         success: true,
         units: [],
         fromDatabase: false,
-        source: 'none',
-        error: 'AI generation not available'
+        source: 'database_empty'
       })
     }
     
-    // Cloudflare AI Workersで単元を生成
-    const prompt = `${textbook}の${grade}・${subject}教科書の単元名を教科書の目次順に30個リストアップしてください。
-
-【出力形式】JSON形式のみ（説明不要）：
-{
-  "units": [
-    {"unit_name": "単元名1"},
-    {"unit_name": "単元名2"},
-    ... (30個)
-  ]
-}`
-
-    const aiResponse = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-      prompt: prompt,
-      max_tokens: 2000
-    })
-    
-    console.log('Cloudflare AI response:', JSON.stringify(aiResponse, null, 2))
-    const text = aiResponse.response || ''
-    
-    if (!text) {
-      console.error('Empty response from Cloudflare AI:', aiResponse)
-      throw new Error('Empty response from Cloudflare AI')
-    }
-    
-    // JSONを抽出
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('Failed to parse AI response')
-    }
-    
-    const aiResult = JSON.parse(jsonMatch[0])
-    const units = aiResult.units || []
-    
+    // データベース接続エラーの場合も空の配列を返す
     return c.json({
       success: true,
-      units: units,
+      units: [],
       fromDatabase: false,
-      source: 'ai_generated',
-      textbook_company: textbook
+      source: 'database_error'
     })
-    
   } catch (error) {
     console.error('Unit suggestions error:', error)
     
