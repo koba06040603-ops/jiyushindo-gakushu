@@ -2609,32 +2609,46 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
       const stmt = env.DB.prepare(query)
       const result = await stmt.bind(...params).all()
       
-      // データベースに結果がある場合は返す
-      if (result.results && result.results.length > 0) {
+      // データベースの結果を確認
+      const dbUnits = result.results || []
+      
+      // データベースに30件以上ある場合はそのまま返す
+      if (dbUnits.length >= 30) {
         return c.json({
           success: true,
-          units: result.results,
+          units: dbUnits,
           fromDatabase: true,
           source: 'database'
         })
       }
       
-      // データベースが空の場合は、空の配列を返す（フロントエンドでダミーデータ表示）
-      console.log('⚠️  Database is empty, returning empty array for frontend dummy data display')
+      // 30件未満の場合は、ダミーデータで補完
+      console.log(`⚠️  Database has only ${dbUnits.length} units, filling with dummy data to reach 30`)
+      
+      // 教科書会社別の単元テンプレート
+      const dummyUnits = generateDummyUnitsForTextbook(grade, subject, textbook, 30 - dbUnits.length)
+      
       return c.json({
         success: true,
-        units: [],
-        fromDatabase: false,
-        source: 'database_empty'
+        units: [...dbUnits, ...dummyUnits],
+        fromDatabase: dbUnits.length > 0,
+        source: dbUnits.length > 0 ? 'database_with_dummy' : 'dummy_only',
+        databaseCount: dbUnits.length,
+        dummyCount: dummyUnits.length
       })
     }
     
-    // データベース接続エラーの場合も空の配列を返す
+    // データベース接続エラーの場合は、ダミーデータのみを返す
+    console.log('⚠️  Database not available, returning 30 dummy units')
+    const dummyUnits = generateDummyUnitsForTextbook(grade || '', subject || '', textbook || '', 30)
+    
     return c.json({
       success: true,
-      units: [],
+      units: dummyUnits,
       fromDatabase: false,
-      source: 'database_error'
+      source: 'dummy_only',
+      databaseCount: 0,
+      dummyCount: 30
     })
   } catch (error) {
     console.error('Unit suggestions error:', error)
@@ -26759,6 +26773,59 @@ app.post('/api/voice/settings', authMiddleware, async (c) => {
 // ============================================================
 // 家庭学習・テスト対策モード
 // ============================================================
+
+// 教科書会社別の単元ダミーデータ生成関数
+function generateDummyUnitsForTextbook(grade: string, subject: string, textbook: string, count: number) {
+  // 小学6年・社会・東京書籍の例
+  const unitTemplates: { [key: string]: string[] } = {
+    '小学6年_社会_東京書籍': [
+      '縄文時代・弥生時代の暮らし', '古墳時代・大和朝廷', '聖徳太子と飛鳥文化',
+      '奈良時代の政治と文化', '平安時代の貴族の暮らし', '鎌倉幕府の成立',
+      '室町時代の文化', '戦国時代と天下統一', '江戸幕府の成立', '江戸時代の文化',
+      '明治維新', '近代国家への歩み', '日清・日露戦争', '大正デモクラシー',
+      '昭和時代と戦争', '戦後の日本', '高度経済成長', '現代の日本',
+      '日本国憲法と基本的人権', '国会のしくみ', '内閣のしくみ', '裁判所のしくみ',
+      '地方自治', '選挙と政治参加', '国際連合と平和', '世界の中の日本',
+      '環境問題', '資源・エネルギー問題', '少子高齢化', '情報化社会'
+    ],
+    '小学6年_社会_大日本図書': [
+      '縄文・弥生時代', '古墳・飛鳥時代', '奈良時代', '平安時代',
+      '鎌倉時代', '室町時代', '戦国・安土桃山時代', '江戸時代（前期）',
+      '江戸時代（後期）', '明治時代（前期）', '明治時代（後期）', '大正時代',
+      '昭和時代（戦前）', '昭和時代（戦後）', '平成・令和時代', '日本国憲法',
+      '国民主権', '基本的人権', '平和主義', '国会', '内閣', '裁判所',
+      '地方自治のしくみ', '税金とくらし', '社会保障', '国際社会',
+      '世界平和', '地球環境', '持続可能な社会', 'これからの日本'
+    ],
+    '小学6年_算数_東京書籍': [
+      '対称な図形', '文字と式', '分数のかけ算', '分数のわり算',
+      '円の面積', '角柱と円柱の体積', '比', '拡大図と縮図',
+      '速さ', '比例と反比例', '並べ方と組み合わせ方', '資料の調べ方',
+      '量の単位のしくみ', '分数と小数、整数の関係', '計算のくふう',
+      '文章題の解き方', '図形の見方', '面積と体積', '割合の応用',
+      '百分率とグラフ', '統計とグラフ', '平均', '単位量あたりの大きさ',
+      '速さの応用', '比の応用', '図形の性質', '立体図形',
+      '平面図形', '数の性質', '６年のまとめ'
+    ]
+  }
+  
+  const key = `${grade}_${subject}_${textbook}`
+  let templates = unitTemplates[key]
+  
+  // テンプレートがない場合は一般的な単元名を生成
+  if (!templates) {
+    templates = Array.from({ length: 30 }, (_, i) => `${subject}の学習 第${i + 1}単元`)
+  }
+  
+  // 必要な件数分のダミーデータを返す
+  return templates.slice(0, count).map((unitName, index) => ({
+    unit_name: unitName,
+    id: 9000 + index, // ダミーIDは9000番台
+    grade: grade,
+    subject: subject,
+    textbook_company: textbook
+  }))
+}
 
 // APIルート：学年・教科・教科書会社に基づく単元候補を取得
 
