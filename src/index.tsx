@@ -26729,11 +26729,11 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
       }
     }
     
-    // データベースが空、または接続できない場合はAIで生成
-    console.log('🤖 Generating units with AI for:', { grade, subject, textbook })
+    // データベースが空、または接続できない場合はCloudflare AIで生成
+    console.log('🤖 Generating units with Cloudflare AI for:', { grade, subject, textbook })
     
-    if (!env.GEMINI_API_KEY || env.GEMINI_API_KEY === 'your-gemini-api-key-here') {
-      console.warn('Gemini API key not configured')
+    if (!env.AI) {
+      console.warn('Cloudflare AI not available')
       return c.json({
         success: true,
         units: [],
@@ -26743,7 +26743,7 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
       })
     }
     
-    // Gemini APIで単元を生成
+    // Cloudflare AI Workersで単元を生成
     const prompt = `${textbook}の${grade}・${subject}教科書の単元名を教科書の目次順に30個リストアップしてください。
 
 【出力形式】JSON形式のみ（説明不要）：
@@ -26755,49 +26755,17 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
   ]
 }`
 
-    // タイムアウト設定（25秒）
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 25000)
+    const aiResponse = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+      prompt: prompt,
+      max_tokens: 2000
+    })
     
-    const apiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0.0,
-            maxOutputTokens: 2000, // 4000 → 2000に削減
-            topP: 0.95,
-            topK: 40
-          }
-        })
-      }
-    )
-    
-    clearTimeout(timeoutId)
-    
-    if (!apiResponse.ok) {
-      const errorText = await apiResponse.text()
-      console.error('Gemini API error:', {
-        status: apiResponse.status,
-        statusText: apiResponse.statusText,
-        body: errorText
-      })
-      throw new Error(`Gemini API error: ${apiResponse.status} - ${errorText}`)
-    }
-    
-    const data = await apiResponse.json()
-    console.log('Gemini API response:', JSON.stringify(data, null, 2))
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    console.log('Cloudflare AI response:', JSON.stringify(aiResponse, null, 2))
+    const text = aiResponse.response || ''
     
     if (!text) {
-      console.error('Empty response from Gemini:', data)
-      throw new Error('Empty response from Gemini API')
+      console.error('Empty response from Cloudflare AI:', aiResponse)
+      throw new Error('Empty response from Cloudflare AI')
     }
     
     // JSONを抽出
@@ -26819,18 +26787,6 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
     
   } catch (error) {
     console.error('Unit suggestions error:', error)
-    
-    // タイムアウトエラーの場合
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.error('Gemini API timeout')
-      return c.json({ 
-        success: true, 
-        units: [],
-        fromDatabase: false,
-        source: 'error',
-        errorMessage: 'AI生成がタイムアウトしました'
-      })
-    }
     
     // エラーが発生しても、success: trueを返してフロントエンドでダミーデータを表示させる
     return c.json({ 
