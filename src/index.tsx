@@ -26783,7 +26783,7 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
 ※先生方の信頼に応えられる、正確で誠実な単元リストをお願いします。`
 
     const apiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-thinking-exp:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -26802,11 +26802,23 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
     )
     
     if (!apiResponse.ok) {
-      throw new Error(`Gemini API error: ${apiResponse.status}`)
+      const errorText = await apiResponse.text()
+      console.error('Gemini API error:', {
+        status: apiResponse.status,
+        statusText: apiResponse.statusText,
+        body: errorText
+      })
+      throw new Error(`Gemini API error: ${apiResponse.status} - ${errorText}`)
     }
     
     const data = await apiResponse.json()
+    console.log('Gemini API response:', JSON.stringify(data, null, 2))
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    if (!text) {
+      console.error('Empty response from Gemini:', data)
+      throw new Error('Empty response from Gemini API')
+    }
     
     // JSONを抽出
     const jsonMatch = text.match(/\{[\s\S]*\}/)
