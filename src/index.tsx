@@ -26782,24 +26782,31 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
 
 ※先生方の信頼に応えられる、正確で誠実な単元リストをお願いします。`
 
+    // タイムアウト設定（25秒）
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 25000)
+    
     const apiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           contents: [{
             parts: [{ text: prompt }]
           }],
           generationConfig: {
             temperature: 0.0,
-            maxOutputTokens: 4000,
+            maxOutputTokens: 2000, // 4000 → 2000に削減
             topP: 0.95,
             topK: 40
           }
         })
       }
     )
+    
+    clearTimeout(timeoutId)
     
     if (!apiResponse.ok) {
       const errorText = await apiResponse.text()
@@ -26839,6 +26846,19 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
     
   } catch (error) {
     console.error('Unit suggestions error:', error)
+    
+    // タイムアウトエラーの場合
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error('Gemini API timeout')
+      return c.json({ 
+        success: true, 
+        units: [],
+        fromDatabase: false,
+        source: 'error',
+        errorMessage: 'AI生成がタイムアウトしました'
+      })
+    }
+    
     // エラーが発生しても、success: trueを返してフロントエンドでダミーデータを表示させる
     return c.json({ 
       success: true, 
