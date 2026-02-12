@@ -26783,7 +26783,7 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
 ※先生方の信頼に応えられる、正確で誠実な単元リストをお願いします。`
 
     const apiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-thinking-exp:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
