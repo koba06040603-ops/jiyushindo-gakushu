@@ -23791,7 +23791,7 @@ app.post('/api/problems/generate', authMiddleware, async (c) => {
   
   try {
     const body = await c.req.json()
-    const { subject, unitName, difficulty, count, problemType } = body
+    const { subject, grade, textbookCompany, unitName, difficulty, count, problemType } = body
     
     if (!subject) {
       return c.json({ success: false, error: '教科を指定してください' }, 400)
@@ -23800,11 +23800,22 @@ app.post('/api/problems/generate', authMiddleware, async (c) => {
     const request: ProblemGenerationRequest = {
       studentId: user.user_id,
       subject,
+      grade,
+      textbookCompany,
       unitName,
       difficulty: difficulty || 'medium',
       count: Math.min(count || 5, 10), // 最大10問
       problemType
     }
+    
+    console.log('📝 問題生成リクエスト:', {
+      subject,
+      grade,
+      textbookCompany,
+      unitName,
+      difficulty: request.difficulty,
+      count: request.count
+    })
     
     // 問題生成エンジン取得
     const engine = getProblemGeneratorEngine()
@@ -27150,6 +27161,329 @@ app.get('/api/curriculum/list', async (c) => {
   } catch (error: any) {
     console.error('❌ カリキュラム一覧取得エラー:', error)
     return c.json({ error: 'カリキュラム一覧の取得に失敗しました' }, 500)
+  }
+})
+
+// ============================================================
+// AI問題生成 API
+// ============================================================
+
+/**
+ * APIルート: AI問題生成
+ * POST /api/problems/generate
+ */
+app.post('/api/problems/generate', async (c) => {
+  const { env } = c
+  
+  try {
+    const body = await c.req.json()
+    const { 
+      grade, 
+      subject, 
+      unit_name, 
+      textbook_company,
+      difficulty = 'medium', 
+      count = 5,
+      student_id 
+    } = body
+    
+    // バリデーション
+    if (!grade || !subject) {
+      return c.json({
+        success: false,
+        error: '学年と教科は必須です'
+      }, 400)
+    }
+    
+    console.log('🎯 AI問題生成リクエスト:', { grade, subject, unit_name, textbook_company, difficulty, count })
+    
+    // カリキュラムデータ取得
+    let curriculum: any
+    if (unit_name && textbook_company) {
+      curriculum = await env.DB.prepare(`
+        SELECT * FROM curriculum 
+        WHERE grade = ? AND subject = ? AND unit_name = ? AND textbook_company = ?
+        LIMIT 1
+      `).bind(grade, subject, unit_name, textbook_company).first()
+    } else if (unit_name) {
+      curriculum = await env.DB.prepare(`
+        SELECT * FROM curriculum 
+        WHERE grade = ? AND subject = ? AND unit_name = ?
+        LIMIT 1
+      `).bind(grade, subject, unit_name).first()
+    } else {
+      // 単元名が指定されていない場合はランダムに取得
+      curriculum = await env.DB.prepare(`
+        SELECT * FROM curriculum 
+        WHERE grade = ? AND subject = ?
+        ORDER BY RANDOM()
+        LIMIT 1
+      `).bind(grade, subject).first()
+    }
+    
+    if (!curriculum) {
+      return c.json({
+        success: false,
+        error: '指定された条件のカリキュラムが見つかりません'
+      }, 404)
+    }
+    
+    console.log('📚 使用カリキュラム:', curriculum.unit_name)
+    
+    // Gemini APIキーチェック
+    if (!env.GEMINI_API_KEY) {
+      return c.json({
+        success: false,
+        error: 'Gemini APIキーが設定されていません'
+      }, 500)
+    }
+    
+    // Gemini APIで問題生成
+    const problems = []
+    for (let i = 0; i < count; i++) {
+      try {
+        const prompt = buildProblemGenerationPrompt(
+          grade,
+          subject,
+          curriculum.unit_name,
+          curriculum.unit_goal || '',
+          difficulty,
+          i + 1
+        )
+        
+        const geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: prompt }]
+              }],
+              generationConfig: {
+                temperature: 0.8,
+                maxOutputTokens: 2048
+              }
+            })
+          }
+        )
+        
+        if (!geminiResponse.ok) {
+          console.error('❌ Gemini APIエラー:', await geminiResponse.text())
+          continue
+        }
+        
+        const geminiData = await geminiResponse.json()
+        const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text
+        
+        if (!geminiText) {
+          console.error('❌ Gemini応答が空です')
+          continue
+        }
+        
+        // JSON抽出
+        const problem = extractJSON(geminiText)
+        
+        // データベースに保存
+        const insertResult = await env.DB.prepare(`
+          INSERT INTO generated_problems 
+          (grade, subject, unit_name, textbook_company, difficulty, question, options, correct_answer, explanation, hints, problem_type, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `).bind(
+          grade,
+          subject,
+          curriculum.unit_name,
+          textbook_company || '共通',
+          difficulty,
+          problem.question || problem.問題 || '',
+          JSON.stringify(problem.options || problem.選択肢 || []),
+          problem.correct_answer || problem.正解 || '',
+          problem.explanation || problem.解説 || '',
+          JSON.stringify(problem.hints || problem.ヒント || []),
+          problem.problem_type || problem.問題タイプ || 'general'
+        ).run()
+        
+        problems.push({
+          id: insertResult.meta.last_row_id,
+          ...problem,
+          grade,
+          subject,
+          unit_name: curriculum.unit_name,
+          textbook_company: textbook_company || '共通',
+          difficulty
+        })
+        
+        console.log(`✅ 問題 ${i + 1}/${count} 生成完了`)
+        
+      } catch (problemError: any) {
+        console.error(`❌ 問題 ${i + 1} 生成エラー:`, problemError)
+      }
+    }
+    
+    if (problems.length === 0) {
+      return c.json({
+        success: false,
+        error: '問題の生成に失敗しました'
+      }, 500)
+    }
+    
+    return c.json({
+      success: true,
+      count: problems.length,
+      curriculum: {
+        grade: curriculum.grade,
+        subject: curriculum.subject,
+        unit_name: curriculum.unit_name,
+        textbook_company: curriculum.textbook_company,
+        unit_goal: curriculum.unit_goal
+      },
+      problems,
+      generated_at: new Date().toISOString()
+    })
+    
+  } catch (error: any) {
+    console.error('❌ 問題生成エラー:', error)
+    return c.json({
+      success: false,
+      error: '問題生成に失敗しました',
+      details: error.message
+    }, 500)
+  }
+})
+
+/**
+ * 問題生成プロンプト構築
+ */
+function buildProblemGenerationPrompt(
+  grade: string,
+  subject: string,
+  unitName: string,
+  unitGoal: string,
+  difficulty: string,
+  problemNumber: number
+): string {
+  const difficultyMap = {
+    easy: '基礎',
+    medium: '標準',
+    hard: '発展'
+  }
+  
+  const difficultyLabel = difficultyMap[difficulty as keyof typeof difficultyMap] || '標準'
+  
+  return `あなたは優秀な教育者です。以下の条件で小中学生向けの学習問題を1問作成してください。
+
+【条件】
+- 学年: ${grade}
+- 教科: ${subject}
+- 単元: ${unitName}
+- 単元目標: ${unitGoal || '指定なし'}
+- 難易度: ${difficultyLabel}
+- 問題番号: ${problemNumber}
+
+【出力形式】（必ずJSON形式で出力してください）
+\`\`\`json
+{
+  "question": "問題文をここに記述",
+  "options": ["選択肢1", "選択肢2", "選択肢3", "選択肢4"],
+  "correct_answer": "正解の選択肢または答え",
+  "explanation": "詳しい解説をここに記述",
+  "hints": ["ヒント1", "ヒント2", "ヒント3"],
+  "problem_type": "選択問題 または 記述問題 または 計算問題"
+}
+\`\`\`
+
+【重要な注意事項】
+1. 問題文は学年レベルに合わせた言葉遣いで作成してください
+2. 選択肢がある場合は必ず4つ用意してください
+3. 解説は生徒が理解しやすいように段階的に説明してください
+4. ヒントは3つ用意し、徐々に答えに近づくようにしてください
+5. 単元の学習目標に沿った内容にしてください
+6. 実生活に関連付けた問題だとより良いです
+
+それでは問題を作成してください。JSON形式のみを出力してください。`
+}
+
+/**
+ * APIルート: 生成済み問題一覧取得
+ * GET /api/problems/list
+ */
+app.get('/api/problems/list', async (c) => {
+  const { env } = c
+  
+  try {
+    const { grade, subject, unit_name, difficulty, limit = '20' } = c.req.query()
+    
+    let query = 'SELECT * FROM generated_problems WHERE 1=1'
+    const params: any[] = []
+    
+    if (grade) {
+      query += ' AND grade = ?'
+      params.push(grade)
+    }
+    if (subject) {
+      query += ' AND subject = ?'
+      params.push(subject)
+    }
+    if (unit_name) {
+      query += ' AND unit_name = ?'
+      params.push(unit_name)
+    }
+    if (difficulty) {
+      query += ' AND difficulty = ?'
+      params.push(difficulty)
+    }
+    
+    query += ' ORDER BY created_at DESC LIMIT ?'
+    params.push(parseInt(limit) || 20)
+    
+    const problems = await env.DB.prepare(query).bind(...params).all()
+    
+    return c.json({
+      success: true,
+      count: problems.results?.length || 0,
+      problems: problems.results || []
+    })
+    
+  } catch (error: any) {
+    console.error('❌ 問題一覧取得エラー:', error)
+    return c.json({
+      success: false,
+      error: '問題一覧の取得に失敗しました'
+    }, 500)
+  }
+})
+
+/**
+ * APIルート: 問題詳細取得
+ * GET /api/problems/:id
+ */
+app.get('/api/problems/:id', async (c) => {
+  const { env } = c
+  const problemId = c.req.param('id')
+  
+  try {
+    const problem = await env.DB.prepare(`
+      SELECT * FROM generated_problems WHERE id = ?
+    `).bind(problemId).first()
+    
+    if (!problem) {
+      return c.json({
+        success: false,
+        error: '問題が見つかりません'
+      }, 404)
+    }
+    
+    return c.json({
+      success: true,
+      problem
+    })
+    
+  } catch (error: any) {
+    console.error('❌ 問題詳細取得エラー:', error)
+    return c.json({
+      success: false,
+      error: '問題詳細の取得に失敗しました'
+    }, 500)
   }
 })
 

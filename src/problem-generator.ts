@@ -12,6 +12,8 @@ import type { Context } from 'hono'
 export interface ProblemGenerationRequest {
   studentId: number
   subject: string
+  grade?: string
+  textbookCompany?: string
   unitName?: string
   difficulty: 'easy' | 'medium' | 'hard'
   count: number
@@ -695,7 +697,106 @@ export class ProblemGeneratorEngine {
   }
 
   /**
-   * 問題生成（AI + ルールベース）
+   * カリキュラム情報を取得
+   */
+  async getCurriculumUnit(
+    db: D1Database,
+    grade: string,
+    subject: string,
+    textbookCompany?: string,
+    unitName?: string
+  ): Promise<any> {
+    try {
+      let query = `
+        SELECT 
+          id,
+          grade,
+          subject,
+          textbook_company,
+          unit_name,
+          unit_order,
+          total_hours,
+          unit_goal,
+          non_cognitive_goal
+        FROM curriculum
+        WHERE grade = ? AND subject = ?
+      `
+      const params: any[] = [grade, subject]
+      
+      if (textbookCompany) {
+        query += ` AND textbook_company = ?`
+        params.push(textbookCompany)
+      }
+      
+      if (unitName) {
+        query += ` AND unit_name = ?`
+        params.push(unitName)
+      }
+      
+      query += ` ORDER BY unit_order ASC LIMIT 1`
+      
+      const result = await db.prepare(query).bind(...params).first()
+      return result
+    } catch (error) {
+      console.error('❌ カリキュラム情報取得エラー:', error)
+      return null
+    }
+  }
+
+  /**
+   * カリキュラムに基づいた問題生成プロンプト構築
+   */
+  buildCurriculumAwarePrompt(
+    request: ProblemGenerationRequest,
+    curriculumUnit: any,
+    performance?: StudentPerformance
+  ): string {
+    let prompt = `以下の条件で学習問題を1問作成してください。
+
+【教科情報】
+- 学年: ${request.grade || '指定なし'}
+- 教科: ${request.subject}
+- 教科書会社: ${request.textbookCompany || '東京書籍'}
+- 単元名: ${curriculumUnit?.unit_name || request.unitName || '指定なし'}
+- 難易度: ${DIFFICULTY_LEVELS[request.difficulty].label}
+`
+    
+    if (curriculumUnit?.unit_goal) {
+      prompt += `- 単元目標: ${curriculumUnit.unit_goal}
+`
+    }
+    
+    if (curriculumUnit?.non_cognitive_goal) {
+      prompt += `- 非認知目標: ${curriculumUnit.non_cognitive_goal}
+`
+    }
+    
+    if (performance) {
+      prompt += `
+【学習者の状況】
+- 正答率: ${Math.round(performance.averageScore)}%
+- 苦手分野: ${performance.weakPoints.join('、') || 'なし'}
+- これらの弱点を克服し、上記の単元目標を達成できる問題を作成してください。
+`
+    }
+    
+    prompt += `
+【出力形式】（必ずこの形式で出力してください）
+問題: [問題文]
+選択肢: [選択肢がある場合のみ、A. B. C. D. の形式で]
+正解: [正解の答え]
+解説: [詳しい解説。単元目標に関連づけて説明してください]
+ヒント1: [最初のヒント]
+ヒント2: [2番目のヒント]
+ヒント3: [3番目のヒント]
+
+それでは問題を作成してください。`
+    
+    return prompt
+  }
+
+  /**
+   * 問題生成（AI + ルールベース + カリキュラム統合）
    */
   async generateProblems(
     request: ProblemGenerationRequest,
@@ -704,7 +805,30 @@ export class ProblemGeneratorEngine {
   ): Promise<GeneratedProblem[]> {
     const problems: GeneratedProblem[] = []
     
-    // 学習履歴分析（エラーが発生してもデフォルト値を使用）
+    // 1. カリキュラム情報取得
+    let curriculumUnit: any = null
+    if (request.grade && request.subject) {
+      curriculumUnit = await this.getCurriculumUnit(
+        db,
+        request.grade,
+        request.subject,
+        request.textbookCompany,
+        request.unitName
+      )
+      
+      if (curriculumUnit) {
+        console.log('✅ カリキュラム情報取得成功:', {
+          unit: curriculumUnit.unit_name,
+          goal: curriculumUnit.unit_goal
+        })
+        // unitNameをカリキュラムから取得した値で上書き
+        request.unitName = curriculumUnit.unit_name
+      } else {
+        console.warn('⚠️ カリキュラム情報が見つかりませんでした。デフォルトで生成します。')
+      }
+    }
+    
+    // 2. 学習履歴分析（エラーが発生してもデフォルト値を使用）
     let performance: StudentPerformance
     try {
       performance = await this.historyAnalyzer.analyzePerformance(
@@ -726,24 +850,55 @@ export class ProblemGeneratorEngine {
       }
     }
     
-    // 難易度の自動調整
+    // 3. 難易度の自動調整
     if (!request.difficulty) {
       request.difficulty = performance.recommendedDifficulty
     }
     
+    // 4. 問題生成ループ
     for (let i = 0; i < request.count; i++) {
       let problem: GeneratedProblem | null = null
       
-      // 1. AI生成を試行（30%の確率）
-      if (ai && Math.random() < 0.3) {
+      // 4-1. カリキュラム対応AI生成を試行（カリキュラム情報がある場合は60%、ない場合は30%）
+      const aiProbability = curriculumUnit ? 0.6 : 0.3
+      if (ai && Math.random() < aiProbability) {
         try {
-          problem = await this.aiGenerator.generateWithAI(ai, request, performance)
+          // カリキュラム情報がある場合は専用プロンプトを使用
+          if (curriculumUnit) {
+            const curriculumPrompt = this.buildCurriculumAwarePrompt(
+              request,
+              curriculumUnit,
+              performance
+            )
+            
+            const response = await ai.run('@cf/meta/llama-3.1-8b-instruct', {
+              messages: [
+                {
+                  role: 'system',
+                  content: 'あなたは教育カリキュラムに沿った学習問題を作成する専門家です。学習指導要領と教科書の内容に基づき、適切な難易度で学習効果の高い問題を生成してください。'
+                },
+                {
+                  role: 'user',
+                  content: curriculumPrompt
+                }
+              ],
+              max_tokens: 1024,
+              temperature: 0.8
+            })
+            
+            if (response.response) {
+              problem = this.aiGenerator['parseAIResponse'](response.response, request)
+            }
+          } else {
+            // 従来のAI生成
+            problem = await this.aiGenerator.generateWithAI(ai, request, performance)
+          }
         } catch (error) {
           console.warn('⚠️ AI生成失敗。ルールベースにフォールバック:', error)
         }
       }
       
-      // 2. ルールベース生成（フォールバック）
+      // 4-2. ルールベース生成（フォールバック）
       if (!problem) {
         try {
           problem = this.ruleBasedGenerator.generate(

@@ -49,6 +49,14 @@
 
 ## 🚀 すぐに試す（デモ）
 
+**本番URL**: https://jiyushindo-gakushu.pages.dev
+
+### 🆕 最新機能
+- **カリキュラム対応AI問題生成**: https://jiyushindo-gakushu.pages.dev/curriculum-problem-generator.html ⭐NEW
+  - 3,807単元の実データに基づくAI問題生成
+  - 全学年・全教科・5社教科書対応
+  - 学習指導要領に沿った単元目標考慮型生成
+
 ### 📱 本番URL
 **https://e58a32fd.jiyushindo-gakushu.pages.dev** ✅ 最新版（ファイルアップロード機能：画像・動画を直接アップロード）
 

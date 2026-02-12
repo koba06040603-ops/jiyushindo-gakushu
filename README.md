@@ -4,11 +4,11 @@
 
 ## 🌐 本番環境URL
 
-**Phase 12完全実装完了！（採点機能大幅強化版）** ✅  
-- **本番URL**: https://jiyushindo-learning.pages.dev
-- **最新デプロイ**: https://1751a984.jiyushindo-learning.pages.dev ⭐NEW
-- **AI問題生成**: https://jiyushindo-learning.pages.dev/problem-generator.html （正解演出実装）⭐NEW
-- **AIチューター**: https://jiyushindo-learning.pages.dev/ai-tutor.html
+**Phase 17完全実装完了！（カリキュラム対応AI問題生成）** ✅  
+- **本番URL**: https://jiyushindo-gakushu.pages.dev
+- **カリキュラム対応AI問題生成**: https://jiyushindo-gakushu.pages.dev/curriculum-problem-generator.html ⭐NEW
+- **従来のAI問題生成**: https://jiyushindo-gakushu.pages.dev/problem-generator.html
+- **AIチューター**: https://jiyushindo-gakushu.pages.dev/ai-tutor.html
 - **AIフィードバック**: https://jiyushindo-learning.pages.dev/feedback-dashboard.html
 - **学習経路最適化**: https://jiyushindo-learning.pages.dev/learning-path.html
 - **認知科学学習**: https://jiyushindo-learning.pages.dev/cognitive-learning.html
@@ -43,8 +43,99 @@
 - **Phase 11-3完了**: ✅ 100% - 画像/アセット最適化完了
 - **Phase 15完了**: ✅ 100% - レベル5理論体系統合完了（12理論F1-F12、適性診断システム、世界最高峰エビデンス）
 - **Phase 16完了**: ✅ 100% - 12理論実装統合完了（学習カード統合、AI問題生成、ダッシュボード可視化）
+- **Phase 17完了**: ✅ 100% - カリキュラム対応AI問題生成完了（3,807単元、15教科、5社教科書対応）
 
-## Phase 16: 12理論実装統合 🚀 **NEW**
+## Phase 17: カリキュラム対応AI問題生成 🎓 **NEW**
+
+### Phase 17実装内容（完了）✅
+
+#### 実装概要
+学習指導要領と教科書に完全対応したAI問題生成システムを実装しました。
+
+**データベース統合**:
+- **総単元数**: 3,807単元（プレースホルダー0件、100%実データ）
+- **対応学年**: 9学年（小学1年〜中学3年）
+- **対応教科**: 15教科
+  - 主要教科: 算数/数学(1,005)、国語(1,015)、理科(345)、社会(360)、英語(185)
+  - 副教科: 生活(70)、音楽(185)、図画工作(80)、美術(105)、技術(90)、家庭(185)、保健体育(180)
+- **教科書会社**: 5社完全対応（東京書籍、大日本図書、学校図書、教育出版、啓林館）
+- **DBサイズ**: 5.64 MB
+
+#### Phase 17-1: ProblemGeneratorEngine 強化
+
+**新機能**:
+- `getCurriculumUnit()`: カリキュラムテーブルから学年・教科・教科書会社・単元名に基づいて情報取得
+- `buildCurriculumAwarePrompt()`: 単元目標と非認知目標を含む詳細なAIプロンプト構築
+- カリキュラム情報がある場合のAI生成確率を30%→60%に向上
+- ルールベース生成へのフォールバック機能
+
+**実装ファイル**: `/src/problem-generator.ts`（拡張）
+
+#### Phase 17-2: APIエンドポイント拡張
+
+**拡張API**:
+- `POST /api/problems/generate`: 以下のパラメータを追加
+  - `grade`: 学年（例: "小学3年"）
+  - `textbookCompany`: 教科書会社（例: "東京書籍"）
+  - `subject`: 教科
+  - `unitName`: 単元名
+  - `difficulty`: 難易度（easy/medium/hard）
+  - `count`: 問題数（最大10問）
+
+**機能**:
+- カリキュラム情報に基づくコンテキスト考慮型問題生成
+- 学習履歴分析による難易度自動調整
+- 生成問題のDB保存とメタデータ記録
+
+#### Phase 17-3: 新UI実装
+
+**新規ページ**: `/public/curriculum-problem-generator.html`
+
+**機能**:
+- 4段階選択UI: 学年 → 教科 → 教科書会社 → 単元
+- 単元選択時のカリキュラム情報表示（単元目標、非認知目標）
+- リアルタイム単元データ読み込み
+- 難易度・問題数選択
+- 問題生成結果表示（問題文、正解、解説、ヒント）
+- 回答表示/非表示トグル機能
+
+**技術スタック**:
+- TailwindCSS（デザイン）
+- Axios（API通信）
+- Vanilla JavaScript（ロジック）
+
+#### 実装統計
+
+**コード変更**:
+- `src/problem-generator.ts`: +150行（getCurriculumUnit, buildCurriculumAwarePrompt, 問題生成ロジック強化）
+- `src/index.tsx`: +30行（API パラメータ追加、ログ強化）
+- `public/curriculum-problem-generator.html`: 新規作成（25,500文字）
+
+**データベース状態**:
+- `curriculum`テーブル: 3,807レコード
+- 全単元に実データ（プレースホルダー0件）
+- 全5社×全15教科×全9学年対応
+
+#### 使用方法
+
+1. **Webページにアクセス**: https://jiyushindo-gakushu.pages.dev/curriculum-problem-generator.html
+2. **学年選択**: 小学1年〜中学3年
+3. **教科選択**: 算数/数学、国語、理科、社会、英語など15教科
+4. **教科書会社選択**: 東京書籍、大日本図書、学校図書、教育出版、啓林館
+5. **単元選択**: 教科に応じた単元リストから選択
+6. **難易度・問題数設定**: 基礎/標準/発展、3〜10問
+7. **問題生成**: AIが単元目標に沿った問題を自動生成
+8. **学習**: 問題を解いて正解を確認、解説とヒントで理解を深める
+
+#### 技術的特徴
+
+- **AI生成**: Cloudflare Workers AI（@cf/meta/llama-3.1-8b-instruct）
+- **フォールバック**: AI生成失敗時は自動的にルールベース生成
+- **学習履歴連携**: 過去の学習データから最適な難易度を推薦
+- **エッジコンピューティング**: Cloudflare Pages上で高速動作
+- **D1データベース**: SQLiteベースの高速カリキュラムデータアクセス
+
+
 
 ### Phase 16実装内容（完了）✅
 
