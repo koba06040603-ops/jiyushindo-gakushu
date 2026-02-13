@@ -1465,7 +1465,7 @@ async function renderTopPage() {
             あなただけのテスト対策で自信をつけよう
           </p>
           <a 
-            href="/test-preparation"
+            href="/static/test-preparation.html"
             class="inline-block bg-white text-blue-600 hover:bg-blue-50 py-5 px-10 rounded-lg font-bold text-xl transition shadow-xl group">
             <i class="fas fa-rocket mr-2"></i>
             テスト対策を始める
