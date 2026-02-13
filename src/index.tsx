@@ -2664,6 +2664,73 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
   }
 })
 
+// APIルート：カリキュラムデータベースから単元一覧を取得（学習カード生成用）
+app.get('/api/curriculum/units', async (c) => {
+  const { env } = c
+  const grade = c.req.query('grade')
+  const subject = c.req.query('subject')
+  const textbook_company = c.req.query('textbook_company')
+  
+  try {
+    if (!env.DB) {
+      return c.json({ 
+        success: false, 
+        error: 'Database not available',
+        units: []
+      })
+    }
+    
+    let query = `
+      SELECT DISTINCT 
+        id, 
+        grade, 
+        subject, 
+        textbook_company, 
+        unit_name
+      FROM curriculum
+      WHERE 1=1
+    `
+    const params: any[] = []
+    
+    if (grade) {
+      query += ` AND grade = ?`
+      params.push(grade)
+    }
+    
+    if (subject) {
+      query += ` AND subject = ?`
+      params.push(subject)
+    }
+    
+    if (textbook_company) {
+      query += ` AND textbook_company = ?`
+      params.push(textbook_company)
+    }
+    
+    query += ` ORDER BY id ASC`
+    
+    const stmt = env.DB.prepare(query)
+    const result = await stmt.bind(...params).all()
+    
+    const units = result.results || []
+    
+    console.log(`✅ Found ${units.length} units for ${grade} ${subject} ${textbook_company}`)
+    
+    return c.json({
+      success: true,
+      units,
+      count: units.length
+    })
+    
+  } catch (error) {
+    console.error('❌ Error fetching curriculum units:', error)
+    return c.json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      units: []
+    })
+  }
+})
 
 // APIルート：特定カリキュラムの詳細取得（学習のてびき用）
 app.get('/api/curriculum/:id', async (c) => {

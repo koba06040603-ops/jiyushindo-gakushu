@@ -12088,28 +12088,28 @@ function showUnitGeneratorModal() {
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-sm font-bold text-gray-700">単元名 *</label>
                 <button 
-                  id="suggestUnitsBtn" 
-                  onclick="suggestUnitNames()"
-                  class="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full hover:bg-purple-200 transition disabled:opacity-50"
+                  id="loadUnitsBtn" 
+                  onclick="loadCurriculumUnits()"
+                  class="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200 transition disabled:opacity-50"
                   disabled>
-                  <i class="fas fa-lightbulb mr-1"></i>
-                  AIで単元候補を表示
+                  <i class="fas fa-database mr-1"></i>
+                  教科書の単元を表示
                 </button>
               </div>
               <input type="text" id="genUnitName" 
-                     placeholder="例: かけ算の筆算（または上のボタンで候補から選択）" 
+                     placeholder="例: かけ算の筆算（または上のボタンで教科書の単元から選択）" 
                      list="unitDatalist"
                      class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
               <datalist id="unitDatalist"></datalist>
               <!-- 単元候補表示エリア -->
               <div id="unitSuggestions" class="mt-2 hidden">
-                <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-3">
+                <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 max-h-64 overflow-y-auto">
                   <div class="flex items-center justify-between mb-2">
-                    <p class="text-sm font-bold text-purple-800">
-                      <i class="fas fa-robot mr-1"></i>
-                      AI推奨の単元候補
+                    <p class="text-sm font-bold text-blue-800">
+                      <i class="fas fa-book mr-1"></i>
+                      教科書の単元一覧（<span id="unitCount">0</span>件）
                     </p>
-                    <span class="text-xs text-purple-600">クリックで選択</span>
+                    <span class="text-xs text-blue-600">クリックで選択</span>
                   </div>
                   <div id="unitSuggestionList" class="space-y-1"></div>
                 </div>
@@ -12243,12 +12243,12 @@ function showUnitGeneratorModal() {
     const grade = document.getElementById('genGrade').value
     const subject = document.getElementById('genSubject').value
     const textbook = document.getElementById('genTextbook').value
-    const suggestBtn = document.getElementById('suggestUnitsBtn')
+    const loadBtn = document.getElementById('loadUnitsBtn')
     
     if (grade && subject && textbook) {
-      suggestBtn.disabled = false
+      loadBtn.disabled = false
     } else {
-      suggestBtn.disabled = true
+      loadBtn.disabled = true
     }
   }
   
@@ -12477,6 +12477,123 @@ async function suggestUnitNames() {
     
     suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> 再生成'
     suggestBtn.disabled = false
+  }
+}
+
+// カリキュラムデータベースから単元を読み込む
+async function loadCurriculumUnits() {
+  console.log('📚 loadCurriculumUnits が呼び出されました')
+  
+  const grade = document.getElementById('genGrade').value
+  const subject = document.getElementById('genSubject').value
+  const textbook = document.getElementById('genTextbook').value
+  
+  console.log('📝 選択された値:', { grade, subject, textbook })
+  
+  if (!grade || !subject || !textbook) {
+    alert('学年・教科・教科書会社を選択してください')
+    return
+  }
+  
+  const loadBtn = document.getElementById('loadUnitsBtn')
+  const suggestionArea = document.getElementById('unitSuggestions')
+  const suggestionList = document.getElementById('unitSuggestionList')
+  const unitCountSpan = document.getElementById('unitCount')
+  
+  // ローディング表示
+  loadBtn.disabled = true
+  loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> 読込中...'
+  suggestionList.innerHTML = '<div class="text-center text-gray-500 py-2"><i class="fas fa-spinner fa-spin mr-2"></i>教科書の単元を読み込んでいます...</div>'
+  suggestionArea.classList.remove('hidden')
+  
+  try {
+    console.log('📡 APIリクエスト送信中...')
+    
+    // カリキュラムデータベースから単元を取得
+    const response = await axios.get('/api/curriculum/units', {
+      params: {
+        grade,
+        subject,
+        textbook_company: textbook
+      }
+    })
+    
+    console.log('📥 APIレスポンス:', response.data)
+    
+    if (response.data.error) {
+      throw new Error(response.data.error)
+    }
+    
+    const units = response.data.units || []
+    
+    console.log('✅ 取得した単元数:', units.length)
+    console.log('📋 単元リスト:', units)
+    
+    if (units.length === 0) {
+      console.warn('⚠️ 単元が0件です')
+      suggestionList.innerHTML = `
+        <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-3">
+          <div class="flex items-start">
+            <i class="fas fa-exclamation-circle text-yellow-600 mt-0.5 mr-2"></i>
+            <div class="flex-1">
+              <p class="text-sm font-semibold text-yellow-800 mb-1">
+                該当する単元が見つかりませんでした
+              </p>
+              <p class="text-xs text-yellow-700">
+                ${textbook}の${grade}・${subject}の単元データが登録されていません。<br>
+                単元名を直接入力してください。
+              </p>
+            </div>
+          </div>
+        </div>
+      `
+      unitCountSpan.textContent = '0'
+      loadBtn.innerHTML = '<i class="fas fa-database mr-1"></i> 教科書の単元を表示'
+      loadBtn.disabled = false
+      return
+    }
+    
+    // 単元リストを表示
+    unitCountSpan.textContent = units.length
+    suggestionList.innerHTML = units.map((unit, index) => `
+      <button 
+        onclick="selectSuggestedUnit('${unit.unit_name.replace(/'/g, "\\'")}', ${index + 1})"
+        class="w-full text-left px-3 py-2 bg-white hover:bg-blue-100 border border-blue-200 rounded transition flex items-center justify-between group">
+        <span class="text-sm text-gray-800">
+          <span class="font-bold text-blue-600 mr-2">${index + 1}.</span>
+          ${unit.unit_name}
+        </span>
+        <i class="fas fa-chevron-right text-blue-400 opacity-0 group-hover:opacity-100 transition"></i>
+      </button>
+    `).join('')
+    
+    console.log('✅ 単元リストを表示しました')
+    loadBtn.innerHTML = '<i class="fas fa-database mr-1"></i> 再読込'
+    loadBtn.disabled = false
+    
+  } catch (error) {
+    console.error('❌ 単元読み込みエラー:', error)
+    
+    suggestionList.innerHTML = `
+      <div class="bg-red-50 border border-red-300 rounded-lg p-3">
+        <div class="flex items-start">
+          <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 mr-2"></i>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-red-800 mb-1">
+              データの読み込みに失敗しました
+            </p>
+            <p class="text-xs text-red-700">
+              ${error.message}<br>
+              単元名を直接入力してください。
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+    
+    unitCountSpan.textContent = '0'
+    loadBtn.innerHTML = '<i class="fas fa-database mr-1"></i> 再試行'
+    loadBtn.disabled = false
   }
 }
 
