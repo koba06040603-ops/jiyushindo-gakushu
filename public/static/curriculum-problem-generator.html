@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カリキュラム対応AI問題生成 - 自由進度学習支援システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <style>
+        .problem-card {
+            transition: all 0.3s ease;
+        }
+        
+        .problem-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+        
+        .difficulty-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .difficulty-easy { background: #10B981; color: white; }
+        .difficulty-medium { background: #3B82F6; color: white; }
+        .difficulty-hard { background: #8B5CF6; color: white; }
+        
+        .generating-animation {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .curriculum-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- ヘッダー -->
+        <div class="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="bg-white p-3 rounded-full shadow-md">
+                        <i class="fas fa-lightbulb text-4xl text-yellow-500"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-bold text-white mb-1">
+                            カリキュラム対応AI問題生成
+                        </h1>
+                        <p class="text-purple-100">学習指導要領と教科書に沿った問題を自動生成します</p>
+                    </div>
+                </div>
+                <button onclick="window.location.href='/'" class="px-4 py-2 bg-white text-purple-600 hover:bg-purple-50 rounded-lg font-semibold transition duration-200">
+                    <i class="fas fa-home mr-2"></i>ホーム
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左側: 設定パネル -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">
+                        <i class="fas fa-cog text-purple-600 mr-2"></i>
+                        問題生成設定
+                    </h2>
+                    
+                    <form id="generateForm" onsubmit="handleGenerate(event)">
+                        <!-- 学年選択 -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-graduation-cap text-blue-500 mr-1"></i>
+                                学年
+                            </label>
+                            <select id="gradeSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" onchange="loadCurriculumUnits()">
+                                <option value="">学年を選択...</option>
+                                <option value="小学1年">小学1年</option>
+                                <option value="小学2年">小学2年</option>
+                                <option value="小学3年">小学3年</option>
+                                <option value="小学4年">小学4年</option>
+                                <option value="小学5年">小学5年</option>
+                                <option value="小学6年">小学6年</option>
+                                <option value="中学1年">中学1年</option>
+                                <option value="中学2年">中学2年</option>
+                                <option value="中学3年">中学3年</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 教科選択 -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-book text-green-500 mr-1"></i>
+                                教科
+                            </label>
+                            <select id="subjectSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" onchange="loadCurriculumUnits()">
+                                <option value="">教科を選択...</option>
+                                <option value="算数">算数</option>
+                                <option value="数学">数学</option>
+                                <option value="国語">国語</option>
+                                <option value="理科">理科</option>
+                                <option value="社会">社会</option>
+                                <option value="英語">英語</option>
+                                <option value="生活">生活</option>
+                                <option value="音楽">音楽</option>
+                                <option value="図画工作">図画工作</option>
+                                <option value="美術">美術</option>
+                                <option value="技術">技術</option>
+                                <option value="家庭">家庭</option>
+                                <option value="保健体育">保健体育</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 教科書会社選択 -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-building text-orange-500 mr-1"></i>
+                                教科書会社
+                            </label>
+                            <select id="textbookSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" onchange="loadCurriculumUnits()">
+                                <option value="東京書籍">東京書籍</option>
+                                <option value="大日本図書">大日本図書</option>
+                                <option value="学校図書">学校図書</option>
+                                <option value="教育出版">教育出版</option>
+                                <option value="啓林館">啓林館</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 単元選択 -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-list text-purple-500 mr-1"></i>
+                                単元
+                            </label>
+                            <select id="unitSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                <option value="">単元を選択...</option>
+                            </select>
+                            <div id="unitLoading" class="hidden text-sm text-gray-500 mt-1">
+                                <i class="fas fa-spinner fa-spin mr-1"></i>読み込み中...
+                            </div>
+                        </div>
+                        
+                        <!-- カリキュラム情報表示 -->
+                        <div id="curriculumInfo" class="hidden curriculum-info mb-4">
+                            <div class="text-sm font-semibold mb-2">📚 単元情報</div>
+                            <div id="curriculumGoal" class="text-sm opacity-90"></div>
+                        </div>
+                        
+                        <!-- 難易度選択 -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-signal text-yellow-500 mr-1"></i>
+                                難易度
+                            </label>
+                            <select id="difficultySelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                <option value="easy">基礎（やさしい）</option>
+                                <option value="medium" selected>標準（ふつう）</option>
+                                <option value="hard">発展（むずかしい）</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 問題数選択 -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-sort-numeric-up text-red-500 mr-1"></i>
+                                問題数
+                            </label>
+                            <select id="countSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                <option value="3">3問</option>
+                                <option value="5" selected>5問</option>
+                                <option value="7">7問</option>
+                                <option value="10">10問</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 生成ボタン -->
+                        <button type="submit" id="generateBtn" class="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-pink-700 transition duration-300 shadow-xl transform hover:scale-105">
+                            <i class="fas fa-sparkles mr-2"></i>
+                            問題を生成する
+                        </button>
+                    </form>
+                    
+                    <!-- 生成中インジケーター -->
+                    <div id="generatingIndicator" class="hidden mt-4 text-center">
+                        <div class="generating-animation inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 rounded-lg border-2 border-purple-300">
+                            <i class="fas fa-spinner fa-spin text-xl"></i>
+                            <span class="font-bold text-lg">AI が問題を生成中...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 統計情報 -->
+                <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3">
+                        <i class="fas fa-chart-bar text-blue-600 mr-2"></i>
+                        統計情報
+                    </h3>
+                    <div id="stats" class="space-y-2 text-sm text-gray-600">
+                        <p>データベース: <span id="dbStats" class="font-semibold text-gray-800">読み込み中...</span></p>
+                        <p>生成済み問題: <span id="generatedCount" class="font-semibold text-gray-800">0</span>問</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右側: 生成された問題表示エリア -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">
+                        <i class="fas fa-clipboard-list text-purple-600 mr-2"></i>
+                        生成された問題
+                    </h2>
+                    <div id="generatedProblems" class="space-y-6">
+                        <div class="text-center py-16 text-gray-400">
+                            <div class="mb-6">
+                                <i class="fas fa-wand-magic-sparkles text-8xl text-purple-300"></i>
+                            </div>
+                            <p class="text-xl font-semibold text-gray-600 mb-2">AIが問題を生成します</p>
+                            <p class="text-gray-500">⬅️ 左側のフォームで設定を選んで「問題を生成する」ボタンを押してください</p>
+                            <div class="mt-6 flex justify-center gap-4 text-sm text-gray-400">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                    <span>3,807単元対応</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                    <span>15教科対応</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                    <span>5社教科書対応</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // グローバル変数
+        // ========================================
+        let currentUnits = []
+        let currentCurriculumId = null
+        
+        // ========================================
+        // 初期化
+        // ========================================
+        async function init() {
+            await loadStats()
+            console.log('✅ カリキュラム対応AI問題生成システム初期化完了')
+        }
+        
+        // ========================================
+        // 統計情報読み込み
+        // ========================================
+        async function loadStats() {
+            try {
+                // DBサイズ取得
+                const dbResponse = await axios.get('/api/curriculum/unit-suggestions?grade=小学1年&subject=算数')
+                document.getElementById('dbStats').textContent = '接続OK'
+            } catch (error) {
+                document.getElementById('dbStats').textContent = '接続エラー'
+            }
+        }
+        
+        // ========================================
+        // カリキュラム単元読み込み
+        // ========================================
+        async function loadCurriculumUnits() {
+            const grade = document.getElementById('gradeSelect').value
+            const subject = document.getElementById('subjectSelect').value
+            const textbook = document.getElementById('textbookSelect').value
+            const unitSelect = document.getElementById('unitSelect')
+            const unitLoading = document.getElementById('unitLoading')
+            const curriculumInfo = document.getElementById('curriculumInfo')
+            
+            // リセット
+            unitSelect.innerHTML = '<option value="">単元を選択...</option>'
+            curriculumInfo.classList.add('hidden')
+            
+            if (!grade || !subject) {
+                return
+            }
+            
+            unitLoading.classList.remove('hidden')
+            
+            try {
+                const response = await axios.get('/api/curriculum/unit-suggestions', {
+                    params: { grade, subject, textbook }
+                })
+                
+                if (response.data.success && response.data.units) {
+                    currentUnits = response.data.units
+                    
+                    // 単元リスト構築
+                    response.data.units.forEach(unit => {
+                        const option = document.createElement('option')
+                        option.value = unit.id
+                        option.textContent = `${unit.unit_order}. ${unit.unit_name}`
+                        option.dataset.goal = unit.unit_goal || ''
+                        option.dataset.nonCognitiveGoal = unit.non_cognitive_goal || ''
+                        unitSelect.appendChild(option)
+                    })
+                    
+                    // 単元選択時のイベントハンドラ
+                    unitSelect.onchange = function() {
+                        const selectedOption = unitSelect.options[unitSelect.selectedIndex]
+                        if (selectedOption.value) {
+                            const goal = selectedOption.dataset.goal
+                            const nonCognitiveGoal = selectedOption.dataset.nonCognitiveGoal
+                            
+                            let infoHtml = `<strong>目標:</strong> ${goal || '（未設定）'}`
+                            if (nonCognitiveGoal) {
+                                infoHtml += `<br><strong>非認知的目標:</strong> ${nonCognitiveGoal}`
+                            }
+                            
+                            document.getElementById('curriculumGoal').innerHTML = infoHtml
+                            curriculumInfo.classList.remove('hidden')
+                        } else {
+                            curriculumInfo.classList.add('hidden')
+                        }
+                    }
+                    
+                    console.log(`✅ ${response.data.units.length}件の単元を読み込みました`)
+                }
+            } catch (error) {
+                console.error('❌ 単元読み込みエラー:', error)
+                showError('単元の読み込みに失敗しました')
+            } finally {
+                unitLoading.classList.add('hidden')
+            }
+        }
+        
+        // ========================================
+        // 問題生成ハンドラ
+        // ========================================
+        async function handleGenerate(event) {
+            event.preventDefault()
+            
+            const grade = document.getElementById('gradeSelect').value
+            const subject = document.getElementById('subjectSelect').value
+            const textbook = document.getElementById('textbookSelect').value
+            const unitId = document.getElementById('unitSelect').value
+            const difficulty = document.getElementById('difficultySelect').value
+            const count = parseInt(document.getElementById('countSelect').value)
+            
+            // バリデーション
+            if (!grade) {
+                showError('学年を選択してください')
+                return
+            }
+            
+            if (!subject) {
+                showError('教科を選択してください')
+                return
+            }
+            
+            // 単元名を取得
+            let unitName = ''
+            if (unitId) {
+                const selectedUnit = currentUnits.find(u => u.id == unitId)
+                if (selectedUnit) {
+                    unitName = selectedUnit.unit_name
+                }
+            }
+            
+            await generateProblems({
+                grade,
+                subject,
+                textbookCompany: textbook,
+                unitName,
+                difficulty,
+                count
+            })
+        }
+        
+        // ========================================
+        // 問題生成
+        // ========================================
+        async function generateProblems(params) {
+            const generateBtn = document.getElementById('generateBtn')
+            const generatingIndicator = document.getElementById('generatingIndicator')
+            const generatedProblems = document.getElementById('generatedProblems')
+            
+            // UI更新
+            generateBtn.disabled = true
+            generatingIndicator.classList.remove('hidden')
+            generatedProblems.innerHTML = '<div class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl text-purple-600"></i></div>'
+            
+            try {
+                console.log('📤 問題生成リクエスト:', params)
+                
+                const response = await axios.post('/api/problems/generate-demo', params)
+                
+                if (response.data.success) {
+                    const problems = response.data.problems
+                    console.log(`✅ ${problems.length}問の問題を生成しました`)
+                    displayProblems(problems)
+                    
+                    // カウント更新
+                    document.getElementById('generatedCount').textContent = problems.length
+                } else {
+                    const errorMsg = response.data.error || '問題の生成に失敗しました'
+                    const details = response.data.details || ''
+                    console.error('❌ API エラー:', errorMsg, details)
+                    showError(`${errorMsg}${details ? '\n詳細: ' + details : ''}`)
+                }
+            } catch (error) {
+                console.error('❌ 問題生成エラー:', error)
+                let errorMsg = 'エラーが発生しました。もう一度お試しください。'
+                
+                if (error.response) {
+                    errorMsg += `\nステータス: ${error.response.status}`
+                    if (error.response.data && error.response.data.error) {
+                        errorMsg += `\n詳細: ${error.response.data.error}`
+                    }
+                }
+                
+                showError(errorMsg)
+            } finally {
+                generateBtn.disabled = false
+                generatingIndicator.classList.add('hidden')
+            }
+        }
+        
+        // ========================================
+        // 問題表示
+        // ========================================
+        function displayProblems(problems) {
+            const container = document.getElementById('generatedProblems')
+            
+            if (problems.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                        <i class="fas fa-inbox text-4xl mb-3"></i>
+                        <p>問題が生成されませんでした</p>
+                    </div>
+                `
+                return
+            }
+            
+            container.innerHTML = problems.map((problem, index) => {
+                const difficultyColors = {
+                    easy: 'difficulty-easy',
+                    medium: 'difficulty-medium',
+                    hard: 'difficulty-hard'
+                }
+                
+                const difficultyLabels = {
+                    easy: '基礎',
+                    medium: '標準',
+                    hard: '発展'
+                }
+                
+                return `
+                    <div class="problem-card bg-white rounded-lg shadow-lg p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl font-bold text-purple-600">問題${index + 1}</span>
+                                <span class="difficulty-badge ${difficultyColors[problem.difficulty]}">
+                                    ${difficultyLabels[problem.difficulty]}
+                                </span>
+                            </div>
+                            <div class="text-sm text-gray-500">
+                                ${problem.subject} - ${problem.unitName}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+                            <div class="font-semibold text-gray-800 mb-2">【問題】</div>
+                            <div class="text-lg text-gray-700 whitespace-pre-wrap">${problem.question}</div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <button onclick="toggleAnswer(${index})" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition duration-200">
+                                <i class="fas fa-eye mr-2"></i>
+                                正解を表示
+                            </button>
+                        </div>
+                        
+                        <div id="answer-${index}" class="hidden">
+                            <div class="mb-4 p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+                                <div class="font-semibold text-green-800 mb-2">【正解】</div>
+                                <div class="text-gray-700">${problem.correctAnswer}</div>
+                            </div>
+                            
+                            <div class="mb-4 p-4 bg-purple-50 rounded-lg">
+                                <div class="font-semibold text-purple-800 mb-2">【解説】</div>
+                                <div class="text-gray-700 whitespace-pre-wrap">${problem.explanation}</div>
+                            </div>
+                            
+                            ${problem.hints && problem.hints.length > 0 ? `
+                                <div class="p-4 bg-yellow-50 rounded-lg">
+                                    <div class="font-semibold text-yellow-800 mb-2">
+                                        <i class="fas fa-lightbulb mr-1"></i>
+                                        ヒント
+                                    </div>
+                                    <ul class="space-y-1 text-sm text-gray-700">
+                                        ${problem.hints.map(hint => `<li>• ${hint}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `
+            }).join('')
+        }
+        
+        // ========================================
+        // 回答表示トグル
+        // ========================================
+        function toggleAnswer(index) {
+            const answerDiv = document.getElementById(`answer-${index}`)
+            answerDiv.classList.toggle('hidden')
+        }
+        
+        // ========================================
+        // エラー表示
+        // ========================================
+        function showError(message) {
+            const container = document.getElementById('generatedProblems')
+            container.innerHTML = `
+                <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-6">
+                    <div class="flex items-center mb-2">
+                        <i class="fas fa-exclamation-triangle text-red-500 text-2xl mr-3"></i>
+                        <h3 class="text-lg font-bold text-red-800">エラー</h3>
+                    </div>
+                    <p class="text-red-700 whitespace-pre-wrap">${message}</p>
+                </div>
+            `
+        }
+        
+        // ========================================
+        // ページロード時の初期化
+        // ========================================
+        window.addEventListener('DOMContentLoaded', init)
+    </script>
+</body>
+</html>
