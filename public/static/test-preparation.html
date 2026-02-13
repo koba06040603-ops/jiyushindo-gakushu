@@ -16,6 +16,10 @@
         .topic-chip { transition: all 0.2s; }
         .topic-chip:hover { transform: scale(1.02); }
         .topic-chip.selected { ring: 2px solid; }
+        .focus-btn, .fatigue-btn { transition: all 0.2s; cursor: pointer; }
+        .focus-btn:hover, .fatigue-btn:hover { transform: scale(1.15); }
+        .feeling-btn { transition: all 0.2s; cursor: pointer; }
+        .feeling-btn:hover { transform: scale(1.2); }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
@@ -198,7 +202,7 @@
             </div>
         </div>
 
-        <!-- ========== ステップ3: 学習実行 ========== -->
+        <!-- ========== ステップ3: 学習実行（自己調整学習支援付き） ========== -->
         <div id="step3" class="fade-in hidden">
             <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">
@@ -233,23 +237,77 @@
                         </button>
                     </div>
 
-                    <!-- 学習時間タイマー -->
-                    <div class="flex items-center justify-center space-x-4 mb-4">
-                        <button onclick="toggleTimer()" id="timerBtn" class="px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition">
-                            <i class="fas fa-play mr-2"></i>タイマー開始
-                        </button>
-                        <span id="timerDisplay" class="text-3xl font-mono font-bold text-gray-800">00:00</span>
+                    <!-- ポモドーロタイマー -->
+                    <div class="bg-white rounded-lg p-4 mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium text-gray-700"><i class="fas fa-clock text-teal-500 mr-1"></i>ポモドーロタイマー</span>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="setPomodoro(15)" class="px-2 py-1 text-xs rounded bg-teal-100 text-teal-700 hover:bg-teal-200">15分</button>
+                                <button onclick="setPomodoro(25)" class="px-2 py-1 text-xs rounded bg-teal-100 text-teal-700 hover:bg-teal-200">25分</button>
+                                <button onclick="setPomodoro(0)" class="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200">自由</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-center space-x-4">
+                            <button onclick="toggleTimer()" id="timerBtn" class="px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition">
+                                <i class="fas fa-play mr-2"></i>開始
+                            </button>
+                            <span id="timerDisplay" class="text-3xl font-mono font-bold text-gray-800">00:00</span>
+                            <span id="pomodoroTarget" class="text-sm text-gray-500 hidden">/ <span id="pomodoroTargetTime">25:00</span></span>
+                        </div>
+                        <div id="pomodoroProgress" class="w-full bg-gray-200 rounded-full h-1.5 mt-2 hidden">
+                            <div id="pomodoroBar" class="bg-teal-500 h-1.5 rounded-full transition-all" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- 自己モニタリング（集中度・疲労度） -->
+                    <div class="bg-white rounded-lg p-4 mb-4" id="selfMonitorPanel">
+                        <p class="text-sm font-bold text-gray-700 mb-3"><i class="fas fa-gauge-high text-orange-500 mr-1"></i>いまの調子は？</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-xs text-gray-500 mb-1 block">集中度</label>
+                                <div class="flex space-x-1" id="focusGauge">
+                                    <button onclick="setFocus(1)" class="focus-btn w-8 h-8 rounded-full bg-red-200 hover:bg-red-300 text-xs">1</button>
+                                    <button onclick="setFocus(2)" class="focus-btn w-8 h-8 rounded-full bg-orange-200 hover:bg-orange-300 text-xs">2</button>
+                                    <button onclick="setFocus(3)" class="focus-btn w-8 h-8 rounded-full bg-yellow-200 hover:bg-yellow-300 text-xs">3</button>
+                                    <button onclick="setFocus(4)" class="focus-btn w-8 h-8 rounded-full bg-green-200 hover:bg-green-300 text-xs">4</button>
+                                    <button onclick="setFocus(5)" class="focus-btn w-8 h-8 rounded-full bg-blue-200 hover:bg-blue-300 text-xs">5</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500 mb-1 block">疲労度</label>
+                                <div class="flex space-x-1" id="fatigueGauge">
+                                    <button onclick="setFatigue(1)" class="fatigue-btn w-8 h-8 rounded-full bg-green-200 hover:bg-green-300 text-xs">1</button>
+                                    <button onclick="setFatigue(2)" class="fatigue-btn w-8 h-8 rounded-full bg-yellow-200 hover:bg-yellow-300 text-xs">2</button>
+                                    <button onclick="setFatigue(3)" class="fatigue-btn w-8 h-8 rounded-full bg-orange-200 hover:bg-orange-300 text-xs">3</button>
+                                    <button onclick="setFatigue(4)" class="fatigue-btn w-8 h-8 rounded-full bg-red-200 hover:bg-red-300 text-xs">4</button>
+                                    <button onclick="setFatigue(5)" class="fatigue-btn w-8 h-8 rounded-full bg-red-300 hover:bg-red-400 text-xs">5</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- AI提案表示エリア -->
+                        <div id="aiSuggestionBubble" class="hidden mt-3 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200">
+                            <div class="flex items-start space-x-2">
+                                <span id="suggestionIcon" class="text-2xl">💡</span>
+                                <p id="suggestionText" class="text-sm text-gray-700"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 学習戦略提案 -->
+                    <div id="strategyPanel" class="bg-white rounded-lg p-4 mb-4 hidden">
+                        <p class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>おすすめの学習方法</p>
+                        <div id="strategyList" class="space-y-2"></div>
                     </div>
 
                     <!-- 理解度記録 -->
                     <div class="bg-white rounded-lg p-4">
                         <p class="text-sm font-medium text-gray-700 mb-2">この単元の理解度は？</p>
-                        <div class="flex items-center justify-center space-x-3">
-                            <button onclick="recordUnderstanding(1)" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition text-sm">😰 まだ難しい</button>
-                            <button onclick="recordUnderstanding(2)" class="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition text-sm">🤔 少しわかった</button>
-                            <button onclick="recordUnderstanding(3)" class="px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded-lg transition text-sm">😊 だいたいOK</button>
-                            <button onclick="recordUnderstanding(4)" class="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition text-sm">😄 よくわかった</button>
-                            <button onclick="recordUnderstanding(5)" class="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition text-sm">🤩 完璧！</button>
+                        <div class="flex items-center justify-center space-x-2 flex-wrap gap-y-2">
+                            <button onclick="recordUnderstanding(1)" class="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition text-sm">😰 難しい</button>
+                            <button onclick="recordUnderstanding(2)" class="px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition text-sm">🤔 少し</button>
+                            <button onclick="recordUnderstanding(3)" class="px-3 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded-lg transition text-sm">😊 OK</button>
+                            <button onclick="recordUnderstanding(4)" class="px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition text-sm">😄 良い</button>
+                            <button onclick="recordUnderstanding(5)" class="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition text-sm">🤩 完璧</button>
                         </div>
                     </div>
                 </div>
@@ -268,7 +326,7 @@
             </div>
         </div>
 
-        <!-- ========== ステップ4: 振り返り ========== -->
+        <!-- ========== ステップ4: 振り返り（KPT法 + AI分析） ========== -->
         <div id="step4" class="fade-in hidden">
             <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">
@@ -276,7 +334,7 @@
                 </h2>
 
                 <!-- 学習結果サマリー -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4 text-center">
                         <p class="text-3xl font-bold text-blue-600" id="totalStudyTime">0</p>
                         <p class="text-sm text-gray-600">学習時間（分）</p>
@@ -289,6 +347,16 @@
                         <p class="text-3xl font-bold text-purple-600" id="avgUnderstanding">-</p>
                         <p class="text-sm text-gray-600">平均理解度</p>
                     </div>
+                    <div class="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-4 text-center">
+                        <p class="text-3xl font-bold text-orange-600" id="confidenceGrowth">-</p>
+                        <p class="text-sm text-gray-600">自信度の変化</p>
+                    </div>
+                </div>
+
+                <!-- 自信度 Before/After 比較チャート -->
+                <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-chart-bar text-blue-500 mr-2"></i>自信度の変化（Before / After）</h3>
+                    <canvas id="confidenceCompareChart" height="200"></canvas>
                 </div>
 
                 <!-- 理解度チャート -->
@@ -297,10 +365,56 @@
                     <canvas id="understandingChart" height="200"></canvas>
                 </div>
 
+                <!-- KPT法による振り返り -->
+                <div class="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl p-6 mb-6 border border-yellow-200">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-clipboard-list text-yellow-600 mr-2"></i>KPT法で振り返ろう
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-4">学びを深めるために、3つの観点で振り返りましょう</p>
+
+                    <div class="space-y-4">
+                        <!-- Keep -->
+                        <div class="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
+                            <label class="block text-sm font-bold text-green-700 mb-2">
+                                <i class="fas fa-thumbs-up mr-1"></i>Keep（うまくいったこと・続けたいこと）
+                            </label>
+                            <textarea id="kptKeep" rows="2" class="w-full px-3 py-2 border border-green-200 rounded-lg text-sm focus:ring-2 focus:ring-green-400" placeholder="例：毎日15分ずつ進められた、問題を声に出して読んだら分かりやすかった"></textarea>
+                        </div>
+
+                        <!-- Problem -->
+                        <div class="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">
+                            <label class="block text-sm font-bold text-red-700 mb-2">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>Problem（困ったこと・うまくいかなかったこと）
+                            </label>
+                            <textarea id="kptProblem" rows="2" class="w-full px-3 py-2 border border-red-200 rounded-lg text-sm focus:ring-2 focus:ring-red-400" placeholder="例：文章題が難しくて集中が切れた、時間が足りなかった"></textarea>
+                        </div>
+
+                        <!-- Try -->
+                        <div class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
+                            <label class="block text-sm font-bold text-blue-700 mb-2">
+                                <i class="fas fa-rocket mr-1"></i>Try（次に試したいこと・改善点）
+                            </label>
+                            <textarea id="kptTry" rows="2" class="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-400" placeholder="例：苦手な単元から先にやる、わからない問題はすぐ先生に聞く"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 全体の気持ち -->
+                    <div class="mt-4">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">今の気持ちは？</label>
+                        <div class="flex justify-center space-x-3" id="feelingSelector">
+                            <button onclick="setFeeling('great')" class="feeling-btn px-4 py-2 rounded-lg border-2 border-gray-200 hover:border-green-400 transition text-2xl" data-feeling="great">😊</button>
+                            <button onclick="setFeeling('good')" class="feeling-btn px-4 py-2 rounded-lg border-2 border-gray-200 hover:border-blue-400 transition text-2xl" data-feeling="good">🙂</button>
+                            <button onclick="setFeeling('okay')" class="feeling-btn px-4 py-2 rounded-lg border-2 border-gray-200 hover:border-yellow-400 transition text-2xl" data-feeling="okay">😐</button>
+                            <button onclick="setFeeling('tired')" class="feeling-btn px-4 py-2 rounded-lg border-2 border-gray-200 hover:border-orange-400 transition text-2xl" data-feeling="tired">😓</button>
+                            <button onclick="setFeeling('frustrated')" class="feeling-btn px-4 py-2 rounded-lg border-2 border-gray-200 hover:border-red-400 transition text-2xl" data-feeling="frustrated">😤</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- テスト結果入力 -->
                 <div class="bg-orange-50 rounded-xl p-6 mb-6">
                     <h3 class="text-lg font-bold text-gray-800 mb-4">
-                        <i class="fas fa-pen-to-square text-orange-600 mr-2"></i>テスト結果を入力
+                        <i class="fas fa-pen-to-square text-orange-600 mr-2"></i>テスト結果を入力（テスト後に記入）
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
@@ -312,25 +426,32 @@
                             <input type="number" id="testMaxScore" value="100" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
                         </div>
                     </div>
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">振り返りコメント</label>
-                        <textarea id="reflectionText" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="テストを終えての感想、次に活かしたいこと..."></textarea>
-                    </div>
-                    <button onclick="submitFeedback()" class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl transition">
-                        <i class="fas fa-paper-plane mr-2"></i>結果を保存してAI分析を受ける
-                    </button>
                 </div>
 
+                <!-- 保存 & AI分析ボタン -->
+                <button onclick="submitReflection()" id="reflectionSubmitBtn" class="w-full py-4 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-bold text-lg rounded-xl transition mb-6">
+                    <i class="fas fa-paper-plane mr-2"></i>振り返りを保存してAI分析を受ける
+                </button>
+
                 <!-- AI分析結果 -->
-                <div id="aiAnalysis" class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mb-6 hidden">
+                <div id="aiReflectionAnalysis" class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mb-6 hidden">
                     <h3 class="text-lg font-bold text-gray-800 mb-4">
                         <i class="fas fa-robot text-purple-600 mr-2"></i>AIからのフィードバック
                     </h3>
-                    <div id="aiAnalysisContent" class="space-y-3"></div>
+                    <div id="aiReflectionSummary" class="mb-4 p-4 bg-white rounded-lg"></div>
+                    <div id="aiReflectionTips" class="space-y-2 mb-4"></div>
+                    <div id="aiReflectionEncouragement" class="p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg text-center"></div>
+                    <div id="aiReflectionGoals" class="mt-4 space-y-2"></div>
                 </div>
 
+                <!-- AI分析結果（旧互換） -->
+                <div id="aiAnalysis" class="hidden"></div>
+
                 <div class="flex gap-4">
-                    <button onclick="goToStep(1)" class="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl transition">
+                    <button onclick="goToStep(3)" class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-xl transition">
+                        <i class="fas fa-arrow-left mr-2"></i>学習に戻る
+                    </button>
+                    <button onclick="location.reload()" class="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl transition">
                         <i class="fas fa-plus mr-2"></i>新しいテスト対策を始める
                     </button>
                 </div>
@@ -364,7 +485,13 @@
         timerRunning: false,
         timerSeconds: 0,
         timerInterval: null,
-        confidenceBefore: {}
+        confidenceBefore: {},
+        // Task4: 自己調整学習
+        focusLevel: 3,
+        fatigueLevel: 1,
+        pomodoroTarget: 0, // 0=自由、>0=ポモドーロ秒数
+        // Task5: 振り返り
+        feeling: 'good'
     };
 
     // ===== 初期化 =====
@@ -659,7 +786,7 @@
     function recordUnderstanding(level) {
         const topic = state.allTopics[state.currentTopicIndex];
         const minutes = Math.floor(state.timerSeconds / 60);
-        state.studyLogs[state.currentTopicIndex] = { topic, understanding: level, minutes };
+        state.studyLogs[state.currentTopicIndex] = { topic, understanding: level, minutes, focus: state.focusLevel, fatigue: state.fatigueLevel };
 
         // API記録
         axios.post('/api/test-preparation/study-log', {
@@ -680,25 +807,129 @@
         document.getElementById('currentStudyItem').appendChild(msg);
         setTimeout(() => msg.remove(), 1500);
 
+        // 理解度が低い場合は戦略提案を表示
+        if (level <= 2) loadStrategies();
+
         renderCurrentTopic();
     }
 
-    // タイマー
+    // ポモドーロタイマー
+    function setPomodoro(minutes) {
+        stopTimer();
+        state.timerSeconds = 0;
+        state.pomodoroTarget = minutes * 60;
+        document.getElementById('timerDisplay').textContent = '00:00';
+        if (minutes > 0) {
+            document.getElementById('pomodoroTarget').classList.remove('hidden');
+            document.getElementById('pomodoroTargetTime').textContent = `${minutes.toString().padStart(2,'0')}:00`;
+            document.getElementById('pomodoroProgress').classList.remove('hidden');
+            document.getElementById('pomodoroBar').style.width = '0%';
+        } else {
+            document.getElementById('pomodoroTarget').classList.add('hidden');
+            document.getElementById('pomodoroProgress').classList.add('hidden');
+        }
+    }
+
     function toggleTimer() {
         if (state.timerRunning) stopTimer();
-        else { state.timerRunning = true; document.getElementById('timerBtn').innerHTML = '<i class="fas fa-pause mr-2"></i>一時停止';
+        else {
+            state.timerRunning = true;
+            document.getElementById('timerBtn').innerHTML = '<i class="fas fa-pause mr-2"></i>一時停止';
             state.timerInterval = setInterval(() => {
                 state.timerSeconds++;
                 const m = Math.floor(state.timerSeconds / 60).toString().padStart(2, '0');
                 const s = (state.timerSeconds % 60).toString().padStart(2, '0');
                 document.getElementById('timerDisplay').textContent = `${m}:${s}`;
+                // ポモドーロ進捗
+                if (state.pomodoroTarget > 0) {
+                    const pct = Math.min(100, (state.timerSeconds / state.pomodoroTarget) * 100);
+                    document.getElementById('pomodoroBar').style.width = pct + '%';
+                    if (state.timerSeconds >= state.pomodoroTarget) {
+                        stopTimer();
+                        showSuggestion('break', '⏰ ポモドーロ完了！5分間休憩しましょう。立ち上がってストレッチを！', '🎉');
+                    }
+                }
+                // 10分ごとにセルフチェック促進
+                if (state.timerSeconds > 0 && state.timerSeconds % 600 === 0) {
+                    showSuggestion('check', '10分経ちました。集中度と疲労度をチェックしてみましょう！', '📊');
+                }
             }, 1000);
         }
     }
     function stopTimer() {
         state.timerRunning = false;
         clearInterval(state.timerInterval);
-        document.getElementById('timerBtn').innerHTML = '<i class="fas fa-play mr-2"></i>タイマー開始';
+        document.getElementById('timerBtn').innerHTML = '<i class="fas fa-play mr-2"></i>開始';
+    }
+
+    // 自己モニタリング
+    function setFocus(level) {
+        state.focusLevel = level;
+        document.querySelectorAll('.focus-btn').forEach((btn, i) => {
+            btn.className = `focus-btn w-8 h-8 rounded-full text-xs font-bold transition ${i < level ? 'ring-2 ring-offset-1 ring-blue-500 bg-blue-300 text-blue-800' : 'bg-gray-200 text-gray-500'}`;
+        });
+        checkMonitorAndSuggest();
+    }
+    function setFatigue(level) {
+        state.fatigueLevel = level;
+        document.querySelectorAll('.fatigue-btn').forEach((btn, i) => {
+            btn.className = `fatigue-btn w-8 h-8 rounded-full text-xs font-bold transition ${i < level ? 'ring-2 ring-offset-1 ring-red-500 bg-red-300 text-red-800' : 'bg-gray-200 text-gray-500'}`;
+        });
+        checkMonitorAndSuggest();
+    }
+
+    async function checkMonitorAndSuggest() {
+        try {
+            const { data } = await axios.post('/api/self-regulated/monitor', {
+                student_id: state.studentId,
+                plan_id: state.planId,
+                topic: state.allTopics[state.currentTopicIndex],
+                focus_level: state.focusLevel,
+                fatigue_level: state.fatigueLevel
+            });
+            if (data.suggestion) {
+                showSuggestion(data.suggestion.type, data.suggestion.message, data.suggestion.icon);
+            }
+        } catch (e) { console.error('Monitor error:', e); }
+    }
+
+    function showSuggestion(type, message, icon) {
+        const bubble = document.getElementById('aiSuggestionBubble');
+        document.getElementById('suggestionIcon').textContent = icon || '💡';
+        document.getElementById('suggestionText').textContent = message;
+        bubble.classList.remove('hidden');
+        // 自動で消す（20秒後）
+        setTimeout(() => bubble.classList.add('hidden'), 20000);
+    }
+
+    // 学習戦略提案
+    async function loadStrategies() {
+        const topic = state.allTopics[state.currentTopicIndex];
+        const grade = document.getElementById('gradeSelect').value;
+        const subject = document.getElementById('subjectSelect').value;
+        const log = state.studyLogs[state.currentTopicIndex];
+        try {
+            const { data } = await axios.post('/api/self-regulated/strategy-suggest', {
+                student_id: state.studentId,
+                topic,
+                subject: subject || '',
+                understanding_level: log?.understanding || 0,
+                time_spent_minutes: Math.floor(state.timerSeconds / 60)
+            });
+            if (data.success && data.strategies.length) {
+                const panel = document.getElementById('strategyPanel');
+                panel.classList.remove('hidden');
+                document.getElementById('strategyList').innerHTML = data.strategies.map(s => `
+                    <div class="flex items-center space-x-3 p-2 bg-yellow-50 rounded-lg border border-yellow-100">
+                        <span class="text-xl">${s.difficulty === 'easy' ? '🟢' : s.difficulty === 'hard' ? '🔴' : '🟡'}</span>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800 text-sm">${s.strategy}</p>
+                            <p class="text-xs text-gray-500">${s.description}（${s.expected_time}）</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (e) { console.error('Strategy error:', e); }
     }
 
     function openProblemGenerator() {
@@ -724,7 +955,20 @@
         if (n === 4) renderStep4();
     }
 
-    // ===== 振り返り =====
+    // ===== Task5: 振り返り（KPT法対応） =====
+    function setFeeling(f) {
+        state.feeling = f;
+        document.querySelectorAll('.feeling-btn').forEach(btn => {
+            btn.className = btn.className.replace(/border-\w+-400/g, 'border-gray-200');
+            if (btn.dataset.feeling === f) {
+                const colors = { great: 'border-green-400', good: 'border-blue-400', okay: 'border-yellow-400', tired: 'border-orange-400', frustrated: 'border-red-400' };
+                btn.className = btn.className.replace('border-gray-200', colors[f] || 'border-gray-200') + ' bg-gray-50';
+            } else {
+                btn.className = btn.className.replace(' bg-gray-50', '');
+            }
+        });
+    }
+
     function renderStep4() {
         const logs = Object.values(state.studyLogs);
         const totalMin = logs.reduce((s, l) => s + (l.minutes || 0), 0);
@@ -734,7 +978,51 @@
         document.getElementById('completedCount').textContent = logs.length;
         document.getElementById('avgUnderstanding').textContent = avgUnd;
 
-        // チャート
+        // 自信度の変化を計算
+        const confBefore = Object.values(state.confidenceBefore);
+        const confAfter = logs.map(l => l.understanding);
+        if (confBefore.length > 0 && confAfter.length > 0) {
+            const avgBefore = (confBefore.reduce((a,b) => a+b, 0) / confBefore.length).toFixed(1);
+            const avgAfterVal = (confAfter.reduce((a,b) => a+b, 0) / confAfter.length).toFixed(1);
+            const growth = (avgAfterVal - avgBefore).toFixed(1);
+            document.getElementById('confidenceGrowth').textContent = (growth > 0 ? '+' : '') + growth;
+            document.getElementById('confidenceGrowth').className = `text-3xl font-bold ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`;
+        }
+
+        // Before/After 比較チャート
+        const confCtx = document.getElementById('confidenceCompareChart').getContext('2d');
+        if (window.confCompareChart) window.confCompareChart.destroy();
+        window.confCompareChart = new Chart(confCtx, {
+            type: 'bar',
+            data: {
+                labels: state.allTopics.map(t => t.length > 8 ? t.substring(0, 8) + '..' : t),
+                datasets: [
+                    {
+                        label: '学習前の自信度',
+                        data: state.allTopics.map((_, i) => state.confidenceBefore[i] || 0),
+                        backgroundColor: 'rgba(147, 197, 253, 0.7)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
+                        label: '学習後の理解度',
+                        data: state.allTopics.map((_, i) => state.studyLogs[i]?.understanding || 0),
+                        backgroundColor: 'rgba(134, 239, 172, 0.7)',
+                        borderColor: '#22c55e',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { min: 0, max: 5, ticks: { stepSize: 1 } } },
+                plugins: { legend: { position: 'top' } }
+            }
+        });
+
+        // 理解度チャート
         const ctx = document.getElementById('understandingChart').getContext('2d');
         if (window.understandingChartInstance) window.understandingChartInstance.destroy();
         window.understandingChartInstance = new Chart(ctx, {
@@ -769,39 +1057,102 @@
         }).catch(console.error);
     }
 
-    async function submitFeedback() {
+    async function submitReflection() {
+        const btn = document.getElementById('reflectionSubmitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>AI分析中...';
+
+        const keep = document.getElementById('kptKeep').value;
+        const problem = document.getElementById('kptProblem').value;
+        const tryNext = document.getElementById('kptTry').value;
         const score = parseInt(document.getElementById('testScore').value);
         const maxScore = parseInt(document.getElementById('testMaxScore').value) || 100;
-        const reflection = document.getElementById('reflectionText').value;
-
         const logs = Object.values(state.studyLogs);
-        const weakness = logs.filter(l => l.understanding < 3).map(l => l.topic);
-        const strength = logs.filter(l => l.understanding >= 4).map(l => l.topic);
 
         try {
-            const { data } = await axios.post('/api/test-preparation/feedback', {
+            // 1. KPT振り返りを保存
+            await axios.post('/api/reflection/save', {
+                student_id: state.studentId,
+                plan_id: state.planId,
+                keep,
+                problem,
+                try_next: tryNext,
+                overall_feeling: state.feeling,
+                goal_achievement: Math.round(parseFloat(document.getElementById('avgUnderstanding').textContent) || 3),
+                confidence_change: document.getElementById('confidenceGrowth').textContent
+            });
+
+            // 2. テスト結果フィードバック保存
+            const weakness = logs.filter(l => l.understanding < 3).map(l => l.topic);
+            const strength = logs.filter(l => l.understanding >= 4).map(l => l.topic);
+            await axios.post('/api/test-preparation/feedback', {
                 plan_id: state.planId,
                 student_id: state.studentId,
                 score: isNaN(score) ? null : score,
                 max_score: maxScore,
                 weakness_areas: weakness,
                 strength_areas: strength,
-                reflection
+                reflection: `Keep: ${keep}\nProblem: ${problem}\nTry: ${tryNext}`
             });
 
-            if (data.success && data.ai_recommendations?.length) {
-                const div = document.getElementById('aiAnalysis');
+            // 3. AI振り返り分析
+            const { data } = await axios.post('/api/reflection/ai-analyze', {
+                student_id: state.studentId,
+                keep,
+                problem,
+                try_next: tryNext,
+                study_logs: logs,
+                confidence_before: state.confidenceBefore,
+                confidence_after: logs.map(l => l.understanding)
+            });
+
+            if (data.success && data.analysis) {
+                const div = document.getElementById('aiReflectionAnalysis');
                 div.classList.remove('hidden');
-                document.getElementById('aiAnalysisContent').innerHTML = data.ai_recommendations.map((r, i) => `
-                    <div class="flex items-start space-x-3 p-3 bg-white rounded-lg">
-                        <span class="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs">${i+1}</span>
-                        <p class="text-gray-700">${r}</p>
-                    </div>
-                `).join('');
+
+                document.getElementById('aiReflectionSummary').innerHTML = `
+                    <p class="text-gray-700"><i class="fas fa-comment-dots text-purple-500 mr-2"></i>${data.analysis.summary}</p>`;
+
+                document.getElementById('aiReflectionTips').innerHTML = 
+                    `<p class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>改善アドバイス</p>` +
+                    (data.analysis.improvement_tips || []).map((tip, i) => `
+                    <div class="flex items-start space-x-3 p-3 bg-white rounded-lg border">
+                        <span class="w-6 h-6 rounded-full bg-purple-600 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs">${i+1}</span>
+                        <p class="text-sm text-gray-700">${tip}</p>
+                    </div>`).join('');
+
+                document.getElementById('aiReflectionEncouragement').innerHTML = `
+                    <p class="text-lg font-bold text-green-700"><i class="fas fa-star text-yellow-500 mr-2"></i>${data.analysis.encouragement}</p>`;
+
+                if (data.analysis.next_goals?.length) {
+                    document.getElementById('aiReflectionGoals').innerHTML = 
+                        `<p class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-bullseye text-red-500 mr-1"></i>次の目標</p>` +
+                        data.analysis.next_goals.map(g => `
+                        <div class="flex items-center space-x-2 p-2 bg-blue-50 rounded-lg">
+                            <i class="fas fa-flag text-blue-500"></i>
+                            <span class="text-sm text-gray-700">${g}</span>
+                        </div>`).join('');
+                }
             }
-            alert('保存しました！');
-        } catch (e) { alert('保存に失敗しました'); console.error(e); }
+
+            // 成功メッセージ
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-xl shadow-lg z-50 fade-in';
+            toast.innerHTML = '<i class="fas fa-check-circle mr-2"></i>振り返りを保存しました！';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+
+        } catch (e) { 
+            alert('保存に失敗しました'); 
+            console.error(e); 
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>振り返りを保存してAI分析を受ける';
+        }
     }
+
+    // 旧互換用
+    async function submitFeedback() { await submitReflection(); }
 
     // ===== 過去のプラン =====
     async function loadPastPlans() {

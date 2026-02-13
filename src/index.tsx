@@ -27754,20 +27754,6 @@ app.post('/api/test-preparation/create-plan', async (c) => {
       return c.json({ success: false, error: '学年、教科、生徒IDは必須です' }, 400)
     }
 
-    const result = await env.DB.prepare(`
-      INSERT INTO test_preparation_plans (student_id, title, test_date, grade, subject, textbook_company, curriculum_ids, custom_topics)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      student_id,
-      title || 'テスト対策',
-      test_date || null,
-      grade,
-      subject,
-      textbook_company || null,
-      JSON.stringify(curriculum_ids || []),
-      JSON.stringify(custom_topics || [])
-    ).run()
-
     // 選択された単元情報を取得
     let selectedUnits: any[] = []
     if (curriculum_ids && curriculum_ids.length > 0) {
@@ -27778,7 +27764,7 @@ app.post('/api/test-preparation/create-plan', async (c) => {
       selectedUnits = unitsResult.results || []
     }
 
-    // AIで学習スケジュール提案を生成
+    // 全トピックリスト
     const allTopics = [
       ...selectedUnits.map((u: any) => u.unit_name),
       ...(custom_topics || [])
@@ -27821,6 +27807,24 @@ JSON のみ出力。`
         console.error('AI schedule generation failed:', e)
       }
     }
+
+    // DBにプランを保存（all_topicsとai_scheduleも含む）
+    const result = await env.DB.prepare(`
+      INSERT INTO test_preparation_plans (student_id, title, test_date, grade, subject, textbook_company, curriculum_ids, custom_topics, all_topics, ai_schedule, daily_minutes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      student_id,
+      title || 'テスト対策',
+      test_date || null,
+      grade,
+      subject,
+      textbook_company || null,
+      JSON.stringify(curriculum_ids || []),
+      JSON.stringify(custom_topics || []),
+      JSON.stringify(allTopics),
+      aiSchedule ? JSON.stringify(aiSchedule) : null,
+      body.daily_minutes || 30
+    ).run()
 
     return c.json({
       success: true,
