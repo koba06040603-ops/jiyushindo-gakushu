@@ -7,27 +7,31 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .confidence-star { cursor: pointer; transition: all 0.2s; }
+        .confidence-star:hover { transform: scale(1.2); }
+        .topic-chip { transition: all 0.2s; }
+        .topic-chip:hover { transform: scale(1.02); }
+        .topic-chip.selected { ring: 2px solid; }
+    </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
     
-    <!-- ヘッダー -->
     <header class="bg-white shadow-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <a href="/" class="flex items-center space-x-2 hover:opacity-80 transition">
-                        <i class="fas fa-arrow-left text-gray-600"></i>
-                        <span class="text-sm text-gray-600">トップに戻る</span>
-                    </a>
-                </div>
+                <a href="/" class="flex items-center space-x-2 hover:opacity-80 transition">
+                    <i class="fas fa-arrow-left text-gray-600"></i>
+                    <span class="text-sm text-gray-600">トップに戻る</span>
+                </a>
                 <h1 class="text-2xl font-bold text-gray-800">
-                    <i class="fas fa-clipboard-check text-blue-600 mr-2"></i>
-                    テスト対策プラン
+                    <i class="fas fa-clipboard-check text-blue-600 mr-2"></i>テスト対策プラン
                 </h1>
-                <div class="flex items-center space-x-4">
-                    <div class="text-right">
-                        <p class="text-sm text-gray-600">ようこそ、<span id="studentName" class="font-semibold">山田太郎</span>さん</p>
-                    </div>
+                <div class="text-right">
+                    <p class="text-sm text-gray-600">ID: <span id="studentId" class="font-semibold">1</span></p>
                 </div>
             </div>
         </div>
@@ -35,136 +39,794 @@
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        <!-- ウェルカムセクション -->
-        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
-            <div class="text-center">
-                <h2 class="text-3xl font-bold mb-2">テスト対策で自信をつけよう！</h2>
-                <p class="text-blue-100 text-lg">苦手な単元を克服し、得意な単元をさらに伸ばす</p>
+        <!-- ステップインジケータ -->
+        <div class="flex items-center justify-center mb-8" id="stepIndicator">
+            <div class="flex items-center space-x-2">
+                <div id="step1indicator" class="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm">1</div>
+                <span class="text-sm font-medium text-blue-600">範囲設定</span>
+            </div>
+            <div class="w-16 h-0.5 bg-gray-300 mx-2"></div>
+            <div class="flex items-center space-x-2">
+                <div id="step2indicator" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">2</div>
+                <span class="text-sm font-medium text-gray-400">学習計画</span>
+            </div>
+            <div class="w-16 h-0.5 bg-gray-300 mx-2"></div>
+            <div class="flex items-center space-x-2">
+                <div id="step3indicator" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">3</div>
+                <span class="text-sm font-medium text-gray-400">学習実行</span>
+            </div>
+            <div class="w-16 h-0.5 bg-gray-300 mx-2"></div>
+            <div class="flex items-center space-x-2">
+                <div id="step4indicator" class="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm">4</div>
+                <span class="text-sm font-medium text-gray-400">振り返り</span>
             </div>
         </div>
 
-        <!-- 3つのプランカード -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            
-            <!-- AI問題生成 -->
-            <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition cursor-pointer" onclick="showAIProblemGenerator()">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-full p-3">
-                        <i class="fas fa-brain text-2xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"></i>
+        <!-- ========== ステップ1: テスト範囲設定 ========== -->
+        <div id="step1" class="fade-in">
+            <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-crosshairs text-blue-600 mr-2"></i>テスト範囲を設定しよう
+                </h2>
+                
+                <!-- テスト基本情報 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">テスト名</label>
+                        <input type="text" id="testTitle" placeholder="例: 2学期期末テスト" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     </div>
-                    <span class="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                        おすすめ
-                    </span>
-                </div>
-                <h3 class="text-xl font-bold text-gray-800 mb-2">AI問題生成</h3>
-                <p class="text-gray-600 text-sm mb-4">自分に合った問題を自動生成</p>
-                <ul class="text-xs text-gray-500 space-y-1 mb-4">
-                    <li>• 3,807単元から選択</li>
-                    <li>• 15教科完全対応</li>
-                    <li>• 難易度調整可能</li>
-                </ul>
-                <button class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 rounded-lg transition">
-                    <i class="fas fa-sparkles mr-2"></i>問題を生成する
-                </button>
-            </div>
-
-            <!-- 弱点克服プラン -->
-            <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition cursor-pointer" onclick="showWeaknessAnalysis()">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="bg-red-100 rounded-full p-3">
-                        <i class="fas fa-chart-line text-2xl text-red-600"></i>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">テスト日</label>
+                        <input type="date" id="testDate" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     </div>
-                    <span class="bg-red-100 text-red-800 text-xs font-semibold px-3 py-1 rounded-full">
-                        重要
-                    </span>
-                </div>
-                <h3 class="text-xl font-bold text-gray-800 mb-2">弱点克服プラン</h3>
-                <p class="text-gray-600 text-sm mb-4">AIが苦手分野を分析</p>
-                <ul class="text-xs text-gray-500 space-y-1 mb-4">
-                    <li>• 学習履歴から弱点抽出</li>
-                    <li>• 優先度順に表示</li>
-                    <li>• 集中トレーニング</li>
-                </ul>
-                <button class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition">
-                    <i class="fas fa-dumbbell mr-2"></i>弱点を克服する
-                </button>
-            </div>
-
-            <!-- 総復習プラン -->
-            <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition cursor-pointer" onclick="showComprehensiveReview()">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="bg-green-100 rounded-full p-3">
-                        <i class="fas fa-book-open text-2xl text-green-600"></i>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">1日の学習時間（分）</label>
+                        <input type="number" id="dailyMinutes" value="30" min="10" max="120" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                     </div>
-                    <span class="bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">
-                        基礎固め
-                    </span>
                 </div>
-                <h3 class="text-xl font-bold text-gray-800 mb-2">総復習プラン</h3>
-                <p class="text-gray-600 text-sm mb-4">複数単元を統合して学習</p>
-                <ul class="text-xs text-gray-500 space-y-1 mb-4">
-                    <li>• 単元横断的な問題</li>
-                    <li>• 関連性の理解</li>
-                    <li>• 総合力アップ</li>
-                </ul>
-                <button class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition">
-                    <i class="fas fa-clipboard-list mr-2"></i>総復習を始める
-                </button>
-            </div>
-        </div>
 
-        <!-- AI問題生成セクション -->
-        <div id="aiProblemSection" class="bg-white rounded-xl shadow-lg p-8 mb-8 hidden">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6">
-                <i class="fas fa-brain text-purple-600 mr-2"></i>
-                AI問題生成
-            </h2>
-            
-            <iframe 
-                src="/static/curriculum-problem-generator" 
-                class="w-full h-screen border-0 rounded-lg"
-                style="min-height: 800px;">
-            </iframe>
-        </div>
-
-        <!-- 学習履歴 -->
-        <div class="bg-white rounded-xl shadow-lg p-6">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-history text-blue-600 mr-2"></i>
-                最近のテスト対策
-            </h3>
-            <div id="recentHistory" class="space-y-3">
-                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div class="flex items-center space-x-4">
-                        <div class="bg-purple-100 rounded-full p-2">
-                            <i class="fas fa-brain text-purple-600"></i>
+                <!-- カリキュラムDB選択 -->
+                <div class="bg-blue-50 rounded-xl p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-database text-blue-600 mr-2"></i>教科書から単元を選択
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">学年</label>
+                            <select id="gradeSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="onGradeChange()">
+                                <option value="">選択してください</option>
+                            </select>
                         </div>
                         <div>
-                            <p class="font-semibold text-gray-800">小学3年 算数 - かけ算</p>
-                            <p class="text-sm text-gray-600">AI問題生成 • 標準 • 5問</p>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">教科</label>
+                            <select id="subjectSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="onSubjectChange()">
+                                <option value="">学年を先に選択</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">教科書会社</label>
+                            <select id="companySelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="loadUnits()">
+                                <option value="">選択してください</option>
+                            </select>
                         </div>
                     </div>
-                    <span class="text-xs text-gray-500">2時間前</span>
+                    
+                    <!-- 単元一覧 -->
+                    <div id="unitsContainer" class="hidden">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-sm font-medium text-gray-700">単元を選択（複数可）</p>
+                            <button onclick="toggleAllUnits()" class="text-xs text-blue-600 hover:text-blue-800 font-medium">全選択/解除</button>
+                        </div>
+                        <div id="unitsList" class="flex flex-wrap gap-2 max-h-60 overflow-y-auto p-2"></div>
+                    </div>
+                </div>
+
+                <!-- 自由テキスト入力 -->
+                <div class="bg-purple-50 rounded-xl p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-pen text-purple-600 mr-2"></i>追加の学習項目（自由入力）
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-3">教科書にない内容やプリントの範囲を入力できます</p>
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" id="customTopicInput" placeholder="例: 漢字テスト範囲p.50-60" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" onkeypress="if(event.key==='Enter')addCustomTopic()">
+                        <button onclick="addCustomTopic()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition">
+                            <i class="fas fa-plus mr-1"></i>追加
+                        </button>
+                    </div>
+                    <div id="customTopicsList" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <!-- 選択済みサマリー -->
+                <div id="selectionSummary" class="bg-gray-50 rounded-xl p-6 mb-6 hidden">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3">
+                        <i class="fas fa-list-check text-green-600 mr-2"></i>選択済みの学習範囲
+                    </h3>
+                    <div id="summaryContent" class="space-y-2"></div>
+                    <div class="mt-4 text-sm text-gray-600">
+                        合計 <span id="totalTopics" class="font-bold text-blue-600">0</span> 項目
+                    </div>
+                </div>
+
+                <button onclick="createPlan()" id="createPlanBtn" class="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-lg rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-rocket mr-2"></i>テスト対策プランを作成する
+                </button>
+            </div>
+        </div>
+
+        <!-- ========== ステップ2: 学習計画 ========== -->
+        <div id="step2" class="fade-in hidden">
+            <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-calendar-alt text-green-600 mr-2"></i>AIが提案する学習計画
+                </h2>
+                
+                <div id="aiAdvice" class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+                    <div class="flex items-start space-x-3">
+                        <div class="bg-blue-600 rounded-full p-2 flex-shrink-0">
+                            <i class="fas fa-robot text-white text-lg"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-gray-800 mb-1">AIアドバイザー</p>
+                            <p id="aiAdviceText" class="text-gray-700">分析中...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 優先順位 -->
+                <div id="priorityOrder" class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3"><i class="fas fa-sort-amount-down text-orange-500 mr-2"></i>学習の優先順位</h3>
+                    <div id="priorityList" class="space-y-2"></div>
+                </div>
+
+                <!-- 学習前の自信度チェック -->
+                <div class="bg-yellow-50 rounded-xl p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-star text-yellow-500 mr-2"></i>学習前の自信度チェック（メタ認知）
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-4">各項目について、今の自信度を星で評価してください</p>
+                    <div id="confidenceCheck" class="space-y-3"></div>
+                </div>
+
+                <div class="flex gap-4">
+                    <button onclick="goToStep(1)" class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-xl transition">
+                        <i class="fas fa-arrow-left mr-2"></i>戻る
+                    </button>
+                    <button onclick="startStudy()" class="flex-1 py-3 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-bold text-lg rounded-xl transition">
+                        <i class="fas fa-play mr-2"></i>学習を始める
+                    </button>
                 </div>
             </div>
         </div>
 
+        <!-- ========== ステップ3: 学習実行 ========== -->
+        <div id="step3" class="fade-in hidden">
+            <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-book-reader text-teal-600 mr-2"></i>学習中
+                </h2>
+
+                <!-- 進捗バー -->
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>進捗</span>
+                        <span id="progressText">0 / 0 完了</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="progressBar" class="bg-gradient-to-r from-green-500 to-teal-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- 現在の学習項目 -->
+                <div id="currentStudyItem" class="bg-gradient-to-r from-teal-50 to-green-50 rounded-xl p-6 mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold text-gray-800" id="currentTopicName">-</h3>
+                        <span id="currentTopicIndex" class="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm font-medium">1/1</span>
+                    </div>
+
+                    <!-- AI問題生成へのリンク -->
+                    <div class="flex gap-3 mb-4">
+                        <button onclick="openProblemGenerator()" class="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium">
+                            <i class="fas fa-brain mr-2"></i>AI問題を解く
+                        </button>
+                        <button onclick="openLearningCards()" class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium">
+                            <i class="fas fa-layer-group mr-2"></i>学習カードで学ぶ
+                        </button>
+                    </div>
+
+                    <!-- 学習時間タイマー -->
+                    <div class="flex items-center justify-center space-x-4 mb-4">
+                        <button onclick="toggleTimer()" id="timerBtn" class="px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition">
+                            <i class="fas fa-play mr-2"></i>タイマー開始
+                        </button>
+                        <span id="timerDisplay" class="text-3xl font-mono font-bold text-gray-800">00:00</span>
+                    </div>
+
+                    <!-- 理解度記録 -->
+                    <div class="bg-white rounded-lg p-4">
+                        <p class="text-sm font-medium text-gray-700 mb-2">この単元の理解度は？</p>
+                        <div class="flex items-center justify-center space-x-3">
+                            <button onclick="recordUnderstanding(1)" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition text-sm">😰 まだ難しい</button>
+                            <button onclick="recordUnderstanding(2)" class="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition text-sm">🤔 少しわかった</button>
+                            <button onclick="recordUnderstanding(3)" class="px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded-lg transition text-sm">😊 だいたいOK</button>
+                            <button onclick="recordUnderstanding(4)" class="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg transition text-sm">😄 よくわかった</button>
+                            <button onclick="recordUnderstanding(5)" class="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition text-sm">🤩 完璧！</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-4">
+                    <button onclick="prevTopic()" id="prevBtn" class="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-xl transition" disabled>
+                        <i class="fas fa-arrow-left mr-2"></i>前へ
+                    </button>
+                    <button onclick="nextTopic()" id="nextBtn" class="flex-1 py-3 bg-gradient-to-r from-teal-600 to-green-600 text-white font-bold rounded-xl transition">
+                        次の単元へ <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                    <button onclick="goToStep(4)" id="finishBtn" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl transition hidden">
+                        <i class="fas fa-flag-checkered mr-2"></i>学習完了！
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== ステップ4: 振り返り ========== -->
+        <div id="step4" class="fade-in hidden">
+            <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-chart-pie text-pink-600 mr-2"></i>学習の振り返り
+                </h2>
+
+                <!-- 学習結果サマリー -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-4 text-center">
+                        <p class="text-3xl font-bold text-blue-600" id="totalStudyTime">0</p>
+                        <p class="text-sm text-gray-600">学習時間（分）</p>
+                    </div>
+                    <div class="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-4 text-center">
+                        <p class="text-3xl font-bold text-green-600" id="completedCount">0</p>
+                        <p class="text-sm text-gray-600">完了項目数</p>
+                    </div>
+                    <div class="bg-gradient-to-r from-purple-50 to-purple-100 rounded-xl p-4 text-center">
+                        <p class="text-3xl font-bold text-purple-600" id="avgUnderstanding">-</p>
+                        <p class="text-sm text-gray-600">平均理解度</p>
+                    </div>
+                </div>
+
+                <!-- 理解度チャート -->
+                <div class="bg-gray-50 rounded-xl p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">各項目の理解度</h3>
+                    <canvas id="understandingChart" height="200"></canvas>
+                </div>
+
+                <!-- テスト結果入力 -->
+                <div class="bg-orange-50 rounded-xl p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-pen-to-square text-orange-600 mr-2"></i>テスト結果を入力
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">得点</label>
+                            <input type="number" id="testScore" min="0" max="100" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">満点</label>
+                            <input type="number" id="testMaxScore" value="100" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">振り返りコメント</label>
+                        <textarea id="reflectionText" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="テストを終えての感想、次に活かしたいこと..."></textarea>
+                    </div>
+                    <button onclick="submitFeedback()" class="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl transition">
+                        <i class="fas fa-paper-plane mr-2"></i>結果を保存してAI分析を受ける
+                    </button>
+                </div>
+
+                <!-- AI分析結果 -->
+                <div id="aiAnalysis" class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mb-6 hidden">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-robot text-purple-600 mr-2"></i>AIからのフィードバック
+                    </h3>
+                    <div id="aiAnalysisContent" class="space-y-3"></div>
+                </div>
+
+                <div class="flex gap-4">
+                    <button onclick="goToStep(1)" class="flex-1 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl transition">
+                        <i class="fas fa-plus mr-2"></i>新しいテスト対策を始める
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 過去のプラン一覧 -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mt-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-history text-blue-600 mr-2"></i>過去のテスト対策プラン
+            </h3>
+            <div id="pastPlans" class="space-y-3">
+                <p class="text-gray-500 text-sm">プランがまだありません</p>
+            </div>
+        </div>
     </div>
 
     <script>
-        function showAIProblemGenerator() {
-            document.getElementById('aiProblemSection').classList.remove('hidden');
-            document.getElementById('aiProblemSection').scrollIntoView({ behavior: 'smooth' });
+    // ===== グローバル状態 =====
+    let state = {
+        studentId: 1,
+        currentStep: 1,
+        filters: null,
+        selectedUnitIds: new Set(),
+        selectedUnits: [],
+        customTopics: [],
+        planId: null,
+        allTopics: [],
+        currentTopicIndex: 0,
+        studyLogs: {},
+        timerRunning: false,
+        timerSeconds: 0,
+        timerInterval: null,
+        confidenceBefore: {}
+    };
+
+    // ===== 初期化 =====
+    async function init() {
+        await loadFilters();
+        await loadPastPlans();
+        // デフォルト日付（2週間後）
+        const d = new Date(); d.setDate(d.getDate() + 14);
+        document.getElementById('testDate').value = d.toISOString().split('T')[0];
+    }
+
+    async function loadFilters() {
+        try {
+            const { data } = await axios.get('/api/curriculum/filters');
+            if (data.success) {
+                state.filters = data;
+                const sel = document.getElementById('gradeSelect');
+                data.grades.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g; opt.textContent = g;
+                    sel.appendChild(opt);
+                });
+                const compSel = document.getElementById('companySelect');
+                data.companies.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c; opt.textContent = c;
+                    compSel.appendChild(opt);
+                });
+            }
+        } catch (e) { console.error('Failed to load filters:', e); }
+    }
+
+    function onGradeChange() {
+        const grade = document.getElementById('gradeSelect').value;
+        const subSel = document.getElementById('subjectSelect');
+        subSel.innerHTML = '<option value="">選択してください</option>';
+        if (grade && state.filters?.grade_subjects?.[grade]) {
+            state.filters.grade_subjects[grade].forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s; opt.textContent = s;
+                subSel.appendChild(opt);
+            });
+        }
+        document.getElementById('unitsContainer').classList.add('hidden');
+    }
+
+    function onSubjectChange() { loadUnits(); }
+
+    async function loadUnits() {
+        const grade = document.getElementById('gradeSelect').value;
+        const subject = document.getElementById('subjectSelect').value;
+        const company = document.getElementById('companySelect').value;
+        if (!grade || !subject || !company) return;
+
+        try {
+            const { data } = await axios.get('/api/curriculum/units', { params: { grade, subject, textbook_company: company } });
+            if (data.success && data.units.length > 0) {
+                const container = document.getElementById('unitsList');
+                container.innerHTML = '';
+                data.units.forEach(u => {
+                    const chip = document.createElement('button');
+                    chip.className = 'topic-chip px-3 py-2 rounded-lg text-sm font-medium border-2 transition ' +
+                        (state.selectedUnitIds.has(u.id) ? 'border-blue-600 bg-blue-100 text-blue-800' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-400');
+                    chip.textContent = u.unit_name;
+                    chip.dataset.id = u.id;
+                    chip.dataset.name = u.unit_name;
+                    chip.onclick = () => toggleUnit(u.id, u.unit_name, chip);
+                    container.appendChild(chip);
+                });
+                document.getElementById('unitsContainer').classList.remove('hidden');
+            }
+        } catch (e) { console.error('Failed to load units:', e); }
+    }
+
+    function toggleUnit(id, name, el) {
+        if (state.selectedUnitIds.has(id)) {
+            state.selectedUnitIds.delete(id);
+            state.selectedUnits = state.selectedUnits.filter(u => u.id !== id);
+            el.className = el.className.replace('border-blue-600 bg-blue-100 text-blue-800', 'border-gray-200 bg-white text-gray-700 hover:border-blue-400');
+        } else {
+            state.selectedUnitIds.add(id);
+            state.selectedUnits.push({ id, name });
+            el.className = el.className.replace('border-gray-200 bg-white text-gray-700 hover:border-blue-400', 'border-blue-600 bg-blue-100 text-blue-800');
+        }
+        updateSummary();
+    }
+
+    function toggleAllUnits() {
+        const chips = document.querySelectorAll('#unitsList .topic-chip');
+        const allSelected = chips.length === state.selectedUnitIds.size;
+        chips.forEach(chip => {
+            const id = parseInt(chip.dataset.id);
+            const name = chip.dataset.name;
+            if (allSelected) {
+                state.selectedUnitIds.delete(id);
+                state.selectedUnits = state.selectedUnits.filter(u => u.id !== id);
+                chip.className = chip.className.replace('border-blue-600 bg-blue-100 text-blue-800', 'border-gray-200 bg-white text-gray-700 hover:border-blue-400');
+            } else if (!state.selectedUnitIds.has(id)) {
+                state.selectedUnitIds.add(id);
+                state.selectedUnits.push({ id, name });
+                chip.className = chip.className.replace('border-gray-200 bg-white text-gray-700 hover:border-blue-400', 'border-blue-600 bg-blue-100 text-blue-800');
+            }
+        });
+        updateSummary();
+    }
+
+    function addCustomTopic() {
+        const input = document.getElementById('customTopicInput');
+        const topic = input.value.trim();
+        if (!topic) return;
+        state.customTopics.push(topic);
+        input.value = '';
+        renderCustomTopics();
+        updateSummary();
+    }
+
+    function removeCustomTopic(index) {
+        state.customTopics.splice(index, 1);
+        renderCustomTopics();
+        updateSummary();
+    }
+
+    function renderCustomTopics() {
+        const container = document.getElementById('customTopicsList');
+        container.innerHTML = state.customTopics.map((t, i) => 
+            `<span class="inline-flex items-center px-3 py-1.5 rounded-full bg-purple-100 text-purple-800 text-sm font-medium">
+                ${t}
+                <button onclick="removeCustomTopic(${i})" class="ml-2 text-purple-500 hover:text-purple-700"><i class="fas fa-times"></i></button>
+            </span>`
+        ).join('');
+    }
+
+    function updateSummary() {
+        const total = state.selectedUnits.length + state.customTopics.length;
+        const summary = document.getElementById('selectionSummary');
+        const content = document.getElementById('summaryContent');
+        const btn = document.getElementById('createPlanBtn');
+
+        if (total > 0) {
+            summary.classList.remove('hidden');
+            let html = '';
+            state.selectedUnits.forEach(u => {
+                html += `<div class="flex items-center space-x-2 text-sm"><i class="fas fa-book text-blue-500"></i><span>${u.name}</span></div>`;
+            });
+            state.customTopics.forEach(t => {
+                html += `<div class="flex items-center space-x-2 text-sm"><i class="fas fa-pen text-purple-500"></i><span>${t}</span></div>`;
+            });
+            content.innerHTML = html;
+            document.getElementById('totalTopics').textContent = total;
+            btn.disabled = false;
+        } else {
+            summary.classList.add('hidden');
+            btn.disabled = true;
+        }
+    }
+
+    // ===== プラン作成 =====
+    async function createPlan() {
+        const grade = document.getElementById('gradeSelect').value;
+        const subject = document.getElementById('subjectSelect').value;
+        const company = document.getElementById('companySelect').value;
+        const title = document.getElementById('testTitle').value || 'テスト対策';
+        const testDate = document.getElementById('testDate').value;
+
+        if (!grade || !subject) { alert('学年と教科を選択してください'); return; }
+
+        const btn = document.getElementById('createPlanBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>プランを作成中...';
+
+        try {
+            const { data } = await axios.post('/api/test-preparation/create-plan', {
+                student_id: state.studentId,
+                title,
+                test_date: testDate,
+                grade,
+                subject,
+                textbook_company: company,
+                curriculum_ids: [...state.selectedUnitIds],
+                custom_topics: state.customTopics
+            });
+
+            if (data.success) {
+                state.planId = data.plan_id;
+                state.allTopics = data.topics;
+
+                // Step 2 に進む
+                renderStep2(data);
+                goToStep(2);
+            } else {
+                alert('エラー: ' + (data.error || '不明なエラー'));
+            }
+        } catch (e) {
+            alert('プラン作成に失敗しました');
+            console.error(e);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-rocket mr-2"></i>テスト対策プランを作成する';
+        }
+    }
+
+    function renderStep2(planData) {
+        // AIアドバイス
+        if (planData.ai_schedule) {
+            document.getElementById('aiAdviceText').textContent = planData.ai_schedule.advice || 'がんばりましょう！';
+            
+            // 優先順位
+            const list = document.getElementById('priorityList');
+            const priorities = planData.ai_schedule.priority_order || state.allTopics;
+            list.innerHTML = priorities.map((t, i) => 
+                `<div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <span class="w-8 h-8 rounded-full bg-orange-${Math.min(500, 100 + i * 100)} text-white flex items-center justify-center font-bold text-sm">${i+1}</span>
+                    <span class="font-medium text-gray-800">${t}</span>
+                </div>`
+            ).join('');
+        } else {
+            document.getElementById('aiAdviceText').textContent = '選択した項目を順番に学習していきましょう！';
+            const list = document.getElementById('priorityList');
+            list.innerHTML = state.allTopics.map((t, i) => 
+                `<div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <span class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm">${i+1}</span>
+                    <span class="font-medium text-gray-800">${t}</span>
+                </div>`
+            ).join('');
         }
 
-        function showWeaknessAnalysis() {
-            alert('弱点克服プランは現在開発中です。\n学習履歴から自動的に苦手分野を分析し、最適な問題を提案します。');
-        }
+        // 自信度チェック
+        const confDiv = document.getElementById('confidenceCheck');
+        confDiv.innerHTML = state.allTopics.map((t, i) => `
+            <div class="flex items-center justify-between p-3 bg-white rounded-lg border">
+                <span class="font-medium text-gray-700 text-sm">${t}</span>
+                <div class="flex space-x-1">
+                    ${[1,2,3,4,5].map(s => `
+                        <button onclick="setConfidence(${i}, ${s})" id="conf_${i}_${s}" class="confidence-star text-2xl ${s <= 3 ? 'text-gray-300' : 'text-gray-300'}">★</button>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
 
-        function showComprehensiveReview() {
-            alert('総復習プランは現在開発中です。\n複数の単元を横断的に学習できる問題セットを提供します。');
+    function setConfidence(topicIndex, stars) {
+        state.confidenceBefore[topicIndex] = stars;
+        for (let s = 1; s <= 5; s++) {
+            const el = document.getElementById(`conf_${topicIndex}_${s}`);
+            el.className = `confidence-star text-2xl ${s <= stars ? 'text-yellow-400' : 'text-gray-300'}`;
         }
+    }
+
+    // ===== 学習実行 =====
+    function startStudy() {
+        // メタ認知ログ（学習前）
+        axios.post('/api/metacognition/log', {
+            student_id: state.studentId,
+            plan_id: state.planId,
+            phase: 'pre_study',
+            planned_topics: state.allTopics,
+            confidence_level: Math.round(Object.values(state.confidenceBefore).reduce((a, b) => a + b, 0) / Math.max(1, Object.keys(state.confidenceBefore).length))
+        }).catch(console.error);
+
+        state.currentTopicIndex = 0;
+        renderCurrentTopic();
+        goToStep(3);
+    }
+
+    function renderCurrentTopic() {
+        const topic = state.allTopics[state.currentTopicIndex];
+        document.getElementById('currentTopicName').textContent = topic;
+        document.getElementById('currentTopicIndex').textContent = `${state.currentTopicIndex + 1}/${state.allTopics.length}`;
+        
+        // 進捗バー
+        const completed = Object.keys(state.studyLogs).length;
+        const pct = (completed / state.allTopics.length * 100).toFixed(0);
+        document.getElementById('progressBar').style.width = pct + '%';
+        document.getElementById('progressText').textContent = `${completed} / ${state.allTopics.length} 完了`;
+        
+        // ボタン制御
+        document.getElementById('prevBtn').disabled = state.currentTopicIndex === 0;
+        
+        const isLast = state.currentTopicIndex === state.allTopics.length - 1;
+        document.getElementById('nextBtn').classList.toggle('hidden', isLast);
+        document.getElementById('finishBtn').classList.toggle('hidden', !isLast);
+
+        // タイマーリセット
+        stopTimer();
+        state.timerSeconds = 0;
+        document.getElementById('timerDisplay').textContent = '00:00';
+    }
+
+    function prevTopic() { if (state.currentTopicIndex > 0) { state.currentTopicIndex--; renderCurrentTopic(); } }
+    function nextTopic() { if (state.currentTopicIndex < state.allTopics.length - 1) { state.currentTopicIndex++; renderCurrentTopic(); } }
+
+    function recordUnderstanding(level) {
+        const topic = state.allTopics[state.currentTopicIndex];
+        const minutes = Math.floor(state.timerSeconds / 60);
+        state.studyLogs[state.currentTopicIndex] = { topic, understanding: level, minutes };
+
+        // API記録
+        axios.post('/api/test-preparation/study-log', {
+            plan_id: state.planId,
+            student_id: state.studentId,
+            topic,
+            study_minutes: minutes,
+            confidence_before: state.confidenceBefore[state.currentTopicIndex] || 3,
+            confidence_after: level,
+            understanding_level: level
+        }).catch(console.error);
+
+        // 次へ進む表示
+        const emojis = ['', '😰', '🤔', '😊', '😄', '🤩'];
+        const msg = document.createElement('div');
+        msg.className = 'text-center py-2 text-lg font-bold text-green-600 fade-in';
+        msg.textContent = `${emojis[level]} 記録しました！`;
+        document.getElementById('currentStudyItem').appendChild(msg);
+        setTimeout(() => msg.remove(), 1500);
+
+        renderCurrentTopic();
+    }
+
+    // タイマー
+    function toggleTimer() {
+        if (state.timerRunning) stopTimer();
+        else { state.timerRunning = true; document.getElementById('timerBtn').innerHTML = '<i class="fas fa-pause mr-2"></i>一時停止';
+            state.timerInterval = setInterval(() => {
+                state.timerSeconds++;
+                const m = Math.floor(state.timerSeconds / 60).toString().padStart(2, '0');
+                const s = (state.timerSeconds % 60).toString().padStart(2, '0');
+                document.getElementById('timerDisplay').textContent = `${m}:${s}`;
+            }, 1000);
+        }
+    }
+    function stopTimer() {
+        state.timerRunning = false;
+        clearInterval(state.timerInterval);
+        document.getElementById('timerBtn').innerHTML = '<i class="fas fa-play mr-2"></i>タイマー開始';
+    }
+
+    function openProblemGenerator() {
+        const topic = state.allTopics[state.currentTopicIndex];
+        window.open(`/static/curriculum-problem-generator?topic=${encodeURIComponent(topic)}`, '_blank');
+    }
+    function openLearningCards() {
+        window.open('/#learning-cards', '_blank');
+    }
+
+    // ===== ステップ遷移 =====
+    function goToStep(n) {
+        for (let i = 1; i <= 4; i++) {
+            document.getElementById(`step${i}`).classList.toggle('hidden', i !== n);
+            const ind = document.getElementById(`step${i}indicator`);
+            if (i < n) { ind.className = 'w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center font-bold text-sm'; ind.innerHTML = '<i class="fas fa-check"></i>'; }
+            else if (i === n) { ind.className = 'w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm'; ind.textContent = i; }
+            else { ind.className = 'w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold text-sm'; ind.textContent = i; }
+        }
+        state.currentStep = n;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        if (n === 4) renderStep4();
+    }
+
+    // ===== 振り返り =====
+    function renderStep4() {
+        const logs = Object.values(state.studyLogs);
+        const totalMin = logs.reduce((s, l) => s + (l.minutes || 0), 0);
+        const avgUnd = logs.length ? (logs.reduce((s, l) => s + l.understanding, 0) / logs.length).toFixed(1) : '-';
+
+        document.getElementById('totalStudyTime').textContent = totalMin;
+        document.getElementById('completedCount').textContent = logs.length;
+        document.getElementById('avgUnderstanding').textContent = avgUnd;
+
+        // チャート
+        const ctx = document.getElementById('understandingChart').getContext('2d');
+        if (window.understandingChartInstance) window.understandingChartInstance.destroy();
+        window.understandingChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: state.allTopics.map(t => t.length > 10 ? t.substring(0, 10) + '...' : t),
+                datasets: [{
+                    label: '理解度',
+                    data: state.allTopics.map((_, i) => state.studyLogs[i]?.understanding || 0),
+                    backgroundColor: state.allTopics.map((_, i) => {
+                        const u = state.studyLogs[i]?.understanding || 0;
+                        return u >= 4 ? '#22c55e' : u >= 3 ? '#eab308' : u >= 2 ? '#f97316' : '#ef4444';
+                    }),
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { min: 0, max: 5, ticks: { stepSize: 1 } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // メタ認知ログ（学習後）
+        axios.post('/api/metacognition/log', {
+            student_id: state.studentId,
+            plan_id: state.planId,
+            phase: 'post_study',
+            time_spent_minutes: totalMin,
+            understanding_level: Math.round(parseFloat(avgUnd) || 3),
+            needs_review: logs.some(l => l.understanding < 3)
+        }).catch(console.error);
+    }
+
+    async function submitFeedback() {
+        const score = parseInt(document.getElementById('testScore').value);
+        const maxScore = parseInt(document.getElementById('testMaxScore').value) || 100;
+        const reflection = document.getElementById('reflectionText').value;
+
+        const logs = Object.values(state.studyLogs);
+        const weakness = logs.filter(l => l.understanding < 3).map(l => l.topic);
+        const strength = logs.filter(l => l.understanding >= 4).map(l => l.topic);
+
+        try {
+            const { data } = await axios.post('/api/test-preparation/feedback', {
+                plan_id: state.planId,
+                student_id: state.studentId,
+                score: isNaN(score) ? null : score,
+                max_score: maxScore,
+                weakness_areas: weakness,
+                strength_areas: strength,
+                reflection
+            });
+
+            if (data.success && data.ai_recommendations?.length) {
+                const div = document.getElementById('aiAnalysis');
+                div.classList.remove('hidden');
+                document.getElementById('aiAnalysisContent').innerHTML = data.ai_recommendations.map((r, i) => `
+                    <div class="flex items-start space-x-3 p-3 bg-white rounded-lg">
+                        <span class="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center flex-shrink-0 font-bold text-xs">${i+1}</span>
+                        <p class="text-gray-700">${r}</p>
+                    </div>
+                `).join('');
+            }
+            alert('保存しました！');
+        } catch (e) { alert('保存に失敗しました'); console.error(e); }
+    }
+
+    // ===== 過去のプラン =====
+    async function loadPastPlans() {
+        try {
+            const { data } = await axios.get(`/api/test-preparation/plans/${state.studentId}`);
+            if (data.success && data.plans.length > 0) {
+                const container = document.getElementById('pastPlans');
+                container.innerHTML = data.plans.map(p => `
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                        <div>
+                            <p class="font-semibold text-gray-800">${p.title}</p>
+                            <p class="text-sm text-gray-600">${p.grade} ${p.subject} • ${p.test_date || '日付未定'}</p>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <span class="px-3 py-1 rounded-full text-xs font-medium ${p.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">${p.status === 'completed' ? '完了' : '進行中'}</span>
+                            <span class="text-xs text-gray-500">${new Date(p.created_at).toLocaleDateString('ja-JP')}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (e) { console.error('Failed to load past plans:', e); }
+    }
+
+    // 初期化
+    init();
     </script>
-
 </body>
 </html>

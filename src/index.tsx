@@ -2732,6 +2732,36 @@ app.get('/api/curriculum/units', async (c) => {
   }
 })
 
+// カリキュラム学年・教科一覧取得（フィルター用）
+app.get('/api/curriculum/filters', async (c) => {
+  const { env } = c
+  try {
+    const grades = await env.DB.prepare(`SELECT DISTINCT grade FROM curriculum ORDER BY grade`).all()
+    const subjects = await env.DB.prepare(`SELECT DISTINCT subject FROM curriculum ORDER BY subject`).all()
+    const companies = await env.DB.prepare(`SELECT DISTINCT textbook_company FROM curriculum ORDER BY textbook_company`).all()
+
+    const gradeSubjects = await env.DB.prepare(`
+      SELECT DISTINCT grade, subject FROM curriculum ORDER BY grade, subject
+    `).all()
+
+    const gradeSubjectMap: Record<string, string[]> = {}
+    for (const row of (gradeSubjects.results || []) as any[]) {
+      if (!gradeSubjectMap[row.grade]) gradeSubjectMap[row.grade] = []
+      gradeSubjectMap[row.grade].push(row.subject)
+    }
+
+    return c.json({
+      success: true,
+      grades: (grades.results || []).map((r: any) => r.grade),
+      subjects: (subjects.results || []).map((r: any) => r.subject),
+      companies: (companies.results || []).map((r: any) => r.textbook_company),
+      grade_subjects: gradeSubjectMap
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
 // APIルート：特定カリキュラムの詳細取得（学習のてびき用）
 app.get('/api/curriculum/:id', async (c) => {
   const { env } = c
@@ -27621,6 +27651,279 @@ app.get('/api/problems/:id', async (c) => {
     }, 500)
   }
 })
+
+// ============================================================
+// テスト対策システム API
+// ============================================================
+
+// テスト対策プラン作成
+app.post('/api/test-preparation/create-plan', async (c) => {
+  const { env } = c
+  try {
+    const body = await c.req.json()
+    const { student_id, title, test_date, grade, subject, textbook_company, curriculum_ids, custom_topics } = body
+    
+    if (!student_id || !grade || !subject) {
+      return c.json({ success: false, error: '学年、教科、生徒IDは必須です' }, 400)
+    }
+
+    const result = await env.DB.prepare(`
+      INSERT INTO test_preparation_plans (student_id, title, test_date, grade, subject, textbook_company, curriculum_ids, custom_topics)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      student_id,
+      title || 'テスト対策',
+      test_date || null,
+      grade,
+      subject,
+      textbook_company || null,
+      JSON.stringify(curriculum_ids || []),
+      JSON.stringify(custom_topics || [])
+    ).run()
+
+    // 選択された単元情報を取得
+    let selectedUnits: any[] = []
+    if (curriculum_ids && curriculum_ids.length > 0) {
+      const placeholders = curriculum_ids.map(() => '?').join(',')
+      const unitsResult = await env.DB.prepare(
+        `SELECT id, unit_name FROM curriculum WHERE id IN (${placeholders})`
+      ).bind(...curriculum_ids).all()
+      selectedUnits = unitsResult.results || []
+    }
+
+    // AIで学習スケジュール提案を生成
+    const allTopics = [
+      ...selectedUnits.map((u: any) => u.unit_name),
+      ...(custom_topics || [])
+    ]
+
+    let aiSchedule = null
+    if (env.GEMINI_API_KEY && allTopics.length > 0 && test_date) {
+      try {
+        const prompt = `あなたは学習アドバイザーです。以下のテスト対策プランに対して、効率的な学習スケジュールを提案してください。
+
+テスト日: ${test_date}
+学年: ${grade}
+教科: ${subject}
+学習項目: ${allTopics.join('、')}
+
+JSON形式で出力してください:
+{
+  "advice": "全体的なアドバイス（100文字程度）",
+  "priority_order": ["優先度順の項目名"],
+  "daily_plan": "1日あたりの推奨学習時間と配分"
+}
+JSON のみ出力。`
+
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.3, maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } }
+            })
+          }
+        )
+        const data = await resp.json() as any
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        if (jsonMatch) aiSchedule = JSON.parse(jsonMatch[0])
+      } catch (e) {
+        console.error('AI schedule generation failed:', e)
+      }
+    }
+
+    return c.json({
+      success: true,
+      plan_id: result.meta?.last_row_id,
+      topics: allTopics,
+      ai_schedule: aiSchedule
+    })
+  } catch (error) {
+    console.error('Error creating test plan:', error)
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, 500)
+  }
+})
+
+// テスト対策プラン一覧取得
+app.get('/api/test-preparation/plans/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  try {
+    const result = await env.DB.prepare(`
+      SELECT * FROM test_preparation_plans WHERE student_id = ? ORDER BY created_at DESC LIMIT 20
+    `).bind(studentId).all()
+    return c.json({ success: true, plans: result.results || [] })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// テスト対策プラン詳細取得
+app.get('/api/test-preparation/plan/:planId', async (c) => {
+  const { env } = c
+  const planId = c.req.param('planId')
+  try {
+    const plan = await env.DB.prepare(`SELECT * FROM test_preparation_plans WHERE id = ?`).bind(planId).first()
+    if (!plan) return c.json({ success: false, error: 'Plan not found' }, 404)
+
+    const studyLogs = await env.DB.prepare(`
+      SELECT * FROM test_study_logs WHERE plan_id = ? ORDER BY created_at DESC
+    `).bind(planId).all()
+
+    const feedback = await env.DB.prepare(`
+      SELECT * FROM test_performance_feedback WHERE plan_id = ? ORDER BY created_at DESC LIMIT 1
+    `).bind(planId).first()
+
+    return c.json({ success: true, plan, study_logs: studyLogs.results || [], feedback })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// 学習記録の追加
+app.post('/api/test-preparation/study-log', async (c) => {
+  const { env } = c
+  try {
+    const body = await c.req.json()
+    const { plan_id, student_id, topic, study_minutes, confidence_before, confidence_after, understanding_level, notes } = body
+    
+    await env.DB.prepare(`
+      INSERT INTO test_study_logs (plan_id, student_id, topic, study_minutes, confidence_before, confidence_after, understanding_level, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(plan_id, student_id, topic, study_minutes || 0, confidence_before || 3, confidence_after, understanding_level, notes).run()
+
+    // プランの総学習時間を更新
+    await env.DB.prepare(`
+      UPDATE test_preparation_plans SET total_study_minutes = total_study_minutes + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(study_minutes || 0, plan_id).run()
+
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// テスト結果フィードバック記録
+app.post('/api/test-preparation/feedback', async (c) => {
+  const { env } = c
+  try {
+    const body = await c.req.json()
+    const { plan_id, student_id, score, max_score, weakness_areas, strength_areas, reflection } = body
+
+    // AIで改善提案を生成
+    let aiRecommendations: string[] = []
+    if (env.GEMINI_API_KEY) {
+      try {
+        const plan = await env.DB.prepare(`SELECT * FROM test_preparation_plans WHERE id = ?`).bind(plan_id).first() as any
+        const prompt = `テスト結果の分析と改善提案を行ってください。
+得点: ${score}/${max_score}
+教科: ${plan?.subject || '不明'}
+弱点: ${JSON.stringify(weakness_areas || [])}
+強み: ${JSON.stringify(strength_areas || [])}
+振り返り: ${reflection || 'なし'}
+
+3つの具体的な改善提案をJSON配列で出力してください: ["提案1", "提案2", "提案3"]
+JSON配列のみ。`
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.3, maxOutputTokens: 1000, thinkingConfig: { thinkingBudget: 0 } }
+            })
+          }
+        )
+        const data = await resp.json() as any
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const match = text.match(/\[[\s\S]*\]/)
+        if (match) aiRecommendations = JSON.parse(match[0])
+      } catch (e) { console.error('AI recommendations failed:', e) }
+    }
+
+    await env.DB.prepare(`
+      INSERT INTO test_performance_feedback (plan_id, student_id, score, max_score, weakness_areas, strength_areas, ai_recommendations, reflection)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      plan_id, student_id, score, max_score || 100,
+      JSON.stringify(weakness_areas || []),
+      JSON.stringify(strength_areas || []),
+      JSON.stringify(aiRecommendations),
+      reflection
+    ).run()
+
+    // プランをcompletedに更新
+    await env.DB.prepare(`
+      UPDATE test_preparation_plans SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(plan_id).run()
+
+    return c.json({ success: true, ai_recommendations: aiRecommendations })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// メタ認知ログ記録
+app.post('/api/metacognition/log', async (c) => {
+  const { env } = c
+  try {
+    const body = await c.req.json()
+    const { student_id, plan_id, phase, planned_topics, confidence_level, difficulty_encountered, time_spent_minutes, understanding_level, needs_review, notes } = body
+
+    await env.DB.prepare(`
+      INSERT INTO metacognition_logs (student_id, plan_id, phase, planned_topics, confidence_level, difficulty_encountered, time_spent_minutes, understanding_level, needs_review, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      student_id, plan_id || null, phase,
+      JSON.stringify(planned_topics || []),
+      confidence_level || 3,
+      difficulty_encountered ? 1 : 0,
+      time_spent_minutes || 0,
+      understanding_level || null,
+      needs_review ? 1 : 0,
+      notes
+    ).run()
+
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// 弱点分析API
+app.get('/api/test-preparation/weakness-analysis/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  try {
+    // 過去のテスト結果から弱点を集計
+    const feedbacks = await env.DB.prepare(`
+      SELECT f.*, p.grade, p.subject FROM test_performance_feedback f
+      JOIN test_preparation_plans p ON f.plan_id = p.id
+      WHERE f.student_id = ? ORDER BY f.created_at DESC LIMIT 10
+    `).bind(studentId).all()
+
+    // 学習ログから自信度の低い項目を抽出
+    const lowConfidence = await env.DB.prepare(`
+      SELECT topic, AVG(confidence_after) as avg_confidence, COUNT(*) as attempts
+      FROM test_study_logs WHERE student_id = ? AND confidence_after IS NOT NULL
+      GROUP BY topic HAVING avg_confidence < 3 ORDER BY avg_confidence ASC LIMIT 10
+    `).bind(studentId).all()
+
+    return c.json({
+      success: true,
+      feedbacks: feedbacks.results || [],
+      low_confidence_topics: lowConfidence.results || []
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+
 
 export default app
 
