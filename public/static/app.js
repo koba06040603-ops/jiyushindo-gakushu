@@ -1305,11 +1305,19 @@ async function renderTopPage() {
         
         <button 
           onclick="showUnitGeneratorModal()"
-          class="w-full bg-white text-purple-600 hover:bg-purple-50 py-6 px-8 rounded-lg font-bold text-2xl transition shadow-xl flex items-center justify-center group">
+          class="w-full bg-white text-purple-600 hover:bg-purple-50 py-6 px-8 rounded-lg font-bold text-2xl transition shadow-xl flex items-center justify-center group mb-4">
           <i class="fas fa-magic mr-3 text-3xl group-hover:animate-bounce"></i>
           AIで学習カードを作成する
           <i class="fas fa-arrow-right ml-3 group-hover:translate-x-2 transition-transform"></i>
         </button>
+
+        <a 
+          href="/curriculum-problem-generator.html"
+          class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 py-5 px-8 rounded-lg font-bold text-xl transition shadow-xl flex items-center justify-center group block">
+          <i class="fas fa-brain mr-3 text-2xl"></i>
+          AI問題生成ページへ
+          <i class="fas fa-arrow-right ml-3 group-hover:translate-x-2 transition-transform"></i>
+        </a>
 
         <!-- 機能紹介 -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
