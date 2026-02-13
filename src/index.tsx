@@ -7808,7 +7808,93 @@ app.get('/api/ai/list-models', async (c) => {
   }
 })
 
-// APIルート：段階的コース生成（1コース=6枚のカードを生成）
+// APIルート：単元分析（動的カード枚数決定）
+app.post('/api/units/analyze', async (c) => {
+  const { env } = c
+  try {
+    const { unit_id, unit_name, grade, subject } = await c.req.json()
+    const apiKey = env.GEMINI_API_KEY
+    
+    // カリキュラムDBから単元情報を取得
+    let unitInfo = null
+    if (unit_id && env.DB) {
+      unitInfo = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(unit_id).first() as any
+    }
+    
+    const targetUnit = unitInfo?.unit_name || unit_name || '不明'
+    const targetGrade = unitInfo?.grade || grade || ''
+    const targetSubject = unitInfo?.subject || subject || ''
+
+    if (!apiKey) {
+      // AI不使用時はデフォルト6枚
+      return c.json({
+        success: true,
+        unit_name: targetUnit,
+        content_items: 3,
+        difficulty: 'medium',
+        estimated_cards_per_course: 6,
+        total_estimated_cards: 18,
+        analysis_source: 'default'
+      })
+    }
+
+    const prompt = `${targetGrade}${targetSubject}の「${targetUnit}」について分析してください。
+
+以下のJSON形式のみ出力：
+{
+  "content_items": <この単元の主要学習項目数（数値）>,
+  "difficulty": "<easy/medium/hard>",
+  "key_concepts": ["概念1", "概念2"],
+  "prerequisite_skills": ["前提スキル1"]
+}
+JSONのみ。`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 1000, thinkingConfig: { thinkingBudget: 0 } }
+        })
+      }
+    )
+    const data = await resp.json() as any
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const match = text.match(/\{[\s\S]*\}/)
+    const analysis = match ? JSON.parse(match[0]) : { content_items: 3, difficulty: 'medium' }
+
+    // カード枚数の動的決定ロジック
+    const items = analysis.content_items || 3
+    let cardsPerCourse: number
+    if (items <= 3) cardsPerCourse = 4
+    else if (items <= 5) cardsPerCourse = 6
+    else if (items <= 8) cardsPerCourse = 9
+    else if (items <= 12) cardsPerCourse = 12
+    else cardsPerCourse = 15
+
+    // 難易度による補正
+    if (analysis.difficulty === 'hard') cardsPerCourse = Math.min(cardsPerCourse + 2, 15)
+    if (analysis.difficulty === 'easy') cardsPerCourse = Math.max(cardsPerCourse - 1, 4)
+
+    return c.json({
+      success: true,
+      unit_name: targetUnit,
+      content_items: items,
+      difficulty: analysis.difficulty,
+      key_concepts: analysis.key_concepts || [],
+      prerequisite_skills: analysis.prerequisite_skills || [],
+      estimated_cards_per_course: cardsPerCourse,
+      total_estimated_cards: cardsPerCourse * 3,
+      analysis_source: 'ai'
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown', estimated_cards_per_course: 6 }, 500)
+  }
+})
+
+// APIルート：段階的コース生成（動的枚数対応）
 app.post('/api/ai/generate-course', async (c) => {
   const { env } = c
   const { 
@@ -7819,7 +7905,8 @@ app.post('/api/ai/generate-course', async (c) => {
     unitGoal,
     courseLevel,  // 'slow', 'steady', 'fast'
     courseInfo,   // { name, label, description, color_code }
-    customization 
+    customization,
+    cards_count   // 動的カード枚数（省略時6枚）
   } = await c.req.json()
   
   console.log('🔍 コース生成APIリクエスト受信:', {
@@ -7862,8 +7949,9 @@ app.post('/api/ai/generate-course', async (c) => {
       'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
     }[courseLevel] || '標準的なペースで学ぶコース'
 
-    // 【強化】プロンプト（6枚のカード生成 - より詳細な指示）
-    const prompt = `あなたは小学校の優秀な教師です。以下の単元の学習カード6枚を生成してください。
+    // 【強化】プロンプト（動的枚数のカード生成）
+    const numCards = cards_count || 6  // 動的カード枚数（デフォルト6枚）
+    const prompt = `あなたは小学校の優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
 
 【単元情報】
 - 学年: ${grade}
@@ -7871,7 +7959,7 @@ app.post('/api/ai/generate-course', async (c) => {
 - 単元名: ${unitName}
 - コース: ${courseInfo.name} (${difficultyDescription})
 
-【重要】以下のJSON形式で、必ず完全な6枚のカードを生成してください：
+【重要】以下のJSON形式で、必ず完全な${numCards}枚のカードを生成してください：
 
 {
   "course_name": "${courseInfo.name}",
@@ -7898,16 +7986,12 @@ app.post('/api/ai/generate-course', async (c) => {
         {"hint_level": 3, "hint_text": "ヒント3: 答えに近づくために", "thinking_tool_suggestion": "図・表・式"}
       ]
     },
-    { /* カード2: 上記と同じ構造 */ },
-    { /* カード3: 上記と同じ構造 */ },
-    { /* カード4: 上記と同じ構造 */ },
-    { /* カード5: 上記と同じ構造 */ },
-    { /* カード6: 上記と同じ構造 */ }
+    { /* カード2〜${numCards}: 上記と同じ構造で繰り返し */ }
   ]
 }
 
 【厳守事項】
-1. 必ず6枚のカードを生成すること
+1. 必ず${numCards}枚のカードを生成すること
 2. 各カードに必ず3つのヒントを含めること
 3. JSONのみを出力し、説明文は含めないこと
 4. すべてのフィールドに具体的な内容を記入すること
@@ -8051,14 +8135,15 @@ app.post('/api/ai/generate-course', async (c) => {
       }
     }
     
-    // 【強化】バリデーション: 厳格なチェック
-    if (!courseData.cards || courseData.cards.length !== 6) {
+    // 【強化】バリデーション: 動的枚数チェック
+    const expectedCards = numCards
+    if (!courseData.cards || courseData.cards.length < Math.max(expectedCards - 2, 3)) {
       console.error('❌ バリデーションエラー:', {
         cards存在: !!courseData.cards,
         cards長さ: courseData.cards?.length || 0,
-        期待枚数: 6
+        期待枚数: expectedCards
       })
-      throw new Error(`カードが6枚ではありません: ${courseData.cards?.length || 0}枚（期待: 6枚）`)
+      throw new Error(`カード枚数不足: ${courseData.cards?.length || 0}枚（期待: ${expectedCards}枚）`)
     }
     
     // 【新規】各カードのヒント数チェック
@@ -8143,7 +8228,9 @@ app.post('/api/ai/generate-course', async (c) => {
     
     return c.json({
       success: true,
-      course: courseData
+      course: courseData,
+      cards_count: courseData.cards.length,
+      requested_cards: numCards
     })
     
   } catch (error: any) {
@@ -27923,7 +28010,206 @@ app.get('/api/test-preparation/weakness-analysis/:studentId', async (c) => {
   }
 })
 
+// ============================================================
+// Task4: 自己調整学習支援API
+// ============================================================
 
+// 学習セッション中のセルフモニタリング記録
+app.post('/api/self-regulated/monitor', async (c) => {
+  const { env } = c
+  try {
+    const { student_id, plan_id, topic, focus_level, fatigue_level, strategy_used, notes } = await c.req.json()
+    
+    await env.DB.prepare(`
+      INSERT INTO metacognition_logs (student_id, plan_id, phase, confidence_level, understanding_level, notes, created_at)
+      VALUES (?, ?, 'during_study', ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(student_id, plan_id || null, focus_level || 3, fatigue_level || 1, 
+      JSON.stringify({ topic, strategy_used, notes, focus_level, fatigue_level })
+    ).run()
+
+    // AIベースのペース調整提案
+    let suggestion = null
+    if (fatigue_level >= 4) {
+      suggestion = { type: 'break', message: '少し疲れているようです。5分間休憩しましょう！水を飲んだりストレッチをすると効果的です。', icon: '☕' }
+    } else if (focus_level <= 2) {
+      suggestion = { type: 'change_strategy', message: '集中が難しそうですね。学習方法を変えてみましょう。問題を解く→音読する→図を描くなど。', icon: '🔄' }
+    } else if (focus_level >= 4 && fatigue_level <= 2) {
+      suggestion = { type: 'keep_going', message: '集中力バッチリ！この調子で続けましょう。今の学習法が合っているようです。', icon: '🔥' }
+    }
+
+    return c.json({ success: true, suggestion })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// 学習戦略の提案（単元と学習状況に基づく）
+app.post('/api/self-regulated/strategy-suggest', async (c) => {
+  const { env } = c
+  try {
+    const { student_id, topic, subject, understanding_level, time_spent_minutes } = await c.req.json()
+    const apiKey = env.GEMINI_API_KEY
+
+    const strategies = []
+    
+    if (apiKey) {
+      const prompt = `生徒が「${topic}」（${subject}）を勉強中です。
+現在の理解度: ${understanding_level}/5, 学習時間: ${time_spent_minutes}分
+
+以下のJSON形式で3つの学習戦略を提案してください:
+[
+  {"strategy": "戦略名", "description": "具体的なやり方（50字以内）", "expected_time": "目安時間", "difficulty": "easy/medium/hard"}
+]
+JSONのみ出力。`
+
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 1000, thinkingConfig: { thinkingBudget: 0 } }
+          })
+        }
+      )
+      const data = await resp.json() as any
+      const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || ''
+      const match = text.match(/\[[\s\S]*\]/)
+      if (match) {
+        const parsed = JSON.parse(match[0])
+        strategies.push(...parsed)
+      }
+    }
+
+    if (strategies.length === 0) {
+      // フォールバック
+      if (understanding_level <= 2) {
+        strategies.push(
+          { strategy: '基礎に戻る', description: '前の単元の復習から始めましょう', expected_time: '15分', difficulty: 'easy' },
+          { strategy: '例題を写す', description: '教科書の例題を手書きで写しながら理解する', expected_time: '10分', difficulty: 'easy' },
+          { strategy: '誰かに聞く', description: '先生やお友達に質問してみましょう', expected_time: '5分', difficulty: 'easy' }
+        )
+      } else {
+        strategies.push(
+          { strategy: '問題演習', description: 'ドリルやワークの問題を解いてみよう', expected_time: '15分', difficulty: 'medium' },
+          { strategy: '自分で説明', description: '学んだことを自分の言葉で説明してみる', expected_time: '10分', difficulty: 'medium' },
+          { strategy: '応用問題', description: '少し難しい問題に挑戦してみよう', expected_time: '20分', difficulty: 'hard' }
+        )
+      }
+    }
+
+    return c.json({ success: true, strategies })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// ============================================================
+// Task5: 振り返り（リフレクション）API
+// ============================================================
+
+// KPT法による振り返り保存
+app.post('/api/reflection/save', async (c) => {
+  const { env } = c
+  try {
+    const { student_id, plan_id, keep, problem, try_next, overall_feeling, goal_achievement, confidence_change } = await c.req.json()
+
+    // テスト対策フィードバックテーブルにリフレクションデータを保存
+    await env.DB.prepare(`
+      INSERT INTO test_performance_feedback (plan_id, student_id, reflection, ai_recommendations, created_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `).bind(
+      plan_id || 0, 
+      student_id,
+      JSON.stringify({ keep, problem, try_next, overall_feeling, goal_achievement, confidence_change }),
+      '[]'
+    ).run()
+
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// AI振り返り分析
+app.post('/api/reflection/ai-analyze', async (c) => {
+  const { env } = c
+  try {
+    const { student_id, keep, problem, try_next, study_logs, confidence_before, confidence_after } = await c.req.json()
+    const apiKey = env.GEMINI_API_KEY
+
+    if (!apiKey) {
+      return c.json({ success: true, analysis: {
+        summary: '学習お疲れさまでした！記録をもとに次の学習計画に活かしましょう。',
+        improvement_tips: ['復習の間隔を空けて記憶を定着させましょう', '苦手な部分は繰り返し練習が効果的です'],
+        encouragement: 'よく頑張りました！継続は力なりです。'
+      }})
+    }
+
+    const studyInfo = study_logs ? study_logs.map((l: any) => `${l.topic}: 理解度${l.understanding}/5`).join(', ') : '記録なし'
+    
+    const prompt = `小学生の学習振り返りを分析してください。
+
+【振り返り内容（KPT法）】
+Keep（良かったこと）: ${keep || 'なし'}
+Problem（困ったこと）: ${problem || 'なし'}
+Try（次にやること）: ${try_next || 'なし'}
+
+【学習記録】${studyInfo}
+
+以下のJSON形式で回答:
+{
+  "summary": "振り返りの要約（100字以内、優しい言葉で）",
+  "improvement_tips": ["具体的な改善アドバイス1", "アドバイス2", "アドバイス3"],
+  "encouragement": "励ましのメッセージ（50字以内）",
+  "next_goals": ["次の具体的な目標1", "目標2"]
+}
+JSONのみ。`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } }
+        })
+      }
+    )
+    const data = await resp.json() as any
+    const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || ''
+    const match = text.match(/\{[\s\S]*\}/)
+    const analysis = match ? JSON.parse(match[0]) : {
+      summary: '学習お疲れさまでした！',
+      improvement_tips: ['復習を続けましょう'],
+      encouragement: 'よく頑張りました！'
+    }
+
+    return c.json({ success: true, analysis })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// 過去の振り返り履歴取得
+app.get('/api/reflection/history/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  try {
+    const results = await env.DB.prepare(`
+      SELECT f.*, p.title, p.grade, p.subject, p.test_date
+      FROM test_performance_feedback f
+      LEFT JOIN test_preparation_plans p ON f.plan_id = p.id
+      WHERE f.student_id = ? ORDER BY f.created_at DESC LIMIT 20
+    `).bind(studentId).all()
+
+    return c.json({ success: true, reflections: results.results || [] })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
 
 export default app
 

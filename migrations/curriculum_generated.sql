@@ -2665,3 +2665,341 @@ INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('�
 INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '社会', '啓林館', '自然災害を防ぐ');
 INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '社会', '啓林館', '環境を守るわたしたち');
 
+-- COMBO: 小学6年_算数_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '対称な図形');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '文字と式');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '分数のかけ算');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '分数のわり算');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '比');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '図形の拡大と縮小');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '円の面積');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '立体の体積');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', 'およその面積と体積');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '比例と反比例');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', 'データの活用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '並べ方と組み合わせ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '算数', '啓林館', '算数のしあげ');
+
+-- COMBO: 小学6年_国語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '帰り道');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '時計の時間と心の時間');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '笑うから楽しい');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '防災ポスターを作ろう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '私たちにできること');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '森へ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '「鳥獣戯画」を読む');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '日本文化を発信しよう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', 'きつねの窓');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', 'ヒロシマのうた');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '柿山伏');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '大切な人とつながるために');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '国語', '啓林館', '海の命');
+
+-- COMBO: 小学6年_理科_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '物の燃え方');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '植物の体とつくり');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', 'ヒトの体のつくりと働き');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '植物の養分と水の通り道');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '生き物と食べ物・空気・水');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '月と太陽');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '大地のつくりと変化');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', 'てこのはたらき');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '水溶液の性質');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '電気の利用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '生き物と環境');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '理科', '啓林館', '自然とともに生きる');
+
+-- COMBO: 小学6年_社会_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', 'わたしたちの生活と政治');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '日本国憲法とわたしたちの暮らし');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '震災復興の願いを実現する政治');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '縄文のむらから古墳のくにへ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '天皇中心の国づくり');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '貴族のくらし');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '武士の世の中へ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '天下統一への歩み');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '江戸幕府と政治の安定');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '明治の国づくりを進めた人々');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '長く続いた戦争と人々のくらし');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '新しい日本への歩み');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '日本とつながりの深い国々');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '社会', '啓林館', '世界の中の日本とわたしたち');
+
+-- COMBO: 中学1年_数学_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '正の数・負の数');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '正の数・負の数の計算');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '文字を用いた式');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '文字の式の計算');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '方程式');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '方程式の利用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '比例');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '反比例');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '比例と反比例の利用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '基本的な作図');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '円とおうぎ形');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '空間図形');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '立体の体積と表面積');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', 'データの分布');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '数学', '啓林館', '近似値と誤差');
+
+-- COMBO: 小学2年_国語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', 'ふきのとう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', '春がいっぱい');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', 'たんぽぽのちえ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', 'かんさつしたことを書こう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', 'スイミー');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', '夏がいっぱい');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', '言葉で道案内');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', 'お話のさくしゃになろう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', 'お手紙');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', '秋がいっぱい');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', 'わたしはおねえさん');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', 'むかし話を読みくらべよう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', '冬がいっぱい');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', 'かさこじぞう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学2年', '国語', '啓林館', '楽しかったよ、二年生');
+
+-- COMBO: 中学1年_理科_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '身のまわりの生物の観察');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '花のつくりと分類');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '植物のなかま');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '身のまわりの物質');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '気体の性質');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '水溶液の性質');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '物質の状態変化');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '光の反射・屈折');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '凸レンズの働き');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '音の性質');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '力の働き');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '火山と火成岩');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '地震の伝わり方');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '理科', '啓林館', '地層の重なりと過去の様子');
+
+-- COMBO: 中学1年_社会_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', '世界の姿');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', '世界のさまざまな地域');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', 'アジア州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', 'アフリカ州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', 'ヨーロッパ州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', '北アメリカ州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', '南アメリカ州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', 'オセアニア州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', '身近な地域の調査');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', '日本の姿');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', '歴史へのとびら');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', '古代までの日本と世界');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '社会', '啓林館', '中世の日本と世界');
+
+-- COMBO: 中学2年_数学_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '式の計算');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '文字式の利用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '連立方程式');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '連立方程式の利用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '1次関数');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '1次関数のグラフ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '1次関数の利用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '平行線と角');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '多角形の角');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '三角形の合同');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '三角形の性質');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '四角形の性質');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '確率');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', 'データの比較');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '数学', '啓林館', '箱ひげ図');
+
+-- COMBO: 小学5年_英語_教育出版
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'Let''s Go on a Trip!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'What do you want to be?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'My Best Memory');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'Let''s Think about Our Food');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'Where is the Post Office?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'What do you want for lunch?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'Let''s Tell Our Town''s Story');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'What time do you get up?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'Let''s Make a Travel Plan');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'What do you want to do?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'My Favorite Place');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '教育出版', 'Let''s Study English!');
+
+-- COMBO: 小学5年_英語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'Hello, new school year!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'Let’s go to Italy!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'What do you want to be?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'Let’s try new sports!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'How was your weekend?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'Let’s go to an amusement park!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'What do you want for lunch?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'Let’s make a speech!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'Where is the post office?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'Let’s write about our town!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'What time do you get up?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学5年', '英語', '啓林館', 'Let’s tell a story!');
+
+-- COMBO: 小学6年_英語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Hello, world!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Let''s go to Italy!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Let''s climb Mt. Fuji!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Let''s tell about our town!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Let''s read a story!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Let''s think about our future!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Review 1');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Let''s go to India!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Let''s try new sports!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Let''s cook okonomiyaki!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Let''s make a travel plan!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('小学6年', '英語', '啓林館', 'Review 2');
+
+-- COMBO: 中学1年_国語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '言葉と出会う');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '物語の世界へ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '漢字の音と訓');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '詩を味わう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '言葉の力を知る');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '文法を学ぼう①');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '説明的文章を読む');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '古典の世界へ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '文法を学ぼう②');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '自分の考えを伝えよう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '多様な言葉');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '国語', '啓林館', '未来へ');
+
+-- COMBO: 中学1年_英語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'Hello, world!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'My name is...');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'This is my favorite...');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'Let''s play together!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'What do you want?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'Where is the post office?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'What time is it?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'Let''s go to Kyoto!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'What are you doing?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'I like summer!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'My dream is...');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学1年', '英語', '啓林館', 'Welcome to Japan!');
+
+-- COMBO: 中学2年_国語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '字のない葉書');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '盆土産');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', 'カレーライス');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '走れメロス');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', 'アイスプラネット');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '扇面');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '少年の日の思い出');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '生きる');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '握手');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '字を楽しむ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '枕草子');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '国語', '啓林館', '平家物語');
+
+-- COMBO: 中学2年_理科_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '化学変化と原子・分子');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '化学変化と物質の質量');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '動物の生活とからだのつくり');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '感覚と運動のしくみ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '植物の生活とからだのつくり');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '大気と水の動き');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '天気変化と大気の動き');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '電流とその利用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '磁界と電流の向き');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '電流が磁界から受ける力');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '生物の体のつくりとはたらき');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '理科', '啓林館', '地球と宇宙');
+
+-- COMBO: 中学2年_社会_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', '世界に目を向けよう');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', '世界の諸地域');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', 'アジア州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', '世界の諸地域');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', 'ヨーロッパ州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', '世界の諸地域');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', 'アフリカ州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', '世界の諸地域');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', '北アメリカ州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', '世界の諸地域');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', '南アメリカ州');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '社会', '啓林館', '持続可能な社会へ');
+
+-- COMBO: 中学2年_英語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 1 Welcome to Our Town');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 2 My Best Memory');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 3 Let''s Think about Our Food');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 4 What Do You Want to Be?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 5 A Trip to Nara');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 6 The Power of Words');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 7 Saving Our Planet');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 8 Dreams Come True');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 9 Enjoy Traditional Culture');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 10 The World of Sports');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 11 Messages from the Past');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学2年', '英語', '啓林館', 'Unit 12 Toward a Better Future');
+
+-- COMBO: 中学3年_数学_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '第1章 式の計算');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '第2章 平方根');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '第3章 2次方程式');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '第4章 関数 y=ax²');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '第5章 相似な図形');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '第6章 円');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '第7章 三平方の定理');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '第8章 標本調査');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '式の計算の利用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', 'いろいろな関数');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '図形の相似の利用');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '数学', '啓林館', '三平方の定理の利用');
+
+-- COMBO: 中学3年_国語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '言葉で世界を捉える');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '多様な意見を относиться');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '物語を味わい、語り合う');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '古典に親しむ');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', 'メディアとコミュニケーション');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '説得力のある意見');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '詩を読み解く');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '古典の世界を旅する');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '情報を分析し、伝える');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', 'よりよい社会を目指して');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '言葉と向き合う');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '国語', '啓林館', '未来をひらく');
+
+-- COMBO: 中学3年_理科_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '運動とエネルギー');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', 'いろいろなエネルギー');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '電気');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '電流と磁界');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '音の性質');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '力と圧力');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '仕事とエネルギー');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '化学変化とイオン');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '酸・アルカリとイオン');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '中和と塩');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '生命の連続性');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '理科', '啓林館', '地球と宇宙');
+
+-- COMBO: 中学3年_社会_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '私たちと国際社会');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', 'グローバル化と私たち');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '持続可能な社会を目指して');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '第一次世界大戦と日本');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '世界恐慌と第二次世界大戦');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '第二次世界大戦後の世界');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '冷戦下の世界と日本');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '社会の変化と私たちの生活');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '民主政治の基本原理');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '人権の保障と社会');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', 'これからの社会と私たち');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '社会', '啓林館', '私たちと経済');
+
+-- COMBO: 中学3年_英語_啓林館
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 1 Welcome to High School Life!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 2 What Do You Want to Be?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 3 Let''s Read About SDGs');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 4 What Can We Do?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 5 Learning from the Past');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 6 My Best Memory');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 7 What''s Special About Japan?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 8 Let''s Enjoy Traditional Culture!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 9 What Makes a Good Story?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 10 Let''s Write a Story!');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 11 What Can We Learn from Nature?');
+INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES ('中学3年', '英語', '啓林館', 'Unit 12 The Power of Nature');
+
