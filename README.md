@@ -4,9 +4,10 @@
 
 ## 🌐 本番環境URL
 
-**Phase 17完全実装完了！（カリキュラム対応AI問題生成）** ✅  
+**Phase 18-2完了！（テスト対策 + 自己調整学習 + KPT振り返り）** ✅  
 - **本番URL**: https://jiyushindo-gakushu.pages.dev
-- **カリキュラム対応AI問題生成**: https://jiyushindo-gakushu.pages.dev/curriculum-problem-generator.html ⭐NEW
+- **テスト対策プラン**: https://jiyushindo-gakushu.pages.dev/static/test-preparation ⭐NEW
+- **カリキュラム対応AI問題生成**: https://jiyushindo-gakushu.pages.dev/curriculum-problem-generator.html
 - **従来のAI問題生成**: https://jiyushindo-gakushu.pages.dev/problem-generator.html
 - **AIチューター**: https://jiyushindo-gakushu.pages.dev/ai-tutor.html
 - **AIフィードバック**: https://jiyushindo-learning.pages.dev/feedback-dashboard.html
@@ -44,8 +45,59 @@
 - **Phase 15完了**: ✅ 100% - レベル5理論体系統合完了（12理論F1-F12、適性診断システム、世界最高峰エビデンス）
 - **Phase 16完了**: ✅ 100% - 12理論実装統合完了（学習カード統合、AI問題生成、ダッシュボード可視化）
 - **Phase 17完了**: ✅ 100% - カリキュラム対応AI問題生成完了（3,807単元、15教科、5社教科書対応）
+- **Phase 18-2完了**: ✅ 100% - カリキュラム実データ3,608件（195組み合わせ全カバー）+ テスト対策システム + 自己調整学習支援 + KPT振り返り
 
-## Phase 17: カリキュラム対応AI問題生成 🎓 **NEW**
+## Phase 18-2: テスト対策 + 自己調整学習 + 振り返りシステム 📝 **NEW**
+
+### 完了したタスク
+
+#### Task1: カリキュラム実データ生成
+- Gemini APIを使用して195組み合わせ（9学年 x 最大7教科 x 5社）の実データ3,608件を自動生成
+- ダミーデータ11,080件を完全削除、実データのみに置き換え
+- 5並列のバッチ処理スクリプトで効率的に生成
+
+#### Task2: テスト対策システム実装
+- 4ステップUI（範囲設定 → 学習計画 → 学習実行 → 振り返り）
+- カリキュラムDB選択 + 自由テキスト入力のハイブリッド範囲設定
+- AI学習スケジュール提案（優先順位・時間配分）
+- メタ認知記録API（学習前/中/後の自己評価）
+
+#### Task3: 学習カード枚数の動的調整
+- `/api/units/analyze` エンドポイント（AI単元分析）
+- 単元の複雑さ・難易度に基づく自動枚数決定（4〜15枚）
+- `generate-course` APIの動的カード枚数対応
+
+#### Task4: 自己調整学習支援UI
+- ポモドーロタイマー（15分/25分/自由モード）
+- セルフモニタリング（集中度・疲労度ゲージ）
+- AIベースのペース調整提案
+- `/api/self-regulated/strategy-suggest` 学習戦略提案API
+
+#### Task5: 振り返り機能（KPT法）
+- KPT法による振り返りUI（Keep / Problem / Try）
+- 自信度Before/After比較チャート
+- `/api/reflection/ai-analyze` AI振り返り分析（改善アドバイス・励まし・次の目標）
+- 感情記録機能
+
+### 新規API一覧
+| エンドポイント | メソッド | 説明 |
+|---|---|---|
+| `/api/curriculum/filters` | GET | 学年・教科・教科書会社フィルター取得 |
+| `/api/curriculum/units` | GET | 単元一覧取得（フィルター対応） |
+| `/api/units/analyze` | POST | AI単元分析（動的カード枚数決定） |
+| `/api/test-preparation/create-plan` | POST | テスト対策プラン作成 |
+| `/api/test-preparation/study-log` | POST | 学習ログ記録 |
+| `/api/test-preparation/feedback` | POST | テスト結果フィードバック |
+| `/api/test-preparation/plans/:studentId` | GET | 過去のプラン一覧 |
+| `/api/test-preparation/weakness-analysis/:studentId` | GET | 弱点分析 |
+| `/api/self-regulated/monitor` | POST | セルフモニタリング記録＋AI提案 |
+| `/api/self-regulated/strategy-suggest` | POST | AI学習戦略提案 |
+| `/api/reflection/save` | POST | KPT振り返り保存 |
+| `/api/reflection/ai-analyze` | POST | AI振り返り分析 |
+| `/api/reflection/history/:studentId` | GET | 振り返り履歴取得 |
+| `/api/metacognition/log` | POST | メタ認知ログ記録 |
+
+## Phase 17: カリキュラム対応AI問題生成 🎓
 
 ### ⚠️ Phase 17実装内容（部分完了・データ生成中）
 
