@@ -27,6 +27,7 @@
     "@hono/vite-dev-server": "^0.18.2",
     "@playwright/test": "^1.58.0",
     "@types/bcryptjs": "^2.4.6",
+    "better-sqlite3": "^12.6.2",
     "lighthouse": "^12.8.2",
     "vite": "^6.3.5",
     "wrangler": "^4.4.0"
