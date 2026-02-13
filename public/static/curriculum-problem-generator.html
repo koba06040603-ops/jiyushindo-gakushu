@@ -309,10 +309,10 @@
                     currentUnits = response.data.units
                     
                     // 単元リスト構築
-                    response.data.units.forEach(unit => {
+                    response.data.units.forEach((unit, index) => {
                         const option = document.createElement('option')
                         option.value = unit.id
-                        option.textContent = `${unit.unit_order}. ${unit.unit_name}`
+                        option.textContent = `${index + 1}. ${unit.unit_name}`
                         option.dataset.goal = unit.unit_goal || ''
                         option.dataset.nonCognitiveGoal = unit.non_cognitive_goal || ''
                         unitSelect.appendChild(option)
