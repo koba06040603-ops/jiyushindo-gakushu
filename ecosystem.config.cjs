@@ -8,7 +8,7 @@ module.exports = {
         NODE_ENV: 'development',
         PORT: 3000,
         WRANGLER_SEND_METRICS: 'false',
-        CLOUDFLARE_API_TOKEN: '',
+        CLOUDFLARE_API_TOKEN: 'local-dev',
         NO_UPDATE_NOTIFIER: 'true'
       },
       watch: false,

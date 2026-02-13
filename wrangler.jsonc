@@ -25,8 +25,5 @@
       "binding": "MEDIA_BUCKET",
       "bucket_name": "jiyushindo-gakushu-media-2024"
     }
-  ],
-  "ai": {
-    "binding": "AI"
-  }
+  ]
 }
