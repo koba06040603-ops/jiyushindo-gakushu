@@ -1456,6 +1456,32 @@ async function renderTopPage() {
         </div>
       </div>
 
+      <!-- AI問題生成ページへのリンク -->
+      <div class="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg shadow-2xl p-8 mb-8">
+        <div class="text-center">
+          <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
+            ✨ NEW機能
+          </div>
+          <h2 class="text-3xl font-bold text-white mb-3">
+            <i class="fas fa-brain mr-2"></i>
+            AI問題生成システム
+          </h2>
+          <p class="text-white text-lg opacity-90 mb-2">
+            教科書対応の問題をAIが自動生成
+          </p>
+          <p class="text-white text-sm opacity-75 mb-6">
+            3,807単元 × 15教科 × 5社教科書完全対応
+          </p>
+          <a 
+            href="/curriculum-problem-generator.html"
+            class="inline-block bg-white text-purple-600 hover:bg-purple-50 py-5 px-10 rounded-lg font-bold text-xl transition shadow-xl group">
+            <i class="fas fa-sparkles mr-2"></i>
+            AI問題生成ページへ
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </a>
+        </div>
+      </div>
+
       <!-- ケース4-12: 個別最適化学習デモ -->
       <div class="bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg shadow-xl p-8 mb-8">
         <div class="text-center mb-8">
