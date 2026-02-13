@@ -24042,6 +24042,74 @@ app.get('/api/problems/performance', authMiddleware, async (c) => {
 })
 
 /**
+ * POST /api/problems/generate-demo - デモ用問題自動生成（認証不要）
+ */
+app.post('/api/problems/generate-demo', async (c) => {
+  const { env } = c
+  
+  try {
+    const body = await c.req.json()
+    const { subject, grade, textbookCompany, unitName, difficulty, count, problemType } = body
+    
+    if (!subject) {
+      return c.json({ success: false, error: '教科を指定してください' }, 400)
+    }
+    
+    const request: ProblemGenerationRequest = {
+      studentId: 0, // デモユーザー
+      subject,
+      grade,
+      textbookCompany,
+      unitName,
+      difficulty: difficulty || 'medium',
+      count: Math.min(count || 5, 10),
+      problemType
+    }
+    
+    console.log('📝 デモ問題生成リクエスト:', {
+      subject,
+      grade,
+      textbookCompany,
+      unitName,
+      difficulty: request.difficulty,
+      count: request.count
+    })
+    
+    // 問題生成エンジン取得
+    const engine = getProblemGeneratorEngine()
+    
+    // 問題生成（DB保存なし、AIのみ使用）
+    const problems = await engine.generateProblems(request, env.DB, env.AI)
+    
+    if (!problems || problems.length === 0) {
+      console.warn('⚠️ 問題が生成されませんでした。リクエスト:', request)
+      return c.json({
+        success: false,
+        error: '問題の生成に失敗しました。もう一度お試しください。',
+        details: '生成された問題が0件でした'
+      }, 500)
+    }
+    
+    console.log(`✅ ${problems.length}問の問題を生成しました（デモモード）`)
+    
+    // デモモードではDB保存せず、問題のみ返す
+    return c.json({
+      success: true,
+      problems: problems,
+      count: problems.length,
+      demo: true
+    })
+  } catch (error: any) {
+    console.error('❌ デモ問題生成エラー:', error)
+    return c.json({ 
+      success: false, 
+      error: '問題の生成に失敗しました',
+      details: error.message 
+    }, 500)
+  }
+})
+
+/**
  * GET /api/problems/metadata - 問題生成メタデータ
  */
 app.get('/api/problems/metadata', authMiddleware, async (c) => {

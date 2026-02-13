@@ -52,16 +52,20 @@
 <body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
     <div class="container mx-auto px-4 py-8">
         <!-- ヘッダー -->
-        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div class="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg shadow-lg p-6 mb-6">
             <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-800 mb-2">
-                        <i class="fas fa-robot text-purple-600"></i>
-                        カリキュラム対応AI問題生成
-                    </h1>
-                    <p class="text-gray-600">学習指導要領と教科書に沿った問題を自動生成します</p>
+                <div class="flex items-center gap-4">
+                    <div class="bg-white p-3 rounded-full shadow-md">
+                        <i class="fas fa-lightbulb text-4xl text-yellow-500"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-bold text-white mb-1">
+                            カリキュラム対応AI問題生成
+                        </h1>
+                        <p class="text-purple-100">学習指導要領と教科書に沿った問題を自動生成します</p>
+                    </div>
                 </div>
-                <button onclick="window.location.href='/'" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg">
+                <button onclick="window.location.href='/'" class="px-4 py-2 bg-white text-purple-600 hover:bg-purple-50 rounded-lg font-semibold transition duration-200">
                     <i class="fas fa-home mr-2"></i>ホーム
                 </button>
             </div>
@@ -184,17 +188,17 @@
                         </div>
                         
                         <!-- 生成ボタン -->
-                        <button type="submit" id="generateBtn" class="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-lg hover:from-purple-700 hover:to-pink-700 transition duration-300 shadow-lg">
-                            <i class="fas fa-magic mr-2"></i>
+                        <button type="submit" id="generateBtn" class="w-full py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-pink-700 transition duration-300 shadow-xl transform hover:scale-105">
+                            <i class="fas fa-sparkles mr-2"></i>
                             問題を生成する
                         </button>
                     </form>
                     
                     <!-- 生成中インジケーター -->
                     <div id="generatingIndicator" class="hidden mt-4 text-center">
-                        <div class="generating-animation inline-flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <span class="font-semibold">AI が問題を生成中...</span>
+                        <div class="generating-animation inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 rounded-lg border-2 border-purple-300">
+                            <i class="fas fa-spinner fa-spin text-xl"></i>
+                            <span class="font-bold text-lg">AI が問題を生成中...</span>
                         </div>
                     </div>
                 </div>
@@ -220,9 +224,26 @@
                         生成された問題
                     </h2>
                     <div id="generatedProblems" class="space-y-6">
-                        <div class="text-center py-12 text-gray-400">
-                            <i class="fas fa-clipboard-question text-6xl mb-4"></i>
-                            <p class="text-lg">設定を選んで「問題を生成する」ボタンを押してください</p>
+                        <div class="text-center py-16 text-gray-400">
+                            <div class="mb-6">
+                                <i class="fas fa-wand-magic-sparkles text-8xl text-purple-300"></i>
+                            </div>
+                            <p class="text-xl font-semibold text-gray-600 mb-2">AIが問題を生成します</p>
+                            <p class="text-gray-500">⬅️ 左側のフォームで設定を選んで「問題を生成する」ボタンを押してください</p>
+                            <div class="mt-6 flex justify-center gap-4 text-sm text-gray-400">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                    <span>3,807単元対応</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                    <span>15教科対応</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                    <span>5社教科書対応</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -385,7 +406,7 @@
             try {
                 console.log('📤 問題生成リクエスト:', params)
                 
-                const response = await axios.post('/api/problems/generate', params)
+                const response = await axios.post('/api/problems/generate-demo', params)
                 
                 if (response.data.success) {
                     const problems = response.data.problems

@@ -12,7 +12,7 @@
     <div class="max-w-7xl mx-auto">
         <!-- ヘッダー -->
         <div class="bg-white rounded-2xl shadow-xl p-8 mb-8">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <h1 class="text-4xl font-bold text-gray-800 mb-2">
                         <i class="fas fa-shield-alt text-indigo-600 mr-3"></i>
@@ -20,14 +20,20 @@
                     </h1>
                     <p class="text-gray-600">JWT + Role-Based Access Control (RBAC)</p>
                 </div>
-                <div id="userStatus" class="text-right">
-                    <div id="loggedOutStatus" class="text-red-600">
-                        <i class="fas fa-times-circle mr-2"></i>
-                        ログアウト中
-                    </div>
-                    <div id="loggedInStatus" class="hidden text-green-600">
-                        <i class="fas fa-check-circle mr-2"></i>
-                        ログイン中
+                <div class="flex items-center gap-4">
+                    <a href="/curriculum-problem-generator.html" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-semibold shadow-lg">
+                        <i class="fas fa-brain mr-2"></i>
+                        AI問題生成
+                    </a>
+                    <div id="userStatus" class="text-right">
+                        <div id="loggedOutStatus" class="text-red-600">
+                            <i class="fas fa-times-circle mr-2"></i>
+                            ログアウト中
+                        </div>
+                        <div id="loggedInStatus" class="hidden text-green-600">
+                            <i class="fas fa-check-circle mr-2"></i>
+                            ログイン中
+                        </div>
                     </div>
                 </div>
             </div>
@@ -42,7 +48,11 @@
             <div id="userInfoDisplay" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <!-- ユーザー情報が表示されます -->
             </div>
-            <div class="mt-6 flex gap-4">
+            <div class="mt-6 flex gap-4 flex-wrap">
+                <a href="/curriculum-problem-generator.html" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-semibold shadow-lg">
+                    <i class="fas fa-brain mr-2"></i>
+                    AI問題生成
+                </a>
                 <button onclick="logout()" class="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all">
                     <i class="fas fa-sign-out-alt mr-2"></i>
                     ログアウト
@@ -140,6 +150,16 @@
                             ログイン
                         </button>
                     </form>
+                    <div class="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border-2 border-purple-200">
+                        <p class="text-sm text-gray-700 mb-3">
+                            <i class="fas fa-sparkles text-purple-600 mr-2"></i>
+                            <strong>認証なしでも利用可能</strong>
+                        </p>
+                        <a href="/curriculum-problem-generator.html" class="inline-block w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-center rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-semibold shadow-lg">
+                            <i class="fas fa-brain mr-2"></i>
+                            AI問題生成ページへ
+                        </a>
+                    </div>
                 </div>
 
                 <!-- アクセステストタブ -->
