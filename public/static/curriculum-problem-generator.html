@@ -272,7 +272,7 @@
         async function loadStats() {
             try {
                 // DBサイズ取得
-                const dbResponse = await axios.get('/api/curriculum/unit-suggestions?grade=小学1年&subject=算数')
+                const dbResponse = await axios.get('/api/curriculum/units?grade=小学1年&subject=算数')
                 document.getElementById('dbStats').textContent = '接続OK'
             } catch (error) {
                 document.getElementById('dbStats').textContent = '接続エラー'
@@ -301,8 +301,8 @@
             unitLoading.classList.remove('hidden')
             
             try {
-                const response = await axios.get('/api/curriculum/unit-suggestions', {
-                    params: { grade, subject, textbook }
+                const response = await axios.get('/api/curriculum/units', {
+                    params: { grade, subject, textbook_company: textbook }
                 })
                 
                 if (response.data.success && response.data.units) {
