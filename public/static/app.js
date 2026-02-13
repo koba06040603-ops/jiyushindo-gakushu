@@ -1305,19 +1305,11 @@ async function renderTopPage() {
         
         <button 
           onclick="showUnitGeneratorModal()"
-          class="w-full bg-white text-purple-600 hover:bg-purple-50 py-6 px-8 rounded-lg font-bold text-2xl transition shadow-xl flex items-center justify-center group mb-4">
+          class="w-full bg-white text-purple-600 hover:bg-purple-50 py-6 px-8 rounded-lg font-bold text-2xl transition shadow-xl flex items-center justify-center group">
           <i class="fas fa-magic mr-3 text-3xl group-hover:animate-bounce"></i>
           AIで学習カードを作成する
           <i class="fas fa-arrow-right ml-3 group-hover:translate-x-2 transition-transform"></i>
         </button>
-
-        <a 
-          href="/curriculum-problem-generator.html"
-          class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 py-5 px-8 rounded-lg font-bold text-xl transition shadow-xl flex items-center justify-center group block">
-          <i class="fas fa-brain mr-3 text-2xl"></i>
-          AI問題生成ページへ
-          <i class="fas fa-arrow-right ml-3 group-hover:translate-x-2 transition-transform"></i>
-        </a>
 
         <!-- 機能紹介 -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
@@ -1456,27 +1448,27 @@ async function renderTopPage() {
         </div>
       </div>
 
-      <!-- AI問題生成ページへのリンク -->
-      <div class="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg shadow-2xl p-8 mb-8">
+      <!-- テスト対策プランへのリンク -->
+      <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-2xl p-8 mb-8">
         <div class="text-center">
           <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
-            ✨ NEW機能
+            📝 テスト前の総仕上げ
           </div>
           <h2 class="text-3xl font-bold text-white mb-3">
-            <i class="fas fa-brain mr-2"></i>
-            AI問題生成システム
+            <i class="fas fa-clipboard-check mr-2"></i>
+            テスト対策プラン
           </h2>
           <p class="text-white text-lg opacity-90 mb-2">
-            教科書対応の問題をAIが自動生成
+            苦手克服・AI問題生成・総復習で万全の準備
           </p>
           <p class="text-white text-sm opacity-75 mb-6">
-            3,807単元 × 15教科 × 5社教科書完全対応
+            あなただけのテスト対策で自信をつけよう
           </p>
           <a 
-            href="/curriculum-problem-generator.html"
-            class="inline-block bg-white text-purple-600 hover:bg-purple-50 py-5 px-10 rounded-lg font-bold text-xl transition shadow-xl group">
-            <i class="fas fa-sparkles mr-2"></i>
-            AI問題生成ページへ
+            href="/test-preparation.html"
+            class="inline-block bg-white text-blue-600 hover:bg-blue-50 py-5 px-10 rounded-lg font-bold text-xl transition shadow-xl group">
+            <i class="fas fa-rocket mr-2"></i>
+            テスト対策を始める
             <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
           </a>
         </div>
