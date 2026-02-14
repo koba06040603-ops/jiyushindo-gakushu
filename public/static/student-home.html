@@ -671,7 +671,7 @@ const STATE = {
 
 // URLパラメータ取得 + ログイン情報
 const params = new URLSearchParams(window.location.search)
-STATE.curriculumId = params.get('curriculum_id') || null
+STATE.curriculumId = params.get('curriculum_id') || '99001' // デモ用デフォルト
 const planIdParam = params.get('plan_id')
 
 // student_id: URLパラメータ > localStorage > デフォルト
@@ -1011,12 +1011,11 @@ function switchSplitTab(target) {
     }
 }
 
-// ========== スプリットビュー左ペイン: てびきインライン描画 ==========
+// ========== スプリットビュー左ペイン: てびきインライン描画（教師版と同じフル表示） ==========
 function renderTebikiInline() {
     const container = document.getElementById('tebikiInlineContent')
     if (!container) return
     if (!STATE.tebikiData) {
-        // まだ読み込み中 → loadTebikiData完了後に再呼出
         container.innerHTML = `
             <div class="text-center py-6 text-gray-400">
                 <i class="fas fa-spinner fa-spin text-xl mb-2"></i>
@@ -1034,91 +1033,151 @@ function renderTebikiInline() {
         return 0
     })
 
-    const courseLabels = { basic: '\ud83d\udc22 \u3058\u3063\u304f\u308a', standard: '\ud83d\udc15 \u3057\u3063\u304b\u308a', advanced: '\ud83d\udc06 \u3050\u3093\u3050\u3093' }
-    const courseBorderColors = { basic: 'border-green-400', standard: 'border-blue-400', advanced: 'border-orange-400' }
-    const courseBgColors = { basic: 'bg-green-50', standard: 'bg-blue-50', advanced: 'bg-orange-50' }
+    const courseLabels = { basic: '\ud83d\udc22 \u3058\u3063\u304f\u308a\u30b3\u30fc\u30b9', standard: '\ud83d\udc15 \u3057\u3063\u304b\u308a\u30b3\u30fc\u30b9', advanced: '\ud83d\udc06 \u3050\u3093\u3050\u3093\u30b3\u30fc\u30b9' }
+    const courseBorders = { basic: 'border-green-500', standard: 'border-blue-500', advanced: 'border-orange-500' }
+    const courseBgs = { basic: 'bg-green-50', standard: 'bg-blue-50', advanced: 'bg-orange-50' }
+    const courseGrads = { basic: 'from-green-50 to-white', standard: 'from-blue-50 to-white', advanced: 'from-orange-50 to-white' }
 
     let html = ''
 
-    // 単元概要
-    if (curriculum) {
-        html += `
-            <div class="mb-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-3">
-                <h4 class="text-xs font-bold text-indigo-800 mb-1">${escapeHtml(curriculum.unit_name || '')}</h4>
-                <p class="text-[10px] text-gray-600">${escapeHtml(curriculum.grade || '')} ${escapeHtml(curriculum.subject || '')}</p>
-                ${curriculum.unit_overview ? `<p class="text-[10px] text-gray-500 mt-1">${escapeHtml(curriculum.unit_overview)}</p>` : ''}
-            </div>`
-    }
+    // ===== タイトル =====
+    html += `
+        <div class="text-center mb-4 border-b-4 border-indigo-600 pb-4">
+            <h2 class="text-2xl font-bold text-indigo-700 mb-2">\u5b66\u7fd2\u306e\u3066\u3073\u304d</h2>
+            <p class="text-base font-bold text-gray-800">${escapeHtml(curriculum?.unit_name || STATE.unitConfig.unit_name)}</p>
+            <p class="text-xs text-gray-500 mt-1">${escapeHtml(curriculum?.grade || STATE.unitConfig.grade)} ${escapeHtml(curriculum?.subject || STATE.unitConfig.subject)}</p>
+        </div>`
 
-    // コース別カード一覧
+    // ===== 単元の目標 =====
+    html += `
+        <div class="mb-4">
+            <div class="bg-blue-100 border-l-4 border-blue-600 p-3 rounded-r-lg">
+                <h3 class="text-sm font-bold text-blue-800 mb-1 flex items-center">
+                    <i class="fas fa-bullseye mr-1"></i>\u305f\u3093\u3052\u3093\u306e\u3082\u304f\u3072\u3087\u3046
+                </h3>
+                <p class="text-xs text-gray-800 leading-relaxed">${escapeHtml(STATE.unitConfig.unit_goal)}</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-2">
+                <div class="bg-green-100 border-l-4 border-green-600 p-2 rounded-r-lg">
+                    <h4 class="text-[10px] font-bold text-green-800"><i class="fas fa-heart mr-1"></i>\u3053\u3053\u308d\u306e\u305b\u3044\u3061\u3087\u3046</h4>
+                    <p class="text-[10px] text-gray-700">\u3042\u304d\u3089\u3081\u305a\u306b\u3001\u304f\u3075\u3046\u3057\u306a\u304c\u3089\u5b66\u3076\u529b\u3092\u306e\u3070\u305d\u3046\u3002</p>
+                </div>
+                <div class="bg-purple-100 border-l-4 border-purple-600 p-2 rounded-r-lg">
+                    <h4 class="text-[10px] font-bold text-purple-800"><i class="fas fa-clock mr-1"></i>\u3058\u3085\u304e\u3087\u3046\u3058\u304b\u3093</h4>
+                    <p class="text-base font-bold text-purple-700">\u305c\u3093\u3076\u3067 ${STATE.unitConfig.total_hours} \u3058\u304b\u3093</p>
+                </div>
+            </div>
+        </div>`
+
+    // ===== コース別学習カード =====
+    html += `
+        <div class="mb-4">
+            <h3 class="text-base font-bold text-center text-gray-800 mb-3 pb-2 border-b-2 border-gray-300">
+                <i class="fas fa-route mr-1 text-indigo-600"></i>
+                \u30b3\u30fc\u30b9\u3079\u3064\u5b66\u3057\u3085\u3046\u30ab\u30fc\u30c9
+            </h3>`
+
     for (const course of sorted) {
         const isSelected = course.course_level === targetLevel
         const label = courseLabels[course.course_level] || course.course_name
-        const border = courseBorderColors[course.course_level] || 'border-gray-300'
-        const bg = courseBgColors[course.course_level] || 'bg-gray-50'
+        const border = courseBorders[course.course_level] || 'border-gray-300'
+        const bg = courseBgs[course.course_level] || 'bg-gray-50'
+        const grad = courseGrads[course.course_level] || 'from-gray-50 to-white'
         const cards = course.cards || []
 
         html += `
-        <div class="mb-3 border-2 ${isSelected ? border : 'border-gray-200'} rounded-xl overflow-hidden ${isSelected ? '' : 'opacity-50'}">
-            <div class="px-3 py-2 ${isSelected ? bg : 'bg-gray-50'} flex items-center justify-between">
-                <span class="text-xs font-bold">${label}</span>
+        <div class="mb-3 border-3 ${isSelected ? border : 'border-gray-200'} rounded-xl overflow-hidden ${isSelected ? '' : 'opacity-50'}
+            bg-gradient-to-br ${isSelected ? grad : 'from-gray-50 to-white'}">
+            <div class="px-3 py-2 ${isSelected ? bg : 'bg-gray-100'} flex items-center justify-between">
+                <span class="text-sm font-bold">${label}</span>
                 ${isSelected ? '<span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full">\u3042\u306a\u305f\u306e\u30b3\u30fc\u30b9</span>' : ''}
-            </div>
-            <div class="divide-y">`
-
-        for (const card of cards) {
-            const hasHints = card.hints && card.hints.length > 0
-            const hasAnswer = card.answer
-            html += `
-            <div class="px-3 py-1.5">
-                <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
-                    <span class="chevron text-gray-400 text-[10px]"><i class="fas fa-chevron-right"></i></span>
-                    <span class="text-[10px] font-semibold text-gray-700">\u30ab\u30fc\u30c9${card.card_number}</span>
-                    <span class="text-[10px] text-gray-400 truncate flex-1">${escapeHtml(card.card_title || card.content_summary || '')}</span>
-                    ${hasHints ? '<i class="fas fa-lightbulb text-yellow-400 text-[10px]" title="\u30d2\u30f3\u30c8\u3042\u308a"></i>' : ''}
-                </div>
-                <div class="card-accordion">
-                    <div class="mt-1 space-y-1 pb-1">
-                        ${card.card_content ? `<div class="card-preview rounded p-2 text-[10px] text-gray-700 leading-relaxed">${escapeHtml(card.card_content).replace(/\\n/g, '<br>')}</div>` : ''}
-                        ${hasHints ? `
-                            <div class="space-y-0.5">
-                                <p class="text-[10px] font-bold text-yellow-700"><i class="fas fa-lightbulb mr-1"></i>\u30d2\u30f3\u30c8</p>
-                                ${card.hints.map((h, idx) => `
-                                    <div class="hint-step pl-2 py-0.5 text-[10px] text-gray-600">
-                                        <span class="font-bold text-yellow-600">\u30d2\u30f3\u30c8${idx + 1}:</span> ${escapeHtml(h.hint_content || h.hint_text || '')}
-                                    </div>
-                                `).join('')}
-                            </div>` : ''}
-                        ${hasAnswer ? `
-                            <details class="mt-0.5">
-                                <summary class="text-[10px] text-green-600 cursor-pointer font-bold"><i class="fas fa-check-circle mr-1"></i>\u3053\u305f\u3048\u3092\u898b\u308b</summary>
-                                <div class="mt-1 bg-green-50 rounded p-2 text-[10px] text-gray-700">${escapeHtml(card.answer).replace(/\\n/g, '<br>')}</div>
-                            </details>` : ''}
-                    </div>
-                </div>
+                <span class="text-[10px] text-gray-500">\u30ab\u30fc\u30c9${cards.length}\u679a</span>
             </div>`
+
+        if (cards.length > 0) {
+            html += `<div class="divide-y">`
+            for (const card of cards) {
+                const hasHints = card.hints && card.hints.length > 0
+                const hasAnswer = card.answer
+                html += `
+                <div class="px-3 py-2">
+                    <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+                        <span class="chevron text-gray-400 text-xs"><i class="fas fa-chevron-right"></i></span>
+                        <span class="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">${card.card_number}</span>
+                        <span class="text-xs font-semibold text-gray-700 flex-1">${escapeHtml(card.card_title || card.content_summary || '\u30ab\u30fc\u30c9' + card.card_number)}</span>
+                        ${hasHints ? '<i class="fas fa-lightbulb text-yellow-400 text-xs"></i>' : ''}
+                    </div>
+                    <div class="card-accordion">
+                        <div class="mt-2 space-y-2 pb-2 pl-8">
+                            ${card.card_content ? `
+                                <div class="bg-gray-50 rounded-lg p-2 border-l-4 border-indigo-400">
+                                    <p class="text-xs text-gray-800 leading-relaxed whitespace-pre-wrap">${escapeHtml(card.card_content).replace(/\\n/g, '<br>')}</p>
+                                </div>` : ''}
+                            ${hasHints ? `
+                                <div class="space-y-1">
+                                    <p class="text-[10px] font-bold text-yellow-700"><i class="fas fa-lightbulb mr-1"></i>\u30d2\u30f3\u30c8</p>
+                                    ${card.hints.map((h, idx) => `
+                                        <div class="hint-step pl-2 py-1 text-[10px] text-gray-600 bg-yellow-50 rounded">
+                                            <span class="font-bold text-yellow-600">\u30d2\u30f3\u30c8${idx + 1}:</span> ${escapeHtml(h.hint_content || h.hint_text || '')}
+                                        </div>
+                                    `).join('')}
+                                </div>` : ''}
+                            ${hasAnswer ? `
+                                <details>
+                                    <summary class="text-[10px] text-green-600 cursor-pointer font-bold"><i class="fas fa-check-circle mr-1"></i>\u3053\u305f\u3048\u3092\u898b\u308b</summary>
+                                    <div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-700">\ud83d\udca1 \u3053\u305f\u3048: ${escapeHtml(card.answer).replace(/\\n/g, '<br>')}</div>
+                                    ${card.answer_explanation ? `<div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-600"><strong>\u89e3\u8aac:</strong> ${escapeHtml(card.answer_explanation).replace(/\\n/g, '<br>')}</div>` : ''}
+                                </details>` : ''}
+                        </div>
+                    </div>
+                </div>`
+            }
+            html += `</div>`
+        } else {
+            html += `<div class="px-3 py-2 text-center text-gray-400 text-xs">\u30ab\u30fc\u30c9\u304c\u307e\u3060\u3042\u308a\u307e\u305b\u3093</div>`
         }
 
-        html += `</div></div>`
+        html += `</div>`
     }
+    html += `</div>`
 
-    // 選択課題
+    // ===== チェックテスト案内 =====
+    html += `
+        <div class="mb-4">
+            <h3 class="text-sm font-bold text-center text-gray-800 mb-2 pb-1 border-b-2 border-yellow-300">
+                <i class="fas fa-check-circle mr-1 text-yellow-600"></i>
+                \u30c1\u30a7\u30c3\u30af\u30c6\u30b9\u30c8
+            </h3>
+            <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-3">
+                <p class="text-[10px] text-center text-gray-700 font-medium">
+                    \u2b50 \u5b66\u3057\u3085\u3046\u30ab\u30fc\u30c9\u3092\u305c\u3093\u3076\u304a\u308f\u3089\u305b\u305f\u3089\u3001<br>
+                    \u30c1\u30a7\u30c3\u30af\u30c6\u30b9\u30c8\u306b\u3061\u3087\u3046\u305b\u3093\u3057\u3088\u3046\uff01<br>
+                    \u3054\u3046\u304b\u304f\u3059\u308b\u3068\u3001\u4e0b\u306e\u300c\u3048\u3089\u3079\u308b\u3082\u3093\u3060\u3044\u300d\u306b\u3059\u3059\u3081\u308b\u3088\uff01 \ud83c\udf89
+                </p>
+            </div>
+        </div>`
+
+    // ===== 選択課題（えらべるもんだい） =====
     if (optionalProblems && optionalProblems.length > 0) {
         html += `
-        <div class="mb-3 border-2 border-purple-200 rounded-xl overflow-hidden">
-            <div class="px-3 py-2 bg-purple-50">
-                <span class="text-xs font-bold text-purple-800"><i class="fas fa-star mr-1"></i>\u9078\u629e\u8ab2\u984c</span>
-            </div>
-            <div class="divide-y">
-                ${optionalProblems.map(p => `
-                    <div class="px-3 py-1.5">
-                        <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
-                            <span class="chevron text-gray-400 text-[10px]"><i class="fas fa-chevron-right"></i></span>
-                            <span class="text-[10px] font-semibold text-purple-700">${escapeHtml(p.problem_title || '\u9078\u629e\u8ab2\u984c' + p.problem_number)}</span>
+        <div class="mb-3">
+            <h3 class="text-sm font-bold text-center text-gray-800 mb-2 pb-1 border-b-2 border-pink-300">
+                <i class="fas fa-star mr-1 text-pink-600"></i>
+                \u3048\u3089\u3079\u308b\u3082\u3093\u3060\u3044
+            </h3>
+            <p class="text-[10px] text-center text-gray-600 mb-2">
+                \u30c1\u30a7\u30c3\u30af\u30c6\u30b9\u30c8\u3054\u3046\u304b\u304f\u5f8c\u3001\u3084\u308a\u305f\u3044\u3082\u3093\u3060\u3044\u3092\u3048\u3089\u307c\u3046\uff01
+            </p>
+            <div class="grid grid-cols-2 gap-2">
+                ${optionalProblems.map((p, idx) => `
+                    <div class="border-2 border-pink-200 bg-gradient-to-br from-white to-pink-50 rounded-xl p-2.5 hover:shadow transition">
+                        <div class="flex items-start mb-1">
+                            <div class="w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center text-[10px] font-bold mr-2 flex-shrink-0">
+                                ${p.problem_number || idx + 1}
+                            </div>
+                            <h4 class="text-xs font-bold text-gray-800 flex-1">${escapeHtml(p.problem_title || '\u9078\u629e\u8ab2\u984c' + (idx + 1))}</h4>
                         </div>
-                        <div class="card-accordion">
-                            <div class="mt-1 card-preview rounded p-2 text-[10px] text-gray-700 leading-relaxed">${escapeHtml(p.problem_content || '').replace(/\\n/g, '<br>')}</div>
-                        </div>
+                        <p class="text-[10px] text-gray-600 leading-relaxed">${escapeHtml(p.problem_content || '').substring(0, 80)}${(p.problem_content || '').length > 80 ? '...' : ''}</p>
                     </div>
                 `).join('')}
             </div>
