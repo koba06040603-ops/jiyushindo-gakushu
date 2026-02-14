@@ -253,9 +253,15 @@
                 <h2 class="text-lg font-bold text-gray-800">
                     <i class="fas fa-pencil-alt text-green-500 mr-2"></i>学習中
                 </h2>
-                <span class="text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">
-                    <i class="fas fa-clock mr-1"></i><span id="studyTimer">00:00</span>
-                </span>
+                <div class="flex items-center gap-2">
+                    <!-- 録画インジケーター -->
+                    <span id="recordingIndicator" class="hidden text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-medium animate-pulse">
+                        <i class="fas fa-circle text-red-500 mr-1" style="font-size:6px;vertical-align:middle"></i>REC <span id="recordingTimer">00:00</span>
+                    </span>
+                    <span class="text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">
+                        <i class="fas fa-clock mr-1"></i><span id="studyTimer">00:00</span>
+                    </span>
+                </div>
             </div>
             <p class="text-sm text-gray-600 mb-4">
                 きょうのめあて・計画: <strong id="todayGoalShow"></strong>
@@ -433,10 +439,31 @@
                 <div class="flex-1" id="persistenceStrategyPanel"></div>
             </div>
 
+            <!-- エビデンスカード: なぜこの数字か？ -->
+            <details class="mt-2">
+                <summary class="text-xs text-blue-500 cursor-pointer hover:text-blue-700 font-medium">
+                    <i class="fas fa-search-plus mr-1"></i>この数字の根拠を見る
+                </summary>
+                <div id="evidenceTraceCard" class="mt-2 bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs space-y-2"></div>
+            </details>
+
+            <!-- 保護者向けメッセージ -->
+            <div id="parentMessage" class="mt-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-800 hidden">
+                <i class="fas fa-home mr-1"></i><span id="parentMsgContent"></span>
+            </div>
+
             <!-- 先生向け（児童には非表示） -->
             <details class="mt-2">
                 <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600">🎓 先生向け詳細（3層測定データ）</summary>
                 <div id="persistenceTeacherMemo" class="teacher-only text-xs text-gray-500 mt-2 space-y-1 bg-gray-50 rounded-lg p-3"></div>
+            </details>
+
+            <!-- 測定ステータス・妥当性ダッシュボード（先生向け） -->
+            <details class="mt-2">
+                <summary class="text-xs text-emerald-500 cursor-pointer hover:text-emerald-700 font-medium">
+                    <i class="fas fa-flask mr-1"></i>測定の信頼性と研究開発ステータス
+                </summary>
+                <div id="measurementStatusDashboard" class="mt-2 text-xs space-y-3"></div>
             </details>
         </div>
 
@@ -1067,10 +1094,14 @@ function startStudyTimer() {
         const sec = String(elapsed % 60).padStart(2, '0')
         document.getElementById('studyTimer').textContent = `${min}:${sec}`
     }, 1000)
+    // 自動録画開始
+    startAutoRecording()
 }
 
 async function finishLearning() {
     if (STATE.timerInterval) clearInterval(STATE.timerInterval)
+    // 録画停止
+    await stopAutoRecording()
     const studyMinutes = STATE.studyStartTime ? Math.round((Date.now() - STATE.studyStartTime) / 60000) : 0
 
     // 今回完了したカードと課題を収集
@@ -1422,6 +1453,202 @@ function renderPersistenceAdvice(persist) {
     teacherHtml += `<p class="text-gray-500 mb-1">信頼性 ${rel}% — 3エビデンス源の一致度から算出</p>`
     teacherHtml += `<p class="text-gray-500">モデル: ${persist.model_version || '4.0'} | 理論: ${(persist.theories || []).slice(0, 5).join(', ')}</p>`
     teacherMemo.innerHTML = teacherHtml
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // Phase A: エビデンス透明化レイヤーの描画
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const et = persist.evidence_transparency || {}
+    renderEvidenceTraceCard(et)
+    renderParentMessage(et)
+    renderMeasurementStatusDashboard(et, persist)
+}
+
+// ─── エビデンストレースカード: なぜこの数字か？ ───
+function renderEvidenceTraceCard(et) {
+    const card = document.getElementById('evidenceTraceCard')
+    if (!card || !et.score_traceability) return
+    const trace = et.score_traceability
+    const trust = et.trust_explanation?.for_teachers || {}
+
+    let html = `
+        <div class="bg-white rounded-lg p-2.5 border border-blue-100">
+            <div class="font-bold text-blue-800 mb-1.5">
+                <i class="fas fa-calculator mr-1"></i>スコア算出過程（完全トレーサビリティ）
+            </div>
+            <div class="space-y-2">
+                <div class="bg-blue-50 rounded p-2">
+                    <div class="font-medium text-gray-700">総合: ${trace.total_score?.value}点</div>
+                    <div class="text-gray-500">${trace.total_score?.formula}</div>
+                    <div class="text-gray-400 font-mono text-[10px]">${trace.total_score?.breakdown}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">`
+    // 粘り強さ
+    const pTrace = trace.perseverance || {}
+    const pInputs = pTrace.raw_inputs || {}
+    html += `
+                    <div class="bg-orange-50 rounded p-2">
+                        <div class="font-medium text-orange-700">粘り強さ: ${pTrace.value}点</div>
+                        <div class="text-gray-500">${pTrace.formula}</div>
+                        <div class="text-gray-400 mt-1 space-y-0.5">
+                            ${Object.values(pInputs).map(v => `<div>• ${v}</div>`).join('')}
+                        </div>
+                    </div>`
+    // 自己調整
+    const sTrace = trace.self_regulation || {}
+    const sInputs = sTrace.raw_inputs || {}
+    html += `
+                    <div class="bg-indigo-50 rounded p-2">
+                        <div class="font-medium text-indigo-700">自己調整: ${sTrace.value}点</div>
+                        <div class="text-gray-500">${sTrace.formula}</div>
+                        <div class="text-gray-400 mt-1 space-y-0.5">
+                            ${Object.values(sInputs).map(v => `<div>• ${v}</div>`).join('')}
+                        </div>
+                    </div>`
+    html += `</div>`
+    // 信頼性
+    const rTrace = trace.reliability || {}
+    html += `
+                <div class="bg-gray-50 rounded p-2">
+                    <div class="font-medium text-gray-700">信頼性推定: ${rTrace.value}%</div>
+                    <div class="text-gray-500">${rTrace.formula}</div>
+                    <div class="text-gray-400 font-mono text-[10px]">${rTrace.breakdown}</div>
+                    <div class="text-gray-600 mt-1 italic">${rTrace.interpretation}</div>
+                </div>
+            </div>
+        </div>
+    `
+
+    // 信頼性の説明
+    if (trust.what_this_score_is) {
+        html += `
+        <div class="bg-white rounded-lg p-2.5 border border-blue-100">
+            <div class="font-bold text-blue-800 mb-1.5">
+                <i class="fas fa-info-circle mr-1"></i>このスコアの読み方
+            </div>
+            <div class="space-y-1.5 text-gray-600">
+                <p><span class="font-medium text-gray-700">✅ これは：</span>${trust.what_this_score_is}</p>
+                <p><span class="font-medium text-gray-700">❌ これではない：</span>${trust.what_this_score_is_not || ''}</p>
+                <p><span class="font-medium text-gray-700">📋 使い方：</span>${trust.how_to_use || ''}</p>
+            </div>
+            <div class="mt-2 bg-emerald-50 rounded p-2 border border-emerald-100">
+                <div class="font-medium text-emerald-700 mb-1">なぜ信頼できるか：</div>
+                <ul class="space-y-0.5 text-gray-600">
+                    ${(trust.why_trustworthy || []).map(w => `<li>• ${w}</li>`).join('')}
+                </ul>
+            </div>
+            <div class="mt-2 bg-amber-50 rounded p-2 border border-amber-100">
+                <div class="font-medium text-amber-700"><i class="fas fa-flask mr-1"></i>${trust.research_status || ''}</div>
+            </div>
+        </div>`
+    }
+    card.innerHTML = html
+}
+
+// ─── 保護者向けメッセージ ───
+function renderParentMessage(et) {
+    const parentEl = document.getElementById('parentMessage')
+    const parentContent = document.getElementById('parentMsgContent')
+    if (!parentEl || !et.trust_explanation?.for_parents) return
+    const p = et.trust_explanation.for_parents
+    parentContent.innerHTML = `
+        <strong>${p.simple_explanation || ''}</strong><br>
+        ${p.score_meaning || ''}<br>
+        <span class="text-amber-600 italic">${p.important_note || ''}</span>
+    `
+    parentEl.classList.remove('hidden')
+}
+
+// ─── 測定ステータスダッシュボード（APA妥当性進捗） ───
+function renderMeasurementStatusDashboard(et, persist) {
+    const dashboard = document.getElementById('measurementStatusDashboard')
+    if (!dashboard) return
+
+    const vp = et.validity_progress || {}
+    const lim = et.limitations || {}
+
+    // 妥当性ステータスのアイコン
+    const statusIcon = (s) => s === 'achieved' ? '✅' : s === 'in_progress' ? '🔄' : s === 'planned' ? '📋' : s === 'by_design' ? '🛡️' : '⬜'
+    const statusLabel = (s) => s === 'achieved' ? '達成' : s === 'in_progress' ? '進行中' : s === 'planned' ? '計画済' : s === 'by_design' ? '設計原則' : '未着手'
+    const statusColor = (s) => s === 'achieved' ? 'bg-green-100 text-green-700' : s === 'in_progress' ? 'bg-blue-100 text-blue-700' : s === 'planned' ? 'bg-yellow-100 text-yellow-700' : 'bg-purple-100 text-purple-700'
+
+    let html = `
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+            <div class="font-bold text-emerald-800 mb-2">
+                <i class="fas fa-microscope mr-1"></i>研究開発ステータス
+            </div>
+            <div class="bg-white rounded-lg p-2 mb-2 border border-emerald-100">
+                <div class="font-medium text-gray-700">${lim.current_stage || ''}</div>
+                <div class="text-gray-500 mt-1">データの蓄積と改善こそが、信頼される測定への道です。</div>
+            </div>
+
+            <div class="font-bold text-emerald-700 mb-1.5">
+                APA/AERA/NCME 妥当性エビデンス進捗（5種類）
+            </div>
+            <div class="space-y-1.5">`
+
+    Object.values(vp).forEach(v => {
+        html += `
+            <details class="bg-white rounded-lg border border-emerald-100 overflow-hidden">
+                <summary class="px-2.5 py-1.5 cursor-pointer hover:bg-emerald-50 flex items-center gap-2">
+                    <span>${statusIcon(v.status)}</span>
+                    <span class="flex-1 font-medium text-gray-700">${v.name}</span>
+                    <span class="${statusColor(v.status)} px-2 py-0.5 rounded-full text-[10px] font-medium">${statusLabel(v.status)}</span>
+                </summary>
+                <div class="px-2.5 py-2 border-t border-emerald-50 bg-gray-50 space-y-1">
+                    <p class="text-gray-600">${v.description}</p>
+                    <p class="text-gray-500"><i class="fas fa-book-open mr-1"></i>${v.evidence}</p>
+                    <p class="text-gray-400 italic">${v.standard}</p>
+                    ${v.next_step ? `<p class="text-blue-600 font-medium"><i class="fas fa-arrow-right mr-1"></i>次のステップ: ${v.next_step}</p>` : ''}
+                </div>
+            </details>`
+    })
+
+    html += `</div>`
+
+    // 限界の正直な開示
+    if (lim.honest_limitations) {
+        html += `
+            <div class="font-bold text-amber-700 mt-3 mb-1.5">
+                <i class="fas fa-exclamation-triangle mr-1"></i>測定の限界（正直な開示）
+            </div>
+            <div class="space-y-1">`
+        lim.honest_limitations.forEach(l => {
+            const sevColor = l.severity?.includes('対処済') ? 'text-green-600' : l.severity?.includes('検証待') ? 'text-yellow-600' : 'text-blue-600'
+            html += `
+                <div class="bg-white rounded-lg p-2 border border-amber-100">
+                    <div class="flex items-center justify-between">
+                        <span class="font-medium text-gray-700">${l.issue}</span>
+                        <span class="${sevColor} text-[10px] font-medium">${l.severity}</span>
+                    </div>
+                    <p class="text-gray-500 mt-0.5">${l.detail}</p>
+                </div>`
+        })
+        html += `</div>`
+    }
+
+    // データ要件
+    if (lim.data_requirements) {
+        const dr = lim.data_requirements
+        html += `
+            <div class="font-bold text-gray-700 mt-3 mb-1.5">
+                <i class="fas fa-database mr-1"></i>統計的信頼性の達成要件
+            </div>
+            <div class="bg-white rounded-lg p-2 border border-gray-200 grid grid-cols-2 gap-2">
+                <div><span class="text-gray-500">信頼性検証:</span><br><span class="font-medium">${dr.minimum_for_reliability}</span></div>
+                <div><span class="text-gray-500">因子分析:</span><br><span class="font-medium">${dr.minimum_for_factor_analysis}</span></div>
+                <div><span class="text-gray-500">現在のデータ:</span><br><span class="font-medium">${dr.current_sample}</span></div>
+                <div><span class="text-gray-500">目標α係数:</span><br><span class="font-medium">${dr.target_alpha}</span></div>
+            </div>`
+    }
+
+    html += `
+            <div class="mt-3 bg-white rounded-lg p-2 border border-emerald-100 text-center">
+                <p class="text-emerald-700 font-medium"><i class="fas fa-seedling mr-1"></i>データの蓄積が測定の信頼性を高めます</p>
+                <p class="text-gray-500 mt-0.5">1回1回の授業実践が、世界水準の測定モデル構築に貢献しています。</p>
+            </div>
+        </div>`
+
+    dashboard.innerHTML = html
 }
 
 function endLesson() {
@@ -1556,6 +1783,176 @@ function renderUnitEvaluation(data) {
 
 function goToPortfolio() {
     window.location.href = `/static/student-home.html?student_id=${STATE.studentId}&view=portfolio`
+}
+
+// ================================================================
+// 自動録画モジュール — MediaRecorder API
+// 学習カード開始時に自動で録画開始、10分で自動停止
+// 480p + 音声、R2にアップロード
+// 理論的根拠: Shute (2011) Stealth Assessment —
+//   「テストされていると感じさせない測定」
+// ================================================================
+const RECORDING = {
+    mediaRecorder: null,
+    stream: null,
+    chunks: [],
+    recordingId: null,
+    startTime: null,
+    timerInterval: null,
+    maxDuration: 600, // 10分（秒）
+    isRecording: false,
+    hasPermission: false
+}
+
+async function startAutoRecording() {
+    // 前回の録画が残っていたらクリーンアップ
+    if (RECORDING.isRecording) await stopAutoRecording()
+
+    try {
+        // カメラ＋マイクのアクセス許可を要求
+        // 480p = 640x480
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15, max: 15 } },
+            audio: { echoCancellation: true, noiseSuppression: true }
+        })
+        RECORDING.stream = stream
+        RECORDING.hasPermission = true
+
+        // サーバに録画セッション開始を通知
+        let recordingId = null
+        try {
+            const res = await axios.post('/api/recording/start', {
+                student_id: STATE.studentId,
+                plan_id: STATE.planId,
+                hour_number: STATE.currentHour
+            })
+            if (res.data.success) {
+                recordingId = res.data.recording_id
+                RECORDING.maxDuration = res.data.max_duration_seconds || 600
+                // 同意未取得の場合はログのみ（録画はするが送信しない）
+                if (res.data.consent_status === 'denied') {
+                    console.log('録画同意なし — ローカルのみ')
+                }
+            }
+        } catch (e) {
+            console.warn('録画セッション開始API失敗（ローカル録画は続行）:', e)
+        }
+        RECORDING.recordingId = recordingId
+
+        // MediaRecorder 初期化
+        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+            ? 'video/webm;codecs=vp8,opus'
+            : MediaRecorder.isTypeSupported('video/webm')
+                ? 'video/webm'
+                : 'video/mp4'
+
+        RECORDING.chunks = []
+        const recorder = new MediaRecorder(stream, {
+            mimeType,
+            videoBitsPerSecond: 500000 // 500kbps → 約3.75MB/分
+        })
+
+        recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) RECORDING.chunks.push(e.data)
+        }
+
+        recorder.onstop = async () => {
+            RECORDING.isRecording = false
+            showRecordingIndicator(false)
+            // Blobを作成してアップロード
+            if (RECORDING.chunks.length > 0 && RECORDING.recordingId) {
+                const blob = new Blob(RECORDING.chunks, { type: mimeType })
+                await uploadRecording(blob)
+            }
+            cleanupStream()
+        }
+
+        recorder.onerror = (e) => {
+            console.error('MediaRecorder error:', e)
+            RECORDING.isRecording = false
+            showRecordingIndicator(false)
+            cleanupStream()
+        }
+
+        // 5秒ごとにチャンクを収集
+        recorder.start(5000)
+        RECORDING.mediaRecorder = recorder
+        RECORDING.isRecording = true
+        RECORDING.startTime = Date.now()
+
+        // 録画インジケーター表示
+        showRecordingIndicator(true)
+
+        // 10分タイマー
+        RECORDING.timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - RECORDING.startTime) / 1000)
+            const min = String(Math.floor(elapsed / 60)).padStart(2, '0')
+            const sec = String(elapsed % 60).padStart(2, '0')
+            const timerEl = document.getElementById('recordingTimer')
+            if (timerEl) timerEl.textContent = `${min}:${sec}`
+
+            // 最大時間に達したら自動停止
+            if (elapsed >= RECORDING.maxDuration) {
+                stopAutoRecording()
+            }
+        }, 1000)
+
+    } catch (err) {
+        // カメラ/マイクの許可が拒否された場合
+        console.log('録画許可なし（学習は続行します）:', err.name)
+        RECORDING.hasPermission = false
+        // 録画なしで学習は正常に続行
+    }
+}
+
+async function stopAutoRecording() {
+    if (RECORDING.timerInterval) {
+        clearInterval(RECORDING.timerInterval)
+        RECORDING.timerInterval = null
+    }
+    if (RECORDING.mediaRecorder && RECORDING.isRecording) {
+        const duration = RECORDING.startTime ? Math.floor((Date.now() - RECORDING.startTime) / 1000) : 0
+        RECORDING.mediaRecorder.stop()
+        // 録画時間をサーバに記録
+        if (RECORDING.recordingId) {
+            try {
+                await axios.post(`/api/recording/stop/${RECORDING.recordingId}`, {
+                    duration_seconds: duration
+                })
+            } catch (e) { console.warn('録画停止API失敗:', e) }
+        }
+    }
+    showRecordingIndicator(false)
+}
+
+async function uploadRecording(blob) {
+    if (!RECORDING.recordingId || blob.size < 1000) return
+    try {
+        const res = await axios.post(`/api/recording/upload/${RECORDING.recordingId}`, blob, {
+            headers: { 'Content-Type': 'video/webm' },
+            maxContentLength: 200 * 1024 * 1024, // 200MB
+            timeout: 120000 // 2分
+        })
+        if (res.data.success) {
+            console.log(`録画アップロード完了: ${res.data.file_size_mb}MB`)
+        }
+    } catch (e) {
+        console.warn('録画アップロード失敗:', e)
+    }
+}
+
+function cleanupStream() {
+    if (RECORDING.stream) {
+        RECORDING.stream.getTracks().forEach(track => track.stop())
+        RECORDING.stream = null
+    }
+}
+
+function showRecordingIndicator(show) {
+    const el = document.getElementById('recordingIndicator')
+    if (el) {
+        el.classList.toggle('hidden', !show)
+    }
 }
 
 // ========== 起動 ==========

@@ -60,6 +60,7 @@ cat > dist/_routes.json << 'EOF'
     "/teacher-comments.html",
     "/teacher-dashboard-demo.html",
     "/teacher-dashboard.html",
+    "/teacher-bars-rating.html",
     "/test-buttons.html",
     "/test-case6.html",
     "/theory-assessment.html",
