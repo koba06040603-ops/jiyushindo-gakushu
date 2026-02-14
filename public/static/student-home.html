@@ -1295,40 +1295,61 @@ function renderPersistenceAdvice(persist) {
     details.forEach((d, i) => {
         const color = dimColors[i] || '#6b7280'
         const barWidth = Math.max(4, d.score)
-        const emoji = d.score >= 70 ? '🌟' : d.score >= 40 ? '📈' : '💡'
+        const barsLevel = d.bars_level || 3
+        const barsStars = '★'.repeat(barsLevel) + '☆'.repeat(5 - barsLevel)
 
-        // 計算内訳を「見てわかる表」形式で生成
-        let calcHtml = ''
-        if (d.calc && d.calc.length > 0) {
-            const calcRows = d.calc.map(c => {
-                const sign = c.points < 0 ? '−' : '＋'
-                const absPoints = Math.abs(c.points)
-                const pointColor = c.points < 0 ? '#ef4444' : '#22c55e'
-                const howText = c.how ? `<span class="text-gray-400 ml-1">(${c.how})</span>` : ''
-                return `<div class="flex items-center justify-between py-0.5 border-b border-gray-50">
-                    <span class="text-gray-600">${c.label}${c.value ? ' <span class="font-medium text-gray-800">'+c.value+'</span>' : ''}</span>
-                    <span class="flex items-center gap-1">
-                        <span style="color:${pointColor}" class="font-bold">${sign}${absPoints}</span>${c.max > 0 ? '<span class="text-gray-300">/'+c.max+'</span>' : ''}
-                    </span>
+        // BARS アンカー: 現在のレベルを強調表示
+        let barsHtml = ''
+        if (d.bars_anchors && d.bars_anchors.length > 0) {
+            const currentAnchor = d.bars_anchors.find(a => a.level === barsLevel)
+            barsHtml = `<div class="text-xs mt-1 bg-blue-50 border border-blue-100 rounded px-2 py-1">
+                <span class="font-bold text-blue-700">Lv.${barsLevel}</span>
+                <span class="text-blue-600 ml-1">${currentAnchor ? currentAnchor.desc : ''}</span>
+            </div>`
+        }
+
+        // エビデンス（行動指標ごとの根拠表示）
+        let evidenceHtml = ''
+        if (d.evidence && d.evidence.length > 0) {
+            const rows = d.evidence.map(ev => {
+                const scoreColor = ev.evidence_score >= 70 ? '#22c55e' : ev.evidence_score >= 30 ? '#eab308' : '#94a3b8'
+                return `<div class="flex items-start gap-2 py-1 border-b border-gray-50 last:border-0">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-700 font-medium">${ev.indicator}</span>
+                            <span class="text-gray-500">→</span>
+                            <span class="font-bold" style="color:${scoreColor}">${ev.observed}</span>
+                            <span class="text-gray-300 text-xs">(${ev.weight})</span>
+                        </div>
+                        <div class="text-gray-400 text-xs italic pl-2">${ev.reasoning}</div>
+                    </div>
                 </div>`
             }).join('')
-            const howHints = d.calc.filter(c => c.how).map(c => c.how)
-            const howLine = howHints.length > 0 ? `<div class="text-xs text-gray-400 mt-0.5 italic">💡 ${howHints[howHints.length - 1]}</div>` : ''
-            calcHtml = `<div class="mt-1 text-xs bg-gray-50 rounded px-2 py-1">${calcRows}<div class="flex justify-end pt-0.5 font-bold text-gray-700">合計 = ${d.score}点</div></div>`
+            evidenceHtml = `<details class="mt-1"><summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600">📊 エビデンス詳細（なぜこの点数か）</summary>
+                <div class="mt-1 text-xs bg-gray-50 rounded px-2 py-1">${rows}
+                    <div class="text-right text-xs text-gray-500 pt-1 border-t border-gray-100 mt-1">
+                        ${d.scoring_method || ''}
+                    </div>
+                </div>
+            </details>`
         }
 
         cardsContainer.innerHTML += `
             <div class="dim-card bg-white" style="border-left-color:${color}">
                 <div class="flex items-center gap-2 mb-1">
-                    <span class="text-sm">${d.icon || emoji}</span>
+                    <span class="text-sm">${d.icon}</span>
                     <span class="text-xs font-bold text-gray-800">${d.name}</span>
-                    <div class="flex-1 mx-2 bg-gray-100 rounded-full h-2">
+                    <span class="text-xs text-yellow-500 ml-auto" title="BARS Lv.${barsLevel}">${barsStars}</span>
+                    <span class="text-xs font-bold" style="color:${color}">${d.score}</span>
+                </div>
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="flex-1 bg-gray-100 rounded-full h-2">
                         <div class="dim-bar h-2" style="width:${barWidth}%;background:${color}"></div>
                     </div>
-                    <span class="text-xs font-bold" style="color:${color}">${d.score}<span class="text-gray-300">/100</span></span>
                 </div>
-                <p class="text-xs text-gray-600 leading-snug">${d.student_msg}</p>
-                ${calcHtml}
+                ${barsHtml}
+                <p class="text-xs text-gray-600 leading-snug mt-1">${d.student_msg}</p>
+                ${evidenceHtml}
                 <p class="text-xs text-gray-400 mt-0.5">📖 ${d.theory_short}</p>
             </div>
         `
