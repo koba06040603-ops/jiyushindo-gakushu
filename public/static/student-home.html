@@ -43,6 +43,30 @@
         .dim-bar { height: 8px; border-radius: 4px; transition: width 0.8s ease-out; }
         .dim-card { border-left: 4px solid; padding: 8px 10px; border-radius: 0 8px 8px 0; }
         .teacher-only { display: none !important; }
+        /* === スプリットビュー（Phase0: 左てびき / 右計画表） === */
+        .split-container { display: flex; gap: 16px; min-height: calc(100vh - 180px); }
+        .split-left { flex: 0 0 42%; max-width: 42%; overflow-y: auto; max-height: calc(100vh - 180px); position: sticky; top: 80px; border-radius: 16px; }
+        .split-left::-webkit-scrollbar { width: 4px; }
+        .split-left::-webkit-scrollbar-thumb { background: #c7d2fe; border-radius: 4px; }
+        .split-right { flex: 1; min-width: 0; }
+        /* スプリットビュー内てびき */
+        .tebiki-inline { background: white; border: 2px solid #c7d2fe; border-radius: 16px; padding: 16px; }
+        .tebiki-inline-header { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; margin-bottom: 12px; }
+        .tebiki-inline .card-accordion { max-height: 0; overflow: hidden; transition: max-height 0.35s ease-out; }
+        .tebiki-inline .card-accordion.open { max-height: 3000px; transition: max-height 0.5s ease-in; }
+        /* モバイル: タブ切替 */
+        .split-tabs { display: none; }
+        .split-tab { flex: 1; padding: 10px; text-align: center; font-weight: 700; font-size: 0.85rem; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .split-tab.active { border-bottom-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+        .split-tab:not(.active) { color: #6b7280; }
+        .split-tab:hover:not(.active) { background: #f9fafb; }
+        @media (max-width: 900px) {
+            .split-container { flex-direction: column; min-height: auto; }
+            .split-left { flex: none; max-width: 100%; max-height: none; position: static; }
+            .split-tabs { display: flex; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 12px; }
+            .split-left.tab-hidden { display: none; }
+            .split-right.tab-hidden { display: none; }
+        }
         /* === てびきスライドオーバーパネル === */
         .tebiki-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(2px); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
         .tebiki-overlay.open { opacity: 1; pointer-events: auto; }
@@ -103,16 +127,17 @@
     </div>
 
     <!-- ===== Phase 0: 計画作成（オリエンテーション・初回のみ） ===== -->
-    <div id="phase0" class="hidden space-y-6">
-        <!-- 単元目標 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">
+    <div id="phase0" class="hidden space-y-4 fade-in">
+
+        <!-- 単元目標（フル幅で上に表示） -->
+        <div class="bg-white rounded-2xl shadow-lg p-5 section-card">
+            <h2 class="text-lg font-bold text-gray-800 mb-3">
                 <i class="fas fa-flag text-green-500 mr-2"></i>単元の目標
             </h2>
-            <div class="bg-green-50 rounded-xl p-4 mb-4">
-                <p id="unitGoalDisplay" class="text-gray-700 font-medium">（教師が設定した目標）</p>
+            <div class="bg-green-50 rounded-xl p-3 mb-3">
+                <p id="unitGoalDisplay" class="text-gray-700 font-medium text-sm">（教師が設定した目標）</p>
             </div>
-            <div class="mt-4">
+            <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1">
                     <i class="fas fa-star text-yellow-500 mr-1"></i>わたしのめあて
                 </label>
@@ -120,62 +145,90 @@
             </div>
         </div>
 
-        <!-- コース選択 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-800">
+        <!-- コース選択（フル幅） -->
+        <div class="bg-white rounded-2xl shadow-lg p-5 section-card">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-bold text-gray-800">
                     <i class="fas fa-route text-purple-500 mr-2"></i>コースをえらぼう
                 </h2>
                 <a href="/static/curriculum-problem-generator.html" target="_blank" class="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-full hover:bg-purple-200 transition">
-                    <i class="fas fa-puzzle-piece mr-1"></i>問題を見てから決めたい人はこちら
+                    <i class="fas fa-puzzle-piece mr-1"></i>問題を見てから決めたい人
                 </a>
             </div>
-            <p class="text-xs text-gray-500 mb-3"><i class="fas fa-lightbulb text-yellow-400 mr-1"></i>迷ったら「問題を見てから決めたい人はこちら」から学習のてびきの問題を見て、自分に合うコースを選ぼう。</p>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div onclick="selectCourse('slow')" id="course-slow" class="cursor-pointer border-2 border-gray-200 rounded-2xl p-5 text-center hover:border-green-400 hover:bg-green-50 transition">
-                    <div class="text-3xl mb-2">🐢</div>
-                    <h3 class="font-bold text-green-700">じっくりコース</h3>
-                    <p class="text-xs text-gray-600 mt-1">ゆっくりていねいに進める。カード1枚ずつしっかり理解する。</p>
-                    <p class="text-xs text-green-600 mt-2 font-medium">基本問題を中心に取り組む</p>
+            <div class="grid grid-cols-3 gap-3">
+                <div onclick="selectCourse('slow')" id="course-slow" class="cursor-pointer border-2 border-gray-200 rounded-xl p-3 text-center hover:border-green-400 hover:bg-green-50 transition">
+                    <div class="text-2xl mb-1">🐢</div>
+                    <h3 class="font-bold text-green-700 text-sm">じっくり</h3>
+                    <p class="text-[10px] text-gray-500 mt-0.5">基本をていねいに</p>
                 </div>
-                <div onclick="selectCourse('steady')" id="course-steady" class="cursor-pointer border-2 border-gray-200 rounded-2xl p-5 text-center hover:border-blue-400 hover:bg-blue-50 transition">
-                    <div class="text-3xl mb-2">🐕</div>
-                    <h3 class="font-bold text-blue-700">しっかりコース</h3>
-                    <p class="text-xs text-gray-600 mt-1">教科書のペースでバランスよく進める。</p>
-                    <p class="text-xs text-blue-600 mt-2 font-medium">基本＋練習問題に取り組む</p>
+                <div onclick="selectCourse('steady')" id="course-steady" class="cursor-pointer border-2 border-gray-200 rounded-xl p-3 text-center hover:border-blue-400 hover:bg-blue-50 transition">
+                    <div class="text-2xl mb-1">🐕</div>
+                    <h3 class="font-bold text-blue-700 text-sm">しっかり</h3>
+                    <p class="text-[10px] text-gray-500 mt-0.5">バランスよく</p>
                 </div>
-                <div onclick="selectCourse('fast')" id="course-fast" class="cursor-pointer border-2 border-gray-200 rounded-2xl p-5 text-center hover:border-orange-400 hover:bg-orange-50 transition">
-                    <div class="text-3xl mb-2">🐆</div>
-                    <h3 class="font-bold text-orange-700">ぐんぐんコース</h3>
-                    <p class="text-xs text-gray-600 mt-1">はやめに進んで、発展問題や選択課題にたくさん挑戦する。</p>
-                    <p class="text-xs text-orange-600 mt-2 font-medium">発展・応用問題にも挑戦</p>
+                <div onclick="selectCourse('fast')" id="course-fast" class="cursor-pointer border-2 border-gray-200 rounded-xl p-3 text-center hover:border-orange-400 hover:bg-orange-50 transition">
+                    <div class="text-2xl mb-1">🐆</div>
+                    <h3 class="font-bold text-orange-700 text-sm">ぐんぐん</h3>
+                    <p class="text-[10px] text-gray-500 mt-0.5">発展にも挑戦</p>
                 </div>
             </div>
         </div>
 
-        <!-- 学習計画表（はじめの計画） -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
-            <h2 class="text-xl font-bold text-gray-800 mb-2">
-                <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>はじめの学習計画表
-            </h2>
-            <p class="text-sm text-gray-500 mb-4">各時間に「何をするか」と「予定日」を書こう。あとで変えても大丈夫だよ。</p>
-            <p id="tebikiHint" class="text-xs text-indigo-500 mb-3 hidden"><i class="fas fa-book-open mr-1"></i>各時間の下にある <strong>▶</strong> をタップすると、その時間の学習カードの内容が見られるよ。右下の <strong>📖ボタン</strong> でてびき全体も確認できるよ。</p>
-            <div class="overflow-x-auto">
-                <table class="w-full plan-table text-sm" id="initialPlanTable">
-                    <thead>
-                        <tr class="bg-gray-100">
-                            <th class="px-3 py-2 text-left rounded-tl-lg">時</th>
-                            <th class="px-3 py-2 text-left date-cell">予定日</th>
-                            <th class="px-3 py-2 text-left">はじめの計画（何をする？）</th>
-                        </tr>
-                    </thead>
-                    <tbody id="initialPlanBody"></tbody>
-                </table>
+        <!-- モバイル用タブ切替 -->
+        <div class="split-tabs" id="splitTabs">
+            <div class="split-tab active" data-target="left" onclick="switchSplitTab('left')">
+                <i class="fas fa-book-open mr-1"></i>学習のてびき
             </div>
-            <div class="mt-6 text-center">
-                <button onclick="saveInitialPlan()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg transition pulse-glow">
-                    <i class="fas fa-rocket mr-2"></i>計画を決定して学習をはじめる！
-                </button>
+            <div class="split-tab" data-target="right" onclick="switchSplitTab('right')">
+                <i class="fas fa-calendar-alt mr-1"></i>計画表
+            </div>
+        </div>
+
+        <!-- スプリットビュー: 左てびき / 右計画表 -->
+        <div class="split-container">
+            <!-- ===== 左ペイン: 学習のてびき（インライン） ===== -->
+            <div class="split-left" id="splitLeft">
+                <div class="tebiki-inline">
+                    <div class="tebiki-inline-header">
+                        <i class="fas fa-book-open text-indigo-600"></i>
+                        <h3 class="text-sm font-bold text-gray-800">学習のてびき</h3>
+                        <span class="text-[10px] bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full ml-auto">参照用</span>
+                    </div>
+                    <div id="tebikiInlineContent">
+                        <div class="text-center py-8 text-gray-400">
+                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                            <p class="text-xs">てびきデータを読み込み中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== 右ペイン: 学習計画表 ===== -->
+            <div class="split-right" id="splitRight">
+                <div class="bg-white rounded-2xl shadow-lg p-5 section-card">
+                    <h2 class="text-lg font-bold text-gray-800 mb-2">
+                        <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>はじめの学習計画表
+                    </h2>
+                    <p class="text-xs text-gray-500 mb-2">各時間に「何をするか」と「予定日」を書こう。あとで変えても大丈夫！</p>
+                    <p id="tebikiHint" class="text-xs text-indigo-500 mb-3 hidden"><i class="fas fa-book-open mr-1"></i>各行の <strong>▶</strong> をタップするとカード内容が見られるよ。左の「学習のてびき」でも全体を確認できるよ。</p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full plan-table text-sm" id="initialPlanTable">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="px-3 py-2 text-left rounded-tl-lg">時</th>
+                                    <th class="px-3 py-2 text-left date-cell">予定日</th>
+                                    <th class="px-3 py-2 text-left">はじめの計画（何をする？）</th>
+                                </tr>
+                            </thead>
+                            <tbody id="initialPlanBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="mt-6 text-center">
+                        <button onclick="saveInitialPlan()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg transition pulse-glow">
+                            <i class="fas fa-rocket mr-2"></i>計画を決定して学習をはじめる！
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -673,13 +726,16 @@ async function loadTebikiData() {
             STATE.tebikiData = res.data
             STATE.tebikiLoaded = true
             renderTebikiPanel()
-            // Phase 0が表示中ならアコーディオン付きで再描画
+            // Phase 0が表示中ならスプリットビュー＋アコーディオン付きで再描画
             if (!document.getElementById('phase0').classList.contains('hidden')) {
                 renderInitialPlanTable()
+                renderTebikiInline()
                 const hint = document.getElementById('tebikiHint')
                 if (hint) hint.classList.remove('hidden')
             }
-            updateTebikiFab(true)
+            // Phase0ではFABを隠す（インラインで見えるため）
+            const isPhase0 = !document.getElementById('phase0').classList.contains('hidden')
+            updateTebikiFab(!isPhase0)
         } else {
             showTebikiEmpty()
         }
@@ -932,10 +988,144 @@ function showPhase0() {
     document.getElementById('phase0').classList.remove('hidden')
     document.getElementById('unitGoalDisplay').textContent = STATE.unitConfig.unit_goal
     renderInitialPlanTable()
-    updateTebikiFab(!!STATE.curriculumId)
+    // スプリットビュー左ペインにてびきをインライン表示
+    renderTebikiInline()
     // てびきヒント表示
     const hint = document.getElementById('tebikiHint')
     if (hint) hint.classList.toggle('hidden', !STATE.tebikiLoaded)
+    // Phase0ではFABを非表示（インラインで見えるため）
+    updateTebikiFab(false)
+}
+
+// ========== スプリットビュー: タブ切替（モバイル） ==========
+function switchSplitTab(target) {
+    document.querySelectorAll('.split-tab').forEach(t => t.classList.toggle('active', t.dataset.target === target))
+    const left = document.getElementById('splitLeft')
+    const right = document.getElementById('splitRight')
+    if (target === 'left') {
+        left.classList.remove('tab-hidden')
+        right.classList.add('tab-hidden')
+    } else {
+        left.classList.add('tab-hidden')
+        right.classList.remove('tab-hidden')
+    }
+}
+
+// ========== スプリットビュー左ペイン: てびきインライン描画 ==========
+function renderTebikiInline() {
+    const container = document.getElementById('tebikiInlineContent')
+    if (!container) return
+    if (!STATE.tebikiData) {
+        // まだ読み込み中 → loadTebikiData完了後に再呼出
+        container.innerHTML = `
+            <div class="text-center py-6 text-gray-400">
+                <i class="fas fa-spinner fa-spin text-xl mb-2"></i>
+                <p class="text-xs">てびきデータを読み込み中...</p>
+            </div>`
+        return
+    }
+
+    const { curriculum, courses, optionalProblems } = STATE.tebikiData
+    const courseMap = { slow: 'basic', steady: 'standard', fast: 'advanced' }
+    const targetLevel = courseMap[STATE.selectedCourse] || 'standard'
+    const sorted = [...(courses || [])].sort((a, b) => {
+        if (a.course_level === targetLevel) return -1
+        if (b.course_level === targetLevel) return 1
+        return 0
+    })
+
+    const courseLabels = { basic: '\ud83d\udc22 \u3058\u3063\u304f\u308a', standard: '\ud83d\udc15 \u3057\u3063\u304b\u308a', advanced: '\ud83d\udc06 \u3050\u3093\u3050\u3093' }
+    const courseBorderColors = { basic: 'border-green-400', standard: 'border-blue-400', advanced: 'border-orange-400' }
+    const courseBgColors = { basic: 'bg-green-50', standard: 'bg-blue-50', advanced: 'bg-orange-50' }
+
+    let html = ''
+
+    // 単元概要
+    if (curriculum) {
+        html += `
+            <div class="mb-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-3">
+                <h4 class="text-xs font-bold text-indigo-800 mb-1">${escapeHtml(curriculum.unit_name || '')}</h4>
+                <p class="text-[10px] text-gray-600">${escapeHtml(curriculum.grade || '')} ${escapeHtml(curriculum.subject || '')}</p>
+                ${curriculum.unit_overview ? `<p class="text-[10px] text-gray-500 mt-1">${escapeHtml(curriculum.unit_overview)}</p>` : ''}
+            </div>`
+    }
+
+    // コース別カード一覧
+    for (const course of sorted) {
+        const isSelected = course.course_level === targetLevel
+        const label = courseLabels[course.course_level] || course.course_name
+        const border = courseBorderColors[course.course_level] || 'border-gray-300'
+        const bg = courseBgColors[course.course_level] || 'bg-gray-50'
+        const cards = course.cards || []
+
+        html += `
+        <div class="mb-3 border-2 ${isSelected ? border : 'border-gray-200'} rounded-xl overflow-hidden ${isSelected ? '' : 'opacity-50'}">
+            <div class="px-3 py-2 ${isSelected ? bg : 'bg-gray-50'} flex items-center justify-between">
+                <span class="text-xs font-bold">${label}</span>
+                ${isSelected ? '<span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full">\u3042\u306a\u305f\u306e\u30b3\u30fc\u30b9</span>' : ''}
+            </div>
+            <div class="divide-y">`
+
+        for (const card of cards) {
+            const hasHints = card.hints && card.hints.length > 0
+            const hasAnswer = card.answer
+            html += `
+            <div class="px-3 py-1.5">
+                <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+                    <span class="chevron text-gray-400 text-[10px]"><i class="fas fa-chevron-right"></i></span>
+                    <span class="text-[10px] font-semibold text-gray-700">\u30ab\u30fc\u30c9${card.card_number}</span>
+                    <span class="text-[10px] text-gray-400 truncate flex-1">${escapeHtml(card.card_title || card.content_summary || '')}</span>
+                    ${hasHints ? '<i class="fas fa-lightbulb text-yellow-400 text-[10px]" title="\u30d2\u30f3\u30c8\u3042\u308a"></i>' : ''}
+                </div>
+                <div class="card-accordion">
+                    <div class="mt-1 space-y-1 pb-1">
+                        ${card.card_content ? `<div class="card-preview rounded p-2 text-[10px] text-gray-700 leading-relaxed">${escapeHtml(card.card_content).replace(/\\n/g, '<br>')}</div>` : ''}
+                        ${hasHints ? `
+                            <div class="space-y-0.5">
+                                <p class="text-[10px] font-bold text-yellow-700"><i class="fas fa-lightbulb mr-1"></i>\u30d2\u30f3\u30c8</p>
+                                ${card.hints.map((h, idx) => `
+                                    <div class="hint-step pl-2 py-0.5 text-[10px] text-gray-600">
+                                        <span class="font-bold text-yellow-600">\u30d2\u30f3\u30c8${idx + 1}:</span> ${escapeHtml(h.hint_content || h.hint_text || '')}
+                                    </div>
+                                `).join('')}
+                            </div>` : ''}
+                        ${hasAnswer ? `
+                            <details class="mt-0.5">
+                                <summary class="text-[10px] text-green-600 cursor-pointer font-bold"><i class="fas fa-check-circle mr-1"></i>\u3053\u305f\u3048\u3092\u898b\u308b</summary>
+                                <div class="mt-1 bg-green-50 rounded p-2 text-[10px] text-gray-700">${escapeHtml(card.answer).replace(/\\n/g, '<br>')}</div>
+                            </details>` : ''}
+                    </div>
+                </div>
+            </div>`
+        }
+
+        html += `</div></div>`
+    }
+
+    // 選択課題
+    if (optionalProblems && optionalProblems.length > 0) {
+        html += `
+        <div class="mb-3 border-2 border-purple-200 rounded-xl overflow-hidden">
+            <div class="px-3 py-2 bg-purple-50">
+                <span class="text-xs font-bold text-purple-800"><i class="fas fa-star mr-1"></i>\u9078\u629e\u8ab2\u984c</span>
+            </div>
+            <div class="divide-y">
+                ${optionalProblems.map(p => `
+                    <div class="px-3 py-1.5">
+                        <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+                            <span class="chevron text-gray-400 text-[10px]"><i class="fas fa-chevron-right"></i></span>
+                            <span class="text-[10px] font-semibold text-purple-700">${escapeHtml(p.problem_title || '\u9078\u629e\u8ab2\u984c' + p.problem_number)}</span>
+                        </div>
+                        <div class="card-accordion">
+                            <div class="mt-1 card-preview rounded p-2 text-[10px] text-gray-700 leading-relaxed">${escapeHtml(p.problem_content || '').replace(/\\n/g, '<br>')}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`
+    }
+
+    container.innerHTML = html
 }
 
 function showPhase1() {
@@ -998,6 +1188,7 @@ function selectCourse(type) {
     if (STATE.tebikiLoaded) {
         renderInitialPlanTable()
         renderTebikiPanel()
+        renderTebikiInline()
     }
 }
 

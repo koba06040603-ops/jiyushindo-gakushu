@@ -12150,19 +12150,65 @@ app.post('/api/auth/register', async (c) => {
   }
 })
 
-// APIルート: ログイン
+// APIルート: ログイン（email / username 両対応）
 app.post('/api/auth/login', async (c) => {
   const { env } = c
-  const { email, password } = await c.req.json()
+  const body = await c.req.json()
+  const email = body.email || body.username || ''
+  const password = body.password || ''
   
   try {
-    // ユーザー検索
-    const user = await env.DB.prepare(`
-      SELECT * FROM users WHERE email = ? AND is_active = 1
-    `).bind(email).first()
+    // 1) auth_users テーブルで検索（username）
+    const authUser = await env.DB.prepare(
+      'SELECT * FROM auth_users WHERE username = ? AND is_active = 1'
+    ).bind(email).first() as any
+    
+    if (authUser) {
+      // auth_usersのbcryptパスワード検証
+      const isValid = await bcrypt.compare(password, authUser.password_hash)
+      if (!isValid) {
+        return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
+      }
+      // auth_usersでログイン成功
+      const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const refreshToken = `refresh_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      
+      try {
+        await env.DB.prepare(
+          'INSERT INTO auth_sessions (user_id, session_token, refresh_token, expires_at, refresh_expires_at) VALUES (?, ?, ?, ?, ?)'
+        ).bind(authUser.user_id, sessionToken, refreshToken, expiresAt, refreshExpiresAt).run()
+      } catch {}
+      
+      return c.json({
+        success: true,
+        session_token: sessionToken,
+        refresh_token: refreshToken,
+        expires_at: expiresAt,
+        user: {
+          id: authUser.user_id,
+          user_id: authUser.user_id,
+          name: authUser.full_name,
+          full_name: authUser.full_name,
+          username: authUser.username,
+          email: authUser.email || '',
+          role: authUser.user_role,
+          school_id: authUser.school_id
+        }
+      })
+    }
+    
+    // 2) usersテーブルでも検索（email）
+    let user: any = null
+    try {
+      user = await env.DB.prepare(
+        'SELECT * FROM users WHERE email = ? AND is_active = 1'
+      ).bind(email).first()
+    } catch {}
     
     if (!user) {
-      return c.json({ error: 'メールアドレスまたはパスワードが正しくありません' }, 401)
+      return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
     }
     
     // アカウントロックチェック

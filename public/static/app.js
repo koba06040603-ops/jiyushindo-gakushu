@@ -21806,6 +21806,9 @@ async function handleLogin(event) {
     localStorage.setItem('session_token', data.session_token)
     localStorage.setItem('refresh_token', data.refresh_token)
     localStorage.setItem('user', JSON.stringify(data.user))
+    localStorage.setItem('user_id', String(data.user.id || data.user.user_id))
+    localStorage.setItem('user_role', data.user.role)
+    localStorage.setItem('user_name', data.user.name || data.user.full_name || '')
     
     // ユーザー情報をstateに反映
     if (data.user.role === 'student') {
@@ -21814,7 +21817,14 @@ async function handleLogin(event) {
     
     loadingManager.hide()
     
-    // トップページへ遷移
+    // ロール別リダイレクト
+    if (data.user.role === 'student') {
+      // 児童 → 学習のてびき
+      window.location.href = `/static/student-home.html?student_id=${data.user.id || data.user.user_id}`
+      return
+    }
+    
+    // 教師・管理者 → トップページ
     renderTopPage()
   } catch (error) {
     loadingManager.hide()
