@@ -6546,6 +6546,12 @@ app.get('/test-buttons.html', async (c) => {
 
 // トップページ
 app.get('/', (c) => {
+  // ルートアクセス → ログインページにリダイレクト
+  return c.redirect('/login.html')
+})
+
+// レガシーランディングページ（直接アクセス用に保持）
+app.get('/landing', (c) => {
   return c.html(`
     <!DOCTYPE html>
     <html lang="ja">
@@ -30245,6 +30251,164 @@ app.get('/api/validation/dashboard', async (c) => {
           { name: '動画AI分析 (Gemini)', status: 'future' }
         ]
       }
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// ============================================================
+// てびき参照API — 児童生徒向け（unit_name or curriculum_id ベース）
+// 実際のDBスキーマに合わせた柔軟なデータ取得
+// ============================================================
+app.get('/api/student-learning/tebiki', async (c) => {
+  const { env } = c
+  try {
+    const curriculumId = c.req.query('curriculum_id')
+    const unitName = c.req.query('unit_name')
+    const subject = c.req.query('subject')
+    const grade = c.req.query('grade')
+
+    // 1. カリキュラム基本情報取得
+    let curriculum: any = null
+    if (curriculumId) {
+      curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first()
+    }
+    if (!curriculum && unitName) {
+      curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE unit_name = ? LIMIT 1').bind(unitName).first()
+    }
+    if (!curriculum && unitName && subject) {
+      curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE unit_name = ? AND subject = ? LIMIT 1').bind(unitName, subject).first()
+    }
+
+    if (!curriculum) {
+      return c.json({ success: false, error: 'カリキュラムが見つかりません' }, 404)
+    }
+
+    // 2. コース情報（coursesテーブルがある場合）
+    let courses: any[] = []
+    try {
+      const coursesRes = await env.DB.prepare(`
+        SELECT * FROM courses WHERE curriculum_id = ?
+        ORDER BY CASE course_level WHEN 'basic' THEN 1 WHEN 'standard' THEN 2 WHEN 'advanced' THEN 3 END
+      `).bind(curriculum.id).all()
+      courses = coursesRes.results || []
+    } catch { /* coursesテーブルがなくてもOK */ }
+
+    // 3. 学習カード取得
+    // course_id があるカードはコース別、なければ unit_name ベースで取得
+    const coursesWithCards: any[] = []
+
+    if (courses.length > 0) {
+      // coursesテーブルがある場合 → course_id でカードをグループ化
+      for (const course of courses) {
+        let cards: any[] = []
+        try {
+          const cardsRes = await env.DB.prepare(`
+            SELECT * FROM learning_cards WHERE course_id = ? ORDER BY card_order, card_id
+          `).bind(course.id).all()
+          cards = cardsRes.results || []
+        } catch {}
+
+        // ヒント取得（hint_cards のスキーマに合わせる）
+        const cardsWithDetails = await Promise.all(cards.map(async (card: any) => {
+          const cardId = card.card_id || card.id
+          let hints: any[] = []
+          try {
+            // hint_cards: hint_id, card_id, hint_level, hint_text
+            const hintsRes = await env.DB.prepare(`
+              SELECT hint_id, card_id, hint_level AS hint_number, hint_text AS hint_content
+              FROM hint_cards WHERE card_id = ? ORDER BY hint_level
+            `).bind(cardId).all()
+            hints = hintsRes.results || []
+          } catch {}
+
+          return {
+            ...card,
+            card_number: card.card_order || card.card_id,
+            card_content: card.problem_text || card.problem_description || '',
+            content_summary: card.card_title || '',
+            hints,
+            answer: card.correct_answer || card.explanation || '',
+            answer_explanation: card.explanation || ''
+          }
+        }))
+
+        coursesWithCards.push({
+          ...course,
+          cards: cardsWithDetails
+        })
+      }
+    } else {
+      // coursesテーブルがない場合 → unit_name ベースで全カードを1コースにまとめる
+      let cards: any[] = []
+      try {
+        const cardsRes = await env.DB.prepare(`
+          SELECT * FROM learning_cards 
+          WHERE unit_name = ? AND is_active = 1 
+          ORDER BY card_order, card_id
+        `).bind(curriculum.unit_name).all()
+        cards = cardsRes.results || []
+      } catch {}
+
+      const cardsWithDetails = await Promise.all(cards.map(async (card: any) => {
+        const cardId = card.card_id || card.id
+        let hints: any[] = []
+        try {
+          const hintsRes = await env.DB.prepare(`
+            SELECT hint_id, card_id, hint_level AS hint_number, hint_text AS hint_content
+            FROM hint_cards WHERE card_id = ? ORDER BY hint_level
+          `).bind(cardId).all()
+          hints = hintsRes.results || []
+        } catch {}
+
+        return {
+          ...card,
+          card_number: card.card_order || card.card_id,
+          card_content: card.problem_text || card.problem_description || '',
+          content_summary: card.card_title || '',
+          hints,
+          answer: card.correct_answer || card.explanation || '',
+          answer_explanation: card.explanation || ''
+        }
+      }))
+
+      // 仮コースとしてまとめる
+      coursesWithCards.push({
+        id: 0,
+        curriculum_id: curriculum.id,
+        course_name: 'しっかりコース',
+        course_level: 'standard',
+        cards: cardsWithDetails
+      })
+    }
+
+    // 4. 選択課題取得
+    let optionalProblems: any[] = []
+    try {
+      // optional_problems: problem_id, unit_id, problem_title, content
+      const optRes = await env.DB.prepare(`
+        SELECT problem_id, unit_id, problem_title, 
+               content AS problem_content,
+               ROW_NUMBER() OVER (ORDER BY problem_id) AS problem_number
+        FROM optional_problems WHERE unit_id = ?
+      `).bind(curriculum.id).all()
+      optionalProblems = optRes.results || []
+    } catch {
+      try {
+        // curriculum_id で再試行
+        const optRes2 = await env.DB.prepare(`
+          SELECT * FROM optional_problems WHERE curriculum_id = ? ORDER BY problem_number
+        `).bind(curriculum.id).all()
+        optionalProblems = optRes2.results || []
+      } catch {}
+    }
+
+    return c.json({
+      success: true,
+      curriculum: { ...curriculum, curriculum_id: curriculum.id },
+      courses: coursesWithCards,
+      optionalProblems
     })
   } catch (error) {
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)

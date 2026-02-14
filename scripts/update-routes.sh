@@ -21,6 +21,7 @@ cat > dist/_routes.json << 'EOF'
     "/ai-tutor.html",
     "/api-docs.html",
     "/auth-demo.html",
+    "/login.html",
     "/cache-dashboard.html",
     "/class-progress-comparison.html",
     "/cognitive-learning.html",

@@ -43,9 +43,27 @@
         .dim-bar { height: 8px; border-radius: 4px; transition: width 0.8s ease-out; }
         .dim-card { border-left: 4px solid; padding: 8px 10px; border-radius: 0 8px 8px 0; }
         .teacher-only { display: none !important; }
+        /* === てびきスライドオーバーパネル === */
+        .tebiki-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(2px); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .tebiki-overlay.open { opacity: 1; pointer-events: auto; }
+        .tebiki-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 90vw; background: white; z-index: 101; transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); box-shadow: -4px 0 24px rgba(0,0,0,0.12); overflow-y: auto; }
+        .tebiki-panel.open { transform: translateX(0); }
+        .tebiki-fab { position: fixed; bottom: 20px; right: 20px; z-index: 90; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; border: none; box-shadow: 0 4px 14px rgba(59,130,246,0.4); cursor: pointer; font-size: 22px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .tebiki-fab:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(59,130,246,0.5); }
+        .tebiki-fab.hidden-fab { display: none; }
+        /* アコーディオン */
+        .card-accordion { max-height: 0; overflow: hidden; transition: max-height 0.35s ease-out; }
+        .card-accordion.open { max-height: 2000px; transition: max-height 0.5s ease-in; }
+        .accordion-toggle { cursor: pointer; user-select: none; }
+        .accordion-toggle .chevron { transition: transform 0.3s; display: inline-block; }
+        .accordion-toggle.open .chevron { transform: rotate(90deg); }
+        /* カードプレビュー */
+        .card-preview { background: linear-gradient(135deg, #faf5ff 0%, #eff6ff 100%); border-left: 3px solid #818cf8; }
+        .hint-step { border-left: 2px solid #fbbf24; }
         @media (max-width: 768px) {
             .plan-table { font-size: 0.7rem; }
             .plan-table th, .plan-table td { padding: 3px 4px; }
+            .tebiki-panel { width: 100vw; max-width: 100vw; }
         }
     </style>
 </head>
@@ -67,6 +85,9 @@
                 <div class="text-right text-xs text-gray-500">
                     <span id="studentName">児童</span>
                 </div>
+                <button onclick="handleLogout()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded-full transition" title="ログアウト">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -138,6 +159,7 @@
                 <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>はじめの学習計画表
             </h2>
             <p class="text-sm text-gray-500 mb-4">各時間に「何をするか」と「予定日」を書こう。あとで変えても大丈夫だよ。</p>
+            <p id="tebikiHint" class="text-xs text-indigo-500 mb-3 hidden"><i class="fas fa-book-open mr-1"></i>各時間の下にある <strong>▶</strong> をタップすると、その時間の学習カードの内容が見られるよ。右下の <strong>📖ボタン</strong> でてびき全体も確認できるよ。</p>
             <div class="overflow-x-auto">
                 <table class="w-full plan-table text-sm" id="initialPlanTable">
                     <thead>
@@ -453,13 +475,13 @@
             </div>
 
             <!-- 先生向け（児童には非表示） -->
-            <details class="mt-2">
+            <details class="mt-2 teacher-only">
                 <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600">🎓 先生向け詳細（3層測定データ）</summary>
-                <div id="persistenceTeacherMemo" class="teacher-only text-xs text-gray-500 mt-2 space-y-1 bg-gray-50 rounded-lg p-3"></div>
+                <div id="persistenceTeacherMemo" class="text-xs text-gray-500 mt-2 space-y-1 bg-gray-50 rounded-lg p-3"></div>
             </details>
 
             <!-- 測定ステータス・妥当性ダッシュボード（先生向け） -->
-            <details class="mt-2">
+            <details class="mt-2 teacher-only">
                 <summary class="text-xs text-emerald-500 cursor-pointer hover:text-emerald-700 font-medium">
                     <i class="fas fa-flask mr-1"></i>測定の信頼性と研究開発ステータス
                 </summary>
@@ -539,6 +561,29 @@
 
 </main>
 
+<!-- ========== てびき参照スライドオーバーパネル ========== -->
+<div class="tebiki-overlay" id="tebikiOverlay" onclick="closeTebikiPanel()"></div>
+<div class="tebiki-panel" id="tebikiPanel">
+    <div class="sticky top-0 bg-white border-b z-10 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <i class="fas fa-book-open text-indigo-600"></i>
+            <h2 class="text-base font-bold text-gray-800">学習のてびき</h2>
+        </div>
+        <button onclick="closeTebikiPanel()" class="text-gray-400 hover:text-gray-600 text-lg"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="tebikiPanelContent" class="px-4 py-3">
+        <div class="text-center py-8 text-gray-400">
+            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+            <p class="text-sm">てびきデータを読み込み中...</p>
+        </div>
+    </div>
+</div>
+
+<!-- フローティングてびきボタン -->
+<button class="tebiki-fab" id="tebikiFab" onclick="openTebikiPanel()" title="学習のてびきを見る">
+    <i class="fas fa-book-open"></i>
+</button>
+
 <!-- ===== JavaScript ===== -->
 <script>
 // ========== 状態管理 ==========
@@ -553,6 +598,10 @@ const STATE = {
     confidenceRating: 3,
     studyStartTime: null,
     timerInterval: null,
+    // てびきデータ（カリキュラム詳細）
+    tebikiData: null,
+    tebikiLoaded: false,
+    curriculumId: null,
     // 単元設定（デモ / 教師設定から取得）
     unitConfig: {
         unit_name: '小数のかけ算',
@@ -567,10 +616,213 @@ const STATE = {
     }
 }
 
-// URLパラメータ取得
+// URLパラメータ取得 + ログイン情報
 const params = new URLSearchParams(window.location.search)
-STATE.studentId = params.get('student_id') || 1
+STATE.curriculumId = params.get('curriculum_id') || null
 const planIdParam = params.get('plan_id')
+
+// student_id: URLパラメータ > localStorage > デフォルト
+{
+    const urlStudentId = params.get('student_id')
+    const storedUser = JSON.parse(localStorage.getItem('user') || 'null')
+    const storedUserId = localStorage.getItem('user_id')
+    if (urlStudentId) {
+        STATE.studentId = urlStudentId
+    } else if (storedUser && storedUser.id) {
+        STATE.studentId = storedUser.id
+    } else if (storedUserId) {
+        STATE.studentId = storedUserId
+    } else {
+        STATE.studentId = 1
+    }
+    // 名前表示
+    const nameEl = document.getElementById('studentName')
+    if (nameEl) {
+        if (storedUser && storedUser.name) {
+            nameEl.textContent = storedUser.name
+        } else {
+            nameEl.textContent = `ID: ${STATE.studentId}`
+        }
+    }
+}
+
+function handleLogout() {
+    localStorage.removeItem('session_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('user_id')
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('user_name')
+    window.location.href = '/login.html'
+}
+
+// ========== てびき参照パネル（Aパターン: スライドオーバー） ==========
+async function loadTebikiData() {
+    if (STATE.tebikiLoaded) return
+    try {
+        // curriculum_id または unit_name ベースでてびきを取得
+        const params = new URLSearchParams()
+        if (STATE.curriculumId) params.set('curriculum_id', STATE.curriculumId)
+        if (STATE.unitConfig.unit_name) params.set('unit_name', STATE.unitConfig.unit_name)
+        if (STATE.unitConfig.subject) params.set('subject', STATE.unitConfig.subject)
+        if (STATE.unitConfig.grade) params.set('grade', STATE.unitConfig.grade)
+
+        const res = await axios.get(`/api/student-learning/tebiki?${params.toString()}`)
+        if (res.data.success) {
+            STATE.tebikiData = res.data
+            STATE.tebikiLoaded = true
+            renderTebikiPanel()
+            // Phase 0が表示中ならアコーディオン付きで再描画
+            if (!document.getElementById('phase0').classList.contains('hidden')) {
+                renderInitialPlanTable()
+                const hint = document.getElementById('tebikiHint')
+                if (hint) hint.classList.remove('hidden')
+            }
+            updateTebikiFab(true)
+        } else {
+            showTebikiEmpty()
+        }
+    } catch (e) {
+        console.warn('てびきデータ読み込み失敗:', e)
+        showTebikiEmpty()
+    }
+}
+
+function showTebikiEmpty() {
+    document.getElementById('tebikiPanelContent').innerHTML = `
+        <div class="text-center py-8 text-gray-400">
+            <i class="fas fa-book-open text-3xl mb-3"></i>
+            <p class="text-sm font-medium">てびきデータがまだ登録されていません</p>
+            <p class="text-xs mt-1">先生がカリキュラムを設定すると表示されます</p>
+        </div>`
+}
+
+function renderTebikiPanel() {
+    const d = STATE.tebikiData
+    if (!d) return
+    const { curriculum, courses, optionalProblems } = d
+
+    // 選択されたコースに合致するコースを優先表示
+    const courseMap = { slow: 'basic', steady: 'standard', fast: 'advanced' }
+    const targetLevel = courseMap[STATE.selectedCourse] || 'standard'
+    const sorted = [...(courses || [])].sort((a, b) => {
+        if (a.course_level === targetLevel) return -1
+        if (b.course_level === targetLevel) return 1
+        return 0
+    })
+
+    const courseLabels = { basic: '🐢 じっくり', standard: '🐕 しっかり', advanced: '🐆 ぐんぐん' }
+    const courseBorderColors = { basic: 'border-green-400', standard: 'border-blue-400', advanced: 'border-orange-400' }
+    const courseBgColors = { basic: 'bg-green-50', standard: 'bg-blue-50', advanced: 'bg-orange-50' }
+
+    let html = `
+        <div class="mb-4">
+            <h3 class="text-sm font-bold text-gray-700 mb-1">${curriculum.unit_name || ''}</h3>
+            <p class="text-xs text-gray-500">${curriculum.grade || ''} ${curriculum.subject || ''}</p>
+        </div>`
+
+    for (const course of sorted) {
+        const isSelected = course.course_level === targetLevel
+        const label = courseLabels[course.course_level] || course.course_name
+        const border = courseBorderColors[course.course_level] || 'border-gray-300'
+        const bg = courseBgColors[course.course_level] || 'bg-gray-50'
+        const cards = course.cards || []
+
+        html += `
+        <div class="mb-4 border-2 ${isSelected ? border : 'border-gray-200'} rounded-xl overflow-hidden ${isSelected ? '' : 'opacity-60'}">
+            <div class="px-3 py-2 ${isSelected ? bg : 'bg-gray-50'} flex items-center justify-between">
+                <span class="text-sm font-bold">${label}</span>
+                ${isSelected ? '<span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full">あなたのコース</span>' : ''}
+            </div>
+            <div class="divide-y">`
+
+        for (const card of cards) {
+            const hasHints = card.hints && card.hints.length > 0
+            const hasAnswer = card.answer
+            html += `
+            <div class="px-3 py-2">
+                <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+                    <span class="chevron text-gray-400 text-xs"><i class="fas fa-chevron-right"></i></span>
+                    <span class="text-xs font-semibold text-gray-700">カード${card.card_number}</span>
+                    <span class="text-[10px] text-gray-400 truncate flex-1">${card.card_title || card.content_summary || ''}</span>
+                    ${hasHints ? '<i class="fas fa-lightbulb text-yellow-400 text-[10px]" title="ヒントあり"></i>' : ''}
+                </div>
+                <div class="card-accordion">
+                    <div class="mt-2 space-y-2 pb-1">
+                        ${card.card_content ? `<div class="card-preview rounded-lg p-2 text-xs text-gray-700 leading-relaxed">${escapeHtml(card.card_content).replace(/\\n/g, '<br>')}</div>` : ''}
+                        ${hasHints ? `
+                            <div class="space-y-1">
+                                <p class="text-[10px] font-bold text-yellow-700"><i class="fas fa-lightbulb mr-1"></i>ヒント</p>
+                                ${card.hints.map((h, idx) => `
+                                    <div class="hint-step pl-3 py-1 text-[10px] text-gray-600">
+                                        <span class="font-bold text-yellow-600">ヒント${idx + 1}:</span> ${escapeHtml(h.hint_content || h.hint_text || '')}
+                                    </div>
+                                `).join('')}
+                            </div>` : ''}
+                        ${hasAnswer ? `
+                            <details class="mt-1">
+                                <summary class="text-[10px] text-green-600 cursor-pointer font-bold"><i class="fas fa-check-circle mr-1"></i>こたえを見る</summary>
+                                <div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-700">${escapeHtml(card.answer).replace(/\\n/g, '<br>')}</div>
+                                ${card.answer_explanation ? `<div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-600"><strong>解説:</strong> ${escapeHtml(card.answer_explanation).replace(/\\n/g, '<br>')}</div>` : ''}
+                            </details>` : ''}
+                    </div>
+                </div>
+            </div>`
+        }
+
+        html += `</div></div>`
+    }
+
+    // 選択課題
+    if (optionalProblems && optionalProblems.length > 0) {
+        html += `
+        <div class="mb-4 border-2 border-purple-200 rounded-xl overflow-hidden">
+            <div class="px-3 py-2 bg-purple-50">
+                <span class="text-sm font-bold text-purple-800"><i class="fas fa-star mr-1"></i>選択課題</span>
+            </div>
+            <div class="divide-y">
+                ${optionalProblems.map(p => `
+                    <div class="px-3 py-2">
+                        <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+                            <span class="chevron text-gray-400 text-xs"><i class="fas fa-chevron-right"></i></span>
+                            <span class="text-xs font-semibold text-purple-700">${p.problem_title || '選択課題' + p.problem_number}</span>
+                        </div>
+                        <div class="card-accordion">
+                            <div class="mt-2 card-preview rounded-lg p-2 text-xs text-gray-700 leading-relaxed">${escapeHtml(p.problem_content || '').replace(/\\n/g, '<br>')}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`
+    }
+
+    document.getElementById('tebikiPanelContent').innerHTML = html
+}
+
+function escapeHtml(str) {
+    if (!str) return ''
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function openTebikiPanel() {
+    loadTebikiData()
+    document.getElementById('tebikiOverlay').classList.add('open')
+    document.getElementById('tebikiPanel').classList.add('open')
+    document.body.style.overflow = 'hidden'
+}
+
+function closeTebikiPanel() {
+    document.getElementById('tebikiOverlay').classList.remove('open')
+    document.getElementById('tebikiPanel').classList.remove('open')
+    document.body.style.overflow = ''
+}
+
+// FABの表示制御
+function updateTebikiFab(show) {
+    const fab = document.getElementById('tebikiFab')
+    fab.classList.toggle('hidden-fab', !show)
+}
 
 // ========== 初期化 ==========
 async function init() {
@@ -630,13 +882,21 @@ async function init() {
         showPhase0()
     }
     document.getElementById('loadingScreen').classList.add('hidden')
+    // てびきデータの事前読み込み（curriculum_idまたはunit_nameで取得試行）
+    loadTebikiData()
 }
 
 function updateHeader() {
     document.getElementById('headerSubtitle').textContent = `${STATE.unitConfig.grade} ${STATE.unitConfig.subject}「${STATE.unitConfig.unit_name}」`
     const courseLabels = { slow: '🐢 じっくり', steady: '🐕 しっかり', fast: '🐆 ぐんぐん' }
     document.getElementById('courseLabel').textContent = courseLabels[STATE.selectedCourse] || 'コース未選択'
-    document.getElementById('studentName').textContent = `ID: ${STATE.studentId}`
+    // 名前はログイン情報を優先
+    const storedUser = JSON.parse(localStorage.getItem('user') || 'null')
+    if (storedUser && storedUser.name) {
+        document.getElementById('studentName').textContent = storedUser.name
+    } else {
+        document.getElementById('studentName').textContent = `ID: ${STATE.studentId}`
+    }
 }
 
 function determinePhase() {
@@ -672,6 +932,10 @@ function showPhase0() {
     document.getElementById('phase0').classList.remove('hidden')
     document.getElementById('unitGoalDisplay').textContent = STATE.unitConfig.unit_goal
     renderInitialPlanTable()
+    updateTebikiFab(!!STATE.curriculumId)
+    // てびきヒント表示
+    const hint = document.getElementById('tebikiHint')
+    if (hint) hint.classList.toggle('hidden', !STATE.tebikiLoaded)
 }
 
 function showPhase1() {
@@ -682,6 +946,7 @@ function showPhase1() {
     renderProgressChips()
     renderPlanOverview()
     loadAiSuggestion()
+    updateTebikiFab(!!STATE.curriculumId)
 }
 
 function showPhase2() {
@@ -692,6 +957,7 @@ function showPhase2() {
     renderCardCheckboxes()
     renderSelectionCheckboxes()
     startStudyTimer()
+    updateTebikiFab(!!STATE.curriculumId)
 }
 
 function showPhase3() {
@@ -728,6 +994,11 @@ function selectCourse(type) {
     const el = document.getElementById(`course-${type}`)
     el.classList.remove('border-gray-200')
     el.classList.add(...colors[type])
+    // コース変更でアコーディオン内容も更新
+    if (STATE.tebikiLoaded) {
+        renderInitialPlanTable()
+        renderTebikiPanel()
+    }
 }
 
 function renderInitialPlanTable() {
@@ -746,7 +1017,114 @@ function renderInitialPlanTable() {
             </td>
         `
         tbody.appendChild(tr)
+
+        // Bパターン: この時間に対応するカード内容をアコーディオン行で表示
+        const cardRow = buildCardAccordionRow(i)
+        if (cardRow) tbody.appendChild(cardRow)
     }
+}
+
+// Bパターン: 計画表の各行にカード内容プレビューを埋め込む
+function buildCardAccordionRow(hourNum) {
+    if (!STATE.tebikiData) return null
+    const { courses, optionalProblems } = STATE.tebikiData
+    const courseMap = { slow: 'basic', steady: 'standard', fast: 'advanced' }
+    const targetLevel = courseMap[STATE.selectedCourse] || 'standard'
+    const course = courses?.find(c => c.course_level === targetLevel) || courses?.[0]
+    if (!course) return null
+
+    const total = STATE.unitConfig.total_hours
+    const cards = course.cards || []
+
+    // 時間→内容のマッピングロジック
+    let content = null
+    if (hourNum === 1) {
+        // 1時間目: オリエンテーション — コース概要を表示
+        content = { type: 'orientation', courseName: course.course_name, cards }
+    } else if (hourNum <= Math.ceil(total * 0.6) && cards.length > 0) {
+        // カード学習時間: 対応するカードを表示
+        const cardIdx = hourNum - 2
+        if (cardIdx >= 0 && cardIdx < cards.length) {
+            content = { type: 'card', card: cards[cardIdx] }
+        }
+    } else if (hourNum === Math.ceil(total * 0.7)) {
+        // チェックテスト時間
+        content = { type: 'checktest' }
+    } else if (hourNum <= total - 1 && optionalProblems?.length > 0) {
+        // 選択課題時間
+        const selIdx = hourNum - Math.ceil(total * 0.7) - 1
+        if (selIdx >= 0 && selIdx < optionalProblems.length) {
+            content = { type: 'optional', problem: optionalProblems[selIdx] }
+        } else {
+            content = { type: 'optional_browse', problems: optionalProblems }
+        }
+    } else if (hourNum === total) {
+        content = { type: 'review' }
+    }
+
+    if (!content) return null
+
+    const tr = document.createElement('tr')
+    tr.className = 'bg-indigo-50/50'
+    const td = document.createElement('td')
+    td.colSpan = 3
+    td.className = 'px-3 py-0'
+
+    let innerHtml = ''
+    if (content.type === 'orientation') {
+        innerHtml = `
+            <div class="accordion-toggle flex items-center gap-2 py-1.5" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+                <span class="chevron text-indigo-400 text-[10px]"><i class="fas fa-chevron-right"></i></span>
+                <span class="text-[10px] text-indigo-600 font-medium"><i class="fas fa-info-circle mr-1"></i>このコースの学習カード一覧を見る（${content.cards.length}枚）</span>
+            </div>
+            <div class="card-accordion">
+                <div class="py-1 space-y-1 pb-2">
+                    ${content.cards.map((c, idx) => `
+                        <div class="flex items-center gap-2 text-[10px] text-gray-600 pl-4">
+                            <span class="bg-indigo-200 text-indigo-800 px-1.5 py-0.5 rounded font-bold">${c.card_number}</span>
+                            <span class="truncate">${escapeHtml(c.card_title || c.content_summary || 'カード' + c.card_number)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`
+    } else if (content.type === 'card') {
+        const c = content.card
+        const hasHints = c.hints && c.hints.length > 0
+        innerHtml = `
+            <div class="accordion-toggle flex items-center gap-2 py-1.5" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+                <span class="chevron text-indigo-400 text-[10px]"><i class="fas fa-chevron-right"></i></span>
+                <span class="text-[10px] text-indigo-600 font-medium"><i class="fas fa-layer-group mr-1"></i>カード${c.card_number}: ${escapeHtml(c.card_title || c.content_summary || '')}</span>
+                ${hasHints ? '<i class="fas fa-lightbulb text-yellow-400 text-[10px]"></i>' : ''}
+            </div>
+            <div class="card-accordion">
+                <div class="py-1 pb-2 pl-4 space-y-1">
+                    ${c.card_content ? `<div class="card-preview rounded p-2 text-[10px] text-gray-700 leading-relaxed">${escapeHtml(c.card_content).substring(0, 300).replace(/\\n/g, '<br>')}${c.card_content.length > 300 ? '...' : ''}</div>` : ''}
+                    ${hasHints ? `<p class="text-[10px] text-yellow-600"><i class="fas fa-lightbulb mr-1"></i>ヒント${c.hints.length}段階あり</p>` : ''}
+                </div>
+            </div>`
+    } else if (content.type === 'checktest') {
+        innerHtml = `<div class="py-1.5 text-[10px] text-indigo-500 pl-5"><i class="fas fa-clipboard-check mr-1"></i>チェックテストの時間 — ここまでの理解を確認しよう</div>`
+    } else if (content.type === 'optional') {
+        const p = content.problem
+        innerHtml = `
+            <div class="accordion-toggle flex items-center gap-2 py-1.5" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+                <span class="chevron text-purple-400 text-[10px]"><i class="fas fa-chevron-right"></i></span>
+                <span class="text-[10px] text-purple-600 font-medium"><i class="fas fa-star mr-1"></i>${escapeHtml(p.problem_title || '選択課題' + p.problem_number)}</span>
+            </div>
+            <div class="card-accordion">
+                <div class="py-1 pb-2 pl-4">
+                    ${p.problem_content ? `<div class="card-preview rounded p-2 text-[10px] text-gray-700 leading-relaxed">${escapeHtml(p.problem_content).substring(0, 200).replace(/\\n/g, '<br>')}${p.problem_content.length > 200 ? '...' : ''}</div>` : ''}
+                </div>
+            </div>`
+    } else if (content.type === 'optional_browse') {
+        innerHtml = `<div class="py-1.5 text-[10px] text-purple-500 pl-5"><i class="fas fa-star mr-1"></i>選択課題（${content.problems.length}問）からえらんで取り組もう</div>`
+    } else if (content.type === 'review') {
+        innerHtml = `<div class="py-1.5 text-[10px] text-green-600 pl-5"><i class="fas fa-trophy mr-1"></i>単元全体のふりかえりの時間</div>`
+    }
+
+    td.innerHTML = innerHtml
+    tr.appendChild(td)
+    return tr
 }
 
 function getDefaultPlanHint(hour) {
