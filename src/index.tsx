@@ -28417,19 +28417,25 @@ app.post('/api/student-learning/analyze-reflection', async (c) => {
 【フィードバック原則】（必ず守ること）
 1. 先に良い点を具体的に引用して褒める（有能感を満たす → 自己決定理論）
 2. 理論名は子ども向け言葉に言い換える（例：メタ認知→「自分の学びを知る力」）
-3. 1人学びを高く評価する（自律性は自由進度学習の核）
-4. 他者比較は絶対禁止。前の自分との比較で成長を示す
-5. 具体的な次ステップ提案は1つだけ
-6. 友だち学びがあれば高評価
+3. ★最重要★ 1人学びは自由進度学習の核であり、最も高く評価する
+   → 1人でカードを進められた＝自律性の発現（SDT d=0.61）
+   → 1人学びができることが全ての基盤
+4. 友だちに聞いた場合: 「受動的」ではなく「自分で判断して助けを求めた」（help-seeking, Newman 2002）として評価
+   → help-seekingは自己調整学習の適応的方略（Zimmerman 2000）
+5. 他者比較は絶対禁止。前の自分との比較で成長を示す
+6. 具体的な次ステップ提案は1つだけ
 7. 書けていない項目は責めず、次の課題として提案
+8. 粘り強さの評価: 学習指導要領の「粘り強い取組」と「自己調整」の2側面から
 
 【参照すべき学習理論と効果量】
 - F6 Flavellメタ認知理論(d=0.69): ②③に記述があるか → メタ認知的モニタリング能力
 - F5 Zimmerman自己調整学習(d=0.52): ④に記述があるか → 省察→予見サイクル
 - F8 Deci & Ryan自己決定理論(d=0.61): 手ごたえ・1人学び → 自律性+有能感
 - F11 社会的構成主義(d=0.40): 友だちとの学び → 関係性+協同的知識構成
-- Duckworthグリット: カード数+選択課題 → 粘り強さ
+- Newman(2002) help-seeking: 友だちに聞くことは自律的な方略選択
+- Duckworthグリット(d=0.20): カード数+選択課題 → 努力の粘り強さ
 - Dweck成長マインドセット(d=0.19): 困難に向かう姿勢
+- Pekrun学業感情理論(2006): 手ごたえの変化 → 感情調整能力
 
 以下のJSON形式で返答:
 {
@@ -28437,7 +28443,8 @@ app.post('/api/student-learning/analyze-reflection', async (c) => {
   "theories_used": ["F5_self_regulation", "F6_metacognition"],
   "metacognition_note": "メタ認知的知識のどの側面が見られるか（人間・課題・方略）",
   "self_determination_note": "3欲求（自律性・有能感・関係性）のどれが満たされているか",
-  "persistence_note": "粘り強さの観点での評価（学習指導要領）",
+  "persistence_note": "粘り強さの観点での評価（学習指導要領の2側面から）",
+  "solo_learning_note": "1人学びの評価（自律性の発現として）",
   "next_suggestion": "次の時間への具体的提案1つ"
 }
 JSONのみ回答。`
@@ -28497,10 +28504,18 @@ JSONのみ回答。`
         feedback += `🤝 友だちとの学びを振り返れたね。人と一緒に学ぶと、自分だけでは気づけないことに気づけるんだ（社会的構成主義）。\n\n`
       }
 
-      // 1人学びの肯定的評価（自己決定理論: 自律性）
+      // 1人学びの肯定的評価（自己決定理論: 自律性 ← 自由進度学習の核）
       if (!hasFriend && cardsList.length > 0) {
         theories.push('F8_self_determination')
-        feedback += `📚 今日は自分の力で${progressNote}。1人でこつこつ進められるのは「自律性」が高い証拠。自己決定理論（Deci & Ryan）では、自分で決めて自分で進むことが一番やる気が続くと言われている。自由進度学習の基本がしっかりできているよ！\n\n`
+        theories.push('Solo_Learning_Autonomy')
+        feedback += `📚 今日は自分の力で${progressNote}。1人でこつこつ進められるのは「自律性」が高い証拠。\n自己決定理論（Deci & Ryan, d=0.61）では、自分で決めて自分で進むことが一番やる気が続くと言われている。\n自由進度学習では1人で学べること自体がとても大事な力。これが全ての基盤だよ！\n\n`
+      }
+
+      // 協働学びの評価（受動ではなく「自律的選択」として評価）
+      if (hasFriend && cardsList.length > 0) {
+        theories.push('F11_social_constructivism')
+        theories.push('Newman_Help_Seeking')
+        feedback += `🤝 友だちの力をかりながらも${progressNote}。\n友だちに聞くのは「受け身」ではなく、自分に必要なことを判断して行動する力（help-seeking, Newman 2002）。\n自分で考えた上で友だちと学ぶのは、自律性と協働力の両方が育っている証拠だよ。\n\n`
       }
 
       // 粘り強さの評価（Duckworthグリット + 学習指導要領）
@@ -28603,16 +28618,44 @@ app.post('/api/student-learning/analyze-unit', async (c) => {
     const methodRefs = refs.filter((r: any) => r.method_reflection && r.method_reflection.length > 5)
     methodScore = Math.min(100, (methodRefs.length / Math.max(1, refs.length)) * 100)
 
-    // ===== 協働の力スコア =====
+    // ===== 協働の力スコア（再設計: 1人学び=基盤、協働=自律的選択） =====
+    // 理論的位置づけ:
+    //   ■ 1人学び = 自由進度学習の核（SDT自律性 d=0.61）
+    //     → 1人でカードを進められること自体が「自律的学習者」の証拠
+    //     → 1人学びが0の場合、基盤が弱い可能性（依存的学習）
+    //   ■ 協働学び = 自律性の上に築く発展的能力
+    //     → Zimmerman(2000): help-seeking（助けを求める行動）は自己調整学習の適応的方略
+    //     → Newman(2002): 教えてもらうことは「受動的」ではなく「自己選択的」行動
+    //     → Vygotsky ZPD: 友だちとの対話は近接発達領域を活かす自律的判断
+    //   ■ 教えること = 最も深い学び（Peerチュータリング d=0.55, Hattie 2009）
+    //
+    // 評価方針: 
+    //   1人学びと協働学びを二項対立にせず、「自分で選んだ学び方」として両方評価する
     let collaborationScore = 0
-    if (collaborations.length > 0) {
-      collaborationScore = Math.min(100, collaborations.length * 15)
-      // 教え合いの多様性ボーナス
-      const types = new Set(collaborations.map((c: any) => c.interaction_type))
-      if (types.has('taught_to')) collaborationScore = Math.min(100, collaborationScore + 20)
-      if (types.has('discussed')) collaborationScore = Math.min(100, collaborationScore + 10)
+    const soloHours = refs.filter((r: any) => !r.learned_with_friend).length
+    const collabHours = refs.filter((r: any) => r.learned_with_friend).length
+    const totalRefHours = refs.length || 1
+
+    // ベース: 1人学びも協働も「自分で学び方を選べた」時点で基礎点
+    collaborationScore = 30 // 基礎点: 学び方を自分で選べること自体に価値
+
+    // 1人学びの時間: 自律的に進められた証拠
+    if (soloHours > 0) {
+      collaborationScore += Math.min(20, (soloHours / totalRefHours) * 20)
     }
-    // 1人学びも評価（自律性に含める）
+
+    // 協働の質: 自分で選んだ協働として評価
+    if (collaborations.length > 0) {
+      collaborationScore += Math.min(25, collaborations.length * 8)
+      const collabTypes = new Set(collaborations.map((c: any) => c.interaction_type))
+      // 教えてもらう = help-seeking（Newman 2002: 適応的方略）
+      if (collabTypes.has('taught_by')) collaborationScore = Math.min(100, collaborationScore + 5)
+      // 教える = ピアチュータリング（d=0.55, 最も深い理解が必要）
+      if (collabTypes.has('taught_to')) collaborationScore = Math.min(100, collaborationScore + 15)
+      // 議論 = 社会的構成主義（Vygotsky ZPD）
+      if (collabTypes.has('discussed')) collaborationScore = Math.min(100, collaborationScore + 10)
+    }
+    collaborationScore = Math.min(100, collaborationScore)
 
     // ===== 粘り強さスコア =====
     let persistenceScore = 50
@@ -28628,15 +28671,28 @@ app.post('/api/student-learning/analyze-unit', async (c) => {
     persistenceScore += Math.min(30, lowConfidenceFollowedByAction * 10)
     persistenceScore = Math.min(100, persistenceScore)
 
-    // ===== 自律性スコア =====
-    let autonomyScore = 50
-    // 1人で学べた時間の割合
-    const soloLearning = refs.filter((r: any) => !r.learned_with_friend).length
-    autonomyScore = (soloLearning / Math.max(1, refs.length)) * 50
+    // ===== 自律性スコア（再設計: 1人学びを高く評価） =====
+    // 理論的位置づけ:
+    //   ■ SDT自己決定理論（Deci & Ryan 1985）: 自律性欲求 d=0.61
+    //     → 「自分で決めて、自分で進める」ことが内発的動機の源泉
+    //   ■ 自由進度学習の核心: 1人で学ぶ力を育てること
+    //     → 1人でカードを進められる = 自律的学習者としての基盤
+    //     → 計画を立てて実行・修正できる = 自己調整学習サイクル
+    //   ■ 協働も自律性の発現（help-seekingは自律的方略）
+    //     → 「困ったから聞く」は受動ではなく、自己モニタリング→方略選択の結果
+    let autonomyScore = 0
+    // 1人で学べた時間: 自律性の直接的指標
+    const soloLearningCount = refs.filter((r: any) => !r.learned_with_friend).length
+    autonomyScore = (soloLearningCount / Math.max(1, refs.length)) * 35
     // 自分で計画を立てて実行した割合
-    autonomyScore += (todayPlanWritten / Math.max(1, planRows.length)) * 30
-    // 選択課題の取り組み（自分で選んだ）
-    autonomyScore += Math.min(20, allSelections * 3)
+    autonomyScore += (todayPlanWritten / Math.max(1, planRows.length)) * 25
+    // 選択課題の取り組み（自分で選んだ課題）
+    autonomyScore += Math.min(15, allSelections * 3)
+    // 計画修正: 自分で判断して変えた証拠
+    if (modifiedRows.length > 0) autonomyScore += Math.min(15, modifiedRows.length * 5)
+    // help-seeking: 必要な時に友だちに聞けた = 自律的な方略選択
+    const helpSeekingCount = collaborations.filter((c: any) => c.interaction_type === 'taught_by').length
+    if (helpSeekingCount > 0) autonomyScore += Math.min(10, helpSeekingCount * 3)
     autonomyScore = Math.min(100, autonomyScore)
 
     // AI総合コメント生成
@@ -28650,7 +28706,7 @@ app.post('/api/student-learning/analyze-unit', async (c) => {
       metacognitionScore: 'メタ認知力（自分の学びを知る力）',
       planningScore: '計画力',
       methodScore: '学び方の力',
-      collaborationScore: '協働の力',
+      collaborationScore: '学び方を選ぶ力（1人学び＋協働）',
       persistenceScore: '粘り強さ',
       autonomyScore: '自律性（自分で進める力）'
     }
@@ -28658,7 +28714,7 @@ app.post('/api/student-learning/analyze-unit', async (c) => {
       metacognitionScore: 'Flavellメタ認知理論',
       planningScore: 'Zimmerman自己調整学習理論・予見フェーズ',
       methodScore: 'Flavellメタ認知的知識・方略の知識',
-      collaborationScore: 'Vygotsky社会的構成主義',
+      collaborationScore: 'SDT自律性＋Newman help-seeking＋Vygotsky ZPD＋Peerチュータリング',
       persistenceScore: 'Duckworthグリット理論＋Dweck成長マインドセット',
       autonomyScore: 'Deci & Ryan自己決定理論・自律性'
     }
@@ -28680,7 +28736,15 @@ app.post('/api/student-learning/analyze-unit', async (c) => {
       aiComment += `🚀 自律性が高い！1人でこつこつ進められるのは自由進度学習の基本。自分で決めて自分で進む力がしっかり身についている。（自己決定理論）\n\n`
     }
     if (collaborationScore >= 50) {
-      aiComment += `🤝 友だちとの学び合いもできたね。教え合うことでお互いの理解が深まるんだ。（Vygotsky社会的構成主義）\n\n`
+      // 1人学びと協働の両方を肯定的に評価
+      const soloRatio = Math.round((soloHours / totalRefHours) * 100)
+      if (soloHours > 0 && collabHours > 0) {
+        aiComment += `🤝 自分で学び方を選べる力がある！1人でじっくり進めた時間（${soloRatio}%）と友だちと学んだ時間、どちらも「自分で選んだ」ことに価値がある。Newman先生の研究では「助けを求める行動（help-seeking）」も自律的な方略選択なんだ。（自己決定理論＋社会的構成主義）\n\n`
+      } else if (soloHours > 0) {
+        aiComment += `📚 1人でしっかり学べたね。自由進度学習では1人で進める力が基本であり、最も大切な力。これからもし困ったことがあれば友だちに聞くのも立派な学び方の選択だよ。（自己決定理論）\n\n`
+      } else if (collabHours > 0) {
+        aiComment += `🤝 友だちとの学び合いを活かせたね。次の単元では1人でじっくり考える時間も作ってみよう。1人で考えた上で友だちと議論すると、もっと深い学びになるよ。（Vygotsky社会的構成主義＋SDT自律性）\n\n`
+      }
     }
 
     // 次の単元へのアドバイス
@@ -28735,40 +28799,66 @@ app.post('/api/student-learning/analyze-unit', async (c) => {
   }
 })
 
-// --- 粘り強さ測定 (理論ベース5次元 深化版) ---
+// --- 粘り強さ測定 (理論ベース5次元 深化版 v2) ---
 // =====================================================================
-// 粘り強さとは何か（理論的定義の深掘り）
+// 「粘り強さ」とは何か ― 理論的定義の深掘り
 // =====================================================================
+//
 // ■ 学習指導要領の定義（文部科学省2019年改訂）
-//   「主体的に学習に取り組む態度」= 粘り強さ ＋ 自己調整
-//   粘り強さ = 「知識及び技能を獲得したり思考力等を身に付けたりすることに向けた
-//              粘り強い取組を行おうとする側面」
-//   → つまり「目標に向かって途中で投げ出さずにやり続ける姿勢」
+//   「主体的に学習に取り組む態度」は2つの側面から評価する:
+//   (1) 粘り強い取組を行おうとする側面
+//       → 知識及び技能を獲得したり、思考力等を身に付けたりすることに向けた
+//         粘り強い取組を行おうとしているか
+//   (2) 自らの学習を調整しようとする側面
+//       → 粘り強い取組の中で、自らの学習を調整しようとしているか
+//   ★ この2つは「一体的に評価」するのが原則
+//   ★ つまり「ただ頑張る」だけでなく「自分で工夫しながら頑張り続ける」ことが粘り強さ
 //
 // ■ Duckworth Grit理論（2007, 2016）
 //   Grit = Perseverance of Effort（努力の粘り強さ）+ Consistency of Interest（興味の一貫性）
-//   → 短期の粘り強さ = 1つの課題に諦めずに取り組み続けること
-//   → 長期の粘り強さ = 単元を通じて学習を継続すること
-//   効果量 d=0.20（学業成績との相関 r=0.17, Credé et al. 2017）
+//   → 短期の粘り強さ: 1つの課題に諦めずに取り組み続けること（1コマ内）
+//   → 長期の粘り強さ: 単元全体を通じて学習を継続すること（単元を通じた変化で測定）
+//   効果量: d=0.20（学業成績, Credé et al. 2017）
 //   ※ 効果量は小さいが「テストでは測れない力」として教育的価値が高い
+//   ※ Duckworth(2016): 「粘り強さは練習で伸びる」→ 毎時間の記録で可視化
 //
 // ■ Dweck 成長マインドセット（2006）
-//   Fixed Mindset（固定的知能観）vs Growth Mindset（成長的知能観）
-//   成長マインドセット = 「能力は努力で伸びる」と信じ、困難を成長の機会と捉える
-//   効果量 d=0.19（Sisk et al. 2018 メタ分析）
-//   → 粘り強さとの関連: 失敗を恐れず再挑戦する姿勢
+//   Fixed Mindset vs Growth Mindset
+//   → 成長マインドセット = 能力は努力で伸びると信じる
+//   → 困難を「脅威」ではなく「成長の機会」と捉える
+//   効果量: d=0.19（Sisk et al. 2018）
+//   ★ 粘り強さとの関連: 失敗後に「もうダメだ」と思うか「まだ成長できる」と思うか
+//   ★ 実践: 「間違いは脳が成長している証拠」（Moser et al. 2011 ERN研究）
 //
 // ■ Academic Resilience（学業的レジリエンス, Yeager & Dweck 2012）
-//   逆境（難問・失敗・低得点）から立ち直り学び続ける力
-//   → 「できない」を「まだできない」に変換する思考パターン
+//   「逆境（難問・失敗・低得点）から立ち直り学び続ける力」
+//   → 3つの要素:
+//     (a) 困難を一時的な障害と捉える認知的枠組み
+//     (b) 問題解決志向の対処方略（help-seeking含む）
+//     (c) 感情調整能力
+//   ★ 実践: チェックテストで低得点→でも次のカードに挑戦 = レジリエンスの発現
 //
-// ■ Self-Determination Theory（自己決定理論, Deci & Ryan 1985）
-//   内発的動機づけ = 自律性 × 有能感 × 関係性
-//   → 粘り強さとの関連: 自分から深める行動は内発的動機の発現
+// ■ Self-Determination Theory（Deci & Ryan 1985）
+//   内発的動機づけ = 自律性(d=0.61) × 有能感(d=0.46) × 関係性(d=0.40)
+//   → 粘り強さとの関連:
+//     ・自律性: 自分で「もう少しやろう」と決める → 自発的深化
+//     ・有能感: 「できた」体験の積み重ね → 次も挑戦する意欲
+//     ・関係性: 友だちの存在 → 「自分も頑張ろう」の動機
 //
 // ■ Zimmerman 自己調整学習（1989, 2000）
-//   感情調整 = 困難に直面した際の感情コントロール能力
-//   → 粘り強さとの関連: 不安や焦りを制御して学び続ける力
+//   予見フェーズ → 遂行フェーズ → 省察フェーズ
+//   遂行フェーズの2つの下位プロセス:
+//     (a) 自己制御: タスク方略・自己教示・焦点化・メンタルイメージ
+//     (b) 自己観察: メタ認知的モニタリング・自己記録
+//   → 粘り強さとの関連: 感情調整（frustrationの制御）は遂行フェーズの核
+//
+// ■ 学習指導要領における粘り強さの具体的観点（国研資料より整理）
+//   ① 課題に取り組む持続性
+//   ② 困難に直面しても工夫して取り組む姿勢
+//   ③ 自分なりの目標を持って取り組む姿勢
+//   ④ 間違いから学ぼうとする姿勢
+//   ⑤ 学習の見通しを持ち、振り返る姿勢
+//   → これらを5次元モデルにマッピング
 // =====================================================================
 app.post('/api/student-learning/measure-persistence', async (c) => {
   const { env } = c
@@ -28776,56 +28866,75 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
     const { student_id, plan_id, hour_number, task_completion_rate, session_duration_minutes, early_quit_count, retry_after_failure_count, gave_up_count, extra_tasks_attempted, review_initiated_count, confidence_during_difficulty } = await c.req.json()
 
     // ===== 次元1: 継続性（Duckworth Grit - Perseverance of Effort） =====
-    // 「始めたことを最後までやり抜く力」
-    // 指標: タスク完了率 × 学習時間の持続 - 途中離脱
-    // 学習指導要領: 「粘り強い取組を行おうとする側面」に直結
-    const idealMinutes = 45 // 1コマの目安
+    // 定義: 「始めたことを最後までやり抜く力」
+    // 学習指導要領: ①課題に取り組む持続性
+    // Duckworth(2016): 「グリットの高い人は、同じ分野で長期的に努力を続ける」
+    // 指標: タスク完了率(40%) × 学習時間の持続(40%) - 途中離脱(ペナルティ) + ベースライン(20%)
+    // 効果量: d=0.20（Credé et al. 2017 Grit-Performance meta-analysis）
+    const idealMinutes = 45
     const durationFactor = Math.min(1, (session_duration_minutes || 0) / idealMinutes) * 40
     const completionFactor = (task_completion_rate || 0) * 40
     const quitPenalty = (early_quit_count || 0) * 15
     const continuityScore = Math.max(0, Math.min(100, completionFactor + durationFactor + 20 - quitPenalty))
 
-    // ===== 次元2: 挑戦性（Dweck Growth Mindset） =====
-    // 「間違いを恐れず難しいことに向かう力」
-    // 指標: 不正解後の再挑戦回数 - 諦めた回数
-    // Dweck: 「失敗は脳が成長している証拠」
+    // ===== 次元2: 挑戦性（Dweck Growth Mindset + 学習指導要領②④） =====
+    // 定義: 「間違いを恐れず難しいことに向かう力」
+    // Dweck(2006): 成長マインドセットの子は失敗後に「もう一度やってみよう」と思える
+    // Moser et al.(2011): 間違えた時の脳活動(ERN)は成長の証拠
+    // 学習指導要領: ②困難に直面しても工夫して取り組む ④間違いから学ぼうとする
+    // 指標: 不正解後の再挑戦回数(max60) - 諦めた回数(ペナルティ) + ベースライン(30)
+    // ★ 改善: チェックテスト後の行動も考慮（テストで間違えた後に復習 = 成長マインドセット）
     const retryFactor = Math.min(60, (retry_after_failure_count || 0) * 15)
     const gaveUpPenalty = (gave_up_count || 0) * 20
     const challengeScore = Math.max(0, Math.min(100, 30 + retryFactor - gaveUpPenalty))
 
     // ===== 次元3: 回復力（Academic Resilience - Yeager & Dweck 2012） =====
-    // 「つまずいても立ち直って学び続ける力」
-    // 指標: 諦めゼロならベースが高い、諦めても再挑戦すれば回復
-    // Yeager: 「困難を一時的な障害と捉えられるか」
+    // 定義: 「つまずいても立ち直って学び続ける力」
+    // Yeager & Dweck(2012): レジリエンスの3要素:
+    //   (a) 困難を一時的と捉える認知 → 「まだできない（not yet）」の思考
+    //   (b) 問題解決志向の対処 → help-seeking, 教科書を読み直す, 方略変更
+    //   (c) 感情調整 → パニックにならず冷静に取り組む
+    // Newman(2002): help-seeking（助けを求める行動）= 自律的・適応的方略
+    //   → 「教えてもらった」を選んだこと自体がレジリエンスの発現
+    // 指標: ベースライン80 - 諦めペナルティ + 再挑戦回復ボーナス
     let recoveryScore = 80
     if (gave_up_count > 0) {
       recoveryScore = Math.max(0, 80 - (gave_up_count * 25))
-      // 再挑戦で回復加点
       recoveryScore += Math.min(40, (retry_after_failure_count || 0) * 10)
     }
-    // ヒントを求める行動も回復力（help-seeking = 適応的方略, Newman 2002）
     recoveryScore = Math.min(100, recoveryScore)
 
-    // ===== 次元4: 自発的深化（SDT - 内発的動機づけ） =====
-    // 「求められた以上のことに自分から取り組む力」
-    // 指標: 追加課題・自発的復習
-    // Deci & Ryan: 自律性欲求が満たされると内発的動機が高まる
+    // ===== 次元4: 自発的深化（SDT 内発的動機づけ + 学習指導要領③） =====
+    // 定義: 「求められた以上のことに自分から取り組む力」
+    // Deci & Ryan(1985): 自律性欲求が満たされると内発的動機が高まる
+    //   → 選択課題への取り組み = 自分で「もっとやりたい」と選んだ証拠
+    //   → 自発的復習 = 「もう一度確認したい」という内発的動機
+    // 学習指導要領: ③自分なりの目標を持って取り組む
+    // 効果量: d=0.61（自律性, Deci & Ryan メタ分析）
+    // ★ 粘り強さとの関係: 「やらされている」学習は粘り強くならない
+    //   → 自発的な深化行動があることは「本物の粘り強さ」の証拠
     const extraFactor = Math.min(50, (extra_tasks_attempted || 0) * 20)
     const reviewFactor = Math.min(30, (review_initiated_count || 0) * 15)
     const deepeningScore = Math.min(100, extraFactor + reviewFactor + 20)
 
-    // ===== 次元5: 感情的安定性（Zimmerman SRL 感情調整） =====
-    // 「困難に直面しても落ち着いて取り組める力」
-    // 指標: 手ごたえ（困難時の自己評価）
-    // Zimmerman: 自己調整学習の遂行フェーズにおける感情制御
+    // ===== 次元5: 感情的安定性（Zimmerman SRL 遂行フェーズ + 学習指導要領⑤） =====
+    // 定義: 「困難に直面しても落ち着いて取り組める力」
+    // Zimmerman(2000): 自己調整学習の遂行フェーズにおける感情制御
+    //   → 「焦り」「不安」「退屈」を自覚し、コントロールする能力
+    //   → 手ごたえが低くても学習を継続できる = 感情調整力の発現
+    // Pekrun(2006) Academic Emotions:
+    //   → 達成感情（enjoyment, hope, pride, anger, anxiety, shame, boredom）
+    //   → 手ごたえ3以上 = ポジティブ感情優位 → 学習継続に有利
+    //   → 手ごたえ1-2でも学習を続けた = 感情調整力が高い
+    // 学習指導要領: ⑤学習の見通しを持ち、振り返る（感情も含めた自己モニタリング）
     const emotionalStability = confidence_during_difficulty
       ? Math.min(100, Math.max(0, (confidence_during_difficulty) * 20 + 10))
       : 50
 
-    // ===== 総合スコア（学習指導要領の重み付け） =====
-    // 「粘り強さ」を最も重視（継続性・挑戦性で50%）
-    // 「自己調整」に関わる部分（回復力・感情安定で35%）
-    // 「主体性」に関わる部分（自発的深化で15%）
+    // ===== 総合スコア（学習指導要領の2側面に基づく重み付け） =====
+    // (1) 粘り強い取組を行おうとする側面 = 継続性25% + 挑戦性25% = 50%
+    // (2) 自らの学習を調整しようとする側面 = 回復力20% + 自発的深化15% + 感情安定15% = 50%
+    // → 2つの側面を同等に評価（学習指導要領の「一体的評価」に準拠）
     const totalScore = Math.round(
       continuityScore * 0.25 +
       challengeScore * 0.25 +
@@ -28839,65 +28948,81 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(student_id, plan_id, hour_number || 0, task_completion_rate || 0, session_duration_minutes || 0, early_quit_count || 0, retry_after_failure_count || 0, gave_up_count || 0, extra_tasks_attempted || 0, review_initiated_count || 0, confidence_during_difficulty || 3, totalScore).run()
 
-    // ===== 理論ベースアドバイス生成 =====
+    // ===== 理論ベース評価アドバイス生成（教師向け＋子ども向けの二層構造） =====
     let advice = ''
     const dimensions = [
       {
         name: '継続する力（やり抜く力）',
         score: continuityScore,
-        theory: 'Duckworthグリット理論（努力の粘り強さ d=0.20）',
-        definition: '始めたことを最後までやり抜く力。テストの点数よりも将来の成功に関係する。',
-        low: '最後まで取り組むことを意識しよう。Duckworth先生は「毎日少しずつ」の積み重ねが一番大事だと言っている。短い時間でもいいから、やりきることが大切だよ。',
-        high: '最後まで取り組めるのはすばらしい！これが「やり抜く力（グリット）」。Duckworth先生の研究では、この力はテストの点数よりも将来の成功に関係しているんだ。'
+        theory: 'Duckworthグリット理論（d=0.20, Credé et al. 2017）',
+        curriculum: '学習指導要領: ①課題に取り組む持続性',
+        definition: '始めたことを最後までやり抜く力。短期（1コマ）の持続力を測定。Duckworthは「才能よりも努力の持続が成功を予測する」と実証。',
+        low: '最後まで取り組むことを意識しよう。Duckworth先生は「毎日少しずつの積み重ね」が一番大事だと言っている。短い時間でもいいから、やりきることが大切だよ。\n📋 先生向け: 課題量の調整（スモールステップ化）が有効です。1コマの中で「完了体験」を増やすことで有能感（SDT）が育ちます。',
+        high: '最後まで取り組めるのはすばらしい！これが「やり抜く力（グリット）」。Duckworth先生の研究では、この力はテストの点数よりも将来の成功に関係しているんだ。\n📋 先生向け: 粘り強い取組（継続性${Math.round(continuityScore)}）が安定しています。より挑戦的な課題への誘導が効果的です。'
       },
       {
         name: '挑戦する力（成長マインドセット）',
         score: challengeScore,
-        theory: 'Dweck成長マインドセット理論（d=0.19）',
-        definition: '間違いを恐れず難しいことに向かう力。「まだできない」は「これから成長する」という意味。',
-        low: '間違えても大丈夫。Dweck先生の研究では、間違った時こそ脳が一番成長しているんだ。「まだできない」は「これから成長する」という意味だよ。もう一回やってみよう。',
-        high: '難しい問題にも挑戦できるね！間違いから学ぼうとする姿勢は「成長マインドセット」。Dweck先生は「才能ではなく努力を信じる子ほど伸びる」と発見したんだ。'
+        theory: 'Dweck成長マインドセット（d=0.19, Sisk et al. 2018）+ Moser ERN研究(2011)',
+        curriculum: '学習指導要領: ②困難に直面しても工夫して取り組む ④間違いから学ぼうとする',
+        definition: '間違いを恐れず難しいことに向かう力。Moser et al.(2011)は脳波研究で「間違えた時に脳が最も活発に活動する」ことを実証。',
+        low: '間違えても大丈夫！Moser先生の脳の研究では、間違った時こそ脳が一番成長しているんだ。「まだできない」は「これから成長する」という意味だよ。もう一回やってみよう。\n📋 先生向け: 「間違い＝成長」のフレーミングが重要です（Dweck 2006）。間違いを共有し称賛する学級文化が挑戦性を育てます。チェックテスト後の振り返りで「間違いから何を学んだか」を問う指導が有効です。',
+        high: '難しい問題にも挑戦できるね！間違いから学ぼうとする姿勢は「成長マインドセット」。Dweck先生は「才能ではなく努力を信じる子ほど伸びる」と発見したんだ。\n📋 先生向け: 成長マインドセットが形成されています（挑戦性${Math.round(challengeScore)}）。「プロセスを褒める」声かけ（Dweck 2006）で強化できます。'
       },
       {
         name: '立ち直る力（レジリエンス）',
         score: recoveryScore,
-        theory: '学業的レジリエンス理論（Yeager & Dweck 2012）',
-        definition: 'つまずいても立ち直って学び続ける力。困難を「一時的な壁」と捉えて乗り越える。',
-        low: 'うまくいかなくても、ヒントを見たり友だちに聞いたりしてみよう。「助けを求める」のも立派な学びの方略だよ（Newman先生のhelp-seeking研究）。立ち直る力は練習で伸びるよ。',
-        high: 'つまずいても立ち直れる力（レジリエンス）があるね。Yeager先生の研究では「困難を一時的な壁と捉えられる子」が最も伸びるとわかっている。この力があれば、どんな壁も乗り越えられるよ。'
+        theory: '学業的レジリエンス（Yeager & Dweck 2012）+ Newman help-seeking(2002)',
+        curriculum: '学習指導要領: 粘り強い取組を行おうとする側面',
+        definition: 'つまずいても立ち直って学び続ける力。Yeagerの3要素: (a)困難を一時的と捉える認知、(b)問題解決志向の対処（help-seeking含む）、(c)感情調整。',
+        low: 'うまくいかなくても、ヒントを見たり友だちに聞いたりしてみよう。Newman先生の研究では「助けを求める行動（help-seeking）」は弱さではなく、自分の状態を把握して適切な方略を選べる力の証拠なんだ。立ち直る力は練習で伸びるよ。\n📋 先生向け: help-seekingを促進する環境整備が重要です（Newman 2002）。「質問することは賢い選択」というメッセージを学級全体に伝えましょう。',
+        high: 'つまずいても立ち直れる力（レジリエンス）があるね。Yeager先生の研究では「困難を一時的な壁と捉えられる子」が最も伸びるとわかっている。この力があれば、どんな壁も乗り越えられるよ。\n📋 先生向け: 学業的レジリエンスが高い状態です（回復力${Math.round(recoveryScore)}）。この子の回復過程を学級で共有すると、他児のレジリエンス向上にも寄与します。'
       },
       {
         name: '自分から深める力（内発的動機づけ）',
         score: deepeningScore,
-        theory: 'Deci & Ryan 自己決定理論（d=0.61）',
-        definition: '求められた以上のことに自分から取り組む力。「やらされる」ではなく「やりたい」。',
-        low: '余裕があったら、もう1問やってみたり復習してみよう。Deci & Ryan先生の研究では「自分で決めてやること」が一番記憶に残りやすいよ。',
-        high: '自分から進んで追加問題や復習に取り組めるのはすごい！Deci & Ryan先生の「自己決定理論」では、内発的動機づけ（自分からやりたいと思う気持ち）が最も深い学びにつながると証明されている。'
+        theory: 'Deci & Ryan 自己決定理論（自律性 d=0.61）',
+        curriculum: '学習指導要領: ③自分なりの目標を持って取り組む + 自らの学習を調整しようとする側面',
+        definition: '求められた以上のことに自分から取り組む力。選択課題への挑戦・自発的な復習は、内発的動機づけの直接的な発現。SDTの自律性欲求が満たされている証拠。',
+        low: '余裕があったら、選択課題に挑戦してみよう。Deci & Ryan先生の研究では「自分で決めてやること」が一番記憶に残りやすいし、やる気も続くんだ。まずは興味があるものを1つ選んでみよう！\n📋 先生向け: 選択課題の魅力を伝えるオリエンテーションが有効です。「選択肢がある」こと自体が自律性を刺激します（SDT理論）。',
+        high: '自分から進んで追加の課題に取り組めるのはすごい！Deci & Ryan先生の「自己決定理論」では、内発的動機づけ（自分からやりたいと思う気持ち）が最も深い学びにつながると証明されている。この力が「本物の粘り強さ」の土台だよ。\n📋 先生向け: 内発的動機づけが発現しています（深化${Math.round(deepeningScore)}）。自由進度学習の目標「自律的学習者」に近づいています。'
       },
       {
         name: '気持ちの安定（感情調整）',
         score: emotionalStability,
-        theory: 'Zimmerman 自己調整学習 遂行フェーズ（d=0.52）',
-        definition: '困難に直面しても落ち着いて取り組める力。焦りや不安をコントロールする。',
-        low: '難しいと感じた時は深呼吸しよう。焦らなくて大丈夫。Zimmerman先生の研究では「自分のペースを守れる子」が結果的に一番速く進むんだ。',
-        high: '難しい問題でも落ち着いて取り組めているね。Zimmerman先生が発見した「自己調整」の中で、感情をコントロールする力は特に大事。この力がついている。'
+        theory: 'Zimmerman SRL遂行フェーズ（d=0.52）+ Pekrun Academic Emotions(2006)',
+        curriculum: '学習指導要領: ⑤学習の見通しを持ち、振り返る（感情の自己モニタリング含む）',
+        definition: '困難に直面しても落ち着いて取り組める力。Pekrun(2006)の学業感情理論: 達成感情（enjoyment, anxiety, boredom等）の調整が学業成績を予測。手ごたえが低くても学習を続けられることが感情調整力の証拠。',
+        low: '難しいと感じた時は深呼吸しよう。焦らなくて大丈夫。Zimmerman先生の研究では「自分のペースを守れる子」が結果的に一番速く進むんだ。気持ちに波があるのは自然なこと。大切なのは「波があっても続けること」だよ。\n📋 先生向け: 感情調整の支援として、振り返りカードの「手ごたえ」欄の活用を勧めます。感情を言語化すること自体がAffect Labeling効果（Lieberman 2007）で感情調整を促します。',
+        high: '難しい問題でも落ち着いて取り組めているね。Zimmerman先生が発見した「自己調整」の中で、感情をコントロールする力は特に大事。Pekrun先生の研究でも「ポジティブな感情を維持できる子」は学力が伸びることがわかっている。\n📋 先生向け: 感情的安定性が高い状態です（安定性${Math.round(emotionalStability)}）。この安定感が他の粘り強さ次元の基盤になっています。'
       }
     ]
 
+    // === アドバイス生成 ===
     dimensions.forEach(d => {
       const emoji = d.score >= 70 ? '🌟' : d.score >= 40 ? '📈' : '💡'
       advice += `${emoji} ${d.name}: ${Math.round(d.score)}点\n`
       advice += `   ${d.score >= 50 ? d.high : d.low}\n`
-      advice += `   📖 ${d.theory}\n\n`
+      advice += `   📖 ${d.theory}\n`
+      advice += `   📎 ${d.curriculum}\n\n`
     })
 
-    // 総合メッセージ
+    // === 総合メッセージ（学習指導要領の2側面の統合評価） ===
+    const perseveranceSide = Math.round((continuityScore + challengeScore) / 2)
+    const selfRegSide = Math.round((recoveryScore + deepeningScore + emotionalStability) / 3)
+
+    advice += `\n━━━ 学習指導要領「主体的に学習に取り組む態度」との対応 ━━━\n`
+    advice += `(1) 粘り強い取組を行おうとする側面: ${perseveranceSide}点（継続性＋挑戦性）\n`
+    advice += `(2) 自らの学習を調整しようとする側面: ${selfRegSide}点（回復力＋深化＋感情安定）\n\n`
+
     if (totalScore >= 80) {
-      advice += `\n🏆 総合: 粘り強さが光っている！「主体的に学習に取り組む態度」（学習指導要領）の観点で、とても高い評価だよ。`
+      advice += `🏆 総合: 粘り強さが光っている！「主体的に学習に取り組む態度」の両側面でバランスよく力を発揮できている。\n📋 先生向け: 粘り強さ(${perseveranceSide})と自己調整(${selfRegSide})の一体的評価として「十分満足できる状況(A)」に相当します。`
     } else if (totalScore >= 50) {
-      advice += `\n📊 総合: 粘り強さが育ってきている。特に一番高い力をもっと伸ばしていこう！`
+      const stronger = perseveranceSide > selfRegSide ? '粘り強さ' : '自己調整'
+      const weaker = perseveranceSide > selfRegSide ? '自己調整' : '粘り強さ'
+      advice += `📊 総合: ${stronger}の力が育ってきている。${weaker}を意識するともっと伸びるよ！\n📋 先生向け: 「おおむね満足できる状況(B)」です。${weaker}側面への声かけ・支援で向上が見込めます。`
     } else {
-      advice += `\n🌱 総合: これからどんどん伸びるよ！毎回の授業で少しずつ「やり抜く」経験を積み重ねよう。`
+      advice += `🌱 総合: これからどんどん伸びるよ！毎回の授業で少しずつ「やり抜く」経験を積み重ねよう。\n📋 先生向け: 「努力を要する状況(C)」です。課題のスモールステップ化（有能感向上）と個別の声かけ（関係性欲求の充足）が最優先の支援策です。`
     }
 
     return c.json({
@@ -28918,13 +29043,14 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
         emotional_stability: '気持ちの安定（感情調整）'
       },
       advice,
-      theories: ['Duckworth_Grit', 'Dweck_Growth_Mindset', 'Academic_Resilience', 'SDT_Intrinsic_Motivation', 'Zimmerman_SRL'],
-      // 学習指導要領マッピング
+      theories: ['Duckworth_Grit', 'Dweck_Growth_Mindset', 'Academic_Resilience', 'SDT_Intrinsic_Motivation', 'Zimmerman_SRL', 'Pekrun_Academic_Emotions', 'Newman_Help_Seeking'],
+      // 学習指導要領マッピング（2側面の評価）
       curriculum_mapping: {
         perseverance: '粘り強い取組を行おうとする側面',
         self_regulation: '自らの学習を調整しようとする側面',
-        score_continuity_challenge: Math.round((continuityScore + challengeScore) / 2),
-        score_self_regulation: Math.round((recoveryScore + deepeningScore + emotionalStability) / 3)
+        score_perseverance: perseveranceSide,
+        score_self_regulation: selfRegSide,
+        integrated_level: totalScore >= 80 ? 'A（十分満足）' : totalScore >= 50 ? 'B（おおむね満足）' : 'C（努力を要する）'
       }
     })
   } catch (error) {

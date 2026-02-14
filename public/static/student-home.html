@@ -202,8 +202,8 @@
                             <th class="px-2 py-2 text-left date-cell">予定日</th>
                             <th class="px-2 py-2 text-left date-cell">実施日</th>
                             <th class="px-2 py-2 text-left">はじめの計画</th>
-                            <th class="px-2 py-2 text-left">きょうの計画</th>
-                            <th class="px-2 py-2 text-left">やったこと</th>
+                            <th class="px-2 py-2 text-left">めあて・計画</th>
+                            <th class="px-2 py-2 text-left">やったこと（進捗）</th>
                             <th class="px-2 py-2 text-center w-16">振り返り</th>
                             <th class="px-2 py-2 text-center w-12">AI</th>
                         </tr>
@@ -213,20 +213,18 @@
             </div>
         </div>
 
-        <!-- きょうの構想 -->
+        <!-- きょうの構想（統合版: めあて・計画） -->
         <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
             <h2 class="text-lg font-bold text-gray-800 mb-3">
                 <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>きょうの構想（見通しタイム）
             </h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">きょうのめあて</label>
-                    <input type="text" id="todayGoalInput" placeholder="きょうの授業で達成したいこと" class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">きょうの計画</label>
-                    <input type="text" id="todayPlanInput" placeholder="例: カード3をやる、チェックテストまで進む" class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 text-sm">
-                </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">
+                    <i class="fas fa-bullseye text-blue-500 mr-1"></i>きょうのめあて・計画
+                    <span class="text-xs text-gray-400 ml-1">（何をめざして、何をする？）</span>
+                </label>
+                <textarea id="todayGoalPlanInput" rows="2" placeholder="例: カード3を理解して、チェックテストに挑戦する。わからないところは教科書を見ながら考える。" class="w-full px-3 py-2 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-400 text-sm bg-blue-50"></textarea>
+                <p class="text-xs text-gray-400 mt-1"><i class="fas fa-info-circle mr-1"></i>めあて（何をめざすか）と計画（何をするか）をまとめて書こう。</p>
             </div>
             <div class="mt-4 text-center">
                 <button onclick="saveTodayPlanAndStart()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition">
@@ -248,7 +246,7 @@
                 </span>
             </div>
             <p class="text-sm text-gray-600 mb-4">
-                きょうのめあて: <strong id="todayGoalShow"></strong>
+                きょうのめあて・計画: <strong id="todayGoalShow"></strong>
             </p>
 
             <!-- 学習カードリスト + チェックテスト + 選択課題 -->
@@ -316,35 +314,42 @@
                     <textarea id="refNextApplication" rows="2" placeholder="次の時間に気をつけること、やってみたいこと..." class="w-full px-3 py-2 border-2 border-green-200 rounded-xl focus:ring-2 focus:ring-green-400 text-sm bg-green-50"></textarea>
                 </div>
 
-                <!-- 友だちとの学び -->
+                <!-- 友だちとの学び（1人学び＝基盤、協働＝発展として再設計） -->
                 <div class="bg-yellow-50 rounded-xl p-4">
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         ⑤ 友だちとの学び
                     </label>
-                    <div class="flex items-center space-x-4 mb-2">
-                        <label class="flex items-center space-x-2 cursor-pointer">
+                    <p class="text-xs text-gray-500 mb-2">
+                        <i class="fas fa-info-circle text-blue-400 mr-1"></i>
+                        自由進度学習では<strong>1人で進める力が基本</strong>。友だちに聞いたり教えたりするのも「自分で選んだ学び方」として高く評価します。
+                    </p>
+                    <div class="flex flex-col space-y-2 mb-2">
+                        <label class="flex items-center space-x-2 cursor-pointer bg-white rounded-lg px-3 py-2 border-2 border-transparent hover:border-blue-200 transition" id="soloLearnOption">
                             <input type="radio" name="friendLearning" value="0" checked onchange="toggleFriendSection()" class="text-blue-600">
-                            <span class="text-sm">ひとりで学んだ</span>
+                            <span class="text-sm"><strong>📚 ひとりで学んだ</strong></span>
+                            <span class="text-xs text-blue-500 ml-auto">← 自律性の力</span>
                         </label>
-                        <label class="flex items-center space-x-2 cursor-pointer">
+                        <label class="flex items-center space-x-2 cursor-pointer bg-white rounded-lg px-3 py-2 border-2 border-transparent hover:border-yellow-200 transition" id="collabLearnOption">
                             <input type="radio" name="friendLearning" value="1" onchange="toggleFriendSection()" class="text-blue-600">
-                            <span class="text-sm">友だちと学んだ</span>
+                            <span class="text-sm"><strong>🤝 友だちの力もかりた</strong></span>
+                            <span class="text-xs text-yellow-600 ml-auto">← 自分で選んだ協働</span>
                         </label>
                     </div>
-                    <div id="friendDetails" class="hidden space-y-2 mt-2">
+                    <div id="friendDetails" class="hidden space-y-2 mt-2 pl-2 border-l-4 border-yellow-300">
                         <input type="text" id="friendNamesInput" placeholder="友だちの名前（カンマ区切り）" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                        <p class="text-xs text-gray-500">どんな関わり方をした？（自分で選んだ学び方として記録）</p>
                         <div class="flex flex-wrap gap-2">
-                            <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1 rounded-lg border cursor-pointer">
-                                <input type="checkbox" value="taught_by" class="friend-type"> 教えてもらった
+                            <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-purple-300 transition">
+                                <input type="checkbox" value="taught_by" class="friend-type"> 🙋 教えてもらった<span class="text-gray-400 ml-1">(help-seeking)</span>
                             </label>
-                            <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1 rounded-lg border cursor-pointer">
-                                <input type="checkbox" value="taught_to" class="friend-type"> 教えてあげた
+                            <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-green-300 transition">
+                                <input type="checkbox" value="taught_to" class="friend-type"> 🎓 教えてあげた<span class="text-gray-400 ml-1">(teaching)</span>
                             </label>
-                            <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1 rounded-lg border cursor-pointer">
-                                <input type="checkbox" value="discussed" class="friend-type"> いっしょに考えた
+                            <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-blue-300 transition">
+                                <input type="checkbox" value="discussed" class="friend-type"> 💬 いっしょに考えた<span class="text-gray-400 ml-1">(discussion)</span>
                             </label>
                         </div>
-                        <textarea id="friendInteraction" rows="1" placeholder="どんなことをした？" class="w-full px-3 py-1.5 border rounded-lg text-sm"></textarea>
+                        <textarea id="friendInteraction" rows="1" placeholder="どんなことをした？（例: わり算のやり方を聞いた、解き方を説明した）" class="w-full px-3 py-1.5 border rounded-lg text-sm"></textarea>
                     </div>
                 </div>
 
@@ -619,7 +624,7 @@ function showPhase2() {
     hideAllPhases()
     document.getElementById('phase2').classList.remove('hidden')
     const row = STATE.rows.find(r => r.hour_number === STATE.currentHour)
-    document.getElementById('todayGoalShow').textContent = row?.today_goal || '（未設定）'
+    document.getElementById('todayGoalShow').textContent = row?.today_goal || row?.today_plan || '（未設定）'
     renderCardCheckboxes()
     renderSelectionCheckboxes()
     startStudyTimer()
@@ -796,20 +801,80 @@ function renderPlanOverview() {
         const ref = refMap[row.hour_number]
         const rowClass = isDone ? 'plan-row-done' : (isCurrent ? 'plan-row-active' : 'plan-row-planned')
 
+        // 進捗のミニチップ表示
+        let progressHtml = '-'
+        if (isDone) {
+            progressHtml = renderRowProgressChips(row)
+        }
+
+        // 予定日：完了済みは表示のみ、未完了は入力可能
+        let plannedDateHtml = ''
+        if (isDone || row.planned_date) {
+            plannedDateHtml = row.planned_date || '-'
+        } else {
+            plannedDateHtml = `<input type="date" class="plan-date-input w-full px-1 py-0.5 border rounded text-xs" data-hour="${row.hour_number}" value="${row.planned_date || ''}" onchange="updatePlannedDate(${row.hour_number}, this.value)">`
+        }
+
+        // 実施日
+        let actualDateHtml = ''
+        if (isDone && row.actual_date) {
+            actualDateHtml = row.actual_date
+        } else if (isCurrent) {
+            actualDateHtml = '<span class="text-blue-500 font-medium">きょう</span>'
+        } else {
+            actualDateHtml = '-'
+        }
+
         const tr = document.createElement('tr')
         tr.className = `${rowClass} border-b text-xs`
         tr.innerHTML = `
             <td class="px-2 py-2 text-center font-bold">${row.hour_number}</td>
-            <td class="px-2 py-2 date-cell">${row.planned_date || '-'}</td>
-            <td class="px-2 py-2 date-cell">${row.actual_date || (isCurrent ? '<span class=text-blue-500>きょう</span>' : '-')}</td>
+            <td class="px-2 py-2 date-cell">${plannedDateHtml}</td>
+            <td class="px-2 py-2 date-cell">${actualDateHtml}</td>
             <td class="px-2 py-2">${row.initial_plan || '-'}</td>
-            <td class="px-2 py-2">${row.today_plan || (isCurrent ? '<em class="text-gray-400">入力してね</em>' : '-')}</td>
-            <td class="px-2 py-2">${row.actual_done || (isDone ? summarizeProgress(row) : '-')}</td>
+            <td class="px-2 py-2">${row.today_plan || (isCurrent ? '<em class="text-gray-400">↓下で入力</em>' : '-')}</td>
+            <td class="px-2 py-2">${progressHtml}</td>
             <td class="px-2 py-2 text-center">${ref ? renderQualityStars(ref.reflection_quality_level) : '-'}</td>
             <td class="px-2 py-2 text-center">${ref?.ai_feedback ? '✅' : '-'}</td>
         `
         tbody.appendChild(tr)
     })
+}
+
+// 行ごとの進捗ミニチップ（カード→テスト→選択課題の軸で表示）
+function renderRowProgressChips(row) {
+    const parts = []
+    try {
+        const cards = JSON.parse(row.cards_done || '[]')
+        if (cards.length) parts.push(`<span class="inline-flex items-center bg-green-100 text-green-700 px-1.5 py-0.5 rounded text-xs">📝${cards.map(c => c).join(',')}</span>`)
+    } catch {}
+    if (row.check_test_done) {
+        const scoreText = row.check_test_score ? `${row.check_test_score}点` : '✔'
+        parts.push(`<span class="inline-flex items-center bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs">📋${scoreText}</span>`)
+    }
+    try {
+        const sel = JSON.parse(row.selection_tasks_done || '[]')
+        const names = STATE.unitConfig.selection_task_names || []
+        if (sel.length) parts.push(`<span class="inline-flex items-center bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded text-xs">🎯${sel.length}個</span>`)
+    } catch {}
+    if (row.study_minutes) {
+        parts.push(`<span class="inline-flex items-center bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs">⏱${row.study_minutes}分</span>`)
+    }
+    return parts.length > 0 ? `<div class="flex flex-wrap gap-0.5">${parts.join('')}</div>` : '-'
+}
+
+// 計画表の予定日を更新
+async function updatePlannedDate(hourNumber, dateValue) {
+    try {
+        await axios.post('/api/student-learning/save-initial-plans', {
+            plan_id: STATE.planId,
+            rows: [{ hour_number: hourNumber, planned_date: dateValue, initial_plan: '' }]
+        })
+        const row = STATE.rows.find(r => r.hour_number === hourNumber)
+        if (row) row.planned_date = dateValue
+    } catch (e) {
+        console.error('Failed to update planned date:', e)
+    }
 }
 
 function summarizeProgress(row) {
@@ -850,24 +915,23 @@ async function loadAiSuggestion() {
 }
 
 async function saveTodayPlanAndStart() {
-    const todayPlan = document.getElementById('todayPlanInput').value
-    const todayGoal = document.getElementById('todayGoalInput').value
-    if (!todayGoal && !todayPlan) {
-        if (!confirm('計画とめあてが空だけど、学習を始める？')) return
+    const todayGoalPlan = document.getElementById('todayGoalPlanInput').value
+    if (!todayGoalPlan) {
+        if (!confirm('めあて・計画が空だけど、学習を始める？')) return
     }
     try {
         await axios.post('/api/student-learning/save-today-plan', {
             plan_id: STATE.planId,
             hour_number: STATE.currentHour,
-            today_plan: todayPlan,
-            today_goal: todayGoal,
+            today_plan: todayGoalPlan,
+            today_goal: todayGoalPlan,
             actual_date: new Date().toISOString().split('T')[0]
         })
         // ローカル状態更新
         const row = STATE.rows.find(r => r.hour_number === STATE.currentHour)
         if (row) {
-            row.today_plan = todayPlan
-            row.today_goal = todayGoal
+            row.today_plan = todayGoalPlan
+            row.today_goal = todayGoalPlan
             row.status = 'in_progress'
             row.actual_date = new Date().toISOString().split('T')[0]
         }
@@ -1135,9 +1199,29 @@ function renderPersistenceRadar(dims) {
 
 function renderPersistenceAdvice(persist) {
     const container = document.getElementById('persistenceAdvice')
+    // 学習指導要領マッピングを表示
+    const mapping = persist.curriculum_mapping || {}
+    const mappingHtml = mapping.score_perseverance ? `
+        <div class="bg-orange-50 rounded-lg p-3 mb-3 border border-orange-200">
+            <p class="text-xs font-bold text-orange-800 mb-1">📎 学習指導要領「主体的に学習に取り組む態度」</p>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <div class="bg-white rounded p-2">
+                    <span class="text-gray-600">(1) 粘り強い取組</span>
+                    <div class="text-lg font-bold text-orange-600">${mapping.score_perseverance}点</div>
+                </div>
+                <div class="bg-white rounded p-2">
+                    <span class="text-gray-600">(2) 自己調整</span>
+                    <div class="text-lg font-bold text-indigo-600">${mapping.score_self_regulation}点</div>
+                </div>
+            </div>
+            ${mapping.integrated_level ? `<p class="text-xs text-center mt-1 font-medium">→ ${mapping.integrated_level}</p>` : ''}
+        </div>
+    ` : ''
+
     container.innerHTML = `
         <div class="font-bold text-orange-700 mb-2">粘り強さ総合: ${persist.total_score}点</div>
-        <div class="text-xs text-gray-700 whitespace-pre-line leading-relaxed">${persist.advice || ''}</div>
+        ${mappingHtml}
+        <div class="text-xs text-gray-700 whitespace-pre-line leading-relaxed max-h-96 overflow-y-auto">${persist.advice || ''}</div>
     `
 }
 
@@ -1156,8 +1240,7 @@ function endLesson() {
 }
 
 function resetForms() {
-    document.getElementById('todayGoalInput').value = ''
-    document.getElementById('todayPlanInput').value = ''
+    document.getElementById('todayGoalPlanInput').value = ''
     document.getElementById('refContentLearned').value = ''
     document.getElementById('refMethodReflection').value = ''
     document.getElementById('refNextApplication').value = ''
