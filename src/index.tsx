@@ -28215,6 +28215,835 @@ app.get('/api/reflection/history/:studentId', async (c) => {
   }
 })
 
+// ============================================================
+// 児童生徒学習システム API
+// 学習計画表・観点別振り返り・粘り強さ測定・協働学習・ポートフォリオ
+// ============================================================
+
+// --- 学習計画（単元）作成 ---
+app.post('/api/student-learning/create-plan', async (c) => {
+  const { env } = c
+  try {
+    const body = await c.req.json()
+    const { student_id, unit_name, grade, subject, course_type, total_hours, total_cards, total_check_tests, total_selection_tasks, selection_task_names, unit_goal, personal_goal, start_date, end_date } = body
+
+    const result = await env.DB.prepare(`
+      INSERT INTO unit_study_plans (student_id, unit_name, grade, subject, course_type, total_hours, total_cards, total_check_tests, total_selection_tasks, selection_task_names, unit_goal, personal_goal, start_date, end_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(student_id, unit_name, grade || '', subject || '', course_type || 'steady', total_hours || 8, total_cards || 6, total_check_tests || 1, total_selection_tasks || 6, JSON.stringify(selection_task_names || []), unit_goal || '', personal_goal || '', start_date || '', end_date || '').run()
+
+    const planId = result.meta.last_row_id
+
+    // 各時間分の計画行を自動生成
+    const hours = total_hours || 8
+    for (let i = 1; i <= hours; i++) {
+      await env.DB.prepare(`
+        INSERT INTO study_plan_rows (plan_id, student_id, hour_number, status)
+        VALUES (?, ?, ?, 'planned')
+      `).bind(planId, student_id, i).run()
+    }
+
+    return c.json({ success: true, plan_id: planId, hours_created: hours })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 学習計画取得 ---
+app.get('/api/student-learning/plan/:planId', async (c) => {
+  const { env } = c
+  const planId = c.req.param('planId')
+  try {
+    const plan = await env.DB.prepare('SELECT * FROM unit_study_plans WHERE id = ?').bind(planId).first()
+    if (!plan) return c.json({ success: false, error: 'Plan not found' }, 404)
+
+    const rows = await env.DB.prepare('SELECT * FROM study_plan_rows WHERE plan_id = ? ORDER BY hour_number').bind(planId).all()
+    const reflections = await env.DB.prepare('SELECT * FROM hourly_reflections WHERE plan_id = ? ORDER BY hour_number').bind(planId).all()
+
+    return c.json({ success: true, plan, rows: rows.results || [], reflections: reflections.results || [] })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 生徒の全学習計画一覧 ---
+app.get('/api/student-learning/plans/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  try {
+    const plans = await env.DB.prepare('SELECT * FROM unit_study_plans WHERE student_id = ? ORDER BY created_at DESC').bind(studentId).all()
+    return c.json({ success: true, plans: plans.results || [] })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- はじめの計画を保存（第1時） ---
+app.post('/api/student-learning/save-initial-plans', async (c) => {
+  const { env } = c
+  try {
+    const { plan_id, rows } = await c.req.json()
+    // rows = [{hour_number, initial_plan, planned_date}, ...]
+    for (const row of rows) {
+      await env.DB.prepare(`
+        UPDATE study_plan_rows SET initial_plan = ?, planned_date = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE plan_id = ? AND hour_number = ?
+      `).bind(row.initial_plan || '', row.planned_date || '', plan_id, row.hour_number).run()
+    }
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- きょうの計画を保存（毎時間の最初） ---
+app.post('/api/student-learning/save-today-plan', async (c) => {
+  const { env } = c
+  try {
+    const { plan_id, hour_number, today_plan, today_goal, actual_date } = await c.req.json()
+    await env.DB.prepare(`
+      UPDATE study_plan_rows SET today_plan = ?, today_goal = ?, actual_date = ?, status = 'in_progress', updated_at = CURRENT_TIMESTAMP
+      WHERE plan_id = ? AND hour_number = ?
+    `).bind(today_plan || '', today_goal || '', actual_date || new Date().toISOString().split('T')[0], plan_id, hour_number).run()
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- やったことを記録（授業おわり） ---
+app.post('/api/student-learning/save-actual', async (c) => {
+  const { env } = c
+  try {
+    const { plan_id, hour_number, actual_done, cards_done, check_test_done, check_test_score, check_test_max, selection_tasks_done, study_minutes, actual_date } = await c.req.json()
+    await env.DB.prepare(`
+      UPDATE study_plan_rows SET actual_done = ?, cards_done = ?, check_test_done = ?, check_test_score = ?, check_test_max = ?, selection_tasks_done = ?, study_minutes = ?, actual_date = COALESCE(?, actual_date), status = 'done', updated_at = CURRENT_TIMESTAMP
+      WHERE plan_id = ? AND hour_number = ?
+    `).bind(actual_done || '', JSON.stringify(cards_done || []), check_test_done || 0, check_test_score ?? null, check_test_max ?? null, JSON.stringify(selection_tasks_done || []), study_minutes || 0, actual_date || null, plan_id, hour_number).run()
+    return c.json({ success: true })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 毎時間の観点別振り返り保存 ---
+app.post('/api/student-learning/save-reflection', async (c) => {
+  const { env } = c
+  try {
+    const body = await c.req.json()
+    const { plan_id, plan_row_id, student_id, hour_number, content_learned, method_reflection, next_application, learned_with_friend, friend_names, friend_interaction, friend_interaction_type, confidence_rating } = body
+
+    const result = await env.DB.prepare(`
+      INSERT INTO hourly_reflections (plan_id, plan_row_id, student_id, hour_number, content_learned, method_reflection, next_application, learned_with_friend, friend_names, friend_interaction, friend_interaction_type, confidence_rating)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(plan_id, plan_row_id || 0, student_id, hour_number, content_learned || '', method_reflection || '', next_application || '', learned_with_friend || 0, JSON.stringify(friend_names || []), friend_interaction || '', JSON.stringify(friend_interaction_type || []), confidence_rating || 3).run()
+
+    // 協働学習記録も保存
+    if (learned_with_friend && friend_names && friend_names.length > 0) {
+      for (const name of friend_names) {
+        const types = friend_interaction_type || ['discussed']
+        for (const itype of types) {
+          await env.DB.prepare(`
+            INSERT INTO collaboration_records (student_id, plan_id, hour_number, partner_name, interaction_type, topic, description)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `).bind(student_id, plan_id, hour_number, name, itype, '', friend_interaction || '').run()
+        }
+      }
+    }
+
+    return c.json({ success: true, reflection_id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 振り返りAI分析（毎時間）: 理論ベース深化版 ---
+// 教育理論:
+//   F5 Zimmerman自己調整学習 (d=0.52): 予見→遂行→省察の循環
+//   F6 Flavellメタ認知 (d=0.69): メタ認知的知識(人間・課題・方略) + メタ認知的活動(モニタリング・コントロール)
+//   F8 Deci & Ryan自己決定理論 (d=0.61): 自律性・有能感・関係性の3欲求
+//   F11 Vygotsky社会的構成主義 (d=0.40): 他者との相互作用による知識構成
+//   F2 Dweck成長マインドセット (d=0.19): 能力は努力で伸びる信念
+//   Duckworthグリット (d=0.20): 長期的目標への情熱と粘り強さ
+//   Hattie振り返り効果量: Lv1活動記述(~0), Lv2感想(0.15), Lv3内容気づき(0.40), Lv4方法気づき(0.69), Lv5転用(0.75+)
+// 学習指導要領「主体的に学習に取り組む態度」: 粘り強さ ＋ 自己調整
+app.post('/api/student-learning/analyze-reflection', async (c) => {
+  const { env } = c
+  try {
+    const { reflection_id, plan_id, student_id, hour_number, content_learned, method_reflection, next_application, friend_interaction, confidence_rating, unit_name, subject, grade, cards_done, check_test_score, selection_tasks_done } = await c.req.json()
+
+    // ===== 振り返りの質レベル判定（Hattie効果量ベース） =====
+    let qualityLevel = 1
+    const hasContent = (content_learned || '').length > 5
+    const hasMethod = (method_reflection || '').length > 5
+    const hasNext = (next_application || '').length > 5
+    const hasFriend = (friend_interaction || '').length > 5
+    // Lv.1: 活動記述のみ（「やった」だけ）
+    // Lv.2: 感想がある（「楽しかった」等）
+    const hasFeeling = confidence_rating && confidence_rating !== 3
+    if (hasFeeling && !hasContent) qualityLevel = 2
+    // Lv.3: 内容の気づき（「わかった/わからない」を書けている）
+    if (hasContent) qualityLevel = 3
+    // Lv.4: 方法の気づき（「どうやって学んだか」を書けている = メタ認知的知識）
+    if (hasContent && hasMethod) qualityLevel = 4
+    // Lv.5: 転用・つながり（「次にいかす」「友だちとの学びから気づき」= 自己調整）
+    if (hasContent && hasMethod && (hasNext || hasFriend)) qualityLevel = 5
+
+    // ===== 進捗サマリー =====
+    const cardsList = cards_done || []
+    const selectionList = selection_tasks_done || []
+    const progressNote = `カード${cardsList.length}枚完了${check_test_score ? `、チェックテスト${check_test_score}点` : ''}${selectionList.length > 0 ? `、選択課題${selectionList.length}個完了` : ''}`
+
+    // ===== 理論ベースフィードバック =====
+    const theories: string[] = []
+    let feedback = ''
+    const apiKey = env.GEMINI_API_KEY
+
+    // Gemini AIによる深い分析を試行
+    if (apiKey && (hasContent || hasMethod || hasNext)) {
+      try {
+        const prompt = `あなたは小中学校の自由進度学習における「ふりかえりAI」です。
+子ども（${grade || ''}${subject || ''}）の振り返りを分析し、学習理論に基づいたフィードバックを返してください。
+
+【単元】${unit_name || ''}
+【第${hour_number}時の振り返り】
+② わかったこと/わからなかったこと: ${content_learned || '（未記入）'}
+③ どうやって学んだか: ${method_reflection || '（未記入）'}
+④ 次にいかすこと: ${next_application || '（未記入）'}
+⑤ 友だちとの学び: ${friend_interaction || '（ひとりで学んだ）'}
+⑥ 手ごたえ: ${confidence_rating || 3}/5
+【今日の進捗】${progressNote}
+
+【フィードバック原則】（必ず守ること）
+1. 先に良い点を具体的に引用して褒める（有能感を満たす → 自己決定理論）
+2. 理論名は子ども向け言葉に言い換える（例：メタ認知→「自分の学びを知る力」）
+3. 1人学びを高く評価する（自律性は自由進度学習の核）
+4. 他者比較は絶対禁止。前の自分との比較で成長を示す
+5. 具体的な次ステップ提案は1つだけ
+6. 友だち学びがあれば高評価
+7. 書けていない項目は責めず、次の課題として提案
+
+【参照すべき学習理論と効果量】
+- F6 Flavellメタ認知理論(d=0.69): ②③に記述があるか → メタ認知的モニタリング能力
+- F5 Zimmerman自己調整学習(d=0.52): ④に記述があるか → 省察→予見サイクル
+- F8 Deci & Ryan自己決定理論(d=0.61): 手ごたえ・1人学び → 自律性+有能感
+- F11 社会的構成主義(d=0.40): 友だちとの学び → 関係性+協同的知識構成
+- Duckworthグリット: カード数+選択課題 → 粘り強さ
+- Dweck成長マインドセット(d=0.19): 困難に向かう姿勢
+
+以下のJSON形式で返答:
+{
+  "feedback": "子ども向けフィードバック全文（400字以内、絵文字使用OK、段落分け）",
+  "theories_used": ["F5_self_regulation", "F6_metacognition"],
+  "metacognition_note": "メタ認知的知識のどの側面が見られるか（人間・課題・方略）",
+  "self_determination_note": "3欲求（自律性・有能感・関係性）のどれが満たされているか",
+  "persistence_note": "粘り強さの観点での評価（学習指導要領）",
+  "next_suggestion": "次の時間への具体的提案1つ"
+}
+JSONのみ回答。`
+
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.4, maxOutputTokens: 3000 }
+            })
+          }
+        )
+        const data = await resp.json() as any
+        const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || ''
+        const match = text.match(/\{[\s\S]*\}/)
+        if (match) {
+          const aiResult = JSON.parse(match[0])
+          feedback = aiResult.feedback || ''
+          theories.push(...(aiResult.theories_used || []))
+          // 補足情報を追加
+          if (aiResult.persistence_note) {
+            feedback += `\n\n💪 粘り強さ: ${aiResult.persistence_note}`
+          }
+          if (aiResult.next_suggestion) {
+            feedback += `\n\n💡 次の時間の提案: ${aiResult.next_suggestion}`
+          }
+        }
+      } catch (geminiErr) {
+        console.error('Gemini reflection analysis failed, using rule-based:', geminiErr)
+        // fallthrough to rule-based
+      }
+    }
+
+    // Geminiが使えない場合 or 失敗時: ルールベースフィードバック
+    if (!feedback) {
+      // 振り返りレベルに応じた肯定的フィードバック
+      if (qualityLevel >= 4 && hasMethod) {
+        theories.push('F6_metacognition')
+        feedback += `🌟 「${method_reflection?.substring(0, 30)}」という学び方への気づきがすばらしい！自分に合った学び方を見つけられるのは「メタ認知」（自分の学びを知る力）というとても大事な力だよ。（Flavellメタ認知理論 d=0.69）\n\n`
+      } else if (qualityLevel >= 3 && hasContent) {
+        theories.push('F6_metacognition')
+        feedback += `👍 わかったこと・わからなかったことを書けたね。自分の理解を確かめる力＝「メタ認知的モニタリング」がついてきている。次はどうやって学んだか（学び方）も振り返ってみると、もっと力がつくよ。\n\n`
+      } else {
+        feedback += `📝 今日もがんばったね！次は「わかったこと」や「どうやって学んだか」も書いてみよう。書くことで頭の中が整理されるよ。\n\n`
+      }
+
+      if (hasNext) {
+        theories.push('F5_self_regulation')
+        feedback += `🔮 次にいかすことを考えられたね。「次はこうしよう」と自分で決められるのは、自分の学びをコントロールする力（自己調整力）の証拠だよ。Zimmerman先生の研究では「省察→次の計画」のサイクルが学力向上の鍵なんだ。\n\n`
+      }
+
+      if (hasFriend) {
+        theories.push('F11_social_constructivism')
+        feedback += `🤝 友だちとの学びを振り返れたね。人と一緒に学ぶと、自分だけでは気づけないことに気づけるんだ（社会的構成主義）。\n\n`
+      }
+
+      // 1人学びの肯定的評価（自己決定理論: 自律性）
+      if (!hasFriend && cardsList.length > 0) {
+        theories.push('F8_self_determination')
+        feedback += `📚 今日は自分の力で${progressNote}。1人でこつこつ進められるのは「自律性」が高い証拠。自己決定理論（Deci & Ryan）では、自分で決めて自分で進むことが一番やる気が続くと言われている。自由進度学習の基本がしっかりできているよ！\n\n`
+      }
+
+      // 粘り強さの評価（Duckworthグリット + 学習指導要領）
+      if (cardsList.length >= 2 || selectionList.length >= 1) {
+        theories.push('Duckworth_Grit')
+        feedback += `💪 たくさん取り組んだね。Angela Duckworth先生の研究では「粘り強く続ける力（グリット）」はテストの点数よりも将来の成功と関係があるんだ。\n\n`
+      }
+
+      // 次回への提案（1つだけ）
+      feedback += `💡 次の時間の提案: `
+      if (!hasMethod) {
+        feedback += `振り返りに「どうやって学んだか」も書いてみよう。例えば「教科書を読んでから問題をやった」「図を描いて考えた」など。自分に合った学び方が見えてくるよ。`
+      } else if (!hasNext) {
+        feedback += `「次にいかすこと」を一つ決めてみよう。小さな目標でOK！Zimmerman先生の研究では「省察」から「次の計画」へつなげるサイクルが大事だよ。`
+      } else {
+        feedback += `この調子で続けよう！前回の振り返りをもとに、今日の計画を立ててみてね。`
+      }
+    }
+
+    // DB更新
+    if (reflection_id) {
+      await env.DB.prepare(`
+        UPDATE hourly_reflections SET reflection_quality_level = ?, ai_feedback = ?, ai_theory_references = ? WHERE id = ?
+      `).bind(qualityLevel, feedback, JSON.stringify(theories), reflection_id).run()
+    }
+
+    return c.json({
+      success: true,
+      quality_level: qualityLevel,
+      quality_label: ['', 'Lv.1 活動記述', 'Lv.2 感想', 'Lv.3 内容の気づき', 'Lv.4 方法の気づき', 'Lv.5 転用・つながり'][qualityLevel],
+      feedback,
+      theories
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 単元全体の振り返り保存 ---
+app.post('/api/student-learning/save-unit-reflection', async (c) => {
+  const { env } = c
+  try {
+    const body = await c.req.json()
+    const { plan_id, student_id, goal_achievement, most_important_learning, effective_methods, planning_reflection, friend_learning, next_unit_application } = body
+
+    const result = await env.DB.prepare(`
+      INSERT INTO unit_reflections (plan_id, student_id, goal_achievement, most_important_learning, effective_methods, planning_reflection, friend_learning, next_unit_application)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(plan_id, student_id, goal_achievement || '', most_important_learning || '', effective_methods || '', planning_reflection || '', friend_learning || '', next_unit_application || '').run()
+
+    return c.json({ success: true, unit_reflection_id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 単元全体のAI評価（理論ベース） ---
+app.post('/api/student-learning/analyze-unit', async (c) => {
+  const { env } = c
+  try {
+    const { plan_id, student_id } = await c.req.json()
+
+    // 計画データ取得
+    const plan = await env.DB.prepare('SELECT * FROM unit_study_plans WHERE id = ?').bind(plan_id).first()
+    const rows = await env.DB.prepare('SELECT * FROM study_plan_rows WHERE plan_id = ? ORDER BY hour_number').bind(plan_id).all()
+    const reflections = await env.DB.prepare('SELECT * FROM hourly_reflections WHERE plan_id = ? ORDER BY hour_number').bind(plan_id).all()
+    const unitRef = await env.DB.prepare('SELECT * FROM unit_reflections WHERE plan_id = ? ORDER BY created_at DESC LIMIT 1').bind(plan_id).first()
+    const collabs = await env.DB.prepare('SELECT * FROM collaboration_records WHERE plan_id = ?').bind(plan_id).all()
+
+    const planRows = (rows.results || []) as any[]
+    const refs = (reflections.results || []) as any[]
+    const collaborations = (collabs.results || []) as any[]
+
+    // ===== メタ認知力スコア =====
+    let metacognitionScore = 50 // ベース
+    const avgQuality = refs.length > 0 ? refs.reduce((s: number, r: any) => s + (r.reflection_quality_level || 1), 0) / refs.length : 1
+    metacognitionScore = Math.min(100, avgQuality * 20)
+    // 手ごたえの正確さボーナス
+    const confidenceRows = refs.filter((r: any) => r.confidence_rating)
+    if (confidenceRows.length > 0) metacognitionScore = Math.min(100, metacognitionScore + 10)
+
+    // ===== 計画力スコア =====
+    let planningScore = 50
+    const doneRows = planRows.filter((r: any) => r.status === 'done')
+    const modifiedRows = planRows.filter((r: any) => r.today_plan && r.initial_plan && r.today_plan !== r.initial_plan)
+    // 計画の実現度
+    const completionRate = planRows.length > 0 ? doneRows.length / planRows.length * 100 : 0
+    planningScore = completionRate * 0.5
+    // 修正の質: 修正した後に完了した割合
+    if (modifiedRows.length > 0) {
+      planningScore += 25 // 修正できること自体が計画力
+    }
+    // 「きょうの計画」を書いた割合
+    const todayPlanWritten = planRows.filter((r: any) => r.today_plan && r.today_plan.length > 3).length
+    planningScore += (todayPlanWritten / Math.max(1, planRows.length)) * 25
+    planningScore = Math.min(100, planningScore)
+
+    // ===== 学び方の力スコア =====
+    let methodScore = 50
+    const methodRefs = refs.filter((r: any) => r.method_reflection && r.method_reflection.length > 5)
+    methodScore = Math.min(100, (methodRefs.length / Math.max(1, refs.length)) * 100)
+
+    // ===== 協働の力スコア =====
+    let collaborationScore = 0
+    if (collaborations.length > 0) {
+      collaborationScore = Math.min(100, collaborations.length * 15)
+      // 教え合いの多様性ボーナス
+      const types = new Set(collaborations.map((c: any) => c.interaction_type))
+      if (types.has('taught_to')) collaborationScore = Math.min(100, collaborationScore + 20)
+      if (types.has('discussed')) collaborationScore = Math.min(100, collaborationScore + 10)
+    }
+    // 1人学びも評価（自律性に含める）
+
+    // ===== 粘り強さスコア =====
+    let persistenceScore = 50
+    // 継続性: 全時間を通じてやり遂げたか
+    persistenceScore = completionRate * 0.4
+    // 挑戦性: 選択課題への取り組み
+    const allSelections = planRows.reduce((total: number, r: any) => {
+      try { return total + (JSON.parse(r.selection_tasks_done || '[]')).length } catch { return total }
+    }, 0)
+    persistenceScore += Math.min(30, allSelections * 5)
+    // 回復力: 困難後の継続
+    const lowConfidenceFollowedByAction = refs.filter((r: any, i: number) => r.confidence_rating <= 2 && i < refs.length - 1).length
+    persistenceScore += Math.min(30, lowConfidenceFollowedByAction * 10)
+    persistenceScore = Math.min(100, persistenceScore)
+
+    // ===== 自律性スコア =====
+    let autonomyScore = 50
+    // 1人で学べた時間の割合
+    const soloLearning = refs.filter((r: any) => !r.learned_with_friend).length
+    autonomyScore = (soloLearning / Math.max(1, refs.length)) * 50
+    // 自分で計画を立てて実行した割合
+    autonomyScore += (todayPlanWritten / Math.max(1, planRows.length)) * 30
+    // 選択課題の取り組み（自分で選んだ）
+    autonomyScore += Math.min(20, allSelections * 3)
+    autonomyScore = Math.min(100, autonomyScore)
+
+    // AI総合コメント生成
+    const scores = { metacognitionScore, planningScore, methodScore, collaborationScore, persistenceScore, autonomyScore }
+    let aiComment = `📊 ${(plan as any)?.unit_name || ''}の学びのまとめ\n\n`
+
+    // 最も伸びた力を特定
+    const scoreEntries = Object.entries(scores).sort((a, b) => (b[1] as number) - (a[1] as number))
+    const topSkill = scoreEntries[0]
+    const skillNames: Record<string, string> = {
+      metacognitionScore: 'メタ認知力（自分の学びを知る力）',
+      planningScore: '計画力',
+      methodScore: '学び方の力',
+      collaborationScore: '協働の力',
+      persistenceScore: '粘り強さ',
+      autonomyScore: '自律性（自分で進める力）'
+    }
+    const theoryNames: Record<string, string> = {
+      metacognitionScore: 'Flavellメタ認知理論',
+      planningScore: 'Zimmerman自己調整学習理論・予見フェーズ',
+      methodScore: 'Flavellメタ認知的知識・方略の知識',
+      collaborationScore: 'Vygotsky社会的構成主義',
+      persistenceScore: 'Duckworthグリット理論＋Dweck成長マインドセット',
+      autonomyScore: 'Deci & Ryan自己決定理論・自律性'
+    }
+
+    aiComment += `🏆 いちばん輝いた力: ${skillNames[topSkill[0]]}（${Math.round(topSkill[1] as number)}点）\n`
+    aiComment += `📖 ${theoryNames[topSkill[0]]}\n\n`
+
+    // 各力の評価
+    if (metacognitionScore >= 70) {
+      aiComment += `🧠 メタ認知力が高い！自分の「わかった」「わからない」を正しく判断できている。これは学ぶ力の土台だよ。\n\n`
+    }
+    if (planningScore >= 70) {
+      aiComment += `📐 計画力がすばらしい！特に計画を途中で修正できた経験は、大人でも難しいことなんだ。（Zimmerman自己調整理論：計画→修正→改善のサイクル）\n\n`
+    }
+    if (persistenceScore >= 70) {
+      aiComment += `💪 粘り強さが光っている！難しくても最後まで取り組む力は、「やり抜く力（グリット）」と呼ばれ、テストの点数以上に大切な力だよ。\n\n`
+    }
+    if (autonomyScore >= 70) {
+      aiComment += `🚀 自律性が高い！1人でこつこつ進められるのは自由進度学習の基本。自分で決めて自分で進む力がしっかり身についている。（自己決定理論）\n\n`
+    }
+    if (collaborationScore >= 50) {
+      aiComment += `🤝 友だちとの学び合いもできたね。教え合うことでお互いの理解が深まるんだ。（Vygotsky社会的構成主義）\n\n`
+    }
+
+    // 次の単元へのアドバイス
+    const lowestSkill = scoreEntries[scoreEntries.length - 1]
+    aiComment += `💡 次の単元で伸ばしたい力: ${skillNames[lowestSkill[0]]}\n`
+
+    // DB更新
+    if (unitRef) {
+      await env.DB.prepare(`
+        UPDATE unit_reflections SET ai_overall_evaluation = ?, metacognition_score = ?, planning_score = ?, method_score = ?, collaboration_score = ?, persistence_score = ?, autonomy_score = ?, growth_data = ? WHERE id = ?
+      `).bind(aiComment, metacognitionScore, planningScore, methodScore, collaborationScore, persistenceScore, autonomyScore, JSON.stringify(scores), (unitRef as any).id).run()
+    }
+
+    // ポートフォリオにスナップショット保存
+    const prevPortfolio = await env.DB.prepare('SELECT * FROM skill_portfolio WHERE student_id = ? ORDER BY created_at DESC LIMIT 1').bind(student_id).first()
+    let growthSummary: any = {}
+    if (prevPortfolio) {
+      growthSummary = {
+        metacognition: metacognitionScore - ((prevPortfolio as any).metacognition_score || 0),
+        planning: planningScore - ((prevPortfolio as any).planning_score || 0),
+        method: methodScore - ((prevPortfolio as any).method_diversity_score || 0),
+        collaboration: collaborationScore - ((prevPortfolio as any).collaboration_score || 0),
+        persistence: persistenceScore - ((prevPortfolio as any).persistence_score || 0),
+        autonomy: autonomyScore - ((prevPortfolio as any).autonomy_score || 0)
+      }
+    }
+
+    await env.DB.prepare(`
+      INSERT INTO skill_portfolio (student_id, plan_id, unit_name, subject, grade, metacognition_score, planning_score, self_regulation_score, method_diversity_score, collaboration_score, persistence_score, autonomy_score, reflection_quality_avg, previous_portfolio_id, growth_summary, ai_summary)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(student_id, plan_id, (plan as any)?.unit_name || '', (plan as any)?.subject || '', (plan as any)?.grade || '', metacognitionScore, planningScore, (metacognitionScore + planningScore) / 2, methodScore, collaborationScore, persistenceScore, autonomyScore, avgQuality, prevPortfolio ? (prevPortfolio as any).id : null, JSON.stringify(growthSummary), aiComment).run()
+
+    return c.json({
+      success: true,
+      scores,
+      score_labels: skillNames,
+      theory_references: theoryNames,
+      ai_comment: aiComment,
+      quality_level_avg: avgQuality,
+      growth: growthSummary,
+      stats: {
+        total_hours_done: doneRows.length,
+        total_cards_done: planRows.reduce((t: number, r: any) => { try { return t + JSON.parse(r.cards_done || '[]').length } catch { return t } }, 0),
+        total_selections_done: allSelections,
+        total_reflections: refs.length,
+        total_collaborations: collaborations.length,
+        plan_modifications: modifiedRows.length
+      }
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 粘り強さ測定 (理論ベース5次元 深化版) ---
+// =====================================================================
+// 粘り強さとは何か（理論的定義の深掘り）
+// =====================================================================
+// ■ 学習指導要領の定義（文部科学省2019年改訂）
+//   「主体的に学習に取り組む態度」= 粘り強さ ＋ 自己調整
+//   粘り強さ = 「知識及び技能を獲得したり思考力等を身に付けたりすることに向けた
+//              粘り強い取組を行おうとする側面」
+//   → つまり「目標に向かって途中で投げ出さずにやり続ける姿勢」
+//
+// ■ Duckworth Grit理論（2007, 2016）
+//   Grit = Perseverance of Effort（努力の粘り強さ）+ Consistency of Interest（興味の一貫性）
+//   → 短期の粘り強さ = 1つの課題に諦めずに取り組み続けること
+//   → 長期の粘り強さ = 単元を通じて学習を継続すること
+//   効果量 d=0.20（学業成績との相関 r=0.17, Credé et al. 2017）
+//   ※ 効果量は小さいが「テストでは測れない力」として教育的価値が高い
+//
+// ■ Dweck 成長マインドセット（2006）
+//   Fixed Mindset（固定的知能観）vs Growth Mindset（成長的知能観）
+//   成長マインドセット = 「能力は努力で伸びる」と信じ、困難を成長の機会と捉える
+//   効果量 d=0.19（Sisk et al. 2018 メタ分析）
+//   → 粘り強さとの関連: 失敗を恐れず再挑戦する姿勢
+//
+// ■ Academic Resilience（学業的レジリエンス, Yeager & Dweck 2012）
+//   逆境（難問・失敗・低得点）から立ち直り学び続ける力
+//   → 「できない」を「まだできない」に変換する思考パターン
+//
+// ■ Self-Determination Theory（自己決定理論, Deci & Ryan 1985）
+//   内発的動機づけ = 自律性 × 有能感 × 関係性
+//   → 粘り強さとの関連: 自分から深める行動は内発的動機の発現
+//
+// ■ Zimmerman 自己調整学習（1989, 2000）
+//   感情調整 = 困難に直面した際の感情コントロール能力
+//   → 粘り強さとの関連: 不安や焦りを制御して学び続ける力
+// =====================================================================
+app.post('/api/student-learning/measure-persistence', async (c) => {
+  const { env } = c
+  try {
+    const { student_id, plan_id, hour_number, task_completion_rate, session_duration_minutes, early_quit_count, retry_after_failure_count, gave_up_count, extra_tasks_attempted, review_initiated_count, confidence_during_difficulty } = await c.req.json()
+
+    // ===== 次元1: 継続性（Duckworth Grit - Perseverance of Effort） =====
+    // 「始めたことを最後までやり抜く力」
+    // 指標: タスク完了率 × 学習時間の持続 - 途中離脱
+    // 学習指導要領: 「粘り強い取組を行おうとする側面」に直結
+    const idealMinutes = 45 // 1コマの目安
+    const durationFactor = Math.min(1, (session_duration_minutes || 0) / idealMinutes) * 40
+    const completionFactor = (task_completion_rate || 0) * 40
+    const quitPenalty = (early_quit_count || 0) * 15
+    const continuityScore = Math.max(0, Math.min(100, completionFactor + durationFactor + 20 - quitPenalty))
+
+    // ===== 次元2: 挑戦性（Dweck Growth Mindset） =====
+    // 「間違いを恐れず難しいことに向かう力」
+    // 指標: 不正解後の再挑戦回数 - 諦めた回数
+    // Dweck: 「失敗は脳が成長している証拠」
+    const retryFactor = Math.min(60, (retry_after_failure_count || 0) * 15)
+    const gaveUpPenalty = (gave_up_count || 0) * 20
+    const challengeScore = Math.max(0, Math.min(100, 30 + retryFactor - gaveUpPenalty))
+
+    // ===== 次元3: 回復力（Academic Resilience - Yeager & Dweck 2012） =====
+    // 「つまずいても立ち直って学び続ける力」
+    // 指標: 諦めゼロならベースが高い、諦めても再挑戦すれば回復
+    // Yeager: 「困難を一時的な障害と捉えられるか」
+    let recoveryScore = 80
+    if (gave_up_count > 0) {
+      recoveryScore = Math.max(0, 80 - (gave_up_count * 25))
+      // 再挑戦で回復加点
+      recoveryScore += Math.min(40, (retry_after_failure_count || 0) * 10)
+    }
+    // ヒントを求める行動も回復力（help-seeking = 適応的方略, Newman 2002）
+    recoveryScore = Math.min(100, recoveryScore)
+
+    // ===== 次元4: 自発的深化（SDT - 内発的動機づけ） =====
+    // 「求められた以上のことに自分から取り組む力」
+    // 指標: 追加課題・自発的復習
+    // Deci & Ryan: 自律性欲求が満たされると内発的動機が高まる
+    const extraFactor = Math.min(50, (extra_tasks_attempted || 0) * 20)
+    const reviewFactor = Math.min(30, (review_initiated_count || 0) * 15)
+    const deepeningScore = Math.min(100, extraFactor + reviewFactor + 20)
+
+    // ===== 次元5: 感情的安定性（Zimmerman SRL 感情調整） =====
+    // 「困難に直面しても落ち着いて取り組める力」
+    // 指標: 手ごたえ（困難時の自己評価）
+    // Zimmerman: 自己調整学習の遂行フェーズにおける感情制御
+    const emotionalStability = confidence_during_difficulty
+      ? Math.min(100, Math.max(0, (confidence_during_difficulty) * 20 + 10))
+      : 50
+
+    // ===== 総合スコア（学習指導要領の重み付け） =====
+    // 「粘り強さ」を最も重視（継続性・挑戦性で50%）
+    // 「自己調整」に関わる部分（回復力・感情安定で35%）
+    // 「主体性」に関わる部分（自発的深化で15%）
+    const totalScore = Math.round(
+      continuityScore * 0.25 +
+      challengeScore * 0.25 +
+      recoveryScore * 0.20 +
+      deepeningScore * 0.15 +
+      emotionalStability * 0.15
+    )
+
+    await env.DB.prepare(`
+      INSERT INTO persistence_metrics (student_id, plan_id, hour_number, task_completion_rate, session_duration_minutes, early_quit_count, retry_after_failure_count, gave_up_count, extra_tasks_attempted, review_initiated_count, confidence_during_difficulty, persistence_total_score)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(student_id, plan_id, hour_number || 0, task_completion_rate || 0, session_duration_minutes || 0, early_quit_count || 0, retry_after_failure_count || 0, gave_up_count || 0, extra_tasks_attempted || 0, review_initiated_count || 0, confidence_during_difficulty || 3, totalScore).run()
+
+    // ===== 理論ベースアドバイス生成 =====
+    let advice = ''
+    const dimensions = [
+      {
+        name: '継続する力（やり抜く力）',
+        score: continuityScore,
+        theory: 'Duckworthグリット理論（努力の粘り強さ d=0.20）',
+        definition: '始めたことを最後までやり抜く力。テストの点数よりも将来の成功に関係する。',
+        low: '最後まで取り組むことを意識しよう。Duckworth先生は「毎日少しずつ」の積み重ねが一番大事だと言っている。短い時間でもいいから、やりきることが大切だよ。',
+        high: '最後まで取り組めるのはすばらしい！これが「やり抜く力（グリット）」。Duckworth先生の研究では、この力はテストの点数よりも将来の成功に関係しているんだ。'
+      },
+      {
+        name: '挑戦する力（成長マインドセット）',
+        score: challengeScore,
+        theory: 'Dweck成長マインドセット理論（d=0.19）',
+        definition: '間違いを恐れず難しいことに向かう力。「まだできない」は「これから成長する」という意味。',
+        low: '間違えても大丈夫。Dweck先生の研究では、間違った時こそ脳が一番成長しているんだ。「まだできない」は「これから成長する」という意味だよ。もう一回やってみよう。',
+        high: '難しい問題にも挑戦できるね！間違いから学ぼうとする姿勢は「成長マインドセット」。Dweck先生は「才能ではなく努力を信じる子ほど伸びる」と発見したんだ。'
+      },
+      {
+        name: '立ち直る力（レジリエンス）',
+        score: recoveryScore,
+        theory: '学業的レジリエンス理論（Yeager & Dweck 2012）',
+        definition: 'つまずいても立ち直って学び続ける力。困難を「一時的な壁」と捉えて乗り越える。',
+        low: 'うまくいかなくても、ヒントを見たり友だちに聞いたりしてみよう。「助けを求める」のも立派な学びの方略だよ（Newman先生のhelp-seeking研究）。立ち直る力は練習で伸びるよ。',
+        high: 'つまずいても立ち直れる力（レジリエンス）があるね。Yeager先生の研究では「困難を一時的な壁と捉えられる子」が最も伸びるとわかっている。この力があれば、どんな壁も乗り越えられるよ。'
+      },
+      {
+        name: '自分から深める力（内発的動機づけ）',
+        score: deepeningScore,
+        theory: 'Deci & Ryan 自己決定理論（d=0.61）',
+        definition: '求められた以上のことに自分から取り組む力。「やらされる」ではなく「やりたい」。',
+        low: '余裕があったら、もう1問やってみたり復習してみよう。Deci & Ryan先生の研究では「自分で決めてやること」が一番記憶に残りやすいよ。',
+        high: '自分から進んで追加問題や復習に取り組めるのはすごい！Deci & Ryan先生の「自己決定理論」では、内発的動機づけ（自分からやりたいと思う気持ち）が最も深い学びにつながると証明されている。'
+      },
+      {
+        name: '気持ちの安定（感情調整）',
+        score: emotionalStability,
+        theory: 'Zimmerman 自己調整学習 遂行フェーズ（d=0.52）',
+        definition: '困難に直面しても落ち着いて取り組める力。焦りや不安をコントロールする。',
+        low: '難しいと感じた時は深呼吸しよう。焦らなくて大丈夫。Zimmerman先生の研究では「自分のペースを守れる子」が結果的に一番速く進むんだ。',
+        high: '難しい問題でも落ち着いて取り組めているね。Zimmerman先生が発見した「自己調整」の中で、感情をコントロールする力は特に大事。この力がついている。'
+      }
+    ]
+
+    dimensions.forEach(d => {
+      const emoji = d.score >= 70 ? '🌟' : d.score >= 40 ? '📈' : '💡'
+      advice += `${emoji} ${d.name}: ${Math.round(d.score)}点\n`
+      advice += `   ${d.score >= 50 ? d.high : d.low}\n`
+      advice += `   📖 ${d.theory}\n\n`
+    })
+
+    // 総合メッセージ
+    if (totalScore >= 80) {
+      advice += `\n🏆 総合: 粘り強さが光っている！「主体的に学習に取り組む態度」（学習指導要領）の観点で、とても高い評価だよ。`
+    } else if (totalScore >= 50) {
+      advice += `\n📊 総合: 粘り強さが育ってきている。特に一番高い力をもっと伸ばしていこう！`
+    } else {
+      advice += `\n🌱 総合: これからどんどん伸びるよ！毎回の授業で少しずつ「やり抜く」経験を積み重ねよう。`
+    }
+
+    return c.json({
+      success: true,
+      total_score: totalScore,
+      dimensions: {
+        continuity: Math.round(continuityScore),
+        challenge: Math.round(challengeScore),
+        recovery: Math.round(recoveryScore),
+        deepening: Math.round(deepeningScore),
+        emotional_stability: Math.round(emotionalStability)
+      },
+      dimension_labels: {
+        continuity: '継続する力（やり抜く力）',
+        challenge: '挑戦する力（成長マインドセット）',
+        recovery: '立ち直る力（レジリエンス）',
+        deepening: '自分から深める力（内発的動機づけ）',
+        emotional_stability: '気持ちの安定（感情調整）'
+      },
+      advice,
+      theories: ['Duckworth_Grit', 'Dweck_Growth_Mindset', 'Academic_Resilience', 'SDT_Intrinsic_Motivation', 'Zimmerman_SRL'],
+      // 学習指導要領マッピング
+      curriculum_mapping: {
+        perseverance: '粘り強い取組を行おうとする側面',
+        self_regulation: '自らの学習を調整しようとする側面',
+        score_continuity_challenge: Math.round((continuityScore + challengeScore) / 2),
+        score_self_regulation: Math.round((recoveryScore + deepeningScore + emotionalStability) / 3)
+      }
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- ポートフォリオ取得（長期成長） ---
+app.get('/api/student-learning/portfolio/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  try {
+    const portfolios = await env.DB.prepare('SELECT * FROM skill_portfolio WHERE student_id = ? ORDER BY created_at ASC').bind(studentId).all()
+    const latest = await env.DB.prepare('SELECT * FROM skill_portfolio WHERE student_id = ? ORDER BY created_at DESC LIMIT 1').bind(studentId).first()
+    const persistenceHistory = await env.DB.prepare('SELECT plan_id, AVG(persistence_total_score) as avg_persistence FROM persistence_metrics WHERE student_id = ? GROUP BY plan_id ORDER BY measured_at ASC').bind(studentId).all()
+    const collabStats = await env.DB.prepare(`SELECT interaction_type, COUNT(*) as count FROM collaboration_records WHERE student_id = ? GROUP BY interaction_type`).bind(studentId).all()
+
+    return c.json({
+      success: true,
+      portfolios: portfolios.results || [],
+      latest,
+      persistence_history: persistenceHistory.results || [],
+      collaboration_stats: collabStats.results || [],
+      total_units: (portfolios.results || []).length
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- AI構想タイム提案（毎時間の最初） ---
+app.post('/api/student-learning/ai-suggestion', async (c) => {
+  const { env } = c
+  try {
+    const { plan_id, student_id, hour_number } = await c.req.json()
+
+    // 前回の振り返りと計画を取得
+    const prevReflection = await env.DB.prepare('SELECT * FROM hourly_reflections WHERE plan_id = ? AND hour_number = ? LIMIT 1').bind(plan_id, hour_number - 1).first()
+    const prevRow = await env.DB.prepare('SELECT * FROM study_plan_rows WHERE plan_id = ? AND hour_number = ? LIMIT 1').bind(plan_id, hour_number - 1).first()
+    const currentRow = await env.DB.prepare('SELECT * FROM study_plan_rows WHERE plan_id = ? AND hour_number = ? LIMIT 1').bind(plan_id, hour_number).first()
+    const plan = await env.DB.prepare('SELECT * FROM unit_study_plans WHERE id = ?').bind(plan_id).first()
+
+    let suggestion = ''
+    let theoryRef = ''
+
+    if (prevReflection) {
+      const prev = prevReflection as any
+      // 前回の振り返りに基づく提案
+      if (prev.confidence_rating <= 2) {
+        suggestion = `前回、手ごたえが低かったね。今日は前回のところを復習してから進むのもいいかも。焦らず自分のペースでいいよ。`
+        theoryRef = 'F3 エビングハウス忘却曲線: 復習すると記憶が強くなる'
+      } else if (prev.next_application && prev.next_application.length > 5) {
+        suggestion = `前回「${prev.next_application.substring(0, 40)}」と書いてたね。今日はそれを意識してみよう！前回の振り返りを活かせるのはすごいことだよ。`
+        theoryRef = 'F5 Zimmerman自己調整学習: 自己省察→次の予見へのサイクル'
+      } else {
+        suggestion = `前回までの調子がいいね。はじめの計画を見て、今日はどこまで進むか決めてみよう。`
+        theoryRef = 'F5 Zimmerman自己調整学習: 予見フェーズ'
+      }
+    } else if (hour_number === 1) {
+      suggestion = `最初の時間だね！学習のてびきをよく読んで、自分のペースで計画を立てよう。最初の計画は完璧じゃなくて大丈夫。あとで修正するのも大事な力だよ。`
+      theoryRef = 'F5 Zimmerman自己調整学習: 計画を立てて修正する力'
+    } else {
+      suggestion = `今日も自分のペースで進めよう。はじめの計画と今の進み具合を見て、今日の目標を決めてね。`
+      theoryRef = 'F8 Deci & Ryan自己決定理論: 自分で決めるとやる気が上がる'
+    }
+
+    // 計画のズレに関するメタ認知促進
+    if (currentRow && (currentRow as any).initial_plan) {
+      const initial = (currentRow as any).initial_plan
+      suggestion += `\n\n📋 はじめの計画:「${initial}」\n今の進み具合を見て、このまま進む？それとも変える？どちらも正しい判断だよ。`
+    }
+
+    return c.json({
+      success: true,
+      suggestion,
+      theory_reference: theoryRef,
+      hour_number,
+      has_previous_reflection: !!prevReflection
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 協働学習統計 ---
+app.get('/api/student-learning/collaboration-stats/:studentId', async (c) => {
+  const { env } = c
+  const studentId = c.req.param('studentId')
+  try {
+    const byType = await env.DB.prepare(`SELECT interaction_type, COUNT(*) as count FROM collaboration_records WHERE student_id = ? GROUP BY interaction_type`).bind(studentId).all()
+    const byPartner = await env.DB.prepare(`SELECT partner_name, COUNT(*) as count, GROUP_CONCAT(DISTINCT interaction_type) as types FROM collaboration_records WHERE student_id = ? GROUP BY partner_name ORDER BY count DESC`).bind(studentId).all()
+    const timeline = await env.DB.prepare(`SELECT plan_id, hour_number, partner_name, interaction_type, description, created_at FROM collaboration_records WHERE student_id = ? ORDER BY created_at DESC LIMIT 20`).bind(studentId).all()
+
+    // 協働レベル判定
+    const types = (byType.results || []) as any[]
+    let collabLevel = 1
+    const hasTeachTo = types.some(t => t.interaction_type === 'taught_to')
+    const hasTeachBy = types.some(t => t.interaction_type === 'taught_by')
+    const hasDiscussed = types.some(t => t.interaction_type === 'discussed')
+    if (hasTeachBy) collabLevel = 2
+    if (hasTeachBy && hasTeachTo) collabLevel = 4
+    if (hasDiscussed) collabLevel = Math.max(collabLevel, 5)
+    const totalCount = types.reduce((s: number, t: any) => s + t.count, 0)
+    if (totalCount === 0) collabLevel = 1
+
+    return c.json({
+      success: true,
+      by_type: byType.results || [],
+      by_partner: byPartner.results || [],
+      timeline: timeline.results || [],
+      collaboration_level: collabLevel,
+      level_label: ['', 'ひとりで学ぶ', '教えてもらう', '教えてもらい自分でもやる', '教える', '一緒に考える'][collabLevel],
+      total_interactions: totalCount
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
 export default app
 
 // ============================================================

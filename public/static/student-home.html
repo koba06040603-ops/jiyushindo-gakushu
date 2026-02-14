@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学習のてびき - 自由進度学習システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-glow { animation: pulseGlow 2s infinite; }
+        @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.3); } 50% { box-shadow: 0 0 0 8px rgba(59,130,246,0); } }
+        .plan-row-done { background: linear-gradient(90deg, #f0fdf4 0%, #dcfce7 100%); }
+        .plan-row-active { background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid #3b82f6; }
+        .plan-row-planned { background: #fafafa; }
+        .card-chip { transition: all 0.2s; }
+        .card-chip:hover { transform: scale(1.05); }
+        .card-chip.done { background: #22c55e; color: white; }
+        .card-chip.current { background: #3b82f6; color: white; animation: pulseGlow 2s infinite; }
+        .card-chip.future { background: #e5e7eb; color: #6b7280; }
+        .feeling-btn { transition: all 0.15s; cursor: pointer; }
+        .feeling-btn:hover { transform: scale(1.3); }
+        .feeling-btn.selected { transform: scale(1.3); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        .progress-track { background: #e5e7eb; border-radius: 9999px; overflow: hidden; }
+        .progress-fill { transition: width 0.8s ease-out; border-radius: 9999px; }
+        .ai-bubble { background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%); border: 1px solid #c7d2fe; }
+        .theory-tag { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: #f3e8ff; color: #7c3aed; }
+        .section-card { transition: all 0.2s; }
+        .section-card:hover { box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+        .persistence-bar { transition: width 1s ease-out; }
+        .tab-btn.active { border-bottom: 3px solid #3b82f6; color: #3b82f6; font-weight: 700; }
+        .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .date-cell { min-width: 90px; }
+        @media (max-width: 768px) {
+            .plan-table { font-size: 0.75rem; }
+            .plan-table th, .plan-table td { padding: 6px 4px; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen">
+
+<!-- ========== ヘッダー ========== -->
+<header class="bg-white shadow-md sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-3">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-book-open text-2xl text-blue-600"></i>
+                <div>
+                    <h1 class="text-lg font-bold text-gray-800" id="headerTitle">学習のてびき</h1>
+                    <p class="text-xs text-gray-500" id="headerSubtitle">単元を読み込み中...</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full" id="courseLabel">コース未選択</span>
+                <div class="text-right text-xs text-gray-500">
+                    <span id="studentName">児童</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ========== メインコンテンツ ========== -->
+<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- ===== Phase: 新規 or 継続判定 ===== -->
+    <div id="loadingScreen" class="text-center py-16">
+        <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+        <p class="text-gray-600">学習データを読み込んでいます...</p>
+    </div>
+
+    <!-- ===== Phase 0: 計画作成（オリエンテーション・初回のみ） ===== -->
+    <div id="phase0" class="hidden space-y-6">
+        <!-- 単元目標 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-flag text-green-500 mr-2"></i>単元の目標
+            </h2>
+            <div class="bg-green-50 rounded-xl p-4 mb-4">
+                <p id="unitGoalDisplay" class="text-gray-700 font-medium">（教師が設定した目標）</p>
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-1">
+                    <i class="fas fa-star text-yellow-500 mr-1"></i>わたしのめあて
+                </label>
+                <textarea id="personalGoalInput" rows="2" placeholder="この単元で自分がめざすこと..." class="w-full px-4 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 text-sm"></textarea>
+            </div>
+        </div>
+
+        <!-- コース選択 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-route text-purple-500 mr-2"></i>コースをえらぼう
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div onclick="selectCourse('slow')" id="course-slow" class="cursor-pointer border-2 border-gray-200 rounded-2xl p-5 text-center hover:border-green-400 hover:bg-green-50 transition">
+                    <div class="text-3xl mb-2">🐢</div>
+                    <h3 class="font-bold text-green-700">じっくりコース</h3>
+                    <p class="text-xs text-gray-600 mt-1">ゆっくりていねいに進める。カード1枚ずつしっかり理解する。</p>
+                </div>
+                <div onclick="selectCourse('steady')" id="course-steady" class="cursor-pointer border-2 border-gray-200 rounded-2xl p-5 text-center hover:border-blue-400 hover:bg-blue-50 transition">
+                    <div class="text-3xl mb-2">🐕</div>
+                    <h3 class="font-bold text-blue-700">しっかりコース</h3>
+                    <p class="text-xs text-gray-600 mt-1">教科書のペースでバランスよく進める。</p>
+                </div>
+                <div onclick="selectCourse('fast')" id="course-fast" class="cursor-pointer border-2 border-gray-200 rounded-2xl p-5 text-center hover:border-orange-400 hover:bg-orange-50 transition">
+                    <div class="text-3xl mb-2">🐆</div>
+                    <h3 class="font-bold text-orange-700">ぐんぐんコース</h3>
+                    <p class="text-xs text-gray-600 mt-1">はやめに進んで、発展問題や選択課題にたくさん挑戦する。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 学習計画表（はじめの計画） -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <h2 class="text-xl font-bold text-gray-800 mb-2">
+                <i class="fas fa-calendar-alt text-blue-500 mr-2"></i>はじめの学習計画表
+            </h2>
+            <p class="text-sm text-gray-500 mb-4">各時間に「何をするか」と「予定日」を書こう。あとで変えても大丈夫だよ。</p>
+            <div class="overflow-x-auto">
+                <table class="w-full plan-table text-sm" id="initialPlanTable">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="px-3 py-2 text-left rounded-tl-lg">時</th>
+                            <th class="px-3 py-2 text-left date-cell">予定日</th>
+                            <th class="px-3 py-2 text-left">はじめの計画（何をする？）</th>
+                        </tr>
+                    </thead>
+                    <tbody id="initialPlanBody"></tbody>
+                </table>
+            </div>
+            <div class="mt-6 text-center">
+                <button onclick="saveInitialPlan()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg transition pulse-glow">
+                    <i class="fas fa-rocket mr-2"></i>計画を決定して学習をはじめる！
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Phase 1: 見通しタイム（毎時間の最初） ===== -->
+    <div id="phase1" class="hidden space-y-6">
+        <!-- AI提案パネル -->
+        <div class="ai-bubble rounded-2xl p-5 fade-in">
+            <div class="flex items-start space-x-3">
+                <div class="text-2xl">🤖</div>
+                <div class="flex-1">
+                    <p class="font-semibold text-sm text-indigo-800 mb-1">AIからの提案</p>
+                    <p id="aiSuggestionText" class="text-sm text-gray-700">読み込み中...</p>
+                    <span id="aiTheoryRef" class="theory-tag mt-2 inline-block"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 単元全体の見渡し＋計画表 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">
+                    <i class="fas fa-map text-blue-500 mr-2"></i>わたしの学習計画表
+                </h2>
+                <div class="flex items-center space-x-2 text-xs">
+                    <span class="text-gray-500">第</span>
+                    <span id="currentHourBadge" class="bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">?</span>
+                    <span class="text-gray-500">/ <span id="totalHoursBadge">?</span> 時間</span>
+                </div>
+            </div>
+
+            <!-- 進捗マップ: カード→テスト→選択課題 -->
+            <div class="mb-4">
+                <p class="text-xs font-semibold text-gray-600 mb-2">
+                    <i class="fas fa-tasks mr-1"></i>学習の流れ
+                </p>
+                <div class="flex items-center flex-wrap gap-1" id="progressChips"></div>
+                <div class="mt-2 flex items-center space-x-4 text-xs text-gray-500">
+                    <span><span class="inline-block w-3 h-3 rounded bg-green-500 mr-1"></span>完了</span>
+                    <span><span class="inline-block w-3 h-3 rounded bg-blue-500 mr-1"></span>いまここ</span>
+                    <span><span class="inline-block w-3 h-3 rounded bg-gray-300 mr-1"></span>これから</span>
+                </div>
+            </div>
+
+            <!-- 進捗バー -->
+            <div class="mb-4">
+                <div class="flex justify-between text-xs text-gray-600 mb-1">
+                    <span>全体の進み具合</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress-track h-3">
+                    <div id="progressBar" class="progress-fill h-3 bg-gradient-to-r from-blue-500 to-green-500" style="width:0%"></div>
+                </div>
+            </div>
+
+            <!-- 計画表（全時間見渡し） -->
+            <div class="overflow-x-auto">
+                <table class="w-full plan-table text-sm" id="planOverviewTable">
+                    <thead>
+                        <tr class="bg-gray-50 text-xs">
+                            <th class="px-2 py-2 text-center w-10">時</th>
+                            <th class="px-2 py-2 text-left date-cell">予定日</th>
+                            <th class="px-2 py-2 text-left date-cell">実施日</th>
+                            <th class="px-2 py-2 text-left">はじめの計画</th>
+                            <th class="px-2 py-2 text-left">きょうの計画</th>
+                            <th class="px-2 py-2 text-left">やったこと</th>
+                            <th class="px-2 py-2 text-center w-16">振り返り</th>
+                            <th class="px-2 py-2 text-center w-12">AI</th>
+                        </tr>
+                    </thead>
+                    <tbody id="planOverviewBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- きょうの構想 -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <h2 class="text-lg font-bold text-gray-800 mb-3">
+                <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>きょうの構想（見通しタイム）
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">きょうのめあて</label>
+                    <input type="text" id="todayGoalInput" placeholder="きょうの授業で達成したいこと" class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">きょうの計画</label>
+                    <input type="text" id="todayPlanInput" placeholder="例: カード3をやる、チェックテストまで進む" class="w-full px-3 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 text-sm">
+                </div>
+            </div>
+            <div class="mt-4 text-center">
+                <button onclick="saveTodayPlanAndStart()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition">
+                    <i class="fas fa-play mr-2"></i>学習を開始する
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Phase 2: 学習実行中 ===== -->
+    <div id="phase2" class="hidden space-y-6">
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-800">
+                    <i class="fas fa-pencil-alt text-green-500 mr-2"></i>学習中
+                </h2>
+                <span class="text-xs bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">
+                    <i class="fas fa-clock mr-1"></i><span id="studyTimer">00:00</span>
+                </span>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">
+                きょうのめあて: <strong id="todayGoalShow"></strong>
+            </p>
+
+            <!-- 学習カードリスト + チェックテスト + 選択課題 -->
+            <div class="space-y-3">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">学習カード</p>
+                <div id="cardCheckboxes" class="flex flex-wrap gap-2"></div>
+
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-4">チェックテスト</p>
+                <div id="checkTestArea" class="flex items-center space-x-3">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="checkTestDone" class="w-5 h-5 rounded text-blue-600">
+                        <span class="text-sm">チェックテスト完了</span>
+                    </label>
+                    <input type="number" id="checkTestScore" placeholder="点数" min="0" max="100" class="w-20 px-2 py-1 border rounded text-sm">
+                    <span class="text-xs text-gray-500">/ <input type="number" id="checkTestMax" value="100" min="1" class="w-16 px-2 py-1 border rounded text-sm"> 点</span>
+                </div>
+
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-4">選択課題</p>
+                <div id="selectionCheckboxes" class="flex flex-wrap gap-2"></div>
+            </div>
+
+            <div class="mt-6 text-center">
+                <button onclick="finishLearning()" class="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition">
+                    <i class="fas fa-check-circle mr-2"></i>学習おわり → ふりかえりへ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Phase 3: 振り返りタイム ===== -->
+    <div id="phase3" class="hidden space-y-6">
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">
+                <i class="fas fa-pencil-alt text-purple-500 mr-2"></i>ふりかえりタイム
+            </h2>
+
+            <!-- やったこと自動記録 -->
+            <div class="bg-gray-50 rounded-xl p-4 mb-4">
+                <p class="text-xs font-semibold text-gray-500 mb-1">① やったこと（自動記録）</p>
+                <p id="autoRecordSummary" class="text-sm text-gray-700"></p>
+                <textarea id="actualDoneExtra" rows="1" placeholder="ほかにやったことがあれば追加..." class="w-full mt-2 px-3 py-1 border rounded-lg text-sm"></textarea>
+            </div>
+
+            <!-- 観点別振り返り -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        ② わかったこと・わからなかったこと
+                        <span class="text-xs text-gray-400 ml-1">（内容のふりかえり）</span>
+                    </label>
+                    <textarea id="refContentLearned" rows="2" placeholder="この時間でわかったこと、まだわからないこと..." class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-400 text-sm"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        ③ どうやって学んだか
+                        <span class="text-xs text-gray-400 ml-1">（学び方のふりかえり ← メタ認知の力をきたえる！）</span>
+                    </label>
+                    <textarea id="refMethodReflection" rows="2" placeholder="例：教科書を読んでからカードをやった、友だちに聞いてみた..." class="w-full px-3 py-2 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-400 text-sm bg-indigo-50"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">
+                        ④ つぎにいかすこと
+                        <span class="text-xs text-gray-400 ml-1">（自己調整の力をきたえる！）</span>
+                    </label>
+                    <textarea id="refNextApplication" rows="2" placeholder="次の時間に気をつけること、やってみたいこと..." class="w-full px-3 py-2 border-2 border-green-200 rounded-xl focus:ring-2 focus:ring-green-400 text-sm bg-green-50"></textarea>
+                </div>
+
+                <!-- 友だちとの学び -->
+                <div class="bg-yellow-50 rounded-xl p-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        ⑤ 友だちとの学び
+                    </label>
+                    <div class="flex items-center space-x-4 mb-2">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="friendLearning" value="0" checked onchange="toggleFriendSection()" class="text-blue-600">
+                            <span class="text-sm">ひとりで学んだ</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="friendLearning" value="1" onchange="toggleFriendSection()" class="text-blue-600">
+                            <span class="text-sm">友だちと学んだ</span>
+                        </label>
+                    </div>
+                    <div id="friendDetails" class="hidden space-y-2 mt-2">
+                        <input type="text" id="friendNamesInput" placeholder="友だちの名前（カンマ区切り）" class="w-full px-3 py-1.5 border rounded-lg text-sm">
+                        <div class="flex flex-wrap gap-2">
+                            <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1 rounded-lg border cursor-pointer">
+                                <input type="checkbox" value="taught_by" class="friend-type"> 教えてもらった
+                            </label>
+                            <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1 rounded-lg border cursor-pointer">
+                                <input type="checkbox" value="taught_to" class="friend-type"> 教えてあげた
+                            </label>
+                            <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1 rounded-lg border cursor-pointer">
+                                <input type="checkbox" value="discussed" class="friend-type"> いっしょに考えた
+                            </label>
+                        </div>
+                        <textarea id="friendInteraction" rows="1" placeholder="どんなことをした？" class="w-full px-3 py-1.5 border rounded-lg text-sm"></textarea>
+                    </div>
+                </div>
+
+                <!-- 手ごたえ -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">⑥ 手ごたえ</label>
+                    <div class="flex items-center space-x-4">
+                        <span onclick="setConfidence(1)" class="feeling-btn text-2xl" data-val="1">😰</span>
+                        <span onclick="setConfidence(2)" class="feeling-btn text-2xl" data-val="2">😟</span>
+                        <span onclick="setConfidence(3)" class="feeling-btn text-2xl" data-val="3">😐</span>
+                        <span onclick="setConfidence(4)" class="feeling-btn text-2xl" data-val="4">😊</span>
+                        <span onclick="setConfidence(5)" class="feeling-btn text-2xl" data-val="5">🤩</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 text-center">
+                <button onclick="submitReflection()" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition">
+                    <i class="fas fa-paper-plane mr-2"></i>ふりかえりを送る
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Phase 4: AI評価表示 ===== -->
+    <div id="phase4" class="hidden space-y-6">
+        <div class="ai-bubble rounded-2xl p-6 fade-in">
+            <div class="flex items-start space-x-3 mb-4">
+                <div class="text-3xl">🤖</div>
+                <div>
+                    <p class="font-bold text-indigo-800">ふりかえりAIからのコメント</p>
+                    <div class="flex items-center space-x-2 mt-1">
+                        <span id="qualityLevelBadge" class="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full font-medium"></span>
+                    </div>
+                </div>
+            </div>
+            <div id="aiFeedbackContent" class="text-sm text-gray-700 whitespace-pre-line leading-relaxed"></div>
+            <div id="aiTheories" class="mt-3 flex flex-wrap gap-1"></div>
+        </div>
+
+        <!-- 粘り強さレーダー（この時間分） -->
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">
+                <i class="fas fa-fist-raised text-orange-500 mr-2"></i>粘り強さの5つの力
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <canvas id="persistenceRadar" width="300" height="300"></canvas>
+                </div>
+                <div id="persistenceAdvice" class="text-sm space-y-2"></div>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <button onclick="endLesson()" class="bg-gray-700 hover:bg-gray-800 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition">
+                <i class="fas fa-home mr-2"></i>てびきに戻る
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== Phase 5: 単元全体振り返り ===== -->
+    <div id="phase5" class="hidden space-y-6">
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-trophy text-yellow-500 mr-2"></i>単元全体のふりかえり
+            </h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">単元のめあてはどうだったか</label>
+                    <textarea id="unitRefGoal" rows="2" class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm" placeholder="はじめに立てためあては達成できた？"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">いちばん大事だと思ったこと</label>
+                    <textarea id="unitRefImportant" rows="2" class="w-full px-3 py-2 border-2 border-gray-200 rounded-xl text-sm" placeholder="この単元で一番大切だと思ったことは？"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">うまくいった学び方</label>
+                    <textarea id="unitRefMethods" rows="2" class="w-full px-3 py-2 border-2 border-indigo-200 rounded-xl text-sm bg-indigo-50" placeholder="どんな学び方がうまくいった？"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">計画のしかたについて</label>
+                    <textarea id="unitRefPlanning" rows="2" class="w-full px-3 py-2 border-2 border-blue-200 rounded-xl text-sm bg-blue-50" placeholder="計画はうまく立てられた？修正はどうだった？"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">友だちとの学びについて</label>
+                    <textarea id="unitRefFriend" rows="2" class="w-full px-3 py-2 border-2 border-yellow-200 rounded-xl text-sm bg-yellow-50" placeholder="友だちと学んだことでよかったことは？"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">次の単元にいかしたいこと</label>
+                    <textarea id="unitRefNext" rows="2" class="w-full px-3 py-2 border-2 border-green-200 rounded-xl text-sm bg-green-50" placeholder="次の単元では何をがんばりたい？"></textarea>
+                </div>
+            </div>
+            <div class="mt-6 text-center">
+                <button onclick="submitUnitReflection()" class="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg transition">
+                    <i class="fas fa-award mr-2"></i>単元のふりかえりを送る
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Phase 6: 単元AI総合評価 ===== -->
+    <div id="phase6" class="hidden space-y-6">
+        <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-chart-bar text-blue-500 mr-2"></i>AI総合評価
+            </h2>
+            <div id="unitAiComment" class="ai-bubble rounded-xl p-5 text-sm whitespace-pre-line leading-relaxed mb-6"></div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="unitScoreCards"></div>
+            <div class="mt-6">
+                <canvas id="unitSkillChart" height="200"></canvas>
+            </div>
+            <div class="mt-4 bg-gray-50 rounded-xl p-4">
+                <h4 class="text-sm font-bold text-gray-700 mb-2">📊 学習統計</h4>
+                <div id="unitStats" class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm"></div>
+            </div>
+        </div>
+        <div class="text-center">
+            <button onclick="goToPortfolio()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition">
+                <i class="fas fa-book mr-2"></i>ポートフォリオを見る
+            </button>
+        </div>
+    </div>
+
+</main>
+
+<!-- ===== JavaScript ===== -->
+<script>
+// ========== 状態管理 ==========
+const STATE = {
+    studentId: null,
+    planId: null,
+    plan: null,
+    rows: [],
+    reflections: [],
+    currentHour: 1,
+    selectedCourse: 'steady',
+    confidenceRating: 3,
+    studyStartTime: null,
+    timerInterval: null,
+    // 単元設定（デモ / 教師設定から取得）
+    unitConfig: {
+        unit_name: '小数のかけ算',
+        grade: '5年',
+        subject: '算数',
+        total_hours: 8,
+        total_cards: 6,
+        total_check_tests: 1,
+        total_selection_tasks: 6,
+        selection_task_names: ['発展問題', '文章題チャレンジ', 'パズル問題', '説明する問題', '生活に使おう', '友だちと考えよう'],
+        unit_goal: '小数のかけ算のしくみを理解し、いろいろな場面で使えるようになる。'
+    }
+}
+
+// URLパラメータ取得
+const params = new URLSearchParams(window.location.search)
+STATE.studentId = params.get('student_id') || 1
+const planIdParam = params.get('plan_id')
+
+// ========== 初期化 ==========
+async function init() {
+    try {
+        if (planIdParam) {
+            // 既存計画の読み込み
+            const res = await axios.get(`/api/student-learning/plan/${planIdParam}`)
+            if (res.data.success) {
+                STATE.planId = parseInt(planIdParam)
+                STATE.plan = res.data.plan
+                STATE.rows = res.data.rows
+                STATE.reflections = res.data.reflections
+                STATE.unitConfig.unit_name = STATE.plan.unit_name
+                STATE.unitConfig.total_hours = STATE.plan.total_hours
+                STATE.unitConfig.total_cards = STATE.plan.total_cards
+                STATE.unitConfig.total_check_tests = STATE.plan.total_check_tests
+                STATE.unitConfig.total_selection_tasks = STATE.plan.total_selection_tasks
+                try { STATE.unitConfig.selection_task_names = JSON.parse(STATE.plan.selection_task_names || '[]') } catch {}
+                STATE.unitConfig.unit_goal = STATE.plan.unit_goal
+                STATE.selectedCourse = STATE.plan.course_type || 'steady'
+                updateHeader()
+                determinePhase()
+            } else {
+                showPhase0()
+            }
+        } else {
+            // 生徒の最新の active plan を探す
+            const res = await axios.get(`/api/student-learning/plans/${STATE.studentId}`)
+            if (res.data.success && res.data.plans.length > 0) {
+                const activePlan = res.data.plans.find(p => p.status === 'active')
+                if (activePlan) {
+                    STATE.planId = activePlan.id
+                    // リロード
+                    const planRes = await axios.get(`/api/student-learning/plan/${activePlan.id}`)
+                    STATE.plan = planRes.data.plan
+                    STATE.rows = planRes.data.rows
+                    STATE.reflections = planRes.data.reflections
+                    STATE.unitConfig.unit_name = STATE.plan.unit_name
+                    STATE.unitConfig.total_hours = STATE.plan.total_hours
+                    STATE.unitConfig.total_cards = STATE.plan.total_cards
+                    STATE.unitConfig.total_check_tests = STATE.plan.total_check_tests
+                    STATE.unitConfig.total_selection_tasks = STATE.plan.total_selection_tasks
+                    try { STATE.unitConfig.selection_task_names = JSON.parse(STATE.plan.selection_task_names || '[]') } catch {}
+                    STATE.unitConfig.unit_goal = STATE.plan.unit_goal
+                    STATE.selectedCourse = STATE.plan.course_type || 'steady'
+                    updateHeader()
+                    determinePhase()
+                } else {
+                    showPhase0()
+                }
+            } else {
+                showPhase0()
+            }
+        }
+    } catch(e) {
+        console.error('Init error:', e)
+        showPhase0()
+    }
+    document.getElementById('loadingScreen').classList.add('hidden')
+}
+
+function updateHeader() {
+    document.getElementById('headerSubtitle').textContent = `${STATE.unitConfig.grade} ${STATE.unitConfig.subject}「${STATE.unitConfig.unit_name}」`
+    const courseLabels = { slow: '🐢 じっくり', steady: '🐕 しっかり', fast: '🐆 ぐんぐん' }
+    document.getElementById('courseLabel').textContent = courseLabels[STATE.selectedCourse] || 'コース未選択'
+    document.getElementById('studentName').textContent = `ID: ${STATE.studentId}`
+}
+
+function determinePhase() {
+    // 完了した時間数を確認
+    const doneRows = STATE.rows.filter(r => r.status === 'done')
+    const inProgressRow = STATE.rows.find(r => r.status === 'in_progress')
+    const allDone = doneRows.length >= STATE.unitConfig.total_hours
+
+    if (allDone) {
+        // 単元全体振り返り
+        showPhase5()
+    } else if (inProgressRow) {
+        // 学習中の時間がある → Phase2
+        STATE.currentHour = inProgressRow.hour_number
+        showPhase2()
+    } else {
+        // 次の時間の見通しタイム → Phase1
+        STATE.currentHour = doneRows.length + 1
+        showPhase1()
+    }
+}
+
+// ========== Phase表示制御 ==========
+function hideAllPhases() {
+    for (let i = 0; i <= 6; i++) {
+        const el = document.getElementById(`phase${i}`)
+        if (el) el.classList.add('hidden')
+    }
+}
+
+function showPhase0() {
+    hideAllPhases()
+    document.getElementById('phase0').classList.remove('hidden')
+    document.getElementById('unitGoalDisplay').textContent = STATE.unitConfig.unit_goal
+    renderInitialPlanTable()
+}
+
+function showPhase1() {
+    hideAllPhases()
+    document.getElementById('phase1').classList.remove('hidden')
+    document.getElementById('currentHourBadge').textContent = STATE.currentHour
+    document.getElementById('totalHoursBadge').textContent = STATE.unitConfig.total_hours
+    renderProgressChips()
+    renderPlanOverview()
+    loadAiSuggestion()
+}
+
+function showPhase2() {
+    hideAllPhases()
+    document.getElementById('phase2').classList.remove('hidden')
+    const row = STATE.rows.find(r => r.hour_number === STATE.currentHour)
+    document.getElementById('todayGoalShow').textContent = row?.today_goal || '（未設定）'
+    renderCardCheckboxes()
+    renderSelectionCheckboxes()
+    startStudyTimer()
+}
+
+function showPhase3() {
+    hideAllPhases()
+    document.getElementById('phase3').classList.remove('hidden')
+    renderAutoRecord()
+}
+
+function showPhase4(data) {
+    hideAllPhases()
+    document.getElementById('phase4').classList.remove('hidden')
+    renderAiFeedback(data)
+}
+
+function showPhase5() {
+    hideAllPhases()
+    document.getElementById('phase5').classList.remove('hidden')
+}
+
+function showPhase6(data) {
+    hideAllPhases()
+    document.getElementById('phase6').classList.remove('hidden')
+    renderUnitEvaluation(data)
+}
+
+// ========== Phase 0: 計画作成 ==========
+function selectCourse(type) {
+    STATE.selectedCourse = type
+    document.querySelectorAll('[id^="course-"]').forEach(el => {
+        el.classList.remove('border-green-500', 'border-blue-500', 'border-orange-500', 'bg-green-50', 'bg-blue-50', 'bg-orange-50')
+        el.classList.add('border-gray-200')
+    })
+    const colors = { slow: ['border-green-500', 'bg-green-50'], steady: ['border-blue-500', 'bg-blue-50'], fast: ['border-orange-500', 'bg-orange-50'] }
+    const el = document.getElementById(`course-${type}`)
+    el.classList.remove('border-gray-200')
+    el.classList.add(...colors[type])
+}
+
+function renderInitialPlanTable() {
+    const tbody = document.getElementById('initialPlanBody')
+    tbody.innerHTML = ''
+    for (let i = 1; i <= STATE.unitConfig.total_hours; i++) {
+        const tr = document.createElement('tr')
+        tr.className = 'border-b hover:bg-gray-50'
+        tr.innerHTML = `
+            <td class="px-3 py-2 font-bold text-blue-600">${i}</td>
+            <td class="px-3 py-2 date-cell">
+                <input type="date" class="init-date w-full px-2 py-1 border rounded text-xs" data-hour="${i}">
+            </td>
+            <td class="px-3 py-2">
+                <input type="text" class="init-plan w-full px-2 py-1 border rounded text-xs" data-hour="${i}" placeholder="${getDefaultPlanHint(i)}">
+            </td>
+        `
+        tbody.appendChild(tr)
+    }
+}
+
+function getDefaultPlanHint(hour) {
+    const total = STATE.unitConfig.total_hours
+    if (hour === 1) return 'オリエンテーション・計画づくり'
+    if (hour <= Math.ceil(total * 0.6)) return `カード${hour - 1}をやる`
+    if (hour === Math.ceil(total * 0.7)) return 'チェックテスト'
+    if (hour <= total - 1) return '選択課題に取り組む'
+    if (hour === total) return '単元全体のふりかえり'
+    return ''
+}
+
+async function saveInitialPlan() {
+    try {
+        const personalGoal = document.getElementById('personalGoalInput').value
+        // 1. 計画作成
+        const createRes = await axios.post('/api/student-learning/create-plan', {
+            student_id: STATE.studentId,
+            unit_name: STATE.unitConfig.unit_name,
+            grade: STATE.unitConfig.grade,
+            subject: STATE.unitConfig.subject,
+            course_type: STATE.selectedCourse,
+            total_hours: STATE.unitConfig.total_hours,
+            total_cards: STATE.unitConfig.total_cards,
+            total_check_tests: STATE.unitConfig.total_check_tests,
+            total_selection_tasks: STATE.unitConfig.total_selection_tasks,
+            selection_task_names: STATE.unitConfig.selection_task_names,
+            unit_goal: STATE.unitConfig.unit_goal,
+            personal_goal: personalGoal,
+            start_date: document.querySelector('.init-date')?.value || '',
+            end_date: document.querySelectorAll('.init-date')[STATE.unitConfig.total_hours - 1]?.value || ''
+        })
+
+        if (!createRes.data.success) throw new Error(createRes.data.error)
+        STATE.planId = createRes.data.plan_id
+
+        // 2. 各時間のはじめの計画を保存
+        const rows = []
+        for (let i = 1; i <= STATE.unitConfig.total_hours; i++) {
+            const planInput = document.querySelector(`.init-plan[data-hour="${i}"]`)
+            const dateInput = document.querySelector(`.init-date[data-hour="${i}"]`)
+            rows.push({
+                hour_number: i,
+                initial_plan: planInput?.value || '',
+                planned_date: dateInput?.value || ''
+            })
+        }
+        await axios.post('/api/student-learning/save-initial-plans', { plan_id: STATE.planId, rows })
+
+        // 3. 計画データを再取得
+        const planRes = await axios.get(`/api/student-learning/plan/${STATE.planId}`)
+        STATE.plan = planRes.data.plan
+        STATE.rows = planRes.data.rows
+        STATE.reflections = planRes.data.reflections
+        STATE.currentHour = 1
+
+        updateHeader()
+        showPhase1()
+    } catch (e) {
+        alert('保存に失敗しました: ' + (e.message || e))
+    }
+}
+
+// ========== Phase 1: 見通しタイム ==========
+function renderProgressChips() {
+    const container = document.getElementById('progressChips')
+    container.innerHTML = ''
+
+    // カードの進捗を集計
+    const allCardsDone = new Set()
+    const allSelectionsDone = new Set()
+    let checkTestDone = false
+    STATE.rows.forEach(r => {
+        try { JSON.parse(r.cards_done || '[]').forEach(c => allCardsDone.add(c)) } catch {}
+        try { JSON.parse(r.selection_tasks_done || '[]').forEach(s => allSelectionsDone.add(s)) } catch {}
+        if (r.check_test_done) checkTestDone = true
+    })
+
+    // カードチップ
+    for (let i = 1; i <= STATE.unitConfig.total_cards; i++) {
+        const done = allCardsDone.has(i)
+        const cls = done ? 'done' : 'future'
+        container.innerHTML += `<span class="card-chip ${cls} px-2 py-1 rounded-lg text-xs font-medium">📝 カード${i}</span>`
+    }
+
+    // チェックテスト
+    container.innerHTML += `<span class="text-gray-400 mx-1">→</span>`
+    container.innerHTML += `<span class="card-chip ${checkTestDone ? 'done' : 'future'} px-2 py-1 rounded-lg text-xs font-medium">📋 チェックテスト</span>`
+
+    // 選択課題
+    container.innerHTML += `<span class="text-gray-400 mx-1">→</span>`
+    const taskNames = STATE.unitConfig.selection_task_names || []
+    for (let i = 1; i <= STATE.unitConfig.total_selection_tasks; i++) {
+        const done = allSelectionsDone.has(i)
+        const name = taskNames[i - 1] || `課題${i}`
+        container.innerHTML += `<span class="card-chip ${done ? 'done' : 'future'} px-2 py-1 rounded-lg text-xs font-medium">🎯 ${name}</span>`
+    }
+
+    // 進捗率計算
+    const totalItems = STATE.unitConfig.total_cards + 1 + STATE.unitConfig.total_selection_tasks
+    const doneItems = allCardsDone.size + (checkTestDone ? 1 : 0) + allSelectionsDone.size
+    const pct = Math.round(doneItems / totalItems * 100)
+    document.getElementById('progressPercent').textContent = `${pct}%`
+    document.getElementById('progressBar').style.width = `${pct}%`
+}
+
+function renderPlanOverview() {
+    const tbody = document.getElementById('planOverviewBody')
+    tbody.innerHTML = ''
+    const refMap = {}
+    STATE.reflections.forEach(r => { refMap[r.hour_number] = r })
+
+    STATE.rows.forEach(row => {
+        const isCurrent = row.hour_number === STATE.currentHour
+        const isDone = row.status === 'done'
+        const ref = refMap[row.hour_number]
+        const rowClass = isDone ? 'plan-row-done' : (isCurrent ? 'plan-row-active' : 'plan-row-planned')
+
+        const tr = document.createElement('tr')
+        tr.className = `${rowClass} border-b text-xs`
+        tr.innerHTML = `
+            <td class="px-2 py-2 text-center font-bold">${row.hour_number}</td>
+            <td class="px-2 py-2 date-cell">${row.planned_date || '-'}</td>
+            <td class="px-2 py-2 date-cell">${row.actual_date || (isCurrent ? '<span class=text-blue-500>きょう</span>' : '-')}</td>
+            <td class="px-2 py-2">${row.initial_plan || '-'}</td>
+            <td class="px-2 py-2">${row.today_plan || (isCurrent ? '<em class="text-gray-400">入力してね</em>' : '-')}</td>
+            <td class="px-2 py-2">${row.actual_done || (isDone ? summarizeProgress(row) : '-')}</td>
+            <td class="px-2 py-2 text-center">${ref ? renderQualityStars(ref.reflection_quality_level) : '-'}</td>
+            <td class="px-2 py-2 text-center">${ref?.ai_feedback ? '✅' : '-'}</td>
+        `
+        tbody.appendChild(tr)
+    })
+}
+
+function summarizeProgress(row) {
+    const parts = []
+    try {
+        const cards = JSON.parse(row.cards_done || '[]')
+        if (cards.length) parts.push(`カード${cards.join(',')}`)
+    } catch {}
+    if (row.check_test_done) parts.push(`テスト${row.check_test_score || ''}点`)
+    try {
+        const sel = JSON.parse(row.selection_tasks_done || '[]')
+        if (sel.length) parts.push(`課題${sel.length}個`)
+    } catch {}
+    return parts.join(' / ') || '-'
+}
+
+function renderQualityStars(level) {
+    if (!level) return '-'
+    const stars = '★'.repeat(level) + '☆'.repeat(5 - level)
+    const colors = ['', 'text-gray-400', 'text-gray-500', 'text-yellow-500', 'text-yellow-600', 'text-yellow-500']
+    return `<span class="${colors[level]} text-xs">${stars}</span>`
+}
+
+async function loadAiSuggestion() {
+    try {
+        const res = await axios.post('/api/student-learning/ai-suggestion', {
+            plan_id: STATE.planId,
+            student_id: STATE.studentId,
+            hour_number: STATE.currentHour
+        })
+        if (res.data.success) {
+            document.getElementById('aiSuggestionText').textContent = res.data.suggestion
+            document.getElementById('aiTheoryRef').textContent = res.data.theory_reference
+        }
+    } catch (e) {
+        document.getElementById('aiSuggestionText').textContent = '今日も自分のペースで進めよう！'
+    }
+}
+
+async function saveTodayPlanAndStart() {
+    const todayPlan = document.getElementById('todayPlanInput').value
+    const todayGoal = document.getElementById('todayGoalInput').value
+    if (!todayGoal && !todayPlan) {
+        if (!confirm('計画とめあてが空だけど、学習を始める？')) return
+    }
+    try {
+        await axios.post('/api/student-learning/save-today-plan', {
+            plan_id: STATE.planId,
+            hour_number: STATE.currentHour,
+            today_plan: todayPlan,
+            today_goal: todayGoal,
+            actual_date: new Date().toISOString().split('T')[0]
+        })
+        // ローカル状態更新
+        const row = STATE.rows.find(r => r.hour_number === STATE.currentHour)
+        if (row) {
+            row.today_plan = todayPlan
+            row.today_goal = todayGoal
+            row.status = 'in_progress'
+            row.actual_date = new Date().toISOString().split('T')[0]
+        }
+        showPhase2()
+    } catch (e) {
+        alert('保存に失敗: ' + (e.message || e))
+    }
+}
+
+// ========== Phase 2: 学習実行 ==========
+function renderCardCheckboxes() {
+    const container = document.getElementById('cardCheckboxes')
+    container.innerHTML = ''
+    const allCardsDone = new Set()
+    STATE.rows.filter(r => r.status === 'done').forEach(r => {
+        try { JSON.parse(r.cards_done || '[]').forEach(c => allCardsDone.add(c)) } catch {}
+    })
+
+    for (let i = 1; i <= STATE.unitConfig.total_cards; i++) {
+        const prevDone = allCardsDone.has(i)
+        container.innerHTML += `
+            <label class="flex items-center space-x-1 bg-white border-2 ${prevDone ? 'border-green-300 bg-green-50' : 'border-gray-200'} rounded-lg px-3 py-2 cursor-pointer hover:bg-blue-50 transition">
+                <input type="checkbox" class="card-cb w-4 h-4 text-green-600 rounded" value="${i}" ${prevDone ? 'checked disabled' : ''}>
+                <span class="text-sm ${prevDone ? 'text-green-600 line-through' : ''}">カード${i}</span>
+            </label>
+        `
+    }
+}
+
+function renderSelectionCheckboxes() {
+    const container = document.getElementById('selectionCheckboxes')
+    container.innerHTML = ''
+    const allSelDone = new Set()
+    STATE.rows.filter(r => r.status === 'done').forEach(r => {
+        try { JSON.parse(r.selection_tasks_done || '[]').forEach(s => allSelDone.add(s)) } catch {}
+    })
+    const names = STATE.unitConfig.selection_task_names || []
+
+    for (let i = 1; i <= STATE.unitConfig.total_selection_tasks; i++) {
+        const prevDone = allSelDone.has(i)
+        const name = names[i - 1] || `課題${i}`
+        container.innerHTML += `
+            <label class="flex items-center space-x-1 bg-white border-2 ${prevDone ? 'border-green-300 bg-green-50' : 'border-gray-200'} rounded-lg px-3 py-2 cursor-pointer hover:bg-yellow-50 transition">
+                <input type="checkbox" class="sel-cb w-4 h-4 text-yellow-600 rounded" value="${i}" ${prevDone ? 'checked disabled' : ''}>
+                <span class="text-sm ${prevDone ? 'text-green-600 line-through' : ''}">${name}</span>
+            </label>
+        `
+    }
+}
+
+function startStudyTimer() {
+    STATE.studyStartTime = Date.now()
+    if (STATE.timerInterval) clearInterval(STATE.timerInterval)
+    STATE.timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - STATE.studyStartTime) / 1000)
+        const min = String(Math.floor(elapsed / 60)).padStart(2, '0')
+        const sec = String(elapsed % 60).padStart(2, '0')
+        document.getElementById('studyTimer').textContent = `${min}:${sec}`
+    }, 1000)
+}
+
+async function finishLearning() {
+    if (STATE.timerInterval) clearInterval(STATE.timerInterval)
+    const studyMinutes = STATE.studyStartTime ? Math.round((Date.now() - STATE.studyStartTime) / 60000) : 0
+
+    // 今回完了したカードと課題を収集
+    const newCardsDone = [...document.querySelectorAll('.card-cb:checked:not(:disabled)')].map(cb => parseInt(cb.value))
+    const prevCardsDone = []
+    try {
+        const row = STATE.rows.find(r => r.hour_number === STATE.currentHour)
+        JSON.parse(row?.cards_done || '[]').forEach(c => prevCardsDone.push(c))
+    } catch {}
+    const cardsDone = [...new Set([...prevCardsDone, ...newCardsDone])]
+
+    const newSelDone = [...document.querySelectorAll('.sel-cb:checked:not(:disabled)')].map(cb => parseInt(cb.value))
+    const prevSelDone = []
+    try {
+        const row = STATE.rows.find(r => r.hour_number === STATE.currentHour)
+        JSON.parse(row?.selection_tasks_done || '[]').forEach(s => prevSelDone.push(s))
+    } catch {}
+    const selectionTasksDone = [...new Set([...prevSelDone, ...newSelDone])]
+
+    const checkTestDone = document.getElementById('checkTestDone').checked ? 1 : 0
+    const checkTestScore = parseFloat(document.getElementById('checkTestScore').value) || null
+    const checkTestMax = parseFloat(document.getElementById('checkTestMax').value) || 100
+
+    try {
+        await axios.post('/api/student-learning/save-actual', {
+            plan_id: STATE.planId,
+            hour_number: STATE.currentHour,
+            actual_done: '',
+            cards_done: cardsDone,
+            check_test_done: checkTestDone,
+            check_test_score: checkTestScore,
+            check_test_max: checkTestMax,
+            selection_tasks_done: selectionTasksDone,
+            study_minutes: studyMinutes,
+            actual_date: new Date().toISOString().split('T')[0]
+        })
+
+        // ローカル更新
+        const row = STATE.rows.find(r => r.hour_number === STATE.currentHour)
+        if (row) {
+            row.cards_done = JSON.stringify(cardsDone)
+            row.check_test_done = checkTestDone
+            row.check_test_score = checkTestScore
+            row.selection_tasks_done = JSON.stringify(selectionTasksDone)
+            row.study_minutes = studyMinutes
+        }
+
+        showPhase3()
+    } catch (e) {
+        alert('保存に失敗: ' + (e.message || e))
+    }
+}
+
+// ========== Phase 3: 振り返り ==========
+function renderAutoRecord() {
+    const row = STATE.rows.find(r => r.hour_number === STATE.currentHour)
+    if (!row) return
+    const parts = []
+    try {
+        const cards = JSON.parse(row.cards_done || '[]')
+        if (cards.length) parts.push(`カード${cards.join(', ')}を完了`)
+    } catch {}
+    if (row.check_test_done) parts.push(`チェックテスト: ${row.check_test_score || '-'}/${row.check_test_max || 100}点`)
+    try {
+        const sel = JSON.parse(row.selection_tasks_done || '[]')
+        const names = STATE.unitConfig.selection_task_names || []
+        if (sel.length) parts.push(`選択課題: ${sel.map(s => names[s-1] || `課題${s}`).join(', ')}`)
+    } catch {}
+    if (row.study_minutes) parts.push(`学習時間: ${row.study_minutes}分`)
+    document.getElementById('autoRecordSummary').textContent = parts.join(' | ') || '（記録なし）'
+}
+
+function toggleFriendSection() {
+    const val = document.querySelector('input[name="friendLearning"]:checked').value
+    document.getElementById('friendDetails').classList.toggle('hidden', val === '0')
+}
+
+function setConfidence(val) {
+    STATE.confidenceRating = val
+    document.querySelectorAll('.feeling-btn').forEach(btn => {
+        btn.classList.toggle('selected', parseInt(btn.dataset.val) === val)
+    })
+}
+
+async function submitReflection() {
+    const row = STATE.rows.find(r => r.hour_number === STATE.currentHour)
+    const learnedWithFriend = document.querySelector('input[name="friendLearning"]:checked').value === '1' ? 1 : 0
+    const friendNames = learnedWithFriend ? document.getElementById('friendNamesInput').value.split(/[,、]/).filter(Boolean).map(s => s.trim()) : []
+    const friendTypes = learnedWithFriend ? [...document.querySelectorAll('.friend-type:checked')].map(cb => cb.value) : []
+
+    const body = {
+        plan_id: STATE.planId,
+        plan_row_id: row?.id || 0,
+        student_id: STATE.studentId,
+        hour_number: STATE.currentHour,
+        content_learned: document.getElementById('refContentLearned').value,
+        method_reflection: document.getElementById('refMethodReflection').value,
+        next_application: document.getElementById('refNextApplication').value,
+        learned_with_friend: learnedWithFriend,
+        friend_names: friendNames,
+        friend_interaction: document.getElementById('friendInteraction')?.value || '',
+        friend_interaction_type: friendTypes,
+        confidence_rating: STATE.confidenceRating
+    }
+
+    try {
+        // 振り返り保存
+        const saveRes = await axios.post('/api/student-learning/save-reflection', body)
+        const reflectionId = saveRes.data.reflection_id
+
+        // AI分析
+        const cardsDone = row?.cards_done ? JSON.parse(row.cards_done) : []
+        const selDone = row?.selection_tasks_done ? JSON.parse(row.selection_tasks_done) : []
+        const analyzeRes = await axios.post('/api/student-learning/analyze-reflection', {
+            reflection_id: reflectionId,
+            plan_id: STATE.planId,
+            student_id: STATE.studentId,
+            hour_number: STATE.currentHour,
+            content_learned: body.content_learned,
+            method_reflection: body.method_reflection,
+            next_application: body.next_application,
+            friend_interaction: body.friend_interaction,
+            confidence_rating: STATE.confidenceRating,
+            unit_name: STATE.unitConfig.unit_name,
+            subject: STATE.unitConfig.subject,
+            grade: STATE.unitConfig.grade,
+            cards_done: cardsDone,
+            check_test_score: row?.check_test_score,
+            selection_tasks_done: selDone
+        })
+
+        // 粘り強さ測定
+        const retryCount = cardsDone.length // 簡易: カード完了数を挑戦として
+        const persistRes = await axios.post('/api/student-learning/measure-persistence', {
+            student_id: STATE.studentId,
+            plan_id: STATE.planId,
+            hour_number: STATE.currentHour,
+            task_completion_rate: cardsDone.length > 0 ? 1.0 : 0.5,
+            session_duration_minutes: row?.study_minutes || 0,
+            early_quit_count: 0,
+            retry_after_failure_count: retryCount,
+            gave_up_count: 0,
+            extra_tasks_attempted: selDone.length,
+            review_initiated_count: 0,
+            confidence_during_difficulty: STATE.confidenceRating
+        })
+
+        // ローカル更新: rowをdoneに
+        if (row) row.status = 'done'
+
+        showPhase4({
+            reflection: analyzeRes.data,
+            persistence: persistRes.data
+        })
+    } catch (e) {
+        alert('送信に失敗: ' + (e.message || e))
+    }
+}
+
+// ========== Phase 4: AI評価表示 ==========
+function renderAiFeedback(data) {
+    const ref = data.reflection
+    document.getElementById('qualityLevelBadge').textContent = ref.quality_label || 'Lv.1'
+    document.getElementById('aiFeedbackContent').textContent = ref.feedback || ''
+
+    const theoriesContainer = document.getElementById('aiTheories')
+    theoriesContainer.innerHTML = ''
+    ;(ref.theories || []).forEach(t => {
+        theoriesContainer.innerHTML += `<span class="theory-tag">${t.replace(/_/g, ' ')}</span> `
+    })
+
+    // 粘り強さレーダー
+    const persist = data.persistence
+    if (persist && persist.dimensions) {
+        renderPersistenceRadar(persist.dimensions)
+        renderPersistenceAdvice(persist)
+    }
+}
+
+function renderPersistenceRadar(dims) {
+    const ctx = document.getElementById('persistenceRadar').getContext('2d')
+    if (window._persistChart) window._persistChart.destroy()
+    window._persistChart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['継続する力', '挑戦する力', '立ち直る力', '自分から深める力', '気持ちの安定'],
+            datasets: [{
+                label: '粘り強さ',
+                data: [dims.continuity, dims.challenge, dims.recovery, dims.deepening, dims.emotional_stability],
+                backgroundColor: 'rgba(249, 115, 22, 0.2)',
+                borderColor: 'rgba(249, 115, 22, 0.8)',
+                pointBackgroundColor: 'rgba(249, 115, 22, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, font: { size: 10 } }, pointLabels: { font: { size: 11 } } } },
+            plugins: { legend: { display: false } }
+        }
+    })
+}
+
+function renderPersistenceAdvice(persist) {
+    const container = document.getElementById('persistenceAdvice')
+    container.innerHTML = `
+        <div class="font-bold text-orange-700 mb-2">粘り強さ総合: ${persist.total_score}点</div>
+        <div class="text-xs text-gray-700 whitespace-pre-line leading-relaxed">${persist.advice || ''}</div>
+    `
+}
+
+function endLesson() {
+    // 全時間完了チェック
+    const doneCount = STATE.rows.filter(r => r.status === 'done').length
+    if (doneCount >= STATE.unitConfig.total_hours) {
+        showPhase5()
+    } else {
+        // 次の時間に進む
+        STATE.currentHour = doneCount + 1
+        // フォームをリセット
+        resetForms()
+        showPhase1()
+    }
+}
+
+function resetForms() {
+    document.getElementById('todayGoalInput').value = ''
+    document.getElementById('todayPlanInput').value = ''
+    document.getElementById('refContentLearned').value = ''
+    document.getElementById('refMethodReflection').value = ''
+    document.getElementById('refNextApplication').value = ''
+    document.getElementById('friendNamesInput') && (document.getElementById('friendNamesInput').value = '')
+    document.getElementById('friendInteraction') && (document.getElementById('friendInteraction').value = '')
+    document.getElementById('actualDoneExtra') && (document.getElementById('actualDoneExtra').value = '')
+    STATE.confidenceRating = 3
+    document.querySelectorAll('.feeling-btn').forEach(btn => btn.classList.remove('selected'))
+}
+
+// ========== Phase 5: 単元全体振り返り ==========
+async function submitUnitReflection() {
+    try {
+        const saveRes = await axios.post('/api/student-learning/save-unit-reflection', {
+            plan_id: STATE.planId,
+            student_id: STATE.studentId,
+            goal_achievement: document.getElementById('unitRefGoal').value,
+            most_important_learning: document.getElementById('unitRefImportant').value,
+            effective_methods: document.getElementById('unitRefMethods').value,
+            planning_reflection: document.getElementById('unitRefPlanning').value,
+            friend_learning: document.getElementById('unitRefFriend').value,
+            next_unit_application: document.getElementById('unitRefNext').value
+        })
+
+        // AI総合評価
+        const analyzeRes = await axios.post('/api/student-learning/analyze-unit', {
+            plan_id: STATE.planId,
+            student_id: STATE.studentId
+        })
+
+        if (analyzeRes.data.success) {
+            showPhase6(analyzeRes.data)
+        }
+    } catch (e) {
+        alert('送信に失敗: ' + (e.message || e))
+    }
+}
+
+// ========== Phase 6: 単元AI総合評価 ==========
+function renderUnitEvaluation(data) {
+    document.getElementById('unitAiComment').innerHTML = data.ai_comment.replace(/\n/g, '<br>')
+
+    const scores = data.scores
+    const labels = data.score_labels
+    const theories = data.theory_references
+
+    const cardsContainer = document.getElementById('unitScoreCards')
+    cardsContainer.innerHTML = ''
+    const icons = {
+        metacognitionScore: '🧠', planningScore: '📐', methodScore: '📚',
+        collaborationScore: '🤝', persistenceScore: '💪', autonomyScore: '🚀'
+    }
+    const colors = {
+        metacognitionScore: 'purple', planningScore: 'blue', methodScore: 'indigo',
+        collaborationScore: 'yellow', persistenceScore: 'orange', autonomyScore: 'green'
+    }
+
+    Object.entries(scores).forEach(([key, val]) => {
+        const growth = data.growth?.[key.replace('Score', '')] || 0
+        const growthText = growth > 0 ? `<span class="text-green-500 text-xs">+${Math.round(growth)}</span>` : growth < 0 ? `<span class="text-red-400 text-xs">${Math.round(growth)}</span>` : ''
+        cardsContainer.innerHTML += `
+            <div class="bg-${colors[key]}-50 rounded-xl p-4 text-center">
+                <div class="text-2xl mb-1">${icons[key]}</div>
+                <div class="text-xs font-semibold text-gray-600">${labels[key]}</div>
+                <div class="text-2xl font-bold text-${colors[key]}-700">${Math.round(val)}</div>
+                ${growthText}
+                <div class="theory-tag mt-1">${(theories[key] || '').split('・')[0]}</div>
+            </div>
+        `
+    })
+
+    // 棒グラフ
+    const ctx = document.getElementById('unitSkillChart').getContext('2d')
+    if (window._unitChart) window._unitChart.destroy()
+    window._unitChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.values(labels).map(l => l.replace(/（.*）/, '')),
+            datasets: [{
+                label: 'スコア',
+                data: Object.values(scores).map(v => Math.round(v)),
+                backgroundColor: ['#a855f7', '#3b82f6', '#6366f1', '#eab308', '#f97316', '#22c55e'],
+                borderRadius: 8
+            }]
+        },
+        options: {
+            scales: { y: { beginAtZero: true, max: 100 } },
+            plugins: { legend: { display: false } }
+        }
+    })
+
+    // 統計
+    const statsContainer = document.getElementById('unitStats')
+    statsContainer.innerHTML = ''
+    const stats = data.stats
+    const statLabels = {
+        total_hours_done: ['完了した時間', '時間'],
+        total_cards_done: ['完了したカード', '枚'],
+        total_selections_done: ['完了した選択課題', '個'],
+        total_reflections: ['振り返り回数', '回'],
+        total_collaborations: ['友だちとの学び', '回'],
+        plan_modifications: ['計画の修正', '回']
+    }
+    Object.entries(stats).forEach(([key, val]) => {
+        const [label, unit] = statLabels[key] || [key, '']
+        statsContainer.innerHTML += `
+            <div class="bg-white rounded-lg p-3 text-center shadow-sm">
+                <div class="text-xl font-bold text-gray-800">${val}</div>
+                <div class="text-xs text-gray-500">${label}${unit ? ` (${unit})` : ''}</div>
+            </div>
+        `
+    })
+}
+
+function goToPortfolio() {
+    window.location.href = `/static/student-home.html?student_id=${STATE.studentId}&view=portfolio`
+}
+
+// ========== 起動 ==========
+init()
+</script>
+</body>
+</html>
