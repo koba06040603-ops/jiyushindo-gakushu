@@ -28948,81 +28948,111 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(student_id, plan_id, hour_number || 0, task_completion_rate || 0, session_duration_minutes || 0, early_quit_count || 0, retry_after_failure_count || 0, gave_up_count || 0, extra_tasks_attempted || 0, review_initiated_count || 0, confidence_during_difficulty || 3, totalScore).run()
 
-    // ===== 理論ベース評価アドバイス生成（教師向け＋子ども向けの二層構造） =====
-    let advice = ''
-    const dimensions = [
-      {
-        name: '継続する力（やり抜く力）',
-        score: continuityScore,
-        theory: 'Duckworthグリット理論（d=0.20, Credé et al. 2017）',
-        curriculum: '学習指導要領: ①課題に取り組む持続性',
-        definition: '始めたことを最後までやり抜く力。短期（1コマ）の持続力を測定。Duckworthは「才能よりも努力の持続が成功を予測する」と実証。',
-        low: '最後まで取り組むことを意識しよう。Duckworth先生は「毎日少しずつの積み重ね」が一番大事だと言っている。短い時間でもいいから、やりきることが大切だよ。\n📋 先生向け: 課題量の調整（スモールステップ化）が有効です。1コマの中で「完了体験」を増やすことで有能感（SDT）が育ちます。',
-        high: '最後まで取り組めるのはすばらしい！これが「やり抜く力（グリット）」。Duckworth先生の研究では、この力はテストの点数よりも将来の成功に関係しているんだ。\n📋 先生向け: 粘り強い取組（継続性${Math.round(continuityScore)}）が安定しています。より挑戦的な課題への誘導が効果的です。'
-      },
-      {
-        name: '挑戦する力（成長マインドセット）',
-        score: challengeScore,
-        theory: 'Dweck成長マインドセット（d=0.19, Sisk et al. 2018）+ Moser ERN研究(2011)',
-        curriculum: '学習指導要領: ②困難に直面しても工夫して取り組む ④間違いから学ぼうとする',
-        definition: '間違いを恐れず難しいことに向かう力。Moser et al.(2011)は脳波研究で「間違えた時に脳が最も活発に活動する」ことを実証。',
-        low: '間違えても大丈夫！Moser先生の脳の研究では、間違った時こそ脳が一番成長しているんだ。「まだできない」は「これから成長する」という意味だよ。もう一回やってみよう。\n📋 先生向け: 「間違い＝成長」のフレーミングが重要です（Dweck 2006）。間違いを共有し称賛する学級文化が挑戦性を育てます。チェックテスト後の振り返りで「間違いから何を学んだか」を問う指導が有効です。',
-        high: '難しい問題にも挑戦できるね！間違いから学ぼうとする姿勢は「成長マインドセット」。Dweck先生は「才能ではなく努力を信じる子ほど伸びる」と発見したんだ。\n📋 先生向け: 成長マインドセットが形成されています（挑戦性${Math.round(challengeScore)}）。「プロセスを褒める」声かけ（Dweck 2006）で強化できます。'
-      },
-      {
-        name: '立ち直る力（レジリエンス）',
-        score: recoveryScore,
-        theory: '学業的レジリエンス（Yeager & Dweck 2012）+ Newman help-seeking(2002)',
-        curriculum: '学習指導要領: 粘り強い取組を行おうとする側面',
-        definition: 'つまずいても立ち直って学び続ける力。Yeagerの3要素: (a)困難を一時的と捉える認知、(b)問題解決志向の対処（help-seeking含む）、(c)感情調整。',
-        low: 'うまくいかなくても、ヒントを見たり友だちに聞いたりしてみよう。Newman先生の研究では「助けを求める行動（help-seeking）」は弱さではなく、自分の状態を把握して適切な方略を選べる力の証拠なんだ。立ち直る力は練習で伸びるよ。\n📋 先生向け: help-seekingを促進する環境整備が重要です（Newman 2002）。「質問することは賢い選択」というメッセージを学級全体に伝えましょう。',
-        high: 'つまずいても立ち直れる力（レジリエンス）があるね。Yeager先生の研究では「困難を一時的な壁と捉えられる子」が最も伸びるとわかっている。この力があれば、どんな壁も乗り越えられるよ。\n📋 先生向け: 学業的レジリエンスが高い状態です（回復力${Math.round(recoveryScore)}）。この子の回復過程を学級で共有すると、他児のレジリエンス向上にも寄与します。'
-      },
-      {
-        name: '自分から深める力（内発的動機づけ）',
-        score: deepeningScore,
-        theory: 'Deci & Ryan 自己決定理論（自律性 d=0.61）',
-        curriculum: '学習指導要領: ③自分なりの目標を持って取り組む + 自らの学習を調整しようとする側面',
-        definition: '求められた以上のことに自分から取り組む力。選択課題への挑戦・自発的な復習は、内発的動機づけの直接的な発現。SDTの自律性欲求が満たされている証拠。',
-        low: '余裕があったら、選択課題に挑戦してみよう。Deci & Ryan先生の研究では「自分で決めてやること」が一番記憶に残りやすいし、やる気も続くんだ。まずは興味があるものを1つ選んでみよう！\n📋 先生向け: 選択課題の魅力を伝えるオリエンテーションが有効です。「選択肢がある」こと自体が自律性を刺激します（SDT理論）。',
-        high: '自分から進んで追加の課題に取り組めるのはすごい！Deci & Ryan先生の「自己決定理論」では、内発的動機づけ（自分からやりたいと思う気持ち）が最も深い学びにつながると証明されている。この力が「本物の粘り強さ」の土台だよ。\n📋 先生向け: 内発的動機づけが発現しています（深化${Math.round(deepeningScore)}）。自由進度学習の目標「自律的学習者」に近づいています。'
-      },
-      {
-        name: '気持ちの安定（感情調整）',
-        score: emotionalStability,
-        theory: 'Zimmerman SRL遂行フェーズ（d=0.52）+ Pekrun Academic Emotions(2006)',
-        curriculum: '学習指導要領: ⑤学習の見通しを持ち、振り返る（感情の自己モニタリング含む）',
-        definition: '困難に直面しても落ち着いて取り組める力。Pekrun(2006)の学業感情理論: 達成感情（enjoyment, anxiety, boredom等）の調整が学業成績を予測。手ごたえが低くても学習を続けられることが感情調整力の証拠。',
-        low: '難しいと感じた時は深呼吸しよう。焦らなくて大丈夫。Zimmerman先生の研究では「自分のペースを守れる子」が結果的に一番速く進むんだ。気持ちに波があるのは自然なこと。大切なのは「波があっても続けること」だよ。\n📋 先生向け: 感情調整の支援として、振り返りカードの「手ごたえ」欄の活用を勧めます。感情を言語化すること自体がAffect Labeling効果（Lieberman 2007）で感情調整を促します。',
-        high: '難しい問題でも落ち着いて取り組めているね。Zimmerman先生が発見した「自己調整」の中で、感情をコントロールする力は特に大事。Pekrun先生の研究でも「ポジティブな感情を維持できる子」は学力が伸びることがわかっている。\n📋 先生向け: 感情的安定性が高い状態です（安定性${Math.round(emotionalStability)}）。この安定感が他の粘り強さ次元の基盤になっています。'
-      }
-    ]
-
-    // === アドバイス生成 ===
-    dimensions.forEach(d => {
-      const emoji = d.score >= 70 ? '🌟' : d.score >= 40 ? '📈' : '💡'
-      advice += `${emoji} ${d.name}: ${Math.round(d.score)}点\n`
-      advice += `   ${d.score >= 50 ? d.high : d.low}\n`
-      advice += `   📖 ${d.theory}\n`
-      advice += `   📎 ${d.curriculum}\n\n`
-    })
-
-    // === 総合メッセージ（学習指導要領の2側面の統合評価） ===
+    // ===== 理論ベース評価アドバイス生成（子ども向け＋教師向けを構造化JSON） =====
     const perseveranceSide = Math.round((continuityScore + challengeScore) / 2)
     const selfRegSide = Math.round((recoveryScore + deepeningScore + emotionalStability) / 3)
 
-    advice += `\n━━━ 学習指導要領「主体的に学習に取り組む態度」との対応 ━━━\n`
-    advice += `(1) 粘り強い取組を行おうとする側面: ${perseveranceSide}点（継続性＋挑戦性）\n`
-    advice += `(2) 自らの学習を調整しようとする側面: ${selfRegSide}点（回復力＋深化＋感情安定）\n\n`
+    // 各次元の構造化データを生成（フロントエンドで見やすく表示するため）
+    const dimensionDetails = [
+      {
+        key: 'continuity',
+        name: '継続する力',
+        icon: '🔥',
+        score: Math.round(continuityScore),
+        theory_short: 'Duckworth グリット(d=0.20)',
+        student_msg: continuityScore >= 50
+          ? '最後まで取り組めているね！「やり抜く力」がしっかり育っている。'
+          : '短い時間でもいいから、やりきることを意識してみよう。',
+        teacher_msg: continuityScore >= 50
+          ? '継続性' + Math.round(continuityScore) + '点。より挑戦的な課題への誘導が効果的です。'
+          : '課題量のスモールステップ化で「完了体験」を増やし有能感(SDT)を育てましょう。',
+        reason: '学習時間(' + (session_duration_minutes || 0) + '分)と課題完了率(' + Math.round((task_completion_rate || 0) * 100) + '%)から算出'
+      },
+      {
+        key: 'challenge',
+        name: '挑戦する力',
+        icon: '⚡',
+        score: Math.round(challengeScore),
+        theory_short: 'Dweck 成長マインドセット(d=0.19)',
+        student_msg: challengeScore >= 50
+          ? '難しい問題にも向かえているね！間違いから学ぶ姿勢がすばらしい。'
+          : '間違えた時こそ脳が一番成長している(Moser 2011)。「まだできない」は成長の証！',
+        teacher_msg: challengeScore >= 50
+          ? '挑戦性' + Math.round(challengeScore) + '点。プロセスを褒める声かけ(Dweck 2006)で強化を。'
+          : '「間違い＝成長」のフレーミングが重要です。間違いを称賛する学級文化を。',
+        reason: '再挑戦回数(' + (retry_after_failure_count || 0) + '回)と諦め回数(' + (gave_up_count || 0) + '回)から算出'
+      },
+      {
+        key: 'recovery',
+        name: '立ち直る力',
+        icon: '🌿',
+        score: Math.round(recoveryScore),
+        theory_short: 'Yeager & Dweck レジリエンス(2012)',
+        student_msg: recoveryScore >= 50
+          ? 'つまずいても立ち直れる力があるね。困難は「一時的な壁」だと思える力がある。'
+          : 'うまくいかない時は、ヒントを見たり友だちに聞いたりしよう。立ち直る力は練習で伸びるよ。',
+        teacher_msg: recoveryScore >= 50
+          ? '回復力' + Math.round(recoveryScore) + '点。この子の回復過程を学級で共有すると他児にも寄与します。'
+          : 'help-seeking促進が重要(Newman 2002)。「質問は賢い選択」のメッセージを。',
+        reason: '諦め(' + (gave_up_count || 0) + '回)と再挑戦(' + (retry_after_failure_count || 0) + '回)から算出'
+      },
+      {
+        key: 'deepening',
+        name: '深める力',
+        icon: '🔍',
+        score: Math.round(deepeningScore),
+        theory_short: 'Deci & Ryan SDT(自律性 d=0.61)',
+        student_msg: deepeningScore >= 50
+          ? '自分から追加課題に取り組めているね！「本物の粘り強さ」の土台だ。'
+          : '余裕があれば選択課題を1つやってみよう。自分で選ぶと記憶に残りやすいよ。',
+        teacher_msg: deepeningScore >= 50
+          ? '深化' + Math.round(deepeningScore) + '点。自律的学習者に近づいています。'
+          : '選択課題のオリエンテーションが有効。「選択肢がある」こと自体がSDTの自律性を刺激。',
+        reason: '追加課題(' + (extra_tasks_attempted || 0) + '個)と自発的復習(' + (review_initiated_count || 0) + '回)から算出'
+      },
+      {
+        key: 'emotional_stability',
+        name: '気持ちの安定',
+        icon: '🧘',
+        score: Math.round(emotionalStability),
+        theory_short: 'Zimmerman SRL(d=0.52) + Pekrun感情(2006)',
+        student_msg: emotionalStability >= 50
+          ? '落ち着いて取り組めているね。この安定感が他のすべての力の土台になっている。'
+          : '難しい時は深呼吸。自分のペースを守れる子が結果的に一番速く進むよ。',
+        teacher_msg: emotionalStability >= 50
+          ? '安定性' + Math.round(emotionalStability) + '点。他の粘り強さ次元の基盤です。'
+          : '振り返りカードの「手ごたえ」欄で感情言語化を。Affect Labeling効果(Lieberman 2007)。',
+        reason: '手ごたえ自己評価(' + (confidence_during_difficulty || 3) + '/5)から算出'
+      }
+    ]
 
+    // レガシー互換のテキストadvice（旧表示にフォールバック）
+    let advice = ''
+    dimensionDetails.forEach(d => {
+      const emoji = d.score >= 70 ? '🌟' : d.score >= 40 ? '📈' : '💡'
+      advice += emoji + ' ' + d.name + ': ' + d.score + '点\n'
+      advice += '   ' + d.student_msg + '\n'
+      advice += '   📖 ' + d.theory_short + '\n\n'
+    })
+
+    // 総合判定
+    let overallLevel = ''
+    let overallStudentMsg = ''
+    let overallTeacherMsg = ''
     if (totalScore >= 80) {
-      advice += `🏆 総合: 粘り強さが光っている！「主体的に学習に取り組む態度」の両側面でバランスよく力を発揮できている。\n📋 先生向け: 粘り強さ(${perseveranceSide})と自己調整(${selfRegSide})の一体的評価として「十分満足できる状況(A)」に相当します。`
+      overallLevel = 'A（十分満足）'
+      overallStudentMsg = '粘り強さが光っている！両方の力をバランスよく発揮できている。'
+      overallTeacherMsg = '粘り強さ(' + perseveranceSide + ')と自己調整(' + selfRegSide + ')の一体的評価として「十分満足できる状況(A)」に相当します。'
     } else if (totalScore >= 50) {
       const stronger = perseveranceSide > selfRegSide ? '粘り強さ' : '自己調整'
       const weaker = perseveranceSide > selfRegSide ? '自己調整' : '粘り強さ'
-      advice += `📊 総合: ${stronger}の力が育ってきている。${weaker}を意識するともっと伸びるよ！\n📋 先生向け: 「おおむね満足できる状況(B)」です。${weaker}側面への声かけ・支援で向上が見込めます。`
+      overallLevel = 'B（おおむね満足）'
+      overallStudentMsg = stronger + 'の力が育ってきている。' + weaker + 'を意識するともっと伸びるよ！'
+      overallTeacherMsg = '「おおむね満足できる状況(B)」です。' + weaker + '側面への声かけ・支援で向上が見込めます。'
     } else {
-      advice += `🌱 総合: これからどんどん伸びるよ！毎回の授業で少しずつ「やり抜く」経験を積み重ねよう。\n📋 先生向け: 「努力を要する状況(C)」です。課題のスモールステップ化（有能感向上）と個別の声かけ（関係性欲求の充足）が最優先の支援策です。`
+      overallLevel = 'C（努力を要する）'
+      overallStudentMsg = 'これからどんどん伸びるよ！毎回少しずつ「やり抜く」経験を積み重ねよう。'
+      overallTeacherMsg = '「努力を要する状況(C)」です。スモールステップ化（有能感向上）と個別の声かけ（関係性欲求の充足）が最優先です。'
     }
 
     return c.json({
@@ -29036,21 +29066,29 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
         emotional_stability: Math.round(emotionalStability)
       },
       dimension_labels: {
-        continuity: '継続する力（やり抜く力）',
-        challenge: '挑戦する力（成長マインドセット）',
-        recovery: '立ち直る力（レジリエンス）',
-        deepening: '自分から深める力（内発的動機づけ）',
-        emotional_stability: '気持ちの安定（感情調整）'
+        continuity: '継続する力',
+        challenge: '挑戦する力',
+        recovery: '立ち直る力',
+        deepening: '深める力',
+        emotional_stability: '気持ちの安定'
+      },
+      // 新しい構造化データ（フロントで見やすく表示用）
+      dimension_details: dimensionDetails,
+      overall: {
+        level: overallLevel,
+        student_msg: overallStudentMsg,
+        teacher_msg: overallTeacherMsg,
+        score_perseverance: perseveranceSide,
+        score_self_regulation: selfRegSide
       },
       advice,
       theories: ['Duckworth_Grit', 'Dweck_Growth_Mindset', 'Academic_Resilience', 'SDT_Intrinsic_Motivation', 'Zimmerman_SRL', 'Pekrun_Academic_Emotions', 'Newman_Help_Seeking'],
-      // 学習指導要領マッピング（2側面の評価）
       curriculum_mapping: {
         perseverance: '粘り強い取組を行おうとする側面',
         self_regulation: '自らの学習を調整しようとする側面',
         score_perseverance: perseveranceSide,
         score_self_regulation: selfRegSide,
-        integrated_level: totalScore >= 80 ? 'A（十分満足）' : totalScore >= 50 ? 'B（おおむね満足）' : 'C（努力を要する）'
+        integrated_level: overallLevel
       }
     })
   } catch (error) {
