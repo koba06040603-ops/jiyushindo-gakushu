@@ -209,16 +209,16 @@
                 </div>
             </div>
 
-            <!-- 計画表（全時間見渡し・コンパクト版） -->
+            <!-- 計画表（全時間見渡し・振り返り重視版） -->
             <table class="w-full plan-table text-xs border-collapse" id="planOverviewTable">
                 <thead>
                     <tr class="bg-gray-100 text-xs">
-                        <th class="px-1 py-1.5 text-center" style="width:30px">時</th>
-                        <th class="px-1 py-1.5 text-center" style="width:50px">日程</th>
-                        <th class="px-1 py-1.5 text-left" style="width:25%">はじめの計画</th>
-                        <th class="px-1 py-1.5 text-left" style="width:25%">きょうのめあて</th>
-                        <th class="px-1 py-1.5 text-left" style="width:120px">進捗</th>
-                        <th class="px-1 py-1.5 text-center" style="width:36px">振返</th>
+                        <th class="px-1 py-1.5 text-center" style="width:22px">時</th>
+                        <th class="px-1 py-1.5 text-center" style="width:36px">日</th>
+                        <th class="px-1 py-1.5 text-left" style="width:14%">計画</th>
+                        <th class="px-1 py-1.5 text-left" style="width:50px">進捗</th>
+                        <th class="px-1 py-1.5 text-left" style="width:30%">振り返り</th>
+                        <th class="px-1 py-1.5 text-left" style="width:40%">振り返りAI</th>
                     </tr>
                 </thead>
                 <tbody id="planOverviewBody"></tbody>
@@ -821,52 +821,83 @@ function renderPlanOverview() {
         const ref = refMap[row.hour_number]
         const rowClass = isDone ? 'plan-row-done' : (isCurrent ? 'plan-row-active' : 'plan-row-planned')
 
-        // 進捗のミニチップ表示
+        // 進捗のミニ表示（アイコンのみ超コンパクト）
         let progressHtml = '<span class="text-gray-300">-</span>'
         if (isDone) {
-            progressHtml = renderRowProgressChips(row)
+            progressHtml = renderRowProgressMini(row)
         }
 
-        // 日程: 予定日/実施日を1セルにまとめる
+        // 日程: M/D のみ
         let dateHtml = ''
         if (isDone && row.actual_date) {
-            // 完了済み: 実施日のみ表示（月/日）
             const d = row.actual_date.split('-')
-            dateHtml = `<span class="text-green-600 text-xs">${d[1]||''}/${d[2]||''}</span>`
+            dateHtml = `<span class="text-green-600">${parseInt(d[1]||0)}/${parseInt(d[2]||0)}</span>`
         } else if (isCurrent) {
-            dateHtml = '<span class="text-blue-500 font-bold text-xs">きょう</span>'
+            dateHtml = '<span class="text-blue-500 font-bold">今日</span>'
         } else if (row.planned_date) {
             const d = row.planned_date.split('-')
-            dateHtml = `<span class="text-gray-500 text-xs">${d[1]||''}/${d[2]||''}</span>`
+            dateHtml = `<span class="text-gray-400">${parseInt(d[1]||0)}/${parseInt(d[2]||0)}</span>`
         } else {
-            dateHtml = `<input type="text" class="w-14 px-0.5 py-0 border rounded text-center" data-hour="${row.hour_number}" value="" placeholder="M/D" onfocus="this.type='date'" onchange="updatePlannedDate(${row.hour_number}, this.value)" style="font-size:10px">`
+            dateHtml = `<input type="text" class="w-10 px-0 py-0 border rounded text-center" value="" placeholder="M/D" onfocus="this.type='date'" onchange="updatePlannedDate(${row.hour_number}, this.value)" style="font-size:9px">`
         }
 
-        // 振り返り + AI を統合（星 or ✅）
-        let refHtml = '<span class="text-gray-300">-</span>'
+        // 計画（はじめ＋めあてを統合、短縮表示）
+        let planText = row.today_plan || row.initial_plan || '-'
+        if (planText.length > 15) planText = planText.substring(0, 15) + '…'
+        const planTitle = ((row.initial_plan || '') + ' → ' + (row.today_plan || '')).replace(/"/g, '&quot;')
+
+        // 振り返り（しっかり表示 - 幅30%）
+        let refContentHtml = '<span class="text-gray-300">-</span>'
         if (ref) {
-            refHtml = renderQualityStars(ref.reflection_quality_level)
-            if (ref.ai_feedback) refHtml += '<span class="text-green-500 ml-0.5">✓</span>'
+            const emoji = ref.confidence_rating ? ['😰','😟','😐','😊','🤩'][ref.confidence_rating - 1] : ''
+            const stars = renderQualityStars(ref.reflection_quality_level)
+            const learned = ref.content_learned ? ref.content_learned.substring(0, 60) : ''
+            const method = ref.method_reflection ? ref.method_reflection.substring(0, 30) : ''
+            const parts = [stars]
+            if (emoji) parts.push(emoji)
+            if (learned) parts.push(`<span class="text-gray-700">${learned}</span>`)
+            if (method) parts.push(`<span class="text-gray-500 italic">${method}</span>`)
+            refContentHtml = `<div class="text-xs leading-snug wrap-cell">${parts.join(' ')}</div>`
         }
 
-        // 計画テキスト（table-layout:fixedで自動省略）
-        const planText = row.initial_plan || '-'
-        const todayText = row.today_plan
-            ? row.today_plan
-            : (isCurrent ? '<em class="text-gray-400 text-xs">↓下で入力</em>' : '<span class="text-gray-300">-</span>')
+        // AI振り返り（しっかり表示 - 幅40%）
+        let aiHtml = '<span class="text-gray-300">-</span>'
+        if (ref && ref.ai_feedback) {
+            const fbLen = 80
+            const short = ref.ai_feedback.substring(0, fbLen) + (ref.ai_feedback.length > fbLen ? '…' : '')
+            aiHtml = `<div class="text-xs text-indigo-700 leading-snug wrap-cell" title="${ref.ai_feedback.replace(/"/g, '&quot;')}">🤖 ${short}</div>`
+        }
 
         const tr = document.createElement('tr')
         tr.className = `${rowClass} border-b plan-compact`
         tr.innerHTML = `
             <td class="px-1 py-1 text-center font-bold text-xs">${row.hour_number}</td>
-            <td class="px-1 py-1 text-center">${dateHtml}</td>
-            <td class="px-1 py-1 text-xs" title="${(row.initial_plan || '').replace(/"/g, '&quot;')}">${planText}</td>
-            <td class="px-1 py-1 text-xs" title="${(row.today_plan || '').replace(/"/g, '&quot;')}">${todayText}</td>
-            <td class="px-1 py-1">${progressHtml}</td>
-            <td class="px-1 py-1 text-center">${refHtml}</td>
+            <td class="px-1 py-1 text-center" style="font-size:9px">${dateHtml}</td>
+            <td class="px-1 py-1 text-xs" title="${planTitle}">${planText}</td>
+            <td class="px-1 py-1 text-center" style="font-size:9px">${progressHtml}</td>
+            <td class="px-1 py-1 wrap-cell">${refContentHtml}</td>
+            <td class="px-1 py-1 wrap-cell">${aiHtml}</td>
         `
         tbody.appendChild(tr)
     })
+}
+
+// 行ごとの進捗ミニ表示（超コンパクト：アイコン＋数字のみ）
+function renderRowProgressMini(row) {
+    const parts = []
+    try {
+        const cards = JSON.parse(row.cards_done || '[]')
+        if (cards.length) parts.push(`📝${cards.length}`)
+    } catch {}
+    if (row.check_test_done) {
+        parts.push(row.check_test_score ? `📋${row.check_test_score}` : '📋✔')
+    }
+    try {
+        const sel = JSON.parse(row.selection_tasks_done || '[]')
+        if (sel.length) parts.push(`🎯${sel.length}`)
+    } catch {}
+    if (row.study_minutes) parts.push(`${row.study_minutes}m`)
+    return parts.length > 0 ? `<span class="text-xs">${parts.join(' ')}</span>` : '-'
 }
 
 // 行ごとの進捗ミニチップ（カード→テスト→選択課題の軸で表示）
@@ -1266,16 +1297,24 @@ function renderPersistenceAdvice(persist) {
         const barWidth = Math.max(4, d.score)
         const emoji = d.score >= 70 ? '🌟' : d.score >= 40 ? '📈' : '💡'
 
-        // 計算内訳を表形式で生成
+        // 計算内訳を「見てわかる表」形式で生成
         let calcHtml = ''
         if (d.calc && d.calc.length > 0) {
             const calcRows = d.calc.map(c => {
                 const sign = c.points < 0 ? '−' : '＋'
                 const absPoints = Math.abs(c.points)
                 const pointColor = c.points < 0 ? '#ef4444' : '#22c55e'
-                return `<span class="inline-flex items-center mr-2 mb-0.5"><span class="text-gray-500">${c.label}</span>${c.value ? `<span class="text-gray-400 mx-0.5">${c.value}</span>` : ''}<span style="color:${pointColor}" class="font-bold ml-0.5">${sign}${absPoints}</span>${c.max > 0 ? `<span class="text-gray-300">/${c.max}</span>` : ''}</span>`
+                const howText = c.how ? `<span class="text-gray-400 ml-1">(${c.how})</span>` : ''
+                return `<div class="flex items-center justify-between py-0.5 border-b border-gray-50">
+                    <span class="text-gray-600">${c.label}${c.value ? ' <span class="font-medium text-gray-800">'+c.value+'</span>' : ''}</span>
+                    <span class="flex items-center gap-1">
+                        <span style="color:${pointColor}" class="font-bold">${sign}${absPoints}</span>${c.max > 0 ? '<span class="text-gray-300">/'+c.max+'</span>' : ''}
+                    </span>
+                </div>`
             }).join('')
-            calcHtml = `<div class="text-xs text-gray-400 mt-0.5 leading-relaxed">計算: ${calcRows} = <strong class="text-gray-600">${d.score}点</strong></div>`
+            const howHints = d.calc.filter(c => c.how).map(c => c.how)
+            const howLine = howHints.length > 0 ? `<div class="text-xs text-gray-400 mt-0.5 italic">💡 ${howHints[howHints.length - 1]}</div>` : ''
+            calcHtml = `<div class="mt-1 text-xs bg-gray-50 rounded px-2 py-1">${calcRows}<div class="flex justify-end pt-0.5 font-bold text-gray-700">合計 = ${d.score}点</div></div>`
         }
 
         cardsContainer.innerHTML += `

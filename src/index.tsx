@@ -28869,7 +28869,7 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
     // 定義: 「始めたことを最後までやり抜く力」
     // 学習指導要領: ①課題に取り組む持続性
     // Duckworth(2016): 「グリットの高い人は、同じ分野で長期的に努力を続ける」
-    // 指標: タスク完了率(40%) × 学習時間の持続(40%) - 途中離脱(ペナルティ) + ベースライン(20%)
+    // 内訳: 課題完了率(0-40) + 学習時間(0-40) + 途中離脱ペナルティ + 学習参加(20)
     // 効果量: d=0.20（Credé et al. 2017 Grit-Performance meta-analysis）
     const idealMinutes = 45
     const durationFactor = Math.min(1, (session_duration_minutes || 0) / idealMinutes) * 40
@@ -28878,58 +28878,52 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
     const continuityScore = Math.max(0, Math.min(100, completionFactor + durationFactor + 20 - quitPenalty))
 
     // ===== 次元2: 挑戦性（Dweck Growth Mindset + 学習指導要領②④） =====
-    // 定義: 「間違いを恐れず難しいことに向かう力」
+    // 定義: 「課題に向かって取り組む力 + 間違いから学ぼうとする力」
     // Dweck(2006): 成長マインドセットの子は失敗後に「もう一度やってみよう」と思える
-    // Moser et al.(2011): 間違えた時の脳活動(ERN)は成長の証拠
-    // 学習指導要領: ②困難に直面しても工夫して取り組む ④間違いから学ぼうとする
-    // 指標: 不正解後の再挑戦回数(max60) - 諦めた回数(ペナルティ) + ベースライン(30)
-    // ★ 改善: チェックテスト後の行動も考慮（テストで間違えた後に復習 = 成長マインドセット）
-    const retryFactor = Math.min(60, (retry_after_failure_count || 0) * 15)
+    // ★ 改善点: 1時間の授業でカードやテストに取り組んだこと自体が「挑戦」
+    //   → 再挑戦がなくても課題に取り組んだ事実（カード完了率）を挑戦として評価
+    //   → 諦めた場合はその分マイナス
+    // 内訳: 課題に取り組んだ(完了率×40, max40) + 再挑戦ボーナス(×15, max40) + 諦めペナルティ + 学習参加(20)
+    const challengeFromTask = Math.round((task_completion_rate || 0) * 40) // 課題取組 max40
+    const retryBonus = Math.min(40, (retry_after_failure_count || 0) * 15) // 再挑戦 max40
     const gaveUpPenalty = (gave_up_count || 0) * 20
-    const challengeScore = Math.max(0, Math.min(100, 30 + retryFactor - gaveUpPenalty))
+    const challengeScore = Math.max(0, Math.min(100, 20 + challengeFromTask + retryBonus - gaveUpPenalty))
 
     // ===== 次元3: 回復力（Academic Resilience - Yeager & Dweck 2012） =====
     // 定義: 「つまずいても立ち直って学び続ける力」
-    // Yeager & Dweck(2012): レジリエンスの3要素:
-    //   (a) 困難を一時的と捉える認知 → 「まだできない（not yet）」の思考
-    //   (b) 問題解決志向の対処 → help-seeking, 教科書を読み直す, 方略変更
-    //   (c) 感情調整 → パニックにならず冷静に取り組む
-    // Newman(2002): help-seeking（助けを求める行動）= 自律的・適応的方略
-    //   → 「教えてもらった」を選んだこと自体がレジリエンスの発現
-    // 指標: ベースライン80 - 諦めペナルティ + 再挑戦回復ボーナス
-    let recoveryScore = 80
+    // ★ 改善: 諦めなし→満点(80)、諦めあり→回数に応じて減点、再挑戦で回復
+    // 「あきらめ」= タスクを途中放棄した回数（gave_up_count）
+    //   → 0回なら「困難に負けなかった」として80点
+    //   → 1回あるごとに-25点だが、再挑戦で回復可能
+    let recoveryBase = 80
+    let recoveryPenalty = 0
+    let recoveryBonus = 0
     if (gave_up_count > 0) {
-      recoveryScore = Math.max(0, 80 - (gave_up_count * 25))
-      recoveryScore += Math.min(40, (retry_after_failure_count || 0) * 10)
+      recoveryPenalty = gave_up_count * 25
+      recoveryBonus = Math.min(40, (retry_after_failure_count || 0) * 10)
     }
-    recoveryScore = Math.min(100, recoveryScore)
+    const recoveryScore = Math.max(0, Math.min(100, recoveryBase - recoveryPenalty + recoveryBonus + 20))
 
     // ===== 次元4: 自発的深化（SDT 内発的動機づけ + 学習指導要領③） =====
-    // 定義: 「求められた以上のことに自分から取り組む力」
-    // Deci & Ryan(1985): 自律性欲求が満たされると内発的動機が高まる
-    //   → 選択課題への取り組み = 自分で「もっとやりたい」と選んだ証拠
-    //   → 自発的復習 = 「もう一度確認したい」という内発的動機
-    // 学習指導要領: ③自分なりの目標を持って取り組む
-    // 効果量: d=0.61（自律性, Deci & Ryan メタ分析）
-    // ★ 粘り強さとの関係: 「やらされている」学習は粘り強くならない
-    //   → 自発的な深化行動があることは「本物の粘り強さ」の証拠
-    const extraFactor = Math.min(50, (extra_tasks_attempted || 0) * 20)
-    const reviewFactor = Math.min(30, (review_initiated_count || 0) * 15)
-    const deepeningScore = Math.min(100, extraFactor + reviewFactor + 20)
+    // 定義: 「学びを深めようとする力」
+    // ★ 改善: 学習カードの完了自体が「深化」の証拠
+    //   → カード完了率は「内容を理解しようとした」行動
+    //   → 選択課題は「さらに深めたい」行動
+    //   → 復習は「定着させたい」行動
+    // 内訳: カード学習(完了率×30, max30) + 選択課題(×15, max30) + 復習(×15, max20) + 学習参加(20)
+    const deepeningFromCards = Math.round((task_completion_rate || 0) * 30) // カード完了 max30
+    const extraFactor = Math.min(30, (extra_tasks_attempted || 0) * 15) // 選択課題 max30
+    const reviewFactor = Math.min(20, (review_initiated_count || 0) * 15) // 復習 max20
+    const deepeningScore = Math.min(100, deepeningFromCards + extraFactor + reviewFactor + 20)
 
     // ===== 次元5: 感情的安定性（Zimmerman SRL 遂行フェーズ + 学習指導要領⑤） =====
     // 定義: 「困難に直面しても落ち着いて取り組める力」
-    // Zimmerman(2000): 自己調整学習の遂行フェーズにおける感情制御
-    //   → 「焦り」「不安」「退屈」を自覚し、コントロールする能力
-    //   → 手ごたえが低くても学習を継続できる = 感情調整力の発現
-    // Pekrun(2006) Academic Emotions:
-    //   → 達成感情（enjoyment, hope, pride, anger, anxiety, shame, boredom）
-    //   → 手ごたえ3以上 = ポジティブ感情優位 → 学習継続に有利
-    //   → 手ごたえ1-2でも学習を続けた = 感情調整力が高い
-    // 学習指導要領: ⑤学習の見通しを持ち、振り返る（感情も含めた自己モニタリング）
-    const emotionalStability = confidence_during_difficulty
-      ? Math.min(100, Math.max(0, (confidence_during_difficulty) * 20 + 10))
-      : 50
+    // ★ 改善: 計算方法を児童にわかるように
+    //   → 手ごたえ(1-5)を5段階で20点ずつ割り当て
+    //   → 1→20, 2→40, 3→60, 4→80, 5→100
+    //   → 「手ごたえが低くても正直に書けた」ことも重要
+    const confidenceVal = confidence_during_difficulty || 3
+    const emotionalStability = Math.min(100, Math.max(0, confidenceVal * 20))
 
     // ===== 総合スコア（学習指導要領の2側面に基づく重み付け） =====
     // (1) 粘り強い取組を行おうとする側面 = 継続性25% + 挑戦性25% = 50%
@@ -28956,7 +28950,7 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
     const dimensionDetails = [
       {
         key: 'continuity',
-        name: '継続する力',
+        name: '継続する力（やり抜く力）',
         icon: '🔥',
         score: Math.round(continuityScore),
         theory_short: 'Duckworth グリット(d=0.20)',
@@ -28967,33 +28961,34 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
           ? '継続性' + Math.round(continuityScore) + '点。より挑戦的な課題への誘導が効果的です。'
           : '課題量のスモールステップ化で「完了体験」を増やし有能感(SDT)を育てましょう。',
         calc: [
-          { label: '課題完了率', value: Math.round((task_completion_rate || 0) * 100) + '%', points: Math.round(completionFactor), max: 40 },
-          { label: '学習時間', value: (session_duration_minutes || 0) + '分/' + idealMinutes + '分', points: Math.round(durationFactor), max: 40 },
-          { label: '学習に参加した', value: '授業に出席', points: 20, max: 20 },
-          ...(quitPenalty > 0 ? [{ label: '途中離脱', value: (early_quit_count || 0) + '回', points: -Math.round(quitPenalty), max: 0 }] : [])
+          { label: '📝課題の完了', value: Math.round((task_completion_rate || 0) * 100) + '%', points: Math.round(completionFactor), max: 40, how: '完了率×40' },
+          { label: '⏱️学習した時間', value: (session_duration_minutes || 0) + '分', points: Math.round(durationFactor), max: 40, how: (session_duration_minutes||0)+'÷'+idealMinutes+'×40' },
+          { label: '✅授業に参加した', value: '', points: 20, max: 20, how: '参加するだけで20点' },
+          ...(quitPenalty > 0 ? [{ label: '⚠️途中でやめた', value: (early_quit_count || 0) + '回', points: -Math.round(quitPenalty), max: 0, how: '1回ごとに-15点' }] : [])
         ]
       },
       {
         key: 'challenge',
-        name: '挑戦する力',
+        name: '挑戦する力（向かう力）',
         icon: '⚡',
         score: Math.round(challengeScore),
         theory_short: 'Dweck 成長マインドセット(d=0.19)',
         student_msg: challengeScore >= 50
-          ? '難しい問題にも向かえているね！間違いから学ぶ姿勢がすばらしい。'
+          ? '課題に向かって取り組めているね！間違いから学ぶ姿勢がすばらしい。'
           : '間違えた時こそ脳が一番成長している(Moser 2011)。「まだできない」は成長の証！',
         teacher_msg: challengeScore >= 50
           ? '挑戦性' + Math.round(challengeScore) + '点。プロセスを褒める声かけ(Dweck 2006)で強化を。'
           : '「間違い＝成長」のフレーミングが重要です。間違いを称賛する学級文化を。',
         calc: [
-          { label: '学習を始めた', value: '取り組む姿勢', points: 30, max: 30 },
-          { label: '再挑戦', value: (retry_after_failure_count || 0) + '回 x15', points: Math.round(retryFactor), max: 60 },
-          ...(gaveUpPenalty > 0 ? [{ label: '諦め', value: (gave_up_count || 0) + '回 x20', points: -Math.round(gaveUpPenalty), max: 0 }] : [])
+          { label: '✅授業に参加した', value: '', points: 20, max: 20, how: '参加するだけで20点' },
+          { label: '📝課題に取り組んだ', value: Math.round((task_completion_rate || 0) * 100) + '%', points: challengeFromTask, max: 40, how: '完了率×40（やった分だけ加点）' },
+          { label: '🔄間違いの後にやり直した', value: (retry_after_failure_count || 0) + '回', points: Math.round(retryBonus), max: 40, how: '1回15点（再挑戦なしでも0点、減点なし）' },
+          ...(gaveUpPenalty > 0 ? [{ label: '⚠️あきらめた', value: (gave_up_count || 0) + '回', points: -Math.round(gaveUpPenalty), max: 0, how: '1回ごとに-20点' }] : [])
         ]
       },
       {
         key: 'recovery',
-        name: '立ち直る力',
+        name: '立ち直る力（レジリエンス）',
         icon: '🌿',
         score: Math.round(recoveryScore),
         theory_short: 'Yeager & Dweck レジリエンス(2012)',
@@ -29004,47 +28999,51 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
           ? '回復力' + Math.round(recoveryScore) + '点。この子の回復過程を学級で共有すると他児にも寄与します。'
           : 'help-seeking促進が重要(Newman 2002)。「質問は賢い選択」のメッセージを。',
         calc: [
-          { label: '学習に取り組んだ', value: '諦め0なら満点', points: (gave_up_count || 0) > 0 ? Math.max(0, 80 - ((gave_up_count || 0) * 25)) : 80, max: 80 },
+          { label: '✅授業に参加した', value: '', points: 20, max: 20, how: '参加するだけで20点' },
           ...(gave_up_count > 0 ? [
-            { label: '諦め', value: (gave_up_count || 0) + '回 x25', points: -((gave_up_count || 0) * 25), max: 0 },
-            { label: '再挑戦ボーナス', value: (retry_after_failure_count || 0) + '回 x10', points: Math.min(40, (retry_after_failure_count || 0) * 10), max: 40 }
+            { label: '💪あきらめずに取り組んだ', value: '', points: Math.max(0, 80 - recoveryPenalty), max: 80, how: 'あきらめた回数×25を80点から引く' },
+            { label: '⚠️あきらめた', value: gave_up_count + '回', points: -recoveryPenalty, max: 0, how: '1回ごとに-25点' },
+            { label: '🔄再挑戦で回復', value: (retry_after_failure_count || 0) + '回', points: recoveryBonus, max: 40, how: '1回10点で回復できる' }
           ] : [
-            { label: '諦めなし', value: '減点なし', points: 0, max: 0 }
+            { label: '💪あきらめずに最後まで取り組んだ', value: 'あきらめ0回', points: 80, max: 80, how: '1度もあきらめなかったので満点' }
           ])
         ]
       },
       {
         key: 'deepening',
-        name: '深める力',
+        name: '深める力（学びの深さ）',
         icon: '🔍',
         score: Math.round(deepeningScore),
         theory_short: 'Deci & Ryan SDT(自律性 d=0.61)',
         student_msg: deepeningScore >= 50
-          ? '自分から追加課題に取り組めているね！「本物の粘り強さ」の土台だ。'
-          : '余裕があれば選択課題を1つやってみよう。自分で選ぶと記憶に残りやすいよ。',
+          ? '学びを深めようとしているね！「本物の粘り強さ」の土台だ。'
+          : '学習カードをしっかりやるだけでも深まるよ。余裕があれば選択課題にも挑戦！',
         teacher_msg: deepeningScore >= 50
           ? '深化' + Math.round(deepeningScore) + '点。自律的学習者に近づいています。'
           : '選択課題のオリエンテーションが有効。「選択肢がある」こと自体がSDTの自律性を刺激。',
         calc: [
-          { label: '選択課題', value: (extra_tasks_attempted || 0) + '個 x20', points: Math.round(extraFactor), max: 50 },
-          { label: '自発的復習', value: (review_initiated_count || 0) + '回 x15', points: Math.round(reviewFactor), max: 30 },
-          { label: '学習を続けた', value: '出席で付与', points: 20, max: 20 }
+          { label: '✅授業に参加した', value: '', points: 20, max: 20, how: '参加するだけで20点' },
+          { label: '📝学習カードで学んだ', value: Math.round((task_completion_rate || 0) * 100) + '%', points: deepeningFromCards, max: 30, how: '完了率×30（カードをやること=深化）' },
+          { label: '🎯選択課題に挑戦した', value: (extra_tasks_attempted || 0) + '個', points: Math.round(extraFactor), max: 30, how: '1個15点（やらなくても減点なし）' },
+          { label: '📖自分から復習した', value: (review_initiated_count || 0) + '回', points: Math.round(reviewFactor), max: 20, how: '1回15点（しなくても減点なし）' }
         ]
       },
       {
         key: 'emotional_stability',
-        name: '気持ちの安定',
+        name: '気持ちの安定（こころのゆとり）',
         icon: '🧘',
         score: Math.round(emotionalStability),
         theory_short: 'Zimmerman SRL(d=0.52) + Pekrun感情(2006)',
-        student_msg: emotionalStability >= 50
+        student_msg: emotionalStability >= 60
           ? '落ち着いて取り組めているね。この安定感が他のすべての力の土台になっている。'
-          : '難しい時は深呼吸。自分のペースを守れる子が結果的に一番速く進むよ。',
-        teacher_msg: emotionalStability >= 50
+          : emotionalStability >= 40
+            ? '少し不安を感じているかもしれないね。でも正直に書けたことが大事！自分のペースでOKだよ。'
+            : '難しい時は深呼吸。自分のペースを守れる子が結果的に一番速く進むよ。',
+        teacher_msg: emotionalStability >= 60
           ? '安定性' + Math.round(emotionalStability) + '点。他の粘り強さ次元の基盤です。'
           : '振り返りカードの「手ごたえ」欄で感情言語化を。Affect Labeling効果(Lieberman 2007)。',
         calc: [
-          { label: '手ごたえ自己評価', value: (confidence_during_difficulty || 3) + '/5 x20+10', points: Math.round(emotionalStability), max: 100 }
+          { label: ['😰','😟','😐','😊','🤩'][confidenceVal - 1] + '手ごたえ自己評価', value: confidenceVal + '/5', points: Math.round(emotionalStability), max: 100, how: '😰=20 😟=40 😐=60 😊=80 🤩=100' }
         ]
       }
     ]
