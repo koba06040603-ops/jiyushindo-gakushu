@@ -36,8 +36,9 @@
         .tab-btn.active { border-bottom: 3px solid #3b82f6; color: #3b82f6; font-weight: 700; }
         .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
         .date-cell { min-width: 64px; max-width: 80px; }
-        .plan-table th, .plan-table td { padding: 4px 6px; white-space: nowrap; }
-        .plan-table td.wrap-cell { white-space: normal; word-break: break-all; }
+        .plan-table { table-layout: fixed; }
+        .plan-table th, .plan-table td { padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .plan-table td.wrap-cell { white-space: normal; word-break: break-all; overflow: visible; }
         .plan-compact td { line-height: 1.3; }
         .dim-bar { height: 8px; border-radius: 4px; transition: width 0.8s ease-out; }
         .dim-card { border-left: 4px solid; padding: 8px 10px; border-radius: 0 8px 8px 0; }
@@ -52,7 +53,7 @@
 
 <!-- ========== ヘッダー ========== -->
 <header class="bg-white shadow-md sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto px-4 py-3">
+    <div class="mx-auto px-4 py-3" style="max-width:95vw">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <i class="fas fa-book-open text-2xl text-blue-600"></i>
@@ -72,7 +73,7 @@
 </header>
 
 <!-- ========== メインコンテンツ ========== -->
-<main class="mx-auto px-4 py-6 space-y-6" style="max-width:1200px">
+<main class="mx-auto px-4 py-6 space-y-6" style="max-width:95vw">
 
     <!-- ===== Phase: 新規 or 継続判定 ===== -->
     <div id="loadingScreen" class="text-center py-16">
@@ -212,11 +213,11 @@
             <table class="w-full plan-table text-xs border-collapse" id="planOverviewTable">
                 <thead>
                     <tr class="bg-gray-100 text-xs">
-                        <th class="px-1 py-1.5 text-center" style="width:28px">時</th>
-                        <th class="px-1 py-1.5 text-center" style="width:56px">日程</th>
-                        <th class="px-1 py-1.5 text-left">計画</th>
-                        <th class="px-1 py-1.5 text-left">めあて・計画</th>
-                        <th class="px-1 py-1.5 text-left" style="width:100px">進捗</th>
+                        <th class="px-1 py-1.5 text-center" style="width:30px">時</th>
+                        <th class="px-1 py-1.5 text-center" style="width:50px">日程</th>
+                        <th class="px-1 py-1.5 text-left" style="width:25%">はじめの計画</th>
+                        <th class="px-1 py-1.5 text-left" style="width:25%">きょうのめあて</th>
+                        <th class="px-1 py-1.5 text-left" style="width:120px">進捗</th>
                         <th class="px-1 py-1.5 text-center" style="width:36px">振返</th>
                     </tr>
                 </thead>
@@ -848,10 +849,10 @@ function renderPlanOverview() {
             if (ref.ai_feedback) refHtml += '<span class="text-green-500 ml-0.5">✓</span>'
         }
 
-        // 計画テキスト（長い場合は省略）
-        const planText = (row.initial_plan || '-').substring(0, 20) + ((row.initial_plan || '').length > 20 ? '…' : '')
+        // 計画テキスト（table-layout:fixedで自動省略）
+        const planText = row.initial_plan || '-'
         const todayText = row.today_plan
-            ? (row.today_plan.substring(0, 20) + (row.today_plan.length > 20 ? '…' : ''))
+            ? row.today_plan
             : (isCurrent ? '<em class="text-gray-400 text-xs">↓下で入力</em>' : '<span class="text-gray-300">-</span>')
 
         const tr = document.createElement('tr')
@@ -859,8 +860,8 @@ function renderPlanOverview() {
         tr.innerHTML = `
             <td class="px-1 py-1 text-center font-bold text-xs">${row.hour_number}</td>
             <td class="px-1 py-1 text-center">${dateHtml}</td>
-            <td class="px-1 py-1 wrap-cell text-xs" title="${row.initial_plan || ''}">${planText}</td>
-            <td class="px-1 py-1 wrap-cell text-xs" title="${row.today_plan || ''}">${todayText}</td>
+            <td class="px-1 py-1 text-xs" title="${(row.initial_plan || '').replace(/"/g, '&quot;')}">${planText}</td>
+            <td class="px-1 py-1 text-xs" title="${(row.today_plan || '').replace(/"/g, '&quot;')}">${todayText}</td>
             <td class="px-1 py-1">${progressHtml}</td>
             <td class="px-1 py-1 text-center">${refHtml}</td>
         `

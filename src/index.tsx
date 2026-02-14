@@ -28969,7 +28969,7 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
         calc: [
           { label: '課題完了率', value: Math.round((task_completion_rate || 0) * 100) + '%', points: Math.round(completionFactor), max: 40 },
           { label: '学習時間', value: (session_duration_minutes || 0) + '分/' + idealMinutes + '分', points: Math.round(durationFactor), max: 40 },
-          { label: '基本点', value: '', points: 20, max: 20 },
+          { label: '学習に参加した', value: '授業に出席', points: 20, max: 20 },
           ...(quitPenalty > 0 ? [{ label: '途中離脱', value: (early_quit_count || 0) + '回', points: -Math.round(quitPenalty), max: 0 }] : [])
         ]
       },
@@ -28986,7 +28986,7 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
           ? '挑戦性' + Math.round(challengeScore) + '点。プロセスを褒める声かけ(Dweck 2006)で強化を。'
           : '「間違い＝成長」のフレーミングが重要です。間違いを称賛する学級文化を。',
         calc: [
-          { label: '基本点', value: '', points: 30, max: 30 },
+          { label: '学習を始めた', value: '取り組む姿勢', points: 30, max: 30 },
           { label: '再挑戦', value: (retry_after_failure_count || 0) + '回 x15', points: Math.round(retryFactor), max: 60 },
           ...(gaveUpPenalty > 0 ? [{ label: '諦め', value: (gave_up_count || 0) + '回 x20', points: -Math.round(gaveUpPenalty), max: 0 }] : [])
         ]
@@ -29004,7 +29004,7 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
           ? '回復力' + Math.round(recoveryScore) + '点。この子の回復過程を学級で共有すると他児にも寄与します。'
           : 'help-seeking促進が重要(Newman 2002)。「質問は賢い選択」のメッセージを。',
         calc: [
-          { label: '基本点', value: '諦め0なら', points: (gave_up_count || 0) > 0 ? Math.max(0, 80 - ((gave_up_count || 0) * 25)) : 80, max: 80 },
+          { label: '学習に取り組んだ', value: '諦め0なら満点', points: (gave_up_count || 0) > 0 ? Math.max(0, 80 - ((gave_up_count || 0) * 25)) : 80, max: 80 },
           ...(gave_up_count > 0 ? [
             { label: '諦め', value: (gave_up_count || 0) + '回 x25', points: -((gave_up_count || 0) * 25), max: 0 },
             { label: '再挑戦ボーナス', value: (retry_after_failure_count || 0) + '回 x10', points: Math.min(40, (retry_after_failure_count || 0) * 10), max: 40 }
@@ -29028,7 +29028,7 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
         calc: [
           { label: '選択課題', value: (extra_tasks_attempted || 0) + '個 x20', points: Math.round(extraFactor), max: 50 },
           { label: '自発的復習', value: (review_initiated_count || 0) + '回 x15', points: Math.round(reviewFactor), max: 30 },
-          { label: '基本点', value: '', points: 20, max: 20 }
+          { label: '学習を続けた', value: '出席で付与', points: 20, max: 20 }
         ]
       },
       {
