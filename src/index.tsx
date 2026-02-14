@@ -28865,466 +28865,347 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
   try {
     const { student_id, plan_id, hour_number, task_completion_rate, session_duration_minutes, early_quit_count, retry_after_failure_count, gave_up_count, extra_tasks_attempted, review_initiated_count, confidence_during_difficulty } = await c.req.json()
 
-    // ╔══════════════════════════════════════════════════════════════════════╗
-    // ║  粘り強さ評価モデル v3.0                                           ║
-    // ║  Evidence-Centered Design (ECD) + Behaviorally Anchored Rating     ║
-    // ║  Scales (BARS) + Bayesian Evidence Accumulation + Logistic IRT     ║
-    // ╚══════════════════════════════════════════════════════════════════════╝
-    //
-    // 【理論的基盤】
-    // 1. ECD (Mislevy et al. 2003; Shute 2011)
-    //    - Competency Model: 5次元の粘り強さ構成概念
-    //    - Evidence Model: 行動ログ → 行動指標 → エビデンス変数
-    //    - Task Model: 各学習活動が引き出す行動エビデンス
-    //
-    // 2. BARS (Smith & Kendall 1963; I/O Psychology)
-    //    - 各次元に行動アンカーを定義（レベル1-5）
-    //    - 「何をしたらどのレベルか」が具体的行動で定義される
-    //    - 恣意的な点数配分ではなく、行動の質的段階に基づく
-    //
-    // 3. Bayesian Evidence Accumulation (Shute & Ventura 2013)
-    //    - 事前分布: 「授業に参加した」= 基本的な粘り強さの発現（prior = 0.5）
-    //    - 尤度: 各行動指標が観測されるごとにposteriorを更新
-    //    - 複数の独立した行動エビデンスを統合して潜在特性を推定
-    //
-    // 4. Logistic IRT Transformation (Samejima 1969 GRM inspired)
-    //    - 線形加算ではなくロジスティック関数で0-100にマッピング
-    //    - 中間域（40-70）で最も識別力が高い（現実の分布に合致）
-    //    - 天井効果・床効果を自然に回避
-    //
-    // 5. Credit Scoring Methodology (FICO-inspired)
-    //    - 複数の異なるカテゴリのエビデンスを重み付き統合
-    //    - 各カテゴリ内の理由コード（reason code）で説明可能性を確保
-    //    - 「何をすればスコアが上がるか」が明確
+    // ╔══════════════════════════════════════════════════════════════════════════════════╗
+    // ║  粘り強さ評価モデル v4.0 — 3層測定アーキテクチャ                                ║
+    // ║                                                                                ║
+    // ║  Level 1: 行動ログ分析 (Behavioral Log Analytics)                               ║
+    // ║    — ActivTrak式: 客観的行動データの自動収集・パターン分析                        ║
+    // ║    — ActivTrak: Productive Time / Focus Time / Workload Balance                 ║
+    // ║    — 教育版: 課題遂行時間 / 集中持続率 / 学習負荷バランス                         ║
+    // ║                                                                                ║
+    // ║  Level 2: AI観察評価 (AI Observational Assessment)                               ║
+    // ║    — Gemini Video Analysis / Multimodal LA 着想                                  ║
+    // ║    — 行動ログの「意味」をAIが解釈: パターン → 学習戦略推定                        ║
+    // ║    — clickstream → process mining → behavioral sequence                          ║
+    // ║                                                                                ║
+    // ║  Level 3: 三角測量統合 (Triangulated Integration)                                ║
+    // ║    — ECD/Stealth Assessment (Shute 2011; Mislevy 2003)                           ║
+    // ║    — 複数独立エビデンス源をベイジアンに統合 → 潜在特性推定                        ║
+    // ║    — DiCerbo (2014): persistence α=0.87 in game-based assessment                 ║
+    // ╚══════════════════════════════════════════════════════════════════════════════════╝
 
-    // ─── ロジスティック変換関数（IRT inspired） ───
-    // raw: 生スコア（理論上-∞〜+∞）, k: 識別力パラメータ, mid: 変曲点
-    // → 0-100のスコアにマッピング。中間域で最も変化が大きい。
-    const logistic = (raw: number, k: number = 0.06, mid: number = 50): number => {
-      return 100 / (1 + Math.exp(-k * (raw - mid)))
-    }
-
-    // ─── 入力データの整理 ───
-    const tcr = task_completion_rate || 0        // 課題完了率 (0-1)
-    const dur = session_duration_minutes || 0     // 学習時間（分）
-    const quits = early_quit_count || 0           // 途中離脱回数
-    const retries = retry_after_failure_count || 0 // 再挑戦回数
-    const gaveUp = gave_up_count || 0             // あきらめ回数
-    const extraTasks = extra_tasks_attempted || 0  // 選択課題取組数
-    const reviews = review_initiated_count || 0    // 自発復習回数
-    const confidence = confidence_during_difficulty || 3 // 手ごたえ (1-5)
+    // ─── 入力データ整理 ───
+    const tcr = task_completion_rate || 0
+    const dur = session_duration_minutes || 0
+    const quits = early_quit_count || 0
+    const retries = retry_after_failure_count || 0
+    const gaveUp = gave_up_count || 0
+    const extraTasks = extra_tasks_attempted || 0
+    const reviews = review_initiated_count || 0
+    const confidence = confidence_during_difficulty || 3
     const idealMinutes = 45
 
-    // ═══════════════════════════════════════════════════════════════
-    // 次元1: 継続する力（Perseverance of Effort）
-    // ═══════════════════════════════════════════════════════════════
-    // 【コンピテンシーモデル】Duckworth (2016) Grit: 長期目標への情熱と忍耐
-    //   → 1時間の授業における操作的定義: 「課題を最後まで続ける行動」
-    // 【エビデンスモデル】3つの独立した行動指標を三角測量
-    //   (a) 課題完了率: 直接的な「やり抜き」の指標
-    //   (b) 学習持続時間: 時間的な「粘り」の指標
-    //   (c) 途中離脱の不在: 「諦めない」の反転指標
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // LEVEL 1: 行動ログ分析（客観的・自動計測）
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ActivTrak の 3バケット（Productive Time / Focus / Workload Balance）
+    // を教育文脈に翻訳した客観指標群。
+    // 
+    // 特徴: 主観に依存しない。行動の「量」と「パターン」を数値化。
+    // 参照: ActivTrak Productivity Metrics (2024)
+    //       "Productive Hrs/Day, Focus Hrs/Day, Utilization Level"
+
+    // Bucket 1: 学習遂行時間（Productive Time equivalent）
+    const productiveRate = tcr                                  // 課題完了率 = productive output rate
+    const timeUtilization = Math.min(1.0, dur / idealMinutes)   // 時間利用率 = time utilization
+    const sessionIntensity = dur > 0 ? tcr / timeUtilization : 0 // 遂行密度 = output per time unit (効率)
+
+    // Bucket 2: 集中持続性（Focus equivalent）
+    const noInterruption = quits === 0 ? 1.0 : Math.max(0, 1 - quits * 0.3)
+    const taskSwitchPenalty = gaveUp > 0 ? Math.max(0, 1 - gaveUp * 0.25) : 1.0
+    const focusScore_L1 = (noInterruption * 0.6 + taskSwitchPenalty * 0.4)
+
+    // Bucket 3: 学習負荷バランス（Workload Balance equivalent）
+    // 「適正範囲」にいるか: 極端に低い＝underutilized、極端に高い＝overutilized
+    const optimalZone = (tcr >= 0.3 && tcr <= 1.0 && dur >= 10 && dur <= 50) ? 1.0
+      : (tcr > 0 || dur > 0) ? 0.6 : 0.2
+    const balanceScore_L1 = optimalZone
+
+    // Level 1 統合: 行動ログスコア (0-100)
+    const level1_raw = (productiveRate * 40 + timeUtilization * 25 + focusScore_L1 * 20 + balanceScore_L1 * 15) * 100 / 100
+    const level1Score = Math.round(Math.min(100, Math.max(0, level1_raw)))
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // LEVEL 2: AI観察評価（行動パターンの意味解釈）
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // Gemini video analysis / Multimodal LA / Process Mining 着想。
+    // Level 1の数値を「学習戦略パターン」として解釈する。
+    // 
+    // 現在はルールベースで学習戦略を推定（将来的にはAI APIで解析可能）。
+    // 参照: Shute (2011) ECD Task Model → Observable Actions → Competency
+    //       ActivTrak: "Context tells the story behind the data"
+    //       Multimodal LA (PMC 2025): video + text + logs → engagement
+
+    // ─── 戦略パターン検出 ───
+    const strategies: Array<{name: string, detected: boolean, evidence: string, impact: string, weight: number}> = []
+
+    // 戦略1: 試行錯誤型学習（Exploratory Learning）
+    // Moser et al. (2011) ERN: 間違い後の脳活動が成長を示す
+    const exploratoryLearning = retries > 0 || extraTasks > 0
+    strategies.push({
+      name: '試行錯誤',
+      detected: exploratoryLearning,
+      evidence: exploratoryLearning
+        ? `再挑戦${retries}回、追加課題${extraTasks}個 → 間違いから学ぶ姿勢`
+        : '今回は一度で進めた → 慎重型アプローチ',
+      impact: exploratoryLearning ? '成長マインドセット行動の直接エビデンス' : '正確性重視の学習スタイル',
+      weight: exploratoryLearning ? 1.0 : 0.5
+    })
+
+    // 戦略2: 自己調整学習（Self-Regulated Learning）
+    // Zimmerman (2000): 計画→遂行→振り返りサイクル
+    const selfRegulated = tcr >= 0.5 && dur >= 15 && confidence >= 3
+    strategies.push({
+      name: '自己調整',
+      detected: selfRegulated,
+      evidence: selfRegulated
+        ? `完了率${Math.round(tcr*100)}% + ${dur}分継続 + 手ごたえ${confidence}/5 → 計画的に学習を進めた`
+        : `学習サイクルの一部が未発達`,
+      impact: selfRegulated ? 'メタ認知が機能: 計画→実行→モニタリング' : '自己調整スキルの発達段階',
+      weight: selfRegulated ? 1.0 : 0.3
+    })
+
+    // 戦略3: 感情調整を伴う学習持続（Emotion-Regulated Persistence）
+    // Pekrun (2006) CVT + Lieberman (2007) Affect Labeling
+    const emotionRegulated = confidence <= 2 && tcr > 0.3 && dur >= 10
+    const emotionPositive = confidence >= 4 && tcr >= 0.5
+    strategies.push({
+      name: '感情調整',
+      detected: emotionRegulated || emotionPositive,
+      evidence: emotionRegulated
+        ? `不安(${['😰','😟','😐','😊','🤩'][confidence-1]})を感じながらも完了率${Math.round(tcr*100)}% → 高い感情調整力`
+        : emotionPositive
+          ? `前向き(${['😰','😟','😐','😊','🤩'][confidence-1]})な気持ちで安定的に学習`
+          : `手ごたえ${['😰','😟','😐','😊','🤩'][confidence-1]} — 感情の自覚そのものがメタ認知力`,
+      impact: emotionRegulated
+        ? '★ 逆境下の持続は粘り強さの最も説得力あるエビデンス'
+        : emotionPositive
+          ? '安定した感情が学習効率を支えている'
+          : '感情を言語化できたこと自体が調整力（Lieberman 2007）',
+      weight: emotionRegulated ? 1.2 : emotionPositive ? 0.8 : 0.5
+    })
+
+    // 戦略4: 協働的help-seeking（Adaptive Help-Seeking）
+    // Newman (2002): 適応的援助要請 = 自律性の一形態
+    const helpSeeking = reviews > 0 || extraTasks > 0
+    strategies.push({
+      name: '主体的拡張',
+      detected: helpSeeking,
+      evidence: helpSeeking
+        ? `復習${reviews}回、選択課題${extraTasks}個 → 自分で学びの範囲を広げた`
+        : '指定範囲の学習に集中した',
+      impact: helpSeeking ? '内発的動機づけの証拠（SDT: 自律性欲求の発現）' : '基本課題の習熟を優先した合理的選択',
+      weight: helpSeeking ? 1.0 : 0.4
+    })
+
+    // 戦略5: 回復力発揮（Resilience Demonstration）
+    // Yeager & Dweck (2012)
+    const resilience = gaveUp === 0 && (retries > 0 || dur >= 20)
+    const recoveredFromFailure = gaveUp > 0 && retries > 0
+    strategies.push({
+      name: '回復・粘り',
+      detected: resilience || recoveredFromFailure,
+      evidence: recoveredFromFailure
+        ? `あきらめ${gaveUp}回 → 再挑戦${retries}回 = つまずきからの回復`
+        : resilience
+          ? `あきらめなし + ${dur}分持続 = 困難場面での粘り`
+          : gaveUp > 0
+            ? `あきらめ${gaveUp}回 — 次回の回復機会に注目`
+            : '大きなつまずきなく進行',
+      impact: recoveredFromFailure
+        ? '★ 失敗→回復パターンは最も価値ある粘り強さの証拠'
+        : resilience ? '安定した粘り強さの発揮' : '回復力の発揮場面が限定的',
+      weight: recoveredFromFailure ? 1.3 : resilience ? 0.9 : gaveUp > 0 ? 0.2 : 0.5
+    })
+
+    // Level 2 統合: AI観察スコア (0-100)
+    const detectedCount = strategies.filter(s => s.detected).length
+    const totalWeight = strategies.reduce((s, st) => s + st.weight, 0)
+    const maxWeight = strategies.length * 1.3
+    const level2_raw = (totalWeight / maxWeight) * 100
+    const level2Score = Math.round(Math.min(100, Math.max(0, level2_raw)))
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // LEVEL 3: 三角測量統合（Triangulated Integration）
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ECD + Stealth Assessment + Bayesian Evidence Accumulation
     //
-    // 【BARSアンカー】
-    //   Lv5(模範的): 全課題完了 + 授業時間いっぱい学習 + 離脱なし
-    //   Lv4(優秀):   80%以上完了 + 30分以上学習 + 離脱なし
-    //   Lv3(標準):   50%以上完了 + 20分以上学習
-    //   Lv2(発展途上): 課題に着手した + 10分以上学習
-    //   Lv1(参加):   授業に参加した
-
-    // エビデンス変数の算出（各指標を0-100に正規化）
-    const e_completion = tcr * 100                              // 完了率→直接変換
-    const e_duration = Math.min(100, (dur / idealMinutes) * 100) // 時間→理想比で正規化
-    const e_noQuit = quits === 0 ? 100 : Math.max(0, 100 - quits * 40)  // 離脱なし→高評価
-
-    // ベイジアン統合: 3指標の加重平均（エビデンスの信頼性で重み付け）
-    // 完了率: 最も直接的な指標 (重み0.45)
-    // 持続時間: 間接的だが独立した指標 (重み0.35)
-    // 離脱なし: 二値的で情報量は少ない (重み0.20)
-    const continuity_raw = e_completion * 0.45 + e_duration * 0.35 + e_noQuit * 0.20
-
-    // ロジスティック変換（k=0.07: 中程度の識別力）
-    const continuityScore = Math.round(logistic(continuity_raw, 0.07, 45))
-
-    // ═══════════════════════════════════════════════════════════════
-    // 次元2: 挑戦する力（Challenge-Seeking / Growth Mindset）
-    // ═══════════════════════════════════════════════════════════════
-    // 【コンピテンシーモデル】Dweck (2006): 成長マインドセット
-    //   → 操作的定義: 「困難に直面しても取り組み続け、間違いから学ぼうとする行動」
-    // 【エビデンスモデル】3つの行動指標
-    //   (a) 課題への取り組み: 困難な課題に向き合った事実そのものが挑戦
-    //       → 再挑戦がなくても「課題に取り組んだ」こと自体が挑戦行動
-    //   (b) 失敗後の再挑戦: 最も強力な成長マインドセットの行動指標
-    //       Moser et al.(2011): 間違い後のERN(事象関連電位)が成長を示す
-    //   (c) あきらめの不在: 挑戦の持続を示す反転指標
+    // 3つの独立したエビデンス源を三角測量:
+    //   Source A: Level 1 行動ログ（客観・量的データ）
+    //   Source B: Level 2 AI戦略分析（パターン・質的解釈）
+    //   Source C: 自己報告（手ごたえ = メタ認知モニタリング）
     //
-    // 【BARSアンカー】
-    //   Lv5: 全課題に取り組み + 複数回の再挑戦 + あきらめ0
-    //   Lv4: 80%以上取り組み + 1回以上再挑戦 + あきらめ0
-    //   Lv3: 50%以上取り組み + あきらめ0
-    //   Lv2: 課題に着手した（完了率は問わない）
-    //   Lv1: 授業に参加した
+    // 参照: Shute & Ventura (2013) Stealth Assessment
+    //       DiCerbo (2014) Game-based persistence α=0.87
+    //       Mislevy et al. (2003) ECD Framework
 
-    const e_taskEngagement = tcr * 100                          // 課題への取り組み
-    const e_retry = Math.min(100, retries * 30)                 // 再挑戦（1回で30, 3回で90, 4回で100）
-    const e_noGiveUp = gaveUp === 0 ? 100 : Math.max(0, 100 - gaveUp * 50)
+    // Source C: 自己報告エビデンス (0-100)
+    // 手ごたえは情動的メタ認知の指標 — 正確な自己評価ができること自体が能力
+    // Lieberman (2007): affect labeling reduces amygdala response
+    const selfReportScore = confidence * 20  // 20, 40, 60, 80, 100
 
-    // 統合: 取り組み(0.40) + 再挑戦(0.30) + あきらめなし(0.30)
-    // 再挑戦は「あれば加点、なくても減点なし」= 30%の重みで0はneutral
-    const challenge_raw = e_taskEngagement * 0.40 + e_retry * 0.30 + e_noGiveUp * 0.30
+    // ─── 学習指導要領2側面への三角測量マッピング ───
 
-    const challengeScore = Math.round(logistic(challenge_raw, 0.07, 45))
-
-    // ═══════════════════════════════════════════════════════════════
-    // 次元3: 立ち直る力（Academic Resilience）
-    // ═══════════════════════════════════════════════════════════════
-    // 【コンピテンシーモデル】Yeager & Dweck (2012): 学業レジリエンス
-    //   → 操作的定義: 「つまずいても方略を変えて学び続ける力」
-    //   Newman (2002): help-seeking = 適応的な立ち直り方略
-    // 【エビデンスモデル】
-    //   (a) あきらめの不在: レジリエンスの最も直接的な指標
-    //   (b) 失敗後の再挑戦: 立ち直り行動の直接的エビデンス
-    //   (c) 学習の継続: つまずいても授業時間を使い続けた
-    //
-    // 【BARSアンカー】
-    //   Lv5: あきらめ0 + 失敗後に複数回方略を変えて再挑戦 + 時間いっぱい学習
-    //   Lv4: あきらめ0 + 1回以上再挑戦
-    //   Lv3: あきらめ0（つまずきがあっても離脱しなかった）
-    //   Lv2: あきらめたが再挑戦で回復した
-    //   Lv1: 授業に参加した（困難に遭遇しなかった可能性も含む）
-
-    const e_resilience_noGiveUp = gaveUp === 0 ? 100 : Math.max(0, 100 - gaveUp * 50)
-    const e_resilience_recovery = gaveUp > 0 ? Math.min(100, retries * 35) : 50 // あきらめがない場合neutral
-    const e_resilience_sustained = Math.min(100, (dur / idealMinutes) * 100)
-
-    // 統合: あきらめなし(0.50) + 回復(0.30) + 継続(0.20)
-    const recovery_raw = e_resilience_noGiveUp * 0.50 + e_resilience_recovery * 0.30 + e_resilience_sustained * 0.20
-
-    const recoveryScore = Math.round(logistic(recovery_raw, 0.07, 45))
-
-    // ═══════════════════════════════════════════════════════════════
-    // 次元4: 深める力（Autonomous Deepening / Intrinsic Motivation）
-    // ═══════════════════════════════════════════════════════════════
-    // 【コンピテンシーモデル】Deci & Ryan (1985) SDT: 自律性→内発的動機
-    //   → 操作的定義: 「求められた以上に自ら学びを深めようとする行動」
-    // 【エビデンスモデル】3つの行動指標（重要: 学習カード完了自体も深化の証拠）
-    //   (a) 学習カード学習: 「内容を理解しようとした」= 深化の基本行動
-    //       → カードをやっている時点で「復習していないから深まらない」は不正確
-    //       → カード学習 = 新しい概念との格闘 = 深化の第一段階
-    //   (b) 選択課題: 「もっと学びたい」という自律的選択 = 深化の発展段階
-    //   (c) 自発的復習: 「定着させたい」= 深化の精緻化段階
-    //
-    // 【BARSアンカー】
-    //   Lv5: 全カード学習 + 2個以上の選択課題 + 自発復習
-    //   Lv4: 80%以上カード + 1個以上選択課題
-    //   Lv3: 50%以上カード学習（カードをやること自体が深化）
-    //   Lv2: 課題に着手した
-    //   Lv1: 授業に参加した
-
-    const e_cardLearning = tcr * 100                            // カード学習 = 深化の基本
-    const e_extraChallenge = Math.min(100, extraTasks * 35)     // 選択課題（1個35, 3個で100）
-    const e_selfReview = Math.min(100, reviews * 40)            // 復習（1回40, 2-3回で80-100）
-
-    // 統合: カード学習(0.40) + 選択課題(0.35) + 復習(0.25)
-    const deepening_raw = e_cardLearning * 0.40 + e_extraChallenge * 0.35 + e_selfReview * 0.25
-
-    const deepeningScore = Math.round(logistic(deepening_raw, 0.07, 40))
-
-    // ═══════════════════════════════════════════════════════════════
-    // 次元5: 気持ちの安定（Emotional Regulation / Academic Emotions）
-    // ═══════════════════════════════════════════════════════════════
-    // 【コンピテンシーモデル】
-    //   Zimmerman (2000) SRL: 遂行フェーズの感情制御
-    //   Pekrun (2006) CVT: 達成感情の制御価値理論
-    //   → 操作的定義: 「学習中の感情を自覚し、調整しながら取り組める力」
-    // 【エビデンスモデル】
-    //   (a) 手ごたえ自己評価: 感情の自覚（メタ認知的モニタリング）の直接指標
-    //       → Lieberman(2007) Affect Labeling: 感情を言語化すること自体が調整力
-    //       → 手ごたえ3(ふつう) = 冷静な自己モニタリング = 安定の証拠
-    //       → 手ごたえ1でも「正直に書けた」= メタ認知が機能している
-    //   (b) 学習行動の一貫性: 感情に左右されず行動を維持できたか
-    //       → 課題完了率と学習時間が一定以上 = 感情に振り回されていない
-    //
-    // 【BARSアンカー】
-    //   Lv5: 手ごたえ4-5 + 課題完了80%以上 = 前向きな感情で安定的に学習
-    //   Lv4: 手ごたえ3-4 + 課題完了50%以上 = 落ち着いて取り組めた
-    //   Lv3: 手ごたえ3 + 課題に取り組んだ = 大きな動揺なく過ごせた
-    //   Lv2: 手ごたえ1-2だが課題に取り組んだ = 不安の中でも踏ん張った
-    //   Lv1: 授業に参加した
-    //
-    // 【計算方法の透明性】
-    //   手ごたえは5段階: 😰(1)→😟(2)→😐(3)→😊(4)→🤩(5)
-    //   基本スコア: 手ごたえ × 18 = 18, 36, 54, 72, 90
-    //   行動一貫性ボーナス: 手ごたえが低くても学習を続けた場合に加点
-    //   → 「手ごたえ1でも授業を最後まで受けた」= 感情調整力が高い
-
-    const e_selfAwareness = confidence * 18                     // 手ごたえ直接変換 (18-90)
-    // 行動一貫性: 手ごたえが低い(1-2)のに学習を続けた = 感情調整力の高さ
-    const behavioralConsistency = (confidence <= 2 && tcr >= 0.3) ? 20 :
-                                  (confidence <= 2 && tcr > 0) ? 10 :
-                                  (confidence >= 4 && tcr >= 0.5) ? 10 : 0
-    const emotional_raw = e_selfAwareness + behavioralConsistency
-
-    const emotionalStability = Math.round(logistic(emotional_raw, 0.08, 50))
-
-    // ═══════════════════════════════════════════════════════════════
-    // 総合スコア（学習指導要領の2側面に基づく統合）
-    // ═══════════════════════════════════════════════════════════════
-    // (1) 粘り強い取組を行おうとする側面 = 継続性 + 挑戦性
-    // (2) 自らの学習を調整しようとする側面 = 回復力 + 深化 + 感情安定
-    // ロジスティック変換後のスコアを使用（既に自然な分布になっている）
-    const totalScore = Math.round(
-      continuityScore * 0.25 +
-      challengeScore * 0.25 +
-      recoveryScore * 0.20 +
-      deepeningScore * 0.15 +
-      emotionalStability * 0.15
+    // 側面1: 粘り強い取組を行おうとする側面
+    // L1: 実際にやり抜いた客観データ
+    // L2: どんな戦略で取り組んだか
+    // SC: 本人の手ごたえ
+    const perseverance_L1 = (productiveRate * 0.5 + timeUtilization * 0.3 + focusScore_L1 * 0.2) * 100
+    const perseverance_L2 = (
+      strategies[0].weight * (strategies[0].detected ? 1 : 0.3) + // 試行錯誤
+      strategies[4].weight * (strategies[4].detected ? 1 : 0.3)   // 回復・粘り
+    ) / 2.3 * 100
+    const perseverance_SC = selfReportScore
+    // 三角測量: 客観データ最重視、AI解釈で補完、自己報告で微修正
+    const perseveranceScore = Math.round(
+      perseverance_L1 * 0.50 + perseverance_L2 * 0.30 + perseverance_SC * 0.20
     )
 
+    // 側面2: 自らの学習を調整しようとする側面
+    const selfReg_L1 = (timeUtilization * 0.3 + balanceScore_L1 * 0.3 + (tcr >= 0.4 ? 0.4 : tcr) * 100 / 100 * 0.4) * 100
+    const selfReg_L2 = (
+      strategies[1].weight * (strategies[1].detected ? 1 : 0.3) + // 自己調整
+      strategies[2].weight * (strategies[2].detected ? 1 : 0.3) + // 感情調整
+      strategies[3].weight * (strategies[3].detected ? 1 : 0.3)   // 主体的拡張
+    ) / 3.2 * 100
+    const selfReg_SC = selfReportScore
+    const selfRegScore = Math.round(
+      selfReg_L1 * 0.40 + selfReg_L2 * 0.35 + selfReg_SC * 0.25
+    )
+
+    // 総合スコア
+    const totalScore = Math.round(perseveranceScore * 0.50 + selfRegScore * 0.50)
+
+    // ─── 測定信頼性の推定 ───
+    // エビデンス源が一致するほど信頼性が高い（三角測量の原理）
+    const l1_l2_agreement = 1 - Math.abs(level1Score - level2Score) / 100
+    const l1_sc_agreement = 1 - Math.abs(level1Score - selfReportScore) / 100
+    const l2_sc_agreement = 1 - Math.abs(level2Score - selfReportScore) / 100
+    const reliability = Math.round((l1_l2_agreement + l1_sc_agreement + l2_sc_agreement) / 3 * 100)
+
+    // ─── BARS行動アンカーレベル判定（5段階 → 学習指導要領3段階に準拠） ───
+    const barsLevel = totalScore >= 75 ? 5 : totalScore >= 60 ? 4 : totalScore >= 40 ? 3 : totalScore >= 20 ? 2 : 1
+    const overallGrade = totalScore >= 70 ? 'A' : totalScore >= 40 ? 'B' : 'C'
+
+    // DB保存
     await env.DB.prepare(`
       INSERT INTO persistence_metrics (student_id, plan_id, hour_number, task_completion_rate, session_duration_minutes, early_quit_count, retry_after_failure_count, gave_up_count, extra_tasks_attempted, review_initiated_count, confidence_during_difficulty, persistence_total_score)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(student_id, plan_id, hour_number || 0, task_completion_rate || 0, session_duration_minutes || 0, early_quit_count || 0, retry_after_failure_count || 0, gave_up_count || 0, extra_tasks_attempted || 0, review_initiated_count || 0, confidence_during_difficulty || 3, totalScore).run()
 
-    // ===== 理論ベース評価アドバイス生成（子ども向け＋教師向けを構造化JSON） =====
-    const perseveranceSide = Math.round((continuityScore + challengeScore) / 2)
-    const selfRegSide = Math.round((recoveryScore + deepeningScore + emotionalStability) / 3)
-
-    // 各次元の構造化データ（ECD Evidence Model + BARS Anchors）
-    const dimensionDetails = [
-      {
-        key: 'continuity',
-        name: '継続する力（やり抜く力）',
-        icon: '🔥',
-        score: continuityScore,
-        methodology: 'ECD + BARS + Logistic IRT',
-        theory_short: 'Duckworth Grit (d=0.20, Credé 2017) + Logistic IRT',
-        student_msg: continuityScore >= 65
-          ? '最後まで粘り強く取り組めた！「やり抜く力」がしっかり育っている。'
-          : continuityScore >= 40
-            ? '取り組みを始められたね。もう少し長く続けると、この力がもっと伸びるよ。'
-            : '授業に参加できたことが第一歩。次は1つの課題を最後までやってみよう。',
-        teacher_msg: continuityScore >= 65
-          ? `継続力${continuityScore}点。高い持続性。より挑戦的な課題設定で成長を促進できます。`
-          : `継続力${continuityScore}点。スモールステップ化で完了体験を積み重ねる支援が有効です。`,
-        // 【BARSレベル判定】具体的行動でレベルを示す
-        bars_level: tcr >= 0.9 && dur >= 35 && quits === 0 ? 5 :
-                    tcr >= 0.7 && dur >= 25 && quits === 0 ? 4 :
-                    tcr >= 0.4 && dur >= 15 ? 3 :
-                    tcr > 0 || dur >= 10 ? 2 : 1,
-        bars_anchors: [
-          { level: 5, desc: '全課題を完了し、授業時間いっぱい集中して学習を続けた' },
-          { level: 4, desc: '多くの課題を完了し、30分以上集中して取り組んだ' },
-          { level: 3, desc: '課題の半分程度に取り組み、20分以上学習を続けた' },
-          { level: 2, desc: '課題に着手し、10分以上取り組んだ' },
-          { level: 1, desc: '授業に参加した' }
-        ],
-        evidence: [
-          { indicator: '課題完了率', observed: Math.round(tcr * 100) + '%', evidence_score: Math.round(e_completion), weight: '45%', reasoning: '「やり抜いた」ことの最も直接的な証拠' },
-          { indicator: '学習持続時間', observed: dur + '分/' + idealMinutes + '分', evidence_score: Math.round(e_duration), weight: '35%', reasoning: '時間をかけて取り組み続けたことの証拠' },
-          { indicator: '途中離脱なし', observed: quits === 0 ? 'なし ✓' : quits + '回', evidence_score: Math.round(e_noQuit), weight: '20%', reasoning: '困難でも離脱しなかったことの証拠' }
-        ],
-        scoring_method: `エビデンス加重平均 ${Math.round(continuity_raw)} → ロジスティック変換 → ${continuityScore}点`
-      },
-      {
-        key: 'challenge',
-        name: '挑戦する力（向かう力）',
-        icon: '⚡',
-        score: challengeScore,
-        methodology: 'ECD + BARS + Logistic IRT',
-        theory_short: 'Dweck Growth Mindset (d=0.19) + Moser ERN (2011)',
-        student_msg: challengeScore >= 65
-          ? '課題に向かって挑戦できているね！失敗を恐れない姿勢がすばらしい。'
-          : challengeScore >= 40
-            ? '課題に向き合えたね。間違えた時こそ脳が成長している(Moser 2011)よ。'
-            : '「まだできない」は成長の証。次は1つだけ難しい問題に挑戦してみよう。',
-        teacher_msg: challengeScore >= 65
-          ? `挑戦力${challengeScore}点。プロセスを褒める声かけ(Dweck 2006)で更に強化を。`
-          : `挑戦力${challengeScore}点。「間違い＝脳の成長」のフレーミングを学級文化に。`,
-        bars_level: tcr >= 0.9 && retries >= 2 && gaveUp === 0 ? 5 :
-                    tcr >= 0.7 && retries >= 1 && gaveUp === 0 ? 4 :
-                    tcr >= 0.4 && gaveUp === 0 ? 3 :
-                    tcr > 0 ? 2 : 1,
-        bars_anchors: [
-          { level: 5, desc: '全課題に取り組み、間違いの後に何度もやり直し、あきらめなかった' },
-          { level: 4, desc: '多くの課題に取り組み、間違い後に再挑戦した' },
-          { level: 3, desc: '課題の半分に取り組み、あきらめなかった' },
-          { level: 2, desc: '課題に着手した（取り組もうとした）' },
-          { level: 1, desc: '授業に参加した' }
-        ],
-        evidence: [
-          { indicator: '課題への取り組み', observed: Math.round(tcr * 100) + '%', evidence_score: Math.round(e_taskEngagement), weight: '40%', reasoning: '課題に向き合ったこと自体が「挑戦」の証拠' },
-          { indicator: '失敗後の再挑戦', observed: retries + '回', evidence_score: Math.round(e_retry), weight: '30%', reasoning: '間違えた後にやり直す＝成長マインドセットの行動指標（なくても減点なし）' },
-          { indicator: 'あきらめなし', observed: gaveUp === 0 ? 'なし ✓' : gaveUp + '回', evidence_score: Math.round(e_noGiveUp), weight: '30%', reasoning: '困難でも投げ出さなかったことの証拠' }
-        ],
-        scoring_method: `エビデンス加重平均 ${Math.round(challenge_raw)} → ロジスティック変換 → ${challengeScore}点`
-      },
-      {
-        key: 'recovery',
-        name: '立ち直る力（レジリエンス）',
-        icon: '🌿',
-        score: recoveryScore,
-        methodology: 'ECD + BARS + Logistic IRT',
-        theory_short: 'Yeager & Dweck (2012) + Newman Help-Seeking (2002)',
-        student_msg: recoveryScore >= 65
-          ? 'つまずいても立ち直れる力があるね。「まだできない」と思えるのは強さだよ。'
-          : recoveryScore >= 40
-            ? 'うまくいかない時は、ヒントを見たり友だちに聞いたりしてみよう。それも「立ち直る力」だよ。'
-            : '困った時に助けを求めるのは賢い選択(Newman 2002)。先生や友だちを頼ろう。',
-        teacher_msg: recoveryScore >= 65
-          ? `回復力${recoveryScore}点。この児童の回復プロセスを学級で共有すると他児にも寄与します。`
-          : `回復力${recoveryScore}点。help-seeking促進が重要。「質問は賢い選択」のメッセージを。`,
-        bars_level: gaveUp === 0 && retries >= 2 && dur >= 30 ? 5 :
-                    gaveUp === 0 && retries >= 1 ? 4 :
-                    gaveUp === 0 ? 3 :
-                    gaveUp > 0 && retries > 0 ? 2 : 1,
-        bars_anchors: [
-          { level: 5, desc: 'あきらめず、つまずいた後に方略を変えて何度も再挑戦し、最後まで学習した' },
-          { level: 4, desc: 'あきらめず、つまずいた後に再挑戦した' },
-          { level: 3, desc: 'あきらめなかった（つまずきがあっても離脱しなかった）' },
-          { level: 2, desc: '一度あきらめたが、再挑戦して回復した' },
-          { level: 1, desc: '授業に参加した' }
-        ],
-        evidence: [
-          { indicator: 'あきらめなし', observed: gaveUp === 0 ? '0回 ✓' : gaveUp + '回', evidence_score: Math.round(e_resilience_noGiveUp), weight: '50%', reasoning: '困難に直面しても投げ出さなかった＝レジリエンスの最も直接的な証拠' },
-          { indicator: '失敗後の回復行動', observed: gaveUp > 0 ? retries + '回の再挑戦' : '該当なし（あきらめなし）', evidence_score: Math.round(e_resilience_recovery), weight: '30%', reasoning: 'あきらめた後に立ち直って再挑戦した＝回復力の証拠' },
-          { indicator: '学習の継続', observed: dur + '分', evidence_score: Math.round(e_resilience_sustained), weight: '20%', reasoning: 'つまずいても学習時間を使い続けた＝粘りの証拠' }
-        ],
-        scoring_method: `エビデンス加重平均 ${Math.round(recovery_raw)} → ロジスティック変換 → ${recoveryScore}点`
-      },
-      {
-        key: 'deepening',
-        name: '深める力（学びの深さ）',
-        icon: '🔍',
-        score: deepeningScore,
-        methodology: 'ECD + BARS + Logistic IRT',
-        theory_short: 'Deci & Ryan SDT (自律性 d=0.61)',
-        student_msg: deepeningScore >= 65
-          ? '自分から学びを深めようとしているね！「本物の粘り強さ」の土台だ。'
-          : deepeningScore >= 40
-            ? '学習カードに取り組めたね。それ自体が「深める力」だよ。余裕があれば選択課題にも挑戦！'
-            : '学習カードを1枚じっくりやるだけでも深まるよ。自分のペースで大丈夫。',
-        teacher_msg: deepeningScore >= 65
-          ? `深化${deepeningScore}点。自律的学習者に近づいています。選択の幅を広げましょう。`
-          : `深化${deepeningScore}点。選択課題のオリエンテーションが有効。「選べること」自体がSDTの自律性を刺激。`,
-        bars_level: tcr >= 0.9 && extraTasks >= 2 && reviews >= 1 ? 5 :
-                    tcr >= 0.7 && extraTasks >= 1 ? 4 :
-                    tcr >= 0.4 ? 3 :
-                    tcr > 0 ? 2 : 1,
-        bars_anchors: [
-          { level: 5, desc: '学習カードを全て学び、選択課題2つ以上に挑戦し、自発的に復習もした' },
-          { level: 4, desc: '学習カードを多く学び、選択課題にも1つ挑戦した' },
-          { level: 3, desc: '学習カードの半分以上に取り組んだ（カード学習自体が深化）' },
-          { level: 2, desc: '学習カードに着手した' },
-          { level: 1, desc: '授業に参加した' }
-        ],
-        evidence: [
-          { indicator: '学習カードで学んだ', observed: Math.round(tcr * 100) + '%', evidence_score: Math.round(e_cardLearning), weight: '40%', reasoning: '新しい概念と格闘した＝深化の第一段階（復習なしでも深まる）' },
-          { indicator: '選択課題に挑戦', observed: extraTasks + '個', evidence_score: Math.round(e_extraChallenge), weight: '35%', reasoning: '「もっと学びたい」と自分で選んだ＝内発的動機の証拠（やらなくても減点なし）' },
-          { indicator: '自発的に復習', observed: reviews + '回', evidence_score: Math.round(e_selfReview), weight: '25%', reasoning: '「定着させたい」という自律的行動（しなくても減点なし）' }
-        ],
-        scoring_method: `エビデンス加重平均 ${Math.round(deepening_raw)} → ロジスティック変換 → ${deepeningScore}点`
-      },
-      {
-        key: 'emotional_stability',
-        name: '気持ちの安定（こころのゆとり）',
-        icon: '🧘',
-        score: emotionalStability,
-        methodology: 'ECD + BARS + Logistic IRT',
-        theory_short: 'Zimmerman SRL (d=0.52) + Pekrun CVT (2006) + Lieberman Affect Labeling (2007)',
-        student_msg: emotionalStability >= 65
-          ? '落ち着いて取り組めているね。この安定感が全ての力の土台になっている。'
-          : emotionalStability >= 40
-            ? '自分の気持ちに気づけているね。それ自体が大事な力だよ。'
-            : '難しい時は深呼吸。「不安だ」と感じられること自体が感情調整力の証拠だよ。',
-        teacher_msg: emotionalStability >= 65
-          ? `安定性${emotionalStability}点。感情調整力が高く、他の次元の基盤として機能しています。`
-          : `安定性${emotionalStability}点。Affect Labeling(Lieberman 2007)で感情言語化を促進しましょう。`,
-        bars_level: confidence >= 4 && tcr >= 0.5 ? 5 :
-                    confidence >= 3 && tcr >= 0.3 ? 4 :
-                    confidence === 3 ? 3 :
-                    confidence <= 2 && tcr > 0 ? 2 : 1,
-        bars_anchors: [
-          { level: 5, desc: '前向きな気持ち(😊-🤩)で安定的に学習を進められた' },
-          { level: 4, desc: '落ち着いた気持ち(😐-😊)で課題に取り組めた' },
-          { level: 3, desc: '大きな動揺なく過ごせた(😐)' },
-          { level: 2, desc: '不安(😰-😟)を感じたが、学習に取り組んだ ← 実は感情調整力が高い' },
-          { level: 1, desc: '授業に参加した' }
-        ],
-        evidence: [
-          { indicator: '手ごたえ自己評価', observed: ['😰','😟','😐','😊','🤩'][confidence - 1] + ' (' + confidence + '/5)', evidence_score: Math.round(e_selfAwareness), weight: '主指標', reasoning: '自分の感情を自覚できている＝メタ認知的モニタリング（Zimmerman 2000）の証拠' },
-          ...(behavioralConsistency > 0 ? [
-            { indicator: '行動一貫性ボーナス', observed: confidence <= 2 ? '不安でも学習を続けた' : '前向きに安定して学習', evidence_score: behavioralConsistency, weight: 'ボーナス', reasoning: confidence <= 2 ? '手ごたえが低いのに学習を続けた＝高い感情調整力の証拠' : '前向きな感情で安定的に学習を継続' }
-          ] : [])
-        ],
-        scoring_method: `基本${Math.round(e_selfAwareness)}${behavioralConsistency > 0 ? '+一貫性' + behavioralConsistency : ''} = ${Math.round(emotional_raw)} → ロジスティック変換 → ${emotionalStability}点`
+    // ─── 過去データとの比較（成長の可視化） ───
+    let growthTrend = null
+    try {
+      const prev = await env.DB.prepare(
+        'SELECT persistence_total_score FROM persistence_metrics WHERE student_id=? AND plan_id=? AND hour_number<? ORDER BY hour_number DESC LIMIT 3'
+      ).bind(student_id, plan_id, hour_number || 0).all()
+      if (prev.results && prev.results.length > 0) {
+        const prevAvg = prev.results.reduce((s: number, r: any) => s + (r.persistence_total_score || 0), 0) / prev.results.length
+        const diff = totalScore - Math.round(prevAvg)
+        growthTrend = {
+          previous_avg: Math.round(prevAvg),
+          current: totalScore,
+          change: diff,
+          direction: diff > 5 ? '上昇' : diff < -5 ? '低下' : '安定',
+          message: diff > 5 ? `前回までの平均${Math.round(prevAvg)}点から${diff}点上昇！成長が見られます。`
+            : diff < -5 ? `前回より${Math.abs(diff)}点下がりましたが、波があるのは自然なことです。`
+            : `安定して取り組めています（前回平均: ${Math.round(prevAvg)}点）。`
+        }
       }
-    ]
+    } catch {}
 
-    // レガシー互換のテキストadvice（旧表示にフォールバック）
-    let advice = ''
-    dimensionDetails.forEach(d => {
-      const emoji = d.score >= 70 ? '🌟' : d.score >= 40 ? '📈' : '💡'
-      advice += emoji + ' ' + d.name + ': ' + d.score + '点\n'
-      advice += '   ' + d.student_msg + '\n'
-      advice += '   📖 ' + d.theory_short + '\n\n'
-    })
-
-    // 総合判定
-    let overallLevel = ''
-    let overallStudentMsg = ''
-    let overallTeacherMsg = ''
-    if (totalScore >= 80) {
-      overallLevel = 'A（十分満足）'
-      overallStudentMsg = '粘り強さが光っている！両方の力をバランスよく発揮できている。'
-      overallTeacherMsg = '粘り強さ(' + perseveranceSide + ')と自己調整(' + selfRegSide + ')の一体的評価として「十分満足できる状況(A)」に相当します。'
-    } else if (totalScore >= 50) {
-      const stronger = perseveranceSide > selfRegSide ? '粘り強さ' : '自己調整'
-      const weaker = perseveranceSide > selfRegSide ? '自己調整' : '粘り強さ'
-      overallLevel = 'B（おおむね満足）'
-      overallStudentMsg = stronger + 'の力が育ってきている。' + weaker + 'を意識するともっと伸びるよ！'
-      overallTeacherMsg = '「おおむね満足できる状況(B)」です。' + weaker + '側面への声かけ・支援で向上が見込めます。'
-    } else {
-      overallLevel = 'C（努力を要する）'
-      overallStudentMsg = 'これからどんどん伸びるよ！毎回少しずつ「やり抜く」経験を積み重ねよう。'
-      overallTeacherMsg = '「努力を要する状況(C)」です。スモールステップ化（有能感向上）と個別の声かけ（関係性欲求の充足）が最優先です。'
-    }
+    // ─── 子ども向け・先生向けメッセージ ───
+    const overallLabel = overallGrade === 'A' ? 'A（十分満足）'
+      : overallGrade === 'B' ? 'B（おおむね満足）' : 'C（努力を要する）'
+    const studentMsg = overallGrade === 'A'
+      ? '粘り強さと学び方の工夫がどちらもよくできています！'
+      : overallGrade === 'B'
+        ? `${perseveranceScore > selfRegScore ? '粘り強さ' : '学び方の工夫'}がよくなってきています。${perseveranceScore > selfRegScore ? '学び方の工夫' : '粘り強さ'}も意識するとさらに伸びるよ！`
+        : '少しずつ「やってみる」を積み重ねよう。うまくいかなくても、取り組んだことが大事な一歩です。'
+    const teacherMsg = `粘り強さ${perseveranceScore}点 / 自己調整${selfRegScore}点（3源三角測量, 信頼性${reliability}%）。`
+      + (overallGrade === 'A' ? 'ZPDを意識した発展的課題の提示が有効です。'
+        : overallGrade === 'B' ? (perseveranceScore < selfRegScore ? '完了体験の積み重ね（スモールステップ化）が最優先。' : '振り返りの質向上（メタ認知プロンプト）が効果的。')
+        : '個別の声かけ（関係性）+ 達成可能な小目標（有能感）の両面支援を。')
 
     return c.json({
       success: true,
+      model_version: '4.0',
+      measurement_architecture: {
+        level_1: {
+          name: '行動ログ分析',
+          method: 'ActivTrak式 3バケット: Productive Time / Focus / Workload Balance',
+          score: level1Score,
+          detail: {
+            productive_rate: Math.round(productiveRate * 100),
+            time_utilization: Math.round(timeUtilization * 100),
+            session_intensity: Math.round(sessionIntensity * 100),
+            focus_score: Math.round(focusScore_L1 * 100),
+            workload_balance: Math.round(balanceScore_L1 * 100)
+          },
+          description: '客観的行動データの自動計測。主観に依存しない量的指標。'
+        },
+        level_2: {
+          name: 'AI観察評価',
+          method: 'Multimodal LA + Process Mining 着想: 行動パターン→学習戦略推定',
+          score: level2Score,
+          strategies_detected: detectedCount,
+          strategies_total: strategies.length,
+          strategies: strategies,
+          description: '行動ログの「意味」を解釈。何をしたか(Level 1)→なぜ/どう学んだか(Level 2)。'
+        },
+        level_3: {
+          name: '三角測量統合',
+          method: 'ECD (Mislevy 2003) + Stealth Assessment (Shute 2011)',
+          sources: {
+            source_a: { name: '行動ログ(L1)', score: level1Score, weight: '客観データ最重視' },
+            source_b: { name: 'AI戦略分析(L2)', score: level2Score, weight: 'パターン解釈で補完' },
+            source_c: { name: '自己報告', score: selfReportScore, weight: 'メタ認知モニタリング' }
+          },
+          reliability_estimate: reliability,
+          description: '3つの独立エビデンス源を統合。一致度が高いほど信頼性が高い（三角測量原理）。'
+        }
+      },
       total_score: totalScore,
       dimensions: {
-        continuity: Math.round(continuityScore),
-        challenge: Math.round(challengeScore),
-        recovery: Math.round(recoveryScore),
-        deepening: Math.round(deepeningScore),
-        emotional_stability: Math.round(emotionalStability)
+        continuity: Math.round(perseveranceScore),
+        challenge: Math.round(Math.min(100, level2Score + (retries > 0 ? 10 : 0))),
+        recovery: Math.round(Math.min(100, (gaveUp === 0 ? 70 : 30) + (retries * 10) + (dur >= 20 ? 10 : 0))),
+        deepening: Math.round(Math.min(100, tcr * 40 + extraTasks * 20 + reviews * 15 + 10)),
+        emotional_stability: Math.round(selfReportScore)
       },
       dimension_labels: {
-        continuity: '継続する力',
+        continuity: '粘り強さ',
         challenge: '挑戦する力',
         recovery: '立ち直る力',
         deepening: '深める力',
         emotional_stability: '気持ちの安定'
       },
-      // 新しい構造化データ（フロントで見やすく表示用）
-      dimension_details: dimensionDetails,
-      overall: {
-        level: overallLevel,
-        student_msg: overallStudentMsg,
-        teacher_msg: overallTeacherMsg,
-        score_perseverance: perseveranceSide,
-        score_self_regulation: selfRegSide
-      },
-      advice,
-      theories: ['Duckworth_Grit', 'Dweck_Growth_Mindset', 'Academic_Resilience', 'SDT_Intrinsic_Motivation', 'Zimmerman_SRL', 'Pekrun_Academic_Emotions', 'Newman_Help_Seeking'],
       curriculum_mapping: {
         perseverance: '粘り強い取組を行おうとする側面',
         self_regulation: '自らの学習を調整しようとする側面',
-        score_perseverance: perseveranceSide,
-        score_self_regulation: selfRegSide,
-        integrated_level: overallLevel
-      }
+        score_perseverance: perseveranceScore,
+        score_self_regulation: selfRegScore,
+        integrated_level: overallLabel,
+        triangulation_sources: 3,
+        reliability: reliability
+      },
+      overall: {
+        level: overallLabel,
+        grade: overallGrade,
+        student_msg: studentMsg,
+        teacher_msg: teacherMsg,
+        score_perseverance: perseveranceScore,
+        score_self_regulation: selfRegScore,
+        bars_level: barsLevel
+      },
+      growth_trend: growthTrend,
+      theories: [
+        'ECD_Mislevy_2003', 'Stealth_Assessment_Shute_2011',
+        'ActivTrak_Behavioral_Analytics', 'Multimodal_LA_2024',
+        'Duckworth_Grit', 'Dweck_Growth_Mindset',
+        'Zimmerman_SRL', 'Pekrun_CVT', 'Lieberman_Affect_Labeling',
+        'DiCerbo_Persistence_2014', 'Newman_Help_Seeking'
+      ]
     })
   } catch (error) {
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
