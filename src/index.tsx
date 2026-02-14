@@ -28966,7 +28966,12 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
         teacher_msg: continuityScore >= 50
           ? '継続性' + Math.round(continuityScore) + '点。より挑戦的な課題への誘導が効果的です。'
           : '課題量のスモールステップ化で「完了体験」を増やし有能感(SDT)を育てましょう。',
-        reason: '学習時間(' + (session_duration_minutes || 0) + '分)と課題完了率(' + Math.round((task_completion_rate || 0) * 100) + '%)から算出'
+        calc: [
+          { label: '課題完了率', value: Math.round((task_completion_rate || 0) * 100) + '%', points: Math.round(completionFactor), max: 40 },
+          { label: '学習時間', value: (session_duration_minutes || 0) + '分/' + idealMinutes + '分', points: Math.round(durationFactor), max: 40 },
+          { label: '基本点', value: '', points: 20, max: 20 },
+          ...(quitPenalty > 0 ? [{ label: '途中離脱', value: (early_quit_count || 0) + '回', points: -Math.round(quitPenalty), max: 0 }] : [])
+        ]
       },
       {
         key: 'challenge',
@@ -28980,7 +28985,11 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
         teacher_msg: challengeScore >= 50
           ? '挑戦性' + Math.round(challengeScore) + '点。プロセスを褒める声かけ(Dweck 2006)で強化を。'
           : '「間違い＝成長」のフレーミングが重要です。間違いを称賛する学級文化を。',
-        reason: '再挑戦回数(' + (retry_after_failure_count || 0) + '回)と諦め回数(' + (gave_up_count || 0) + '回)から算出'
+        calc: [
+          { label: '基本点', value: '', points: 30, max: 30 },
+          { label: '再挑戦', value: (retry_after_failure_count || 0) + '回 x15', points: Math.round(retryFactor), max: 60 },
+          ...(gaveUpPenalty > 0 ? [{ label: '諦め', value: (gave_up_count || 0) + '回 x20', points: -Math.round(gaveUpPenalty), max: 0 }] : [])
+        ]
       },
       {
         key: 'recovery',
@@ -28994,7 +29003,15 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
         teacher_msg: recoveryScore >= 50
           ? '回復力' + Math.round(recoveryScore) + '点。この子の回復過程を学級で共有すると他児にも寄与します。'
           : 'help-seeking促進が重要(Newman 2002)。「質問は賢い選択」のメッセージを。',
-        reason: '諦め(' + (gave_up_count || 0) + '回)と再挑戦(' + (retry_after_failure_count || 0) + '回)から算出'
+        calc: [
+          { label: '基本点', value: '諦め0なら', points: (gave_up_count || 0) > 0 ? Math.max(0, 80 - ((gave_up_count || 0) * 25)) : 80, max: 80 },
+          ...(gave_up_count > 0 ? [
+            { label: '諦め', value: (gave_up_count || 0) + '回 x25', points: -((gave_up_count || 0) * 25), max: 0 },
+            { label: '再挑戦ボーナス', value: (retry_after_failure_count || 0) + '回 x10', points: Math.min(40, (retry_after_failure_count || 0) * 10), max: 40 }
+          ] : [
+            { label: '諦めなし', value: '減点なし', points: 0, max: 0 }
+          ])
+        ]
       },
       {
         key: 'deepening',
@@ -29008,7 +29025,11 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
         teacher_msg: deepeningScore >= 50
           ? '深化' + Math.round(deepeningScore) + '点。自律的学習者に近づいています。'
           : '選択課題のオリエンテーションが有効。「選択肢がある」こと自体がSDTの自律性を刺激。',
-        reason: '追加課題(' + (extra_tasks_attempted || 0) + '個)と自発的復習(' + (review_initiated_count || 0) + '回)から算出'
+        calc: [
+          { label: '選択課題', value: (extra_tasks_attempted || 0) + '個 x20', points: Math.round(extraFactor), max: 50 },
+          { label: '自発的復習', value: (review_initiated_count || 0) + '回 x15', points: Math.round(reviewFactor), max: 30 },
+          { label: '基本点', value: '', points: 20, max: 20 }
+        ]
       },
       {
         key: 'emotional_stability',
@@ -29022,7 +29043,9 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
         teacher_msg: emotionalStability >= 50
           ? '安定性' + Math.round(emotionalStability) + '点。他の粘り強さ次元の基盤です。'
           : '振り返りカードの「手ごたえ」欄で感情言語化を。Affect Labeling効果(Lieberman 2007)。',
-        reason: '手ごたえ自己評価(' + (confidence_during_difficulty || 3) + '/5)から算出'
+        calc: [
+          { label: '手ごたえ自己評価', value: (confidence_during_difficulty || 3) + '/5 x20+10', points: Math.round(emotionalStability), max: 100 }
+        ]
       }
     ]
 

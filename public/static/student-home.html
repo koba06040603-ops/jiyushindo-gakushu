@@ -41,8 +41,7 @@
         .plan-compact td { line-height: 1.3; }
         .dim-bar { height: 8px; border-radius: 4px; transition: width 0.8s ease-out; }
         .dim-card { border-left: 4px solid; padding: 8px 10px; border-radius: 0 8px 8px 0; }
-        .teacher-toggle { cursor: pointer; color: #6b7280; font-size: 0.7rem; }
-        .teacher-toggle:hover { color: #3b82f6; }
+        .teacher-only { display: none !important; }
         @media (max-width: 768px) {
             .plan-table { font-size: 0.7rem; }
             .plan-table th, .plan-table td { padding: 3px 4px; }
@@ -73,7 +72,7 @@
 </header>
 
 <!-- ========== メインコンテンツ ========== -->
-<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+<main class="mx-auto px-4 py-6 space-y-6" style="max-width:1200px">
 
     <!-- ===== Phase: 新規 or 継続判定 ===== -->
     <div id="loadingScreen" class="text-center py-16">
@@ -101,24 +100,33 @@
 
         <!-- コース選択 -->
         <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-route text-purple-500 mr-2"></i>コースをえらぼう
-            </h2>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">
+                    <i class="fas fa-route text-purple-500 mr-2"></i>コースをえらぼう
+                </h2>
+                <a href="/static/curriculum-problem-generator.html" target="_blank" class="text-xs bg-purple-100 text-purple-700 px-3 py-1.5 rounded-full hover:bg-purple-200 transition">
+                    <i class="fas fa-puzzle-piece mr-1"></i>問題を見てから決めたい人はこちら
+                </a>
+            </div>
+            <p class="text-xs text-gray-500 mb-3"><i class="fas fa-lightbulb text-yellow-400 mr-1"></i>迷ったら「問題を見てから決めたい人はこちら」から学習のてびきの問題を見て、自分に合うコースを選ぼう。</p>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div onclick="selectCourse('slow')" id="course-slow" class="cursor-pointer border-2 border-gray-200 rounded-2xl p-5 text-center hover:border-green-400 hover:bg-green-50 transition">
                     <div class="text-3xl mb-2">🐢</div>
                     <h3 class="font-bold text-green-700">じっくりコース</h3>
                     <p class="text-xs text-gray-600 mt-1">ゆっくりていねいに進める。カード1枚ずつしっかり理解する。</p>
+                    <p class="text-xs text-green-600 mt-2 font-medium">基本問題を中心に取り組む</p>
                 </div>
                 <div onclick="selectCourse('steady')" id="course-steady" class="cursor-pointer border-2 border-gray-200 rounded-2xl p-5 text-center hover:border-blue-400 hover:bg-blue-50 transition">
                     <div class="text-3xl mb-2">🐕</div>
                     <h3 class="font-bold text-blue-700">しっかりコース</h3>
                     <p class="text-xs text-gray-600 mt-1">教科書のペースでバランスよく進める。</p>
+                    <p class="text-xs text-blue-600 mt-2 font-medium">基本＋練習問題に取り組む</p>
                 </div>
                 <div onclick="selectCourse('fast')" id="course-fast" class="cursor-pointer border-2 border-gray-200 rounded-2xl p-5 text-center hover:border-orange-400 hover:bg-orange-50 transition">
                     <div class="text-3xl mb-2">🐆</div>
                     <h3 class="font-bold text-orange-700">ぐんぐんコース</h3>
                     <p class="text-xs text-gray-600 mt-1">はやめに進んで、発展問題や選択課題にたくさん挑戦する。</p>
+                    <p class="text-xs text-orange-600 mt-2 font-medium">発展・応用問題にも挑戦</p>
                 </div>
             </div>
         </div>
@@ -410,11 +418,8 @@
             </div>
             <!-- 各次元カード（コンパクト） -->
             <div id="persistenceDimCards" class="space-y-1.5"></div>
-            <!-- 先生向け（折り畳み） -->
-            <details class="mt-3">
-                <summary class="teacher-toggle"><i class="fas fa-chalkboard-teacher mr-1"></i>先生向けメモ</summary>
-                <div id="persistenceTeacherMemo" class="text-xs text-gray-500 mt-2 space-y-1 bg-gray-50 rounded-lg p-3"></div>
-            </details>
+            <!-- 先生向け（児童には非表示） -->
+            <div id="persistenceTeacherMemo" class="teacher-only text-xs text-gray-500 mt-2 space-y-1 bg-gray-50 rounded-lg p-3"></div>
         </div>
 
         <div class="text-center">
@@ -833,7 +838,7 @@ function renderPlanOverview() {
             const d = row.planned_date.split('-')
             dateHtml = `<span class="text-gray-500 text-xs">${d[1]||''}/${d[2]||''}</span>`
         } else {
-            dateHtml = `<input type="date" class="w-16 px-0.5 py-0 border rounded text-xs" data-hour="${row.hour_number}" value="" onchange="updatePlannedDate(${row.hour_number}, this.value)" style="font-size:10px">`
+            dateHtml = `<input type="text" class="w-14 px-0.5 py-0 border rounded text-center" data-hour="${row.hour_number}" value="" placeholder="M/D" onfocus="this.type='date'" onchange="updatePlannedDate(${row.hour_number}, this.value)" style="font-size:10px">`
         }
 
         // 振り返り + AI を統合（星 or ✅）
@@ -1259,18 +1264,32 @@ function renderPersistenceAdvice(persist) {
         const color = dimColors[i] || '#6b7280'
         const barWidth = Math.max(4, d.score)
         const emoji = d.score >= 70 ? '🌟' : d.score >= 40 ? '📈' : '💡'
+
+        // 計算内訳を表形式で生成
+        let calcHtml = ''
+        if (d.calc && d.calc.length > 0) {
+            const calcRows = d.calc.map(c => {
+                const sign = c.points < 0 ? '−' : '＋'
+                const absPoints = Math.abs(c.points)
+                const pointColor = c.points < 0 ? '#ef4444' : '#22c55e'
+                return `<span class="inline-flex items-center mr-2 mb-0.5"><span class="text-gray-500">${c.label}</span>${c.value ? `<span class="text-gray-400 mx-0.5">${c.value}</span>` : ''}<span style="color:${pointColor}" class="font-bold ml-0.5">${sign}${absPoints}</span>${c.max > 0 ? `<span class="text-gray-300">/${c.max}</span>` : ''}</span>`
+            }).join('')
+            calcHtml = `<div class="text-xs text-gray-400 mt-0.5 leading-relaxed">計算: ${calcRows} = <strong class="text-gray-600">${d.score}点</strong></div>`
+        }
+
         cardsContainer.innerHTML += `
             <div class="dim-card bg-white" style="border-left-color:${color}">
                 <div class="flex items-center gap-2 mb-1">
                     <span class="text-sm">${d.icon || emoji}</span>
                     <span class="text-xs font-bold text-gray-800">${d.name}</span>
-                    <span class="text-xs font-bold ml-auto" style="color:${color}">${d.score}点</span>
-                </div>
-                <div class="bg-gray-100 rounded-full h-1.5 mb-1">
-                    <div class="dim-bar" style="width:${barWidth}%;background:${color}"></div>
+                    <div class="flex-1 mx-2 bg-gray-100 rounded-full h-2">
+                        <div class="dim-bar h-2" style="width:${barWidth}%;background:${color}"></div>
+                    </div>
+                    <span class="text-xs font-bold" style="color:${color}">${d.score}<span class="text-gray-300">/100</span></span>
                 </div>
                 <p class="text-xs text-gray-600 leading-snug">${d.student_msg}</p>
-                <p class="text-xs text-gray-400 mt-0.5">📖 ${d.theory_short} ｜ 算出: ${d.reason}</p>
+                ${calcHtml}
+                <p class="text-xs text-gray-400 mt-0.5">📖 ${d.theory_short}</p>
             </div>
         `
     })
