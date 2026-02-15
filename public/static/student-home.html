@@ -177,6 +177,53 @@
             </div>
         </div>
 
+        <!-- 教科・時数設定 -->
+        <div class="bg-white rounded-2xl shadow-lg p-5 section-card">
+            <h2 class="text-lg font-bold text-gray-800 mb-3">
+                <i class="fas fa-book text-blue-500 mr-2"></i>教科と時間の設定
+            </h2>
+            <div class="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">教科1</label>
+                    <div class="flex items-center gap-2">
+                        <span id="subject1Display" class="text-sm font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 flex-1 text-center">算数</span>
+                        <span class="text-xs text-gray-500">×</span>
+                        <input type="number" id="hours1Input" value="8" min="1" max="30" class="w-16 px-2 py-1.5 border-2 border-blue-300 rounded-lg text-center font-bold text-sm" onchange="updateTotalHours()">
+                        <span class="text-xs text-gray-600">時間</span>
+                    </div>
+                </div>
+                <div id="subject2Area">
+                    <label class="block text-xs font-bold text-gray-600 mb-1">教科2（なければ空欄）</label>
+                    <div class="flex items-center gap-2">
+                        <select id="subject2Select" class="text-sm font-bold px-3 py-1.5 rounded-lg border border-gray-200 flex-1" onchange="updateSubject2()">
+                            <option value="">なし</option>
+                            <option value="国語">国語</option>
+                            <option value="算数">算数</option>
+                            <option value="理科">理科</option>
+                            <option value="社会">社会</option>
+                            <option value="生活">生活</option>
+                            <option value="音楽">音楽</option>
+                            <option value="図工">図工</option>
+                            <option value="体育">体育</option>
+                            <option value="道徳">道徳</option>
+                            <option value="外国語">外国語</option>
+                        </select>
+                        <span class="text-xs text-gray-500">×</span>
+                        <input type="number" id="hours2Input" value="0" min="0" max="30" class="w-16 px-2 py-1.5 border-2 border-gray-300 rounded-lg text-center font-bold text-sm" onchange="updateTotalHours()" disabled>
+                        <span class="text-xs text-gray-600">時間</span>
+                    </div>
+                </div>
+            </div>
+            <div id="subject2UnitArea" class="mb-3 hidden">
+                <label class="block text-xs font-bold text-gray-600 mb-1">教科2の単元名</label>
+                <input type="text" id="unitName2Input" placeholder="例：物語を読もう" class="w-full px-3 py-1.5 border-2 border-gray-200 rounded-lg text-sm">
+            </div>
+            <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl px-4 py-3 flex items-center justify-between">
+                <span class="text-sm font-bold text-gray-700"><i class="fas fa-clock mr-1"></i>合計時間</span>
+                <span id="totalHoursDisplay" class="text-2xl font-black text-blue-700">8<span class="text-sm font-bold text-gray-500 ml-1">じかん</span></span>
+            </div>
+        </div>
+
         <!-- モバイル用タブ切替 -->
         <div class="split-tabs" id="splitTabs">
             <div class="split-tab active" data-target="left" onclick="switchSplitTab('left')">
@@ -218,9 +265,10 @@
                         <table class="w-full plan-table text-sm" id="initialPlanTable">
                             <thead>
                                 <tr class="bg-gray-100">
-                                    <th class="px-3 py-2 text-left rounded-tl-lg">時</th>
-                                    <th class="px-3 py-2 text-left date-cell">予定日</th>
-                                    <th class="px-3 py-2 text-left">はじめの計画（何をする？）</th>
+                                    <th class="px-2 py-2 text-left rounded-tl-lg" style="width:28px">時</th>
+                                    <th class="px-2 py-2 text-left" style="width:55px">教科</th>
+                                    <th class="px-2 py-2 text-left date-cell">予定日</th>
+                                    <th class="px-2 py-2 text-left">はじめの計画（何をする？）</th>
                                 </tr>
                             </thead>
                             <tbody id="initialPlanBody"></tbody>
@@ -292,11 +340,12 @@
                 <thead>
                     <tr class="bg-gray-100 text-xs">
                         <th class="px-1 py-1.5 text-center" style="width:22px">時</th>
+                        <th class="px-1 py-1.5 text-center" style="width:40px">教科</th>
                         <th class="px-1 py-1.5 text-center" style="width:36px">日</th>
                         <th class="px-1 py-1.5 text-left" style="width:14%">計画</th>
                         <th class="px-1 py-1.5 text-left" style="width:50px">進捗</th>
-                        <th class="px-1 py-1.5 text-left" style="width:30%">振り返り</th>
-                        <th class="px-1 py-1.5 text-left" style="width:40%">振り返りAI</th>
+                        <th class="px-1 py-1.5 text-left" style="width:28%">振り返り</th>
+                        <th class="px-1 py-1.5 text-left" style="width:35%">振り返りAI</th>
                     </tr>
                 </thead>
                 <tbody id="planOverviewBody"></tbody>
@@ -668,7 +717,11 @@ const STATE = {
         total_check_tests: 1,
         total_selection_tasks: 6,
         selection_task_names: ['発展問題', '文章題チャレンジ', 'パズル問題', '説明する問題', '生活に使おう', '友だちと考えよう'],
-        unit_goal: '小数のかけ算のしくみを理解し、いろいろな場面で使えるようになる。'
+        unit_goal: '小数のかけ算のしくみを理解し、いろいろな場面で使えるようになる。',
+        // 2教科同時自由進度対応
+        subject2: '',
+        unit_name2: '',
+        total_hours2: 0
     }
 }
 
@@ -983,6 +1036,9 @@ async function init() {
                 STATE.unitConfig.total_selection_tasks = STATE.plan.total_selection_tasks
                 try { STATE.unitConfig.selection_task_names = JSON.parse(STATE.plan.selection_task_names || '[]') } catch {}
                 STATE.unitConfig.unit_goal = STATE.plan.unit_goal
+                STATE.unitConfig.subject2 = STATE.plan.subject2 || ''
+                STATE.unitConfig.unit_name2 = STATE.plan.unit_name2 || ''
+                STATE.unitConfig.total_hours2 = STATE.plan.total_hours2 || 0
                 STATE.selectedCourse = STATE.plan.course_type || 'steady'
                 updateHeader()
                 determinePhase()
@@ -1008,6 +1064,9 @@ async function init() {
                     STATE.unitConfig.total_selection_tasks = STATE.plan.total_selection_tasks
                     try { STATE.unitConfig.selection_task_names = JSON.parse(STATE.plan.selection_task_names || '[]') } catch {}
                     STATE.unitConfig.unit_goal = STATE.plan.unit_goal
+                    STATE.unitConfig.subject2 = STATE.plan.subject2 || ''
+                    STATE.unitConfig.unit_name2 = STATE.plan.unit_name2 || ''
+                    STATE.unitConfig.total_hours2 = STATE.plan.total_hours2 || 0
                     STATE.selectedCourse = STATE.plan.course_type || 'steady'
                     updateHeader()
                     determinePhase()
@@ -1080,6 +1139,7 @@ function showPhase0() {
     hideAllPhases()
     document.getElementById('phase0').classList.remove('hidden')
     document.getElementById('unitGoalDisplay').textContent = STATE.unitConfig.unit_goal
+    syncSubjectUI()
     renderInitialPlanTable()
     // スプリットビュー左ペインにてびきをインライン表示
     renderTebikiInline()
@@ -1164,6 +1224,7 @@ function renderTebikiInline() {
                 <div class="bg-purple-100 border-l-4 border-purple-600 p-2 rounded-r-lg">
                     <h4 class="text-[10px] font-bold text-purple-800"><i class="fas fa-clock mr-1"></i>じゅぎょうじかん</h4>
                     <p class="text-base font-bold text-purple-700">ぜんぶで ${STATE.unitConfig.total_hours} じかん</p>
+                    ${STATE.unitConfig.subject2 ? `<p class="text-[9px] text-purple-600">${STATE.unitConfig.subject}${STATE.unitConfig.total_hours - (STATE.unitConfig.total_hours2||0)}h + ${STATE.unitConfig.subject2}${STATE.unitConfig.total_hours2||0}h</p>` : ''}
                 </div>
             </div>
         </div>`
@@ -1433,6 +1494,55 @@ function showPhase6(data) {
 }
 
 // ========== Phase 0: 計画作成 ==========
+// ========== 教科・時数管理 ==========
+function updateSubject2() {
+    const s2 = document.getElementById('subject2Select').value
+    const hours2Input = document.getElementById('hours2Input')
+    const unitArea = document.getElementById('subject2UnitArea')
+    STATE.unitConfig.subject2 = s2
+    if (s2) {
+        hours2Input.disabled = false
+        hours2Input.value = hours2Input.value === '0' ? '8' : hours2Input.value
+        unitArea.classList.remove('hidden')
+    } else {
+        hours2Input.disabled = true
+        hours2Input.value = '0'
+        unitArea.classList.add('hidden')
+    }
+    updateTotalHours()
+}
+
+function updateTotalHours() {
+    const h1 = parseInt(document.getElementById('hours1Input').value) || 0
+    const h2 = parseInt(document.getElementById('hours2Input').value) || 0
+    const total = h1 + h2
+    STATE.unitConfig.total_hours = total
+    STATE.unitConfig.total_hours2 = h2
+    STATE.unitConfig.unit_name2 = document.getElementById('unitName2Input')?.value || ''
+    document.getElementById('totalHoursDisplay').innerHTML = `${total}<span class="text-sm font-bold text-gray-500 ml-1">じかん</span>`
+    // 計画表を再描画
+    renderInitialPlanTable()
+}
+
+// Phase0初期表示時にUI同期
+function syncSubjectUI() {
+    const s1 = STATE.unitConfig.subject || '算数'
+    const s2 = STATE.unitConfig.subject2 || ''
+    const h1 = STATE.unitConfig.total_hours - (STATE.unitConfig.total_hours2 || 0)
+    const h2 = STATE.unitConfig.total_hours2 || 0
+    document.getElementById('subject1Display').textContent = s1
+    document.getElementById('hours1Input').value = h1
+    document.getElementById('subject2Select').value = s2
+    document.getElementById('hours2Input').value = h2
+    document.getElementById('hours2Input').disabled = !s2
+    if (s2) {
+        document.getElementById('subject2UnitArea').classList.remove('hidden')
+        document.getElementById('unitName2Input').value = STATE.unitConfig.unit_name2 || ''
+    }
+    const total = STATE.unitConfig.total_hours
+    document.getElementById('totalHoursDisplay').innerHTML = `${total}<span class="text-sm font-bold text-gray-500 ml-1">じかん</span>`
+}
+
 function selectCourse(type) {
     STATE.selectedCourse = type
     document.querySelectorAll('[id^="course-"]').forEach(el => {
@@ -1454,15 +1564,26 @@ function selectCourse(type) {
 function renderInitialPlanTable() {
     const tbody = document.getElementById('initialPlanBody')
     tbody.innerHTML = ''
+    const s1 = STATE.unitConfig.subject || '算数'
+    const s2 = STATE.unitConfig.subject2 || ''
+    const hasSubject2 = !!s2
     for (let i = 1; i <= STATE.unitConfig.total_hours; i++) {
         const tr = document.createElement('tr')
         tr.className = 'border-b hover:bg-gray-50'
+        // 教科セレクトボックス（2教科あるときのみ選択可能）
+        const subjectCell = hasSubject2
+            ? `<select class="init-subject w-full px-1 py-1 border rounded text-xs" data-hour="${i}">
+                   <option value="${s1}">${s1}</option>
+                   <option value="${s2}">${s2}</option>
+               </select>`
+            : `<span class="text-xs text-gray-600">${s1}</span>`
         tr.innerHTML = `
-            <td class="px-3 py-2 font-bold text-blue-600">${i}</td>
-            <td class="px-3 py-2 date-cell">
+            <td class="px-2 py-2 font-bold text-blue-600">${i}</td>
+            <td class="px-2 py-2">${subjectCell}</td>
+            <td class="px-2 py-2 date-cell">
                 <input type="date" class="init-date w-full px-2 py-1 border rounded text-xs" data-hour="${i}">
             </td>
-            <td class="px-3 py-2">
+            <td class="px-2 py-2">
                 <input type="text" class="init-plan w-full px-2 py-1 border rounded text-xs" data-hour="${i}" placeholder="${getDefaultPlanHint(i)}">
             </td>
         `
@@ -1517,7 +1638,7 @@ function buildCardAccordionRow(hourNum) {
     const tr = document.createElement('tr')
     tr.className = 'bg-indigo-50/50'
     const td = document.createElement('td')
-    td.colSpan = 3
+    td.colSpan = 4
     td.className = 'px-3 py-0'
 
     let innerHtml = ''
@@ -1589,8 +1710,20 @@ function getDefaultPlanHint(hour) {
 
 async function saveInitialPlan() {
     try {
+        // 最新のUIから教科・時数を取得
+        STATE.unitConfig.unit_name2 = document.getElementById('unitName2Input')?.value || ''
         const personalGoal = document.getElementById('personalGoalInput').value
-        // 1. 計画作成
+
+        // 1. 計画行（教科情報付き）を先に構築
+        const planRows = []
+        for (let i = 1; i <= STATE.unitConfig.total_hours; i++) {
+            const subjectEl = document.querySelector(`.init-subject[data-hour="${i}"]`)
+            planRows.push({
+                subject: subjectEl?.value || STATE.unitConfig.subject || ''
+            })
+        }
+
+        // 2. 計画作成
         const createRes = await axios.post('/api/student-learning/create-plan', {
             student_id: STATE.studentId,
             unit_name: STATE.unitConfig.unit_name,
@@ -1605,26 +1738,32 @@ async function saveInitialPlan() {
             unit_goal: STATE.unitConfig.unit_goal,
             personal_goal: personalGoal,
             start_date: document.querySelector('.init-date')?.value || '',
-            end_date: document.querySelectorAll('.init-date')[STATE.unitConfig.total_hours - 1]?.value || ''
+            end_date: document.querySelectorAll('.init-date')[STATE.unitConfig.total_hours - 1]?.value || '',
+            subject2: STATE.unitConfig.subject2,
+            unit_name2: STATE.unitConfig.unit_name2,
+            total_hours2: STATE.unitConfig.total_hours2,
+            plan_rows: planRows
         })
 
         if (!createRes.data.success) throw new Error(createRes.data.error)
         STATE.planId = createRes.data.plan_id
 
-        // 2. 各時間のはじめの計画を保存
+        // 3. 各時間のはじめの計画を保存（教科情報付き）
         const rows = []
         for (let i = 1; i <= STATE.unitConfig.total_hours; i++) {
             const planInput = document.querySelector(`.init-plan[data-hour="${i}"]`)
             const dateInput = document.querySelector(`.init-date[data-hour="${i}"]`)
+            const subjectEl = document.querySelector(`.init-subject[data-hour="${i}"]`)
             rows.push({
                 hour_number: i,
                 initial_plan: planInput?.value || '',
-                planned_date: dateInput?.value || ''
+                planned_date: dateInput?.value || '',
+                subject: subjectEl?.value || STATE.unitConfig.subject || ''
             })
         }
         await axios.post('/api/student-learning/save-initial-plans', { plan_id: STATE.planId, rows })
 
-        // 3. 計画データを再取得
+        // 4. 計画データを再取得
         const planRes = await axios.get(`/api/student-learning/plan/${STATE.planId}`)
         STATE.plan = planRes.data.plan
         STATE.rows = planRes.data.rows
@@ -1740,10 +1879,14 @@ function renderPlanOverview() {
             aiHtml = `<div class="text-xs text-indigo-700 leading-snug wrap-cell" title="${ref.ai_feedback.replace(/"/g, '&quot;')}">🤖 ${short}</div>`
         }
 
+        // 教科
+        const subjectText = row.subject || STATE.unitConfig.subject || '算数'
+
         const tr = document.createElement('tr')
         tr.className = `${rowClass} border-b plan-compact`
         tr.innerHTML = `
             <td class="px-1 py-1 text-center font-bold text-xs">${row.hour_number}</td>
+            <td class="px-1 py-1 text-center" style="font-size:9px">${subjectText}</td>
             <td class="px-1 py-1 text-center" style="font-size:9px">${dateHtml}</td>
             <td class="px-1 py-1 text-xs" title="${planTitle}">${planText}</td>
             <td class="px-1 py-1 text-center" style="font-size:9px">${progressHtml}</td>

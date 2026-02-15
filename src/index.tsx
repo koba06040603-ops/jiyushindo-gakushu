@@ -28289,22 +28289,24 @@ app.post('/api/student-learning/create-plan', async (c) => {
   const { env } = c
   try {
     const body = await c.req.json()
-    const { student_id, unit_name, grade, subject, course_type, total_hours, total_cards, total_check_tests, total_selection_tasks, selection_task_names, unit_goal, personal_goal, start_date, end_date } = body
+    const { student_id, unit_name, grade, subject, course_type, total_hours, total_cards, total_check_tests, total_selection_tasks, selection_task_names, unit_goal, personal_goal, start_date, end_date,
+      subject2, unit_name2, total_hours2, plan_rows } = body
 
     const result = await env.DB.prepare(`
-      INSERT INTO unit_study_plans (student_id, unit_name, grade, subject, course_type, total_hours, total_cards, total_check_tests, total_selection_tasks, selection_task_names, unit_goal, personal_goal, start_date, end_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(student_id, unit_name, grade || '', subject || '', course_type || 'steady', total_hours || 8, total_cards || 6, total_check_tests || 1, total_selection_tasks || 6, JSON.stringify(selection_task_names || []), unit_goal || '', personal_goal || '', start_date || '', end_date || '').run()
+      INSERT INTO unit_study_plans (student_id, unit_name, grade, subject, course_type, total_hours, total_cards, total_check_tests, total_selection_tasks, selection_task_names, unit_goal, personal_goal, start_date, end_date, subject2, unit_name2, total_hours2)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(student_id, unit_name, grade || '', subject || '', course_type || 'steady', total_hours || 8, total_cards || 6, total_check_tests || 1, total_selection_tasks || 6, JSON.stringify(selection_task_names || []), unit_goal || '', personal_goal || '', start_date || '', end_date || '', subject2 || '', unit_name2 || '', total_hours2 || 0).run()
 
     const planId = result.meta.last_row_id
 
-    // 各時間分の計画行を自動生成
+    // 各時間分の計画行を自動生成（教科情報付き）
     const hours = total_hours || 8
     for (let i = 1; i <= hours; i++) {
+      const rowSubject = (plan_rows && plan_rows[i - 1]?.subject) || subject || ''
       await env.DB.prepare(`
-        INSERT INTO study_plan_rows (plan_id, student_id, hour_number, status)
-        VALUES (?, ?, ?, 'planned')
-      `).bind(planId, student_id, i).run()
+        INSERT INTO study_plan_rows (plan_id, student_id, hour_number, subject, status)
+        VALUES (?, ?, ?, ?, 'planned')
+      `).bind(planId, student_id, i, rowSubject).run()
     }
 
     return c.json({ success: true, plan_id: planId, hours_created: hours })
@@ -28347,12 +28349,12 @@ app.post('/api/student-learning/save-initial-plans', async (c) => {
   const { env } = c
   try {
     const { plan_id, rows } = await c.req.json()
-    // rows = [{hour_number, initial_plan, planned_date}, ...]
+    // rows = [{hour_number, initial_plan, planned_date, subject}, ...]
     for (const row of rows) {
       await env.DB.prepare(`
-        UPDATE study_plan_rows SET initial_plan = ?, planned_date = ?, updated_at = CURRENT_TIMESTAMP
+        UPDATE study_plan_rows SET initial_plan = ?, planned_date = ?, subject = ?, updated_at = CURRENT_TIMESTAMP
         WHERE plan_id = ? AND hour_number = ?
-      `).bind(row.initial_plan || '', row.planned_date || '', plan_id, row.hour_number).run()
+      `).bind(row.initial_plan || '', row.planned_date || '', row.subject || '', plan_id, row.hour_number).run()
     }
     return c.json({ success: true })
   } catch (error) {

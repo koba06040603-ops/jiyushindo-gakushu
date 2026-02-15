@@ -3715,19 +3715,26 @@ async function loadLearningPlanPage(curriculumId) {
             <div class="grid grid-cols-2 gap-6 mb-6">
               <div class="bg-blue-50 rounded-xl p-4">
                 <label class="block text-sm font-bold text-blue-800 mb-2">
-                  <i class="fas fa-clock mr-2"></i>ぜんぶの学習時間
+                  <i class="fas fa-clock mr-2"></i>教科1の時間数
                 </label>
                 <div class="flex items-center gap-2">
                   <input type="number" 
-                         id="totalHours" 
+                         id="subject1Hours" 
                          value="${curriculum.total_hours}" 
                          min="3" 
                          max="30" 
                          class="w-24 px-3 py-2 border-2 border-blue-300 rounded-lg font-bold text-xl text-center"
-                         onchange="updatePlanHours()">
+                         onchange="recalcTotalHours()">
                   <span class="text-lg font-bold text-blue-700">じかん</span>
                 </div>
-                <p class="text-xs text-gray-600 mt-2">
+                <input type="hidden" id="totalHours" value="${curriculum.total_hours}">
+                <div class="mt-2 flex items-center gap-2">
+                  <span class="text-xs text-gray-600">合計</span>
+                  <span id="totalHoursLabel" class="text-lg font-black text-purple-700">${curriculum.total_hours}</span>
+                  <span class="text-xs text-gray-600">時間</span>
+                  <span id="totalHoursBreakdown" class="text-xs text-gray-500 hidden"></span>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">
                   ※ 1時間目（オリエンテーション）と最後の時間（まとめ）は固定です。<br>
                   自由に計画できるのは<strong id="planHours">${curriculum.total_hours - 2}</strong>時間です。
                 </p>
@@ -3769,7 +3776,8 @@ async function loadLearningPlanPage(curriculumId) {
                 <div>
                   <label class="block text-sm font-bold text-gray-700 mb-2">時間数</label>
                   <input type="number" id="subject2Hours" value="8" min="1" max="20"
-                         class="w-full px-3 py-2 border-2 border-yellow-300 rounded-lg">
+                         class="w-full px-3 py-2 border-2 border-yellow-300 rounded-lg"
+                         onchange="recalcTotalHours()">
                 </div>
               </div>
             </div>
@@ -4060,6 +4068,7 @@ function toggleSubject2() {
         select.appendChild(option)
       }
     })
+    recalcTotalHours()
   } else {
     subject2Options.classList.add('hidden')
     const subjectSelects = document.querySelectorAll('.subject-select')
@@ -4068,7 +4077,26 @@ function toggleSubject2() {
         select.remove(1)
       }
     })
+    recalcTotalHours()
   }
+}
+
+function recalcTotalHours() {
+  const s1h = parseInt(document.getElementById('subject1Hours').value) || 0
+  const is2 = document.getElementById('subjectSelect').value === '2'
+  const s2h = is2 ? (parseInt(document.getElementById('subject2Hours').value) || 0) : 0
+  const total = s1h + s2h
+  document.getElementById('totalHours').value = total
+  document.getElementById('totalHoursLabel').textContent = total
+  const bd = document.getElementById('totalHoursBreakdown')
+  if (is2) {
+    bd.classList.remove('hidden')
+    bd.textContent = `（${s1h} + ${s2h}）`
+  } else {
+    bd.classList.add('hidden')
+  }
+  document.getElementById('planHours').textContent = total - 2
+  updatePlanHours()
 }
 
 async function getReflectionAI(hourNumber) {
@@ -4594,6 +4622,7 @@ window.loadTeacherOverview = loadTeacherOverview
 window.loadLearningPlanPage = loadLearningPlanPage
 window.updatePlanHours = updatePlanHours
 window.toggleSubject2 = toggleSubject2
+window.recalcTotalHours = recalcTotalHours
 window.getReflectionAI = getReflectionAI
 window.getUnitReflectionAI = getUnitReflectionAI
 window.saveLearningPlan = saveLearningPlan
