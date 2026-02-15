@@ -539,12 +539,12 @@
         <div class="bg-white rounded-2xl shadow-lg p-5 section-card fade-in">
             <div class="flex items-center justify-between mb-3">
                 <h3 class="text-base font-bold text-gray-800">
-                    <i class="fas fa-fist-raised text-orange-500 mr-2"></i>学びに向かう力の評価
+                    <i class="fas fa-fist-raised text-orange-500 mr-2"></i>がんばる力のふりかえり
                 </h3>
                 <div id="persistenceTotalBadge" class="text-sm font-bold"></div>
             </div>
 
-            <!-- 2側面スコア（学習指導要領準拠）+ 信頼性 -->
+            <!-- 2つの力 + しんらい度 -->
             <div id="persistenceSummaryPanel" class="mb-3"></div>
 
             <!-- 成長トレンド -->
@@ -552,13 +552,13 @@
 
             <!-- 3層測定結果 -->
             <div class="space-y-2 mb-3">
-                <!-- Level 1: 行動ログ -->
+                <!-- Level 1: がんばりの足あと -->
                 <div id="persistenceLevel1" class="bg-blue-50 rounded-xl p-3"></div>
-                <!-- Level 2: AI観察 -->
+                <!-- Level 2: AIの学び方チェック -->
                 <div id="persistenceLevel2" class="bg-purple-50 rounded-xl p-3"></div>
             </div>
 
-            <!-- レーダー（2側面のサブスコア可視化用） -->
+            <!-- レーダー（がんばりを見える化） -->
             <div class="flex items-start gap-4 mb-3">
                 <div style="width:180px;min-width:180px">
                     <canvas id="persistenceRadar" width="180" height="180"></canvas>
@@ -566,15 +566,15 @@
                 <div class="flex-1" id="persistenceStrategyPanel"></div>
             </div>
 
-            <!-- エビデンスカード: なぜこの数字か？ -->
+            <!-- くわしい理由 -->
             <details class="mt-2">
                 <summary class="text-xs text-blue-500 cursor-pointer hover:text-blue-700 font-medium">
-                    <i class="fas fa-search-plus mr-1"></i>この数字の根拠を見る
+                    <i class="fas fa-search-plus mr-1"></i>どうしてこのけっかになったの？
                 </summary>
                 <div id="evidenceTraceCard" class="mt-2 bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs space-y-2"></div>
             </details>
 
-            <!-- 保護者向けメッセージ -->
+            <!-- おうちの人へのメッセージ -->
             <div id="parentMessage" class="mt-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 text-xs text-amber-800 hidden">
                 <i class="fas fa-home mr-1"></i><span id="parentMsgContent"></span>
             </div>
@@ -645,7 +645,7 @@
     <div id="phase6" class="hidden space-y-6">
         <div class="bg-white rounded-2xl shadow-lg p-6 section-card fade-in">
             <h2 class="text-xl font-bold text-gray-800 mb-4">
-                <i class="fas fa-chart-bar text-blue-500 mr-2"></i>AI総合評価
+                <i class="fas fa-chart-bar text-blue-500 mr-2"></i>AIからのまとめコメント
             </h2>
             <div id="unitAiComment" class="ai-bubble rounded-xl p-5 text-sm whitespace-pre-line leading-relaxed mb-6"></div>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="unitScoreCards"></div>
@@ -653,7 +653,7 @@
                 <canvas id="unitSkillChart" height="200"></canvas>
             </div>
             <div class="mt-4 bg-gray-50 rounded-xl p-4">
-                <h4 class="text-sm font-bold text-gray-700 mb-2">📊 学習統計</h4>
+                <h4 class="text-sm font-bold text-gray-700 mb-2">📊 学習のきろく</h4>
                 <div id="unitStats" class="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm"></div>
             </div>
         </div>
@@ -2258,7 +2258,7 @@ function renderPersistenceRadar(dims) {
     window._persistChart = new Chart(ctx, {
         type: 'radar',
         data: {
-            labels: ['粘り強さ', '挑戦', '回復', '深化', '安定'],
+            labels: ['ねばり強さ', 'ちょうせん', '立ちなおり', '深める力', '気もちの安定'],
             datasets: [{
                 label: '学びに向かう力',
                 data: [dims.continuity, dims.challenge, dims.recovery, dims.deepening, dims.emotional_stability],
@@ -2291,27 +2291,28 @@ function renderPersistenceAdvice(persist) {
     const score = persist.total_score || 0
     const grade = overall.grade || 'B'
     const gradeColors = { A: 'bg-green-100 text-green-700', B: 'bg-yellow-100 text-yellow-700', C: 'bg-red-100 text-red-600' }
-    badge.innerHTML = `<span class="${gradeColors[grade] || gradeColors.B} px-3 py-1 rounded-full font-bold">${score}点 ${overall.level || ''}</span>`
+    const gradeEmoji = { A: '🌟', B: '👍', C: '💪' }
+    const gradeLabel = { A: 'すごい！', B: 'いいかんじ！', C: 'もっとできるよ！' }
+    badge.innerHTML = `<span class="${gradeColors[grade] || gradeColors.B} px-3 py-1 rounded-full font-bold">${gradeEmoji[grade] || '👍'} ${score}てん ${gradeLabel[grade] || ''}</span>`
 
     // ─── 2側面サマリー + 信頼性 ───
     const summaryPanel = document.getElementById('persistenceSummaryPanel')
     const rel = mapping.reliability || 0
     const relColor = rel >= 70 ? 'text-green-600' : rel >= 40 ? 'text-yellow-600' : 'text-red-500'
-    const relLabel = rel >= 70 ? '高' : rel >= 40 ? '中' : '低'
     summaryPanel.innerHTML = `
         <div class="grid grid-cols-2 gap-2 mb-2">
             <div class="bg-orange-50 rounded-xl px-3 py-2.5 text-center">
-                <div class="text-xs text-gray-500">(1) 粘り強い取組</div>
+                <div class="text-xs text-gray-500">① あきらめずにがんばる力</div>
                 <div class="text-2xl font-black text-orange-600">${mapping.score_perseverance || '-'}</div>
             </div>
             <div class="bg-indigo-50 rounded-xl px-3 py-2.5 text-center">
-                <div class="text-xs text-gray-500">(2) 自己調整</div>
+                <div class="text-xs text-gray-500">② くふうして学ぶ力</div>
                 <div class="text-2xl font-black text-indigo-600">${mapping.score_self_regulation || '-'}</div>
             </div>
         </div>
         <div class="flex items-center justify-between text-xs text-gray-500">
-            <span>📐 3源三角測量</span>
-            <span class="${relColor}">信頼性: ${rel}% (${relLabel})</span>
+            <span>📊 総合チェック</span>
+            <span class="${relColor}">しんらい度: ${rel}%${rel >= 70 ? ' 👍' : rel >= 40 ? '' : ''}</span>
         </div>
         <p class="text-sm text-gray-700 mt-2 leading-snug">${overall.student_msg || ''}</p>
     `
@@ -2330,37 +2331,37 @@ function renderPersistenceAdvice(persist) {
         growthEl.innerHTML = ''
     }
 
-    // ─── Level 1: 行動ログ分析 ───
+    // ─── Level 1: がんばりの足あと ───
     const l1El = document.getElementById('persistenceLevel1')
     const l1d = l1.detail || {}
     const barStyle = (val) => `width:${Math.max(4, val)}%; background: ${val >= 60 ? '#22c55e' : val >= 30 ? '#eab308' : '#ef4444'}`
     l1El.innerHTML = `
         <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-blue-700"><i class="fas fa-chart-bar mr-1"></i>Level 1: 行動ログ</span>
-            <span class="text-xs font-bold text-blue-600">${l1.score || 0}点</span>
+            <span class="text-xs font-bold text-blue-700"><i class="fas fa-shoe-prints mr-1"></i>がんばりの足あと</span>
+            <span class="text-xs font-bold text-blue-600">${l1.score || 0}てん</span>
         </div>
-        <div class="text-xs text-gray-500 mb-2">客観的な行動データの自動計測（ActivTrak式）</div>
+        <div class="text-xs text-gray-500 mb-2">きみのがんばりを自動できろくしているよ 📝</div>
         <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
             <div>
-                <div class="flex justify-between text-xs text-gray-600"><span>課題完了率</span><span class="font-bold">${l1d.productive_rate || 0}%</span></div>
+                <div class="flex justify-between text-xs text-gray-600"><span>やりとげた量</span><span class="font-bold">${l1d.productive_rate || 0}%</span></div>
                 <div class="bg-blue-100 rounded-full h-1.5 mt-0.5"><div class="rounded-full h-1.5" style="${barStyle(l1d.productive_rate || 0)}"></div></div>
             </div>
             <div>
-                <div class="flex justify-between text-xs text-gray-600"><span>時間活用率</span><span class="font-bold">${l1d.time_utilization || 0}%</span></div>
+                <div class="flex justify-between text-xs text-gray-600"><span>時間のつかいかた</span><span class="font-bold">${l1d.time_utilization || 0}%</span></div>
                 <div class="bg-blue-100 rounded-full h-1.5 mt-0.5"><div class="rounded-full h-1.5" style="${barStyle(l1d.time_utilization || 0)}"></div></div>
             </div>
             <div>
-                <div class="flex justify-between text-xs text-gray-600"><span>集中度</span><span class="font-bold">${l1d.focus_score || 0}%</span></div>
+                <div class="flex justify-between text-xs text-gray-600"><span>しゅう中できた度</span><span class="font-bold">${l1d.focus_score || 0}%</span></div>
                 <div class="bg-blue-100 rounded-full h-1.5 mt-0.5"><div class="rounded-full h-1.5" style="${barStyle(l1d.focus_score || 0)}"></div></div>
             </div>
             <div>
-                <div class="flex justify-between text-xs text-gray-600"><span>負荷バランス</span><span class="font-bold">${l1d.workload_balance || 0}%</span></div>
+                <div class="flex justify-between text-xs text-gray-600"><span>バランスのよさ</span><span class="font-bold">${l1d.workload_balance || 0}%</span></div>
                 <div class="bg-blue-100 rounded-full h-1.5 mt-0.5"><div class="rounded-full h-1.5" style="${barStyle(l1d.workload_balance || 0)}"></div></div>
             </div>
         </div>
     `
 
-    // ─── Level 2: AI観察評価（戦略検出） ───
+    // ─── Level 2: AIの学び方チェック ───
     const l2El = document.getElementById('persistenceLevel2')
     const strats = l2.strategies || []
     const stratHtml = strats.map(s => {
@@ -2374,42 +2375,42 @@ function renderPersistenceAdvice(persist) {
     }).join('')
     l2El.innerHTML = `
         <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-bold text-purple-700"><i class="fas fa-brain mr-1"></i>Level 2: AI学習戦略分析</span>
-            <span class="text-xs font-bold text-purple-600">${l2.score || 0}点 (${l2.strategies_detected || 0}/${l2.strategies_total || 0}検出)</span>
+            <span class="text-xs font-bold text-purple-700"><i class="fas fa-brain mr-1"></i>AIの学び方チェック</span>
+            <span class="text-xs font-bold text-purple-600">${l2.score || 0}てん (${l2.strategies_detected || 0}/${l2.strategies_total || 0}見つけたよ)</span>
         </div>
-        <div class="text-xs text-gray-500 mb-2">行動パターンから「どう学んだか」を推定（Multimodal LA着想）</div>
+        <div class="text-xs text-gray-500 mb-2">AIがきみの学び方のくふうを見つけたよ 🤖✨</div>
         <div class="space-y-1">${stratHtml}</div>
     `
 
-    // ─── 戦略パネル（レーダー横） ───
+    // ─── Level 3 パネル（レーダー横）: 総合チェック ───
     const stratPanel = document.getElementById('persistenceStrategyPanel')
     if (l3.sources) {
         const src = l3.sources
         stratPanel.innerHTML = `
             <div class="text-xs space-y-2">
-                <div class="font-bold text-gray-700 mb-1"><i class="fas fa-project-diagram mr-1"></i>Level 3: 三角測量</div>
+                <div class="font-bold text-gray-700 mb-1"><i class="fas fa-check-double mr-1"></i>総合チェック</div>
                 <div class="space-y-1">
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                        <span class="text-gray-600">行動ログ(L1)</span>
+                        <span class="text-gray-600">がんばりの足あと</span>
                         <span class="ml-auto font-bold text-blue-600">${src.source_a?.score || 0}</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-purple-500"></span>
-                        <span class="text-gray-600">AI分析(L2)</span>
+                        <span class="text-gray-600">AIのチェック</span>
                         <span class="ml-auto font-bold text-purple-600">${src.source_b?.score || 0}</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                        <span class="text-gray-600">自己報告</span>
+                        <span class="text-gray-600">じぶんのふりかえり</span>
                         <span class="ml-auto font-bold text-green-600">${src.source_c?.score || 0}</span>
                     </div>
                 </div>
                 <div class="bg-gray-100 rounded-lg px-2 py-1 mt-1">
-                    <span class="text-gray-500">エビデンス一致度</span>
+                    <span class="text-gray-500">ぴったり度</span>
                     <span class="ml-1 font-bold ${relColor}">${rel}%</span>
                 </div>
-                <p class="text-gray-400 leading-snug mt-1">3つの独立エビデンス源の一致度が高いほど信頼性が高い（三角測量原理）</p>
+                <p class="text-gray-400 leading-snug mt-1">3つの見かたからそれぞれ確認しているよ。合っているほどしんらいできるんだ 👍</p>
             </div>`
     }
 
@@ -2717,7 +2718,7 @@ function renderUnitEvaluation(data) {
         data: {
             labels: Object.values(labels).map(l => l.replace(/（.*）/, '')),
             datasets: [{
-                label: 'スコア',
+                label: 'がんばりポイント',
                 data: Object.values(scores).map(v => Math.round(v)),
                 backgroundColor: ['#a855f7', '#3b82f6', '#6366f1', '#eab308', '#f97316', '#22c55e'],
                 borderRadius: 8
@@ -2734,12 +2735,12 @@ function renderUnitEvaluation(data) {
     statsContainer.innerHTML = ''
     const stats = data.stats
     const statLabels = {
-        total_hours_done: ['完了した時間', '時間'],
-        total_cards_done: ['完了したカード', '枚'],
-        total_selections_done: ['完了した選択課題', '個'],
-        total_reflections: ['振り返り回数', '回'],
-        total_collaborations: ['友だちとの学び', '回'],
-        plan_modifications: ['計画の修正', '回']
+        total_hours_done: ['おわった時間', '時間'],
+        total_cards_done: ['おわったカード', 'まい'],
+        total_selections_done: ['ちょうせんした課題', 'こ'],
+        total_reflections: ['ふりかえった回数', 'かい'],
+        total_collaborations: ['友だちと学んだ回数', 'かい'],
+        plan_modifications: ['計画をなおした回数', 'かい']
     }
     Object.entries(stats).forEach(([key, val]) => {
         const [label, unit] = statLabels[key] || [key, '']
