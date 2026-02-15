@@ -2814,7 +2814,7 @@ app.get('/api/curriculum/:id', async (c) => {
         const cards = await env.DB.prepare(`
           SELECT * FROM learning_cards 
           WHERE course_id = ?
-          ORDER BY card_number
+          ORDER BY card_order
         `).bind(course.id).all()
         
         // 各カードにヒントと解答を追加
@@ -2828,28 +2828,23 @@ app.get('/api/curriculum/:id', async (c) => {
               SELECT 
                 hint_id,
                 hint_id AS id,
-                learning_card_id,
-                hint_number,
-                hint_number AS hint_level,
-                hint_content,
-                hint_content AS hint_text,
-                thinking_tool_suggestion
+                card_id AS learning_card_id,
+                hint_level AS hint_number,
+                hint_level,
+                hint_text AS hint_content,
+                hint_text
               FROM hint_cards 
-              WHERE learning_card_id = ?
-              ORDER BY hint_number
+              WHERE card_id = ?
+              ORDER BY hint_level
             `).bind(cardId).all()
             
-            // 解答取得
-            const answer = await env.DB.prepare(`
-              SELECT * FROM answers WHERE learning_card_id = ?
-            `).bind(cardId).first()
-            
+            // 解答は learning_cards テーブル自体に correct_answer / explanation がある
             return {
               ...card,
               hints: hints.results || [],
-              answer: answer?.answer_content || '',
-              answer_explanation: answer?.explanation || '',
-              explanation: answer?.explanation || ''
+              answer: card.correct_answer || '',
+              answer_explanation: card.explanation || '',
+              explanation: card.explanation || ''
             }
           })
         )
@@ -2874,15 +2869,22 @@ app.get('/api/curriculum/:id', async (c) => {
     
     // 選択問題
     const optionalProblems = await env.DB.prepare(`
-      SELECT * FROM optional_problems 
-      WHERE curriculum_id = ?
-      ORDER BY problem_number
+      SELECT problem_id, unit_id, problem_title, problem_type, difficulty_level, content AS problem_content, content AS problem_description, created_at
+      FROM optional_problems 
+      WHERE unit_id = ?
+      ORDER BY problem_id
     `).bind(id).all()
+    
+    // problem_number を付与
+    const optionalWithNumber = (optionalProblems.results || []).map((p: any, idx: number) => ({
+      ...p,
+      problem_number: idx + 1
+    }))
     
     return c.json({
       curriculum,
       courses: coursesWithCards,
-      optionalProblems: optionalProblems.results
+      optionalProblems: optionalWithNumber
     })
   } catch (error: any) {
     console.error('カリキュラム取得エラー:', error)
@@ -10506,16 +10508,24 @@ app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
   
   try {
     const problems = await env.DB.prepare(`
-      SELECT * FROM optional_problems 
-      WHERE curriculum_id = ? 
-      ORDER BY problem_number
+      SELECT problem_id, unit_id, problem_title, problem_type, difficulty_level, 
+             content AS problem_content, content AS problem_description, created_at
+      FROM optional_problems 
+      WHERE unit_id = ? 
+      ORDER BY problem_id
     `).bind(curriculumId).all()
     
-    console.log(`選択問題取得: ${problems.results?.length || 0}件`)
+    // problem_number を付与
+    const problemsWithNumber = (problems.results || []).map((p: any, idx: number) => ({
+      ...p,
+      problem_number: idx + 1
+    }))
+    
+    console.log(`選択問題取得: ${problemsWithNumber.length}件`)
     
     return c.json({ 
       success: true,
-      optional_problems: problems.results || []
+      optional_problems: problemsWithNumber
     })
   } catch (error: any) {
     console.error('選択問題取得エラー:', error)
