@@ -933,6 +933,10 @@ function escapeHtml(str) {
 
 function openTebikiPanel() {
     loadTebikiData()
+    // パネルを開く度に最新のコース選択状態で再描画
+    if (STATE.tebikiLoaded) {
+        renderTebikiPanel()
+    }
     document.getElementById('tebikiOverlay').classList.add('open')
     document.getElementById('tebikiPanel').classList.add('open')
     document.body.style.overflow = 'hidden'
