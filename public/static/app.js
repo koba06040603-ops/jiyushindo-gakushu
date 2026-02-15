@@ -40306,8 +40306,8 @@ async function showStudentInsight(studentId) {
                 <p class="text-xs font-bold text-blue-700">直近の振り返り:</p>
                 ${unitLearning.recent_reflections.map(r => `
                   <div class="text-xs bg-white rounded p-2 border border-blue-100">
-                    ${r.keep_text ? `<span class="text-green-600"><strong>続けること:</strong> ${r.keep_text}</span>` : ''}
-                    ${r.try_text ? `<span class="text-orange-600 ml-2"><strong>挑戦すること:</strong> ${r.try_text}</span>` : ''}
+                    ${r.goal_achievement ? `<span class="text-green-600"><strong>達成:</strong> ${r.goal_achievement}</span>` : ''}
+                    ${r.next_unit_application ? `<span class="text-orange-600 ml-2"><strong>次の挑戦:</strong> ${r.next_unit_application}</span>` : ''}
                   </div>
                 `).join('')}
               </div>` : ''}

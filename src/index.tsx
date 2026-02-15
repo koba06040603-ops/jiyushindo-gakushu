@@ -26095,6 +26095,187 @@ app.get('/api/parent/student/:student_id/progress', async (c) => {
   }
 })
 
+// ============================================================
+// 保護者用統合ダッシュボードAPI（認証不要・デモ用はstudent_idで直接取得）
+// ============================================================
+app.get('/api/parent/dashboard/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    // 1. 児童基本情報
+    const student = await env.DB.prepare(`
+      SELECT student_id, student_name, grade_level, enrollment_date FROM students WHERE student_id = ?
+    `).bind(studentId).first() as any || { student_id: studentId, student_name: '児童' + studentId }
+
+    // 2. 今週の学習概要
+    let weeklySummary: any = { study_days: 0, answers_count: 0, correct_rate: 0 }
+    try {
+      const weekData = await env.DB.prepare(`
+        SELECT COUNT(*) as total, SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct
+        FROM answers WHERE student_id = ? AND answered_at >= datetime('now', '-7 days')
+      `).bind(studentId).first() as any
+      if (weekData) {
+        weeklySummary.answers_count = weekData.total || 0
+        weeklySummary.correct_rate = weekData.total > 0 ? Math.round((weekData.correct || 0) / weekData.total * 100) : 0
+      }
+    } catch {}
+
+    // 学習計画進捗
+    let planProgress: any = { total_hours: 0, completed_hours: 0, plan_name: '' }
+    try {
+      const activePlan = await env.DB.prepare(`
+        SELECT id, unit_name, total_hours FROM unit_study_plans 
+        WHERE student_id = ? AND is_active = 1 ORDER BY created_at DESC LIMIT 1
+      `).bind(studentId).first() as any
+      if (activePlan) {
+        planProgress.plan_name = activePlan.unit_name || ''
+        planProgress.total_hours = activePlan.total_hours || 0
+        const rows = await env.DB.prepare(`
+          SELECT COUNT(*) as total, SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as done
+          FROM study_plan_rows WHERE plan_id = ?
+        `).bind(activePlan.id).first() as any
+        if (rows) {
+          planProgress.completed_hours = rows.done || 0
+          planProgress.total_hours = rows.total || planProgress.total_hours
+        }
+      }
+    } catch {}
+
+    // 3. テスト対策プラン
+    let testPrepPlans: any[] = []
+    try {
+      const plans = await env.DB.prepare(`
+        SELECT id, title, test_date, subject, grade, status, total_study_minutes, created_at
+        FROM test_preparation_plans WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
+      `).bind(studentId).all()
+      testPrepPlans = (plans.results || []) as any[]
+    } catch {}
+
+    // 4. 個別最適化コース
+    let personalizedCourses: any[] = []
+    try {
+      const pMeta = await env.DB.prepare(`
+        SELECT meta_value FROM curriculum_metadata WHERE meta_key = ?
+      `).bind(`personalized_course_student_${studentId}`).all()
+      for (const m of ((pMeta.results || []) as any[])) {
+        try {
+          const meta = JSON.parse(m.meta_value || '{}')
+          const course = await env.DB.prepare(`
+            SELECT id, course_name, description,
+              (SELECT COUNT(*) FROM learning_cards WHERE course_id = courses.id) as card_count
+            FROM courses WHERE id = ?
+          `).bind(meta.course_id).first() as any
+          if (course) {
+            personalizedCourses.push({
+              course_name: course.course_name,
+              description: course.description,
+              card_count: course.card_count || 0,
+              analysis_summary: meta.analysis_summary || '',
+              recommended_approach: meta.recommended_approach || '',
+              published_at: meta.published_at || ''
+            })
+          }
+        } catch {}
+      }
+    } catch {}
+
+    // 5. 教師からのコメント（評価）
+    let teacherComments: any[] = []
+    try {
+      const comments = await env.DB.prepare(`
+        SELECT comments, score, max_score, subject, evaluated_at
+        FROM evaluations WHERE student_id = ? AND comments IS NOT NULL AND comments != ''
+        ORDER BY evaluated_at DESC LIMIT 5
+      `).bind(studentId).all()
+      teacherComments = (comments.results || []) as any[]
+    } catch {}
+
+    // 6. 振り返り記録（お子さまの成長）
+    let reflections: any[] = []
+    try {
+      const refRes = await env.DB.prepare(`
+        SELECT goal_achievement, most_important_learning, effective_methods, next_unit_application, created_at
+        FROM unit_reflections WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
+      `).bind(studentId).all()
+      reflections = (refRes.results || []) as any[]
+    } catch {}
+
+    // 7. 学習傾向（強み・弱み）
+    let learningTrends: any = { strengths: [], weaknesses: [] }
+    try {
+      // テスト対策の弱点
+      if (testPrepPlans.length > 0) {
+        const planIds = testPrepPlans.map(p => p.id).join(',')
+        const lowConf = await env.DB.prepare(`
+          SELECT topic, AVG(confidence_after) as avg_confidence
+          FROM test_study_logs WHERE plan_id IN (${planIds}) AND confidence_after IS NOT NULL
+          GROUP BY topic ORDER BY avg_confidence ASC LIMIT 10
+        `).all()
+        const topics = (lowConf.results || []) as any[]
+        learningTrends.weaknesses = topics.filter(t => (t.avg_confidence || 0) < 3).map(t => ({
+          topic: t.topic, confidence: Math.round((t.avg_confidence || 0) * 10) / 10
+        }))
+        learningTrends.strengths = topics.filter(t => (t.avg_confidence || 0) >= 3).map(t => ({
+          topic: t.topic, confidence: Math.round((t.avg_confidence || 0) * 10) / 10
+        }))
+      }
+
+      // テスト対策フィードバック
+      const fbRes = await env.DB.prepare(`
+        SELECT weakness_areas, strength_areas, score FROM test_performance_feedback
+        WHERE student_id = ? ORDER BY created_at DESC LIMIT 3
+      `).bind(studentId).all()
+      const fbs = (fbRes.results || []) as any[]
+      for (const fb of fbs) {
+        try {
+          const wa = JSON.parse(fb.weakness_areas || '[]')
+          const sa = JSON.parse(fb.strength_areas || '[]')
+          for (const w of wa) if (!learningTrends.weaknesses.find((x: any) => x.topic === w)) learningTrends.weaknesses.push({ topic: w, source: 'テスト結果' })
+          for (const s of sa) if (!learningTrends.strengths.find((x: any) => x.topic === s)) learningTrends.strengths.push({ topic: s, source: 'テスト結果' })
+        } catch {}
+      }
+    } catch {}
+
+    // 8. 保護者へのメッセージ（AI生成的な）
+    let parentMessage = ''
+    const parts = []
+    if (weeklySummary.answers_count > 0) {
+      parts.push(`今週は${weeklySummary.answers_count}問に取り組み、正答率${weeklySummary.correct_rate}%でした。`)
+    }
+    if (planProgress.completed_hours > 0) {
+      parts.push(`学習計画は${planProgress.completed_hours}/${planProgress.total_hours}時間完了しています。`)
+    }
+    if (testPrepPlans.length > 0) {
+      const activePlans = testPrepPlans.filter(p => p.status !== 'completed')
+      if (activePlans.length > 0) parts.push(`テスト対策プランが${activePlans.length}件進行中です。`)
+    }
+    if (personalizedCourses.length > 0) {
+      parts.push(`先生がお子さま専用の学習コースを${personalizedCourses.length}個作成しました。`)
+    }
+    if (reflections.length > 0 && reflections[0].goal_achievement) {
+      parts.push(`最近の振り返りでは「${reflections[0].goal_achievement}」と達成感を感じています。`)
+    }
+    parentMessage = parts.length > 0 ? parts.join(' ') : 'まだ学習データがありません。お子さまの学習が始まると、ここに状況が表示されます。'
+
+    return c.json({
+      success: true,
+      student,
+      weekly_summary: weeklySummary,
+      plan_progress: planProgress,
+      test_prep_plans: testPrepPlans,
+      personalized_courses: personalizedCourses,
+      teacher_comments: teacherComments,
+      reflections,
+      learning_trends: learningTrends,
+      parent_message: parentMessage
+    })
+
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
 // ================================================
 // Phase 21: リアルタイム協働学習（基本API）
 // ================================================
@@ -27311,15 +27492,16 @@ app.post('/api/ai/generate-test-plan/:studentId', async (c) => {
     let reflectionInsight = ''
     try {
       const recentReflections = await env.DB.prepare(`
-        SELECT keep_text, try_text, created_at FROM unit_reflections 
+        SELECT goal_achievement, most_important_learning, effective_methods, next_unit_application, created_at FROM unit_reflections 
         WHERE student_id = ? ORDER BY created_at DESC LIMIT 3
       `).bind(studentId).all()
       const refls = (recentReflections.results || []) as any[]
       if (refls.length > 0) {
         reflectionInsight = `\n【児童の直近の振り返り】\n`
         for (const r of refls) {
-          if (r.keep_text) reflectionInsight += `- 続けること: ${r.keep_text}\n`
-          if (r.try_text) reflectionInsight += `- 挑戦すること: ${r.try_text}\n`
+          if (r.goal_achievement) reflectionInsight += `- 達成したこと: ${r.goal_achievement}\n`
+          if (r.most_important_learning) reflectionInsight += `- 大切な学び: ${r.most_important_learning}\n`
+          if (r.next_unit_application) reflectionInsight += `- 次に挑戦: ${r.next_unit_application}\n`
         }
       }
     } catch {}
@@ -28275,7 +28457,7 @@ app.get('/api/teacher/student-insight/:studentId', async (c) => {
         // フィードバック
         try {
           const feedbacks = await env.DB.prepare(`
-            SELECT feedback_data, created_at FROM test_performance_feedback 
+            SELECT weakness_areas, strength_areas, reflection, score, created_at FROM test_performance_feedback 
             WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
           `).bind(studentId).all()
           testPrep.feedbacks = (feedbacks.results || []) as any[]
@@ -28318,7 +28500,7 @@ app.get('/api/teacher/student-insight/:studentId', async (c) => {
 
       // 振り返り
       const reflections = await env.DB.prepare(`
-        SELECT keep_text, try_text, problem_text, created_at FROM unit_reflections
+        SELECT goal_achievement, most_important_learning, effective_methods, planning_reflection, next_unit_application, created_at FROM unit_reflections
         WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
       `).bind(studentId).all()
       unitLearning.reflections_count = (reflections.results || []).length
@@ -28494,16 +28676,13 @@ app.post('/api/teacher/generate-personalized-course', async (c) => {
         // テスト対策の振り返りフィードバック
         try {
           const feedbacks = await env.DB.prepare(`
-            SELECT feedback_data FROM test_performance_feedback 
+            SELECT weakness_areas, strength_areas, reflection, score FROM test_performance_feedback 
             WHERE student_id = ? ORDER BY created_at DESC LIMIT 3
           `).bind(student_id).all()
           const fbData = (feedbacks.results || []) as any[]
           if (fbData.length > 0) {
-            const parsed = fbData.map((f: any) => {
-              try { return JSON.parse(f.feedback_data) } catch { return null }
-            }).filter(Boolean)
-            testPrepData.feedbackSummary = parsed.map((p: any) => 
-              p.difficult_topics || p.reflection || p.self_assessment || ''
+            testPrepData.feedbackSummary = fbData.map((f: any) => 
+              f.reflection || (f.weakness_areas ? `弱点: ${f.weakness_areas}` : '')
             ).filter(Boolean).join('、')
           }
         } catch {}
@@ -28529,7 +28708,7 @@ ${baseCards.slice(0, 10).map((card: any) => `- [${card.course_name}] ${card.card
 - 難しい問題の正答率: ${hardCorrectRate >= 0 ? hardCorrectRate + '%' : 'データなし'}
 - 振り返り記録: ${refl.length}件
 - 学習計画の進捗: ${planRows.filter((r: any) => r.status === 'completed').length}/${planRows.length}時間完了
-${refl.length > 0 ? `- 直近の振り返り: ${(refl[0] as any).keep_text || ''} / ${(refl[0] as any).try_text || ''}` : ''}
+${refl.length > 0 ? `- 直近の振り返り: ${(refl[0] as any).goal_achievement || ''} / ${(refl[0] as any).next_unit_application || ''}` : ''}
 
 【テスト対策プランからの学習データ（重要：弱点を把握するための核心情報）】
 - テスト対策プラン数: ${testPrepData.plans}件（総学習時間: ${testPrepData.totalMinutes}分）
@@ -28676,7 +28855,7 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
           problem_text, problem_description, correct_answer, explanation,
           hint_text, solution_video_url, image_url,
           card_order, estimated_time_minutes, is_active, course_id
-        ) VALUES (?, ?, ?, ?, ?, ?, 'personalized', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `).bind(
         curriculum.subject, gradeNum, curriculum.unit_name,
         card.card_title || `カード${i + 1}`, cardType, diffLevel,
