@@ -27279,6 +27279,51 @@ app.post('/api/ai/generate-test-plan/:studentId', async (c) => {
     const testDateObj = new Date(testDate)
     const daysUntilTest = Math.ceil((testDateObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     
+    // 個別最適化コースのデータを収集（双方向連携: 単元学習→テスト対策）
+    let personalizedCourseInsight = ''
+    try {
+      const personalizedMeta = await env.DB.prepare(`
+        SELECT cm.meta_key, cm.meta_value, c.course_name, c.description,
+          (SELECT COUNT(*) FROM learning_cards lc WHERE lc.course_id = c.id) as card_count
+        FROM curriculum_metadata cm
+        LEFT JOIN courses c ON c.id = CAST(
+          json_extract(cm.meta_value, '$.course_id') AS INTEGER
+        )
+        WHERE cm.meta_key LIKE ? AND cm.meta_key LIKE '%personalized_course_student_%'
+      `).bind(`personalized_course_student_${studentId}`).all()
+      
+      const pCourses = (personalizedMeta.results || []) as any[]
+      if (pCourses.length > 0) {
+        personalizedCourseInsight = `\n【配信済み個別最適化コースの情報】\n`
+        for (const pc of pCourses) {
+          try {
+            const meta = JSON.parse(pc.meta_value || '{}')
+            personalizedCourseInsight += `- コース: ${pc.course_name || '個別コース'} (${pc.card_count || 0}枚)\n`
+            if (meta.analysis_summary) personalizedCourseInsight += `  分析: ${meta.analysis_summary}\n`
+            if (meta.recommended_approach) personalizedCourseInsight += `  アプローチ: ${meta.recommended_approach}\n`
+          } catch {}
+        }
+        personalizedCourseInsight += `→ この個別コースで対応済みの弱点は、テスト対策では発展的内容に移行可能\n`
+      }
+    } catch {}
+
+    // 直近の振り返りデータを取得（テスト対策→単元学習フィードバック）
+    let reflectionInsight = ''
+    try {
+      const recentReflections = await env.DB.prepare(`
+        SELECT keep_text, try_text, created_at FROM unit_reflections 
+        WHERE student_id = ? ORDER BY created_at DESC LIMIT 3
+      `).bind(studentId).all()
+      const refls = (recentReflections.results || []) as any[]
+      if (refls.length > 0) {
+        reflectionInsight = `\n【児童の直近の振り返り】\n`
+        for (const r of refls) {
+          if (r.keep_text) reflectionInsight += `- 続けること: ${r.keep_text}\n`
+          if (r.try_text) reflectionInsight += `- 挑戦すること: ${r.try_text}\n`
+        }
+      }
+    } catch {}
+    
     // 現在の理解度レベルのマッピング
     const levelLabels = {
       'beginner': '初級：まだよくわからない',
@@ -27303,7 +27348,7 @@ ${index + 1}. ${detail.subject} - ${detail.unitName}（${detail.grade}年）
    - 学習実績: ${detail.stats.total_attempts}問挑戦、正答率${detail.stats.accuracy}%、平均${detail.stats.avg_time}秒
    - ヒント使用: ${detail.stats.hint_usage}回
 `).join('\n')}
-
+${personalizedCourseInsight}${reflectionInsight}
 【重要：複数教科・単元の統合プランニングのポイント】
 
 1. **バランスの取れた時間配分**
@@ -28187,6 +28232,170 @@ app.get('/api/teacher/test-prep-dashboard', async (c) => {
 })
 
 // ============================================================
+// 教師向け児童理解ダッシュボードAPI（テスト対策＋単元学習＋個別最適化の統合）
+// ============================================================
+app.get('/api/teacher/student-insight/:studentId', async (c) => {
+  const { env } = c
+  const studentId = parseInt(c.req.param('studentId'))
+  
+  try {
+    // 1. 児童基本情報
+    const student = await env.DB.prepare(`
+      SELECT student_id, student_name, grade_level, enrollment_date FROM students WHERE student_id = ?
+    `).bind(studentId).first() as any || { student_id: studentId }
+
+    // 2. テスト対策データ
+    let testPrep: any = { plan_count: 0, total_minutes: 0, weak_topics: [], plans: [] }
+    try {
+      const testPlans = await env.DB.prepare(`
+        SELECT id, title, subject, test_date, grade, total_study_minutes, status, created_at
+        FROM test_preparation_plans WHERE student_id = ? ORDER BY created_at DESC LIMIT 10
+      `).bind(studentId).all()
+      const tPlans = (testPlans.results || []) as any[]
+      testPrep.plan_count = tPlans.length
+      testPrep.total_minutes = tPlans.reduce((s: number, p: any) => s + (p.total_study_minutes || 0), 0)
+      testPrep.plans = tPlans
+
+      // 弱点トピック
+      if (tPlans.length > 0) {
+        const planIds = tPlans.map((p: any) => p.id).join(',')
+        try {
+          const lowConf = await env.DB.prepare(`
+            SELECT topic, AVG(confidence_after) as avg_confidence, COUNT(*) as attempts
+            FROM test_study_logs WHERE plan_id IN (${planIds}) AND confidence_after IS NOT NULL
+            GROUP BY topic HAVING AVG(confidence_after) < 3 ORDER BY avg_confidence ASC LIMIT 10
+          `).all()
+          testPrep.weak_topics = ((lowConf.results || []) as any[]).map((r: any) => ({
+            topic: r.topic,
+            avg_confidence: Math.round((r.avg_confidence || 0) * 10) / 10,
+            attempts: r.attempts
+          }))
+        } catch {}
+
+        // フィードバック
+        try {
+          const feedbacks = await env.DB.prepare(`
+            SELECT feedback_data, created_at FROM test_performance_feedback 
+            WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
+          `).bind(studentId).all()
+          testPrep.feedbacks = (feedbacks.results || []) as any[]
+        } catch {}
+      }
+    } catch {}
+
+    // 3. 単元内学習データ
+    let unitLearning: any = {}
+    try {
+      const answers = await env.DB.prepare(`
+        SELECT a.is_correct, a.time_spent_seconds, lc.difficulty_level
+        FROM answers a
+        JOIN learning_cards lc ON a.card_id = lc.card_id
+        WHERE a.student_id = ?
+        ORDER BY a.answered_at DESC LIMIT 200
+      `).bind(studentId).all()
+      const ansArr = (answers.results || []) as any[]
+      unitLearning.total_answers = ansArr.length
+      unitLearning.correct_rate = ansArr.length > 0
+        ? Math.round(ansArr.filter(a => a.is_correct).length / ansArr.length * 100) : 0
+      unitLearning.avg_time = ansArr.length > 0
+        ? Math.round(ansArr.reduce((s: number, a: any) => s + (a.time_spent_seconds || 0), 0) / ansArr.length) : 0
+      
+      const easyAns = ansArr.filter(a => a.difficulty_level === 'easy')
+      const hardAns = ansArr.filter(a => a.difficulty_level === 'hard')
+      unitLearning.easy_correct_rate = easyAns.length > 0
+        ? Math.round(easyAns.filter(a => a.is_correct).length / easyAns.length * 100) : -1
+      unitLearning.hard_correct_rate = hardAns.length > 0
+        ? Math.round(hardAns.filter(a => a.is_correct).length / hardAns.length * 100) : -1
+
+      // 学習計画進捗
+      const planRows = await env.DB.prepare(`
+        SELECT spr.status FROM study_plan_rows spr
+        JOIN unit_study_plans usp ON spr.plan_id = usp.id
+        WHERE usp.student_id = ?
+      `).bind(studentId).all()
+      const rows = (planRows.results || []) as any[]
+      unitLearning.plan_progress = `${rows.filter(r => r.status === 'completed').length}/${rows.length}`
+
+      // 振り返り
+      const reflections = await env.DB.prepare(`
+        SELECT keep_text, try_text, problem_text, created_at FROM unit_reflections
+        WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
+      `).bind(studentId).all()
+      unitLearning.reflections_count = (reflections.results || []).length
+      unitLearning.recent_reflections = (reflections.results || []) as any[]
+    } catch {}
+
+    // 4. 個別最適化コース（配信済み）
+    let personalizedCourses: any[] = []
+    try {
+      const pMeta = await env.DB.prepare(`
+        SELECT cm.meta_key, cm.meta_value
+        FROM curriculum_metadata cm
+        WHERE cm.meta_key = ?
+      `).bind(`personalized_course_student_${studentId}`).all()
+      
+      for (const m of ((pMeta.results || []) as any[])) {
+        try {
+          const meta = JSON.parse(m.meta_value || '{}')
+          const course = await env.DB.prepare(`
+            SELECT id, course_name, description, course_level,
+              (SELECT COUNT(*) FROM learning_cards WHERE course_id = courses.id) as card_count
+            FROM courses WHERE id = ?
+          `).bind(meta.course_id).first() as any
+          
+          if (course) {
+            personalizedCourses.push({
+              ...course,
+              analysis_summary: meta.analysis_summary || '',
+              recommended_approach: meta.recommended_approach || '',
+              published_at: meta.published_at || '',
+              card_count: course.card_count || 0
+            })
+          }
+        } catch {}
+      }
+    } catch {}
+
+    // 5. AI総合分析（軽量サマリ）
+    let aiInsight = ''
+    const hasData = (unitLearning.total_answers || 0) > 0 || (testPrep.plan_count || 0) > 0
+    if (hasData) {
+      const parts = []
+      if (unitLearning.correct_rate > 80) parts.push('単元学習では高い正答率を示しています。')
+      else if (unitLearning.correct_rate > 50) parts.push('単元学習は基本的な理解はありますが、定着にばらつきがあります。')
+      else if (unitLearning.total_answers > 0) parts.push('単元学習では基礎の定着に課題があります。スモールステップでの支援が必要です。')
+      
+      if (testPrep.weak_topics?.length > 0) {
+        parts.push(`テスト対策では「${testPrep.weak_topics.map((t: any) => t.topic).join('、')}」に自信がなく、重点的な支援が必要です。`)
+      }
+      
+      if (personalizedCourses.length > 0) {
+        parts.push(`${personalizedCourses.length}個の個別最適化コースが配信済みです。`)
+      }
+      
+      if (unitLearning.easy_correct_rate >= 0 && unitLearning.hard_correct_rate >= 0) {
+        const gap = unitLearning.easy_correct_rate - unitLearning.hard_correct_rate
+        if (gap > 30) parts.push('易しい問題と難しい問題の正答率に大きな差があり、段階的な難易度調整が効果的です。')
+      }
+      
+      aiInsight = parts.join(' ')
+    }
+
+    return c.json({
+      success: true,
+      student,
+      test_prep: testPrep,
+      unit_learning: unitLearning,
+      personalized_courses: personalizedCourses,
+      ai_insight: aiInsight
+    })
+
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// ============================================================
 // AI個別最適化コース生成（教師が児童データを見て生成→チェック→配信）
 // ============================================================
 app.post('/api/teacher/generate-personalized-course', async (c) => {
@@ -28252,6 +28461,55 @@ app.post('/api/teacher/generate-personalized-course', async (c) => {
     const refl = (reflections.results || []) as any[]
     const planRows = (studyPlanRows.results || []) as any[]
 
+    // 4b. テスト対策プランからの学習データを収集（有機的連携）
+    let testPrepData = { plans: 0, totalMinutes: 0, weakTopics: [] as string[], lowConfidenceTopics: [] as any[], feedbackSummary: '' }
+    try {
+      // テスト対策プラン履歴
+      const testPlans = await env.DB.prepare(`
+        SELECT id, title, subject, total_study_minutes, status, ai_schedule
+        FROM test_preparation_plans WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
+      `).bind(student_id).all()
+      const tPlans = (testPlans.results || []) as any[]
+      testPrepData.plans = tPlans.length
+      testPrepData.totalMinutes = tPlans.reduce((s: number, p: any) => s + (p.total_study_minutes || 0), 0)
+
+      // テスト対策内の自信度が低い項目（弱点）
+      if (tPlans.length > 0) {
+        const planIds = tPlans.map((p: any) => p.id).join(',')
+        try {
+          const lowConf = await env.DB.prepare(`
+            SELECT topic, AVG(confidence_after) as avg_conf, COUNT(*) as attempts,
+                   SUM(CASE WHEN confidence_after < 3 THEN 1 ELSE 0 END) as low_count
+            FROM test_study_logs WHERE plan_id IN (${planIds}) AND confidence_after IS NOT NULL
+            GROUP BY topic ORDER BY avg_conf ASC LIMIT 10
+          `).all()
+          testPrepData.lowConfidenceTopics = ((lowConf.results || []) as any[]).map((r: any) => ({
+            topic: r.topic, avg_confidence: Math.round((r.avg_conf || 0) * 10) / 10, attempts: r.attempts
+          }))
+          testPrepData.weakTopics = testPrepData.lowConfidenceTopics
+            .filter((t: any) => t.avg_confidence < 3)
+            .map((t: any) => t.topic)
+        } catch {}
+
+        // テスト対策の振り返りフィードバック
+        try {
+          const feedbacks = await env.DB.prepare(`
+            SELECT feedback_data FROM test_performance_feedback 
+            WHERE student_id = ? ORDER BY created_at DESC LIMIT 3
+          `).bind(student_id).all()
+          const fbData = (feedbacks.results || []) as any[]
+          if (fbData.length > 0) {
+            const parsed = fbData.map((f: any) => {
+              try { return JSON.parse(f.feedback_data) } catch { return null }
+            }).filter(Boolean)
+            testPrepData.feedbackSummary = parsed.map((p: any) => 
+              p.difficult_topics || p.reflection || p.self_assessment || ''
+            ).filter(Boolean).join('、')
+          }
+        } catch {}
+      }
+    } catch {}
+
     // 5. AI生成プロンプト
     const prompt = `
 あなたは児童の学習データを分析し、個別最適化された学習カードを生成する教育AIです。
@@ -28265,13 +28523,19 @@ app.post('/api/teacher/generate-personalized-course', async (c) => {
 【既存コースの学習カード（ベース）】
 ${baseCards.slice(0, 10).map((card: any) => `- [${card.course_name}] ${card.card_title}: ${(card.problem_text || '').substring(0, 80)}`).join('\n')}
 
-【児童ID ${student_id} の学習データ分析】
+【児童ID ${student_id} の単元内学習データ】
 - 解答履歴: ${answers.length}問（正答率${correctRate}%、平均回答時間${avgTime}秒）
 - 易しい問題の正答率: ${easyCorrectRate >= 0 ? easyCorrectRate + '%' : 'データなし'}
 - 難しい問題の正答率: ${hardCorrectRate >= 0 ? hardCorrectRate + '%' : 'データなし'}
 - 振り返り記録: ${refl.length}件
 - 学習計画の進捗: ${planRows.filter((r: any) => r.status === 'completed').length}/${planRows.length}時間完了
 ${refl.length > 0 ? `- 直近の振り返り: ${(refl[0] as any).keep_text || ''} / ${(refl[0] as any).try_text || ''}` : ''}
+
+【テスト対策プランからの学習データ（重要：弱点を把握するための核心情報）】
+- テスト対策プラン数: ${testPrepData.plans}件（総学習時間: ${testPrepData.totalMinutes}分）
+${testPrepData.weakTopics.length > 0 ? `- ⚠️ 自信度の低いトピック: ${testPrepData.weakTopics.join('、')}` : '- テスト対策データなし'}
+${testPrepData.lowConfidenceTopics.length > 0 ? `- トピック別自信度:\n${testPrepData.lowConfidenceTopics.map((t: any) => `  ・${t.topic}: 自信度${t.avg_confidence}/5（${t.attempts}回学習）`).join('\n')}` : ''}
+${testPrepData.feedbackSummary ? `- テスト対策振り返り: ${testPrepData.feedbackSummary}` : ''}
 
 【タスク】
 この児童の特性に合わせて個別最適化された学習カードを生成してください。
@@ -28281,6 +28545,8 @@ ${refl.length > 0 ? `- 直近の振り返り: ${(refl[0] as any).keep_text || ''
 2. 正答率が高い場合 → 発展的な応用問題、思考を深める問いを追加
 3. 回答時間が長い場合 → 手順を明確に示す、見本解答を段階的に見せる
 4. 学習計画の進捗が遅い場合 → 短時間で取り組める問題、達成感を得やすい構成
+5. テスト対策で自信度が低いトピックがある場合 → そのトピックを重点的にカバーし、基礎に戻って補強する
+6. テスト対策の振り返りで苦手と申告した分野 → 別のアプローチ（図解・動画・具体物操作）で再学習させる
 
 【出力形式】JSON
 {
@@ -28350,7 +28616,15 @@ ${refl.length > 0 ? `- 直近の振り返り: ${(refl[0] as any).keep_text || ''
         easy_correct_rate: easyCorrectRate,
         hard_correct_rate: hardCorrectRate,
         reflections_count: refl.length,
-        plan_progress: `${planRows.filter((r: any) => r.status === 'completed').length}/${planRows.length}`
+        plan_progress: `${planRows.filter((r: any) => r.status === 'completed').length}/${planRows.length}`,
+        // テスト対策プランからの連携データ
+        test_prep: {
+          plan_count: testPrepData.plans,
+          total_study_minutes: testPrepData.totalMinutes,
+          weak_topics: testPrepData.weakTopics,
+          low_confidence_topics: testPrepData.lowConfidenceTopics,
+          feedback_summary: testPrepData.feedbackSummary
+        }
       },
       personalized_plan: personalizedPlan,
       status: 'draft'  // draft = 教師チェック待ち

@@ -39836,6 +39836,55 @@ function showPersonalizedCourseReview(data) {
             <p class="text-sm text-gray-700">${personalized_plan.analysis_summary || ''}</p>
           </div>
           
+          <!-- テスト対策データ可視化 -->
+          ${student_analysis.test_prep && (student_analysis.test_prep.plan_count > 0 || student_analysis.test_prep.weak_topics?.length > 0) ? `
+          <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+            <h3 class="font-bold text-red-800 mb-2"><i class="fas fa-clipboard-check mr-2"></i>テスト対策からの知見</h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-2">
+              <div class="bg-white rounded-lg p-2 text-center">
+                <div class="text-lg font-bold text-red-600">${student_analysis.test_prep.plan_count}</div>
+                <div class="text-xs text-gray-500">対策プラン数</div>
+              </div>
+              <div class="bg-white rounded-lg p-2 text-center">
+                <div class="text-lg font-bold text-orange-600">${student_analysis.test_prep.total_study_minutes}分</div>
+                <div class="text-xs text-gray-500">テスト対策学習時間</div>
+              </div>
+              <div class="bg-white rounded-lg p-2 text-center">
+                <div class="text-lg font-bold text-pink-600">${student_analysis.test_prep.weak_topics?.length || 0}</div>
+                <div class="text-xs text-gray-500">弱点トピック数</div>
+              </div>
+            </div>
+            ${student_analysis.test_prep.weak_topics?.length > 0 ? `
+            <div class="mt-2">
+              <p class="text-xs font-bold text-red-700 mb-1">⚠️ 自信度の低いトピック（テスト対策）:</p>
+              <div class="flex flex-wrap gap-1">
+                ${student_analysis.test_prep.weak_topics.map(t => `
+                  <span class="text-xs px-2 py-1 bg-red-100 text-red-700 rounded-full font-bold">${t}</span>
+                `).join('')}
+              </div>
+            </div>` : ''}
+            ${student_analysis.test_prep.low_confidence_topics?.length > 0 ? `
+            <div class="mt-2">
+              <p class="text-xs font-bold text-red-700 mb-1">トピック別自信度:</p>
+              <div class="space-y-1">
+                ${student_analysis.test_prep.low_confidence_topics.map(t => `
+                  <div class="flex items-center gap-2 text-xs">
+                    <span class="font-bold text-gray-700 w-32 truncate">${t.topic}</span>
+                    <div class="flex-1 bg-gray-200 rounded-full h-2">
+                      <div class="h-2 rounded-full ${t.avg_confidence < 2 ? 'bg-red-500' : t.avg_confidence < 3 ? 'bg-orange-500' : 'bg-green-500'}" style="width:${(t.avg_confidence/5*100)}%"></div>
+                    </div>
+                    <span class="text-gray-500">${t.avg_confidence}/5</span>
+                    <span class="text-gray-400">(${t.attempts}回)</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>` : ''}
+            ${student_analysis.test_prep.feedback_summary ? `
+            <div class="mt-2 bg-white rounded-lg p-2 text-xs text-gray-600">
+              <strong class="text-red-700">振り返り:</strong> ${student_analysis.test_prep.feedback_summary}
+            </div>` : ''}
+          </div>` : ''}
+          
           <!-- AIアドバイス -->
           ${personalized_plan.hints_for_teacher ? `
           <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
@@ -40055,6 +40104,19 @@ async function showTestPrepDashboard() {
                   <h4 class="text-xs font-bold text-gray-600 mb-1">直近の振り返り:</h4>
                   <p class="text-xs text-gray-700">${JSON.stringify(plan.feedbacks[0]).substring(0, 200)}...</p>
                 </div>` : ''}
+                
+                <!-- テスト対策の弱点→個別最適化コース生成ボタン -->
+                <div class="mt-3 flex gap-2">
+                  ${plan.progress?.topic_details?.some(t => t.avg_confidence < 3) ? `
+                  <button onclick="document.getElementById('testPrepDashModal').remove(); generatePersonalizedFromTestPrep(${plan.student_id}, '${(plan.curriculum_ids || '[]').replace(/'/g, '')}', ${JSON.stringify(plan.progress?.topic_details?.filter(t => t.avg_confidence < 3).map(t => t.topic) || []).replace(/"/g, '&quot;')})" 
+                    class="flex-1 text-xs px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg font-bold hover:from-pink-600 hover:to-purple-700 transition shadow">
+                    <i class="fas fa-magic mr-1"></i>弱点から個別最適化コースを生成
+                  </button>` : ''}
+                  <button onclick="showStudentInsight(${plan.student_id})" 
+                    class="text-xs px-3 py-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-lg font-bold hover:from-teal-600 hover:to-cyan-700 transition shadow">
+                    <i class="fas fa-user-graduate mr-1"></i>児童理解
+                  </button>
+                </div>
               </div>
             `).join('')}
           </div>
@@ -40120,6 +40182,211 @@ async function showPersonalizedCourseSelector(curriculumId) {
 }
 
 window.showPersonalizedCourseSelector = showPersonalizedCourseSelector
+
+// テスト対策の弱点から個別最適化コースを生成
+async function generatePersonalizedFromTestPrep(studentId, curriculumIdsJson, weakTopics) {
+  console.log('🎯 テスト対策弱点→個別最適化コース生成:', { studentId, curriculumIdsJson, weakTopics })
+  
+  try {
+    let curriculumIds = []
+    try { curriculumIds = JSON.parse(curriculumIdsJson) } catch {}
+    
+    // カリキュラムIDが取得できない場合、児童のアクティブなカリキュラムを検索
+    let curriculumId = curriculumIds[0]
+    if (!curriculumId) {
+      try {
+        const res = await axios.get('/api/curriculum/list')
+        const curricula = res.data || []
+        if (curricula.length > 0) curriculumId = curricula[0].id
+      } catch {}
+    }
+    
+    if (!curriculumId) {
+      alert('カリキュラムが見つかりません。先に単元を作成してください。')
+      return
+    }
+    
+    // 弱点情報をクエリパラメータとして個別最適化コース生成を呼び出す
+    generatePersonalizedCourse(studentId, curriculumId)
+  } catch (error) {
+    console.error('❌ テスト対策→個別最適化連携エラー:', error)
+    alert('エラーが発生しました: ' + error.message)
+  }
+}
+
+// 児童理解ダッシュボード（テスト対策＋単元学習＋個別最適化の統合ビュー）
+async function showStudentInsight(studentId) {
+  console.log('👤 児童理解ダッシュボード表示:', studentId)
+  
+  try {
+    showLoading('児童データを統合分析中...')
+    
+    const response = await axios.get(`/api/teacher/student-insight/${studentId}`)
+    hideLoading()
+    
+    if (!response.data.success) throw new Error(response.data.error)
+    
+    const d = response.data
+    const student = d.student || {}
+    const testPrep = d.test_prep || {}
+    const unitLearning = d.unit_learning || {}
+    const personalizedCourses = d.personalized_courses || []
+    
+    const modalHTML = `
+      <div id="studentInsightModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='studentInsightModal')document.getElementById('studentInsightModal').remove()">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+          
+          <div class="bg-gradient-to-r from-teal-600 to-cyan-700 text-white p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold"><i class="fas fa-user-graduate mr-2"></i>児童理解ダッシュボード</h2>
+                <p class="text-sm opacity-90 mt-1">${student.student_name || '児童ID:' + studentId} - ${student.grade_level ? student.grade_level + '年生' : ''}</p>
+              </div>
+              <button onclick="document.getElementById('studentInsightModal').remove()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="flex-1 overflow-y-auto p-6 space-y-4">
+            
+            <!-- 概要カード -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div class="bg-blue-50 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-blue-600">${unitLearning.total_answers || 0}</div>
+                <div class="text-xs text-gray-500">総解答数</div>
+              </div>
+              <div class="bg-green-50 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-green-600">${unitLearning.correct_rate || 0}%</div>
+                <div class="text-xs text-gray-500">正答率</div>
+              </div>
+              <div class="bg-orange-50 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-orange-600">${unitLearning.avg_time || 0}秒</div>
+                <div class="text-xs text-gray-500">平均回答時間</div>
+              </div>
+              <div class="bg-purple-50 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-purple-600">${testPrep.plan_count || 0}</div>
+                <div class="text-xs text-gray-500">テスト対策数</div>
+              </div>
+              <div class="bg-pink-50 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-pink-600">${personalizedCourses.length}</div>
+                <div class="text-xs text-gray-500">個別コース</div>
+              </div>
+            </div>
+            
+            <!-- テスト対策から見える弱点 -->
+            ${testPrep.weak_topics?.length > 0 ? `
+            <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+              <h3 class="font-bold text-red-800 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>テスト対策で明らかになった弱点</h3>
+              <div class="flex flex-wrap gap-2 mb-2">
+                ${testPrep.weak_topics.map(t => `
+                  <span class="text-xs px-3 py-1 bg-red-100 text-red-700 rounded-full font-bold">
+                    <i class="fas fa-times-circle mr-1"></i>${t.topic || t} (自信度: ${t.avg_confidence || '低'})
+                  </span>
+                `).join('')}
+              </div>
+              <p class="text-xs text-red-600 mt-1">→ これらのトピックは個別最適化コースで重点的にカバーされます</p>
+            </div>` : ''}
+            
+            <!-- 単元内学習の傾向 -->
+            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+              <h3 class="font-bold text-blue-800 mb-2"><i class="fas fa-chart-line mr-2"></i>単元内学習の傾向</h3>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <p class="text-xs text-gray-600">易しい問題: <strong class="text-green-600">${unitLearning.easy_correct_rate >= 0 ? unitLearning.easy_correct_rate + '%' : 'データなし'}</strong></p>
+                  <p class="text-xs text-gray-600">難しい問題: <strong class="text-red-600">${unitLearning.hard_correct_rate >= 0 ? unitLearning.hard_correct_rate + '%' : 'データなし'}</strong></p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-600">学習計画進捗: <strong class="text-purple-600">${unitLearning.plan_progress || '0/0'}</strong></p>
+                  <p class="text-xs text-gray-600">振り返り数: <strong class="text-orange-600">${unitLearning.reflections_count || 0}件</strong></p>
+                </div>
+              </div>
+              ${unitLearning.recent_reflections?.length > 0 ? `
+              <div class="mt-2 space-y-1">
+                <p class="text-xs font-bold text-blue-700">直近の振り返り:</p>
+                ${unitLearning.recent_reflections.map(r => `
+                  <div class="text-xs bg-white rounded p-2 border border-blue-100">
+                    ${r.keep_text ? `<span class="text-green-600"><strong>続けること:</strong> ${r.keep_text}</span>` : ''}
+                    ${r.try_text ? `<span class="text-orange-600 ml-2"><strong>挑戦すること:</strong> ${r.try_text}</span>` : ''}
+                  </div>
+                `).join('')}
+              </div>` : ''}
+            </div>
+            
+            <!-- テスト対策プラン履歴 -->
+            ${testPrep.plans?.length > 0 ? `
+            <div class="bg-indigo-50 border-l-4 border-indigo-400 p-4 rounded">
+              <h3 class="font-bold text-indigo-800 mb-2"><i class="fas fa-clipboard-check mr-2"></i>テスト対策プラン履歴</h3>
+              <div class="space-y-2">
+                ${testPrep.plans.map(p => `
+                  <div class="flex items-center justify-between bg-white rounded-lg p-2 border">
+                    <div>
+                      <span class="text-xs font-bold text-gray-800">${p.title || 'テスト対策'}</span>
+                      <span class="text-xs text-gray-500 ml-2">${p.subject || ''} • ${p.test_date || ''}</span>
+                    </div>
+                    <span class="text-xs px-2 py-1 rounded-full ${p.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}">
+                      ${p.status === 'completed' ? '完了' : '進行中'}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
+              <p class="text-xs text-indigo-600 mt-2">総学習時間: ${testPrep.total_minutes || 0}分</p>
+            </div>` : ''}
+            
+            <!-- 配信済み個別最適化コース -->
+            ${personalizedCourses.length > 0 ? `
+            <div class="bg-pink-50 border-l-4 border-pink-400 p-4 rounded">
+              <h3 class="font-bold text-pink-800 mb-2"><i class="fas fa-magic mr-2"></i>配信済み個別最適化コース</h3>
+              <div class="space-y-2">
+                ${personalizedCourses.map(pc => `
+                  <div class="bg-white rounded-lg p-3 border border-pink-200">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs font-bold text-pink-700">${pc.course_name}</span>
+                      <span class="text-xs text-gray-500">${pc.card_count}枚</span>
+                    </div>
+                    ${pc.analysis_summary ? `<p class="text-xs text-gray-600 mt-1">${pc.analysis_summary}</p>` : ''}
+                    <p class="text-xs text-gray-400 mt-1">配信日: ${pc.published_at || ''}</p>
+                  </div>
+                `).join('')}
+              </div>
+            </div>` : ''}
+            
+            <!-- AI分析サマリ -->
+            ${d.ai_insight ? `
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+              <h3 class="font-bold text-yellow-800 mb-2"><i class="fas fa-robot mr-2"></i>AI分析による児童理解</h3>
+              <p class="text-sm text-gray-700 whitespace-pre-line">${d.ai_insight}</p>
+            </div>` : ''}
+          </div>
+          
+          <!-- フッター -->
+          <div class="border-t border-gray-200 p-4 bg-gray-50">
+            <div class="flex justify-between items-center">
+              <button onclick="document.getElementById('studentInsightModal').remove()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-bold text-gray-700">
+                <i class="fas fa-times mr-2"></i>閉じる
+              </button>
+              <div class="flex gap-2">
+                <button onclick="document.getElementById('studentInsightModal').remove(); showTestPrepModal()" class="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg font-bold text-sm hover:from-blue-600 hover:to-indigo-700 transition shadow">
+                  <i class="fas fa-clipboard-check mr-1"></i>テスト対策プラン作成
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 児童理解ダッシュボードエラー:', error)
+    alert('データの読み込みに失敗しました: ' + error.message)
+  }
+}
+
+window.generatePersonalizedFromTestPrep = generatePersonalizedFromTestPrep
+window.showStudentInsight = showStudentInsight
 
 console.log('✅ Phase 10.5 個別最適化＆テスト対策ダッシュボード初期化完了')
 
