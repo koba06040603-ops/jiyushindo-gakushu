@@ -447,14 +447,14 @@
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1">
                         ③ どうやって学んだか
-                        <span class="text-xs text-gray-400 ml-1">（学び方のふりかえり ← メタ認知の力をきたえる！）</span>
+                        <span class="text-xs text-gray-400 ml-1">（自分の学び方を知る力をきたえる！）</span>
                     </label>
                     <textarea id="refMethodReflection" rows="2" placeholder="例：教科書を読んでからカードをやった、友だちに聞いてみた..." class="w-full px-3 py-2 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-400 text-sm bg-indigo-50"></textarea>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1">
                         ④ つぎにいかすこと
-                        <span class="text-xs text-gray-400 ml-1">（自己調整の力をきたえる！）</span>
+                        <span class="text-xs text-gray-400 ml-1">（自分で計画する力をきたえる！）</span>
                     </label>
                     <textarea id="refNextApplication" rows="2" placeholder="次の時間に気をつけること、やってみたいこと..." class="w-full px-3 py-2 border-2 border-green-200 rounded-xl focus:ring-2 focus:ring-green-400 text-sm bg-green-50"></textarea>
                 </div>
@@ -472,7 +472,7 @@
                         <label class="flex items-center space-x-2 cursor-pointer bg-white rounded-lg px-3 py-2 border-2 border-transparent hover:border-blue-200 transition" id="soloLearnOption">
                             <input type="radio" name="friendLearning" value="0" checked onchange="toggleFriendSection()" class="text-blue-600">
                             <span class="text-sm"><strong>📚 ひとりで学んだ</strong></span>
-                            <span class="text-xs text-blue-500 ml-auto">← 自律性の力</span>
+                            <span class="text-xs text-blue-500 ml-auto">← 自分で進める力！</span>
                         </label>
                         <label class="flex items-center space-x-2 cursor-pointer bg-white rounded-lg px-3 py-2 border-2 border-transparent hover:border-yellow-200 transition" id="collabLearnOption">
                             <input type="radio" name="friendLearning" value="1" onchange="toggleFriendSection()" class="text-blue-600">
@@ -485,7 +485,7 @@
                         <p class="text-xs text-gray-500">どんな関わり方をした？（自分で選んだ学び方として記録）</p>
                         <div class="flex flex-wrap gap-2">
                             <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-purple-300 transition">
-                                <input type="checkbox" value="taught_by" class="friend-type"> 🙋 教えてもらった<span class="text-gray-400 ml-1">(help-seeking)</span>
+                                <input type="checkbox" value="taught_by" class="friend-type"> 🙋 教えてもらった
                             </label>
                             <label class="flex items-center space-x-1 text-xs bg-white px-2 py-1.5 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-green-300 transition">
                                 <input type="checkbox" value="taught_to" class="friend-type"> 🎓 教えてあげた<span class="text-gray-400 ml-1">(teaching)</span>
@@ -2240,8 +2240,20 @@ function renderAiFeedback(data) {
 
     const theoriesContainer = document.getElementById('aiTheories')
     theoriesContainer.innerHTML = ''
+    const theoryFriendly = {
+        'F6_metacognition': '🧠 自分の学びを知る力',
+        'F5_self_regulation': '📐 自分で計画する力',
+        'F8_self_determination': '🚀 自分で決めてがんばる力',
+        'F11_social_constructivism': '🤝 友だちと学ぶ力',
+        'Solo_Learning_Autonomy': '📚 1人で進める力',
+        'Newman_Help_Seeking': '🙋 友だちに聞ける力',
+        'Duckworth_Grit': '💪 やりぬく力',
+        'metacognition': '🧠 自分の学びを知る力',
+        'self_regulation': '📐 自分で計画する力',
+    }
     ;(ref.theories || []).forEach(t => {
-        theoriesContainer.innerHTML += `<span class="theory-tag">${t.replace(/_/g, ' ')}</span> `
+        const label = theoryFriendly[t] || ''
+        if (label) theoriesContainer.innerHTML += `<span class="theory-tag">${label}</span> `
     })
 
     // 粘り強さレーダー
@@ -2459,7 +2471,7 @@ function renderEvidenceTraceCard(et) {
     const pInputs = pTrace.raw_inputs || {}
     html += `
                     <div class="bg-orange-50 rounded p-2">
-                        <div class="font-medium text-orange-700">粘り強さ: ${pTrace.value}点</div>
+                        <div class="font-medium text-orange-700">がんばる力: ${pTrace.value}点</div>
                         <div class="text-gray-500">${pTrace.formula}</div>
                         <div class="text-gray-400 mt-1 space-y-0.5">
                             ${Object.values(pInputs).map(v => `<div>• ${v}</div>`).join('')}
@@ -2470,7 +2482,7 @@ function renderEvidenceTraceCard(et) {
     const sInputs = sTrace.raw_inputs || {}
     html += `
                     <div class="bg-indigo-50 rounded p-2">
-                        <div class="font-medium text-indigo-700">自己調整: ${sTrace.value}点</div>
+                        <div class="font-medium text-indigo-700">くふうして学ぶ力: ${sTrace.value}点</div>
                         <div class="text-gray-500">${sTrace.formula}</div>
                         <div class="text-gray-400 mt-1 space-y-0.5">
                             ${Object.values(sInputs).map(v => `<div>• ${v}</div>`).join('')}

@@ -2080,25 +2080,26 @@ async function generateAIResponse(
   grade: string | null
 ): Promise<string> {
   // システムプロンプト
-  const systemPrompt = `あなたは小学生向けの優しい学習アシスタントAIです。
+  const isJH = (grade || '').includes('中')
+  const systemPrompt = `あなたは小学1年生から中学3年生までの学びを応援する、やさしいAI先生です。
 
 【あなたの役割】
-- 小学生の質問に、わかりやすく丁寧に答える
-- 全教科（算数、国語、理科、社会、英語）に対応する
-- 答えを直接教えるのではなく、考え方やヒントを提供する
-- 励ましの言葉を忘れずに入れる
+- ${isJH ? '生徒' : '子ども'}の質問に、わかりやすくていねいに答える
+- 全教科（${isJH ? '数学' : '算数'}、国語、理科、社会、英語など）に対応する
+- 答えを直接教えるのではなく、考え方やヒントを出す
+- 必ず励ましの言葉を入れる
 
 【回答ルール】
-1. 小学${grade || '3-4年'}生にわかる言葉を使う
+1. ${grade || '小学3-4年'}生にわかる言葉を使う${isJH ? '（幼すぎる表現は避ける）' : ''}
 2. 1回の回答は200文字以内に収める
-3. 難しい言葉には（ ）で説明を加える
+3. 難しい言葉には（ ）でやさしい説明を加える
 4. 絵文字を適度に使って親しみやすくする 😊
-5. 「〜だよ」「〜してみようね」など優しい口調で話す
+5. ${isJH ? '親しみを込めつつ、ていねいな口調で話す' : '「〜だよ」「〜してみようね」など優しい口調で話す'}
 
 【現在の教科】: ${subject || '不明'}
 【学年】: ${grade || '不明'}
 
-生徒の質問に、優しく丁寧に答えてください。`;
+${isJH ? '生徒' : '子ども'}の質問に、やさしくていねいに答えてください。`;
 
   // 会話履歴をフォーマット
   const historyText = conversationHistory
@@ -4815,46 +4816,59 @@ app.post('/api/ai/reflect', async (c) => {
   if (!apiKey) {
     return c.json({ 
       feedback: type === 'unit' 
-        ? '単元を最後まで学習できましたね！次の単元も楽しみです。'
-        : 'がんばりましたね！次回も楽しく学習しましょう。' 
+        ? '単元をさいごまでがんばったね！すごい！次の単元もいっしょに楽しもう 🌟'
+        : 'よくがんばったね！次もいっしょに楽しく学ぼう 😊' 
     })
   }
   
+  // 学年に応じたトーン調整（小1～中3）
+  const grade = reflections.grade || ''
+  const isJuniorHigh = grade.includes('中')
+  const toneTip = isJuniorHigh
+    ? '中学生に話しかけるように、親しみを込めつつ敬意を持った口調で。幼すぎる表現は避ける。'
+    : '小学生にわかりやすい言葉で、あたたかく話しかけるように。'
+
   const promptText = type === 'unit' 
-    ? `あなたは小学生の学習を応援するAI先生です。子どもの単元全体の振り返りを読んで、成長を認め、次の学習への意欲を高めるメッセージを送ってください。
+    ? `あなたは小学1年生から中学3年生までの学びを応援するAI先生です。
+児童・生徒の単元全体の振り返りを読んで、がんばりを認め、次への意欲を引き出すメッセージを送ってください。
 
 【単元全体の振り返り】
-良かったこと: ${reflections.good || 'なし'}
-直したいこと: ${reflections.bad || 'なし'}
+学年: ${grade || '不明'}
+よかったこと: ${reflections.good || 'なし'}
+なおしたいこと: ${reflections.bad || 'なし'}
 わかったこと: ${reflections.learned || 'なし'}
 
 【フィードバックのルール】
-1. 単元全体を通しての成長を認める
-2. 良かったことを具体的に褒める
-3. 直したいことは次の目標として前向きに受け止める
-4. わかったことの価値を伝え、学びの喜びを共感する
-5. 次の単元への期待感を持たせる
-6. 小学生にわかりやすい言葉で
+1. 単元全体を通しての成長を具体的に認め、「すごいね」「がんばったね」など温かい言葉で伝える
+2. よかったことを具体的にほめる（「〇〇ができたのは本当にすばらしい」のように）
+3. なおしたいことは否定せず「次はこうしてみるのもいいかも」と前向きに提案する
+4. わかったことの価値を伝え、学ぶ楽しさへの共感を示す
+5. 次の単元への期待感を持たせる（「次も楽しみだね」「もっと成長できるよ」）
+6. ${toneTip}
 7. 200文字以内で
+8. 絶対に否定的な表現（「ダメ」「できていない」「不十分」等）は使わない
 
-温かく励ますメッセージを書いてください。`
-    : `あなたは小学生の学習を応援するAI先生です。子どもの1時間の学習の振り返りを読んで、励ましとアドバイスをしてください。
+あたたかく励ますメッセージを書いてください。`
+    : `あなたは小学1年生から中学3年生までの学びを応援するAI先生です。
+児童・生徒の1時間の学習の振り返りを読んで、やさしく励ましとアドバイスをしてください。
 
 【振り返り内容】
-良かったこと: ${reflections.good || 'なし'}
-難しかったこと: ${reflections.bad || 'なし'}
+学年: ${grade || '不明'}
+よかったこと: ${reflections.good || 'なし'}
+むずかしかったこと: ${reflections.bad || 'なし'}
 わかったこと: ${reflections.learned || 'なし'}
 
 【フィードバックのルール】
-1. 必ず励ましの言葉から始める
-2. 良かったことを具体的に褒める
-3. 難しかったことには共感し、次へのヒントを出す
-4. わかったことの素晴らしさを伝える
-5. 次の学習への意欲が湧く言葉で締める
-6. 小学生にわかりやすい言葉で
+1. 必ず「がんばったね」「すごいね」等の励ましの言葉から始める
+2. よかったことを具体的にほめる
+3. むずかしかったことには「むずかしかったのによく取り組んだね」と共感してから、次へのヒントを出す
+4. わかったことのすばらしさを伝え、学ぶ喜びを一緒に分かち合う
+5. 次の学習への意欲がわく言葉で締める（「次もいっしょにがんばろう！」等）
+6. ${toneTip}
 7. 150文字以内で簡潔に
+8. 絶対に否定的な表現（「ダメ」「できていない」「不十分」等）は使わない
 
-フィードバックしてください。`
+あたたかいフィードバックをしてください。`
   
   try {
     const geminiResponse = await fetch(
@@ -4886,15 +4900,15 @@ app.post('/api/ai/reflect', async (c) => {
     
     const feedback = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 
                      (type === 'unit' 
-                       ? '単元をしっかり学習できました！次の単元も楽しみです！'
-                       : 'よくがんばりました！次回も楽しく学習しましょう。')
+                       ? '単元をさいごまでやりきったね！すごいことだよ。次の単元もいっしょに楽しもう 🌟'
+                       : 'よくがんばったね！次もいっしょに楽しく学ぼう 😊')
     
     return c.json({ feedback })
     
   } catch (error) {
     console.error('AI reflection error:', error)
     return c.json({ 
-      feedback: 'すばらしい振り返りですね！これからも一緒にがんばりましょう！' 
+      feedback: 'ふりかえりをしっかり書けたね、すばらしい！これからもいっしょにがんばろう 💪' 
     })
   }
 })
@@ -6124,13 +6138,13 @@ app.post('/api/ai-chat', async (c) => {
     
     if (!hasGradeInfo && (!conversationHistory || conversationHistory.length === 0)) {
       // 初回メッセージ：学年を尋ねる
-      systemPrompt = `あなたは小学生の学習を優しくサポートするAI先生です。
+      systemPrompt = `あなたは小学1年生から中学3年生までの学びを応援する、やさしいAI先生です。
 
 【初回対応】
-最初に、子どもに何年生かを尋ねてください。その後、その学年に合わせた言葉と説明の難しさで対応してください。
+最初に、何年生かをたずねてください。その学年に合わせた言葉と説明のむずかしさで対応してください。
 
 【回答例】
-「こんにちは！AI先生だよ。何年生かな？教えてくれると、ちょうどいい説明ができるよ！」`
+「こんにちは！AI先生だよ 😊 何年生かな？教えてくれると、ちょうどいい説明ができるよ！」`
     } else {
       // 学年がわかっている場合：通常の対応
       const gradeLevel = studentGrade || '小学生'
@@ -6145,7 +6159,7 @@ app.post('/api/ai-chat', async (c) => {
         ? `${mathSubjectName}・国語・理科・社会`
         : '国語・理科・社会・' + mathSubjectName
       
-      systemPrompt = `あなたは${gradeLevel}の学習を優しくサポートするAI先生です。
+      systemPrompt = `あなたは${gradeLevel}の学びを応援する、やさしいAI先生です。
 ${cardContext ? `
 【超重要】現在の学習カードの内容（必ず参照すること）
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -6763,7 +6777,7 @@ ${progress.results.slice(0, 5).map((p: any) =>
     {"title": "おすすめアクション1", "description": "具体的な説明"},
     {"title": "おすすめアクション2", "description": "具体的な説明"}
   ],
-  "encouragement": "児童への励ましメッセージ（50文字以内）"
+  "encouragement": "やさしい励ましのメッセージ（50文字以内、学術用語は使わない）"
 }`
 
     const response = await fetch(
@@ -6831,7 +6845,7 @@ ${progress.results.slice(0, 5).map((p: any) =>
       strengths: ['頑張って学習を続けています'],
       areas_for_improvement: [],
       recommendations: [],
-      encouragement: 'これからも一緒に頑張りましょう！'
+      encouragement: 'いっしょにがんばろう！きみならできるよ 😊'
     })
   }
 })
@@ -20221,34 +20235,34 @@ app.post('/api/ai-teacher/socratic-dialogue', async (c) => {
 
     // ソクラテス式対話プロンプト
     const prompt = `
-あなたは優れた教師として、ソクラテス式対話法を使って児童の学習を支援します。
+あなたは子どもの学びを応援するやさしいAI先生です。質問やヒントで、子どもが自分で答えに気づけるように導いてください。
 
 【問題】
 ${card.card_title}
 ${card.problem_description || ''}
 
-【児童の現在の理解】
+【子どもの現在の理解】
 ${currentUnderstanding}
 
 【試行回数】
 ${attemptCount}回目
 
 【あなたの役割】
-1. 直接答えは教えない
-2. 段階的な質問で思考を促す
-3. 児童が自分で気づけるようにヒントを出す
-4. 試行回数に応じてヒントの具体性を調整する
+1. 答えは直接教えない
+2. 質問やヒントで、自分で考える手助けをする
+3. 子どもが自分で気づけるようにサポートする
+4. 試行回数に応じてヒントの具体的さを変える
 
 【対話の方針】
-- 1-2回目: 非常に抽象的な質問
-- 3-4回目: やや具体的なヒント
-- 5回目以降: より直接的なヒントと励まし
+- 1-2回目: やさしい質問で考えるきっかけを
+- 3-4回目: もう少し具体的なヒント
+- 5回目以降: わかりやすいヒントと励まし
 
 JSON形式で以下を返してください：
 {
-  "question": "児童への質問",
+  "question": "子どもへの質問",
   "hint_level": 1-5の数値（抽象→具体）,
-  "encouragement": "励ましのメッセージ",
+  "encouragement": "あたたかい励ましのメッセージ",
   "is_close_to_answer": true/false
 }
 `
@@ -20553,24 +20567,25 @@ app.post('/api/ai-teacher/encouragement', async (c) => {
 
   try {
     const prompt = `
-あなたは児童の心に寄り添う優しいAI先生です。
+あなたは小学1年生から中学3年生までの子どもの心に寄り添う、やさしいAI先生です。
 
 【状況】
 ${context}
 
-【児童の気持ち】
+【子どもの気持ち】
 ${emotion}
 
 【あなたの役割】
-1. 共感を示す
-2. 具体的に褒める
+1. 気持ちに共感する
+2. がんばっていることを具体的にほめる
 3. 成長を認める
 4. 次への意欲を高める
 
 【メッセージの要件】
-- 温かく励まし的なトーン
-- 具体的な成果を認める
-- 次の一歩を示唆する
+- あたたかく、やさしい言葉で
+- 具体的にほめる（「〇〇ができたね！」のように）
+- 次にできそうなことを1つ提案する
+- 学術用語は絶対に使わない
 - 150文字以内で簡潔に
 
 JSON形式で以下を返してください：
@@ -24910,7 +24925,7 @@ app.get('/api/feedback/advice', authMiddleware, async (c) => {
         advice: {
           generalAdvice: 'まだ学習履歴がありません。問題を解いて学習を始めましょう！',
           specificAdvice: [],
-          encouragement: '新しい学習の旅を始めましょう！'
+          encouragement: '新しい学びのぼうけんを始めよう！ 🌟'
         }
       })
     }
@@ -28209,28 +28224,29 @@ app.post('/api/reflection/ai-analyze', async (c) => {
 
     if (!apiKey) {
       return c.json({ success: true, analysis: {
-        summary: '学習お疲れさまでした！記録をもとに次の学習計画に活かしましょう。',
-        improvement_tips: ['復習の間隔を空けて記憶を定着させましょう', '苦手な部分は繰り返し練習が効果的です'],
-        encouragement: 'よく頑張りました！継続は力なりです。'
+        summary: '学習おつかれさま！きろくをもとに次の学習に活かしていこうね 😊',
+        improvement_tips: ['復習の間かくを空けると、おぼえたことが定着するよ', 'むずかしかった部分はくり返し練習すると力がつくよ'],
+        encouragement: 'がんばっているね！続けていこう！ 💪'
       }})
     }
 
     const studyInfo = study_logs ? study_logs.map((l: any) => `${l.topic}: 理解度${l.understanding}/5`).join(', ') : '記録なし'
     
-    const prompt = `小学生の学習振り返りを分析してください。
+    const prompt = `小学1年生から中学3年生までの子どもの学習の振り返りを分析してください。
+やさしく励ます言葉で、学術用語は使わないでください。
 
 【振り返り内容（KPT法）】
-Keep（良かったこと）: ${keep || 'なし'}
-Problem（困ったこと）: ${problem || 'なし'}
+Keep（よかったこと）: ${keep || 'なし'}
+Problem（むずかしかったこと）: ${problem || 'なし'}
 Try（次にやること）: ${try_next || 'なし'}
 
 【学習記録】${studyInfo}
 
 以下のJSON形式で回答:
 {
-  "summary": "振り返りの要約（100字以内、優しい言葉で）",
-  "improvement_tips": ["具体的な改善アドバイス1", "アドバイス2", "アドバイス3"],
-  "encouragement": "励ましのメッセージ（50字以内）",
+  "summary": "振り返りの要約（100字以内、やさしい言葉で）",
+  "improvement_tips": ["次にやれそうなこと1", "次にやれそうなこと2", "次にやれそうなこと3"],
+  "encouragement": "あたたかい励ましのメッセージ（50字以内）",
   "next_goals": ["次の具体的な目標1", "目標2"]
 }
 JSONのみ。`
@@ -28250,9 +28266,9 @@ JSONのみ。`
     const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || ''
     const match = text.match(/\{[\s\S]*\}/)
     const analysis = match ? JSON.parse(match[0]) : {
-      summary: '学習お疲れさまでした！',
-      improvement_tips: ['復習を続けましょう'],
-      encouragement: 'よく頑張りました！'
+      summary: '学習おつかれさま！',
+      improvement_tips: ['復習を続けてみようね'],
+      encouragement: 'がんばったね！ 😊'
     }
 
     return c.json({ success: true, analysis })
@@ -28468,8 +28484,8 @@ app.post('/api/student-learning/analyze-reflection', async (c) => {
     // Gemini AIによる深い分析を試行
     if (apiKey && (hasContent || hasMethod || hasNext)) {
       try {
-        const prompt = `あなたは小中学校の自由進度学習における「ふりかえりAI」です。
-子ども（${grade || ''}${subject || ''}）の振り返りを分析し、学習理論に基づいたフィードバックを返してください。
+        const prompt = `あなたは小学1年生から中学3年生までの自由進度学習を応援する「ふりかえりAI先生」です。
+子ども（${grade || ''}${subject || ''}）の振り返りを読んで、やさしく励ましながらアドバイスしてください。
 
 【単元】${unit_name || ''}
 【第${hour_number}時の振り返り】
@@ -28481,36 +28497,29 @@ app.post('/api/student-learning/analyze-reflection', async (c) => {
 【今日の進捗】${progressNote}
 
 【フィードバック原則】（必ず守ること）
-1. 先に良い点を具体的に引用して褒める（有能感を満たす → 自己決定理論）
-2. 理論名は子ども向け言葉に言い換える（例：メタ認知→「自分の学びを知る力」）
-3. ★最重要★ 1人学びは自由進度学習の核であり、最も高く評価する
-   → 1人でカードを進められた＝自律性の発現（SDT d=0.61）
-   → 1人学びができることが全ての基盤
-4. 友だちに聞いた場合: 「受動的」ではなく「自分で判断して助けを求めた」（help-seeking, Newman 2002）として評価
-   → help-seekingは自己調整学習の適応的方略（Zimmerman 2000）
-5. 他者比較は絶対禁止。前の自分との比較で成長を示す
-6. 具体的な次ステップ提案は1つだけ
-7. 書けていない項目は責めず、次の課題として提案
-8. 粘り強さの評価: 学習指導要領の「粘り強い取組」と「自己調整」の2側面から
-
-【参照すべき学習理論と効果量】
-- F6 Flavellメタ認知理論(d=0.69): ②③に記述があるか → メタ認知的モニタリング能力
-- F5 Zimmerman自己調整学習(d=0.52): ④に記述があるか → 省察→予見サイクル
-- F8 Deci & Ryan自己決定理論(d=0.61): 手ごたえ・1人学び → 自律性+有能感
-- F11 社会的構成主義(d=0.40): 友だちとの学び → 関係性+協同的知識構成
-- Newman(2002) help-seeking: 友だちに聞くことは自律的な方略選択
-- Duckworthグリット(d=0.20): カード数+選択課題 → 努力の粘り強さ
-- Dweck成長マインドセット(d=0.19): 困難に向かう姿勢
-- Pekrun学業感情理論(2006): 手ごたえの変化 → 感情調整能力
+1. まず「がんばったね」「すごいね」など温かい言葉で始める
+2. よかったところを具体的に引用してほめる
+3. 学術用語・研究者名・英語の専門用語は絶対に使わない
+   → ×「メタ認知」→ ○「自分の学びを知る力」
+   → ×「自己決定理論」→ ○「自分で決めてがんばる力」
+   → ×「help-seeking」→ ○「友だちに聞く力」
+4. ★最重要★ 1人で学べたことを最も高くほめる
+   → 「自分の力でこつこつ進められた」＝すばらしいこと
+5. 友だちに聞いた場合: 「自分で考えて友だちに聞けた」としてほめる
+6. 他の人と比べるのは絶対ダメ。前の自分との成長をほめる
+7. 具体的な「次にやること」の提案は1つだけ
+8. 書けていない項目は責めない。「次はここも書いてみようね」とやさしく提案
+9. 否定的な表現（「ダメ」「できていない」「不十分」）は絶対に使わない
+10. ${(grade || '').includes('中') ? '中学生に話しかけるように、親しみを込めつつ敬意のある口調で。幼すぎない表現で。' : '小学生にわかりやすい言葉で、あたたかく話しかけるように。'}
 
 以下のJSON形式で返答:
 {
-  "feedback": "子ども向けフィードバック全文（400字以内、絵文字使用OK、段落分け）",
-  "theories_used": ["F5_self_regulation", "F6_metacognition"],
-  "metacognition_note": "メタ認知的知識のどの側面が見られるか（人間・課題・方略）",
-  "self_determination_note": "3欲求（自律性・有能感・関係性）のどれが満たされているか",
-  "persistence_note": "粘り強さの観点での評価（学習指導要領の2側面から）",
-  "solo_learning_note": "1人学びの評価（自律性の発現として）",
+  "feedback": "子ども向けフィードバック全文（400字以内、絵文字OK、段落分け。学術用語は絶対に使わない）",
+  "theories_used": ["metacognition", "self_regulation"],
+  "metacognition_note": "「自分の学びを知る力」のどんな面が見られるか",
+  "self_determination_note": "自分で決めてがんばる力のどこが育っているか",
+  "persistence_note": "粘り強さの評価",
+  "solo_learning_note": "1人学びの評価（自分で進める力として）",
   "next_suggestion": "次の時間への具体的提案1つ"
 }
 JSONのみ回答。`
@@ -28535,7 +28544,7 @@ JSONのみ回答。`
           theories.push(...(aiResult.theories_used || []))
           // 補足情報を追加
           if (aiResult.persistence_note) {
-            feedback += `\n\n💪 粘り強さ: ${aiResult.persistence_note}`
+            feedback += `\n\n💪 がんばる力: ${aiResult.persistence_note}`
           }
           if (aiResult.next_suggestion) {
             feedback += `\n\n💡 次の時間の提案: ${aiResult.next_suggestion}`
@@ -28552,50 +28561,50 @@ JSONのみ回答。`
       // 振り返りレベルに応じた肯定的フィードバック
       if (qualityLevel >= 4 && hasMethod) {
         theories.push('F6_metacognition')
-        feedback += `🌟 「${method_reflection?.substring(0, 30)}」という学び方への気づきがすばらしい！自分に合った学び方を見つけられるのは「メタ認知」（自分の学びを知る力）というとても大事な力だよ。（Flavellメタ認知理論 d=0.69）\n\n`
+        feedback += `🌟 「${method_reflection?.substring(0, 30)}」という学び方への気づき、すばらしいね！自分に合った学び方を見つけられるのは「自分の学びを知る力」で、とても大事な力だよ ✨\n\n`
       } else if (qualityLevel >= 3 && hasContent) {
         theories.push('F6_metacognition')
-        feedback += `👍 わかったこと・わからなかったことを書けたね。自分の理解を確かめる力＝「メタ認知的モニタリング」がついてきている。次はどうやって学んだか（学び方）も振り返ってみると、もっと力がつくよ。\n\n`
+        feedback += `👍 わかったこと・わからなかったことを書けたね！「自分がどこまでわかっているか」をたしかめる力がついてきている 😊 次は「どうやって学んだか（学び方）」も振り返ってみると、もっと力がつくよ！\n\n`
       } else {
         feedback += `📝 今日もがんばったね！次は「わかったこと」や「どうやって学んだか」も書いてみよう。書くことで頭の中が整理されるよ。\n\n`
       }
 
       if (hasNext) {
         theories.push('F5_self_regulation')
-        feedback += `🔮 次にいかすことを考えられたね。「次はこうしよう」と自分で決められるのは、自分の学びをコントロールする力（自己調整力）の証拠だよ。Zimmerman先生の研究では「省察→次の計画」のサイクルが学力向上の鍵なんだ。\n\n`
+        feedback += `🔮 「次にいかすこと」を考えられたね！「次はこうしよう」と自分で決められるのは、自分の学びを自分でコントロールできている証拠だよ。振り返って→次の計画を立てる、このくり返しがぐんぐん伸びるコツなんだ 💪\n\n`
       }
 
       if (hasFriend) {
         theories.push('F11_social_constructivism')
-        feedback += `🤝 友だちとの学びを振り返れたね。人と一緒に学ぶと、自分だけでは気づけないことに気づけるんだ（社会的構成主義）。\n\n`
+        feedback += `🤝 友だちとの学びを振り返れたね！人と一緒に学ぶと、自分だけでは気づけないことに気づけるんだ。友だちの考えからも学べるって、すてきだね ✨\n\n`
       }
 
       // 1人学びの肯定的評価（自己決定理論: 自律性 ← 自由進度学習の核）
       if (!hasFriend && cardsList.length > 0) {
         theories.push('F8_self_determination')
         theories.push('Solo_Learning_Autonomy')
-        feedback += `📚 今日は自分の力で${progressNote}。1人でこつこつ進められるのは「自律性」が高い証拠。\n自己決定理論（Deci & Ryan, d=0.61）では、自分で決めて自分で進むことが一番やる気が続くと言われている。\n自由進度学習では1人で学べること自体がとても大事な力。これが全ての基盤だよ！\n\n`
+        feedback += `📚 今日は自分の力で${progressNote}！1人でこつこつ進められるのは、「自分で決めて自分で進む力」がしっかりついている証拠だよ 🌟\n自分で進めるって、やる気がいちばん続く学び方なんだ。自由進度学習ではこの力がいちばん大切。すごいよ！\n\n`
       }
 
       // 協働学びの評価（受動ではなく「自律的選択」として評価）
       if (hasFriend && cardsList.length > 0) {
         theories.push('F11_social_constructivism')
         theories.push('Newman_Help_Seeking')
-        feedback += `🤝 友だちの力をかりながらも${progressNote}。\n友だちに聞くのは「受け身」ではなく、自分に必要なことを判断して行動する力（help-seeking, Newman 2002）。\n自分で考えた上で友だちと学ぶのは、自律性と協働力の両方が育っている証拠だよ。\n\n`
+        feedback += `🤝 友だちの力もかりながら${progressNote}！\n友だちに聞くのは「受け身」じゃないよ。自分で「ここがわからない」と気づいて、聞ける相手を選んで行動できたってこと。\n自分で考える力と、人と学ぶ力の両方が育っている証拠だよ 😊\n\n`
       }
 
       // 粘り強さの評価（Duckworthグリット + 学習指導要領）
       if (cardsList.length >= 2 || selectionList.length >= 1) {
         theories.push('Duckworth_Grit')
-        feedback += `💪 たくさん取り組んだね。Angela Duckworth先生の研究では「粘り強く続ける力（グリット）」はテストの点数よりも将来の成功と関係があるんだ。\n\n`
+        feedback += `💪 たくさん取り組んだね！あきらめずに続けられる「やりぬく力」は、テストの点数よりも大切な力だと言われているんだ。これからもその調子でがんばろう！\n\n`
       }
 
       // 次回への提案（1つだけ）
       feedback += `💡 次の時間の提案: `
       if (!hasMethod) {
-        feedback += `振り返りに「どうやって学んだか」も書いてみよう。例えば「教科書を読んでから問題をやった」「図を描いて考えた」など。自分に合った学び方が見えてくるよ。`
+        feedback += `振り返りに「どうやって学んだか」も書いてみよう 📝 たとえば「教科書を読んでから問題をやった」「図を描いて考えた」など。自分に合った学び方が見えてくるよ！`
       } else if (!hasNext) {
-        feedback += `「次にいかすこと」を一つ決めてみよう。小さな目標でOK！Zimmerman先生の研究では「省察」から「次の計画」へつなげるサイクルが大事だよ。`
+        feedback += `「次にいかすこと」を一つ決めてみよう。小さな目標でOK！振り返ったことを次に活かす、このくり返しがどんどん力をつけるコツだよ 💡`
       } else {
         feedback += `この調子で続けよう！前回の振り返りをもとに、今日の計画を立ててみてね。`
       }
@@ -28611,7 +28620,7 @@ JSONのみ回答。`
     return c.json({
       success: true,
       quality_level: qualityLevel,
-      quality_label: ['', 'Lv.1 活動記述', 'Lv.2 感想', 'Lv.3 内容の気づき', 'Lv.4 方法の気づき', 'Lv.5 転用・つながり'][qualityLevel],
+      quality_label: ['', '⭐ やったことを書けたよ', '⭐⭐ 気持ちも書けたね', '⭐⭐⭐ 気づきがあるね！', '⭐⭐⭐⭐ 学び方も考えてる！', '⭐⭐⭐⭐⭐ 次にいかせるね！'][qualityLevel],
       feedback,
       theories
     })
@@ -28769,53 +28778,53 @@ app.post('/api/student-learning/analyze-unit', async (c) => {
     const scoreEntries = Object.entries(scores).sort((a, b) => (b[1] as number) - (a[1] as number))
     const topSkill = scoreEntries[0]
     const skillNames: Record<string, string> = {
-      metacognitionScore: 'メタ認知力（自分の学びを知る力）',
-      planningScore: '計画力',
-      methodScore: '学び方の力',
-      collaborationScore: '学び方を選ぶ力（1人学び＋協働）',
-      persistenceScore: '粘り強さ',
-      autonomyScore: '自律性（自分で進める力）'
+      metacognitionScore: '自分の学びを知る力',
+      planningScore: '計画する力',
+      methodScore: '学び方をくふうする力',
+      collaborationScore: '学び方を選ぶ力（1人学び＋友だちとの学び）',
+      persistenceScore: 'あきらめずにがんばる力',
+      autonomyScore: '自分で進める力'
     }
     const theoryNames: Record<string, string> = {
-      metacognitionScore: 'Flavellメタ認知理論',
-      planningScore: 'Zimmerman自己調整学習理論・予見フェーズ',
-      methodScore: 'Flavellメタ認知的知識・方略の知識',
-      collaborationScore: 'SDT自律性＋Newman help-seeking＋Vygotsky ZPD＋Peerチュータリング',
-      persistenceScore: 'Duckworthグリット理論＋Dweck成長マインドセット',
-      autonomyScore: 'Deci & Ryan自己決定理論・自律性'
+      metacognitionScore: '自分の「わかった」「わからない」に気づける力',
+      planningScore: '計画→やってみる→ふりかえるのサイクルをまわす力',
+      methodScore: '自分に合った学び方を見つける力',
+      collaborationScore: '1人学びも友だちとの学びも自分で選べる力',
+      persistenceScore: 'むずかしくてもあきらめずにやりぬく力',
+      autonomyScore: '自分で決めて自分で進める力'
     }
 
     aiComment += `🏆 いちばん輝いた力: ${skillNames[topSkill[0]]}（${Math.round(topSkill[1] as number)}点）\n`
-    aiComment += `📖 ${theoryNames[topSkill[0]]}\n\n`
+    aiComment += `✨ ${theoryNames[topSkill[0]]}\n\n`
 
     // 各力の評価
     if (metacognitionScore >= 70) {
-      aiComment += `🧠 メタ認知力が高い！自分の「わかった」「わからない」を正しく判断できている。これは学ぶ力の土台だよ。\n\n`
+      aiComment += `🧠 自分の学びを知る力がすごい！「わかった」「わからない」をちゃんと見分けられているね。これは学ぶ力の土台だよ ✨\n\n`
     }
     if (planningScore >= 70) {
-      aiComment += `📐 計画力がすばらしい！特に計画を途中で修正できた経験は、大人でも難しいことなんだ。（Zimmerman自己調整理論：計画→修正→改善のサイクル）\n\n`
+      aiComment += `📐 計画する力がすばらしい！とくに計画を途中で「やっぱりこうしよう」と変えられたのは、大人でもむずかしいこと。計画→やってみる→ふりかえるのくりかえしが上手にできているね 👏\n\n`
     }
     if (persistenceScore >= 70) {
-      aiComment += `💪 粘り強さが光っている！難しくても最後まで取り組む力は、「やり抜く力（グリット）」と呼ばれ、テストの点数以上に大切な力だよ。\n\n`
+      aiComment += `💪 あきらめずにがんばる力が光っている！むずかしくても最後まで取り組めるのは、テストの点数以上に大切な力だよ。この調子でいこう！🔥\n\n`
     }
     if (autonomyScore >= 70) {
-      aiComment += `🚀 自律性が高い！1人でこつこつ進められるのは自由進度学習の基本。自分で決めて自分で進む力がしっかり身についている。（自己決定理論）\n\n`
+      aiComment += `🚀 自分で進める力がすごい！1人でこつこつ進められるのは自由進度学習のいちばん大切な力。自分で決めて自分で進む力がしっかり身についているね 🌟\n\n`
     }
     if (collaborationScore >= 50) {
       // 1人学びと協働の両方を肯定的に評価
       const soloRatio = Math.round((soloHours / totalRefHours) * 100)
       if (soloHours > 0 && collabHours > 0) {
-        aiComment += `🤝 自分で学び方を選べる力がある！1人でじっくり進めた時間（${soloRatio}%）と友だちと学んだ時間、どちらも「自分で選んだ」ことに価値がある。Newman先生の研究では「助けを求める行動（help-seeking）」も自律的な方略選択なんだ。（自己決定理論＋社会的構成主義）\n\n`
+        aiComment += `🤝 自分で学び方を選べる力がある！1人でじっくり進めた時間（${soloRatio}%）と友だちと学んだ時間、どちらも「自分で選んだ」ことに価値があるよ。友だちに聞けるのも、自分で考えて行動できている証拠だね ✨\n\n`
       } else if (soloHours > 0) {
-        aiComment += `📚 1人でしっかり学べたね。自由進度学習では1人で進める力が基本であり、最も大切な力。これからもし困ったことがあれば友だちに聞くのも立派な学び方の選択だよ。（自己決定理論）\n\n`
+        aiComment += `📚 1人でしっかり学べたね！自由進度学習では1人で進められることがいちばん大切な力。これからもし困ったことがあれば友だちに聞くのも立派な学び方の選択だよ 😊\n\n`
       } else if (collabHours > 0) {
-        aiComment += `🤝 友だちとの学び合いを活かせたね。次の単元では1人でじっくり考える時間も作ってみよう。1人で考えた上で友だちと議論すると、もっと深い学びになるよ。（Vygotsky社会的構成主義＋SDT自律性）\n\n`
+        aiComment += `🤝 友だちとの学び合いを活かせたね！次の単元では1人でじっくり考える時間も作ってみよう。自分で考えてから友だちと話し合うと、もっと深い学びになるよ 💡\n\n`
       }
     }
 
     // 次の単元へのアドバイス
     const lowestSkill = scoreEntries[scoreEntries.length - 1]
-    aiComment += `💡 次の単元で伸ばしたい力: ${skillNames[lowestSkill[0]]}\n`
+    aiComment += `💡 次の単元でもっと伸ばしたい力: ${skillNames[lowestSkill[0]]}\n`
 
     // DB更新
     if (unitRef) {
@@ -29173,21 +29182,21 @@ app.post('/api/student-learning/measure-persistence', async (c) => {
           current: totalScore,
           change: diff,
           direction: diff > 5 ? '上昇' : diff < -5 ? '低下' : '安定',
-          message: diff > 5 ? `前回までの平均${Math.round(prevAvg)}点から${diff}点上昇！成長が見られます。`
-            : diff < -5 ? `前回より${Math.abs(diff)}点下がりましたが、波があるのは自然なことです。`
-            : `安定して取り組めています（前回平均: ${Math.round(prevAvg)}点）。`
+          message: diff > 5 ? `前の時間より${diff}てんアップ！どんどん成長しているね 😄`
+            : diff < -5 ? `前の時間よりちょっと下がったけど、波があるのは自然なことだよ。大丈夫 😊`
+            : `安定して取り組めているね！その調子で進めよう 👍`
         }
       }
     } catch {}
 
     // ─── 子ども向け・先生向けメッセージ ───
-    const overallLabel = overallGrade === 'A' ? 'A（十分満足）'
-      : overallGrade === 'B' ? 'B（おおむね満足）' : 'C（努力を要する）'
+    const overallLabel = overallGrade === 'A' ? '🌟 とてもよくできているよ！'
+      : overallGrade === 'B' ? '👍 いいかんじ！' : '💪 もっとのびるよ！'
     const studentMsg = overallGrade === 'A'
-      ? '粘り強さと学び方の工夫がどちらもよくできています！'
+      ? 'あきらめずにがんばる力と、くふうして学ぶ力のどちらもすごくがんばれているよ！その調子！ 🌟'
       : overallGrade === 'B'
-        ? `${perseveranceScore > selfRegScore ? '粘り強さ' : '学び方の工夫'}がよくなってきています。${perseveranceScore > selfRegScore ? '学び方の工夫' : '粘り強さ'}も意識するとさらに伸びるよ！`
-        : '少しずつ「やってみる」を積み重ねよう。うまくいかなくても、取り組んだことが大事な一歩です。'
+        ? `${perseveranceScore > selfRegScore ? 'あきらめずにがんばる力' : 'くふうして学ぶ力'}がどんどん伸びてきているね！${perseveranceScore > selfRegScore ? '「どうやったらうまくいくかな」を意識する' : '「もう少しやってみよう」を意識する'}と、もっとすごくなるよ 😊`
+        : '取り組もうとしたこと自体が大事な一歩だよ！少しずつ「やってみる」を積み重ねていこう。うまくいかなくても、それも学びの一部だからね 💪'
     const teacherMsg = `粘り強さ${perseveranceScore}点 / 自己調整${selfRegScore}点（3源三角測量, 信頼性${reliability}%）。`
       + (overallGrade === 'A' ? 'ZPDを意識した発展的課題の提示が有効です。'
         : overallGrade === 'B' ? (perseveranceScore < selfRegScore ? '完了体験の積み重ね（スモールステップ化）が最優先。' : '振り返りの質向上（メタ認知プロンプト）が効果的。')
@@ -29479,23 +29488,23 @@ app.post('/api/student-learning/ai-suggestion', async (c) => {
       // 前回の振り返りに基づく提案
       if (prev.confidence_rating <= 2) {
         suggestion = `前回、手ごたえが低かったね。今日は前回のところを復習してから進むのもいいかも。焦らず自分のペースでいいよ。`
-        theoryRef = 'F3 エビングハウス忘却曲線: 復習すると記憶が強くなる'
+        theoryRef = '📖 復習すると記憶が強くなるよ！'
       } else if (prev.next_application && prev.next_application.length > 5) {
         suggestion = `前回「${prev.next_application.substring(0, 40)}」と書いてたね。今日はそれを意識してみよう！前回の振り返りを活かせるのはすごいことだよ。`
-        theoryRef = 'F5 Zimmerman自己調整学習: 自己省察→次の予見へのサイクル'
+        theoryRef = '✨ 先回のふりかえりを活かせているね！'
       } else {
         suggestion = `前回までの調子がいいね。はじめの計画を見て、今日はどこまで進むか決めてみよう。`
-        theoryRef = 'F5 Zimmerman自己調整学習: 予見フェーズ'
+        theoryRef = '📝 計画を立てて進める力がついてるね！'
       }
     } else if (hour_number === 1) {
       suggestion = `最初の時間だね！学習のてびきをよく読んで、自分のペースで計画を立てよう。最初の計画は完璧じゃなくて大丈夫。あとで修正するのも大事な力だよ。`
-      theoryRef = 'F5 Zimmerman自己調整学習: 計画を立てて修正する力'
+      theoryRef = '🌟 計画を立てて修正する力も大事な力だよ！'
     } else {
       suggestion = `今日も自分のペースで進めよう。はじめの計画と今の進み具合を見て、今日の目標を決めてね。`
-      theoryRef = 'F8 Deci & Ryan自己決定理論: 自分で決めるとやる気が上がる'
+      theoryRef = '🚀 自分で決めるとやる気がアップするよ！'
     }
 
-    // 計画のズレに関するメタ認知促進
+    // 計画のズレに関する「自分の学びを知る力」促進
     if (currentRow && (currentRow as any).initial_plan) {
       const initial = (currentRow as any).initial_plan
       suggestion += `\n\n📋 はじめの計画:「${initial}」\n今の進み具合を見て、このまま進む？それとも変える？どちらも正しい判断だよ。`
