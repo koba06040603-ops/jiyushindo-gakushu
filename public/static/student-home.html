@@ -783,7 +783,7 @@ function renderTebikiPanel() {
         return 0
     })
 
-    const courseLabels = { basic: '🐢 じっくり', standard: '🐕 しっかり', advanced: '🐆 ぐんぐん' }
+    const courseLabels = { basic: '🐢 じっくりコース', standard: '🐕 しっかりコース', advanced: '🐆 ぐんぐんコース' }
     const courseColors = {
         basic:    { border: 'border-green-400', bg: 'bg-green-50',  light: 'border-green-200', text: 'text-green-600' },
         standard: { border: 'border-blue-400',  bg: 'bg-blue-50',   light: 'border-blue-200',  text: 'text-blue-600' },
@@ -1007,6 +1007,14 @@ async function init() {
         console.error('Init error:', e)
         showPhase0()
     }
+
+    // student-guide.htmlからの明示的コース選択はplanのcourse_typeより優先
+    if (preSelectedCourse && ['slow', 'steady', 'fast'].includes(preSelectedCourse)) {
+        STATE.selectedCourse = preSelectedCourse
+        updateHeader()
+        selectCourse(STATE.selectedCourse)
+    }
+
     document.getElementById('loadingScreen').classList.add('hidden')
     // てびきデータの事前読み込み（curriculum_idまたはunit_nameで取得試行）
     loadTebikiData()
@@ -1014,7 +1022,7 @@ async function init() {
 
 function updateHeader() {
     document.getElementById('headerSubtitle').textContent = `${STATE.unitConfig.grade} ${STATE.unitConfig.subject}「${STATE.unitConfig.unit_name}」`
-    const courseLabels = { slow: '🐢 じっくり', steady: '🐕 しっかり', fast: '🐆 ぐんぐん' }
+    const courseLabels = { slow: '🐢 じっくりコース', steady: '🐕 しっかりコース', fast: '🐆 ぐんぐんコース' }
     document.getElementById('courseLabel').textContent = courseLabels[STATE.selectedCourse] || 'コース未選択'
     // 名前はログイン情報を優先
     const storedUser = JSON.parse(localStorage.getItem('user') || 'null')
