@@ -210,6 +210,55 @@ async function loadGuideData() {
     }
 }
 
+// ========== カードアイテム描画ヘルパー ==========
+function renderCardItem(card, style) {
+    const hasHints = card.hints && card.hints.length > 0
+    const hasAnswer = card.answer || card.correct_answer
+
+    let hintsHtml = ''
+    if (hasHints) {
+        hintsHtml = '<div class="space-y-1">' +
+            card.hints.map(function(h, hi) {
+                return '<div class="bg-yellow-50 rounded p-2 text-xs text-gray-600 border-l-2 border-yellow-400">' +
+                    '<span class="font-bold text-yellow-700">ヒント' + (hi + 1) + ':</span> ' + escapeHtml(h.hint_content || h.hint_text || '') +
+                '</div>'
+            }).join('') +
+        '</div>'
+    }
+
+    let answerHtml = ''
+    if (hasAnswer) {
+        const answerText = escapeHtml(card.answer || card.correct_answer || '')
+        const explanationText = card.explanation || card.answer_explanation || ''
+        answerHtml = '<details>' +
+            '<summary class="text-xs text-green-600 cursor-pointer font-bold"><i class="fas fa-check-circle mr-1"></i>こたえを見る</summary>' +
+            '<div class="mt-1 bg-green-50 rounded-lg p-2 text-xs text-gray-700">' + answerText + '</div>' +
+            (explanationText ? '<div class="mt-1 bg-green-50 rounded-lg p-2 text-xs text-gray-600"><strong>解説:</strong> ' + escapeHtml(explanationText) + '</div>' : '') +
+        '</details>'
+    }
+
+    let problemHtml = ''
+    if (card.problem_text || card.problem_description) {
+        problemHtml = '<div class="bg-gray-50 rounded-lg p-3 text-xs text-gray-700 leading-relaxed">' +
+            '<p class="font-bold text-gray-800 mb-1"><i class="fas fa-question-circle mr-1"></i>問題</p>' +
+            escapeHtml(card.problem_text || card.problem_description || '').replace(/\n/g, '<br>') +
+        '</div>'
+    }
+
+    return '<div class="px-4 py-3">' +
+        '<div class="flex items-center gap-2 cursor-pointer" onclick="this.querySelector(\'.chevron-icon\').classList.toggle(\'rotate-90\'); this.nextElementSibling.classList.toggle(\'hidden\')">' +
+            '<i class="fas fa-chevron-right text-gray-400 text-xs chevron-icon transition-transform"></i>' +
+            '<span class="text-sm font-bold text-gray-700">カード' + (card.card_order || '') + '</span>' +
+            '<span class="text-xs text-gray-500 truncate flex-1">' + escapeHtml(card.card_title || '') + '</span>' +
+            (hasHints ? '<i class="fas fa-lightbulb text-yellow-400 text-xs" title="ヒントあり"></i>' : '') +
+            (hasAnswer ? '<i class="fas fa-check-circle text-green-400 text-xs" title="解答あり"></i>' : '') +
+        '</div>' +
+        '<div class="hidden mt-2 ml-5 space-y-2">' +
+            problemHtml + hintsHtml + answerHtml +
+        '</div>' +
+    '</div>'
+}
+
 // ========== ページ描画 ==========
 function renderGuidePage(learningSupportHtml) {
     const c = STATE.curriculum
@@ -229,8 +278,10 @@ function renderGuidePage(learningSupportHtml) {
     ]
 
     // コース名マッピング
-    const courseNames = ['ゆっくりコース', 'しっかりコース', 'どんどんコース']
-    const courseDescs = ['じっくり考えながら進むコース', 'バランスよく学ぶコース', '発展的な内容にチャレンジするコース']
+    // コース名はDBから取得した実際の名前を使用（フォールバック用のみ定義）
+    const courseNameFallback = { basic: 'じっくりコース', standard: 'しっかりコース', advanced: 'ぐんぐんコース' }
+    const courseDescFallback = { basic: 'ゆっくりていねいに進める', standard: '教科書のペースでバランスよく', advanced: 'はやめに進んで発展問題に挑戦' }
+    const courseIcons = { basic: '🐢', standard: '🐕', advanced: '🐆' }
     const levelMap = { basic: 'slow', standard: 'steady', advanced: 'fast' }
 
     const html = `
@@ -290,9 +341,10 @@ function renderGuidePage(learningSupportHtml) {
                     ${courses.map((course, idx) => {
                         const style = courseStyles[idx] || courseStyles[1]
                         const problem = csp[idx] || { problem_title: `${course.course_name}の問題`, problem_content: course.description }
-                        const displayName = courseNames[idx] || course.course_name
-                        const displayDesc = courseDescs[idx] || course.description || ''
+                        const displayName = course.course_name || courseNameFallback[course.course_level] || 'コース'
+                        const displayDesc = course.description || course.course_label || courseDescFallback[course.course_level] || ''
                         const levelKey = levelMap[course.course_level] || 'steady'
+                        const icon = courseIcons[course.course_level] || '📘'
 
                         return `
                         <div class="course-card border-4 ${style.border} bg-gradient-to-br ${style.bg} rounded-xl p-5 hover:shadow-2xl transition"
@@ -301,7 +353,7 @@ function renderGuidePage(learningSupportHtml) {
                                 <div class="inline-block px-4 py-1 ${style.badge} text-white rounded-full font-bold mb-2">
                                     ${idx + 1}
                                 </div>
-                                <h4 class="text-xl font-bold text-gray-800">${escapeHtml(displayName)}</h4>
+                                <h4 class="text-xl font-bold text-gray-800">${icon} ${escapeHtml(displayName)}</h4>
                                 <p class="text-sm text-gray-600 font-medium">${escapeHtml(displayDesc)}</p>
                             </div>
 
@@ -340,6 +392,34 @@ function renderGuidePage(learningSupportHtml) {
                         </div>`
                     }).join('')}
                 </div>
+            </div>
+
+            <!-- 学習カード一覧（コースごと） -->
+            <div class="mb-6">
+                <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                    <i class="fas fa-layer-group mr-2 text-indigo-600"></i>
+                    学しゅうカード一らん（コースごとの学しゅう内容）
+                </h3>
+                <p class="text-center text-gray-600 mb-4 text-sm">
+                    それぞれのコースで学しゅうするカードの内容だよ。アコーディオンを開くとくわしく見られるよ！
+                </p>
+                ${courses.map((course, idx) => {
+                    const style = courseStyles[idx] || courseStyles[1]
+                    const displayName = course.course_name || courseNameFallback[course.course_level] || 'コース'
+                    const icon = courseIcons[course.course_level] || ''
+                    const cards = course.cards || []
+                    if (cards.length === 0) return ''
+                    return `
+                    <div class="mb-4 border-2 ${style.border} rounded-xl overflow-hidden">
+                        <div class="px-4 py-3 bg-gradient-to-r ${style.bg} flex items-center justify-between">
+                            <span class="text-base font-bold text-gray-800">${icon} ${escapeHtml(displayName)}</span>
+                            <span class="text-xs bg-white/80 text-gray-600 px-2 py-1 rounded-full">${cards.length}枚のカード</span>
+                        </div>
+                        <div class="divide-y bg-white">
+                            ${cards.map(card => renderCardItem(card, style)).join('')}
+                        </div>
+                    </div>`
+                }).join('')}
             </div>
 
             <!-- チェックテスト -->
@@ -461,12 +541,13 @@ function renderGuidePage(learningSupportHtml) {
                 <div class="grid grid-cols-3 gap-3 course-grid">
                     ${courses.map((course, idx) => {
                         const style = courseStyles[idx] || courseStyles[1]
-                        const displayName = courseNames[idx] || course.course_name
+                        const displayName = course.course_name || courseNameFallback[course.course_level] || 'コース'
                         const levelKey = levelMap[course.course_level] || 'steady'
+                        const icon = courseIcons[course.course_level] || '📘'
                         return `
                         <button onclick="selectCourse(${idx}, '${levelKey}', ${course.id})"
                                 class="py-4 ${style.badge} text-white rounded-xl font-bold text-lg hover:opacity-90 shadow-lg transition">
-                            ${idx === 0 ? '🐢' : idx === 1 ? '🐕' : '🐆'} ${escapeHtml(displayName)}
+                            ${icon} ${escapeHtml(displayName)}
                         </button>`
                     }).join('')}
                 </div>
@@ -573,19 +654,18 @@ function selectCourse(idx, levelKey, courseId) {
     STATE.selectedCourseId = courseId
     STATE.selectedCourseLevel = levelKey
 
-    const icons = ['🐢', '🐕', '🐆']
-    const names = ['ゆっくりコース', 'しっかりコース', 'どんどんコース']
-    const descs = ['じっくり考えながら、ていねいに進めるよ', 'バランスよく、教科書のペースで学ぶよ', 'はやめに進んで、発展問題にもチャレンジするよ']
-    const details = [
-        '基本の学しゅうカードを1まいずつていねいに進めます。わからないところはヒントを使ってじっくり考えよう。',
-        '教科書のペースに合わせて、基本問題と練習問題をバランスよく学びます。',
-        'はやいペースで学しゅうカードを進めて、チェックテストの後はたくさんの発展問題にちょうせんできます。'
-    ]
+    const course = STATE.courses[idx]
+    const icons = { basic: '🐢', standard: '🐕', advanced: '🐆' }
+    const details = {
+        basic: '基本の学しゅうカードを1まいずつていねいに進めます。わからないところはヒントを使ってじっくり考えよう。',
+        standard: '教科書のペースに合わせて、基本問題と練習問題をバランスよく学びます。',
+        advanced: 'はやいペースで学しゅうカードを進めて、チェックテストの後はたくさんの発展問題にちょうせんできます。'
+    }
 
-    document.getElementById('modalCourseIcon').textContent = icons[idx] || '📘'
-    document.getElementById('modalCourseTitle').textContent = names[idx] || STATE.courses[idx]?.course_name || 'コース'
-    document.getElementById('modalCourseDesc').textContent = descs[idx] || ''
-    document.getElementById('modalCourseDetail').textContent = details[idx] || ''
+    document.getElementById('modalCourseIcon').textContent = icons[course?.course_level] || '📘'
+    document.getElementById('modalCourseTitle').textContent = course?.course_name || 'コース'
+    document.getElementById('modalCourseDesc').textContent = course?.description || course?.course_label || ''
+    document.getElementById('modalCourseDetail').textContent = details[course?.course_level] || ''
     document.getElementById('courseConfirmModal').classList.remove('hidden')
 }
 
