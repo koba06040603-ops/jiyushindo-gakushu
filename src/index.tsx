@@ -30432,29 +30432,46 @@ app.get('/api/student-learning/tebiki', async (c) => {
     // 4. 選択課題取得
     let optionalProblems: any[] = []
     try {
-      // optional_problems: problem_id, unit_id, problem_title, content
+      // optional_problems: problem_id, unit_id, problem_title, content, difficulty_level, problem_type
       const optRes = await env.DB.prepare(`
         SELECT problem_id, unit_id, problem_title, 
                content AS problem_content,
+               difficulty_level, problem_type,
                ROW_NUMBER() OVER (ORDER BY problem_id) AS problem_number
         FROM optional_problems WHERE unit_id = ?
       `).bind(curriculum.id).all()
       optionalProblems = optRes.results || []
     } catch {
       try {
-        // curriculum_id で再試行
+        // curriculum_id で再試行（別スキーマ対応）
         const optRes2 = await env.DB.prepare(`
-          SELECT * FROM optional_problems WHERE curriculum_id = ? ORDER BY problem_number
+          SELECT *, ROW_NUMBER() OVER (ORDER BY problem_id) AS problem_number 
+          FROM optional_problems WHERE curriculum_id = ?
         `).bind(curriculum.id).all()
         optionalProblems = optRes2.results || []
       } catch {}
     }
 
+    // 5. メタデータ取得（コース選択問題・共通チェックテスト）
+    let courseSelectionProblems: any[] = []
+    let commonCheckTest: any = null
+    try {
+      const metaRes = await env.DB.prepare(`
+        SELECT * FROM curriculum_metadata WHERE curriculum_id = ?
+      `).bind(curriculum.id).first()
+      if (metaRes) {
+        try { courseSelectionProblems = JSON.parse(metaRes.course_selection_problems as string || '[]') } catch {}
+        try { commonCheckTest = JSON.parse(metaRes.common_check_test as string || 'null') } catch {}
+      }
+    } catch { /* metadata テーブルがなくてもOK */ }
+
     return c.json({
       success: true,
       curriculum: { ...curriculum, curriculum_id: curriculum.id },
       courses: coursesWithCards,
-      optionalProblems
+      optionalProblems,
+      courseSelectionProblems,
+      commonCheckTest
     })
   } catch (error) {
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)

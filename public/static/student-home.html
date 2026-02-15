@@ -98,6 +98,9 @@
     <div class="mx-auto px-4 py-3" style="max-width:95vw">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-3">
+                <button onclick="goBackToGuide()" class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-1 rounded-full transition" title="学習のてびきに戻る">
+                    <i class="fas fa-arrow-left mr-1"></i>てびき
+                </button>
                 <i class="fas fa-book-open text-2xl text-blue-600"></i>
                 <div>
                     <h1 class="text-lg font-bold text-gray-800" id="headerTitle">学習のてびき</h1>
@@ -673,6 +676,12 @@ const STATE = {
 const params = new URLSearchParams(window.location.search)
 STATE.curriculumId = params.get('curriculum_id') || '99001' // デモ用デフォルト
 const planIdParam = params.get('plan_id')
+const preSelectedCourse = params.get('course') // student-guide.htmlから渡されるコース選択 (slow/steady/fast)
+
+// student-guide.htmlからコースが選択済みなら適用
+if (preSelectedCourse && ['slow', 'steady', 'fast'].includes(preSelectedCourse)) {
+    STATE.selectedCourse = preSelectedCourse
+}
 
 // student_id: URLパラメータ > localStorage > デフォルト
 {
@@ -708,6 +717,12 @@ function handleLogout() {
     localStorage.removeItem('user_role')
     localStorage.removeItem('user_name')
     window.location.href = '/login.html'
+}
+
+function goBackToGuide() {
+    // 学習のてびきページに戻る
+    const url = `/static/student-guide.html?student_id=${STATE.studentId}&curriculum_id=${STATE.curriculumId}`
+    window.location.href = url
 }
 
 // ========== てびき参照パネル（Aパターン: スライドオーバー） ==========
@@ -757,7 +772,7 @@ function showTebikiEmpty() {
 function renderTebikiPanel() {
     const d = STATE.tebikiData
     if (!d) return
-    const { curriculum, courses, optionalProblems } = d
+    const { curriculum, courses, optionalProblems, courseSelectionProblems, commonCheckTest } = d
 
     // 選択されたコースに合致するコースを優先表示
     const courseMap = { slow: 'basic', steady: 'standard', fast: 'advanced' }
@@ -769,11 +784,14 @@ function renderTebikiPanel() {
     })
 
     const courseLabels = { basic: '🐢 じっくり', standard: '🐕 しっかり', advanced: '🐆 ぐんぐん' }
-    const courseBorderColors = { basic: 'border-green-400', standard: 'border-blue-400', advanced: 'border-orange-400' }
-    const courseBgColors = { basic: 'bg-green-50', standard: 'bg-blue-50', advanced: 'bg-orange-50' }
+    const courseColors = {
+        basic:    { border: 'border-green-400', bg: 'bg-green-50',  light: 'border-green-200', text: 'text-green-600' },
+        standard: { border: 'border-blue-400',  bg: 'bg-blue-50',   light: 'border-blue-200',  text: 'text-blue-600' },
+        advanced: { border: 'border-orange-400', bg: 'bg-orange-50', light: 'border-orange-200', text: 'text-orange-600' }
+    }
 
     let html = `
-        <div class="mb-4">
+        <div class="mb-3">
             <h3 class="text-sm font-bold text-gray-700 mb-1">${curriculum.unit_name || ''}</h3>
             <p class="text-xs text-gray-500">${curriculum.grade || ''} ${curriculum.subject || ''}</p>
         </div>`
@@ -781,16 +799,41 @@ function renderTebikiPanel() {
     for (const course of sorted) {
         const isSelected = course.course_level === targetLevel
         const label = courseLabels[course.course_level] || course.course_name
-        const border = courseBorderColors[course.course_level] || 'border-gray-300'
-        const bg = courseBgColors[course.course_level] || 'bg-gray-50'
+        const c = courseColors[course.course_level] || courseColors.standard
         const cards = course.cards || []
+        const levelIdx = course.course_level === 'basic' ? 0 : course.course_level === 'standard' ? 1 : 2
+        const selProblem = (courseSelectionProblems || [])[levelIdx]
+        const introProblem = course.introduction_problem
 
         html += `
-        <div class="mb-4 border-2 ${isSelected ? border : 'border-gray-200'} rounded-xl overflow-hidden ${isSelected ? '' : 'opacity-60'}">
-            <div class="px-3 py-2 ${isSelected ? bg : 'bg-gray-50'} flex items-center justify-between">
+        <div class="mb-3 border-2 ${isSelected ? c.border : 'border-gray-200'} rounded-xl overflow-hidden ${isSelected ? '' : 'opacity-60'}">
+            <div class="px-3 py-2 ${isSelected ? c.bg : 'bg-gray-50'} flex items-center justify-between ${isSelected ? '' : 'cursor-pointer'}"
+                 ${isSelected ? '' : `onclick="this.nextElementSibling.classList.toggle('hidden')"`}>
                 <span class="text-sm font-bold">${label}</span>
                 ${isSelected ? '<span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full">あなたのコース</span>' : ''}
+                <span class="text-[10px] text-gray-500">${cards.length}枚</span>
             </div>
+            <div class="${isSelected ? '' : 'hidden'}">
+
+            ${selProblem ? `
+            <div class="px-3 py-2 border-t ${c.light}">
+                <div class="bg-white rounded-lg p-2 border ${c.light}">
+                    <p class="text-xs font-bold text-gray-800 mb-1">✨ ${escapeHtml(selProblem.problem_title || '')}</p>
+                    <p class="text-[10px] text-gray-700">${escapeHtml(selProblem.problem_content || selProblem.problem_description || '')}</p>
+                </div>
+            </div>` : ''}
+
+            ${introProblem ? `
+            <div class="px-3 py-2 border-t ${c.light}">
+                <div class="bg-white rounded-lg p-2 border ${c.light}">
+                    <div class="flex items-center mb-1">
+                        <i class="fas fa-star ${c.text} mr-1"></i>
+                        <p class="text-xs font-bold text-gray-800">${escapeHtml(introProblem.problem_title || '')}</p>
+                    </div>
+                    <p class="text-[10px] text-gray-800 whitespace-pre-wrap">${escapeHtml(introProblem.problem_content || '')}</p>
+                </div>
+            </div>` : ''}
+
             <div class="divide-y">`
 
         for (const card of cards) {
@@ -827,7 +870,25 @@ function renderTebikiPanel() {
             </div>`
         }
 
-        html += `</div></div>`
+        html += `</div></div></div>`
+    }
+
+    // チェックテスト
+    if (commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0) {
+        html += `
+        <div class="mb-3 border-2 border-yellow-400 rounded-xl overflow-hidden">
+            <div class="px-3 py-2 bg-yellow-50">
+                <span class="text-sm font-bold text-yellow-800"><i class="fas fa-check-circle mr-1"></i>チェックテスト</span>
+            </div>
+            <div class="px-3 py-2 space-y-1">
+                ${commonCheckTest.sample_problems.map(p => `
+                    <div class="flex items-start gap-2 text-[10px] border border-yellow-200 rounded p-1.5">
+                        <span class="w-5 h-5 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold flex-shrink-0">${p.problem_number}</span>
+                        <span class="text-gray-700">${escapeHtml(p.problem_text || '')}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>`
     }
 
     // 選択課題
@@ -843,9 +904,18 @@ function renderTebikiPanel() {
                         <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
                             <span class="chevron text-gray-400 text-xs"><i class="fas fa-chevron-right"></i></span>
                             <span class="text-xs font-semibold text-purple-700">${p.problem_title || '選択課題' + p.problem_number}</span>
+                            ${p.difficulty_level ? `<span class="text-[9px] px-1 py-0.5 rounded-full ${
+                                p.difficulty_level === 'hard' ? 'bg-orange-100 text-orange-700' :
+                                p.difficulty_level === 'very_hard' ? 'bg-red-100 text-red-700' :
+                                'bg-green-100 text-green-700'
+                            }">${p.difficulty_level === 'hard' ? '★★★' : p.difficulty_level === 'very_hard' ? '★★★★' : '★★'}</span>` : ''}
                         </div>
                         <div class="card-accordion">
-                            <div class="mt-2 card-preview rounded-lg p-2 text-xs text-gray-700 leading-relaxed">${escapeHtml(p.problem_content || '').replace(/\\n/g, '<br>')}</div>
+                            <div class="mt-2 card-preview rounded-lg p-2 text-xs text-gray-700 leading-relaxed">${escapeHtml(p.problem_content || p.problem_description || '').replace(/\\n/g, '<br>')}</div>
+                            ${p.learning_meaning ? `
+                                <div class="mt-1 bg-yellow-50 rounded p-1.5 text-[9px] text-gray-700">
+                                    <i class="fas fa-lightbulb text-yellow-600 mr-1"></i>${escapeHtml(p.learning_meaning)}
+                                </div>` : ''}
                         </div>
                     </div>
                 `).join('')}
@@ -995,6 +1065,8 @@ function showPhase0() {
     if (hint) hint.classList.toggle('hidden', !STATE.tebikiLoaded)
     // Phase0ではFABを非表示（インラインで見えるため）
     updateTebikiFab(false)
+    // コース選択の視覚的ハイライトを適用
+    selectCourse(STATE.selectedCourse)
 }
 
 // ========== スプリットビュー: タブ切替（モバイル） ==========
@@ -1024,160 +1096,265 @@ function renderTebikiInline() {
         return
     }
 
-    const { curriculum, courses, optionalProblems } = STATE.tebikiData
+    const { curriculum, courses, optionalProblems, courseSelectionProblems, commonCheckTest } = STATE.tebikiData
     const courseMap = { slow: 'basic', steady: 'standard', fast: 'advanced' }
     const targetLevel = courseMap[STATE.selectedCourse] || 'standard'
+
+    // コース配列: 選択コースを先頭に
     const sorted = [...(courses || [])].sort((a, b) => {
         if (a.course_level === targetLevel) return -1
         if (b.course_level === targetLevel) return 1
         return 0
     })
 
-    const courseLabels = { basic: '\ud83d\udc22 \u3058\u3063\u304f\u308a\u30b3\u30fc\u30b9', standard: '\ud83d\udc15 \u3057\u3063\u304b\u308a\u30b3\u30fc\u30b9', advanced: '\ud83d\udc06 \u3050\u3093\u3050\u3093\u30b3\u30fc\u30b9' }
-    const courseBorders = { basic: 'border-green-500', standard: 'border-blue-500', advanced: 'border-orange-500' }
-    const courseBgs = { basic: 'bg-green-50', standard: 'bg-blue-50', advanced: 'bg-orange-50' }
-    const courseGrads = { basic: 'from-green-50 to-white', standard: 'from-blue-50 to-white', advanced: 'from-orange-50 to-white' }
+    const courseLabels = { basic: '🐢 じっくりコース', standard: '🐕 しっかりコース', advanced: '🐆 ぐんぐんコース' }
+    const courseColors = {
+        basic:    { border: 'border-green-500',  bg: 'bg-green-50',  grad: 'from-green-50 to-white',  badge: 'bg-green-500', text: 'text-green-600', light: 'border-green-200' },
+        standard: { border: 'border-blue-500',   bg: 'bg-blue-50',   grad: 'from-blue-50 to-white',   badge: 'bg-blue-500',  text: 'text-blue-600',  light: 'border-blue-200' },
+        advanced: { border: 'border-orange-500',  bg: 'bg-orange-50', grad: 'from-orange-50 to-white', badge: 'bg-orange-500',text: 'text-orange-600',light: 'border-orange-200' }
+    }
 
     let html = ''
 
-    // ===== タイトル =====
+    // ===== タイトルセクション =====
     html += `
-        <div class="text-center mb-4 border-b-4 border-indigo-600 pb-4">
-            <h2 class="text-2xl font-bold text-indigo-700 mb-2">\u5b66\u7fd2\u306e\u3066\u3073\u304d</h2>
-            <p class="text-base font-bold text-gray-800">${escapeHtml(curriculum?.unit_name || STATE.unitConfig.unit_name)}</p>
+        <div class="text-center mb-5 border-b-4 border-indigo-600 pb-5">
+            <h2 class="text-2xl font-bold text-indigo-700 mb-2">学習のてびき</h2>
+            <p class="text-lg font-bold text-gray-800">${escapeHtml(curriculum?.unit_name || STATE.unitConfig.unit_name)}</p>
             <p class="text-xs text-gray-500 mt-1">${escapeHtml(curriculum?.grade || STATE.unitConfig.grade)} ${escapeHtml(curriculum?.subject || STATE.unitConfig.subject)}</p>
         </div>`
 
     // ===== 単元の目標 =====
     html += `
-        <div class="mb-4">
-            <div class="bg-blue-100 border-l-4 border-blue-600 p-3 rounded-r-lg">
+        <div class="mb-5">
+            <div class="bg-blue-100 border-l-4 border-blue-600 p-3 rounded-r-lg mb-2">
                 <h3 class="text-sm font-bold text-blue-800 mb-1 flex items-center">
-                    <i class="fas fa-bullseye mr-1"></i>\u305f\u3093\u3052\u3093\u306e\u3082\u304f\u3072\u3087\u3046
+                    <i class="fas fa-bullseye mr-1"></i>たんげんのもくひょう
                 </h3>
                 <p class="text-xs text-gray-800 leading-relaxed">${escapeHtml(STATE.unitConfig.unit_goal)}</p>
             </div>
-            <div class="grid grid-cols-2 gap-2 mt-2">
+            <div class="grid grid-cols-2 gap-2">
                 <div class="bg-green-100 border-l-4 border-green-600 p-2 rounded-r-lg">
-                    <h4 class="text-[10px] font-bold text-green-800"><i class="fas fa-heart mr-1"></i>\u3053\u3053\u308d\u306e\u305b\u3044\u3061\u3087\u3046</h4>
-                    <p class="text-[10px] text-gray-700">\u3042\u304d\u3089\u3081\u305a\u306b\u3001\u304f\u3075\u3046\u3057\u306a\u304c\u3089\u5b66\u3076\u529b\u3092\u306e\u3070\u305d\u3046\u3002</p>
+                    <h4 class="text-[10px] font-bold text-green-800"><i class="fas fa-heart mr-1"></i>こころのせいちょう</h4>
+                    <p class="text-[10px] text-gray-700">あきらめずに、くふうしながら学ぶ力をのばそう。</p>
                 </div>
                 <div class="bg-purple-100 border-l-4 border-purple-600 p-2 rounded-r-lg">
-                    <h4 class="text-[10px] font-bold text-purple-800"><i class="fas fa-clock mr-1"></i>\u3058\u3085\u304e\u3087\u3046\u3058\u304b\u3093</h4>
-                    <p class="text-base font-bold text-purple-700">\u305c\u3093\u3076\u3067 ${STATE.unitConfig.total_hours} \u3058\u304b\u3093</p>
+                    <h4 class="text-[10px] font-bold text-purple-800"><i class="fas fa-clock mr-1"></i>じゅぎょうじかん</h4>
+                    <p class="text-base font-bold text-purple-700">ぜんぶで ${STATE.unitConfig.total_hours} じかん</p>
                 </div>
             </div>
         </div>`
 
-    // ===== コース別学習カード =====
+    // ===== コースをえらぼう（教師版と同じ3列レイアウト） =====
     html += `
-        <div class="mb-4">
-            <h3 class="text-base font-bold text-center text-gray-800 mb-3 pb-2 border-b-2 border-gray-300">
+        <div class="mb-5">
+            <h3 class="text-base font-bold text-center text-gray-800 mb-2 pb-2 border-b-2 border-gray-300">
                 <i class="fas fa-route mr-1 text-indigo-600"></i>
-                \u30b3\u30fc\u30b9\u3079\u3064\u5b66\u3057\u3085\u3046\u30ab\u30fc\u30c9
-            </h3>`
+                コースをえらぼう！
+            </h3>
+            <p class="text-[10px] text-center text-gray-600 mb-3">
+                それぞれのコースの とくちょうが わかる もんだいを しょうかいするよ！
+            </p>
+            <div class="space-y-3">`
 
-    for (const course of sorted) {
+    // コース別カード（選択コースはフル展開、他は折りたたみ）
+    sorted.forEach((course, cIdx) => {
         const isSelected = course.course_level === targetLevel
+        const c = courseColors[course.course_level] || courseColors.standard
         const label = courseLabels[course.course_level] || course.course_name
-        const border = courseBorders[course.course_level] || 'border-gray-300'
-        const bg = courseBgs[course.course_level] || 'bg-gray-50'
-        const grad = courseGrads[course.course_level] || 'from-gray-50 to-white'
         const cards = course.cards || []
 
+        // コース選択問題（メタデータから）
+        const levelIdx = course.course_level === 'basic' ? 0 : course.course_level === 'standard' ? 1 : 2
+        const selProblem = (courseSelectionProblems || [])[levelIdx]
+        const introProblem = course.introduction_problem
+
         html += `
-        <div class="mb-3 border-3 ${isSelected ? border : 'border-gray-200'} rounded-xl overflow-hidden ${isSelected ? '' : 'opacity-50'}
-            bg-gradient-to-br ${isSelected ? grad : 'from-gray-50 to-white'}">
-            <div class="px-3 py-2 ${isSelected ? bg : 'bg-gray-100'} flex items-center justify-between">
-                <span class="text-sm font-bold">${label}</span>
-                ${isSelected ? '<span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full">\u3042\u306a\u305f\u306e\u30b3\u30fc\u30b9</span>' : ''}
-                <span class="text-[10px] text-gray-500">\u30ab\u30fc\u30c9${cards.length}\u679a</span>
-            </div>`
+        <div class="border-3 ${isSelected ? c.border : 'border-gray-200'} rounded-xl overflow-hidden
+            bg-gradient-to-br ${isSelected ? c.grad : 'from-gray-50 to-white'} ${isSelected ? '' : 'opacity-60'}">
 
-        if (cards.length > 0) {
-            html += `<div class="divide-y">`
-            for (const card of cards) {
-                const hasHints = card.hints && card.hints.length > 0
-                const hasAnswer = card.answer
-                html += `
-                <div class="px-3 py-2">
-                    <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
-                        <span class="chevron text-gray-400 text-xs"><i class="fas fa-chevron-right"></i></span>
-                        <span class="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">${card.card_number}</span>
-                        <span class="text-xs font-semibold text-gray-700 flex-1">${escapeHtml(card.card_title || card.content_summary || '\u30ab\u30fc\u30c9' + card.card_number)}</span>
-                        ${hasHints ? '<i class="fas fa-lightbulb text-yellow-400 text-xs"></i>' : ''}
+            <!-- コースヘッダ -->
+            <div class="px-4 py-3 ${isSelected ? c.bg : 'bg-gray-100'} ${isSelected ? '' : 'cursor-pointer'}"
+                 ${isSelected ? '' : `onclick="this.nextElementSibling.classList.toggle('hidden')"`}>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-bold">${label}</span>
+                        ${isSelected ? '<span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full animate-pulse">あなたのコース</span>' : ''}
                     </div>
-                    <div class="card-accordion">
-                        <div class="mt-2 space-y-2 pb-2 pl-8">
-                            ${card.card_content ? `
-                                <div class="bg-gray-50 rounded-lg p-2 border-l-4 border-indigo-400">
-                                    <p class="text-xs text-gray-800 leading-relaxed whitespace-pre-wrap">${escapeHtml(card.card_content).replace(/\\n/g, '<br>')}</p>
-                                </div>` : ''}
-                            ${hasHints ? `
-                                <div class="space-y-1">
-                                    <p class="text-[10px] font-bold text-yellow-700"><i class="fas fa-lightbulb mr-1"></i>\u30d2\u30f3\u30c8</p>
-                                    ${card.hints.map((h, idx) => `
-                                        <div class="hint-step pl-2 py-1 text-[10px] text-gray-600 bg-yellow-50 rounded">
-                                            <span class="font-bold text-yellow-600">\u30d2\u30f3\u30c8${idx + 1}:</span> ${escapeHtml(h.hint_content || h.hint_text || '')}
-                                        </div>
-                                    `).join('')}
-                                </div>` : ''}
-                            ${hasAnswer ? `
-                                <details>
-                                    <summary class="text-[10px] text-green-600 cursor-pointer font-bold"><i class="fas fa-check-circle mr-1"></i>\u3053\u305f\u3048\u3092\u898b\u308b</summary>
-                                    <div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-700">\ud83d\udca1 \u3053\u305f\u3048: ${escapeHtml(card.answer).replace(/\\n/g, '<br>')}</div>
-                                    ${card.answer_explanation ? `<div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-600"><strong>\u89e3\u8aac:</strong> ${escapeHtml(card.answer_explanation).replace(/\\n/g, '<br>')}</div>` : ''}
-                                </details>` : ''}
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] text-gray-500">カード${cards.length}枚</span>
+                        ${!isSelected ? '<i class="fas fa-chevron-down text-gray-400 text-xs"></i>' : ''}
+                    </div>
+                </div>
+                ${course.description ? `<p class="text-[10px] text-gray-600 mt-1">${escapeHtml(course.description)}</p>` : ''}
+            </div>
+
+            <!-- コース詳細（選択コースはデフォルト表示、他は非表示） -->
+            <div class="${isSelected ? '' : 'hidden'}">
+
+                <!-- コース選択問題 -->
+                ${selProblem ? `
+                <div class="px-3 py-2 border-t ${c.light}">
+                    <div class="bg-white rounded-lg p-2 border-2 ${c.light}">
+                        <p class="text-xs font-bold text-gray-800 mb-1">✨ ${escapeHtml(selProblem.problem_title || 'コースの問題')}</p>
+                        <p class="text-[10px] text-gray-700 leading-relaxed">${escapeHtml(selProblem.problem_content || selProblem.problem_description || '')}</p>
+                    </div>
+                </div>` : ''}
+
+                <!-- 導入問題 -->
+                ${introProblem ? `
+                <div class="px-3 py-2 border-t ${c.light}">
+                    <div class="bg-white rounded-lg p-2 border-2 ${c.light}">
+                        <div class="flex items-center mb-1">
+                            <i class="fas fa-star ${c.text} mr-1"></i>
+                            <p class="text-xs font-bold text-gray-800">${escapeHtml(introProblem.problem_title || 'どうにゅう問題')}</p>
                         </div>
+                        <div class="bg-gray-50 rounded p-2 border-l-4 ${c.border} mb-1">
+                            <p class="text-[10px] text-gray-800 leading-relaxed whitespace-pre-wrap">${escapeHtml(introProblem.problem_content || '')}</p>
+                        </div>
+                        ${introProblem.answer ? `
+                            <details>
+                                <summary class="text-[10px] text-yellow-600 cursor-pointer font-bold"><i class="fas fa-lightbulb mr-1"></i>こたえのヒント</summary>
+                                <div class="mt-1 bg-yellow-50 rounded p-2 text-[10px] text-gray-700">${escapeHtml(introProblem.answer)}</div>
+                            </details>` : ''}
                     </div>
-                </div>`
-            }
-            html += `</div>`
-        } else {
-            html += `<div class="px-3 py-2 text-center text-gray-400 text-xs">\u30ab\u30fc\u30c9\u304c\u307e\u3060\u3042\u308a\u307e\u305b\u3093</div>`
-        }
+                </div>` : ''}
 
-        html += `</div>`
-    }
-    html += `</div>`
+                <!-- 学習カード一覧 -->
+                ${cards.length > 0 ? `
+                <div class="divide-y border-t">
+                    ${cards.map(card => {
+                        const hasHints = card.hints && card.hints.length > 0
+                        const hasAnswer = card.answer
+                        return `
+                    <div class="px-3 py-2">
+                        <div class="accordion-toggle flex items-center gap-2" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+                            <span class="chevron text-gray-400 text-xs"><i class="fas fa-chevron-right"></i></span>
+                            <span class="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">${card.card_number}</span>
+                            <span class="text-xs font-semibold text-gray-700 flex-1">${escapeHtml(card.card_title || card.content_summary || 'カード' + card.card_number)}</span>
+                            ${hasHints ? '<i class="fas fa-lightbulb text-yellow-400 text-xs"></i>' : ''}
+                        </div>
+                        <div class="card-accordion">
+                            <div class="mt-2 space-y-2 pb-2 pl-8">
+                                ${card.card_content ? `
+                                    <div class="bg-gray-50 rounded-lg p-2 border-l-4 border-indigo-400">
+                                        <p class="text-xs text-gray-800 leading-relaxed whitespace-pre-wrap">${escapeHtml(card.card_content).replace(/\\n/g, '<br>')}</p>
+                                    </div>` : ''}
+                                ${hasHints ? `
+                                    <div class="space-y-1">
+                                        <p class="text-[10px] font-bold text-yellow-700"><i class="fas fa-lightbulb mr-1"></i>ヒント</p>
+                                        ${card.hints.map((h, idx) => `
+                                            <div class="hint-step pl-2 py-1 text-[10px] text-gray-600 bg-yellow-50 rounded">
+                                                <span class="font-bold text-yellow-600">ヒント${idx + 1}:</span> ${escapeHtml(h.hint_content || h.hint_text || '')}
+                                            </div>
+                                        `).join('')}
+                                    </div>` : ''}
+                                ${hasAnswer ? `
+                                    <details>
+                                        <summary class="text-[10px] text-green-600 cursor-pointer font-bold"><i class="fas fa-check-circle mr-1"></i>こたえを見る</summary>
+                                        <div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-700">💡 こたえ: ${escapeHtml(card.answer).replace(/\\n/g, '<br>')}</div>
+                                        ${card.answer_explanation ? `<div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-600"><strong>解説:</strong> ${escapeHtml(card.answer_explanation).replace(/\\n/g, '<br>')}</div>` : ''}
+                                    </details>` : ''}
+                            </div>
+                        </div>
+                    </div>`
+                    }).join('')}
+                </div>` : `<div class="px-3 py-2 text-center text-gray-400 text-xs border-t">カードがまだありません</div>`}
 
-    // ===== チェックテスト案内 =====
-    html += `
-        <div class="mb-4">
-            <h3 class="text-sm font-bold text-center text-gray-800 mb-2 pb-1 border-b-2 border-yellow-300">
-                <i class="fas fa-check-circle mr-1 text-yellow-600"></i>
-                \u30c1\u30a7\u30c3\u30af\u30c6\u30b9\u30c8
-            </h3>
-            <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-3">
-                <p class="text-[10px] text-center text-gray-700 font-medium">
-                    \u2b50 \u5b66\u3057\u3085\u3046\u30ab\u30fc\u30c9\u3092\u305c\u3093\u3076\u304a\u308f\u3089\u305b\u305f\u3089\u3001<br>
-                    \u30c1\u30a7\u30c3\u30af\u30c6\u30b9\u30c8\u306b\u3061\u3087\u3046\u305b\u3093\u3057\u3088\u3046\uff01<br>
-                    \u3054\u3046\u304b\u304f\u3059\u308b\u3068\u3001\u4e0b\u306e\u300c\u3048\u3089\u3079\u308b\u3082\u3093\u3060\u3044\u300d\u306b\u3059\u3059\u3081\u308b\u3088\uff01 \ud83c\udf89
-                </p>
             </div>
         </div>`
+    })
 
-    // ===== 選択課題（えらべるもんだい） =====
+    html += `</div></div>`
+
+    // ===== チェックテスト（教師版と同じ詳細表示） =====
+    html += `
+        <div class="mb-5">
+            <h3 class="text-base font-bold text-center text-gray-800 mb-3 pb-2 border-b-2 border-yellow-300">
+                <i class="fas fa-check-circle mr-1 text-yellow-600"></i>
+                チェックテスト
+            </h3>
+            <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-3">
+                <p class="text-[10px] text-center text-gray-700 font-medium mb-2">
+                    ⭐ どのコースも共通の きそきほん チェックテスト ⭐<br>
+                    学しゅうカードをぜんぶおわらせたら、チェックテストにちょうせんしよう！<br>
+                    ごうかくすると、下の「えらべるもんだい」にすすめるよ！ 🎉
+                </p>`
+
+    // チェックテスト問題プレビュー
+    if (commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0) {
+        html += `
+                <div class="bg-white rounded-xl p-3 mb-2">
+                    <h4 class="font-bold text-gray-800 text-center text-xs mb-2">
+                        📝 ${escapeHtml(commonCheckTest.test_description || 'チェックテスト')}
+                    </h4>
+                    ${commonCheckTest.test_note ? `<p class="text-[10px] text-gray-600 text-center mb-2">${escapeHtml(commonCheckTest.test_note)}</p>` : ''}
+                    <div class="space-y-2">
+                        ${commonCheckTest.sample_problems.map(problem => `
+                            <div class="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-white rounded-lg p-2">
+                                <div class="flex items-start gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 text-white flex items-center justify-center font-bold flex-shrink-0 text-[10px]">
+                                        ${problem.problem_number}
+                                    </div>
+                                    <div class="flex-1">
+                                        <p class="text-[10px] text-gray-800">${escapeHtml(problem.problem_text || '')}</p>
+                                        ${problem.answer ? `
+                                            <details class="mt-1">
+                                                <summary class="text-[10px] text-yellow-600 cursor-pointer font-bold"><i class="fas fa-eye mr-1"></i>答えを表示</summary>
+                                                <div class="mt-1 bg-yellow-100 rounded px-2 py-1 text-[10px] text-gray-600">💡 こたえ: ${escapeHtml(problem.answer)}</div>
+                                            </details>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`
+    }
+
+    html += `</div></div>`
+
+    // ===== 選択課題（えらべるもんだい）- 教師版と同じリッチ表示 =====
     if (optionalProblems && optionalProblems.length > 0) {
         html += `
         <div class="mb-3">
-            <h3 class="text-sm font-bold text-center text-gray-800 mb-2 pb-1 border-b-2 border-pink-300">
+            <h3 class="text-base font-bold text-center text-gray-800 mb-2 pb-2 border-b-2 border-pink-300">
                 <i class="fas fa-star mr-1 text-pink-600"></i>
-                \u3048\u3089\u3079\u308b\u3082\u3093\u3060\u3044
+                えらべるもんだい
             </h3>
-            <p class="text-[10px] text-center text-gray-600 mb-2">
-                \u30c1\u30a7\u30c3\u30af\u30c6\u30b9\u30c8\u3054\u3046\u304b\u304f\u5f8c\u3001\u3084\u308a\u305f\u3044\u3082\u3093\u3060\u3044\u3092\u3048\u3089\u307c\u3046\uff01
+            <p class="text-[10px] text-center text-gray-600 mb-3">
+                <i class="fas fa-heart mr-1 text-pink-500"></i>
+                チェックテストごうかく後、やりたいもんだいをえらぼう！<br>
+                どんな ちからが つくのか、かくにんして ちょうせんしよう！
             </p>
             <div class="grid grid-cols-2 gap-2">
                 ${optionalProblems.map((p, idx) => `
-                    <div class="border-2 border-pink-200 bg-gradient-to-br from-white to-pink-50 rounded-xl p-2.5 hover:shadow transition">
+                    <div class="border-2 border-pink-200 bg-gradient-to-br from-white to-pink-50 rounded-xl p-2.5 hover:shadow-md transition">
                         <div class="flex items-start mb-1">
-                            <div class="w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center text-[10px] font-bold mr-2 flex-shrink-0">
+                            <div class="w-7 h-7 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center text-[10px] font-bold mr-2 flex-shrink-0">
                                 ${p.problem_number || idx + 1}
                             </div>
-                            <h4 class="text-xs font-bold text-gray-800 flex-1">${escapeHtml(p.problem_title || '\u9078\u629e\u8ab2\u984c' + (idx + 1))}</h4>
+                            <h4 class="text-xs font-bold text-gray-800 flex-1">${escapeHtml(p.problem_title || '選択課題' + (idx + 1))}</h4>
                         </div>
-                        <p class="text-[10px] text-gray-600 leading-relaxed">${escapeHtml(p.problem_content || '').substring(0, 80)}${(p.problem_content || '').length > 80 ? '...' : ''}</p>
+                        <p class="text-[10px] text-gray-700 mb-1 leading-relaxed">${escapeHtml(p.problem_description || p.problem_content || '').substring(0, 100)}${(p.problem_description || p.problem_content || '').length > 100 ? '...' : ''}</p>
+                        ${p.learning_meaning ? `
+                            <div class="bg-yellow-100 border-l-3 border-yellow-500 rounded-r p-1.5 mb-1">
+                                <p class="text-[9px] font-semibold text-gray-800 mb-0.5">
+                                    <i class="fas fa-lightbulb mr-1 text-yellow-600"></i>この もんだいで なにが できるようになる？
+                                </p>
+                                <p class="text-[9px] text-gray-700">${escapeHtml(p.learning_meaning)}</p>
+                            </div>` : ''}
+                        ${p.difficulty_level ? `
+                            <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                p.difficulty_level === 'medium' ? 'bg-blue-100 text-blue-700' :
+                                p.difficulty_level === 'hard' ? 'bg-orange-100 text-orange-700' :
+                                p.difficulty_level === 'very_hard' ? 'bg-red-100 text-red-700' :
+                                'bg-green-100 text-green-700'
+                            }">
+                                ${p.difficulty_level === 'medium' ? '★★ ふつう' :
+                                  p.difficulty_level === 'hard' ? '★★★ むずかしい' :
+                                  p.difficulty_level === 'very_hard' ? '★★★★ とてもむずかしい' :
+                                  '★ かんたん'}
+                            </span>` : ''}
                     </div>
                 `).join('')}
             </div>
