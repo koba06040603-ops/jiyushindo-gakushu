@@ -494,6 +494,19 @@
         feeling: 'good'
     };
 
+    // URLからstudent_id取得
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('student_id')) {
+        state.studentId = parseInt(urlParams.get('student_id')) || 1;
+        document.getElementById('studentId').textContent = state.studentId;
+    } else {
+        // LocalStorageからも試行
+        try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.id) { state.studentId = user.id; document.getElementById('studentId').textContent = user.id; }
+        } catch {}
+    }
+
     // ===== 初期化 =====
     async function init() {
         await loadFilters();

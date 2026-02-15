@@ -1194,7 +1194,7 @@ app.get('/api/class/:classId/heatmap', async (c) => {
       unitParams.push(subject);
     }
     
-    unitQuery += ' ORDER BY c.unit_order LIMIT 5';
+    unitQuery += ' ORDER BY c.id LIMIT 5';
     
     const units = await env.DB.prepare(unitQuery).bind(...unitParams).all();
 
@@ -1339,7 +1339,7 @@ app.get('/api/class/:classId/distribution', async (c) => {
       JOIN answer_history ah ON c.id = ah.curriculum_id
       WHERE ah.student_id IN (${studentIds.map(() => '?').join(',')})
       GROUP BY c.id, c.unit_name
-      ORDER BY c.unit_order
+      ORDER BY c.id
       LIMIT 5
     `).bind(...studentIds).all();
 
@@ -2471,7 +2471,7 @@ app.get('/api/curriculum', authMiddleware, async (c) => {
         let query = `
           SELECT 
             id, school_id, grade, subject, textbook_company, unit_name, 
-            unit_order, total_hours, unit_goal, non_cognitive_goal
+            total_hours, unit_goal, non_cognitive_goal
           FROM curriculum
         `
         
@@ -2480,7 +2480,7 @@ app.get('/api/curriculum', authMiddleware, async (c) => {
           query += ` WHERE school_id = ${user.school_id}`
         }
         
-        query += ` ORDER BY grade, unit_order`
+        query += ` ORDER BY grade, id`
         
         const result = await env.DB.prepare(query).all()
         
@@ -2904,7 +2904,7 @@ app.get('/api/curriculum/:id/metadata', async (c) => {
   
   try {
     const metadata = await env.DB.prepare(`
-      SELECT metadata_key, metadata_value 
+      SELECT meta_key, meta_value 
       FROM curriculum_metadata 
       WHERE curriculum_id = ?
     `).bind(id).all()
@@ -2912,9 +2912,9 @@ app.get('/api/curriculum/:id/metadata', async (c) => {
     const result: any = {}
     for (const row of metadata.results || []) {
       try {
-        result[row.metadata_key] = JSON.parse(row.metadata_value)
+        result[row.meta_key] = JSON.parse(row.meta_value)
       } catch {
-        result[row.metadata_key] = row.metadata_value
+        result[row.meta_key] = row.meta_value
       }
     }
     
@@ -2937,7 +2937,7 @@ app.put('/api/curriculum/:id/metadata', async (c) => {
     // course_selection_problemsの更新
     if (body.course_selection_problems) {
       await env.DB.prepare(`
-        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
         VALUES (?, 'course_selection_problems', ?)
       `).bind(id, JSON.stringify(body.course_selection_problems)).run()
     }
@@ -2945,7 +2945,7 @@ app.put('/api/curriculum/:id/metadata', async (c) => {
     // check_testsの更新
     if (body.check_tests) {
       await env.DB.prepare(`
-        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
         VALUES (?, 'check_tests', ?)
       `).bind(id, JSON.stringify(body.check_tests)).run()
     }
@@ -8658,189 +8658,191 @@ app.post('/api/curriculum/save-generated', async (c) => {
   const { curriculum, courses, optionalProblems, courseSelectionProblems, commonCheckTest } = await c.req.json()
   
   try {
+    // ============================================================
     // カリキュラムを保存
+    // 実スキーマ: id, grade, subject, textbook_company, unit_name,
+    //             created_at, total_hours, unit_goal, non_cognitive_goal
+    // ============================================================
     const curriculumResult = await env.DB.prepare(`
       INSERT INTO curriculum (
         grade, subject, textbook_company, unit_name, 
-        unit_order, total_hours, unit_goal, non_cognitive_goal
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        total_hours, unit_goal, non_cognitive_goal
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
       curriculum.grade,
       curriculum.subject,
-      curriculum.textbook_company,
+      curriculum.textbook_company || '',
       curriculum.unit_name,
-      99, // 生成された単元は最後に追加
-      curriculum.total_hours,
-      curriculum.unit_goal,
-      curriculum.non_cognitive_goal
+      curriculum.total_hours || 8,
+      curriculum.unit_goal || '',
+      curriculum.non_cognitive_goal || ''
     ).run()
     
     const curriculumId = curriculumResult.meta.last_row_id
     
+    // ============================================================
     // コースを保存
+    // 実スキーマ: id, curriculum_id, course_name, course_level,
+    //             description, introduction_problem, created_at
+    // ============================================================
     for (const course of courses) {
-      // course_levelを決定（course_nameから推測）
       let courseLevel = 'standard'
-      if (course.course_name?.includes('ゆっくり') || course.course_name?.includes('じっくり')) {
+      if (course.course_name?.includes('ゆっくり') || course.course_name?.includes('じっくり') || course.course_level === 'basic') {
         courseLevel = 'basic'
-      } else if (course.course_name?.includes('どんどん') || course.course_name?.includes('ぐんぐん')) {
+      } else if (course.course_name?.includes('どんどん') || course.course_name?.includes('ぐんぐん') || course.course_level === 'advanced') {
         courseLevel = 'advanced'
       }
       
+      const courseName = course.course_name || course.name || course.course_label || 
+        (courseLevel === 'basic' ? 'じっくりコース' : courseLevel === 'advanced' ? 'ぐんぐんコース' : 'しっかりコース')
+      
       const courseResult = await env.DB.prepare(`
         INSERT INTO courses (
-          curriculum_id, course_level, course_display_name, 
-          selection_question_title, selection_question_content,
-          course_name, description, color_code, course_label
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          curriculum_id, course_name, course_level, description, introduction_problem
+        ) VALUES (?, ?, ?, ?, ?)
       `).bind(
         curriculumId,
+        courseName,
         courseLevel,
-        course.course_name || course.course_label || course.name || 'コース',
-        course.course_name || course.name || 'コース選択問題',
         course.description || '',
-        course.course_name || course.name || 'コース',
-        course.description || '',
-        course.color_code || 'blue',
-        course.course_label || course.label || ''
+        course.introduction_problem || ''
       ).run()
       
       const courseId = courseResult.meta.last_row_id
       
-      // 外部キー制約を一時的に無効化
-      await env.DB.prepare('PRAGMA foreign_keys = OFF').run()
-      
+      // ============================================================
       // 学習カードを保存
-      for (const card of course.cards || []) {
-        // card_type の値を検証（許可された値のみ）
+      // 実スキーマ: card_id, subject, grade_level, unit_name, card_title,
+      //   card_type(standard/challenge/review/optional),
+      //   difficulty_level(easy/standard/hard),
+      //   learning_track(jikkuri/shikkari/gungun),
+      //   problem_text, problem_description, correct_answer, explanation,
+      //   hint_text, solution_video_url, image_url,
+      //   card_order, estimated_time_minutes, curriculum_code,
+      //   is_active, created_at, updated_at, course_id
+      // ============================================================
+      const trackMap: Record<string,string> = { basic: 'jikkuri', standard: 'shikkari', advanced: 'gungun' }
+      const learningTrack = trackMap[courseLevel] || 'shikkari'
+      
+      // grade文字列から数字を抽出（"小学5年" → 5）
+      const gradeNum = parseInt(String(curriculum.grade).replace(/[^0-9]/g, '')) || 5
+      
+      for (let ci = 0; ci < (course.cards || []).length; ci++) {
+        const card = course.cards[ci]
         const cardType = validateCardType(card.card_type)
+        
+        // difficulty_level の検証
+        let diffLevel = card.difficulty_level || 'standard'
+        if (!['easy', 'standard', 'hard'].includes(diffLevel)) diffLevel = 'standard'
         
         const cardResult = await env.DB.prepare(`
           INSERT INTO learning_cards (
-            course_id, card_number, card_title, card_type,
-            problem_content, problem_description, new_terms, example_problem,
-            example_solution, real_world_connection, textbook_page
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            subject, grade_level, unit_name, card_title, card_type,
+            difficulty_level, learning_track,
+            problem_text, problem_description, correct_answer, explanation,
+            hint_text, solution_video_url, image_url,
+            card_order, estimated_time_minutes, curriculum_code,
+            is_active, course_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         `).bind(
-          courseId,
-          card.card_number || 1,
-          card.card_title || card.title || 'カード',
+          curriculum.subject,
+          gradeNum,
+          curriculum.unit_name,
+          card.card_title || card.title || `カード${ci + 1}`,
           cardType,
-          card.problem_description || card.problem_content || card.content || '',
-          card.problem_description || card.problem_content || card.content || '',
-          card.new_terms || '',
-          card.example_problem || '',
-          card.example_solution || '',
-          card.real_world_connection || card.real_world_context || '',
-          card.textbook_page || ''
+          diffLevel,
+          learningTrack,
+          card.problem_text || card.problem_content || card.problem_description || card.content || '',
+          card.problem_description || card.problem_content || '',
+          card.correct_answer || card.answer || '',
+          card.explanation || card.answer_explanation || '',
+          card.hint_text || '',
+          card.solution_video_url || card.video_url || '',
+          card.image_url || '',
+          card.card_order ?? card.card_number ?? (ci + 1),
+          card.estimated_time_minutes || card.time_minutes || 10,
+          card.curriculum_code || '',
+          courseId
         ).run()
         
         const cardId = cardResult.meta.last_row_id
         
-        // 解答を保存（answersテーブル）- 必ず保存
-        const answerContent = card.answer || card.problem_description || card.problem_content || '解答を生成中です'
-        const answerExplanation = card.answer_explanation || card.explanation || card.real_world_connection || '解説を生成中です'
-        
-        await env.DB.prepare(`
-          INSERT INTO answers (
-            learning_card_id, answer_content, explanation
-          ) VALUES (?, ?, ?)
-        `).bind(
-          cardId,
-          answerContent,
-          answerExplanation
-        ).run()
-        
-        // ヒントカードを保存（デフォルト値を設定）
+        // ============================================================
+        // ヒントカードを保存
+        // 実スキーマ: hint_id, card_id, hint_level, hint_text, created_at
+        // ============================================================
         const hints = card.hints || []
         
-        // ヒントが空の場合はデフォルトで3つ生成
         if (hints.length === 0) {
           hints.push(
-            { hint_level: 1, hint_text: 'まず、問題で何を求められているか確認しましょう。', thinking_tool_suggestion: '' },
-            { hint_level: 2, hint_text: '図や表に書いて整理してみましょう。', thinking_tool_suggestion: '' },
-            { hint_level: 3, hint_text: '似ている問題を思い出してみましょう。', thinking_tool_suggestion: '' }
+            { hint_level: 1, hint_text: 'まず、問題で何を求められているか確認しましょう。' },
+            { hint_level: 2, hint_text: '図や表に書いて整理してみましょう。' },
+            { hint_level: 3, hint_text: '似ている問題を思い出してみましょう。' }
           )
-          console.log(`⚠️ カード${card.card_number}のヒントが空のため、デフォルト値を設定しました`)
+          console.log(`⚠️ カード${ci + 1}のヒントが空のため、デフォルト値を設定しました`)
         }
         
         for (const hint of hints) {
           await env.DB.prepare(`
-            INSERT INTO hint_cards (
-              learning_card_id, hint_number, hint_content, thinking_tool_suggestion
-            ) VALUES (?, ?, ?, ?)
+            INSERT INTO hint_cards (card_id, hint_level, hint_text) VALUES (?, ?, ?)
           `).bind(
             cardId,
             hint.hint_level || hint.hint_number || 1,
-            hint.hint_text || hint.hint_content || '',
-            hint.thinking_tool_suggestion || ''
+            hint.hint_text || hint.hint_content || ''
           ).run()
         }
       }
-      
-      // 外部キー制約を再度有効化
-      await env.DB.prepare('PRAGMA foreign_keys = ON').run()
     }
     
+    // ============================================================
     // 選択問題を保存
+    // 実スキーマ: problem_id, unit_id, problem_title, problem_type,
+    //             difficulty_level, content, created_at
+    // ============================================================
     for (const problem of optionalProblems || []) {
       await env.DB.prepare(`
         INSERT INTO optional_problems (
-          curriculum_id, problem_number, problem_title, problem_description, problem_content,
-          difficulty_level, learning_meaning
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          unit_id, problem_title, problem_type, difficulty_level, content
+        ) VALUES (?, ?, ?, ?, ?)
       `).bind(
         curriculumId,
-        problem.problem_number || 1,
         problem.problem_title || problem.title || '選択問題',
-        problem.problem_description || problem.description || '',
-        problem.problem_content || problem.problem_description || problem.content || '問題内容',
-        problem.difficulty_level || 'medium',
-        problem.learning_meaning || ''
+        problem.problem_type || 'optional',
+        problem.difficulty_level || 'standard',
+        problem.content || problem.problem_content || problem.problem_description || ''
       ).run()
     }
     
-    // コース選択問題を保存（カリキュラムメタデータとして）
+    // ============================================================
+    // メタデータを保存（コース選択問題・共通チェックテスト）
+    // 実スキーマ: metadata_id, curriculum_id, meta_key, meta_value, created_at
+    // ============================================================
     if (courseSelectionProblems && courseSelectionProblems.length > 0) {
-      const courseSelectionJSON = JSON.stringify(courseSelectionProblems)
       await env.DB.prepare(`
-        INSERT OR REPLACE INTO curriculum_metadata (
-          curriculum_id, metadata_key, metadata_value
-        ) VALUES (?, ?, ?)
-      `).bind(
-        curriculumId,
-        'course_selection_problems',
-        courseSelectionJSON
-      ).run()
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+      `).bind(curriculumId, 'course_selection_problems', JSON.stringify(courseSelectionProblems)).run()
     }
     
-    // 共通チェックテストを保存（カリキュラムメタデータとして）
     if (commonCheckTest && commonCheckTest.sample_problems && commonCheckTest.sample_problems.length > 0) {
-      const checkTestJSON = JSON.stringify(commonCheckTest)
       await env.DB.prepare(`
-        INSERT OR REPLACE INTO curriculum_metadata (
-          curriculum_id, metadata_key, metadata_value
-        ) VALUES (?, ?, ?)
-      `).bind(
-        curriculumId,
-        'common_check_test',
-        checkTestJSON
-      ).run()
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+      `).bind(curriculumId, 'common_check_test', JSON.stringify(commonCheckTest)).run()
     }
     
+    const totalCards = courses.reduce((sum: number, co: any) => sum + (co.cards?.length || 0), 0)
     console.log('✅ 単元保存完了:', {
       curriculum_id: curriculumId,
       courses: courses.length,
-      total_cards: courses.reduce((sum, c) => sum + (c.cards?.length || 0), 0),
-      optional_problems: optionalProblems?.length || 0,
-      course_selection_problems: courseSelectionProblems?.length || 0,
-      common_check_test: commonCheckTest ? '有' : '無'
+      total_cards: totalCards,
+      optional_problems: optionalProblems?.length || 0
     })
     
     return c.json({
       success: true,
       curriculum_id: curriculumId,
       saved_data: {
+        courses_count: courses.length,
+        total_cards: totalCards,
         optional_problems_count: optionalProblems?.length || 0,
         course_selection_count: courseSelectionProblems?.length || 0,
         common_check_test: !!commonCheckTest
@@ -8981,7 +8983,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
       console.log(`コース選択問題を保存: ${problems.course_selection_problems.length}件`)
       const courseSelectionJSON = JSON.stringify(problems.course_selection_problems)
       await env.DB.prepare(`
-        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
         VALUES (?, ?, ?)
       `).bind(curriculumId, 'course_selection_problems', courseSelectionJSON).run()
     } else {
@@ -10314,7 +10316,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
       
       const checkTestJSON = JSON.stringify(checkTestWithMeta)
       await env.DB.prepare(`
-        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
         VALUES (?, ?, ?)
       `).bind(curriculumId, 'common_check_test', checkTestJSON).run()
     } else {
@@ -10325,19 +10327,17 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
       console.log(`選択問題を保存: ${problems.optional_problems.length}件`)
       for (const problem of problems.optional_problems) {
         console.log(`  - 問題${problem.problem_number}: ${problem.problem_title}`)
+        // 実スキーマ: problem_id, unit_id, problem_title, problem_type, difficulty_level, content
         await env.DB.prepare(`
           INSERT INTO optional_problems (
-            curriculum_id, problem_number, problem_title, problem_content, problem_description,
-            difficulty_level, learning_meaning
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            unit_id, problem_title, problem_type, difficulty_level, content
+          ) VALUES (?, ?, ?, ?, ?)
         `).bind(
           curriculumId,
-          problem.problem_number,
           problem.problem_title || '問題',
-          problem.problem_content || problem.problem_description || '問題内容',
-          problem.problem_description || problem.problem_content || '問題の説明',
-          problem.difficulty_level || 'medium',
-          problem.learning_meaning || ''
+          problem.problem_type || 'optional',
+          problem.difficulty_level || 'standard',
+          problem.problem_content || problem.problem_description || problem.content || ''
         ).run()
       }
     } else {
@@ -10778,7 +10778,7 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
     if (additionalProblems.course_selection_problems) {
       const courseSelectionJSON = JSON.stringify(additionalProblems.course_selection_problems)
       await env.DB.prepare(`
-        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
         VALUES (?, ?, ?)
       `).bind(curriculumId, 'course_selection_problems', courseSelectionJSON).run()
     }
@@ -10800,7 +10800,7 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
     if (additionalProblems.common_check_test) {
       const checkTestJSON = JSON.stringify(additionalProblems.common_check_test)
       await env.DB.prepare(`
-        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
         VALUES (?, ?, ?)
       `).bind(curriculumId, 'common_check_test', checkTestJSON).run()
     }
@@ -11073,14 +11073,13 @@ app.post('/api/curriculum/:id/duplicate', async (c) => {
     const newCurriculum = await env.DB.prepare(`
       INSERT INTO curriculum (
         grade, subject, textbook_company, unit_name, 
-        unit_order, total_hours, unit_goal, non_cognitive_goal
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        total_hours, unit_goal, non_cognitive_goal
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(
       newGrade || sourceCurriculum.grade,
       newSubject || sourceCurriculum.subject,
       newTextbook || sourceCurriculum.textbook_company,
       newUnitName || `${sourceCurriculum.unit_name}（コピー）`,
-      sourceCurriculum.unit_order,
       sourceCurriculum.total_hours,
       sourceCurriculum.unit_goal,
       sourceCurriculum.non_cognitive_goal
@@ -11145,12 +11144,12 @@ app.post('/api/curriculum/:id/duplicate', async (c) => {
     
     for (const meta of metadata.results) {
       await env.DB.prepare(`
-        INSERT INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
         VALUES (?, ?, ?)
       `).bind(
         newCurriculumId,
-        (meta as any).metadata_key,
-        (meta as any).metadata_value
+        (meta as any).meta_key,
+        (meta as any).meta_value
       ).run()
     }
     
@@ -11437,15 +11436,15 @@ app.put('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) => {
   try {
     // 既存のチェックテストを取得
     const metaRow: any = await env.DB.prepare(`
-      SELECT metadata_value FROM curriculum_metadata
-      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
+      SELECT meta_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
     `).bind(curriculumId).first()
     
     if (!metaRow) {
       return c.json({ error: 'チェックテストが見つかりません' }, 404)
     }
     
-    const checkTest = JSON.parse(metaRow.metadata_value)
+    const checkTest = JSON.parse(metaRow.meta_value)
     
     // 指定された問題を更新
     const problemIndex = checkTest.sample_problems.findIndex((p: any) => p.problem_number === problemNumber)
@@ -11462,8 +11461,8 @@ app.put('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) => {
     // データベースに保存
     await env.DB.prepare(`
       UPDATE curriculum_metadata
-      SET metadata_value = ?
-      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
+      SET meta_value = ?
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
     `).bind(JSON.stringify(checkTest), curriculumId).run()
     
     return c.json({
@@ -11496,11 +11495,11 @@ app.put('/api/curriculum/:id/check-test', async (c) => {
     
     // 既存のチェックテストを取得または新規作成
     const metaRow: any = await env.DB.prepare(`
-      SELECT metadata_value FROM curriculum_metadata
-      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
+      SELECT meta_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
     `).bind(curriculumId).first()
     
-    const checkTest = metaRow ? JSON.parse(metaRow.metadata_value) : {
+    const checkTest = metaRow ? JSON.parse(metaRow.meta_value) : {
       test_title: '基礎基本チェックテスト',
       test_description: '',
       test_note: '',
@@ -11516,12 +11515,12 @@ app.put('/api/curriculum/:id/check-test', async (c) => {
     if (metaRow) {
       await env.DB.prepare(`
         UPDATE curriculum_metadata
-        SET metadata_value = ?
-        WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
+        SET meta_value = ?
+        WHERE curriculum_id = ? AND meta_key = 'common_check_test'
       `).bind(JSON.stringify(checkTest), curriculumId).run()
     } else {
       await env.DB.prepare(`
-        INSERT INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
         VALUES (?, 'common_check_test', ?)
       `).bind(curriculumId, JSON.stringify(checkTest)).run()
     }
@@ -11551,15 +11550,15 @@ app.delete('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) =>
   try {
     // 既存のチェックテストを取得
     const metaRow: any = await env.DB.prepare(`
-      SELECT metadata_value FROM curriculum_metadata
-      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
+      SELECT meta_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
     `).bind(curriculumId).first()
     
     if (!metaRow) {
       return c.json({ error: 'チェックテストが見つかりません' }, 404)
     }
     
-    const checkTest = JSON.parse(metaRow.metadata_value)
+    const checkTest = JSON.parse(metaRow.meta_value)
     
     // 指定された問題を削除
     checkTest.sample_problems = checkTest.sample_problems.filter((p: any) => p.problem_number !== problemNumber)
@@ -11572,8 +11571,8 @@ app.delete('/api/curriculum/:id/check-test/problem/:problemNumber', async (c) =>
     // データベースに保存
     await env.DB.prepare(`
       UPDATE curriculum_metadata
-      SET metadata_value = ?
-      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
+      SET meta_value = ?
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
     `).bind(JSON.stringify(checkTest), curriculumId).run()
     
     return c.json({
@@ -11599,13 +11598,13 @@ app.post('/api/curriculum/:id/check-test/problem', async (c) => {
   try {
     // 既存のチェックテストを取得
     const metaRow: any = await env.DB.prepare(`
-      SELECT metadata_value FROM curriculum_metadata
-      WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
+      SELECT meta_value FROM curriculum_metadata
+      WHERE curriculum_id = ? AND meta_key = 'common_check_test'
     `).bind(curriculumId).first()
     
     let checkTest
     if (metaRow) {
-      checkTest = JSON.parse(metaRow.metadata_value)
+      checkTest = JSON.parse(metaRow.meta_value)
     } else {
       checkTest = {
         test_title: '基礎基本チェックテスト',
@@ -11628,12 +11627,12 @@ app.post('/api/curriculum/:id/check-test/problem', async (c) => {
     if (metaRow) {
       await env.DB.prepare(`
         UPDATE curriculum_metadata
-        SET metadata_value = ?
-        WHERE curriculum_id = ? AND metadata_key = 'common_check_test'
+        SET meta_value = ?
+        WHERE curriculum_id = ? AND meta_key = 'common_check_test'
       `).bind(JSON.stringify(checkTest), curriculumId).run()
     } else {
       await env.DB.prepare(`
-        INSERT INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
         VALUES (?, 'common_check_test', ?)
       `).bind(curriculumId, JSON.stringify(checkTest)).run()
     }
@@ -11877,7 +11876,7 @@ app.post('/api/curriculum/:id/regenerate-check-test', async (c) => {
     
     // データベースに保存
     await env.DB.prepare(`
-      INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, metadata_key, metadata_value)
+      INSERT OR REPLACE INTO curriculum_metadata (curriculum_id, meta_key, meta_value)
       VALUES (?, 'common_check_test', ?)
     `).bind(
       curriculumId,
@@ -22356,22 +22355,21 @@ app.get('/api/export/curriculum', authMiddleware, requireRole('teacher', 'admin'
         subject,
         textbook_company,
         unit_name,
-        unit_order,
         total_hours,
         created_at
       FROM curriculum
       WHERE school_id = ?
-      ORDER BY grade, unit_order
+      ORDER BY grade, id
     `
     
     const result = await env.DB.prepare(query).bind(user.school_id).all()
     const curriculums = result.results || []
     
     // CSV生成
-    let csv = 'ID,学年,教科,教科書会社,単元名,単元順序,総時数,作成日時\n'
+    let csv = 'ID,学年,教科,教科書会社,単元名,総時数,作成日時\n'
     
     for (const curr of curriculums) {
-      csv += `${curr.id},${curr.grade},${curr.subject},${curr.textbook_company || ''},${curr.unit_name},${curr.unit_order},${curr.total_hours},${curr.created_at}\n`
+      csv += `${curr.id},${curr.grade},${curr.subject},${curr.textbook_company || ''},${curr.unit_name},${curr.total_hours},${curr.created_at}\n`
     }
     
     return new Response(csv, {
@@ -27446,9 +27444,43 @@ ${targetScore ? `
     
     console.log('✅ テスト対策プラン生成完了')
     
+    // ============================================================
+    // 教師が生成したプランをDBに保存（児童がtest-preparation.htmlから参照可能に）
+    // ============================================================
+    let savedPlanId: number | null = null
+    try {
+      const subjectName = subjectDetails.map(d => d.subject).join(', ')
+      const gradeName = subjectDetails[0]?.grade || ''
+      const curriculumIds = JSON.stringify(subjectDetails.map(d => d.curriculumId))
+      const topicsList = subjectDetails.map(d => `${d.subject}: ${d.unitName}`)
+      
+      const planResult = await env.DB.prepare(`
+        INSERT INTO test_preparation_plans (
+          student_id, title, test_date, grade, subject, 
+          curriculum_ids, all_topics, ai_schedule, daily_minutes, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+      `).bind(
+        parseInt(studentId),
+        `テスト対策（${subjectName}）`,
+        testDate,
+        gradeName,
+        subjectName,
+        curriculumIds,
+        JSON.stringify(topicsList),
+        JSON.stringify(testPlan),
+        testPlan.time_management?.daily_average ? parseInt(String(testPlan.time_management.daily_average)) : 30
+      ).run()
+      
+      savedPlanId = planResult.meta.last_row_id as number
+      console.log(`📦 テスト対策プランをDB保存: plan_id=${savedPlanId}`)
+    } catch (dbErr) {
+      console.warn('⚠️ テスト対策プランのDB保存に失敗（表示は継続）:', dbErr)
+    }
+    
     return c.json({
       success: true,
       student_id: studentId,
+      plan_id: savedPlanId,
       test_date: testDate,
       days_until_test: daysUntilTest,
       target_score: targetScore,
@@ -28094,7 +28126,339 @@ app.get('/api/test-preparation/weakness-analysis/:studentId', async (c) => {
 })
 
 // ============================================================
-// Task4: 自己調整学習支援API
+// 教師ダッシュボード：テスト対策プラン結果フィードバック
+// ============================================================
+app.get('/api/teacher/test-prep-dashboard', async (c) => {
+  const { env } = c
+  try {
+    // 全児童のテスト対策プランと進捗を取得
+    const plans = await env.DB.prepare(`
+      SELECT p.*, s.student_name as student_name,
+        (SELECT COUNT(*) FROM test_study_logs l WHERE l.plan_id = p.id) as log_count,
+        (SELECT COUNT(*) FROM test_performance_feedback f WHERE f.plan_id = p.id) as feedback_count
+      FROM test_preparation_plans p
+      LEFT JOIN students s ON p.student_id = s.student_id
+      ORDER BY p.created_at DESC LIMIT 50
+    `).all()
+
+    // 各プランの詳細進捗
+    const planDetails = []
+    for (const plan of (plans.results || []) as any[]) {
+      // 学習ログサマリ
+      let logSummary: any = { total_minutes: 0, topics_studied: 0 }
+      try {
+        const logs = await env.DB.prepare(`
+          SELECT topic, SUM(study_minutes) as minutes, AVG(confidence_after) as avg_confidence
+          FROM test_study_logs WHERE plan_id = ? GROUP BY topic
+        `).bind(plan.id).all()
+        logSummary = {
+          total_minutes: plan.total_study_minutes || 0,
+          topics_studied: (logs.results || []).length,
+          topic_details: (logs.results || []).map((l: any) => ({
+            topic: l.topic,
+            minutes: l.minutes,
+            avg_confidence: Math.round((l.avg_confidence || 0) * 10) / 10
+          }))
+        }
+      } catch {}
+
+      // フィードバック（振り返り結果）
+      let feedbacks: any[] = []
+      try {
+        const fbRes = await env.DB.prepare(`
+          SELECT * FROM test_performance_feedback WHERE plan_id = ? ORDER BY created_at DESC
+        `).bind(plan.id).all()
+        feedbacks = (fbRes.results || []) as any[]
+      } catch {}
+
+      planDetails.push({
+        ...plan,
+        progress: logSummary,
+        feedbacks,
+        completion_rate: plan.status === 'completed' ? 100 :
+          (logSummary.total_minutes > 0 ? Math.min(90, Math.round(logSummary.total_minutes / (plan.daily_minutes || 30) * 10)) : 0)
+      })
+    }
+
+    return c.json({ success: true, plans: planDetails })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// ============================================================
+// AI個別最適化コース生成（教師が児童データを見て生成→チェック→配信）
+// ============================================================
+app.post('/api/teacher/generate-personalized-course', async (c) => {
+  const { env } = c
+  try {
+    const { student_id, curriculum_id } = await c.req.json()
+    const apiKey = env.GEMINI_API_KEY
+
+    if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+      return c.json({ success: false, error: 'Gemini APIキーが設定されていません' }, 500)
+    }
+
+    // 1. カリキュラム情報を取得
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculum_id).first() as any
+    if (!curriculum) return c.json({ success: false, error: 'カリキュラムが見つかりません' }, 404)
+
+    // 2. 既存3コースのカード情報を取得（ベースライン）
+    const baseCourses = await env.DB.prepare(`
+      SELECT c.*, 
+        (SELECT COUNT(*) FROM learning_cards lc WHERE lc.course_id = c.id) as card_count
+      FROM courses c WHERE c.curriculum_id = ? ORDER BY c.course_level
+    `).bind(curriculum_id).all()
+
+    let baseCards: any[] = []
+    for (const course of (baseCourses.results || []) as any[]) {
+      const cards = await env.DB.prepare(`
+        SELECT * FROM learning_cards WHERE course_id = ? ORDER BY card_order
+      `).bind(course.id).all()
+      baseCards = baseCards.concat((cards.results || []).map((card: any) => ({
+        ...card, course_name: course.course_name, course_level: course.course_level
+      })))
+    }
+
+    // 3. 児童の学習データを収集
+    const answerHistory = await env.DB.prepare(`
+      SELECT a.card_id, a.is_correct, a.time_spent_seconds, lc.card_title, lc.difficulty_level
+      FROM answers a
+      JOIN learning_cards lc ON a.card_id = lc.card_id
+      WHERE a.student_id = ? AND lc.unit_name = ?
+      ORDER BY a.answered_at DESC LIMIT 100
+    `).bind(student_id, curriculum.unit_name).all()
+
+    const reflections = await env.DB.prepare(`
+      SELECT * FROM unit_reflections WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
+    `).bind(student_id).all()
+
+    const studyPlanRows = await env.DB.prepare(`
+      SELECT spr.* FROM study_plan_rows spr
+      JOIN unit_study_plans usp ON spr.plan_id = usp.id
+      WHERE usp.student_id = ? AND usp.unit_name = ?
+      ORDER BY spr.hour_number
+    `).bind(student_id, curriculum.unit_name).all()
+
+    // 4. 学習特性を分析
+    const answers = (answerHistory.results || []) as any[]
+    const correctRate = answers.length > 0 ? Math.round(answers.filter(a => a.is_correct).length / answers.length * 100) : 0
+    const avgTime = answers.length > 0 ? Math.round(answers.reduce((s: number, a: any) => s + (a.time_spent_seconds || 0), 0) / answers.length) : 0
+    const hardCorrectRate = answers.filter(a => a.difficulty_level === 'hard').length > 0
+      ? Math.round(answers.filter(a => a.difficulty_level === 'hard' && a.is_correct).length / answers.filter(a => a.difficulty_level === 'hard').length * 100) : -1
+    const easyCorrectRate = answers.filter(a => a.difficulty_level === 'easy').length > 0
+      ? Math.round(answers.filter(a => a.difficulty_level === 'easy' && a.is_correct).length / answers.filter(a => a.difficulty_level === 'easy').length * 100) : -1
+
+    const refl = (reflections.results || []) as any[]
+    const planRows = (studyPlanRows.results || []) as any[]
+
+    // 5. AI生成プロンプト
+    const prompt = `
+あなたは児童の学習データを分析し、個別最適化された学習カードを生成する教育AIです。
+
+【カリキュラム情報】
+- 教科: ${curriculum.subject}
+- 単元: ${curriculum.unit_name}
+- 学年: ${curriculum.grade}
+- 単元目標: ${curriculum.unit_goal || '未設定'}
+
+【既存コースの学習カード（ベース）】
+${baseCards.slice(0, 10).map((card: any) => `- [${card.course_name}] ${card.card_title}: ${(card.problem_text || '').substring(0, 80)}`).join('\n')}
+
+【児童ID ${student_id} の学習データ分析】
+- 解答履歴: ${answers.length}問（正答率${correctRate}%、平均回答時間${avgTime}秒）
+- 易しい問題の正答率: ${easyCorrectRate >= 0 ? easyCorrectRate + '%' : 'データなし'}
+- 難しい問題の正答率: ${hardCorrectRate >= 0 ? hardCorrectRate + '%' : 'データなし'}
+- 振り返り記録: ${refl.length}件
+- 学習計画の進捗: ${planRows.filter((r: any) => r.status === 'completed').length}/${planRows.length}時間完了
+${refl.length > 0 ? `- 直近の振り返り: ${(refl[0] as any).keep_text || ''} / ${(refl[0] as any).try_text || ''}` : ''}
+
+【タスク】
+この児童の特性に合わせて個別最適化された学習カードを生成してください。
+
+重要な観点:
+1. 正答率が低い場合 → 具体操作・図解・動画を多めに配置、スモールステップ化
+2. 正答率が高い場合 → 発展的な応用問題、思考を深める問いを追加
+3. 回答時間が長い場合 → 手順を明確に示す、見本解答を段階的に見せる
+4. 学習計画の進捗が遅い場合 → 短時間で取り組める問題、達成感を得やすい構成
+
+【出力形式】JSON
+{
+  "analysis_summary": "この児童の学習特性の分析結果（3文）",
+  "recommended_approach": "おすすめの学習アプローチ（2文）",
+  "cards": [
+    {
+      "card_title": "カードタイトル",
+      "card_type": "standard",
+      "difficulty_level": "easy|standard|hard",
+      "problem_text": "問題文（具体的な操作指示や図解の指示を含む）",
+      "problem_description": "問題の補足説明",
+      "correct_answer": "正解",
+      "explanation": "解説（つまずきやすいポイントを含む）",
+      "hint_text": "ヒント",
+      "estimated_time_minutes": 10,
+      "personalization_note": "この児童向けにカスタマイズした理由",
+      "media_suggestions": {
+        "needs_video": true/false,
+        "video_description": "必要な動画の説明（例: 小数のかけ算の筆算手順のアニメーション）",
+        "needs_diagram": true/false,
+        "diagram_description": "必要な図解の説明（例: 数直線で小数の位置を確認する図）",
+        "needs_manipulatives": true/false,
+        "manipulatives_description": "必要な具体物操作の説明"
+      }
+    }
+  ],
+  "hints_for_teacher": [
+    "教師へのアドバイス1（この児童への声かけのコツなど）",
+    "教師へのアドバイス2"
+  ]
+}
+
+※ カードは4〜8枚生成してください
+※ 各カードの problem_text は児童が直接読む文章です（小学生にわかりやすく）
+※ media_suggestions は教師がチェック時に動画や図を追加する判断材料です
+`
+
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 5000, responseMimeType: 'application/json' }
+        })
+      }
+    )
+
+    if (!geminiResponse.ok) throw new Error(`Gemini APIエラー: ${geminiResponse.status}`)
+
+    const geminiData = await geminiResponse.json() as any
+    const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const personalizedPlan = extractJSON(geminiText)
+
+    // 6. 教師チェック用としてレスポンス（まだDBに保存しない → 教師が確認・修正後に保存APIを呼ぶ）
+    return c.json({
+      success: true,
+      student_id,
+      curriculum_id,
+      curriculum_info: { subject: curriculum.subject, unit_name: curriculum.unit_name, grade: curriculum.grade },
+      student_analysis: {
+        total_answers: answers.length,
+        correct_rate: correctRate,
+        avg_time_seconds: avgTime,
+        easy_correct_rate: easyCorrectRate,
+        hard_correct_rate: hardCorrectRate,
+        reflections_count: refl.length,
+        plan_progress: `${planRows.filter((r: any) => r.status === 'completed').length}/${planRows.length}`
+      },
+      personalized_plan: personalizedPlan,
+      status: 'draft'  // draft = 教師チェック待ち
+    })
+
+  } catch (error) {
+    console.error('個別最適化コース生成エラー:', error)
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// ============================================================
+// 教師チェック後に個別最適化コースを確定・配信
+// ============================================================
+app.post('/api/teacher/publish-personalized-course', async (c) => {
+  const { env } = c
+  try {
+    const { student_id, curriculum_id, cards, analysis_summary, recommended_approach, hints_for_teacher } = await c.req.json()
+
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculum_id).first() as any
+    if (!curriculum) return c.json({ success: false, error: 'カリキュラムが見つかりません' }, 404)
+
+    const gradeNum = parseInt(String(curriculum.grade).replace(/[^0-9]/g, '')) || 5
+
+    // 個別最適化コースをcoursesテーブルに作成
+    const courseResult = await env.DB.prepare(`
+      INSERT INTO courses (curriculum_id, course_name, course_level, description) VALUES (?, ?, 'personalized', ?)
+    `).bind(
+      curriculum_id,
+      `${curriculum.unit_name} 個別コース（ID:${student_id}）`,
+      analysis_summary || '個別最適化された学習コース'
+    ).run()
+
+    const courseId = courseResult.meta.last_row_id
+
+    // カードをlearning_cardsに保存
+    const savedCardIds: number[] = []
+    for (let i = 0; i < (cards || []).length; i++) {
+      const card = cards[i]
+      let diffLevel = card.difficulty_level || 'standard'
+      if (!['easy', 'standard', 'hard'].includes(diffLevel)) diffLevel = 'standard'
+      let cardType = card.card_type || 'standard'
+      if (!['standard', 'challenge', 'review', 'optional'].includes(cardType)) cardType = 'standard'
+
+      const cardResult = await env.DB.prepare(`
+        INSERT INTO learning_cards (
+          subject, grade_level, unit_name, card_title, card_type,
+          difficulty_level, learning_track,
+          problem_text, problem_description, correct_answer, explanation,
+          hint_text, solution_video_url, image_url,
+          card_order, estimated_time_minutes, is_active, course_id
+        ) VALUES (?, ?, ?, ?, ?, ?, 'personalized', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      `).bind(
+        curriculum.subject, gradeNum, curriculum.unit_name,
+        card.card_title || `カード${i + 1}`, cardType, diffLevel,
+        card.problem_text || '', card.problem_description || '',
+        card.correct_answer || '', card.explanation || '',
+        card.hint_text || '',
+        card.solution_video_url || '', card.image_url || '',
+        i + 1, card.estimated_time_minutes || 10, courseId
+      ).run()
+
+      const cardId = cardResult.meta.last_row_id as number
+      savedCardIds.push(cardId)
+
+      // ヒント自動生成
+      const hints = card.hints || [
+        { hint_level: 1, hint_text: 'まず問題をよく読もう。' },
+        { hint_level: 2, hint_text: '図や絵に書いてみよう。' },
+        { hint_level: 3, hint_text: 'わかるところから始めよう。' }
+      ]
+      for (const hint of hints) {
+        await env.DB.prepare(`INSERT INTO hint_cards (card_id, hint_level, hint_text) VALUES (?, ?, ?)`)
+          .bind(cardId, hint.hint_level || 1, hint.hint_text || '').run()
+      }
+    }
+
+    // メタデータに個別最適化情報を保存
+    await env.DB.prepare(`
+      INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+    `).bind(
+      curriculum_id,
+      `personalized_course_student_${student_id}`,
+      JSON.stringify({
+        course_id: courseId,
+        student_id, analysis_summary, recommended_approach, hints_for_teacher,
+        card_ids: savedCardIds,
+        published_at: new Date().toISOString()
+      })
+    ).run()
+
+    console.log(`✅ 個別最適化コース配信完了: student=${student_id}, course_id=${courseId}, cards=${savedCardIds.length}`)
+
+    return c.json({
+      success: true,
+      course_id: courseId,
+      card_count: savedCardIds.length,
+      card_ids: savedCardIds,
+      message: `${cards.length}枚の個別最適化カードを配信しました`
+    })
+
+  } catch (error) {
+    console.error('個別最適化コース配信エラー:', error)
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// ============================================================
 // ============================================================
 
 // 学習セッション中のセルフモニタリング記録
@@ -30474,17 +30838,73 @@ app.get('/api/student-learning/tebiki', async (c) => {
     }
 
     // 5. メタデータ取得（コース選択問題・共通チェックテスト）
+    // 実スキーマ: metadata_id, curriculum_id, meta_key, meta_value, created_at
     let courseSelectionProblems: any[] = []
     let commonCheckTest: any = null
     try {
-      const metaRes = await env.DB.prepare(`
-        SELECT * FROM curriculum_metadata WHERE curriculum_id = ?
-      `).bind(curriculum.id).first()
-      if (metaRes) {
-        try { courseSelectionProblems = JSON.parse(metaRes.course_selection_problems as string || '[]') } catch {}
-        try { commonCheckTest = JSON.parse(metaRes.common_check_test as string || 'null') } catch {}
+      const metaRows = await env.DB.prepare(`
+        SELECT meta_key, meta_value FROM curriculum_metadata WHERE curriculum_id = ?
+      `).bind(curriculum.id).all()
+      for (const row of (metaRows.results || []) as any[]) {
+        try {
+          if (row.meta_key === 'course_selection_problems') courseSelectionProblems = JSON.parse(row.meta_value || '[]')
+          if (row.meta_key === 'common_check_test') commonCheckTest = JSON.parse(row.meta_value || 'null')
+        } catch {}
       }
     } catch { /* metadata テーブルがなくてもOK */ }
+
+    // 6. 個別最適化コース取得（student_idが指定された場合）
+    const studentId = c.req.query('student_id')
+    let personalizedCourse: any = null
+    if (studentId) {
+      try {
+        // メタデータから個別最適化コース情報を探す
+        const personalizedMeta = await env.DB.prepare(`
+          SELECT meta_value FROM curriculum_metadata 
+          WHERE curriculum_id = ? AND meta_key = ?
+        `).bind(curriculum.id, `personalized_course_student_${studentId}`).first() as any
+
+        if (personalizedMeta) {
+          const metaInfo = JSON.parse(personalizedMeta.meta_value)
+          // コースとカードを取得
+          const pCourse = await env.DB.prepare(`SELECT * FROM courses WHERE id = ?`).bind(metaInfo.course_id).first() as any
+          if (pCourse) {
+            const pCards = await env.DB.prepare(`
+              SELECT * FROM learning_cards WHERE course_id = ? ORDER BY card_order
+            `).bind(pCourse.id).all()
+
+            const pCardsWithHints = await Promise.all(((pCards.results || []) as any[]).map(async (card: any) => {
+              const cardId = card.card_id || card.id
+              let hints: any[] = []
+              try {
+                const hintsRes = await env.DB.prepare(`
+                  SELECT hint_id, card_id, hint_level AS hint_number, hint_text AS hint_content
+                  FROM hint_cards WHERE card_id = ? ORDER BY hint_level
+                `).bind(cardId).all()
+                hints = hintsRes.results || []
+              } catch {}
+              return {
+                ...card,
+                card_number: card.card_order || card.card_id,
+                card_content: card.problem_text || card.problem_description || '',
+                hints,
+                answer: card.correct_answer || card.explanation || '',
+                answer_explanation: card.explanation || ''
+              }
+            }))
+
+            personalizedCourse = {
+              ...pCourse,
+              cards: pCardsWithHints,
+              analysis_summary: metaInfo.analysis_summary,
+              recommended_approach: metaInfo.recommended_approach,
+              hints_for_teacher: metaInfo.hints_for_teacher,
+              published_at: metaInfo.published_at
+            }
+          }
+        }
+      } catch { /* 個別最適化コースがなくてもOK */ }
+    }
 
     return c.json({
       success: true,
@@ -30496,6 +30916,7 @@ app.get('/api/student-learning/tebiki', async (c) => {
         non_cognitive_goal: curriculum.non_cognitive_goal || ''
       },
       courses: coursesWithCards,
+      personalizedCourse,
       optionalProblems,
       courseSelectionProblems,
       commonCheckTest

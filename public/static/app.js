@@ -3230,6 +3230,12 @@ async function loadGuidePage(curriculumId) {
               <button onclick="showTestPrepModal()" class="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-graduation-cap mr-2"></i>テスト対策プラン
               </button>
+              <button onclick="showTestPrepDashboard()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-chart-line mr-2"></i>テスト対策進捗
+              </button>
+              <button onclick="showPersonalizedCourseSelector(${curriculumId})" class="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-magic mr-2"></i>個別最適化コース
+              </button>
               <button onclick="showLearningDashboard(${curriculumId})" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chart-line mr-2"></i>学習統計
               </button>
@@ -39750,6 +39756,372 @@ window.displayTestPrepPlan = displayTestPrepPlan
 window.updateSelectionSummary = updateSelectionSummary
 
 console.log('✅ Phase 10 家庭学習・テスト対策モード初期化完了')
+
+// ============================================================
+// Phase 10.5: 個別最適化コース生成＆テスト対策フィードバック
+// ============================================================
+
+// 個別最適化コースを生成（教師が児童を選んで実行）
+async function generatePersonalizedCourse(studentId, curriculumId) {
+  console.log('🎯 個別最適化コース生成開始:', { studentId, curriculumId })
+  
+  try {
+    showLoading('学習データを分析して個別コースを生成中...')
+    
+    const response = await axios.post('/api/teacher/generate-personalized-course', {
+      student_id: studentId,
+      curriculum_id: curriculumId
+    })
+    
+    hideLoading()
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error || '生成に失敗しました')
+    }
+    
+    // 教師チェック画面を表示
+    showPersonalizedCourseReview(response.data)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 個別最適化コース生成エラー:', error)
+    alert('個別最適化コースの生成に失敗しました。\n' + (error.response?.data?.error || error.message))
+  }
+}
+
+// 教師チェック画面
+function showPersonalizedCourseReview(data) {
+  const { student_id, curriculum_id, curriculum_info, student_analysis, personalized_plan } = data
+  const cards = personalized_plan.cards || []
+  
+  const modalHTML = `
+    <div id="personalizedModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='personalizedModal')document.getElementById('personalizedModal').remove()">
+      <div class="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+        
+        <div class="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-xl font-bold"><i class="fas fa-magic mr-2"></i>個別最適化コース確認</h2>
+              <p class="text-sm opacity-90 mt-1">${curriculum_info.subject} ${curriculum_info.unit_name} - 児童ID:${student_id}</p>
+            </div>
+            <button onclick="document.getElementById('personalizedModal').remove()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-6 space-y-4">
+          
+          <!-- 児童分析 -->
+          <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+            <h3 class="font-bold text-blue-800 mb-2"><i class="fas fa-chart-bar mr-2"></i>学習データ分析</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+              <div class="bg-white rounded-lg p-2 text-center">
+                <div class="text-2xl font-bold text-blue-600">${student_analysis.correct_rate}%</div>
+                <div class="text-xs text-gray-500">正答率</div>
+              </div>
+              <div class="bg-white rounded-lg p-2 text-center">
+                <div class="text-2xl font-bold text-green-600">${student_analysis.total_answers}</div>
+                <div class="text-xs text-gray-500">解答数</div>
+              </div>
+              <div class="bg-white rounded-lg p-2 text-center">
+                <div class="text-2xl font-bold text-orange-600">${student_analysis.avg_time_seconds}秒</div>
+                <div class="text-xs text-gray-500">平均回答時間</div>
+              </div>
+              <div class="bg-white rounded-lg p-2 text-center">
+                <div class="text-2xl font-bold text-purple-600">${student_analysis.plan_progress}</div>
+                <div class="text-xs text-gray-500">計画進捗</div>
+              </div>
+            </div>
+            <p class="text-sm text-gray-700">${personalized_plan.analysis_summary || ''}</p>
+          </div>
+          
+          <!-- AIアドバイス -->
+          ${personalized_plan.hints_for_teacher ? `
+          <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+            <h3 class="font-bold text-yellow-800 mb-2"><i class="fas fa-lightbulb mr-2"></i>教師へのアドバイス</h3>
+            <ul class="text-sm text-gray-700 space-y-1">
+              ${(personalized_plan.hints_for_teacher || []).map(h => `<li>• ${h}</li>`).join('')}
+            </ul>
+          </div>` : ''}
+          
+          <!-- カード一覧（編集可能） -->
+          <div class="bg-pink-50 border-l-4 border-pink-400 p-4 rounded">
+            <h3 class="font-bold text-pink-800 mb-3"><i class="fas fa-layer-group mr-2"></i>個別最適化カード（${cards.length}枚）</h3>
+            <p class="text-xs text-gray-600 mb-3">各カードの内容を確認・修正してから配信してください。動画や図の追加も可能です。</p>
+            
+            <div class="space-y-3" id="personalizedCards">
+              ${cards.map((card, i) => `
+                <div class="bg-white rounded-lg p-4 border border-pink-200 shadow-sm">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="font-bold text-pink-700">カード${i+1}: ${card.card_title || ''}</span>
+                    <span class="text-xs px-2 py-1 rounded-full ${
+                      card.difficulty_level === 'easy' ? 'bg-green-100 text-green-700' :
+                      card.difficulty_level === 'hard' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                    }">${card.difficulty_level || 'standard'}</span>
+                  </div>
+                  
+                  <div class="space-y-2">
+                    <div>
+                      <label class="text-xs font-bold text-gray-600">問題文:</label>
+                      <textarea class="w-full text-sm border rounded p-2 mt-1" rows="2" data-field="problem_text" data-index="${i}">${card.problem_text || ''}</textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="text-xs font-bold text-gray-600">正解:</label>
+                        <input class="w-full text-sm border rounded p-2 mt-1" data-field="correct_answer" data-index="${i}" value="${card.correct_answer || ''}">
+                      </div>
+                      <div>
+                        <label class="text-xs font-bold text-gray-600">推定時間(分):</label>
+                        <input type="number" class="w-full text-sm border rounded p-2 mt-1" data-field="estimated_time_minutes" data-index="${i}" value="${card.estimated_time_minutes || 10}">
+                      </div>
+                    </div>
+                    <div>
+                      <label class="text-xs font-bold text-gray-600">解説:</label>
+                      <textarea class="w-full text-sm border rounded p-2 mt-1" rows="2" data-field="explanation" data-index="${i}">${card.explanation || ''}</textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="text-xs font-bold text-gray-600">動画URL:</label>
+                        <input class="w-full text-sm border rounded p-2 mt-1" data-field="solution_video_url" data-index="${i}" value="${card.solution_video_url || ''}" placeholder="https://...">
+                      </div>
+                      <div>
+                        <label class="text-xs font-bold text-gray-600">図・画像URL:</label>
+                        <input class="w-full text-sm border rounded p-2 mt-1" data-field="image_url" data-index="${i}" value="${card.image_url || ''}" placeholder="https://...">
+                      </div>
+                    </div>
+                    
+                    ${card.media_suggestions ? `
+                    <div class="bg-yellow-50 rounded-lg p-2 text-xs text-gray-600">
+                      <strong class="text-yellow-700">📋 AI提案:</strong>
+                      ${card.media_suggestions.needs_video ? `<span class="block">🎬 ${card.media_suggestions.video_description || '動画推奨'}</span>` : ''}
+                      ${card.media_suggestions.needs_diagram ? `<span class="block">📐 ${card.media_suggestions.diagram_description || '図解推奨'}</span>` : ''}
+                      ${card.media_suggestions.needs_manipulatives ? `<span class="block">🧩 ${card.media_suggestions.manipulatives_description || '具体操作推奨'}</span>` : ''}
+                    </div>` : ''}
+                    
+                    ${card.personalization_note ? `
+                    <div class="bg-pink-50 rounded-lg p-2 text-xs text-pink-700">
+                      <i class="fas fa-info-circle mr-1"></i>${card.personalization_note}
+                    </div>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+        
+        <!-- フッター -->
+        <div class="border-t border-gray-200 p-4 bg-gray-50">
+          <div class="flex justify-between items-center">
+            <button onclick="document.getElementById('personalizedModal').remove()" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-bold text-gray-700">
+              <i class="fas fa-times mr-2"></i>キャンセル
+            </button>
+            <button onclick="publishPersonalizedCourse(${student_id}, ${curriculum_id})" class="px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg font-bold transition shadow-lg">
+              <i class="fas fa-paper-plane mr-2"></i>確認して配信する
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  
+  document.body.insertAdjacentHTML('beforeend', modalHTML)
+  // カードデータを一時保存
+  window._personalizedCards = cards
+  window._personalizedPlan = personalized_plan
+}
+
+// 個別最適化コースを配信（教師チェック後）
+async function publishPersonalizedCourse(studentId, curriculumId) {
+  try {
+    // 編集後のカードデータを収集
+    const cards = [...window._personalizedCards]
+    document.querySelectorAll('#personalizedCards textarea, #personalizedCards input').forEach(el => {
+      const idx = parseInt(el.dataset.index)
+      const field = el.dataset.field
+      if (idx >= 0 && field && cards[idx]) {
+        cards[idx][field] = el.value
+      }
+    })
+    
+    showLoading('個別最適化コースを配信中...')
+    
+    const response = await axios.post('/api/teacher/publish-personalized-course', {
+      student_id: studentId,
+      curriculum_id: curriculumId,
+      cards,
+      analysis_summary: window._personalizedPlan.analysis_summary,
+      recommended_approach: window._personalizedPlan.recommended_approach,
+      hints_for_teacher: window._personalizedPlan.hints_for_teacher
+    })
+    
+    hideLoading()
+    
+    if (response.data.success) {
+      document.getElementById('personalizedModal')?.remove()
+      alert(`✅ ${response.data.card_count}枚の個別最適化カードを配信しました！\n児童の「学習のてびき」に表示されます。`)
+    } else {
+      throw new Error(response.data.error)
+    }
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 配信エラー:', error)
+    alert('配信に失敗しました: ' + (error.response?.data?.error || error.message))
+  }
+}
+
+// テスト対策プラン結果ダッシュボード
+async function showTestPrepDashboard() {
+  console.log('📊 テスト対策ダッシュボード表示')
+  
+  try {
+    showLoading('テスト対策データを読み込み中...')
+    const response = await axios.get('/api/teacher/test-prep-dashboard')
+    hideLoading()
+    
+    if (!response.data.success) throw new Error(response.data.error)
+    
+    const plans = response.data.plans || []
+    
+    const dashHTML = `
+      <div id="testPrepDashModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='testPrepDashModal')document.getElementById('testPrepDashModal').remove()">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">
+          <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-xl font-bold"><i class="fas fa-chart-line mr-2"></i>テスト対策プラン 進捗ダッシュボード</h2>
+                <p class="text-sm opacity-90 mt-1">${plans.length}件のプランを管理中</p>
+              </div>
+              <button onclick="document.getElementById('testPrepDashModal').remove()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2">
+                <i class="fas fa-times text-xl"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="flex-1 overflow-y-auto p-6">
+            ${plans.length === 0 ? `
+              <div class="text-center py-12 text-gray-500">
+                <i class="fas fa-inbox text-4xl mb-4"></i>
+                <p>まだテスト対策プランがありません</p>
+              </div>
+            ` : plans.map(plan => `
+              <div class="bg-white border rounded-lg p-4 mb-4 shadow-sm hover:shadow-md transition">
+                <div class="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 class="font-bold text-gray-800">${plan.student_name || '児童ID:' + plan.student_id} - ${plan.title || 'テスト対策'}</h3>
+                    <p class="text-sm text-gray-500">${plan.grade} ${plan.subject} • テスト日: ${plan.test_date || '未定'}</p>
+                  </div>
+                  <span class="px-3 py-1 rounded-full text-xs font-bold ${
+                    plan.status === 'completed' ? 'bg-green-100 text-green-700' :
+                    plan.completion_rate > 50 ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                  }">${plan.status === 'completed' ? '完了' : '進行中 ' + plan.completion_rate + '%'}</span>
+                </div>
+                
+                <!-- 進捗バー -->
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-3">
+                  <div class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full transition-all" style="width: ${plan.completion_rate}%"></div>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-3 text-center">
+                  <div class="bg-blue-50 rounded-lg p-2">
+                    <div class="text-lg font-bold text-blue-600">${plan.progress?.total_minutes || 0}分</div>
+                    <div class="text-xs text-gray-500">学習時間</div>
+                  </div>
+                  <div class="bg-green-50 rounded-lg p-2">
+                    <div class="text-lg font-bold text-green-600">${plan.progress?.topics_studied || 0}</div>
+                    <div class="text-xs text-gray-500">学習項目数</div>
+                  </div>
+                  <div class="bg-purple-50 rounded-lg p-2">
+                    <div class="text-lg font-bold text-purple-600">${plan.feedbacks?.length || 0}</div>
+                    <div class="text-xs text-gray-500">振り返り数</div>
+                  </div>
+                </div>
+                
+                ${plan.progress?.topic_details?.length > 0 ? `
+                <div class="mt-3">
+                  <h4 class="text-xs font-bold text-gray-600 mb-1">項目別の自信度:</h4>
+                  <div class="flex flex-wrap gap-1">
+                    ${plan.progress.topic_details.map(t => `
+                      <span class="text-[10px] px-2 py-1 rounded-full ${
+                        t.avg_confidence >= 4 ? 'bg-green-100 text-green-700' :
+                        t.avg_confidence >= 3 ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                      }">${t.topic} (${'⭐'.repeat(Math.round(t.avg_confidence))})</span>
+                    `).join('')}
+                  </div>
+                </div>` : ''}
+                
+                ${plan.feedbacks?.length > 0 ? `
+                <div class="mt-3 bg-gray-50 rounded-lg p-3">
+                  <h4 class="text-xs font-bold text-gray-600 mb-1">直近の振り返り:</h4>
+                  <p class="text-xs text-gray-700">${JSON.stringify(plan.feedbacks[0]).substring(0, 200)}...</p>
+                </div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `
+    
+    document.body.insertAdjacentHTML('beforeend', dashHTML)
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ ダッシュボードエラー:', error)
+    alert('データの読み込みに失敗しました: ' + error.message)
+  }
+}
+
+window.generatePersonalizedCourse = generatePersonalizedCourse
+window.publishPersonalizedCourse = publishPersonalizedCourse
+window.showTestPrepDashboard = showTestPrepDashboard
+
+// 個別最適化コース：児童選択モーダル
+async function showPersonalizedCourseSelector(curriculumId) {
+  console.log('🎯 個別最適化コース生成 - 児童選択:', curriculumId)
+  
+  try {
+    // 児童一覧を取得
+    let students = []
+    try {
+      const res = await axios.get('/api/students/list')
+      students = Array.isArray(res.data) ? res.data : (res.data.students || [])
+    } catch {
+      // フォールバック
+      students = [{ id: 1, name: '児童1' }, { id: 2, name: '児童2' }, { id: 3, name: '児童3' }]
+    }
+    
+    const html = `
+      <div id="personalizedSelectorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='personalizedSelectorModal')document.getElementById('personalizedSelectorModal').remove()">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6" onclick="event.stopPropagation()">
+          <h2 class="text-xl font-bold text-gray-800 mb-4"><i class="fas fa-magic text-pink-600 mr-2"></i>個別最適化コース生成</h2>
+          <p class="text-sm text-gray-600 mb-4">コースを作成する児童を選んでください。AIがその児童の学習データを分析し、最適なカード構成を提案します。</p>
+          
+          <div class="space-y-2 max-h-60 overflow-y-auto mb-4">
+            ${students.map(s => `
+              <button onclick="document.getElementById('personalizedSelectorModal').remove(); generatePersonalizedCourse(${s.id}, ${curriculumId})" 
+                      class="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-pink-50 rounded-lg transition border hover:border-pink-300">
+                <span class="font-bold text-gray-800"><i class="fas fa-user-graduate text-pink-500 mr-2"></i>${s.name || '児童' + s.id}</span>
+                <i class="fas fa-chevron-right text-gray-400"></i>
+              </button>
+            `).join('')}
+          </div>
+          
+          <button onclick="document.getElementById('personalizedSelectorModal').remove()" class="w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition text-gray-700 font-bold">
+            キャンセル
+          </button>
+        </div>
+      </div>
+    `
+    document.body.insertAdjacentHTML('beforeend', html)
+  } catch (error) {
+    console.error('❌ 児童選択モーダルエラー:', error)
+    alert('児童一覧の取得に失敗しました')
+  }
+}
+
+window.showPersonalizedCourseSelector = showPersonalizedCourseSelector
+
+console.log('✅ Phase 10.5 個別最適化＆テスト対策ダッシュボード初期化完了')
 
 // ============================================================
 // Phase 11: 編集可能な学習計画表
