@@ -30477,7 +30477,13 @@ app.get('/api/student-learning/tebiki', async (c) => {
 
     return c.json({
       success: true,
-      curriculum: { ...curriculum, curriculum_id: curriculum.id },
+      curriculum: { 
+        ...curriculum, 
+        curriculum_id: curriculum.id,
+        total_hours: curriculum.total_hours || 8,
+        unit_goal: curriculum.unit_goal || '',
+        non_cognitive_goal: curriculum.non_cognitive_goal || ''
+      },
       courses: coursesWithCards,
       optionalProblems,
       courseSelectionProblems,

@@ -1905,7 +1905,7 @@ async function renderTopPage() {
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 算数が得意、どんどん進みたい</p>
-                <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">どんどんコース</span></p>
+                <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">ぐんぐんコース</span></p>
                 <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
                   <li>• 📹 <strong>AI生成動画</strong>: 「九九の計算手順」解説動画（Gemini Veo, 5秒）
@@ -1938,7 +1938,7 @@ async function renderTopPage() {
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 算数に苦手意識、じっくり学びたい</p>
-                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">じっくりコース</span></p>
                 <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
                   <li>• 🎵 <strong>AI生成音楽</strong>: 「九九の歌（3の段）」で暗記支援（ElevenLabs）
@@ -2065,7 +2065,7 @@ async function renderTopPage() {
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 日本語学習中、視覚的な理解が得意</p>
-                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">じっくりコース</span></p>
                 <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
                   <li>• <span class="font-semibold">AI生成画像</span>で視覚的に理解（文字が読めなくても OK）</li>
@@ -2090,7 +2090,7 @@ async function renderTopPage() {
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> ADHD、集中が続きにくい</p>
-                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">じっくりコース</span></p>
                 <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
                   <li>• <span class="font-semibold">短時間動画</span>（AI生成5〜8秒）で飽きずに学習</li>
@@ -2115,7 +2115,7 @@ async function renderTopPage() {
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 高い学習能力、探究心旺盛</p>
-                <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">どんどんコース</span></p>
+                <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">ぐんぐんコース</span></p>
                 <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
                   <li>• <span class="font-semibold">選択問題</span>で発展的内容に挑戦（AIが上位学年の問題も自動生成）</li>
@@ -2190,7 +2190,7 @@ async function renderTopPage() {
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 体を動かして学ぶのが得意</p>
-                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">じっくりコース</span></p>
                 <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
                   <li>• <span class="font-semibold">体験優位版</span>: 具体物（積み木、お金）を使った実演提案</li>
@@ -2215,7 +2215,7 @@ async function renderTopPage() {
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
                 <p><strong>特徴:</strong> 学習障害＋家庭環境の課題</p>
-                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">ゆっくりコース</span></p>
+                <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">じっくりコース</span></p>
                 <p><strong>🎯 活用している全機能:</strong></p>
                 <ul class="ml-4 space-y-1">
                   <li>• <span class="font-semibold">3スタイル統合</span>: 視覚・聴覚・体験を組み合わせた UDL 設計</li>
@@ -12878,7 +12878,7 @@ async function executeUnitGeneration(params) {
       {
         level: 'slow',
         info: {
-          name: 'ゆっくりコース',
+          name: 'じっくりコース',
           label: 'じっくり考えながら進むコース',
           description: 'ひとつひとつていねいに学びたい人におすすめ',
           color_code: 'green'
@@ -12896,7 +12896,7 @@ async function executeUnitGeneration(params) {
       {
         level: 'fast',
         info: {
-          name: 'どんどんコース',
+          name: 'ぐんぐんコース',
           label: '発展的な内容にチャレンジするコース',
           description: 'より高い目標を目指したい人におすすめ',
           color_code: 'purple'
@@ -13540,7 +13540,7 @@ function animateRealtimeProgress(totalTime, qualityMode) {
       endPercent: 30,
       icon: 'fa-route',
       task: '3つのコースを作成中...',
-      comment: '🎨 ゆっくり・しっかり・どんどんコースを設計しています',
+      comment: '🎨 ゆっくり・しっかり・ぐんぐんコースを設計しています',
       emoji: '🎨'
     },
     {
@@ -35170,7 +35170,7 @@ function demoCase2Struggling() {
             </h4>
             <div class="space-y-3 text-gray-700">
               <p><strong>学習者の特徴:</strong> 算数に苦手意識、じっくり学びたい</p>
-              <p><strong>選択コース:</strong> <span class="bg-green-600 text-white px-3 py-1 rounded">ゆっくりコース</span></p>
+              <p><strong>選択コース:</strong> <span class="bg-green-600 text-white px-3 py-1 rounded">じっくりコース</span></p>
               <p><strong>教育理論:</strong> Wood et al. (1976) Scaffolding理論</p>
               <p class="text-sm text-gray-600 bg-blue-50 p-3 rounded">
                 スモールステップで段階的に支援。丁寧な説明と安心感を提供し、小さな成功体験の積み重ねで自信を育む。

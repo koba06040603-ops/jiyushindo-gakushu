@@ -169,9 +169,9 @@
                     <h3 class="font-bold text-blue-700 text-sm">しっかり</h3>
                     <p class="text-[10px] text-gray-500 mt-0.5">バランスよく</p>
                 </div>
-                <div onclick="selectCourse('fast')" id="course-fast" class="cursor-pointer border-2 border-gray-200 rounded-xl p-3 text-center hover:border-orange-400 hover:bg-orange-50 transition">
+                <div onclick="selectCourse('fast')" id="course-fast" class="cursor-pointer border-2 border-gray-200 rounded-xl p-3 text-center hover:border-purple-400 hover:bg-purple-50 transition">
                     <div class="text-2xl mb-1">🐆</div>
-                    <h3 class="font-bold text-orange-700 text-sm">ぐんぐん</h3>
+                    <h3 class="font-bold text-purple-700 text-sm">ぐんぐん</h3>
                     <p class="text-[10px] text-gray-500 mt-0.5">発展にも挑戦</p>
                 </div>
             </div>
@@ -740,6 +740,17 @@ async function loadTebikiData() {
         if (res.data.success) {
             STATE.tebikiData = res.data
             STATE.tebikiLoaded = true
+
+            // プランが未作成の場合、カリキュラムのデータでunitConfigを更新
+            if (!STATE.planId && res.data.curriculum) {
+                const curr = res.data.curriculum
+                if (curr.total_hours) STATE.unitConfig.total_hours = curr.total_hours
+                if (curr.unit_goal) STATE.unitConfig.unit_goal = curr.unit_goal
+                if (curr.unit_name) STATE.unitConfig.unit_name = curr.unit_name
+                if (curr.grade) STATE.unitConfig.grade = curr.grade
+                if (curr.subject) STATE.unitConfig.subject = curr.subject
+            }
+
             renderTebikiPanel()
             // Phase 0が表示中ならスプリットビュー＋アコーディオン付きで再描画
             if (!document.getElementById('phase0').classList.contains('hidden')) {
@@ -787,7 +798,7 @@ function renderTebikiPanel() {
     const courseColors = {
         basic:    { border: 'border-green-400', bg: 'bg-green-50',  light: 'border-green-200', text: 'text-green-600' },
         standard: { border: 'border-blue-400',  bg: 'bg-blue-50',   light: 'border-blue-200',  text: 'text-blue-600' },
-        advanced: { border: 'border-orange-400', bg: 'bg-orange-50', light: 'border-orange-200', text: 'text-orange-600' }
+        advanced: { border: 'border-purple-400', bg: 'bg-purple-50', light: 'border-purple-200', text: 'text-purple-600' }
     }
 
     let html = `
@@ -1123,7 +1134,7 @@ function renderTebikiInline() {
     const courseColors = {
         basic:    { border: 'border-green-500',  bg: 'bg-green-50',  grad: 'from-green-50 to-white',  badge: 'bg-green-500', text: 'text-green-600', light: 'border-green-200' },
         standard: { border: 'border-blue-500',   bg: 'bg-blue-50',   grad: 'from-blue-50 to-white',   badge: 'bg-blue-500',  text: 'text-blue-600',  light: 'border-blue-200' },
-        advanced: { border: 'border-orange-500',  bg: 'bg-orange-50', grad: 'from-orange-50 to-white', badge: 'bg-orange-500',text: 'text-orange-600',light: 'border-orange-200' }
+        advanced: { border: 'border-purple-500',  bg: 'bg-purple-50', grad: 'from-purple-50 to-white', badge: 'bg-purple-500',text: 'text-purple-600',light: 'border-purple-200' }
     }
 
     let html = ''
@@ -1425,10 +1436,10 @@ function showPhase6(data) {
 function selectCourse(type) {
     STATE.selectedCourse = type
     document.querySelectorAll('[id^="course-"]').forEach(el => {
-        el.classList.remove('border-green-500', 'border-blue-500', 'border-orange-500', 'bg-green-50', 'bg-blue-50', 'bg-orange-50')
+        el.classList.remove('border-green-500', 'border-blue-500', 'border-purple-500', 'bg-green-50', 'bg-blue-50', 'bg-purple-50')
         el.classList.add('border-gray-200')
     })
-    const colors = { slow: ['border-green-500', 'bg-green-50'], steady: ['border-blue-500', 'bg-blue-50'], fast: ['border-orange-500', 'bg-orange-50'] }
+    const colors = { slow: ['border-green-500', 'bg-green-50'], steady: ['border-blue-500', 'bg-blue-50'], fast: ['border-purple-500', 'bg-purple-50'] }
     const el = document.getElementById(`course-${type}`)
     el.classList.remove('border-gray-200')
     el.classList.add(...colors[type])
