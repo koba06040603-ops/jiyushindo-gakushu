@@ -2,6 +2,40 @@
 
 > 📘 **一般向けの簡易版READMEは [README_SIMPLE.md](./README_SIMPLE.md) をご覧ください**
 
+## 🔄 Phase 19: 個別最適化ループ完全実装 **NEW** (2026-02-16)
+
+### 実装完了: 診断→問題生成→解答→ログ→次回生成の適応的ループ
+
+**課題**: フロントエンド（student-home.html）に解答記録送信がなく、初期診断APIも未実装だったため、
+問題生成AIが空データで動作し、個別最適化が機能していなかった。
+
+**修正内容**:
+1. **初期診断テスト（phaseDiag）** - VARK学習スタイル＋レディネス＋非認知能力の8問診断
+2. **バックエンドAPI 4本新規実装**:
+   - `GET /api/student-learning/diagnostic-status` - 診断完了チェック
+   - `POST /api/student-learning/initial-diagnostic` - 診断結果保存＋AI分析
+   - `POST /api/student-learning/record-answer` - カード・チェックテスト解答記録
+   - `GET /api/student-learning/adaptive-next` - 適応的次問題推奨
+3. **フロントエンド統合**:
+   - `init()` フロー修正: 診断未完了→phaseDiag表示
+   - 全学習カードに「できた！/もう一回」ボタン追加
+   - チェックテスト問題に正誤記録ボタン追加
+   - カードタイマー（解答時間計測）
+   - 5問ごとの適応的推奨自動更新
+4. **問題生成AIプロンプト改修**:
+   - `/api/ai/recommend-problems`: 初期診断＋解答履歴を注入
+   - `/api/teacher/generate-personalized-course`: VARK＋レディネス統合
+5. **DBマイグレーション**: `initial_diagnostics` + `student_card_answers` テーブル
+
+**データフロー**:
+```
+児童初回アクセス → phaseDiag（VARK診断8問）→ initial_diagnostics保存
+→ Phase0（計画作成）→ 学習カード表示
+→ 「できた！/もう一回」ボタン → student_card_answers + learning_logs
+→ 5問ごとに adaptive-next API → 推奨難易度・メッセージ更新
+→ 蓄積データ → AI問題生成プロンプトに自動注入 → 個別最適化問題生成
+```
+
 ## 🌐 本番環境URL
 
 **Phase 18-2完了！（テスト対策 + 自己調整学習 + KPT振り返り）** ✅  
