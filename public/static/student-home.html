@@ -129,6 +129,28 @@
         <p class="text-gray-600">学習データを読み込んでいます...</p>
     </div>
 
+    <!-- ===== Phase Diag: 初期診断テスト（個別最適化アンケート） ===== -->
+    <div id="phaseDiag" class="hidden space-y-4 fade-in">
+        <div class="bg-white rounded-2xl shadow-lg p-5">
+            <h2 class="text-lg font-bold text-gray-800 mb-2">
+                <i class="fas fa-clipboard-check text-purple-500 mr-2"></i>あなたの「まなびかた」しんだん
+            </h2>
+            <p class="text-xs text-gray-500 mb-4">あなたに合った問題をAIが作るために、かんたんなしんだんをします。リラックスしてこたえてね！</p>
+            <div id="diagContent" class="space-y-4">
+                <!-- JS で動的に描画 -->
+            </div>
+            <div id="diagResult" class="hidden mt-4 bg-purple-50 rounded-xl p-4">
+                <h3 class="text-sm font-bold text-purple-800 mb-2"><i class="fas fa-star mr-1"></i>しんだん結果</h3>
+                <div id="diagResultBody"></div>
+            </div>
+            <div id="diagActions" class="mt-4 flex gap-3 justify-center">
+                <button id="diagSubmitBtn" onclick="submitDiagnostic()" class="px-6 py-3 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition shadow-lg">
+                    <i class="fas fa-paper-plane mr-1"></i>しんだんけっかを送る
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== Phase 0: 計画作成（オリエンテーション・初回のみ） ===== -->
     <div id="phase0" class="hidden space-y-4 fade-in">
 
@@ -930,6 +952,18 @@ function renderTebikiPanel() {
                                 <div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-700">${escapeHtml(card.answer).replace(/\\n/g, '<br>')}</div>
                                 ${card.answer_explanation ? `<div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-600"><strong>解説:</strong> ${escapeHtml(card.answer_explanation).replace(/\\n/g, '<br>')}</div>` : ''}
                             </details>` : ''}
+                        <!-- 解答記録ボタン（パネル版） -->
+                        <div class="flex items-center gap-2 mt-1 pt-1 border-t border-gray-100">
+                            <button onclick="startCardTimer(${card.card_id || card.id || 0}); recordCardAnswer(${card.card_id || card.id || 0}, true, getCardTimer(${card.card_id || card.id || 0}))"
+                                class="px-2 py-0.5 text-[9px] rounded-full border border-green-300 text-green-700 hover:bg-green-50 transition font-bold">
+                                <i class="fas fa-check"></i> できた
+                            </button>
+                            <button onclick="startCardTimer(${card.card_id || card.id || 0}); recordCardAnswer(${card.card_id || card.id || 0}, false, getCardTimer(${card.card_id || card.id || 0}))"
+                                class="px-2 py-0.5 text-[9px] rounded-full border border-orange-300 text-orange-700 hover:bg-orange-50 transition font-bold">
+                                <i class="fas fa-redo"></i> もう一回
+                            </button>
+                            <span id="answer-badge-panel-${card.card_id || card.id || 0}" class="hidden ml-1"></span>
+                        </div>
                     </div>
                 </div>
             </div>`
@@ -1087,8 +1121,23 @@ function updateTebikiFab(show) {
 // ========== 初期化 ==========
 async function init() {
     try {
+        // まず初期診断が済んでいるかチェック
+        let diagDone = false
+        try {
+            const diagCheck = await axios.get(`/api/student-learning/diagnostic-status?student_id=${STATE.studentId}&curriculum_id=${STATE.curriculumId}`)
+            diagDone = diagCheck.data.completed === true
+            if (diagDone && diagCheck.data.profile) {
+                STATE.diagnosticProfile = diagCheck.data.profile
+                STATE.diagnosticDone = true
+            }
+        } catch (e) {
+            console.log('診断ステータス取得スキップ:', e.message)
+            // テーブル未作成の場合は診断スキップ（後方互換性）
+            diagDone = true
+        }
+
         if (planIdParam) {
-            // 既存計画の読み込み
+            // 既存計画の読み込み（計画がある＝診断済みの可能性が高い）
             const res = await axios.get(`/api/student-learning/plan/${planIdParam}`)
             if (res.data.success) {
                 STATE.planId = parseInt(planIdParam)
@@ -1109,7 +1158,7 @@ async function init() {
                 updateHeader()
                 determinePhase()
             } else {
-                showPhase0()
+                showPhase0OrDiag(diagDone)
             }
         } else {
             // 生徒の最新の active plan を探す
@@ -1137,10 +1186,10 @@ async function init() {
                     updateHeader()
                     determinePhase()
                 } else {
-                    showPhase0()
+                    showPhase0OrDiag(diagDone)
                 }
             } else {
-                showPhase0()
+                showPhase0OrDiag(diagDone)
             }
         }
     } catch(e) {
@@ -1158,6 +1207,15 @@ async function init() {
     document.getElementById('loadingScreen').classList.add('hidden')
     // てびきデータの事前読み込み（curriculum_idまたはunit_nameで取得試行）
     loadTebikiData()
+}
+
+// 診断未完了ならphaseDiag、完了済みならphase0を表示
+function showPhase0OrDiag(diagDone) {
+    if (!diagDone) {
+        showPhaseDiag()
+    } else {
+        showPhase0()
+    }
 }
 
 function updateHeader() {
@@ -1199,6 +1257,14 @@ function hideAllPhases() {
         const el = document.getElementById(`phase${i}`)
         if (el) el.classList.add('hidden')
     }
+    const diagEl = document.getElementById('phaseDiag')
+    if (diagEl) diagEl.classList.add('hidden')
+}
+
+function showPhaseDiag() {
+    hideAllPhases()
+    document.getElementById('phaseDiag').classList.remove('hidden')
+    renderDiagnostic()
 }
 
 function showPhase0() {
@@ -1405,6 +1471,20 @@ function renderTebikiInline() {
                                         <div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-700">💡 こたえ: ${escapeHtml(card.answer).replace(/\\n/g, '<br>')}</div>
                                         ${card.answer_explanation ? `<div class="mt-1 bg-green-50 rounded-lg p-2 text-[10px] text-gray-600"><strong>解説:</strong> ${escapeHtml(card.answer_explanation).replace(/\\n/g, '<br>')}</div>` : ''}
                                     </details>` : ''}
+                                <!-- 解答記録ボタン（個別最適化ループの核心） -->
+                                <div class="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                                    <span class="text-[9px] text-gray-400">この問題:</span>
+                                    <button onclick="startCardTimer(${card.card_id || card.id || 0}); recordCardAnswer(${card.card_id || card.id || 0}, true, getCardTimer(${card.card_id || card.id || 0}))"
+                                        class="px-3 py-1 text-[10px] rounded-full border-2 border-green-300 text-green-700 hover:bg-green-50 transition font-bold">
+                                        <i class="fas fa-check mr-1"></i>できた！
+                                    </button>
+                                    <button onclick="startCardTimer(${card.card_id || card.id || 0}); recordCardAnswer(${card.card_id || card.id || 0}, false, getCardTimer(${card.card_id || card.id || 0}))"
+                                        class="px-3 py-1 text-[10px] rounded-full border-2 border-orange-300 text-orange-700 hover:bg-orange-50 transition font-bold">
+                                        <i class="fas fa-redo mr-1"></i>もう一回
+                                    </button>
+                                    <span id="answer-badge-${card.card_id || card.id || 0}" class="hidden ml-1"></span>
+                                </div>
+                                <div id="adaptiveRecommendation" class="hidden"></div>
                             </div>
                         </div>
                     </div>`
@@ -1453,6 +1533,18 @@ function renderTebikiInline() {
                                                 <summary class="text-[10px] text-yellow-600 cursor-pointer font-bold"><i class="fas fa-eye mr-1"></i>答えを表示</summary>
                                                 <div class="mt-1 bg-yellow-100 rounded px-2 py-1 text-[10px] text-gray-600">💡 こたえ: ${escapeHtml(problem.answer)}</div>
                                             </details>` : ''}
+                                        <!-- チェックテスト解答記録 -->
+                                        <div class="flex items-center gap-2 mt-1">
+                                            <button onclick="recordCheckTestAnswer(${problem.problem_number}, true)"
+                                                class="px-2 py-0.5 text-[9px] rounded-full border border-green-300 text-green-700 hover:bg-green-50 transition">
+                                                <i class="fas fa-check"></i> できた
+                                            </button>
+                                            <button onclick="recordCheckTestAnswer(${problem.problem_number}, false)"
+                                                class="px-2 py-0.5 text-[9px] rounded-full border border-orange-300 text-orange-700 hover:bg-orange-50 transition">
+                                                <i class="fas fa-redo"></i> もう一回
+                                            </button>
+                                            <span id="ct-badge-${problem.problem_number}" class="text-xs"></span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -3002,6 +3094,304 @@ function showRecordingIndicator(show) {
     const el = document.getElementById('recordingIndicator')
     if (el) {
         el.classList.toggle('hidden', !show)
+    }
+}
+
+// ========== 初期診断テスト（個別最適化アンケート） ==========
+
+// 診断問題定義（教育理論ベース: VARK + レディネス + 非認知能力 + 既有知識）
+function getDiagnosticQuestions() {
+    return [
+        // ---- Section 1: 学習スタイル（VARK理論） ----
+        { id: 'ls1', section: 'learning_style', label: 'あたらしいことをおぼえるとき、どれがいちばんわかりやすい？',
+          options: [
+            { value: 'visual', text: '絵や図を見る', icon: 'fas fa-image' },
+            { value: 'auditory', text: '声で聞く・読み上げてもらう', icon: 'fas fa-headphones' },
+            { value: 'kinesthetic', text: '自分の手でやってみる', icon: 'fas fa-hand-paper' },
+            { value: 'read_write', text: '文字を読んで書く', icon: 'fas fa-pen' }
+          ]},
+        { id: 'ls2', section: 'learning_style', label: 'むずかしい問題があったとき、どうする？',
+          options: [
+            { value: 'visual', text: '図にかいて考える', icon: 'fas fa-draw-polygon' },
+            { value: 'auditory', text: '声に出して考える', icon: 'fas fa-comment' },
+            { value: 'kinesthetic', text: '実際のものを使って考える', icon: 'fas fa-cubes' },
+            { value: 'read_write', text: 'ノートにメモしながら考える', icon: 'fas fa-sticky-note' }
+          ]},
+        // ---- Section 2: 学習への態度・非認知能力 ----
+        { id: 'nc1', section: 'non_cognitive', label: 'むずかしい問題にであったとき、いつもどう感じる？', type: 'scale',
+          scaleLabels: ['やりたくない…', 'すこしいやだ', 'ふつう', 'がんばれそう', 'わくわくする！'],
+          scaleIcons: ['😢', '😟', '😐', '😊', '🤩'] },
+        { id: 'nc2', section: 'non_cognitive', label: 'まちがえたとき、つぎどうする？', 
+          options: [
+            { value: 'retry', text: 'もう一回やってみる', icon: 'fas fa-redo' },
+            { value: 'hint', text: 'ヒントをもらってから考える', icon: 'fas fa-lightbulb' },
+            { value: 'friend', text: '友だちに聞いてみる', icon: 'fas fa-user-friends' },
+            { value: 'skip', text: 'べつの問題をやる', icon: 'fas fa-forward' }
+          ]},
+        // ---- Section 3: ペース・自己調整 ----
+        { id: 'sr1', section: 'self_regulation', label: '勉強するペースはどれがすき？',
+          options: [
+            { value: 'slow', text: 'ゆっくり・じっくり', icon: 'fas fa-turtle' },
+            { value: 'steady', text: 'ちょうどいいペース', icon: 'fas fa-walking' },
+            { value: 'fast', text: 'どんどん先にすすみたい', icon: 'fas fa-running' }
+          ]},
+        { id: 'sr2', section: 'self_regulation', label: '1回にどのくらい勉強したい？',
+          options: [
+            { value: 'short', text: '10〜15分くらい', icon: 'fas fa-hourglass-start' },
+            { value: 'medium', text: '20〜30分くらい', icon: 'fas fa-hourglass-half' },
+            { value: 'long', text: '30分以上でも大丈夫', icon: 'fas fa-hourglass-end' }
+          ]},
+        // ---- Section 4: 既有知識チェック（単元レディネス） ----
+        { id: 'rk1', section: 'readiness', label: `この単元（${STATE.unitConfig.unit_name}）に関係あることを、どれくらい知っていると思う？`, type: 'scale',
+          scaleLabels: ['ぜんぜん', 'すこしだけ', 'まあまあ', 'けっこう', 'よく知ってる'],
+          scaleIcons: ['1', '2', '3', '4', '5'] },
+        { id: 'rk2', section: 'readiness', label: 'この教科（' + STATE.unitConfig.subject + '）はすきですか？', type: 'scale',
+          scaleLabels: ['にがて', 'あまり…', 'ふつう', 'まあすき', 'だいすき！'],
+          scaleIcons: ['😣', '😕', '😐', '😊', '😍'] },
+    ]
+}
+
+STATE.diagAnswers = {}
+
+function renderDiagnostic() {
+    const questions = getDiagnosticQuestions()
+    const el = document.getElementById('diagContent')
+    let html = ''
+    questions.forEach((q, idx) => {
+        html += `<div class="bg-gray-50 rounded-xl p-3 slide-up" style="animation-delay:${idx * 0.08}s">
+            <p class="text-sm font-bold text-gray-800 mb-2"><span class="text-purple-500 mr-1">Q${idx + 1}.</span> ${q.label}</p>`
+        if (q.type === 'scale') {
+            html += `<div class="flex justify-between gap-1">`
+            for (let i = 0; i < 5; i++) {
+                html += `<button onclick="selectDiag('${q.id}', ${i + 1}, this)" data-qid="${q.id}"
+                    class="diag-opt flex-1 flex flex-col items-center gap-1 p-2 rounded-lg border-2 border-gray-200 hover:border-purple-400 transition text-center">
+                    <span class="text-lg">${q.scaleIcons[i]}</span>
+                    <span class="text-[9px] text-gray-500 leading-tight">${q.scaleLabels[i]}</span>
+                </button>`
+            }
+            html += `</div>`
+        } else {
+            html += `<div class="grid grid-cols-2 gap-2">`
+            q.options.forEach(opt => {
+                html += `<button onclick="selectDiag('${q.id}', '${opt.value}', this)" data-qid="${q.id}"
+                    class="diag-opt flex items-center gap-2 p-2 rounded-lg border-2 border-gray-200 hover:border-purple-400 transition text-left text-xs">
+                    <i class="${opt.icon} text-purple-400"></i>
+                    <span>${opt.text}</span>
+                </button>`
+            })
+            html += `</div>`
+        }
+        html += `</div>`
+    })
+    el.innerHTML = html
+}
+
+function selectDiag(qId, value, btn) {
+    STATE.diagAnswers[qId] = value
+    // UI: 同じ設問のボタンのみリセットし選択状態にする
+    document.querySelectorAll(`[data-qid="${qId}"]`).forEach(b => {
+        b.classList.remove('border-purple-500', 'bg-purple-50')
+        b.classList.add('border-gray-200')
+    })
+    btn.classList.remove('border-gray-200')
+    btn.classList.add('border-purple-500', 'bg-purple-50')
+}
+
+async function submitDiagnostic() {
+    const questions = getDiagnosticQuestions()
+    const unanswered = questions.filter(q => STATE.diagAnswers[q.id] === undefined)
+    if (unanswered.length > 0) {
+        alert(`まだ${unanswered.length}問こたえていないよ！全部こたえてね。`)
+        return
+    }
+
+    const btn = document.getElementById('diagSubmitBtn')
+    btn.disabled = true
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>送信中...'
+
+    try {
+        // 学習スタイル集計
+        const lsAnswers = questions.filter(q => q.section === 'learning_style').map(q => STATE.diagAnswers[q.id])
+        const styleCounts = {}
+        lsAnswers.forEach(v => { styleCounts[v] = (styleCounts[v] || 0) + 1 })
+        const dominantStyle = Object.entries(styleCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'balanced'
+
+        // 非認知能力
+        const resilience = STATE.diagAnswers['nc1'] || 3
+        const errorStrategy = STATE.diagAnswers['nc2'] || 'hint'
+
+        // 自己調整
+        const pace = STATE.diagAnswers['sr1'] || 'steady'
+        const sessionLength = STATE.diagAnswers['sr2'] || 'medium'
+
+        // レディネス
+        const priorKnowledge = STATE.diagAnswers['rk1'] || 3
+        const subjectAffinity = STATE.diagAnswers['rk2'] || 3
+
+        const diagData = {
+            student_id: STATE.studentId,
+            curriculum_id: STATE.curriculumId,
+            unit_name: STATE.unitConfig.unit_name,
+            subject: STATE.unitConfig.subject,
+            grade: STATE.unitConfig.grade,
+            learning_style: { counts: styleCounts, dominant: dominantStyle },
+            non_cognitive: { resilience: resilience, error_strategy: errorStrategy },
+            self_regulation: { pace, session_length: sessionLength },
+            readiness: { prior_knowledge: priorKnowledge, subject_affinity: subjectAffinity },
+            raw_answers: STATE.diagAnswers
+        }
+
+        const res = await axios.post('/api/student-learning/initial-diagnostic', diagData)
+
+        if (res.data.success) {
+            STATE.diagnosticDone = true
+            STATE.diagnosticProfile = res.data.profile
+            // 結果表示
+            const styleNames = { visual: '目で見る派', auditory: '耳でき聞く派', kinesthetic: '体でおぼえる派', read_write: '読み書き派', balanced: 'バランス型' }
+            const paceNames = { slow: 'じっくりさん', steady: 'マイペースさん', fast: 'どんどんさん' }
+            document.getElementById('diagResultBody').innerHTML = `
+                <div class="grid grid-cols-2 gap-2 text-center">
+                    <div class="bg-white rounded-lg p-2"><p class="text-[10px] text-gray-500">まなびかたタイプ</p><p class="text-sm font-bold text-purple-700">${styleNames[dominantStyle] || dominantStyle}</p></div>
+                    <div class="bg-white rounded-lg p-2"><p class="text-[10px] text-gray-500">ペース</p><p class="text-sm font-bold text-blue-700">${paceNames[pace] || pace}</p></div>
+                    <div class="bg-white rounded-lg p-2"><p class="text-[10px] text-gray-500">チャレンジ度</p><p class="text-sm font-bold text-orange-700">${['', '😢', '😟', '😐', '😊', '🤩'][resilience]} Lv.${resilience}</p></div>
+                    <div class="bg-white rounded-lg p-2"><p class="text-[10px] text-gray-500">この単元の予備知識</p><p class="text-sm font-bold text-green-700">Lv.${priorKnowledge}/5</p></div>
+                </div>
+                <p class="text-xs text-purple-700 mt-2 text-center font-bold">あなたに合った問題を用意するね！</p>
+            `
+            document.getElementById('diagResult').classList.remove('hidden')
+            document.getElementById('diagActions').innerHTML = `
+                <button onclick="finishDiagAndGoPhase0()" class="px-6 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition shadow-lg">
+                    <i class="fas fa-arrow-right mr-1"></i>学習計画をつくろう！
+                </button>
+            `
+        } else {
+            alert('送信に失敗しました: ' + (res.data.error || ''))
+            btn.disabled = false
+            btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>しんだんけっかを送る'
+        }
+    } catch (e) {
+        console.error('診断送信エラー:', e)
+        alert('エラーが発生しました')
+        btn.disabled = false
+        btn.innerHTML = '<i class="fas fa-paper-plane mr-1"></i>しんだんけっかを送る'
+    }
+}
+
+function finishDiagAndGoPhase0() {
+    showPhase0()
+}
+
+// ========== 解答記録機能（カード問題の正誤記録） ==========
+// student-home.htmlの学習カード表示に回答ボタンを追加するための関数群
+
+// カードごとのタイマー管理（解答時間を計測）
+const cardTimers = {}
+function startCardTimer(cardId) {
+    if (!cardTimers[cardId]) {
+        cardTimers[cardId] = Date.now()
+    }
+}
+function getCardTimer(cardId) {
+    if (cardTimers[cardId]) {
+        const elapsed = Date.now() - cardTimers[cardId]
+        delete cardTimers[cardId] // リセット
+        return elapsed
+    }
+    return 0
+}
+
+// カードのアコーディオンが開かれた時にタイマーを自動開始
+document.addEventListener('click', function(e) {
+    const toggle = e.target.closest && e.target.closest('.accordion-toggle')
+    if (toggle) {
+        // アコーディオンが開かれた場合、最寄りのカードIDのタイマーを開始
+        const cardDiv = toggle.closest('.px-3.py-2')
+        if (cardDiv) {
+            const btn = cardDiv.querySelector('[onclick*="startCardTimer"]')
+            if (btn) {
+                const match = btn.getAttribute('onclick').match(/startCardTimer\((\d+)\)/)
+                if (match) startCardTimer(parseInt(match[1]))
+            }
+        }
+    }
+})
+
+async function recordCardAnswer(cardId, isCorrect, answerTimeMs) {
+    try {
+        const res = await axios.post('/api/student-learning/record-answer', {
+            student_id: STATE.studentId,
+            curriculum_id: STATE.curriculumId,
+            card_id: cardId,
+            is_correct: isCorrect,
+            answer_time_seconds: Math.round((answerTimeMs || 0) / 1000),
+            plan_id: STATE.planId || null,
+            hour_number: STATE.currentHour || null
+        })
+        if (res.data.success) {
+            console.log('解答記録成功:', cardId, isCorrect)
+            // 視覚フィードバック
+            const badge = document.getElementById(`answer-badge-${cardId}`)
+            if (badge) {
+                badge.innerHTML = isCorrect
+                    ? '<span class="text-green-600 text-[10px] font-bold"><i class="fas fa-check-circle mr-1"></i>できた！</span>'
+                    : '<span class="text-orange-600 text-[10px] font-bold"><i class="fas fa-redo mr-1"></i>もう一回！</span>'
+                badge.classList.remove('hidden')
+            }
+            // 適応的推奨を更新（累計5問ごと）
+            STATE.answerCount = (STATE.answerCount || 0) + 1
+            if (STATE.answerCount % 5 === 0) {
+                loadAdaptiveRecommendation()
+            }
+        }
+    } catch (e) {
+        console.error('解答記録エラー:', e)
+    }
+}
+
+async function loadAdaptiveRecommendation() {
+    try {
+        const res = await axios.get(`/api/student-learning/adaptive-next?student_id=${STATE.studentId}&curriculum_id=${STATE.curriculumId}`)
+        if (res.data.success && res.data.recommendation) {
+            const rec = res.data.recommendation
+            const el = document.getElementById('adaptiveRecommendation')
+            if (el) {
+                el.innerHTML = `
+                    <div class="bg-blue-50 rounded-lg p-2 border border-blue-200 mt-2">
+                        <p class="text-[10px] font-bold text-blue-700"><i class="fas fa-robot mr-1"></i>AIからのおすすめ</p>
+                        <p class="text-[10px] text-blue-600">${rec.message || ''}</p>
+                        ${rec.suggested_difficulty ? `<span class="inline-block mt-1 px-2 py-0.5 text-[9px] rounded-full bg-blue-100 text-blue-700">つぎの難しさ: ${rec.suggested_difficulty}</span>` : ''}
+                    </div>
+                `
+                el.classList.remove('hidden')
+            }
+        }
+    } catch (e) {
+        console.error('適応的推奨取得エラー:', e)
+    }
+}
+
+// チェックテスト個別問題の正誤記録
+async function recordCheckTestAnswer(problemNumber, isCorrect) {
+    try {
+        await axios.post('/api/student-learning/record-answer', {
+            student_id: STATE.studentId,
+            curriculum_id: STATE.curriculumId,
+            card_id: null,
+            is_correct: isCorrect,
+            content_type: 'check_test',
+            problem_number: problemNumber,
+            plan_id: STATE.planId || null,
+            hour_number: STATE.currentHour || null
+        })
+        // UIフィードバック
+        const badge = document.getElementById(`ct-badge-${problemNumber}`)
+        if (badge) {
+            badge.innerHTML = isCorrect
+                ? '<i class="fas fa-check-circle text-green-500"></i>'
+                : '<i class="fas fa-times-circle text-red-400"></i>'
+        }
+    } catch (e) {
+        console.error('チェックテスト記録エラー:', e)
     }
 }
 

@@ -9720,15 +9720,65 @@ app.post('/api/ai/recommend-problems/:studentId', async (c) => {
       problem_solving_approach: stats.avg_time < 30 ? '直感的・速断型' : stats.avg_time > 90 ? '慎重・熟考型' : 'バランス型'
     }
 
-    // 6. AIプロンプト生成（学習特性を考慮）
+    // 5b. 初期診断データを取得（個別最適化の起点）
+    let diagProfile = ''
+    try {
+      const diag = await env.DB.prepare(
+        'SELECT * FROM initial_diagnostics WHERE student_id = ? ORDER BY created_at DESC LIMIT 1'
+      ).bind(studentId).first() as any
+      if (diag) {
+        const styleNames: Record<string, string> = { visual: '視覚型（図・イラスト重視）', auditory: '聴覚型（声・音声重視）', kinesthetic: '身体感覚型（体験・操作重視）', read_write: '読み書き型（テキスト重視）', balanced: 'バランス型' }
+        const paceNames: Record<string, string> = { slow: 'じっくり型', steady: '標準型', fast: 'ぐんぐん型' }
+        const errNames: Record<string, string> = { retry: '再挑戦型', hint: 'ヒント活用型', friend: '協働学習型', skip: '切替型' }
+        diagProfile = `
+【初期診断プロフィール（VARK学習スタイル＋レディネス）】
+- 学習スタイル: ${styleNames[diag.learning_style_dominant] || diag.learning_style_dominant}（詳細: ${diag.learning_style_counts || '{}'}）
+- チャレンジ意欲: ${diag.resilience}/5
+- 間違い時の対処法: ${errNames[diag.error_strategy] || diag.error_strategy}
+- 学習ペース嗜好: ${paceNames[diag.preferred_pace] || diag.preferred_pace}
+- 1回の学習時間嗜好: ${diag.session_length === 'short' ? '10-15分' : diag.session_length === 'long' ? '30分以上' : '20-30分'}
+- 既有知識（単元レディネス）: ${diag.prior_knowledge}/5
+- 教科好感度: ${diag.subject_affinity}/5
+${diag.ai_profile_summary ? `- AI分析要約: ${diag.ai_profile_summary}` : ''}
+
+★★ 初期診断に基づく個別最適化要件 ★★
+- 学習スタイルに合わせた問題形式: ${diag.learning_style_dominant === 'visual' ? '図解・イラスト・色分けを多用' : diag.learning_style_dominant === 'auditory' ? '音読しやすい文章、リズムのある問題' : diag.learning_style_dominant === 'kinesthetic' ? 'ステップバイステップの操作的活動' : '読みやすいテキスト形式'}
+- レディネスに合わせた難易度: 既有知識Lv${diag.prior_knowledge}→${diag.prior_knowledge <= 2 ? '基礎から丁寧に導入' : diag.prior_knowledge >= 4 ? '応用・発展から開始可能' : '標準レベルから開始'}
+- ペースに合わせた問題量: ${diag.preferred_pace === 'slow' ? '少量ずつ確実に' : diag.preferred_pace === 'fast' ? '多めの問題で挑戦的に' : 'バランスよく'}
+- チャレンジ意欲Lv${diag.resilience}→${diag.resilience <= 2 ? '成功体験を重視、易しめの問題から' : diag.resilience >= 4 ? '挑戦的な問題も積極的に提示' : '段階的に難易度を上げる'}`
+      }
+    } catch (diagErr) {
+      console.warn('初期診断データ取得スキップ:', diagErr)
+    }
+
+    // 5c. student_card_answersからの直近履歴も取得（learning_logsとは別系統）
+    let cardAnswersSummary = ''
+    try {
+      const cardAnswers = await env.DB.prepare(`
+        SELECT is_correct, answer_time_seconds, content_type, difficulty_felt
+        FROM student_card_answers
+        WHERE student_id = ? AND curriculum_id = ?
+        ORDER BY created_at DESC LIMIT 30
+      `).bind(studentId, curriculumId).all()
+      const ca = (cardAnswers.results || []) as any[]
+      if (ca.length > 0) {
+        const caCorrect = ca.filter(a => a.is_correct).length
+        const caAccuracy = Math.round(caCorrect / ca.length * 100)
+        const caAvgTime = Math.round(ca.reduce((s, a) => s + (a.answer_time_seconds || 0), 0) / ca.length)
+        cardAnswersSummary = `\n【カード学習の直近実績（student-home経由）】\n- 直近${ca.length}問: 正答率${caAccuracy}%, 平均時間${caAvgTime}秒`
+      }
+    } catch {}
+
+    // 6. AIプロンプト生成（学習特性を考慮 + 初期診断データ統合）
     const aiPrompt = `
-あなたは児童生徒の学習を支援する教育AIです。以下の学習データを分析し、**個々の学習特性**を深く理解した上で、個別最適化された問題推奨を行ってください。
+あなたは児童生徒の学習を支援する教育AIです。以下の学習データと初期診断プロフィールを分析し、**個々の学習特性**を深く理解した上で、個別最適化された問題推奨を行ってください。
 
 【カリキュラム情報】
 - 学年: 小学${curriculum.grade}年
 - 教科: ${curriculum.subject}
 - 単元名: ${curriculum.unit_name}
 - 単元目標: ${curriculum.unit_goal || '未設定'}
+${diagProfile}${cardAnswersSummary}
 
 【学習履歴の基本データ】
 - 総挑戦回数: ${stats.total_attempts}回
@@ -28689,6 +28739,45 @@ app.post('/api/teacher/generate-personalized-course', async (c) => {
       }
     } catch {}
 
+    // 4c. 初期診断データを取得（個別最適化の起点）
+    let diagPromptSection = ''
+    try {
+      const diag = await env.DB.prepare(
+        'SELECT * FROM initial_diagnostics WHERE student_id = ? ORDER BY created_at DESC LIMIT 1'
+      ).bind(student_id).first() as any
+      if (diag) {
+        const styleN: Record<string, string> = { visual: '視覚型', auditory: '聴覚型', kinesthetic: '身体感覚型', read_write: '読み書き型', balanced: 'バランス型' }
+        const paceN: Record<string, string> = { slow: 'じっくり型', steady: '標準型', fast: 'ぐんぐん型' }
+        const errN: Record<string, string> = { retry: '再挑戦型', hint: 'ヒント活用型', friend: '協働学習型', skip: '切替型' }
+        diagPromptSection = `
+【★初期診断プロフィール（VARK学習スタイル＋レディネス）★】
+- 学習スタイル: ${styleN[diag.learning_style_dominant] || diag.learning_style_dominant}
+- チャレンジ意欲: ${diag.resilience}/5
+- 間違い時の対処法: ${errN[diag.error_strategy] || diag.error_strategy}
+- 学習ペース嗜好: ${paceN[diag.preferred_pace] || diag.preferred_pace}
+- 既有知識（レディネス）: ${diag.prior_knowledge}/5
+- 教科好感度: ${diag.subject_affinity}/5
+${diag.ai_profile_summary ? `- AI要約: ${diag.ai_profile_summary}` : ''}
+
+→ この診断結果に基づき、学習スタイルに合った問題形式（${diag.learning_style_dominant === 'visual' ? '図解・色分け重視' : diag.learning_style_dominant === 'auditory' ? '音読向き文章' : diag.learning_style_dominant === 'kinesthetic' ? '操作的活動' : 'テキスト中心'}）で生成してください。`
+      }
+    } catch (diagErr) { console.warn('診断データ取得スキップ:', diagErr) }
+
+    // 4d. student_card_answersからの直近実績
+    let cardAnswerSection = ''
+    try {
+      const ca = await env.DB.prepare(`
+        SELECT is_correct, answer_time_seconds, content_type FROM student_card_answers
+        WHERE student_id = ? AND curriculum_id = ? ORDER BY created_at DESC LIMIT 30
+      `).bind(student_id, curriculum_id).all()
+      const caResults = (ca.results || []) as any[]
+      if (caResults.length > 0) {
+        const caAcc = Math.round(caResults.filter(a => a.is_correct).length / caResults.length * 100)
+        const caAvg = Math.round(caResults.reduce((s, a) => s + (a.answer_time_seconds || 0), 0) / caResults.length)
+        cardAnswerSection = `\n【カード学習の直近実績（student-home経由）】\n- 直近${caResults.length}問: 正答率${caAcc}%, 平均時間${caAvg}秒`
+      }
+    } catch {}
+
     // 5. AI生成プロンプト
     const prompt = `
 あなたは児童の学習データを分析し、個別最適化された学習カードを生成する教育AIです。
@@ -28709,6 +28798,7 @@ ${baseCards.slice(0, 10).map((card: any) => `- [${card.course_name}] ${card.card
 - 振り返り記録: ${refl.length}件
 - 学習計画の進捗: ${planRows.filter((r: any) => r.status === 'completed').length}/${planRows.length}時間完了
 ${refl.length > 0 ? `- 直近の振り返り: ${(refl[0] as any).goal_achievement || ''} / ${(refl[0] as any).next_unit_application || ''}` : ''}
+${diagPromptSection}${cardAnswerSection}
 
 【テスト対策プランからの学習データ（重要：弱点を把握するための核心情報）】
 - テスト対策プラン数: ${testPrepData.plans}件（総学習時間: ${testPrepData.totalMinutes}分）
@@ -28726,6 +28816,7 @@ ${testPrepData.feedbackSummary ? `- テスト対策振り返り: ${testPrepData.
 4. 学習計画の進捗が遅い場合 → 短時間で取り組める問題、達成感を得やすい構成
 5. テスト対策で自信度が低いトピックがある場合 → そのトピックを重点的にカバーし、基礎に戻って補強する
 6. テスト対策の振り返りで苦手と申告した分野 → 別のアプローチ（図解・動画・具体物操作）で再学習させる
+7. ★初期診断プロフィールがある場合 → 学習スタイル（VARK）に合った問題形式、レディネスレベルに合った難易度、ペース嗜好に合った分量で生成する
 
 【出力形式】JSON
 {
@@ -31375,6 +31466,376 @@ app.get('/api/student-learning/tebiki', async (c) => {
       commonCheckTest
     })
   } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// ============================================================
+// 個別最適化ループ：初期診断 → 解答記録 → 適応的出題
+// ============================================================
+
+// --- 初期診断ステータス確認 ---
+app.get('/api/student-learning/diagnostic-status', async (c) => {
+  const { env } = c
+  try {
+    const studentId = c.req.query('student_id')
+    const curriculumId = c.req.query('curriculum_id')
+    if (!studentId) return c.json({ completed: false, error: 'student_id required' })
+
+    // initial_diagnosticsテーブルの存在チェック（マイグレーション未適用時のフォールバック）
+    let diag: any = null
+    try {
+      const query = curriculumId
+        ? `SELECT * FROM initial_diagnostics WHERE student_id = ? AND curriculum_id = ? ORDER BY created_at DESC LIMIT 1`
+        : `SELECT * FROM initial_diagnostics WHERE student_id = ? ORDER BY created_at DESC LIMIT 1`
+      const stmt = curriculumId
+        ? env.DB.prepare(query).bind(parseInt(studentId), parseInt(curriculumId))
+        : env.DB.prepare(query).bind(parseInt(studentId))
+      diag = await stmt.first()
+    } catch (tableErr: any) {
+      // テーブルが存在しない場合（マイグレーション未適用）
+      if (tableErr.message && tableErr.message.includes('no such table')) {
+        console.log('initial_diagnostics テーブル未作成 → 診断スキップ')
+        return c.json({ completed: false, table_missing: true })
+      }
+      throw tableErr
+    }
+
+    if (diag) {
+      // プロフィール情報を構築
+      const profile = {
+        learning_style: diag.learning_style_dominant || 'balanced',
+        learning_style_counts: JSON.parse(diag.learning_style_counts || '{}'),
+        resilience: diag.resilience,
+        error_strategy: diag.error_strategy,
+        pace: diag.preferred_pace,
+        session_length: diag.session_length,
+        prior_knowledge: diag.prior_knowledge,
+        subject_affinity: diag.subject_affinity,
+        ai_summary: diag.ai_profile_summary || null,
+        diagnosed_at: diag.created_at
+      }
+      return c.json({ completed: true, profile })
+    }
+    return c.json({ completed: false })
+  } catch (error) {
+    console.error('診断ステータス確認エラー:', error)
+    return c.json({ completed: false, error: error instanceof Error ? error.message : 'Unknown' })
+  }
+})
+
+// --- 初期診断結果保存 ---
+app.post('/api/student-learning/initial-diagnostic', async (c) => {
+  const { env } = c
+  try {
+    const body = await c.req.json()
+    const {
+      student_id, curriculum_id, unit_name, subject, grade,
+      learning_style, non_cognitive, self_regulation, readiness,
+      raw_answers
+    } = body
+
+    if (!student_id) return c.json({ success: false, error: 'student_id required' }, 400)
+
+    // テーブル作成（マイグレーション未適用時のフォールバック）
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS initial_diagnostics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        curriculum_id INTEGER,
+        unit_name TEXT, subject TEXT, grade TEXT,
+        learning_style_dominant TEXT DEFAULT 'balanced',
+        learning_style_counts TEXT,
+        resilience INTEGER DEFAULT 3,
+        error_strategy TEXT DEFAULT 'hint',
+        preferred_pace TEXT DEFAULT 'steady',
+        session_length TEXT DEFAULT 'medium',
+        prior_knowledge INTEGER DEFAULT 3,
+        subject_affinity INTEGER DEFAULT 3,
+        raw_answers TEXT,
+        ai_profile_summary TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`).run()
+    } catch {}
+
+    // 既存診断があれば更新、なければ挿入
+    const existing = await env.DB.prepare(
+      'SELECT id FROM initial_diagnostics WHERE student_id = ? AND curriculum_id = ?'
+    ).bind(parseInt(student_id), parseInt(curriculum_id || 0)).first()
+
+    const ls = learning_style || {}
+    const nc = non_cognitive || {}
+    const sr = self_regulation || {}
+    const rd = readiness || {}
+
+    if (existing) {
+      await env.DB.prepare(`
+        UPDATE initial_diagnostics SET
+          unit_name = ?, subject = ?, grade = ?,
+          learning_style_dominant = ?, learning_style_counts = ?,
+          resilience = ?, error_strategy = ?,
+          preferred_pace = ?, session_length = ?,
+          prior_knowledge = ?, subject_affinity = ?,
+          raw_answers = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(
+        unit_name || '', subject || '', grade || '',
+        ls.dominant || 'balanced', JSON.stringify(ls.counts || {}),
+        nc.resilience || 3, nc.error_strategy || 'hint',
+        sr.pace || 'steady', sr.session_length || 'medium',
+        rd.prior_knowledge || 3, rd.subject_affinity || 3,
+        JSON.stringify(raw_answers || {}),
+        existing.id
+      ).run()
+    } else {
+      await env.DB.prepare(`
+        INSERT INTO initial_diagnostics (
+          student_id, curriculum_id, unit_name, subject, grade,
+          learning_style_dominant, learning_style_counts,
+          resilience, error_strategy,
+          preferred_pace, session_length,
+          prior_knowledge, subject_affinity,
+          raw_answers
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        parseInt(student_id), parseInt(curriculum_id || 0),
+        unit_name || '', subject || '', grade || '',
+        ls.dominant || 'balanced', JSON.stringify(ls.counts || {}),
+        nc.resilience || 3, nc.error_strategy || 'hint',
+        sr.pace || 'steady', sr.session_length || 'medium',
+        rd.prior_knowledge || 3, rd.subject_affinity || 3,
+        JSON.stringify(raw_answers || {})
+      ).run()
+    }
+
+    // AI分析を試行（Gemini APIキーがある場合のみ）
+    let aiSummary = ''
+    const apiKey = env.GEMINI_API_KEY
+    if (apiKey && apiKey !== 'your-gemini-api-key-here') {
+      try {
+        const styleNames: Record<string, string> = { visual: '視覚型', auditory: '聴覚型', kinesthetic: '身体感覚型', read_write: '読み書き型', balanced: 'バランス型' }
+        const paceNames: Record<string, string> = { slow: 'じっくり型', steady: '標準型', fast: 'ぐんぐん型' }
+        const prompt = `以下の児童の初期診断結果を分析し、50字以内で簡潔な学習者プロフィール要約を日本語で作成してください。
+学年: ${grade || '不明'}, 教科: ${subject || '不明'}, 単元: ${unit_name || '不明'}
+学習スタイル: ${styleNames[ls.dominant] || ls.dominant}（${JSON.stringify(ls.counts || {})}）
+チャレンジ度: ${nc.resilience || 3}/5
+間違い時の戦略: ${nc.error_strategy || 'hint'}
+学習ペース: ${paceNames[sr.pace] || sr.pace}
+1回の学習時間: ${sr.session_length || 'medium'}
+既有知識: ${rd.prior_knowledge || 3}/5
+教科好感度: ${rd.subject_affinity || 3}/5
+50字以内の要約のみ出力してください。`
+
+        const geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
+        )
+        if (geminiRes.ok) {
+          const data = await geminiRes.json() as any
+          aiSummary = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || ''
+          if (aiSummary) {
+            const diagId = existing ? existing.id : (await env.DB.prepare(
+              'SELECT id FROM initial_diagnostics WHERE student_id = ? AND curriculum_id = ? ORDER BY created_at DESC LIMIT 1'
+            ).bind(parseInt(student_id), parseInt(curriculum_id || 0)).first() as any)?.id
+            if (diagId) {
+              await env.DB.prepare('UPDATE initial_diagnostics SET ai_profile_summary = ? WHERE id = ?')
+                .bind(aiSummary, diagId).run()
+            }
+          }
+        }
+      } catch (aiErr) {
+        console.warn('AI診断分析スキップ:', aiErr)
+      }
+    }
+
+    const profile = {
+      learning_style: ls.dominant || 'balanced',
+      learning_style_counts: ls.counts || {},
+      resilience: nc.resilience || 3,
+      error_strategy: nc.error_strategy || 'hint',
+      pace: sr.pace || 'steady',
+      session_length: sr.session_length || 'medium',
+      prior_knowledge: rd.prior_knowledge || 3,
+      subject_affinity: rd.subject_affinity || 3,
+      ai_summary: aiSummary || null
+    }
+
+    console.log(`✅ 初期診断保存完了: student=${student_id}, style=${ls.dominant}, pace=${sr.pace}`)
+    return c.json({ success: true, profile })
+  } catch (error) {
+    console.error('初期診断保存エラー:', error)
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 解答記録保存（カード問題・チェックテスト） ---
+app.post('/api/student-learning/record-answer', async (c) => {
+  const { env } = c
+  try {
+    const body = await c.req.json()
+    const {
+      student_id, curriculum_id, card_id, is_correct,
+      answer_time_seconds, plan_id, hour_number,
+      content_type, problem_number, hint_used, difficulty_felt
+    } = body
+
+    if (!student_id) return c.json({ success: false, error: 'student_id required' }, 400)
+
+    // テーブル作成（マイグレーション未適用時のフォールバック）
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS student_card_answers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL, curriculum_id INTEGER,
+        card_id INTEGER, plan_id INTEGER, hour_number INTEGER,
+        is_correct INTEGER DEFAULT 0, answer_time_seconds INTEGER DEFAULT 0,
+        content_type TEXT DEFAULT 'card', problem_number INTEGER,
+        hint_used INTEGER DEFAULT 0, difficulty_felt TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`).run()
+    } catch {}
+
+    const result = await env.DB.prepare(`
+      INSERT INTO student_card_answers (
+        student_id, curriculum_id, card_id, plan_id, hour_number,
+        is_correct, answer_time_seconds, content_type, problem_number,
+        hint_used, difficulty_felt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      parseInt(student_id), parseInt(curriculum_id || 0),
+      card_id ? parseInt(card_id) : null,
+      plan_id ? parseInt(plan_id) : null,
+      hour_number ? parseInt(hour_number) : null,
+      is_correct ? 1 : 0,
+      answer_time_seconds || 0,
+      content_type || 'card',
+      problem_number || null,
+      hint_used ? 1 : 0,
+      difficulty_felt || null
+    ).run()
+
+    // learning_logsにも並行記録（既存の分析ロジックとの互換性のため）
+    try {
+      await env.DB.prepare(`
+        INSERT INTO learning_logs (student_id, unit_id, card_id, course_type, is_correct, answer_time_seconds, difficulty_level, problem_type, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `).bind(
+        parseInt(student_id), parseInt(curriculum_id || 0),
+        card_id ? parseInt(card_id) : null,
+        'student_home', is_correct ? 1 : 0,
+        answer_time_seconds || 0, difficulty_felt || 'medium',
+        content_type || 'card'
+      ).run()
+    } catch (llErr) {
+      console.warn('learning_logs並行記録スキップ:', llErr)
+    }
+
+    console.log(`📝 解答記録: student=${student_id}, card=${card_id}, correct=${is_correct}`)
+    return c.json({ success: true, answer_id: result.meta?.last_row_id })
+  } catch (error) {
+    console.error('解答記録エラー:', error)
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 適応的次問題推奨 ---
+app.get('/api/student-learning/adaptive-next', async (c) => {
+  const { env } = c
+  try {
+    const studentId = c.req.query('student_id')
+    const curriculumId = c.req.query('curriculum_id')
+    if (!studentId) return c.json({ success: false, error: 'student_id required' }, 400)
+
+    // 最近の解答履歴を取得
+    let recentAnswers: any[] = []
+    try {
+      const res = await env.DB.prepare(`
+        SELECT is_correct, answer_time_seconds, content_type, difficulty_felt, created_at
+        FROM student_card_answers
+        WHERE student_id = ? ${curriculumId ? 'AND curriculum_id = ?' : ''}
+        ORDER BY created_at DESC LIMIT 20
+      `).bind(...(curriculumId ? [parseInt(studentId), parseInt(curriculumId)] : [parseInt(studentId)])).all()
+      recentAnswers = (res.results || []) as any[]
+    } catch {}
+
+    if (recentAnswers.length === 0) {
+      return c.json({
+        success: true,
+        recommendation: {
+          message: 'まずは学習カードの問題にチャレンジしてみよう！',
+          suggested_difficulty: 'medium',
+          accuracy_trend: 'unknown',
+          needs_review: false
+        }
+      })
+    }
+
+    // 統計分析
+    const totalCorrect = recentAnswers.filter(a => a.is_correct).length
+    const accuracy = Math.round(totalCorrect / recentAnswers.length * 100)
+    const avgTime = Math.round(recentAnswers.reduce((s, a) => s + (a.answer_time_seconds || 0), 0) / recentAnswers.length)
+
+    // 直近5問 vs その前5問でトレンド判定
+    const recent5 = recentAnswers.slice(0, Math.min(5, recentAnswers.length))
+    const prev5 = recentAnswers.slice(5, Math.min(10, recentAnswers.length))
+    const recent5Acc = recent5.length > 0 ? recent5.filter(a => a.is_correct).length / recent5.length * 100 : 0
+    const prev5Acc = prev5.length > 0 ? prev5.filter(a => a.is_correct).length / prev5.length * 100 : 0
+
+    let accuracyTrend = 'stable'
+    if (prev5.length >= 3) {
+      if (recent5Acc > prev5Acc + 15) accuracyTrend = 'improving'
+      else if (recent5Acc < prev5Acc - 15) accuracyTrend = 'declining'
+    }
+
+    // 難易度推奨
+    let suggestedDifficulty = 'medium'
+    if (accuracy >= 85) suggestedDifficulty = 'hard'
+    else if (accuracy >= 60) suggestedDifficulty = 'medium'
+    else suggestedDifficulty = 'easy'
+
+    // メッセージ生成
+    let message = ''
+    const needsReview = accuracy < 50
+    if (accuracy >= 85) {
+      message = `すばらしい！正答率${accuracy}%🎉 もっとむずかしい問題にチャレンジしてみよう！`
+    } else if (accuracy >= 60) {
+      message = `いい調子！正答率${accuracy}%✨ ${accuracyTrend === 'improving' ? 'どんどん良くなっているね！' : 'このまま続けよう！'}`
+    } else {
+      message = `正答率${accuracy}%📝 ${needsReview ? 'ゆっくり基礎を復習してみよう。ヒントも使ってね！' : 'もう一度カードを見直してから挑戦してみよう！'}`
+    }
+
+    // 初期診断データがあれば追加アドバイス
+    let diagAdvice = ''
+    try {
+      const diag = await env.DB.prepare(
+        'SELECT * FROM initial_diagnostics WHERE student_id = ? ORDER BY created_at DESC LIMIT 1'
+      ).bind(parseInt(studentId)).first() as any
+      if (diag) {
+        if (diag.learning_style_dominant === 'visual' && accuracy < 70) {
+          diagAdvice = '（あなたは目で見るのが得意！図やイラストを使って考えてみてね）'
+        } else if (diag.learning_style_dominant === 'kinesthetic' && accuracy < 70) {
+          diagAdvice = '（あなたは手を動かすのが得意！実際に書いたり数えたりしてみよう）'
+        } else if (diag.learning_style_dominant === 'auditory' && accuracy < 70) {
+          diagAdvice = '（あなたは耳で聞くのが得意！問題を声に出して読んでみよう）'
+        }
+      }
+    } catch {}
+
+    return c.json({
+      success: true,
+      recommendation: {
+        message: message + diagAdvice,
+        suggested_difficulty: suggestedDifficulty,
+        accuracy: accuracy,
+        accuracy_trend: accuracyTrend,
+        avg_time: avgTime,
+        total_answers: recentAnswers.length,
+        needs_review: needsReview
+      }
+    })
+  } catch (error) {
+    console.error('適応的推奨エラー:', error)
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
   }
 })
