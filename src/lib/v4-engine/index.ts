@@ -88,3 +88,39 @@ export {
   adjustF8ForAffect,
   applyF8ToControls,
 } from './f8-motivation-engine'
+
+// F6 認知方略エンジン (Phase 3)
+export {
+  computeF6Controls,
+  checkAllStrategies,
+  determineRetrievalLevel,
+  computeOptimalSpacing,
+  computeInterleavingRatio,
+  determineElaborationType,
+  applyF6ToControls,
+} from './f6-strategy-engine'
+
+export type {
+  StrategyType,
+  StrategyApplicability,
+  F6_FullControls,
+  RetrievalLevel,
+  SpacingSchedule,
+  ElaborationPromptType,
+} from './f6-strategy-engine'
+
+// F1 感覚チャネルエンジン (Phase 3)
+export {
+  computeF1Controls,
+  determineEntryChannel,
+  selectEncodingChannels,
+  computeModalityWeights,
+  assessMultimodalCapacity,
+  applyF1ToControls,
+} from './f1-sensory-engine'
+
+export type {
+  SensoryChannel,
+  ModalityWeights,
+  F1_FullControls,
+} from './f1-sensory-engine'

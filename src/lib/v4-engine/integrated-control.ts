@@ -13,7 +13,7 @@
  * 
  * Phase 1 実装: F4 + F7 + F12 (瞬時制御ループ)
  * Phase 2 実装: F5 + F8 (セッションレベル制御 — 自己調整学習 + 動機づけ)
- * Phase 3 以降で F6, F1 等を追加
+ * Phase 3 実装: F6 + F1 (認知方略 + 感覚チャネル最適化)
  */
 
 import type {
@@ -32,6 +32,8 @@ import { computeF7Controls, computeContingencyRule } from './f7-scaffold-engine'
 import { executeAffectGating, applyAffectGating } from './f12-affect-engine'
 import { computeF5Controls, adjustSRLForAffect, applySRLToControls } from './f5-srl-engine'
 import { computeF8Controls, adjustF8ForAffect, applyF8ToControls } from './f8-motivation-engine'
+import { computeF6Controls, applyF6ToControls } from './f6-strategy-engine'
+import { computeF1Controls, applyF1ToControls } from './f1-sensory-engine'
 
 // ============================================================
 // Part 1: 基幹軸の算出 — 12の視座から5つの軸へ
@@ -373,28 +375,6 @@ function applyArchetypeH(d: IntegratedControlParameters): IntegratedControlParam
 }
 
 // ============================================================
-// Part 4: F6 方略の条件チェッカー
-// ============================================================
-
-/**
- * 認知方略の適用可能性チェック（設計書 Part 2 F6 canApplyStrategy）
- */
-function canApplyStrategy(strategy: string, profile: F6_StrategyProfile): boolean {
-  switch (strategy) {
-    case 'interleaving':
-      return profile.mastery_level_for_current_unit >= 70  // 基礎習得後のみ
-    case 'elaboration':
-      return profile.elaboration_prior_knowledge >= 40     // 最低限の既存知識
-    case 'retrieval_practice':
-      return profile.mastery_level_for_current_unit >= 30  // 初期学習完了後
-    case 'spacing':
-      return true  // 常に適用可能だが間隔は動的調整
-    default:
-      return true
-  }
-}
-
-// ============================================================
 // Part 5: 統合アルゴリズム — computeIntegratedControls
 // ============================================================
 
@@ -408,7 +388,7 @@ function canApplyStrategy(strategy: string, profile: F6_StrategyProfile): boolea
  *   Step 2: 基幹軸算出
  *   Step 3: アーキタイプ推定（今の姿の理解）
  *   Step 4: デフォルト制御値取得
- *   Step 5: 因果チェーンによる動的修正（F4, F7, F6, F5）
+ *   Step 5: 因果チェーンによる動的修正（F4, F7, F6, F1, F5, F8）
  *   Step 6: 感情ゲーティングの適用（上書き）
  *   Step 7: 矛盾解消
  * 
@@ -492,15 +472,18 @@ export function computeIntegratedControls(
     }
   }
 
-  // 5d. F6 方略の条件チェック
-  if (!canApplyStrategy('interleaving', profiles.F6)) {
-    controls.cognitive_strategy.interleaving_enabled = false
-    reasoning.push(`[F6] 交互配置: 前提条件未充足 → 無効化`)
-  }
-  if (!canApplyStrategy('elaboration', profiles.F6)) {
-    controls.cognitive_strategy.elaboration_prompt_type = 'none'
-    reasoning.push(`[F6] 精緻化: 前提知識不足 → 無効化`)
-  }
+  // 5d. F6 認知方略エンジン（Phase 3: 6方略条件チェック・段階制御・感情安全補正）
+  const f6Controls = computeF6Controls(profiles.F6, behavior, archetype, profiles.F5, profiles.F12)
+  // F6制御パラメータを統合制御に適用（cognitive_strategy セクション全体を上書き）
+  const f6Applied = applyF6ToControls(controls, f6Controls)
+  controls.cognitive_strategy = f6Applied.cognitive_strategy
+  reasoning.push(`[F6/方略] ${f6Controls.reasoning}`)
+
+  // 5d-2. F1 感覚チャネル最適化（Phase 3: 入口チャネル・多重符号化・モダリティウェイト）
+  const f1Controls = computeF1Controls(profiles.F1, archetype)
+  const f1Applied = applyF1ToControls(controls, f1Controls)
+  controls.presentation = f1Applied.presentation
+  reasoning.push(`[F1/感覚] ${f1Controls.reasoning}`)
 
   // 5e. F5 SRLエンジン（Phase 2: 3相サイクル・4発達段階・足場制御）
   let f5Controls = computeF5Controls(profiles.F5, behavior, archetype, profiles.F12)
@@ -638,3 +621,22 @@ export {
   adjustF8ForAffect,
   applyF8ToControls,
 } from './f8-motivation-engine'
+
+export {
+  computeF6Controls,
+  checkAllStrategies,
+  determineRetrievalLevel,
+  computeOptimalSpacing,
+  computeInterleavingRatio,
+  determineElaborationType,
+  applyF6ToControls,
+} from './f6-strategy-engine'
+
+export {
+  computeF1Controls,
+  determineEntryChannel,
+  selectEncodingChannels,
+  computeModalityWeights,
+  assessMultimodalCapacity,
+  applyF1ToControls,
+} from './f1-sensory-engine'

@@ -22,6 +22,8 @@ import { computeATIStructure } from './f4-ati-engine'
 import { estimateAffectState } from './f12-affect-engine'
 import { computeF5Controls, detectSRLPhase, assessDevelopmentalStage, adjustSRLForAffect } from './f5-srl-engine'
 import { computeF8Controls, assessNeedSatisfaction, assessMotivationQuality, adjustF8ForAffect } from './f8-motivation-engine'
+import { computeF6Controls, checkAllStrategies, determineRetrievalLevel, computeOptimalSpacing, computeInterleavingRatio, determineElaborationType } from './f6-strategy-engine'
+import { computeF1Controls, determineEntryChannel, selectEncodingChannels, assessMultimodalCapacity } from './f1-sensory-engine'
 
 // ============================================================
 // テスト用ヘルパー: プロファイル生成
@@ -725,6 +727,396 @@ function runTests(): void {
     helplessResult.controls._human_intervention_recommended === true,
     '統合F8: 学習性無力感 → 人的介入推奨',
     `human_intervention=${helplessResult.controls._human_intervention_recommended}`
+  )
+
+  // -------------------------------------------------------
+  // Test 18: F6 条件チェッカー — 6方略の適用可能性テスト
+  // -------------------------------------------------------
+  // 高習得度 → 全方略が適用可能
+  const highMasteryProfile: Parameters<typeof checkAllStrategies>[0] = {
+    retrieval_practice_readiness: 80,
+    spacing_optimal_gap: 3,
+    interleaving_readiness: true,
+    elaboration_prior_knowledge: 75,
+    mastery_level_for_current_unit: 85,
+  }
+  const highStrategies = checkAllStrategies(highMasteryProfile)
+  assert(
+    highStrategies.retrieval_practice.applicable === true,
+    'F6/条件: 高習得度 → 検索練習=適用可',
+    `applicable=${highStrategies.retrieval_practice.applicable}, mastery=85%`
+  )
+  assert(
+    highStrategies.interleaving.applicable === true,
+    'F6/条件: 高習得度+readiness → 交互配置=適用可',
+    `applicable=${highStrategies.interleaving.applicable}`
+  )
+  assert(
+    highStrategies.elaboration.applicable === true,
+    'F6/条件: 高前提知識 → 精緻化=適用可',
+    `applicable=${highStrategies.elaboration.applicable}`
+  )
+
+  // 低習得度 → 交互配置ブロック（d=-0.30リスク）
+  const lowMasteryProfile: Parameters<typeof checkAllStrategies>[0] = {
+    retrieval_practice_readiness: 20,
+    spacing_optimal_gap: 3,
+    interleaving_readiness: false,
+    elaboration_prior_knowledge: 25,
+    mastery_level_for_current_unit: 20,
+  }
+  const lowStrategies = checkAllStrategies(lowMasteryProfile)
+  assert(
+    lowStrategies.interleaving.applicable === false,
+    'F6/条件: 低習得度 → 交互配置=ブロック',
+    `applicable=${lowStrategies.interleaving.applicable}, harm_risk=${lowStrategies.interleaving.harm_risk}`
+  )
+  assert(
+    lowStrategies.interleaving.harm_risk >= 0.7,
+    'F6/条件: 交互配置ブロック時 → 高害リスク',
+    `harm_risk=${lowStrategies.interleaving.harm_risk}`
+  )
+  assert(
+    lowStrategies.retrieval_practice.applicable === false,
+    'F6/条件: 低習得度 → 検索練習=ブロック',
+    `applicable=${lowStrategies.retrieval_practice.applicable}`
+  )
+  assert(
+    lowStrategies.elaboration.applicable === false,
+    'F6/条件: 低前提知識 → 精緻化=ブロック',
+    `applicable=${lowStrategies.elaboration.applicable}`
+  )
+  assert(
+    lowStrategies.spacing.applicable === true,
+    'F6/条件: 間隔効果は常に適用可能',
+    `applicable=${lowStrategies.spacing.applicable}`
+  )
+
+  // -------------------------------------------------------
+  // Test 19: F6 検索練習段階制御テスト
+  // -------------------------------------------------------
+  // 高習得+高正答率 → 自由再生
+  const retrievalHigh = determineRetrievalLevel(
+    highMasteryProfile, 'A',
+    createTestBehavior({ recent_accuracy: 0.85 }),
+  )
+  assert(
+    retrievalHigh.level === 'free_recall',
+    'F6/検索: 高習得+高正答率 → 自由再生',
+    `level=${retrievalHigh.level}`
+  )
+
+  // 中習得+中正答率 → 手がかり再生
+  const midProfile: Parameters<typeof determineRetrievalLevel>[0] = {
+    ...highMasteryProfile,
+    mastery_level_for_current_unit: 55,
+  }
+  const retrievalMid = determineRetrievalLevel(
+    midProfile, 'B',
+    createTestBehavior({ recent_accuracy: 0.6 }),
+  )
+  assert(
+    retrievalMid.level === 'cued_recall',
+    'F6/検索: 中習得+中正答率 → 手がかり再生',
+    `level=${retrievalMid.level}`
+  )
+
+  // 低習得 → 再認
+  const retrievalLow = determineRetrievalLevel(
+    lowMasteryProfile, 'H',
+    createTestBehavior({ recent_accuracy: 0.3 }),
+  )
+  assert(
+    retrievalLow.level === 'recognition',
+    'F6/検索: 低習得+低正答率 → 再認',
+    `level=${retrievalLow.level}`
+  )
+
+  // -------------------------------------------------------
+  // Test 20: F6 間隔効果の動的算出テスト
+  // -------------------------------------------------------
+  const spacingResult = computeOptimalSpacing(30, 0, 50)
+  assert(
+    spacingResult.interval_days >= 1 && spacingResult.interval_days <= 30,
+    'F6/間隔: 間隔が1-30日の範囲内',
+    `interval=${spacingResult.interval_days}日, schedule=${spacingResult.schedule}`
+  )
+
+  // 連続正解 → 間隔が広がる
+  const spacingExpand = computeOptimalSpacing(30, 3, 50)
+  assert(
+    spacingExpand.interval_days > spacingResult.interval_days,
+    'F6/間隔: 連続正解 → 間隔拡大',
+    `base=${spacingResult.interval_days}日, expanded=${spacingExpand.interval_days}日`
+  )
+
+  // 高習得度 → 間隔が広がる
+  const spacingHighMastery = computeOptimalSpacing(30, 0, 80)
+  assert(
+    spacingHighMastery.interval_days >= spacingResult.interval_days,
+    'F6/間隔: 高習得度 → 間隔拡大',
+    `base=${spacingResult.interval_days}日, high_mastery=${spacingHighMastery.interval_days}日`
+  )
+
+  // -------------------------------------------------------
+  // Test 21: F6 交互配置比率テスト
+  // -------------------------------------------------------
+  const interleavingA = computeInterleavingRatio(90, 'A')
+  assert(
+    interleavingA > 0,
+    'F6/交互: Type A + 高習得度 → 比率>0',
+    `ratio=${interleavingA.toFixed(2)}`
+  )
+
+  const interleavingH = computeInterleavingRatio(90, 'H')
+  assert(
+    interleavingH === 0,
+    'F6/交互: Type H → 比率=0（使わない）',
+    `ratio=${interleavingH}`
+  )
+
+  const interleavingG = computeInterleavingRatio(90, 'G')
+  assert(
+    interleavingG === 0,
+    'F6/交互: Type G → 比率=0（使わない）',
+    `ratio=${interleavingG}`
+  )
+
+  // -------------------------------------------------------
+  // Test 22: F6 精緻化プロンプト決定テスト
+  // -------------------------------------------------------
+  const elabHigh = determineElaborationType(highMasteryProfile, 'A')
+  assert(
+    elabHigh.type === 'connect',
+    'F6/精緻化: Type A + 高前提知識 → connect型',
+    `type=${elabHigh.type}, depth=${elabHigh.depth}`
+  )
+  assert(
+    elabHigh.depth === 'deep',
+    'F6/精緻化: Type A → 深い精緻化',
+    `depth=${elabHigh.depth}`
+  )
+
+  const elabLow = determineElaborationType(lowMasteryProfile, 'G')
+  assert(
+    elabLow.type === 'none',
+    'F6/精緻化: 低前提知識 → none',
+    `type=${elabLow.type}`
+  )
+
+  // -------------------------------------------------------
+  // Test 23: F6 全体制御算出テスト（感情安全補正含む）
+  // -------------------------------------------------------
+  // 不安な子: 検索練習が1段下がり、交互配置が無効化
+  const anxiousF6Profile: Parameters<typeof computeF6Controls>[0] = {
+    retrieval_practice_readiness: 70,
+    spacing_optimal_gap: 3,
+    interleaving_readiness: true,
+    elaboration_prior_knowledge: 60,
+    mastery_level_for_current_unit: 75,
+  }
+  const anxiousF12 = createTestProfiles({ anxiety: 70, arousal: 75, valence: -20 }).F12
+  const f6Anxious = computeF6Controls(
+    anxiousF6Profile,
+    createTestBehavior({ recent_accuracy: 0.8 }),
+    'D', undefined, anxiousF12,
+  )
+  assert(
+    f6Anxious.retrieval.level !== 'free_recall',
+    'F6/感情補正: 不安時 → 自由再生が格下げ',
+    `level=${f6Anxious.retrieval.level}`
+  )
+  assert(
+    f6Anxious.interleaving.enabled === false,
+    'F6/感情補正: 不安時 → 交互配置を無効化',
+    `enabled=${f6Anxious.interleaving.enabled}`
+  )
+
+  // -------------------------------------------------------
+  // Test 24: F1 入口チャネル決定テスト
+  // -------------------------------------------------------
+  // 視覚優位
+  const visualProfile = {
+    visual_processing_efficiency: 85,
+    auditory_processing_efficiency: 50,
+    reading_processing_efficiency: 60,
+    kinesthetic_processing_efficiency: 40,
+    multimodal_index: 55,
+  }
+  const entryVisual = determineEntryChannel(visualProfile)
+  assert(
+    entryVisual.channel === 'visual',
+    'F1/入口: 視覚優位 → visual',
+    `channel=${entryVisual.channel}, confidence=${entryVisual.confidence.toFixed(2)}`
+  )
+
+  // 聴覚優位
+  const auditoryProfile = {
+    visual_processing_efficiency: 40,
+    auditory_processing_efficiency: 80,
+    reading_processing_efficiency: 55,
+    kinesthetic_processing_efficiency: 45,
+    multimodal_index: 50,
+  }
+  const entryAuditory = determineEntryChannel(auditoryProfile)
+  assert(
+    entryAuditory.channel === 'auditory',
+    'F1/入口: 聴覚優位 → auditory',
+    `channel=${entryAuditory.channel}`
+  )
+
+  // -------------------------------------------------------
+  // Test 25: F1 多重符号化チャネル選定テスト
+  // -------------------------------------------------------
+  // 視覚入口 → 言語系を追加（二重符号化理論）
+  const encodingFromVisual = selectEncodingChannels(visualProfile, 'visual')
+  assert(
+    encodingFromVisual.channels.some(c => c === 'reading' || c === 'auditory'),
+    'F1/符号化: 視覚入口 → 言語系チャネル追加',
+    `channels=[${encodingFromVisual.channels.join(', ')}]`
+  )
+
+  // 聴覚入口 → 視覚系を追加
+  const encodingFromAuditory = selectEncodingChannels(auditoryProfile, 'auditory')
+  assert(
+    encodingFromAuditory.channels.some(c => c === 'visual' || c === 'kinesthetic'),
+    'F1/符号化: 聴覚入口 → 視覚系チャネル追加',
+    `channels=[${encodingFromAuditory.channels.join(', ')}]`
+  )
+
+  // -------------------------------------------------------
+  // Test 26: F1 マルチモーダル容量評価テスト
+  // -------------------------------------------------------
+  const highMultimodal = assessMultimodalCapacity({
+    ...visualProfile, multimodal_index: 80,
+  })
+  assert(
+    highMultimodal.capacity === 'high' && highMultimodal.max_channels === 3,
+    'F1/マルチモーダル: 高指数 → 3チャネル',
+    `capacity=${highMultimodal.capacity}, max=${highMultimodal.max_channels}`
+  )
+
+  const lowMultimodal = assessMultimodalCapacity({
+    ...visualProfile, multimodal_index: 25,
+  })
+  assert(
+    lowMultimodal.capacity === 'low' && lowMultimodal.max_channels === 1,
+    'F1/マルチモーダル: 低指数 → 1チャネル',
+    `capacity=${lowMultimodal.capacity}, max=${lowMultimodal.max_channels}`
+  )
+
+  // -------------------------------------------------------
+  // Test 27: F1 全体制御算出テスト（アーキタイプ補正含む）
+  // -------------------------------------------------------
+  const f1A = computeF1Controls(visualProfile, 'A')
+  assert(
+    f1A.entry.channel === 'visual',
+    'F1/制御: Type A → 視覚入口',
+    `entry=${f1A.entry.channel}`
+  )
+  assert(
+    f1A.encoding.channels.length >= 1,
+    'F1/制御: Type A → 符号化チャネル≥1',
+    `channels=[${f1A.encoding.channels.join(', ')}]`
+  )
+
+  // Type H: 認知負荷最小化 → 符号化チャネル制限
+  const f1H = computeF1Controls(visualProfile, 'H')
+  assert(
+    f1H.encoding.channels.length <= 1,
+    'F1/制御: Type H → 符号化チャネル≤1（認知負荷最小化）',
+    `channels=[${f1H.encoding.channels.join(', ')}]`
+  )
+
+  // -------------------------------------------------------
+  // Test 28: 統合テスト — F6がreasoningに含まれる
+  // -------------------------------------------------------
+  const normalWithF6 = computeIntegratedControls(normalProfile, createTestBehavior())
+  const reasoningHasF6 = normalWithF6.reasoning.some(r => r.includes('[F6/方略]'))
+  assert(
+    reasoningHasF6,
+    'reasoning: F6/方略情報が含まれる',
+    `reasoning=${normalWithF6.reasoning.filter(r => r.includes('F6')).join('; ')}`
+  )
+
+  // -------------------------------------------------------
+  // Test 29: 統合テスト — F1がreasoningに含まれる
+  // -------------------------------------------------------
+  const reasoningHasF1 = normalWithF6.reasoning.some(r => r.includes('[F1/感覚]'))
+  assert(
+    reasoningHasF1,
+    'reasoning: F1/感覚情報が含まれる',
+    `reasoning=${normalWithF6.reasoning.filter(r => r.includes('F1')).join('; ')}`
+  )
+
+  // -------------------------------------------------------
+  // Test 30: 統合テスト — F6制御が統合制御に反映
+  // -------------------------------------------------------
+  // Type A + 高習得度 → 自由再生 + 交互配置有効
+  const typeAHighMastery = createTestProfiles({
+    cognitive_autonomy: 85, emotional_stability: 80,
+    strategic_maturity: 80, motivational_energy: 80,
+    anxiety: 10, independence: 85, prior_knowledge: 80,
+  })
+  const typeAF6Result = computeIntegratedControls(typeAHighMastery, createTestBehavior({ recent_accuracy: 0.85, consecutive_successes: 3 }))
+  assert(
+    typeAF6Result.controls.cognitive_strategy.retrieval_mode === 'free_recall',
+    '統合F6: Type A + 高習得度 → 自由再生',
+    `retrieval_mode=${typeAF6Result.controls.cognitive_strategy.retrieval_mode}`
+  )
+  assert(
+    typeAF6Result.controls.cognitive_strategy.interleaving_enabled === true,
+    '統合F6: Type A + 高習得度 → 交互配置ON',
+    `interleaving=${typeAF6Result.controls.cognitive_strategy.interleaving_enabled}`
+  )
+
+  // Type G + 低習得度 → 再認 + 交互配置OFF
+  const typeGLowMastery = createTestProfiles({
+    cognitive_autonomy: 25, emotional_stability: 55,
+    strategic_maturity: 25, motivational_energy: 25,
+    anxiety: 40, independence: 20, prior_knowledge: 25,
+  })
+  const typeGF6Result = computeIntegratedControls(typeGLowMastery, createTestBehavior({ recent_accuracy: 0.3 }))
+  assert(
+    typeGF6Result.controls.cognitive_strategy.retrieval_mode === 'recognition',
+    '統合F6: Type G + 低習得度 → 再認',
+    `retrieval_mode=${typeGF6Result.controls.cognitive_strategy.retrieval_mode}`
+  )
+  assert(
+    typeGF6Result.controls.cognitive_strategy.interleaving_enabled === false,
+    '統合F6: Type G + 低習得度 → 交互配置OFF',
+    `interleaving=${typeGF6Result.controls.cognitive_strategy.interleaving_enabled}`
+  )
+
+  // -------------------------------------------------------
+  // Test 31: 統合テスト — F1制御が統合制御に反映
+  // -------------------------------------------------------
+  // 視覚優位の子 → entry_channel = visual
+  assert(
+    typeAF6Result.controls.presentation.entry_channel === 'visual',
+    '統合F1: 視覚優位 → entry_channel=visual',
+    `entry_channel=${typeAF6Result.controls.presentation.entry_channel}`
+  )
+  assert(
+    typeAF6Result.controls.presentation.encoding_channels.length >= 1,
+    '統合F1: 多重符号化チャネル≥1',
+    `encoding=[${typeAF6Result.controls.presentation.encoding_channels.join(', ')}]`
+  )
+
+  // -------------------------------------------------------
+  // Test 32: 統合テスト — 不安な子でF6が安全に制限される
+  // -------------------------------------------------------
+  const anxiousLearner = createTestProfiles({
+    cognitive_autonomy: 75, emotional_stability: 25,
+    strategic_maturity: 80, motivational_energy: 30,
+    anxiety: 75, independence: 70, prior_knowledge: 80,
+    arousal: 80, valence: -30, boredom: 5, flow: 0.05,
+  })
+  const anxiousF6Result = computeIntegratedControls(anxiousLearner, createTestBehavior({ recent_accuracy: 0.8 }))
+  assert(
+    anxiousF6Result.controls.cognitive_strategy.interleaving_enabled === false,
+    '統合F6: 不安な子 → 交互配置がブロック',
+    `interleaving=${anxiousF6Result.controls.cognitive_strategy.interleaving_enabled}`
   )
 
   // -------------------------------------------------------
