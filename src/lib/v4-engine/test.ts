@@ -20,10 +20,17 @@ import {
 } from './integrated-control'
 import { computeATIStructure } from './f4-ati-engine'
 import { estimateAffectState } from './f12-affect-engine'
-import { computeF5Controls, detectSRLPhase, assessDevelopmentalStage, adjustSRLForAffect } from './f5-srl-engine'
-import { computeF8Controls, assessNeedSatisfaction, assessMotivationQuality, adjustF8ForAffect } from './f8-motivation-engine'
+import { computeF5Controls, detectSRLPhase, assessDevelopmentalStage, adjustSRLForAffect, trackSRLPhaseTransition, computeSRLAutoAdjustment, assessAdaptationQuality } from './f5-srl-engine'
+import type { SRLSessionTracker } from './f5-srl-engine'
+import { computeF8Controls, assessNeedSatisfaction, assessMotivationQuality, adjustF8ForAffect, detectMotivationFeedbackLoop } from './f8-motivation-engine'
+import type { MotivationFeedbackState } from './f8-motivation-engine'
 import { computeF6Controls, checkAllStrategies, determineRetrievalLevel, computeOptimalSpacing, computeInterleavingRatio, determineElaborationType } from './f6-strategy-engine'
 import { computeF1Controls, determineEntryChannel, selectEncodingChannels, assessMultimodalCapacity } from './f1-sensory-engine'
+import { computeF2Controls, determinePrimaryEntry, determineFallbackEntry, determineMindsetMessage } from './f2-intelligence-engine'
+import { computeF3Controls, determineEntryPhase, buildCycleSequence } from './f3-experiential-engine'
+import { computeF9Controls, assessMetacognitiveLevel, determineProblemSolvingScaffold } from './f9-metacognitive-engine'
+import { computeF10Controls, determineMisconceptionHandling } from './f10-domain-engine'
+import { computeF11Controls, assessAuthenticityLevel } from './f11-authentic-engine'
 
 // ============================================================
 // テスト用ヘルパー: プロファイル生成
@@ -1118,6 +1125,604 @@ function runTests(): void {
     '統合F6: 不安な子 → 交互配置がブロック',
     `interleaving=${anxiousF6Result.controls.cognitive_strategy.interleaving_enabled}`
   )
+
+  // -------------------------------------------------------
+  // Test 33: F2 多元的入口 — 主入口とフォールバック
+  // -------------------------------------------------------
+  const f2ProfileLogical = {
+    linguistic: 55, logical_mathematical: 85, spatial: 50,
+    bodily_kinesthetic: 40, musical: 30, interpersonal: 45,
+    intrapersonal: 50, naturalist: 35, growth_mindset: 60,
+  }
+  const primaryEntry = determinePrimaryEntry(f2ProfileLogical)
+  assert(
+    primaryEntry.entry === 'logical_mathematical',
+    'F2/入口: 論理数学優位 → logical_mathematical',
+    `entry=${primaryEntry.entry}, score=${primaryEntry.score}`
+  )
+
+  const fallbackEntry = determineFallbackEntry(f2ProfileLogical, primaryEntry.entry)
+  assert(
+    fallbackEntry.entry !== 'logical_mathematical',
+    'F2/フォールバック: 主入口と異なる',
+    `fallback=${fallbackEntry.entry}`
+  )
+
+  // 成長マインドセット
+  assert(
+    determineMindsetMessage(f2ProfileLogical, 'B') === 'process_praise',
+    'F2/マインドセット: 中程度(60) → process_praise',
+    `message=${determineMindsetMessage(f2ProfileLogical, 'B')}`
+  )
+  assert(
+    determineMindsetMessage({ ...f2ProfileLogical, growth_mindset: 20 }, 'G') === 'effort_praise',
+    'F2/マインドセット: 低(20) → effort_praise',
+    `message=${determineMindsetMessage({ ...f2ProfileLogical, growth_mindset: 20 }, 'G')}`
+  )
+  assert(
+    determineMindsetMessage({ ...f2ProfileLogical, growth_mindset: 80 }, 'A') === 'strategy_praise',
+    'F2/マインドセット: 高(80) → strategy_praise',
+    `message=${determineMindsetMessage({ ...f2ProfileLogical, growth_mindset: 80 }, 'A')}`
+  )
+
+  // F2全体制御
+  const f2Controls = computeF2Controls(f2ProfileLogical, 'B')
+  assert(
+    f2Controls.primary_entry === 'logical_mathematical',
+    'F2/制御: 主入口が正しい',
+    `primary=${f2Controls.primary_entry}`
+  )
+
+  // -------------------------------------------------------
+  // Test 34: F3 経験変容学習 — Kolbサイクル
+  // -------------------------------------------------------
+  const f3ProfileAC = {
+    ce_preference: 40, ro_preference: 50, ac_preference: 80, ae_preference: 30,
+    cycle_completion_rate: 0.8, dominant_style: 'assimilating' as const,
+  }
+  const entryPhase = determineEntryPhase(f3ProfileAC, 'B')
+  assert(
+    entryPhase.phase === 'AC',
+    'F3/入口: AC優位 → AC入口',
+    `phase=${entryPhase.phase}`
+  )
+
+  // サイクル順序
+  const sequence = buildCycleSequence('AC')
+  assert(
+    sequence[0] === 'AC' && sequence[1] === 'AE' && sequence[2] === 'CE' && sequence[3] === 'RO',
+    'F3/サイクル: AC入口 → AC→AE→CE→RO',
+    `sequence=[${sequence.join('→')}]`
+  )
+
+  // CE入口のサイクル
+  const sequenceCE = buildCycleSequence('CE')
+  assert(
+    sequenceCE[0] === 'CE' && sequenceCE.length === 4,
+    'F3/サイクル: CE入口 → CE→RO→AC→AE',
+    `sequence=[${sequenceCE.join('→')}]`
+  )
+
+  // Type G/H はAC入口が推奨
+  const f3ProfileCE = {
+    ce_preference: 70, ro_preference: 40, ac_preference: 50, ae_preference: 30,
+    cycle_completion_rate: 0.3, dominant_style: 'accommodating' as const,
+  }
+  const entryG = determineEntryPhase(f3ProfileCE, 'G')
+  assert(
+    entryG.phase === 'AC',
+    'F3/入口: Type G → AC推奨（構造化入口）',
+    `phase=${entryG.phase}`
+  )
+
+  // サイクル完走率が低い → 完走強制
+  const f3LowCompletion = computeF3Controls(f3ProfileCE, 'G')
+  assert(
+    f3LowCompletion.force_full_cycle === true,
+    'F3/完走: 低完走率(0.3) → 完走強制',
+    `force=${f3LowCompletion.force_full_cycle}`
+  )
+
+  // -------------------------------------------------------
+  // Test 35: F9 メタ認知 — レベル評価と制御
+  // -------------------------------------------------------
+  const f9High = { metacognitive_knowledge: 80, metacognitive_regulation: 75, critical_thinking: 70, creative_thinking: 60 }
+  assert(
+    assessMetacognitiveLevel(f9High) === 'high',
+    'F9/レベル: 高メタ認知 → high',
+    `level=${assessMetacognitiveLevel(f9High)}`
+  )
+
+  const f9Low = { metacognitive_knowledge: 20, metacognitive_regulation: 25, critical_thinking: 30, creative_thinking: 20 }
+  assert(
+    assessMetacognitiveLevel(f9Low) === 'minimal',
+    'F9/レベル: 低メタ認知 → minimal',
+    `level=${assessMetacognitiveLevel(f9Low)}`
+  )
+
+  // 問題解決足場
+  assert(
+    determineProblemSolvingScaffold(f9High, 'A') === 'open',
+    'F9/PS足場: Type A + high → open',
+    `scaffold=${determineProblemSolvingScaffold(f9High, 'A')}`
+  )
+  assert(
+    determineProblemSolvingScaffold(f9Low, 'H') === 'structured',
+    'F9/PS足場: Type H + minimal → structured',
+    `scaffold=${determineProblemSolvingScaffold(f9Low, 'H')}`
+  )
+
+  // F9全体制御
+  const f9ControlsA = computeF9Controls(f9High, 'A')
+  assert(
+    f9ControlsA.metacognitive_prompts === false,
+    'F9/制御: Type A + high → プロンプトOFF',
+    `prompts=${f9ControlsA.metacognitive_prompts}`
+  )
+
+  const f9ControlsG = computeF9Controls(f9Low, 'G')
+  assert(
+    f9ControlsG.metacognitive_prompts === true,
+    'F9/制御: Type G + minimal → プロンプトON',
+    `prompts=${f9ControlsG.metacognitive_prompts}`
+  )
+
+  // -------------------------------------------------------
+  // Test 36: F10 領域固有認知 — 段階と誤概念
+  // -------------------------------------------------------
+  const f10Acclimation = {
+    domain_knowledge_stage: 'acclimation' as const,
+    misconceptions: ['分数は小数より小さい'],
+    knowledge_structure_depth: 20,
+  }
+  const f10AControls = computeF10Controls(f10Acclimation, 'B')
+  assert(
+    f10AControls.misconception_handling === 'bridging',
+    'F10/誤概念: acclimation段階 → bridging',
+    `handling=${f10AControls.misconception_handling}`
+  )
+  assert(
+    f10AControls.knowledge_structure_visualization === false,
+    'F10/可視化: acclimation → OFF',
+    `viz=${f10AControls.knowledge_structure_visualization}`
+  )
+
+  const f10Competence = {
+    domain_knowledge_stage: 'competence' as const,
+    misconceptions: ['掛け算は足し算より大きくなる'],
+    knowledge_structure_depth: 60,
+  }
+  const f10CControls = computeF10Controls(f10Competence, 'A')
+  assert(
+    f10CControls.misconception_handling === 'explicit_refutation',
+    'F10/誤概念: competence + Type A → explicit_refutation',
+    `handling=${f10CControls.misconception_handling}`
+  )
+  assert(
+    f10CControls.expert_novice_comparison === true,
+    'F10/専門家比較: competence段階 → ON',
+    `comparison=${f10CControls.expert_novice_comparison}`
+  )
+
+  const f10Proficiency = {
+    domain_knowledge_stage: 'proficiency' as const,
+    misconceptions: [],
+    knowledge_structure_depth: 85,
+  }
+  assert(
+    computeF10Controls(f10Proficiency, 'A').transfer_prompt === true,
+    'F10/転移: proficiency段階 → ON',
+    `transfer=${computeF10Controls(f10Proficiency, 'A').transfer_prompt}`
+  )
+
+  // -------------------------------------------------------
+  // Test 37: F11 真正文脈 — 真正性レベルと制御
+  // -------------------------------------------------------
+  const f11Low = { personal_relevance: 20, real_world_connection_awareness: 25, community_participation: 15 }
+  assert(
+    assessAuthenticityLevel(f11Low) === 'low',
+    'F11/レベル: 低真正性 → low',
+    `level=${assessAuthenticityLevel(f11Low)}`
+  )
+
+  const f11High = { personal_relevance: 75, real_world_connection_awareness: 70, community_participation: 65 }
+  assert(
+    assessAuthenticityLevel(f11High) === 'high',
+    'F11/レベル: 高真正性 → high',
+    `level=${assessAuthenticityLevel(f11High)}`
+  )
+
+  // F11全体制御
+  const f11ControlsLow = computeF11Controls(f11Low, 'F')
+  assert(
+    f11ControlsLow.authentic_task_framing === true,
+    'F11/制御: 低真正性 → authentic_task ON',
+    `framing=${f11ControlsLow.authentic_task_framing}`
+  )
+
+  const f11ControlsH = computeF11Controls(f11Low, 'H')
+  assert(
+    f11ControlsH.authentic_task_framing === false,
+    'F11/制御: Type H → authentic_task OFF（認知負荷）',
+    `framing=${f11ControlsH.authentic_task_framing}`
+  )
+
+  // -------------------------------------------------------
+  // Test 38: 統合テスト — F2/F3/F9/F10/F11がreasoningに含まれる
+  // -------------------------------------------------------
+  const fullResult = computeIntegratedControls(normalProfile, createTestBehavior())
+  assert(
+    fullResult.reasoning.some(r => r.includes('[F2/入口]')),
+    'reasoning: F2/入口情報が含まれる',
+    `found=${fullResult.reasoning.some(r => r.includes('[F2/入口]'))}`
+  )
+  assert(
+    fullResult.reasoning.some(r => r.includes('[F3/Kolb]')),
+    'reasoning: F3/Kolb情報が含まれる',
+    `found=${fullResult.reasoning.some(r => r.includes('[F3/Kolb]'))}`
+  )
+  assert(
+    fullResult.reasoning.some(r => r.includes('[F9/メタ認知]')),
+    'reasoning: F9/メタ認知情報が含まれる',
+    `found=${fullResult.reasoning.some(r => r.includes('[F9/メタ認知]'))}`
+  )
+  assert(
+    fullResult.reasoning.some(r => r.includes('[F10/領域]')),
+    'reasoning: F10/領域情報が含まれる',
+    `found=${fullResult.reasoning.some(r => r.includes('[F10/領域]'))}`
+  )
+  assert(
+    fullResult.reasoning.some(r => r.includes('[F11/真正]')),
+    'reasoning: F11/真正情報が含まれる',
+    `found=${fullResult.reasoning.some(r => r.includes('[F11/真正]'))}`
+  )
+
+  // -------------------------------------------------------
+  // Test 39: 統合テスト — 12理論全てのreasoning出力
+  // -------------------------------------------------------
+  const allTheoryTags = ['F12感情', 'F4/ATI', 'F7/足場', 'F6/方略', 'F1/感覚', 'F2/入口', 'F3/Kolb', 'F9/メタ認知', 'F10/領域', 'F11/真正', 'F5/SRL', 'F8/動機']
+  const presentTags = allTheoryTags.filter(tag => fullResult.reasoning.some(r => r.includes(tag)))
+  assert(
+    presentTags.length === 12,
+    '統合: 12理論全てのreasoningが出力される',
+    `${presentTags.length}/12 present: [${presentTags.join(', ')}]`
+  )
+
+  // -------------------------------------------------------
+  // Test 40: F5 SRL適応品質の評価（Phase D）
+  // -------------------------------------------------------
+  const srlHighProfile = createTestProfiles({
+    cognitive_autonomy: 75, emotional_stability: 70,
+    strategic_maturity: 70, motivational_energy: 75,
+  })
+  const srlHighBehavior = createTestBehavior({ recent_accuracy: 0.8, consecutive_successes: 3 })
+  const srlHighF5 = computeF5Controls(srlHighProfile.F5, srlHighBehavior, 'A', srlHighProfile.F12)
+  const srlHighQuality = assessAdaptationQuality(srlHighProfile.F5, srlHighBehavior, srlHighF5.phase_detail)
+  assert(
+    srlHighQuality.overall >= 0.4,
+    'F5/適応品質: 高SRLプロファイル → 品質≧0.4',
+    `overall=${srlHighQuality.overall.toFixed(3)}`
+  )
+  assert(
+    srlHighQuality.forethought_quality > 0,
+    'F5/適応品質: 予見段階品質 > 0',
+    `forethought=${srlHighQuality.forethought_quality.toFixed(3)}`
+  )
+
+  // 低SRLプロファイルの適応品質
+  const srlLowProfile = createTestProfiles({
+    cognitive_autonomy: 15, emotional_stability: 20,
+    strategic_maturity: 15, motivational_energy: 15,
+  })
+  const srlLowBehavior = createTestBehavior({ recent_accuracy: 0.2, consecutive_errors: 4, hint_usage_count: 5 })
+  const srlLowF5 = computeF5Controls(srlLowProfile.F5, srlLowBehavior, 'H', srlLowProfile.F12)
+  const srlLowQuality = assessAdaptationQuality(srlLowProfile.F5, srlLowBehavior, srlLowF5.phase_detail)
+  assert(
+    srlLowQuality.overall < srlHighQuality.overall,
+    'F5/適応品質: 低SRL < 高SRL',
+    `low=${srlLowQuality.overall.toFixed(3)}, high=${srlHighQuality.overall.toFixed(3)}`
+  )
+
+  // -------------------------------------------------------
+  // Test 41: SRLセッション追跡（Phase D）
+  // -------------------------------------------------------
+  const srlTracker = trackSRLPhaseTransition(
+    srlHighF5.phase_detail,
+    null, // 初回呼び出し
+    10,
+    srlHighBehavior,
+    srlHighProfile.F5,
+  )
+  assert(
+    srlTracker.adaptation_quality.overall >= 0,
+    'F5/セッション追跡: 適応品質が算出される',
+    `quality=${srlTracker.adaptation_quality.overall.toFixed(3)}`
+  )
+  assert(
+    srlTracker.self_regulation_trend !== undefined,
+    'F5/セッション追跡: トレンドが算出される',
+    `trend=${srlTracker.self_regulation_trend}`
+  )
+
+  // -------------------------------------------------------
+  // Test 42: SRL自動調整（Phase D コア）
+  // -------------------------------------------------------
+  // 高SRL → scaffold_down（足場のフェイディング）
+  const srlAutoHigh = computeSRLAutoAdjustment(
+    srlHighF5, srlHighProfile.F5, srlHighBehavior, 'A', srlTracker, srlHighProfile.F12
+  )
+  assert(
+    srlAutoHigh.developmental_impact.direction === 'scaffold_down' ||
+    srlAutoHigh.developmental_impact.direction === 'maintain',
+    'F5/自動調整: 高SRL → scaffold_down or maintain',
+    `direction=${srlAutoHigh.developmental_impact.direction}`
+  )
+
+  // 低SRL → scaffold_up（足場の強化）
+  const srlLowTracker = trackSRLPhaseTransition(
+    srlLowF5.phase_detail,
+    null,
+    10,
+    srlLowBehavior,
+    srlLowProfile.F5,
+  )
+  const srlAutoLow = computeSRLAutoAdjustment(
+    srlLowF5, srlLowProfile.F5, srlLowBehavior, 'H', srlLowTracker, srlLowProfile.F12
+  )
+  assert(
+    srlAutoLow.adjustments_made.length > 0,
+    'F5/自動調整: 低SRL → 調整アクションが生成される',
+    `actions=${srlAutoLow.adjustments_made.length}`
+  )
+  assert(
+    srlAutoLow.developmental_impact.direction === 'scaffold_up' ||
+    srlAutoLow.developmental_impact.direction === 'phase_redirect',
+    'F5/自動調整: 低SRL → scaffold_up or phase_redirect',
+    `direction=${srlAutoLow.developmental_impact.direction}`
+  )
+
+  // -------------------------------------------------------
+  // Test 43: SRL因果効果（F5→F8, F5→F4）
+  // -------------------------------------------------------
+  assert(
+    typeof srlAutoHigh.causal_to_f8.efficacy_to_competence === 'number',
+    'F5/因果: efficacy_to_competence が数値',
+    `value=${srlAutoHigh.causal_to_f8.efficacy_to_competence.toFixed(3)}`
+  )
+  assert(
+    typeof srlAutoHigh.causal_to_f4.attribution_to_anxiety === 'number',
+    'F5/因果: attribution_to_anxiety が数値',
+    `value=${srlAutoHigh.causal_to_f4.attribution_to_anxiety.toFixed(3)}`
+  )
+  // 高SRL + 高自己効力感 → 有能感へ正の影響
+  assert(
+    srlAutoHigh.causal_to_f8.efficacy_to_competence >= 0,
+    'F5/因果: 高SRL → 有能感への正の影響',
+    `efficacy_to_competence=${srlAutoHigh.causal_to_f8.efficacy_to_competence.toFixed(3)}`
+  )
+
+  // -------------------------------------------------------
+  // Test 44: F8 動機づけフィードバックループ（Phase D）
+  // -------------------------------------------------------
+  // 正のスパイラル検出
+  const positiveMotProfile = createTestProfiles({
+    cognitive_autonomy: 75, emotional_stability: 75,
+    strategic_maturity: 75, motivational_energy: 80,
+  })
+  const positiveBehavior = createTestBehavior({ consecutive_successes: 4, recent_accuracy: 0.85 })
+  const positiveNeedState = assessNeedSatisfaction(positiveMotProfile.F8)
+  const positiveFeedback = detectMotivationFeedbackLoop(
+    positiveMotProfile.F8, positiveBehavior, positiveNeedState, 'A', positiveMotProfile.F7
+  )
+  assert(
+    positiveFeedback.spiral_type === 'positive',
+    'F8/ループ: 連続成功+高動機 → 正のスパイラル',
+    `spiral=${positiveFeedback.spiral_type}, intensity=${positiveFeedback.spiral_intensity.toFixed(2)}`
+  )
+  assert(
+    positiveFeedback.spiral_intensity > 0,
+    'F8/ループ: 正のスパイラル強度 > 0',
+    `intensity=${positiveFeedback.spiral_intensity.toFixed(3)}`
+  )
+
+  // 負のスパイラル検出
+  const negativeMotProfile = createTestProfiles({
+    cognitive_autonomy: 15, emotional_stability: 20,
+    strategic_maturity: 15, motivational_energy: 10, anxiety: 80,
+  })
+  const negativeBehavior = createTestBehavior({
+    consecutive_errors: 4, recent_accuracy: 0.15,
+    hint_usage_count: 5, idle_time_seconds: 60,
+  })
+  const negativeNeedState = assessNeedSatisfaction(negativeMotProfile.F8)
+  const negativeFeedback = detectMotivationFeedbackLoop(
+    negativeMotProfile.F8, negativeBehavior, negativeNeedState, 'H', negativeMotProfile.F7
+  )
+  assert(
+    negativeFeedback.spiral_type === 'negative',
+    'F8/ループ: 連続失敗+低動機 → 負のスパイラル',
+    `spiral=${negativeFeedback.spiral_type}, intensity=${negativeFeedback.spiral_intensity.toFixed(2)}`
+  )
+
+  // -------------------------------------------------------
+  // Test 45: 欲求バランス評価（Phase D）
+  // -------------------------------------------------------
+  assert(
+    positiveFeedback.need_balance.balance_score > 0,
+    'F8/バランス: 正のスパイラル時のバランススコア > 0',
+    `balance=${positiveFeedback.need_balance.balance_score.toFixed(3)}`
+  )
+  assert(
+    negativeFeedback.need_balance.weakest !== undefined,
+    'F8/バランス: 最弱欲求が特定される',
+    `weakest=${negativeFeedback.need_balance.weakest}`
+  )
+
+  // 全欲求欠乏パターン（F8プロファイルを直接操作して全欲求<30にする）
+  const allDeficientProfiles = createTestProfiles({
+    cognitive_autonomy: 10, emotional_stability: 10,
+    strategic_maturity: 10, motivational_energy: 5, anxiety: 90,
+  })
+  // relatedness_satisfactionをテスト用に強制的に低下させる
+  allDeficientProfiles.F8.relatedness_satisfaction = 15
+  allDeficientProfiles.F8.autonomy_satisfaction = 10
+  allDeficientProfiles.F8.competence_satisfaction = 10
+  const allDeficientNeedState = assessNeedSatisfaction(allDeficientProfiles.F8)
+  const allDeficientFeedback = detectMotivationFeedbackLoop(
+    allDeficientProfiles.F8,
+    createTestBehavior({ consecutive_errors: 5, recent_accuracy: 0.1 }),
+    allDeficientNeedState, 'H', allDeficientProfiles.F7
+  )
+  assert(
+    allDeficientFeedback.need_balance.imbalance_pattern === 'all_deficient',
+    'F8/バランス: 全欲求低下 → all_deficient',
+    `pattern=${allDeficientFeedback.need_balance.imbalance_pattern}`
+  )
+
+  // -------------------------------------------------------
+  // Test 46: 予防的介入（Phase D）
+  // -------------------------------------------------------
+  // 負のスパイラル → spiral_break
+  assert(
+    negativeFeedback.preventive_intervention !== null,
+    'F8/予防介入: 負のスパイラル → 介入が推奨される',
+    `intervention=${negativeFeedback.preventive_intervention?.type}`
+  )
+  assert(
+    negativeFeedback.preventive_intervention?.type === 'spiral_break',
+    'F8/予防介入: 負のスパイラル → spiral_break',
+    `type=${negativeFeedback.preventive_intervention?.type}`
+  )
+  assert(
+    negativeFeedback.preventive_intervention?.urgency === 'immediate',
+    'F8/予防介入: 負のスパイラル → 即時介入',
+    `urgency=${negativeFeedback.preventive_intervention?.urgency}`
+  )
+
+  // 全欲求欠乏 → safety_net
+  assert(
+    allDeficientFeedback.preventive_intervention?.type === 'safety_net',
+    'F8/予防介入: 全欲求欠乏 → safety_net',
+    `type=${allDeficientFeedback.preventive_intervention?.type}`
+  )
+
+  // -------------------------------------------------------
+  // Test 47: F8→F5 波及効果（Phase D）
+  // -------------------------------------------------------
+  assert(
+    positiveFeedback.ripple_to_f5.intrinsic_interest_modulation > 0,
+    'F8/波及: 正のスパイラル → 内発的興味↑',
+    `modulation=${positiveFeedback.ripple_to_f5.intrinsic_interest_modulation.toFixed(3)}`
+  )
+  assert(
+    positiveFeedback.ripple_to_f5.persistence_modulation > 0,
+    'F8/波及: 正のスパイラル → 忍耐力↑',
+    `modulation=${positiveFeedback.ripple_to_f5.persistence_modulation.toFixed(3)}`
+  )
+  assert(
+    negativeFeedback.ripple_to_f5.intrinsic_interest_modulation < positiveFeedback.ripple_to_f5.intrinsic_interest_modulation,
+    'F8/波及: 負のスパイラル → 内発的興味は正より低い',
+    `negative=${negativeFeedback.ripple_to_f5.intrinsic_interest_modulation.toFixed(3)}, positive=${positiveFeedback.ripple_to_f5.intrinsic_interest_modulation.toFixed(3)}`
+  )
+
+  // -------------------------------------------------------
+  // Test 48: F8→F4 波及効果と構造化推奨（Phase D）
+  // -------------------------------------------------------
+  assert(
+    typeof positiveFeedback.ripple_to_f4.anxiety_modulation === 'number',
+    'F8/波及: anxiety_modulation が数値',
+    `value=${positiveFeedback.ripple_to_f4.anxiety_modulation.toFixed(3)}`
+  )
+  assert(
+    typeof positiveFeedback.ripple_to_f4.structure_recommendation === 'number',
+    'F8/波及: structure_recommendation が数値',
+    `value=${positiveFeedback.ripple_to_f4.structure_recommendation.toFixed(3)}`
+  )
+  // 正のスパイラル → 構造化度↓推奨
+  assert(
+    positiveFeedback.ripple_to_f4.structure_recommendation <= 0,
+    'F8/波及: 正のスパイラル → 構造化度↓推奨',
+    `recommendation=${positiveFeedback.ripple_to_f4.structure_recommendation.toFixed(3)}`
+  )
+  // 負のスパイラル → 構造化度↑推奨
+  assert(
+    negativeFeedback.ripple_to_f4.structure_recommendation >= 0,
+    'F8/波及: 負のスパイラル → 構造化度↑推奨',
+    `recommendation=${negativeFeedback.ripple_to_f4.structure_recommendation.toFixed(3)}`
+  )
+
+  // -------------------------------------------------------
+  // Test 49: 統合テスト — 双方向因果ループのreasoning出力（Phase D）
+  // -------------------------------------------------------
+  // 正のスパイラルシナリオ
+  const positiveIntegrated = computeIntegratedControls(positiveMotProfile, positiveBehavior)
+  assert(
+    positiveIntegrated.reasoning.some(r => r.includes('[F5/適応]') || r.includes('[F5/SRL]')),
+    '統合/Phase D: F5適応ループのreasoningが含まれる',
+    `found=${positiveIntegrated.reasoning.some(r => r.includes('[F5/') )}`
+  )
+  assert(
+    positiveIntegrated.reasoning.some(r => r.includes('[F8/ループ]')),
+    '統合/Phase D: F8フィードバックループのreasoningが含まれる',
+    `found=${positiveIntegrated.reasoning.some(r => r.includes('[F8/ループ]'))}`
+  )
+
+  // 負のスパイラルシナリオ
+  const negativeIntegrated = computeIntegratedControls(negativeMotProfile, negativeBehavior)
+  assert(
+    negativeIntegrated.reasoning.some(r => r.includes('[F8/ループ]')),
+    '統合/Phase D: 負のスパイラルreasoningが含まれる',
+    `found=${negativeIntegrated.reasoning.some(r => r.includes('[F8/ループ]'))}`
+  )
+
+  // 因果連鎖の推論が含まれるか
+  const hasCausalReasoning = negativeIntegrated.reasoning.some(r =>
+    r.includes('[因果:') || r.includes('[スパイラル]') || r.includes('[予防介入]')
+  )
+  assert(
+    hasCausalReasoning,
+    '統合/Phase D: 因果連鎖/スパイラルのreasoningが含まれる',
+    `found=${hasCausalReasoning}, reasoning_count=${negativeIntegrated.reasoning.length}`
+  )
+
+  // -------------------------------------------------------
+  // Test 50: 統合テスト — 負のスパイラル時の制御変更（Phase D）
+  // -------------------------------------------------------
+  assert(
+    negativeIntegrated.controls.scaffold.frustration_control === true,
+    '統合/Phase D: 負のスパイラル → frustration_control ON',
+    `fc=${negativeIntegrated.controls.scaffold.frustration_control}`
+  )
+  assert(
+    negativeIntegrated.controls.scaffold.soft_language === true,
+    '統合/Phase D: 負のスパイラル → soft_language ON',
+    `sl=${negativeIntegrated.controls.scaffold.soft_language}`
+  )
+
+  // -------------------------------------------------------
+  // Test 51: 8アーキタイプ全てでPhase Dが動作（Phase D）
+  // -------------------------------------------------------
+  const archetypeParamsForD: { id: ArchetypeId; params: Parameters<typeof createTestProfiles>[0] }[] = [
+    { id: 'A', params: { cognitive_autonomy: 80, emotional_stability: 80, strategic_maturity: 80, motivational_energy: 80, anxiety: 15, independence: 85 } },
+    { id: 'B', params: { cognitive_autonomy: 55, emotional_stability: 80, strategic_maturity: 60, motivational_energy: 85, anxiety: 15, independence: 55, prior_knowledge: 65 } },
+    { id: 'C', params: { cognitive_autonomy: 55, emotional_stability: 75, strategic_maturity: 30, motivational_energy: 55, anxiety: 25, independence: 55 } },
+    { id: 'D', params: { cognitive_autonomy: 75, emotional_stability: 30, strategic_maturity: 75, motivational_energy: 35, anxiety: 70, independence: 70 } },
+    { id: 'E', params: { cognitive_autonomy: 55, emotional_stability: 55, strategic_maturity: 55, motivational_energy: 75, anxiety: 35, independence: 50 } },
+    { id: 'F', params: { cognitive_autonomy: 30, emotional_stability: 30, strategic_maturity: 25, motivational_energy: 55, anxiety: 65, independence: 25 } },
+    { id: 'G', params: { cognitive_autonomy: 25, emotional_stability: 55, strategic_maturity: 25, motivational_energy: 25, anxiety: 40, independence: 20 } },
+    { id: 'H', params: { cognitive_autonomy: 15, emotional_stability: 20, strategic_maturity: 15, motivational_energy: 15, anxiety: 80, independence: 10 } },
+  ]
+
+  for (const at of archetypeParamsForD) {
+    const p = createTestProfiles(at.params)
+    const b = createTestBehavior()
+    const result = computeIntegratedControls(p, b)
+    assert(
+      result.reasoning.some(r => r.includes('[F8/ループ]')),
+      `統合/Phase D: Type ${at.id} でF8ループreasoningが出力`,
+      `archetype=${at.id}, reasoning_count=${result.reasoning.length}`
+    )
+  }
 
   // -------------------------------------------------------
   // 結果表示

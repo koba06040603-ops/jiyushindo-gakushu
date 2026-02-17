@@ -14,6 +14,7 @@
  * Phase 1 実装: F4 + F7 + F12 (瞬時制御ループ)
  * Phase 2 実装: F5 + F8 (セッションレベル制御 — 自己調整学習 + 動機づけ)
  * Phase 3 実装: F6 + F1 (認知方略 + 感覚チャネル最適化)
+ * Phase 4 実装: F2 + F3 + F9 + F10 + F11 (全12理論完全統合)
  */
 
 import type {
@@ -30,10 +31,17 @@ import { ARCHETYPES } from './types'
 import { computeF4Controls, computeATIStructure, shouldAdjustStructure } from './f4-ati-engine'
 import { computeF7Controls, computeContingencyRule } from './f7-scaffold-engine'
 import { executeAffectGating, applyAffectGating } from './f12-affect-engine'
-import { computeF5Controls, adjustSRLForAffect, applySRLToControls } from './f5-srl-engine'
-import { computeF8Controls, adjustF8ForAffect, applyF8ToControls } from './f8-motivation-engine'
+import { computeF5Controls, adjustSRLForAffect, applySRLToControls, trackSRLPhaseTransition, computeSRLAutoAdjustment, assessAdaptationQuality } from './f5-srl-engine'
+import type { SRLSessionTracker, SRLAutoAdjustment } from './f5-srl-engine'
+import { computeF8Controls, adjustF8ForAffect, applyF8ToControls, detectMotivationFeedbackLoop, assessNeedSatisfaction as assessNeedSatisfactionFn } from './f8-motivation-engine'
+import type { MotivationFeedbackState } from './f8-motivation-engine'
 import { computeF6Controls, applyF6ToControls } from './f6-strategy-engine'
 import { computeF1Controls, applyF1ToControls } from './f1-sensory-engine'
+import { computeF2Controls, applyF2ToControls } from './f2-intelligence-engine'
+import { computeF3Controls, applyF3ToControls } from './f3-experiential-engine'
+import { computeF9Controls, applyF9ToControls } from './f9-metacognitive-engine'
+import { computeF10Controls, applyF10ToControls } from './f10-domain-engine'
+import { computeF11Controls, applyF11ToControls } from './f11-authentic-engine'
 
 // ============================================================
 // Part 1: 基幹軸の算出 — 12の視座から5つの軸へ
@@ -485,10 +493,55 @@ export function computeIntegratedControls(
   controls.presentation = f1Applied.presentation
   reasoning.push(`[F1/感覚] ${f1Controls.reasoning}`)
 
-  // 5e. F5 SRLエンジン（Phase 2: 3相サイクル・4発達段階・足場制御）
+  // 5d-3. F2 多元的入口（Phase 4: 概念入口・フォールバック・成長マインドセット）
+  const f2Controls = computeF2Controls(profiles.F2, archetype)
+  const f2Applied = applyF2ToControls(controls, f2Controls)
+  controls.presentation = f2Applied.presentation
+  reasoning.push(`[F2/入口] ${f2Controls.reasoning}`)
+
+  // 5d-4. F3 経験変容学習（Phase 4: Kolbサイクル・入口段階・完走強制）
+  const f3Controls = computeF3Controls(profiles.F3, archetype)
+  const f3Applied = applyF3ToControls(controls, f3Controls)
+  controls.presentation = f3Applied.presentation
+  reasoning.push(`[F3/Kolb] ${f3Controls.reasoning}`)
+
+  // 5d-5. F9 メタ認知的コンピテンシー（Phase 4: メタ認知プロンプト・PS足場）
+  const f9Controls = computeF9Controls(profiles.F9, archetype)
+  const f9Applied = applyF9ToControls(controls, f9Controls)
+  controls.srl = f9Applied.srl
+  reasoning.push(`[F9/メタ認知] ${f9Controls.reasoning}`)
+
+  // 5d-6. F10 領域固有認知構造（Phase 4: 教科思考プロンプト・誤概念対処）
+  const f10Controls = computeF10Controls(profiles.F10, archetype)
+  const f10Applied = applyF10ToControls(controls, f10Controls)
+  controls.presentation = f10Applied.presentation
+  reasoning.push(`[F10/領域] ${f10Controls.reasoning}`)
+
+  // 5d-7. F11 真正文脈学習（Phase 4: 実生活接続・意味づけ）
+  const f11Controls = computeF11Controls(profiles.F11, archetype)
+  const f11Applied = applyF11ToControls(controls, f11Controls)
+  controls.presentation = f11Applied.presentation
+  reasoning.push(`[F11/真正] ${f11Controls.reasoning}`)
+
+  // 5e. F5 SRLエンジン（Phase 2+D: 3相サイクル・4発達段階・足場制御・自動調整ループ）
   let f5Controls = computeF5Controls(profiles.F5, behavior, archetype, profiles.F12)
   // 感情状態によるSRL調整
   f5Controls = adjustSRLForAffect(f5Controls, profiles.F12)
+
+  // Phase D: SRLセッション追跡と自動調整ループ
+  const srlSessionTracker = trackSRLPhaseTransition(
+    f5Controls.phase_detail,
+    null,  // 前回の位相（統合呼び出し時はnull、セッション追跡時は前回値）
+    behavior.session_duration_minutes,
+    behavior,
+    profiles.F5,
+  )
+  const srlAutoAdjust = computeSRLAutoAdjustment(
+    f5Controls, profiles.F5, behavior, archetype, srlSessionTracker, profiles.F12
+  )
+  // 自動調整された制御パラメータを採用
+  f5Controls = srlAutoAdjust.adjusted_controls
+
   // SRL制御パラメータを統合制御に適用
   applySRLToControls(controls, f5Controls)
   reasoning.push(`[F5/SRL] 位相=${f5Controls.phase_detail.current_phase}, ` +
@@ -496,7 +549,15 @@ export function computeIntegratedControls(
     `次段階準備度=${(f5Controls.developmental_assessment.readiness_for_next * 100).toFixed(0)}%, ` +
     `goal=${controls.srl.goal_prompt_type}, think_aloud=${controls.srl.think_aloud_modeling}`)
 
-  // 5f. F8 動機づけエンジン（Phase 2: 3欲求・動機質連続体・リスク検出）
+  // Phase D: SRL適応ループの推論
+  if (srlAutoAdjust.adjustments_made.length > 0) {
+    reasoning.push(`[F5/適応] 調整${srlAutoAdjust.adjustments_made.length}件: ` +
+      `${srlAutoAdjust.adjustments_made.map(a => a.type).join(', ')}。` +
+      `トレンド=${srlSessionTracker.self_regulation_trend}, ` +
+      `適応品質=${(srlSessionTracker.adaptation_quality.overall * 100).toFixed(0)}%`)
+  }
+
+  // 5f. F8 動機づけエンジン（Phase 2+D: 3欲求・動機質連続体・リスク検出・フィードバックループ）
   let f8Controls = computeF8Controls(profiles.F8, behavior, archetype, profiles.F7, profiles.F12)
   // 感情状態による動機づけ調整
   f8Controls = adjustF8ForAffect(f8Controls, profiles.F12)
@@ -504,21 +565,92 @@ export function computeIntegratedControls(
   applyF8ToControls(controls, f8Controls)
   reasoning.push(`[F8/動機] ${f8Controls.reasoning}`)
 
-  // 5g. 因果チェーン F8→F5→F4 の波及効果
-  // F8の有能感 → F5の自己効力感への変調
-  if (Math.abs(f8Controls.causal_effects.f5_efficacy_modulation) > 0.1) {
-    const mod = f8Controls.causal_effects.f5_efficacy_modulation
-    reasoning.push(`[因果連鎖] F8→F5: 自己効力感変調=${mod > 0 ? '+' : ''}${mod.toFixed(2)}`)
+  // Phase D: 動機づけフィードバックループ検出と予防的介入
+  const needState = f8Controls.need_satisfaction
+  const feedbackLoop = detectMotivationFeedbackLoop(
+    profiles.F8, behavior, needState, archetype, profiles.F7
+  )
+  reasoning.push(`[F8/ループ] ${feedbackLoop.reasoning}`)
+
+  // 5g. 双方向因果チェーン（Phase D 強化: 設計書 Part 3.1-3.2 完全実装）
+  //
+  // 正のスパイラル:
+  //   F7(ZPD成功) → F8(有能感↑) → F5(自己効力感↑) → F4(不安↓) → F4(構造化度↓) → F8(自律性↑)
+  // 負のスパイラル:
+  //   F7(ZPD逸脱) → F8(有能感↓) → F5(回避行動) → F4(不安↑) → F4(構造化度↑) → F8(自律性↓)
+
+  // F8→F5: 有能感→自己効力感 + 動機→内発的興味
+  const f8ToF5_efficacy = f8Controls.causal_effects.f5_efficacy_modulation
+  const f8ToF5_interest = feedbackLoop.ripple_to_f5.intrinsic_interest_modulation
+  if (Math.abs(f8ToF5_efficacy) > 0.1 || Math.abs(f8ToF5_interest) > 0.1) {
+    reasoning.push(`[因果:F8→F5] 自己効力感=${f8ToF5_efficacy > 0 ? '+' : ''}${f8ToF5_efficacy.toFixed(2)}, ` +
+      `内発的興味=${f8ToF5_interest > 0 ? '+' : ''}${f8ToF5_interest.toFixed(2)}`)
   }
-  // F8の欲求充足 → F4の不安への変調
-  if (Math.abs(f8Controls.causal_effects.f4_anxiety_modulation) > 0.1) {
-    const mod = f8Controls.causal_effects.f4_anxiety_modulation
-    // 不安が増加する方向なら構造化度を上げる
-    if (mod > 0.1) {
-      controls.structure.structure_level = Math.min(0.95, controls.structure.structure_level + mod * 0.15)
-      reasoning.push(`[因果連鎖] F8→F4: 不安↑ → structure_level微増`)
+
+  // F5→F4: 方略帰属→不安の減少 + F5→F8: 自己効力感→有能感
+  const f5ToF4_anxiety = srlAutoAdjust.causal_to_f4.attribution_to_anxiety
+  const f5ToF8_competence = srlAutoAdjust.causal_to_f8.efficacy_to_competence
+  const f5ToF8_autonomy = srlAutoAdjust.causal_to_f8.attribution_to_autonomy
+  if (Math.abs(f5ToF4_anxiety) > 0.1) {
+    reasoning.push(`[因果:F5→F4] 不安変調=${f5ToF4_anxiety > 0 ? '+' : ''}${f5ToF4_anxiety.toFixed(2)}`)
+  }
+  if (Math.abs(f5ToF8_competence) > 0.1 || Math.abs(f5ToF8_autonomy) > 0.1) {
+    reasoning.push(`[因果:F5→F8] 有能感=${f5ToF8_competence > 0 ? '+' : ''}${f5ToF8_competence.toFixed(2)}, ` +
+      `自律性=${f5ToF8_autonomy > 0 ? '+' : ''}${f5ToF8_autonomy.toFixed(2)}`)
+  }
+
+  // F8→F4: 全欲求充足→不安の変調 + フィードバックループからの構造化推奨
+  const f8ToF4_anxiety = f8Controls.causal_effects.f4_anxiety_modulation
+  const loopStructureRec = feedbackLoop.ripple_to_f4.structure_recommendation
+  // 不安が増加する方向なら構造化度を上げる
+  const totalAnxietyMod = f8ToF4_anxiety + feedbackLoop.ripple_to_f4.anxiety_modulation
+  if (totalAnxietyMod > 0.1) {
+    controls.structure.structure_level = Math.min(0.95,
+      controls.structure.structure_level + totalAnxietyMod * 0.15)
+    reasoning.push(`[因果:F8→F4] 不安↑(${totalAnxietyMod.toFixed(2)}) → structure_level微増`)
+  } else if (totalAnxietyMod < -0.1) {
+    // 不安が減少 → 構造化度を微減（より自由に）
+    controls.structure.structure_level = Math.max(0.1,
+      controls.structure.structure_level + totalAnxietyMod * 0.1)
+    reasoning.push(`[因果:F8→F4] 不安↓(${totalAnxietyMod.toFixed(2)}) → structure_level微減`)
+  }
+
+  // フィードバックループからの構造化推奨を適用
+  if (Math.abs(loopStructureRec) > 0.05) {
+    controls.structure.structure_level = Math.max(0.1, Math.min(0.95,
+      controls.structure.structure_level + loopStructureRec))
+    reasoning.push(`[因果:ループ] 構造化推奨=${loopStructureRec > 0 ? '+' : ''}${loopStructureRec.toFixed(2)}`)
+  }
+
+  // スパイラル検出による特別制御
+  if (feedbackLoop.spiral_type === 'negative' && feedbackLoop.spiral_intensity >= 0.5) {
+    // 負のスパイラル → 即時介入
+    controls.scaffold.frustration_control = true
+    controls.scaffold.soft_language = true
+    controls.scaffold.encouragement = true
+    // ZPD位置を下げて確実に成功できるようにする
+    controls.structure.difficulty_zpd_position = Math.max(0.1,
+      controls.structure.difficulty_zpd_position - 0.15)
+    reasoning.push(`[スパイラル] 負のスパイラル検出 → 足場強化・ZPD下方修正`)
+  }
+
+  if (feedbackLoop.spiral_type === 'positive' && feedbackLoop.spiral_intensity >= 0.5) {
+    // 正のスパイラル → 自律性の促進
+    reasoning.push(`[スパイラル] 正のスパイラル維持中(${(feedbackLoop.spiral_intensity*100).toFixed(0)}%)`)
+  }
+
+  // 予防的介入による教師アラート
+  if (feedbackLoop.preventive_intervention) {
+    const intervention = feedbackLoop.preventive_intervention
+    if (intervention.urgency === 'immediate') {
+      controls._teacher_alert = true
+      reasoning.push(`[予防介入] ${intervention.type}: ${intervention.actions[0]}`)
+    }
+    if (intervention.type === 'safety_net') {
+      controls._human_intervention_recommended = true
     }
   }
+
   // F8のリスク検出による教師アラート
   const highRisks = f8Controls.need_satisfaction.risks.filter(r => r.severity === 'high')
   if (highRisks.length > 0) {
@@ -612,6 +744,9 @@ export {
   assessDevelopmentalStage,
   adjustSRLForAffect,
   applySRLToControls,
+  trackSRLPhaseTransition,
+  computeSRLAutoAdjustment,
+  assessAdaptationQuality,
 } from './f5-srl-engine'
 
 export {
@@ -620,6 +755,7 @@ export {
   assessMotivationQuality,
   adjustF8ForAffect,
   applyF8ToControls,
+  detectMotivationFeedbackLoop,
 } from './f8-motivation-engine'
 
 export {
@@ -640,3 +776,41 @@ export {
   assessMultimodalCapacity,
   applyF1ToControls,
 } from './f1-sensory-engine'
+
+export {
+  computeF2Controls,
+  determinePrimaryEntry,
+  determineFallbackEntry,
+  determineMindsetMessage,
+  applyF2ToControls,
+} from './f2-intelligence-engine'
+
+export {
+  computeF3Controls,
+  determineEntryPhase,
+  buildCycleSequence,
+  computePhaseTimeAllocation,
+  applyF3ToControls,
+} from './f3-experiential-engine'
+
+export {
+  computeF9Controls,
+  assessMetacognitiveLevel,
+  shouldPromptMetacognition,
+  determineProblemSolvingScaffold,
+  applyF9ToControls,
+} from './f9-metacognitive-engine'
+
+export {
+  computeF10Controls,
+  generateDomainThinkingPrompt,
+  determineMisconceptionHandling,
+  applyF10ToControls,
+} from './f10-domain-engine'
+
+export {
+  computeF11Controls,
+  assessAuthenticityLevel,
+  generateRealWorldConnection,
+  applyF11ToControls,
+} from './f11-authentic-engine'

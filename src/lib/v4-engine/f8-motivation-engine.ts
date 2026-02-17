@@ -486,7 +486,403 @@ export function adjustF8ForAffect(
 }
 
 // ============================================================
-// Part 5: F8制御パラメータから IntegratedControlParameters への適用
+// Part 5: 因果フィードバックループ・スパイラル検出（Phase D 強化）
+// ============================================================
+
+/**
+ * 動機づけフィードバックループの状態
+ * 
+ * 設計書 Part 3.2 の正/負のスパイラルを検出し、
+ * リアルタイムで介入方針を決定する。
+ * 
+ * 正のスパイラル: 成功体験 → 有能感↑ → 自己効力感↑ → 方略帰属 → 不安↓ → 自律性↑ → 内発的動機↑
+ * 負のスパイラル: 失敗体験 → 有能感↓ → 回避行動 → 能力帰属 → 不安↑ → 構造化度↑ → 自律性↓
+ */
+export interface MotivationFeedbackState {
+  /** 検出されたスパイラルの種類 */
+  spiral_type: 'positive' | 'negative' | 'neutral' | 'fragile_positive'
+  /** スパイラルの強度 (0-1) */
+  spiral_intensity: number
+  /** 欲求バランスの状態 */
+  need_balance: NeedBalanceState
+  /** 予防的介入の推奨 */
+  preventive_intervention: PreventiveIntervention | null
+  /** F5への波及効果（自己調整学習への影響） */
+  ripple_to_f5: {
+    /** 内発的興味の変調: F5.forethought.intrinsic_interest への影響 */
+    intrinsic_interest_modulation: number  // -1 to +1
+    /** 忍耐力の変調: 粘り強さへの影響 */
+    persistence_modulation: number  // -1 to +1
+  }
+  /** F4への波及効果（不安・構造化への影響） */
+  ripple_to_f4: {
+    /** 不安の変調 */
+    anxiety_modulation: number  // -1 to +1 (positive = more anxiety)
+    /** 構造化度への推奨変更 */
+    structure_recommendation: number  // -0.3 to +0.3
+  }
+  /** 推論 */
+  reasoning: string
+}
+
+/** 3欲求バランスの動的状態 */
+export interface NeedBalanceState {
+  /** 最も充足されている欲求 */
+  strongest: 'autonomy' | 'competence' | 'relatedness'
+  /** 最も不足している欲求 */
+  weakest: 'autonomy' | 'competence' | 'relatedness'
+  /** バランス度 (0=極端に不均衡, 1=完全均衡) */
+  balance_score: number
+  /** 不均衡の方向性 */
+  imbalance_pattern: NeedImbalancePattern | null
+}
+
+/** 欲求不均衡パターン */
+export type NeedImbalancePattern =
+  | 'competence_dominant'     // 有能感偏重（成績は良いが孤独・不自由）
+  | 'autonomy_dominant'       // 自律性偏重（自由だが無力・孤立）
+  | 'relatedness_dominant'    // 関係性偏重（友達はいるが自力不足）
+  | 'all_deficient'           // 全欠乏（学習性無力感リスク）
+  | 'autonomy_competence_high' // 自律+有能だが関係性低（孤高の学び手）
+
+/** 予防的介入の推奨 */
+export interface PreventiveIntervention {
+  /** 介入の種類 */
+  type: 'micro_success' | 'need_rebalance' | 'spiral_break' | 'safety_net' | 'autonomy_seed'
+  /** 緊急度 */
+  urgency: 'immediate' | 'session_end' | 'next_session'
+  /** 具体的アクション */
+  actions: string[]
+  /** 対象となるリスク */
+  target_risk: MotivationRisk['type'] | 'negative_spiral'
+}
+
+/**
+ * 動機づけフィードバックループの検出と介入決定
+ * 
+ * 設計書 Part 3.1-3.2 完全準拠:
+ * F7(ZPD成功体験) → F8(有能感↑) → F5(自己効力感↑) → F4(不安↓) → F8(自律性↑)
+ * 
+ * この関数は、行動データとプロファイルからスパイラルの方向を検出し、
+ * 正のスパイラルを促進し、負のスパイラルを早期に断ち切る介入を推奨する。
+ */
+export function detectMotivationFeedbackLoop(
+  profile: F8_MotivationProfile,
+  behavior: RealtimeBehaviorData,
+  needState: NeedSatisfactionState,
+  archetype: ArchetypeId,
+  scaffoldProfile?: F7_ScaffoldProfile,
+): MotivationFeedbackState {
+  // 1. スパイラルの検出
+  const { spiral_type, spiral_intensity } = detectSpiral(profile, behavior, needState, scaffoldProfile)
+
+  // 2. 欲求バランスの評価
+  const need_balance = assessNeedBalance(profile)
+
+  // 3. 予防的介入の決定
+  const preventive_intervention = determinePreventiveIntervention(
+    spiral_type, spiral_intensity, need_balance, needState, archetype, behavior
+  )
+
+  // 4. F5への波及効果
+  const ripple_to_f5 = computeRippleToF5(profile, spiral_type, spiral_intensity, need_balance)
+
+  // 5. F4への波及効果
+  const ripple_to_f4 = computeRippleToF4(profile, spiral_type, spiral_intensity, needState)
+
+  // 推論
+  const reasoning = buildFeedbackReasoning(spiral_type, spiral_intensity, need_balance, preventive_intervention)
+
+  return {
+    spiral_type,
+    spiral_intensity,
+    need_balance,
+    preventive_intervention,
+    ripple_to_f5,
+    ripple_to_f4,
+    reasoning,
+  }
+}
+
+/**
+ * 正/負のスパイラルを検出する
+ */
+function detectSpiral(
+  profile: F8_MotivationProfile,
+  behavior: RealtimeBehaviorData,
+  needState: NeedSatisfactionState,
+  scaffoldProfile?: F7_ScaffoldProfile,
+): { spiral_type: MotivationFeedbackState['spiral_type']; spiral_intensity: number } {
+  // 正のスパイラル指標
+  const positiveSignals = [
+    behavior.consecutive_successes >= 2 ? 0.3 : 0,
+    behavior.recent_accuracy >= 0.75 ? 0.25 : 0,
+    profile.motivation_continuum_score >= 60 ? 0.2 : 0,
+    needState.overall >= 60 ? 0.15 : 0,
+    scaffoldProfile && scaffoldProfile.consecutive_success >= 3 ? 0.1 : 0,
+  ].reduce((a, b) => a + b, 0)
+
+  // 負のスパイラル指標
+  const negativeSignals = [
+    behavior.consecutive_errors >= 2 ? 0.3 : 0,
+    behavior.recent_accuracy < 0.3 ? 0.25 : 0,
+    profile.motivation_continuum_score < 25 ? 0.2 : 0,
+    needState.overall < 30 ? 0.2 : 0,
+    behavior.idle_time_seconds > 45 ? 0.1 : 0,
+    behavior.hint_usage_count >= 3 ? 0.1 : 0,
+  ].reduce((a, b) => a + b, 0)
+
+  // 脆い正のスパイラル: 一見うまくいっているが、基盤が弱い
+  const fragileSignals = [
+    profile.fragile_competence ? 0.4 : 0,
+    profile.surface_autonomy ? 0.3 : 0,
+    (positiveSignals > 0.4 && needState.weakest_need === 'relatedness' && needState.relatedness < 35) ? 0.3 : 0,
+  ].reduce((a, b) => a + b, 0)
+
+  if (negativeSignals >= 0.5) {
+    return { spiral_type: 'negative', spiral_intensity: Math.min(1, negativeSignals) }
+  }
+  if (fragileSignals >= 0.5 && positiveSignals > 0.3) {
+    return { spiral_type: 'fragile_positive', spiral_intensity: Math.min(1, fragileSignals) }
+  }
+  if (positiveSignals >= 0.5) {
+    return { spiral_type: 'positive', spiral_intensity: Math.min(1, positiveSignals) }
+  }
+  return { spiral_type: 'neutral', spiral_intensity: 0 }
+}
+
+/**
+ * 3欲求のバランスを評価する
+ */
+function assessNeedBalance(profile: F8_MotivationProfile): NeedBalanceState {
+  const needs = {
+    autonomy: profile.autonomy_satisfaction,
+    competence: profile.competence_satisfaction,
+    relatedness: profile.relatedness_satisfaction,
+  }
+
+  // 最強・最弱の特定
+  const sorted = Object.entries(needs).sort((a, b) => b[1] - a[1])
+  const strongest = sorted[0][0] as 'autonomy' | 'competence' | 'relatedness'
+  const weakest = sorted[sorted.length - 1][0] as 'autonomy' | 'competence' | 'relatedness'
+
+  // バランススコア: 3欲求の標準偏差の逆数を正規化
+  const mean = (needs.autonomy + needs.competence + needs.relatedness) / 3
+  const variance = ((needs.autonomy - mean) ** 2 + (needs.competence - mean) ** 2 + (needs.relatedness - mean) ** 2) / 3
+  const sd = Math.sqrt(variance)
+  const balance_score = Math.max(0, Math.min(1, 1 - sd / 50))  // SD=0 → 1.0, SD=50 → 0.0
+
+  // 不均衡パターンの検出
+  let imbalance_pattern: NeedImbalancePattern | null = null
+
+  // 全欲求欠乏: 全てが30未満（バランスは良いが水準が極めて低い）
+  if (needs.autonomy < 30 && needs.competence < 30 && needs.relatedness < 30) {
+    imbalance_pattern = 'all_deficient'
+  } else if (balance_score < 0.5) {
+    if (needs.competence > 60 && needs.autonomy < 40 && needs.relatedness < 40) {
+      imbalance_pattern = 'competence_dominant'
+    } else if (needs.autonomy > 60 && needs.competence < 40) {
+      imbalance_pattern = 'autonomy_dominant'
+    } else if (needs.relatedness > 60 && needs.competence < 40) {
+      imbalance_pattern = 'relatedness_dominant'
+    } else if (needs.autonomy > 60 && needs.competence > 60 && needs.relatedness < 35) {
+      imbalance_pattern = 'autonomy_competence_high'
+    }
+  }
+
+  return { strongest, weakest, balance_score, imbalance_pattern }
+}
+
+/**
+ * 予防的介入を決定する
+ * 
+ * 設計書の原則: 負のスパイラルは始まってから止めるより、始まる前に予防する。
+ */
+function determinePreventiveIntervention(
+  spiral_type: MotivationFeedbackState['spiral_type'],
+  spiral_intensity: number,
+  need_balance: NeedBalanceState,
+  needState: NeedSatisfactionState,
+  archetype: ArchetypeId,
+  behavior: RealtimeBehaviorData,
+): PreventiveIntervention | null {
+  // 全欲求欠乏 → 安全ネット（最優先 — 学習性無力感は最も深刻なリスク）
+  if (need_balance.imbalance_pattern === 'all_deficient') {
+    return {
+      type: 'safety_net',
+      urgency: 'immediate',
+      actions: [
+        '極小の成功体験から始める（ZPD下限に設定）',
+        '「ここにいていい」という安全感を最優先',
+        '教師への連携必須',
+        '無理に動機づけしない — 安全と関係性を先に',
+      ],
+      target_risk: 'learned_helplessness',
+    }
+  }
+
+  // 負のスパイラル → 即時介入
+  if (spiral_type === 'negative' && spiral_intensity >= 0.5) {
+    return {
+      type: 'spiral_break',
+      urgency: 'immediate',
+      actions: [
+        'ZPD位置を下方修正し、確実に成功できる課題を提示',
+        '方略帰属メッセージ: 「やり方が合わなかっただけ」',
+        'フラストレーション制御を有効化',
+        archetype === 'H' || archetype === 'G' ? '教師への連絡を推奨' : '温かい言葉かけを増やす',
+      ],
+      target_risk: 'negative_spiral',
+    }
+  }
+
+  // 脆い正のスパイラル → セッション末に介入
+  if (spiral_type === 'fragile_positive') {
+    return {
+      type: 'need_rebalance',
+      urgency: 'session_end',
+      actions: [
+        '過去の自分との成長の可視化（社会比較を完全に排除）',
+        need_balance.weakest === 'relatedness' ? '学びの共有の機会を提供' : '',
+        '「なぜこれを学ぶのか」の内在化支援',
+      ].filter(a => a !== ''),
+      target_risk: 'fragile_competence',
+    }
+  }
+
+  // 全欲求欠乏 → 安全ネット
+  if (need_balance.imbalance_pattern === 'all_deficient') {
+    return {
+      type: 'safety_net',
+      urgency: 'immediate',
+      actions: [
+        '極小の成功体験から始める（ZPD下限に設定）',
+        '「ここにいていい」という安全感を最優先',
+        '教師への連携必須',
+        '無理に動機づけしない — 安全と関係性を先に',
+      ],
+      target_risk: 'learned_helplessness',
+    }
+  }
+
+  // 自律性偏重 → 関係性の種まき
+  if (need_balance.imbalance_pattern === 'autonomy_dominant' ||
+      need_balance.imbalance_pattern === 'autonomy_competence_high') {
+    return {
+      type: 'autonomy_seed',
+      urgency: 'next_session',
+      actions: [
+        '学びの共有の機会を自然に提供',
+        '教師の非同期フィードバックで関係性を補強',
+        'AIの温かいインタラクションを維持',
+      ],
+      target_risk: 'isolated_autonomy',
+    }
+  }
+
+  // 成功後の有能感強化
+  if (behavior.consecutive_successes >= 3 && needState.competence < 50) {
+    return {
+      type: 'micro_success',
+      urgency: 'immediate',
+      actions: [
+        '成功体験の言語化: 「できたね！どうやって解いた？」',
+        '過程にフォーカスした具体的フィードバック',
+      ],
+      target_risk: 'fragile_competence',
+    }
+  }
+
+  return null
+}
+
+/**
+ * F5への波及効果を計算する
+ * 
+ * 設計書 Part 3.1: F8(有能感↑) → F5(自己効力感↑ = 予見段階の強化)
+ */
+function computeRippleToF5(
+  profile: F8_MotivationProfile,
+  spiral_type: MotivationFeedbackState['spiral_type'],
+  spiral_intensity: number,
+  need_balance: NeedBalanceState,
+): MotivationFeedbackState['ripple_to_f5'] {
+  // 内発的興味の変調: 動機質が高い → F5の予見段階における内発的興味↑
+  const motivationNorm = (profile.motivation_continuum_score - 50) / 50
+  let intrinsic_interest_modulation = motivationNorm * 0.4
+
+  // スパイラルの影響
+  if (spiral_type === 'positive') intrinsic_interest_modulation += spiral_intensity * 0.2
+  if (spiral_type === 'negative') intrinsic_interest_modulation -= spiral_intensity * 0.3
+
+  // 忍耐力の変調: 内発的動機 → 粘り強さ
+  let persistence_modulation = motivationNorm * 0.35
+  if (need_balance.balance_score >= 0.7) persistence_modulation += 0.15  // バランスが良い → 忍耐力↑
+  if (spiral_type === 'negative') persistence_modulation -= spiral_intensity * 0.25
+
+  return {
+    intrinsic_interest_modulation: Math.max(-1, Math.min(1, intrinsic_interest_modulation)),
+    persistence_modulation: Math.max(-1, Math.min(1, persistence_modulation)),
+  }
+}
+
+/**
+ * F4への波及効果を計算する
+ * 
+ * 設計書 Part 3.1: F4(不安↓) → F4(構造化度↓ = より自由な学習)
+ */
+function computeRippleToF4(
+  profile: F8_MotivationProfile,
+  spiral_type: MotivationFeedbackState['spiral_type'],
+  spiral_intensity: number,
+  needState: NeedSatisfactionState,
+): MotivationFeedbackState['ripple_to_f4'] {
+  // 不安の変調: 全欲求充足 → 不安↓
+  const overallNorm = (needState.overall - 50) / 50
+  let anxiety_modulation = -overallNorm * 0.35  // 充足が高い → 不安↓（負の方向）
+  if (spiral_type === 'negative') anxiety_modulation += spiral_intensity * 0.3
+  if (spiral_type === 'positive') anxiety_modulation -= spiral_intensity * 0.15
+
+  // 構造化度の推奨変更
+  let structure_recommendation = 0
+  if (spiral_type === 'positive' && spiral_intensity >= 0.5) {
+    structure_recommendation = -0.1  // 構造化度↓（より自由に）
+  }
+  if (spiral_type === 'negative' && spiral_intensity >= 0.5) {
+    structure_recommendation = 0.15  // 構造化度↑（より構造的に）
+  }
+
+  return {
+    anxiety_modulation: Math.max(-1, Math.min(1, anxiety_modulation)),
+    structure_recommendation: Math.max(-0.3, Math.min(0.3, structure_recommendation)),
+  }
+}
+
+function buildFeedbackReasoning(
+  spiral_type: MotivationFeedbackState['spiral_type'],
+  spiral_intensity: number,
+  need_balance: NeedBalanceState,
+  intervention: PreventiveIntervention | null,
+): string {
+  const spiralNames = {
+    positive: '正のスパイラル（成長促進中）',
+    negative: '負のスパイラル（介入必要）',
+    neutral: '中立',
+    fragile_positive: '脆い正のスパイラル（基盤強化必要）',
+  }
+  let reasoning = `動機ループ: ${spiralNames[spiral_type]}(強度=${(spiral_intensity * 100).toFixed(0)}%)。`
+  reasoning += `欲求バランス=${(need_balance.balance_score * 100).toFixed(0)}%, 最弱=${need_balance.weakest}。`
+  if (need_balance.imbalance_pattern) {
+    reasoning += `不均衡: ${need_balance.imbalance_pattern}。`
+  }
+  if (intervention) {
+    reasoning += `介入: ${intervention.type}(${intervention.urgency})。`
+  }
+  return reasoning
+}
+
+// ============================================================
+// Part 6: F8制御パラメータから IntegratedControlParameters への適用
 // ============================================================
 
 /**
