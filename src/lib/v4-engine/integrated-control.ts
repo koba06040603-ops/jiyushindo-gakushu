@@ -12,7 +12,8 @@
  * 衝突解決: 感情 > 認知 > 社会
  * 
  * Phase 1 実装: F4 + F7 + F12 (瞬時制御ループ)
- * Phase 2 以降で F5, F8, F6, F1 等を追加
+ * Phase 2 実装: F5 + F8 (セッションレベル制御 — 自己調整学習 + 動機づけ)
+ * Phase 3 以降で F6, F1 等を追加
  */
 
 import type {
@@ -29,6 +30,8 @@ import { ARCHETYPES } from './types'
 import { computeF4Controls, computeATIStructure, shouldAdjustStructure } from './f4-ati-engine'
 import { computeF7Controls, computeContingencyRule } from './f7-scaffold-engine'
 import { executeAffectGating, applyAffectGating } from './f12-affect-engine'
+import { computeF5Controls, adjustSRLForAffect, applySRLToControls } from './f5-srl-engine'
+import { computeF8Controls, adjustF8ForAffect, applyF8ToControls } from './f8-motivation-engine'
 
 // ============================================================
 // Part 1: 基幹軸の算出 — 12の視座から5つの軸へ
@@ -499,14 +502,44 @@ export function computeIntegratedControls(
     reasoning.push(`[F6] 精緻化: 前提知識不足 → 無効化`)
   }
 
-  // 5e. F5 SRL位相に基づく応答（Phase 2 で拡充予定）
-  if (behavior.current_srl_phase === 'forethought') {
-    const srlLevel = profiles.F5.forethought.goal_setting
-    controls.srl.goal_prompt_type = srlLevel > 60 ? 'example' : srlLevel > 30 ? 'guided' : 'template'
-    reasoning.push(`[F5/SRL] 予見段階 → goal_prompt=${controls.srl.goal_prompt_type}`)
-  } else if (behavior.current_srl_phase === 'self_reflection') {
-    controls.srl.attribution_guidance = profiles.F5.self_reflection.causal_attribution < 60
-    reasoning.push(`[F5/SRL] 内省段階 → attribution_guidance=${controls.srl.attribution_guidance}`)
+  // 5e. F5 SRLエンジン（Phase 2: 3相サイクル・4発達段階・足場制御）
+  let f5Controls = computeF5Controls(profiles.F5, behavior, archetype, profiles.F12)
+  // 感情状態によるSRL調整
+  f5Controls = adjustSRLForAffect(f5Controls, profiles.F12)
+  // SRL制御パラメータを統合制御に適用
+  applySRLToControls(controls, f5Controls)
+  reasoning.push(`[F5/SRL] 位相=${f5Controls.phase_detail.current_phase}, ` +
+    `発達=${f5Controls.developmental_assessment.current_stage}, ` +
+    `次段階準備度=${(f5Controls.developmental_assessment.readiness_for_next * 100).toFixed(0)}%, ` +
+    `goal=${controls.srl.goal_prompt_type}, think_aloud=${controls.srl.think_aloud_modeling}`)
+
+  // 5f. F8 動機づけエンジン（Phase 2: 3欲求・動機質連続体・リスク検出）
+  let f8Controls = computeF8Controls(profiles.F8, behavior, archetype, profiles.F7, profiles.F12)
+  // 感情状態による動機づけ調整
+  f8Controls = adjustF8ForAffect(f8Controls, profiles.F12)
+  // 動機づけ制御パラメータを統合制御に適用
+  applyF8ToControls(controls, f8Controls)
+  reasoning.push(`[F8/動機] ${f8Controls.reasoning}`)
+
+  // 5g. 因果チェーン F8→F5→F4 の波及効果
+  // F8の有能感 → F5の自己効力感への変調
+  if (Math.abs(f8Controls.causal_effects.f5_efficacy_modulation) > 0.1) {
+    const mod = f8Controls.causal_effects.f5_efficacy_modulation
+    reasoning.push(`[因果連鎖] F8→F5: 自己効力感変調=${mod > 0 ? '+' : ''}${mod.toFixed(2)}`)
+  }
+  // F8の欲求充足 → F4の不安への変調
+  if (Math.abs(f8Controls.causal_effects.f4_anxiety_modulation) > 0.1) {
+    const mod = f8Controls.causal_effects.f4_anxiety_modulation
+    // 不安が増加する方向なら構造化度を上げる
+    if (mod > 0.1) {
+      controls.structure.structure_level = Math.min(0.95, controls.structure.structure_level + mod * 0.15)
+      reasoning.push(`[因果連鎖] F8→F4: 不安↑ → structure_level微増`)
+    }
+  }
+  // F8のリスク検出による教師アラート
+  const highRisks = f8Controls.need_satisfaction.risks.filter(r => r.severity === 'high')
+  if (highRisks.length > 0) {
+    reasoning.push(`[F8/リスク] 高リスク検出: ${highRisks.map(r => r.type).join(', ')}`)
   }
 
   // Step 6: 感情ゲーティングの適用（最優先上書き）
@@ -589,3 +622,19 @@ export {
   estimateAffectState,
   computeOptimalArousalRange,
 } from './f12-affect-engine'
+
+export {
+  computeF5Controls,
+  detectSRLPhase,
+  assessDevelopmentalStage,
+  adjustSRLForAffect,
+  applySRLToControls,
+} from './f5-srl-engine'
+
+export {
+  computeF8Controls,
+  assessNeedSatisfaction,
+  assessMotivationQuality,
+  adjustF8ForAffect,
+  applyF8ToControls,
+} from './f8-motivation-engine'

@@ -70,3 +70,21 @@ export {
   estimateAffectState,
   computeOptimalArousalRange,
 } from './f12-affect-engine'
+
+// F5 SRLエンジン (Phase 2)
+export {
+  computeF5Controls,
+  detectSRLPhase,
+  assessDevelopmentalStage,
+  adjustSRLForAffect,
+  applySRLToControls,
+} from './f5-srl-engine'
+
+// F8 動機エンジン (Phase 2)
+export {
+  computeF8Controls,
+  assessNeedSatisfaction,
+  assessMotivationQuality,
+  adjustF8ForAffect,
+  applyF8ToControls,
+} from './f8-motivation-engine'

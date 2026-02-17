@@ -20,6 +20,8 @@ import {
 } from './integrated-control'
 import { computeATIStructure } from './f4-ati-engine'
 import { estimateAffectState } from './f12-affect-engine'
+import { computeF5Controls, detectSRLPhase, assessDevelopmentalStage, adjustSRLForAffect } from './f5-srl-engine'
+import { computeF8Controls, assessNeedSatisfaction, assessMotivationQuality, adjustF8ForAffect } from './f8-motivation-engine'
 
 // ============================================================
 // テスト用ヘルパー: プロファイル生成
@@ -324,6 +326,405 @@ function runTests(): void {
     normalResult.reasoning.length >= 3,
     'reasoning出力: 少なくとも3つの推論ステップ',
     `reasoning_count=${normalResult.reasoning.length}`
+  )
+
+  // -------------------------------------------------------
+  // Test 7: F5 SRLエンジン — 位相検出テスト
+  // -------------------------------------------------------
+  // セッション開始直後 → 予見段階
+  const srlProfileObs = createTestProfiles({ cognitive_autonomy: 20 })
+  const srlBehaviorStart = createTestBehavior({ session_duration_minutes: 1, current_srl_phase: 'unknown' })
+  const phaseStart = detectSRLPhase(srlBehaviorStart, srlProfileObs.F5)
+  assert(
+    phaseStart.current_phase === 'forethought',
+    'F5/SRL位相: セッション開始直後 → 予見段階',
+    `phase=${phaseStart.current_phase}, confidence=${phaseStart.confidence}`
+  )
+
+  // 連続失敗 → 内省段階（current_srl_phaseをunknownにして行動ベース推定を有効化）
+  const srlBehaviorFail = createTestBehavior({ consecutive_errors: 3, session_duration_minutes: 10, current_srl_phase: 'unknown' })
+  const phaseFail = detectSRLPhase(srlBehaviorFail, srlProfileObs.F5)
+  assert(
+    phaseFail.current_phase === 'self_reflection',
+    'F5/SRL位相: 連続失敗 → 内省段階',
+    `phase=${phaseFail.current_phase}`
+  )
+
+  // -------------------------------------------------------
+  // Test 8: F5 SRLエンジン — 発達段階評価テスト
+  // -------------------------------------------------------
+  // 観察段階の子
+  const obsProfile = createTestProfiles({ cognitive_autonomy: 15 })
+  const obsAssessment = assessDevelopmentalStage(obsProfile.F5)
+  assert(
+    obsAssessment.current_stage === 'observation',
+    'F5/発達: 低自律度 → 観察段階',
+    `stage=${obsAssessment.current_stage}, readiness=${obsAssessment.readiness_for_next.toFixed(2)}`
+  )
+  assert(
+    obsAssessment.support.modeling_frequency > 0.5,
+    'F5/発達: 観察段階 → 高頻度モデリング',
+    `modeling_frequency=${obsAssessment.support.modeling_frequency.toFixed(2)}`
+  )
+
+  // 自己調整段階の子
+  const srProfile = createTestProfiles({ cognitive_autonomy: 85 })
+  const srAssessment = assessDevelopmentalStage(srProfile.F5)
+  assert(
+    srAssessment.current_stage === 'self_regulation',
+    'F5/発達: 高自律度 → 自己調整段階',
+    `stage=${srAssessment.current_stage}`
+  )
+  assert(
+    srAssessment.support.full_autonomy === true,
+    'F5/発達: 自己調整段階 → 完全自律モード',
+    `full_autonomy=${srAssessment.support.full_autonomy}`
+  )
+
+  // -------------------------------------------------------
+  // Test 9: F5 SRL制御パラメータ — アーキタイプ別テスト
+  // -------------------------------------------------------
+  // Type A (自律的探究者): SRL足場は最小限
+  const srlA = computeF5Controls(
+    createTestProfiles({ cognitive_autonomy: 85, emotional_stability: 80, strategic_maturity: 80, motivational_energy: 80 }).F5,
+    createTestBehavior({ session_duration_minutes: 10 }),
+    'A'
+  )
+  assert(
+    srlA.forethought_scaffold.goal_prompt_type === 'none' || srlA.forethought_scaffold.goal_prompt_type === 'example',
+    'F5/制御: Type A → goal_prompt最小限',
+    `goal_prompt=${srlA.forethought_scaffold.goal_prompt_type}`
+  )
+  assert(
+    srlA.performance_scaffold.monitoring_interval >= 8,
+    'F5/制御: Type A → モニタリング間隔長い',
+    `monitoring_interval=${srlA.performance_scaffold.monitoring_interval}`
+  )
+
+  // Type G (受動的依存者): Think-Aloud ON, 短いモニタリング間隔
+  const srlG = computeF5Controls(
+    createTestProfiles({ cognitive_autonomy: 20, emotional_stability: 50, strategic_maturity: 20, motivational_energy: 20 }).F5,
+    createTestBehavior({ session_duration_minutes: 10 }),
+    'G'
+  )
+  assert(
+    srlG.performance_scaffold.think_aloud_modeling === true,
+    'F5/制御: Type G → Think-Aloud ON',
+    `think_aloud=${srlG.performance_scaffold.think_aloud_modeling}`
+  )
+  assert(
+    srlG.performance_scaffold.monitoring_interval <= 3,
+    'F5/制御: Type G → 短いモニタリング間隔',
+    `monitoring_interval=${srlG.performance_scaffold.monitoring_interval}`
+  )
+
+  // Type H (学習回避者): Think-Aloud ON, テンプレート
+  const srlH = computeF5Controls(
+    createTestProfiles({ cognitive_autonomy: 10, emotional_stability: 15, strategic_maturity: 10, motivational_energy: 10 }).F5,
+    createTestBehavior({ session_duration_minutes: 10 }),
+    'H'
+  )
+  assert(
+    srlH.performance_scaffold.think_aloud_modeling === true,
+    'F5/制御: Type H → Think-Aloud ON',
+    `think_aloud=${srlH.performance_scaffold.think_aloud_modeling}`
+  )
+
+  // -------------------------------------------------------
+  // Test 10: F5 × F12 感情によるSRL調整テスト
+  // -------------------------------------------------------
+  const srlNormal = computeF5Controls(
+    createTestProfiles({ cognitive_autonomy: 50 }).F5,
+    createTestBehavior({ session_duration_minutes: 10 }),
+    'B'
+  )
+  // 不安時: 自己効力感メッセージが付与される
+  const anxiousAffect = createTestProfiles({ anxiety: 75, arousal: 80, valence: -30 }).F12
+  const srlAnxious = adjustSRLForAffect(srlNormal, anxiousAffect)
+  assert(
+    srlAnxious.forethought_scaffold.efficacy_message !== null,
+    'F5×F12: 不安時 → 自己効力感メッセージ付与',
+    `message=${srlAnxious.forethought_scaffold.efficacy_message}`
+  )
+
+  // フロー時: SRL足場を最小化
+  const flowAffect = createTestProfiles({ anxiety: 5, arousal: 60, valence: 70, flow: 0.85 }).F12
+  const srlFlow = adjustSRLForAffect(srlNormal, flowAffect)
+  assert(
+    srlFlow.performance_scaffold.think_aloud_modeling === false,
+    'F5×F12: フロー時 → Think-Aloud OFF',
+    `think_aloud=${srlFlow.performance_scaffold.think_aloud_modeling}`
+  )
+  assert(
+    srlFlow.reflection_scaffold.reflection_prompt_type === 'none',
+    'F5×F12: フロー時 → 振り返りプロンプトOFF',
+    `reflection=${srlFlow.reflection_scaffold.reflection_prompt_type}`
+  )
+
+  // -------------------------------------------------------
+  // Test 11: F8 動機エンジン — 3欲求充足テスト
+  // -------------------------------------------------------
+  // 健全な動機状態
+  const healthyMotivation = createTestProfiles({
+    emotional_stability: 80, motivational_energy: 75,
+  })
+  const needsHealthy = assessNeedSatisfaction(healthyMotivation.F8)
+  assert(
+    needsHealthy.overall >= 50,
+    'F8/欲求: 健全状態 → 全体充足度≥50',
+    `overall=${needsHealthy.overall}, weakest=${needsHealthy.weakest_need}`
+  )
+  assert(
+    needsHealthy.risks.length === 0,
+    'F8/欲求: 健全状態 → リスクなし',
+    `risks=${needsHealthy.risks.map(r => r.type).join(', ') || 'none'}`
+  )
+
+  // 学習性無力感リスク
+  const helplessProfile = {
+    autonomy_satisfaction: 15,
+    competence_satisfaction: 10,
+    relatedness_satisfaction: 20,
+    motivation_quality: 'external' as const,
+    motivation_continuum_score: 10,
+    isolated_autonomy: false,
+    fragile_competence: false,
+    surface_autonomy: false,
+  }
+  const needsHelpless = assessNeedSatisfaction(helplessProfile)
+  assert(
+    needsHelpless.risks.some(r => r.type === 'learned_helplessness'),
+    'F8/リスク: 低欲求 → 学習性無力感検出',
+    `risks=${needsHelpless.risks.map(r => r.type).join(', ')}`
+  )
+  assert(
+    needsHelpless.risks.some(r => r.type === 'amotivation'),
+    'F8/リスク: 極低動機 → 無動機検出',
+    `risks=${needsHelpless.risks.map(r => r.type).join(', ')}`
+  )
+
+  // 孤立した自律性リスク
+  const isolatedProfile = {
+    autonomy_satisfaction: 85,
+    competence_satisfaction: 60,
+    relatedness_satisfaction: 20,
+    motivation_quality: 'identified' as const,
+    motivation_continuum_score: 60,
+    isolated_autonomy: true,
+    fragile_competence: false,
+    surface_autonomy: false,
+  }
+  const needsIsolated = assessNeedSatisfaction(isolatedProfile)
+  assert(
+    needsIsolated.risks.some(r => r.type === 'isolated_autonomy'),
+    'F8/リスク: 自律性高+関係性低 → 孤立した自律性検出',
+    `risks=${needsIsolated.risks.map(r => r.type).join(', ')}`
+  )
+
+  // 脆い有能感リスク
+  const fragileProfile = {
+    autonomy_satisfaction: 50,
+    competence_satisfaction: 70,
+    relatedness_satisfaction: 50,
+    motivation_quality: 'external' as const,
+    motivation_continuum_score: 25,
+    isolated_autonomy: false,
+    fragile_competence: true,
+    surface_autonomy: false,
+  }
+  const needsFragile = assessNeedSatisfaction(fragileProfile)
+  assert(
+    needsFragile.risks.some(r => r.type === 'fragile_competence'),
+    'F8/リスク: 有能感高+外発的動機 → 脆い有能感検出',
+    `risks=${needsFragile.risks.map(r => r.type).join(', ')}`
+  )
+
+  // -------------------------------------------------------
+  // Test 12: F8 動機質連続体テスト
+  // -------------------------------------------------------
+  const intrinsicProfile = createTestProfiles({ motivational_energy: 85, emotional_stability: 80 })
+  const qualityIntrinsic = assessMotivationQuality(intrinsicProfile.F8, 'A')
+  assert(
+    qualityIntrinsic.current_quality === 'intrinsic',
+    'F8/動機質: 高動機エネルギー → 内発的動機',
+    `quality=${qualityIntrinsic.current_quality}`
+  )
+  assert(
+    qualityIntrinsic.direction === 'stable',
+    'F8/動機質: 欲求充足+内発的 → 安定',
+    `direction=${qualityIntrinsic.direction}`
+  )
+
+  // 外発的動機の子
+  const externalProfile = createTestProfiles({ motivational_energy: 25, emotional_stability: 30 })
+  const qualityExternal = assessMotivationQuality(externalProfile.F8, 'G')
+  assert(
+    qualityExternal.current_quality === 'external',
+    'F8/動機質: 低動機エネルギー → 外的調整',
+    `quality=${qualityExternal.current_quality}`
+  )
+
+  // -------------------------------------------------------
+  // Test 13: F8 因果チェーンテスト
+  // -------------------------------------------------------
+  // 高欲求充足状態の因果テスト用プロファイル
+  const highNeedProfile = createTestProfiles({
+    emotional_stability: 85, motivational_energy: 85,
+  })
+  // F8の欲求を明示的に高く設定
+  highNeedProfile.F8 = {
+    ...highNeedProfile.F8,
+    autonomy_satisfaction: 80,
+    competence_satisfaction: 85,
+    relatedness_satisfaction: 75,
+    motivation_quality: 'intrinsic',
+    motivation_continuum_score: 85,
+  }
+  const f8Healthy = computeF8Controls(
+    highNeedProfile.F8,
+    createTestBehavior(),
+    'A',
+  )
+  assert(
+    f8Healthy.causal_effects.f5_efficacy_modulation > 0,
+    'F8/因果: 健全な有能感 → F5自己効力感に正の影響',
+    `f5_mod=${f8Healthy.causal_effects.f5_efficacy_modulation.toFixed(3)}`
+  )
+  assert(
+    f8Healthy.causal_effects.f4_anxiety_modulation < 0,
+    'F8/因果: 欲求充足 → F4不安に負の影響（不安減少）',
+    `f4_mod=${f8Healthy.causal_effects.f4_anxiety_modulation.toFixed(3)}`
+  )
+
+  // 低欲求状態の因果
+  const f8Low = computeF8Controls(
+    createTestProfiles({ motivational_energy: 20, emotional_stability: 20 }).F8,
+    createTestBehavior(),
+    'H',
+  )
+  assert(
+    f8Low.causal_effects.f5_efficacy_modulation < 0,
+    'F8/因果: 低有能感 → F5自己効力感に負の影響',
+    `f5_mod=${f8Low.causal_effects.f5_efficacy_modulation.toFixed(3)}`
+  )
+
+  // -------------------------------------------------------
+  // Test 14: F8 × F12 感情との相互作用テスト
+  // -------------------------------------------------------
+  const f8Normal = computeF8Controls(
+    createTestProfiles({ motivational_energy: 50, emotional_stability: 50 }).F8,
+    createTestBehavior(),
+    'B',
+  )
+  // 不安時: micro_success_feedbackが強制ON
+  const f8Anxious = adjustF8ForAffect(f8Normal, anxiousAffect)
+  assert(
+    f8Anxious.motivation_controls.micro_success_feedback === true,
+    'F8×F12: 不安時 → micro_success_feedback ON',
+    `micro_success=${f8Anxious.motivation_controls.micro_success_feedback}`
+  )
+
+  // フロー時: micro_success_feedbackがOFF
+  const f8Flow = adjustF8ForAffect(f8Normal, flowAffect)
+  assert(
+    f8Flow.motivation_controls.micro_success_feedback === false,
+    'F8×F12: フロー時 → micro_success_feedback OFF',
+    `micro_success=${f8Flow.motivation_controls.micro_success_feedback}`
+  )
+
+  // -------------------------------------------------------
+  // Test 15: 統合テスト — F5+F8が統合制御に正しく反映されるか
+  // -------------------------------------------------------
+  // Type G: SRL足場が手厚く、動機づけ支援が効いている
+  const typeGProfile = createTestProfiles({
+    cognitive_autonomy: 25, emotional_stability: 55,
+    strategic_maturity: 25, motivational_energy: 25,
+    anxiety: 40, independence: 20,
+  })
+  const typeGResult = computeIntegratedControls(typeGProfile, createTestBehavior({ session_duration_minutes: 10 }))
+  assert(
+    typeGResult.controls.srl.think_aloud_modeling === true,
+    '統合F5: Type G → think_aloud_modeling ON',
+    `think_aloud=${typeGResult.controls.srl.think_aloud_modeling}`
+  )
+  assert(
+    typeGResult.controls.srl.goal_prompt_type === 'guided' || typeGResult.controls.srl.goal_prompt_type === 'template',
+    '統合F5: Type G → goal_prompt はguided/template',
+    `goal_prompt=${typeGResult.controls.srl.goal_prompt_type}`
+  )
+  assert(
+    typeGResult.controls.motivation.micro_success_feedback === true,
+    '統合F8: Type G → micro_success_feedback ON',
+    `micro_success=${typeGResult.controls.motivation.micro_success_feedback}`
+  )
+  assert(
+    typeGResult.controls.motivation.language_style === 'inviting',
+    '統合F8: Type G → inviting言語スタイル',
+    `language=${typeGResult.controls.motivation.language_style}`
+  )
+
+  // Type A: SRL足場最小、動機づけ介入最小
+  const typeAProfile = createTestProfiles({
+    cognitive_autonomy: 85, emotional_stability: 80,
+    strategic_maturity: 80, motivational_energy: 80,
+    anxiety: 10, independence: 85,
+  })
+  const typeAResult = computeIntegratedControls(typeAProfile, createTestBehavior({ session_duration_minutes: 10 }))
+  assert(
+    typeAResult.controls.srl.goal_prompt_type === 'none' || typeAResult.controls.srl.goal_prompt_type === 'example',
+    '統合F5: Type A → goal_prompt 最小限',
+    `goal_prompt=${typeAResult.controls.srl.goal_prompt_type}`
+  )
+  assert(
+    typeAResult.controls.motivation.choice_with_rationale === true,
+    '統合F8: Type A → choice_with_rationale ON',
+    `choice=${typeAResult.controls.motivation.choice_with_rationale}`
+  )
+
+  // -------------------------------------------------------
+  // Test 16: 統合テスト — reasoningにF5/F8が含まれる
+  // -------------------------------------------------------
+  const reasoningHasF5 = normalResult.reasoning.some(r => r.includes('[F5/SRL]'))
+  assert(
+    reasoningHasF5,
+    'reasoning: F5/SRL情報が含まれる',
+    `reasoning=${normalResult.reasoning.filter(r => r.includes('F5')).join('; ')}`
+  )
+  const reasoningHasF8 = normalResult.reasoning.some(r => r.includes('[F8/動機]'))
+  assert(
+    reasoningHasF8,
+    'reasoning: F8/動機情報が含まれる',
+    `reasoning=${normalResult.reasoning.filter(r => r.includes('F8')).join('; ')}`
+  )
+
+  // -------------------------------------------------------
+  // Test 17: 統合テスト — 学習性無力感リスクで教師アラート
+  // -------------------------------------------------------
+  const helplessLearner = createTestProfiles({
+    cognitive_autonomy: 10, emotional_stability: 15,
+    strategic_maturity: 10, motivational_energy: 10,
+    anxiety: 85, independence: 5,
+    arousal: 15, valence: -60, boredom: 10, flow: 0,
+  })
+  // F8の動機を直接低く設定
+  helplessLearner.F8 = {
+    ...helplessLearner.F8,
+    autonomy_satisfaction: 10,
+    competence_satisfaction: 8,
+    relatedness_satisfaction: 15,
+    motivation_quality: 'external',
+    motivation_continuum_score: 5,
+  }
+  const helplessResult = computeIntegratedControls(helplessLearner, createTestBehavior())
+  assert(
+    helplessResult.controls._teacher_alert === true,
+    '統合F8: 学習性無力感 → 教師アラートON',
+    `teacher_alert=${helplessResult.controls._teacher_alert}`
+  )
+  assert(
+    helplessResult.controls._human_intervention_recommended === true,
+    '統合F8: 学習性無力感 → 人的介入推奨',
+    `human_intervention=${helplessResult.controls._human_intervention_recommended}`
   )
 
   // -------------------------------------------------------
