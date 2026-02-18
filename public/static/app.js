@@ -3085,15 +3085,21 @@ async function loadGuidePage(curriculumId) {
     let courseSelectionProblems = []
     let commonCheckTest = null
     let deliveryMode = 'group'  // デフォルト: 全体配信
+    let approvedCourseIds = []
+    let excludedStudents = []
     try {
       const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
       courseSelectionProblems = metaResponse.data.course_selection_problems || []
       commonCheckTest = metaResponse.data.common_check_test || null
       deliveryMode = metaResponse.data.delivery_mode || 'group'
+      approvedCourseIds = metaResponse.data.approved_courses || []
+      excludedStudents = metaResponse.data.excluded_students || []
       console.log('✅ メタデータ取得:', {
         courseSelectionCount: courseSelectionProblems.length,
         hasCheckTest: !!commonCheckTest,
-        deliveryMode: deliveryMode
+        deliveryMode: deliveryMode,
+        approvedCourseIds: approvedCourseIds,
+        excludedStudents: excludedStudents
       })
     } catch (metaError) {
       console.log('⚠️ メタデータなし、デフォルト表示')
@@ -3112,6 +3118,8 @@ async function loadGuidePage(curriculumId) {
     // 個別最適化コースと学習統計を取得（教師フロー表示用）
     const standardCourses = courses.filter(c => c.course_level !== 'personalized')
     const personalizedCourses = courses.filter(c => c.course_level === 'personalized')
+    const pendingCourses = personalizedCourses.filter(pc => !approvedCourseIds.includes(pc.course_id))
+    const approvedCourses = personalizedCourses.filter(pc => approvedCourseIds.includes(pc.course_id))
     let learningStats = { totalStudents: 0, activeStudents: 0, avgCorrectRate: 0, totalAnswers: 0 }
     try {
       const statsResponse = await axios.get(`/api/curriculum/${curriculumId}/learning-stats`)
@@ -3265,95 +3273,108 @@ async function loadGuidePage(curriculumId) {
               <!-- Step 1: AI生成 -->
               <div class="flex-1 relative">
                 <div class="border-2 border-pink-400 bg-pink-50 rounded-l-xl p-4">
-                  <div class="flex items-center gap-2 mb-3">
+                  <div class="flex items-center gap-2 mb-2">
                     <div class="w-8 h-8 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-sm">1</div>
-                    <h4 class="font-bold text-pink-800">AIが個別カード生成</h4>
+                    <h4 class="font-bold text-pink-800 text-sm">AI生成</h4>
                   </div>
-                  <p class="text-xs text-gray-600 mb-3">児童一人ひとりに合わせて、学習カード・チェックテスト・選択課題をAIが自動生成します。</p>
+                  <p class="text-xs text-gray-600 mb-2">児童ごとに学習カード・テスト・選択課題を自動生成</p>
                   
-                  <div class="grid grid-cols-2 gap-2 mb-3">
-                    <div class="bg-white rounded-lg p-2 text-center border">
-                      <div class="text-lg font-bold text-pink-600">${personalizedCourses.length}</div>
-                      <div class="text-xs text-gray-500">生成済み</div>
-                    </div>
-                    <div class="bg-white rounded-lg p-2 text-center border">
-                      <div class="text-lg font-bold text-pink-600">${personalizedCourses.reduce((sum, c) => sum + (c.cards?.length || 0), 0)}</div>
-                      <div class="text-xs text-gray-500">総カード数</div>
-                    </div>
+                  <div class="bg-white rounded-lg p-2 text-center border mb-2">
+                    <div class="text-xl font-bold text-pink-600">${personalizedCourses.length}</div>
+                    <div class="text-xs text-gray-500">生成済み</div>
                   </div>
 
                   <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
                     class="w-full text-xs bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-2 px-3 rounded-lg font-bold transition">
-                    <i class="fas fa-magic mr-1"></i>個別コースを一括生成
+                    <i class="fas fa-magic mr-1"></i>一括生成
                   </button>
                 </div>
               </div>
 
               <!-- Arrow 1 -->
               <div class="flex items-center px-1 relative z-10" style="margin-left:-8px; margin-right:-8px;">
-                <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-pink-500' : 'bg-gray-300'} text-white flex items-center justify-center shadow-lg text-sm">
+                <div class="w-7 h-7 rounded-full ${personalizedCourses.length > 0 ? 'bg-pink-500' : 'bg-gray-300'} text-white flex items-center justify-center shadow-lg text-xs">
                   <i class="fas fa-arrow-right"></i>
                 </div>
               </div>
 
-              <!-- Step 2: 教師チェック -->
-              <div class="flex-1 relative">
-                <div class="border-2 ${personalizedCourses.length > 0 ? 'border-orange-400 bg-orange-50' : 'border-gray-300 bg-gray-50'} p-4">
-                  <div class="flex items-center gap-2 mb-3">
+              <!-- Step 2: 教師確認 -->
+              <div class="flex-1 relative" style="flex:1.5;">
+                <div class="border-2 ${pendingCourses.length > 0 ? 'border-orange-400 bg-orange-50' : personalizedCourses.length > 0 ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50'} p-4">
+                  <div class="flex items-center gap-2 mb-2">
                     <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-orange-500' : 'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">2</div>
-                    <h4 class="font-bold ${personalizedCourses.length > 0 ? 'text-orange-800' : 'text-gray-600'}">教師が確認・編集</h4>
+                    <h4 class="font-bold ${personalizedCourses.length > 0 ? 'text-orange-800' : 'text-gray-600'} text-sm">教師確認</h4>
+                    ${pendingCourses.length > 0 ? `<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold animate-pulse">${pendingCourses.length}件 未確認</span>` : ''}
+                    ${approvedCourses.length > 0 ? `<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">${approvedCourses.length}件 確認済</span>` : ''}
                   </div>
-                  <p class="text-xs text-gray-600 mb-3">AIが生成したカードを教師が確認し、必要に応じて修正・追加・削除します。</p>
                   
                   ${personalizedCourses.length > 0 ? `
-                  <div class="space-y-1 mb-3 max-h-24 overflow-y-auto">
-                    ${personalizedCourses.map(pc => `
-                      <div class="bg-white rounded-lg p-2 border border-orange-200 flex items-center gap-2 text-xs">
-                        <i class="fas fa-user-graduate text-orange-500"></i>
+                  <div class="space-y-1 mb-2 max-h-32 overflow-y-auto">
+                    ${personalizedCourses.map(pc => {
+                      const isApproved = approvedCourseIds.includes(pc.course_id)
+                      return `
+                      <div class="bg-white rounded-lg p-2 border ${isApproved ? 'border-green-300' : 'border-orange-300'} flex items-center gap-1 text-xs">
+                        <i class="fas ${isApproved ? 'fa-check-circle text-green-500' : 'fa-clock text-orange-500'}"></i>
                         <span class="font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
-                        <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">${pc.cards?.length || 0}枚</span>
+                        <span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs">${pc.cards?.length || 0}枚</span>
                         <button onclick="showPersonalizedCourseGuide(${pc.course_id}, '${(pc.course_name || '').replace(/'/g, "\\'")}', ${curriculumId})" 
-                          class="text-orange-600 hover:text-orange-800" title="学習のてびき形式で確認">
+                          class="text-blue-600 hover:text-blue-800 px-1" title="内容を確認">
                           <i class="fas fa-eye"></i>
                         </button>
-                      </div>
-                    `).join('')}
-                  </div>` : `
-                  <div class="bg-white rounded-lg p-3 border border-dashed border-gray-300 text-center mb-3">
+                        ${!isApproved ? `
+                        <button onclick="approveCourse(${curriculumId}, ${pc.course_id})" 
+                          class="bg-green-500 hover:bg-green-600 text-white px-2 py-0.5 rounded text-xs font-bold" title="確認OK・配信許可">
+                          <i class="fas fa-check mr-0.5"></i>承認
+                        </button>` : `
+                        <button onclick="unapproveCourse(${curriculumId}, ${pc.course_id})" 
+                          class="bg-gray-400 hover:bg-gray-500 text-white px-2 py-0.5 rounded text-xs" title="承認取消">
+                          <i class="fas fa-undo mr-0.5"></i>取消
+                        </button>`}
+                      </div>`
+                    }).join('')}
+                  </div>
+                  ${pendingCourses.length > 0 ? `
+                  <button onclick="approveAllCourses(${curriculumId})" 
+                    class="w-full text-xs bg-green-500 hover:bg-green-600 text-white py-1.5 px-3 rounded-lg font-bold transition">
+                    <i class="fas fa-check-double mr-1"></i>全て承認する
+                  </button>` : `
+                  <div class="text-center text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>全コース確認済み</div>`}
+                  ` : `
+                  <div class="bg-white rounded-lg p-3 border border-dashed border-gray-300 text-center">
                     <i class="fas fa-clipboard-check text-gray-400 text-lg mb-1"></i>
-                    <p class="text-xs text-gray-500">まずStep 1で個別コースを生成してください</p>
+                    <p class="text-xs text-gray-500">Step 1で生成すると、ここに表示されます</p>
                   </div>`}
                 </div>
               </div>
 
               <!-- Arrow 2 -->
               <div class="flex items-center px-1 relative z-10" style="margin-left:-8px; margin-right:-8px;">
-                <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-orange-500' : 'bg-gray-300'} text-white flex items-center justify-center shadow-lg text-sm">
+                <div class="w-7 h-7 rounded-full ${approvedCourses.length > 0 ? 'bg-green-500' : 'bg-gray-300'} text-white flex items-center justify-center shadow-lg text-xs">
                   <i class="fas fa-arrow-right"></i>
                 </div>
               </div>
 
-              <!-- Step 3: 配信・データ収集 -->
+              <!-- Step 3: 配信 -->
               <div class="flex-1 relative">
-                <div class="border-2 ${learningStats.activeStudents > 0 ? 'border-green-400 bg-green-50' : personalizedCourses.length > 0 ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50'} rounded-r-xl p-4">
-                  <div class="flex items-center gap-2 mb-3">
-                    <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-green-500' : 'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">3</div>
-                    <h4 class="font-bold ${personalizedCourses.length > 0 ? 'text-green-800' : 'text-gray-600'}">配信・データ収集</h4>
+                <div class="border-2 ${approvedCourses.length > 0 ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50'} rounded-r-xl p-4">
+                  <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 rounded-full ${approvedCourses.length > 0 ? 'bg-green-500' : 'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">3</div>
+                    <h4 class="font-bold ${approvedCourses.length > 0 ? 'text-green-800' : 'text-gray-600'} text-sm">配信</h4>
                   </div>
-                  <p class="text-xs text-gray-600 mb-3">確認済みの個別カードを児童に配信し、学習データを収集します。</p>
+                  <p class="text-xs text-gray-600 mb-2">承認済みのカードを児童に配信</p>
                   
-                  <div class="grid grid-cols-2 gap-2 mb-3">
-                    <div class="bg-white rounded-lg p-2 text-center border">
-                      <div class="text-lg font-bold ${learningStats.activeStudents > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.activeStudents || 0}</div>
-                      <div class="text-xs text-gray-500">学習中の児童</div>
+                  <div class="grid grid-cols-2 gap-1 mb-2">
+                    <div class="bg-white rounded-lg p-1.5 text-center border">
+                      <div class="text-lg font-bold text-green-600">${approvedCourses.length}</div>
+                      <div class="text-xs text-gray-500">配信可能</div>
                     </div>
-                    <div class="bg-white rounded-lg p-2 text-center border">
+                    <div class="bg-white rounded-lg p-1.5 text-center border">
                       <div class="text-lg font-bold ${learningStats.totalAnswers > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.totalAnswers || 0}</div>
-                      <div class="text-xs text-gray-500">回答データ数</div>
+                      <div class="text-xs text-gray-500">回答数</div>
                     </div>
                   </div>
 
-                  <button onclick="showLearningDashboard(${curriculumId})" class="w-full text-xs bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                  <button onclick="showLearningDashboard(${curriculumId})" class="w-full text-xs bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-bold transition ${approvedCourses.length === 0 ? 'opacity-50' : ''}">
                     <i class="fas fa-chart-bar mr-1"></i>学習統計
                   </button>
                 </div>
@@ -3363,7 +3384,7 @@ async function loadGuidePage(curriculumId) {
             <div class="mt-3 bg-pink-50 rounded-lg p-3 text-xs text-pink-700">
               <i class="fas fa-info-circle mr-1"></i>
               <strong>個別配信フロー：</strong>
-              ①児童を選択して一括生成 → ②教師が学習のてびき形式で確認・編集 → ③児童に個別配信 → ④学習データを収集
+              ①児童を選択→AI一括生成 → ②教師が内容確認→承認 → ③承認済みのみ児童に配信
             </div>
             ` : `
             <!-- ===== 全体配信モード（3コース） ===== -->
@@ -3374,6 +3395,7 @@ async function loadGuidePage(curriculumId) {
                 ${learningStats.totalAnswers > 0 
                   ? '<span class="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full font-bold">データ収集中</span>' 
                   : '<span class="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">配信準備完了</span>'}
+                ${excludedStudents.length > 0 ? `<span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full font-bold">${excludedStudents.length}名 配信除外</span>` : ''}
               </div>
               <p class="text-xs text-gray-600 mb-4">全児童に共通の3コース（じっくり・しっかり・ぐんぐん）を配信し、児童がコースを選んで学習します。</p>
               
@@ -3399,6 +3421,9 @@ async function loadGuidePage(curriculumId) {
               <div class="flex gap-2">
                 <button onclick="printGuide()" class="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-bold transition">
                   <i class="fas fa-print mr-1"></i>てびき印刷
+                </button>
+                <button onclick="showDeliveryManager(${curriculumId}, 'group')" class="flex-1 text-xs bg-orange-500 hover:bg-orange-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                  <i class="fas fa-user-check mr-1"></i>配信管理
                 </button>
                 <button onclick="showLearningDashboard(${curriculumId})" class="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-bold transition">
                   <i class="fas fa-chart-bar mr-1"></i>学習統計
@@ -14150,6 +14175,195 @@ function showUnitPreview(unitData, modelUsed) {
 }
 
 // changeDeliveryMode は削除 — 配信モードは単元作成時に決定、後から変更しない
+
+// ===== 教師承認管理関数群 =====
+
+// 個別コースを承認する
+async function approveCourse(curriculumId, courseId) {
+  try {
+    // 現在の承認リストを取得
+    const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+    let approved = metaResponse.data.approved_courses || []
+    if (!approved.includes(courseId)) {
+      approved.push(courseId)
+    }
+    await axios.put(`/api/curriculum/${curriculumId}/metadata`, { approved_courses: approved })
+    console.log('✅ コース承認:', courseId)
+    loadGuidePage(curriculumId)
+  } catch (error) {
+    console.error('承認エラー:', error)
+    alert('承認に失敗しました')
+  }
+}
+window.approveCourse = approveCourse
+
+// 個別コースの承認を取消する
+async function unapproveCourse(curriculumId, courseId) {
+  try {
+    const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+    let approved = (metaResponse.data.approved_courses || []).filter(id => id !== courseId)
+    await axios.put(`/api/curriculum/${curriculumId}/metadata`, { approved_courses: approved })
+    console.log('✅ 承認取消:', courseId)
+    loadGuidePage(curriculumId)
+  } catch (error) {
+    console.error('承認取消エラー:', error)
+    alert('承認取消に失敗しました')
+  }
+}
+window.unapproveCourse = unapproveCourse
+
+// 全コースを一括承認する
+async function approveAllCourses(curriculumId) {
+  try {
+    // カリキュラムの全個別コースを取得
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const allPersonalized = (response.data.courses || []).filter(c => c.course_level === 'personalized')
+    const allIds = allPersonalized.map(c => c.id || c.course_id)
+    
+    await axios.put(`/api/curriculum/${curriculumId}/metadata`, { approved_courses: allIds })
+    console.log('✅ 全コース一括承認:', allIds.length, '件')
+    loadGuidePage(curriculumId)
+  } catch (error) {
+    console.error('一括承認エラー:', error)
+    alert('一括承認に失敗しました')
+  }
+}
+window.approveAllCourses = approveAllCourses
+
+// 配信管理モーダル（全体配信用：児童ごとにON/OFF）
+async function showDeliveryManager(curriculumId, mode) {
+  try {
+    // 児童リストを取得
+    let students = []
+    try {
+      const res = await axios.get('/api/students/list')
+      students = res.data.students || res.data || []
+    } catch (e) {
+      // フォールバック：デフォルトの児童リスト
+      students = Array.from({length: 30}, (_, i) => ({ id: `student_${i+1}`, name: `児童${i+1}` }))
+    }
+    
+    // 現在の除外リストを取得
+    const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+    const excludedStudents = metaResponse.data.excluded_students || []
+    
+    const modal = document.createElement('div')
+    modal.id = 'delivery-manager-modal'
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.innerHTML = `
+      <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden">
+        <div class="p-6 border-b bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-t-2xl">
+          <h2 class="text-xl font-bold"><i class="fas fa-user-check mr-2"></i>配信管理</h2>
+          <p class="text-sm opacity-90 mt-1">配信する児童を選択してください。チェックを外すと配信しません。</p>
+        </div>
+        
+        <div class="p-4 border-b bg-gray-50">
+          <div class="flex gap-2 flex-wrap items-center">
+            <button onclick="deliveryManagerSelectAll(true)" class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold">
+              <i class="fas fa-check-double mr-1"></i>全員配信
+            </button>
+            <button onclick="deliveryManagerSelectAll(false)" class="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold">
+              <i class="fas fa-times mr-1"></i>全員除外
+            </button>
+            <span id="delivery-count" class="ml-auto text-sm font-bold text-gray-600">
+              ${students.length - excludedStudents.length}名に配信 / ${excludedStudents.length}名を除外
+            </span>
+          </div>
+        </div>
+        
+        <div class="p-4 overflow-y-auto" style="max-height:50vh;">
+          <div class="grid grid-cols-3 gap-2">
+            ${students.map(s => {
+              const sid = s.id || s.student_id || s.name
+              const isExcluded = excludedStudents.includes(sid)
+              return `
+              <label class="flex items-center gap-2 p-2 rounded-lg border cursor-pointer hover:bg-blue-50 transition ${isExcluded ? 'bg-gray-100 border-gray-300' : 'bg-white border-blue-200'}">
+                <input type="checkbox" class="delivery-student-cb w-4 h-4" value="${sid}" ${!isExcluded ? 'checked' : ''} onchange="updateDeliveryCount()">
+                <i class="fas fa-user-graduate text-gray-500"></i>
+                <span class="text-sm font-bold ${isExcluded ? 'text-gray-400 line-through' : 'text-gray-700'}">${s.name || sid}</span>
+              </label>`
+            }).join('')}
+          </div>
+        </div>
+        
+        <div class="p-4 border-t flex gap-3">
+          <button onclick="document.getElementById('delivery-manager-modal').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-bold">
+            キャンセル
+          </button>
+          <button onclick="saveDeliverySettings(${curriculumId})" class="flex-1 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white py-3 rounded-lg font-bold">
+            <i class="fas fa-save mr-1"></i>配信設定を保存
+          </button>
+        </div>
+      </div>
+    `
+    document.body.appendChild(modal)
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove() })
+  } catch (error) {
+    console.error('配信管理エラー:', error)
+    alert('配信管理の表示に失敗しました')
+  }
+}
+window.showDeliveryManager = showDeliveryManager
+
+function deliveryManagerSelectAll(checked) {
+  document.querySelectorAll('.delivery-student-cb').forEach(cb => {
+    cb.checked = checked
+    const label = cb.closest('label')
+    const nameSpan = label.querySelector('span')
+    if (checked) {
+      label.className = label.className.replace('bg-gray-100 border-gray-300', 'bg-white border-blue-200')
+      nameSpan.classList.remove('text-gray-400', 'line-through')
+      nameSpan.classList.add('text-gray-700')
+    } else {
+      label.className = label.className.replace('bg-white border-blue-200', 'bg-gray-100 border-gray-300')
+      nameSpan.classList.remove('text-gray-700')
+      nameSpan.classList.add('text-gray-400', 'line-through')
+    }
+  })
+  updateDeliveryCount()
+}
+window.deliveryManagerSelectAll = deliveryManagerSelectAll
+
+function updateDeliveryCount() {
+  const all = document.querySelectorAll('.delivery-student-cb')
+  const checked = document.querySelectorAll('.delivery-student-cb:checked')
+  const el = document.getElementById('delivery-count')
+  if (el) {
+    el.textContent = `${checked.length}名に配信 / ${all.length - checked.length}名を除外`
+  }
+  // ラベルのスタイルも更新
+  all.forEach(cb => {
+    const label = cb.closest('label')
+    const nameSpan = label.querySelector('span')
+    if (cb.checked) {
+      label.className = label.className.replace('bg-gray-100 border-gray-300', 'bg-white border-blue-200')
+      nameSpan.classList.remove('text-gray-400', 'line-through')
+      nameSpan.classList.add('text-gray-700')
+    } else {
+      label.className = label.className.replace('bg-white border-blue-200', 'bg-gray-100 border-gray-300')
+      nameSpan.classList.remove('text-gray-700')
+      nameSpan.classList.add('text-gray-400', 'line-through')
+    }
+  })
+}
+window.updateDeliveryCount = updateDeliveryCount
+
+async function saveDeliverySettings(curriculumId) {
+  try {
+    const all = document.querySelectorAll('.delivery-student-cb')
+    const excluded = []
+    all.forEach(cb => { if (!cb.checked) excluded.push(cb.value) })
+    
+    await axios.put(`/api/curriculum/${curriculumId}/metadata`, { excluded_students: excluded })
+    console.log('✅ 配信設定保存:', excluded.length, '名を除外')
+    document.getElementById('delivery-manager-modal').remove()
+    loadGuidePage(curriculumId)
+  } catch (error) {
+    console.error('配信設定保存エラー:', error)
+    alert('配信設定の保存に失敗しました')
+  }
+}
+window.saveDeliverySettings = saveDeliverySettings
 
 // 生成した単元を保存
 async function saveGeneratedUnit(unitData) {

@@ -3193,7 +3193,6 @@ app.put('/api/curriculum/:id/metadata', async (c) => {
     
     // delivery_modeの更新
     if (body.delivery_mode) {
-      // 既存のdelivery_modeを削除してから挿入
       await env.DB.prepare(`
         DELETE FROM curriculum_metadata WHERE curriculum_id = ? AND meta_key = 'delivery_mode'
       `).bind(id).run()
@@ -3201,6 +3200,28 @@ app.put('/api/curriculum/:id/metadata', async (c) => {
         INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, 'delivery_mode', ?)
       `).bind(id, body.delivery_mode).run()
       console.log('📡 配信モード更新:', id, body.delivery_mode)
+    }
+    
+    // approved_courses の更新（教師確認済みコースIDリスト）
+    if (body.approved_courses !== undefined) {
+      await env.DB.prepare(`
+        DELETE FROM curriculum_metadata WHERE curriculum_id = ? AND meta_key = 'approved_courses'
+      `).bind(id).run()
+      await env.DB.prepare(`
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, 'approved_courses', ?)
+      `).bind(id, JSON.stringify(body.approved_courses)).run()
+      console.log('📡 承認済みコース更新:', id, body.approved_courses)
+    }
+    
+    // excluded_students の更新（配信除外児童IDリスト）
+    if (body.excluded_students !== undefined) {
+      await env.DB.prepare(`
+        DELETE FROM curriculum_metadata WHERE curriculum_id = ? AND meta_key = 'excluded_students'
+      `).bind(id).run()
+      await env.DB.prepare(`
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, 'excluded_students', ?)
+      `).bind(id, JSON.stringify(body.excluded_students)).run()
+      console.log('📡 配信除外児童更新:', id, body.excluded_students)
     }
     
     return c.json({ success: true })
