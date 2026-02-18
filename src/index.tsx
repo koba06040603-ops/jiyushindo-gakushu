@@ -57,6 +57,7 @@ import {
   getHomeworkSubmissions,
   compareClasses
 } from './teacher-dashboard'
+import { v4Api } from './v4-api'
 
 type Bindings = {
   DB: D1Database
@@ -31839,6 +31840,12 @@ app.get('/api/student-learning/adaptive-next', async (c) => {
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
   }
 })
+
+// =============================================================================
+// Phase E: v4 統合制御エンジン API
+// 12理論統合因果モデルに基づく子ども理解・制御パラメータ算出
+// =============================================================================
+app.route('/api/v4', v4Api)
 
 // ============================================================
 // 静的HTML配信フォールバック（wrangler pages devローカル環境用）

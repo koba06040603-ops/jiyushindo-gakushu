@@ -2,6 +2,77 @@
 
 > 📘 **一般向けの簡易版READMEは [README_SIMPLE.md](./README_SIMPLE.md) をご覧ください**
 
+## 🧠 Phase E: v4統合制御エンジン API統合 **NEW** (2026-02-17)
+
+### 実装完了: 12理論統合因果モデルのWebAPI化
+
+**概要**: v4統合制御エンジン（F1〜F12の12理論を統合した因果モデル）をHono APIエンドポイントとして公開。
+子どもの「今の姿」を12の視座で理解し、最適な学習制御パラメータを算出するAPIを実装。
+
+**新規ファイル**: `src/v4-api.ts` — 5エンドポイント、844行
+
+### APIエンドポイント一覧
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `POST` | `/api/v4/compute` | **統合制御パラメータ算出**（メインAPI） — 12理論プロファイル + 行動データ → 制御パラメータ |
+| `POST` | `/api/v4/analyze` | **個別エンジン分析** — F1〜F12 各視座の詳細分析結果 |
+| `POST` | `/api/v4/diagnose` | **診断・介入提案** — スパイラル検出、欲求バランス、リスク評価、介入提案 |
+| `GET` | `/api/v4/archetypes` | **8アーキタイプ一覧** — A〜H の学習者像定義 |
+| `GET` | `/api/v4/schema` | **入力スキーマ** — サンプルプロファイル、効果量、影響行列 |
+
+### 入力方式
+
+**簡易パラメータ（quick_params）** — 7パラメータから12理論プロファイルを自動生成:
+```json
+{
+  "quick_params": {
+    "cognitive_autonomy": 50,
+    "emotional_stability": 60,
+    "strategic_maturity": 45,
+    "motivational_energy": 55,
+    "anxiety": 35,
+    "independence": 50,
+    "prior_knowledge": 50
+  },
+  "behavior": {
+    "consecutive_successes": 2,
+    "recent_accuracy": 0.65,
+    "hint_usage_count": 1,
+    "current_srl_phase": "performance",
+    "session_duration_minutes": 15
+  }
+}
+```
+
+**完全プロファイル（profiles）** — F1〜F12 各理論の全パラメータを直接指定可能
+
+### 出力内容
+
+- **compute**: 制御パラメータ（提示方法、構造、足場、認知方略、SRL設定、動機制御）、アーキタイプ判定、5基幹軸、感情状態、推論過程
+- **analyze**: F1〜F12 各エンジンの個別分析（感覚チャネル、多元的入口、経験変容、ATI、SRL、認知方略、足場、動機、メタ認知、領域固有、真正文脈、感情統合）
+- **diagnose**: スパイラル検出（正/負/脆い正/中立）、リスク評価（重篤度付き）、介入提案（制御パラメータ調整含む）、因果チェーン状態（F8→F5、F8→F4波及効果）
+
+### テスト結果（2026-02-17）
+
+| テスト | 入力 | 結果 |
+|--------|------|------|
+| compute (高自律) | cognitive_autonomy=85 | Type C 判定、9ms |
+| compute (回避者) | cognitive_autonomy=15, anxiety=80 | Type H 判定、3ms |
+| analyze | 12エンジン | F1〜F12 全12エンジン分析成功 |
+| diagnose (安定) | accuracy=0.85, success=5 | 正のスパイラル、リスク0 |
+| diagnose (危機) | errors=8, anxiety=95 | 負のスパイラル+感情危機、4リスク+2介入 |
+| バリデーション | 範囲外値 | 4エラー正常検出 |
+
+### 技術的な改善点
+
+- **v4エンジン全12エンジンの正確な関数シグネチャ統合**: F1〜F12の各`computeControls`関数を正しい引数で呼び出し
+- **ステートレスAPI設計**: セッション状態なしでも動作（sessionTracker不要でSRL品質評価可能）
+- **部分入力サポート**: `quick_params`（7パラメータ）から`AllTheoryProfiles`（12理論×数十パラメータ）を自動構築
+- **バリデーション**: F1, F4, F12 の範囲チェック（0-100, -100-100, 0-1）
+
+---
+
 ## 🔄 Phase 19: 個別最適化ループ完全実装 **NEW** (2026-02-16)
 
 ### 実装完了: 診断→問題生成→解答→ログ→次回生成の適応的ループ
