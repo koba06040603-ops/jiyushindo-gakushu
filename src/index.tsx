@@ -977,6 +977,22 @@ app.get('/health', async (c) => {
   return c.json(metrics, statusCode);
 });
 
+// 一時的DBスキーマ確認エンドポイント
+app.get('/api/debug/schema', async (c) => {
+  const { env } = c
+  const tables = ['curriculum', 'courses', 'learning_cards', 'hint_cards', 'optional_problems']
+  const result: any = {}
+  for (const table of tables) {
+    try {
+      const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all()
+      result[table] = (info.results || []).map((col: any) => ({ name: col.name, type: col.type, pk: col.pk }))
+    } catch (e: any) {
+      result[table] = { error: e.message }
+    }
+  }
+  return c.json(result)
+})
+
 // 詳細なシステムステータス（認証必須・管理者のみ）
 app.get('/api/admin/system-status', authMiddleware, requireRole('admin'), async (c) => {
   const metrics = await performHealthCheck(c);
@@ -2830,8 +2846,8 @@ app.get('/api/curriculum/:id', async (c) => {
             // ヒント取得
             const hints = await env.DB.prepare(`
               SELECT 
-                id,
-                id AS hint_id,
+                hint_id,
+                hint_id AS id,
                 learning_card_id,
                 learning_card_id AS card_id,
                 hint_number,
@@ -2873,19 +2889,27 @@ app.get('/api/curriculum/:id', async (c) => {
       })
     )
     
-    // 選択問題
-    const optionalProblems = await env.DB.prepare(`
-      SELECT problem_id, unit_id, problem_title, problem_type, difficulty_level, content AS problem_content, content AS problem_description, created_at
-      FROM optional_problems 
-      WHERE unit_id = ?
-      ORDER BY problem_id
-    `).bind(id).all()
-    
-    // problem_number を付与
-    const optionalWithNumber = (optionalProblems.results || []).map((p: any, idx: number) => ({
-      ...p,
-      problem_number: idx + 1
-    }))
+    // 選択問題（本番スキーマとの互換性を確保）
+    let optionalWithNumber: any[] = []
+    try {
+      // 本番スキーマ: problem_id(PK), curriculum_id, problem_number, problem_title, problem_description, problem_content, difficulty_level, learning_meaning
+      const optionalProblems = await env.DB.prepare(`
+        SELECT problem_id, curriculum_id, problem_number, problem_title, 
+               problem_description, problem_content, difficulty_level,
+               created_at
+        FROM optional_problems 
+        WHERE curriculum_id = ?
+        ORDER BY problem_number, problem_id
+      `).bind(id).all()
+      optionalWithNumber = (optionalProblems.results || []).map((p: any, idx: number) => ({
+        ...p,
+        problem_number: p.problem_number || idx + 1,
+        problem_type: p.difficulty_level || 'optional'
+      }))
+    } catch (optErr: any) {
+      console.warn('選択問題取得エラー:', optErr.message)
+      optionalWithNumber = []
+    }
     
     return c.json({
       curriculum,
@@ -2992,8 +3016,8 @@ app.get('/api/cards/:cardId', async (c) => {
     
     const hints = await env.DB.prepare(`
       SELECT 
-        id,
-        id AS hint_id,
+        hint_id,
+        hint_id AS id,
         learning_card_id,
         learning_card_id AS card_id,
         hint_number,
@@ -5718,7 +5742,7 @@ app.put('/api/hints/:hintId', async (c) => {
       UPDATE hint_cards SET
         hint_content = ?,
         thinking_tool_suggestion = ?
-      WHERE id = ?
+      WHERE hint_id = ?
     `).bind(
       body.hint_text || body.hint_content || '',
       body.thinking_tool_suggestion || '',
@@ -5761,7 +5785,7 @@ app.delete('/api/hints/:hintId', async (c) => {
   
   try {
     await env.DB.prepare(`
-      DELETE FROM hint_cards WHERE id = ?
+      DELETE FROM hint_cards WHERE hint_id = ?
     `).bind(hintId).run()
     
     return c.json({ success: true })
@@ -31257,9 +31281,9 @@ app.get('/api/student-learning/tebiki', async (c) => {
           const cardId = card.card_id || card.id
           let hints: any[] = []
           try {
-            // hint_cards: id, learning_card_id, hint_number, hint_content, thinking_tool_suggestion
+            // hint_cards: hint_id(PK), learning_card_id, hint_number, hint_content, thinking_tool_suggestion
             const hintsRes = await env.DB.prepare(`
-              SELECT id AS hint_id, learning_card_id AS card_id, hint_number, hint_number AS hint_level, hint_content, hint_content AS hint_text
+              SELECT hint_id, learning_card_id, learning_card_id AS card_id, hint_number, hint_number AS hint_level, hint_content, hint_content AS hint_text
               FROM hint_cards WHERE learning_card_id = ? ORDER BY hint_number
             `).bind(cardId).all()
             hints = hintsRes.results || []
@@ -31298,7 +31322,7 @@ app.get('/api/student-learning/tebiki', async (c) => {
         let hints: any[] = []
         try {
           const hintsRes = await env.DB.prepare(`
-            SELECT id AS hint_id, learning_card_id AS card_id, hint_number, hint_number AS hint_level, hint_content, hint_content AS hint_text
+            SELECT hint_id, learning_card_id, learning_card_id AS card_id, hint_number, hint_number AS hint_level, hint_content, hint_content AS hint_text
             FROM hint_cards WHERE learning_card_id = ? ORDER BY hint_number
           `).bind(cardId).all()
           hints = hintsRes.results || []
@@ -31389,7 +31413,7 @@ app.get('/api/student-learning/tebiki', async (c) => {
               let hints: any[] = []
               try {
                 const hintsRes = await env.DB.prepare(`
-                  SELECT id AS hint_id, learning_card_id AS card_id, hint_number, hint_number AS hint_level, hint_content, hint_content AS hint_text
+                  SELECT hint_id, learning_card_id, learning_card_id AS card_id, hint_number, hint_number AS hint_level, hint_content, hint_content AS hint_text
                   FROM hint_cards WHERE learning_card_id = ? ORDER BY hint_number
                 `).bind(cardId).all()
                 hints = hintsRes.results || []
