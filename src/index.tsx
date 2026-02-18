@@ -966,6 +966,91 @@ app.use('*', async (c, next) => {
 app.use('/api/*', cors())
 
 // =============================================================================
+// DB初期化: 必要なテーブルが存在しない場合は自動作成
+// =============================================================================
+let dbInitialized = false
+app.use('/api/*', async (c, next) => {
+  if (!dbInitialized) {
+    try {
+      const { env } = c
+      
+      // curriculum_metadata テーブル
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS curriculum_metadata (
+          metadata_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          curriculum_id INTEGER NOT NULL,
+          meta_key TEXT NOT NULL,
+          meta_value TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (curriculum_id) REFERENCES curriculum(id)
+        )
+      `).run()
+      await env.DB.prepare(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_curriculum_metadata_unique 
+        ON curriculum_metadata(curriculum_id, meta_key)
+      `).run()
+      
+      // retrieval_practice_content テーブル
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS retrieval_practice_content (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          curriculum_id INTEGER NOT NULL,
+          content_type TEXT NOT NULL,
+          problem_data TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(curriculum_id, content_type)
+        )
+      `).run()
+      
+      // answers テーブル
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS answers (
+          answer_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          learning_card_id INTEGER NOT NULL,
+          answer_text TEXT,
+          explanation TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run()
+      
+      // student_progress テーブル
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS student_progress (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          student_id INTEGER,
+          curriculum_id INTEGER,
+          course_id INTEGER,
+          learning_card_id INTEGER,
+          status TEXT DEFAULT 'not_started',
+          understanding_level INTEGER DEFAULT 0,
+          help_requested_from TEXT,
+          help_count INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run()
+      
+      // user_sessions テーブル
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS user_sessions (
+          session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          session_token TEXT UNIQUE NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          expires_at DATETIME
+        )
+      `).run()
+      
+      dbInitialized = true
+      console.log('✅ DB初期化完了')
+    } catch (e: any) {
+      console.warn('⚠️ DB初期化エラー (無視して続行):', e.message)
+      dbInitialized = true
+    }
+  }
+  await next()
+})
+
+// =============================================================================
 // Phase 7: ヘルスチェック・監視エンドポイント
 // =============================================================================
 
@@ -10494,32 +10579,35 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
       return c.json({ error: 'カリキュラムが見つかりません', details: 'カリキュラムレコードがデータベースに存在しません' }, 404)
     }
     
-    if (!courses.results || courses.results.length < 3) {
-      console.error(`❌ コースが不足しています: ${courses.results?.length || 0}/3件`)
+    if (!courses.results || courses.results.length === 0) {
+      console.error(`❌ コースが見つかりません`)
       return c.json({ 
-        error: 'カリキュラムが見つかりません', 
-        details: `3つのコースが必要ですが、${courses.results?.length || 0}件しか見つかりませんでした`,
+        error: 'コースが見つかりません', 
+        details: 'カリキュラムにコースが登録されていません',
         curriculum_id: curriculumId,
-        courses_found: courses.results?.length || 0
+        courses_found: 0
       }, 404)
     }
     
+    const numCourses = courses.results.length
     console.log('✅ カリキュラムとコースの検証完了')
     
-    // 軽量なプロンプト（導入問題3題のみ）
-    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の3つのコースの導入問題を生成。
+    // コース数に応じたプロンプト
+    const courseList = courses.results.map((c: any, i: number) => 
+      `${i+1}. ${c.course_name || `コース${i+1}`}: ${c.description || ''}`
+    ).join('\n')
+    
+    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の${numCourses}つのコースの導入問題を生成。
 
-【3つのコース】
-1. ${courses.results[0]?.course_name || 'ゆっくりコース'}: ${courses.results[0]?.description || ''}
-2. ${courses.results[1]?.course_name || 'しっかりコース'}: ${courses.results[1]?.description || ''}
-3. ${courses.results[2]?.course_name || 'ぐんぐんコース'}: ${courses.results[2]?.description || ''}
+【${numCourses}つのコース】
+${courseList}
 
-【JSON出力（導入問題3題のみ）】
+【JSON出力（導入問題${numCourses}題のみ）】
 {
   "introduction_problems": [
-    {"course_number": 1, "problem_title": "タイトル（20字以内）", "problem_content": "具体的な数字を含む問題文（80-150字）", "answer": "解答と解説（50-100字）"},
-    {"course_number": 2, "problem_title": "タイトル（20字以内）", "problem_content": "具体的な数字を含む問題文（80-150字）", "answer": "解答と解説（50-100字）"},
-    {"course_number": 3, "problem_title": "タイトル（20字以内）", "problem_content": "具体的な数字を含む問題文（80-150字）", "answer": "解答と解説（50-100字）"}
+${courses.results.map((_: any, i: number) => 
+  `    {"course_number": ${i+1}, "problem_title": "タイトル（20字以内）", "problem_content": "具体的な数字を含む問題文（80-150字）", "answer": "解答と解説（50-100字）"}`
+).join(',\n')}
   ]
 }`
 
@@ -10589,11 +10677,13 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
     }
     
     // データベースに保存
-    if (problems.introduction_problems && problems.introduction_problems.length === 3) {
+    const introProblems = problems.introduction_problems || []
+    if (introProblems.length > 0) {
       const coursesList = courses.results
-      for (let i = 0; i < 3; i++) {
-        const introProblem = problems.introduction_problems[i]
-        const course = coursesList[i]
+      const saveCount = Math.min(introProblems.length, coursesList.length)
+      for (let i = 0; i < saveCount; i++) {
+        const introProblem = introProblems[i]
+        const course = coursesList[i] as any
         const introJSON = JSON.stringify(introProblem)
         console.log(`コース${i+1}(ID:${course.id})に導入問題を保存:`, introProblem.problem_title)
         await env.DB.prepare(`
@@ -10603,11 +10693,11 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
       
       return c.json({ 
         success: true, 
-        message: '導入問題3題を生成・保存しました',
-        details: { introduction_count: 3 }
+        message: `導入問題${saveCount}題を生成・保存しました`,
+        details: { introduction_count: saveCount }
       })
     } else {
-      throw new Error('導入問題が3題生成されませんでした')
+      throw new Error('導入問題が生成されませんでした')
     }
     
   } catch (error: any) {
