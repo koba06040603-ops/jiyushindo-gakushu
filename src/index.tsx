@@ -58,6 +58,7 @@ import {
   compareClasses
 } from './teacher-dashboard'
 import { v4Api } from './v4-api'
+import { v4CardApi } from './v4-card-integration'
 
 type Bindings = {
   DB: D1Database
@@ -31846,6 +31847,12 @@ app.get('/api/student-learning/adaptive-next', async (c) => {
 // 12理論統合因果モデルに基づく子ども理解・制御パラメータ算出
 // =============================================================================
 app.route('/api/v4', v4Api)
+
+// =============================================================================
+// Phase F: v4統合制御エンジン × 学習カード生成 統合
+// D1データ→プロファイル→v4制御→AIカード生成→リアルタイム適応
+// =============================================================================
+app.route('/api/v4/card', v4CardApi)
 
 // ============================================================
 // 静的HTML配信フォールバック（wrangler pages devローカル環境用）

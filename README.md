@@ -2,6 +2,58 @@
 
 > 📘 **一般向けの簡易版READMEは [README_SIMPLE.md](./README_SIMPLE.md) をご覧ください**
 
+## 🎴 Phase F: v4統合制御 × 個別最適カード生成 **NEW** (2026-02-18)
+
+### 実装完了: D1データ → 12理論プロファイル → v4制御 → AIカード生成 → リアルタイム適応
+
+**概要**: v4統合制御エンジンと学習カード生成を完全統合。児童のD1データベースに蓄積された
+初期診断・解答履歴・振り返り・テスト結果等から12理論プロファイルを自動構築し、
+AIが制御パラメータに厳密に従って個別最適化された学習カードを生成する。
+
+**新規ファイル**: `src/v4-card-integration.ts` — F-1〜F-6の6レイヤー統合、約900行
+
+### 6つの統合レイヤー
+
+| # | レイヤー | 内容 |
+|---|---------|------|
+| F-1 | プロファイル構築 | D1の7テーブル（initial_diagnostics, student_card_answers, unit_reflections, hourly_reflections, test_study_logs, metacognition_logs, test_performance_feedback）→ AllTheoryProfiles (F1〜F12) |
+| F-2 | 行動データ変換 | 直近20件の解答データ → RealtimeBehaviorData（連続正解/不正解、正答率、ヒント使用、アイドル時間、SRL位相推定、感情推定） |
+| F-3 | Geminiプロンプト統合 | IntegratedControlParameters → 日本語の詳細な指示文（チャネル・構造・足場・方略・SRL・動機すべて） |
+| F-4 | カードテンプレート分岐 | 制御パラメータ → media_type(5種) × question_format(6種) × scaffold × reflection × motivation |
+| F-5 | リアルタイム適応ループ | 解答後にv4再計算 → 次カードの難易度・形式・足場を自動調整（調整理由・リスク・励ましメッセージ付き） |
+| F-6 | テスト・検証API | 8アーキタイプ×3行動パターン=24ケースのバッチテスト |
+
+### 新規APIエンドポイント
+
+| メソッド | パス | 説明 |
+|---------|------|------|
+| `POST` | `/api/v4/card/profile/:studentId` | D1データからv4プロファイル構築（検証用） |
+| `POST` | `/api/v4/card/generate/:studentId` | v4制御に基づく個別最適カード生成（Gemini連携） |
+| `POST` | `/api/v4/card/adaptive-next/:studentId` | リアルタイム適応 — 解答後の次カードパラメータ算出 |
+| `POST` | `/api/v4/card/batch-test` | 24ケースバッチテスト（8アーキタイプ×3行動パターン） |
+
+### D1 → 12理論プロファイル マッピング概要
+
+| D1テーブル | → | 理論パラメータ |
+|-----------|---|---------------|
+| initial_diagnostics.learning_style | → | F1 (感覚チャネル効率) |
+| initial_diagnostics.resilience/error_strategy | → | F4 (不安・統制の所在), F5 (自己効力感), F8 (動機) |
+| student_card_answers (正答率/時間) | → | F4 (認知能力), F6 (習熟度), F7 (ZPD/現在パフォーマンス) |
+| unit_reflections (メタ認知/計画/方法) | → | F5 (SRL 3位相), F9 (メタ認知) |
+| hourly_reflections (手ごたえ/友達学び) | → | F2 (対人知能), F8 (関係性欲求), F11 (共同体参加), F12 (覚醒/感情価) |
+| test_study_logs (集中/疲労/自信) | → | F5 (注意集中), F12 (覚醒度/退屈) |
+| test_performance_feedback (弱点) | → | F10 (誤概念リスト) |
+
+### バッチテスト結果サマリ（24ケース、26ms）
+
+| 状態 | 検索練習 | 構造レベル | ZPD | frustration | 教師alert |
+|------|---------|----------|-----|------------|----------|
+| 苦戦時 | recognition(選択式) | 0.59-0.95 | 0.10-0.24 | True | True |
+| 安定時 | free_recall/cued_recall | 0.10-0.78 | 0.36-0.66 | 場合による | False |
+| 退屈時 | free_recall(自由再生) | 0.10-0.78 | 0.36-0.95 | False | False |
+
+---
+
 ## 🧠 Phase E: v4統合制御エンジン API統合 **NEW** (2026-02-17)
 
 ### 実装完了: 12理論統合因果モデルのWebAPI化
