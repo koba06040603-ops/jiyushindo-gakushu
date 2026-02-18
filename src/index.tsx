@@ -1140,6 +1140,39 @@ app.get('/api/debug/schema', async (c) => {
   return c.json(result)
 })
 
+// DB状態確認用デバッグエンドポイント
+app.get('/api/debug/db-status', async (c) => {
+  const { env } = c
+  try {
+    const maxId = await env.DB.prepare('SELECT MAX(id) as max_id, COUNT(*) as total FROM curriculum').first()
+    const recent = await env.DB.prepare('SELECT id, unit_name, grade, subject FROM curriculum ORDER BY id DESC LIMIT 5').all()
+    const testId = c.req.query('test_id')
+    let testResult = null
+    if (testId) {
+      testResult = await env.DB.prepare('SELECT id, unit_name FROM curriculum WHERE id = ?').bind(testId).first()
+    }
+    // 欠落データのあるカリキュラムを検索
+    const missing = await env.DB.prepare(`
+      SELECT c.id, c.unit_name, c.grade, c.subject,
+        (SELECT COUNT(*) FROM courses WHERE curriculum_id = c.id) as course_count,
+        (SELECT COUNT(*) FROM courses WHERE curriculum_id = c.id AND introduction_problem IS NOT NULL) as intro_count,
+        (SELECT COUNT(*) FROM curriculum_metadata WHERE curriculum_id = c.id AND meta_key = 'common_check_test') as has_check_test,
+        (SELECT COUNT(*) FROM curriculum_metadata WHERE curriculum_id = c.id AND meta_key = 'course_selection_problems') as has_selection
+      FROM curriculum c
+      WHERE (SELECT COUNT(*) FROM courses WHERE curriculum_id = c.id) >= 3
+        AND (
+          (SELECT COUNT(*) FROM courses WHERE curriculum_id = c.id AND introduction_problem IS NOT NULL) < (SELECT COUNT(*) FROM courses WHERE curriculum_id = c.id)
+          OR (SELECT COUNT(*) FROM curriculum_metadata WHERE curriculum_id = c.id AND meta_key = 'common_check_test') = 0
+        )
+      ORDER BY c.id DESC
+      LIMIT 10
+    `).all()
+    return c.json({ max_id: maxId, recent: recent.results, test_result: testResult, missing_data: missing.results, database_id: 'c01fd96b-f795-4b53-8ad8-3b9ea98859ee' })
+  } catch (e: any) {
+    return c.json({ error: e.message })
+  }
+})
+
 // 重複カリキュラムデータの削除
 app.post('/api/debug/cleanup-duplicates', async (c) => {
   const { env } = c

@@ -3106,19 +3106,18 @@ async function loadGuidePage(curriculumId) {
       console.log('⚠️ 選択問題なし')
     }
     
-    // 欠落データのバックグラウンド自動生成（順次実行・リトライ付き）
+    // 欠落データのバックグラウンド自動生成（順次実行）
     const missingIntroProblems = courses.filter(c => !c.introduction_problem)
     const needsAssessment = !commonCheckTest || !commonCheckTest.sample_problems || commonCheckTest.sample_problems.length === 0 || optionalProblems.length === 0
     const needsCourseProblems = courseSelectionProblems.length === 0
     const hasAnyMissing = missingIntroProblems.length > 0 || needsAssessment || needsCourseProblems
     
-    // ループ防止: 同一セッションで同一カリキュラムの自動生成は1回のみ
-    const autoGenKey = `autoGen_${curriculumId}`
-    const alreadyTriedAutoGen = sessionStorage.getItem(autoGenKey) === 'done'
+    // 自動リロードのループ防止（生成は毎回実行、リロードは1回のみ）
+    const autoReloadKey = `autoReload_${curriculumId}`
+    const alreadyAutoReloaded = sessionStorage.getItem(autoReloadKey) === 'done'
     
-    if (hasAnyMissing && !alreadyTriedAutoGen) {
-      sessionStorage.setItem(autoGenKey, 'done')
-      console.log('🔄 欠落データを自動生成中（1回限り）...')
+    if (hasAnyMissing) {
+      console.log('🔄 欠落データを自動生成開始...', { missingIntro: missingIntroProblems.length, needsAssessment, needsCourseProblems })
       // ページ描画後にバックグラウンドで順次生成を実行
       setTimeout(async () => {
         try {
@@ -3135,22 +3134,32 @@ async function loadGuidePage(curriculumId) {
             console.log('  → 導入問題を生成中...')
             await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ 導入問題生成失敗:', e.message))
             generated++
-            autoGenBanners.forEach(b => { b.querySelector('span').textContent = `AIが問題を生成中です... (${generated}/${totalTasks} 完了)` })
+            autoGenBanners.forEach(b => { const s = b.querySelector('span'); if(s) s.textContent = `AIが問題を生成中です... (${generated}/${totalTasks} 完了)` })
           }
           if (needsAssessment) {
             console.log('  → チェックテスト・選択問題を生成中...')
             await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ 評価問題生成失敗:', e.message))
             generated++
-            autoGenBanners.forEach(b => { b.querySelector('span').textContent = `AIが問題を生成中です... (${generated}/${totalTasks} 完了)` })
+            autoGenBanners.forEach(b => { const s = b.querySelector('span'); if(s) s.textContent = `AIが問題を生成中です... (${generated}/${totalTasks} 完了)` })
           }
           if (needsCourseProblems) {
             console.log('  → コース選択問題を生成中...')
             await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ コース問題生成失敗:', e.message))
             generated++
           }
-          console.log('✅ バックグラウンド自動生成完了 → 自動リロード')
-          // 自動生成完了後、ページを自動リロード（sessionStorageは'done'のまま→再生成はしない）
-          loadGuidePage(curriculumId)
+          console.log('✅ バックグラウンド自動生成完了')
+          
+          if (!alreadyAutoReloaded) {
+            // 初回のみ自動リロード
+            sessionStorage.setItem(autoReloadKey, 'done')
+            console.log('🔄 自動リロード実行')
+            loadGuidePage(curriculumId)
+          } else {
+            // 2回目以降はバナーで通知のみ
+            autoGenBanners.forEach(banner => {
+              banner.innerHTML = '<div class="bg-green-100 border border-green-300 rounded-lg p-3 text-center mt-2"><i class="fas fa-check-circle text-green-600 mr-1"></i><span class="text-sm font-bold text-green-700">生成完了！再読み込みで表示されます</span></div>'
+            })
+          }
         } catch (e) {
           console.warn('⚠️ 自動生成エラー:', e)
           const autoGenBanners = document.querySelectorAll('.auto-gen-status-banner')
@@ -3159,8 +3168,6 @@ async function loadGuidePage(curriculumId) {
           })
         }
       }, 100)
-    } else if (hasAnyMissing && alreadyTriedAutoGen) {
-      console.log('ℹ️ 自動生成は既に試行済み。手動で再読み込みしてください')
     }
     
     // データの完全性を確認
@@ -3424,7 +3431,7 @@ async function loadGuidePage(curriculumId) {
                     <p class="font-bold text-gray-700 mb-2">チェックテストはまだありません</p>
                     <p class="text-sm text-gray-500">バックグラウンドで生成中です。しばらくしてから再読み込みしてください。</p>
                     <div class="auto-gen-status-banner"></div>
-                    <button onclick="sessionStorage.removeItem('autoGen_${curriculumId}'); loadGuidePage(${curriculumId})" class="mt-3 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                    <button onclick="sessionStorage.removeItem('autoReload_${curriculumId}'); loadGuidePage(${curriculumId})" class="mt-3 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
                       <i class="fas fa-sync-alt mr-1"></i>再読み込み（再生成）
                     </button>
                   </div>
@@ -3511,7 +3518,7 @@ async function loadGuidePage(curriculumId) {
                 <p class="font-bold text-gray-700 mb-2">えらべるもんだいはまだありません</p>
                 <p class="text-sm text-gray-500">バックグラウンドで生成中です。しばらくしてから再読み込みしてください。</p>
                 <div class="auto-gen-status-banner"></div>
-                <button onclick="sessionStorage.removeItem('autoGen_${curriculumId}'); loadGuidePage(${curriculumId})" class="mt-3 bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                <button onclick="sessionStorage.removeItem('autoReload_${curriculumId}'); loadGuidePage(${curriculumId})" class="mt-3 bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
                   <i class="fas fa-sync-alt mr-1"></i>再読み込み（再生成）
                 </button>
               </div>
