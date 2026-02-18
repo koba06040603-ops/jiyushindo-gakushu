@@ -3084,13 +3084,16 @@ async function loadGuidePage(curriculumId) {
     //コース選択問題と共通チェックテストをメタデータから取得
     let courseSelectionProblems = []
     let commonCheckTest = null
+    let deliveryMode = 'group'  // デフォルト: 全体配信
     try {
       const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
       courseSelectionProblems = metaResponse.data.course_selection_problems || []
       commonCheckTest = metaResponse.data.common_check_test || null
+      deliveryMode = metaResponse.data.delivery_mode || 'group'
       console.log('✅ メタデータ取得:', {
         courseSelectionCount: courseSelectionProblems.length,
-        hasCheckTest: !!commonCheckTest
+        hasCheckTest: !!commonCheckTest,
+        deliveryMode: deliveryMode
       })
     } catch (metaError) {
       console.log('⚠️ メタデータなし、デフォルト表示')
@@ -3246,10 +3249,123 @@ async function loadGuidePage(curriculumId) {
 
           <!-- 教師用：授業フローナビゲーション -->
           <div class="bg-white rounded-2xl shadow-lg p-6 mb-4 print:hidden border-2 border-indigo-200">
-            <h3 class="text-lg font-bold text-indigo-800 mb-4 flex items-center">
-              <i class="fas fa-chalkboard-teacher mr-2"></i>授業フロー（教師用）
-            </h3>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-bold text-indigo-800 flex items-center">
+                <i class="fas fa-chalkboard-teacher mr-2"></i>授業フロー（教師用）
+              </h3>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-3 py-1 rounded-full font-bold ${deliveryMode === 'individual' ? 'bg-pink-200 text-pink-800' : 'bg-blue-200 text-blue-800'}">
+                  <i class="fas ${deliveryMode === 'individual' ? 'fa-user-cog' : 'fa-users'} mr-1"></i>
+                  ${deliveryMode === 'individual' ? '個別配信モード' : '全体配信モード'}
+                </span>
+                <button onclick="changeDeliveryMode(${curriculumId}, '${deliveryMode}')" class="text-xs text-indigo-500 hover:text-indigo-700 underline">変更</button>
+              </div>
+            </div>
             
+            ${deliveryMode === 'individual' ? `
+            <!-- 個別配信モード -->
+            <div class="flex items-stretch gap-0">
+              <!-- Step 1: AI生成 -->
+              <div class="flex-1 relative">
+                <div class="border-2 border-pink-400 bg-pink-50 rounded-l-xl p-4">
+                  <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-sm">1</div>
+                    <h4 class="font-bold text-pink-800">AIが個別カード生成</h4>
+                  </div>
+                  <p class="text-xs text-gray-600 mb-3">児童一人ひとりの学力・特性に合わせて、AIが最適な学習カードを自動生成します。</p>
+                  
+                  <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div class="bg-white rounded-lg p-2 text-center border">
+                      <div class="text-lg font-bold text-pink-600">${personalizedCourses.length}</div>
+                      <div class="text-xs text-gray-500">生成済みコース</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-2 text-center border">
+                      <div class="text-lg font-bold text-pink-600">${personalizedCourses.reduce((sum, c) => sum + (c.cards?.length || 0), 0)}</div>
+                      <div class="text-xs text-gray-500">個別カード数</div>
+                    </div>
+                  </div>
+
+                  <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
+                    class="w-full text-xs bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-2 px-3 rounded-lg font-bold transition">
+                    <i class="fas fa-magic mr-1"></i>個別コースを生成
+                  </button>
+                </div>
+              </div>
+
+              <!-- Arrow 1 -->
+              <div class="flex items-center px-1 relative z-10" style="margin-left:-8px; margin-right:-8px;">
+                <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-pink-500' : 'bg-gray-300'} text-white flex items-center justify-center shadow-lg text-sm">
+                  <i class="fas fa-arrow-right"></i>
+                </div>
+              </div>
+
+              <!-- Step 2: 教師チェック -->
+              <div class="flex-1 relative">
+                <div class="border-2 ${personalizedCourses.length > 0 ? 'border-orange-400 bg-orange-50' : 'border-gray-300 bg-gray-50'} p-4">
+                  <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-orange-500' : 'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">2</div>
+                    <h4 class="font-bold ${personalizedCourses.length > 0 ? 'text-orange-800' : 'text-gray-600'}">教師が確認・編集</h4>
+                  </div>
+                  <p class="text-xs text-gray-600 mb-3">AIが生成したカードを教師が確認し、必要に応じて修正・追加・削除します。</p>
+                  
+                  ${personalizedCourses.length > 0 ? `
+                  <div class="space-y-1 mb-3 max-h-24 overflow-y-auto">
+                    ${personalizedCourses.map(pc => `
+                      <div class="bg-white rounded-lg p-2 border border-orange-200 flex items-center gap-2 text-xs">
+                        <i class="fas fa-user-graduate text-orange-500"></i>
+                        <span class="font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
+                        <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">${pc.cards?.length || 0}枚</span>
+                      </div>
+                    `).join('')}
+                  </div>` : `
+                  <div class="bg-white rounded-lg p-3 border border-dashed border-gray-300 text-center mb-3">
+                    <i class="fas fa-clipboard-check text-gray-400 text-lg mb-1"></i>
+                    <p class="text-xs text-gray-500">まずStep 1で個別コースを生成してください</p>
+                  </div>`}
+                </div>
+              </div>
+
+              <!-- Arrow 2 -->
+              <div class="flex items-center px-1 relative z-10" style="margin-left:-8px; margin-right:-8px;">
+                <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-orange-500' : 'bg-gray-300'} text-white flex items-center justify-center shadow-lg text-sm">
+                  <i class="fas fa-arrow-right"></i>
+                </div>
+              </div>
+
+              <!-- Step 3: 個別配信 -->
+              <div class="flex-1 relative">
+                <div class="border-2 ${personalizedCourses.length > 0 ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50'} rounded-r-xl p-4">
+                  <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-green-500' : 'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">3</div>
+                    <h4 class="font-bold ${personalizedCourses.length > 0 ? 'text-green-800' : 'text-gray-600'}">児童に個別配信</h4>
+                  </div>
+                  <p class="text-xs text-gray-600 mb-3">確認済みの個別カードを児童に配信し、学習データを収集します。</p>
+                  
+                  <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div class="bg-white rounded-lg p-2 text-center border">
+                      <div class="text-lg font-bold ${learningStats.activeStudents > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.activeStudents || 0}</div>
+                      <div class="text-xs text-gray-500">学習中の児童</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-2 text-center border">
+                      <div class="text-lg font-bold ${learningStats.totalAnswers > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.totalAnswers || 0}</div>
+                      <div class="text-xs text-gray-500">回答データ数</div>
+                    </div>
+                  </div>
+
+                  <button onclick="showLearningDashboard(${curriculumId})" class="w-full text-xs bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                    <i class="fas fa-chart-bar mr-1"></i>学習統計
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="mt-3 bg-pink-50 rounded-lg p-3 text-xs text-pink-700">
+              <i class="fas fa-info-circle mr-1"></i>
+              <strong>個別配信フロー：</strong>
+              ①児童データを入力 → ②AIが個別カードを生成 → ③教師が確認・編集 → ④児童に個別配信 → ⑤学習データを収集
+            </div>
+            ` : `
+            <!-- 全体配信モード（従来版） -->
             <div class="flex items-stretch gap-0">
               <!-- Phase 1: 全体配信 -->
               <div class="flex-1 relative">
@@ -3342,6 +3458,7 @@ async function loadGuidePage(curriculumId) {
               <strong>フロー：</strong>
               ①てびきを印刷・配布 → ②児童が3コースから選んで学習 → ③学習データが蓄積 → ④データを基にAIが個別カード生成 → ⑤教師が確認・編集 → ⑥個別配信
             </div>
+            `}
           </div>
 
           <!-- 学習のてびき1枚完結版 -->
@@ -3389,6 +3506,70 @@ async function loadGuidePage(curriculumId) {
               </div>
             </div>
 
+            ${deliveryMode === 'individual' ? `
+            <!-- 個別配信モード：コース選択の代わりに個別配信ガイドを表示 -->
+            <div class="mb-6">
+              <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-pink-300">
+                <i class="fas fa-user-cog mr-2 text-pink-600"></i>
+                この単元は個別配信モードです
+              </h3>
+              <div class="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-6 border-2 border-pink-200">
+                <div class="text-center mb-4">
+                  <div class="inline-flex items-center gap-2 bg-pink-200 text-pink-800 px-4 py-2 rounded-full font-bold text-sm">
+                    <i class="fas fa-user-cog"></i>個別配信モード
+                  </div>
+                </div>
+                <p class="text-center text-gray-700 mb-6">
+                  この単元では、教師がAIを活用して児童一人ひとりに最適化した学習カードを生成・配信します。<br>
+                  児童は3コースから選ぶのではなく、自分専用のカードで学習します。
+                </p>
+                
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                  <div class="bg-white rounded-xl p-4 text-center border-2 border-pink-200 shadow-sm">
+                    <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-pink-100 flex items-center justify-center">
+                      <i class="fas fa-robot text-pink-600 text-xl"></i>
+                    </div>
+                    <h4 class="font-bold text-pink-800 text-sm mb-1">Step 1</h4>
+                    <p class="text-xs text-gray-600">AIが児童データを分析し個別カードを生成</p>
+                  </div>
+                  <div class="bg-white rounded-xl p-4 text-center border-2 border-orange-200 shadow-sm">
+                    <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-orange-100 flex items-center justify-center">
+                      <i class="fas fa-clipboard-check text-orange-600 text-xl"></i>
+                    </div>
+                    <h4 class="font-bold text-orange-800 text-sm mb-1">Step 2</h4>
+                    <p class="text-xs text-gray-600">教師が内容を確認・編集</p>
+                  </div>
+                  <div class="bg-white rounded-xl p-4 text-center border-2 border-green-200 shadow-sm">
+                    <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-green-100 flex items-center justify-center">
+                      <i class="fas fa-paper-plane text-green-600 text-xl"></i>
+                    </div>
+                    <h4 class="font-bold text-green-800 text-sm mb-1">Step 3</h4>
+                    <p class="text-xs text-gray-600">児童に個別配信して学習開始</p>
+                  </div>
+                </div>
+
+                ${personalizedCourses.length > 0 ? `
+                <div class="bg-white rounded-lg p-4 border border-pink-200">
+                  <h4 class="font-bold text-pink-800 mb-2"><i class="fas fa-list mr-1"></i>配信済み個別コース（${personalizedCourses.length}名分）</h4>
+                  <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                    ${personalizedCourses.map(pc => `
+                      <div class="bg-pink-50 rounded-lg p-2 border border-pink-100 flex items-center gap-2">
+                        <i class="fas fa-user-graduate text-pink-500"></i>
+                        <span class="text-xs font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
+                        <span class="text-xs bg-pink-200 text-pink-700 px-2 py-0.5 rounded-full">${pc.cards?.length || 0}枚</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>` : `
+                <div class="text-center">
+                  <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
+                    class="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-xl transition shadow-lg text-sm">
+                    <i class="fas fa-magic mr-2"></i>個別最適化コースを生成する
+                  </button>
+                </div>`}
+              </div>
+            </div>
+            ` : `
             <!-- コース選択問題（統合版：導入問題含む） -->
             <div class="mb-6">
               <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
@@ -3633,6 +3814,7 @@ async function loadGuidePage(curriculumId) {
               </div>
               `}
             </div>
+            `}
 
             ${await generateLearningSupportSectionWithData(curriculumId)}
 
@@ -13971,13 +14153,62 @@ function showUnitPreview(unitData, modelUsed) {
         </div>
       ` : ''}
 
+      <!-- 配信モード選択 -->
+      <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 mb-4 border-2 border-indigo-200">
+        <h3 class="text-lg font-bold text-indigo-800 mb-3 flex items-center">
+          <i class="fas fa-broadcast-tower mr-2"></i>配信モードを選択してください
+        </h3>
+        <div class="grid grid-cols-2 gap-4" id="delivery-mode-selector">
+          <label class="cursor-pointer">
+            <input type="radio" name="delivery_mode" value="group" checked class="hidden peer" onchange="updateDeliveryModeUI()">
+            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:ring-2 peer-checked:ring-blue-300 border-2 border-gray-300 rounded-xl p-4 transition-all hover:border-blue-300">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center">
+                  <i class="fas fa-users"></i>
+                </div>
+                <div>
+                  <h4 class="font-bold text-blue-800">全体配信モード</h4>
+                  <p class="text-xs text-blue-600">3コース一斉配信</p>
+                </div>
+              </div>
+              <p class="text-xs text-gray-600 mt-2">全児童に共通の3コース（じっくり・しっかり・ぐんぐん）を配信し、児童が自分で選んで学習します。学習データを収集して個別最適化に活用できます。</p>
+              <div class="mt-2 flex flex-wrap gap-1">
+                <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">じっくり</span>
+                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">しっかり</span>
+                <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">ぐんぐん</span>
+              </div>
+            </div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="delivery_mode" value="individual" class="hidden peer" onchange="updateDeliveryModeUI()">
+            <div class="peer-checked:border-pink-500 peer-checked:bg-pink-50 peer-checked:ring-2 peer-checked:ring-pink-300 border-2 border-gray-300 rounded-xl p-4 transition-all hover:border-pink-300">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="w-10 h-10 rounded-full bg-pink-500 text-white flex items-center justify-center">
+                  <i class="fas fa-user-cog"></i>
+                </div>
+                <div>
+                  <h4 class="font-bold text-pink-800">個別配信モード</h4>
+                  <p class="text-xs text-pink-600">児童ごとに個別配信</p>
+                </div>
+              </div>
+              <p class="text-xs text-gray-600 mt-2">教師がAIで生成した個別最適化カードを確認・編集してから、児童一人ひとりに配信します。3コースの選択は行わず、最初から個別対応します。</p>
+              <div class="mt-2 flex flex-wrap gap-1">
+                <span class="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full">AI生成</span>
+                <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">教師チェック</span>
+                <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">個別配信</span>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <!-- アクションボタン -->
       <div class="flex flex-col space-y-3">
         <!-- 教師用：全体確認・編集ボタン -->
         <button onclick="showTeacherOverview(${JSON.stringify(unitData).replace(/"/g, '&quot;')})"
                 class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
           <i class="fas fa-edit mr-2"></i>
-          👨‍🏫 教師用：全体を確認・編集する
+          教師用：全体を確認・編集する
         </button>
         <button onclick="showPrintPreview(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
                 class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
@@ -13991,7 +14222,8 @@ function showUnitPreview(unitData, modelUsed) {
             破棄してトップへ
           </button>
           <button onclick="saveGeneratedUnit(${JSON.stringify(unitData).replace(/"/g, '&quot;')})" 
-                  class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg">
+                  class="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-6 rounded-lg transition shadow-lg"
+                  id="save-unit-button">
             <i class="fas fa-save mr-2"></i>
             この単元を保存して使用する
           </button>
@@ -14000,6 +14232,34 @@ function showUnitPreview(unitData, modelUsed) {
     </div>
   `
 }
+
+// 配信モード切替UI更新
+function updateDeliveryModeUI() {
+  const mode = document.querySelector('input[name="delivery_mode"]:checked')?.value || 'group'
+  console.log('📡 配信モード変更:', mode)
+}
+window.updateDeliveryModeUI = updateDeliveryModeUI
+
+// 配信モード変更（ガイドページから）
+async function changeDeliveryMode(curriculumId, currentMode) {
+  const newMode = currentMode === 'group' ? 'individual' : 'group'
+  const modeLabel = newMode === 'group' ? '全体配信モード（3コース）' : '個別配信モード'
+  
+  if (!confirm(`配信モードを「${modeLabel}」に変更しますか？\n\nこの変更はいつでも元に戻せます。`)) return
+  
+  try {
+    await axios.put(`/api/curriculum/${curriculumId}/metadata`, {
+      delivery_mode: newMode
+    })
+    console.log('✅ 配信モード変更:', newMode)
+    // ページをリロード
+    loadGuidePage(curriculumId)
+  } catch (error) {
+    console.error('配信モード変更エラー:', error)
+    alert('配信モードの変更に失敗しました')
+  }
+}
+window.changeDeliveryMode = changeDeliveryMode
 
 // 生成した単元を保存
 async function saveGeneratedUnit(unitData) {
@@ -14010,8 +14270,15 @@ async function saveGeneratedUnit(unitData) {
   console.log('📦 curriculum:', unitData.curriculum)
   console.log('📦 courses数:', unitData.courses?.length)
   
+  // 配信モードを取得
+  const deliveryMode = document.querySelector('input[name="delivery_mode"]:checked')?.value || 'group'
+  console.log('📡 配信モード:', deliveryMode)
+  
+  // unitDataに配信モードを追加
+  unitData.delivery_mode = deliveryMode
+  
   // ボタンを無効化してローディング表示
-  const saveButton = event.target
+  const saveButton = document.getElementById('save-unit-button') || event.target
   const originalHTML = saveButton.innerHTML
   saveButton.disabled = true
   saveButton.innerHTML = `

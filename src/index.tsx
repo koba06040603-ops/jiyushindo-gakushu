@@ -3191,6 +3191,18 @@ app.put('/api/curriculum/:id/metadata', async (c) => {
       `).bind(id, JSON.stringify(body.check_tests)).run()
     }
     
+    // delivery_modeの更新
+    if (body.delivery_mode) {
+      // 既存のdelivery_modeを削除してから挿入
+      await env.DB.prepare(`
+        DELETE FROM curriculum_metadata WHERE curriculum_id = ? AND meta_key = 'delivery_mode'
+      `).bind(id).run()
+      await env.DB.prepare(`
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, 'delivery_mode', ?)
+      `).bind(id, body.delivery_mode).run()
+      console.log('📡 配信モード更新:', id, body.delivery_mode)
+    }
+    
     return c.json({ success: true })
   } catch (error) {
     console.error('メタデータ更新エラー:', error)
@@ -8895,7 +8907,7 @@ ${customInfo}
 // APIルート：生成した単元を保存
 app.post('/api/curriculum/save-generated', async (c) => {
   const { env } = c
-  const { curriculum, courses, optionalProblems, courseSelectionProblems, commonCheckTest } = await c.req.json()
+  const { curriculum, courses, optionalProblems, courseSelectionProblems, commonCheckTest, delivery_mode } = await c.req.json()
   
   try {
     // ============================================================
@@ -9134,6 +9146,13 @@ app.post('/api/curriculum/save-generated', async (c) => {
         INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
       `).bind(curriculumId, 'common_check_test', JSON.stringify(commonCheckTest)).run()
     }
+    
+    // 配信モードを保存（デフォルト: group = 全体配信3コース）
+    const savedDeliveryMode = delivery_mode || 'group'
+    await env.DB.prepare(`
+      INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+    `).bind(curriculumId, 'delivery_mode', savedDeliveryMode).run()
+    console.log('📡 配信モード保存:', savedDeliveryMode)
     
     const totalCards = courses.reduce((sum: number, co: any) => sum + (co.cards?.length || 0), 0)
     console.log('✅ 単元保存完了:', {
