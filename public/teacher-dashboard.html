@@ -45,6 +45,95 @@
         </header>
 
         <div class="container mx-auto px-4 py-8">
+            <!-- ===== 学習カード作成セクション（学年→教科→教科書→単元 直接選択） ===== -->
+            <div class="bg-white rounded-2xl shadow-2xl mb-8 overflow-hidden">
+                <!-- ステップバー -->
+                <div class="bg-gradient-to-r from-purple-600 to-pink-500 p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">
+                                <i class="fas fa-wand-magic-sparkles mr-2"></i>
+                                学習カードを作成しよう
+                            </h2>
+                            <p class="text-white opacity-90 text-sm mt-1">学年・教科・教科書を選択 → 単元を選んで学習開始</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <a href="/landing" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition text-sm font-medium">
+                                <i class="fas fa-home mr-1"></i>トップページへ
+                            </a>
+                        </div>
+                    </div>
+                    <!-- ステップインジケーター -->
+                    <div class="flex justify-center mt-4 gap-2 flex-wrap">
+                        <div id="step1Ind" class="flex items-center bg-white bg-opacity-30 rounded-full px-4 py-1 text-white text-sm font-bold">
+                            <span class="bg-white text-purple-600 rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">1</span>
+                            学年
+                        </div>
+                        <i class="fas fa-chevron-right text-white opacity-50 self-center"></i>
+                        <div id="step2Ind" class="flex items-center bg-white bg-opacity-20 rounded-full px-4 py-1 text-white text-sm font-bold">
+                            <span class="bg-white bg-opacity-50 text-purple-600 rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">2</span>
+                            教科
+                        </div>
+                        <i class="fas fa-chevron-right text-white opacity-50 self-center"></i>
+                        <div id="step3Ind" class="flex items-center bg-white bg-opacity-20 rounded-full px-4 py-1 text-white text-sm font-bold">
+                            <span class="bg-white bg-opacity-50 text-purple-600 rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">3</span>
+                            教科書
+                        </div>
+                        <i class="fas fa-chevron-right text-white opacity-50 self-center"></i>
+                        <div id="step4Ind" class="flex items-center bg-white bg-opacity-20 rounded-full px-4 py-1 text-white text-sm font-bold">
+                            <span class="bg-white bg-opacity-50 text-purple-600 rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">4</span>
+                            単元
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    <!-- 選択フォーム（横並び） -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">
+                                <i class="fas fa-user-graduate mr-1 text-purple-500"></i> 学年
+                            </label>
+                            <select id="gradeSelect" class="w-full p-3 border-2 border-gray-300 rounded-xl text-lg focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition">
+                                <option value="">選択してください</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">
+                                <i class="fas fa-book mr-1 text-blue-500"></i> 教科
+                            </label>
+                            <select id="subjectSelect" class="w-full p-3 border-2 border-gray-300 rounded-xl text-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition">
+                                <option value="">選択してください</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">
+                                <i class="fas fa-building mr-1 text-green-500"></i> 教科書会社
+                            </label>
+                            <select id="textbookSelect" class="w-full p-3 border-2 border-gray-300 rounded-xl text-lg focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200 transition">
+                                <option value="">選択してください</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 単元一覧 -->
+                    <div id="unitSelectArea" style="display:none;" class="mb-4">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">
+                            <i class="fas fa-list-ol mr-1 text-pink-500"></i> 単元を選択
+                        </label>
+                        <div id="unitList" class="space-y-2 max-h-64 overflow-y-auto border-2 border-gray-200 rounded-xl p-3 bg-gray-50">
+                        </div>
+                    </div>
+
+                    <!-- コースバー -->
+                    <div class="flex justify-center gap-6 text-sm mt-2 pt-3 border-t border-gray-100">
+                        <span class="flex items-center"><span class="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span><strong>じっくり</strong>（基礎）</span>
+                        <span class="flex items-center"><span class="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span><strong>しっかり</strong>（標準）</span>
+                        <span class="flex items-center"><span class="inline-block w-3 h-3 rounded-full bg-purple-500 mr-2"></span><strong>ぐんぐん</strong>（発展）</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- クラス選択 -->
             <div class="bg-white rounded-lg shadow p-6 mb-6">
                 <h2 class="text-xl font-bold text-gray-800 mb-4">
@@ -303,6 +392,107 @@
 
         // 初期化
         loadClasses();
+        loadCurriculumOptions();
+
+        // ===== 学習カード選択フロー =====
+        async function loadCurriculumOptions() {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await axios.get('/api/curriculum/options', {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const { grades, subjects, textbooks } = res.data;
+
+                const gradeSelect = document.getElementById('gradeSelect');
+                const subjectSelect = document.getElementById('subjectSelect');
+                const textbookSelect = document.getElementById('textbookSelect');
+
+                grades.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g.grade;
+                    opt.textContent = g.grade;
+                    gradeSelect.appendChild(opt);
+                });
+                subjects.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.subject;
+                    opt.textContent = s.subject;
+                    subjectSelect.appendChild(opt);
+                });
+                textbooks.forEach(t => {
+                    const opt = document.createElement('option');
+                    opt.value = t.textbook_company;
+                    opt.textContent = t.textbook_company;
+                    textbookSelect.appendChild(opt);
+                });
+
+                const updateSteps = () => {
+                    const g = gradeSelect.value, s = subjectSelect.value, t = textbookSelect.value;
+                    document.getElementById('step2Ind').classList.toggle('bg-opacity-30', !!g);
+                    document.getElementById('step3Ind').classList.toggle('bg-opacity-30', !!(g && s));
+                    document.getElementById('step4Ind').classList.toggle('bg-opacity-30', !!(g && s && t));
+                };
+
+                gradeSelect.addEventListener('change', () => { updateSteps(); loadUnits(); });
+                subjectSelect.addEventListener('change', () => { updateSteps(); loadUnits(); });
+                textbookSelect.addEventListener('change', () => { updateSteps(); loadUnits(); });
+            } catch (e) {
+                console.error('カリキュラム選択肢取得エラー:', e);
+            }
+        }
+
+        async function loadUnits() {
+            const grade = document.getElementById('gradeSelect').value;
+            const subject = document.getElementById('subjectSelect').value;
+            const textbook = document.getElementById('textbookSelect').value;
+            const unitArea = document.getElementById('unitSelectArea');
+            const unitList = document.getElementById('unitList');
+
+            if (!grade || !subject || !textbook) {
+                unitArea.style.display = 'none';
+                return;
+            }
+
+            unitArea.style.display = '';
+            unitList.innerHTML = '<p class="text-gray-400 text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i>読み込み中...</p>';
+
+            try {
+                const token = localStorage.getItem('token');
+                const res = await axios.get('/api/curriculum', {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const curricula = res.data.filter(c =>
+                    c.grade == grade &&
+                    c.subject === subject &&
+                    c.textbook_company === textbook
+                );
+
+                if (curricula.length === 0) {
+                    unitList.innerHTML = '<p class="text-gray-400 text-center py-4"><i class="fas fa-info-circle mr-2"></i>該当する単元がありません</p>';
+                    return;
+                }
+
+                unitList.innerHTML = '';
+                curricula.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white border-2 border-gray-200 rounded-lg p-3 hover:border-purple-400 hover:shadow-md transition cursor-pointer flex items-center justify-between group';
+                    card.onclick = () => { window.location.href = `/landing#curriculum=${item.id}`; };
+                    card.innerHTML = `
+                        <div class="flex-1">
+                            <p class="font-bold text-gray-800 group-hover:text-purple-700 transition">
+                                <i class="fas fa-book-open mr-2 text-purple-400"></i>${item.unit_order}. ${item.unit_name}
+                            </p>
+                            <p class="text-sm text-gray-500 ml-7">${item.grade} ${item.subject} - ${item.textbook_company}</p>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-300 group-hover:text-purple-500 transition"></i>
+                    `;
+                    unitList.appendChild(card);
+                });
+            } catch (e) {
+                console.error('単元一覧取得エラー:', e);
+                unitList.innerHTML = '<p class="text-red-400 text-center py-4"><i class="fas fa-exclamation-triangle mr-2"></i>読み込みエラー</p>';
+            }
+        }
     </script>
 </body>
 </html>
