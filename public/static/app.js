@@ -13939,193 +13939,44 @@ async function saveGeneratedUnit(unitData) {
       console.log('📊 curriculum_id が有効:', !!curriculumId)
       console.log('=' .repeat(80))
       
-      // 保存成功表示
+      // 保存成功 → すぐに学習のてびきへ遷移（追加問題はバックグラウンドで生成）
       saveButton.innerHTML = `
         <i class="fas fa-check-circle mr-2"></i>
-        保存完了！
+        保存完了！学習のてびきへ移動します...
       `
       saveButton.className = 'flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
       
       console.log('✅ 単元を保存しました。curriculum_id:', curriculumId)
-      console.log('📊 保存されたデータ:', response.data.saved_data)
       
-      // 保存完了表示を維持
-      saveButton.innerHTML = `
-        <i class="fas fa-check-circle mr-2"></i>
-        保存完了！
-      `
-      
-      console.log('✅ 単元を保存しました。curriculum_id:', curriculumId)
-      console.log('📊 保存されたデータ:', response.data.saved_data)
-      
-      // 追加問題を順次生成（必須）- プログレス表示対応
-      console.log('🔄 追加問題生成を開始... curriculum_id:', curriculumId)
-      
-      let completedCount = 0
-      const totalCount = 3
-      
-      const updateProgress = (completed) => {
-        saveButton.innerHTML = `
-          <i class="fas fa-spinner fa-spin mr-2"></i>
-          追加問題を生成中... (${completed}/${totalCount})
-        `
+      // 追加問題をバックグラウンドで生成（遷移をブロックしない）
+      const generateAdditionalProblems = async () => {
+        try {
+          console.log('🔄 バックグラウンドで追加問題生成開始...')
+          await Promise.allSettled([
+            axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`).then(() => console.log('✅ コース選択問題 完了')).catch(e => console.warn('⚠️ コース選択問題 失敗:', e.message)),
+            axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`).then(() => console.log('✅ 評価問題 完了')).catch(e => console.warn('⚠️ 評価問題 失敗:', e.message)),
+            axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`).then(() => console.log('✅ 導入問題 完了')).catch(e => console.warn('⚠️ 導入問題 失敗:', e.message))
+          ])
+          console.log('🎉 バックグラウンド追加問題生成完了')
+        } catch (e) {
+          console.warn('⚠️ 追加問題生成エラー（学習のてびきで自動補完されます）:', e.message)
+        }
       }
       
-      updateProgress(0)
+      // バックグラウンドで追加問題生成を開始（awaitしない）
+      generateAdditionalProblems()
       
-      try {
-        console.log('🌐 API呼び出し準備完了')
-        
-        // API1: コース選択問題
-        let courseSuccess = false
-        let courseProblems = null
-        try {
-          console.log('🚀 API1開始: コース選択問題')
-          courseProblems = await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`)
-          courseSuccess = true
-          console.log('✅ API1成功: コース選択問題')
-        } catch (e) {
-          console.error('🔴 API1エラー:', e)
-          courseProblems = { reason: e }
-        }
-        completedCount++
-        updateProgress(completedCount)
-        
-        // API2: 評価問題
-        let assessmentSuccess = false
-        let assessmentProblems = null
-        try {
-          console.log('🚀 API2開始: 評価問題')
-          assessmentProblems = await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`)
-          assessmentSuccess = true
-          console.log('✅ API2成功: 評価問題')
-        } catch (e) {
-          console.error('🔴 API2エラー:', e)
-          assessmentProblems = { reason: e }
-        }
-        completedCount++
-        updateProgress(completedCount)
-        
-        // API3: 導入問題
-        let introSuccess = false
-        let introProblems = null
-        try {
-          console.log('🚀 API3開始: 導入問題')
-          introProblems = await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
-          introSuccess = true
-          console.log('✅ API3成功: 導入問題')
-        } catch (e) {
-          console.error('🔴 API3エラー:', e)
-          introProblems = { reason: e }
-        }
-        completedCount++
-        updateProgress(completedCount)
-        
-        console.log('✅ API順次実行完了')
-        
-        console.log('✅ コース選択問題:', courseSuccess ? '成功' : '失敗')
-        if (courseSuccess) {
-          console.log('   レスポンス:', courseProblems?.data)
-        } else {
-          console.error('   エラー詳細:', courseProblems.reason?.response?.data || courseProblems.reason?.message || courseProblems.reason)
-        }
-        
-        console.log('✅ 評価問題:', assessmentSuccess ? '成功' : '失敗')
-        if (assessmentSuccess) {
-          console.log('   レスポンス:', assessmentProblems?.data)
-        } else {
-          console.error('   エラー詳細:', assessmentProblems.reason?.response?.data || assessmentProblems.reason?.message || assessmentProblems.reason)
-        }
-        
-        console.log('✅ 導入問題:', introSuccess ? '成功' : '失敗')
-        if (introSuccess) {
-          console.log('   レスポンス:', introProblems?.data)
-        } else {
-          console.error('   エラー詳細:', introProblems.reason?.response?.data || introProblems.reason?.message || introProblems.reason)
-        }
-        
-        if (courseSuccess && assessmentSuccess && introSuccess) {
-          saveButton.innerHTML = `
-            <i class="fas fa-check-circle mr-2"></i>
-            すべて完了！
-          `
-          console.log('🎉 すべての追加問題が正常に生成されました')
-        } else {
-          const failed = []
-          const success = []
-          
-          if (!courseSuccess) {
-            failed.push('コース選択問題')
-          } else {
-            success.push('コース選択問題')
-          }
-          
-          if (!assessmentSuccess) {
-            failed.push('選択問題・チェックテスト')
-          } else {
-            success.push('選択問題・チェックテスト')
-          }
-          
-          if (!introSuccess) {
-            failed.push('導入問題')
-          } else {
-            success.push('導入問題')
-          }
-          
-          saveButton.innerHTML = `
-            <i class="fas fa-check-circle mr-2"></i>
-            ${success.length > 0 ? success.length + '/' + (success.length + failed.length) + ' 完了' : '一部未生成'}
-          `
-          
-          console.warn('⚠️ 一部の追加問題生成に失敗:', failed)
-          console.log('✅ 生成成功:', success)
-          
-          // 重要: アラートは表示せず、学習のてびきで自動補完に任せる
-          console.info('💡 失敗した問題は「学習のてびき」画面で自動補完されます')
-        }
-      } catch (additionalError) {
-        console.error('❌ 追加問題生成エラー:', additionalError)
-        saveButton.innerHTML = `
-          <i class="fas fa-exclamation-triangle mr-2"></i>
-          追加問題未生成
-        `
-        alert('❌ 追加問題の生成に失敗しました。\n\nもう一度新しい単元を生成してください。')
-      }
-      
-      // 学習のてびきページへ遷移（簡易版）
+      // 1秒後に学習のてびきページへ遷移
       setTimeout(async () => {
-        saveButton.innerHTML = `
-          <i class="fas fa-check-circle mr-2"></i>
-          保存完了！
-        `
-        saveButton.className = 'flex-1 bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg'
-        
-        console.log('=' .repeat(80))
-        console.log('🔄 学習カリキュラム画面へ遷移開始')
-        console.log('🆔 渡すcurriculum_id:', curriculumId)
-        console.log('📊 型:', typeof curriculumId)
-        console.log('📊 値:', curriculumId)
-        console.log('📊 有効性チェック:', {
-          exists: !!curriculumId,
-          notUndefined: curriculumId !== undefined,
-          notNull: curriculumId !== null,
-          isNumber: typeof curriculumId === 'number' || !isNaN(Number(curriculumId))
-        })
-        console.log('=' .repeat(80))
-        
-        // 学習のてびきページへ遷移
+        console.log('🔄 学習のてびきページへ遷移開始 curriculum_id:', curriculumId)
         try {
           await loadGuidePage(curriculumId)
         } catch (transitionError) {
           console.error('❌ 画面遷移エラー:', transitionError)
-          console.error('エラー詳細:', {
-            message: transitionError.message,
-            stack: transitionError.stack,
-            response: transitionError.response?.data
-          })
-          alert('画面遷移に失敗しました: ' + transitionError.message)
+          alert('画面遷移に失敗しました: ' + transitionError.message + '\n\nトップページに戻ります。')
+          renderTopPage()
         }
-      }, 1500)
+      }, 1000)
     } else {
       const errorMsg = response.data.details || response.data.error || '保存に失敗しました'
       throw new Error(errorMsg)
