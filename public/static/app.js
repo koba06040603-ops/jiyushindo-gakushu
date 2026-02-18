@@ -3106,14 +3106,19 @@ async function loadGuidePage(curriculumId) {
       console.log('⚠️ 選択問題なし')
     }
     
-    // 欠落データのバックグラウンド自動生成（通知なし・完了後サイレントリロード）
+    // 欠落データのバックグラウンド自動生成（通知なし・1回だけ実行）
     const missingIntroProblems = courses.filter(c => !c.introduction_problem)
     const needsAssessment = !commonCheckTest || !commonCheckTest.sample_problems || commonCheckTest.sample_problems.length === 0 || optionalProblems.length === 0
     const needsCourseProblems = courseSelectionProblems.length === 0
     const hasAnyMissing = missingIntroProblems.length > 0 || needsAssessment || needsCourseProblems
     
-    if (hasAnyMissing) {
-      console.log('🔄 欠落データを静かに自動生成中...')
+    // ループ防止: セッション中に既に自動生成を試行した場合は再実行しない
+    const autoGenKey = `autoGen_${curriculumId}`
+    const alreadyTriedAutoGen = sessionStorage.getItem(autoGenKey)
+    
+    if (hasAnyMissing && !alreadyTriedAutoGen) {
+      sessionStorage.setItem(autoGenKey, 'true')
+      console.log('🔄 欠落データを静かに自動生成中（1回のみ）...')
       ;(async () => {
         try {
           const tasks = []
@@ -3133,6 +3138,8 @@ async function loadGuidePage(curriculumId) {
           console.warn('⚠️ 自動生成エラー:', e)
         }
       })()
+    } else if (hasAnyMissing && alreadyTriedAutoGen) {
+      console.log('⚠️ 自動生成は既に試行済み。ループ防止のためスキップ')
     }
     
     // データの完全性を確認
@@ -3392,10 +3399,10 @@ async function loadGuidePage(curriculumId) {
                   </div>
                 ` : `
                   <div class="bg-white rounded-xl p-6 mb-3 text-center">
-                    <i class="fas fa-spinner fa-spin text-yellow-500 text-3xl mb-3"></i>
-                    <p class="font-bold text-gray-700 mb-2">チェックテストを準備中です</p>
-                    <p class="text-sm text-gray-500">AIが問題を作成しています。ページを再読み込みすると表示されます。</p>
-                    <button onclick="loadGuidePage(${curriculumId})" class="mt-3 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                    <i class="fas fa-clock text-yellow-500 text-3xl mb-3"></i>
+                    <p class="font-bold text-gray-700 mb-2">チェックテストはまだありません</p>
+                    <p class="text-sm text-gray-500">自動生成中です。しばらくしてからページを再読み込みしてください。</p>
+                    <button onclick="sessionStorage.removeItem('autoGen_${curriculumId}'); loadGuidePage(${curriculumId})" class="mt-3 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
                       <i class="fas fa-sync-alt mr-1"></i>再読み込み
                     </button>
                   </div>
@@ -3478,10 +3485,10 @@ async function loadGuidePage(curriculumId) {
               </div>
               ` : `
               <div class="bg-white rounded-xl p-6 text-center">
-                <i class="fas fa-spinner fa-spin text-pink-500 text-3xl mb-3"></i>
-                <p class="font-bold text-gray-700 mb-2">えらべるもんだいを準備中です</p>
-                <p class="text-sm text-gray-500">AIが問題を作成しています。ページを再読み込みすると表示されます。</p>
-                <button onclick="loadGuidePage(${curriculumId})" class="mt-3 bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                <i class="fas fa-clock text-pink-500 text-3xl mb-3"></i>
+                <p class="font-bold text-gray-700 mb-2">えらべるもんだいはまだありません</p>
+                <p class="text-sm text-gray-500">自動生成中です。しばらくしてからページを再読み込みしてください。</p>
+                <button onclick="sessionStorage.removeItem('autoGen_${curriculumId}'); loadGuidePage(${curriculumId})" class="mt-3 bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
                   <i class="fas fa-sync-alt mr-1"></i>再読み込み
                 </button>
               </div>
@@ -12344,33 +12351,23 @@ async function suggestUnitNames() {
     
     if (units.length === 0) {
       console.warn('⚠️ 単元が0件です')
-      // ダミーデータを使用
-      const dummyUnits = generateDummyUnits(grade, subject)
       
       suggestionList.innerHTML = `
-        <div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-3">
+        <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-3 mb-3">
           <div class="flex items-start">
-            <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 mr-2"></i>
+            <i class="fas fa-info-circle text-yellow-600 mt-0.5 mr-2"></i>
             <div class="flex-1">
-              <p class="text-sm font-semibold text-red-800 mb-1">
-                ⚠️ 単元データの取得に失敗しました
+              <p class="text-sm font-semibold text-yellow-800 mb-1">
+                該当する単元データがありません
               </p>
-              <p class="text-xs text-red-700">
-                サーバーエラーが発生しました。以下は一般的な${grade}・${subject}の単元例です。実際の${textbook}の単元とは異なる場合があります。
+              <p class="text-xs text-yellow-700">
+                ${textbook}の${grade}・${subject}の単元データが登録されていません。<br>
+                単元名を直接入力してください。
               </p>
             </div>
           </div>
         </div>
-      ` + dummyUnits.map((unit, index) => `
-        <button 
-          onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
-          class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
-          <span class="text-sm text-gray-800">
-            <span class="font-bold text-purple-600 mr-2">${index + 1}.</span>
-            ${unit}
-          </span>
-          <i class="fas fa-chevron-right text-purple-400 opacity-0 group-hover:opacity-100 transition"></i>
-        </button>
+      `
       `).join('')
       
       suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> 再生成'
@@ -12439,45 +12436,23 @@ async function suggestUnitNames() {
     
   } catch (error) {
     console.error('❌ 単元候補取得エラー:', error)
-    console.warn('⚠️ データベースエラーのため、サンプル単元を表示します')
     
-    // エラーが発生した場合でも、ダミーデータを表示
-    const dummyUnits = generateDummyUnits(grade, subject)
-    
-    if (dummyUnits && dummyUnits.length > 0) {
-      suggestionList.innerHTML = `
-        <div class="bg-red-50 border border-red-300 rounded-lg p-3 mb-3">
-          <div class="flex items-start">
-            <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 mr-2"></i>
-            <div class="flex-1">
-              <p class="text-sm font-semibold text-red-800 mb-1">
-                データ取得エラー
-              </p>
-              <p class="text-xs text-red-700">
-                サーバーへの接続に失敗しました。以下は一般的な${grade}・${subject}の単元例です。実際の教科書会社の単元とは異なる場合があります。
-              </p>
-            </div>
+    suggestionList.innerHTML = `
+      <div class="bg-red-50 border border-red-300 rounded-lg p-3">
+        <div class="flex items-start">
+          <i class="fas fa-exclamation-triangle text-red-600 mt-0.5 mr-2"></i>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-red-800 mb-1">
+              データの取得に失敗しました
+            </p>
+            <p class="text-xs text-red-700">
+              サーバーへの接続に失敗しました。<br>
+              単元名を直接入力してください。例: かけ算の筆算、物語文の読解、分数のたし算
+            </p>
           </div>
         </div>
-      ` + dummyUnits.map((unit, index) => `
-        <button 
-          onclick="selectSuggestedUnit('${unit.replace(/'/g, "\\'")}', ${index + 1})"
-          class="w-full text-left px-3 py-2 bg-white hover:bg-purple-100 border border-purple-200 rounded transition flex items-center justify-between group">
-          <span class="text-sm text-gray-800">
-            <span class="font-bold text-purple-600 mr-2">${index + 1}.</span>
-            ${unit}
-          </span>
-          <i class="fas fa-chevron-right text-purple-400 opacity-0 group-hover:opacity-100 transition"></i>
-        </button>
-      `).join('')
-    } else {
-      suggestionList.innerHTML = `
-        <div class="text-sm text-red-700 bg-red-50 p-3 rounded border border-red-200">
-          <p class="font-bold mb-1"><i class="fas fa-exclamation-triangle mr-1"></i>単元データを取得できませんでした</p>
-          <p class="text-xs text-gray-600 mt-2">単元名を手動で入力してください。例: かけ算の筆算、物語文の読解、分数のたし算、など</p>
-        </div>
-      `
-    }
+      </div>
+    `
     
     suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> 再生成'
     suggestBtn.disabled = false
@@ -12609,8 +12584,11 @@ async function loadCurriculumUnits() {
   }
 }
 
-// ダミー単元を生成
-function generateDummyUnits(grade, subject) {
+// 候補から単元を選択 (generateDummyUnits removed)
+// generateDummyUnits は削除済み - ダミーデータは使用しない
+function _deprecated_generateDummyUnits(grade, subject) { return [] }
+function generateDummyUnits(grade, subject) { return [] }
+/*
   const unitTemplates = {
     '算数': {
       '小学1年': ['かずとすうじ', '10までのかず', 'なんばんめ', 'いくつといくつ', 'あわせていくつ', 'のこりはいくつ', 'ちがいはいくつ', '10よりおおきいかず', '20までのかず', 'たしざん（1）', 'ひきざん（1）', 'かたちあそび', '100までのかず', 'なんじなんぷん', 'おおきさくらべ', 'ながさくらべ', '3つのかずのけいさん', 'たしざん（2）', 'ひきざん（2）', '大きい数', 'どちらがおおい', 'かたちづくり', '100までの数のたしざん', '100までの数のひきざん', 'ものとひとのかず', 'ずをつかってかんがえよう', 'なんじなんぷん（2）', 'たしざんとひきざん', '1年のふくしゅう', 'さんすうのまとめ'],
@@ -12769,6 +12747,7 @@ function generateDummyUnits(grade, subject) {
     '第6単元', '第7単元', '第8単元', '第9単元', '第10単元'
   ]
 }
+*/
 
 // 候補から単元を選択
 function selectSuggestedUnit(unitName, index) {

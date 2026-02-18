@@ -2836,54 +2836,31 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
       // データベースの結果を確認
       const dbUnits = result.results || []
       
-      // データベースにデータがある場合はそのまま返す（30件制限を撤廃）
-      if (dbUnits.length > 0) {
-        return c.json({
-          success: true,
-          units: dbUnits,
-          fromDatabase: true,
-          source: 'database'
-        })
-      }
-      
-      // データが0件の場合のみダミーデータで補完
-      console.log(`⚠️  Database has 0 units, returning dummy data`)
-      
-      // 教科書会社別の単元テンプレート
-      const dummyUnits = generateDummyUnitsForTextbook(grade, subject, textbook, 30)
-      
+      // データベースの結果をそのまま返す（0件でもダミーデータは使わない）
       return c.json({
         success: true,
-        units: dummyUnits,
-        fromDatabase: false,
-        source: 'dummy_only',
-        databaseCount: 0,
-        dummyCount: 30
+        units: dbUnits,
+        fromDatabase: true,
+        source: 'database'
       })
     }
     
-    // データベース接続エラーの場合は、ダミーデータのみを返す
-    console.log('⚠️  Database not available, returning 30 dummy units')
-    const dummyUnits = generateDummyUnitsForTextbook(grade || '', subject || '', textbook || '', 30)
-    
+    // データベース接続不可の場合は空を返す
+    console.log('⚠️  Database not available')
     return c.json({
       success: true,
-      units: dummyUnits,
+      units: [],
       fromDatabase: false,
-      source: 'dummy_only',
-      databaseCount: 0,
-      dummyCount: 30
+      source: 'no_database'
     })
   } catch (error) {
     console.error('Unit suggestions error:', error)
     
-    // エラーが発生しても、success: trueを返してフロントエンドでダミーデータを表示させる
     return c.json({ 
-      success: true, 
+      success: false, 
       units: [],
-      fromDatabase: false,
       source: 'error',
-      errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error'
     })
   }
 })
@@ -6692,7 +6669,7 @@ app.get('/test-buttons.html', async (c) => {
     </script>
     
     <script src="/static/ocr-handler.js"></script>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=${Date.now()}"></script>
     
     <script>
         // app.js読み込み後にグローバル関数をチェック
@@ -6817,8 +6794,8 @@ app.get('/landing', (c) => {
         <!-- Preload Critical Resources -->
         <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
         <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" as="style">
-        <link rel="preload" href="/static/styles.css" as="style">
-        <link rel="preload" href="/static/app.js" as="script">
+        <link rel="preload" href="/static/styles.css?v=${Date.now()}" as="style">
+        <link rel="preload" href="/static/app.js?v=${Date.now()}" as="script">
         
         <!-- Stylesheets -->
         <script src="https://cdn.tailwindcss.com"></script>
@@ -6891,7 +6868,7 @@ app.get('/landing', (c) => {
             
             scripts.forEach((src, index) => {
               const script = document.createElement('script')
-              script.src = src
+              script.src = src + '?v=' + Date.now()
               script.async = false // 順番に読み込む
               script.onload = () => {
                 console.log('✅ 読み込み完了:', src)
@@ -27653,57 +27630,9 @@ app.post('/api/voice/settings', authMiddleware, async (c) => {
 // 家庭学習・テスト対策モード
 // ============================================================
 
-// 教科書会社別の単元ダミーデータ生成関数
+// 教科書会社別の単元ダミーデータ生成関数（削除済み - ダミーデータは使用しない）
 function generateDummyUnitsForTextbook(grade: string, subject: string, textbook: string, count: number) {
-  // 小学6年・社会・東京書籍の例
-  const unitTemplates: { [key: string]: string[] } = {
-    '小学6年_社会_東京書籍': [
-      '縄文時代・弥生時代の暮らし', '古墳時代・大和朝廷', '聖徳太子と飛鳥文化',
-      '奈良時代の政治と文化', '平安時代の貴族の暮らし', '鎌倉幕府の成立',
-      '室町時代の文化', '戦国時代と天下統一', '江戸幕府の成立', '江戸時代の文化',
-      '明治維新', '近代国家への歩み', '日清・日露戦争', '大正デモクラシー',
-      '昭和時代と戦争', '戦後の日本', '高度経済成長', '現代の日本',
-      '日本国憲法と基本的人権', '国会のしくみ', '内閣のしくみ', '裁判所のしくみ',
-      '地方自治', '選挙と政治参加', '国際連合と平和', '世界の中の日本',
-      '環境問題', '資源・エネルギー問題', '少子高齢化', '情報化社会'
-    ],
-    '小学6年_社会_大日本図書': [
-      '縄文・弥生時代', '古墳・飛鳥時代', '奈良時代', '平安時代',
-      '鎌倉時代', '室町時代', '戦国・安土桃山時代', '江戸時代（前期）',
-      '江戸時代（後期）', '明治時代（前期）', '明治時代（後期）', '大正時代',
-      '昭和時代（戦前）', '昭和時代（戦後）', '平成・令和時代', '日本国憲法',
-      '国民主権', '基本的人権', '平和主義', '国会', '内閣', '裁判所',
-      '地方自治のしくみ', '税金とくらし', '社会保障', '国際社会',
-      '世界平和', '地球環境', '持続可能な社会', 'これからの日本'
-    ],
-    '小学6年_算数_東京書籍': [
-      '対称な図形', '文字と式', '分数のかけ算', '分数のわり算',
-      '円の面積', '角柱と円柱の体積', '比', '拡大図と縮図',
-      '速さ', '比例と反比例', '並べ方と組み合わせ方', '資料の調べ方',
-      '量の単位のしくみ', '分数と小数、整数の関係', '計算のくふう',
-      '文章題の解き方', '図形の見方', '面積と体積', '割合の応用',
-      '百分率とグラフ', '統計とグラフ', '平均', '単位量あたりの大きさ',
-      '速さの応用', '比の応用', '図形の性質', '立体図形',
-      '平面図形', '数の性質', '６年のまとめ'
-    ]
-  }
-  
-  const key = `${grade}_${subject}_${textbook}`
-  let templates = unitTemplates[key]
-  
-  // テンプレートがない場合は一般的な単元名を生成
-  if (!templates) {
-    templates = Array.from({ length: 30 }, (_, i) => `${subject}の学習 第${i + 1}単元`)
-  }
-  
-  // 必要な件数分のダミーデータを返す
-  return templates.slice(0, count).map((unitName, index) => ({
-    unit_name: unitName,
-    id: 9000 + index, // ダミーIDは9000番台
-    grade: grade,
-    subject: subject,
-    textbook_company: textbook
-  }))
+  return []
 }
 
 // APIルート：学年・教科・教科書会社に基づく単元候補を取得
