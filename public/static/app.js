@@ -3253,17 +3253,14 @@ async function loadGuidePage(curriculumId) {
               <h3 class="text-lg font-bold text-indigo-800 flex items-center">
                 <i class="fas fa-chalkboard-teacher mr-2"></i>授業フロー（教師用）
               </h3>
-              <div class="flex items-center gap-2">
-                <span class="text-xs px-3 py-1 rounded-full font-bold ${deliveryMode === 'individual' ? 'bg-pink-200 text-pink-800' : 'bg-blue-200 text-blue-800'}">
-                  <i class="fas ${deliveryMode === 'individual' ? 'fa-user-cog' : 'fa-users'} mr-1"></i>
-                  ${deliveryMode === 'individual' ? '個別配信モード' : '全体配信モード'}
-                </span>
-                <button onclick="changeDeliveryMode(${curriculumId}, '${deliveryMode}')" class="text-xs text-indigo-500 hover:text-indigo-700 underline">変更</button>
-              </div>
+              <span class="text-xs px-3 py-1 rounded-full font-bold ${deliveryMode === 'individual' ? 'bg-pink-200 text-pink-800' : 'bg-blue-200 text-blue-800'}">
+                <i class="fas ${deliveryMode === 'individual' ? 'fa-user-cog' : 'fa-users'} mr-1"></i>
+                ${deliveryMode === 'individual' ? '個別配信' : '全体配信（3コース）'}
+              </span>
             </div>
             
             ${deliveryMode === 'individual' ? `
-            <!-- 個別配信モード -->
+            <!-- ===== 個別配信モード ===== -->
             <div class="flex items-stretch gap-0">
               <!-- Step 1: AI生成 -->
               <div class="flex-1 relative">
@@ -3272,22 +3269,22 @@ async function loadGuidePage(curriculumId) {
                     <div class="w-8 h-8 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-sm">1</div>
                     <h4 class="font-bold text-pink-800">AIが個別カード生成</h4>
                   </div>
-                  <p class="text-xs text-gray-600 mb-3">児童一人ひとりの学力・特性に合わせて、AIが最適な学習カードを自動生成します。</p>
+                  <p class="text-xs text-gray-600 mb-3">児童一人ひとりに合わせて、学習カード・チェックテスト・選択課題をAIが自動生成します。</p>
                   
                   <div class="grid grid-cols-2 gap-2 mb-3">
                     <div class="bg-white rounded-lg p-2 text-center border">
                       <div class="text-lg font-bold text-pink-600">${personalizedCourses.length}</div>
-                      <div class="text-xs text-gray-500">生成済みコース</div>
+                      <div class="text-xs text-gray-500">生成済み</div>
                     </div>
                     <div class="bg-white rounded-lg p-2 text-center border">
                       <div class="text-lg font-bold text-pink-600">${personalizedCourses.reduce((sum, c) => sum + (c.cards?.length || 0), 0)}</div>
-                      <div class="text-xs text-gray-500">個別カード数</div>
+                      <div class="text-xs text-gray-500">総カード数</div>
                     </div>
                   </div>
 
                   <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
                     class="w-full text-xs bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-2 px-3 rounded-lg font-bold transition">
-                    <i class="fas fa-magic mr-1"></i>個別コースを生成
+                    <i class="fas fa-magic mr-1"></i>個別コースを一括生成
                   </button>
                 </div>
               </div>
@@ -3315,6 +3312,10 @@ async function loadGuidePage(curriculumId) {
                         <i class="fas fa-user-graduate text-orange-500"></i>
                         <span class="font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
                         <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">${pc.cards?.length || 0}枚</span>
+                        <button onclick="showPersonalizedCourseGuide(${pc.course_id}, '${(pc.course_name || '').replace(/'/g, "\\'")}', ${curriculumId})" 
+                          class="text-orange-600 hover:text-orange-800" title="学習のてびき形式で確認">
+                          <i class="fas fa-eye"></i>
+                        </button>
                       </div>
                     `).join('')}
                   </div>` : `
@@ -3332,12 +3333,12 @@ async function loadGuidePage(curriculumId) {
                 </div>
               </div>
 
-              <!-- Step 3: 個別配信 -->
+              <!-- Step 3: 配信・データ収集 -->
               <div class="flex-1 relative">
-                <div class="border-2 ${personalizedCourses.length > 0 ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50'} rounded-r-xl p-4">
+                <div class="border-2 ${learningStats.activeStudents > 0 ? 'border-green-400 bg-green-50' : personalizedCourses.length > 0 ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50'} rounded-r-xl p-4">
                   <div class="flex items-center gap-2 mb-3">
                     <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-green-500' : 'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">3</div>
-                    <h4 class="font-bold ${personalizedCourses.length > 0 ? 'text-green-800' : 'text-gray-600'}">児童に個別配信</h4>
+                    <h4 class="font-bold ${personalizedCourses.length > 0 ? 'text-green-800' : 'text-gray-600'}">配信・データ収集</h4>
                   </div>
                   <p class="text-xs text-gray-600 mb-3">確認済みの個別カードを児童に配信し、学習データを収集します。</p>
                   
@@ -3362,101 +3363,53 @@ async function loadGuidePage(curriculumId) {
             <div class="mt-3 bg-pink-50 rounded-lg p-3 text-xs text-pink-700">
               <i class="fas fa-info-circle mr-1"></i>
               <strong>個別配信フロー：</strong>
-              ①児童データを入力 → ②AIが個別カードを生成 → ③教師が確認・編集 → ④児童に個別配信 → ⑤学習データを収集
+              ①児童を選択して一括生成 → ②教師が学習のてびき形式で確認・編集 → ③児童に個別配信 → ④学習データを収集
             </div>
             ` : `
-            <!-- 全体配信モード（従来版） -->
-            <div class="flex items-stretch gap-0">
-              <!-- Phase 1: 全体配信 -->
-              <div class="flex-1 relative">
-                <div class="border-2 ${learningStats.totalAnswers > 0 ? 'border-green-400 bg-green-50' : 'border-blue-400 bg-blue-50'} rounded-l-xl p-4">
-                  <div class="flex items-center gap-2 mb-3">
-                    <div class="w-8 h-8 rounded-full ${learningStats.totalAnswers > 0 ? 'bg-green-500' : 'bg-blue-500'} text-white flex items-center justify-center font-bold text-sm">1</div>
-                    <h4 class="font-bold ${learningStats.totalAnswers > 0 ? 'text-green-800' : 'text-blue-800'}">全体配信フェーズ</h4>
-                    ${learningStats.totalAnswers > 0 ? '<span class="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full font-bold">データ収集中</span>' : '<span class="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">準備完了</span>'}
-                  </div>
-                  <p class="text-xs text-gray-600 mb-3">全児童に共通の3コース（じっくり・しっかり・ぐんぐん）を配信し、学習データを収集します。</p>
-                  
-                  <div class="grid grid-cols-2 gap-2 mb-3">
-                    <div class="bg-white rounded-lg p-2 text-center border">
-                      <div class="text-lg font-bold text-blue-600">${standardCourses.length}</div>
-                      <div class="text-xs text-gray-500">コース数</div>
-                    </div>
-                    <div class="bg-white rounded-lg p-2 text-center border">
-                      <div class="text-lg font-bold text-blue-600">${standardCourses.reduce((sum, c) => sum + (c.cards?.length || 0), 0)}</div>
-                      <div class="text-xs text-gray-500">学習カード数</div>
-                    </div>
-                    <div class="bg-white rounded-lg p-2 text-center border">
-                      <div class="text-lg font-bold ${learningStats.activeStudents > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.activeStudents || 0}</div>
-                      <div class="text-xs text-gray-500">学習中の児童</div>
-                    </div>
-                    <div class="bg-white rounded-lg p-2 text-center border">
-                      <div class="text-lg font-bold ${learningStats.totalAnswers > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.totalAnswers || 0}</div>
-                      <div class="text-xs text-gray-500">回答データ数</div>
-                    </div>
-                  </div>
-
-                  <div class="flex gap-2">
-                    <button onclick="printGuide()" class="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-bold transition">
-                      <i class="fas fa-print mr-1"></i>てびき印刷
-                    </button>
-                    <button onclick="showLearningDashboard(${curriculumId})" class="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-bold transition">
-                      <i class="fas fa-chart-bar mr-1"></i>学習統計
-                    </button>
-                  </div>
+            <!-- ===== 全体配信モード（3コース） ===== -->
+            <div class="border-2 border-blue-400 bg-blue-50 rounded-xl p-5">
+              <div class="flex items-center gap-2 mb-3">
+                <div class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm"><i class="fas fa-users"></i></div>
+                <h4 class="font-bold text-blue-800">3コース全体配信</h4>
+                ${learningStats.totalAnswers > 0 
+                  ? '<span class="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full font-bold">データ収集中</span>' 
+                  : '<span class="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">配信準備完了</span>'}
+              </div>
+              <p class="text-xs text-gray-600 mb-4">全児童に共通の3コース（じっくり・しっかり・ぐんぐん）を配信し、児童がコースを選んで学習します。</p>
+              
+              <div class="grid grid-cols-4 gap-2 mb-4">
+                <div class="bg-white rounded-lg p-2 text-center border">
+                  <div class="text-lg font-bold text-blue-600">${standardCourses.length}</div>
+                  <div class="text-xs text-gray-500">コース数</div>
+                </div>
+                <div class="bg-white rounded-lg p-2 text-center border">
+                  <div class="text-lg font-bold text-blue-600">${standardCourses.reduce((sum, c) => sum + (c.cards?.length || 0), 0)}</div>
+                  <div class="text-xs text-gray-500">学習カード数</div>
+                </div>
+                <div class="bg-white rounded-lg p-2 text-center border">
+                  <div class="text-lg font-bold ${learningStats.activeStudents > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.activeStudents || 0}</div>
+                  <div class="text-xs text-gray-500">学習中の児童</div>
+                </div>
+                <div class="bg-white rounded-lg p-2 text-center border">
+                  <div class="text-lg font-bold ${learningStats.totalAnswers > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.totalAnswers || 0}</div>
+                  <div class="text-xs text-gray-500">回答データ数</div>
                 </div>
               </div>
 
-              <!-- Arrow -->
-              <div class="flex items-center px-1 relative z-10" style="margin-left:-8px; margin-right:-8px;">
-                <div class="w-10 h-10 rounded-full ${personalizedCourses.length > 0 ? 'bg-green-500' : learningStats.totalAnswers > 0 ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300'} text-white flex items-center justify-center shadow-lg">
-                  <i class="fas fa-arrow-right"></i>
-                </div>
-              </div>
-
-              <!-- Phase 2: 個別配信 -->
-              <div class="flex-1 relative">
-                <div class="border-2 ${personalizedCourses.length > 0 ? 'border-pink-400 bg-pink-50' : 'border-gray-300 bg-gray-50'} rounded-r-xl p-4">
-                  <div class="flex items-center gap-2 mb-3">
-                    <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-pink-500' : 'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">2</div>
-                    <h4 class="font-bold ${personalizedCourses.length > 0 ? 'text-pink-800' : 'text-gray-600'}">個別配信フェーズ</h4>
-                    ${personalizedCourses.length > 0 
-                      ? `<span class="text-xs bg-pink-200 text-pink-800 px-2 py-0.5 rounded-full font-bold">${personalizedCourses.length}名に配信済</span>` 
-                      : learningStats.totalAnswers > 0 
-                        ? '<span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full font-bold">配信可能</span>'
-                        : '<span class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">データ収集後</span>'}
-                  </div>
-                  <p class="text-xs text-gray-600 mb-3">収集した学習データを基に、児童一人ひとりに最適化したカードを教師が確認・編集して配信します。</p>
-                  
-                  ${personalizedCourses.length > 0 ? `
-                  <div class="space-y-2 mb-3 max-h-32 overflow-y-auto">
-                    ${personalizedCourses.map(pc => `
-                      <div class="bg-white rounded-lg p-2 border border-pink-200 flex items-center gap-2">
-                        <i class="fas fa-user-graduate text-pink-500"></i>
-                        <span class="text-xs font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
-                        <span class="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full">${pc.cards?.length || 0}枚</span>
-                      </div>
-                    `).join('')}
-                  </div>` : `
-                  <div class="bg-white rounded-lg p-3 border border-dashed border-gray-300 text-center mb-3">
-                    <i class="fas fa-user-clock text-gray-400 text-xl mb-1"></i>
-                    <p class="text-xs text-gray-500">${learningStats.totalAnswers > 0 ? '学習データが蓄積されています。個別コースを生成できます。' : 'まず全体配信で学習データを収集してください。'}</p>
-                  </div>`}
-
-                  <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
-                    class="w-full text-xs ${learningStats.totalAnswers > 0 || personalizedCourses.length > 0 ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700' : 'bg-gray-400 cursor-not-allowed'} text-white py-2 px-3 rounded-lg font-bold transition"
-                    ${learningStats.totalAnswers === 0 && personalizedCourses.length === 0 ? 'title="学習データが収集されてから利用できます"' : ''}>
-                    <i class="fas fa-magic mr-1"></i>個別最適化コースを生成
-                  </button>
-                </div>
+              <div class="flex gap-2">
+                <button onclick="printGuide()" class="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                  <i class="fas fa-print mr-1"></i>てびき印刷
+                </button>
+                <button onclick="showLearningDashboard(${curriculumId})" class="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                  <i class="fas fa-chart-bar mr-1"></i>学習統計
+                </button>
               </div>
             </div>
             
-            <!-- フロー説明 -->
-            <div class="mt-3 bg-indigo-50 rounded-lg p-3 text-xs text-indigo-700">
+            <div class="mt-3 bg-blue-50 rounded-lg p-3 text-xs text-blue-700">
               <i class="fas fa-info-circle mr-1"></i>
-              <strong>フロー：</strong>
-              ①てびきを印刷・配布 → ②児童が3コースから選んで学習 → ③学習データが蓄積 → ④データを基にAIが個別カード生成 → ⑤教師が確認・編集 → ⑥個別配信
+              <strong>全体配信フロー：</strong>
+              ①てびきを印刷・配布 → ②児童が3コースから1つ選択 → ③学習カード → ④チェックテスト → ⑤選択課題 → ⑥学習データを収集
             </div>
             `}
           </div>
@@ -14196,26 +14149,7 @@ function showUnitPreview(unitData, modelUsed) {
   `
 }
 
-// 配信モード変更（ガイドページから）
-async function changeDeliveryMode(curriculumId, currentMode) {
-  const newMode = currentMode === 'group' ? 'individual' : 'group'
-  const modeLabel = newMode === 'group' ? '全体配信モード（3コース）' : '個別配信モード'
-  
-  if (!confirm(`配信モードを「${modeLabel}」に変更しますか？\n\nこの変更はいつでも元に戻せます。`)) return
-  
-  try {
-    await axios.put(`/api/curriculum/${curriculumId}/metadata`, {
-      delivery_mode: newMode
-    })
-    console.log('✅ 配信モード変更:', newMode)
-    // ページをリロード
-    loadGuidePage(curriculumId)
-  } catch (error) {
-    console.error('配信モード変更エラー:', error)
-    alert('配信モードの変更に失敗しました')
-  }
-}
-window.changeDeliveryMode = changeDeliveryMode
+// changeDeliveryMode は削除 — 配信モードは単元作成時に決定、後から変更しない
 
 // 生成した単元を保存
 async function saveGeneratedUnit(unitData) {
