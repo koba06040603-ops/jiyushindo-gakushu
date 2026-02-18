@@ -3106,40 +3106,52 @@ async function loadGuidePage(curriculumId) {
       console.log('⚠️ 選択問題なし')
     }
     
-    // 欠落データのバックグラウンド自動生成（通知なし・1回だけ実行）
+    // 欠落データのバックグラウンド自動生成（順次実行・リトライ付き）
     const missingIntroProblems = courses.filter(c => !c.introduction_problem)
     const needsAssessment = !commonCheckTest || !commonCheckTest.sample_problems || commonCheckTest.sample_problems.length === 0 || optionalProblems.length === 0
     const needsCourseProblems = courseSelectionProblems.length === 0
     const hasAnyMissing = missingIntroProblems.length > 0 || needsAssessment || needsCourseProblems
     
-    // ループ防止: セッション中に既に自動生成を試行した場合は再実行しない
+    // ループ防止: 同一セッションで同一カリキュラムの自動生成は1回のみ
     const autoGenKey = `autoGen_${curriculumId}`
-    const alreadyTriedAutoGen = sessionStorage.getItem(autoGenKey)
+    const alreadyTriedAutoGen = sessionStorage.getItem(autoGenKey) === 'done'
     
     if (hasAnyMissing && !alreadyTriedAutoGen) {
-      sessionStorage.setItem(autoGenKey, 'true')
-      console.log('🔄 欠落データを静かに自動生成中（1回のみ）...')
-      ;(async () => {
+      sessionStorage.setItem(autoGenKey, 'done')
+      console.log('🔄 欠落データを自動生成中（1回限り）...')
+      // ページ描画後にバックグラウンドで順次生成を実行
+      // ページリロードはしない（ユーザーが手動で再読み込みボタンを押す）
+      setTimeout(async () => {
         try {
-          const tasks = []
           if (missingIntroProblems.length > 0) {
-            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`).catch(e => null))
+            console.log('  → 導入問題を生成中...')
+            await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ 導入問題生成失敗:', e.message))
           }
           if (needsAssessment) {
-            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`).catch(e => null))
+            console.log('  → チェックテスト・選択問題を生成中...')
+            await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ 評価問題生成失敗:', e.message))
           }
           if (needsCourseProblems) {
-            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`).catch(e => null))
+            console.log('  → コース選択問題を生成中...')
+            await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ コース問題生成失敗:', e.message))
           }
-          await Promise.allSettled(tasks)
-          console.log('✅ 自動生成完了 → サイレントリロード')
-          loadGuidePage(curriculumId)
+          console.log('✅ バックグラウンド自動生成完了')
+          // 自動生成完了後、「まだありません」セクションに「生成完了」バッジを表示
+          const autoGenBanners = document.querySelectorAll('.auto-gen-status-banner')
+          autoGenBanners.forEach(banner => {
+            banner.innerHTML = `
+              <div class="bg-green-100 border border-green-300 rounded-lg p-3 text-center mt-2">
+                <i class="fas fa-check-circle text-green-600 mr-1"></i>
+                <span class="text-sm font-bold text-green-700">生成完了！再読み込みで表示されます</span>
+              </div>
+            `
+          })
         } catch (e) {
           console.warn('⚠️ 自動生成エラー:', e)
         }
-      })()
+      }, 100)
     } else if (hasAnyMissing && alreadyTriedAutoGen) {
-      console.log('⚠️ 自動生成は既に試行済み。ループ防止のためスキップ')
+      console.log('ℹ️ 自動生成は既に試行済み。手動で再読み込みしてください')
     }
     
     // データの完全性を確認
@@ -3401,8 +3413,9 @@ async function loadGuidePage(curriculumId) {
                   <div class="bg-white rounded-xl p-6 mb-3 text-center">
                     <i class="fas fa-clock text-yellow-500 text-3xl mb-3"></i>
                     <p class="font-bold text-gray-700 mb-2">チェックテストはまだありません</p>
-                    <p class="text-sm text-gray-500">自動生成中です。しばらくしてからページを再読み込みしてください。</p>
-                    <button onclick="sessionStorage.removeItem('autoGen_${curriculumId}'); loadGuidePage(${curriculumId})" class="mt-3 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                    <p class="text-sm text-gray-500">バックグラウンドで生成中です。しばらくしてから再読み込みしてください。</p>
+                    <div class="auto-gen-status-banner"></div>
+                    <button onclick="loadGuidePage(${curriculumId})" class="mt-3 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
                       <i class="fas fa-sync-alt mr-1"></i>再読み込み
                     </button>
                   </div>
@@ -3487,8 +3500,9 @@ async function loadGuidePage(curriculumId) {
               <div class="bg-white rounded-xl p-6 text-center">
                 <i class="fas fa-clock text-pink-500 text-3xl mb-3"></i>
                 <p class="font-bold text-gray-700 mb-2">えらべるもんだいはまだありません</p>
-                <p class="text-sm text-gray-500">自動生成中です。しばらくしてからページを再読み込みしてください。</p>
-                <button onclick="sessionStorage.removeItem('autoGen_${curriculumId}'); loadGuidePage(${curriculumId})" class="mt-3 bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                <p class="text-sm text-gray-500">バックグラウンドで生成中です。しばらくしてから再読み込みしてください。</p>
+                <div class="auto-gen-status-banner"></div>
+                <button onclick="loadGuidePage(${curriculumId})" class="mt-3 bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
                   <i class="fas fa-sync-alt mr-1"></i>再読み込み
                 </button>
               </div>
@@ -13905,27 +13919,41 @@ async function saveGeneratedUnit(unitData) {
       
       console.log('✅ 単元を保存しました。curriculum_id:', curriculumId)
       
-      // 追加問題をバックグラウンドで生成（遷移をブロックしない）
-      const generateAdditionalProblems = async () => {
+      // 追加問題を順次生成（並列だとCF Workers 30秒タイムアウトのリスク）
+      // 生成完了を待ってから遷移する
+      const generateAndNavigate = async () => {
         try {
-          console.log('🔄 バックグラウンドで追加問題生成開始...')
-          await Promise.allSettled([
-            axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`).then(() => console.log('✅ コース選択問題 完了')).catch(e => console.warn('⚠️ コース選択問題 失敗:', e.message)),
-            axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`).then(() => console.log('✅ 評価問題 完了')).catch(e => console.warn('⚠️ 評価問題 失敗:', e.message)),
-            axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`).then(() => console.log('✅ 導入問題 完了')).catch(e => console.warn('⚠️ 導入問題 失敗:', e.message))
-          ])
-          console.log('🎉 バックグラウンド追加問題生成完了')
+          saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>追加問題を生成中... (1/3)'
+          console.log('🔄 追加問題を順次生成開始...')
+          
+          // 1. 導入問題（最も軽い）
+          try {
+            await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`, {}, {timeout: 60000})
+            console.log('✅ 導入問題 完了')
+          } catch (e) { console.warn('⚠️ 導入問題 失敗:', e.message) }
+          
+          saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>追加問題を生成中... (2/3)'
+          
+          // 2. 評価問題
+          try {
+            await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`, {}, {timeout: 60000})
+            console.log('✅ 評価問題 完了')
+          } catch (e) { console.warn('⚠️ 評価問題 失敗:', e.message) }
+          
+          saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>追加問題を生成中... (3/3)'
+          
+          // 3. コース選択問題（最も重い）
+          try {
+            await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 60000})
+            console.log('✅ コース選択問題 完了')
+          } catch (e) { console.warn('⚠️ コース選択問題 失敗:', e.message) }
+          
+          console.log('🎉 追加問題生成完了 → 学習のてびきへ遷移')
         } catch (e) {
-          console.warn('⚠️ 追加問題生成エラー（学習のてびきで自動補完されます）:', e.message)
+          console.warn('⚠️ 追加問題生成エラー:', e.message)
         }
-      }
-      
-      // バックグラウンドで追加問題生成を開始（awaitしない）
-      generateAdditionalProblems()
-      
-      // 1秒後に学習のてびきページへ遷移
-      setTimeout(async () => {
-        console.log('🔄 学習のてびきページへ遷移開始 curriculum_id:', curriculumId)
+        
+        // 生成完了後に遷移
         try {
           await loadGuidePage(curriculumId)
         } catch (transitionError) {
@@ -13933,7 +13961,9 @@ async function saveGeneratedUnit(unitData) {
           alert('画面遷移に失敗しました: ' + transitionError.message + '\n\nトップページに戻ります。')
           renderTopPage()
         }
-      }, 1000)
+      }
+      
+      generateAndNavigate()
     } else {
       const errorMsg = response.data.details || response.data.error || '保存に失敗しました'
       throw new Error(errorMsg)
