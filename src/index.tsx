@@ -974,17 +974,79 @@ app.use('/api/*', async (c, next) => {
     try {
       const { env } = c
       
-      // curriculum_metadata テーブル
-      await env.DB.prepare(`
-        CREATE TABLE IF NOT EXISTS curriculum_metadata (
-          metadata_id INTEGER PRIMARY KEY AUTOINCREMENT,
-          curriculum_id INTEGER NOT NULL,
-          meta_key TEXT NOT NULL,
-          meta_value TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (curriculum_id) REFERENCES curriculum(id)
-        )
-      `).run()
+      // curriculum_metadata テーブル - スキーマ修正対応
+      // 旧migration(0003)ではmetadata_key/metadata_valueだったが、コードはmeta_key/meta_valueを使用
+      // テーブルが存在するか確認し、カラム名が違う場合はマイグレーション
+      try {
+        const tableInfo = await env.DB.prepare(`PRAGMA table_info(curriculum_metadata)`).all()
+        const columns = (tableInfo.results || []).map((r: any) => r.name)
+        
+        if (columns.length === 0) {
+          // テーブルが存在しない → 新規作成
+          console.log('📦 curriculum_metadata テーブルを新規作成')
+          await env.DB.prepare(`
+            CREATE TABLE curriculum_metadata (
+              metadata_id INTEGER PRIMARY KEY AUTOINCREMENT,
+              curriculum_id INTEGER NOT NULL,
+              meta_key TEXT NOT NULL,
+              meta_value TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (curriculum_id) REFERENCES curriculum(id)
+            )
+          `).run()
+        } else if (columns.includes('metadata_key') && !columns.includes('meta_key')) {
+          // 旧スキーマが存在 → データ移行して再作成
+          console.log('🔄 curriculum_metadata スキーマ移行中 (metadata_key → meta_key)')
+          // 旧データをバックアップ
+          const oldData = await env.DB.prepare(`SELECT * FROM curriculum_metadata`).all()
+          // 旧テーブル削除
+          await env.DB.prepare(`DROP TABLE curriculum_metadata`).run()
+          // 新テーブル作成
+          await env.DB.prepare(`
+            CREATE TABLE curriculum_metadata (
+              metadata_id INTEGER PRIMARY KEY AUTOINCREMENT,
+              curriculum_id INTEGER NOT NULL,
+              meta_key TEXT NOT NULL,
+              meta_value TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (curriculum_id) REFERENCES curriculum(id)
+            )
+          `).run()
+          // 旧データを新テーブルに移行
+          for (const row of (oldData.results || []) as any[]) {
+            const key = row.metadata_key || row.meta_key
+            const value = row.metadata_value || row.meta_value
+            if (key) {
+              await env.DB.prepare(`
+                INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value, created_at) 
+                VALUES (?, ?, ?, ?)
+              `).bind(row.curriculum_id, key, value, row.created_at || new Date().toISOString()).run()
+            }
+          }
+          console.log(`✅ curriculum_metadata 移行完了: ${(oldData.results || []).length}件`)
+        } else {
+          console.log('✅ curriculum_metadata テーブルは正常なスキーマです')
+        }
+      } catch (metaErr: any) {
+        console.warn('⚠️ curriculum_metadata 初期化エラー:', metaErr.message)
+        // 最後の手段: テーブルを強制再作成
+        try {
+          await env.DB.prepare(`DROP TABLE IF EXISTS curriculum_metadata`).run()
+          await env.DB.prepare(`
+            CREATE TABLE curriculum_metadata (
+              metadata_id INTEGER PRIMARY KEY AUTOINCREMENT,
+              curriculum_id INTEGER NOT NULL,
+              meta_key TEXT NOT NULL,
+              meta_value TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+              FOREIGN KEY (curriculum_id) REFERENCES curriculum(id)
+            )
+          `).run()
+          console.log('✅ curriculum_metadata テーブルを強制再作成しました')
+        } catch (forceErr: any) {
+          console.error('❌ curriculum_metadata 強制再作成失敗:', forceErr.message)
+        }
+      }
       await env.DB.prepare(`
         CREATE UNIQUE INDEX IF NOT EXISTS idx_curriculum_metadata_unique 
         ON curriculum_metadata(curriculum_id, meta_key)

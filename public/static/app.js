@@ -3163,35 +3163,99 @@ async function loadGuidePage(curriculumId) {
       })()
     }
     
+    // チェックテスト・選択問題が欠落している場合のバックグラウンド自動生成
+    const needsAssessment = !commonCheckTest || !commonCheckTest.sample_problems || commonCheckTest.sample_problems.length === 0 || optionalProblems.length === 0
+    const needsCourseProblems = courseSelectionProblems.length === 0
+    
+    if (needsAssessment || needsCourseProblems) {
+      console.warn('⚠️ チェックテスト/選択問題/コース問題が欠落。バックグラウンドで自動生成を開始...')
+      ;(async () => {
+        const genNotif = document.createElement('div')
+        genNotif.id = 'auto-gen-notification'
+        genNotif.className = 'fixed top-4 left-4 bg-blue-100 border-2 border-blue-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
+        const missingItems = []
+        if (needsAssessment) missingItems.push('チェックテスト・選択問題')
+        if (needsCourseProblems) missingItems.push('コース選択問題')
+        genNotif.innerHTML = `
+          <div class="flex items-start gap-3">
+            <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
+            <div>
+              <p class="font-bold text-blue-800">問題を自動生成中...</p>
+              <p class="text-sm text-blue-700 mt-1">${missingItems.join('・')}をAIが作成しています</p>
+            </div>
+          </div>
+        `
+        document.body.appendChild(genNotif)
+        
+        try {
+          const tasks = []
+          if (needsAssessment) {
+            tasks.push(
+              axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`)
+                .then(r => { console.log('✅ チェックテスト・選択問題 自動生成完了:', r.data); return r })
+                .catch(e => { console.error('❌ チェックテスト自動生成失敗:', e.message); throw e })
+            )
+          }
+          if (needsCourseProblems) {
+            tasks.push(
+              axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`)
+                .then(r => { console.log('✅ コース選択問題 自動生成完了:', r.data); return r })
+                .catch(e => { console.error('❌ コース選択問題自動生成失敗:', e.message); throw e })
+            )
+          }
+          await Promise.allSettled(tasks)
+          
+          genNotif.className = 'fixed top-4 left-4 bg-green-100 border-2 border-green-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
+          genNotif.innerHTML = `
+            <div class="flex items-start gap-3">
+              <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+              <div>
+                <p class="font-bold text-green-800">問題生成完了！</p>
+                <p class="text-sm text-green-700 mt-1">ページを再読み込みすると表示されます</p>
+                <button onclick="loadGuidePage(${curriculumId})" class="mt-2 bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm font-bold transition">
+                  <i class="fas fa-sync-alt mr-1"></i>再読み込み
+                </button>
+              </div>
+            </div>
+          `
+          setTimeout(() => genNotif.remove(), 15000)
+        } catch (genErr) {
+          console.error('❌ 自動生成エラー:', genErr)
+          genNotif.className = 'fixed top-4 left-4 bg-red-100 border-2 border-red-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
+          genNotif.innerHTML = `
+            <div class="flex items-start gap-3">
+              <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+              <div>
+                <p class="font-bold text-red-800">自動生成に失敗しました</p>
+                <p class="text-sm text-red-700 mt-1">ページを再読み込みして再試行してください</p>
+                <button onclick="loadGuidePage(${curriculumId})" class="mt-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-bold transition">
+                  <i class="fas fa-sync-alt mr-1"></i>再読み込み
+                </button>
+              </div>
+            </div>
+          `
+          setTimeout(() => genNotif.remove(), 10000)
+        }
+      })()
+    }
+    
     // データの完全性を確認
-    const hasAllData = courseSelectionProblems.length === 3 && 
-                       optionalProblems.length === 6 &&
+    const numCourses = courses.length
+    const hasAllData = courseSelectionProblems.length >= numCourses && 
+                       optionalProblems.length >= 6 &&
                        commonCheckTest && 
-                       commonCheckTest.sample_problems?.length === 6 &&
-                       courses.filter(c => c.introduction_problem).length === 3
+                       commonCheckTest.sample_problems?.length >= 6 &&
+                       courses.filter(c => c.introduction_problem).length >= numCourses
     
     if (!hasAllData) {
       const dataStatus = {
-        'コース選択問題': `${courseSelectionProblems.length}/3`,
-        '導入問題': `${courses.filter(c => c.introduction_problem).length}/3`,
+        'コース選択問題': `${courseSelectionProblems.length}/${numCourses}`,
+        '導入問題': `${courses.filter(c => c.introduction_problem).length}/${numCourses}`,
         'チェックテスト': `${commonCheckTest?.sample_problems?.length || 0}/6`,
         '選択問題': `${optionalProblems.length}/6`
       }
       
       console.warn('⚠️ データが不完全です:', dataStatus)
-      
-      // 学習カードは必ず存在するはずなので、追加問題のみチェック
-      const totalProblems = courseSelectionProblems.length + 
-                           (commonCheckTest?.sample_problems?.length || 0) +
-                           optionalProblems.length +
-                           courses.filter(c => c.introduction_problem).length
-      
-      const expectedProblems = 3 + 6 + 6 + 3 // 18
-      
-      if (totalProblems < expectedProblems) {
-        console.warn(`📊 追加問題: ${totalProblems}/${expectedProblems}件`)
-        console.info('💡 不足している問題は、ページを再読み込みすると自動補完される場合があります')
-      }
     } else {
       console.log('✅ すべてのデータが揃っています')
     }
