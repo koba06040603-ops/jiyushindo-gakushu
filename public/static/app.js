@@ -3106,89 +3106,31 @@ async function loadGuidePage(curriculumId) {
       console.log('⚠️ 選択問題なし')
     }
     
-    // 導入問題の自動追補チェック（バックグラウンドで実行、ページ表示をブロックしない）
+    // 欠落データのバックグラウンド自動生成（通知なし・完了後サイレントリロード）
     const missingIntroProblems = courses.filter(c => !c.introduction_problem)
     const needsAssessment = !commonCheckTest || !commonCheckTest.sample_problems || commonCheckTest.sample_problems.length === 0 || optionalProblems.length === 0
     const needsCourseProblems = courseSelectionProblems.length === 0
     const hasAnyMissing = missingIntroProblems.length > 0 || needsAssessment || needsCourseProblems
     
     if (hasAnyMissing) {
-      const missingItems = []
-      if (missingIntroProblems.length > 0) missingItems.push(`導入問題(${missingIntroProblems.length}件)`)
-      if (needsAssessment) missingItems.push('チェックテスト・選択問題')
-      if (needsCourseProblems) missingItems.push('コース選択問題')
-      console.warn('⚠️ 欠落データあり:', missingItems.join(', '))
-      
-      // 統合通知を表示
+      console.log('🔄 欠落データを静かに自動生成中...')
       ;(async () => {
-        const notificationDiv = document.createElement('div')
-        notificationDiv.className = 'fixed top-4 right-4 bg-yellow-100 border-2 border-yellow-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
-        notificationDiv.innerHTML = `
-          <div class="flex items-start gap-3">
-            <i class="fas fa-spinner fa-spin text-yellow-600 text-2xl"></i>
-            <div>
-              <p class="font-bold text-yellow-800">問題を自動生成中...</p>
-              <p class="text-sm text-yellow-700 mt-1">AIが${missingItems.join('・')}を作成中（ページはそのまま使えます）</p>
-            </div>
-          </div>
-        `
-        document.body.appendChild(notificationDiv)
-        
         try {
           const tasks = []
           if (missingIntroProblems.length > 0) {
-            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
-              .then(r => { console.log('✅ 導入問題 自動生成完了:', r.data); return 'intro' })
-              .catch(e => { console.error('❌ 導入問題自動生成失敗:', e.message); return null }))
+            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`).catch(e => null))
           }
           if (needsAssessment) {
-            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`)
-              .then(r => { console.log('✅ チェックテスト・選択問題 自動生成完了:', r.data); return 'assessment' })
-              .catch(e => { console.error('❌ チェックテスト自動生成失敗:', e.message); return null }))
+            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`).catch(e => null))
           }
           if (needsCourseProblems) {
-            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`)
-              .then(r => { console.log('✅ コース選択問題 自動生成完了:', r.data); return 'course' })
-              .catch(e => { console.error('❌ コース選択問題自動生成失敗:', e.message); return null }))
+            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`).catch(e => null))
           }
-          
-          const results = await Promise.allSettled(tasks)
-          const succeeded = results.filter(r => r.status === 'fulfilled' && r.value).length
-          
-          if (succeeded > 0) {
-            notificationDiv.className = 'fixed top-4 right-4 bg-green-100 border-2 border-green-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
-            notificationDiv.innerHTML = `
-              <div class="flex items-start gap-3">
-                <i class="fas fa-check-circle text-green-600 text-2xl"></i>
-                <div>
-                  <p class="font-bold text-green-800">問題生成完了！自動的に更新します...</p>
-                </div>
-              </div>
-            `
-            // 自動的にページを再読み込み
-            setTimeout(() => {
-              notificationDiv.remove()
-              loadGuidePage(curriculumId)
-            }, 1500)
-          } else {
-            notificationDiv.className = 'fixed top-4 right-4 bg-red-100 border-2 border-red-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
-            notificationDiv.innerHTML = `
-              <div class="flex items-start gap-3">
-                <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
-                <div>
-                  <p class="font-bold text-red-800">生成に失敗しました</p>
-                  <p class="text-sm text-red-700 mt-1">ページを再読み込みして再試行してください</p>
-                  <button onclick="loadGuidePage(${curriculumId})" class="mt-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-bold transition">
-                    <i class="fas fa-sync-alt mr-1"></i>再読み込み
-                  </button>
-                </div>
-              </div>
-            `
-            setTimeout(() => notificationDiv.remove(), 10000)
-          }
-        } catch (err) {
-          console.error('❌ 自動生成エラー:', err)
-          notificationDiv.remove()
+          await Promise.allSettled(tasks)
+          console.log('✅ 自動生成完了 → サイレントリロード')
+          loadGuidePage(curriculumId)
+        } catch (e) {
+          console.warn('⚠️ 自動生成エラー:', e)
         }
       })()
     }
@@ -12615,9 +12557,17 @@ async function loadCurriculumUnits() {
       return
     }
     
-    // 単元リストを表示
-    unitCountSpan.textContent = units.length
-    suggestionList.innerHTML = units.map((unit, index) => `
+    // 単元リストを重複排除して表示
+    const uniqueUnits = []
+    const seenNames = new Set()
+    for (const unit of units) {
+      if (!seenNames.has(unit.unit_name)) {
+        seenNames.add(unit.unit_name)
+        uniqueUnits.push(unit)
+      }
+    }
+    unitCountSpan.textContent = uniqueUnits.length
+    suggestionList.innerHTML = uniqueUnits.map((unit, index) => `
       <button 
         onclick="selectSuggestedUnit('${unit.unit_name.replace(/'/g, "\\'")}', ${index + 1})"
         class="w-full text-left px-3 py-2 bg-white hover:bg-blue-100 border border-blue-200 rounded transition flex items-center justify-between group">
