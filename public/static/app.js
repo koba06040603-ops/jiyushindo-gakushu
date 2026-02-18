@@ -3551,20 +3551,32 @@ async function loadGuidePage(curriculumId) {
                 ${personalizedCourses.length > 0 ? `
                 <div class="bg-white rounded-lg p-4 border border-pink-200">
                   <h4 class="font-bold text-pink-800 mb-2"><i class="fas fa-list mr-1"></i>配信済み個別コース（${personalizedCourses.length}名分）</h4>
-                  <div class="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
                     ${personalizedCourses.map(pc => `
-                      <div class="bg-pink-50 rounded-lg p-2 border border-pink-100 flex items-center gap-2">
-                        <i class="fas fa-user-graduate text-pink-500"></i>
-                        <span class="text-xs font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
-                        <span class="text-xs bg-pink-200 text-pink-700 px-2 py-0.5 rounded-full">${pc.cards?.length || 0}枚</span>
+                      <div class="bg-pink-50 rounded-lg p-3 border border-pink-100">
+                        <div class="flex items-center gap-2 mb-2">
+                          <i class="fas fa-user-graduate text-pink-500"></i>
+                          <span class="text-sm font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
+                          <span class="text-xs bg-pink-200 text-pink-700 px-2 py-0.5 rounded-full">${pc.cards?.length || 0}枚</span>
+                        </div>
+                        <button onclick="showPersonalizedCourseGuide(${pc.id}, ${curriculumId})" 
+                                class="w-full text-xs bg-pink-500 hover:bg-pink-600 text-white py-1.5 rounded-lg font-bold transition">
+                          <i class="fas fa-book-open mr-1"></i>学習のてびき形式で見る
+                        </button>
                       </div>
                     `).join('')}
                   </div>
+                </div>
+                <div class="mt-3 text-center">
+                  <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
+                    class="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-2 px-6 rounded-xl transition shadow-lg text-sm">
+                    <i class="fas fa-plus mr-2"></i>さらに生成する
+                  </button>
                 </div>` : `
                 <div class="text-center">
                   <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
                     class="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-xl transition shadow-lg text-sm">
-                    <i class="fas fa-magic mr-2"></i>個別最適化コースを生成する
+                    <i class="fas fa-magic mr-2"></i>個別最適化コースを一括生成する
                   </button>
                 </div>`}
               </div>
@@ -14153,55 +14165,6 @@ function showUnitPreview(unitData, modelUsed) {
         </div>
       ` : ''}
 
-      <!-- 配信モード選択 -->
-      <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 mb-4 border-2 border-indigo-200">
-        <h3 class="text-lg font-bold text-indigo-800 mb-3 flex items-center">
-          <i class="fas fa-broadcast-tower mr-2"></i>配信モードを選択してください
-        </h3>
-        <div class="grid grid-cols-2 gap-4" id="delivery-mode-selector">
-          <label class="cursor-pointer">
-            <input type="radio" name="delivery_mode" value="group" checked class="hidden peer" onchange="updateDeliveryModeUI()">
-            <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:ring-2 peer-checked:ring-blue-300 border-2 border-gray-300 rounded-xl p-4 transition-all hover:border-blue-300">
-              <div class="flex items-center gap-2 mb-2">
-                <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center">
-                  <i class="fas fa-users"></i>
-                </div>
-                <div>
-                  <h4 class="font-bold text-blue-800">全体配信モード</h4>
-                  <p class="text-xs text-blue-600">3コース一斉配信</p>
-                </div>
-              </div>
-              <p class="text-xs text-gray-600 mt-2">全児童に共通の3コース（じっくり・しっかり・ぐんぐん）を配信し、児童が自分で選んで学習します。学習データを収集して個別最適化に活用できます。</p>
-              <div class="mt-2 flex flex-wrap gap-1">
-                <span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">じっくり</span>
-                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">しっかり</span>
-                <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">ぐんぐん</span>
-              </div>
-            </div>
-          </label>
-          <label class="cursor-pointer">
-            <input type="radio" name="delivery_mode" value="individual" class="hidden peer" onchange="updateDeliveryModeUI()">
-            <div class="peer-checked:border-pink-500 peer-checked:bg-pink-50 peer-checked:ring-2 peer-checked:ring-pink-300 border-2 border-gray-300 rounded-xl p-4 transition-all hover:border-pink-300">
-              <div class="flex items-center gap-2 mb-2">
-                <div class="w-10 h-10 rounded-full bg-pink-500 text-white flex items-center justify-center">
-                  <i class="fas fa-user-cog"></i>
-                </div>
-                <div>
-                  <h4 class="font-bold text-pink-800">個別配信モード</h4>
-                  <p class="text-xs text-pink-600">児童ごとに個別配信</p>
-                </div>
-              </div>
-              <p class="text-xs text-gray-600 mt-2">教師がAIで生成した個別最適化カードを確認・編集してから、児童一人ひとりに配信します。3コースの選択は行わず、最初から個別対応します。</p>
-              <div class="mt-2 flex flex-wrap gap-1">
-                <span class="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full">AI生成</span>
-                <span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">教師チェック</span>
-                <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">個別配信</span>
-              </div>
-            </div>
-          </label>
-        </div>
-      </div>
-
       <!-- アクションボタン -->
       <div class="flex flex-col space-y-3">
         <!-- 教師用：全体確認・編集ボタン -->
@@ -14233,13 +14196,6 @@ function showUnitPreview(unitData, modelUsed) {
   `
 }
 
-// 配信モード切替UI更新
-function updateDeliveryModeUI() {
-  const mode = document.querySelector('input[name="delivery_mode"]:checked')?.value || 'group'
-  console.log('📡 配信モード変更:', mode)
-}
-window.updateDeliveryModeUI = updateDeliveryModeUI
-
 // 配信モード変更（ガイドページから）
 async function changeDeliveryMode(curriculumId, currentMode) {
   const newMode = currentMode === 'group' ? 'individual' : 'group'
@@ -14269,13 +14225,6 @@ async function saveGeneratedUnit(unitData) {
   console.log('📦 unitData:', unitData)
   console.log('📦 curriculum:', unitData.curriculum)
   console.log('📦 courses数:', unitData.courses?.length)
-  
-  // 配信モードを取得
-  const deliveryMode = document.querySelector('input[name="delivery_mode"]:checked')?.value || 'group'
-  console.log('📡 配信モード:', deliveryMode)
-  
-  // unitDataに配信モードを追加
-  unitData.delivery_mode = deliveryMode
   
   // ボタンを無効化してローディング表示
   const saveButton = document.getElementById('save-unit-button') || event.target
@@ -40376,29 +40325,85 @@ async function showPersonalizedCourseSelector(curriculumId) {
       const res = await axios.get('/api/students/list')
       students = Array.isArray(res.data) ? res.data : (res.data.students || [])
     } catch {
-      // フォールバック
-      students = [{ id: 1, name: '児童1' }, { id: 2, name: '児童2' }, { id: 3, name: '児童3' }]
+      // フォールバック: 30人分のデモ児童
+      students = Array.from({length: 30}, (_, i) => ({ id: i + 1, name: `児童${i + 1}` }))
     }
+    
+    // 既存の個別コースを取得
+    let existingPersonalized = []
+    try {
+      const currRes = await axios.get(`/api/curriculum/${curriculumId}`)
+      existingPersonalized = (currRes.data.courses || []).filter(c => c.course_level === 'personalized')
+    } catch {}
+    const existingStudentIds = existingPersonalized.map(c => {
+      const match = c.course_name?.match(/ID:(\d+)/)
+      return match ? parseInt(match[1]) : null
+    }).filter(Boolean)
     
     const html = `
       <div id="personalizedSelectorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='personalizedSelectorModal')document.getElementById('personalizedSelectorModal').remove()">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6" onclick="event.stopPropagation()">
-          <h2 class="text-xl font-bold text-gray-800 mb-4"><i class="fas fa-magic text-pink-600 mr-2"></i>個別最適化コース生成</h2>
-          <p class="text-sm text-gray-600 mb-4">コースを作成する児童を選んでください。AIがその児童の学習データを分析し、最適なカード構成を提案します。</p>
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+          <h2 class="text-xl font-bold text-gray-800 mb-2">
+            <i class="fas fa-magic text-pink-600 mr-2"></i>個別最適化コース一括生成
+          </h2>
+          <p class="text-sm text-gray-600 mb-4">
+            コースを作成する児童を選んでください（複数選択可）。<br>
+            AIが各児童の学習データを分析し、<strong>学習カード＋チェックテスト＋選択課題</strong>の一連を生成します。
+          </p>
           
-          <div class="space-y-2 max-h-60 overflow-y-auto mb-4">
-            ${students.map(s => `
-              <button onclick="document.getElementById('personalizedSelectorModal').remove(); generatePersonalizedCourse(${s.id}, ${curriculumId})" 
-                      class="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-pink-50 rounded-lg transition border hover:border-pink-300">
-                <span class="font-bold text-gray-800"><i class="fas fa-user-graduate text-pink-500 mr-2"></i>${s.name || '児童' + s.id}</span>
-                <i class="fas fa-chevron-right text-gray-400"></i>
-              </button>
-            `).join('')}
+          <!-- 一括操作 -->
+          <div class="flex gap-2 mb-3">
+            <button onclick="document.querySelectorAll('.student-checkbox').forEach(cb=>{if(!cb.disabled)cb.checked=true}); updateBulkCount()" 
+                    class="text-xs bg-pink-500 hover:bg-pink-600 text-white px-3 py-1.5 rounded-lg font-bold transition">
+              <i class="fas fa-check-double mr-1"></i>全員選択
+            </button>
+            <button onclick="document.querySelectorAll('.student-checkbox').forEach(cb=>cb.checked=false); updateBulkCount()" 
+                    class="text-xs bg-gray-400 hover:bg-gray-500 text-white px-3 py-1.5 rounded-lg font-bold transition">
+              <i class="fas fa-times mr-1"></i>全解除
+            </button>
+            <button onclick="document.querySelectorAll('.student-checkbox').forEach(cb=>{if(!cb.disabled && !cb.dataset.existing)cb.checked=true}); updateBulkCount()" 
+                    class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold transition">
+              <i class="fas fa-user-plus mr-1"></i>未生成のみ選択
+            </button>
+            <div class="flex-1"></div>
+            <span id="bulk-count" class="text-xs text-gray-500 self-center">0名選択中</span>
           </div>
           
-          <button onclick="document.getElementById('personalizedSelectorModal').remove()" class="w-full px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition text-gray-700 font-bold">
-            キャンセル
-          </button>
+          <!-- 児童一覧（チェックボックス付き） -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-64 overflow-y-auto mb-4 p-1">
+            ${students.map(s => {
+              const hasExisting = existingStudentIds.includes(s.id)
+              return `
+              <label class="flex items-center gap-2 p-2 rounded-lg border ${hasExisting ? 'bg-green-50 border-green-200' : 'bg-gray-50 hover:bg-pink-50 border-gray-200 hover:border-pink-300'} transition cursor-pointer">
+                <input type="checkbox" class="student-checkbox w-4 h-4 accent-pink-500" value="${s.id}" ${hasExisting ? 'data-existing="true"' : ''} onchange="updateBulkCount()">
+                <span class="text-sm ${hasExisting ? 'text-green-700' : 'text-gray-800'} truncate">
+                  ${hasExisting ? '<i class="fas fa-check-circle text-green-500 mr-1"></i>' : '<i class="fas fa-user text-gray-400 mr-1"></i>'}
+                  ${s.name || '児童' + s.id}
+                </span>
+              </label>`
+            }).join('')}
+          </div>
+          
+          ${existingPersonalized.length > 0 ? `
+          <div class="bg-green-50 rounded-lg p-3 mb-4 text-xs text-green-700">
+            <i class="fas fa-info-circle mr-1"></i>
+            <strong>${existingPersonalized.length}名</strong>は生成済みです（緑色）。再選択すると上書き再生成します。
+          </div>` : ''}
+          
+          <!-- アクションボタン -->
+          <div class="flex gap-3">
+            <button onclick="document.getElementById('personalizedSelectorModal').remove()" 
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition text-gray-700 font-bold">
+              キャンセル
+            </button>
+            <button id="bulk-generate-btn" onclick="startBulkGeneration(${curriculumId})" 
+                    class="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+              <i class="fas fa-magic mr-2"></i>一括生成開始
+            </button>
+          </div>
+          
+          <!-- 進捗表示エリア -->
+          <div id="bulk-progress" class="hidden mt-4"></div>
         </div>
       </div>
     `
@@ -40409,7 +40414,239 @@ async function showPersonalizedCourseSelector(curriculumId) {
   }
 }
 
+// 選択数の更新
+function updateBulkCount() {
+  const checked = document.querySelectorAll('.student-checkbox:checked')
+  const countEl = document.getElementById('bulk-count')
+  const btn = document.getElementById('bulk-generate-btn')
+  if (countEl) countEl.textContent = `${checked.length}名選択中`
+  if (btn) btn.disabled = checked.length === 0
+}
+window.updateBulkCount = updateBulkCount
+
+// 一括生成開始
+async function startBulkGeneration(curriculumId) {
+  const checkedBoxes = document.querySelectorAll('.student-checkbox:checked')
+  const studentIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value))
+  
+  if (studentIds.length === 0) return alert('児童を選択してください')
+  
+  const btn = document.getElementById('bulk-generate-btn')
+  btn.disabled = true
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>生成中...'
+  
+  const progressEl = document.getElementById('bulk-progress')
+  progressEl.classList.remove('hidden')
+  
+  let completed = 0
+  let failed = 0
+  
+  const updateProgress = () => {
+    const percent = Math.round((completed + failed) / studentIds.length * 100)
+    progressEl.innerHTML = `
+      <div class="bg-gray-100 rounded-lg p-4">
+        <div class="flex justify-between text-sm mb-2">
+          <span class="font-bold text-gray-700">生成進捗</span>
+          <span class="text-gray-500">${completed + failed}/${studentIds.length} (成功:${completed} 失敗:${failed})</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
+          <div class="bg-gradient-to-r from-pink-500 to-purple-600 h-3 rounded-full transition-all duration-300" style="width:${percent}%"></div>
+        </div>
+        <div id="bulk-log" class="text-xs text-gray-500 max-h-32 overflow-y-auto space-y-1"></div>
+      </div>
+    `
+  }
+  updateProgress()
+  
+  const addLog = (msg) => {
+    const log = document.getElementById('bulk-log')
+    if (log) {
+      const div = document.createElement('div')
+      div.textContent = msg
+      log.appendChild(div)
+      log.scrollTop = log.scrollHeight
+    }
+  }
+  
+  // 順次生成（CF Workers タイムアウト回避）
+  for (const studentId of studentIds) {
+    addLog(`⏳ 児童ID:${studentId} の個別コース生成中...`)
+    try {
+      const res = await axios.post('/api/teacher/generate-personalized-course', {
+        student_id: studentId,
+        curriculum_id: curriculumId
+      }, { timeout: 90000 })
+      
+      if (res.data.success) {
+        // 自動配信（教師チェック後に手動配信もできるが、一括の場合は自動配信）
+        const plan = res.data.personalized_plan || {}
+        await axios.post('/api/teacher/publish-personalized-course', {
+          student_id: studentId,
+          curriculum_id: curriculumId,
+          cards: plan.cards || [],
+          analysis_summary: plan.analysis_summary || '',
+          recommended_approach: plan.recommended_approach || '',
+          hints_for_teacher: plan.hints_for_teacher || []
+        }, { timeout: 60000 })
+        
+        completed++
+        addLog(`✅ 児童ID:${studentId} → 生成・配信完了`)
+      } else {
+        failed++
+        addLog(`⚠️ 児童ID:${studentId} → 生成失敗: ${res.data.error || '不明'}`)
+      }
+    } catch (e) {
+      failed++
+      addLog(`❌ 児童ID:${studentId} → エラー: ${e.message}`)
+    }
+    updateProgress()
+  }
+  
+  // 完了
+  btn.innerHTML = `<i class="fas fa-check-circle mr-2"></i>完了（${completed}名成功）`
+  btn.className = 'flex-1 bg-green-500 text-white px-4 py-3 rounded-lg font-bold shadow-lg'
+  btn.onclick = () => { document.getElementById('personalizedSelectorModal').remove(); loadGuidePage(curriculumId) }
+  btn.disabled = false
+  
+  addLog(`🎉 一括生成完了: ${completed}名成功, ${failed}名失敗`)
+}
+window.startBulkGeneration = startBulkGeneration
+
 window.showPersonalizedCourseSelector = showPersonalizedCourseSelector
+
+// 個別コースを「学習のてびき」形式で表示
+async function showPersonalizedCourseGuide(courseId, curriculumId) {
+  console.log('📖 個別コースてびき表示:', courseId)
+  
+  try {
+    // コースとカードを取得
+    const currRes = await axios.get(`/api/curriculum/${curriculumId}`)
+    const curriculum = currRes.data.curriculum
+    const allCourses = currRes.data.courses || []
+    const course = allCourses.find(c => c.id === courseId)
+    
+    if (!course) { alert('コースが見つかりません'); return }
+    
+    const cards = course.cards || []
+    const studentMatch = course.course_name?.match(/ID:(\d+)/)
+    const studentId = studentMatch ? studentMatch[1] : '?'
+    
+    // モーダルで表示
+    const html = `
+      <div id="personalizedGuideModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='personalizedGuideModal')event.target.remove()">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+          
+          <!-- ヘッダー -->
+          <div class="bg-gradient-to-r from-pink-600 to-purple-700 text-white p-6 rounded-t-2xl">
+            <div class="flex justify-between items-start">
+              <div>
+                <h2 class="text-2xl font-bold mb-1">
+                  <i class="fas fa-user-graduate mr-2"></i>個別学習のてびき
+                </h2>
+                <p class="text-pink-100 text-sm">${curriculum.subject} ${curriculum.unit_name} - 児童ID:${studentId}</p>
+              </div>
+              <button onclick="document.getElementById('personalizedGuideModal').remove()" class="text-white hover:text-pink-200 text-2xl">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="p-6">
+            <!-- 単元情報 -->
+            <div class="bg-pink-50 border-l-4 border-pink-500 p-4 rounded-r-lg mb-6">
+              <h3 class="text-lg font-bold text-pink-800 mb-1">${curriculum.unit_name}</h3>
+              <p class="text-sm text-gray-700">${curriculum.unit_goal || ''}</p>
+              <p class="text-xs text-gray-500 mt-1">学年: ${curriculum.grade} / コース: ${course.course_name}</p>
+            </div>
+            
+            <!-- 学習カード一覧 -->
+            <div class="mb-6">
+              <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-layer-group text-pink-600 mr-2"></i>
+                学習カード（${cards.length}枚）
+              </h3>
+              <div class="space-y-4">
+                ${cards.map((card, i) => `
+                  <div class="border-2 ${card.difficulty_level === 'easy' ? 'border-green-300 bg-green-50' : card.difficulty_level === 'hard' ? 'border-red-300 bg-red-50' : 'border-blue-300 bg-blue-50'} rounded-xl p-4">
+                    <div class="flex items-start justify-between mb-2">
+                      <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full ${card.difficulty_level === 'easy' ? 'bg-green-500' : card.difficulty_level === 'hard' ? 'bg-red-500' : 'bg-blue-500'} text-white flex items-center justify-center font-bold text-sm">${i + 1}</div>
+                        <h4 class="font-bold text-gray-800">${card.card_title || 'カード' + (i + 1)}</h4>
+                      </div>
+                      <span class="text-xs px-2 py-0.5 rounded-full font-bold ${card.difficulty_level === 'easy' ? 'bg-green-200 text-green-800' : card.difficulty_level === 'hard' ? 'bg-red-200 text-red-800' : 'bg-blue-200 text-blue-800'}">${card.difficulty_level || 'standard'}</span>
+                    </div>
+                    <div class="bg-white rounded-lg p-3 mb-2 border">
+                      <p class="text-sm text-gray-800">${card.problem_text || card.problem_description || ''}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                      <div class="bg-white rounded p-2 border">
+                        <span class="font-bold text-gray-600">こたえ：</span>
+                        <span class="text-gray-700">${card.correct_answer || card.answer || ''}</span>
+                      </div>
+                      <div class="bg-white rounded p-2 border">
+                        <span class="font-bold text-gray-600">推定時間：</span>
+                        <span class="text-gray-700">${card.estimated_time_minutes || 10}分</span>
+                      </div>
+                    </div>
+                    ${card.explanation || card.answer_explanation ? `
+                    <details class="mt-2">
+                      <summary class="text-xs text-blue-600 cursor-pointer font-bold">解説を表示</summary>
+                      <p class="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">${card.explanation || card.answer_explanation || ''}</p>
+                    </details>` : ''}
+                    ${card.hint_text ? `
+                    <details class="mt-1">
+                      <summary class="text-xs text-green-600 cursor-pointer font-bold">ヒントを表示</summary>
+                      <p class="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">${card.hint_text}</p>
+                    </details>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            
+            <!-- チェックテスト（共通のものを表示） -->
+            <div class="mb-6">
+              <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>
+                チェックテスト
+              </h3>
+              <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center">
+                <p class="text-sm text-gray-700">全コース共通のチェックテストに取り組みます。</p>
+                <p class="text-xs text-gray-500 mt-1">学習カードをすべて終えたら、チェックテストに挑戦しましょう。</p>
+              </div>
+            </div>
+            
+            <!-- 選択課題 -->
+            <div class="mb-6">
+              <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-star text-pink-600 mr-2"></i>
+                えらべるもんだい
+              </h3>
+              <div class="bg-pink-50 border-2 border-pink-300 rounded-xl p-4 text-center">
+                <p class="text-sm text-gray-700">チェックテスト合格後に取り組める選択課題があります。</p>
+                <p class="text-xs text-gray-500 mt-1">全体共通の選択課題に加え、個別に最適化された課題も含まれます。</p>
+              </div>
+            </div>
+            
+            <!-- アクションボタン -->
+            <div class="flex gap-3">
+              <button onclick="document.getElementById('personalizedGuideModal').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-bold transition">
+                <i class="fas fa-times mr-2"></i>閉じる
+              </button>
+              <button onclick="window.print()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-bold transition">
+                <i class="fas fa-print mr-2"></i>印刷
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+    document.body.insertAdjacentHTML('beforeend', html)
+  } catch (error) {
+    console.error('❌ 個別コースてびき表示エラー:', error)
+    alert('個別コースの表示に失敗しました')
+  }
+}
+window.showPersonalizedCourseGuide = showPersonalizedCourseGuide
 
 // テスト対策の弱点から個別最適化コースを生成
 async function generatePersonalizedFromTestPrep(studentId, curriculumIdsJson, weakTopics) {
