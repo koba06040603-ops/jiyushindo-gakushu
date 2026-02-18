@@ -8763,15 +8763,24 @@ app.post('/api/curriculum/save-generated', async (c) => {
         let diffLevel = card.difficulty_level || 'standard'
         if (!['easy', 'standard', 'hard'].includes(diffLevel)) diffLevel = 'standard'
         
+        // problem_content と answer にもデータを保存（表示側で使用）
+        const problemText = card.problem_text || card.problem_content || card.problem_description || card.content || ''
+        const problemDesc = card.problem_description || card.problem_content || ''
+        const answerText = card.correct_answer || card.answer || ''
+        const explanationText = card.explanation || card.answer_explanation || ''
+        
         const cardResult = await env.DB.prepare(`
           INSERT INTO learning_cards (
             subject, grade_level, unit_name, card_title, card_type,
             difficulty_level, learning_track,
-            problem_text, problem_description, correct_answer, explanation,
+            problem_text, problem_description, problem_content,
+            correct_answer, answer, explanation, answer_explanation,
             hint_text, solution_video_url, image_url,
-            card_order, estimated_time_minutes, curriculum_code,
+            card_order, card_number, estimated_time_minutes, curriculum_code,
+            textbook_page, new_terms, example_problem, example_solution,
+            real_world_connection,
             is_active, course_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         `).bind(
           curriculum.subject,
           gradeNum,
@@ -8780,16 +8789,25 @@ app.post('/api/curriculum/save-generated', async (c) => {
           cardType,
           diffLevel,
           learningTrack,
-          card.problem_text || card.problem_content || card.problem_description || card.content || '',
-          card.problem_description || card.problem_content || '',
-          card.correct_answer || card.answer || '',
-          card.explanation || card.answer_explanation || '',
+          problemText,
+          problemDesc,
+          problemDesc, // problem_content = same as problem_description
+          answerText,
+          answerText, // answer = same as correct_answer
+          explanationText,
+          explanationText, // answer_explanation = same as explanation
           card.hint_text || '',
           card.solution_video_url || card.video_url || '',
           card.image_url || '',
           card.card_order ?? card.card_number ?? (ci + 1),
+          card.card_number ?? (ci + 1),
           card.estimated_time_minutes || card.time_minutes || 10,
           card.curriculum_code || '',
+          card.textbook_page || '',
+          card.new_terms || '',
+          card.example_problem || '',
+          card.example_solution || '',
+          card.real_world_connection || '',
           courseId
         ).run()
         
@@ -8825,20 +8843,25 @@ app.post('/api/curriculum/save-generated', async (c) => {
     
     // ============================================================
     // 選択問題を保存
-    // 実スキーマ: problem_id, unit_id, problem_title, problem_type,
-    //             difficulty_level, content, created_at
+    // 本番スキーマ: problem_id, curriculum_id, problem_number, problem_title,
+    //             problem_description, problem_content, difficulty_level,
+    //             learning_meaning, created_at
     // ============================================================
-    for (const problem of optionalProblems || []) {
+    for (let pi = 0; pi < (optionalProblems || []).length; pi++) {
+      const problem = optionalProblems[pi]
       await env.DB.prepare(`
         INSERT INTO optional_problems (
-          unit_id, problem_title, problem_type, difficulty_level, content
-        ) VALUES (?, ?, ?, ?, ?)
+          curriculum_id, problem_number, problem_title, problem_description,
+          problem_content, difficulty_level, learning_meaning
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `).bind(
         curriculumId,
+        problem.problem_number || (pi + 1),
         problem.problem_title || problem.title || '選択問題',
-        problem.problem_type || 'optional',
+        problem.problem_description || problem.content || problem.problem_content || '',
+        problem.problem_content || problem.content || problem.problem_description || '',
         problem.difficulty_level || 'standard',
-        problem.content || problem.problem_content || problem.problem_description || ''
+        problem.learning_meaning || ''
       ).run()
     }
     
@@ -10404,19 +10427,23 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
     
     if (problems.optional_problems) {
       console.log(`選択問題を保存: ${problems.optional_problems.length}件`)
-      for (const problem of problems.optional_problems) {
-        console.log(`  - 問題${problem.problem_number}: ${problem.problem_title}`)
-        // 実スキーマ: problem_id, unit_id, problem_title, problem_type, difficulty_level, content
+      for (let oi = 0; oi < problems.optional_problems.length; oi++) {
+        const problem = problems.optional_problems[oi]
+        console.log(`  - 問題${problem.problem_number || oi+1}: ${problem.problem_title}`)
+        // 本番スキーマ: problem_id, curriculum_id, problem_number, problem_title, problem_description, problem_content, difficulty_level, learning_meaning
         await env.DB.prepare(`
           INSERT INTO optional_problems (
-            unit_id, problem_title, problem_type, difficulty_level, content
-          ) VALUES (?, ?, ?, ?, ?)
+            curriculum_id, problem_number, problem_title, problem_description,
+            problem_content, difficulty_level, learning_meaning
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
         `).bind(
           curriculumId,
+          problem.problem_number || (oi + 1),
           problem.problem_title || '問題',
-          problem.problem_type || 'optional',
+          problem.problem_description || problem.problem_content || problem.content || '',
+          problem.problem_content || problem.problem_description || problem.content || '',
           problem.difficulty_level || 'standard',
-          problem.problem_content || problem.problem_description || problem.content || ''
+          problem.learning_meaning || ''
         ).run()
       }
     } else {
@@ -10600,18 +10627,21 @@ app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
   const curriculumId = c.req.param('curriculumId')
   
   try {
+    // 本番スキーマ: problem_id, curriculum_id, problem_number, problem_title, 
+    //   problem_description, problem_content, difficulty_level, learning_meaning
     const problems = await env.DB.prepare(`
-      SELECT problem_id, unit_id, problem_title, problem_type, difficulty_level, 
-             content AS problem_content, content AS problem_description, created_at
+      SELECT problem_id, curriculum_id, problem_number, problem_title, 
+             problem_description, problem_content, difficulty_level,
+             learning_meaning, created_at
       FROM optional_problems 
-      WHERE unit_id = ? 
-      ORDER BY problem_id
+      WHERE curriculum_id = ? 
+      ORDER BY problem_number, problem_id
     `).bind(curriculumId).all()
     
     // problem_number を付与
     const problemsWithNumber = (problems.results || []).map((p: any, idx: number) => ({
       ...p,
-      problem_number: idx + 1
+      problem_number: p.problem_number || idx + 1
     }))
     
     console.log(`選択問題取得: ${problemsWithNumber.length}件`)
@@ -28930,22 +28960,35 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       let cardType = card.card_type || 'standard'
       if (!['standard', 'challenge', 'review', 'optional'].includes(cardType)) cardType = 'standard'
 
+      const pText = card.problem_text || card.problem_description || ''
+      const pDesc = card.problem_description || card.problem_text || ''
+      const aText = card.correct_answer || card.answer || ''
+      const eText = card.explanation || card.answer_explanation || ''
+
       const cardResult = await env.DB.prepare(`
         INSERT INTO learning_cards (
           subject, grade_level, unit_name, card_title, card_type,
           difficulty_level, learning_track,
-          problem_text, problem_description, correct_answer, explanation,
+          problem_text, problem_description, problem_content,
+          correct_answer, answer, explanation, answer_explanation,
           hint_text, solution_video_url, image_url,
-          card_order, estimated_time_minutes, is_active, course_id
-        ) VALUES (?, ?, ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          card_order, card_number, estimated_time_minutes,
+          textbook_page, new_terms, example_problem, example_solution,
+          real_world_connection,
+          is_active, course_id
+        ) VALUES (?, ?, ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `).bind(
         curriculum.subject, gradeNum, curriculum.unit_name,
         card.card_title || `カード${i + 1}`, cardType, diffLevel,
-        card.problem_text || '', card.problem_description || '',
-        card.correct_answer || '', card.explanation || '',
+        pText, pDesc, pDesc,
+        aText, aText, eText, eText,
         card.hint_text || '',
         card.solution_video_url || '', card.image_url || '',
-        i + 1, card.estimated_time_minutes || 10, courseId
+        i + 1, card.card_number || (i + 1), card.estimated_time_minutes || 10,
+        card.textbook_page || '', card.new_terms || '',
+        card.example_problem || '', card.example_solution || '',
+        card.real_world_connection || '',
+        courseId
       ).run()
 
       const cardId = cardResult.meta.last_row_id as number
