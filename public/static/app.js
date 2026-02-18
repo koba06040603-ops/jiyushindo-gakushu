@@ -3430,7 +3430,16 @@ async function loadGuidePage(curriculumId) {
                       `).join('')}
                     </div>
                   </div>
-                ` : ''}
+                ` : `
+                  <div class="bg-white rounded-xl p-6 mb-3 text-center">
+                    <i class="fas fa-spinner fa-spin text-yellow-500 text-3xl mb-3"></i>
+                    <p class="font-bold text-gray-700 mb-2">チェックテストを準備中です</p>
+                    <p class="text-sm text-gray-500">AIが問題を作成しています。ページを再読み込みすると表示されます。</p>
+                    <button onclick="loadGuidePage(${curriculumId})" class="mt-3 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                      <i class="fas fa-sync-alt mr-1"></i>再読み込み
+                    </button>
+                  </div>
+                `}
               </div>
             </div>
 
@@ -3445,6 +3454,7 @@ async function loadGuidePage(curriculumId) {
                 6つの はってん もんだいから、じぶんが やってみたい もんだいを えらべるよ！<br>
                 どんな ちからが つくのか、かくにんして ちょうせんしよう！
               </p>
+              ${optionalProblems.length > 0 ? `
               <div class="grid grid-cols-2 gap-4">
                 ${optionalProblems.map((problem, index) => {
                   // 選択問題の進捗状態を表示（将来的にAPIから取得）
@@ -3506,6 +3516,16 @@ async function loadGuidePage(curriculumId) {
                   </div>
                 `}).join('')}
               </div>
+              ` : `
+              <div class="bg-white rounded-xl p-6 text-center">
+                <i class="fas fa-spinner fa-spin text-pink-500 text-3xl mb-3"></i>
+                <p class="font-bold text-gray-700 mb-2">えらべるもんだいを準備中です</p>
+                <p class="text-sm text-gray-500">AIが問題を作成しています。ページを再読み込みすると表示されます。</p>
+                <button onclick="loadGuidePage(${curriculumId})" class="mt-3 bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                  <i class="fas fa-sync-alt mr-1"></i>再読み込み
+                </button>
+              </div>
+              `}
             </div>
 
             ${await generateLearningSupportSectionWithData(curriculumId)}
