@@ -12368,7 +12368,6 @@ async function suggestUnitNames() {
           </div>
         </div>
       `
-      `).join('')
       
       suggestBtn.innerHTML = '<i class="fas fa-lightbulb mr-1"></i> 再生成'
       suggestBtn.disabled = false
