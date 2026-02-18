@@ -3106,6 +3106,15 @@ async function loadGuidePage(curriculumId) {
       console.log('⚠️ 選択問題なし')
     }
     
+    // 個別最適化コースと学習統計を取得（教師フロー表示用）
+    const standardCourses = courses.filter(c => c.course_level !== 'personalized')
+    const personalizedCourses = courses.filter(c => c.course_level === 'personalized')
+    let learningStats = { totalStudents: 0, activeStudents: 0, avgCorrectRate: 0, totalAnswers: 0 }
+    try {
+      const statsResponse = await axios.get(`/api/curriculum/${curriculumId}/learning-stats`)
+      if (statsResponse.data) learningStats = statsResponse.data
+    } catch (e) { console.log('⚠️ 学習統計なし') }
+    
     // 欠落データのバックグラウンド自動生成（順次実行）
     const missingIntroProblems = courses.filter(c => !c.introduction_problem)
     const needsAssessment = !commonCheckTest || !commonCheckTest.sample_problems || commonCheckTest.sample_problems.length === 0 || optionalProblems.length === 0
@@ -3232,6 +3241,106 @@ async function loadGuidePage(curriculumId) {
               <button onclick="loadTeacherOverview(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chalkboard-teacher mr-2"></i>教師用編集
               </button>
+            </div>
+          </div>
+
+          <!-- 教師用：授業フローナビゲーション -->
+          <div class="bg-white rounded-2xl shadow-lg p-6 mb-4 print:hidden border-2 border-indigo-200">
+            <h3 class="text-lg font-bold text-indigo-800 mb-4 flex items-center">
+              <i class="fas fa-chalkboard-teacher mr-2"></i>授業フロー（教師用）
+            </h3>
+            
+            <div class="flex items-stretch gap-0">
+              <!-- Phase 1: 全体配信 -->
+              <div class="flex-1 relative">
+                <div class="border-2 ${learningStats.totalAnswers > 0 ? 'border-green-400 bg-green-50' : 'border-blue-400 bg-blue-50'} rounded-l-xl p-4">
+                  <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-full ${learningStats.totalAnswers > 0 ? 'bg-green-500' : 'bg-blue-500'} text-white flex items-center justify-center font-bold text-sm">1</div>
+                    <h4 class="font-bold ${learningStats.totalAnswers > 0 ? 'text-green-800' : 'text-blue-800'}">全体配信フェーズ</h4>
+                    ${learningStats.totalAnswers > 0 ? '<span class="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full font-bold">データ収集中</span>' : '<span class="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-bold">準備完了</span>'}
+                  </div>
+                  <p class="text-xs text-gray-600 mb-3">全児童に共通の3コース（じっくり・しっかり・ぐんぐん）を配信し、学習データを収集します。</p>
+                  
+                  <div class="grid grid-cols-2 gap-2 mb-3">
+                    <div class="bg-white rounded-lg p-2 text-center border">
+                      <div class="text-lg font-bold text-blue-600">${standardCourses.length}</div>
+                      <div class="text-xs text-gray-500">コース数</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-2 text-center border">
+                      <div class="text-lg font-bold text-blue-600">${standardCourses.reduce((sum, c) => sum + (c.cards?.length || 0), 0)}</div>
+                      <div class="text-xs text-gray-500">学習カード数</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-2 text-center border">
+                      <div class="text-lg font-bold ${learningStats.activeStudents > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.activeStudents || 0}</div>
+                      <div class="text-xs text-gray-500">学習中の児童</div>
+                    </div>
+                    <div class="bg-white rounded-lg p-2 text-center border">
+                      <div class="text-lg font-bold ${learningStats.totalAnswers > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.totalAnswers || 0}</div>
+                      <div class="text-xs text-gray-500">回答データ数</div>
+                    </div>
+                  </div>
+
+                  <div class="flex gap-2">
+                    <button onclick="printGuide()" class="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                      <i class="fas fa-print mr-1"></i>てびき印刷
+                    </button>
+                    <button onclick="showLearningDashboard(${curriculumId})" class="flex-1 text-xs bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                      <i class="fas fa-chart-bar mr-1"></i>学習統計
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Arrow -->
+              <div class="flex items-center px-1 relative z-10" style="margin-left:-8px; margin-right:-8px;">
+                <div class="w-10 h-10 rounded-full ${personalizedCourses.length > 0 ? 'bg-green-500' : learningStats.totalAnswers > 0 ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300'} text-white flex items-center justify-center shadow-lg">
+                  <i class="fas fa-arrow-right"></i>
+                </div>
+              </div>
+
+              <!-- Phase 2: 個別配信 -->
+              <div class="flex-1 relative">
+                <div class="border-2 ${personalizedCourses.length > 0 ? 'border-pink-400 bg-pink-50' : 'border-gray-300 bg-gray-50'} rounded-r-xl p-4">
+                  <div class="flex items-center gap-2 mb-3">
+                    <div class="w-8 h-8 rounded-full ${personalizedCourses.length > 0 ? 'bg-pink-500' : 'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">2</div>
+                    <h4 class="font-bold ${personalizedCourses.length > 0 ? 'text-pink-800' : 'text-gray-600'}">個別配信フェーズ</h4>
+                    ${personalizedCourses.length > 0 
+                      ? `<span class="text-xs bg-pink-200 text-pink-800 px-2 py-0.5 rounded-full font-bold">${personalizedCourses.length}名に配信済</span>` 
+                      : learningStats.totalAnswers > 0 
+                        ? '<span class="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full font-bold">配信可能</span>'
+                        : '<span class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">データ収集後</span>'}
+                  </div>
+                  <p class="text-xs text-gray-600 mb-3">収集した学習データを基に、児童一人ひとりに最適化したカードを教師が確認・編集して配信します。</p>
+                  
+                  ${personalizedCourses.length > 0 ? `
+                  <div class="space-y-2 mb-3 max-h-32 overflow-y-auto">
+                    ${personalizedCourses.map(pc => `
+                      <div class="bg-white rounded-lg p-2 border border-pink-200 flex items-center gap-2">
+                        <i class="fas fa-user-graduate text-pink-500"></i>
+                        <span class="text-xs font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
+                        <span class="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full">${pc.cards?.length || 0}枚</span>
+                      </div>
+                    `).join('')}
+                  </div>` : `
+                  <div class="bg-white rounded-lg p-3 border border-dashed border-gray-300 text-center mb-3">
+                    <i class="fas fa-user-clock text-gray-400 text-xl mb-1"></i>
+                    <p class="text-xs text-gray-500">${learningStats.totalAnswers > 0 ? '学習データが蓄積されています。個別コースを生成できます。' : 'まず全体配信で学習データを収集してください。'}</p>
+                  </div>`}
+
+                  <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
+                    class="w-full text-xs ${learningStats.totalAnswers > 0 || personalizedCourses.length > 0 ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700' : 'bg-gray-400 cursor-not-allowed'} text-white py-2 px-3 rounded-lg font-bold transition"
+                    ${learningStats.totalAnswers === 0 && personalizedCourses.length === 0 ? 'title="学習データが収集されてから利用できます"' : ''}>
+                    <i class="fas fa-magic mr-1"></i>個別最適化コースを生成
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <!-- フロー説明 -->
+            <div class="mt-3 bg-indigo-50 rounded-lg p-3 text-xs text-indigo-700">
+              <i class="fas fa-info-circle mr-1"></i>
+              <strong>フロー：</strong>
+              ①てびきを印刷・配布 → ②児童が3コースから選んで学習 → ③学習データが蓄積 → ④データを基にAIが個別カード生成 → ⑤教師が確認・編集 → ⑥個別配信
             </div>
           </div>
 

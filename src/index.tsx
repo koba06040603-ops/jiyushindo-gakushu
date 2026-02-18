@@ -10919,6 +10919,56 @@ app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
   }
 })
 
+// APIルート：カリキュラム全体の学習統計（教師フロー表示用）
+app.get('/api/curriculum/:curriculumId/learning-stats', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    // 学習ログからの集計
+    const logStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT student_id) as active_students,
+        COUNT(*) as total_answers,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_answers,
+        AVG(answer_time_seconds) as avg_time
+      FROM learning_logs 
+      WHERE unit_id = ?
+    `).bind(curriculumId).first()
+    
+    // student_progress からの集計
+    const progressStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(DISTINCT student_id) as total_students,
+        COUNT(*) as total_progress_records
+      FROM student_progress
+      WHERE curriculum_id = ?
+    `).bind(curriculumId).first()
+    
+    const totalAnswers = (logStats as any)?.total_answers || 0
+    const correctAnswers = (logStats as any)?.correct_answers || 0
+    const activeStudents = (logStats as any)?.active_students || (progressStats as any)?.total_students || 0
+    
+    return c.json({
+      totalStudents: activeStudents,
+      activeStudents: activeStudents,
+      totalAnswers: totalAnswers,
+      avgCorrectRate: totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0,
+      avgTime: Math.round((logStats as any)?.avg_time || 0)
+    })
+  } catch (error: any) {
+    console.error('学習統計取得エラー:', error)
+    // エラーの場合もデフォルト値を返す（UIが壊れないように）
+    return c.json({
+      totalStudents: 0,
+      activeStudents: 0,
+      totalAnswers: 0,
+      avgCorrectRate: 0,
+      avgTime: 0
+    })
+  }
+})
+
 // APIルート：追加問題を生成（旧エンドポイント - 互換性のため残す）
 app.post('/api/curriculum/:curriculumId/generate-additional-problems', async (c) => {
   const { env } = c
