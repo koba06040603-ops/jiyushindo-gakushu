@@ -1223,7 +1223,7 @@ async function renderTopPage() {
           自由進度学習支援システム
         </h1>
         <p class="text-white text-xl opacity-90">AIで学習カードを自動生成</p>
-        <p class="text-white text-sm opacity-75 mt-2">学年・教科・単元名を入力するだけ</p>
+        <p class="text-white text-sm opacity-75 mt-2">学年・教科・教科書会社・単元を選んで学習スタート</p>
       </div>
 
       <!-- ユーザー情報 -->
@@ -1233,8 +1233,8 @@ async function renderTopPage() {
             <i class="fas fa-user-circle text-3xl text-indigo-500 mr-3"></i>
             <div>
               <p class="text-sm text-gray-500">ログイン中</p>
-              <p class="font-bold text-lg">${state.student?.name || state.auth?.user?.email || 'ゲスト'}</p>
-              ${state.auth?.user ? `<p class="text-xs text-gray-400">${state.auth.user.role === 'teacher' ? '教師' : state.auth.user.role === 'admin' ? '管理者' : '児童・生徒'} | クラス: ${state.student?.classCode || '未設定'}</p>` : ''}
+              <p class="font-bold text-lg">\${state.student?.name || state.auth?.user?.email || 'ゲスト'}</p>
+              \${state.auth?.user ? \`<p class="text-xs text-gray-400">\${state.auth.user.role === 'teacher' ? '教師' : state.auth.user.role === 'admin' ? '管理者' : '児童・生徒'} | クラス: \${state.student?.classCode || '未設定'}</p>\` : ''}
             </div>
           </div>
           <button
@@ -1246,7 +1246,7 @@ async function renderTopPage() {
         </div>
       </div>
 
-      ${state.auth.user && (state.auth.user.role === 'teacher' || state.auth.user.role === 'admin') ? `
+      \${state.auth.user && (state.auth.user.role === 'teacher' || state.auth.user.role === 'admin') ? \`
       <!-- 教師用メニュー -->
       <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-xl p-6 mb-8">
         <h2 class="text-2xl font-bold text-white mb-4 text-center">
@@ -1283,144 +1283,126 @@ async function renderTopPage() {
           </button>
         </div>
       </div>
-      ` : ''}
+      \` : ''}
 
-      <!-- メインアクション：AI単元生成 -->
-      <div class="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg shadow-2xl p-10 mb-8">
-        <div class="text-center mb-6">
-          <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
-            ✨ AIが約1分で18枚の学習カードを生成
-          </div>
-          <h2 class="text-3xl font-bold text-white mb-3">
+      <!-- ===== メイン：学年・教科・教科書・単元 選択エリア ===== -->
+      <div class="bg-white rounded-2xl shadow-2xl mb-8 overflow-hidden">
+        <!-- ステップバー -->
+        <div class="bg-gradient-to-r from-purple-600 to-pink-500 p-6">
+          <h2 class="text-2xl font-bold text-white text-center mb-2">
             <i class="fas fa-wand-magic-sparkles mr-2"></i>
-            新しい単元を作成
+            学習カードを作成しよう
           </h2>
-          <p class="text-white text-lg opacity-90 mb-2">
-            学年・教科・単元名を入力するだけで完成！
-          </p>
-          <p class="text-white text-sm opacity-75">
-            3つのコース（じっくり・しっかり・ぐんぐん） × 各6枚 = 18枚の学習カード
-          </p>
+          <p class="text-white text-center opacity-90">下の順番で選ぶだけ！ 3コース × 各6枚 = 18枚のカードをAIが自動生成</p>
+          <!-- ステップインジケーター -->
+          <div class="flex justify-center mt-4 gap-2">
+            <div id="step1Indicator" class="flex items-center bg-white bg-opacity-30 rounded-full px-4 py-1 text-white text-sm font-bold">
+              <span class="bg-white text-purple-600 rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">1</span>
+              学年
+            </div>
+            <i class="fas fa-chevron-right text-white opacity-50 self-center"></i>
+            <div id="step2Indicator" class="flex items-center bg-white bg-opacity-20 rounded-full px-4 py-1 text-white text-sm font-bold">
+              <span class="bg-white bg-opacity-50 text-purple-600 rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">2</span>
+              教科
+            </div>
+            <i class="fas fa-chevron-right text-white opacity-50 self-center"></i>
+            <div id="step3Indicator" class="flex items-center bg-white bg-opacity-20 rounded-full px-4 py-1 text-white text-sm font-bold">
+              <span class="bg-white bg-opacity-50 text-purple-600 rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">3</span>
+              教科書
+            </div>
+            <i class="fas fa-chevron-right text-white opacity-50 self-center"></i>
+            <div id="step4Indicator" class="flex items-center bg-white bg-opacity-20 rounded-full px-4 py-1 text-white text-sm font-bold">
+              <span class="bg-white bg-opacity-50 text-purple-600 rounded-full w-6 h-6 flex items-center justify-center mr-2 text-xs font-bold">4</span>
+              単元
+            </div>
+          </div>
         </div>
-        
-        <button 
-          onclick="showUnitGeneratorModal()"
-          class="w-full bg-white text-purple-600 hover:bg-purple-50 py-6 px-8 rounded-lg font-bold text-2xl transition shadow-xl flex items-center justify-center group">
-          <i class="fas fa-magic mr-3 text-3xl group-hover:animate-bounce"></i>
-          AIで学習カードを作成する
-          <i class="fas fa-arrow-right ml-3 group-hover:translate-x-2 transition-transform"></i>
-        </button>
 
-        <!-- 機能紹介 -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
-            <i class="fas fa-clock text-3xl text-white mb-2"></i>
-            <p class="text-white font-bold">約1分</p>
-            <p class="text-white text-sm opacity-75">高速生成</p>
+        <div class="p-8">
+          <!-- 選択フォーム（横並び） -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <!-- 学年 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-user-graduate mr-1 text-purple-500"></i> 学年
+              </label>
+              <select id="gradeSelect" class="w-full p-4 border-2 border-gray-300 rounded-xl text-lg focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition">
+                <option value="">選択してください</option>
+              </select>
+            </div>
+            <!-- 教科 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-book mr-1 text-blue-500"></i> 教科
+              </label>
+              <select id="subjectSelect" class="w-full p-4 border-2 border-gray-300 rounded-xl text-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition">
+                <option value="">選択してください</option>
+              </select>
+            </div>
+            <!-- 教科書会社 -->
+            <div>
+              <label class="block text-sm font-bold text-gray-700 mb-2">
+                <i class="fas fa-building mr-1 text-green-500"></i> 教科書会社
+              </label>
+              <select id="textbookSelect" class="w-full p-4 border-2 border-gray-300 rounded-xl text-lg focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-200 transition">
+                <option value="">選択してください</option>
+              </select>
+            </div>
           </div>
-          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
-            <i class="fas fa-book text-3xl text-white mb-2"></i>
-            <p class="text-white font-bold">18枚のカード</p>
-            <p class="text-white text-sm opacity-75">3コース×6枚</p>
-          </div>
-          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
-            <i class="fas fa-lightbulb text-3xl text-white mb-2"></i>
-            <p class="text-white font-bold">54個のヒント</p>
-            <p class="text-white text-sm opacity-75">3段階で自律学習</p>
-          </div>
-          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
-            <i class="fas fa-clipboard-check text-3xl text-white mb-2"></i>
-            <p class="text-white font-bold">チェックテスト</p>
-            <p class="text-white text-sm opacity-75">理解度を確認</p>
-          </div>
-          <div class="bg-white bg-opacity-10 backdrop-blur rounded-lg p-4 text-center">
-            <i class="fas fa-tasks text-3xl text-white mb-2"></i>
-            <p class="text-white font-bold">選択問題</p>
-            <p class="text-white text-sm opacity-75">発展的学習</p>
-          </div>
-        </div>
-      </div>
 
-      <!-- 使い方ガイド -->
-      <div class="bg-white rounded-lg shadow-lg p-8">
-        <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
-          <i class="fas fa-question-circle mr-2 text-indigo-600"></i>
-          使い方ガイド
-        </h2>
-        
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <!-- Step 1 -->
-          <div class="text-center">
-            <div class="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span class="text-3xl font-bold text-indigo-600">1</span>
+          <!-- 単元一覧 -->
+          <div id="unitSelectArea" class="mb-6" style="display:none;">
+            <label class="block text-sm font-bold text-gray-700 mb-3">
+              <i class="fas fa-list-ol mr-1 text-pink-500"></i> 単元を選択してください
+            </label>
+            <div id="unitSelect" class="space-y-2 max-h-80 overflow-y-auto border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
+              <p class="text-gray-400 text-center py-8">学年・教科・教科書会社を選ぶと単元が表示されます</p>
             </div>
-            <h3 class="font-bold text-gray-800 mb-2">学習内容を入力</h3>
-            <p class="text-gray-600 text-sm">学年・教科・教科書会社・単元名を入力</p>
           </div>
-          
-          <!-- Step 2 -->
-          <div class="text-center">
-            <div class="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span class="text-3xl font-bold text-purple-600">2</span>
+
+          <!-- 開始ボタン（非表示→単元選択後に表示） -->
+          <button id="startButton" disabled
+            class="hidden w-full bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-bold py-5 px-8 rounded-xl text-xl transition shadow-xl flex items-center justify-center group disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fas fa-play-circle mr-3 text-2xl group-hover:animate-bounce"></i>
+            この単元の学習カードを見る
+            <i class="fas fa-arrow-right ml-3 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+
+          <!-- AI新規生成ボタン -->
+          <div class="mt-6 pt-6 border-t-2 border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-bold text-gray-700">
+                  <i class="fas fa-magic mr-1 text-purple-500"></i>
+                  教科書にない単元も、AIで新しく作れます
+                </p>
+                <p class="text-sm text-gray-500 mt-1">学年・教科・単元名を入力 → 約1分で18枚の学習カードを自動生成</p>
+              </div>
+              <button 
+                onclick="showUnitGeneratorModal()"
+                class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-6 rounded-xl transition shadow-lg flex items-center whitespace-nowrap">
+                <i class="fas fa-wand-magic-sparkles mr-2"></i>
+                AIで新規作成
+              </button>
             </div>
-            <h3 class="font-bold text-gray-800 mb-2">AIが自動生成</h3>
-            <p class="text-gray-600 text-sm">Gemini 3が約1分で18枚のカードを作成</p>
-          </div>
-          
-          <!-- Step 3 -->
-          <div class="text-center">
-            <div class="bg-pink-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span class="text-3xl font-bold text-pink-600">3</span>
-            </div>
-            <h3 class="font-bold text-gray-800 mb-2">内容を確認</h3>
-            <p class="text-gray-600 text-sm">詳細を確認し、必要に応じて調整</p>
-          </div>
-          
-          <!-- Step 4 -->
-          <div class="text-center">
-            <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span class="text-3xl font-bold text-green-600">4</span>
-            </div>
-            <h3 class="font-bold text-gray-800 mb-2">学習を開始</h3>
-            <p class="text-gray-600 text-sm">自分のペースで学習を進める</p>
           </div>
         </div>
-        
-        <!-- 特徴一覧 -->
-        <div class="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-6">
-          <h3 class="font-bold text-gray-800 mb-4 text-center">
-            <i class="fas fa-star mr-2 text-yellow-500"></i>
-            このシステムの特徴
-          </h3>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="flex items-start">
-              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-              <div>
-                <p class="font-bold text-gray-800">3段階のヒント</p>
-                <p class="text-gray-600 text-sm">つまずいても安心して進められる</p>
-              </div>
-            </div>
-            <div class="flex items-start">
-              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-              <div>
-                <p class="font-bold text-gray-800">実社会とのつながり</p>
-                <p class="text-gray-600 text-sm">学びを生活に活かせる</p>
-              </div>
-            </div>
-            <div class="flex items-start">
-              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-              <div>
-                <p class="font-bold text-gray-800">自分のペースで学習</p>
-                <p class="text-gray-600 text-sm">3つのコースから選べる</p>
-              </div>
-            </div>
-            <div class="flex items-start">
-              <i class="fas fa-check-circle text-green-500 mr-2 mt-1"></i>
-              <div>
-                <p class="font-bold text-gray-800">印刷対応</p>
-                <p class="text-gray-600 text-sm">紙で学習したい場合も対応</p>
-              </div>
-            </div>
+
+        <!-- コース紹介バー -->
+        <div class="bg-gradient-to-r from-gray-50 to-gray-100 border-t px-8 py-4">
+          <div class="flex justify-center gap-6 text-sm">
+            <span class="flex items-center">
+              <span class="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+              <strong>じっくり</strong>コース（基礎）
+            </span>
+            <span class="flex items-center">
+              <span class="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+              <strong>しっかり</strong>コース（標準）
+            </span>
+            <span class="flex items-center">
+              <span class="inline-block w-3 h-3 rounded-full bg-purple-500 mr-2"></span>
+              <strong>ぐんぐん</strong>コース（発展）
+            </span>
           </div>
         </div>
       </div>
@@ -2549,6 +2531,9 @@ async function renderTopPage() {
 
     </div>
   `
+
+  // DB連動の選択フォームを初期化
+  loadTopPageData()
 }
 
 async function loadTopPageData() {
@@ -2559,10 +2544,11 @@ async function loadTopPageData() {
 
     // 学年選択肢を設定
     const gradeSelect = document.getElementById('gradeSelect')
+    if (!gradeSelect) return
     grades.forEach(item => {
       const option = document.createElement('option')
       option.value = item.grade
-      option.textContent = `小学${item.grade}年`
+      option.textContent = item.grade
       gradeSelect.appendChild(option)
     })
 
@@ -2584,22 +2570,36 @@ async function loadTopPageData() {
       textbookSelect.appendChild(option)
     })
 
-    // 選択が変更されたら単元リストを更新
-    gradeSelect.addEventListener('change', updateUnitList)
-    subjectSelect.addEventListener('change', updateUnitList)
-    textbookSelect.addEventListener('change', updateUnitList)
+    // ステップインジケーター更新
+    function updateStepIndicators() {
+      const g = gradeSelect.value
+      const s = subjectSelect.value
+      const t = textbookSelect.value
+      const activeClass = 'bg-white bg-opacity-30'
+      const inactiveClass = 'bg-white bg-opacity-20'
+      const activeDot = 'bg-white text-purple-600'
+      const inactiveDot = 'bg-white bg-opacity-50 text-purple-600'
 
-    // 開始ボタン
-    document.getElementById('startButton').addEventListener('click', () => {
-      const unitSelect = document.getElementById('unitSelect')
-      const curriculumId = unitSelect.value
-      if (curriculumId) {
-        loadGuidePage(curriculumId)
-      }
-    })
+      const s1 = document.getElementById('step1Indicator')
+      const s2 = document.getElementById('step2Indicator')
+      const s3 = document.getElementById('step3Indicator')
+      const s4 = document.getElementById('step4Indicator')
+      if (!s1) return
+
+      // Step 1 always active since page loaded
+      s1.className = s1.className.replace(inactiveClass, activeClass)
+      s2.className = g ? s2.className.replace(inactiveClass, activeClass) : s2.className.replace(activeClass, inactiveClass)
+      s3.className = g && s ? s3.className.replace(inactiveClass, activeClass) : s3.className.replace(activeClass, inactiveClass)
+      s4.className = g && s && t ? s4.className.replace(inactiveClass, activeClass) : s4.className.replace(activeClass, inactiveClass)
+    }
+
+    // 選択が変更されたら単元リストを更新
+    gradeSelect.addEventListener('change', () => { updateStepIndicators(); updateUnitList() })
+    subjectSelect.addEventListener('change', () => { updateStepIndicators(); updateUnitList() })
+    textbookSelect.addEventListener('change', () => { updateStepIndicators(); updateUnitList() })
+
   } catch (error) {
     console.error('データ読み込みエラー:', error)
-    alert('データの読み込みに失敗しました')
   }
 }
 
@@ -2609,13 +2609,16 @@ async function updateUnitList() {
   const textbook = document.getElementById('textbookSelect').value
   const unitSelect = document.getElementById('unitSelect')
   const startButton = document.getElementById('startButton')
+  const unitArea = document.getElementById('unitSelectArea')
 
   // リセット
-  unitSelect.innerHTML = '<option value="">選択してください</option>'
+  unitSelect.innerHTML = '<p class="text-gray-400 text-center py-8">読み込み中...</p>'
   startButton.disabled = true
+  startButton.classList.add('hidden')
 
   // 3つすべて選択されている場合のみ単元を読み込み
   if (grade && subject && textbook) {
+    unitArea.style.display = ''
     try {
       const response = await axios.get('/api/curriculum')
       const curricula = response.data.filter(c => 
@@ -2627,15 +2630,14 @@ async function updateUnitList() {
       if (curricula.length > 0) {
         // カード形式で表示
         unitSelect.innerHTML = ''
-        unitSelect.className = 'space-y-2'
         
         curricula.forEach(item => {
           const card = document.createElement('div')
-          card.className = 'bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-400 transition cursor-pointer flex items-center justify-between group'
+          card.className = 'bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-400 hover:shadow-md transition cursor-pointer flex items-center justify-between group'
           card.innerHTML = `
             <div class="flex-1" onclick="selectUnit(${item.id})">
-              <p class="font-bold text-gray-800">${item.unit_order}. ${item.unit_name}</p>
-              <p class="text-sm text-gray-500">${item.grade}年 ${item.subject} - ${item.textbook_company}</p>
+              <p class="font-bold text-gray-800 group-hover:text-purple-700 transition"><i class="fas fa-book-open mr-2 text-purple-400"></i>${item.unit_order}. ${item.unit_name}</p>
+              <p class="text-sm text-gray-500 ml-7">${item.grade}年 ${item.subject} - ${item.textbook_company}</p>
             </div>
             <div class="flex gap-2">
               <button 
@@ -2657,19 +2659,15 @@ async function updateUnitList() {
         
         startButton.disabled = false
       } else {
-        unitSelect.innerHTML = '<option value="">該当する単元がありません</option>'
+        unitSelect.innerHTML = '<p class="text-gray-400 text-center py-8"><i class="fas fa-info-circle mr-2"></i>該当する単元がありません。「AIで新規作成」ボタンから作成できます。</p>'
         startButton.disabled = true
       }
     } catch (error) {
       console.error('単元リスト読み込みエラー:', error)
+      unitSelect.innerHTML = '<p class="text-red-400 text-center py-8"><i class="fas fa-exclamation-triangle mr-2"></i>読み込みエラー</p>'
     }
-  }
-
-  // selectモードの場合のみイベントリスナー追加
-  if (unitSelect.tagName === 'SELECT') {
-    unitSelect.addEventListener('change', () => {
-      startButton.disabled = !unitSelect.value
-    })
+  } else {
+    unitArea.style.display = 'none'
   }
 }
 
