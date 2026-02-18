@@ -3108,133 +3108,87 @@ async function loadGuidePage(curriculumId) {
     
     // 導入問題の自動追補チェック（バックグラウンドで実行、ページ表示をブロックしない）
     const missingIntroProblems = courses.filter(c => !c.introduction_problem)
-    if (missingIntroProblems.length > 0) {
-      console.warn(`⚠️ 導入問題が${missingIntroProblems.length}件欠落しています。バックグラウンドで自動生成を開始します...`)
+    const needsAssessment = !commonCheckTest || !commonCheckTest.sample_problems || commonCheckTest.sample_problems.length === 0 || optionalProblems.length === 0
+    const needsCourseProblems = courseSelectionProblems.length === 0
+    const hasAnyMissing = missingIntroProblems.length > 0 || needsAssessment || needsCourseProblems
+    
+    if (hasAnyMissing) {
+      const missingItems = []
+      if (missingIntroProblems.length > 0) missingItems.push(`導入問題(${missingIntroProblems.length}件)`)
+      if (needsAssessment) missingItems.push('チェックテスト・選択問題')
+      if (needsCourseProblems) missingItems.push('コース選択問題')
+      console.warn('⚠️ 欠落データあり:', missingItems.join(', '))
       
-      // バックグラウンドで導入問題を生成（awaitしない）
+      // 統合通知を表示
       ;(async () => {
-        // ユーザーに通知
         const notificationDiv = document.createElement('div')
         notificationDiv.className = 'fixed top-4 right-4 bg-yellow-100 border-2 border-yellow-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
         notificationDiv.innerHTML = `
           <div class="flex items-start gap-3">
             <i class="fas fa-spinner fa-spin text-yellow-600 text-2xl"></i>
             <div>
-              <p class="font-bold text-yellow-800">導入問題を生成中...</p>
-              <p class="text-sm text-yellow-700 mt-1">AIが${missingIntroProblems.length}件の導入問題を作成しています（ページはそのまま使えます）</p>
+              <p class="font-bold text-yellow-800">問題を自動生成中...</p>
+              <p class="text-sm text-yellow-700 mt-1">AIが${missingItems.join('・')}を作成中（ページはそのまま使えます）</p>
             </div>
           </div>
         `
         document.body.appendChild(notificationDiv)
         
         try {
-          console.log(`🔄 導入問題自動生成開始: curriculum_id=${curriculumId}`)
-          const introResponse = await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
-          console.log('✅ 導入問題の自動追補完了:', introResponse.data)
-          
-          // 成功通知を更新
-          notificationDiv.className = 'fixed top-4 right-4 bg-green-100 border-2 border-green-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
-          notificationDiv.innerHTML = `
-            <div class="flex items-start gap-3">
-              <i class="fas fa-check-circle text-green-600 text-2xl"></i>
-              <div>
-                <p class="font-bold text-green-800">導入問題生成完了！</p>
-                <p class="text-sm text-green-700 mt-1">ページを再読み込みすると反映されます</p>
-              </div>
-            </div>
-          `
-          setTimeout(() => notificationDiv.remove(), 5000)
-        } catch (autoGenError) {
-          console.error('❌ 導入問題の自動生成に失敗:', autoGenError)
-          notificationDiv.className = 'fixed top-4 right-4 bg-red-100 border-2 border-red-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
-          notificationDiv.innerHTML = `
-            <div class="flex items-start gap-3">
-              <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
-              <div>
-                <p class="font-bold text-red-800">導入問題生成エラー</p>
-                <p class="text-sm text-red-700 mt-1">後で再試行してください</p>
-              </div>
-              <button onclick="this.parentElement.parentElement.remove()" class="text-red-600 hover:text-red-800">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-          `
-        }
-      })()
-    }
-    
-    // チェックテスト・選択問題が欠落している場合のバックグラウンド自動生成
-    const needsAssessment = !commonCheckTest || !commonCheckTest.sample_problems || commonCheckTest.sample_problems.length === 0 || optionalProblems.length === 0
-    const needsCourseProblems = courseSelectionProblems.length === 0
-    
-    if (needsAssessment || needsCourseProblems) {
-      console.warn('⚠️ チェックテスト/選択問題/コース問題が欠落。バックグラウンドで自動生成を開始...')
-      ;(async () => {
-        const genNotif = document.createElement('div')
-        genNotif.id = 'auto-gen-notification'
-        genNotif.className = 'fixed top-4 left-4 bg-blue-100 border-2 border-blue-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
-        const missingItems = []
-        if (needsAssessment) missingItems.push('チェックテスト・選択問題')
-        if (needsCourseProblems) missingItems.push('コース選択問題')
-        genNotif.innerHTML = `
-          <div class="flex items-start gap-3">
-            <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
-            <div>
-              <p class="font-bold text-blue-800">問題を自動生成中...</p>
-              <p class="text-sm text-blue-700 mt-1">${missingItems.join('・')}をAIが作成しています</p>
-            </div>
-          </div>
-        `
-        document.body.appendChild(genNotif)
-        
-        try {
           const tasks = []
+          if (missingIntroProblems.length > 0) {
+            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`)
+              .then(r => { console.log('✅ 導入問題 自動生成完了:', r.data); return 'intro' })
+              .catch(e => { console.error('❌ 導入問題自動生成失敗:', e.message); return null }))
+          }
           if (needsAssessment) {
-            tasks.push(
-              axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`)
-                .then(r => { console.log('✅ チェックテスト・選択問題 自動生成完了:', r.data); return r })
-                .catch(e => { console.error('❌ チェックテスト自動生成失敗:', e.message); throw e })
-            )
+            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`)
+              .then(r => { console.log('✅ チェックテスト・選択問題 自動生成完了:', r.data); return 'assessment' })
+              .catch(e => { console.error('❌ チェックテスト自動生成失敗:', e.message); return null }))
           }
           if (needsCourseProblems) {
-            tasks.push(
-              axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`)
-                .then(r => { console.log('✅ コース選択問題 自動生成完了:', r.data); return r })
-                .catch(e => { console.error('❌ コース選択問題自動生成失敗:', e.message); throw e })
-            )
+            tasks.push(axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`)
+              .then(r => { console.log('✅ コース選択問題 自動生成完了:', r.data); return 'course' })
+              .catch(e => { console.error('❌ コース選択問題自動生成失敗:', e.message); return null }))
           }
-          await Promise.allSettled(tasks)
           
-          genNotif.className = 'fixed top-4 left-4 bg-green-100 border-2 border-green-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
-          genNotif.innerHTML = `
-            <div class="flex items-start gap-3">
-              <i class="fas fa-check-circle text-green-600 text-2xl"></i>
-              <div>
-                <p class="font-bold text-green-800">問題生成完了！</p>
-                <p class="text-sm text-green-700 mt-1">ページを再読み込みすると表示されます</p>
-                <button onclick="loadGuidePage(${curriculumId})" class="mt-2 bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm font-bold transition">
-                  <i class="fas fa-sync-alt mr-1"></i>再読み込み
-                </button>
+          const results = await Promise.allSettled(tasks)
+          const succeeded = results.filter(r => r.status === 'fulfilled' && r.value).length
+          
+          if (succeeded > 0) {
+            notificationDiv.className = 'fixed top-4 right-4 bg-green-100 border-2 border-green-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
+            notificationDiv.innerHTML = `
+              <div class="flex items-start gap-3">
+                <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+                <div>
+                  <p class="font-bold text-green-800">問題生成完了！自動的に更新します...</p>
+                </div>
               </div>
-            </div>
-          `
-          setTimeout(() => genNotif.remove(), 15000)
-        } catch (genErr) {
-          console.error('❌ 自動生成エラー:', genErr)
-          genNotif.className = 'fixed top-4 left-4 bg-red-100 border-2 border-red-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
-          genNotif.innerHTML = `
-            <div class="flex items-start gap-3">
-              <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
-              <div>
-                <p class="font-bold text-red-800">自動生成に失敗しました</p>
-                <p class="text-sm text-red-700 mt-1">ページを再読み込みして再試行してください</p>
-                <button onclick="loadGuidePage(${curriculumId})" class="mt-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-bold transition">
-                  <i class="fas fa-sync-alt mr-1"></i>再読み込み
-                </button>
+            `
+            // 自動的にページを再読み込み
+            setTimeout(() => {
+              notificationDiv.remove()
+              loadGuidePage(curriculumId)
+            }, 1500)
+          } else {
+            notificationDiv.className = 'fixed top-4 right-4 bg-red-100 border-2 border-red-500 rounded-lg p-4 shadow-lg z-50 max-w-md'
+            notificationDiv.innerHTML = `
+              <div class="flex items-start gap-3">
+                <i class="fas fa-exclamation-triangle text-red-600 text-2xl"></i>
+                <div>
+                  <p class="font-bold text-red-800">生成に失敗しました</p>
+                  <p class="text-sm text-red-700 mt-1">ページを再読み込みして再試行してください</p>
+                  <button onclick="loadGuidePage(${curriculumId})" class="mt-2 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm font-bold transition">
+                    <i class="fas fa-sync-alt mr-1"></i>再読み込み
+                  </button>
+                </div>
               </div>
-            </div>
-          `
-          setTimeout(() => genNotif.remove(), 10000)
+            `
+            setTimeout(() => notificationDiv.remove(), 10000)
+          }
+        } catch (err) {
+          console.error('❌ 自動生成エラー:', err)
+          notificationDiv.remove()
         }
       })()
     }

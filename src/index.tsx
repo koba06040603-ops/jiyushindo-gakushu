@@ -1127,7 +1127,7 @@ app.get('/health', async (c) => {
 // 一時的DBスキーマ確認エンドポイント
 app.get('/api/debug/schema', async (c) => {
   const { env } = c
-  const tables = ['curriculum', 'courses', 'learning_cards', 'hint_cards', 'optional_problems']
+  const tables = ['curriculum', 'courses', 'learning_cards', 'hint_cards', 'optional_problems', 'curriculum_metadata', 'retrieval_practice_content']
   const result: any = {}
   for (const table of tables) {
     try {
@@ -1138,6 +1138,60 @@ app.get('/api/debug/schema', async (c) => {
     }
   }
   return c.json(result)
+})
+
+// 重複カリキュラムデータの削除
+app.post('/api/debug/cleanup-duplicates', async (c) => {
+  const { env } = c
+  try {
+    // 重複するunit_nameを持つカリキュラムを特定（同じgrade, subject, textbook_company, unit_name）
+    const duplicates = await env.DB.prepare(`
+      SELECT grade, subject, textbook_company, unit_name, COUNT(*) as cnt, MIN(id) as keep_id, GROUP_CONCAT(id) as all_ids
+      FROM curriculum
+      GROUP BY grade, subject, textbook_company, unit_name
+      HAVING COUNT(*) > 1
+    `).all()
+    
+    const results: any[] = []
+    for (const dup of (duplicates.results || []) as any[]) {
+      const allIds = String(dup.all_ids).split(',').map(Number)
+      const keepId = dup.keep_id
+      const deleteIds = allIds.filter((id: number) => id !== keepId)
+      
+      if (deleteIds.length > 0) {
+        // 削除対象のカリキュラムに紐づくコース、カード、ヒントも削除
+        for (const delId of deleteIds) {
+          const courses = await env.DB.prepare(`SELECT id FROM courses WHERE curriculum_id = ?`).bind(delId).all()
+          for (const course of (courses.results || []) as any[]) {
+            const cards = await env.DB.prepare(`SELECT card_id FROM learning_cards WHERE course_id = ?`).bind(course.id).all()
+            for (const card of (cards.results || []) as any[]) {
+              await env.DB.prepare(`DELETE FROM hint_cards WHERE learning_card_id = ?`).bind(card.card_id).run()
+            }
+            await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
+          }
+          await env.DB.prepare(`DELETE FROM courses WHERE curriculum_id = ?`).bind(delId).run()
+          await env.DB.prepare(`DELETE FROM optional_problems WHERE curriculum_id = ?`).bind(delId).run()
+          await env.DB.prepare(`DELETE FROM curriculum_metadata WHERE curriculum_id = ?`).bind(delId).run()
+          await env.DB.prepare(`DELETE FROM curriculum WHERE id = ?`).bind(delId).run()
+        }
+        results.push({
+          unit_name: dup.unit_name,
+          grade: dup.grade,
+          kept_id: keepId,
+          deleted_ids: deleteIds,
+          deleted_count: deleteIds.length
+        })
+      }
+    }
+    
+    return c.json({ 
+      success: true, 
+      cleaned: results.length,
+      details: results
+    })
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500)
+  }
 })
 
 // 詳細なシステムステータス（認証必須・管理者のみ）
@@ -2751,8 +2805,9 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
   try {
     // データベースが存在し、接続可能な場合のみクエリを実行
     if (env.DB) {
+      // unit_nameの重複を排除し、各単元の最小IDを使用
       let query = `
-        SELECT DISTINCT unit_name, id, grade, subject, textbook_company
+        SELECT unit_name, MIN(id) as id, grade, subject, textbook_company
         FROM curriculum
         WHERE 1=1
       `
@@ -2773,7 +2828,7 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
         params.push(textbook)
       }
       
-      query += ` ORDER BY id ASC`
+      query += ` GROUP BY unit_name ORDER BY MIN(id) ASC`
       
       const stmt = env.DB.prepare(query)
       const result = await stmt.bind(...params).all()
@@ -2781,8 +2836,8 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
       // データベースの結果を確認
       const dbUnits = result.results || []
       
-      // データベースに30件以上ある場合はそのまま返す
-      if (dbUnits.length >= 30) {
+      // データベースにデータがある場合はそのまま返す（30件制限を撤廃）
+      if (dbUnits.length > 0) {
         return c.json({
           success: true,
           units: dbUnits,
@@ -2791,19 +2846,19 @@ app.get('/api/curriculum/unit-suggestions', async (c) => {
         })
       }
       
-      // 30件未満の場合は、ダミーデータで補完
-      console.log(`⚠️  Database has only ${dbUnits.length} units, filling with dummy data to reach 30`)
+      // データが0件の場合のみダミーデータで補完
+      console.log(`⚠️  Database has 0 units, returning dummy data`)
       
       // 教科書会社別の単元テンプレート
-      const dummyUnits = generateDummyUnitsForTextbook(grade, subject, textbook, 30 - dbUnits.length)
+      const dummyUnits = generateDummyUnitsForTextbook(grade, subject, textbook, 30)
       
       return c.json({
         success: true,
-        units: [...dbUnits, ...dummyUnits],
-        fromDatabase: dbUnits.length > 0,
-        source: dbUnits.length > 0 ? 'database_with_dummy' : 'dummy_only',
-        databaseCount: dbUnits.length,
-        dummyCount: dummyUnits.length
+        units: dummyUnits,
+        fromDatabase: false,
+        source: 'dummy_only',
+        databaseCount: 0,
+        dummyCount: 30
       })
     }
     
@@ -2850,12 +2905,12 @@ app.get('/api/curriculum/units', async (c) => {
     }
     
     let query = `
-      SELECT DISTINCT 
-        id, 
+      SELECT 
+        unit_name,
+        MIN(id) as id, 
         grade, 
         subject, 
-        textbook_company, 
-        unit_name
+        textbook_company
       FROM curriculum
       WHERE 1=1
     `
@@ -2876,7 +2931,7 @@ app.get('/api/curriculum/units', async (c) => {
       params.push(textbook_company)
     }
     
-    query += ` ORDER BY id ASC`
+    query += ` GROUP BY unit_name ORDER BY MIN(id) ASC`
     
     const stmt = env.DB.prepare(query)
     const result = await stmt.bind(...params).all()
