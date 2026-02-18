@@ -8889,26 +8889,68 @@ app.post('/api/curriculum/save-generated', async (c) => {
   
   try {
     // ============================================================
-    // カリキュラムを保存
-    // 実スキーマ: id, grade, subject, textbook_company, unit_name,
-    //             created_at, total_hours, unit_goal, non_cognitive_goal
+    // 重複チェック：同じ学年・教科・教科書・単元名が既に存在する場合は既存IDを使う
     // ============================================================
-    const curriculumResult = await env.DB.prepare(`
-      INSERT INTO curriculum (
-        grade, subject, textbook_company, unit_name, 
-        total_hours, unit_goal, non_cognitive_goal
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    const existingCurriculum = await env.DB.prepare(`
+      SELECT id FROM curriculum 
+      WHERE grade = ? AND subject = ? AND textbook_company = ? AND unit_name = ?
+      LIMIT 1
     `).bind(
       curriculum.grade,
       curriculum.subject,
       curriculum.textbook_company || '',
-      curriculum.unit_name,
-      curriculum.total_hours || 8,
-      curriculum.unit_goal || '',
-      curriculum.non_cognitive_goal || ''
-    ).run()
+      curriculum.unit_name
+    ).first() as any
     
-    const curriculumId = curriculumResult.meta.last_row_id
+    let curriculumId: number
+    
+    if (existingCurriculum) {
+      curriculumId = existingCurriculum.id
+      console.log(`📦 既存カリキュラムを再利用: id=${curriculumId}`)
+      
+      // 既存のコース・カード・ヒントを削除して再生成
+      const existingCourses = await env.DB.prepare(`SELECT id FROM courses WHERE curriculum_id = ?`).bind(curriculumId).all()
+      for (const course of (existingCourses.results || []) as any[]) {
+        const existingCards = await env.DB.prepare(`SELECT card_id FROM learning_cards WHERE course_id = ?`).bind(course.id).all()
+        for (const card of (existingCards.results || []) as any[]) {
+          await env.DB.prepare(`DELETE FROM hint_cards WHERE learning_card_id = ?`).bind(card.card_id).run()
+        }
+        await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
+      }
+      await env.DB.prepare(`DELETE FROM courses WHERE curriculum_id = ?`).bind(curriculumId).run()
+      await env.DB.prepare(`DELETE FROM optional_problems WHERE curriculum_id = ?`).bind(curriculumId).run()
+      await env.DB.prepare(`DELETE FROM curriculum_metadata WHERE curriculum_id = ?`).bind(curriculumId).run()
+      
+      // メタデータ更新
+      await env.DB.prepare(`
+        UPDATE curriculum SET total_hours = ?, unit_goal = ?, non_cognitive_goal = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(
+        curriculum.total_hours || 8,
+        curriculum.unit_goal || '',
+        curriculum.non_cognitive_goal || '',
+        curriculumId
+      ).run()
+    } else {
+      // 新規作成
+      const curriculumResult = await env.DB.prepare(`
+        INSERT INTO curriculum (
+          grade, subject, textbook_company, unit_name, 
+          total_hours, unit_goal, non_cognitive_goal
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        curriculum.grade,
+        curriculum.subject,
+        curriculum.textbook_company || '',
+        curriculum.unit_name,
+        curriculum.total_hours || 8,
+        curriculum.unit_goal || '',
+        curriculum.non_cognitive_goal || ''
+      ).run()
+      
+      curriculumId = curriculumResult.meta.last_row_id as number
+      console.log(`📦 新規カリキュラム作成: id=${curriculumId}`)
+    }
     
     // ============================================================
     // コースを保存
