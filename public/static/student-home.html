@@ -3353,13 +3353,35 @@ async function loadAdaptiveRecommendation() {
         const res = await axios.get(`/api/student-learning/adaptive-next?student_id=${STATE.studentId}&curriculum_id=${STATE.curriculumId}`)
         if (res.data.success && res.data.recommendation) {
             const rec = res.data.recommendation
+            const v4 = rec.v4 || {}
             const el = document.getElementById('adaptiveRecommendation')
             if (el) {
+                // v4拡張: アーキタイプ、チャネル、テンプレート情報を表示
+                const archBadge = v4.archetype ? `<span class="inline-block px-1.5 py-0.5 text-[9px] rounded-full bg-purple-100 text-purple-700 mr-1"><i class="fas fa-user-circle mr-0.5"></i>${v4.archetype.name_ja || v4.archetype.id}</span>` : ''
+                const channelIcon = { visual: 'fa-eye', auditory: 'fa-headphones', kinesthetic: 'fa-hand-paper', reading: 'fa-book' }
+                const channelNames = { visual: '見て学ぶ', auditory: '聞いて学ぶ', kinesthetic: '動いて学ぶ', reading: '読んで学ぶ' }
+                const chIcon = v4.entry_channel ? (channelIcon[v4.entry_channel] || 'fa-lightbulb') : ''
+                const chName = v4.entry_channel ? (channelNames[v4.entry_channel] || '') : ''
+                const channelBadge = chName ? `<span class="inline-block px-1.5 py-0.5 text-[9px] rounded-full bg-green-100 text-green-700 mr-1"><i class="fas ${chIcon} mr-0.5"></i>${chName}</span>` : ''
+                
+                // 教師アラート表示
+                const alertHtml = v4.teacher_alert ? `<div class="mt-1 p-1 bg-red-50 rounded border border-red-200"><p class="text-[9px] text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>先生に相談してみよう</p></div>` : ''
+                
+                // ZPDバー（0-100%）
+                const zpdPct = v4.zpd_position || 50
+                const zpdColor = zpdPct <= 30 ? 'bg-green-400' : zpdPct <= 60 ? 'bg-blue-400' : zpdPct <= 80 ? 'bg-yellow-400' : 'bg-red-400'
+                const zpdBar = `<div class="mt-1"><p class="text-[9px] text-gray-500">チャレンジレベル</p><div class="w-full bg-gray-200 rounded-full h-1.5"><div class="${zpdColor} h-1.5 rounded-full transition-all" style="width:${zpdPct}%"></div></div></div>`
+
                 el.innerHTML = `
-                    <div class="bg-blue-50 rounded-lg p-2 border border-blue-200 mt-2">
-                        <p class="text-[10px] font-bold text-blue-700"><i class="fas fa-robot mr-1"></i>AIからのおすすめ</p>
-                        <p class="text-[10px] text-blue-600">${rec.message || ''}</p>
-                        ${rec.suggested_difficulty ? `<span class="inline-block mt-1 px-2 py-0.5 text-[9px] rounded-full bg-blue-100 text-blue-700">つぎの難しさ: ${rec.suggested_difficulty}</span>` : ''}
+                    <div class="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-2.5 border border-blue-200 mt-2 shadow-sm">
+                        <p class="text-[10px] font-bold text-blue-700 mb-1"><i class="fas fa-magic mr-1"></i>v4 AIからのアドバイス</p>
+                        <p class="text-[10px] text-blue-600 leading-relaxed">${rec.message || ''}</p>
+                        <div class="flex flex-wrap gap-1 mt-1.5">
+                            ${archBadge}${channelBadge}
+                            ${rec.suggested_difficulty ? `<span class="inline-block px-1.5 py-0.5 text-[9px] rounded-full bg-blue-100 text-blue-700">つぎ: ${rec.suggested_difficulty === 'easy' ? 'かんたん' : rec.suggested_difficulty === 'hard' ? 'チャレンジ' : 'ふつう'}</span>` : ''}
+                        </div>
+                        ${zpdBar}
+                        ${alertHtml}
                     </div>
                 `
                 el.classList.remove('hidden')

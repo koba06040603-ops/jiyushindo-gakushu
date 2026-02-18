@@ -2,7 +2,72 @@
 
 > 📘 **一般向けの簡易版READMEは [README_SIMPLE.md](./README_SIMPLE.md) をご覧ください**
 
-## 🎴 Phase F: v4統合制御 × 個別最適カード生成 **NEW** (2026-02-18)
+## 🚀 Phase G: v4統合制御の全面適用 — 教師API + 生徒UI統合 **NEW** (2026-02-18)
+
+### 実装完了: 既存エンドポイントの v4 エンジン完全統合
+
+**概要**: Phase F で実装した v4 統合制御エンジン（12理論×8アーキタイプ×リアルタイム適応）を、
+既存の教師向けコース生成APIと生徒向けフロントエンドに全面適用。
+従来の「正答率ベースの難易度推薦」から「12理論統合因果モデルによる個別最適制御」へ完全移行。
+
+### G-1: `generate-personalized-course` のv4統合
+
+**変更前**: 初期診断VARKスタイル + 正答率 + 7つのルールベースでGeminiへ指示
+**変更後**: D1 7テーブル → 12理論プロファイル → v4制御パラメータ → カードテンプレート → Geminiへ精密指示
+
+| 項目 | 変更前 | 変更後 |
+|------|--------|--------|
+| 学習者分析 | VARK+正答率 | 12理論プロファイル（F1-F12） |
+| プロンプト生成 | 7観点のルール | v4 IntegratedControlParameters 全フィールド |
+| カード構成 | 「4-8枚」固定指示 | F-4テンプレート分岐（メディア×形式×足場） |
+| アーキタイプ | なし | A-H 8タイプ判定、教師に表示 |
+| レスポンス | `student_analysis` のみ | `v4_analysis` 追加（archetype, axes, template, affect_state） |
+| metaデータ | なし | `engine_version: v4.0`, `theories_applied: 12`, `v4_integrated: true` |
+| Geminiモデル | gemini-3-flash-preview | gemini-2.0-flash（高速・高品質） |
+
+### G-2: `adaptive-next` のv4統合
+
+**変更前**: GET `/api/student-learning/adaptive-next` — 正答率ベースの3段階推薦
+**変更後**: 同じパスで、v4統合制御エンジンによるフル分析を返却
+
+レスポンス拡張フィールド (`recommendation.v4`):
+- `archetype`: アーキタイプID + 日本語名
+- `entry_channel`: 最適感覚チャネル（visual/auditory/kinesthetic/reading）
+- `zpd_position`: ZPD内位置 (0-100%)
+- `structure_level`: 構造レベル (0-100%)
+- `retrieval_mode`: 検索練習モード
+- `template_type`: 推奨メディアタイプ
+- `question_format`: 推奨問題形式
+- `frustration_control`: フラストレーション制御ON/OFF
+- `teacher_alert`: 教師介入推奨フラグ
+
+### G-2b: `student-home.html` のv4対応UI
+
+- **アーキタイプバッジ**: 紫色バッジで児童のタイプを表示
+- **学習チャネルバッジ**: 緑色バッジで推奨チャネル表示（見て学ぶ/聞いて学ぶ/等）
+- **ZPDプログレスバー**: チャレンジレベルを視覚化（緑→青→黄→赤）
+- **教師アラート表示**: 危機的状態の場合に赤色パネル表示
+- **グラデーション背景**: v4対応を視覚的に区別
+
+### テスト結果（全11ケース）
+
+| # | テスト | 結果 | 詳細 |
+|---|-------|------|------|
+| 1 | GET /api/v4/archetypes | ✅ | 8アーキタイプ |
+| 2 | GET adaptive-next (v4統合) | ✅ | archetype=受動的依存者, channel=visual, zpd=30% |
+| 3 | POST batch-test (24ケース) | ✅ | 15ms |
+| 4 | POST card/profile | ✅ | archetype=受動的依存者, axes={ca:51.25, es:50, sm:48.5, me:38} |
+| 5 | POST v4/compute | ✅ | archetype=直感的冒険者, 5ms |
+| 6 | POST v4/diagnose (危機的) | ✅ | 2リスク, 2介入 |
+| 7 | POST v4/analyze | ✅ | 12エンジン |
+| 8 | GET v4/schema | ✅ | 5エンドポイント |
+| 9 | POST adaptive-next (POST版) | ✅ | template=illustrated_fill_blank_G |
+| 10 | static student-home.html | ✅ | 308 (redirect) |
+| 11 | POST generate-personalized-course (v4統合) | ✅ | v4_analysis付き, theories=12, 11.7s |
+
+---
+
+## 🎴 Phase F: v4統合制御 × 個別最適カード生成 (2026-02-18)
 
 ### 実装完了: D1データ → 12理論プロファイル → v4制御 → AIカード生成 → リアルタイム適応
 

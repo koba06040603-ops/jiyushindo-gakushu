@@ -58,7 +58,8 @@ import {
   compareClasses
 } from './teacher-dashboard'
 import { v4Api } from './v4-api'
-import { v4CardApi } from './v4-card-integration'
+import { v4CardApi, fetchStudentRawData, buildProfilesFromD1, buildBehaviorFromD1, computeAdaptiveNext, buildV4PromptSection, determineCardTemplate } from './v4-card-integration'
+import { computeIntegratedControls, computeFundamentalAxes, understandCurrentPresence, ARCHETYPES } from './lib/v4-engine'
 
 type Bindings = {
   DB: D1Database
@@ -28630,10 +28631,13 @@ app.get('/api/teacher/student-insight/:studentId', async (c) => {
 })
 
 // ============================================================
-// AI個別最適化コース生成（教師が児童データを見て生成→チェック→配信）
+// AI個別最適化コース生成（v4統合制御エンジン × Gemini統合版）
+// 教師が児童データを見て生成→チェック→配信
+// Phase G: v4エンジンによる12理論統合プロファイル分析 + Geminiカード生成
 // ============================================================
 app.post('/api/teacher/generate-personalized-course', async (c) => {
   const { env } = c
+  const startTime = Date.now()
   try {
     const { student_id, curriculum_id } = await c.req.json()
     const apiKey = env.GEMINI_API_KEY
@@ -28646,7 +28650,7 @@ app.post('/api/teacher/generate-personalized-course', async (c) => {
     const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculum_id).first() as any
     if (!curriculum) return c.json({ success: false, error: 'カリキュラムが見つかりません' }, 404)
 
-    // 2. 既存3コースのカード情報を取得（ベースライン）
+    // 2. 既存コースのカード情報を取得（ベースライン）
     const baseCourses = await env.DB.prepare(`
       SELECT c.*, 
         (SELECT COUNT(*) FROM learning_cards lc WHERE lc.course_id = c.id) as card_count
@@ -28663,126 +28667,63 @@ app.post('/api/teacher/generate-personalized-course', async (c) => {
       })))
     }
 
-    // 3. 児童の学習データを収集
-    const answerHistory = await env.DB.prepare(`
-      SELECT a.card_id, a.is_correct, a.time_spent_seconds, lc.card_title, lc.difficulty_level
-      FROM answers a
-      JOIN learning_cards lc ON a.card_id = lc.card_id
-      WHERE a.student_id = ? AND lc.unit_name = ?
-      ORDER BY a.answered_at DESC LIMIT 100
-    `).bind(student_id, curriculum.unit_name).all()
+    // 3. ★ v4統合: F-1 D1データから12理論プロファイルを構築
+    const rawData = await fetchStudentRawData(env.DB, parseInt(String(student_id)), curriculum_id ? parseInt(String(curriculum_id)) : undefined)
+    const profiles = buildProfilesFromD1(rawData)
 
-    const reflections = await env.DB.prepare(`
-      SELECT * FROM unit_reflections WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
-    `).bind(student_id).all()
+    // 4. ★ v4統合: F-2 行動データ構築
+    const behavior = await buildBehaviorFromD1(env.DB, parseInt(String(student_id)), curriculum_id ? parseInt(String(curriculum_id)) : undefined)
 
-    const studyPlanRows = await env.DB.prepare(`
-      SELECT spr.* FROM study_plan_rows spr
-      JOIN unit_study_plans usp ON spr.plan_id = usp.id
-      WHERE usp.student_id = ? AND usp.unit_name = ?
-      ORDER BY spr.hour_number
-    `).bind(student_id, curriculum.unit_name).all()
+    // 5. ★ v4エンジン実行: 12理論統合制御パラメータ算出
+    const v4Result = computeIntegratedControls(profiles, behavior)
+    const arch = ARCHETYPES[v4Result.archetype]
 
-    // 4. 学習特性を分析
-    const answers = (answerHistory.results || []) as any[]
-    const correctRate = answers.length > 0 ? Math.round(answers.filter(a => a.is_correct).length / answers.length * 100) : 0
-    const avgTime = answers.length > 0 ? Math.round(answers.reduce((s: number, a: any) => s + (a.time_spent_seconds || 0), 0) / answers.length) : 0
-    const hardCorrectRate = answers.filter(a => a.difficulty_level === 'hard').length > 0
-      ? Math.round(answers.filter(a => a.difficulty_level === 'hard' && a.is_correct).length / answers.filter(a => a.difficulty_level === 'hard').length * 100) : -1
-    const easyCorrectRate = answers.filter(a => a.difficulty_level === 'easy').length > 0
-      ? Math.round(answers.filter(a => a.difficulty_level === 'easy' && a.is_correct).length / answers.filter(a => a.difficulty_level === 'easy').length * 100) : -1
+    // 6. ★ v4統合: F-4 カードテンプレート決定
+    const template = determineCardTemplate(v4Result.controls, v4Result.archetype)
 
-    const refl = (reflections.results || []) as any[]
-    const planRows = (studyPlanRows.results || []) as any[]
+    // 7. ★ v4統合: F-3 Geminiプロンプトセクション生成
+    const v4PromptSection = buildV4PromptSection(v4Result.controls, v4Result.archetype, v4Result.axes)
 
-    // 4b. テスト対策プランからの学習データを収集（有機的連携）
+    // 8. 従来のテスト対策データ収集（後方互換）
     let testPrepData = { plans: 0, totalMinutes: 0, weakTopics: [] as string[], lowConfidenceTopics: [] as any[], feedbackSummary: '' }
     try {
-      // テスト対策プラン履歴
       const testPlans = await env.DB.prepare(`
-        SELECT id, title, subject, total_study_minutes, status, ai_schedule
+        SELECT id, title, subject, total_study_minutes, status
         FROM test_preparation_plans WHERE student_id = ? ORDER BY created_at DESC LIMIT 5
       `).bind(student_id).all()
       const tPlans = (testPlans.results || []) as any[]
       testPrepData.plans = tPlans.length
       testPrepData.totalMinutes = tPlans.reduce((s: number, p: any) => s + (p.total_study_minutes || 0), 0)
-
-      // テスト対策内の自信度が低い項目（弱点）
       if (tPlans.length > 0) {
         const planIds = tPlans.map((p: any) => p.id).join(',')
         try {
           const lowConf = await env.DB.prepare(`
-            SELECT topic, AVG(confidence_after) as avg_conf, COUNT(*) as attempts,
-                   SUM(CASE WHEN confidence_after < 3 THEN 1 ELSE 0 END) as low_count
+            SELECT topic, AVG(confidence_after) as avg_conf, COUNT(*) as attempts
             FROM test_study_logs WHERE plan_id IN (${planIds}) AND confidence_after IS NOT NULL
             GROUP BY topic ORDER BY avg_conf ASC LIMIT 10
           `).all()
           testPrepData.lowConfidenceTopics = ((lowConf.results || []) as any[]).map((r: any) => ({
             topic: r.topic, avg_confidence: Math.round((r.avg_conf || 0) * 10) / 10, attempts: r.attempts
           }))
-          testPrepData.weakTopics = testPrepData.lowConfidenceTopics
-            .filter((t: any) => t.avg_confidence < 3)
-            .map((t: any) => t.topic)
+          testPrepData.weakTopics = testPrepData.lowConfidenceTopics.filter((t: any) => t.avg_confidence < 3).map((t: any) => t.topic)
         } catch {}
-
-        // テスト対策の振り返りフィードバック
         try {
           const feedbacks = await env.DB.prepare(`
-            SELECT weakness_areas, strength_areas, reflection, score FROM test_performance_feedback 
+            SELECT weakness_areas, reflection, score FROM test_performance_feedback 
             WHERE student_id = ? ORDER BY created_at DESC LIMIT 3
           `).bind(student_id).all()
           const fbData = (feedbacks.results || []) as any[]
           if (fbData.length > 0) {
-            testPrepData.feedbackSummary = fbData.map((f: any) => 
-              f.reflection || (f.weakness_areas ? `弱点: ${f.weakness_areas}` : '')
-            ).filter(Boolean).join('、')
+            testPrepData.feedbackSummary = fbData.map((f: any) => f.reflection || (f.weakness_areas ? `弱点: ${f.weakness_areas}` : '')).filter(Boolean).join('、')
           }
         } catch {}
       }
     } catch {}
 
-    // 4c. 初期診断データを取得（個別最適化の起点）
-    let diagPromptSection = ''
-    try {
-      const diag = await env.DB.prepare(
-        'SELECT * FROM initial_diagnostics WHERE student_id = ? ORDER BY created_at DESC LIMIT 1'
-      ).bind(student_id).first() as any
-      if (diag) {
-        const styleN: Record<string, string> = { visual: '視覚型', auditory: '聴覚型', kinesthetic: '身体感覚型', read_write: '読み書き型', balanced: 'バランス型' }
-        const paceN: Record<string, string> = { slow: 'じっくり型', steady: '標準型', fast: 'ぐんぐん型' }
-        const errN: Record<string, string> = { retry: '再挑戦型', hint: 'ヒント活用型', friend: '協働学習型', skip: '切替型' }
-        diagPromptSection = `
-【★初期診断プロフィール（VARK学習スタイル＋レディネス）★】
-- 学習スタイル: ${styleN[diag.learning_style_dominant] || diag.learning_style_dominant}
-- チャレンジ意欲: ${diag.resilience}/5
-- 間違い時の対処法: ${errN[diag.error_strategy] || diag.error_strategy}
-- 学習ペース嗜好: ${paceN[diag.preferred_pace] || diag.preferred_pace}
-- 既有知識（レディネス）: ${diag.prior_knowledge}/5
-- 教科好感度: ${diag.subject_affinity}/5
-${diag.ai_profile_summary ? `- AI要約: ${diag.ai_profile_summary}` : ''}
-
-→ この診断結果に基づき、学習スタイルに合った問題形式（${diag.learning_style_dominant === 'visual' ? '図解・色分け重視' : diag.learning_style_dominant === 'auditory' ? '音読向き文章' : diag.learning_style_dominant === 'kinesthetic' ? '操作的活動' : 'テキスト中心'}）で生成してください。`
-      }
-    } catch (diagErr) { console.warn('診断データ取得スキップ:', diagErr) }
-
-    // 4d. student_card_answersからの直近実績
-    let cardAnswerSection = ''
-    try {
-      const ca = await env.DB.prepare(`
-        SELECT is_correct, answer_time_seconds, content_type FROM student_card_answers
-        WHERE student_id = ? AND curriculum_id = ? ORDER BY created_at DESC LIMIT 30
-      `).bind(student_id, curriculum_id).all()
-      const caResults = (ca.results || []) as any[]
-      if (caResults.length > 0) {
-        const caAcc = Math.round(caResults.filter(a => a.is_correct).length / caResults.length * 100)
-        const caAvg = Math.round(caResults.reduce((s, a) => s + (a.answer_time_seconds || 0), 0) / caResults.length)
-        cardAnswerSection = `\n【カード学習の直近実績（student-home経由）】\n- 直近${caResults.length}問: 正答率${caAcc}%, 平均時間${caAvg}秒`
-      }
-    } catch {}
-
-    // 5. AI生成プロンプト
+    // 9. ★ v4統合プロンプト構築（12理論の制御指示を含む）
     const prompt = `
-あなたは児童の学習データを分析し、個別最適化された学習カードを生成する教育AIです。
+あなたは12の教育理論を統合したAI教育システムです。
+v4統合制御エンジンの分析結果に**厳密に従って**、この児童に最適化された学習カードを生成してください。
 
 【カリキュラム情報】
 - 教科: ${curriculum.subject}
@@ -28790,81 +28731,82 @@ ${diag.ai_profile_summary ? `- AI要約: ${diag.ai_profile_summary}` : ''}
 - 学年: ${curriculum.grade}
 - 単元目標: ${curriculum.unit_goal || '未設定'}
 
-【既存コースの学習カード（ベース）】
-${baseCards.slice(0, 10).map((card: any) => `- [${card.course_name}] ${card.card_title}: ${(card.problem_text || '').substring(0, 80)}`).join('\n')}
+【既存コースの学習カード（ベースライン参考）】
+${baseCards.slice(0, 8).map((card: any) => `- [${card.course_name}] ${card.card_title}: ${(card.problem_text || '').substring(0, 60)}`).join('\n')}
 
-【児童ID ${student_id} の単元内学習データ】
-- 解答履歴: ${answers.length}問（正答率${correctRate}%、平均回答時間${avgTime}秒）
-- 易しい問題の正答率: ${easyCorrectRate >= 0 ? easyCorrectRate + '%' : 'データなし'}
-- 難しい問題の正答率: ${hardCorrectRate >= 0 ? hardCorrectRate + '%' : 'データなし'}
-- 振り返り記録: ${refl.length}件
-- 学習計画の進捗: ${planRows.filter((r: any) => r.status === 'completed').length}/${planRows.length}時間完了
-${refl.length > 0 ? `- 直近の振り返り: ${(refl[0] as any).goal_achievement || ''} / ${(refl[0] as any).next_unit_application || ''}` : ''}
-${diagPromptSection}${cardAnswerSection}
+${v4PromptSection}
 
-【テスト対策プランからの学習データ（重要：弱点を把握するための核心情報）】
-- テスト対策プラン数: ${testPrepData.plans}件（総学習時間: ${testPrepData.totalMinutes}分）
-${testPrepData.weakTopics.length > 0 ? `- ⚠️ 自信度の低いトピック: ${testPrepData.weakTopics.join('、')}` : '- テスト対策データなし'}
-${testPrepData.lowConfidenceTopics.length > 0 ? `- トピック別自信度:\n${testPrepData.lowConfidenceTopics.map((t: any) => `  ・${t.topic}: 自信度${t.avg_confidence}/5（${t.attempts}回学習）`).join('\n')}` : ''}
-${testPrepData.feedbackSummary ? `- テスト対策振り返り: ${testPrepData.feedbackSummary}` : ''}
+【カード構造テンプレート（v4 F-4で決定済み）】
+- メディアタイプ: ${template.media_type}
+- 問題形式: ${template.question_format}
+- ヒント段階数: ${template.scaffold_structure.hint_levels}
+- 解法例: ${template.scaffold_structure.show_worked_example ? '完全な解法例あり' : template.scaffold_structure.show_partial_solution ? '部分的な解法例あり' : 'なし（自力解決）'}
+- チェックリスト: ${template.scaffold_structure.provide_checklist ? 'あり' : 'なし'}
+- 振り返り: ${template.reflection_element.type !== 'none' ? template.reflection_element.prompt_text : 'なし'}
+${template.elaboration ? `- 精緻化: ${template.elaboration.prompt_text}` : ''}
+- 推奨カード数: ${template.recommended_card_count}枚
+- 1枚あたり推定時間: ${template.recommended_time_per_card}分
 
-【タスク】
-この児童の特性に合わせて個別最適化された学習カードを生成してください。
-
-重要な観点:
-1. 正答率が低い場合 → 具体操作・図解・動画を多めに配置、スモールステップ化
-2. 正答率が高い場合 → 発展的な応用問題、思考を深める問いを追加
-3. 回答時間が長い場合 → 手順を明確に示す、見本解答を段階的に見せる
-4. 学習計画の進捗が遅い場合 → 短時間で取り組める問題、達成感を得やすい構成
-5. テスト対策で自信度が低いトピックがある場合 → そのトピックを重点的にカバーし、基礎に戻って補強する
-6. テスト対策の振り返りで苦手と申告した分野 → 別のアプローチ（図解・動画・具体物操作）で再学習させる
-7. ★初期診断プロフィールがある場合 → 学習スタイル（VARK）に合った問題形式、レディネスレベルに合った難易度、ペース嗜好に合った分量で生成する
+${testPrepData.weakTopics.length > 0 ? `【テスト対策から判明した弱点（重点的にカバーすること）】\n${testPrepData.weakTopics.map(t => `- ⚠️ ${t}`).join('\n')}\n` : ''}
+${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPrepData.feedbackSummary}\n` : ''}
 
 【出力形式】JSON
 {
-  "analysis_summary": "この児童の学習特性の分析結果（3文）",
+  "analysis_summary": "この児童の学習特性分析（v4 12理論に基づく、3文）",
+  "archetype_insight": "アーキタイプ「${arch.name_ja}」に基づく指導方針（2文）",
   "recommended_approach": "おすすめの学習アプローチ（2文）",
   "cards": [
     {
       "card_title": "カードタイトル",
-      "card_type": "standard",
+      "card_type": "${template.media_type}",
       "difficulty_level": "easy|standard|hard",
-      "problem_text": "問題文（具体的な操作指示や図解の指示を含む）",
+      "question_format": "${template.question_format}",
+      "problem_text": "問題文（小学生が直接読む、わかりやすい文章）",
       "problem_description": "問題の補足説明",
       "correct_answer": "正解",
-      "explanation": "解説（つまずきやすいポイントを含む）",
-      "hint_text": "ヒント",
-      "estimated_time_minutes": 10,
-      "personalization_note": "この児童向けにカスタマイズした理由",
+      "explanation": "解説（つまずきポイントを含む）",
+      "hint_text": "ヒント（段階的）",
+      "hints": ["ヒント1", "ヒント2"],
+      ${template.scaffold_structure.show_worked_example ? '"worked_example": "解法例の全手順",' : ''}
+      ${template.scaffold_structure.provide_checklist ? '"checklist": ["手順1", "手順2", "手順3"],' : ''}
+      "estimated_time_minutes": ${template.recommended_time_per_card},
+      "personalization_note": "v4パラメータに基づくカスタマイズ理由",
       "media_suggestions": {
-        "needs_video": true/false,
-        "video_description": "必要な動画の説明（例: 小数のかけ算の筆算手順のアニメーション）",
-        "needs_diagram": true/false,
-        "diagram_description": "必要な図解の説明（例: 数直線で小数の位置を確認する図）",
-        "needs_manipulatives": true/false,
-        "manipulatives_description": "必要な具体物操作の説明"
-      }
+        "needs_illustration": ${template.media_type === 'illustrated' || template.media_type === 'manipulative'},
+        "illustration_description": "図解の説明",
+        "needs_manipulative": ${template.media_type === 'manipulative'},
+        "manipulative_description": "操作活動の説明"
+      }${template.elaboration ? `,
+      "elaboration_prompt": "${template.elaboration.prompt_text}"` : ''}${template.reflection_element.type !== 'none' ? `,
+      "reflection_prompt": "${template.reflection_element.prompt_text}"` : ''}
     }
   ],
+  "session_plan": {
+    "total_estimated_minutes": ${template.recommended_card_count * template.recommended_time_per_card},
+    "break_after_card": ${Math.ceil(template.recommended_card_count / 2)},
+    "motivation_message_start": "セッション開始時の声かけ",
+    "motivation_message_midpoint": "中間地点での声かけ"
+  },
   "hints_for_teacher": [
-    "教師へのアドバイス1（この児童への声かけのコツなど）",
+    "教師へのアドバイス1",
     "教師へのアドバイス2"
   ]
 }
 
-※ カードは4〜8枚生成してください
-※ 各カードの problem_text は児童が直接読む文章です（小学生にわかりやすく）
-※ media_suggestions は教師がチェック時に動画や図を追加する判断材料です
+※ カードは${template.recommended_card_count}枚生成
+※ 問題文は小学生が直接読む文章（わかりやすく）
+※ v4の制御パラメータに忠実に従ってください
 `
 
+    // 10. Gemini API呼び出し
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 5000, responseMimeType: 'application/json' }
+          generationConfig: { temperature: 0.7, maxOutputTokens: 8000, responseMimeType: 'application/json' }
         })
       }
     )
@@ -28875,35 +28817,56 @@ ${testPrepData.feedbackSummary ? `- テスト対策振り返り: ${testPrepData.
     const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const personalizedPlan = extractJSON(geminiText)
 
-    // 6. 教師チェック用としてレスポンス（まだDBに保存しない → 教師が確認・修正後に保存APIを呼ぶ）
+    const processingTime = Date.now() - startTime
+
+    // 11. ★ v4統合レスポンス（教師チェック用 + v4コンテキスト付き）
     return c.json({
       success: true,
       student_id,
       curriculum_id,
       curriculum_info: { subject: curriculum.subject, unit_name: curriculum.unit_name, grade: curriculum.grade },
+      // v4分析結果（教師に表示）
+      v4_analysis: {
+        archetype: { id: v4Result.archetype, name_ja: arch.name_ja, name_en: arch.name_en, presence: arch.presence },
+        axes: v4Result.axes,
+        affect_state: v4Result.affectState?.state ?? 'normal',
+        template: {
+          name: template.template_name,
+          media_type: template.media_type,
+          question_format: template.question_format,
+          card_count: template.recommended_card_count,
+        },
+        teacher_alert: v4Result.controls._teacher_alert,
+        human_intervention: v4Result.controls._human_intervention_recommended,
+      },
+      // 従来の統計分析（後方互換）
       student_analysis: {
-        total_answers: answers.length,
-        correct_rate: correctRate,
-        avg_time_seconds: avgTime,
-        easy_correct_rate: easyCorrectRate,
-        hard_correct_rate: hardCorrectRate,
-        reflections_count: refl.length,
-        plan_progress: `${planRows.filter((r: any) => r.status === 'completed').length}/${planRows.length}`,
-        // テスト対策プランからの連携データ
+        total_answers: rawData.answerStats?.total_answers ?? 0,
+        correct_rate: Math.round((rawData.answerStats ? rawData.answerStats.correct_count / Math.max(1, rawData.answerStats.total_answers) : 0.5) * 100),
+        avg_time_seconds: Math.round(rawData.answerStats?.avg_time_seconds ?? 0),
+        easy_correct_rate: Math.round((rawData.answerStats?.easy_correct_rate ?? 0.5) * 100),
+        hard_correct_rate: Math.round((rawData.answerStats?.hard_correct_rate ?? 0.5) * 100),
         test_prep: {
           plan_count: testPrepData.plans,
           total_study_minutes: testPrepData.totalMinutes,
           weak_topics: testPrepData.weakTopics,
           low_confidence_topics: testPrepData.lowConfidenceTopics,
-          feedback_summary: testPrepData.feedbackSummary
-        }
+          feedback_summary: testPrepData.feedbackSummary,
+        },
       },
       personalized_plan: personalizedPlan,
-      status: 'draft'  // draft = 教師チェック待ち
+      status: 'draft',  // draft = 教師チェック待ち
+      meta: {
+        engine_version: 'v4.0',
+        processing_time_ms: processingTime,
+        v4_integrated: true,
+        theories_applied: 12,
+        timestamp: new Date().toISOString(),
+      },
     })
 
   } catch (error) {
-    console.error('個別最適化コース生成エラー:', error)
+    console.error('v4個別最適化コース生成エラー:', error)
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
   }
 })
@@ -31741,7 +31704,7 @@ app.post('/api/student-learning/record-answer', async (c) => {
   }
 })
 
-// --- 適応的次問題推奨 ---
+// --- 適応的次問題推奨 (v4統合制御エンジンベース) ---
 app.get('/api/student-learning/adaptive-next', async (c) => {
   const { env } = c
   try {
@@ -31749,95 +31712,93 @@ app.get('/api/student-learning/adaptive-next', async (c) => {
     const curriculumId = c.req.query('curriculum_id')
     if (!studentId) return c.json({ success: false, error: 'student_id required' }, 400)
 
-    // 最近の解答履歴を取得
-    let recentAnswers: any[] = []
-    try {
-      const res = await env.DB.prepare(`
-        SELECT is_correct, answer_time_seconds, content_type, difficulty_felt, created_at
-        FROM student_card_answers
-        WHERE student_id = ? ${curriculumId ? 'AND curriculum_id = ?' : ''}
-        ORDER BY created_at DESC LIMIT 20
-      `).bind(...(curriculumId ? [parseInt(studentId), parseInt(curriculumId)] : [parseInt(studentId)])).all()
-      recentAnswers = (res.results || []) as any[]
-    } catch {}
+    const sid = parseInt(studentId)
+    const cid = curriculumId ? parseInt(curriculumId) : undefined
 
-    if (recentAnswers.length === 0) {
-      return c.json({
-        success: true,
-        recommendation: {
-          message: 'まずは学習カードの問題にチャレンジしてみよう！',
-          suggested_difficulty: 'medium',
-          accuracy_trend: 'unknown',
-          needs_review: false
-        }
-      })
-    }
+    // F-1: D1データからv4プロファイル構築
+    const rawData = await fetchStudentRawData(env.DB, sid, cid)
+    const profiles = buildProfilesFromD1(rawData)
 
-    // 統計分析
-    const totalCorrect = recentAnswers.filter(a => a.is_correct).length
-    const accuracy = Math.round(totalCorrect / recentAnswers.length * 100)
-    const avgTime = Math.round(recentAnswers.reduce((s, a) => s + (a.answer_time_seconds || 0), 0) / recentAnswers.length)
+    // F-2: 行動データ構築
+    const behavior = await buildBehaviorFromD1(env.DB, sid, cid)
 
-    // 直近5問 vs その前5問でトレンド判定
-    const recent5 = recentAnswers.slice(0, Math.min(5, recentAnswers.length))
-    const prev5 = recentAnswers.slice(5, Math.min(10, recentAnswers.length))
-    const recent5Acc = recent5.length > 0 ? recent5.filter(a => a.is_correct).length / recent5.length * 100 : 0
-    const prev5Acc = prev5.length > 0 ? prev5.filter(a => a.is_correct).length / prev5.length * 100 : 0
+    // v4統合制御エンジン実行
+    const v4Result = computeIntegratedControls(profiles, behavior)
+    const arch = ARCHETYPES[v4Result.archetype]
+    const controls = v4Result.controls
 
-    let accuracyTrend = 'stable'
-    if (prev5.length >= 3) {
-      if (recent5Acc > prev5Acc + 15) accuracyTrend = 'improving'
-      else if (recent5Acc < prev5Acc - 15) accuracyTrend = 'declining'
-    }
-
-    // 難易度推奨
-    let suggestedDifficulty = 'medium'
-    if (accuracy >= 85) suggestedDifficulty = 'hard'
-    else if (accuracy >= 60) suggestedDifficulty = 'medium'
-    else suggestedDifficulty = 'easy'
-
-    // メッセージ生成
-    let message = ''
+    // 正答率ベースの基本統計（後方互換）
+    const accuracy = Math.round(behavior.recent_accuracy * 100)
     const needsReview = accuracy < 50
-    if (accuracy >= 85) {
-      message = `すばらしい！正答率${accuracy}%🎉 もっとむずかしい問題にチャレンジしてみよう！`
-    } else if (accuracy >= 60) {
-      message = `いい調子！正答率${accuracy}%✨ ${accuracyTrend === 'improving' ? 'どんどん良くなっているね！' : 'このまま続けよう！'}`
+
+    // v4制御に基づいた推奨難易度
+    const zpd = controls.structure.difficulty_zpd_position
+    const suggestedDifficulty = zpd >= 0.7 ? 'hard' : zpd >= 0.4 ? 'medium' : 'easy'
+
+    // v4制御に基づいたメッセージ生成
+    let message = ''
+    const msgType = controls.motivation.emotional_message_type
+    const langStyle = controls.motivation.language_style
+
+    if (behavior.consecutive_errors >= 3) {
+      // 連続不正解 → v4の帰属指導 + 感情メッセージ
+      if (msgType === 'calming') {
+        message = `大丈夫だよ。正答率は${accuracy}%。やり方を変えてみよう — できないんじゃなくて、まだぴったりのやり方が見つかっていないだけだよ。`
+      } else {
+        message = `正答率${accuracy}%📝 もう少し基礎にもどって、ゆっくりやってみよう！ヒントも使ってね。`
+      }
+    } else if (behavior.consecutive_successes >= 5) {
+      message = `すばらしい！正答率${accuracy}%🎉 ${langStyle === 'inviting' ? 'もう少しむずかしいのにチャレンジしてみない？' : 'レベルアップしてみよう！'}`
+    } else if (accuracy >= 80) {
+      message = `いい調子！正答率${accuracy}%✨ この勢いでいこう！`
+    } else if (accuracy >= 50) {
+      message = `がんばっているね！正答率${accuracy}%。${controls.scaffold.encouragement ? 'この調子でいこう！' : ''}`
     } else {
-      message = `正答率${accuracy}%📝 ${needsReview ? 'ゆっくり基礎を復習してみよう。ヒントも使ってね！' : 'もう一度カードを見直してから挑戦してみよう！'}`
+      message = `正答率${accuracy}%。${controls.scaffold.soft_language ? 'ゆっくり、自分のペースでだいじょうぶだよ。' : 'カードをもう一度よく見てからやってみよう。'}`
     }
 
-    // 初期診断データがあれば追加アドバイス
-    let diagAdvice = ''
-    try {
-      const diag = await env.DB.prepare(
-        'SELECT * FROM initial_diagnostics WHERE student_id = ? ORDER BY created_at DESC LIMIT 1'
-      ).bind(parseInt(studentId)).first() as any
-      if (diag) {
-        if (diag.learning_style_dominant === 'visual' && accuracy < 70) {
-          diagAdvice = '（あなたは目で見るのが得意！図やイラストを使って考えてみてね）'
-        } else if (diag.learning_style_dominant === 'kinesthetic' && accuracy < 70) {
-          diagAdvice = '（あなたは手を動かすのが得意！実際に書いたり数えたりしてみよう）'
-        } else if (diag.learning_style_dominant === 'auditory' && accuracy < 70) {
-          diagAdvice = '（あなたは耳で聞くのが得意！問題を声に出して読んでみよう）'
-        }
-      }
-    } catch {}
+    // v4チャネルに基づくアドバイス
+    const channelAdvice: Record<string, string> = {
+      visual: '（図やイラストを見ながら考えてみよう）',
+      auditory: '（声に出して読んでみよう）',
+      kinesthetic: '（実際に書いたり動かしたりしてみよう）',
+      reading: '（説明文をもう一度ゆっくり読んでみよう）',
+    }
+    if (accuracy < 70) {
+      message += channelAdvice[controls.presentation.entry_channel] || ''
+    }
+
+    // カードテンプレート推奨
+    const template = determineCardTemplate(controls, v4Result.archetype)
 
     return c.json({
       success: true,
       recommendation: {
-        message: message + diagAdvice,
+        message,
         suggested_difficulty: suggestedDifficulty,
-        accuracy: accuracy,
-        accuracy_trend: accuracyTrend,
-        avg_time: avgTime,
-        total_answers: recentAnswers.length,
-        needs_review: needsReview
-      }
+        accuracy,
+        accuracy_trend: behavior.consecutive_successes >= 3 ? 'improving' : behavior.consecutive_errors >= 3 ? 'declining' : 'stable',
+        avg_time: Math.round(behavior.recent_response_time_ms / 1000),
+        total_answers: rawData.answerStats?.total_answers ?? 0,
+        needs_review: needsReview,
+        // v4拡張フィールド
+        v4: {
+          archetype: { id: v4Result.archetype, name_ja: arch.name_ja },
+          entry_channel: controls.presentation.entry_channel,
+          zpd_position: Math.round(zpd * 100),
+          structure_level: Math.round(controls.structure.structure_level * 100),
+          retrieval_mode: controls.cognitive_strategy.retrieval_mode,
+          encouragement: controls.scaffold.encouragement,
+          frustration_control: controls.scaffold.frustration_control,
+          teacher_alert: controls._teacher_alert,
+          template_type: template.media_type,
+          question_format: template.question_format,
+          recommended_cards: template.recommended_card_count,
+        },
+      },
     })
   } catch (error) {
-    console.error('適応的推奨エラー:', error)
+    console.error('v4適応的推奨エラー:', error)
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
   }
 })
