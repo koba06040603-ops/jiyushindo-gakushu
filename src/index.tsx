@@ -81,7 +81,6 @@ export { ProgressWebSocket } from './websocket'
 // hint_cards スキーマ互換レイヤー
 // ローカルDB: card_id, hint_level, hint_text
 // 本番DB:     learning_card_id, hint_number, hint_content, thinking_tool_suggestion
-// リクエストごとにスキーマを検出して適切なSQL を生成
 // ============================================================
 type HintSchema = {
   cardIdCol: string       // card_id or learning_card_id
@@ -90,37 +89,67 @@ type HintSchema = {
   extraCols: string       // additional columns like thinking_tool_suggestion
 }
 
-const hintSchemaCache = new Map<string, HintSchema>()
+const HINT_SCHEMA_NEW: HintSchema = {
+  cardIdCol: 'card_id', levelCol: 'hint_level', textCol: 'hint_text', extraCols: ''
+}
+const HINT_SCHEMA_OLD: HintSchema = {
+  cardIdCol: 'learning_card_id', levelCol: 'hint_number', textCol: 'hint_content', extraCols: ', thinking_tool_suggestion'
+}
+
+let hintSchemaDetected: HintSchema | null = null
 
 async function detectHintSchema(db: D1Database): Promise<HintSchema> {
-  const cached = hintSchemaCache.get('hint_schema')
-  if (cached) return cached
+  if (hintSchemaDetected) return hintSchemaDetected
 
+  // テスト用INSERT → ROLLBACKで検出（実データに影響なし）
   try {
-    const tableInfo = await db.prepare("PRAGMA table_info(hint_cards)").all()
-    const columns = (tableInfo.results || []).map((r: any) => r.name)
-    
-    const hasCardId = columns.includes('card_id')
-    const hasLearningCardId = columns.includes('learning_card_id')
-    const hasHintLevel = columns.includes('hint_level')
-    const hasHintNumber = columns.includes('hint_number')
-    const hasHintText = columns.includes('hint_text')
-    const hasHintContent = columns.includes('hint_content')
-    const hasThinkingTool = columns.includes('thinking_tool_suggestion')
+    // 新スキーマをテスト: card_id カラムがあるか
+    await db.prepare("SELECT card_id FROM hint_cards LIMIT 1").all()
+    hintSchemaDetected = HINT_SCHEMA_NEW
+    console.log('📋 hint_cards: NEW schema (card_id)')
+    return hintSchemaDetected
+  } catch {
+    // 新スキーマ失敗 → 旧スキーマ
+    hintSchemaDetected = HINT_SCHEMA_OLD
+    console.log('📋 hint_cards: OLD schema (learning_card_id)')
+    return hintSchemaDetected
+  }
+}
 
-    const schema: HintSchema = {
-      cardIdCol: hasCardId ? 'card_id' : (hasLearningCardId ? 'learning_card_id' : 'card_id'),
-      levelCol: hasHintLevel ? 'hint_level' : (hasHintNumber ? 'hint_number' : 'hint_level'),
-      textCol: hasHintText ? 'hint_text' : (hasHintContent ? 'hint_content' : 'hint_text'),
-      extraCols: hasThinkingTool ? ', thinking_tool_suggestion' : ''
+// try-catch付きDB実行ヘルパー（スキーマエラー時に反対スキーマで再試行）
+async function hintExec(db: D1Database, sqlFn: (s: HintSchema) => string, binds: any[]): Promise<D1Result<unknown>> {
+  const schema = await detectHintSchema(db)
+  try {
+    return await db.prepare(sqlFn(schema)).bind(...binds).run()
+  } catch (e: any) {
+    // スキーマ不一致エラーの場合、反対のスキーマで再試行
+    const altSchema = schema === HINT_SCHEMA_NEW ? HINT_SCHEMA_OLD : HINT_SCHEMA_NEW
+    try {
+      const result = await db.prepare(sqlFn(altSchema)).bind(...binds).run()
+      // 成功したらスキーマを更新
+      hintSchemaDetected = altSchema
+      console.log(`📋 hint_cards schema corrected to: ${altSchema.cardIdCol}`)
+      return result
+    } catch {
+      throw e // 両方失敗なら元のエラーを投げる
     }
-    
-    hintSchemaCache.set('hint_schema', schema)
-    console.log(`📋 hint_cards schema detected: ${schema.cardIdCol}, ${schema.levelCol}, ${schema.textCol}${schema.extraCols}`)
-    return schema
-  } catch (e) {
-    // デフォルト: 新スキーマ
-    return { cardIdCol: 'card_id', levelCol: 'hint_level', textCol: 'hint_text', extraCols: '' }
+  }
+}
+
+async function hintQuery(db: D1Database, sqlFn: (s: HintSchema) => string, binds: any[]): Promise<D1Result<unknown>> {
+  const schema = await detectHintSchema(db)
+  try {
+    return await db.prepare(sqlFn(schema)).bind(...binds).all()
+  } catch (e: any) {
+    const altSchema = schema === HINT_SCHEMA_NEW ? HINT_SCHEMA_OLD : HINT_SCHEMA_NEW
+    try {
+      const result = await db.prepare(sqlFn(altSchema)).bind(...binds).all()
+      hintSchemaDetected = altSchema
+      console.log(`📋 hint_cards schema corrected to: ${altSchema.cardIdCol}`)
+      return result
+    } catch {
+      throw e
+    }
   }
 }
 
@@ -129,7 +158,7 @@ function hintSelectSQL(schema: HintSchema): string {
     ${schema.cardIdCol} AS card_id, ${schema.cardIdCol} AS learning_card_id,
     ${schema.levelCol} AS hint_level, ${schema.levelCol} AS hint_number,
     ${schema.textCol} AS hint_text, ${schema.textCol} AS hint_content
-    ${schema.extraCols ? `, ${schema.extraCols.replace(', ', '')}` : ''}
+    ${schema.extraCols}
   FROM hint_cards WHERE ${schema.cardIdCol} = ? ORDER BY ${schema.levelCol}`
 }
 
@@ -1266,8 +1295,7 @@ app.post('/api/debug/cleanup-duplicates', async (c) => {
           for (const course of (courses.results || []) as any[]) {
             const cards = await env.DB.prepare(`SELECT card_id FROM learning_cards WHERE course_id = ?`).bind(course.id).all()
             for (const card of (cards.results || []) as any[]) {
-              const hs = await detectHintSchema(env.DB)
-              await env.DB.prepare(hintDeleteSQL(hs)).bind(card.card_id).run()
+              await hintExec(env.DB, (s) => hintDeleteSQL(s), [card.card_id])
             }
             await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
           }
@@ -3124,11 +3152,10 @@ app.get('/api/curriculum/:id', async (c) => {
             // card_idを使用（learning_cardsの主キー）
             const cardId = card.card_id || card.id
             
-            // ヒント取得（スキーマ互換: detectHintSchema で自動検出）
+            // ヒント取得（スキーマ互換: 自動検出＋フォールバック）
             let hints: any = { results: [] }
             try {
-              const hs = await detectHintSchema(env.DB)
-              hints = await env.DB.prepare(hintSelectSQL(hs)).bind(cardId).all()
+              hints = await hintQuery(env.DB, (s) => hintSelectSQL(s), [cardId])
             } catch (hintErr) {
               console.warn('ヒント取得スキップ:', cardId, hintErr)
             }
@@ -3321,8 +3348,7 @@ app.get('/api/cards/:cardId', async (c) => {
       SELECT * FROM learning_cards WHERE card_id = ?
     `).bind(cardId).first()
     
-    const hs = await detectHintSchema(env.DB)
-    const hints = await env.DB.prepare(hintSelectSQL(hs)).bind(cardId).all()
+    const hints = await hintQuery(env.DB, (s) => hintSelectSQL(s), [cardId])
     
     const answer = await env.DB.prepare(`
       SELECT * FROM answers WHERE learning_card_id = ?
@@ -6010,8 +6036,7 @@ app.delete('/api/cards/:cardId', async (c) => {
   
   try {
     // 関連するヒントカードも削除
-    const hs = await detectHintSchema(env.DB)
-    await env.DB.prepare(hintDeleteSQL(hs)).bind(cardId).run()
+    await hintExec(env.DB, (s) => hintDeleteSQL(s), [cardId])
     
     // 学習カード削除
     await env.DB.prepare(`
@@ -6031,11 +6056,10 @@ app.put('/api/hints/:hintId', async (c) => {
   const body = await c.req.json()
   
   try {
-    const hs = await detectHintSchema(env.DB)
-    await env.DB.prepare(hintUpdateSQL(hs)).bind(
+    await hintExec(env.DB, (s) => hintUpdateSQL(s), [
       body.hint_text || body.hint_content || '',
       hintId
-    ).run()
+    ])
     
     return c.json({ success: true })
   } catch (error) {
@@ -6049,12 +6073,11 @@ app.post('/api/hints', async (c) => {
   const body = await c.req.json()
   
   try {
-    const hs = await detectHintSchema(env.DB)
-    const result = await env.DB.prepare(hintInsertSQL(hs)).bind(
+    const result = await hintExec(env.DB, (s) => hintInsertSQL(s), [
       body.learning_card_id || body.card_id,
       body.hint_level || body.hint_number || 1,
       body.hint_text || body.hint_content || ''
-    ).run()
+    ])
     
     return c.json({ success: true, id: result.meta.last_row_id })
   } catch (error) {
@@ -6121,13 +6144,12 @@ app.post('/api/course/:courseId/add-card', async (c) => {
     
     // ヒントカードも追加（提供されている場合）
     if (body.hints && Array.isArray(body.hints)) {
-      const hs = await detectHintSchema(env.DB)
       for (const hint of body.hints) {
-        await env.DB.prepare(hintInsertSQL(hs)).bind(
+        await hintExec(env.DB, (s) => hintInsertSQL(s), [
           newCardId,
           hint.hint_level || hint.hint_number || 1,
           hint.hint_text || hint.hint_content || ''
-        ).run()
+        ])
       }
     }
     
@@ -6192,18 +6214,17 @@ app.put('/api/cards/:cardId/hints', async (c) => {
   
   try {
     // 既存のヒントを削除
-    const hs = await detectHintSchema(env.DB)
-    await env.DB.prepare(hintDeleteSQL(hs)).bind(cardId).run()
+    await hintExec(env.DB, (s) => hintDeleteSQL(s), [cardId])
     
     // 新しいヒントを挿入
     if (hints && hints.length > 0) {
       for (let i = 0; i < hints.length; i++) {
         const hint = hints[i]
-        await env.DB.prepare(hintInsertSQL(hs)).bind(
+        await hintExec(env.DB, (s) => hintInsertSQL(s), [
           cardId,
           i + 1,
           hint.hint_text || hint.hint_content || ''
-        ).run()
+        ])
       }
     }
     
@@ -9227,9 +9248,8 @@ app.post('/api/curriculum/save-generated', async (c) => {
       const existingCourses = await env.DB.prepare(`SELECT id FROM courses WHERE curriculum_id = ?`).bind(curriculumId).all()
       for (const course of (existingCourses.results || []) as any[]) {
         const existingCards = await env.DB.prepare(`SELECT card_id FROM learning_cards WHERE course_id = ?`).bind(course.id).all()
-        const hs9 = await detectHintSchema(env.DB)
         for (const card of (existingCards.results || []) as any[]) {
-          await env.DB.prepare(hintDeleteSQL(hs9)).bind(card.card_id).run()
+          await hintExec(env.DB, (s) => hintDeleteSQL(s), [card.card_id])
         }
         await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
       }
@@ -9390,11 +9410,11 @@ app.post('/api/curriculum/save-generated', async (c) => {
         
         const hsGen = await detectHintSchema(env.DB)
         for (const hint of hints) {
-          await env.DB.prepare(hintInsertSQL(hsGen)).bind(
+          await hintExec(env.DB, (s) => hintInsertSQL(s), [
             cardId,
             hint.hint_level || hint.hint_number || 1,
             hint.hint_text || hint.hint_content || ''
-          ).run()
+          ])
         }
       }
     }
@@ -29577,11 +29597,9 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
         { hint_level: 2, hint_text: '図や絵に書いてみよう。' },
         { hint_level: 3, hint_text: 'わかるところから始めよう。' }
       ]
-      const hsPublish = await detectHintSchema(env.DB)
       for (const hint of hints) {
         try {
-          await env.DB.prepare(hintInsertSQL(hsPublish))
-            .bind(cardId, hint.hint_level || hint.hint_number || 1, hint.hint_text || hint.hint_content || '').run()
+          await hintExec(env.DB, (s) => hintInsertSQL(s), [cardId, hint.hint_level || hint.hint_number || 1, hint.hint_text || hint.hint_content || ''])
         } catch (hintInsertErr) {
           console.warn('ヒント保存スキップ:', cardId, hintInsertErr)
         }
@@ -31908,9 +31926,8 @@ app.get('/api/student-learning/tebiki', async (c) => {
           let hints: any[] = []
           try {
             // hint_cards: スキーマ自動検出
-            const hsG1 = await detectHintSchema(env.DB)
-            const hintsRes = await env.DB.prepare(hintSelectSQL(hsG1)).bind(cardId).all()
-            hints = hintsRes.results || []
+            const hintsRes = await hintQuery(env.DB, (s) => hintSelectSQL(s), [cardId])
+            hints = (hintsRes as any).results || []
           } catch {}
 
           return {
@@ -31945,9 +31962,8 @@ app.get('/api/student-learning/tebiki', async (c) => {
         const cardId = card.card_id || card.id
         let hints: any[] = []
         try {
-          const hsG2 = await detectHintSchema(env.DB)
-          const hintsRes = await env.DB.prepare(hintSelectSQL(hsG2)).bind(cardId).all()
-          hints = hintsRes.results || []
+          const hintsRes = await hintQuery(env.DB, (s) => hintSelectSQL(s), [cardId])
+          hints = (hintsRes as any).results || []
         } catch {}
 
         return {
@@ -32034,9 +32050,8 @@ app.get('/api/student-learning/tebiki', async (c) => {
               const cardId = card.card_id || card.id
               let hints: any[] = []
               try {
-                const hsG3 = await detectHintSchema(env.DB)
-                const hintsRes = await env.DB.prepare(hintSelectSQL(hsG3)).bind(cardId).all()
-                hints = hintsRes.results || []
+                const hintsRes = await hintQuery(env.DB, (s) => hintSelectSQL(s), [cardId])
+                hints = (hintsRes as any).results || []
               } catch {}
               return {
                 ...card,
