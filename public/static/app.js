@@ -3361,21 +3361,27 @@ async function loadGuidePage(curriculumId) {
                     <div class="w-8 h-8 rounded-full ${approvedCourses.length > 0 ? 'bg-green-500' : 'bg-gray-400'} text-white flex items-center justify-center font-bold text-sm">3</div>
                     <h4 class="font-bold ${approvedCourses.length > 0 ? 'text-green-800' : 'text-gray-600'} text-sm">配信</h4>
                   </div>
-                  <p class="text-xs text-gray-600 mb-2">承認済みのカードを児童に配信</p>
                   
-                  <div class="grid grid-cols-2 gap-1 mb-2">
-                    <div class="bg-white rounded-lg p-1.5 text-center border">
-                      <div class="text-lg font-bold text-green-600">${approvedCourses.length}</div>
-                      <div class="text-xs text-gray-500">配信可能</div>
-                    </div>
-                    <div class="bg-white rounded-lg p-1.5 text-center border">
-                      <div class="text-lg font-bold ${learningStats.totalAnswers > 0 ? 'text-green-600' : 'text-gray-400'}">${learningStats.totalAnswers || 0}</div>
-                      <div class="text-xs text-gray-500">回答数</div>
-                    </div>
+                  ${approvedCourses.length > 0 ? `
+                  <div class="space-y-1 mb-2 max-h-24 overflow-y-auto">
+                    ${approvedCourses.map(pc => `
+                      <div class="bg-white rounded-lg p-1.5 border border-green-200 flex items-center gap-1 text-xs">
+                        <i class="fas fa-check-circle text-green-500"></i>
+                        <span class="font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
+                        <button onclick="copyPersonalizedGuideUrl(${curriculumId}, ${pc.course_id}, '${(pc.course_name || '').replace(/'/g, "\\'")}')" 
+                          class="text-green-600 hover:text-green-800 px-1" title="配信URLをコピー">
+                          <i class="fas fa-link"></i>
+                        </button>
+                      </div>
+                    `).join('')}
                   </div>
-
-                  <button onclick="showLearningDashboard(${curriculumId})" class="w-full text-xs bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-bold transition ${approvedCourses.length === 0 ? 'opacity-50' : ''}">
-                    <i class="fas fa-chart-bar mr-1"></i>学習統計
+                  <button onclick="showPersonalizedDeliveryPanel(${curriculumId})" class="w-full text-xs bg-green-500 hover:bg-green-600 text-white py-1.5 px-3 rounded-lg font-bold transition mb-1">
+                    <i class="fas fa-paper-plane mr-1"></i>一括配信
+                  </button>` : `
+                  <p class="text-xs text-gray-500 mb-2">②で承認すると配信できます</p>`}
+                  
+                  <button onclick="showLearningDashboard(${curriculumId})" class="w-full text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 py-1.5 px-3 rounded-lg font-bold transition">
+                    <i class="fas fa-chart-bar mr-1"></i>統計
                   </button>
                 </div>
               </div>
@@ -3437,6 +3443,87 @@ async function loadGuidePage(curriculumId) {
               ①てびきを印刷・配布 → ②児童が3コースから1つ選択 → ③学習カード → ④チェックテスト → ⑤選択課題 → ⑥学習データを収集
             </div>
             `}
+          </div>
+
+          <!-- 配信方法タブ（印刷 / オンライン配信） -->
+          <div class="bg-white rounded-2xl shadow-lg mb-4 print:hidden border border-gray-200 overflow-hidden">
+            <div class="flex border-b">
+              <button id="tab-print-btn" onclick="switchDeliveryTab('print')" class="flex-1 py-3 px-4 text-sm font-bold text-center border-b-2 border-indigo-600 text-indigo-700 bg-indigo-50 transition">
+                <i class="fas fa-print mr-1"></i>印刷して配布
+              </button>
+              <button id="tab-online-btn" onclick="switchDeliveryTab('online')" class="flex-1 py-3 px-4 text-sm font-bold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition">
+                <i class="fas fa-wifi mr-1"></i>オンライン配信 <span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full ml-1">不登校対応</span>
+              </button>
+            </div>
+            
+            <!-- 印刷タブ -->
+            <div id="tab-print-content" class="p-4">
+              <div class="flex items-center gap-3 flex-wrap">
+                <div class="flex-1 min-w-[200px]">
+                  <p class="text-sm text-gray-600">下の「学習のてびき」をそのまま印刷して児童に配布します。</p>
+                </div>
+                <button onclick="printGuide()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold transition text-sm">
+                  <i class="fas fa-print mr-1"></i>印刷
+                </button>
+                <button onclick="downloadGuidePDF(${curriculumId})" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-bold transition text-sm">
+                  <i class="fas fa-file-pdf mr-1"></i>PDF保存
+                </button>
+              </div>
+            </div>
+            
+            <!-- オンライン配信タブ -->
+            <div id="tab-online-content" class="p-4" style="display:none;">
+              <div class="mb-3">
+                <p class="text-sm text-gray-600 mb-2">
+                  <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                  不登校の児童やタブレット学習の児童に、URLリンクで学習のてびきを配信できます。
+                </p>
+                <div class="flex items-center gap-2 mb-3 bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <i class="fas fa-link text-blue-600"></i>
+                  <input id="guide-url-input" type="text" readonly value="${window.location.origin}/guide/${curriculumId}" 
+                    class="flex-1 bg-transparent text-sm font-mono text-blue-800 outline-none truncate" />
+                  <button onclick="copyGuideUrl(${curriculumId})" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap">
+                    <i class="fas fa-copy mr-1"></i>コピー
+                  </button>
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <!-- QRコード -->
+                <div class="border rounded-xl p-4 text-center">
+                  <div id="guide-qr-code" class="flex items-center justify-center mb-2" style="min-height:128px;">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(window.location.origin + '/guide/' + curriculumId)}" 
+                      alt="QRコード" style="width:120px;height:120px;" onerror="this.parentElement.innerHTML='<span class=\\'text-gray-400 text-xs\\'>QR生成エラー</span>'" />
+                  </div>
+                  <p class="text-xs text-gray-500 mb-1">スマホで読み取り</p>
+                  <button onclick="printQRCode(${curriculumId})" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg font-bold">
+                    <i class="fas fa-print mr-1"></i>QRだけ印刷
+                  </button>
+                </div>
+                
+                <!-- 児童名つきリンク -->
+                <div class="border rounded-xl p-4">
+                  <h4 class="font-bold text-sm text-gray-700 mb-2"><i class="fas fa-user mr-1"></i>児童名つきリンク</h4>
+                  <p class="text-xs text-gray-500 mb-3">名前入りURLで個別に配信できます。ヘッダーに名前が表示されます。</p>
+                  <button onclick="showStudentLinkGenerator(${curriculumId})" class="w-full text-xs bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                    <i class="fas fa-users mr-1"></i>児童ごとのリンクを生成
+                  </button>
+                </div>
+                
+                <!-- LINE/メール共有 -->
+                <div class="border rounded-xl p-4">
+                  <h4 class="font-bold text-sm text-gray-700 mb-2"><i class="fas fa-share-alt mr-1"></i>共有</h4>
+                  <div class="space-y-2">
+                    <button onclick="shareViaLINE(${curriculumId})" class="w-full text-xs bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg font-bold transition">
+                      <i class="fab fa-line mr-1"></i>LINEで送る
+                    </button>
+                    <button onclick="shareViaEmail(${curriculumId})" class="w-full text-xs bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg font-bold transition">
+                      <i class="fas fa-envelope mr-1"></i>メールで送る
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- 学習のてびき1枚完結版 -->
@@ -14364,6 +14451,293 @@ async function saveDeliverySettings(curriculumId) {
   }
 }
 window.saveDeliverySettings = saveDeliverySettings
+
+// ===== 配信タブ関連関数群 =====
+
+// タブ切替
+function switchDeliveryTab(tab) {
+  const printBtn = document.getElementById('tab-print-btn')
+  const onlineBtn = document.getElementById('tab-online-btn')
+  const printContent = document.getElementById('tab-print-content')
+  const onlineContent = document.getElementById('tab-online-content')
+  if (!printBtn || !onlineBtn || !printContent || !onlineContent) return
+  
+  if (tab === 'print') {
+    printBtn.className = 'flex-1 py-3 px-4 text-sm font-bold text-center border-b-2 border-indigo-600 text-indigo-700 bg-indigo-50 transition'
+    onlineBtn.className = 'flex-1 py-3 px-4 text-sm font-bold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition'
+    printContent.style.display = ''
+    onlineContent.style.display = 'none'
+  } else {
+    onlineBtn.className = 'flex-1 py-3 px-4 text-sm font-bold text-center border-b-2 border-green-600 text-green-700 bg-green-50 transition'
+    printBtn.className = 'flex-1 py-3 px-4 text-sm font-bold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition'
+    onlineContent.style.display = ''
+    printContent.style.display = 'none'
+    // URLを実際の値に更新
+    const urlInput = document.getElementById('guide-url-input')
+    if (urlInput) {
+      const url = window.location.origin + '/guide/' + urlInput.value.split('/guide/')[1]
+      urlInput.value = url
+    }
+  }
+}
+window.switchDeliveryTab = switchDeliveryTab
+
+// URLコピー
+function copyGuideUrl(curriculumId) {
+  const url = window.location.origin + '/guide/' + curriculumId
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = event.target.closest('button')
+    const orig = btn.innerHTML
+    btn.innerHTML = '<i class="fas fa-check mr-1"></i>コピー済み'
+    btn.classList.replace('bg-blue-600', 'bg-green-600')
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.replace('bg-green-600', 'bg-blue-600') }, 2000)
+  }).catch(() => {
+    prompt('URLをコピーしてください:', url)
+  })
+}
+window.copyGuideUrl = copyGuideUrl
+
+// QRコード印刷
+function printQRCode(curriculumId) {
+  const url = window.location.origin + '/guide/' + curriculumId
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url)
+  const w = window.open('', '_blank')
+  w.document.write(`
+    <html><head><title>QRコード</title>
+    <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;}
+    @media print{button{display:none;}}</style></head>
+    <body>
+      <h2 style="margin-bottom:8px;">📖 学習のてびき</h2>
+      <img src="${qrUrl}" style="width:300px;height:300px;margin:16px;" />
+      <p style="font-size:12px;color:#666;word-break:break-all;max-width:400px;text-align:center;">${url}</p>
+      <button onclick="window.print()" style="margin-top:16px;padding:8px 24px;font-size:14px;cursor:pointer;">印刷する</button>
+    </body></html>
+  `)
+  w.document.close()
+}
+window.printQRCode = printQRCode
+
+// 児童名つきリンク生成モーダル
+async function showStudentLinkGenerator(curriculumId) {
+  let students = []
+  try {
+    const res = await axios.get('/api/students/list')
+    students = res.data.students || res.data || []
+  } catch (e) {
+    students = Array.from({length: 30}, (_, i) => ({ id: `student_${i+1}`, name: `児童${i+1}` }))
+  }
+  
+  const baseUrl = window.location.origin + '/guide/' + curriculumId
+  
+  const modal = document.createElement('div')
+  modal.id = 'student-link-modal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-hidden">
+      <div class="p-5 border-b bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-t-2xl">
+        <h2 class="text-lg font-bold"><i class="fas fa-link mr-2"></i>児童ごとのリンク一覧</h2>
+        <p class="text-sm opacity-90 mt-1">各児童の名前入りURLです。コピーして保護者に送信してください。</p>
+      </div>
+      
+      <div class="p-3 border-b bg-gray-50 flex gap-2">
+        <button onclick="copyAllStudentLinks()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold">
+          <i class="fas fa-copy mr-1"></i>全員のリンクをコピー
+        </button>
+      </div>
+      
+      <div class="overflow-y-auto" style="max-height:55vh;">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-100 sticky top-0">
+            <tr>
+              <th class="py-2 px-3 text-left text-xs font-bold text-gray-600">児童名</th>
+              <th class="py-2 px-3 text-left text-xs font-bold text-gray-600">URL</th>
+              <th class="py-2 px-3 text-center text-xs font-bold text-gray-600 w-20">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${students.map(s => {
+              const name = s.name || s.id || ''
+              const url = baseUrl + '?name=' + encodeURIComponent(name)
+              return `
+              <tr class="border-b hover:bg-blue-50">
+                <td class="py-2 px-3 font-bold text-gray-700"><i class="fas fa-user-graduate text-gray-400 mr-1"></i>${name}</td>
+                <td class="py-2 px-3"><input type="text" readonly value="${url}" class="w-full text-xs font-mono text-gray-600 bg-transparent outline-none truncate student-link-url" /></td>
+                <td class="py-2 px-3 text-center">
+                  <button onclick="copySingleLink(this, '${url.replace(/'/g, "\\'")}')" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded font-bold">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </td>
+              </tr>`
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="p-4 border-t">
+        <button onclick="document.getElementById('student-link-modal').remove()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-lg font-bold">
+          閉じる
+        </button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove() })
+}
+window.showStudentLinkGenerator = showStudentLinkGenerator
+
+function copySingleLink(btn, url) {
+  navigator.clipboard.writeText(url).then(() => {
+    const orig = btn.innerHTML
+    btn.innerHTML = '<i class="fas fa-check"></i>'
+    btn.classList.replace('bg-blue-500', 'bg-green-500')
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.replace('bg-green-500', 'bg-blue-500') }, 1500)
+  }).catch(() => { prompt('コピーしてください:', url) })
+}
+window.copySingleLink = copySingleLink
+
+function copyAllStudentLinks() {
+  const inputs = document.querySelectorAll('.student-link-url')
+  const lines = []
+  inputs.forEach(input => {
+    const row = input.closest('tr')
+    const name = row.querySelector('td').textContent.trim()
+    lines.push(name + '\n' + input.value)
+  })
+  navigator.clipboard.writeText(lines.join('\n\n')).then(() => {
+    alert('全員のリンクをクリップボードにコピーしました')
+  }).catch(() => { alert('コピーに失敗しました') })
+}
+window.copyAllStudentLinks = copyAllStudentLinks
+
+// LINE共有
+function shareViaLINE(curriculumId) {
+  const url = window.location.origin + '/guide/' + curriculumId
+  const text = '学習のてびきです。このリンクを開いてください。'
+  window.open('https://line.me/R/share?text=' + encodeURIComponent(text + '\n' + url), '_blank')
+}
+window.shareViaLINE = shareViaLINE
+
+// メール共有
+function shareViaEmail(curriculumId) {
+  const url = window.location.origin + '/guide/' + curriculumId
+  const subject = '学習のてびき'
+  const body = '学習のてびきをお送りします。\n\n下のリンクを開いて学習を進めてください。\n\n' + url
+  window.open('mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body))
+}
+window.shareViaEmail = shareViaEmail
+
+// 個別コースの配信URLコピー
+function copyPersonalizedGuideUrl(curriculumId, courseId, courseName) {
+  // コース名から児童名を抽出（「個別コース（ID:xxx）」形式）
+  const nameMatch = courseName.match(/ID:(.+?)）/)
+  const studentName = nameMatch ? nameMatch[1] : ''
+  const url = window.location.origin + '/guide/' + curriculumId + '?course=' + courseId + (studentName ? '&name=' + encodeURIComponent(studentName) : '')
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = event.target.closest('button')
+    const orig = btn.innerHTML
+    btn.innerHTML = '<i class="fas fa-check"></i>'
+    setTimeout(() => { btn.innerHTML = orig }, 1500)
+  }).catch(() => { prompt('URLをコピー:', url) })
+}
+window.copyPersonalizedGuideUrl = copyPersonalizedGuideUrl
+
+// 個別コースの一括配信パネル
+async function showPersonalizedDeliveryPanel(curriculumId) {
+  try {
+    // 承認済みコースを取得
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const allCourses = response.data.courses || []
+    const personalizedCourses = allCourses.filter(c => c.course_level === 'personalized')
+    
+    const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+    const approvedIds = metaResponse.data.approved_courses || []
+    const approved = personalizedCourses.filter(c => approvedIds.includes(c.id))
+    
+    if (approved.length === 0) {
+      alert('配信可能な承認済みコースがありません。先にStep 2で承認してください。')
+      return
+    }
+    
+    const baseUrl = window.location.origin + '/guide/' + curriculumId
+    
+    const modal = document.createElement('div')
+    modal.id = 'personalized-delivery-modal'
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+    modal.innerHTML = `
+      <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-hidden">
+        <div class="p-5 border-b bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-t-2xl">
+          <h2 class="text-lg font-bold"><i class="fas fa-paper-plane mr-2"></i>個別コース配信</h2>
+          <p class="text-sm opacity-90 mt-1">承認済み${approved.length}名分のコースを配信します。URLをコピーして各児童・保護者に送信してください。</p>
+        </div>
+        
+        <div class="p-3 border-b bg-gray-50 flex gap-2">
+          <button onclick="copyAllPersonalizedLinks()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold">
+            <i class="fas fa-copy mr-1"></i>全員のリンクをコピー
+          </button>
+        </div>
+        
+        <div class="overflow-y-auto" style="max-height:55vh;">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-100 sticky top-0">
+              <tr>
+                <th class="py-2 px-3 text-left text-xs font-bold text-gray-600">児童 / コース名</th>
+                <th class="py-2 px-3 text-center text-xs font-bold text-gray-600 w-16">カード数</th>
+                <th class="py-2 px-3 text-center text-xs font-bold text-gray-600 w-24">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${approved.map(c => {
+                const url = baseUrl + '?course=' + c.id
+                return `
+                <tr class="border-b hover:bg-pink-50">
+                  <td class="py-2 px-3">
+                    <div class="font-bold text-gray-700 text-xs"><i class="fas fa-user-graduate text-pink-500 mr-1"></i>${c.course_name}</div>
+                    <input type="text" readonly value="${url}" class="w-full text-xs font-mono text-gray-500 bg-transparent outline-none truncate personalized-link-url mt-0.5" />
+                  </td>
+                  <td class="py-2 px-3 text-center"><span class="bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full text-xs font-bold">${c.cards?.length || 0}枚</span></td>
+                  <td class="py-2 px-3 text-center flex gap-1 justify-center">
+                    <button onclick="copySingleLink(this, '${url}')" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded font-bold" title="URLコピー">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                    <a href="${url}" target="_blank" class="text-xs bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded font-bold inline-flex items-center" title="プレビュー">
+                      <i class="fas fa-external-link-alt"></i>
+                    </a>
+                  </td>
+                </tr>`
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="p-4 border-t">
+          <button onclick="document.getElementById('personalized-delivery-modal').remove()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-lg font-bold">
+            閉じる
+          </button>
+        </div>
+      </div>
+    `
+    document.body.appendChild(modal)
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove() })
+  } catch (error) {
+    console.error('配信パネルエラー:', error)
+    alert('配信パネルの表示に失敗しました')
+  }
+}
+window.showPersonalizedDeliveryPanel = showPersonalizedDeliveryPanel
+
+function copyAllPersonalizedLinks() {
+  const inputs = document.querySelectorAll('.personalized-link-url')
+  const lines = []
+  inputs.forEach(input => {
+    const row = input.closest('tr')
+    const name = row.querySelector('.font-bold.text-gray-700').textContent.trim()
+    lines.push(name + '\n' + input.value)
+  })
+  navigator.clipboard.writeText(lines.join('\n\n')).then(() => {
+    alert('全員の個別配信リンクをクリップボードにコピーしました')
+  }).catch(() => { alert('コピーに失敗しました') })
+}
+window.copyAllPersonalizedLinks = copyAllPersonalizedLinks
 
 // 生成した単元を保存
 async function saveGeneratedUnit(unitData) {

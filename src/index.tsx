@@ -6834,6 +6834,249 @@ app.get('/test-buttons.html', async (c) => {
 // =============================================================================
 
 // トップページ
+// ============================================================
+// 児童用：学習のてびきオンライン配信ページ
+// /guide/:curriculumId で児童がブラウザから閲覧できる
+// ============================================================
+app.get('/guide/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  const studentName = c.req.query('name') || ''
+  const courseId = c.req.query('course') || '' // 個別コース指定
+  
+  try {
+    // カリキュラム情報を取得
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
+    if (!curriculum) return c.html('<h1>カリキュラムが見つかりません</h1>', 404)
+    
+    let courses: any[] = []
+    let cards: any[] = []
+    let isPersonalized = false
+    let personalizedCourseName = ''
+    
+    if (courseId) {
+      // 個別コース指定の場合：そのコースだけ取得
+      isPersonalized = true
+      const courseData = await env.DB.prepare('SELECT * FROM courses WHERE id = ? AND curriculum_id = ?').bind(courseId, curriculumId).first() as any
+      if (!courseData) return c.html('<h1>コースが見つかりません</h1>', 404)
+      personalizedCourseName = courseData.course_name || '個別コース'
+      courses = [courseData]
+      
+      const cardsResult = await env.DB.prepare(`
+        SELECT * FROM learning_cards WHERE course_id = ? ORDER BY card_number
+      `).bind(courseId).all()
+      cards = (cardsResult.results || []) as any[]
+    } else {
+      // 全体配信の場合：3コースすべて取得
+      const coursesResult = await env.DB.prepare(`
+        SELECT c.*, 
+          (SELECT COUNT(*) FROM learning_cards WHERE course_id = c.id) as card_count
+        FROM courses c WHERE c.curriculum_id = ? AND c.course_level != 'personalized'
+        ORDER BY CASE c.course_level WHEN 'basic' THEN 1 WHEN 'standard' THEN 2 WHEN 'advanced' THEN 3 ELSE 4 END
+      `).bind(curriculumId).all()
+      courses = (coursesResult.results || []) as any[]
+      
+      const cardsResult = await env.DB.prepare(`
+        SELECT lc.*, c.course_name, c.course_level FROM learning_cards lc
+        JOIN courses c ON lc.course_id = c.id
+        WHERE c.curriculum_id = ? AND c.course_level != 'personalized'
+        ORDER BY c.course_level, lc.card_number
+      `).bind(curriculumId).all()
+      cards = (cardsResult.results || []) as any[]
+    }
+    
+    // メタデータを取得
+    const metaResult = await env.DB.prepare('SELECT meta_key, meta_value FROM curriculum_metadata WHERE curriculum_id = ?').bind(curriculumId).all()
+    let commonCheckTest = null
+    let courseSelectionProblems: any[] = []
+    let optionalProblems: any[] = []
+    for (const row of (metaResult.results || []) as any[]) {
+      try {
+        if (row.meta_key === 'common_check_test') commonCheckTest = JSON.parse(row.meta_value || 'null')
+        if (row.meta_key === 'course_selection_problems') courseSelectionProblems = JSON.parse(row.meta_value || '[]')
+      } catch(e) {}
+    }
+    
+    // 選択問題を取得
+    const optResult = await env.DB.prepare('SELECT * FROM optional_problems WHERE curriculum_id = ? ORDER BY problem_number').bind(curriculumId).all()
+    optionalProblems = (optResult.results || []) as any[]
+    
+    // コースごとにカードをグループ化
+    const courseCards: Record<string, any[]> = {}
+    if (isPersonalized) {
+      // 個別コースの場合はcourseIdでグループ化
+      courseCards[courseId] = cards as any[]
+    } else {
+      for (const card of cards as any[]) {
+        const cid = card.course_id
+        if (!courseCards[cid]) courseCards[cid] = []
+        courseCards[cid].push(card)
+      }
+    }
+    
+    // コースレベルの日本語名とアイコン色
+    const levelInfo: Record<string, {name: string, color: string, emoji: string}> = {
+      basic: { name: 'じっくりコース', color: '#3B82F6', emoji: '🐢' },
+      standard: { name: 'しっかりコース', color: '#10B981', emoji: '🐇' },
+      advanced: { name: 'ぐんぐんコース', color: '#F59E0B', emoji: '🚀' },
+      personalized: { name: '個別コース', color: '#EC4899', emoji: '🌟' }
+    }
+    
+    // 学習カードHTMLを生成
+    const coursesSectionHTML = (courses as any[]).map((course: any) => {
+      const info = levelInfo[course.course_level] || { name: course.course_name, color: '#6366F1', emoji: '📚' }
+      const cCards = courseCards[course.id] || []
+      return `
+        <div class="course-section" style="margin-bottom:2rem;">
+          <h3 style="background:${info.color}; color:white; padding:12px 20px; border-radius:12px; font-size:1.2rem; margin-bottom:1rem;">
+            ${info.emoji} ${course.course_name || info.name}（${cCards.length}枚）
+          </h3>
+          ${cCards.map((card: any, idx: number) => `
+            <div class="card" style="background:white; border:2px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:12px; break-inside:avoid;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span style="background:${info.color}; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem;">${idx+1}</span>
+                <strong style="font-size:1rem;">${card.card_title || 'カード ' + (idx+1)}</strong>
+                ${card.estimated_time_minutes ? `<span style="margin-left:auto; font-size:0.75rem; background:#f3f4f6; padding:2px 8px; border-radius:8px;">⏱ ${card.estimated_time_minutes}分</span>` : ''}
+              </div>
+              ${card.problem_text ? `<div style="background:#f0f9ff; border-left:4px solid ${info.color}; padding:10px 14px; border-radius:0 8px 8px 0; margin-bottom:8px;"><strong>もんだい：</strong>${card.problem_text}</div>` : ''}
+              ${card.problem_description ? `<div style="font-size:0.9rem; color:#4b5563; margin-bottom:8px;">${card.problem_description}</div>` : ''}
+              <div style="background:#f9fafb; border:1px dashed #d1d5db; border-radius:8px; padding:12px; min-height:40px;">
+                <span style="color:#9ca3af; font-size:0.85rem;">こたえをかこう：</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `
+    }).join('')
+    
+    // チェックテストHTML
+    const checkTestHTML = commonCheckTest && commonCheckTest.sample_problems ? `
+      <div style="margin-top:2rem; border-top:3px solid #EF4444; padding-top:1.5rem;">
+        <h3 style="background:#EF4444; color:white; padding:12px 20px; border-radius:12px; font-size:1.2rem; margin-bottom:1rem;">
+          ✅ チェックテスト
+        </h3>
+        ${commonCheckTest.sample_problems.map((p: any, i: number) => `
+          <div style="background:white; border:2px solid #fecaca; border-radius:12px; padding:16px; margin-bottom:12px; break-inside:avoid;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <span style="background:#EF4444; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem;">${i+1}</span>
+              <strong>${p.problem_text || p.question || ''}</strong>
+            </div>
+            <div style="background:#f9fafb; border:1px dashed #d1d5db; border-radius:8px; padding:12px; min-height:40px;">
+              <span style="color:#9ca3af; font-size:0.85rem;">こたえをかこう：</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''
+    
+    // 選択課題HTML
+    const optionalHTML = optionalProblems.length > 0 ? `
+      <div style="margin-top:2rem; border-top:3px solid #8B5CF6; padding-top:1.5rem;">
+        <h3 style="background:#8B5CF6; color:white; padding:12px 20px; border-radius:12px; font-size:1.2rem; margin-bottom:1rem;">
+          ⭐ えらべるもんだい
+        </h3>
+        ${optionalProblems.map((p: any, i: number) => `
+          <div style="background:white; border:2px solid #ddd6fe; border-radius:12px; padding:16px; margin-bottom:12px; break-inside:avoid;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <span style="background:#8B5CF6; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem;">${i+1}</span>
+              <strong>${p.problem_title || 'もんだい ' + (i+1)}</strong>
+            </div>
+            ${p.problem_description ? `<div style="font-size:0.9rem; color:#4b5563; margin-bottom:8px;">${p.problem_description}</div>` : ''}
+            ${p.problem_content ? `<div style="background:#f5f3ff; border-left:4px solid #8B5CF6; padding:10px 14px; border-radius:0 8px 8px 0;">${p.problem_content}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    ` : ''
+
+    return c.html(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学習のてびき - ${curriculum.unit_name}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif; background: #f0f4ff; color: #1f2937; line-height: 1.6; }
+    .container { max-width: 800px; margin: 0 auto; padding: 16px; }
+    .header { background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; padding: 24px; border-radius: 16px; margin-bottom: 24px; text-align: center; }
+    .header h1 { font-size: 1.8rem; margin-bottom: 8px; }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .info-card { background: white; border-radius: 12px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .info-card .label { font-size: 0.75rem; color: #6b7280; }
+    .info-card .value { font-size: 1.1rem; font-weight: bold; color: #4F46E5; }
+    .guide-content { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .goal-box { background: #EFF6FF; border-left: 4px solid #3B82F6; padding: 12px 16px; border-radius: 0 12px 12px 0; margin-bottom: 16px; }
+    @media print {
+      body { background: white; }
+      .container { padding: 0; max-width: 100%; }
+      .no-print { display: none !important; }
+      .guide-content { box-shadow: none; }
+    }
+    @media (max-width: 640px) {
+      .header h1 { font-size: 1.4rem; }
+      .guide-content { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header" ${isPersonalized ? 'style="background: linear-gradient(135deg, #EC4899, #8B5CF6);"' : ''}>
+      <h1>📖 ${isPersonalized ? '個別学習のてびき' : '学習のてびき'}</h1>
+      <p style="font-size:1.2rem; font-weight:bold;">${curriculum.unit_name}</p>
+      ${isPersonalized ? `<p style="font-size:0.9rem; opacity:0.9;">${personalizedCourseName}</p>` : ''}
+      <p style="font-size:0.9rem; opacity:0.9;">${curriculum.grade} ${curriculum.subject}</p>
+      ${studentName ? `<p style="margin-top:8px; font-size:1rem;">👤 ${studentName} さん</p>` : ''}
+    </div>
+    
+    <div class="no-print" style="display:flex; gap:8px; margin-bottom:16px; justify-content:center;">
+      <button onclick="window.print()" style="background:#4F46E5; color:white; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.9rem;">
+        🖨️ 印刷する
+      </button>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="label">きょうかしょ</div>
+        <div class="value">${curriculum.textbook_publisher || '-'}</div>
+      </div>
+      <div class="info-card">
+        <div class="label">じゅぎょう時間</div>
+        <div class="value">${curriculum.total_hours || '-'} 時間</div>
+      </div>
+      <div class="info-card">
+        <div class="label">コース数</div>
+        <div class="value">${courses.length} コース</div>
+      </div>
+    </div>
+    
+    <div class="guide-content">
+      <div class="goal-box">
+        <strong>🎯 たんげんのもくひょう</strong>
+        <p style="margin-top:4px;">${curriculum.unit_goal || ''}</p>
+      </div>
+      ${curriculum.non_cognitive_goal ? `
+      <div class="goal-box" style="background:#F0FDF4; border-color:#10B981;">
+        <strong>💪 がんばりたいこと</strong>
+        <p style="margin-top:4px;">${curriculum.non_cognitive_goal}</p>
+      </div>` : ''}
+      
+      ${coursesSectionHTML}
+      ${checkTestHTML}
+      ${optionalHTML}
+    </div>
+    
+    <div class="no-print" style="text-align:center; margin-top:24px; color:#9ca3af; font-size:0.8rem;">
+      自由進度学習支援システム
+    </div>
+  </div>
+</body>
+</html>`)
+  } catch (error: any) {
+    console.error('ガイド配信ページエラー:', error)
+    return c.html('<h1>エラーが発生しました</h1><p>' + (error.message || '') + '</p>', 500)
+  }
+})
+
 app.get('/', (c) => {
   // ルートアクセス → ログインページにリダイレクト
   return c.redirect('/login.html')
