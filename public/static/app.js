@@ -3237,8 +3237,9 @@ async function loadGuidePage(curriculumId) {
               <button onclick="showTestPrepDashboard()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chart-line mr-2"></i>テスト対策進捗
               </button>
-              <button onclick="showPersonalizedCourseSelector(${curriculumId})" class="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+              <button onclick="scrollToPersonalizedSection()" class="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg ${personalizedCourses.length > 0 ? 'ring-2 ring-pink-300 ring-offset-2' : ''}">
                 <i class="fas fa-magic mr-2"></i>個別最適化コース
+                ${pendingCourses.length > 0 ? `<span class="ml-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">${pendingCourses.length}</span>` : personalizedCourses.length > 0 ? `<span class="ml-1 bg-white text-pink-600 text-xs px-1.5 py-0.5 rounded-full">${personalizedCourses.length}</span>` : ''}
               </button>
               <button onclick="showLearningDashboard(${curriculumId})" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chart-line mr-2"></i>学習統計
@@ -3269,7 +3270,7 @@ async function loadGuidePage(curriculumId) {
             
             ${deliveryMode === 'individual' ? `
             <!-- ===== 個別配信モード ===== -->
-            <div class="flex items-stretch gap-0">
+            <div id="personalized-course-section" class="flex items-stretch gap-0">
               <!-- Step 1: AI生成 -->
               <div class="flex-1 relative">
                 <div class="border-2 border-pink-400 bg-pink-50 rounded-l-xl p-4">
@@ -3441,6 +3442,103 @@ async function loadGuidePage(curriculumId) {
               <i class="fas fa-info-circle mr-1"></i>
               <strong>全体配信フロー：</strong>
               ①てびきを印刷・配布 → ②児童が3コースから1つ選択 → ③学習カード → ④チェックテスト → ⑤選択課題 → ⑥学習データを収集
+            </div>
+            
+            <!-- ===== 個別最適化コース管理（全体配信モードでも表示） ===== -->
+            ${personalizedCourses.length > 0 || true ? `
+            <div id="personalized-course-section" class="mt-4 border-2 border-pink-300 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-5">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                  <div class="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm"><i class="fas fa-magic"></i></div>
+                  <h4 class="font-bold text-pink-800">個別最適化コース</h4>
+                  ${personalizedCourses.length > 0 ? `<span class="text-xs bg-pink-200 text-pink-800 px-2 py-0.5 rounded-full font-bold">${personalizedCourses.length}件 生成済み</span>` : ''}
+                  ${pendingCourses.length > 0 ? `<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold animate-pulse">${pendingCourses.length}件 未確認</span>` : ''}
+                  ${approvedCourses.length > 0 ? `<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">${approvedCourses.length}件 承認済</span>` : ''}
+                </div>
+                <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
+                  class="text-xs bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-2 px-4 rounded-lg font-bold transition shadow">
+                  <i class="fas fa-plus mr-1"></i>新規生成
+                </button>
+              </div>
+              
+              ${personalizedCourses.length > 0 ? `
+              <p class="text-xs text-gray-600 mb-3">児童ごとにAIが生成した個別学習カードです。内容を確認し、承認してから配信してください。</p>
+              
+              <!-- 3ステップ進捗表示 -->
+              <div class="grid grid-cols-3 gap-1 mb-3">
+                <div class="text-center py-1.5 rounded-l-lg ${personalizedCourses.length > 0 ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-500'} text-xs font-bold">
+                  <i class="fas fa-magic mr-1"></i>①生成 ${personalizedCourses.length}件
+                </div>
+                <div class="text-center py-1.5 ${pendingCourses.length > 0 ? 'bg-orange-500 text-white' : approvedCourses.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'} text-xs font-bold">
+                  <i class="fas fa-clipboard-check mr-1"></i>②確認 ${pendingCourses.length > 0 ? pendingCourses.length + '件待ち' : approvedCourses.length > 0 ? '完了' : '—'}
+                </div>
+                <div class="text-center py-1.5 rounded-r-lg ${approvedCourses.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'} text-xs font-bold">
+                  <i class="fas fa-paper-plane mr-1"></i>③配信 ${approvedCourses.length}件
+                </div>
+              </div>
+
+              <!-- コース一覧 -->
+              <div class="space-y-2 max-h-48 overflow-y-auto mb-3">
+                ${personalizedCourses.map(pc => {
+                  const isApproved = approvedCourseIds.includes(pc.course_id)
+                  const cardCount = pc.cards?.length || 0
+                  return `
+                  <div class="bg-white rounded-lg p-3 border ${isApproved ? 'border-green-300 shadow-sm' : 'border-orange-300'} flex items-center gap-2">
+                    <i class="fas ${isApproved ? 'fa-check-circle text-green-500 text-lg' : 'fa-clock text-orange-500 text-lg'}"></i>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-bold text-gray-800 text-sm truncate">${pc.course_name}</div>
+                      <div class="text-xs text-gray-500">学習カード ${cardCount}枚 ${isApproved ? '・<span class="text-green-600 font-bold">承認済み</span>' : '・<span class="text-orange-600 font-bold">未確認</span>'}</div>
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-shrink-0">
+                      <button onclick="showPersonalizedCourseGuide(${pc.course_id}, '${(pc.course_name || '').replace(/'/g, "\\'")}', ${curriculumId})" 
+                        class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="内容を確認">
+                        <i class="fas fa-eye mr-1"></i>確認
+                      </button>
+                      ${!isApproved ? `
+                      <button onclick="approveCourse(${curriculumId}, ${pc.course_id})" 
+                        class="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="承認して配信可能にする">
+                        <i class="fas fa-check mr-1"></i>承認
+                      </button>` : `
+                      <button onclick="copyPersonalizedGuideUrl(${curriculumId}, ${pc.course_id}, '${(pc.course_name || '').replace(/'/g, "\\'")}')" 
+                        class="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="配信URLをコピー">
+                        <i class="fas fa-link mr-1"></i>配信
+                      </button>
+                      <button onclick="unapproveCourse(${curriculumId}, ${pc.course_id})" 
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-2 py-1.5 rounded-lg text-xs transition" title="承認取消">
+                        <i class="fas fa-undo"></i>
+                      </button>`}
+                    </div>
+                  </div>`
+                }).join('')}
+              </div>
+              
+              <!-- アクションボタン -->
+              <div class="flex gap-2">
+                ${pendingCourses.length > 0 ? `
+                <button onclick="approveAllCourses(${curriculumId})" 
+                  class="flex-1 text-xs bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                  <i class="fas fa-check-double mr-1"></i>全て承認する (${pendingCourses.length}件)
+                </button>` : ''}
+                ${approvedCourses.length > 0 ? `
+                <button onclick="showPersonalizedDeliveryPanel(${curriculumId})" 
+                  class="flex-1 text-xs bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white py-2 px-3 rounded-lg font-bold transition">
+                  <i class="fas fa-paper-plane mr-1"></i>承認済みを一括配信 (${approvedCourses.length}件)
+                </button>` : ''}
+              </div>
+              ` : `
+              <p class="text-xs text-gray-600 mb-3">3コースの全体学習データを基に、児童一人ひとりに最適化された学習カードをAIが生成します。</p>
+              <div class="bg-white rounded-lg p-4 border border-dashed border-pink-300 text-center">
+                <i class="fas fa-magic text-pink-300 text-2xl mb-2"></i>
+                <p class="text-sm text-gray-500 mb-2">まだ個別最適化コースが生成されていません</p>
+                <p class="text-xs text-gray-400">「新規生成」ボタンから児童を選択して生成してください</p>
+              </div>
+              `}
+            </div>
+            
+            <div class="mt-3 bg-pink-50 rounded-lg p-3 text-xs text-pink-700">
+              <i class="fas fa-info-circle mr-1"></i>
+              <strong>個別最適化フロー：</strong>
+              「新規生成」→ AIが児童の学習データを分析 → 個別カード生成 → 教師が内容確認・承認 → 承認済みのみ児童に配信
             </div>
             `}
           </div>
@@ -14451,6 +14549,18 @@ async function saveDeliverySettings(curriculumId) {
   }
 }
 window.saveDeliverySettings = saveDeliverySettings
+
+// ===== 個別最適化セクションへスクロール =====
+function scrollToPersonalizedSection() {
+  const section = document.getElementById('personalized-course-section')
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // ハイライトアニメーション
+    section.classList.add('ring-4', 'ring-pink-400', 'ring-offset-2')
+    setTimeout(() => section.classList.remove('ring-4', 'ring-pink-400', 'ring-offset-2'), 2000)
+  }
+}
+window.scrollToPersonalizedSection = scrollToPersonalizedSection
 
 // ===== 配信タブ関連関数群 =====
 
