@@ -3445,95 +3445,7 @@ async function loadGuidePage(curriculumId) {
             </div>
             
             <!-- ===== 個別最適化コース管理（全体配信モードでも表示） ===== -->
-            ${personalizedCourses.length > 0 || true ? `
-            <div id="personalized-course-section" class="mt-4 border-2 border-pink-300 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-5">
-              <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2">
-                  <div class="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm"><i class="fas fa-magic"></i></div>
-                  <h4 class="font-bold text-pink-800">個別最適化コース</h4>
-                  ${personalizedCourses.length > 0 ? `<span class="text-xs bg-pink-200 text-pink-800 px-2 py-0.5 rounded-full font-bold">${personalizedCourses.length}件 生成済み</span>` : ''}
-                  ${pendingCourses.length > 0 ? `<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold animate-pulse">${pendingCourses.length}件 未確認</span>` : ''}
-                  ${approvedCourses.length > 0 ? `<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">${approvedCourses.length}件 承認済</span>` : ''}
-                </div>
-                <button onclick="showPersonalizedCourseSelector(${curriculumId})" 
-                  class="text-xs bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-2 px-4 rounded-lg font-bold transition shadow">
-                  <i class="fas fa-plus mr-1"></i>新規生成
-                </button>
-              </div>
-              
-              ${personalizedCourses.length > 0 ? `
-              <p class="text-xs text-gray-600 mb-3">児童ごとにAIが生成した個別学習カードです。内容を確認し、承認してから配信してください。</p>
-              
-              <!-- 3ステップ進捗表示 -->
-              <div class="grid grid-cols-3 gap-1 mb-3">
-                <div class="text-center py-1.5 rounded-l-lg ${personalizedCourses.length > 0 ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-500'} text-xs font-bold">
-                  <i class="fas fa-magic mr-1"></i>①生成 ${personalizedCourses.length}件
-                </div>
-                <div class="text-center py-1.5 ${pendingCourses.length > 0 ? 'bg-orange-500 text-white' : approvedCourses.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'} text-xs font-bold">
-                  <i class="fas fa-clipboard-check mr-1"></i>②確認 ${pendingCourses.length > 0 ? pendingCourses.length + '件待ち' : approvedCourses.length > 0 ? '完了' : '—'}
-                </div>
-                <div class="text-center py-1.5 rounded-r-lg ${approvedCourses.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'} text-xs font-bold">
-                  <i class="fas fa-paper-plane mr-1"></i>③配信 ${approvedCourses.length}件
-                </div>
-              </div>
-
-              <!-- コース一覧 -->
-              <div class="space-y-2 max-h-48 overflow-y-auto mb-3">
-                ${personalizedCourses.map(pc => {
-                  const isApproved = approvedCourseIds.includes(pc.course_id)
-                  const cardCount = pc.cards?.length || 0
-                  return `
-                  <div class="bg-white rounded-lg p-3 border ${isApproved ? 'border-green-300 shadow-sm' : 'border-orange-300'} flex items-center gap-2">
-                    <i class="fas ${isApproved ? 'fa-check-circle text-green-500 text-lg' : 'fa-clock text-orange-500 text-lg'}"></i>
-                    <div class="flex-1 min-w-0">
-                      <div class="font-bold text-gray-800 text-sm truncate">${pc.course_name}</div>
-                      <div class="text-xs text-gray-500">学習カード ${cardCount}枚 ${isApproved ? '・<span class="text-green-600 font-bold">承認済み</span>' : '・<span class="text-orange-600 font-bold">未確認</span>'}</div>
-                    </div>
-                    <div class="flex items-center gap-1.5 flex-shrink-0">
-                      <button onclick="showPersonalizedCourseGuide(${pc.course_id}, '${(pc.course_name || '').replace(/'/g, "\\'")}', ${curriculumId})" 
-                        class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="内容を確認">
-                        <i class="fas fa-eye mr-1"></i>確認
-                      </button>
-                      ${!isApproved ? `
-                      <button onclick="approveCourse(${curriculumId}, ${pc.course_id})" 
-                        class="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="承認して配信可能にする">
-                        <i class="fas fa-check mr-1"></i>承認
-                      </button>` : `
-                      <button onclick="copyPersonalizedGuideUrl(${curriculumId}, ${pc.course_id}, '${(pc.course_name || '').replace(/'/g, "\\'")}')" 
-                        class="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="配信URLをコピー">
-                        <i class="fas fa-link mr-1"></i>配信
-                      </button>
-                      <button onclick="unapproveCourse(${curriculumId}, ${pc.course_id})" 
-                        class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-2 py-1.5 rounded-lg text-xs transition" title="承認取消">
-                        <i class="fas fa-undo"></i>
-                      </button>`}
-                    </div>
-                  </div>`
-                }).join('')}
-              </div>
-              
-              <!-- アクションボタン -->
-              <div class="flex gap-2">
-                ${pendingCourses.length > 0 ? `
-                <button onclick="approveAllCourses(${curriculumId})" 
-                  class="flex-1 text-xs bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-bold transition">
-                  <i class="fas fa-check-double mr-1"></i>全て承認する (${pendingCourses.length}件)
-                </button>` : ''}
-                ${approvedCourses.length > 0 ? `
-                <button onclick="showPersonalizedDeliveryPanel(${curriculumId})" 
-                  class="flex-1 text-xs bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white py-2 px-3 rounded-lg font-bold transition">
-                  <i class="fas fa-paper-plane mr-1"></i>承認済みを一括配信 (${approvedCourses.length}件)
-                </button>` : ''}
-              </div>
-              ` : `
-              <p class="text-xs text-gray-600 mb-3">3コースの全体学習データを基に、児童一人ひとりに最適化された学習カードをAIが生成します。</p>
-              <div class="bg-white rounded-lg p-4 border border-dashed border-pink-300 text-center">
-                <i class="fas fa-magic text-pink-300 text-2xl mb-2"></i>
-                <p class="text-sm text-gray-500 mb-2">まだ個別最適化コースが生成されていません</p>
-                <p class="text-xs text-gray-400">「新規生成」ボタンから児童を選択して生成してください</p>
-              </div>
-              `}
-            </div>
+            <div id="personalized-section-placeholder"></div>
             
             <div class="mt-3 bg-pink-50 rounded-lg p-3 text-xs text-pink-700">
               <i class="fas fa-info-circle mr-1"></i>
@@ -4034,6 +3946,9 @@ async function loadGuidePage(curriculumId) {
       </div>
     `
     
+    // 個別最適化コース管理セクションをDOM描画後に挿入（テンプレートリテラルネスト回避）
+    renderPersonalizedSection(curriculumId, personalizedCourses, approvedCourseIds)
+    
     loadingManager.hide()
   } catch (error) {
     console.error('学習のてびき読み込みエラー:', error)
@@ -4501,22 +4416,41 @@ async function reloadLearningPlanTable(curriculumId, totalHours) {
 }
 
 // 通知を表示する関数
-function showNotification(type, title, message) {
+function showNotification(typeOrMessage, titleOrType, message) {
+  // 2引数パターン: showNotification(message, type)
+  // 3引数パターン: showNotification(type, title, message)
+  let type, title, msg
+  if (message === undefined) {
+    // 2引数: (message, type)
+    msg = typeOrMessage
+    type = titleOrType || 'info'
+    title = ''
+  } else {
+    // 3引数: (type, title, message)
+    type = typeOrMessage
+    title = titleOrType
+    msg = message
+  }
+  
   const notificationDiv = document.createElement('div')
   
-  const bgColor = type === 'success' ? 'bg-green-100 border-green-500' : 'bg-red-100 border-red-500'
-  const iconColor = type === 'success' ? 'text-green-600' : 'text-red-600'
-  const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'
+  const colors = {
+    'success': { bg: 'bg-green-100 border-green-500', icon: 'text-green-600', fa: 'fa-check-circle' },
+    'error': { bg: 'bg-red-100 border-red-500', icon: 'text-red-600', fa: 'fa-exclamation-triangle' },
+    'info': { bg: 'bg-blue-100 border-blue-500', icon: 'text-blue-600', fa: 'fa-info-circle' },
+    'warning': { bg: 'bg-yellow-100 border-yellow-500', icon: 'text-yellow-600', fa: 'fa-exclamation-circle' }
+  }
+  const c = colors[type] || colors['info']
   
-  notificationDiv.className = `fixed top-4 right-4 ${bgColor} border-2 rounded-lg p-4 shadow-lg z-50 max-w-md animate-fade-in`
+  notificationDiv.className = `fixed top-4 right-4 ${c.bg} border-2 rounded-lg p-4 shadow-lg z-50 max-w-md animate-fade-in`
   notificationDiv.innerHTML = `
     <div class="flex items-start gap-3">
-      <i class="fas ${icon} ${iconColor} text-2xl"></i>
+      <i class="fas ${c.fa} ${c.icon} text-2xl"></i>
       <div class="flex-1">
-        <p class="font-bold ${iconColor}">${title}</p>
-        <p class="text-sm text-gray-700 mt-1">${message}</p>
+        ${title ? '<p class="font-bold ' + c.icon + '">' + title + '</p>' : ''}
+        <p class="${title ? 'text-sm text-gray-700 mt-1' : 'font-bold ' + c.icon}">${msg}</p>
       </div>
-      <button onclick="this.parentElement.parentElement.remove()" class="${iconColor} hover:opacity-70">
+      <button onclick="this.parentElement.parentElement.remove()" class="${c.icon} hover:opacity-70">
         <i class="fas fa-times"></i>
       </button>
     </div>
@@ -14561,6 +14495,107 @@ function scrollToPersonalizedSection() {
   }
 }
 window.scrollToPersonalizedSection = scrollToPersonalizedSection
+
+// ===== 個別最適化コース管理セクションを描画 =====
+function renderPersonalizedSection(curriculumId, personalizedCourses, approvedCourseIds) {
+  const placeholder = document.getElementById('personalized-section-placeholder')
+  if (!placeholder) return
+  
+  const pendingCourses = personalizedCourses.filter(pc => !approvedCourseIds.includes(pc.course_id))
+  const approvedCourses = personalizedCourses.filter(pc => approvedCourseIds.includes(pc.course_id))
+  
+  let badges = ''
+  if (personalizedCourses.length > 0) badges += '<span class="text-xs bg-pink-200 text-pink-800 px-2 py-0.5 rounded-full font-bold">' + personalizedCourses.length + '件 生成済み</span>'
+  if (pendingCourses.length > 0) badges += '<span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold animate-pulse">' + pendingCourses.length + '件 未確認</span>'
+  if (approvedCourses.length > 0) badges += '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">' + approvedCourses.length + '件 承認済</span>'
+  
+  // 進捗バー
+  const step1Class = personalizedCourses.length > 0 ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-500'
+  const step2Class = pendingCourses.length > 0 ? 'bg-orange-500 text-white' : approvedCourses.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+  const step2Label = pendingCourses.length > 0 ? pendingCourses.length + '件待ち' : approvedCourses.length > 0 ? '完了' : '—'
+  const step3Class = approvedCourses.length > 0 ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+  
+  let courseListHtml = ''
+  if (personalizedCourses.length > 0) {
+    courseListHtml = personalizedCourses.map(function(pc) {
+      const isApproved = approvedCourseIds.includes(pc.course_id)
+      const cardCount = pc.cards ? pc.cards.length : 0
+      const safeName = (pc.course_name || '').replace(/'/g, "\\'")
+      
+      let actionBtns = ''
+      if (!isApproved) {
+        actionBtns = '<button onclick="approveCourse(' + curriculumId + ', ' + pc.course_id + ')" ' +
+          'class="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="承認して配信可能にする">' +
+          '<i class="fas fa-check mr-1"></i>承認</button>'
+      } else {
+        actionBtns = '<button onclick="copyPersonalizedGuideUrl(' + curriculumId + ', ' + pc.course_id + ', \'' + safeName + '\')" ' +
+          'class="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="配信URLをコピー">' +
+          '<i class="fas fa-link mr-1"></i>配信</button>' +
+          '<button onclick="unapproveCourse(' + curriculumId + ', ' + pc.course_id + ')" ' +
+          'class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-2 py-1.5 rounded-lg text-xs transition" title="承認取消">' +
+          '<i class="fas fa-undo"></i></button>'
+      }
+      
+      return '<div class="bg-white rounded-lg p-3 border ' + (isApproved ? 'border-green-300 shadow-sm' : 'border-orange-300') + ' flex items-center gap-2">' +
+        '<i class="fas ' + (isApproved ? 'fa-check-circle text-green-500 text-lg' : 'fa-clock text-orange-500 text-lg') + '"></i>' +
+        '<div class="flex-1 min-w-0">' +
+          '<div class="font-bold text-gray-800 text-sm truncate">' + pc.course_name + '</div>' +
+          '<div class="text-xs text-gray-500">学習カード ' + cardCount + '枚 ' + (isApproved ? '・<span class="text-green-600 font-bold">承認済み</span>' : '・<span class="text-orange-600 font-bold">未確認</span>') + '</div>' +
+        '</div>' +
+        '<div class="flex items-center gap-1.5 flex-shrink-0">' +
+          '<button onclick="showPersonalizedCourseGuide(' + pc.course_id + ', \'' + safeName + '\', ' + curriculumId + ')" ' +
+            'class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="内容を確認">' +
+            '<i class="fas fa-eye mr-1"></i>確認</button>' +
+          actionBtns +
+        '</div></div>'
+    }).join('')
+  }
+  
+  let actionButtons = ''
+  if (pendingCourses.length > 0) {
+    actionButtons += '<button onclick="approveAllCourses(' + curriculumId + ')" ' +
+      'class="flex-1 text-xs bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg font-bold transition">' +
+      '<i class="fas fa-check-double mr-1"></i>全て承認する (' + pendingCourses.length + '件)</button>'
+  }
+  if (approvedCourses.length > 0) {
+    actionButtons += '<button onclick="showPersonalizedDeliveryPanel(' + curriculumId + ')" ' +
+      'class="flex-1 text-xs bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white py-2 px-3 rounded-lg font-bold transition">' +
+      '<i class="fas fa-paper-plane mr-1"></i>承認済みを一括配信 (' + approvedCourses.length + '件)</button>'
+  }
+  
+  let contentHtml = ''
+  if (personalizedCourses.length > 0) {
+    contentHtml = '<p class="text-xs text-gray-600 mb-3">児童ごとにAIが生成した個別学習カードです。内容を確認し、承認してから配信してください。</p>' +
+      '<div class="grid grid-cols-3 gap-1 mb-3">' +
+        '<div class="text-center py-1.5 rounded-l-lg ' + step1Class + ' text-xs font-bold"><i class="fas fa-magic mr-1"></i>①生成 ' + personalizedCourses.length + '件</div>' +
+        '<div class="text-center py-1.5 ' + step2Class + ' text-xs font-bold"><i class="fas fa-clipboard-check mr-1"></i>②確認 ' + step2Label + '</div>' +
+        '<div class="text-center py-1.5 rounded-r-lg ' + step3Class + ' text-xs font-bold"><i class="fas fa-paper-plane mr-1"></i>③配信 ' + approvedCourses.length + '件</div>' +
+      '</div>' +
+      '<div class="space-y-2 max-h-48 overflow-y-auto mb-3">' + courseListHtml + '</div>' +
+      '<div class="flex gap-2">' + actionButtons + '</div>'
+  } else {
+    contentHtml = '<p class="text-xs text-gray-600 mb-3">3コースの全体学習データを基に、児童一人ひとりに最適化された学習カードをAIが生成します。</p>' +
+      '<div class="bg-white rounded-lg p-4 border border-dashed border-pink-300 text-center">' +
+        '<i class="fas fa-magic text-pink-300 text-2xl mb-2"></i>' +
+        '<p class="text-sm text-gray-500 mb-2">まだ個別最適化コースが生成されていません</p>' +
+        '<p class="text-xs text-gray-400">「新規生成」ボタンから児童を選択して生成してください</p>' +
+      '</div>'
+  }
+  
+  placeholder.innerHTML = '<div id="personalized-course-section" class="mt-4 border-2 border-pink-300 bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-5">' +
+    '<div class="flex items-center justify-between mb-3">' +
+      '<div class="flex items-center gap-2">' +
+        '<div class="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm"><i class="fas fa-magic"></i></div>' +
+        '<h4 class="font-bold text-pink-800">個別最適化コース</h4>' +
+        badges +
+      '</div>' +
+      '<button onclick="showPersonalizedCourseSelector(' + curriculumId + ')" class="text-xs bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-2 px-4 rounded-lg font-bold transition shadow">' +
+        '<i class="fas fa-plus mr-1"></i>新規生成</button>' +
+    '</div>' +
+    contentHtml +
+  '</div>'
+}
+window.renderPersonalizedSection = renderPersonalizedSection
 
 // ===== 配信タブ関連関数群 =====
 
@@ -38338,7 +38373,7 @@ function showStudyPlanModal(studyPace, studyPlan, targetDate) {
               <p class="text-sm opacity-90 mt-1">目標達成日: ${targetDate}</p>
             </div>
             <div class="flex items-center gap-3">
-              <button id="toggleEditButton" onclick="toggleEditMode()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow">
+              <button id="toggleEditButton" onclick="toggleEditModeGlobal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow">
                 <i class="fas fa-edit mr-2"></i>編集モード
               </button>
               <button onclick="closeStudyPlanModal()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2 transition-all">
@@ -40396,7 +40431,7 @@ function displayTestPrepPlan(planData) {
             <button onclick="loadGuidePage(${state.selectedCurriculum?.id || 1})" class="text-white hover:bg-white hover:bg-opacity-20 rounded px-3 py-1 transition">
               <i class="fas fa-arrow-left mr-2"></i>学習の手引きに戻る
             </button>
-            <button id="toggleEditButton" onclick="toggleEditMode()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow">
+            <button id="toggleEditButton" onclick="toggleEditModeGlobal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow">
               <i class="fas fa-edit mr-2"></i>編集モード
             </button>
           </div>
@@ -41535,7 +41570,7 @@ function loadStudyPlanFromStorage(planId) {
 // 編集モードの切り替え
 let isEditMode = false
 
-function toggleEditMode() {
+function toggleEditModeGlobal() {
   isEditMode = !isEditMode
   const editButton = document.getElementById('toggleEditButton')
   const allEditButtons = document.querySelectorAll('.edit-action-button')
@@ -41800,8 +41835,8 @@ function updateProgress(dayIndex) {
   }
 }
 
-// 通知を表示
-function showNotification(message, type = 'info') {
+// 通知を表示（簡易版）
+function showToastNotification(message, type = 'info') {
   const colors = {
     'success': 'bg-green-500',
     'error': 'bg-red-500',
@@ -41835,7 +41870,7 @@ function saveTestPrepPlanToStorage(planData) {
 }
 
 // グローバルに公開
-window.toggleEditMode = toggleEditMode
+window.toggleEditModeGlobal = toggleEditModeGlobal
 window.editTaskTime = editTaskTime
 window.editTaskActivity = editTaskActivity
 window.deleteTask = deleteTask
