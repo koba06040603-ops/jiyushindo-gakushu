@@ -40863,7 +40863,7 @@ async function showPersonalizedCourseSelector(curriculumId) {
     }).filter(Boolean)
     
     const html = `
-      <div id="personalizedSelectorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='personalizedSelectorModal')document.getElementById('personalizedSelectorModal').remove()">
+      <div id="personalizedSelectorModal" data-generated="false" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='personalizedSelectorModal'){const wasGenerated=event.target.dataset.generated==='true';event.target.remove();if(wasGenerated)loadGuidePage(${curriculumId})}">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
           <h2 class="text-xl font-bold text-gray-800 mb-2">
             <i class="fas fa-magic text-pink-600 mr-2"></i>個別最適化コース一括生成
@@ -40914,9 +40914,9 @@ async function showPersonalizedCourseSelector(curriculumId) {
           
           <!-- アクションボタン -->
           <div class="flex gap-3">
-            <button onclick="document.getElementById('personalizedSelectorModal').remove()" 
+            <button onclick="const modal=document.getElementById('personalizedSelectorModal');const wasGenerated=modal?.dataset.generated==='true';modal?.remove();if(wasGenerated)loadGuidePage(${curriculumId})" 
                     class="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-100 transition text-gray-700 font-bold">
-              キャンセル
+              閉じる
             </button>
             <button id="bulk-generate-btn" onclick="startBulkGeneration(${curriculumId})" 
                     class="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
@@ -41024,13 +41024,25 @@ async function startBulkGeneration(curriculumId) {
     updateProgress()
   }
   
-  // 完了
+  // 完了 - モーダルに生成済みフラグを設定
+  const modal = document.getElementById('personalizedSelectorModal')
+  if (modal) modal.dataset.generated = 'true'
+  
   btn.innerHTML = `<i class="fas fa-check-circle mr-2"></i>完了（${completed}名成功）`
   btn.className = 'flex-1 bg-green-500 text-white px-4 py-3 rounded-lg font-bold shadow-lg'
-  btn.onclick = () => { document.getElementById('personalizedSelectorModal').remove(); loadGuidePage(curriculumId) }
+  btn.onclick = () => { document.getElementById('personalizedSelectorModal')?.remove(); loadGuidePage(curriculumId) }
   btn.disabled = false
   
   addLog(`🎉 一括生成完了: ${completed}名成功, ${failed}名失敗`)
+  
+  // 3秒後に自動でモーダルを閉じてページを更新
+  setTimeout(() => {
+    const m = document.getElementById('personalizedSelectorModal')
+    if (m) {
+      m.remove()
+      loadGuidePage(curriculumId)
+    }
+  }, 3000)
 }
 window.startBulkGeneration = startBulkGeneration
 
