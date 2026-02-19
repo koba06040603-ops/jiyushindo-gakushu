@@ -1198,7 +1198,7 @@ app.post('/api/debug/cleanup-duplicates', async (c) => {
           for (const course of (courses.results || []) as any[]) {
             const cards = await env.DB.prepare(`SELECT card_id FROM learning_cards WHERE course_id = ?`).bind(course.id).all()
             for (const card of (cards.results || []) as any[]) {
-              await env.DB.prepare(`DELETE FROM hint_cards WHERE learning_card_id = ?`).bind(card.card_id).run()
+              await env.DB.prepare(`DELETE FROM hint_cards WHERE card_id = ?`).bind(card.card_id).run()
             }
             await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
           }
@@ -3055,22 +3055,17 @@ app.get('/api/curriculum/:id', async (c) => {
             // card_idを使用（learning_cardsの主キー）
             const cardId = card.card_id || card.id
             
-            // ヒント取得
-            const hints = await env.DB.prepare(`
-              SELECT 
-                hint_id,
-                hint_id AS id,
-                learning_card_id,
-                learning_card_id AS card_id,
-                hint_number,
-                hint_number AS hint_level,
-                hint_content,
-                hint_content AS hint_text,
-                thinking_tool_suggestion
-              FROM hint_cards 
-              WHERE learning_card_id = ?
-              ORDER BY hint_number
-            `).bind(cardId).all()
+            // ヒント取得（スキーマ: card_id, hint_level, hint_text）
+            let hints: any = { results: [] }
+            try {
+              hints = await env.DB.prepare(`
+                SELECT hint_id, hint_id AS id, card_id, card_id AS learning_card_id,
+                  hint_level, hint_level AS hint_number, hint_text, hint_text AS hint_content
+                FROM hint_cards WHERE card_id = ? ORDER BY hint_level
+              `).bind(cardId).all()
+            } catch (hintErr) {
+              console.warn('ヒント取得スキップ:', cardId, hintErr)
+            }
             
             // 解答は learning_cards テーブル自体に correct_answer / explanation がある
             return {
@@ -3264,16 +3259,16 @@ app.get('/api/cards/:cardId', async (c) => {
       SELECT 
         hint_id,
         hint_id AS id,
-        learning_card_id,
-        learning_card_id AS card_id,
-        hint_number,
-        hint_number AS hint_level,
-        hint_content,
-        hint_content AS hint_text,
-        thinking_tool_suggestion
+        card_id,
+        card_id AS learning_card_id,
+        hint_level,
+        hint_level AS hint_number,
+        hint_text,
+        hint_text AS hint_content,
+        '' AS thinking_tool_suggestion
       FROM hint_cards 
-      WHERE learning_card_id = ?
-      ORDER BY hint_number
+      WHERE card_id = ?
+      ORDER BY hint_level
     `).bind(cardId).all()
     
     const answer = await env.DB.prepare(`
@@ -5963,13 +5958,13 @@ app.delete('/api/cards/:cardId', async (c) => {
   try {
     // 関連するヒントカードも削除
     await env.DB.prepare(`
-      DELETE FROM hint_cards WHERE learning_card_id = ?
+      DELETE FROM hint_cards WHERE card_id = ?
     `).bind(cardId).run()
     
     // 学習カード削除
     await env.DB.prepare(`
       DELETE FROM learning_cards WHERE card_id = ? OR id = ?
-    `).bind(cardId).run()
+    `).bind(cardId, cardId).run()
     
     return c.json({ success: true })
   } catch (error) {
@@ -5986,12 +5981,10 @@ app.put('/api/hints/:hintId', async (c) => {
   try {
     await env.DB.prepare(`
       UPDATE hint_cards SET
-        hint_content = ?,
-        thinking_tool_suggestion = ?
+        hint_text = ?
       WHERE hint_id = ?
     `).bind(
       body.hint_text || body.hint_content || '',
-      body.thinking_tool_suggestion || '',
       hintId
     ).run()
     
@@ -6009,13 +6002,12 @@ app.post('/api/hints', async (c) => {
   try {
     const result = await env.DB.prepare(`
       INSERT INTO hint_cards (
-        learning_card_id, hint_number, hint_content, thinking_tool_suggestion
-      ) VALUES (?, ?, ?, ?)
+        card_id, hint_level, hint_text
+      ) VALUES (?, ?, ?)
     `).bind(
       body.learning_card_id || body.card_id,
       body.hint_level || body.hint_number || 1,
-      body.hint_text || body.hint_content || '',
-      body.thinking_tool_suggestion || ''
+      body.hint_text || body.hint_content || ''
     ).run()
     
     return c.json({ success: true, id: result.meta.last_row_id })
@@ -6086,13 +6078,12 @@ app.post('/api/course/:courseId/add-card', async (c) => {
       for (const hint of body.hints) {
         await env.DB.prepare(`
           INSERT INTO hint_cards (
-            learning_card_id, hint_number, hint_content, thinking_tool_suggestion
-          ) VALUES (?, ?, ?, ?)
+            card_id, hint_level, hint_text
+          ) VALUES (?, ?, ?)
         `).bind(
           newCardId,
           hint.hint_level || hint.hint_number || 1,
-          hint.hint_text || hint.hint_content || '',
-          hint.thinking_tool_suggestion || ''
+          hint.hint_text || hint.hint_content || ''
         ).run()
       }
     }
@@ -6159,7 +6150,7 @@ app.put('/api/cards/:cardId/hints', async (c) => {
   try {
     // 既存のヒントを削除
     await env.DB.prepare(`
-      DELETE FROM hint_cards WHERE learning_card_id = ?
+      DELETE FROM hint_cards WHERE card_id = ?
     `).bind(cardId).run()
     
     // 新しいヒントを挿入
@@ -6168,13 +6159,12 @@ app.put('/api/cards/:cardId/hints', async (c) => {
         const hint = hints[i]
         await env.DB.prepare(`
           INSERT INTO hint_cards (
-            learning_card_id, hint_number, hint_content, thinking_tool_suggestion
-          ) VALUES (?, ?, ?, ?)
+            card_id, hint_level, hint_text
+          ) VALUES (?, ?, ?)
         `).bind(
           cardId,
           i + 1,
-          hint.hint_text || hint.hint_content || '',
-          hint.thinking_tool_suggestion || ''
+          hint.hint_text || hint.hint_content || ''
         ).run()
       }
     }
@@ -9200,7 +9190,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
       for (const course of (existingCourses.results || []) as any[]) {
         const existingCards = await env.DB.prepare(`SELECT card_id FROM learning_cards WHERE course_id = ?`).bind(course.id).all()
         for (const card of (existingCards.results || []) as any[]) {
-          await env.DB.prepare(`DELETE FROM hint_cards WHERE learning_card_id = ?`).bind(card.card_id).run()
+          await env.DB.prepare(`DELETE FROM hint_cards WHERE card_id = ?`).bind(card.card_id).run()
         }
         await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
       }
@@ -9361,12 +9351,11 @@ app.post('/api/curriculum/save-generated', async (c) => {
         
         for (const hint of hints) {
           await env.DB.prepare(`
-            INSERT INTO hint_cards (learning_card_id, hint_number, hint_content, thinking_tool_suggestion) VALUES (?, ?, ?, ?)
+            INSERT INTO hint_cards (card_id, hint_level, hint_text) VALUES (?, ?, ?)
           `).bind(
             cardId,
             hint.hint_level || hint.hint_number || 1,
-            hint.hint_text || hint.hint_content || '',
-            hint.thinking_tool_suggestion || ''
+            hint.hint_text || hint.hint_content || ''
           ).run()
         }
       }
@@ -29551,8 +29540,12 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
         { hint_level: 3, hint_text: 'わかるところから始めよう。' }
       ]
       for (const hint of hints) {
-        await env.DB.prepare(`INSERT INTO hint_cards (learning_card_id, hint_number, hint_content) VALUES (?, ?, ?)`)
-          .bind(cardId, hint.hint_level || hint.hint_number || 1, hint.hint_text || hint.hint_content || '').run()
+        try {
+          await env.DB.prepare(`INSERT INTO hint_cards (card_id, hint_level, hint_text) VALUES (?, ?, ?)`)
+            .bind(cardId, hint.hint_level || hint.hint_number || 1, hint.hint_text || hint.hint_content || '').run()
+        } catch (hintInsertErr) {
+          console.warn('ヒント保存スキップ:', cardId, hintInsertErr)
+        }
       }
     }
 
@@ -31875,10 +31868,10 @@ app.get('/api/student-learning/tebiki', async (c) => {
           const cardId = card.card_id || card.id
           let hints: any[] = []
           try {
-            // hint_cards: hint_id(PK), learning_card_id, hint_number, hint_content, thinking_tool_suggestion
+            // hint_cards: hint_id(PK), card_id, hint_level, hint_text
             const hintsRes = await env.DB.prepare(`
-              SELECT hint_id, learning_card_id, learning_card_id AS card_id, hint_number, hint_number AS hint_level, hint_content, hint_content AS hint_text
-              FROM hint_cards WHERE learning_card_id = ? ORDER BY hint_number
+              SELECT hint_id, card_id, card_id AS learning_card_id, hint_level, hint_level AS hint_number, hint_text, hint_text AS hint_content
+              FROM hint_cards WHERE card_id = ? ORDER BY hint_level
             `).bind(cardId).all()
             hints = hintsRes.results || []
           } catch {}
@@ -31916,8 +31909,8 @@ app.get('/api/student-learning/tebiki', async (c) => {
         let hints: any[] = []
         try {
           const hintsRes = await env.DB.prepare(`
-            SELECT hint_id, learning_card_id, learning_card_id AS card_id, hint_number, hint_number AS hint_level, hint_content, hint_content AS hint_text
-            FROM hint_cards WHERE learning_card_id = ? ORDER BY hint_number
+            SELECT hint_id, card_id, card_id AS learning_card_id, hint_level, hint_level AS hint_number, hint_text, hint_text AS hint_content
+            FROM hint_cards WHERE card_id = ? ORDER BY hint_level
           `).bind(cardId).all()
           hints = hintsRes.results || []
         } catch {}
@@ -32007,8 +32000,8 @@ app.get('/api/student-learning/tebiki', async (c) => {
               let hints: any[] = []
               try {
                 const hintsRes = await env.DB.prepare(`
-                  SELECT hint_id, learning_card_id, learning_card_id AS card_id, hint_number, hint_number AS hint_level, hint_content, hint_content AS hint_text
-                  FROM hint_cards WHERE learning_card_id = ? ORDER BY hint_number
+                  SELECT hint_id, card_id, card_id AS learning_card_id, hint_level, hint_level AS hint_number, hint_text, hint_text AS hint_content
+                  FROM hint_cards WHERE card_id = ? ORDER BY hint_level
                 `).bind(cardId).all()
                 hints = hintsRes.results || []
               } catch {}
