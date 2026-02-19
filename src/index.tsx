@@ -29416,7 +29416,12 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 
     const geminiData = await geminiResponse.json() as any
     const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const personalizedPlan = extractJSON(geminiText)
+    const personalizedPlan = extractJSON(geminiText) || {}
+    
+    // cardsが抽出できなかった場合のログ
+    if (!personalizedPlan.cards || personalizedPlan.cards.length === 0) {
+      console.warn('⚠️ Geminiレスポンスからcardsが抽出できませんでした:', { textLength: geminiText.length, planKeys: Object.keys(personalizedPlan) })
+    }
 
     const processingTime = Date.now() - startTime
 
@@ -29551,9 +29556,10 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       }
     }
 
-    // メタデータに個別最適化情報を保存
+    // メタデータに個別最適化情報を保存（UPSERT: 既存データがあれば上書き）
     await env.DB.prepare(`
       INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+      ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
     `).bind(
       curriculum_id,
       `personalized_course_student_${student_id}`,

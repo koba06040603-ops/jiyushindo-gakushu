@@ -41153,19 +41153,40 @@ async function startBulkGeneration(curriculumId) {
       }, { timeout: 90000 })
       
       if (res.data.success) {
-        // 自動配信（教師チェック後に手動配信もできるが、一括の場合は自動配信）
+        // AIが生成したプランを取得
         const plan = res.data.personalized_plan || {}
-        await axios.post('/api/teacher/publish-personalized-course', {
-          student_id: studentId,
-          curriculum_id: curriculumId,
-          cards: plan.cards || [],
-          analysis_summary: plan.analysis_summary || '',
-          recommended_approach: plan.recommended_approach || '',
-          hints_for_teacher: plan.hints_for_teacher || []
-        }, { timeout: 60000 })
+        const planCards = plan.cards || res.data.cards || []
         
-        completed++
-        addLog(`✅ 児童ID:${studentId} → 生成・配信完了`)
+        if (planCards.length === 0) {
+          failed++
+          addLog(`⚠️ 児童ID:${studentId} → AI生成成功だがカード0枚（データ不足の可能性）`)
+          console.warn('⚠️ personalized plan cards empty:', { studentId, plan: res.data })
+        } else {
+          // DB保存（publish）
+          try {
+            const pubRes = await axios.post('/api/teacher/publish-personalized-course', {
+              student_id: studentId,
+              curriculum_id: curriculumId,
+              cards: planCards,
+              analysis_summary: plan.analysis_summary || res.data.analysis_summary || '',
+              recommended_approach: plan.recommended_approach || res.data.recommended_approach || '',
+              hints_for_teacher: plan.hints_for_teacher || res.data.hints_for_teacher || []
+            }, { timeout: 60000 })
+            
+            if (pubRes.data.success) {
+              completed++
+              addLog(`✅ 児童ID:${studentId} → 生成・保存完了（${planCards.length}枚）`)
+            } else {
+              failed++
+              addLog(`⚠️ 児童ID:${studentId} → 保存失敗: ${pubRes.data.error || '不明'}`)
+              console.error('publish failed:', pubRes.data)
+            }
+          } catch (pubError) {
+            failed++
+            addLog(`❌ 児童ID:${studentId} → 保存エラー: ${pubError.message}`)
+            console.error('publish error:', pubError.response?.data || pubError.message)
+          }
+        }
       } else {
         failed++
         addLog(`⚠️ 児童ID:${studentId} → 生成失敗: ${res.data.error || '不明'}`)
