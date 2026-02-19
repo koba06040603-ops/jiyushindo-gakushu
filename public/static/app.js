@@ -3080,6 +3080,7 @@ async function loadGuidePage(curriculumId) {
   try {
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
     const { curriculum, courses } = response.data
+    console.log('📋 カリキュラム取得:', { id: curriculumId, coursesCount: courses.length, courseLevels: courses.map(c => c.course_level) })
     
     //コース選択問題と共通チェックテストをメタデータから取得
     let courseSelectionProblems = []
@@ -3117,7 +3118,14 @@ async function loadGuidePage(curriculumId) {
     
     // 個別最適化コースと学習統計を取得（教師フロー表示用）
     const standardCourses = courses.filter(c => c.course_level !== 'personalized')
-    const personalizedCourses = courses.filter(c => c.course_level === 'personalized')
+    const personalizedCourses = courses.filter(c => c.course_level === 'personalized').map(c => ({
+      ...c,
+      course_id: c.course_id || c.id  // フィールド名の互換性を保証
+    }))
+    console.log('📊 コース分類:', { total: courses.length, standard: standardCourses.length, personalized: personalizedCourses.length })
+    if (personalizedCourses.length > 0) {
+      console.log('🎯 個別最適化コース一覧:', personalizedCourses.map(pc => ({ id: pc.course_id, name: pc.course_name, cards: pc.cards?.length })))
+    }
     const pendingCourses = personalizedCourses.filter(pc => !approvedCourseIds.includes(pc.course_id))
     const approvedCourses = personalizedCourses.filter(pc => approvedCourseIds.includes(pc.course_id))
     let learningStats = { totalStudents: 0, activeStudents: 0, avgCorrectRate: 0, totalAnswers: 0 }

@@ -3095,6 +3095,7 @@ app.get('/api/curriculum/:id', async (c) => {
         
         return { 
           ...course, 
+          course_id: course.id,  // フロントエンド互換: course_id = id
           cards: cardsWithDetails,
           introduction_problem: introductionProblem
         }
