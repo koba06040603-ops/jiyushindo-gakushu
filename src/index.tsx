@@ -98,29 +98,19 @@ const HINT_SCHEMA_OLD: HintSchema = {
 
 let hintSchemaDetected: HintSchema | null = null
 
-async function detectHintSchema(db: D1Database): Promise<HintSchema> {
-  if (hintSchemaDetected) return hintSchemaDetected
-
-  // テスト用INSERT → ROLLBACKで検出（実データに影響なし）
-  try {
-    // 新スキーマをテスト: card_id カラムがあるか
-    await db.prepare("SELECT card_id FROM hint_cards LIMIT 1").all()
-    hintSchemaDetected = HINT_SCHEMA_NEW
-    console.log('📋 hint_cards: NEW schema (card_id)')
-    return hintSchemaDetected
-  } catch {
-    // 新スキーマ失敗 → 旧スキーマ
-    hintSchemaDetected = HINT_SCHEMA_OLD
-    console.log('📋 hint_cards: OLD schema (learning_card_id)')
-    return hintSchemaDetected
-  }
+// スキーマ検出は不要 — hintExec/hintQuery が自動フォールバックする
+// 初期値は旧スキーマ（本番DB）を優先
+function getHintSchema(): HintSchema {
+  return hintSchemaDetected || HINT_SCHEMA_OLD
 }
 
 // try-catch付きDB実行ヘルパー（スキーマエラー時に反対スキーマで再試行）
 async function hintExec(db: D1Database, sqlFn: (s: HintSchema) => string, binds: any[]): Promise<D1Result<unknown>> {
-  const schema = await detectHintSchema(db)
+  const schema = getHintSchema()
   try {
-    return await db.prepare(sqlFn(schema)).bind(...binds).run()
+    const result = await db.prepare(sqlFn(schema)).bind(...binds).run()
+    if (!hintSchemaDetected) hintSchemaDetected = schema
+    return result
   } catch (e: any) {
     // スキーマ不一致エラーの場合、反対のスキーマで再試行
     const altSchema = schema === HINT_SCHEMA_NEW ? HINT_SCHEMA_OLD : HINT_SCHEMA_NEW
@@ -137,9 +127,11 @@ async function hintExec(db: D1Database, sqlFn: (s: HintSchema) => string, binds:
 }
 
 async function hintQuery(db: D1Database, sqlFn: (s: HintSchema) => string, binds: any[]): Promise<D1Result<unknown>> {
-  const schema = await detectHintSchema(db)
+  const schema = getHintSchema()
   try {
-    return await db.prepare(sqlFn(schema)).bind(...binds).all()
+    const result = await db.prepare(sqlFn(schema)).bind(...binds).all()
+    if (!hintSchemaDetected) hintSchemaDetected = schema
+    return result
   } catch (e: any) {
     const altSchema = schema === HINT_SCHEMA_NEW ? HINT_SCHEMA_OLD : HINT_SCHEMA_NEW
     try {
@@ -9408,7 +9400,6 @@ app.post('/api/curriculum/save-generated', async (c) => {
           console.log(`⚠️ カード${ci + 1}のヒントが空のため、デフォルト値を設定しました`)
         }
         
-        const hsGen = await detectHintSchema(env.DB)
         for (const hint of hints) {
           await hintExec(env.DB, (s) => hintInsertSQL(s), [
             cardId,
