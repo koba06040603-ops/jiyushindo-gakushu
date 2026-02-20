@@ -3267,6 +3267,15 @@ async function loadGuidePage(curriculumId) {
               <button onclick="loadTeacherOverview(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chalkboard-teacher mr-2"></i>教師用編集
               </button>
+              <button onclick="loadEnvironmentDesignPage(${curriculumId})" class="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-palette mr-2"></i>学習環境デザイン
+              </button>
+              <button onclick="loadEvaluationPage(${curriculumId})" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-clipboard-check mr-2"></i>指導・評価
+              </button>
+              <button onclick="showTeacherSupportDashboard(${curriculumId})" class="bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
+                <i class="fas fa-hands-helping mr-2"></i>支援ダッシュボード
+              </button>
             </div>
           </div>
 
@@ -40671,6 +40680,51 @@ async function generatePersonalizedCourse(studentId, curriculumId) {
 
 // 教師チェック画面
 function showPersonalizedCourseReview(data) {
+  // アーキタイプ別支援ヘルパー関数
+  function getEffectiveVoice(id) {
+    var m = { 'A': '「自分のペースで進めていいよ」「もっと深く考えてみよう」— 自律性を尊重し、挑戦を促す',
+              'B': '「どの方法を使えば解けるか考えてみよう」「手順を確認してから始めよう」— 方略的思考を促す',
+              'C': '「実際にやってみよう」「絵を描いて考えてみよう」— 感覚的な入力を先に活用させる',
+              'D': '「なぜそう思ったの？」「自分の考えを書いてみよう」— 内省の時間を与える',
+              'E': '「チャレンジ問題にも挑戦してみよう！」「次はもっと難しいのに挑戦！」— 挑戦意欲を活かす',
+              'F': '「友達と一緒に考えてみよう」「教え合いをしてみよう」— 協調性を活かす',
+              'G': '「まずここから始めてみよう」「できたね！次はこれをやってみよう」— 段階的にガイド',
+              'H': '「大丈夫だよ、一緒にやろう」「間違えてもいいんだよ」— 安心感を与える' }
+    return m[id] || '個別の特性に応じた声かけを意識しましょう'
+  }
+  function getAvoidVoice(id) {
+    var m = { 'A': '「みんなと同じやり方でやって」— 自律性を制限するとモチベーション低下',
+              'B': '「直感で答えて」— 方略的な思考を否定しない',
+              'C': '「まず読んでから」— 感覚的な理解方法を否定しない',
+              'D': '「早く答えて」— 考える時間を奪わない',
+              'E': '「まだ基本をやって」— 挑戦意欲を削がない',
+              'F': '「一人でやりなさい」— 協調的な学びの機会を奪わない',
+              'G': '「自分で考えて」— 適切なガイドなしに放置しない',
+              'H': '「もっと頑張って」「なんでできないの」— 不安を増大させない' }
+    return m[id] || '画一的な指示は避け、個別の特性を考慮しましょう'
+  }
+  function getObservePoint(id) {
+    var m = { 'A': '独自の方法で問題に取り組んでいるか。退屈していないか。発展的な課題が必要かも',
+              'B': '方略の選択に迷っていないか。計画通りに進められているか',
+              'C': '具体物や視覚的ツールを使って理解しようとしているか',
+              'D': '静かに考え込んでいる時は集中のサイン。放置してOK。表情に注意',
+              'E': '難しい問題で投げ出していないか。適切な難易度か',
+              'F': '友達との関わりを通じて理解が深まっているか',
+              'G': '手が止まっていないか。困っている表情をしていないか',
+              'H': '表情・姿勢の変化に注意。不安の兆候が見えたらすぐ声かけ' }
+    return m[id] || '学習への取り組み姿勢を観察しましょう'
+  }
+  function getEditGuidance(id, axes) {
+    var mot = axes?.motivational_energy || 50
+    var cog = axes?.cognitive_autonomy || 50
+    var tips = []
+    if (mot < 40) tips.push('動機が低いため、易しめ・身近な題材の問題を多めに')
+    if (cog < 40) tips.push('認知的自律性が低いため、ヒントや手順を追加')
+    if (mot >= 70 && cog >= 70) tips.push('高い能力があるため、発展的・応用的な問題に変更可能')
+    var m = { 'G': '問題数を減らし、1問ずつ達成感を得られる構成に。ヒントは多めに設定', 'H': '難易度を下げ、正解しやすい問題を冒頭に配置。励ましのメッセージを追加' }
+    if (m[id]) tips.push(m[id])
+    return tips.length > 0 ? tips.join('。') : 'カードの構成はこの児童のタイプに合わせて最適化されています'
+  }
   const { student_id, curriculum_id, curriculum_info, student_analysis, personalized_plan, v4_analysis } = data
   const cards = personalized_plan.cards || []
   const arch = v4_analysis?.archetype || {}
@@ -40748,7 +40802,32 @@ function showPersonalizedCourseReview(data) {
               ${v4_analysis.template ? '<div class="flex gap-2 mt-2 text-xs"><span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">メディア: ' + (v4_analysis.template.media_type || '-') + '</span><span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">形式: ' + (v4_analysis.template.question_format || '-') + '</span><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">推奨: ' + (v4_analysis.template.card_count || '-') + '枚</span></div>' : ''}
             </div>
             ${personalized_plan.archetype_insight ? '<p class="text-sm text-indigo-700 mt-1"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>' + personalized_plan.archetype_insight + '</p>' : ''}
-            ${v4_analysis.teacher_alert ? '<div class="bg-red-50 border border-red-300 rounded p-2 mt-2 text-xs text-red-700"><i class="fas fa-exclamation-triangle mr-1"></i>⚠️ この児童は教師の直接介入が推奨されています</div>' : ''}
+            ${v4_analysis.teacher_alert ? '<div class="bg-red-50 border border-red-300 rounded p-2 mt-2 text-xs text-red-700"><i class="fas fa-exclamation-triangle mr-1"></i>この児童は教師の直接介入が推奨されています</div>' : ''}
+          </div>
+          ` : ''}
+          
+          <!-- ★ 子どもの状態と効果的な支援方法 -->
+          ${v4_analysis ? `
+          <div class="bg-gradient-to-r from-teal-50 to-emerald-50 border-l-4 border-teal-400 p-4 rounded">
+            <h3 class="font-bold text-teal-800 mb-3"><i class="fas fa-hands-helping mr-2"></i>この子どもへの効果的な支援方法</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="bg-white rounded-lg p-3 border border-teal-200">
+                <p class="text-xs font-bold text-green-700 mb-1"><i class="fas fa-check-circle mr-1"></i>効果的な声かけ</p>
+                <p class="text-xs text-gray-700">${getEffectiveVoice(arch.id)}</p>
+              </div>
+              <div class="bg-white rounded-lg p-3 border border-red-200">
+                <p class="text-xs font-bold text-red-700 mb-1"><i class="fas fa-times-circle mr-1"></i>避けるべき対応</p>
+                <p class="text-xs text-gray-700">${getAvoidVoice(arch.id)}</p>
+              </div>
+              <div class="bg-white rounded-lg p-3 border border-blue-200">
+                <p class="text-xs font-bold text-blue-700 mb-1"><i class="fas fa-eye mr-1"></i>観察ポイント</p>
+                <p class="text-xs text-gray-700">${getObservePoint(arch.id)}</p>
+              </div>
+              <div class="bg-white rounded-lg p-3 border border-purple-200">
+                <p class="text-xs font-bold text-purple-700 mb-1"><i class="fas fa-lightbulb mr-1"></i>カード編集の指針</p>
+                <p class="text-xs text-gray-700">${getEditGuidance(arch.id, axes)}</p>
+              </div>
+            </div>
           </div>
           ` : ''}
           
@@ -42097,6 +42176,472 @@ window.generatePersonalizedFromTestPrep = generatePersonalizedFromTestPrep
 window.showStudentInsight = showStudentInsight
 
 console.log('✅ Phase 10.5 個別最適化＆テスト対策ダッシュボード初期化完了')
+
+// ============================================================
+// Phase 10.6: 教師支援ダッシュボード（個別最適化ロジック可視化 + 3フェーズ支援）
+// ============================================================
+
+// 教師支援ダッシュボード（授業前・授業中・授業後の3フェーズ）
+async function showTeacherSupportDashboard(curriculumId) {
+  console.log('📊 教師支援ダッシュボード表示:', curriculumId)
+  
+  try {
+    showLoading('支援ダッシュボードを構築中...')
+    
+    // カリキュラム情報・メタデータ・コース情報を並行取得
+    const [currRes, metaRes] = await Promise.all([
+      axios.get('/api/curriculum/' + curriculumId),
+      axios.get('/api/curriculum/' + curriculumId + '/metadata').catch(function() { return { data: {} } })
+    ])
+    
+    const curriculum = currRes.data.curriculum
+    const courses = (currRes.data.courses || [])
+    const personalizedCourses = courses.filter(function(c) { return c.course_level === 'personalized' })
+    
+    // 各個別コースのv4分析を取得
+    var studentAnalyses = []
+    for (var pc of personalizedCourses) {
+      try {
+        var aRes = await axios.get('/api/teacher/personalized-course-analysis/' + (pc.course_id || pc.id))
+        if (aRes.data.success) {
+          studentAnalyses.push({
+            course_id: pc.course_id || pc.id,
+            course_name: pc.course_name,
+            student_id: aRes.data.student_id,
+            v4_analysis: aRes.data.v4_analysis,
+            analysis_summary: aRes.data.analysis_summary,
+            archetype_insight: aRes.data.archetype_insight,
+            recommended_approach: aRes.data.recommended_approach,
+            hints_for_teacher: aRes.data.hints_for_teacher || [],
+            card_notes: aRes.data.card_personalization_notes || [],
+          })
+        }
+      } catch (e) { console.warn('分析取得エラー:', pc.course_id, e) }
+    }
+    
+    hideLoading()
+    
+    // アーキタイプ別集計
+    var archCounts = {}
+    var archEmojis = { 'A': '🌟', 'B': '📚', 'C': '🎯', 'D': '🔍', 'E': '💪', 'F': '🌱', 'G': '🤝', 'H': '🛡️' }
+    var archNames = { 'A': '自律的達成者', 'B': '方略的学習者', 'C': '感覚的探究者', 'D': '内省的分析者', 'E': '挑戦的冒険者', 'F': '協調的共感者', 'G': '受動的依存者', 'H': '不安定な学習者' }
+    studentAnalyses.forEach(function(sa) {
+      var aid = sa.v4_analysis?.archetype?.id || '?'
+      if (!archCounts[aid]) archCounts[aid] = { count: 0, students: [] }
+      archCounts[aid].count++
+      archCounts[aid].students.push(sa)
+    })
+    
+    // 支援が必要な児童を抽出
+    var alertStudents = studentAnalyses.filter(function(sa) {
+      return sa.v4_analysis?.teacher_alert || sa.v4_analysis?.human_intervention
+    })
+    var lowMotivation = studentAnalyses.filter(function(sa) {
+      var axes = sa.v4_analysis?.axes || {}
+      return (axes.motivational_energy || 50) < 35
+    })
+    var lowCognitive = studentAnalyses.filter(function(sa) {
+      var axes = sa.v4_analysis?.axes || {}
+      return (axes.cognitive_autonomy || 50) < 35
+    })
+    
+    // 3フェーズ構築
+    var modalHTML = '<div id="supportDashboardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2" onclick="if(event.target.id===\'supportDashboardModal\')event.target.remove()">' +
+      '<div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col" onclick="event.stopPropagation()">' +
+      
+      // ヘッダー
+      '<div class="bg-gradient-to-r from-rose-600 via-pink-600 to-purple-700 text-white p-5">' +
+        '<div class="flex items-center justify-between">' +
+          '<div>' +
+            '<h2 class="text-xl font-bold"><i class="fas fa-hands-helping mr-2"></i>教師支援ダッシュボード</h2>' +
+            '<p class="text-sm opacity-90 mt-1">' + curriculum.subject + ' ' + curriculum.unit_name + ' — ' + personalizedCourses.length + '名分の個別最適化コース</p>' +
+          '</div>' +
+          '<button onclick="document.getElementById(\'supportDashboardModal\').remove()" class="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-2"><i class="fas fa-times text-xl"></i></button>' +
+        '</div>' +
+        // フェーズタブ
+        '<div class="flex gap-2 mt-4">' +
+          '<button onclick="switchSupportPhase(\'before\')" id="phase-tab-before" class="px-4 py-2 rounded-t-lg text-sm font-bold bg-white bg-opacity-30 hover:bg-opacity-50 transition">📋 授業前</button>' +
+          '<button onclick="switchSupportPhase(\'during\')" id="phase-tab-during" class="px-4 py-2 rounded-t-lg text-sm font-bold hover:bg-white hover:bg-opacity-30 transition">🏫 授業中</button>' +
+          '<button onclick="switchSupportPhase(\'after\')" id="phase-tab-after" class="px-4 py-2 rounded-t-lg text-sm font-bold hover:bg-white hover:bg-opacity-30 transition">📝 授業後</button>' +
+          '<button onclick="switchSupportPhase(\'logic\')" id="phase-tab-logic" class="px-4 py-2 rounded-t-lg text-sm font-bold hover:bg-white hover:bg-opacity-30 transition">🔬 個別最適化ロジック</button>' +
+        '</div>' +
+      '</div>' +
+      
+      // コンテンツ
+      '<div class="flex-1 overflow-y-auto">' +
+      
+      // ========== 授業前フェーズ ==========
+      '<div id="phase-before" class="p-6 space-y-4">' +
+        '<div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl">' +
+          '<h3 class="text-lg font-bold text-blue-800 mb-1"><i class="fas fa-clipboard-list mr-2"></i>授業前の準備ポイント</h3>' +
+          '<p class="text-sm text-gray-600">個別最適化データに基づいて、授業前に押さえておくべきポイントを確認しましょう。</p>' +
+        '</div>' +
+        
+        // ⚠️ 要注意児童
+        (alertStudents.length > 0 ? 
+        '<div class="bg-red-50 border-2 border-red-300 rounded-xl p-4">' +
+          '<h4 class="font-bold text-red-800 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>要注意: 教師の直接介入が推奨される児童</h4>' +
+          '<div class="space-y-2">' +
+          alertStudents.map(function(sa) {
+            var arch = sa.v4_analysis?.archetype || {}
+            return '<div class="bg-white rounded-lg p-3 border border-red-200 flex items-center gap-3">' +
+              '<span class="text-2xl">' + (archEmojis[arch.id] || '🧠') + '</span>' +
+              '<div class="flex-1"><span class="font-bold text-red-700">児童ID:' + sa.student_id + '</span> <span class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">' + (arch.name_ja || '') + '</span>' +
+              '<p class="text-xs text-gray-600 mt-1">' + (sa.analysis_summary || '').substring(0, 100) + '</p></div>' +
+              (sa.v4_analysis?.human_intervention ? '<span class="text-xs bg-red-600 text-white px-2 py-1 rounded-full font-bold">🆘緊急</span>' : '') +
+            '</div>'
+          }).join('') +
+          '</div></div>' : '') +
+        
+        // クラス全体の傾向
+        '<div class="bg-white rounded-xl border-2 border-indigo-200 p-4">' +
+          '<h4 class="font-bold text-indigo-800 mb-3"><i class="fas fa-users mr-2"></i>クラス全体の学習タイプ分布</h4>' +
+          '<div class="grid grid-cols-2 md:grid-cols-4 gap-3">' +
+          Object.keys(archCounts).sort().map(function(aid) {
+            var ac = archCounts[aid]
+            return '<div class="bg-indigo-50 rounded-xl p-3 text-center border border-indigo-100 hover:shadow-md transition cursor-pointer" onclick="showArchetypeDetail(\'' + aid + '\')">' +
+              '<div class="text-3xl mb-1">' + (archEmojis[aid] || '🧠') + '</div>' +
+              '<div class="text-xl font-bold text-indigo-700">' + ac.count + '人</div>' +
+              '<div class="text-xs text-gray-600 font-bold">' + (archNames[aid] || 'タイプ' + aid) + '</div>' +
+            '</div>'
+          }).join('') +
+          '</div>' +
+          (Object.keys(archCounts).length === 0 ? '<p class="text-sm text-gray-500 text-center py-4">個別最適化コースが未生成です</p>' : '') +
+        '</div>' +
+        
+        // 児童別準備ポイント一覧
+        '<div class="bg-white rounded-xl border-2 border-green-200 p-4">' +
+          '<h4 class="font-bold text-green-800 mb-3"><i class="fas fa-child mr-2"></i>児童別の支援ポイント（授業前に確認）</h4>' +
+          '<div class="space-y-2">' +
+          (studentAnalyses.length > 0 ? studentAnalyses.map(function(sa) {
+            var arch = sa.v4_analysis?.archetype || {}
+            var axes = sa.v4_analysis?.axes || {}
+            var motE = axes.motivational_energy || 50
+            var motColor = motE >= 60 ? 'text-green-600' : motE >= 40 ? 'text-blue-600' : 'text-red-600'
+            return '<div class="border rounded-lg p-3 hover:bg-gray-50 transition">' +
+              '<div class="flex items-center gap-2 mb-1">' +
+                '<span class="text-lg">' + (archEmojis[arch.id] || '🧠') + '</span>' +
+                '<span class="font-bold text-gray-800">児童ID:' + sa.student_id + '</span>' +
+                '<span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">' + (arch.name_ja || '未分析') + '</span>' +
+                '<span class="text-xs ' + motColor + ' font-bold ml-auto">⚡' + Math.round(motE) + '</span>' +
+              '</div>' +
+              '<p class="text-xs text-gray-600 ml-8">' + (sa.recommended_approach || sa.analysis_summary || '分析データなし').substring(0, 120) + '</p>' +
+              (sa.hints_for_teacher.length > 0 ? '<div class="ml-8 mt-1 flex flex-wrap gap-1">' + sa.hints_for_teacher.slice(0, 2).map(function(h) {
+                return '<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full"><i class="fas fa-lightbulb mr-1"></i>' + h.substring(0, 40) + '</span>'
+              }).join('') + '</div>' : '') +
+            '</div>'
+          }).join('') : '<p class="text-sm text-gray-500 text-center py-4">個別最適化コースが未生成です</p>') +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      
+      // ========== 授業中フェーズ ==========
+      '<div id="phase-during" class="p-6 space-y-4 hidden">' +
+        '<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-xl">' +
+          '<h3 class="text-lg font-bold text-green-800 mb-1"><i class="fas fa-chalkboard mr-2"></i>授業中の支援ガイド</h3>' +
+          '<p class="text-sm text-gray-600">机間指導時に参照できる、児童タイプ別の声かけ・介入ガイドです。</p>' +
+        '</div>' +
+        
+        // タイプ別声かけガイド
+        '<div class="bg-white rounded-xl border-2 border-green-200 p-4">' +
+          '<h4 class="font-bold text-green-800 mb-3"><i class="fas fa-comment-dots mr-2"></i>タイプ別 声かけ・介入ガイド</h4>' +
+          '<div class="space-y-3">' +
+          Object.keys(archCounts).sort().map(function(aid) {
+            var students = archCounts[aid].students
+            var voiceGuide = getVoiceGuide(aid)
+            return '<div class="border-2 rounded-xl p-4 ' + voiceGuide.borderClass + '">' +
+              '<div class="flex items-center gap-2 mb-2">' +
+                '<span class="text-2xl">' + (archEmojis[aid] || '🧠') + '</span>' +
+                '<h5 class="font-bold ' + voiceGuide.textClass + '">' + (archNames[aid] || 'タイプ' + aid) + '（' + students.length + '人）</h5>' +
+              '</div>' +
+              '<div class="grid grid-cols-1 md:grid-cols-2 gap-2 ml-10">' +
+                '<div class="bg-green-50 rounded-lg p-2"><p class="text-xs font-bold text-green-700 mb-1">✅ 効果的な声かけ</p><p class="text-xs text-gray-700">' + voiceGuide.effective + '</p></div>' +
+                '<div class="bg-red-50 rounded-lg p-2"><p class="text-xs font-bold text-red-700 mb-1">❌ 避けるべき声かけ</p><p class="text-xs text-gray-700">' + voiceGuide.avoid + '</p></div>' +
+              '</div>' +
+              '<div class="ml-10 mt-2 bg-blue-50 rounded-lg p-2"><p class="text-xs font-bold text-blue-700 mb-1">👀 観察ポイント</p><p class="text-xs text-gray-700">' + voiceGuide.observe + '</p></div>' +
+              '<div class="ml-10 mt-1 flex flex-wrap gap-1">' + students.map(function(s) {
+                return '<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">ID:' + s.student_id + '</span>'
+              }).join('') + '</div>' +
+            '</div>'
+          }).join('') +
+          (Object.keys(archCounts).length === 0 ? '<p class="text-sm text-gray-500 text-center py-4">個別最適化コースが未生成です</p>' : '') +
+          '</div>' +
+        '</div>' +
+        
+        // 動機低下児童のリアルタイム支援
+        (lowMotivation.length > 0 ?
+        '<div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-4">' +
+          '<h4 class="font-bold text-orange-800 mb-2"><i class="fas fa-battery-quarter mr-2"></i>動機低下の兆候がある児童（優先的に巡回）</h4>' +
+          '<div class="grid grid-cols-1 md:grid-cols-2 gap-2">' +
+          lowMotivation.map(function(sa) {
+            var axes = sa.v4_analysis?.axes || {}
+            return '<div class="bg-white rounded-lg p-3 border border-orange-200">' +
+              '<div class="flex items-center gap-2 mb-1">' +
+                '<span class="font-bold text-orange-700">ID:' + sa.student_id + '</span>' +
+                '<span class="text-xs text-red-600 font-bold">⚡' + Math.round(axes.motivational_energy || 0) + '/100</span>' +
+              '</div>' +
+              '<p class="text-xs text-gray-600">' + (sa.hints_for_teacher[0] || '小さな成功体験を提供し、具体的に褒める') + '</p>' +
+            '</div>'
+          }).join('') +
+          '</div></div>' : '') +
+      '</div>' +
+      
+      // ========== 授業後フェーズ ==========
+      '<div id="phase-after" class="p-6 space-y-4 hidden">' +
+        '<div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-xl">' +
+          '<h3 class="text-lg font-bold text-purple-800 mb-1"><i class="fas fa-clipboard-check mr-2"></i>授業後の振り返り・次回への示唆</h3>' +
+          '<p class="text-sm text-gray-600">個別最適化の効果を振り返り、次回の授業改善に活かしましょう。</p>' +
+        '</div>' +
+        
+        // 個別最適化の根拠記録
+        '<div class="bg-white rounded-xl border-2 border-purple-200 p-4">' +
+          '<h4 class="font-bold text-purple-800 mb-3"><i class="fas fa-file-alt mr-2"></i>配信済みコースの個別最適化根拠 一覧</h4>' +
+          '<div class="space-y-3">' +
+          (studentAnalyses.length > 0 ? studentAnalyses.map(function(sa) {
+            var arch = sa.v4_analysis?.archetype || {}
+            var axes = sa.v4_analysis?.axes || {}
+            var tmpl = sa.v4_analysis?.template || {}
+            return '<details class="border rounded-xl overflow-hidden">' +
+              '<summary class="bg-gray-50 p-3 cursor-pointer hover:bg-gray-100 transition font-bold text-gray-800 flex items-center gap-2">' +
+                '<span class="text-lg">' + (archEmojis[arch.id] || '🧠') + '</span>' +
+                '児童ID:' + sa.student_id + ' — ' + (arch.name_ja || '未分析') +
+                '<span class="ml-auto text-xs text-gray-500">' + (sa.card_notes.length || 0) + '枚のカード</span>' +
+              '</summary>' +
+              '<div class="p-4 space-y-3">' +
+                // 軸スコア
+                '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">' +
+                  buildMiniAxis('認知的自律性', axes.cognitive_autonomy) +
+                  buildMiniAxis('情緒的安定性', axes.emotional_stability) +
+                  buildMiniAxis('方略的成熟度', axes.strategic_maturity) +
+                  buildMiniAxis('動機的エネルギー', axes.motivational_energy) +
+                '</div>' +
+                // 分析サマリー
+                (sa.analysis_summary ? '<div class="bg-indigo-50 rounded-lg p-3"><p class="text-xs font-bold text-indigo-700 mb-1"><i class="fas fa-search mr-1"></i>学習特性分析</p><p class="text-xs text-gray-700">' + sa.analysis_summary + '</p></div>' : '') +
+                (sa.archetype_insight ? '<div class="bg-purple-50 rounded-lg p-3"><p class="text-xs font-bold text-purple-700 mb-1"><i class="fas fa-lightbulb mr-1"></i>タイプに基づく方針</p><p class="text-xs text-gray-700">' + sa.archetype_insight + '</p></div>' : '') +
+                // テンプレート
+                (tmpl.media_type ? '<div class="flex gap-2 text-xs"><span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">メディア: ' + tmpl.media_type + '</span><span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">形式: ' + (tmpl.question_format || '-') + '</span><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">推奨: ' + (tmpl.card_count || '-') + '枚</span></div>' : '') +
+                // カード別根拠
+                (sa.card_notes.length > 0 ? '<div class="bg-gray-50 rounded-lg p-3"><p class="text-xs font-bold text-gray-700 mb-2"><i class="fas fa-layer-group mr-1"></i>カード別 個別最適化の根拠</p><div class="space-y-1">' +
+                  sa.card_notes.map(function(cn, i) {
+                    var diffColor = cn.difficulty_level === 'easy' ? 'bg-green-100 text-green-700' : cn.difficulty_level === 'hard' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                    return '<div class="flex items-start gap-2 text-xs">' +
+                      '<span class="w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-xs shrink-0">' + (i+1) + '</span>' +
+                      '<div class="flex-1"><span class="font-bold text-gray-800">' + (cn.card_title || '') + '</span> <span class="' + diffColor + ' px-1.5 py-0.5 rounded-full text-xs">' + (cn.difficulty_level || '') + '</span>' +
+                      (cn.personalization_note ? '<p class="text-indigo-600 mt-0.5"><i class="fas fa-brain mr-1"></i>' + cn.personalization_note + '</p>' : '<p class="text-gray-400">（根拠未生成）</p>') +
+                      '</div></div>'
+                  }).join('') +
+                '</div></div>' : '') +
+                // 教師アドバイス
+                (sa.hints_for_teacher.length > 0 ? '<div class="bg-yellow-50 rounded-lg p-3"><p class="text-xs font-bold text-yellow-700 mb-1"><i class="fas fa-chalkboard-teacher mr-1"></i>教師へのアドバイス</p><ul class="text-xs text-gray-700 space-y-0.5">' + sa.hints_for_teacher.map(function(h) { return '<li>• ' + h + '</li>' }).join('') + '</ul></div>' : '') +
+              '</div>' +
+            '</details>'
+          }).join('') : '<p class="text-sm text-gray-500 text-center py-4">個別最適化コースが未生成です</p>') +
+          '</div>' +
+        '</div>' +
+        
+        // 次回への示唆
+        '<div class="bg-white rounded-xl border-2 border-pink-200 p-4">' +
+          '<h4 class="font-bold text-pink-800 mb-3"><i class="fas fa-forward mr-2"></i>次回授業への示唆</h4>' +
+          '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">' +
+            '<div class="bg-pink-50 rounded-lg p-3">' +
+              '<p class="text-xs font-bold text-pink-700 mb-1"><i class="fas fa-chart-pie mr-1"></i>クラスの特徴</p>' +
+              '<p class="text-xs text-gray-700">' + buildClassCharacterSummary(archCounts, archNames, studentAnalyses.length) + '</p>' +
+            '</div>' +
+            '<div class="bg-green-50 rounded-lg p-3">' +
+              '<p class="text-xs font-bold text-green-700 mb-1"><i class="fas fa-bullseye mr-1"></i>重点支援対象</p>' +
+              '<p class="text-xs text-gray-700">' + (alertStudents.length > 0 ? alertStudents.map(function(s) { return 'ID:' + s.student_id }).join(', ') + ' に対して直接的な介入が推奨されます。' : '現在、緊急介入が必要な児童はいません。') + '</p>' +
+            '</div>' +
+            '<div class="bg-blue-50 rounded-lg p-3">' +
+              '<p class="text-xs font-bold text-blue-700 mb-1"><i class="fas fa-users mr-1"></i>グループ編成の示唆</p>' +
+              '<p class="text-xs text-gray-700">' + buildGroupingSuggestion(archCounts) + '</p>' +
+            '</div>' +
+            '<div class="bg-yellow-50 rounded-lg p-3">' +
+              '<p class="text-xs font-bold text-yellow-700 mb-1"><i class="fas fa-lightbulb mr-1"></i>授業改善のヒント</p>' +
+              '<p class="text-xs text-gray-700">' + buildImprovementHint(lowMotivation.length, lowCognitive.length, studentAnalyses.length) + '</p>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      
+      // ========== 個別最適化ロジック可視化 ==========
+      '<div id="phase-logic" class="p-6 space-y-4 hidden">' +
+        '<div class="bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r-xl">' +
+          '<h3 class="text-lg font-bold text-indigo-800 mb-1"><i class="fas fa-cogs mr-2"></i>個別最適化ロジックの可視化</h3>' +
+          '<p class="text-sm text-gray-600">12の教育理論がどのように統合され、一人ひとりの問題が生成されるかを示します。</p>' +
+        '</div>' +
+        
+        // パイプライン図
+        '<div class="bg-white rounded-xl border-2 border-indigo-200 p-4">' +
+          '<h4 class="font-bold text-indigo-800 mb-4"><i class="fas fa-project-diagram mr-2"></i>個別最適化パイプライン</h4>' +
+          '<div class="flex flex-wrap items-center justify-center gap-2 mb-4">' +
+            '<div class="bg-blue-100 border-2 border-blue-400 rounded-xl p-3 text-center min-w-[120px]"><i class="fas fa-database text-blue-600 text-xl mb-1 block"></i><span class="text-xs font-bold text-blue-800">D1データベース</span><p class="text-xs text-gray-500 mt-0.5">診断・回答・振返り</p></div>' +
+            '<i class="fas fa-arrow-right text-gray-400"></i>' +
+            '<div class="bg-green-100 border-2 border-green-400 rounded-xl p-3 text-center min-w-[120px]"><i class="fas fa-user-graduate text-green-600 text-xl mb-1 block"></i><span class="text-xs font-bold text-green-800">12理論プロファイル</span><p class="text-xs text-gray-500 mt-0.5">F1〜F12構築</p></div>' +
+            '<i class="fas fa-arrow-right text-gray-400"></i>' +
+            '<div class="bg-purple-100 border-2 border-purple-400 rounded-xl p-3 text-center min-w-[120px]"><i class="fas fa-brain text-purple-600 text-xl mb-1 block"></i><span class="text-xs font-bold text-purple-800">v4統合エンジン</span><p class="text-xs text-gray-500 mt-0.5">制御パラメータ算出</p></div>' +
+            '<i class="fas fa-arrow-right text-gray-400"></i>' +
+            '<div class="bg-pink-100 border-2 border-pink-400 rounded-xl p-3 text-center min-w-[120px]"><i class="fas fa-th text-pink-600 text-xl mb-1 block"></i><span class="text-xs font-bold text-pink-800">8アーキタイプ分類</span><p class="text-xs text-gray-500 mt-0.5">学習者タイプ決定</p></div>' +
+            '<i class="fas fa-arrow-right text-gray-400"></i>' +
+            '<div class="bg-orange-100 border-2 border-orange-400 rounded-xl p-3 text-center min-w-[120px]"><i class="fas fa-sliders-h text-orange-600 text-xl mb-1 block"></i><span class="text-xs font-bold text-orange-800">カードテンプレート</span><p class="text-xs text-gray-500 mt-0.5">メディア・形式決定</p></div>' +
+            '<i class="fas fa-arrow-right text-gray-400"></i>' +
+            '<div class="bg-yellow-100 border-2 border-yellow-400 rounded-xl p-3 text-center min-w-[120px]"><i class="fas fa-robot text-yellow-600 text-xl mb-1 block"></i><span class="text-xs font-bold text-yellow-800">Gemini生成</span><p class="text-xs text-gray-500 mt-0.5">問題・解説生成</p></div>' +
+          '</div>' +
+        '</div>' +
+        
+        // 12理論の説明
+        '<div class="bg-white rounded-xl border-2 border-indigo-200 p-4">' +
+          '<h4 class="font-bold text-indigo-800 mb-3"><i class="fas fa-book-open mr-2"></i>統合されている12の教育理論</h4>' +
+          '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">' +
+            buildTheoryCard('F1', '感覚処理効率', 'VAK/VARK理論', '視覚・聴覚・読み書き・運動感覚の処理効率を測定し、最適なメディアタイプを選択') +
+            buildTheoryCard('F2', '多重知能', 'Gardner MI', '8つの知能の強弱パターンから、問題形式と提示方法を決定') +
+            buildTheoryCard('F3', '経験学習', 'Kolb理論', '具体的経験→省察→概念化→実験のサイクル段階に合わせた課題設計') +
+            buildTheoryCard('F4', '適性処遇交互作用', 'ATI / Cronbach-Snow', '事前知識・不安・独立性に応じたスキャフォールド量を調整') +
+            buildTheoryCard('F5', '自己調整学習', 'Zimmerman SRL', '予見→遂行→自己省察の3段階を支援する振り返りプロンプトを生成') +
+            buildTheoryCard('F6', '認知戦略', 'Roediger / Bjork', '検索練習・間隔反復・インターリーブ戦略の準備度に応じた出題間隔設計') +
+            buildTheoryCard('F7', 'スキャフォールディング', 'Vygotsky ZPD', '発達の最近接領域の幅と位置に応じたヒント段階数・解法例の決定') +
+            buildTheoryCard('F8', '動機づけ', 'Deci-Ryan SDT', '自律性・有能感・関係性の3欲求充足度から動機づけ支援を設計') +
+            buildTheoryCard('F9', 'メタ認知', 'Flavell / Brown', 'メタ認知的知識・制御・批判的思考の発達に応じた自己モニタリング課題を付加') +
+            buildTheoryCard('F10', '領域固有知識', 'Alexander MDL', '順応期→能力期→熟達期の段階に応じた課題難易度と先行概念対応') +
+            buildTheoryCard('F11', '真正の学び', 'Authentic Learning', '個人的関連性・実世界接続・コミュニティ参加の要素を問題文に埋め込み') +
+            buildTheoryCard('F12', '感情と学習', 'Control-Value', '学業的享受・不安・退屈の状態に応じた感情支援と難易度調整') +
+          '</div>' +
+        '</div>' +
+        
+        // 4基幹軸の説明
+        '<div class="bg-white rounded-xl border-2 border-indigo-200 p-4">' +
+          '<h4 class="font-bold text-indigo-800 mb-3"><i class="fas fa-chart-bar mr-2"></i>4基幹軸とアーキタイプ分類</h4>' +
+          '<p class="text-xs text-gray-600 mb-3">12理論のプロファイルから4つの基幹軸スコアを算出し、その組み合わせで8つの学習者アーキタイプに分類します。</p>' +
+          '<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">' +
+            '<div class="bg-blue-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">🧠</span><span class="text-xs font-bold text-blue-800">認知的自律性 (H)</span><p class="text-xs text-gray-500 mt-0.5">F2知能 + F5SRL + F9メタ認知 + F10領域知識</p></div>' +
+            '<div class="bg-green-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">💚</span><span class="text-xs font-bold text-green-800">情緒的安定性 (G)</span><p class="text-xs text-gray-500 mt-0.5">F4不安(逆) + F8動機 + F12感情</p></div>' +
+            '<div class="bg-purple-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">📐</span><span class="text-xs font-bold text-purple-800">方略的成熟度 (A)</span><p class="text-xs text-gray-500 mt-0.5">F3経験学習 + F5SRL + F6認知戦略</p></div>' +
+            '<div class="bg-orange-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">⚡</span><span class="text-xs font-bold text-orange-800">動機的エネルギー (E)</span><p class="text-xs text-gray-500 mt-0.5">F4適性 + F8動機 + F11真正性</p></div>' +
+          '</div>' +
+          '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">' +
+            Object.keys(archEmojis).map(function(aid) {
+              return '<div class="bg-gray-50 rounded-lg p-2 text-center border hover:shadow-sm transition">' +
+                '<span class="text-xl">' + archEmojis[aid] + '</span>' +
+                '<p class="text-xs font-bold text-gray-800 mt-1">' + aid + ': ' + (archNames[aid] || '') + '</p>' +
+              '</div>'
+            }).join('') +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      
+      '</div>' + // end content
+      
+      // フッター
+      '<div class="border-t border-gray-200 p-4 bg-gray-50">' +
+        '<div class="flex justify-end">' +
+          '<button onclick="document.getElementById(\'supportDashboardModal\').remove()" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold transition">' +
+            '<i class="fas fa-times mr-2"></i>閉じる' +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+      
+      '</div></div>'
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    
+    // 初期タブをアクティブに
+    switchSupportPhase('before')
+    
+  } catch (error) {
+    hideLoading()
+    console.error('❌ 支援ダッシュボードエラー:', error)
+    alert('ダッシュボードの読み込みに失敗しました: ' + error.message)
+  }
+}
+
+// フェーズタブ切り替え
+function switchSupportPhase(phase) {
+  var phases = ['before', 'during', 'after', 'logic']
+  phases.forEach(function(p) {
+    var el = document.getElementById('phase-' + p)
+    var tab = document.getElementById('phase-tab-' + p)
+    if (el) el.classList.toggle('hidden', p !== phase)
+    if (tab) {
+      if (p === phase) {
+        tab.classList.add('bg-white', 'bg-opacity-30')
+      } else {
+        tab.classList.remove('bg-white', 'bg-opacity-30')
+      }
+    }
+  })
+}
+
+// タイプ別声かけガイド
+function getVoiceGuide(archetypeId) {
+  var guides = {
+    'A': { effective: '「自分のペースで進めていいよ」「もっと深く考えてみよう」', avoid: '「みんなと同じやり方でやって」（自律性を制限しない）', observe: '独自の方法で問題に取り組んでいるか、退屈していないか', borderClass: 'border-green-300 bg-green-50', textClass: 'text-green-800' },
+    'B': { effective: '「どの方法を使えば解けるか考えてみよう」「手順を確認してから始めよう」', avoid: '「直感で答えて」（方略的な児童には計画的アプローチを尊重）', observe: '方略の選択に迷っていないか、計画通りに進められているか', borderClass: 'border-blue-300 bg-blue-50', textClass: 'text-blue-800' },
+    'C': { effective: '「実際にやってみよう」「絵を描いて考えてみよう」', avoid: '「まず読んでから」（感覚的な入力を先に活用させる）', observe: '具体物や視覚的ツールを使って理解しようとしているか', borderClass: 'border-yellow-300 bg-yellow-50', textClass: 'text-yellow-800' },
+    'D': { effective: '「なぜそう思ったの？」「自分の考えを書いてみよう」', avoid: '「早く答えて」（内省に時間を与える）', observe: '静かに考え込んでいる時は集中のサイン、放置してOK', borderClass: 'border-purple-300 bg-purple-50', textClass: 'text-purple-800' },
+    'E': { effective: '「チャレンジ問題にも挑戦してみよう！」「すごいね、次はもっと難しいのにチャレンジ！」', avoid: '「まだ基本をやって」（挑戦意欲を削がない）', observe: '難しい問題で投げ出していないか、適切な難易度か', borderClass: 'border-orange-300 bg-orange-50', textClass: 'text-orange-800' },
+    'F': { effective: '「友達と一緒に考えてみよう」「教え合いをしてみよう」', avoid: '「一人でやりなさい」（協調性を活かす機会を与える）', observe: '友達との関わりを通じて理解が深まっているか', borderClass: 'border-teal-300 bg-teal-50', textClass: 'text-teal-800' },
+    'G': { effective: '「まずここから始めてみよう」「できたね！次はこれをやってみよう」', avoid: '「自分で考えて」（段階的なガイドが必要）', observe: '手が止まっていないか、困っている表情をしていないか', borderClass: 'border-pink-300 bg-pink-50', textClass: 'text-pink-800' },
+    'H': { effective: '「大丈夫だよ、一緒にやろう」「間違えてもいいんだよ」', avoid: '「もっと頑張って」「なんでできないの」（不安を増大させない）', observe: '表情・姿勢の変化に注意、不安の兆候が見えたらすぐ声かけ', borderClass: 'border-red-300 bg-red-50', textClass: 'text-red-800' },
+  }
+  return guides[archetypeId] || { effective: '個別の特性を観察して対応', avoid: '画一的な指示', observe: '学習への取り組み姿勢', borderClass: 'border-gray-300 bg-gray-50', textClass: 'text-gray-800' }
+}
+
+// ミニ軸バー生成
+function buildMiniAxis(label, score) {
+  var pct = Math.max(0, Math.min(100, Math.round(score || 0)))
+  var color = pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-blue-500' : 'bg-orange-500'
+  return '<div class="text-center"><div class="text-xs font-bold text-gray-600 mb-1">' + label + '</div><div class="w-full bg-gray-200 rounded-full h-2 mb-0.5"><div class="' + color + ' h-2 rounded-full" style="width:' + pct + '%"></div></div><div class="text-xs text-gray-500">' + pct + '/100</div></div>'
+}
+
+// 理論カード生成
+function buildTheoryCard(id, name, theory, desc) {
+  var colors = { 'F1': 'blue', 'F2': 'green', 'F3': 'yellow', 'F4': 'red', 'F5': 'indigo', 'F6': 'purple', 'F7': 'pink', 'F8': 'orange', 'F9': 'teal', 'F10': 'cyan', 'F11': 'lime', 'F12': 'rose' }
+  var c = colors[id] || 'gray'
+  return '<div class="bg-' + c + '-50 rounded-lg p-2 border border-' + c + '-200"><div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-' + c + '-200 text-' + c + '-800 px-1.5 py-0.5 rounded">' + id + '</span><span class="text-xs font-bold text-gray-800">' + name + '</span></div><p class="text-xs text-gray-500 italic mb-0.5">' + theory + '</p><p class="text-xs text-gray-600">' + desc + '</p></div>'
+}
+
+// クラスの特徴サマリー
+function buildClassCharacterSummary(archCounts, archNames, total) {
+  if (total === 0) return '個別最適化コースが未生成のため、分析できません。'
+  var dominant = Object.keys(archCounts).sort(function(a, b) { return archCounts[b].count - archCounts[a].count })[0]
+  var dName = archNames[dominant] || ''
+  var dCount = archCounts[dominant]?.count || 0
+  return 'クラスの' + Math.round(dCount / total * 100) + '%が「' + dName + '」タイプです。' +
+    (Object.keys(archCounts).length > 3 ? '学習タイプが多様なクラスなので、個別対応の優先度が高いです。' : '比較的同質的なクラスのため、全体指導と個別支援の組み合わせが有効です。')
+}
+
+// グルーピング提案
+function buildGroupingSuggestion(archCounts) {
+  var keys = Object.keys(archCounts)
+  if (keys.length === 0) return '個別最適化コースが未生成のため、提案できません。'
+  if (keys.includes('G') || keys.includes('H')) {
+    return '受動的依存者(G)や不安定な学習者(H)は、自律的達成者(A)や協調的共感者(F)と同じグループにすると相互支援が期待できます。'
+  }
+  return '各タイプが混在するグループを編成し、多様な視点での議論を促しましょう。'
+}
+
+// 授業改善ヒント
+function buildImprovementHint(lowMotCount, lowCogCount, total) {
+  if (total === 0) return '個別最適化コースを生成すると、改善ヒントが表示されます。'
+  var hints = []
+  if (lowMotCount > 0) hints.push('動機低下の児童が' + lowMotCount + '名います。小さな成功体験と具体的な褒め言葉を意識しましょう。')
+  if (lowCogCount > 0) hints.push('認知的自律性が低い児童が' + lowCogCount + '名います。段階的なガイドと手順の明示が効果的です。')
+  if (hints.length === 0) hints.push('全体的にバランスの取れたクラスです。個々の強みを活かす活動を取り入れましょう。')
+  return hints.join(' ')
+}
+
+// アーキタイプ詳細表示（クラス分布クリック時）
+function showArchetypeDetail(archetypeId) {
+  var archEmojis = { 'A': '🌟', 'B': '📚', 'C': '🎯', 'D': '🔍', 'E': '💪', 'F': '🌱', 'G': '🤝', 'H': '🛡️' }
+  var archNames = { 'A': '自律的達成者', 'B': '方略的学習者', 'C': '感覚的探究者', 'D': '内省的分析者', 'E': '挑戦的冒険者', 'F': '協調的共感者', 'G': '受動的依存者', 'H': '不安定な学習者' }
+  var guide = getVoiceGuide(archetypeId)
+  alert(archEmojis[archetypeId] + ' ' + archNames[archetypeId] + '\n\n✅ 効果的な声かけ:\n' + guide.effective + '\n\n❌ 避けるべき声かけ:\n' + guide.avoid + '\n\n👀 観察ポイント:\n' + guide.observe)
+}
+
+window.showTeacherSupportDashboard = showTeacherSupportDashboard
+window.switchSupportPhase = switchSupportPhase
+window.showArchetypeDetail = showArchetypeDetail
+
+console.log('✅ Phase 10.6 教師支援ダッシュボード初期化完了')
 
 // ============================================================
 // Phase 11: 編集可能な学習計画表
