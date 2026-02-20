@@ -8705,15 +8705,15 @@ JSONのみ。`
     // カード枚数の動的決定ロジック
     const items = analysis.content_items || 3
     let cardsPerCourse: number
-    if (items <= 3) cardsPerCourse = 4
-    else if (items <= 5) cardsPerCourse = 6
-    else if (items <= 8) cardsPerCourse = 9
-    else if (items <= 12) cardsPerCourse = 12
-    else cardsPerCourse = 15
+    if (items <= 3) cardsPerCourse = 8
+    else if (items <= 5) cardsPerCourse = 10
+    else if (items <= 8) cardsPerCourse = 12
+    else if (items <= 12) cardsPerCourse = 14
+    else cardsPerCourse = 16
 
     // 難易度による補正
-    if (analysis.difficulty === 'hard') cardsPerCourse = Math.min(cardsPerCourse + 2, 15)
-    if (analysis.difficulty === 'easy') cardsPerCourse = Math.max(cardsPerCourse - 1, 4)
+    if (analysis.difficulty === 'hard') cardsPerCourse = Math.min(cardsPerCourse + 2, 18)
+    if (analysis.difficulty === 'easy') cardsPerCourse = Math.max(cardsPerCourse - 1, 8)
 
     return c.json({
       success: true,
@@ -8787,7 +8787,7 @@ app.post('/api/ai/generate-course', async (c) => {
     }[courseLevel] || '標準的なペースで学ぶコース'
 
     // 【強化】プロンプト（動的枚数のカード生成 + 品質向上 + AI先生 + 難易度引き上げ）
-    const numCards = cards_count || 8  // 動的カード枚数（デフォルト8枚に増加：単元全体カバー）
+    const numCards = cards_count || 10  // 動的カード枚数（デフォルト10枚：単元全体を確実にカバー）
     const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
 
 【単元情報】
@@ -9585,15 +9585,19 @@ app.post('/api/curriculum/save-generated', async (c) => {
       
       // ============================================================
       // 学習カードを保存
-      // 実スキーマ: card_id, subject, grade_level, unit_name, card_title,
-      //   card_type(standard/challenge/review/optional),
-      //   difficulty_level(easy/standard/hard),
-      //   learning_track(jikkuri/shikkari/gungun),
-      //   problem_text, problem_description, correct_answer, explanation,
-      //   hint_text, solution_video_url, image_url,
-      //   card_order, estimated_time_minutes, curriculum_code,
-      //   is_active, created_at, updated_at, course_id
+      // AIティーチャー・3段階ヒント・先生ヘルプ対応のため拡張カラムを確保
       // ============================================================
+      // 拡張カラムを安全に追加（存在しない場合のみ）
+      const extraCols = ['ai_teacher_message', 'ai_teacher_advice', 'teacher_help_keywords']
+      for (const col of extraCols) {
+        try {
+          await env.DB.prepare(`ALTER TABLE learning_cards ADD COLUMN ${col} TEXT DEFAULT ''`).run()
+          console.log(`✅ カラム追加: learning_cards.${col}`)
+        } catch (e: any) {
+          // カラムが既に存在する場合は無視
+        }
+      }
+      
       const trackMap: Record<string,string> = { basic: 'jikkuri', standard: 'shikkari', advanced: 'gungun' }
       const learningTrack = trackMap[courseLevel] || 'shikkari'
       
@@ -9624,8 +9628,9 @@ app.post('/api/curriculum/save-generated', async (c) => {
             card_order, card_number, estimated_time_minutes, curriculum_code,
             textbook_page, new_terms, example_problem, example_solution,
             real_world_connection,
+            ai_teacher_message, ai_teacher_advice, teacher_help_keywords,
             is_active, course_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         `).bind(
           curriculum.subject,
           gradeNum,
@@ -9653,6 +9658,9 @@ app.post('/api/curriculum/save-generated', async (c) => {
           card.example_problem || '',
           card.example_solution || '',
           card.real_world_connection || '',
+          card.ai_teacher_message || '',
+          card.ai_teacher_advice || '',
+          card.teacher_help_keywords || '',
           courseId
         ).run()
         
@@ -29847,6 +29855,10 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
     const courseId = courseResult.meta.last_row_id
 
     // カードをlearning_cardsに保存
+    // 拡張カラムを安全に追加（存在しない場合のみ）
+    for (const col of ['ai_teacher_message', 'ai_teacher_advice', 'teacher_help_keywords']) {
+      try { await env.DB.prepare(`ALTER TABLE learning_cards ADD COLUMN ${col} TEXT DEFAULT ''`).run() } catch (e) {}
+    }
     const savedCardIds: number[] = []
     for (let i = 0; i < (cards || []).length; i++) {
       const card = cards[i]
@@ -29875,8 +29887,9 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
           card_order, card_number, estimated_time_minutes,
           textbook_page, new_terms, example_problem, example_solution,
           real_world_connection,
+          ai_teacher_message, ai_teacher_advice, teacher_help_keywords,
           is_active, course_id
-        ) VALUES (?, ?, ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `).bind(
         curriculum.subject, gradeNum, curriculum.unit_name,
         card.card_title || `カード${i + 1}`, cardType, diffLevel,
@@ -29888,6 +29901,9 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
         card.textbook_page || '', card.new_terms || '',
         card.example_problem || '', card.example_solution || '',
         card.real_world_connection || '',
+        card.ai_teacher_message || '',
+        card.ai_teacher_advice || '',
+        card.teacher_help_keywords || '',
         courseId
       ).run()
 

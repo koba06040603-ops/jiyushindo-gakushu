@@ -1345,64 +1345,64 @@ async function renderTopPage() {
             </summary>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
               <div class="bg-blue-50 rounded-xl p-3 border border-blue-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-blue-200 text-blue-800 px-2 py-0.5 rounded">F1</span><span class="text-sm font-bold text-gray-800">感覚処理効率理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">VARK理論（フレミング）</p>
-                <p class="text-xs text-gray-600">視覚(V)・聴覚(A)・読み書き(R)・運動感覚(K)の処理効率を測定し、最適なメディアタイプ（図解・音声・テキスト・体験活動）を選択する。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-blue-200 text-blue-800 px-2 py-0.5 rounded">F1</span><span class="text-sm font-bold text-gray-800">マルチモーダル感覚処理効率理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">VARK学習スタイル理論を発展（Fleming, 1987）</p>
+                <p class="text-xs text-gray-600">視覚(V)・聴覚(A)・読み書き(R)・運動感覚(K)の処理効率を多面的に測定し、最適なメディアタイプ（図解・動画・テキスト・体験活動）を選択する。</p>
               </div>
               <div class="bg-green-50 rounded-xl p-3 border border-green-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-green-200 text-green-800 px-2 py-0.5 rounded">F2</span><span class="text-sm font-bold text-gray-800">多重知能理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">MI理論（ガードナー）</p>
-                <p class="text-xs text-gray-600">言語的・論理数学的・空間的・身体運動的・音楽的・対人的・内省的・博物的の8つの知能の強弱から、問題形式と提示方法を決定する。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-green-200 text-green-800 px-2 py-0.5 rounded">F2</span><span class="text-sm font-bold text-gray-800">多元的知能プロファイリング理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">多重知能理論（MI理論）を発展（Gardner, 1983）</p>
+                <p class="text-xs text-gray-600">言語・論理数学・空間・身体運動・音楽・対人・内省・博物的の8知能の強弱パターンから、問題形式と提示方法を個別に決定する。</p>
               </div>
               <div class="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded">F3</span><span class="text-sm font-bold text-gray-800">経験学習理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">経験学習サイクル（コルブ）</p>
-                <p class="text-xs text-gray-600">具体的経験→省察的観察→抽象的概念化→能動的実験の4段階サイクルのどの段階にいるかに合わせた課題を設計する。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded">F3</span><span class="text-sm font-bold text-gray-800">適応型経験学習サイクル理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">経験学習サイクル理論を発展（Kolb, 1984）</p>
+                <p class="text-xs text-gray-600">具体的経験→省察的観察→抽象的概念化→能動的実験の4段階を適応的に検出し、段階に合わせた課題を設計する。</p>
               </div>
               <div class="bg-red-50 rounded-xl p-3 border border-red-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded">F4</span><span class="text-sm font-bold text-gray-800">適性処遇交互作用理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">ATI理論（クロンバック＆スノウ）</p>
-                <p class="text-xs text-gray-600">事前知識・不安レベル・独立性などの適性に応じて、スキャフォールド（足場かけ）の量と種類を最適に調整する。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded">F4</span><span class="text-sm font-bold text-gray-800">動的適性処遇交互作用理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">適性処遇交互作用理論（ATI）を発展（Cronbach & Snow, 1977）</p>
+                <p class="text-xs text-gray-600">事前知識・不安レベル・独立性などの適性をリアルタイムに測定し、スキャフォールド（足場かけ）の量と種類を動的に調整する。</p>
               </div>
               <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">F5</span><span class="text-sm font-bold text-gray-800">自己調整学習理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">SRL理論（ジマーマン）</p>
-                <p class="text-xs text-gray-600">予見段階→遂行段階→自己省察段階の3フェーズを支援する振り返りプロンプトやチェックリストを自動生成する。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">F5</span><span class="text-sm font-bold text-gray-800">AI支援型自己調整学習理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">自己調整学習理論（SRL）を発展（Zimmerman, 2000）</p>
+                <p class="text-xs text-gray-600">予見→遂行→自己省察の3フェーズをAIが検出し、段階に応じた振り返りプロンプトやチェックリストを自動生成する。</p>
               </div>
               <div class="bg-purple-50 rounded-xl p-3 border border-purple-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded">F6</span><span class="text-sm font-bold text-gray-800">認知戦略・望ましい困難理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">検索練習効果（レディガー）／望ましい困難（ビョーク）</p>
-                <p class="text-xs text-gray-600">検索練習・間隔反復・交互配置（インターリーブ）の準備度に応じて、出題間隔と問題配列を設計する。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded">F6</span><span class="text-sm font-bold text-gray-800">適応的検索練習・望ましい困難統合理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">検索練習効果（Roediger, 2006）＋ 望ましい困難理論（Bjork, 1994）を統合・発展</p>
+                <p class="text-xs text-gray-600">検索練習・間隔反復・交互配置（インターリーブ）の準備度を自動判定し、出題間隔と問題配列を個別に設計する。</p>
               </div>
               <div class="bg-pink-50 rounded-xl p-3 border border-pink-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-pink-200 text-pink-800 px-2 py-0.5 rounded">F7</span><span class="text-sm font-bold text-gray-800">発達の最近接領域理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">ZPD理論・スキャフォールディング（ヴィゴツキー）</p>
-                <p class="text-xs text-gray-600">「一人ではできないが、支援があればできる」領域の幅と位置に応じてヒント段階数・解法例の有無を決定する。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-pink-200 text-pink-800 px-2 py-0.5 rounded">F7</span><span class="text-sm font-bold text-gray-800">動的ZPDスキャフォールディング理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">発達の最近接領域（ZPD）理論を発展（Vygotsky, 1978）</p>
+                <p class="text-xs text-gray-600">「支援があればできる」領域の幅と位置をリアルタイム推定し、ヒント段階数・解法例の有無を動的に決定する。</p>
               </div>
               <div class="bg-orange-50 rounded-xl p-3 border border-orange-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-orange-200 text-orange-800 px-2 py-0.5 rounded">F8</span><span class="text-sm font-bold text-gray-800">自己決定理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">SDT理論（デシ＆ライアン）</p>
-                <p class="text-xs text-gray-600">自律性・有能感・関係性の3つの基本的心理欲求の充足度を測定し、内発的動機づけを高める支援を設計する。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-orange-200 text-orange-800 px-2 py-0.5 rounded">F8</span><span class="text-sm font-bold text-gray-800">学習文脈型自己決定理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">自己決定理論（SDT）を発展（Deci & Ryan, 1985）</p>
+                <p class="text-xs text-gray-600">自律性・有能感・関係性の3基本的心理欲求の充足度を学習場面で測定し、内発的動機づけを高める支援を個別設計する。</p>
               </div>
               <div class="bg-teal-50 rounded-xl p-3 border border-teal-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-teal-200 text-teal-800 px-2 py-0.5 rounded">F9</span><span class="text-sm font-bold text-gray-800">メタ認知理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">メタ認知（フラベル）／メタ認知的制御（ブラウン）</p>
-                <p class="text-xs text-gray-600">メタ認知的知識・メタ認知的制御・批判的思考の発達段階に応じて、自己モニタリング課題や振り返り問いを付加する。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-teal-200 text-teal-800 px-2 py-0.5 rounded">F9</span><span class="text-sm font-bold text-gray-800">段階的メタ認知発達支援理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">メタ認知理論を発展（Flavell, 1979 ＋ Brown, 1987）</p>
+                <p class="text-xs text-gray-600">メタ認知的知識・制御・批判的思考の発達段階を自動判定し、段階に応じた自己モニタリング課題や振り返り問いを付加する。</p>
               </div>
               <div class="bg-cyan-50 rounded-xl p-3 border border-cyan-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-cyan-200 text-cyan-800 px-2 py-0.5 rounded">F10</span><span class="text-sm font-bold text-gray-800">領域学習モデル</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">MDL: Model of Domain Learning（アレクサンダー）</p>
-                <p class="text-xs text-gray-600">順応期→能力期→熟達期の3段階のどこにいるかに応じて課題の難易度を設定し、先行概念（誤概念）への対応を組み込む。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-cyan-200 text-cyan-800 px-2 py-0.5 rounded">F10</span><span class="text-sm font-bold text-gray-800">適応型領域学習進行モデル</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">領域学習モデル（MDL）を発展（Alexander, 2003）</p>
+                <p class="text-xs text-gray-600">順応期→能力期→熟達期の3段階を診断データから推定し、課題難易度と先行概念（誤概念）への対応を自動で組み込む。</p>
               </div>
               <div class="bg-lime-50 rounded-xl p-3 border border-lime-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-lime-200 text-lime-800 px-2 py-0.5 rounded">F11</span><span class="text-sm font-bold text-gray-800">真正の学び理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">Authentic Learning（ヘリントン＆オリバー）</p>
-                <p class="text-xs text-gray-600">個人的関連性・実世界との接続・コミュニティへの参加の3要素を問題文に埋め込み、学びの意味づけを促す。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-lime-200 text-lime-800 px-2 py-0.5 rounded">F11</span><span class="text-sm font-bold text-gray-800">個別文脈化された真正の学び理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">真正の学び理論を発展（Herrington & Oliver, 2000）</p>
+                <p class="text-xs text-gray-600">個人的関連性・実世界との接続・コミュニティへの参加の3要素を児童の生活文脈に合わせて問題文に埋め込む。</p>
               </div>
               <div class="bg-rose-50 rounded-xl p-3 border border-rose-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-rose-200 text-rose-800 px-2 py-0.5 rounded">F12</span><span class="text-sm font-bold text-gray-800">学業感情の統制価値理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">Control-Value Theory（ペクルン）</p>
-                <p class="text-xs text-gray-600">学業的享受・不安・退屈のバランスを評価し、統制感と価値づけを高める感情支援と適切な難易度調整を行う。</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-rose-200 text-rose-800 px-2 py-0.5 rounded">F12</span><span class="text-sm font-bold text-gray-800">リアルタイム学業感情調整理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">学業感情の統制価値理論を発展（Pekrun, 2006）</p>
+                <p class="text-xs text-gray-600">学業的享受・不安・退屈の状態をリアルタイム検出し、統制感と価値づけを高める感情支援と難易度調整を行う。</p>
               </div>
             </div>
           </details>
@@ -1419,26 +1419,26 @@ async function renderTopPage() {
                 <div class="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
                   <span class="text-2xl block mb-1">🧠</span>
                   <span class="text-xs font-bold text-blue-800">認知的自律性 (H)</span>
-                  <p class="text-[10px] text-blue-600 font-bold mt-0.5">（自分で考えて学べる力）</p>
-                  <p class="text-[10px] text-gray-500 mt-0.5">F2多重知能 + F5自己調整 + F9メタ認知 + F10領域知識</p>
+                  <p class="text-[10px] text-blue-600 font-bold mt-0.5">（自分の力で「わかった！」となれる力 ― 知識を使いこなし、自分で考え抜ける力）</p>
+                  <p class="text-[10px] text-gray-500 mt-0.5">F2多元知能 + F5自己調整 + F9メタ認知 + F10領域学習</p>
                 </div>
                 <div class="bg-green-50 rounded-xl p-3 text-center border border-green-200">
                   <span class="text-2xl block mb-1">💚</span>
                   <span class="text-xs font-bold text-green-800">情緒的安定性 (G)</span>
-                  <p class="text-[10px] text-green-600 font-bold mt-0.5">（安心して学びに取り組める度合い）</p>
-                  <p class="text-[10px] text-gray-500 mt-0.5">F4不安(逆) + F8動機 + F12感情</p>
+                  <p class="text-[10px] text-green-600 font-bold mt-0.5">（「失敗しても大丈夫」と思える心の安心感 ― 不安が小さく、落ち着いて学べる状態）</p>
+                  <p class="text-[10px] text-gray-500 mt-0.5">F4不安(逆) + F8動機 + F12感情調整</p>
                 </div>
                 <div class="bg-purple-50 rounded-xl p-3 text-center border border-purple-200">
                   <span class="text-2xl block mb-1">📐</span>
                   <span class="text-xs font-bold text-purple-800">方略的成熟度 (A)</span>
-                  <p class="text-[10px] text-purple-600 font-bold mt-0.5">（効果的な学習方法を使える力）</p>
-                  <p class="text-[10px] text-gray-500 mt-0.5">F3経験学習 + F5自己調整 + F6認知戦略</p>
+                  <p class="text-[10px] text-purple-600 font-bold mt-0.5">（「こうやればできる！」という学び方のコツ ― 計画を立て、工夫して学べる力）</p>
+                  <p class="text-[10px] text-gray-500 mt-0.5">F3経験学習 + F5自己調整 + F6検索練習</p>
                 </div>
                 <div class="bg-orange-50 rounded-xl p-3 text-center border border-orange-200">
                   <span class="text-2xl block mb-1">⚡</span>
                   <span class="text-xs font-bold text-orange-800">動機的エネルギー (E)</span>
-                  <p class="text-[10px] text-orange-600 font-bold mt-0.5">（学びたいという意欲の強さ）</p>
-                  <p class="text-[10px] text-gray-500 mt-0.5">F4適性 + F8自己決定 + F11真正性</p>
+                  <p class="text-[10px] text-orange-600 font-bold mt-0.5">（「もっと知りたい！」というワクワクの燃料 ― 学ぶこと自体が楽しいと感じる意欲）</p>
+                  <p class="text-[10px] text-gray-500 mt-0.5">F4適性 + F8自己決定 + F11真正の学び</p>
                 </div>
               </div>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -2230,7 +2230,7 @@ async function renderTopPage() {
                   <li>• 🎵 <span class="font-semibold">音楽生成</span>: ElevenLabs で九九の歌、集中BGM</li>
                   <li>• 🎨 <span class="font-semibold">画像生成</span>: Flux で図解、イラスト（例: 立体図形）</li>
                   <li>• 🎤 <span class="font-semibold">音声生成</span>: Minimax TTS で学年別読み上げ</li>
-                  <li>• 📝 <span class="font-semibold">学習カード自動生成</span>: 3コース×6枚+ヒント54個を約1分で作成</li>
+                  <li>• 📝 <span class="font-semibold">学習カード自動生成</span>: 3コース×10枚+ヒント90個を約1分で作成</li>
                 </ul>
                 <div class="bg-indigo-100 p-2 rounded mt-2">
                   <p class="text-indigo-800 font-semibold">
@@ -2280,7 +2280,7 @@ async function renderTopPage() {
                   <li>• <span class="font-semibold">短時間動画</span>（AI生成5〜8秒）で飽きずに学習</li>
                   <li>• <span class="font-semibold">音楽BGM</span>（AI生成）で集中力を持続</li>
                   <li>• <span class="font-semibold">学習時間データ分析</span>: 集中できる時間帯を AI が自動検出</li>
-                  <li>• <span class="font-semibold">小ステップ設計</span>: 6枚×10分＝1時間で達成感</li>
+                  <li>• <span class="font-semibold">小ステップ設計</span>: 10枚×10分＝100分で達成感</li>
                 </ul>
                 <div class="bg-amber-100 p-2 rounded mt-2">
                   <p class="text-amber-800 font-semibold">
@@ -5342,6 +5342,7 @@ async function loadCardPage(cardId) {
                 学習カード ${card.card_number}
               </h1>
               <h2 class="card-title text-gray-800">${formatText(card.card_title)}</h2>
+              <p class="text-sm text-gray-500 mt-1"><i class="fas fa-book mr-1"></i>${state.selectedCurriculum?.textbook_company || ''} ${state.selectedCurriculum?.grade || ''} ${state.selectedCurriculum?.subject || ''} ― ${state.selectedCurriculum?.unit_name || ''}</p>
             </div>
             <div class="flex items-center gap-3">
               ${state.auth.user?.role === 'teacher' ? `
@@ -5383,7 +5384,6 @@ async function loadCardPage(cardId) {
         </div>
 
         <!-- 旧ヘルプメニューを削除し、ヒントは別途表示 -->
-        </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <!-- メインコンテンツ（左側・中央） -->
@@ -5450,6 +5450,21 @@ async function loadCardPage(cardId) {
                 <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">${formatText(card.problem_content || card.problem_text || card.problem_description || '')}</pre>
               </div>
               
+              <!-- 動画コンテンツ（YouTube / NHK for School） -->
+              ${(() => {
+                const vUrl = card.solution_video_url || ''
+                const ytMatch = vUrl.match(/(?:v=|youtu\\.be\\/)([^&?]+)/)
+                const ytId = ytMatch ? ytMatch[1] : ''
+                if (ytId) {
+                  return '<div class="mt-4 rounded-xl overflow-hidden border-2 border-gray-200 shadow-sm"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 p-2 bg-gray-50"><i class="fas fa-video mr-1"></i>学習動画：一時停止しながら考えてみよう</p></div>'
+                } else if (vUrl.includes('nhk.or.jp')) {
+                  return '<div class="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4 shadow-sm"><div class="flex items-center gap-2 mb-3"><span class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">NHK for School</span><span class="text-sm font-bold text-gray-800">学習動画</span></div><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;border:2px solid #e2e8f0;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" src="' + vUrl + '" allow="autoplay; fullscreen" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-3"><i class="fas fa-info-circle mr-1"></i>NHK for Schoolの動画です。再生できない場合は<a href="' + vUrl + '" target="_blank" class="text-blue-600 underline font-bold">こちらから直接視聴</a>してください。</p></div>'
+                } else if (vUrl) {
+                  return '<div class="mt-4 bg-red-50 border-2 border-red-200 rounded-xl p-4"><a href="' + vUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-lg font-bold transition shadow-sm"><i class="fas fa-play-circle text-lg"></i>学習動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>'
+                }
+                return ''
+              })()}
+              
               <!-- 回答欄 -->
               <div class="mt-6">
                 <label class="block text-sm font-bold text-gray-700 mb-2">あなたの答えを書きましょう</label>
@@ -5473,11 +5488,16 @@ async function loadCardPage(cardId) {
                   <textarea id="answerInput" 
                             rows="6" 
                             class="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 text-lg"
-                            style="font-size: 18px; line-height: 1.8; resize: vertical; min-height: 150px; caret-color: #000000; cursor: text;"
-                            placeholder="ここに答えを書いてください..."
-                            onfocus="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.2)'"
-                            onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'"></textarea>
-                  <p class="text-xs text-gray-400 mt-1"><i class="fas fa-keyboard mr-1"></i>キーボードで入力できます。Enterキーで改行します。</p>
+                            style="font-size: 20px; line-height: 2.0; resize: vertical; min-height: 180px; caret-color: #000000; cursor: text; color: #1a1a1a; background-color: #ffffff; -webkit-user-select: text; user-select: text; -webkit-appearance: none;"
+                            placeholder="ここをクリックして答えを書いてください（キーボードで入力できます）"
+                            autocomplete="off"
+                            autocorrect="off"
+                            spellcheck="false"
+                            onfocus="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.2)'; this.placeholder=''"
+                            onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'; if(!this.value) this.placeholder='ここをクリックして答えを書いてください（キーボードで入力できます）'"
+                            onclick="this.focus()"
+                            ></textarea>
+                  <p class="text-xs text-gray-400 mt-1"><i class="fas fa-keyboard mr-1"></i>キーボードで入力できます。Enterキーで改行します。マウスでクリックしてから入力してください。</p>
                 </div>
                 
                 <!-- 手書き入力エリア -->
@@ -5599,18 +5619,18 @@ async function loadCardPage(cardId) {
             <!-- ヒントカードエリア -->
             <div id="hintsArea" class="hidden bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6">
               <h3 class="text-lg font-bold text-yellow-800 mb-4">
-                <i class="fas fa-lightbulb mr-2"></i>ヒント
+                <i class="fas fa-lightbulb mr-2"></i>3だんかいヒント
               </h3>
               <div class="space-y-3">
-                ${hints.map((hint, index) => `
-                  <div class="bg-white rounded-lg p-4">
+                ${hints.length > 0 ? hints.map((hint, index) => `
+                  <div class="bg-white rounded-lg p-4 border ${index === 0 ? 'border-green-200' : index === 1 ? 'border-yellow-200' : 'border-orange-200'}">
                     <button onclick="toggleHint(${index})" 
                             class="w-full text-left font-bold text-gray-800 hover:text-indigo-600 transition flex items-center justify-between">
-                      <span>ヒント ${index + 1}</span>
+                      <span>${index === 0 ? '🟢 ヒント1（考える方向）' : index === 1 ? '🟡 ヒント2（具体的手がかり）' : '🟠 ヒント3（答えに近づく）'}</span>
                       <i class="fas fa-chevron-down"></i>
                     </button>
-                    <div id="hint-${index}" class="hidden mt-3 pt-3 border-t">
-                      <pre class="text-gray-700 whitespace-pre-wrap font-sans text-sm">${hint.hint_content}</pre>
+                    <div id="hint-${index}" class="${index === 0 ? '' : 'hidden'} mt-3 pt-3 border-t">
+                      <pre class="text-gray-700 whitespace-pre-wrap font-sans text-sm">${hint.hint_content || hint.hint_text || ''}</pre>
                       ${hint.thinking_tool_suggestion ? `
                         <div class="mt-3 bg-blue-50 rounded p-3">
                           <p class="text-xs font-bold text-blue-800 mb-1">
@@ -5621,9 +5641,20 @@ async function loadCardPage(cardId) {
                       ` : ''}
                     </div>
                   </div>
-                `).join('')}
+                `).join('') : '<div class="bg-white rounded-lg p-4 text-center text-sm text-gray-500"><i class="fas fa-info-circle mr-1"></i>この問題のヒントは準備中です</div>'}
               </div>
             </div>
+
+            <!-- 先生ヘルプエリア -->
+            ${card.teacher_help_keywords ? `
+              <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-6">
+                <h3 class="text-lg font-bold text-green-800 mb-3">
+                  <i class="fas fa-chalkboard-teacher mr-2"></i>先生にきくときのキーワード
+                </h3>
+                <p class="text-sm text-gray-700">${card.teacher_help_keywords}</p>
+                <p class="text-xs text-gray-500 mt-2"><i class="fas fa-hand-point-right mr-1"></i>先生に質問するとき、このキーワードを使うと伝わりやすいよ！</p>
+              </div>
+            ` : ''}
 
             <!-- AI先生エリア -->
             <div id="aiTeacherArea" class="hidden bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
@@ -9292,7 +9323,7 @@ function generateProgressBars(studentProgress, courses) {
   
   Object.values(studentProgress).forEach(({ student, progress, allProgress }) => {
     const courseColor = getProgressColor(progress?.course_level)
-    const progressPercent = calculateProgressPercent(allProgress, 6) // 6枚のカード想定
+    const progressPercent = calculateProgressPercent(allProgress, 10) // 10枚のカード想定
     const isStuck = isStudentStuck(progress)
     const needsHelp = progress?.help_requested_from === 'teacher'
     
@@ -12886,7 +12917,7 @@ function showUnitGeneratorModal() {
                     <div class="font-bold text-blue-800">⚡ 標準モード（推奨）</div>
                     <div class="text-sm text-gray-700">Gemini 3 Flash - バランス重視</div>
                     <div class="text-xs text-blue-600 mt-1">
-                      生成時間：約1分〜2分 | 3コース×6枚＝18枚のカード確実生成
+                      生成時間：約1分〜2分 | 3コース×10枚＝30枚のカード確実生成
                     </div>
                   </div>
                 </label>
@@ -14088,7 +14119,7 @@ function showGenerationProgress(grade, subject, unitName, qualityMode = 'standar
             <div id="step3" class="step-card bg-white rounded-xl p-4 shadow text-center border-2 border-gray-200 transition-all">
               <div class="text-3xl mb-2">📚</div>
               <p class="font-bold text-gray-800 text-sm mb-1">カード生成</p>
-              <p class="text-xs text-gray-500">18枚のカード</p>
+              <p class="text-xs text-gray-500">30枚のカード</p>
               <div class="step-status mt-2 text-xs text-gray-400">待機中</div>
             </div>
             
@@ -14222,8 +14253,8 @@ function animateRealtimeProgress(totalTime, qualityMode) {
       startPercent: 30,
       endPercent: 75,
       icon: 'fa-cards',
-      task: '18枚の学習カードを生成中...',
-      comment: '📚 各コース6枚ずつ、合計18枚のカードを作っています',
+      task: '30枚の学習カードを生成中...',
+      comment: '📚 各コース6枚ずつ、合計30枚のカードを作っています',
       emoji: '📚'
     },
     {
@@ -42827,18 +42858,18 @@ async function showTeacherSupportDashboard(curriculumId) {
         '<div class="bg-white rounded-xl border-2 border-indigo-200 p-4">' +
           '<h4 class="font-bold text-indigo-800 mb-3"><i class="fas fa-book-open mr-2"></i>統合されている12の教育理論</h4>' +
           '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">' +
-            buildTheoryCard('F1', '感覚処理効率理論', 'VARK理論（フレミング）', '視覚・聴覚・読み書き・運動感覚の処理効率を測定し、最適なメディアタイプを選択') +
-            buildTheoryCard('F2', '多重知能理論', 'MI理論（ガードナー）', '8つの知能の強弱パターンから、問題形式と提示方法を決定') +
-            buildTheoryCard('F3', '経験学習理論', '経験学習サイクル（コルブ）', '具体的経験→省察→概念化→実験のサイクル段階に合わせた課題設計') +
-            buildTheoryCard('F4', '適性処遇交互作用理論', 'ATI理論（クロンバック＆スノウ）', '事前知識・不安・独立性に応じたスキャフォールド量を調整') +
-            buildTheoryCard('F5', '自己調整学習理論', 'SRL理論（ジマーマン）', '予見→遂行→自己省察の3段階を支援する振り返りプロンプトを生成') +
-            buildTheoryCard('F6', '認知戦略・望ましい困難理論', '検索練習効果（レディガー）／望ましい困難（ビョーク）', '検索練習・間隔反復・インターリーブ戦略の準備度に応じた出題間隔設計') +
-            buildTheoryCard('F7', '発達の最近接領域理論', 'ZPD・スキャフォールディング（ヴィゴツキー）', '「支援があればできる」領域の幅と位置に応じたヒント段階数・解法例の決定') +
-            buildTheoryCard('F8', '自己決定理論', 'SDT理論（デシ＆ライアン）', '自律性・有能感・関係性の3欲求充足度から動機づけ支援を設計') +
-            buildTheoryCard('F9', 'メタ認知理論', 'メタ認知（フラベル）／メタ認知的制御（ブラウン）', 'メタ認知的知識・制御・批判的思考の発達に応じた自己モニタリング課題を付加') +
-            buildTheoryCard('F10', '領域学習モデル', 'MDL理論（アレクサンダー）', '順応期→能力期→熟達期の段階に応じた課題難易度と先行概念対応') +
-            buildTheoryCard('F11', '真正の学び理論', 'Authentic Learning（ヘリントン＆オリバー）', '個人的関連性・実世界接続・コミュニティ参加の要素を問題文に埋め込み') +
-            buildTheoryCard('F12', '学業感情の統制価値理論', 'Control-Value Theory（ペクルン）', '学業的享受・不安・退屈の状態に応じた感情支援と難易度調整') +
+            buildTheoryCard('F1', 'マルチモーダル感覚処理効率理論', 'VARK学習スタイル理論を発展（Fleming, 1987）', '視覚・聴覚・読み書き・運動感覚の処理効率を多面的に測定し、最適なメディアタイプを選択') +
+            buildTheoryCard('F2', '多元的知能プロファイリング理論', '多重知能理論（MI）を発展（Gardner, 1983）', '8知能の強弱パターンから、問題形式と提示方法を個別に決定') +
+            buildTheoryCard('F3', '適応型経験学習サイクル理論', '経験学習サイクル理論を発展（Kolb, 1984）', '具体的経験→省察→概念化→実験の段階を適応的に検出し課題を設計') +
+            buildTheoryCard('F4', '動的適性処遇交互作用理論', '適性処遇交互作用理論（ATI）を発展（Cronbach & Snow, 1977）', '適性をリアルタイム測定しスキャフォールド量を動的に調整') +
+            buildTheoryCard('F5', 'AI支援型自己調整学習理論', '自己調整学習理論（SRL）を発展（Zimmerman, 2000）', 'AIが予見→遂行→自己省察の3段階を検出し振り返りプロンプトを自動生成') +
+            buildTheoryCard('F6', '適応的検索練習・望ましい困難統合理論', '検索練習効果（Roediger, 2006）＋ 望ましい困難理論（Bjork, 1994）を統合・発展', '検索練習・間隔反復・インターリーブの準備度を自動判定し出題間隔を個別設計') +
+            buildTheoryCard('F7', '動的ZPDスキャフォールディング理論', '発達の最近接領域（ZPD）理論を発展（Vygotsky, 1978）', 'ZPDをリアルタイム推定しヒント段階数・解法例を動的に決定') +
+            buildTheoryCard('F8', '学習文脈型自己決定理論', '自己決定理論（SDT）を発展（Deci & Ryan, 1985）', '自律性・有能感・関係性の充足度を学習場面で測定し動機づけ支援を個別設計') +
+            buildTheoryCard('F9', '段階的メタ認知発達支援理論', 'メタ認知理論を発展（Flavell, 1979 ＋ Brown, 1987）', 'メタ認知の発達段階を自動判定し自己モニタリング課題を段階的に付加') +
+            buildTheoryCard('F10', '適応型領域学習進行モデル', '領域学習モデル（MDL）を発展（Alexander, 2003）', '順応期→能力期→熟達期を診断データから推定し難易度と誤概念対応を自動組み込み') +
+            buildTheoryCard('F11', '個別文脈化された真正の学び理論', '真正の学び理論を発展（Herrington & Oliver, 2000）', '個人的関連性・実世界接続・コミュニティ参加を児童の生活文脈に合わせ埋め込み') +
+            buildTheoryCard('F12', 'リアルタイム学業感情調整理論', '学業感情の統制価値理論を発展（Pekrun, 2006）', '享受・不安・退屈をリアルタイム検出し感情支援と難易度調整を自動実行') +
           '</div>' +
         '</div>' +
         
@@ -42847,10 +42878,10 @@ async function showTeacherSupportDashboard(curriculumId) {
           '<h4 class="font-bold text-indigo-800 mb-3"><i class="fas fa-chart-bar mr-2"></i>4基幹軸とアーキタイプ分類</h4>' +
           '<p class="text-xs text-gray-600 mb-3">12理論のプロファイルから4つの基幹軸スコア（きかんじくスコア：児童の学びの特性を0-100で数値化した中心指標）を算出し、その組み合わせで8つの学習者アーキタイプに分類します。</p>' +
           '<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">' +
-            '<div class="bg-blue-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">🧠</span><span class="text-xs font-bold text-blue-800">認知的自律性 (H)</span><p class="text-xs text-blue-600 font-bold">（自分で考えて学べる力）</p><p class="text-xs text-gray-500 mt-0.5">F2知能 + F5SRL + F9メタ認知 + F10領域知識</p></div>' +
-            '<div class="bg-green-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">💚</span><span class="text-xs font-bold text-green-800">情緒的安定性 (G)</span><p class="text-xs text-green-600 font-bold">（安心して学びに取り組める度合い）</p><p class="text-xs text-gray-500 mt-0.5">F4不安(逆) + F8動機 + F12感情</p></div>' +
-            '<div class="bg-purple-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">📐</span><span class="text-xs font-bold text-purple-800">方略的成熟度 (A)</span><p class="text-xs text-purple-600 font-bold">（効果的な学習方法を使える力）</p><p class="text-xs text-gray-500 mt-0.5">F3経験学習 + F5SRL + F6認知戦略</p></div>' +
-            '<div class="bg-orange-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">⚡</span><span class="text-xs font-bold text-orange-800">動機的エネルギー (E)</span><p class="text-xs text-orange-600 font-bold">（学びたいという意欲の強さ）</p><p class="text-xs text-gray-500 mt-0.5">F4適性 + F8動機 + F11真正性</p></div>' +
+            '<div class="bg-blue-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">🧠</span><span class="text-xs font-bold text-blue-800">認知的自律性 (H)</span><p class="text-xs text-blue-600 font-bold">（自分の力で「わかった！」となれる力）</p><p class="text-xs text-gray-500 mt-0.5">F2多元知能 + F5自己調整 + F9メタ認知 + F10領域学習</p></div>' +
+            '<div class="bg-green-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">💚</span><span class="text-xs font-bold text-green-800">情緒的安定性 (G)</span><p class="text-xs text-green-600 font-bold">（「失敗しても大丈夫」と思える心の安心感）</p><p class="text-xs text-gray-500 mt-0.5">F4不安(逆) + F8動機 + F12感情調整</p></div>' +
+            '<div class="bg-purple-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">📐</span><span class="text-xs font-bold text-purple-800">方略的成熟度 (A)</span><p class="text-xs text-purple-600 font-bold">（「こうやればできる！」という学び方のコツ）</p><p class="text-xs text-gray-500 mt-0.5">F3経験学習 + F5自己調整 + F6検索練習</p></div>' +
+            '<div class="bg-orange-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">⚡</span><span class="text-xs font-bold text-orange-800">動機的エネルギー (E)</span><p class="text-xs text-orange-600 font-bold">（「もっと知りたい！」というワクワクの燃料）</p><p class="text-xs text-gray-500 mt-0.5">F4適性 + F8自己決定 + F11真正の学び</p></div>' +
           '</div>' +
           '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">' +
             Object.keys(archEmojis).map(function(aid) {
