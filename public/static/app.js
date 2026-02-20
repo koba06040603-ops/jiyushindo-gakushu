@@ -40671,8 +40671,18 @@ async function generatePersonalizedCourse(studentId, curriculumId) {
 
 // 教師チェック画面
 function showPersonalizedCourseReview(data) {
-  const { student_id, curriculum_id, curriculum_info, student_analysis, personalized_plan } = data
+  const { student_id, curriculum_id, curriculum_info, student_analysis, personalized_plan, v4_analysis } = data
   const cards = personalized_plan.cards || []
+  const arch = v4_analysis?.archetype || {}
+  const axes = v4_analysis?.axes || {}
+  const archEmojis = { 'A': '🌟', 'B': '📚', 'C': '🎯', 'D': '🔍', 'E': '💪', 'F': '🌱', 'G': '🤝', 'H': '🛡️' }
+  
+  // 軸スコアバー生成
+  function makeBar(label, score) {
+    const pct = Math.max(0, Math.min(100, score || 0))
+    const clr = pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-blue-500' : 'bg-orange-500'
+    return '<div class="flex items-center gap-2 text-xs"><span class="w-24 text-gray-600 font-bold">' + label + '</span><div class="flex-1 bg-gray-200 rounded-full h-1.5"><div class="' + clr + ' h-1.5 rounded-full" style="width:' + pct + '%"></div></div><span class="w-8 text-right text-gray-500">' + pct + '</span></div>'
+  }
   
   const modalHTML = `
     <div id="personalizedModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='personalizedModal')document.getElementById('personalizedModal').remove()">
@@ -40715,6 +40725,32 @@ function showPersonalizedCourseReview(data) {
             </div>
             <p class="text-sm text-gray-700">${personalized_plan.analysis_summary || ''}</p>
           </div>
+          
+          <!-- ★ v4理論分析（12理論統合） -->
+          ${v4_analysis ? `
+          <div class="bg-indigo-50 border-l-4 border-indigo-400 p-4 rounded">
+            <h3 class="font-bold text-indigo-800 mb-2"><i class="fas fa-brain mr-2"></i>12理論統合分析（v4エンジン）</h3>
+            <div class="bg-white rounded-lg p-3 mb-2">
+              <div class="flex items-center gap-3 mb-2">
+                <span class="text-3xl">${archEmojis[arch.id] || '🧠'}</span>
+                <div>
+                  <span class="text-lg font-bold text-indigo-800">タイプ${arch.id}: ${arch.name_ja || '不明'}</span>
+                  <span class="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full ml-2">${arch.name_en || ''}</span>
+                  <p class="text-xs text-gray-600 mt-1">${arch.presence || ''}</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 gap-1">
+                ${makeBar('認知的自律性', axes.cognitive_autonomy)}
+                ${makeBar('情緒的安定性', axes.emotional_stability)}
+                ${makeBar('方略的成熟度', axes.strategic_maturity)}
+                ${makeBar('動機的エネルギー', axes.motivational_energy)}
+              </div>
+              ${v4_analysis.template ? '<div class="flex gap-2 mt-2 text-xs"><span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">メディア: ' + (v4_analysis.template.media_type || '-') + '</span><span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">形式: ' + (v4_analysis.template.question_format || '-') + '</span><span class="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">推奨: ' + (v4_analysis.template.card_count || '-') + '枚</span></div>' : ''}
+            </div>
+            ${personalized_plan.archetype_insight ? '<p class="text-sm text-indigo-700 mt-1"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>' + personalized_plan.archetype_insight + '</p>' : ''}
+            ${v4_analysis.teacher_alert ? '<div class="bg-red-50 border border-red-300 rounded p-2 mt-2 text-xs text-red-700"><i class="fas fa-exclamation-triangle mr-1"></i>⚠️ この児童は教師の直接介入が推奨されています</div>' : ''}
+          </div>
+          ` : ''}
           
           <!-- テスト対策データ可視化 -->
           ${student_analysis.test_prep && (student_analysis.test_prep.plan_count > 0 || student_analysis.test_prep.weak_topics?.length > 0) ? `
@@ -40789,6 +40825,7 @@ function showPersonalizedCourseReview(data) {
                       card.difficulty_level === 'hard' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
                     }">${card.difficulty_level || 'standard'}</span>
                   </div>
+                  ${card.personalization_note ? '<div class="bg-indigo-50 border border-indigo-200 rounded p-2 mb-2 text-xs"><i class="fas fa-brain text-indigo-500 mr-1"></i><span class="font-bold text-indigo-700">なぜこの問題か:</span> <span class="text-indigo-600">' + card.personalization_note + '</span></div>' : ''}
                   
                   <div class="space-y-2">
                     <div>
@@ -40858,6 +40895,8 @@ function showPersonalizedCourseReview(data) {
   // カードデータを一時保存
   window._personalizedCards = cards
   window._personalizedPlan = personalized_plan
+  // v4分析結果も保存（配信時にDBに送るため）
+  window._personalizedV4Analysis = data.v4_analysis || null
 }
 
 // 個別最適化コースを配信（教師チェック後）
@@ -40881,7 +40920,9 @@ async function publishPersonalizedCourse(studentId, curriculumId) {
       cards,
       analysis_summary: window._personalizedPlan.analysis_summary,
       recommended_approach: window._personalizedPlan.recommended_approach,
-      hints_for_teacher: window._personalizedPlan.hints_for_teacher
+      hints_for_teacher: window._personalizedPlan.hints_for_teacher,
+      archetype_insight: window._personalizedPlan.archetype_insight || '',
+      v4_analysis: window._personalizedV4Analysis || null
     })
     
     hideLoading()
@@ -41240,7 +41281,9 @@ async function startBulkGeneration(curriculumId) {
               cards: planCards,
               analysis_summary: plan.analysis_summary || res.data.analysis_summary || '',
               recommended_approach: plan.recommended_approach || res.data.recommended_approach || '',
-              hints_for_teacher: plan.hints_for_teacher || res.data.hints_for_teacher || []
+              hints_for_teacher: plan.hints_for_teacher || res.data.hints_for_teacher || [],
+              archetype_insight: plan.archetype_insight || '',
+              v4_analysis: res.data.v4_analysis || null
             }, { timeout: 60000 })
             
             if (pubRes.data.success) {
@@ -41360,8 +41403,17 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
     // マルチメディア解析ヘルパー
     function parseMultimedia(card) {
       let mm = {}
-      try { if (card.problem_content && card.problem_content.startsWith('{')) mm = JSON.parse(card.problem_content)?.multimedia || {} } catch(e) {}
-      return mm
+      let pNote = ''
+      let qFormat = ''
+      try { 
+        if (card.problem_content && card.problem_content.startsWith('{')) {
+          const pc = JSON.parse(card.problem_content)
+          mm = pc?.multimedia || {}
+          pNote = pc?.personalization_note || ''
+          qFormat = pc?.question_format || ''
+        }
+      } catch(e) {}
+      return { mm, pNote, qFormat }
     }
     function getYoutubeId(url) {
       try { const m = (url||'').match(/(?:v=|youtu\.be\/)([^&?]+)/); return m ? m[1] : '' } catch(e) { return '' }
@@ -41388,6 +41440,20 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
           </div>
           
           <div class="p-6">
+            <!-- ★ v4分析セクション（動的ロード） -->
+            <div id="v4-analysis-section" class="mb-6">
+              <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4">
+                <h3 class="text-lg font-bold text-indigo-800 mb-2 flex items-center">
+                  <i class="fas fa-brain text-indigo-600 mr-2"></i>
+                  この児童の学習タイプ分析（12理論統合）
+                </h3>
+                <div class="text-center py-3">
+                  <i class="fas fa-spinner fa-spin text-indigo-400 mr-1"></i>
+                  <span class="text-sm text-gray-500">分析データを読み込み中...</span>
+                </div>
+              </div>
+            </div>
+
             <!-- 単元情報 -->
             <div class="bg-pink-50 border-l-4 border-pink-500 p-4 rounded-r-lg mb-6">
               <h3 class="text-lg font-bold text-pink-800 mb-1">${curriculum.unit_name}</h3>
@@ -41404,7 +41470,9 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
               </h3>
               <div class="space-y-4">
                 ${cards.map((card, i) => {
-                  const mm = parseMultimedia(card)
+                  const parsed = parseMultimedia(card)
+                  const mm = parsed.mm
+                  const pNote = parsed.pNote
                   const ytUrl = mm.youtube_url || card.solution_video_url || ''
                   const ytId = getYoutubeId(ytUrl)
                   const tactile = mm.tactile_activity || ''
@@ -41441,6 +41509,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       </details>
                     </div>
                     ${card.hint_text ? '<details class="mt-1"><summary class="text-xs text-green-600 cursor-pointer font-bold">ヒントを表示</summary><p class="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">' + card.hint_text + '</p></details>' : ''}
+                    ${pNote ? '<div class="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs"><span class="font-bold text-indigo-700"><i class="fas fa-brain mr-1"></i>この問題の理論根拠:</span> <span class="text-indigo-600">' + pNote + '</span></div>' : ''}
                     <!-- 編集パネル（非表示） -->
                     <div id="card-edit-panel-${card.card_id || card.id || i}" class="hidden mt-3 bg-white border-2 border-yellow-300 rounded-xl p-4">
                       <h5 class="font-bold text-yellow-700 mb-2"><i class="fas fa-edit mr-1"></i>カード編集</h5>
@@ -41568,6 +41637,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                   </div>
                   ${p.correct_choice ? `<details class="mt-1"><summary class="text-xs text-yellow-600 cursor-pointer font-bold">正解を見る</summary><p class="text-xs text-gray-600 mt-1">正解: ${p.correct_choice} ${p.explanation ? '— ' + p.explanation : ''}</p></details>` : ''}
                   ` : ''}
+                  ${p.personalization_reason ? '<div class="mt-1 text-xs text-indigo-500"><i class="fas fa-brain mr-1"></i>' + p.personalization_reason + '</div>' : ''}
                 </div>
               `).join('')}
             </div>`
@@ -41617,6 +41687,119 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
       }
     } catch (metaErr) {
       console.warn('メタデータ取得エラー:', metaErr)
+    }
+    
+    // ★ v4分析データを非同期で取得して表示
+    try {
+      const analysisRes = await axios.get(`/api/teacher/personalized-course-analysis/${cid}`)
+      const analysisSection = document.getElementById('v4-analysis-section')
+      if (analysisSection && analysisRes.data.success) {
+        const ad = analysisRes.data
+        const v4 = ad.v4_analysis || {}
+        const arch = v4.archetype || {}
+        const axes = v4.axes || {}
+        
+        // 軸スコアバーの色分け
+        function axisBar(label, score, icon) {
+          const pct = Math.max(0, Math.min(100, score || 0))
+          const color = pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-blue-500' : 'bg-orange-500'
+          return '<div class="mb-1"><div class="flex items-center justify-between text-xs mb-0.5"><span class="font-bold text-gray-600">' + icon + ' ' + label + '</span><span class="text-gray-500">' + pct + '/100</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="' + color + ' h-2 rounded-full transition-all" style="width:' + pct + '%"></div></div></div>'
+        }
+        
+        // アーキタイプ別の絵文字
+        const archEmoji = { 'A': '🌟', 'B': '📚', 'C': '🎯', 'D': '🔍', 'E': '💪', 'F': '🌱', 'G': '🤝', 'H': '🛡️' }
+        const archId = arch.id || '?'
+        
+        // 教師アラート
+        const alertHtml = v4.teacher_alert ? '<div class="bg-red-50 border-l-4 border-red-500 p-2 rounded-r text-xs text-red-700 mt-2"><i class="fas fa-exclamation-triangle mr-1"></i>⚠️ この児童は教師の直接介入が推奨されています</div>' : ''
+        const interventionHtml = v4.human_intervention ? '<div class="bg-red-100 border-l-4 border-red-600 p-2 rounded-r text-xs text-red-800 mt-1"><i class="fas fa-hand-paper mr-1"></i>🆘 緊急：人的介入を推奨</div>' : ''
+        
+        // カードのパーソナライゼーション注記を各カードに反映
+        const cardNotes = ad.card_personalization_notes || []
+        cardNotes.forEach(function(cn) {
+          if (cn.personalization_note) {
+            // card-display-{card_id} の中に注記を追加（既存のものがなければ）
+            const noteTarget = document.querySelectorAll('[id^="card-display-"]')
+            noteTarget.forEach(function(el) {
+              const existingNote = el.querySelector('.personalization-note-injected')
+              if (!existingNote && el.querySelector('h4') && el.querySelector('h4').textContent.trim() === cn.card_title.trim()) {
+                const noteDiv = document.createElement('div')
+                noteDiv.className = 'personalization-note-injected mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs'
+                noteDiv.innerHTML = '<span class="font-bold text-indigo-700"><i class="fas fa-brain mr-1"></i>この問題の理論根拠:</span> <span class="text-indigo-600">' + cn.personalization_note + '</span>'
+                const editPanel = el.querySelector('[id^="card-edit-panel-"]')
+                if (editPanel) editPanel.before(noteDiv)
+              }
+            })
+          }
+        })
+        
+        analysisSection.innerHTML = `
+          <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4">
+            <h3 class="text-lg font-bold text-indigo-800 mb-3 flex items-center">
+              <i class="fas fa-brain text-indigo-600 mr-2"></i>
+              この児童の学習タイプ分析（12理論統合）
+            </h3>
+            
+            <!-- アーキタイプ -->
+            <div class="bg-white rounded-xl p-4 border border-indigo-100 mb-3">
+              <div class="flex items-start gap-3">
+                <div class="text-4xl">${archEmoji[archId] || '🧠'}</div>
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-lg font-bold text-indigo-800">タイプ${archId}: ${arch.name_ja || '不明'}</span>
+                    <span class="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">${arch.name_en || ''}</span>
+                  </div>
+                  <p class="text-sm text-gray-700">${arch.presence || ''}</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 基幹軸スコア -->
+            <div class="bg-white rounded-xl p-3 border border-indigo-100 mb-3">
+              <h4 class="text-sm font-bold text-indigo-700 mb-2"><i class="fas fa-chart-bar mr-1"></i>基幹軸スコア</h4>
+              ${axisBar('認知的自律性', axes.cognitive_autonomy, '🧠')}
+              ${axisBar('情緒的安定性', axes.emotional_stability, '💚')}
+              ${axisBar('入力チャネル嗜好', axes.entry_channel_preference, '📡')}
+              ${axisBar('方略的成熟度', axes.strategic_maturity, '📐')}
+              ${axisBar('動機的エネルギー', axes.motivational_energy, '⚡')}
+            </div>
+            
+            <!-- 分析サマリー -->
+            ${ad.analysis_summary ? '<div class="bg-white rounded-xl p-3 border border-indigo-100 mb-3"><h4 class="text-sm font-bold text-indigo-700 mb-1"><i class="fas fa-search mr-1"></i>学習特性分析</h4><p class="text-sm text-gray-700">' + ad.analysis_summary + '</p></div>' : ''}
+            
+            ${ad.archetype_insight ? '<div class="bg-white rounded-xl p-3 border border-indigo-100 mb-3"><h4 class="text-sm font-bold text-purple-700 mb-1"><i class="fas fa-lightbulb mr-1"></i>タイプに基づく方針</h4><p class="text-sm text-gray-700">' + ad.archetype_insight + '</p></div>' : ''}
+            
+            ${ad.recommended_approach ? '<div class="bg-white rounded-xl p-3 border border-indigo-100 mb-3"><h4 class="text-sm font-bold text-green-700 mb-1"><i class="fas fa-route mr-1"></i>推奨アプローチ</h4><p class="text-sm text-gray-700">' + ad.recommended_approach + '</p></div>' : ''}
+            
+            <!-- テンプレート情報 -->
+            ${v4.template ? '<div class="grid grid-cols-3 gap-2 text-xs"><div class="bg-white rounded-lg p-2 border text-center"><span class="block text-gray-500">メディア</span><span class="font-bold text-indigo-700">' + (v4.template.media_type || '-') + '</span></div><div class="bg-white rounded-lg p-2 border text-center"><span class="block text-gray-500">問題形式</span><span class="font-bold text-indigo-700">' + (v4.template.question_format || '-') + '</span></div><div class="bg-white rounded-lg p-2 border text-center"><span class="block text-gray-500">推奨枚数</span><span class="font-bold text-indigo-700">' + (v4.template.card_count || '-') + '枚</span></div></div>' : ''}
+            
+            <!-- 教師へのアドバイス -->
+            ${ad.hints_for_teacher && ad.hints_for_teacher.length > 0 ? '<div class="bg-yellow-50 rounded-xl p-3 border border-yellow-200 mt-3"><h4 class="text-sm font-bold text-yellow-700 mb-1"><i class="fas fa-chalkboard-teacher mr-1"></i>教師へのアドバイス</h4><ul class="text-xs text-gray-700 space-y-1">' + ad.hints_for_teacher.map(function(h) { return '<li class="flex items-start gap-1"><i class="fas fa-check-circle text-yellow-500 mt-0.5"></i><span>' + h + '</span></li>' }).join('') + '</ul></div>' : ''}
+            
+            ${alertHtml}
+            ${interventionHtml}
+          </div>
+        `
+      } else if (analysisSection) {
+        analysisSection.innerHTML = `
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center text-sm text-gray-500">
+            <i class="fas fa-info-circle mr-1"></i>
+            v4分析データは、次回の個別コース生成時に自動保存されます。
+          </div>
+        `
+      }
+    } catch (analysisErr) {
+      console.warn('v4分析データ取得エラー:', analysisErr)
+      const analysisSection = document.getElementById('v4-analysis-section')
+      if (analysisSection) {
+        analysisSection.innerHTML = `
+          <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center text-sm text-gray-500">
+            <i class="fas fa-info-circle mr-1"></i>
+            分析データの取得に失敗しました。次回の個別コース生成時に自動保存されます。
+          </div>
+        `
+      }
     }
   } catch (error) {
     console.error('❌ 個別コースてびき表示エラー:', error, { courseId, curriculumId: curriculumId, args: [courseId, courseNameOrCurriculumId, maybeCurriculumId] })

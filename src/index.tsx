@@ -29810,7 +29810,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 app.post('/api/teacher/publish-personalized-course', async (c) => {
   const { env } = c
   try {
-    const { student_id, curriculum_id, cards, analysis_summary, recommended_approach, hints_for_teacher } = await c.req.json()
+    const { student_id, curriculum_id, cards, analysis_summary, recommended_approach, hints_for_teacher, v4_analysis, archetype_insight } = await c.req.json()
 
     const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculum_id).first() as any
     if (!curriculum) return c.json({ success: false, error: 'カリキュラムが見つかりません' }, 404)
@@ -29862,7 +29862,7 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       `).bind(
         curriculum.subject, gradeNum, curriculum.unit_name,
         card.card_title || `カード${i + 1}`, cardType, diffLevel,
-        pText, pDesc, JSON.stringify({ content: pDesc, multimedia: mm }),
+        pText, pDesc, JSON.stringify({ content: pDesc, multimedia: mm, personalization_note: card.personalization_note || '', question_format: card.question_format || '' }),
         aText, aText, eText, eText,
         card.hint_text || '',
         videoUrl, imageUrl,
@@ -29892,6 +29892,14 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
     }
 
     // メタデータに個別最適化情報を保存（UPSERT: 既存データがあれば上書き）
+    // v4分析結果・各カードのpersonalization_noteも一緒に保存
+    const cardPersonalizationNotes = (cards || []).map((card: any, i: number) => ({
+      card_index: i,
+      card_title: card.card_title || '',
+      personalization_note: card.personalization_note || '',
+      difficulty_level: card.difficulty_level || 'standard',
+      question_format: card.question_format || '',
+    }))
     await env.DB.prepare(`
       INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
       ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
@@ -29901,6 +29909,9 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       JSON.stringify({
         course_id: courseId,
         student_id, analysis_summary, recommended_approach, hints_for_teacher,
+        archetype_insight: archetype_insight || '',
+        v4_analysis: v4_analysis || null,
+        card_personalization_notes: cardPersonalizationNotes,
         card_ids: savedCardIds,
         published_at: new Date().toISOString()
       })
@@ -29915,8 +29926,30 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
         if (!apiKey) { console.warn('⚠️ GEMINI_API_KEY未設定: 個別テスト生成スキップ'); return }
         
         const cardSummary = (cards || []).map((card: any, i: number) => 
-          `カード${i+1}: ${card.card_title || card.title || ''} - ${(card.problem_text || card.problem || '').substring(0, 100)}`
+          `カード${i+1}: ${card.card_title || card.title || ''} - ${(card.problem_text || card.problem || '').substring(0, 100)}${card.personalization_note ? ' [理由: ' + card.personalization_note + ']' : ''}`
         ).join('\n')
+        
+        // v4分析データからチェックテストに反映すべき情報を構築
+        const v4Arch = v4_analysis?.archetype || {}
+        const v4Axes = v4_analysis?.axes || {}
+        const v4Template = v4_analysis?.template || {}
+        const v4Section = v4_analysis ? `
+【★ この児童の12理論統合分析結果 ★】
+- 学習タイプ: ${v4Arch.name_ja || '不明'}（${v4Arch.name_en || ''}）
+- タイプの特徴: ${v4Arch.presence || ''}
+- 認知的自律性: ${v4Axes.cognitive_autonomy || 50}/100
+- 情緒的安定性: ${v4Axes.emotional_stability || 50}/100
+- 方略的成熟度: ${v4Axes.strategic_maturity || 50}/100
+- 動機的エネルギー: ${v4Axes.motivational_energy || 50}/100
+- 推奨メディアタイプ: ${v4Template.media_type || '-'}
+- 推奨問題形式: ${v4Template.question_format || '-'}
+
+【★ チェックテスト生成への理論的影響 ★】
+- 認知的自律性が${(v4Axes.cognitive_autonomy || 50) >= 60 ? '高い' : '低い'}→ ${(v4Axes.cognitive_autonomy || 50) >= 60 ? '自由記述・応用問題を多めに' : '選択式・基本確認問題を多めに'}
+- 情緒的安定性が${(v4Axes.emotional_stability || 50) >= 60 ? '高い' : '低い'}→ ${(v4Axes.emotional_stability || 50) >= 60 ? '挑戦的な問題もOK' : '励ましの言葉を問題文に含め、安心感のある出題を'}
+- 方略的成熟度が${(v4Axes.strategic_maturity || 50) >= 60 ? '高い' : '低い'}→ ${(v4Axes.strategic_maturity || 50) >= 60 ? '手順を考えさせる問題を含める' : 'ヒント付き・段階的な問題にする'}
+- 動機的エネルギーが${(v4Axes.motivational_energy || 50) >= 60 ? '高い' : '低い'}→ ${(v4Axes.motivational_energy || 50) >= 60 ? '発展的な問題で意欲を伸ばす' : '成功体験を積ませる易しめの問題から始める'}
+` : ''
         
         const prompt = `あなたは小学校${curriculum.grade}の${curriculum.subject}の教師です。
 以下の個別学習カードの内容に基づいて、この児童専用のチェックテスト（6問）と選択課題（4問）を作成してください。
@@ -29924,7 +29957,7 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
 単元名: ${curriculum.unit_name}
 学年: ${curriculum.grade}
 教科: ${curriculum.subject}
-
+${v4Section}
 【個別学習カードの内容】
 ${cardSummary}
 
@@ -29934,8 +29967,8 @@ ${cardSummary}
     "test_title": "個別チェックテスト",
     "test_description": "学習カードの理解度を確認するテスト（6もん）",
     "sample_problems": [
-      {"problem_number": 1, "problem_text": "具体的な問題文", "difficulty": "basic", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3", "エ: 選択肢4"], "correct_choice": "ア", "explanation": "なぜこれが正解か"},
-      {"problem_number": 2, "problem_text": "問題文", "difficulty": "basic", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3"], "correct_choice": "イ", "explanation": "解説"},
+      {"problem_number": 1, "problem_text": "具体的な問題文", "difficulty": "basic", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3", "エ: 選択肢4"], "correct_choice": "ア", "explanation": "なぜこれが正解か", "personalization_reason": "この児童のタイプに基づく出題理由"},
+      {"problem_number": 2, "problem_text": "問題文", "difficulty": "basic", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3"], "correct_choice": "イ", "explanation": "解説", "personalization_reason": "出題理由"},
       {"problem_number": 3, "problem_text": "問題文", "difficulty": "basic"},
       {"problem_number": 4, "problem_text": "問題文", "difficulty": "standard", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3", "エ: 選択肢4"], "correct_choice": "ウ", "explanation": "解説"},
       {"problem_number": 5, "problem_text": "問題文", "difficulty": "standard"},
@@ -29957,7 +29990,9 @@ ${cardSummary}
 - 学習カードの内容を踏まえた具体的な問題にすること（「〜を学ぼう」等のメタ記述禁止）
 - 児童の学年に合った言葉遣いにすること（ひらがな多め、簡潔に）
 - problem_contentとproblem_titleは異なる内容にすること
-- 選択課題は4問で、ふりかえり・チャレンジ・つなげる・つくるの4種にすること`
+- 選択課題は4問で、ふりかえり・チャレンジ・つなげる・つくるの4種にすること
+- ★12理論統合分析の結果を踏まえ、この児童のタイプに最適化された出題をすること
+- ★各問題に personalization_reason フィールドを追加し、「なぜこの児童にこの問題を出すのか」を1文で説明すること`
         
         const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
@@ -30015,6 +30050,69 @@ ${cardSummary}
 
 // ============================================================
 // ============================================================
+
+// 個別最適化コースのv4分析情報を取得するAPI
+app.get('/api/teacher/personalized-course-analysis/:courseId', async (c) => {
+  const { env } = c
+  try {
+    const courseId = c.req.param('courseId')
+    
+    // コース情報を取得
+    const course = await env.DB.prepare('SELECT * FROM courses WHERE id = ?').bind(courseId).first() as any
+    if (!course) return c.json({ success: false, error: 'コースが見つかりません' }, 404)
+    
+    // コース名からstudent_idを抽出
+    const studentMatch = course.course_name?.match(/ID:(\d+)/)
+    const studentId = studentMatch ? studentMatch[1] : null
+    
+    if (!studentId) return c.json({ success: false, error: '児童IDが特定できません' }, 404)
+    
+    // メタデータからv4分析情報を取得
+    const meta = await env.DB.prepare(
+      'SELECT meta_value FROM curriculum_metadata WHERE curriculum_id = ? AND meta_key = ?'
+    ).bind(course.curriculum_id, `personalized_course_student_${studentId}`).first() as any
+    
+    let analysisData: any = null
+    if (meta?.meta_value) {
+      try { analysisData = JSON.parse(meta.meta_value) } catch {}
+    }
+    
+    // カードのpersonalization_noteをproblem_contentから抽出
+    const cards = await env.DB.prepare(
+      'SELECT card_id, card_title, problem_content, difficulty_level FROM learning_cards WHERE course_id = ? ORDER BY card_order'
+    ).bind(courseId).all()
+    
+    const cardNotes = ((cards.results || []) as any[]).map((card: any) => {
+      let note = ''
+      let qFormat = ''
+      try {
+        const pc = JSON.parse(card.problem_content || '{}')
+        note = pc.personalization_note || ''
+        qFormat = pc.question_format || ''
+      } catch {}
+      return {
+        card_id: card.card_id,
+        card_title: card.card_title,
+        difficulty_level: card.difficulty_level,
+        personalization_note: note,
+        question_format: qFormat,
+      }
+    })
+    
+    return c.json({
+      success: true,
+      student_id: studentId,
+      v4_analysis: analysisData?.v4_analysis || null,
+      analysis_summary: analysisData?.analysis_summary || '',
+      archetype_insight: analysisData?.archetype_insight || '',
+      recommended_approach: analysisData?.recommended_approach || '',
+      hints_for_teacher: analysisData?.hints_for_teacher || [],
+      card_personalization_notes: cardNotes,
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
 
 // 教師によるカード編集API（個別最適化コースのカード修正）
 app.put('/api/teacher/edit-card/:cardId', async (c) => {
