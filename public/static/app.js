@@ -3383,9 +3383,13 @@ async function loadGuidePage(curriculumId) {
                       <div class="bg-white rounded-lg p-1.5 border border-green-200 flex items-center gap-1 text-xs">
                         <i class="fas fa-check-circle text-green-500"></i>
                         <span class="font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
+                        <a href="/guide/${curriculumId}?course=${pc.course_id}" target="_blank" 
+                          class="text-blue-600 hover:text-blue-800 px-1" title="配信ページを開く">
+                          <i class="fas fa-external-link-alt"></i>
+                        </a>
                         <button onclick="copyPersonalizedGuideUrl(${curriculumId}, ${pc.course_id}, '${(pc.course_name || '').replace(/'/g, "\\'")}')" 
                           class="text-green-600 hover:text-green-800 px-1" title="配信URLをコピー">
-                          <i class="fas fa-link"></i>
+                          <i class="fas fa-copy"></i>
                         </button>
                       </div>
                     `).join('')}
@@ -14550,14 +14554,18 @@ function renderPersonalizedSection(curriculumId, personalizedCourses, approvedCo
       const safeName = (pc.course_name || '').replace(/'/g, "\\'")
       
       let actionBtns = ''
+      const guideUrl = window.location.origin + '/guide/' + curriculumId + '?course=' + pc.course_id
       if (!isApproved) {
         actionBtns = '<button onclick="approveCourse(' + curriculumId + ', ' + pc.course_id + ')" ' +
           'class="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="承認して配信可能にする">' +
           '<i class="fas fa-check mr-1"></i>承認</button>'
       } else {
-        actionBtns = '<button onclick="copyPersonalizedGuideUrl(' + curriculumId + ', ' + pc.course_id + ', \'' + safeName + '\')" ' +
-          'class="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition" title="配信URLをコピー">' +
-          '<i class="fas fa-link mr-1"></i>配信</button>' +
+        actionBtns = '<a href="' + guideUrl + '" target="_blank" ' +
+          'class="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition inline-flex items-center" title="配信ページを開く">' +
+          '<i class="fas fa-external-link-alt mr-1"></i>配信</a>' +
+          '<button onclick="copyPersonalizedGuideUrl(' + curriculumId + ', ' + pc.course_id + ', \'' + safeName + '\')" ' +
+          'class="bg-blue-400 hover:bg-blue-500 text-white px-2 py-1.5 rounded-lg text-xs transition" title="URLをコピー">' +
+          '<i class="fas fa-copy"></i></button>' +
           '<button onclick="unapproveCourse(' + curriculumId + ', ' + pc.course_id + ')" ' +
           'class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-2 py-1.5 rounded-lg text-xs transition" title="承認取消">' +
           '<i class="fas fa-undo"></i></button>'
@@ -41272,8 +41280,8 @@ async function startBulkGeneration(curriculumId) {
   const modal = document.getElementById('personalizedSelectorModal')
   if (modal) modal.dataset.generated = 'true'
   
-  btn.innerHTML = `<i class="fas fa-check-circle mr-2"></i>完了（${completed}名成功）`
-  btn.className = 'flex-1 bg-green-500 text-white px-4 py-3 rounded-lg font-bold shadow-lg'
+  btn.innerHTML = `<i class="fas fa-check-circle mr-2"></i>完了（${completed}名成功）- クリックで表示更新`
+  btn.className = 'flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-bold shadow-lg transition cursor-pointer'
   btn.onclick = () => { document.getElementById('personalizedSelectorModal')?.remove(); loadGuidePage(curriculumId) }
   btn.disabled = false
   
@@ -41304,8 +41312,9 @@ async function startBulkGeneration(curriculumId) {
     } catch(ve) { console.warn('DB確認エラー:', ve) }
   }
   
-  // 成功時のみ5秒後に自動でモーダルを閉じてページを更新（失敗時は手動で閉じる）
+  // 成功時のみ3秒後に自動でモーダルを閉じてページを更新（失敗時は手動で閉じる）
   if (completed > 0) {
+    addLog(`🔄 3秒後にページを自動更新します...個別最適化コースが表示されます。`)
     setTimeout(() => {
       const m = document.getElementById('personalizedSelectorModal')
       if (m) {
@@ -41313,7 +41322,7 @@ async function startBulkGeneration(curriculumId) {
         console.log('🔄 生成完了後にガイドページをリロード: curriculumId=', curriculumId, '成功:', completed, '件')
         loadGuidePage(curriculumId)
       }
-    }, 5000)
+    }, 3000)
   }
 }
 window.startBulkGeneration = startBulkGeneration
@@ -41321,17 +41330,28 @@ window.startBulkGeneration = startBulkGeneration
 window.showPersonalizedCourseSelector = showPersonalizedCourseSelector
 
 // 個別コースを「学習のてびき」形式で表示
-async function showPersonalizedCourseGuide(courseId, curriculumId) {
-  console.log('📖 個別コースてびき表示:', courseId)
+async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, maybeCurriculumId) {
+  // 呼び出し方の互換性: (courseId, curriculumId) または (courseId, courseName, curriculumId)
+  let curriculumId = maybeCurriculumId || courseNameOrCurriculumId
+  // courseNameが渡された場合（数値でない文字列）、3引数パターン
+  if (typeof courseNameOrCurriculumId === 'string' && isNaN(Number(courseNameOrCurriculumId))) {
+    curriculumId = maybeCurriculumId
+  }
+  console.log('📖 個別コースてびき表示:', { courseId, curriculumId, args: [courseId, courseNameOrCurriculumId, maybeCurriculumId] })
   
   try {
     // コースとカードを取得
     const currRes = await axios.get(`/api/curriculum/${curriculumId}`)
     const curriculum = currRes.data.curriculum
     const allCourses = currRes.data.courses || []
-    const course = allCourses.find(c => c.id === courseId)
+    const cid = Number(courseId)
+    const course = allCourses.find(c => c.id === cid || c.course_id === cid)
     
-    if (!course) { alert('コースが見つかりません'); return }
+    if (!course) {
+      console.error('❌ コースが見つかりません:', { courseId: cid, curriculumId, allCourseIds: allCourses.map(c => ({ id: c.id, course_id: c.course_id, level: c.course_level })) })
+      alert(`コースが見つかりません（コースID: ${courseId}, カリキュラムID: ${curriculumId}）`)
+      return
+    }
     
     const cards = course.cards || []
     const studentMatch = course.course_name?.match(/ID:(\d+)/)
@@ -41448,8 +41468,12 @@ async function showPersonalizedCourseGuide(courseId, curriculumId) {
     `
     document.body.insertAdjacentHTML('beforeend', html)
   } catch (error) {
-    console.error('❌ 個別コースてびき表示エラー:', error)
-    alert('個別コースの表示に失敗しました')
+    console.error('❌ 個別コースてびき表示エラー:', error, { courseId, curriculumId: curriculumId, args: [courseId, courseNameOrCurriculumId, maybeCurriculumId] })
+    // エラー時は guide ページを直接開くフォールバック
+    const fallbackUrl = window.location.origin + '/guide/' + curriculumId + '?course=' + courseId
+    if (confirm('コース内容の読み込みに失敗しました。\n\n配信ページを新しいタブで開きますか？')) {
+      window.open(fallbackUrl, '_blank')
+    }
   }
 }
 window.showPersonalizedCourseGuide = showPersonalizedCourseGuide
