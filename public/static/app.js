@@ -41176,10 +41176,19 @@ async function startBulkGeneration(curriculumId) {
         const plan = res.data.personalized_plan || {}
         const planCards = plan.cards || res.data.cards || []
         
+        console.log('🔍 生成結果詳細:', { 
+          studentId, 
+          hasPlan: !!res.data.personalized_plan,
+          planKeys: Object.keys(plan),
+          cardsCount: planCards.length,
+          rawCardsCount: res.data.cards?.length,
+          planCardsCount: plan.cards?.length
+        })
+        
         if (planCards.length === 0) {
           failed++
-          addLog(`⚠️ 児童ID:${studentId} → AI生成成功だがカード0枚（データ不足の可能性）`)
-          console.warn('⚠️ personalized plan cards empty:', { studentId, plan: res.data })
+          addLog(`⚠️ 児童ID:${studentId} → AI生成成功だがカード0枚（プランキー: ${Object.keys(plan).join(',')}）`)
+          console.warn('⚠️ personalized plan cards empty:', { studentId, planKeys: Object.keys(plan), fullResponse: JSON.stringify(res.data).substring(0, 500) })
         } else {
           // DB保存（publish）
           try {
@@ -41228,6 +41237,13 @@ async function startBulkGeneration(curriculumId) {
   btn.disabled = false
   
   addLog(`🎉 一括生成完了: ${completed}名成功, ${failed}名失敗`)
+  
+  // 結果を明確に表示（成功0の場合は警告）
+  if (completed === 0 && failed > 0) {
+    addLog(`❌ 全員の生成に失敗しました。ブラウザのコンソール(F12)でエラーの詳細を確認してください。`)
+  } else if (completed > 0 && failed > 0) {
+    addLog(`⚠️ 一部の生成に失敗しました。成功した${completed}名分のコースは保存されました。`)
+  }
   
   // 3秒後に自動でモーダルを閉じてページを更新
   setTimeout(() => {

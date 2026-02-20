@@ -29540,9 +29540,16 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
     const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
     const personalizedPlan = extractJSON(geminiText) || {}
     
-    // cardsが抽出できなかった場合のログ
-    if (!personalizedPlan.cards || personalizedPlan.cards.length === 0) {
-      console.warn('⚠️ Geminiレスポンスからcardsが抽出できませんでした:', { textLength: geminiText.length, planKeys: Object.keys(personalizedPlan) })
+    // cardsが抽出できなかった場合のログと対応
+    const extractedCards = personalizedPlan.cards || []
+    if (extractedCards.length === 0) {
+      console.warn('⚠️ Geminiレスポンスからcardsが抽出できませんでした:', { 
+        textLength: geminiText.length, 
+        planKeys: Object.keys(personalizedPlan),
+        geminiTextPreview: geminiText.substring(0, 300)
+      })
+    } else {
+      console.log(`✅ Geminiから${extractedCards.length}枚のカードを抽出`)
     }
 
     const processingTime = Date.now() - startTime
@@ -29552,6 +29559,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       success: true,
       student_id,
       curriculum_id,
+      cards: extractedCards,  // ← フロントエンドがplanCards取得を確実にするため
       curriculum_info: { subject: curriculum.subject, unit_name: curriculum.unit_name, grade: curriculum.grade },
       // v4分析結果（教師に表示）
       v4_analysis: {
