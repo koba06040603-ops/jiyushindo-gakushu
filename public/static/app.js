@@ -1314,7 +1314,7 @@ async function renderTopPage() {
               <div class="bg-purple-50 border-2 border-purple-300 rounded-xl p-2 md:p-3 text-center min-w-[100px]">
                 <i class="fas fa-brain text-purple-600 text-lg block mb-0.5"></i>
                 <span class="text-xs font-bold text-purple-800 block">v4統合エンジン</span>
-                <p class="text-[10px] text-gray-500">4基幹軸→8タイプ分類</p>
+                <p class="text-[10px] text-gray-500">4基幹軸（児童の学び方を測る4つの指標）→8タイプ分類</p>
               </div>
               <i class="fas fa-arrow-right text-gray-300 text-sm"></i>
               <div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-2 md:p-3 text-center min-w-[100px]">
@@ -1410,30 +1410,34 @@ async function renderTopPage() {
           <!-- 4基幹軸→8アーキタイプ -->
           <details>
             <summary class="cursor-pointer text-sm font-bold text-indigo-800 hover:text-indigo-600 transition flex items-center gap-2">
-              <i class="fas fa-chart-bar"></i>4基幹軸と8つの学習者タイプ（クリックで詳細を表示）
+              <i class="fas fa-chart-bar"></i>4基幹軸（児童の学びの特性を測る4つの中心指標）と8つの学習者タイプ（クリックで詳細を表示）
               <i class="fas fa-chevron-down text-xs text-gray-400"></i>
             </summary>
             <div class="mt-3">
-              <p class="text-xs text-gray-600 mb-3">12理論のプロファイル値から以下の4つの基幹軸スコア（0-100）を算出し、その組み合わせで8つの学習者アーキタイプに分類します。</p>
+              <p class="text-xs text-gray-600 mb-3">12理論のプロファイル値から以下の<strong>4つの基幹軸スコア</strong>（きかんじくスコア：児童の学び方の特性を0-100で数値化した中心指標）を算出し、その組み合わせで8つの学習者アーキタイプ（学習者タイプ）に分類します。</p>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
                 <div class="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
                   <span class="text-2xl block mb-1">🧠</span>
                   <span class="text-xs font-bold text-blue-800">認知的自律性 (H)</span>
+                  <p class="text-[10px] text-blue-600 font-bold mt-0.5">（自分で考えて学べる力）</p>
                   <p class="text-[10px] text-gray-500 mt-0.5">F2多重知能 + F5自己調整 + F9メタ認知 + F10領域知識</p>
                 </div>
                 <div class="bg-green-50 rounded-xl p-3 text-center border border-green-200">
                   <span class="text-2xl block mb-1">💚</span>
                   <span class="text-xs font-bold text-green-800">情緒的安定性 (G)</span>
+                  <p class="text-[10px] text-green-600 font-bold mt-0.5">（安心して学びに取り組める度合い）</p>
                   <p class="text-[10px] text-gray-500 mt-0.5">F4不安(逆) + F8動機 + F12感情</p>
                 </div>
                 <div class="bg-purple-50 rounded-xl p-3 text-center border border-purple-200">
                   <span class="text-2xl block mb-1">📐</span>
                   <span class="text-xs font-bold text-purple-800">方略的成熟度 (A)</span>
+                  <p class="text-[10px] text-purple-600 font-bold mt-0.5">（効果的な学習方法を使える力）</p>
                   <p class="text-[10px] text-gray-500 mt-0.5">F3経験学習 + F5自己調整 + F6認知戦略</p>
                 </div>
                 <div class="bg-orange-50 rounded-xl p-3 text-center border border-orange-200">
                   <span class="text-2xl block mb-1">⚡</span>
                   <span class="text-xs font-bold text-orange-800">動機的エネルギー (E)</span>
+                  <p class="text-[10px] text-orange-600 font-bold mt-0.5">（学びたいという意欲の強さ）</p>
                   <p class="text-[10px] text-gray-500 mt-0.5">F4適性 + F8自己決定 + F11真正性</p>
                 </div>
               </div>
@@ -1491,7 +1495,7 @@ async function renderTopPage() {
             <i class="fas fa-wand-magic-sparkles mr-2"></i>
             学習カードを作成しよう
           </h2>
-          <p class="text-white text-center opacity-90">下の順番で選ぶだけ！ 3コース × 各6枚 = 18枚のカードをAIが自動生成</p>
+          <p class="text-white text-center opacity-90">下の順番で選ぶだけ！ 3コース × 単元全体をカバーする学習カードをAIが自動生成</p>
           <!-- ステップインジケーター -->
           <div class="flex justify-center mt-4 gap-2">
             <div id="step1Indicator" class="flex items-center bg-white bg-opacity-30 rounded-full px-4 py-1 text-white text-sm font-bold">
@@ -1574,7 +1578,7 @@ async function renderTopPage() {
                   <i class="fas fa-magic mr-1 text-purple-500"></i>
                   教科書にない単元も、AIで新しく作れます
                 </p>
-                <p class="text-sm text-gray-500 mt-1">学年・教科・単元名を入力 → 約1分で18枚の学習カードを自動生成</p>
+                <p class="text-sm text-gray-500 mt-1">学年・教科・単元名を入力 → 約1分で単元全体をカバーする学習カードを自動生成</p>
               </div>
               <button 
                 onclick="showUnitGeneratorModal()"
@@ -3769,6 +3773,7 @@ async function loadGuidePage(curriculumId) {
                 </div>
               </div>
               <h2 class="text-3xl font-bold text-gray-800">${curriculum.unit_name}</h2>
+              <p class="text-sm text-gray-500 mt-1"><i class="fas fa-book mr-1"></i>${curriculum.textbook_company || ''} ${curriculum.grade || ''} ${curriculum.subject || ''}</p>
             </div>
 
             <!-- 単元の目標 -->
@@ -5119,6 +5124,7 @@ async function selectCourse(courseId) {
           <p class="text-xl text-gray-800">
             ${state.selectedCurriculum.unit_name}
           </p>
+          <p class="text-sm text-gray-500 mt-1"><i class="fas fa-book mr-1"></i>${state.selectedCurriculum.textbook_company || ''} ${state.selectedCurriculum.grade || ''} ${state.selectedCurriculum.subject || ''}</p>
         </div>
 
         <!-- 学習カード一覧 -->
@@ -5392,6 +5398,23 @@ async function loadCardPage(cardId) {
               </div>
             ` : ''}
 
+            <!-- AI先生からのメッセージ -->
+            ${card.ai_teacher_message || card.real_world_connection ? `
+              <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4">
+                <div class="flex items-start gap-3">
+                  <div class="bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-robot"></i>
+                  </div>
+                  <div>
+                    <p class="text-sm font-bold text-blue-800 mb-1"><i class="fas fa-comment-dots mr-1"></i>AI先生より</p>
+                    ${card.ai_teacher_message ? `<p class="text-sm text-gray-700 mb-1">${card.ai_teacher_message}</p>` : ''}
+                    ${card.ai_teacher_advice ? `<p class="text-xs text-blue-600"><i class="fas fa-lightbulb mr-1"></i>${card.ai_teacher_advice}</p>` : ''}
+                    ${card.teacher_help_keywords ? `<p class="text-xs text-gray-500 mt-1"><i class="fas fa-question-circle mr-1"></i>わからないとき先生に聞くキーワード: <strong>${card.teacher_help_keywords}</strong></p>` : ''}
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+
             <!-- 例題 -->
             ${card.example_problem ? `
               <div class="bg-white rounded-lg shadow-lg p-6">
@@ -5449,8 +5472,12 @@ async function loadCardPage(cardId) {
                 <div id="textAnswerArea">
                   <textarea id="answerInput" 
                             rows="6" 
-                            class="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none"
-                            placeholder="ここに答えを書いてください..."></textarea>
+                            class="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 text-lg"
+                            style="font-size: 18px; line-height: 1.8; resize: vertical; min-height: 150px; caret-color: #000000; cursor: text;"
+                            placeholder="ここに答えを書いてください..."
+                            onfocus="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.2)'"
+                            onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'"></textarea>
+                  <p class="text-xs text-gray-400 mt-1"><i class="fas fa-keyboard mr-1"></i>キーボードで入力できます。Enterキーで改行します。</p>
                 </div>
                 
                 <!-- 手書き入力エリア -->
@@ -37781,6 +37808,17 @@ async function showLearningDashboard(curriculumId) {
               </div>
             </div>
             
+            <!-- 折れ線グラフ：学習推移 -->
+            <div class="bg-gray-50 rounded-xl p-6 mb-6">
+              <h3 class="text-lg font-bold text-gray-800 mb-4">
+                <i class="fas fa-chart-line mr-2 text-blue-600"></i>学習の推移（折れ線グラフ）
+              </h3>
+              <p class="text-xs text-gray-500 mb-3">正答率と回答時間の推移を時系列で表示します</p>
+              <div class="bg-white rounded-lg p-4 border-2 border-gray-200" style="height: 300px;">
+                <canvas id="learningTrendLineChart"></canvas>
+              </div>
+            </div>
+            
             <!-- 最近の学習履歴 -->
             <div class="bg-white border-2 border-gray-200 rounded-xl p-6">
               <h3 class="text-lg font-bold text-gray-800 mb-4">
@@ -37844,6 +37882,7 @@ async function showLearningDashboard(curriculumId) {
     // Chart.jsでグラフを描画
     setTimeout(() => {
       renderLearningProgressChart(stats)
+      renderLearningTrendLineChart(history)
     }, 100)
     
   } catch (error) {
@@ -37945,6 +37984,114 @@ function closeLearningDashboard(event) {
   if (event && event.target.id !== 'learningDashboardModal') return
   const modal = document.getElementById('learningDashboardModal')
   if (modal) modal.remove()
+}
+
+// 折れ線グラフ：学習推移
+function renderLearningTrendLineChart(history) {
+  const canvas = document.getElementById('learningTrendLineChart')
+  if (!canvas) return
+  
+  if (typeof Chart === 'undefined') {
+    canvas.parentElement.innerHTML = '<div class="flex items-center justify-center h-full"><p class="text-gray-500">グラフを表示するにはChart.jsが必要です</p></div>'
+    return
+  }
+  
+  if (!history || history.length === 0) {
+    canvas.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><i class="fas fa-chart-line text-4xl mb-2"></i><p>学習データが蓄積されると推移グラフが表示されます</p></div>'
+    return
+  }
+  
+  // 日付ごとに集計
+  const dailyData = {}
+  history.slice().reverse().forEach(record => {
+    const date = new Date(record.created_at)
+    const key = date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })
+    if (!dailyData[key]) {
+      dailyData[key] = { correct: 0, total: 0, totalTime: 0, count: 0 }
+    }
+    dailyData[key].total++
+    dailyData[key].count++
+    if (record.is_correct === 1) dailyData[key].correct++
+    if (record.answer_time_seconds) dailyData[key].totalTime += record.answer_time_seconds
+  })
+  
+  const labels = Object.keys(dailyData)
+  const accuracyData = labels.map(k => dailyData[k].total > 0 ? Math.round((dailyData[k].correct / dailyData[k].total) * 100) : 0)
+  const timeData = labels.map(k => dailyData[k].count > 0 ? Math.round(dailyData[k].totalTime / dailyData[k].count) : 0)
+  const countData = labels.map(k => dailyData[k].total)
+  
+  const ctx = canvas.getContext('2d')
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '正答率 (%)',
+        data: accuracyData,
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        yAxisID: 'y'
+      }, {
+        label: '平均回答時間 (秒)',
+        data: timeData,
+        borderColor: 'rgb(234, 88, 12)',
+        backgroundColor: 'rgba(234, 88, 12, 0.1)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        fill: false,
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        yAxisID: 'y1'
+      }, {
+        label: '回答数',
+        data: countData,
+        borderColor: 'rgb(168, 85, 247)',
+        backgroundColor: 'rgba(168, 85, 247, 0.3)',
+        borderWidth: 2,
+        type: 'bar',
+        yAxisID: 'y2'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            afterBody: function(items) {
+              const idx = items[0].dataIndex
+              return '回答数: ' + countData[idx] + '問'
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          type: 'linear', display: true, position: 'left',
+          title: { display: true, text: '正答率 (%)' },
+          min: 0, max: 100,
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        },
+        y1: {
+          type: 'linear', display: true, position: 'right',
+          title: { display: true, text: '回答時間 (秒)' },
+          grid: { drawOnChartArea: false }
+        },
+        y2: {
+          type: 'linear', display: false,
+          min: 0
+        }
+      }
+    }
+  })
 }
 
 window.showLearningDashboard = showLearningDashboard
@@ -41725,7 +41872,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
             <div class="bg-pink-50 border-l-4 border-pink-500 p-4 rounded-r-lg mb-6">
               <h3 class="text-lg font-bold text-pink-800 mb-1">${curriculum.unit_name}</h3>
               <p class="text-sm text-gray-700">${curriculum.unit_goal || ''}</p>
-              <p class="text-xs text-gray-500 mt-1">学年: ${curriculum.grade} / コース: ${course.course_name}</p>
+              <p class="text-xs text-gray-500 mt-1">学年: ${curriculum.grade} / 教科書: ${curriculum.textbook_company || '未設定'} / コース: ${course.course_name}</p>
             </div>
             
             <!-- 学習カード一覧 -->
@@ -41762,7 +41909,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                     <div class="bg-white rounded-lg p-3 mb-2 border">
                       <p class="text-sm text-gray-800">${card.problem_text || card.problem_description || ''}</p>
                     </div>
-                    ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden"><iframe width="100%" height="180" src="https://www.youtube.com/embed/' + ytId + '" frameborder="0" allowfullscreen></iframe><p class="text-xs text-gray-500 mt-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? '<a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-1 text-xs bg-red-500 text-white px-3 py-1 rounded-lg mb-2">▶ 動画を見る</a>' : ''}
+                    ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" src="' + ytUrl + '" allow="autoplay; fullscreen" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>NHK for Schoolの動画です。再生できない場合は<a href="' + ytUrl + '" target="_blank" class="text-blue-600 underline">こちら</a>から視聴してください。</p></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
                     ${tactile ? '<div class="bg-yellow-50 border-l-3 border-yellow-400 p-2 rounded text-xs mb-2"><strong>✋ やってみよう:</strong> ' + tactile + '</div>' : ''}
                     ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
                     <div class="grid grid-cols-2 gap-2 text-xs">
@@ -42040,7 +42187,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
             
             <!-- 基幹軸スコア -->
             <div class="bg-white rounded-xl p-3 border border-indigo-100 mb-3">
-              <h4 class="text-sm font-bold text-indigo-700 mb-2"><i class="fas fa-chart-bar mr-1"></i>基幹軸スコア</h4>
+              <h4 class="text-sm font-bold text-indigo-700 mb-2"><i class="fas fa-chart-bar mr-1"></i>基幹軸スコア（きかんじくスコア：児童の学びの特性を数値化した中心指標）</h4>
               ${axisBar('認知的自律性', axes.cognitive_autonomy, '🧠')}
               ${axisBar('情緒的安定性', axes.emotional_stability, '💚')}
               ${axisBar('入力チャネル嗜好', axes.entry_channel_preference, '📡')}
@@ -42698,12 +42845,12 @@ async function showTeacherSupportDashboard(curriculumId) {
         // 4基幹軸の説明
         '<div class="bg-white rounded-xl border-2 border-indigo-200 p-4">' +
           '<h4 class="font-bold text-indigo-800 mb-3"><i class="fas fa-chart-bar mr-2"></i>4基幹軸とアーキタイプ分類</h4>' +
-          '<p class="text-xs text-gray-600 mb-3">12理論のプロファイルから4つの基幹軸スコアを算出し、その組み合わせで8つの学習者アーキタイプに分類します。</p>' +
+          '<p class="text-xs text-gray-600 mb-3">12理論のプロファイルから4つの基幹軸スコア（きかんじくスコア：児童の学びの特性を0-100で数値化した中心指標）を算出し、その組み合わせで8つの学習者アーキタイプに分類します。</p>' +
           '<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">' +
-            '<div class="bg-blue-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">🧠</span><span class="text-xs font-bold text-blue-800">認知的自律性 (H)</span><p class="text-xs text-gray-500 mt-0.5">F2知能 + F5SRL + F9メタ認知 + F10領域知識</p></div>' +
-            '<div class="bg-green-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">💚</span><span class="text-xs font-bold text-green-800">情緒的安定性 (G)</span><p class="text-xs text-gray-500 mt-0.5">F4不安(逆) + F8動機 + F12感情</p></div>' +
-            '<div class="bg-purple-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">📐</span><span class="text-xs font-bold text-purple-800">方略的成熟度 (A)</span><p class="text-xs text-gray-500 mt-0.5">F3経験学習 + F5SRL + F6認知戦略</p></div>' +
-            '<div class="bg-orange-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">⚡</span><span class="text-xs font-bold text-orange-800">動機的エネルギー (E)</span><p class="text-xs text-gray-500 mt-0.5">F4適性 + F8動機 + F11真正性</p></div>' +
+            '<div class="bg-blue-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">🧠</span><span class="text-xs font-bold text-blue-800">認知的自律性 (H)</span><p class="text-xs text-blue-600 font-bold">（自分で考えて学べる力）</p><p class="text-xs text-gray-500 mt-0.5">F2知能 + F5SRL + F9メタ認知 + F10領域知識</p></div>' +
+            '<div class="bg-green-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">💚</span><span class="text-xs font-bold text-green-800">情緒的安定性 (G)</span><p class="text-xs text-green-600 font-bold">（安心して学びに取り組める度合い）</p><p class="text-xs text-gray-500 mt-0.5">F4不安(逆) + F8動機 + F12感情</p></div>' +
+            '<div class="bg-purple-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">📐</span><span class="text-xs font-bold text-purple-800">方略的成熟度 (A)</span><p class="text-xs text-purple-600 font-bold">（効果的な学習方法を使える力）</p><p class="text-xs text-gray-500 mt-0.5">F3経験学習 + F5SRL + F6認知戦略</p></div>' +
+            '<div class="bg-orange-50 rounded-lg p-3 text-center"><span class="text-2xl block mb-1">⚡</span><span class="text-xs font-bold text-orange-800">動機的エネルギー (E)</span><p class="text-xs text-orange-600 font-bold">（学びたいという意欲の強さ）</p><p class="text-xs text-gray-500 mt-0.5">F4適性 + F8動機 + F11真正性</p></div>' +
           '</div>' +
           '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">' +
             Object.keys(archEmojis).map(function(aid) {
@@ -42712,6 +42859,47 @@ async function showTeacherSupportDashboard(curriculumId) {
                 '<p class="text-xs font-bold text-gray-800 mt-1">' + aid + ': ' + (archNames[aid] || '') + '</p>' +
               '</div>'
             }).join('') +
+          '</div>' +
+        '</div>' +
+        
+        // 教師負担軽減の仕組み
+        '<div class="bg-white rounded-xl border-2 border-green-200 p-4">' +
+          '<h4 class="font-bold text-green-800 mb-3"><i class="fas fa-hands-helping mr-2"></i>30人分の個別カード作成 — 教師の負担軽減の仕組み</h4>' +
+          '<div class="bg-green-50 rounded-lg p-4 mb-3">' +
+            '<p class="text-sm text-gray-700 mb-2">30人の児童に個別最適化カードを作成する場合、手作業では<strong class="text-red-600">1人あたり30分 x 30人 = 約15時間</strong>必要です。</p>' +
+            '<p class="text-sm text-gray-700 mb-2">本システムでは以下の仕組みで<strong class="text-green-700">約90%の時間を削減</strong>し、教師は最も重要な「確認・調整」に集中できます。</p>' +
+          '</div>' +
+          '<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">' +
+            '<div class="bg-blue-50 rounded-xl p-3 border border-blue-200">' +
+              '<div class="text-center mb-2"><i class="fas fa-robot text-blue-600 text-2xl"></i></div>' +
+              '<h5 class="text-xs font-bold text-blue-800 text-center mb-1">1. AI一括生成</h5>' +
+              '<p class="text-xs text-gray-600">12理論統合分析とv4エンジンにより、児童ごとに最適な学習カードを<strong>自動生成</strong>（1人あたり約1分）</p>' +
+              '<div class="mt-2 text-center"><span class="text-lg font-bold text-blue-600">30人 = 約30分</span></div>' +
+            '</div>' +
+            '<div class="bg-purple-50 rounded-xl p-3 border border-purple-200">' +
+              '<div class="text-center mb-2"><i class="fas fa-eye text-purple-600 text-2xl"></i></div>' +
+              '<h5 class="text-xs font-bold text-purple-800 text-center mb-1">2. 効率的な確認</h5>' +
+              '<p class="text-xs text-gray-600">支援ダッシュボードで<strong>アーキタイプ別に一括確認</strong>。同タイプの児童はまとめて確認可能</p>' +
+              '<div class="mt-2 text-center"><span class="text-lg font-bold text-purple-600">30人 = 約30分</span></div>' +
+            '</div>' +
+            '<div class="bg-green-50 rounded-xl p-3 border border-green-200">' +
+              '<div class="text-center mb-2"><i class="fas fa-magic text-green-600 text-2xl"></i></div>' +
+              '<h5 class="text-xs font-bold text-green-800 text-center mb-1">3. AI修正支援</h5>' +
+              '<p class="text-xs text-gray-600">気になるカードは<strong>AI修正指示</strong>で自然言語入力→AIが修正。手動編集も可能</p>' +
+              '<div class="mt-2 text-center"><span class="text-lg font-bold text-green-600">必要に応じて</span></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="bg-gray-50 rounded-lg p-3">' +
+            '<h5 class="text-xs font-bold text-gray-700 mb-2"><i class="fas fa-clock mr-1"></i>時間の比較</h5>' +
+            '<div class="flex items-center gap-2 mb-1">' +
+              '<span class="text-xs text-gray-600 w-20">手作業:</span>' +
+              '<div class="flex-1 bg-red-100 rounded-full h-4"><div class="bg-red-500 h-4 rounded-full text-xs text-white flex items-center justify-center font-bold" style="width:100%">約15時間</div></div>' +
+            '</div>' +
+            '<div class="flex items-center gap-2">' +
+              '<span class="text-xs text-gray-600 w-20">本システム:</span>' +
+              '<div class="flex-1 bg-green-100 rounded-full h-4"><div class="bg-green-500 h-4 rounded-full text-xs text-white flex items-center justify-center font-bold" style="width:10%">約1.5h</div></div>' +
+            '</div>' +
+            '<p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>教師の役割は「生成・確認・承認」に特化。児童理解と直接支援に時間を使えます。</p>' +
           '</div>' +
         '</div>' +
       '</div>' +

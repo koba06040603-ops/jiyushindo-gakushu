@@ -8786,15 +8786,27 @@ app.post('/api/ai/generate-course', async (c) => {
       'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
     }[courseLevel] || '標準的なペースで学ぶコース'
 
-    // 【強化】プロンプト（動的枚数のカード生成）
-    const numCards = cards_count || 6  // 動的カード枚数（デフォルト6枚）
-    const prompt = `あなたは小学校の優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
+    // 【強化】プロンプト（動的枚数のカード生成 + 品質向上 + AI先生 + 難易度引き上げ）
+    const numCards = cards_count || 8  // 動的カード枚数（デフォルト8枚に増加：単元全体カバー）
+    const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
 
 【単元情報】
 - 学年: ${grade}
 - 教科: ${subject}
+- 教科書会社: ${textbook || '未指定'}
 - 単元名: ${unitName}
+- 単元目標: ${unitGoal || '未指定'}
 - コース: ${courseInfo.name} (${difficultyDescription})
+
+【カード設計の方針】
+- 単元の学習内容を網羅的にカバーする（導入→基本→応用→まとめ）
+- ${numCards}枚で単元全体の主要な学習項目を漏れなく扱う
+- 問題文は具体的な数値・場面を含み、教科書の目標水準に合わせる
+- じっくりコースでも「考える力」を育む問題を含める
+- ぐんぐんコースは発展的・応用的な問題を中心に、深い思考を促す
+- 各カードにAI先生からの励ましメッセージと学び方のアドバイスを含める
+- 3段階ヒントは「考える方向性」→「具体的手がかり」→「答えに近づく導き」の順に
+- 先生に質問するための「先生ヘルプ」用のキーワードを含める
 
 【重要】以下のJSON形式で、必ず完全な${numCards}枚のカードを生成してください：
 
@@ -8810,17 +8822,20 @@ app.post('/api/ai/generate-course', async (c) => {
       "card_title": "魅力的なタイトル（20字以内）",
       "card_type": "main",
       "textbook_page": "p.XX",
-      "problem_description": "具体的な数字を含む問題文（80-150字）",
-      "new_terms": "新出用語（カンマ区切り）",
-      "example_problem": "例題（具体的な数字）",
-      "example_solution": "解き方の説明",
-      "real_world_connection": "実生活とのつながり",
-      "answer": "解答と解説（50-100字）",
-      "answer_explanation": "なぜその答えになるか（50-100字）",
+      "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
+      "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
+      "example_problem": "例題（具体的な数字と場面）",
+      "example_solution": "解き方の丁寧な説明（途中式・図解の指示を含む）",
+      "real_world_connection": "実生活とのつながり（なぜこの学習が大切か）",
+      "answer": "正解（具体的に）",
+      "answer_explanation": "なぜその答えになるか（考え方の道筋を含む80-150字）",
+      "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）",
+      "ai_teacher_advice": "この問題の学び方アドバイス（30字程度）",
+      "teacher_help_keywords": "先生に質問するときのキーワード（3つ程度）",
       "hints": [
-        {"hint_level": 1, "hint_text": "ヒント1: まず何を考える？", "thinking_tool_suggestion": "図・表・式"},
-        {"hint_level": 2, "hint_text": "ヒント2: 次に何をする？", "thinking_tool_suggestion": "図・表・式"},
-        {"hint_level": 3, "hint_text": "ヒント3: 答えに近づくために", "thinking_tool_suggestion": "図・表・式"}
+        {"hint_level": 1, "hint_text": "ヒント1: まず何を考える？（考える方向性を示す）", "thinking_tool_suggestion": "使える思考ツール"},
+        {"hint_level": 2, "hint_text": "ヒント2: 具体的な手がかり（図や式の書き方を示す）", "thinking_tool_suggestion": "使える思考ツール"},
+        {"hint_level": 3, "hint_text": "ヒント3: 答えに近づくための最後のヒント", "thinking_tool_suggestion": "使える思考ツール"}
       ]
     },
     { /* カード2〜${numCards}: 上記と同じ構造で繰り返し */ }
@@ -8828,11 +8843,14 @@ app.post('/api/ai/generate-course', async (c) => {
 }
 
 【厳守事項】
-1. 必ず${numCards}枚のカードを生成すること
-2. 各カードに必ず3つのヒントを含めること
-3. JSONのみを出力し、説明文は含めないこと
-4. すべてのフィールドに具体的な内容を記入すること
-5. 完全なJSON（{で始まり}で終わる）を出力すること`
+1. 必ず${numCards}枚のカードを生成し、単元の主要な学習項目を網羅すること
+2. 各カードに必ず3つのヒント（段階的に具体性が増す）を含めること
+3. ai_teacher_message, ai_teacher_advice, teacher_help_keywords を必ず含めること
+4. JSONのみを出力し、説明文は含めないこと
+5. すべてのフィールドに具体的な内容を記入すること
+6. 完全なJSON（{で始まり}で終わる）を出力すること
+7. 問題の難易度は教科書の目標水準（学習指導要領）に合わせること
+8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること`
 
     // 【最新】Gemini 2.5 Flash を使用（最も高速・安定）
     const modelName = 'gemini-3-flash-preview'  // 最新の Gemini 2.5 Flash
