@@ -1285,7 +1285,205 @@ async function renderTopPage() {
       </div>
       \` : ''}
 
-      <!-- ===== メイン：学年・教科・教科書・単元 選択エリア ===== -->
+      \${state.auth.user && (state.auth.user.role === 'teacher' || state.auth.user.role === 'admin') ? \`
+      <!-- 個別最適化ロジック可視化 -->
+      <div class="bg-white rounded-2xl shadow-xl mb-8 overflow-hidden border-2 border-indigo-200">
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-700 p-5">
+          <h2 class="text-xl font-bold text-white flex items-center">
+            <i class="fas fa-brain mr-2"></i>個別最適化の仕組み — 12の教育理論に基づくAI学習カード生成
+          </h2>
+          <p class="text-indigo-100 text-sm mt-1">児童一人ひとりのデータを12の教育理論で分析し、最適な学習カードを生成するプロセス</p>
+        </div>
+        <div class="p-6">
+          <!-- パイプライン図 -->
+          <div class="mb-6">
+            <h3 class="text-sm font-bold text-indigo-800 mb-3"><i class="fas fa-project-diagram mr-1"></i>個別最適化パイプライン（処理の流れ）</h3>
+            <div class="flex flex-wrap items-center justify-center gap-1 md:gap-2">
+              <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-2 md:p-3 text-center min-w-[100px]">
+                <i class="fas fa-database text-blue-600 text-lg block mb-0.5"></i>
+                <span class="text-xs font-bold text-blue-800 block">児童データ収集</span>
+                <p class="text-[10px] text-gray-500">診断・回答履歴・振返り</p>
+              </div>
+              <i class="fas fa-arrow-right text-gray-300 text-sm"></i>
+              <div class="bg-green-50 border-2 border-green-300 rounded-xl p-2 md:p-3 text-center min-w-[100px]">
+                <i class="fas fa-user-graduate text-green-600 text-lg block mb-0.5"></i>
+                <span class="text-xs font-bold text-green-800 block">12理論プロファイル</span>
+                <p class="text-[10px] text-gray-500">F1〜F12の算出</p>
+              </div>
+              <i class="fas fa-arrow-right text-gray-300 text-sm"></i>
+              <div class="bg-purple-50 border-2 border-purple-300 rounded-xl p-2 md:p-3 text-center min-w-[100px]">
+                <i class="fas fa-brain text-purple-600 text-lg block mb-0.5"></i>
+                <span class="text-xs font-bold text-purple-800 block">v4統合エンジン</span>
+                <p class="text-[10px] text-gray-500">4基幹軸→8タイプ分類</p>
+              </div>
+              <i class="fas fa-arrow-right text-gray-300 text-sm"></i>
+              <div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-2 md:p-3 text-center min-w-[100px]">
+                <i class="fas fa-sliders-h text-orange-600 text-lg block mb-0.5"></i>
+                <span class="text-xs font-bold text-orange-800 block">テンプレート決定</span>
+                <p class="text-[10px] text-gray-500">メディア・形式・足場</p>
+              </div>
+              <i class="fas fa-arrow-right text-gray-300 text-sm"></i>
+              <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-2 md:p-3 text-center min-w-[100px]">
+                <i class="fas fa-robot text-yellow-600 text-lg block mb-0.5"></i>
+                <span class="text-xs font-bold text-yellow-800 block">Gemini AI生成</span>
+                <p class="text-[10px] text-gray-500">問題・解説・ヒント</p>
+              </div>
+              <i class="fas fa-arrow-right text-gray-300 text-sm"></i>
+              <div class="bg-pink-50 border-2 border-pink-300 rounded-xl p-2 md:p-3 text-center min-w-[100px]">
+                <i class="fas fa-chalkboard-teacher text-pink-600 text-lg block mb-0.5"></i>
+                <span class="text-xs font-bold text-pink-800 block">教師確認・編集</span>
+                <p class="text-[10px] text-gray-500">承認後に児童へ配信</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 12理論カード -->
+          <details class="mb-4">
+            <summary class="cursor-pointer text-sm font-bold text-indigo-800 hover:text-indigo-600 transition flex items-center gap-2 mb-2">
+              <i class="fas fa-book-open"></i>統合されている12の教育理論（クリックで詳細を表示）
+              <i class="fas fa-chevron-down text-xs text-gray-400"></i>
+            </summary>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+              <div class="bg-blue-50 rounded-xl p-3 border border-blue-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-blue-200 text-blue-800 px-2 py-0.5 rounded">F1</span><span class="text-sm font-bold text-gray-800">感覚処理効率理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">VARK理論（フレミング）</p>
+                <p class="text-xs text-gray-600">視覚(V)・聴覚(A)・読み書き(R)・運動感覚(K)の処理効率を測定し、最適なメディアタイプ（図解・音声・テキスト・体験活動）を選択する。</p>
+              </div>
+              <div class="bg-green-50 rounded-xl p-3 border border-green-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-green-200 text-green-800 px-2 py-0.5 rounded">F2</span><span class="text-sm font-bold text-gray-800">多重知能理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">MI理論（ガードナー）</p>
+                <p class="text-xs text-gray-600">言語的・論理数学的・空間的・身体運動的・音楽的・対人的・内省的・博物的の8つの知能の強弱から、問題形式と提示方法を決定する。</p>
+              </div>
+              <div class="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded">F3</span><span class="text-sm font-bold text-gray-800">経験学習理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">経験学習サイクル（コルブ）</p>
+                <p class="text-xs text-gray-600">具体的経験→省察的観察→抽象的概念化→能動的実験の4段階サイクルのどの段階にいるかに合わせた課題を設計する。</p>
+              </div>
+              <div class="bg-red-50 rounded-xl p-3 border border-red-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded">F4</span><span class="text-sm font-bold text-gray-800">適性処遇交互作用理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">ATI理論（クロンバック＆スノウ）</p>
+                <p class="text-xs text-gray-600">事前知識・不安レベル・独立性などの適性に応じて、スキャフォールド（足場かけ）の量と種類を最適に調整する。</p>
+              </div>
+              <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">F5</span><span class="text-sm font-bold text-gray-800">自己調整学習理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">SRL理論（ジマーマン）</p>
+                <p class="text-xs text-gray-600">予見段階→遂行段階→自己省察段階の3フェーズを支援する振り返りプロンプトやチェックリストを自動生成する。</p>
+              </div>
+              <div class="bg-purple-50 rounded-xl p-3 border border-purple-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded">F6</span><span class="text-sm font-bold text-gray-800">認知戦略・望ましい困難理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">検索練習効果（レディガー）／望ましい困難（ビョーク）</p>
+                <p class="text-xs text-gray-600">検索練習・間隔反復・交互配置（インターリーブ）の準備度に応じて、出題間隔と問題配列を設計する。</p>
+              </div>
+              <div class="bg-pink-50 rounded-xl p-3 border border-pink-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-pink-200 text-pink-800 px-2 py-0.5 rounded">F7</span><span class="text-sm font-bold text-gray-800">発達の最近接領域理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">ZPD理論・スキャフォールディング（ヴィゴツキー）</p>
+                <p class="text-xs text-gray-600">「一人ではできないが、支援があればできる」領域の幅と位置に応じてヒント段階数・解法例の有無を決定する。</p>
+              </div>
+              <div class="bg-orange-50 rounded-xl p-3 border border-orange-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-orange-200 text-orange-800 px-2 py-0.5 rounded">F8</span><span class="text-sm font-bold text-gray-800">自己決定理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">SDT理論（デシ＆ライアン）</p>
+                <p class="text-xs text-gray-600">自律性・有能感・関係性の3つの基本的心理欲求の充足度を測定し、内発的動機づけを高める支援を設計する。</p>
+              </div>
+              <div class="bg-teal-50 rounded-xl p-3 border border-teal-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-teal-200 text-teal-800 px-2 py-0.5 rounded">F9</span><span class="text-sm font-bold text-gray-800">メタ認知理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">メタ認知（フラベル）／メタ認知的制御（ブラウン）</p>
+                <p class="text-xs text-gray-600">メタ認知的知識・メタ認知的制御・批判的思考の発達段階に応じて、自己モニタリング課題や振り返り問いを付加する。</p>
+              </div>
+              <div class="bg-cyan-50 rounded-xl p-3 border border-cyan-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-cyan-200 text-cyan-800 px-2 py-0.5 rounded">F10</span><span class="text-sm font-bold text-gray-800">領域学習モデル</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">MDL: Model of Domain Learning（アレクサンダー）</p>
+                <p class="text-xs text-gray-600">順応期→能力期→熟達期の3段階のどこにいるかに応じて課題の難易度を設定し、先行概念（誤概念）への対応を組み込む。</p>
+              </div>
+              <div class="bg-lime-50 rounded-xl p-3 border border-lime-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-lime-200 text-lime-800 px-2 py-0.5 rounded">F11</span><span class="text-sm font-bold text-gray-800">真正の学び理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">Authentic Learning（ヘリントン＆オリバー）</p>
+                <p class="text-xs text-gray-600">個人的関連性・実世界との接続・コミュニティへの参加の3要素を問題文に埋め込み、学びの意味づけを促す。</p>
+              </div>
+              <div class="bg-rose-50 rounded-xl p-3 border border-rose-200">
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-rose-200 text-rose-800 px-2 py-0.5 rounded">F12</span><span class="text-sm font-bold text-gray-800">学業感情の統制価値理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">Control-Value Theory（ペクルン）</p>
+                <p class="text-xs text-gray-600">学業的享受・不安・退屈のバランスを評価し、統制感と価値づけを高める感情支援と適切な難易度調整を行う。</p>
+              </div>
+            </div>
+          </details>
+
+          <!-- 4基幹軸→8アーキタイプ -->
+          <details>
+            <summary class="cursor-pointer text-sm font-bold text-indigo-800 hover:text-indigo-600 transition flex items-center gap-2">
+              <i class="fas fa-chart-bar"></i>4基幹軸と8つの学習者タイプ（クリックで詳細を表示）
+              <i class="fas fa-chevron-down text-xs text-gray-400"></i>
+            </summary>
+            <div class="mt-3">
+              <p class="text-xs text-gray-600 mb-3">12理論のプロファイル値から以下の4つの基幹軸スコア（0-100）を算出し、その組み合わせで8つの学習者アーキタイプに分類します。</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                <div class="bg-blue-50 rounded-xl p-3 text-center border border-blue-200">
+                  <span class="text-2xl block mb-1">🧠</span>
+                  <span class="text-xs font-bold text-blue-800">認知的自律性 (H)</span>
+                  <p class="text-[10px] text-gray-500 mt-0.5">F2多重知能 + F5自己調整 + F9メタ認知 + F10領域知識</p>
+                </div>
+                <div class="bg-green-50 rounded-xl p-3 text-center border border-green-200">
+                  <span class="text-2xl block mb-1">💚</span>
+                  <span class="text-xs font-bold text-green-800">情緒的安定性 (G)</span>
+                  <p class="text-[10px] text-gray-500 mt-0.5">F4不安(逆) + F8動機 + F12感情</p>
+                </div>
+                <div class="bg-purple-50 rounded-xl p-3 text-center border border-purple-200">
+                  <span class="text-2xl block mb-1">📐</span>
+                  <span class="text-xs font-bold text-purple-800">方略的成熟度 (A)</span>
+                  <p class="text-[10px] text-gray-500 mt-0.5">F3経験学習 + F5自己調整 + F6認知戦略</p>
+                </div>
+                <div class="bg-orange-50 rounded-xl p-3 text-center border border-orange-200">
+                  <span class="text-2xl block mb-1">⚡</span>
+                  <span class="text-xs font-bold text-orange-800">動機的エネルギー (E)</span>
+                  <p class="text-[10px] text-gray-500 mt-0.5">F4適性 + F8自己決定 + F11真正性</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div class="bg-gray-50 rounded-xl p-3 border hover:shadow-md transition text-center">
+                  <span class="text-2xl block">🌟</span>
+                  <p class="text-xs font-bold text-gray-800 mt-1">A: 自律的達成者</p>
+                  <p class="text-[10px] text-gray-500">H高 G高 A高 E高</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 border hover:shadow-md transition text-center">
+                  <span class="text-2xl block">📚</span>
+                  <p class="text-xs font-bold text-gray-800 mt-1">B: 方略的学習者</p>
+                  <p class="text-[10px] text-gray-500">H高 G高 A高 E低</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 border hover:shadow-md transition text-center">
+                  <span class="text-2xl block">🎯</span>
+                  <p class="text-xs font-bold text-gray-800 mt-1">C: 感覚的探究者</p>
+                  <p class="text-[10px] text-gray-500">H高 G低 A低 E高</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 border hover:shadow-md transition text-center">
+                  <span class="text-2xl block">🔍</span>
+                  <p class="text-xs font-bold text-gray-800 mt-1">D: 内省的分析者</p>
+                  <p class="text-[10px] text-gray-500">H高 G低 A高 E低</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 border hover:shadow-md transition text-center">
+                  <span class="text-2xl block">💪</span>
+                  <p class="text-xs font-bold text-gray-800 mt-1">E: 挑戦的冒険者</p>
+                  <p class="text-[10px] text-gray-500">H低 G高 A低 E高</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 border hover:shadow-md transition text-center">
+                  <span class="text-2xl block">🌱</span>
+                  <p class="text-xs font-bold text-gray-800 mt-1">F: 協調的共感者</p>
+                  <p class="text-[10px] text-gray-500">H低 G高 A低 E低</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 border hover:shadow-md transition text-center">
+                  <span class="text-2xl block">🤝</span>
+                  <p class="text-xs font-bold text-gray-800 mt-1">G: 受動的依存者</p>
+                  <p class="text-[10px] text-gray-500">H低 G低 A低 E低</p>
+                </div>
+                <div class="bg-gray-50 rounded-xl p-3 border hover:shadow-md transition text-center">
+                  <span class="text-2xl block">🛡️</span>
+                  <p class="text-xs font-bold text-gray-800 mt-1">H: 不安定な学習者</p>
+                  <p class="text-[10px] text-gray-500">H低 G低 A低 E低(不安高)</p>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+      \` : ''}
       <div class="bg-white rounded-2xl shadow-2xl mb-8 overflow-hidden">
         <!-- ステップバー -->
         <div class="bg-gradient-to-r from-purple-600 to-pink-500 p-6">
@@ -3251,10 +3449,6 @@ async function loadGuidePage(curriculumId) {
               <button onclick="showTestPrepDashboard()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chart-line mr-2"></i>テスト対策進捗
               </button>
-              <button onclick="scrollToPersonalizedSection()" class="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg ${personalizedCourses.length > 0 ? 'ring-2 ring-pink-300 ring-offset-2' : ''}">
-                <i class="fas fa-magic mr-2"></i>個別最適化コース
-                ${pendingCourses.length > 0 ? `<span class="ml-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">${pendingCourses.length}</span>` : personalizedCourses.length > 0 ? `<span class="ml-1 bg-white text-pink-600 text-xs px-1.5 py-0.5 rounded-full">${personalizedCourses.length}</span>` : ''}
-              </button>
               <button onclick="showLearningDashboard(${curriculumId})" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chart-line mr-2"></i>学習統計
               </button>
@@ -3266,12 +3460,6 @@ async function loadGuidePage(curriculumId) {
               </button>
               <button onclick="loadTeacherOverview(${curriculumId})" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-chalkboard-teacher mr-2"></i>教師用編集
-              </button>
-              <button onclick="loadEnvironmentDesignPage(${curriculumId})" class="bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
-                <i class="fas fa-palette mr-2"></i>学習環境デザイン
-              </button>
-              <button onclick="loadEvaluationPage(${curriculumId})" class="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
-                <i class="fas fa-clipboard-check mr-2"></i>指導・評価
               </button>
               <button onclick="showTeacherSupportDashboard(${curriculumId})" class="bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white px-4 py-2 rounded-lg font-bold transition shadow-lg">
                 <i class="fas fa-hands-helping mr-2"></i>支援ダッシュボード
@@ -42492,18 +42680,18 @@ async function showTeacherSupportDashboard(curriculumId) {
         '<div class="bg-white rounded-xl border-2 border-indigo-200 p-4">' +
           '<h4 class="font-bold text-indigo-800 mb-3"><i class="fas fa-book-open mr-2"></i>統合されている12の教育理論</h4>' +
           '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">' +
-            buildTheoryCard('F1', '感覚処理効率', 'VAK/VARK理論', '視覚・聴覚・読み書き・運動感覚の処理効率を測定し、最適なメディアタイプを選択') +
-            buildTheoryCard('F2', '多重知能', 'Gardner MI', '8つの知能の強弱パターンから、問題形式と提示方法を決定') +
-            buildTheoryCard('F3', '経験学習', 'Kolb理論', '具体的経験→省察→概念化→実験のサイクル段階に合わせた課題設計') +
-            buildTheoryCard('F4', '適性処遇交互作用', 'ATI / Cronbach-Snow', '事前知識・不安・独立性に応じたスキャフォールド量を調整') +
-            buildTheoryCard('F5', '自己調整学習', 'Zimmerman SRL', '予見→遂行→自己省察の3段階を支援する振り返りプロンプトを生成') +
-            buildTheoryCard('F6', '認知戦略', 'Roediger / Bjork', '検索練習・間隔反復・インターリーブ戦略の準備度に応じた出題間隔設計') +
-            buildTheoryCard('F7', 'スキャフォールディング', 'Vygotsky ZPD', '発達の最近接領域の幅と位置に応じたヒント段階数・解法例の決定') +
-            buildTheoryCard('F8', '動機づけ', 'Deci-Ryan SDT', '自律性・有能感・関係性の3欲求充足度から動機づけ支援を設計') +
-            buildTheoryCard('F9', 'メタ認知', 'Flavell / Brown', 'メタ認知的知識・制御・批判的思考の発達に応じた自己モニタリング課題を付加') +
-            buildTheoryCard('F10', '領域固有知識', 'Alexander MDL', '順応期→能力期→熟達期の段階に応じた課題難易度と先行概念対応') +
-            buildTheoryCard('F11', '真正の学び', 'Authentic Learning', '個人的関連性・実世界接続・コミュニティ参加の要素を問題文に埋め込み') +
-            buildTheoryCard('F12', '感情と学習', 'Control-Value', '学業的享受・不安・退屈の状態に応じた感情支援と難易度調整') +
+            buildTheoryCard('F1', '感覚処理効率理論', 'VARK理論（フレミング）', '視覚・聴覚・読み書き・運動感覚の処理効率を測定し、最適なメディアタイプを選択') +
+            buildTheoryCard('F2', '多重知能理論', 'MI理論（ガードナー）', '8つの知能の強弱パターンから、問題形式と提示方法を決定') +
+            buildTheoryCard('F3', '経験学習理論', '経験学習サイクル（コルブ）', '具体的経験→省察→概念化→実験のサイクル段階に合わせた課題設計') +
+            buildTheoryCard('F4', '適性処遇交互作用理論', 'ATI理論（クロンバック＆スノウ）', '事前知識・不安・独立性に応じたスキャフォールド量を調整') +
+            buildTheoryCard('F5', '自己調整学習理論', 'SRL理論（ジマーマン）', '予見→遂行→自己省察の3段階を支援する振り返りプロンプトを生成') +
+            buildTheoryCard('F6', '認知戦略・望ましい困難理論', '検索練習効果（レディガー）／望ましい困難（ビョーク）', '検索練習・間隔反復・インターリーブ戦略の準備度に応じた出題間隔設計') +
+            buildTheoryCard('F7', '発達の最近接領域理論', 'ZPD・スキャフォールディング（ヴィゴツキー）', '「支援があればできる」領域の幅と位置に応じたヒント段階数・解法例の決定') +
+            buildTheoryCard('F8', '自己決定理論', 'SDT理論（デシ＆ライアン）', '自律性・有能感・関係性の3欲求充足度から動機づけ支援を設計') +
+            buildTheoryCard('F9', 'メタ認知理論', 'メタ認知（フラベル）／メタ認知的制御（ブラウン）', 'メタ認知的知識・制御・批判的思考の発達に応じた自己モニタリング課題を付加') +
+            buildTheoryCard('F10', '領域学習モデル', 'MDL理論（アレクサンダー）', '順応期→能力期→熟達期の段階に応じた課題難易度と先行概念対応') +
+            buildTheoryCard('F11', '真正の学び理論', 'Authentic Learning（ヘリントン＆オリバー）', '個人的関連性・実世界接続・コミュニティ参加の要素を問題文に埋め込み') +
+            buildTheoryCard('F12', '学業感情の統制価値理論', 'Control-Value Theory（ペクルン）', '学業的享受・不安・退屈の状態に応じた感情支援と難易度調整') +
           '</div>' +
         '</div>' +
         
