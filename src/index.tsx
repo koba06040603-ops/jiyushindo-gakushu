@@ -7086,16 +7086,49 @@ app.get('/guide/:curriculumId', async (c) => {
     let commonCheckTest = null
     let courseSelectionProblems: any[] = []
     let optionalProblems: any[] = []
+    let personalizedCheckTest = null
+    let personalizedOptionalProblems: any[] = []
     for (const row of (metaResult.results || []) as any[]) {
       try {
         if (row.meta_key === 'common_check_test') commonCheckTest = JSON.parse(row.meta_value || 'null')
         if (row.meta_key === 'course_selection_problems') courseSelectionProblems = JSON.parse(row.meta_value || '[]')
+        // 個別コース用チェックテスト・選択課題（course_id別）
+        if (isPersonalized && row.meta_key === `personalized_check_test_${courseId}`) {
+          personalizedCheckTest = JSON.parse(row.meta_value || 'null')
+        }
+        if (isPersonalized && row.meta_key === `personalized_optional_${courseId}`) {
+          personalizedOptionalProblems = JSON.parse(row.meta_value || '[]')
+        }
       } catch(e) {}
     }
     
     // 選択問題を取得
     const optResult = await env.DB.prepare('SELECT * FROM optional_problems WHERE curriculum_id = ? ORDER BY problem_number').bind(curriculumId).all()
     optionalProblems = (optResult.results || []) as any[]
+    
+    // 個別コースの場合：個別用がなければカードベースの確認テスト・課題を自動生成
+    if (isPersonalized) {
+      if (!personalizedCheckTest && cards.length > 0) {
+        personalizedCheckTest = {
+          test_title: '個別チェックテスト',
+          test_description: 'あなた専用の学習カードの理解度を確認するテストです。',
+          sample_problems: (cards as any[]).map((card: any, idx: number) => ({
+            problem_number: idx + 1,
+            problem_text: card.card_title ? `「${card.card_title}」の学習内容について、自分の言葉で説明してみましょう。` : `カード${idx + 1}の内容を振り返り、ポイントをまとめましょう。`,
+            difficulty: 'basic'
+          }))
+        }
+      }
+      if (personalizedOptionalProblems.length === 0 && cards.length > 0) {
+        personalizedOptionalProblems = [
+          { problem_title: 'ふりかえり問題', problem_content: `今日学んだ${curriculum.unit_name}の内容で、一番大切だと思ったことを書きましょう。なぜそう思ったかも説明してください。` },
+          { problem_title: 'チャレンジ問題', problem_content: `${curriculum.unit_name}の内容を使って、自分でオリジナルの問題を1つ作ってみましょう。その答えも考えてください。` },
+        ]
+      }
+      // 個別コースの場合は個別用を使う
+      if (personalizedCheckTest) commonCheckTest = personalizedCheckTest
+      if (personalizedOptionalProblems.length > 0) optionalProblems = personalizedOptionalProblems
+    }
     
     // コースごとにカードをグループ化
     const courseCards: Record<string, any[]> = {}
@@ -7177,8 +7210,10 @@ app.get('/guide/:curriculumId', async (c) => {
               <span style="background:#8B5CF6; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem;">${i+1}</span>
               <strong>${p.problem_title || 'もんだい ' + (i+1)}</strong>
             </div>
-            ${p.problem_description ? `<div style="font-size:0.9rem; color:#4b5563; margin-bottom:8px;">${p.problem_description}</div>` : ''}
-            ${p.problem_content ? `<div style="background:#f5f3ff; border-left:4px solid #8B5CF6; padding:10px 14px; border-radius:0 8px 8px 0;">${p.problem_content}</div>` : ''}
+            ${p.problem_content ? `<div style="background:#f5f3ff; border-left:4px solid #8B5CF6; padding:10px 14px; border-radius:0 8px 8px 0;">${p.problem_content}</div>` : p.problem_description ? `<div style="background:#f5f3ff; border-left:4px solid #8B5CF6; padding:10px 14px; border-radius:0 8px 8px 0;">${p.problem_description}</div>` : ''}
+            <div style="background:#f9fafb; border:1px dashed #d1d5db; border-radius:8px; padding:12px; min-height:40px; margin-top:8px;">
+              <span style="color:#9ca3af; font-size:0.85rem;">こたえをかこう：</span>
+            </div>
           </div>
         `).join('')}
       </div>
@@ -29777,6 +29812,90 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
     ).run()
 
     console.log(`✅ 個別最適化コース配信完了: student=${student_id}, course_id=${courseId}, cards=${savedCardIds.length}`)
+
+    // バックグラウンドで個別用チェックテスト・選択課題をGemini生成
+    const bgGenerate = async () => {
+      try {
+        const apiKey = env.GEMINI_API_KEY
+        if (!apiKey) { console.warn('⚠️ GEMINI_API_KEY未設定: 個別テスト生成スキップ'); return }
+        
+        const cardSummary = (cards || []).map((card: any, i: number) => 
+          `カード${i+1}: ${card.card_title || card.title || ''} - ${(card.problem_text || card.problem || '').substring(0, 100)}`
+        ).join('\n')
+        
+        const prompt = `あなたは小学校${curriculum.grade}の${curriculum.subject}の教師です。
+以下の個別学習カードの内容に基づいて、この児童専用のチェックテスト（3問）と選択課題（3問）を作成してください。
+
+単元名: ${curriculum.unit_name}
+学年: ${curriculum.grade}
+教科: ${curriculum.subject}
+
+【個別学習カードの内容】
+${cardSummary}
+
+以下のJSON形式で出力してください:
+{
+  "check_test": {
+    "test_title": "個別チェックテスト",
+    "test_description": "学習カードの理解度を確認するテスト",
+    "sample_problems": [
+      {"problem_number": 1, "problem_text": "問題文（学習カードの内容に関連した確認問題）", "difficulty": "basic"},
+      {"problem_number": 2, "problem_text": "問題文", "difficulty": "basic"},
+      {"problem_number": 3, "problem_text": "問題文", "difficulty": "standard"}
+    ]
+  },
+  "optional_problems": [
+    {"problem_title": "ふりかえり問題", "problem_content": "学習内容を振り返る問題文"},
+    {"problem_title": "チャレンジ問題", "problem_content": "発展的な問題文"},
+    {"problem_title": "つなげる問題", "problem_content": "日常生活や他教科とつなげる問題文"}
+  ]
+}
+
+重要:
+- 学習カードの内容を踏まえた具体的な問題にすること
+- 児童の学年に合った言葉遣いにすること
+- 答えは含めないこと（問題文のみ）
+- problem_contentとproblem_titleは異なる内容にすること`
+        
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 4000, responseMimeType: 'application/json' }
+          })
+        })
+        
+        if (!geminiRes.ok) { console.warn('⚠️ Gemini個別テスト生成失敗:', geminiRes.status); return }
+        
+        const geminiData = await geminiRes.json() as any
+        const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const parsed = JSON.parse(text)
+        
+        // チェックテスト保存
+        if (parsed.check_test) {
+          await env.DB.prepare(`
+            INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+            ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
+          `).bind(curriculum_id, `personalized_check_test_${courseId}`, JSON.stringify(parsed.check_test)).run()
+          console.log(`✅ 個別チェックテスト生成完了: course_id=${courseId}`)
+        }
+        
+        // 選択課題保存
+        if (parsed.optional_problems && parsed.optional_problems.length > 0) {
+          await env.DB.prepare(`
+            INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+            ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
+          `).bind(curriculum_id, `personalized_optional_${courseId}`, JSON.stringify(parsed.optional_problems)).run()
+          console.log(`✅ 個別選択課題生成完了: course_id=${courseId}, count=${parsed.optional_problems.length}`)
+        }
+      } catch (bgErr) {
+        console.warn('⚠️ 個別テスト/課題バックグラウンド生成エラー:', bgErr)
+      }
+    }
+    
+    // レスポンス返却後にバックグラウンドで実行
+    c.executionCtx.waitUntil(bgGenerate())
 
     return c.json({
       success: true,

@@ -41405,10 +41405,10 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       <p class="text-sm text-gray-800">${card.problem_text || card.problem_description || ''}</p>
                     </div>
                     <div class="grid grid-cols-2 gap-2 text-xs">
-                      <div class="bg-white rounded p-2 border">
-                        <span class="font-bold text-gray-600">こたえ：</span>
-                        <span class="text-gray-700">${card.correct_answer || card.answer || ''}</span>
-                      </div>
+                      <details class="bg-white rounded p-2 border">
+                        <summary class="font-bold text-gray-600 cursor-pointer">こたえを見る <i class="fas fa-eye-slash text-gray-400 text-xs"></i></summary>
+                        <span class="text-gray-700 mt-1 block">${card.correct_answer || card.answer || ''}</span>
+                      </details>
                       <div class="bg-white rounded p-2 border">
                         <span class="font-bold text-gray-600">推定時間：</span>
                         <span class="text-gray-700">${card.estimated_time_minutes || 10}分</span>
