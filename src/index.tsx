@@ -1042,13 +1042,22 @@ app.use('*', async (c, next) => {
   if (path.startsWith('/static/') || path.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2)$/)) {
     // 静的リソースは長期キャッシュ（1年）
     c.header('Cache-Control', 'public, max-age=31536000, immutable')
-  } else if (path === '/' || path.startsWith('/api/')) {
-    // HTML とAPIは短期キャッシュ（1時間）
-    c.header('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400')
+  } else if (path.startsWith('/api/')) {
+    // ★ 重要修正: APIレスポンスはキャッシュしない
+    // データが頻繁に変更されるため（コース生成、学習記録等）、
+    // ブラウザ・CDNキャッシュを無効化する
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+    c.header('CDN-Cache-Control', 'no-store')
+    c.header('Pragma', 'no-cache')
+  } else if (path === '/') {
+    // HTMLページは短期キャッシュ（5分）
+    c.header('Cache-Control', 'public, max-age=300, must-revalidate')
   }
   
-  // Cloudflare のエッジキャッシュ設定
-  c.header('CDN-Cache-Control', 'max-age=86400')
+  // Cloudflare のエッジキャッシュ設定（静的リソースのみ）
+  if (path.startsWith('/static/') || path.match(/\.(js|css|png|jpg|jpeg|gif|svg|woff|woff2)$/)) {
+    c.header('CDN-Cache-Control', 'max-age=86400')
+  }
 })
 
 // CORS設定
