@@ -14606,6 +14606,7 @@ function renderPersonalizedSection(curriculumId, personalizedCourses, approvedCo
         '<i class="fas fa-magic text-pink-300 text-2xl mb-2"></i>' +
         '<p class="text-sm text-gray-500 mb-2">まだ個別最適化コースが生成されていません</p>' +
         '<p class="text-xs text-gray-400">「新規生成」ボタンから児童を選択して生成してください</p>' +
+        '<p class="text-xs text-gray-300 mt-2">カリキュラムID: ' + curriculumId + '</p>' +
       '</div>'
   }
   
@@ -41222,7 +41223,12 @@ async function startBulkGeneration(curriculumId) {
       }
     } catch (e) {
       failed++
-      addLog(`❌ 児童ID:${studentId} → エラー: ${e.message}`)
+      const errMsg = e.code === 'ECONNABORTED' || e.message?.includes('timeout') 
+        ? 'タイムアウト（90秒超過）' 
+        : e.response?.status ? `サーバーエラー(${e.response.status}): ${e.response?.data?.error || ''}` 
+        : e.message
+      addLog(`❌ 児童ID:${studentId} → エラー: ${errMsg}`)
+      console.error('❌ generate error:', { studentId, status: e.response?.status, msg: e.message, data: e.response?.data })
     }
     updateProgress()
   }
@@ -41241,19 +41247,24 @@ async function startBulkGeneration(curriculumId) {
   // 結果を明確に表示（成功0の場合は警告）
   if (completed === 0 && failed > 0) {
     addLog(`❌ 全員の生成に失敗しました。ブラウザのコンソール(F12)でエラーの詳細を確認してください。`)
+    alert(`⚠️ 個別最適化コースの生成に全員失敗しました（${failed}名）。\nコンソール(F12)でエラーの詳細を確認してください。`)
   } else if (completed > 0 && failed > 0) {
     addLog(`⚠️ 一部の生成に失敗しました。成功した${completed}名分のコースは保存されました。`)
+  } else if (completed > 0) {
+    addLog(`✅ ${completed}名全員の個別最適化コースが正常に保存されました！`)
   }
   
-  // 3秒後に自動でモーダルを閉じてページを更新
-  setTimeout(() => {
-    const m = document.getElementById('personalizedSelectorModal')
-    if (m) {
-      m.remove()
-      console.log('🔄 生成完了後にガイドページをリロード: curriculumId=', curriculumId, '成功:', completed, '件')
-      loadGuidePage(curriculumId)
-    }
-  }, 3000)
+  // 成功時のみ5秒後に自動でモーダルを閉じてページを更新（失敗時は手動で閉じる）
+  if (completed > 0) {
+    setTimeout(() => {
+      const m = document.getElementById('personalizedSelectorModal')
+      if (m) {
+        m.remove()
+        console.log('🔄 生成完了後にガイドページをリロード: curriculumId=', curriculumId, '成功:', completed, '件')
+        loadGuidePage(curriculumId)
+      }
+    }, 5000)
+  }
 }
 window.startBulkGeneration = startBulkGeneration
 
