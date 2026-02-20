@@ -1296,6 +1296,20 @@ app.get('/api/debug/personalized', async (c) => {
   }
 })
 
+// デバッグ: カリキュラム検索（認証不要）
+app.get('/api/debug/search-curriculum', async (c) => {
+  const { env } = c
+  const q = c.req.query('q') || ''
+  try {
+    const results = await env.DB.prepare(
+      `SELECT id, unit_name, grade, subject FROM curriculum WHERE unit_name LIKE ? ORDER BY id DESC LIMIT 10`
+    ).bind(`%${q}%`).all()
+    return c.json({ query: q, results: results.results })
+  } catch (e: any) {
+    return c.json({ error: e.message })
+  }
+})
+
 // デバッグ: curriculum API テスト（認証不要）
 app.get('/api/debug/curriculum/:id', async (c) => {
   const { env } = c
@@ -1340,6 +1354,53 @@ app.get('/api/debug/curriculum/:id', async (c) => {
       total_courses: coursesWithInfo.length,
       personalized_count: coursesWithInfo.filter((c: any) => c.course_level === 'personalized').length,
       courses: coursesWithInfo
+    })
+  } catch (e: any) {
+    return c.json({ error: e.message, stack: e.stack })
+  }
+})
+
+// 生成API前チェック: カリキュラムの存在確認とGemini APIキーの状態
+app.get('/api/debug/generate-check/:id', async (c) => {
+  const { env } = c
+  const id = Number(c.req.param('id'))
+  try {
+    const curriculum = await env.DB.prepare('SELECT id, grade, subject, unit_name FROM curriculum WHERE id = ?').bind(id).first() as any
+    const hasGeminiKey = !!(env.GEMINI_API_KEY && env.GEMINI_API_KEY !== 'your-gemini-api-key-here')
+    
+    let courseCount = 0
+    let cardCount = 0
+    try {
+      const courses = await env.DB.prepare('SELECT COUNT(*) as cnt FROM courses WHERE curriculum_id = ?').bind(id).first() as any
+      courseCount = courses?.cnt || 0
+      const cards = await env.DB.prepare(`
+        SELECT COUNT(*) as cnt FROM learning_cards lc 
+        JOIN courses c ON lc.course_id = c.id 
+        WHERE c.curriculum_id = ?
+      `).bind(id).first() as any
+      cardCount = cards?.cnt || 0
+    } catch {}
+
+    // テーブル存在チェック
+    const requiredTables = ['curriculum', 'courses', 'learning_cards', 'hint_cards']
+    const missingTables: string[] = []
+    for (const table of requiredTables) {
+      try {
+        await env.DB.prepare(`SELECT 1 FROM ${table} LIMIT 0`).all()
+      } catch {
+        missingTables.push(table)
+      }
+    }
+
+    return c.json({
+      curriculum_found: !!curriculum,
+      curriculum: curriculum || null,
+      gemini_api_key_set: hasGeminiKey,
+      course_count: courseCount,
+      card_count: cardCount,
+      missing_tables: missingTables,
+      ready_to_generate: !!curriculum && hasGeminiKey && missingTables.length === 0,
+      db_max_id: ((await env.DB.prepare('SELECT MAX(id) as max_id FROM curriculum').first()) as any)?.max_id
     })
   } catch (e: any) {
     return c.json({ error: e.message, stack: e.stack })
@@ -29602,8 +29663,10 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
     })
 
   } catch (error) {
-    console.error('v4個別最適化コース生成エラー:', error)
-    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+    const errMsg = error instanceof Error ? error.message : 'Unknown'
+    const elapsed = Date.now() - startTime
+    console.error(`❌ v4個別最適化コース生成エラー (${elapsed}ms):`, errMsg, error instanceof Error ? error.stack?.split('\n').slice(0, 3) : '')
+    return c.json({ success: false, error: errMsg, debug: { time_ms: elapsed, step: 'v4_generate' } }, 500)
   }
 })
 

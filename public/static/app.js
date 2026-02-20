@@ -14604,9 +14604,9 @@ function renderPersonalizedSection(curriculumId, personalizedCourses, approvedCo
     contentHtml = '<p class="text-xs text-gray-600 mb-3">3コースの全体学習データを基に、児童一人ひとりに最適化された学習カードをAIが生成します。</p>' +
       '<div class="bg-white rounded-lg p-4 border border-dashed border-pink-300 text-center">' +
         '<i class="fas fa-magic text-pink-300 text-2xl mb-2"></i>' +
-        '<p class="text-sm text-gray-500 mb-2">まだ個別最適化コースが生成されていません</p>' +
+        '<p class="text-sm text-gray-500 mb-2">まだ個別最適化コースが作成されていません</p>' +
         '<p class="text-xs text-gray-400">「新規生成」ボタンから児童を選択して生成してください</p>' +
-        '<p class="text-xs text-gray-300 mt-2">カリキュラムID: ' + curriculumId + '</p>' +
+        '<p class="text-xs text-blue-400 mt-2 font-mono bg-blue-50 rounded px-2 py-1 inline-block">カリキュラムID: ' + curriculumId + '</p>' +
       '</div>'
   }
   
@@ -41126,6 +41126,32 @@ async function startBulkGeneration(curriculumId) {
   
   if (studentIds.length === 0) return alert('児童を選択してください')
   
+  // 事前チェック: カリキュラムの存在とAPIキーの確認
+  try {
+    const checkRes = await axios.get(`/api/debug/generate-check/${curriculumId}`)
+    const check = checkRes.data
+    console.log('🔍 生成前チェック結果:', check)
+    
+    if (!check.curriculum_found) {
+      alert(`⚠️ カリキュラムID: ${curriculumId} がデータベースに見つかりません。\n\nDB内の最大ID: ${check.db_max_id}\n\nこのカリキュラムは別のデータベースに存在する可能性があります。\n開発者にこの情報をお知らせください。`)
+      return
+    }
+    
+    if (!check.gemini_api_key_set) {
+      alert('⚠️ Gemini APIキーが設定されていません。管理者にお問い合わせください。')
+      return
+    }
+    
+    if (!check.ready_to_generate) {
+      alert(`⚠️ 生成の準備ができていません。\n\n不足テーブル: ${check.missing_tables?.join(', ') || 'なし'}\nカリキュラム: ${check.curriculum_found ? '✓' : '✗'}\nAPIキー: ${check.gemini_api_key_set ? '✓' : '✗'}`)
+      return
+    }
+    
+    console.log('✅ 生成前チェックOK:', { curriculum: check.curriculum, courses: check.course_count, cards: check.card_count })
+  } catch (checkErr) {
+    console.warn('⚠️ 生成前チェックをスキップ:', checkErr.message)
+  }
+  
   const btn = document.getElementById('bulk-generate-btn')
   btn.disabled = true
   btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>生成中...'
@@ -41164,13 +41190,19 @@ async function startBulkGeneration(curriculumId) {
   }
   
   // 順次生成（CF Workers タイムアウト回避）
+  addLog(`📋 カリキュラムID: ${curriculumId}`)
+  console.log('🚀 一括生成開始:', { curriculumId, studentIds, studentCount: studentIds.length })
+  
   for (const studentId of studentIds) {
-    addLog(`⏳ 児童ID:${studentId} の個別コース生成中...`)
+    addLog(`⏳ 児童ID:${studentId} の個別コース生成中...（約15秒かかります）`)
     try {
+      console.log(`📤 generate API呼び出し: student=${studentId}, curriculum=${curriculumId}`)
       const res = await axios.post('/api/teacher/generate-personalized-course', {
         student_id: studentId,
         curriculum_id: curriculumId
-      }, { timeout: 90000 })
+      }, { timeout: 120000 })
+      
+      console.log(`📥 generate APIレスポンス:`, { status: res.status, success: res.data.success, error: res.data.error, keys: Object.keys(res.data) })
       
       if (res.data.success) {
         // AIが生成したプランを取得
@@ -41193,6 +41225,7 @@ async function startBulkGeneration(curriculumId) {
         } else {
           // DB保存（publish）
           try {
+            console.log(`📤 publish API呼び出し: student=${studentId}, curriculum=${curriculumId}, cards=${planCards.length}`)
             const pubRes = await axios.post('/api/teacher/publish-personalized-course', {
               student_id: studentId,
               curriculum_id: curriculumId,
@@ -41219,16 +41252,18 @@ async function startBulkGeneration(curriculumId) {
         }
       } else {
         failed++
-        addLog(`⚠️ 児童ID:${studentId} → 生成失敗: ${res.data.error || '不明'}`)
+        addLog(`⚠️ 児童ID:${studentId} → 生成失敗: ${res.data.error || '不明'}（カリキュラムID: ${curriculumId}）`)
+        console.error('⚠️ generate API returned success:false:', { studentId, curriculumId, error: res.data.error, fullResponse: JSON.stringify(res.data).substring(0, 500) })
       }
     } catch (e) {
       failed++
       const errMsg = e.code === 'ECONNABORTED' || e.message?.includes('timeout') 
-        ? 'タイムアウト（90秒超過）' 
+        ? 'タイムアウト（120秒超過）- Cloudflare Workersの制限の可能性があります' 
+        : e.response?.status === 404 ? `カリキュラムID:${curriculumId}が見つかりません（DB不整合の可能性）`
         : e.response?.status ? `サーバーエラー(${e.response.status}): ${e.response?.data?.error || ''}` 
-        : e.message
+        : `ネットワークエラー: ${e.message}`
       addLog(`❌ 児童ID:${studentId} → エラー: ${errMsg}`)
-      console.error('❌ generate error:', { studentId, status: e.response?.status, msg: e.message, data: e.response?.data })
+      console.error('❌ generate error詳細:', { studentId, curriculumId, status: e.response?.status, statusText: e.response?.statusText, msg: e.message, code: e.code, data: e.response?.data, url: '/api/teacher/generate-personalized-course' })
     }
     updateProgress()
   }
@@ -41244,14 +41279,29 @@ async function startBulkGeneration(curriculumId) {
   
   addLog(`🎉 一括生成完了: ${completed}名成功, ${failed}名失敗`)
   
-  // 結果を明確に表示（成功0の場合は警告）
+  // 結果を明確に表示
   if (completed === 0 && failed > 0) {
-    addLog(`❌ 全員の生成に失敗しました。ブラウザのコンソール(F12)でエラーの詳細を確認してください。`)
-    alert(`⚠️ 個別最適化コースの生成に全員失敗しました（${failed}名）。\nコンソール(F12)でエラーの詳細を確認してください。`)
+    addLog(`❌ 全員の生成に失敗しました。上記のエラーメッセージをご確認ください。`)
+    addLog(`💡 カリキュラムID: ${curriculumId} - この情報を開発者にお伝えください。`)
+    alert(`⚠️ 個別最適化コースの生成に全員失敗しました（${failed}名）。\n\nカリキュラムID: ${curriculumId}\n\nブラウザのコンソール(F12)でエラーの詳細をご確認ください。\nスクリーンショットをお送りいただければ原因を特定できます。`)
   } else if (completed > 0 && failed > 0) {
     addLog(`⚠️ 一部の生成に失敗しました。成功した${completed}名分のコースは保存されました。`)
+    // 生成後に確認
+    try {
+      const verifyRes = await axios.get(`/api/curriculum/${curriculumId}`)
+      const pCourses = (verifyRes.data.courses || []).filter(c => c.course_level === 'personalized')
+      addLog(`✅ DB確認: ${pCourses.length}件の個別コースがカリキュラムID:${curriculumId}に保存されています`)
+      console.log('📊 生成後DB確認:', { curriculumId, personalizedCount: pCourses.length, courses: pCourses.map(c => ({ id: c.id, name: c.course_name })) })
+    } catch(ve) { console.warn('DB確認エラー:', ve) }
   } else if (completed > 0) {
     addLog(`✅ ${completed}名全員の個別最適化コースが正常に保存されました！`)
+    // 生成後に確認
+    try {
+      const verifyRes = await axios.get(`/api/curriculum/${curriculumId}`)
+      const pCourses = (verifyRes.data.courses || []).filter(c => c.course_level === 'personalized')
+      addLog(`✅ DB確認: ${pCourses.length}件の個別コースがカリキュラムID:${curriculumId}に保存されています`)
+      console.log('📊 生成後DB確認:', { curriculumId, personalizedCount: pCourses.length, courses: pCourses.map(c => ({ id: c.id, name: c.course_name })) })
+    } catch(ve) { console.warn('DB確認エラー:', ve) }
   }
   
   // 成功時のみ5秒後に自動でモーダルを閉じてページを更新（失敗時は手動で閉じる）
