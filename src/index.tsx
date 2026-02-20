@@ -7160,20 +7160,57 @@ app.get('/guide/:curriculumId', async (c) => {
           <h3 style="background:${info.color}; color:white; padding:12px 20px; border-radius:12px; font-size:1.2rem; margin-bottom:1rem;">
             ${info.emoji} ${course.course_name || info.name}（${cCards.length}枚）
           </h3>
-          ${cCards.map((card: any, idx: number) => `
+          ${cCards.map((card: any, idx: number) => {
+            // マルチメディア情報をパース
+            let mm: any = {}
+            try { if (card.problem_content && card.problem_content.startsWith('{')) mm = JSON.parse(card.problem_content)?.multimedia || {} } catch {}
+            const youtubeUrl = mm.youtube_url || card.solution_video_url || ''
+            const youtubeTitle = mm.youtube_title || '関連動画'
+            const tactileActivity = mm.tactile_activity || ''
+            const audioInstruction = mm.audio_instruction || ''
+            const imageDesc = mm.image_description || ''
+            // YouTube embed用ID抽出
+            let ytId = ''
+            try { const m = youtubeUrl.match(/(?:v=|youtu\.be\/)([^&?]+)/); if (m) ytId = m[1] } catch {}
+            
+            return `
             <div class="card" style="background:white; border:2px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:12px; break-inside:avoid;">
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
                 <span style="background:${info.color}; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem;">${idx+1}</span>
                 <strong style="font-size:1rem;">${card.card_title || 'カード ' + (idx+1)}</strong>
-                ${card.estimated_time_minutes ? `<span style="margin-left:auto; font-size:0.75rem; background:#f3f4f6; padding:2px 8px; border-radius:8px;">⏱ ${card.estimated_time_minutes}分</span>` : ''}
+                <span style="margin-left:auto; display:flex; gap:4px; align-items:center;">
+                  ${card.difficulty_level === 'hard' ? '<span style="background:#FEE2E2;color:#991B1B;padding:1px 8px;border-radius:8px;font-size:0.7rem;font-weight:bold;">★ チャレンジ</span>' : card.difficulty_level === 'easy' ? '<span style="background:#DCFCE7;color:#166534;padding:1px 8px;border-radius:8px;font-size:0.7rem;font-weight:bold;">きほん</span>' : '<span style="background:#DBEAFE;color:#1E40AF;padding:1px 8px;border-radius:8px;font-size:0.7rem;font-weight:bold;">しっかり</span>'}
+                  ${card.estimated_time_minutes ? `<span style="font-size:0.75rem; background:#f3f4f6; padding:2px 8px; border-radius:8px;">⏱ ${card.estimated_time_minutes}分</span>` : ''}
+                </span>
               </div>
               ${card.problem_text ? `<div style="background:#f0f9ff; border-left:4px solid ${info.color}; padding:10px 14px; border-radius:0 8px 8px 0; margin-bottom:8px;"><strong>もんだい：</strong>${card.problem_text}</div>` : ''}
-              ${card.problem_description ? `<div style="font-size:0.9rem; color:#4b5563; margin-bottom:8px;">${card.problem_description}</div>` : ''}
+              ${ytId ? `
+              <div class="no-print" style="margin:8px 0; border-radius:8px; overflow:hidden; background:#000;">
+                <iframe width="100%" height="200" src="https://www.youtube.com/embed/${ytId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope" allowfullscreen style="border-radius:8px;"></iframe>
+                <p style="color:#6b7280; font-size:0.75rem; padding:4px 8px; background:#f3f4f6;">🎬 ${youtubeTitle}</p>
+              </div>` : youtubeUrl ? `
+              <div class="no-print" style="margin:8px 0;">
+                <a href="${youtubeUrl}" target="_blank" style="display:inline-flex; align-items:center; gap:4px; background:#FF0000; color:white; padding:6px 12px; border-radius:8px; text-decoration:none; font-size:0.85rem;">
+                  ▶ ${youtubeTitle}を見る
+                </a>
+              </div>` : ''}
+              ${tactileActivity ? `
+              <div style="background:#FEF3C7; border-left:4px solid #F59E0B; padding:8px 12px; border-radius:0 8px 8px 0; margin:8px 0; font-size:0.9rem;">
+                <strong>✋ やってみよう：</strong>${tactileActivity}
+              </div>` : ''}
+              ${audioInstruction ? `
+              <div style="background:#F0FDF4; border-left:4px solid #10B981; padding:8px 12px; border-radius:0 8px 8px 0; margin:8px 0; font-size:0.9rem;">
+                <strong>🔊 きいてみよう：</strong>${audioInstruction}
+              </div>` : ''}
+              ${imageDesc ? `
+              <div style="background:#F5F3FF; border-left:4px solid #8B5CF6; padding:8px 12px; border-radius:0 8px 8px 0; margin:8px 0; font-size:0.85rem; color:#6b7280;">
+                <strong>🖼️ 図：</strong>${imageDesc}
+              </div>` : ''}
               <div style="background:#f9fafb; border:1px dashed #d1d5db; border-radius:8px; padding:12px; min-height:40px;">
                 <span style="color:#9ca3af; font-size:0.85rem;">こたえをかこう：</span>
               </div>
             </div>
-          `).join('')}
+          `}).join('')}
         </div>
       `
     }).join('')
@@ -7182,17 +7219,26 @@ app.get('/guide/:curriculumId', async (c) => {
     const checkTestHTML = commonCheckTest && commonCheckTest.sample_problems ? `
       <div style="margin-top:2rem; border-top:3px solid #EF4444; padding-top:1.5rem;">
         <h3 style="background:#EF4444; color:white; padding:12px 20px; border-radius:12px; font-size:1.2rem; margin-bottom:1rem;">
-          ✅ チェックテスト
+          ✅ チェックテスト（${commonCheckTest.sample_problems.length}もん）
         </h3>
         ${commonCheckTest.sample_problems.map((p: any, i: number) => `
           <div style="background:white; border:2px solid #fecaca; border-radius:12px; padding:16px; margin-bottom:12px; break-inside:avoid;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
               <span style="background:#EF4444; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem;">${i+1}</span>
               <strong>${p.problem_text || p.question || ''}</strong>
+              ${p.difficulty === 'advanced' ? '<span style="background:#FEE2E2;color:#991B1B;padding:1px 6px;border-radius:6px;font-size:0.7rem;font-weight:bold;margin-left:auto;">★ チャレンジ</span>' : ''}
             </div>
+            ${p.choices && p.choices.length > 0 ? `
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0;">
+              ${p.choices.map((ch: string) => `
+                <div style="background:#fff5f5; border:2px solid #fecaca; border-radius:8px; padding:8px 12px; cursor:pointer; font-size:0.9rem;">
+                  ${ch}
+                </div>
+              `).join('')}
+            </div>` : `
             <div style="background:#f9fafb; border:1px dashed #d1d5db; border-radius:8px; padding:12px; min-height:40px;">
               <span style="color:#9ca3af; font-size:0.85rem;">こたえをかこう：</span>
-            </div>
+            </div>`}
           </div>
         `).join('')}
       </div>
@@ -7282,14 +7328,34 @@ app.get('/guide/:curriculumId', async (c) => {
     
     <div class="guide-content">
       <div class="goal-box">
-        <strong>🎯 たんげんのもくひょう</strong>
-        <p style="margin-top:4px;">${curriculum.unit_goal || ''}</p>
+        <strong>🎯 <ruby>目標<rp>(</rp><rt>もくひょう</rt><rp>)</rp></ruby>（めあて）</strong>
+        <p style="margin-top:4px; font-size:1.05rem;">${curriculum.unit_goal || ''}</p>
       </div>
       ${curriculum.non_cognitive_goal ? `
       <div class="goal-box" style="background:#F0FDF4; border-color:#10B981;">
         <strong>💪 がんばりたいこと</strong>
         <p style="margin-top:4px;">${curriculum.non_cognitive_goal}</p>
       </div>` : ''}
+      ${isPersonalized ? `
+      <div style="background:#FDF2F8; border:2px solid #F9A8D4; border-radius:12px; padding:12px 16px; margin-bottom:16px;">
+        <strong style="color:#BE185D;">🌟 あなただけの<ruby>学習<rp>(</rp><rt>がくしゅう</rt><rp>)</rp></ruby>カードです</strong>
+        <p style="font-size:0.85rem; color:#6b7280; margin-top:4px;">
+          みんなと同じ<ruby>単元<rp>(</rp><rt>たんげん</rt><rp>)</rp></ruby>を、あなたに合った<ruby>方法<rp>(</rp><rt>ほうほう</rt><rp>)</rp></ruby>で<ruby>学<rp>(</rp><rt>まな</rt><rp>)</rp></ruby>べるように作りました。
+          <ruby>順番<rp>(</rp><rt>じゅんばん</rt><rp>)</rp></ruby>に取り組んでいきましょう！
+        </p>
+      </div>` : `
+      <div style="background:#EFF6FF; border:2px solid #93C5FD; border-radius:12px; padding:12px 16px; margin-bottom:16px;">
+        <strong style="color:#1E40AF;">📋 <ruby>学習<rp>(</rp><rt>がくしゅう</rt><rp>)</rp></ruby>の<ruby>流<rp>(</rp><rt>なが</rt><rp>)</rp></ruby>れ</strong>
+        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; font-size:0.85rem;">
+          <span style="background:#DBEAFE;padding:3px 8px;border-radius:6px;">①カード</span>
+          <span style="color:#9CA3AF;">→</span>
+          <span style="background:#FEF3C7;padding:3px 8px;border-radius:6px;">②チェック</span>
+          <span style="color:#9CA3AF;">→</span>
+          <span style="background:#F3E8FF;padding:3px 8px;border-radius:6px;">③えらべる</span>
+          <span style="color:#9CA3AF;">→</span>
+          <span style="background:#DCFCE7;padding:3px 8px;border-radius:6px;">④ふりかえり</span>
+        </div>
+      </div>`}
       
       ${coursesSectionHTML}
       ${checkTestHTML}
@@ -29578,6 +29644,19 @@ ${template.elaboration ? `- 精緻化: ${template.elaboration.prompt_text}` : ''
 ${testPrepData.weakTopics.length > 0 ? `【テスト対策から判明した弱点（重点的にカバーすること）】\n${testPrepData.weakTopics.map(t => `- ⚠️ ${t}`).join('\n')}\n` : ''}
 ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPrepData.feedbackSummary}\n` : ''}
 
+【★★★ 最重要：問題品質の絶対ルール ★★★】
+1. problem_text は児童が直接解く「具体的な問題文」でなければならない
+   - NG例: 「音楽の三要素について学びましょう」（これはメタ的な学習記述であり問題ではない）
+   - OK例: 「つぎの音符（♩ ♪ 𝅗𝅥）を、ながさのみじかいじゅんにならべましょう。」
+   - OK例: 「12このあめを3人に同じ数ずつ分けます。1人ぶんは何こですか？ 式と答えを書きましょう。」
+2. difficulty_level は必ず以下のバランスで設定すること:
+   - 最初の1〜2枚: "standard"（基本確認）
+   - 中盤1〜2枚: "standard" or "hard"（応用・思考力）  
+   - 最後の1枚: "hard"（発展・挑戦問題）
+   - 全部 "easy" は絶対に禁止。最低でも1枚は "hard" を含めること
+3. estimated_time_minutes はカードごとに5分〜15分で適切に変えること（全部同じにしない）
+4. 各カードに関連するYouTube動画・参考URL・画像があれば multimedia フィールドに含めること
+
 【出力形式】JSON
 {
   "analysis_summary": "この児童の学習特性分析（v4 12理論に基づく、3文）",
@@ -29585,20 +29664,27 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   "recommended_approach": "おすすめの学習アプローチ（2文）",
   "cards": [
     {
-      "card_title": "カードタイトル",
+      "card_title": "具体的で魅力的なカードタイトル（例：クッキーを分けよう！）",
       "card_type": "${template.media_type}",
-      "difficulty_level": "easy|standard|hard",
+      "difficulty_level": "standard",
       "question_format": "${template.question_format}",
-      "problem_text": "問題文（小学生が直接読む、わかりやすい文章）",
-      "problem_description": "問題の補足説明",
-      "correct_answer": "正解",
-      "explanation": "解説（つまずきポイントを含む）",
-      "hint_text": "ヒント（段階的）",
-      "hints": ["ヒント1", "ヒント2"],
+      "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
+      "problem_description": "問題の背景や文脈の補足（problem_textとは異なる内容にすること）",
+      "correct_answer": "正解（具体的な数値・回答）",
+      "explanation": "解説（つまずきポイントと解法のコツを含む、児童にわかりやすい言葉で）",
+      "hint_text": "段階的ヒント（最初は抽象的→徐々に具体的に）",
+      "hints": ["ヒント1: まずは問題をよく読もう", "ヒント2: 図に描いて考えよう", "ヒント3: 具体的な手がかり"],
       ${template.scaffold_structure.show_worked_example ? '"worked_example": "解法例の全手順",' : ''}
       ${template.scaffold_structure.provide_checklist ? '"checklist": ["手順1", "手順2", "手順3"],' : ''}
-      "estimated_time_minutes": ${template.recommended_time_per_card},
+      "estimated_time_minutes": 10,
       "personalization_note": "v4パラメータに基づくカスタマイズ理由",
+      "multimedia": {
+        "youtube_url": "関連するYouTube動画のURL（NHK for School等の教育動画推奨。見つからない場合は空文字）",
+        "youtube_title": "動画タイトル",
+        "image_description": "この問題に必要な図解・イラストの説明",
+        "audio_instruction": "音声で聞かせたい指示や読み上げテキスト（あれば）",
+        "tactile_activity": "手を使う活動の説明（おはじき、ブロック、紙を折る等。あれば）"
+      },
       "media_suggestions": {
         "needs_illustration": ${template.media_type === 'illustrated' || template.media_type === 'manipulative'},
         "illustration_description": "図解の説明",
@@ -29617,13 +29703,17 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   },
   "hints_for_teacher": [
     "教師へのアドバイス1",
-    "教師へのアドバイス2"
+    "教師へのアドバイス2",
+    "つまずいている児童への具体的な声かけ例"
   ]
 }
 
-※ カードは${template.recommended_card_count}枚生成
-※ 問題文は小学生が直接読む文章（わかりやすく）
+※ カードは${template.recommended_card_count}枚生成（最低3枚、推奨5枚以上）
+※ problem_textは「〜しましょう」「〜を求めましょう」等の具体的な指示文にすること
+※ 「〜を学びます」「〜について考えます」等のメタ的記述は problem_text に絶対に書かないこと
+※ difficulty_levelは全カードで同じにせず、必ず段階的に難しくすること
 ※ v4の制御パラメータに忠実に従ってください
+※ multimediaフィールドでは、NHK for School (https://www.nhk.or.jp/school/) 等の教育動画を可能な限り提案すること
 `
 
     // 10. Gemini API呼び出し
@@ -29751,6 +29841,11 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       const pDesc = card.problem_description || card.problem_text || ''
       const aText = card.correct_answer || card.answer || ''
       const eText = card.explanation || card.answer_explanation || ''
+      
+      // マルチメディア情報を取得
+      const mm = card.multimedia || {}
+      const videoUrl = mm.youtube_url || card.solution_video_url || ''
+      const imageUrl = card.image_url || ''
 
       const cardResult = await env.DB.prepare(`
         INSERT INTO learning_cards (
@@ -29767,10 +29862,10 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       `).bind(
         curriculum.subject, gradeNum, curriculum.unit_name,
         card.card_title || `カード${i + 1}`, cardType, diffLevel,
-        pText, pDesc, pDesc,
+        pText, pDesc, JSON.stringify({ content: pDesc, multimedia: mm }),
         aText, aText, eText, eText,
         card.hint_text || '',
-        card.solution_video_url || '', card.image_url || '',
+        videoUrl, imageUrl,
         i + 1, card.card_number || (i + 1), card.estimated_time_minutes || 10,
         card.textbook_page || '', card.new_terms || '',
         card.example_problem || '', card.example_solution || '',
@@ -29824,7 +29919,7 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
         ).join('\n')
         
         const prompt = `あなたは小学校${curriculum.grade}の${curriculum.subject}の教師です。
-以下の個別学習カードの内容に基づいて、この児童専用のチェックテスト（3問）と選択課題（3問）を作成してください。
+以下の個別学習カードの内容に基づいて、この児童専用のチェックテスト（6問）と選択課題（4問）を作成してください。
 
 単元名: ${curriculum.unit_name}
 学年: ${curriculum.grade}
@@ -29837,25 +29932,32 @@ ${cardSummary}
 {
   "check_test": {
     "test_title": "個別チェックテスト",
-    "test_description": "学習カードの理解度を確認するテスト",
+    "test_description": "学習カードの理解度を確認するテスト（6もん）",
     "sample_problems": [
-      {"problem_number": 1, "problem_text": "問題文（学習カードの内容に関連した確認問題）", "difficulty": "basic"},
-      {"problem_number": 2, "problem_text": "問題文", "difficulty": "basic"},
-      {"problem_number": 3, "problem_text": "問題文", "difficulty": "standard"}
+      {"problem_number": 1, "problem_text": "具体的な問題文", "difficulty": "basic", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3", "エ: 選択肢4"], "correct_choice": "ア", "explanation": "なぜこれが正解か"},
+      {"problem_number": 2, "problem_text": "問題文", "difficulty": "basic", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3"], "correct_choice": "イ", "explanation": "解説"},
+      {"problem_number": 3, "problem_text": "問題文", "difficulty": "basic"},
+      {"problem_number": 4, "problem_text": "問題文", "difficulty": "standard", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3", "エ: 選択肢4"], "correct_choice": "ウ", "explanation": "解説"},
+      {"problem_number": 5, "problem_text": "問題文", "difficulty": "standard"},
+      {"problem_number": 6, "problem_text": "応用・発展的な問題文", "difficulty": "advanced"}
     ]
   },
   "optional_problems": [
-    {"problem_title": "ふりかえり問題", "problem_content": "学習内容を振り返る問題文"},
-    {"problem_title": "チャレンジ問題", "problem_content": "発展的な問題文"},
-    {"problem_title": "つなげる問題", "problem_content": "日常生活や他教科とつなげる問題文"}
+    {"problem_title": "ふりかえり問題", "problem_content": "学習内容を振り返り、自分の言葉でまとめる具体的な指示"},
+    {"problem_title": "チャレンジ問題", "problem_content": "発展的な計算・思考問題"},
+    {"problem_title": "つなげる問題", "problem_content": "日常生活・他教科と結びつける問題"},
+    {"problem_title": "つくる問題", "problem_content": "自分でオリジナル問題を作って、友だちと解き合う課題"}
   ]
 }
 
 重要:
-- 学習カードの内容を踏まえた具体的な問題にすること
-- 児童の学年に合った言葉遣いにすること
-- 答えは含めないこと（問題文のみ）
-- problem_contentとproblem_titleは異なる内容にすること`
+- 全6問のうち3〜4問は選択肢付き（choices配列とcorrect_choice）にすること
+- 残りの2〜3問は記述式（choicesなし）で自由に答えさせること
+- 難易度はbasic(2問)→standard(2問)→advanced(2問)と段階的に上げること
+- 学習カードの内容を踏まえた具体的な問題にすること（「〜を学ぼう」等のメタ記述禁止）
+- 児童の学年に合った言葉遣いにすること（ひらがな多め、簡潔に）
+- problem_contentとproblem_titleは異なる内容にすること
+- 選択課題は4問で、ふりかえり・チャレンジ・つなげる・つくるの4種にすること`
         
         const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
           method: 'POST',
@@ -29913,6 +30015,129 @@ ${cardSummary}
 
 // ============================================================
 // ============================================================
+
+// 教師によるカード編集API（個別最適化コースのカード修正）
+app.put('/api/teacher/edit-card/:cardId', async (c) => {
+  const { env } = c
+  try {
+    const cardId = c.req.param('cardId')
+    const updates = await c.req.json()
+    
+    // 既存カードを取得して確認
+    const card = await env.DB.prepare('SELECT * FROM learning_cards WHERE card_id = ?').bind(cardId).first() as any
+    if (!card) return c.json({ success: false, error: 'カードが見つかりません' }, 404)
+    
+    // 更新可能なフィールド
+    const fields: string[] = []
+    const values: any[] = []
+    
+    if (updates.card_title !== undefined) { fields.push('card_title = ?'); values.push(updates.card_title) }
+    if (updates.problem_text !== undefined) { fields.push('problem_text = ?'); values.push(updates.problem_text) }
+    if (updates.problem_description !== undefined) { fields.push('problem_description = ?'); values.push(updates.problem_description) }
+    if (updates.correct_answer !== undefined) { fields.push('correct_answer = ?', 'answer = ?'); values.push(updates.correct_answer, updates.correct_answer) }
+    if (updates.explanation !== undefined) { fields.push('explanation = ?', 'answer_explanation = ?'); values.push(updates.explanation, updates.explanation) }
+    if (updates.hint_text !== undefined) { fields.push('hint_text = ?'); values.push(updates.hint_text) }
+    if (updates.difficulty_level !== undefined) { fields.push('difficulty_level = ?'); values.push(updates.difficulty_level) }
+    if (updates.estimated_time_minutes !== undefined) { fields.push('estimated_time_minutes = ?'); values.push(updates.estimated_time_minutes) }
+    if (updates.solution_video_url !== undefined) { fields.push('solution_video_url = ?'); values.push(updates.solution_video_url) }
+    if (updates.image_url !== undefined) { fields.push('image_url = ?'); values.push(updates.image_url) }
+    
+    if (fields.length === 0) return c.json({ success: false, error: '更新するフィールドがありません' }, 400)
+    
+    values.push(cardId)
+    await env.DB.prepare(`UPDATE learning_cards SET ${fields.join(', ')} WHERE card_id = ?`).bind(...values).run()
+    
+    console.log(`✅ カード編集完了: card_id=${cardId}, fields=${fields.length}`)
+    return c.json({ success: true, card_id: cardId, updated_fields: fields.length })
+  } catch (error) {
+    console.error('カード編集エラー:', error)
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// 教師による修正指示→AI再生成API
+app.post('/api/teacher/regenerate-card/:cardId', async (c) => {
+  const { env } = c
+  try {
+    const cardId = c.req.param('cardId')
+    const { instruction } = await c.req.json()
+    const apiKey = env.GEMINI_API_KEY
+    if (!apiKey) return c.json({ success: false, error: 'Gemini APIキーが未設定' }, 500)
+    
+    const card = await env.DB.prepare('SELECT lc.*, c.curriculum_id FROM learning_cards lc JOIN courses c ON lc.course_id = c.id WHERE lc.card_id = ?').bind(cardId).first() as any
+    if (!card) return c.json({ success: false, error: 'カードが見つかりません' }, 404)
+    
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(card.curriculum_id).first() as any
+    
+    const prompt = `あなたは小学校の教師AIアシスタントです。
+以下の学習カードを教師の修正指示に基づいて改善してください。
+
+【元のカード情報】
+- タイトル: ${card.card_title || ''}
+- 問題文: ${card.problem_text || ''}
+- 正解: ${card.correct_answer || ''}
+- 解説: ${card.explanation || ''}
+- 難易度: ${card.difficulty_level || 'standard'}
+- 教科: ${curriculum?.subject || ''}, 単元: ${curriculum?.unit_name || ''}, 学年: ${curriculum?.grade || ''}
+
+【教師の修正指示】
+${instruction}
+
+以下のJSON形式で修正版を出力してください:
+{
+  "card_title": "修正後タイトル",
+  "problem_text": "修正後の問題文（児童が直接読む具体的な指示文）",
+  "correct_answer": "修正後の正解",
+  "explanation": "修正後の解説",
+  "difficulty_level": "easy|standard|hard",
+  "hint_text": "修正後のヒント",
+  "estimated_time_minutes": 10
+}
+
+※ 教師の指示を忠実に反映し、児童の学年に合った言葉遣いにすること`
+
+    const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.5, maxOutputTokens: 2000, responseMimeType: 'application/json' }
+      })
+    })
+    
+    if (!geminiRes.ok) return c.json({ success: false, error: `Gemini APIエラー: ${geminiRes.status}` }, 500)
+    
+    const data = await geminiRes.json() as any
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const updated = JSON.parse(text)
+    
+    // カードを更新
+    await env.DB.prepare(`
+      UPDATE learning_cards SET 
+        card_title = ?, problem_text = ?, correct_answer = ?, answer = ?,
+        explanation = ?, answer_explanation = ?, hint_text = ?,
+        difficulty_level = ?, estimated_time_minutes = ?
+      WHERE card_id = ?
+    `).bind(
+      updated.card_title || card.card_title,
+      updated.problem_text || card.problem_text,
+      updated.correct_answer || card.correct_answer,
+      updated.correct_answer || card.correct_answer,
+      updated.explanation || card.explanation,
+      updated.explanation || card.explanation,
+      updated.hint_text || card.hint_text,
+      updated.difficulty_level || card.difficulty_level,
+      updated.estimated_time_minutes || card.estimated_time_minutes,
+      cardId
+    ).run()
+    
+    console.log(`✅ AI再生成完了: card_id=${cardId}`)
+    return c.json({ success: true, card_id: cardId, updated_card: updated })
+  } catch (error) {
+    console.error('AI再生成エラー:', error)
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
 
 // 学習セッション中のセルフモニタリング記録
 app.post('/api/self-regulated/monitor', async (c) => {

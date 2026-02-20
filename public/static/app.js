@@ -41357,6 +41357,16 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
     const studentMatch = course.course_name?.match(/ID:(\d+)/)
     const studentId = studentMatch ? studentMatch[1] : '?'
     
+    // マルチメディア解析ヘルパー
+    function parseMultimedia(card) {
+      let mm = {}
+      try { if (card.problem_content && card.problem_content.startsWith('{')) mm = JSON.parse(card.problem_content)?.multimedia || {} } catch(e) {}
+      return mm
+    }
+    function getYoutubeId(url) {
+      try { const m = (url||'').match(/(?:v=|youtu\.be\/)([^&?]+)/); return m ? m[1] : '' } catch(e) { return '' }
+    }
+    
     // モーダルで表示
     const html = `
       <div id="personalizedGuideModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onclick="if(event.target.id==='personalizedGuideModal')event.target.remove()">
@@ -41390,42 +41400,100 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
               <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
                 <i class="fas fa-layer-group text-pink-600 mr-2"></i>
                 学習カード（${cards.length}枚）
+                <span class="ml-auto text-xs text-gray-400">教師用プレビュー</span>
               </h3>
               <div class="space-y-4">
-                ${cards.map((card, i) => `
-                  <div class="border-2 ${card.difficulty_level === 'easy' ? 'border-green-300 bg-green-50' : card.difficulty_level === 'hard' ? 'border-red-300 bg-red-50' : 'border-blue-300 bg-blue-50'} rounded-xl p-4">
+                ${cards.map((card, i) => {
+                  const mm = parseMultimedia(card)
+                  const ytUrl = mm.youtube_url || card.solution_video_url || ''
+                  const ytId = getYoutubeId(ytUrl)
+                  const tactile = mm.tactile_activity || ''
+                  const audio = mm.audio_instruction || ''
+                  return `
+                  <div class="border-2 ${card.difficulty_level === 'easy' ? 'border-green-300 bg-green-50' : card.difficulty_level === 'hard' ? 'border-red-300 bg-red-50' : 'border-blue-300 bg-blue-50'} rounded-xl p-4" id="card-display-${card.card_id || card.id || i}">
                     <div class="flex items-start justify-between mb-2">
                       <div class="flex items-center gap-2">
                         <div class="w-8 h-8 rounded-full ${card.difficulty_level === 'easy' ? 'bg-green-500' : card.difficulty_level === 'hard' ? 'bg-red-500' : 'bg-blue-500'} text-white flex items-center justify-center font-bold text-sm">${i + 1}</div>
                         <h4 class="font-bold text-gray-800">${card.card_title || 'カード' + (i + 1)}</h4>
                       </div>
-                      <span class="text-xs px-2 py-0.5 rounded-full font-bold ${card.difficulty_level === 'easy' ? 'bg-green-200 text-green-800' : card.difficulty_level === 'hard' ? 'bg-red-200 text-red-800' : 'bg-blue-200 text-blue-800'}">${card.difficulty_level || 'standard'}</span>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs px-2 py-0.5 rounded-full font-bold ${card.difficulty_level === 'easy' ? 'bg-green-200 text-green-800' : card.difficulty_level === 'hard' ? 'bg-red-200 text-red-800' : 'bg-blue-200 text-blue-800'}">${card.difficulty_level === 'easy' ? 'きほん' : card.difficulty_level === 'hard' ? '★チャレンジ' : 'しっかり'}</span>
+                        <span class="text-xs text-gray-500">⏱${card.estimated_time_minutes || 10}分</span>
+                        <button onclick="toggleCardEdit(${card.card_id || card.id || 0}, ${i})" class="text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-700 px-2 py-1 rounded-lg transition" title="編集">
+                          <i class="fas fa-pen"></i> 編集
+                        </button>
+                      </div>
                     </div>
                     <div class="bg-white rounded-lg p-3 mb-2 border">
                       <p class="text-sm text-gray-800">${card.problem_text || card.problem_description || ''}</p>
                     </div>
+                    ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden"><iframe width="100%" height="180" src="https://www.youtube.com/embed/' + ytId + '" frameborder="0" allowfullscreen></iframe><p class="text-xs text-gray-500 mt-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? '<a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-1 text-xs bg-red-500 text-white px-3 py-1 rounded-lg mb-2">▶ 動画を見る</a>' : ''}
+                    ${tactile ? '<div class="bg-yellow-50 border-l-3 border-yellow-400 p-2 rounded text-xs mb-2"><strong>✋ やってみよう:</strong> ' + tactile + '</div>' : ''}
+                    ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
                     <div class="grid grid-cols-2 gap-2 text-xs">
                       <details class="bg-white rounded p-2 border">
                         <summary class="font-bold text-gray-600 cursor-pointer">こたえを見る <i class="fas fa-eye-slash text-gray-400 text-xs"></i></summary>
                         <span class="text-gray-700 mt-1 block">${card.correct_answer || card.answer || ''}</span>
                       </details>
-                      <div class="bg-white rounded p-2 border">
-                        <span class="font-bold text-gray-600">推定時間：</span>
-                        <span class="text-gray-700">${card.estimated_time_minutes || 10}分</span>
+                      <details class="bg-white rounded p-2 border">
+                        <summary class="font-bold text-gray-600 cursor-pointer">解説を見る</summary>
+                        <span class="text-gray-700 mt-1 block">${card.explanation || card.answer_explanation || ''}</span>
+                      </details>
+                    </div>
+                    ${card.hint_text ? '<details class="mt-1"><summary class="text-xs text-green-600 cursor-pointer font-bold">ヒントを表示</summary><p class="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">' + card.hint_text + '</p></details>' : ''}
+                    <!-- 編集パネル（非表示） -->
+                    <div id="card-edit-panel-${card.card_id || card.id || i}" class="hidden mt-3 bg-white border-2 border-yellow-300 rounded-xl p-4">
+                      <h5 class="font-bold text-yellow-700 mb-2"><i class="fas fa-edit mr-1"></i>カード編集</h5>
+                      <div class="space-y-2">
+                        <div>
+                          <label class="text-xs font-bold text-gray-600">タイトル</label>
+                          <input type="text" id="edit-title-${card.card_id || card.id || i}" value="${(card.card_title||'').replace(/"/g,'&quot;')}" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+                        </div>
+                        <div>
+                          <label class="text-xs font-bold text-gray-600">問題文</label>
+                          <textarea id="edit-problem-${card.card_id || card.id || i}" rows="3" class="w-full border rounded-lg px-3 py-1.5 text-sm">${card.problem_text || ''}</textarea>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                          <div>
+                            <label class="text-xs font-bold text-gray-600">正解</label>
+                            <input type="text" id="edit-answer-${card.card_id || card.id || i}" value="${(card.correct_answer||card.answer||'').replace(/"/g,'&quot;')}" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+                          </div>
+                          <div>
+                            <label class="text-xs font-bold text-gray-600">難易度</label>
+                            <select id="edit-difficulty-${card.card_id || card.id || i}" class="w-full border rounded-lg px-3 py-1.5 text-sm">
+                              <option value="easy" ${card.difficulty_level === 'easy' ? 'selected' : ''}>きほん (easy)</option>
+                              <option value="standard" ${card.difficulty_level === 'standard' ? 'selected' : ''}>しっかり (standard)</option>
+                              <option value="hard" ${card.difficulty_level === 'hard' ? 'selected' : ''}>チャレンジ (hard)</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label class="text-xs font-bold text-gray-600">解説</label>
+                          <textarea id="edit-explanation-${card.card_id || card.id || i}" rows="2" class="w-full border rounded-lg px-3 py-1.5 text-sm">${card.explanation || card.answer_explanation || ''}</textarea>
+                        </div>
+                        <div>
+                          <label class="text-xs font-bold text-gray-600">YouTube URL（任意）</label>
+                          <input type="text" id="edit-video-${card.card_id || card.id || i}" value="${(ytUrl).replace(/"/g,'&quot;')}" class="w-full border rounded-lg px-3 py-1.5 text-sm" placeholder="https://www.youtube.com/watch?v=...">
+                        </div>
+                        <div class="border-t pt-2 mt-2">
+                          <label class="text-xs font-bold text-purple-600">🤖 AI修正指示（自由入力→AIが修正）</label>
+                          <textarea id="edit-instruction-${card.card_id || card.id || i}" rows="2" class="w-full border border-purple-200 rounded-lg px-3 py-1.5 text-sm" placeholder="例：もっと難しくして / 問題文をわかりやすくして / 答えを変えて"></textarea>
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                          <button onclick="saveCardEdit(${card.card_id || card.id || 0}, ${i})" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-bold transition">
+                            <i class="fas fa-check mr-1"></i>手動保存
+                          </button>
+                          <button onclick="aiRegenerateCard(${card.card_id || card.id || 0}, ${i})" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-lg text-sm font-bold transition">
+                            <i class="fas fa-magic mr-1"></i>AI修正
+                          </button>
+                          <button onclick="toggleCardEdit(${card.card_id || card.id || 0}, ${i})" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm transition">
+                            取消
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    ${card.explanation || card.answer_explanation ? `
-                    <details class="mt-2">
-                      <summary class="text-xs text-blue-600 cursor-pointer font-bold">解説を表示</summary>
-                      <p class="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">${card.explanation || card.answer_explanation || ''}</p>
-                    </details>` : ''}
-                    ${card.hint_text ? `
-                    <details class="mt-1">
-                      <summary class="text-xs text-green-600 cursor-pointer font-bold">ヒントを表示</summary>
-                      <p class="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">${card.hint_text}</p>
-                    </details>` : ''}
                   </div>
-                `).join('')}
+                `}).join('')}
               </div>
             </div>
             
@@ -41458,6 +41526,9 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
               <button onclick="document.getElementById('personalizedGuideModal').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-bold transition">
                 <i class="fas fa-times mr-2"></i>閉じる
               </button>
+              <button onclick="window.open('/guide/${curriculumId}?course=${courseId}', '_blank')" class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-lg font-bold transition">
+                <i class="fas fa-external-link-alt mr-2"></i>配信ページ
+              </button>
               <button onclick="window.print()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-bold transition">
                 <i class="fas fa-print mr-2"></i>印刷
               </button>
@@ -41489,7 +41560,14 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                   <div class="flex items-center gap-2 mb-1">
                     <div class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-xs">${i+1}</div>
                     <p class="text-sm font-bold text-gray-800">${p.problem_text || ''}</p>
+                    ${p.difficulty === 'advanced' ? '<span class="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">★発展</span>' : ''}
                   </div>
+                  ${p.choices && p.choices.length > 0 ? `
+                  <div class="grid grid-cols-2 gap-2 mt-2">
+                    ${p.choices.map(ch => `<div class="bg-white border border-yellow-200 rounded-lg px-3 py-1.5 text-xs">${ch}</div>`).join('')}
+                  </div>
+                  ${p.correct_choice ? `<details class="mt-1"><summary class="text-xs text-yellow-600 cursor-pointer font-bold">正解を見る</summary><p class="text-xs text-gray-600 mt-1">正解: ${p.correct_choice} ${p.explanation ? '— ' + p.explanation : ''}</p></details>` : ''}
+                  ` : ''}
                 </div>
               `).join('')}
             </div>`
@@ -41550,6 +41628,68 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
   }
 }
 window.showPersonalizedCourseGuide = showPersonalizedCourseGuide
+
+// カード編集パネルの表示/非表示
+function toggleCardEdit(cardId, index) {
+  const panel = document.getElementById('card-edit-panel-' + (cardId || index))
+  if (panel) panel.classList.toggle('hidden')
+}
+window.toggleCardEdit = toggleCardEdit
+
+// カード手動保存
+async function saveCardEdit(cardId, index) {
+  if (!cardId) { alert('カードIDが不明です'); return }
+  const id = cardId || index
+  try {
+    const updates = {
+      card_title: document.getElementById('edit-title-' + id)?.value,
+      problem_text: document.getElementById('edit-problem-' + id)?.value,
+      correct_answer: document.getElementById('edit-answer-' + id)?.value,
+      difficulty_level: document.getElementById('edit-difficulty-' + id)?.value,
+      explanation: document.getElementById('edit-explanation-' + id)?.value,
+      solution_video_url: document.getElementById('edit-video-' + id)?.value,
+    }
+    const res = await axios.put('/api/teacher/edit-card/' + cardId, updates)
+    if (res.data.success) {
+      alert('✅ カードを保存しました！ページを更新して確認してください。')
+      toggleCardEdit(cardId, index)
+    } else {
+      alert('保存エラー: ' + (res.data.error || ''))
+    }
+  } catch (err) {
+    alert('保存エラー: ' + (err.message || err))
+  }
+}
+window.saveCardEdit = saveCardEdit
+
+// AI修正指示
+async function aiRegenerateCard(cardId, index) {
+  if (!cardId) { alert('カードIDが不明です'); return }
+  const id = cardId || index
+  const instruction = document.getElementById('edit-instruction-' + id)?.value
+  if (!instruction || instruction.trim().length < 3) {
+    alert('AI修正指示を入力してください（例：もっと難しくして）')
+    return
+  }
+  if (!confirm('AIに修正指示を送信します。よろしいですか？\n\n指示: ' + instruction)) return
+  
+  try {
+    const btn = event.target.closest('button')
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>AI処理中...' }
+    
+    const res = await axios.post('/api/teacher/regenerate-card/' + cardId, { instruction })
+    if (res.data.success) {
+      alert('✅ AIがカードを修正しました！ページを更新して確認してください。')
+      toggleCardEdit(cardId, index)
+    } else {
+      alert('AI修正エラー: ' + (res.data.error || ''))
+    }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic mr-1"></i>AI修正' }
+  } catch (err) {
+    alert('AI修正エラー: ' + (err.message || err))
+  }
+}
+window.aiRegenerateCard = aiRegenerateCard
 
 // テスト対策の弱点から個別最適化コースを生成
 async function generatePersonalizedFromTestPrep(studentId, curriculumIdsJson, weakTopics) {
