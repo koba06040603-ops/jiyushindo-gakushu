@@ -1262,6 +1262,90 @@ app.get('/api/debug/db-status', async (c) => {
   }
 })
 
+// デバッグ: personalized コース確認
+app.get('/api/debug/personalized', async (c) => {
+  const { env } = c
+  try {
+    const allPersonalized = await env.DB.prepare(`
+      SELECT c.id, c.curriculum_id, c.course_name, c.course_level, 
+        (SELECT COUNT(*) FROM learning_cards WHERE course_id = c.id) as card_count
+      FROM courses c WHERE c.course_level = 'personalized' ORDER BY c.id DESC LIMIT 20
+    `).all()
+    
+    // hint_cards スキーマ確認
+    let hintSchema = 'unknown'
+    try {
+      await env.DB.prepare("SELECT learning_card_id FROM hint_cards LIMIT 1").all()
+      hintSchema = 'OLD (learning_card_id)'
+    } catch {
+      try {
+        await env.DB.prepare("SELECT card_id FROM hint_cards LIMIT 1").all()
+        hintSchema = 'NEW (card_id)'
+      } catch (e: any) {
+        hintSchema = `error: ${e.message}`
+      }
+    }
+    
+    return c.json({ 
+      personalized_courses: allPersonalized.results,
+      count: allPersonalized.results?.length || 0,
+      hint_schema: hintSchema
+    })
+  } catch (e: any) {
+    return c.json({ error: e.message })
+  }
+})
+
+// デバッグ: curriculum API テスト（認証不要）
+app.get('/api/debug/curriculum/:id', async (c) => {
+  const { env } = c
+  const id = Number(c.req.param('id'))
+  try {
+    const courses = await env.DB.prepare(`
+      SELECT id, curriculum_id, course_name, course_level, description FROM courses WHERE curriculum_id = ?
+      ORDER BY CASE course_level WHEN 'basic' THEN 1 WHEN 'standard' THEN 2 WHEN 'advanced' THEN 3 END
+    `).bind(id).all()
+    
+    const coursesWithInfo = await Promise.all(
+      (courses.results || []).map(async (course: any) => {
+        const cards = await env.DB.prepare(
+          'SELECT card_id, card_title, card_type FROM learning_cards WHERE course_id = ? ORDER BY card_order'
+        ).bind(course.id).all()
+        
+        let hintCount = 0
+        for (const card of (cards.results || []) as any[]) {
+          try {
+            const hints = await env.DB.prepare('SELECT COUNT(*) as cnt FROM hint_cards WHERE learning_card_id = ?').bind(card.card_id).all()
+            hintCount += (hints.results?.[0] as any)?.cnt || 0
+          } catch {
+            try {
+              const hints2 = await env.DB.prepare('SELECT COUNT(*) as cnt FROM hint_cards WHERE card_id = ?').bind(card.card_id).all()
+              hintCount += (hints2.results?.[0] as any)?.cnt || 0
+            } catch {}
+          }
+        }
+        
+        return {
+          course_id: course.id,
+          course_name: course.course_name,
+          course_level: course.course_level,
+          card_count: cards.results?.length || 0,
+          hint_count: hintCount
+        }
+      })
+    )
+    
+    return c.json({
+      curriculum_id: id,
+      total_courses: coursesWithInfo.length,
+      personalized_count: coursesWithInfo.filter((c: any) => c.course_level === 'personalized').length,
+      courses: coursesWithInfo
+    })
+  } catch (e: any) {
+    return c.json({ error: e.message, stack: e.stack })
+  }
+})
+
 // 重複カリキュラムデータの削除
 app.post('/api/debug/cleanup-duplicates', async (c) => {
   const { env } = c

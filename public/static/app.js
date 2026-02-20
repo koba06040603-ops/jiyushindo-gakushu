@@ -3079,8 +3079,14 @@ async function loadGuidePage(curriculumId) {
   
   try {
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
-    const { curriculum, courses } = response.data
-    console.log('📋 カリキュラム取得:', { id: curriculumId, coursesCount: courses.length, courseLevels: courses.map(c => c.course_level) })
+    const { curriculum, courses: rawCourses } = response.data
+    const courses = rawCourses || []
+    
+    // デバッグ: APIレスポンス全体をログ
+    if (response.data.error) {
+      console.error('❌ API エラー:', response.data.error, response.data.details)
+    }
+    console.log('📋 カリキュラム取得:', { id: curriculumId, coursesCount: courses.length, courseLevels: courses.map(c => c.course_level), rawResponse: response.data.error ? response.data : 'OK' })
     
     //コース選択問題と共通チェックテストをメタデータから取得
     let courseSelectionProblems = []
@@ -3959,7 +3965,8 @@ async function loadGuidePage(curriculumId) {
     
     loadingManager.hide()
   } catch (error) {
-    console.error('学習のてびき読み込みエラー:', error)
+    console.error('❌❌❌ 学習のてびき読み込みエラー:', error?.message || error, error?.stack || '')
+    console.error('❌ エラー詳細: curriculumId=', curriculumId, 'error=', error)
     loadingManager.hide()
     
     // エラーが発生しても、基本情報だけで表示を試みる
@@ -4035,8 +4042,19 @@ async function loadGuidePage(curriculumId) {
               </div>
             </div>
           </div>
+          
+          <!-- 個別最適化コース管理（フォールバック表示） -->
+          <div id="personalized-section-placeholder"></div>
+          
         </div>
       `
+      
+      // フォールバック表示でも個別最適化セクションを描画
+      try {
+        const fbPersonalized = courses.filter(c => c.course_level === 'personalized').map(c => ({ ...c, course_id: c.course_id || c.id }))
+        console.log('📊 フォールバック個別最適化:', fbPersonalized.length, '件')
+        renderPersonalizedSection(curriculumId, fbPersonalized, [])
+      } catch (pErr) { console.warn('個別最適化セクション描画エラー:', pErr) }
       
       console.log('✅ 簡易版で表示しました')
       
@@ -14506,8 +14524,9 @@ window.scrollToPersonalizedSection = scrollToPersonalizedSection
 
 // ===== 個別最適化コース管理セクションを描画 =====
 function renderPersonalizedSection(curriculumId, personalizedCourses, approvedCourseIds) {
+  console.log('🎨 renderPersonalizedSection呼び出し:', { curriculumId, count: personalizedCourses?.length || 0, courses: personalizedCourses?.map(c => c.course_name), approvedCourseIds })
   const placeholder = document.getElementById('personalized-section-placeholder')
-  if (!placeholder) return
+  if (!placeholder) { console.warn('⚠️ personalized-section-placeholder が見つかりません'); return }
   
   const pendingCourses = personalizedCourses.filter(pc => !approvedCourseIds.includes(pc.course_id))
   const approvedCourses = personalizedCourses.filter(pc => approvedCourseIds.includes(pc.course_id))
@@ -41175,7 +41194,8 @@ async function startBulkGeneration(curriculumId) {
             
             if (pubRes.data.success) {
               completed++
-              addLog(`✅ 児童ID:${studentId} → 生成・保存完了（${planCards.length}枚）`)
+              addLog(`✅ 児童ID:${studentId} → 生成・保存完了（${planCards.length}枚, コースID: ${pubRes.data.course_id}）`)
+              console.log('✅ publish成功:', { studentId, courseId: pubRes.data.course_id, cardCount: pubRes.data.card_count, curriculumId })
             } else {
               failed++
               addLog(`⚠️ 児童ID:${studentId} → 保存失敗: ${pubRes.data.error || '不明'}`)
@@ -41214,6 +41234,7 @@ async function startBulkGeneration(curriculumId) {
     const m = document.getElementById('personalizedSelectorModal')
     if (m) {
       m.remove()
+      console.log('🔄 生成完了後にガイドページをリロード: curriculumId=', curriculumId, '成功:', completed, '件')
       loadGuidePage(curriculumId)
     }
   }, 3000)
