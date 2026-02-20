@@ -41429,27 +41429,27 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
               </div>
             </div>
             
-            <!-- チェックテスト（共通のものを表示） -->
-            <div class="mb-6">
+            <!-- チェックテスト（個別用をAPI取得して表示） -->
+            <div class="mb-6" id="personalized-check-test-section">
               <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
                 <i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>
                 チェックテスト
               </h3>
               <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center">
-                <p class="text-sm text-gray-700">全コース共通のチェックテストに取り組みます。</p>
-                <p class="text-xs text-gray-500 mt-1">学習カードをすべて終えたら、チェックテストに挑戦しましょう。</p>
+                <i class="fas fa-spinner fa-spin text-yellow-500 mr-1"></i>
+                <p class="text-sm text-gray-700">チェックテストを読み込み中...</p>
               </div>
             </div>
             
-            <!-- 選択課題 -->
-            <div class="mb-6">
+            <!-- 選択課題（個別用をAPI取得して表示） -->
+            <div class="mb-6" id="personalized-optional-section">
               <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
                 <i class="fas fa-star text-pink-600 mr-2"></i>
                 えらべるもんだい
               </h3>
               <div class="bg-pink-50 border-2 border-pink-300 rounded-xl p-4 text-center">
-                <p class="text-sm text-gray-700">チェックテスト合格後に取り組める選択課題があります。</p>
-                <p class="text-xs text-gray-500 mt-1">全体共通の選択課題に加え、個別に最適化された課題も含まれます。</p>
+                <i class="fas fa-spinner fa-spin text-pink-500 mr-1"></i>
+                <p class="text-sm text-gray-700">選択課題を読み込み中...</p>
               </div>
             </div>
             
@@ -41467,6 +41467,79 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
       </div>
     `
     document.body.insertAdjacentHTML('beforeend', html)
+    
+    // チェックテスト・選択課題を非同期で取得して表示
+    try {
+      const metaRes = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+      const meta = metaRes.data || {}
+      
+      // 個別用チェックテスト（コースID別）
+      const pCheckTest = meta[`personalized_check_test_${cid}`]
+      const checkSection = document.getElementById('personalized-check-test-section')
+      if (checkSection) {
+        if (pCheckTest && pCheckTest.sample_problems && pCheckTest.sample_problems.length > 0) {
+          checkSection.innerHTML = `
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+              <i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>
+              個別チェックテスト（${pCheckTest.sample_problems.length}問）
+            </h3>
+            <div class="space-y-3">
+              ${pCheckTest.sample_problems.map((p, i) => `
+                <div class="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-3">
+                  <div class="flex items-center gap-2 mb-1">
+                    <div class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-xs">${i+1}</div>
+                    <p class="text-sm font-bold text-gray-800">${p.problem_text || ''}</p>
+                  </div>
+                </div>
+              `).join('')}
+            </div>`
+        } else {
+          checkSection.innerHTML = `
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+              <i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>
+              チェックテスト
+            </h3>
+            <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center">
+              <p class="text-sm text-gray-700">配信ページを開くと、個別用チェックテストが自動生成されます。</p>
+            </div>`
+        }
+      }
+      
+      // 個別用選択課題（コースID別）
+      const pOptional = meta[`personalized_optional_${cid}`]
+      const optSection = document.getElementById('personalized-optional-section')
+      if (optSection) {
+        if (pOptional && pOptional.length > 0) {
+          optSection.innerHTML = `
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+              <i class="fas fa-star text-pink-600 mr-2"></i>
+              えらべるもんだい（${pOptional.length}問）
+            </h3>
+            <div class="space-y-3">
+              ${pOptional.map((p, i) => `
+                <div class="bg-pink-50 border-2 border-pink-200 rounded-xl p-3">
+                  <div class="flex items-center gap-2 mb-1">
+                    <div class="w-6 h-6 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-xs">${i+1}</div>
+                    <span class="text-sm font-bold text-pink-800">${p.problem_title || ''}</span>
+                  </div>
+                  <p class="text-sm text-gray-700 ml-8">${p.problem_content || ''}</p>
+                </div>
+              `).join('')}
+            </div>`
+        } else {
+          optSection.innerHTML = `
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+              <i class="fas fa-star text-pink-600 mr-2"></i>
+              えらべるもんだい
+            </h3>
+            <div class="bg-pink-50 border-2 border-pink-300 rounded-xl p-4 text-center">
+              <p class="text-sm text-gray-700">配信ページを開くと、個別用選択課題が自動生成されます。</p>
+            </div>`
+        }
+      }
+    } catch (metaErr) {
+      console.warn('メタデータ取得エラー:', metaErr)
+    }
   } catch (error) {
     console.error('❌ 個別コースてびき表示エラー:', error, { courseId, curriculumId: curriculumId, args: [courseId, courseNameOrCurriculumId, maybeCurriculumId] })
     // エラー時は guide ページを直接開くフォールバック
