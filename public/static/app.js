@@ -41691,10 +41691,27 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
     
     // ★ v4分析データを非同期で取得して表示
     try {
-      const analysisRes = await axios.get(`/api/teacher/personalized-course-analysis/${cid}`)
+      let analysisRes = await axios.get(`/api/teacher/personalized-course-analysis/${cid}`)
+      let ad = analysisRes.data.success ? analysisRes.data : null
+      
+      // v4_analysisがnullの場合、バックフィルを自動実行
+      if (ad && !ad.v4_analysis) {
+        console.log('🔄 v4分析データなし → バックフィル実行中...')
+        try {
+          const bfRes = await axios.post(`/api/teacher/backfill-v4-analysis/${cid}`)
+          if (bfRes.data.success) {
+            console.log('✅ バックフィル完了:', bfRes.data)
+            // 再取得
+            analysisRes = await axios.get(`/api/teacher/personalized-course-analysis/${cid}`)
+            ad = analysisRes.data.success ? analysisRes.data : ad
+          }
+        } catch (bfErr) {
+          console.warn('バックフィルエラー:', bfErr)
+        }
+      }
+      
       const analysisSection = document.getElementById('v4-analysis-section')
-      if (analysisSection && analysisRes.data.success) {
-        const ad = analysisRes.data
+      if (analysisSection && ad) {
         const v4 = ad.v4_analysis || {}
         const arch = v4.archetype || {}
         const axes = v4.axes || {}

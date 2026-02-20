@@ -30114,6 +30114,161 @@ app.get('/api/teacher/personalized-course-analysis/:courseId', async (c) => {
   }
 })
 
+// 既存配信済みコースにv4分析データをバックフィル（再計算して保存）
+app.post('/api/teacher/backfill-v4-analysis/:courseId', async (c) => {
+  const { env } = c
+  const startTime = Date.now()
+  try {
+    const courseId = c.req.param('courseId')
+    
+    // コース情報を取得
+    const course = await env.DB.prepare('SELECT * FROM courses WHERE id = ?').bind(courseId).first() as any
+    if (!course) return c.json({ success: false, error: 'コースが見つかりません' }, 404)
+    
+    // コース名からstudent_idを抽出
+    const studentMatch = course.course_name?.match(/ID:(\d+)/)
+    const studentId = studentMatch ? parseInt(studentMatch[1]) : null
+    if (!studentId) return c.json({ success: false, error: '児童IDが特定できません' }, 404)
+    
+    const curriculumId = course.curriculum_id
+    
+    // ★ v4エンジン再実行: 12理論プロファイル再構築
+    const rawData = await fetchStudentRawData(env.DB, studentId, curriculumId ? parseInt(String(curriculumId)) : undefined)
+    const profiles = buildProfilesFromD1(rawData)
+    const behavior = await buildBehaviorFromD1(env.DB, studentId, curriculumId ? parseInt(String(curriculumId)) : undefined)
+    const v4Result = computeIntegratedControls(profiles, behavior)
+    const arch = ARCHETYPES[v4Result.archetype]
+    const template = determineCardTemplate(v4Result.controls, v4Result.archetype)
+    
+    // v4分析結果を構築
+    const v4Analysis = {
+      archetype: { id: v4Result.archetype, name_ja: arch.name_ja, name_en: arch.name_en, presence: arch.presence },
+      axes: v4Result.axes,
+      affect_state: v4Result.affectState?.state ?? 'normal',
+      template: {
+        name: template.template_name,
+        media_type: template.media_type,
+        question_format: template.question_format,
+        card_count: template.recommended_card_count,
+      },
+      teacher_alert: v4Result.controls._teacher_alert,
+      human_intervention: v4Result.controls._human_intervention_recommended,
+    }
+    
+    // 既存のメタデータを取得して更新
+    const existingMeta = await env.DB.prepare(
+      'SELECT meta_value FROM curriculum_metadata WHERE curriculum_id = ? AND meta_key = ?'
+    ).bind(curriculumId, `personalized_course_student_${studentId}`).first() as any
+    
+    let metaData: any = {}
+    if (existingMeta?.meta_value) {
+      try { metaData = JSON.parse(existingMeta.meta_value) } catch {}
+    }
+    
+    // v4分析データを追加/更新
+    metaData.v4_analysis = v4Analysis
+    metaData.backfilled_at = new Date().toISOString()
+    
+    // Gemini APIで分析サマリーを再生成（archetype_insightが空の場合）
+    const apiKey = env.GEMINI_API_KEY
+    if (apiKey && apiKey !== 'your-gemini-api-key-here' && !metaData.archetype_insight) {
+      try {
+        // カード内容を取得
+        const existingCards = await env.DB.prepare(
+          'SELECT card_title, problem_text, difficulty_level, problem_content FROM learning_cards WHERE course_id = ? ORDER BY card_order'
+        ).bind(courseId).all()
+        const ecards = (existingCards.results || []) as any[]
+        
+        const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
+        
+        const miniPrompt = `以下の児童データに基づいて、簡潔な分析を出力してください。
+
+児童の学習タイプ: ${arch.name_ja}（${arch.name_en}）
+タイプの特徴: ${arch.presence}
+認知的自律性: ${v4Result.axes.cognitive_autonomy}/100
+情緒的安定性: ${v4Result.axes.emotional_stability}/100
+方略的成熟度: ${v4Result.axes.strategic_maturity}/100
+動機的エネルギー: ${v4Result.axes.motivational_energy}/100
+
+教科: ${curriculum?.subject || '不明'}
+単元: ${curriculum?.unit_name || '不明'}
+
+この児童に配信済みのカード:
+${ecards.map((card: any, i: number) => `${i+1}. [${card.difficulty_level}] ${card.card_title}: ${(card.problem_text || '').substring(0, 80)}`).join('\n')}
+
+以下のJSON形式で出力:
+{
+  "archetype_insight": "このタイプの児童にはなぜこのカード構成が適しているか（2文）",
+  "card_personalization_notes": [
+    {"card_index": 0, "personalization_note": "この問題をこの児童に出す理論的根拠（1文）"},
+    ...（各カード分）
+  ]
+}`
+
+        const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: miniPrompt }] }],
+            generationConfig: { temperature: 0.5, maxOutputTokens: 2000, responseMimeType: 'application/json' }
+          })
+        })
+        
+        if (geminiRes.ok) {
+          const geminiData = await geminiRes.json() as any
+          const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          try {
+            const parsed = JSON.parse(text)
+            if (parsed.archetype_insight) metaData.archetype_insight = parsed.archetype_insight
+            
+            // 各カードのpersonalization_noteをproblem_contentに書き込み
+            if (parsed.card_personalization_notes && Array.isArray(parsed.card_personalization_notes)) {
+              for (const cn of parsed.card_personalization_notes) {
+                if (cn.personalization_note && cn.card_index < ecards.length) {
+                  const card = ecards[cn.card_index]
+                  let pc: any = {}
+                  try { pc = JSON.parse(card.problem_content || '{}') } catch {}
+                  pc.personalization_note = cn.personalization_note
+                  
+                  // カードのproblem_contentを更新（card_idで特定）
+                  await env.DB.prepare(
+                    'UPDATE learning_cards SET problem_content = ? WHERE course_id = ? AND card_order = ?'
+                  ).bind(JSON.stringify(pc), courseId, cn.card_index + 1).run()
+                }
+              }
+            }
+          } catch (parseErr) {
+            console.warn('バックフィル Gemini解析エラー:', parseErr)
+          }
+        }
+      } catch (geminiErr) {
+        console.warn('バックフィル Gemini呼び出しエラー:', geminiErr)
+      }
+    }
+    
+    // メタデータを保存
+    await env.DB.prepare(`
+      INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+      ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
+    `).bind(curriculumId, `personalized_course_student_${studentId}`, JSON.stringify(metaData)).run()
+    
+    const processingTime = Date.now() - startTime
+    console.log(`✅ v4分析バックフィル完了: course=${courseId}, student=${studentId}, time=${processingTime}ms`)
+    
+    return c.json({
+      success: true,
+      course_id: courseId,
+      student_id: studentId,
+      v4_analysis: v4Analysis,
+      archetype_insight: metaData.archetype_insight || '',
+      processing_time_ms: processingTime,
+    })
+  } catch (error) {
+    console.error('v4分析バックフィルエラー:', error)
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
 // 教師によるカード編集API（個別最適化コースのカード修正）
 app.put('/api/teacher/edit-card/:cardId', async (c) => {
   const { env } = c
