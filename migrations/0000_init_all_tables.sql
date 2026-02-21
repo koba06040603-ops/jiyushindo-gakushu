@@ -107,6 +107,9 @@ CREATE TABLE IF NOT EXISTS learning_cards (
   card_order INTEGER DEFAULT 0,
   estimated_time_minutes INTEGER DEFAULT 10,
   curriculum_code TEXT,
+  ai_teacher_message TEXT DEFAULT '',
+  ai_teacher_advice TEXT DEFAULT '',
+  teacher_help_keywords TEXT DEFAULT '',
   is_active BOOLEAN DEFAULT TRUE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

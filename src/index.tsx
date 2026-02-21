@@ -1200,6 +1200,16 @@ app.use('/api/*', async (c, next) => {
         )
       `).run()
       
+      // AI Teacher カラムの自動追加（既存テーブルへのマイグレーション）
+      for (const col of ['ai_teacher_message', 'ai_teacher_advice', 'teacher_help_keywords']) {
+        try {
+          await env.DB.prepare(`ALTER TABLE learning_cards ADD COLUMN ${col} TEXT DEFAULT ''`).run()
+          console.log(`✅ learning_cards に ${col} カラム追加`)
+        } catch (alterErr: any) {
+          // カラム既存の場合は無視
+        }
+      }
+      
       dbInitialized = true
       console.log('✅ DB初期化完了')
     } catch (e: any) {
