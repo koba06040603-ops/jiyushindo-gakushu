@@ -3522,6 +3522,31 @@ app.get('/api/cards/:cardId', async (c) => {
 
 // APIルート：学習進捗の保存
 app.post('/api/progress', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    const result = await env.DB.prepare(`
+      INSERT INTO student_progress 
+        (student_id, curriculum_id, course_id, learning_card_id, 
+         status, understanding_level, help_requested_from, help_count)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      body.student_id,
+      body.curriculum_id,
+      body.course_id,
+      body.learning_card_id,
+      body.status,
+      body.understanding_level,
+      body.help_requested_from,
+      body.help_count || 0
+    ).run()
+    
+    return c.json({ success: true, id: result.meta.last_row_id })
+  } catch (error) {
+    return c.json({ error: 'Database error' }, 500)
+  }
+})
 
 // APIルート：カード再生成
 app.post('/api/courses/:courseId/regenerate-cards', async (c) => {
@@ -3583,7 +3608,8 @@ app.post('/api/courses/:courseId/regenerate-cards', async (c) => {
     "hint_text": "ヒント",
     "example_problem": "例題（あれば）",
     "example_solution": "例題の解き方",
-    "real_world_context": "日常とのつながり",
+    "real_world_connection": "日常とのつながり",
+    "learning_meaning": "この問題を学ぶ意味",
     "difficulty_level": "standard",
     "ai_teacher_message": "この問題のポイントを一言で",
     "ai_teacher_advice": "取り組むコツ",
@@ -3593,7 +3619,8 @@ app.post('/api/courses/:courseId/regenerate-cards', async (c) => {
 ]
 
 重要:
-- 各カードの40%以上は発展的内容にすること
+- difficulty_levelは必ず "easy", "standard", "hard" のいずれかにすること
+- 各カードの40%以上は発展的内容（hard）にすること
 - 小学生が理解しやすい言葉で書くこと
 - JSON配列のみを返すこと（説明文不要）`
 
@@ -3621,21 +3648,23 @@ app.post('/api/courses/:courseId/regenerate-cards', async (c) => {
     const newCards = JSON.parse(jsonMatch[0])
     
     // DBに追加
+    const validDifficulties = ['easy', 'standard', 'hard']
     for (const card of newCards) {
+      const diffLevel = validDifficulties.includes(card.difficulty_level) ? card.difficulty_level : 'standard'
       await env.DB.prepare(`
         INSERT INTO learning_cards (
           subject, grade_level, unit_name, card_title, card_type, difficulty_level,
           learning_track, problem_text, problem_content, correct_answer, explanation,
           hint_text, card_order, card_number, estimated_time_minutes, curriculum_code,
-          example_problem, example_solution, real_world_context, answer, answer_explanation,
+          example_problem, example_solution, real_world_connection, answer, answer_explanation,
           ai_teacher_message, ai_teacher_advice, teacher_help_keywords, new_terms,
-          is_active, course_id
-        ) VALUES (?, ?, ?, ?, 'main', ?, ?, ?, ?, ?, ?, ?, ?, ?, 10, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          learning_meaning, is_active, course_id
+        ) VALUES (?, ?, ?, ?, 'standard', ?, ?, ?, ?, ?, ?, ?, ?, ?, 10, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `).bind(
         subject, grade, unitName,
         card.card_title || `カード${card.card_number}`,
-        card.difficulty_level || 'standard',
-        course.course_level || 'standard',
+        diffLevel,
+        (existingCards.results[0] as any)?.learning_track || 'shikkari',
         card.problem_text || card.problem_content || '',
         card.problem_content || card.problem_text || '',
         card.correct_answer || '',
@@ -3644,15 +3673,16 @@ app.post('/api/courses/:courseId/regenerate-cards', async (c) => {
         card.card_number,
         card.card_number,
         curriculum.curriculum_code || '',
-        card.example_problem || null,
-        card.example_solution || null,
-        card.real_world_context || null,
+        card.example_problem || '',
+        card.example_solution || '',
+        card.real_world_connection || card.real_world_context || '',
         card.correct_answer || '',
         card.explanation || '',
-        card.ai_teacher_message || null,
-        card.ai_teacher_advice || null,
-        card.teacher_help_keywords || null,
-        card.new_terms || null,
+        card.ai_teacher_message || '',
+        card.ai_teacher_advice || '',
+        card.teacher_help_keywords || '',
+        card.new_terms || '',
+        card.learning_meaning || '',
         courseId
       ).run()
     }
@@ -3700,31 +3730,6 @@ app.post('/api/optional-problems/submit', async (c) => {
   } catch (error: any) {
     console.error('Optional problem submit error:', error)
     return c.json({ error: error.message }, 500)
-  }
-})
-  const { env } = c
-  const body = await c.req.json()
-  
-  try {
-    const result = await env.DB.prepare(`
-      INSERT INTO student_progress 
-        (student_id, curriculum_id, course_id, learning_card_id, 
-         status, understanding_level, help_requested_from, help_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      body.student_id,
-      body.curriculum_id,
-      body.course_id,
-      body.learning_card_id,
-      body.status,
-      body.understanding_level,
-      body.help_requested_from,
-      body.help_count || 0
-    ).run()
-    
-    return c.json({ success: true, id: result.meta.last_row_id })
-  } catch (error) {
-    return c.json({ error: 'Database error' }, 500)
   }
 })
 
