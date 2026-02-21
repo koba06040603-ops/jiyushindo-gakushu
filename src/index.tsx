@@ -29939,7 +29939,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   ]
 }
 
-※ カードは${template.recommended_card_count}枚生成（最低3枚、推奨5枚以上）
+※ カードは${template.recommended_card_count}枚生成（最低6枚、推奨8枚以上）
 ※ problem_textは「〜しましょう」「〜を求めましょう」等の具体的な指示文にすること
 ※ 「〜を学びます」「〜について考えます」等のメタ的記述は problem_text に絶対に書かないこと
 ※ difficulty_levelは全カードで同じにせず、必ず段階的に難しくすること

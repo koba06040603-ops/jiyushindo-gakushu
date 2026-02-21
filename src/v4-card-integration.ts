@@ -942,22 +942,23 @@ export function determineCardTemplate(
   }
 
   // --- カード枚数と時間 ---
-  let recommended_card_count = 6
+  // 最低6枚を保証（少なすぎると学習が不十分になる）
+  let recommended_card_count = 8
   let recommended_time_per_card = 8
-  // Type H/G: 少なめ・短め
+  // Type H/G: やや少なめ・短め（ただし最低6枚）
   if (archetype === 'H' || archetype === 'G') {
-    recommended_card_count = 4
+    recommended_card_count = 6
     recommended_time_per_card = 5
   }
   // Type A: 多め・挑戦的
   else if (archetype === 'A') {
-    recommended_card_count = 8
+    recommended_card_count = 10
     recommended_time_per_card = 12
   }
   // 高ZPD → やや多め
   if (zpd >= 0.7) recommended_card_count = Math.min(10, recommended_card_count + 1)
-  // 低ZPD → 少なめ
-  if (zpd <= 0.3) recommended_card_count = Math.max(3, recommended_card_count - 1)
+  // 低ZPD → 少し減らすが最低6枚
+  if (zpd <= 0.3) recommended_card_count = Math.max(6, recommended_card_count - 1)
 
   const template_name = `${media_type}_${question_format}_${archetype}`
 
@@ -1275,7 +1276,7 @@ ${template.elaboration ? `- 精緻化プロンプト（各カードの最後に�
   ]
 }
 
-※ カードは${template.recommended_card_count}枚生成
+※ カードは${template.recommended_card_count}枚生成（最低6枚必須）
 ※ 問題文は小学生が直接読む文章です（わかりやすく）
 ※ v4の制御パラメータに忠実に従ってください
 `
