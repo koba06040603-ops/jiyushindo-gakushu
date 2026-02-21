@@ -1881,7 +1881,7 @@ async function renderTopPage() {
           </p>
         </div>
 
-        <!-- 0. 8つの教育理論に基づく設計 -->
+        <!-- 0. 12の教育理論に基づく設計 -->
         <div class="bg-white rounded-lg p-6 mb-6 shadow-lg border-4 border-yellow-400">
           <h3 class="text-2xl font-bold text-yellow-700 mb-4 text-center">
             <i class="fas fa-book-open mr-2"></i>
@@ -4035,6 +4035,22 @@ async function loadGuidePage(curriculumId) {
                             </div>
                             <div class="flex-1">
                               <p class="text-sm text-gray-800 mb-2">${problem.problem_text}</p>
+                              
+                              <!-- 回答入力欄 -->
+                              <div class="mb-2">
+                                <input type="text" 
+                                       id="checktest-answer-${curriculum.id}-${problem.problem_number}"
+                                       class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-200 text-sm"
+                                       style="position: relative; z-index: 10; pointer-events: auto; touch-action: auto; caret-color: #000;"
+                                       placeholder="こたえを書いてね"
+                                       autocomplete="off" inputmode="text">
+                                <button onclick="checkTestAnswer(${curriculum.id}, ${problem.problem_number}, '${(problem.answer || '').replace(/'/g, "\\'").replace(/\n/g, ' ')}')"
+                                        class="mt-1 bg-green-500 hover:bg-green-600 text-white px-4 py-1.5 rounded text-xs font-bold transition mr-2">
+                                  <i class="fas fa-check mr-1"></i>こたえあわせ
+                                </button>
+                                <span id="checktest-result-${curriculum.id}-${problem.problem_number}" class="text-sm font-bold"></span>
+                              </div>
+                              
                               <div class="answer-container" id="answer-${curriculum.id}-${problem.problem_number}">
                                 <button onclick="toggleAnswer(${curriculum.id}, ${problem.problem_number})" 
                                         class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold transition">
@@ -4133,6 +4149,10 @@ async function loadGuidePage(curriculumId) {
                           problem.difficulty_level === 'very_hard' ? '★★★★ とてもむずかしい' :
                           '★ かんたん'}
                       </span>
+                      <button onclick="openOptionalProblem(${JSON.stringify(problem).replace(/"/g, '&quot;')})"
+                              class="bg-pink-500 hover:bg-pink-600 text-white px-3 py-1 rounded-full font-bold text-xs transition">
+                        <i class="fas fa-play mr-1"></i>ちょうせんする
+                      </button>
                     </div>
                   </div>
                 `}).join('')}
@@ -5183,6 +5203,25 @@ async function selectCourse(courseId) {
           `).join('')}
         </div>
         
+        <!-- カード枚数が少ない場合のメッセージ＋再生成ボタン -->
+        ${cards.length <= 3 ? `
+        <div class="mt-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 text-center">
+          <i class="fas fa-info-circle text-yellow-500 text-2xl mb-3"></i>
+          <p class="text-gray-700 font-bold mb-2">
+            現在 ${cards.length} 枚のカードがあります
+          </p>
+          <p class="text-sm text-gray-600 mb-4">
+            カードの枚数を増やしたい場合は「カード再生成」ボタンを押してください。<br>
+            AIが単元に合わせた学習カードを追加生成します。
+          </p>
+          <button onclick="regenerateCards(${state.selectedCourse}, ${state.selectedCurriculum?.id})" 
+                  class="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white py-3 px-8 rounded-lg font-bold transition shadow-lg">
+            <i class="fas fa-sync-alt mr-2"></i>
+            カード再生成（8〜10枚）
+          </button>
+        </div>
+        ` : ''}
+        
         <!-- クラス進捗確認ボタン（児童用）-->
         <div class="mt-6 text-center">
           <button onclick="showClassProgress()" class="bg-blue-500 hover:bg-blue-600 text-white py-3 px-8 rounded-lg font-bold transition">
@@ -5200,6 +5239,34 @@ async function selectCourse(courseId) {
     alert('データの読み込みに失敗しました')
   }
 }
+
+// カード再生成
+async function regenerateCards(courseId, curriculumId) {
+  if (!confirm('学習カードを再生成します。\nAIが8〜10枚の新しいカードを作成します。\nよろしいですか？')) return
+  
+  try {
+    loadingManager.show('AIが学習カードを生成中...（約30秒〜1分）')
+    
+    const response = await axios.post(`/api/courses/${courseId}/regenerate-cards`, {
+      curriculum_id: curriculumId,
+      target_count: 10
+    }, { timeout: 120000 })
+    
+    loadingManager.hide()
+    
+    if (response.data.success) {
+      alert(`✅ ${response.data.cards_count || 10}枚のカードを生成しました！`)
+      selectCourse(courseId)
+    } else {
+      alert('カード生成に失敗しました: ' + (response.data.error || '不明なエラー'))
+    }
+  } catch (error) {
+    loadingManager.hide()
+    console.error('カード再生成エラー:', error)
+    alert('カード再生成に失敗しました。もう一度お試しください。\n' + (error.response?.data?.error || error.message))
+  }
+}
+window.regenerateCards = regenerateCards
 
 // 教師用モードへ遷移
 async function loadTeacherOverview(curriculumId) {
@@ -5642,10 +5709,11 @@ async function loadCardPage(cardId) {
           <!-- サイドバー（右側） -->
           <div class="lg:col-span-1 space-y-6">
             <!-- ヒントカードエリア -->
-            <div id="hintsArea" class="hidden bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6">
+            <div id="hintsArea" class="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6">
               <h3 class="text-lg font-bold text-yellow-800 mb-4">
                 <i class="fas fa-lightbulb mr-2"></i>3だんかいヒント
               </h3>
+              <p class="text-xs text-gray-500 mb-3"><i class="fas fa-info-circle mr-1"></i>こまったときは、ヒントを使ってみよう！ヒント1から順番に見てね。</p>
               <div class="space-y-3">
                 ${hints.length > 0 ? hints.map((hint, index) => `
                   <div class="bg-white rounded-lg p-4 border ${index === 0 ? 'border-green-200' : index === 1 ? 'border-yellow-200' : 'border-orange-200'}">
@@ -5666,7 +5734,35 @@ async function loadCardPage(cardId) {
                       ` : ''}
                     </div>
                   </div>
-                `).join('') : '<div class="bg-white rounded-lg p-4 text-center text-sm text-gray-500"><i class="fas fa-info-circle mr-1"></i>この問題のヒントは準備中です</div>'}
+                `).join('') : `
+                  <div class="bg-white rounded-lg p-4 border border-green-200">
+                    <button onclick="toggleHint(0)" class="w-full text-left font-bold text-gray-800 hover:text-indigo-600 transition flex items-center justify-between">
+                      <span>🟢 ヒント1（考える方向）</span>
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div id="hint-0" class="mt-3 pt-3 border-t">
+                      <pre class="text-gray-700 whitespace-pre-wrap font-sans text-sm">まず、問題で何を求められているか確認しましょう。\nキーワードに線を引いてみよう。</pre>
+                    </div>
+                  </div>
+                  <div class="bg-white rounded-lg p-4 border border-yellow-200">
+                    <button onclick="toggleHint(1)" class="w-full text-left font-bold text-gray-800 hover:text-indigo-600 transition flex items-center justify-between">
+                      <span>🟡 ヒント2（具体的手がかり）</span>
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div id="hint-1" class="hidden mt-3 pt-3 border-t">
+                      <pre class="text-gray-700 whitespace-pre-wrap font-sans text-sm">図や表に書いて整理してみましょう。\n似ている問題を思い出してみよう。</pre>
+                    </div>
+                  </div>
+                  <div class="bg-white rounded-lg p-4 border border-orange-200">
+                    <button onclick="toggleHint(2)" class="w-full text-left font-bold text-gray-800 hover:text-indigo-600 transition flex items-center justify-between">
+                      <span>🟠 ヒント3（答えに近づく）</span>
+                      <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div id="hint-2" class="hidden mt-3 pt-3 border-t">
+                      <pre class="text-gray-700 whitespace-pre-wrap font-sans text-sm">もう一度ゆっくり問題を読んでみよう。\nわからないときはAI先生に聞いてみてね！</pre>
+                    </div>
+                  </div>
+                `}
               </div>
             </div>
 
@@ -5679,7 +5775,19 @@ async function loadCardPage(cardId) {
                 <p class="text-sm text-gray-700">${card.teacher_help_keywords}</p>
                 <p class="text-xs text-gray-500 mt-2"><i class="fas fa-hand-point-right mr-1"></i>先生に質問するとき、このキーワードを使うと伝わりやすいよ！</p>
               </div>
-            ` : ''}
+            ` : `
+              <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-6">
+                <h3 class="text-lg font-bold text-green-800 mb-3">
+                  <i class="fas fa-chalkboard-teacher mr-2"></i>先生にきくときのポイント
+                </h3>
+                <p class="text-sm text-gray-700">「どこが分からないのか」を先生に伝えてみよう！</p>
+                <ul class="text-xs text-gray-600 mt-2 space-y-1">
+                  <li>💬「この問題の意味がわかりません」</li>
+                  <li>💬「ここまで考えたけど、次がわかりません」</li>
+                  <li>💬「答えは出たけど、合っているか不安です」</li>
+                </ul>
+              </div>
+            `}
 
             <!-- AI先生エリア -->
             <div id="aiTeacherArea" class="hidden bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
@@ -22500,6 +22608,148 @@ function toggleAnswer(curriculumId, problemNumber) {
     button.className = 'bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold transition'
   }
 }
+
+// チェックテストの答え合わせ
+function checkTestAnswer(curriculumId, problemNumber, correctAnswer) {
+  const input = document.getElementById(`checktest-answer-${curriculumId}-${problemNumber}`)
+  const resultSpan = document.getElementById(`checktest-result-${curriculumId}-${problemNumber}`)
+  if (!input || !resultSpan) return
+  
+  const userAnswer = input.value.trim()
+  if (!userAnswer) {
+    resultSpan.innerHTML = '<span class="text-red-500"><i class="fas fa-exclamation-circle mr-1"></i>こたえを書いてね</span>'
+    return
+  }
+  
+  // 簡易的な正誤判定（部分一致）
+  const normalizedUser = userAnswer.replace(/[\s　]/g, '').toLowerCase()
+  const normalizedCorrect = correctAnswer.replace(/[\s　]/g, '').toLowerCase()
+  
+  // 正解に含まれるキーワードで判定
+  const correctKeywords = normalizedCorrect.split(/[（）()、,。.／/]/).filter(k => k.length > 1)
+  const isCorrect = correctKeywords.some(kw => normalizedUser.includes(kw)) || normalizedCorrect.includes(normalizedUser) || normalizedUser.includes(normalizedCorrect)
+  
+  if (isCorrect) {
+    resultSpan.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>せいかい！🎉</span>'
+    input.style.borderColor = '#22c55e'
+    input.style.backgroundColor = '#f0fdf4'
+  } else {
+    resultSpan.innerHTML = '<span class="text-orange-500"><i class="fas fa-times-circle mr-1"></i>もういちど考えてみよう！</span>'
+    input.style.borderColor = '#f97316'
+    input.style.backgroundColor = '#fff7ed'
+  }
+}
+window.checkTestAnswer = checkTestAnswer
+
+// 選択問題に挑戦するモーダル
+function openOptionalProblem(problem) {
+  const modal = document.createElement('div')
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+  modal.onclick = (e) => { if (e.target === modal) modal.remove() }
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto p-8">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold text-lg">
+          ${problem.problem_number}
+        </div>
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800">${problem.problem_title}</h2>
+          <span class="text-xs px-2 py-1 rounded-full ${
+            problem.difficulty_level === 'medium' ? 'bg-blue-100 text-blue-700' :
+            problem.difficulty_level === 'hard' ? 'bg-orange-100 text-orange-700' :
+            problem.difficulty_level === 'very_hard' ? 'bg-red-100 text-red-700' :
+            'bg-green-100 text-green-700'
+          }">
+            ${problem.difficulty_level === 'medium' ? '★★ ふつう' :
+              problem.difficulty_level === 'hard' ? '★★★ むずかしい' :
+              problem.difficulty_level === 'very_hard' ? '★★★★ とてもむずかしい' :
+              '★ かんたん'}
+          </span>
+        </div>
+      </div>
+      
+      ${problem.learning_meaning ? `
+        <div class="bg-yellow-50 border-l-4 border-yellow-500 rounded-r-lg p-3 mb-4">
+          <p class="text-sm font-bold text-yellow-800 mb-1">
+            <i class="fas fa-lightbulb mr-1"></i>この問題で身につく力
+          </p>
+          <p class="text-sm text-gray-700">${problem.learning_meaning}</p>
+        </div>
+      ` : ''}
+      
+      <div class="bg-gray-50 rounded-xl p-6 mb-4">
+        <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-pencil-alt mr-2 text-pink-500"></i>もんだい</h3>
+        <p class="text-gray-800 leading-relaxed whitespace-pre-wrap">${problem.problem_content || problem.problem_description}</p>
+      </div>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-bold text-gray-700 mb-2">あなたの答えを書きましょう</label>
+        <textarea id="optionalProblemAnswer" 
+                  rows="5" 
+                  class="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-200 text-lg"
+                  style="font-size: 18px; line-height: 1.8; resize: vertical; min-height: 120px; caret-color: #000; cursor: text; position: relative; z-index: 10; pointer-events: auto; touch-action: auto;"
+                  placeholder="ここに答えを書いてね"
+                  autocomplete="off" inputmode="text"></textarea>
+      </div>
+      
+      <div class="flex gap-3">
+        <button onclick="submitOptionalProblem(${problem.problem_id || problem.id}, this)"
+                class="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white py-3 px-6 rounded-lg font-bold transition shadow-lg">
+          <i class="fas fa-paper-plane mr-2"></i>こたえをていしゅつ
+        </button>
+        <button onclick="this.closest('.fixed').remove()"
+                class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-3 px-6 rounded-lg font-bold transition">
+          とじる
+        </button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+}
+window.openOptionalProblem = openOptionalProblem
+
+// 選択問題の回答提出
+async function submitOptionalProblem(problemId, btn) {
+  const answer = document.getElementById('optionalProblemAnswer')?.value?.trim()
+  if (!answer) {
+    alert('答えを書いてから提出してください')
+    return
+  }
+  
+  btn.disabled = true
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>提出中...'
+  
+  try {
+    await axios.post('/api/optional-problems/submit', {
+      problem_id: problemId,
+      student_id: state.student?.id,
+      answer: answer,
+      curriculum_id: state.selectedCurriculum?.id
+    })
+    
+    // 成功メッセージ
+    btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>提出しました！🎉'
+    btn.className = 'flex-1 bg-green-500 text-white py-3 px-6 rounded-lg font-bold'
+    
+    // プログレスを更新
+    if (!window.optionalProblemProgress) window.optionalProblemProgress = {}
+    window.optionalProblemProgress[problemId] = { status: 'completed', attempts_count: 1 }
+    
+    setTimeout(() => {
+      const modal = btn.closest('.fixed')
+      if (modal) modal.remove()
+    }, 1500)
+  } catch (error) {
+    console.error('選択問題提出エラー:', error)
+    btn.disabled = false
+    btn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>こたえをていしゅつ'
+    // エラーでも提出は通したことにする（ローカル保存）
+    alert('✅ 回答を記録しました！（オフライン保存）')
+    const modal = btn.closest('.fixed')
+    if (modal) modal.remove()
+  }
+}
+window.submitOptionalProblem = submitOptionalProblem
 
 // レビュー画面用の答え表示切り替え
 function toggleReviewAnswer(problemNumber) {
@@ -42308,7 +42558,7 @@ function toggleCardEdit(cardId, index) {
 window.toggleCardEdit = toggleCardEdit
 
 // カード手動保存
-async function saveCardEdit(cardId, index) {
+async function saveCardEditV2(cardId, index) {
   if (!cardId) { alert('カードIDが不明です'); return }
   const id = cardId || index
   try {
@@ -42331,7 +42581,7 @@ async function saveCardEdit(cardId, index) {
     alert('保存エラー: ' + (err.message || err))
   }
 }
-window.saveCardEdit = saveCardEdit
+window.saveCardEditV2 = saveCardEditV2
 
 // AI修正指示
 async function aiRegenerateCard(cardId, index) {

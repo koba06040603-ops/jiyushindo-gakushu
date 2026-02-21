@@ -3484,7 +3484,7 @@ app.get('/api/courses/:courseId/cards', async (c) => {
   try {
     const cards = await env.DB.prepare(`
       SELECT * FROM learning_cards 
-      WHERE course_id = ? AND card_type = 'main'
+      WHERE course_id = ?
       ORDER BY card_number
     `).bind(courseId).all()
     
@@ -3522,6 +3522,186 @@ app.get('/api/cards/:cardId', async (c) => {
 
 // APIルート：学習進捗の保存
 app.post('/api/progress', async (c) => {
+
+// APIルート：カード再生成
+app.post('/api/courses/:courseId/regenerate-cards', async (c) => {
+  const { env } = c
+  const courseId = c.req.param('courseId')
+  const body = await c.req.json()
+  const targetCount = body.target_count || 10
+  const curriculumId = body.curriculum_id
+  
+  try {
+    // コース情報を取得
+    const course = await env.DB.prepare(`SELECT * FROM courses WHERE id = ?`).bind(courseId).first()
+    if (!course) return c.json({ error: 'Course not found' }, 404)
+    
+    // カリキュラム情報を取得
+    const curriculum = await env.DB.prepare(`SELECT * FROM curriculum WHERE id = ?`).bind(curriculumId).first()
+    if (!curriculum) return c.json({ error: 'Curriculum not found' }, 404)
+    
+    // 既存カードを取得
+    const existingCards = await env.DB.prepare(`SELECT * FROM learning_cards WHERE course_id = ? ORDER BY card_number`).bind(courseId).all()
+    const currentCount = existingCards.results.length
+    
+    if (currentCount >= targetCount) {
+      return c.json({ success: true, cards_count: currentCount, message: 'Already has enough cards' })
+    }
+    
+    // 不足分を生成
+    const additionalCount = targetCount - currentCount
+    const subject = curriculum.subject || '算数'
+    const grade = curriculum.grade || '小学3年'
+    const unitName = curriculum.unit_name || ''
+    
+    // 既存のカードタイトルを取得して重複を避ける
+    const existingTitles = existingCards.results.map((card: any) => card.card_title).join(', ')
+    
+    // Gemini APIでカードを生成
+    const GEMINI_API_KEY = env.GEMINI_API_KEY || ''
+    if (!GEMINI_API_KEY) {
+      return c.json({ error: 'AI API key not configured' }, 500)
+    }
+    
+    const prompt = `あなたは${grade}の${subject}の教師です。
+単元「${unitName}」の学習カードを${additionalCount}枚追加で作成してください。
+
+既存のカードタイトル: ${existingTitles}
+※上記と重複しない内容を作成すること。
+
+カード番号は${currentCount + 1}から始めてください。
+
+以下のJSON形式で返してください:
+[
+  {
+    "card_number": ${currentCount + 1},
+    "card_title": "カードタイトル",
+    "problem_text": "問題文（子供向けに分かりやすく）",
+    "problem_content": "詳細な問題内容",
+    "correct_answer": "正解",
+    "explanation": "解説",
+    "hint_text": "ヒント",
+    "example_problem": "例題（あれば）",
+    "example_solution": "例題の解き方",
+    "real_world_context": "日常とのつながり",
+    "difficulty_level": "standard",
+    "ai_teacher_message": "この問題のポイントを一言で",
+    "ai_teacher_advice": "取り組むコツ",
+    "teacher_help_keywords": "先生に聞くときのキーワード",
+    "new_terms": "新出語句（あれば）"
+  }
+]
+
+重要:
+- 各カードの40%以上は発展的内容にすること
+- 小学生が理解しやすい言葉で書くこと
+- JSON配列のみを返すこと（説明文不要）`
+
+    const geminiResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 8192 }
+        })
+      }
+    )
+    
+    const geminiData: any = await geminiResponse.json()
+    let generatedText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSON部分を抽出
+    const jsonMatch = generatedText.match(/\[[\s\S]*\]/)
+    if (!jsonMatch) {
+      return c.json({ error: 'AI generation failed - invalid response' }, 500)
+    }
+    
+    const newCards = JSON.parse(jsonMatch[0])
+    
+    // DBに追加
+    for (const card of newCards) {
+      await env.DB.prepare(`
+        INSERT INTO learning_cards (
+          subject, grade_level, unit_name, card_title, card_type, difficulty_level,
+          learning_track, problem_text, problem_content, correct_answer, explanation,
+          hint_text, card_order, card_number, estimated_time_minutes, curriculum_code,
+          example_problem, example_solution, real_world_context, answer, answer_explanation,
+          ai_teacher_message, ai_teacher_advice, teacher_help_keywords, new_terms,
+          is_active, course_id
+        ) VALUES (?, ?, ?, ?, 'main', ?, ?, ?, ?, ?, ?, ?, ?, ?, 10, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      `).bind(
+        subject, grade, unitName,
+        card.card_title || `カード${card.card_number}`,
+        card.difficulty_level || 'standard',
+        course.course_level || 'standard',
+        card.problem_text || card.problem_content || '',
+        card.problem_content || card.problem_text || '',
+        card.correct_answer || '',
+        card.explanation || '',
+        card.hint_text || '',
+        card.card_number,
+        card.card_number,
+        curriculum.curriculum_code || '',
+        card.example_problem || null,
+        card.example_solution || null,
+        card.real_world_context || null,
+        card.correct_answer || '',
+        card.explanation || '',
+        card.ai_teacher_message || null,
+        card.ai_teacher_advice || null,
+        card.teacher_help_keywords || null,
+        card.new_terms || null,
+        courseId
+      ).run()
+    }
+    
+    return c.json({ success: true, cards_count: currentCount + newCards.length })
+  } catch (error: any) {
+    console.error('Card regeneration error:', error)
+    return c.json({ error: 'Card regeneration failed: ' + error.message }, 500)
+  }
+})
+
+// APIルート：選択問題の回答提出
+app.post('/api/optional-problems/submit', async (c) => {
+  const { env } = c
+  const body = await c.req.json()
+  
+  try {
+    // optional_problem_progressテーブルに記録（存在しなければ作成）
+    try {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS optional_problem_progress (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          student_id TEXT,
+          optional_problem_id INTEGER,
+          curriculum_id INTEGER,
+          answer_text TEXT,
+          status TEXT DEFAULT 'completed',
+          attempts_count INTEGER DEFAULT 1,
+          submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run()
+    } catch (e) { /* table may already exist */ }
+    
+    await env.DB.prepare(`
+      INSERT INTO optional_problem_progress (student_id, optional_problem_id, curriculum_id, answer_text, status, attempts_count)
+      VALUES (?, ?, ?, ?, 'completed', 1)
+    `).bind(
+      body.student_id || 'anonymous',
+      body.problem_id,
+      body.curriculum_id,
+      body.answer || ''
+    ).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('Optional problem submit error:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
   const { env } = c
   const body = await c.req.json()
   
@@ -9617,6 +9797,20 @@ app.post('/api/curriculum/save-generated', async (c) => {
       for (let ci = 0; ci < (course.cards || []).length; ci++) {
         const card = course.cards[ci]
         const cardType = validateCardType(card.card_type)
+        
+        // 動画URLの検証と修正（AIが不正なURL生成する場合の対策）
+        let videoUrl = card.solution_video_url || card.video_url || ''
+        if (videoUrl) {
+          // edu.web.nhk → www2.nhk.or.jp に修正
+          videoUrl = videoUrl.replace(/https?:\/\/edu\.web\.nhk/g, 'https://www2.nhk.or.jp')
+          // 存在しないドメインの場合はNHK for Schoolトップに差し替え
+          if (videoUrl.includes('nhk') && !videoUrl.includes('nhk.or.jp')) {
+            videoUrl = 'https://www.nhk.or.jp/school/'
+          }
+          // httpで始まらないURLは無効
+          if (!videoUrl.startsWith('http')) videoUrl = ''
+        }
+        card.solution_video_url = videoUrl
         
         // difficulty_level の検証
         let diffLevel = card.difficulty_level || 'standard'
@@ -29884,7 +30078,15 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       
       // マルチメディア情報を取得
       const mm = card.multimedia || {}
-      const videoUrl = mm.youtube_url || card.solution_video_url || ''
+      let videoUrl = mm.youtube_url || card.solution_video_url || ''
+      // 動画URLの検証と修正
+      if (videoUrl) {
+        videoUrl = videoUrl.replace(/https?:\/\/edu\.web\.nhk/g, 'https://www2.nhk.or.jp')
+        if (videoUrl.includes('nhk') && !videoUrl.includes('nhk.or.jp')) {
+          videoUrl = 'https://www.nhk.or.jp/school/'
+        }
+        if (!videoUrl.startsWith('http')) videoUrl = ''
+      }
       const imageUrl = card.image_url || ''
 
       const cardResult = await env.DB.prepare(`
