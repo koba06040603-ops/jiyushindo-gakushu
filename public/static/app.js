@@ -1885,97 +1885,125 @@ async function renderTopPage() {
         <div class="bg-white rounded-lg p-6 mb-6 shadow-lg border-4 border-yellow-400">
           <h3 class="text-2xl font-bold text-yellow-700 mb-4 text-center">
             <i class="fas fa-book-open mr-2"></i>
-            🌟 8つの教育理論に基づく科学的アプローチ
+            🌟 12の教育理論に基づく科学的アプローチ
           </h3>
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-            <!-- 理論1: VARK理論 -->
             <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border-2 border-purple-300">
               <div class="flex items-center mb-2">
-                <div class="bg-purple-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">1</div>
-                <h4 class="font-bold text-purple-800">VARK理論</h4>
+                <div class="bg-purple-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F1</div>
+                <h4 class="font-bold text-purple-800">マルチモーダル感覚処理効率理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">Fleming提唱</p>
-              <p class="text-xs text-gray-600">視覚・聴覚・読み書き・体験の4つの学習スタイルに応じた最適な提示方法</p>
+              <p class="text-sm text-gray-700 mb-2">VARK学習スタイル理論を発展（Fleming, 1987）</p>
+              <p class="text-xs text-gray-600">視覚・聴覚・読み書き・運動感覚の処理効率を多面的に測定し、最適なメディアタイプを選択</p>
             </div>
 
-            <!-- 理論2: 多重知能理論 -->
             <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border-2 border-blue-300">
               <div class="flex items-center mb-2">
-                <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">2</div>
-                <h4 class="font-bold text-blue-800">多重知能理論</h4>
+                <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F2</div>
+                <h4 class="font-bold text-blue-800">多元的知能プロファイリング理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">Gardner博士提唱</p>
-              <p class="text-xs text-gray-600">言語的・論理数学的・視覚空間的・身体運動的・音楽的・対人的・内省的・博物学的知能に対応</p>
+              <p class="text-sm text-gray-700 mb-2">多重知能理論（MI理論）を発展（Gardner, 1983）</p>
+              <p class="text-xs text-gray-600">8知能の強弱パターンから、問題形式と提示方法を個別に決定</p>
             </div>
 
-            <!-- 理論3: 経験学習理論 -->
             <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border-2 border-green-300">
               <div class="flex items-center mb-2">
-                <div class="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">3</div>
-                <h4 class="font-bold text-green-800">経験学習理論</h4>
+                <div class="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F3</div>
+                <h4 class="font-bold text-green-800">適応型経験学習サイクル理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">Kolb提唱</p>
-              <p class="text-xs text-gray-600">具体的経験→内省的観察→抽象的概念化→能動的実験の4段階サイクル</p>
+              <p class="text-sm text-gray-700 mb-2">経験学習サイクル理論を発展（Kolb, 1984）</p>
+              <p class="text-xs text-gray-600">具体的経験→省察→概念化→実験の4段階を適応的に検出し課題設計</p>
             </div>
 
-            <!-- 理論4: ATI理論 -->
             <div class="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border-2 border-orange-300">
               <div class="flex items-center mb-2">
-                <div class="bg-orange-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">4</div>
-                <h4 class="font-bold text-orange-800">ATI理論</h4>
+                <div class="bg-orange-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F4</div>
+                <h4 class="font-bold text-orange-800">動的適性処遇交互作用理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">Cronbach & Snow提唱</p>
-              <p class="text-xs text-gray-600">適性処遇交互作用：学習者の適性と指導方法の最適な組み合わせ</p>
+              <p class="text-sm text-gray-700 mb-2">ATI理論を発展（Cronbach & Snow, 1977）</p>
+              <p class="text-xs text-gray-600">適性をリアルタイム測定し、足場かけの量と種類を動的に調整</p>
             </div>
 
-            <!-- 理論5: 自己調整学習理論 -->
             <div class="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-4 border-2 border-pink-300">
               <div class="flex items-center mb-2">
-                <div class="bg-pink-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">5</div>
-                <h4 class="font-bold text-pink-800">自己調整学習理論</h4>
+                <div class="bg-pink-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F5</div>
+                <h4 class="font-bold text-pink-800">AI支援型自己調整学習理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">Zimmerman提唱</p>
-              <p class="text-xs text-gray-600">予見→遂行→内省の3段階サイクル（次期学習指導要領で重視）</p>
+              <p class="text-sm text-gray-700 mb-2">自己調整学習理論（SRL）を発展（Zimmerman, 2000）</p>
+              <p class="text-xs text-gray-600">予見→遂行→自己省察の3フェーズをAIが検出し支援を自動生成</p>
             </div>
 
-            <!-- 理論6: 認知科学の学習方略 -->
             <div class="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg p-4 border-2 border-teal-300">
               <div class="flex items-center mb-2">
-                <div class="bg-teal-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">6</div>
-                <h4 class="font-bold text-teal-800">認知科学の学習方略</h4>
+                <div class="bg-teal-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F6</div>
+                <h4 class="font-bold text-teal-800">適応的検索練習・望ましい困難統合理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">文部科学省推奨</p>
-              <p class="text-xs text-gray-600">分散学習・検索練習・交互配置・精緻化・具体例・二重符号化の6つの科学的方略</p>
+              <p class="text-sm text-gray-700 mb-2">検索練習効果（Roediger, 2006）＋ 望ましい困難理論（Bjork, 1994）を統合</p>
+              <p class="text-xs text-gray-600">間隔反復・交互配置の準備度を自動判定し出題間隔を個別設計</p>
             </div>
 
-            <!-- 理論7: 足場かけ理論 -->
             <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border-2 border-red-300">
               <div class="flex items-center mb-2">
-                <div class="bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">7</div>
-                <h4 class="font-bold text-red-800">足場かけ理論</h4>
+                <div class="bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F7</div>
+                <h4 class="font-bold text-red-800">動的ZPDスキャフォールディング理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">Vygotsky提唱</p>
-              <p class="text-xs text-gray-600">最近接発達領域（ZPD）：児童の現在の力と支援により到達できる力の間を段階的にサポート</p>
+              <p class="text-sm text-gray-700 mb-2">最近接発達領域（ZPD）理論を発展（Vygotsky, 1978）</p>
+              <p class="text-xs text-gray-600">「支援があればできる」領域をリアルタイム推定しヒント段階を動的決定</p>
             </div>
 
-            <!-- 理論8: 自己決定理論 -->
             <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 border-2 border-indigo-300">
               <div class="flex items-center mb-2">
-                <div class="bg-indigo-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">8</div>
-                <h4 class="font-bold text-indigo-800">自己決定理論</h4>
+                <div class="bg-indigo-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F8</div>
+                <h4 class="font-bold text-indigo-800">学習文脈型自己決定理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">Deci & Ryan提唱</p>
-              <p class="text-xs text-gray-600">自律性・有能感・関係性の3要素を満たし内発的動機づけを促進（コース選択・達成感・AI先生との対話）</p>
+              <p class="text-sm text-gray-700 mb-2">自己決定理論（SDT）を発展（Deci & Ryan, 1985）</p>
+              <p class="text-xs text-gray-600">自律性・有能感・関係性の充足度を測定し内発的動機づけを支援</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-lg p-4 border-2 border-cyan-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-cyan-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F9</div>
+                <h4 class="font-bold text-cyan-800">段階的メタ認知発達支援理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">メタ認知理論を発展（Flavell, 1979 ＋ Brown, 1987）</p>
+              <p class="text-xs text-gray-600">メタ認知的知識と制御の発達段階を検出し振り返り課題を自動配置</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-4 border-2 border-amber-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-amber-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F10</div>
+                <h4 class="font-bold text-amber-800">適応型領域学習発達モデル</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">領域学習モデル（MDL）を発展（Alexander, 2004）</p>
+              <p class="text-xs text-gray-600">順応期→能力期→熟達期の発達段階に応じて難易度を適応調整</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-lime-50 to-lime-100 rounded-lg p-4 border-2 border-lime-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-lime-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F11</div>
+                <h4 class="font-bold text-lime-800">デジタル真正学習デザイン理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">真正の学び理論を発展（Herrington & Oliver, 2000）</p>
+              <p class="text-xs text-gray-600">個人的意味・実世界接続・コミュニティ参加を問題文に埋め込む</p>
+            </div>
+
+            <div class="bg-gradient-to-br from-rose-50 to-rose-100 rounded-lg p-4 border-2 border-rose-300">
+              <div class="flex items-center mb-2">
+                <div class="bg-rose-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F12</div>
+                <h4 class="font-bold text-rose-800">学習感情ダイナミクス制御理論</h4>
+              </div>
+              <p class="text-sm text-gray-700 mb-2">統制−価値理論を発展（Pekrun, 2006）</p>
+              <p class="text-xs text-gray-600">学業享受・不安・退屈の動態を検出し感情支援と難易度を調整</p>
             </div>
           </div>
           <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 text-center">
             <p class="text-yellow-900 font-bold text-lg">
               <i class="fas fa-star mr-2"></i>
-              これら8つの理論を統合し、科学的根拠に基づいた個別最適化学習を実現
+              これら12の理論を統合し、科学的根拠に基づいた個別最適化学習を実現
               <i class="fas fa-star ml-2"></i>
             </p>
             <p class="text-yellow-800 text-sm mt-2">
-              💡 3段階ヒント（足場かけ理論）× コース選択自由（自己決定理論）で主体的な学びを促進
+              💡 3段階ヒント（動的ZPD理論）× コース選択自由（自己決定理論）× AI先生対話（メタ認知支援）で主体的な学びを促進
             </p>
           </div>
         </div>
@@ -5399,7 +5427,6 @@ async function loadCardPage(cardId) {
             ` : ''}
 
             <!-- AI先生からのメッセージ -->
-            ${card.ai_teacher_message || card.real_world_connection ? `
               <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4">
                 <div class="flex items-start gap-3">
                   <div class="bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
@@ -5407,13 +5434,12 @@ async function loadCardPage(cardId) {
                   </div>
                   <div>
                     <p class="text-sm font-bold text-blue-800 mb-1"><i class="fas fa-comment-dots mr-1"></i>AI先生より</p>
-                    ${card.ai_teacher_message ? `<p class="text-sm text-gray-700 mb-1">${card.ai_teacher_message}</p>` : ''}
-                    ${card.ai_teacher_advice ? `<p class="text-xs text-blue-600"><i class="fas fa-lightbulb mr-1"></i>${card.ai_teacher_advice}</p>` : ''}
+                    <p class="text-sm text-gray-700 mb-1">${card.ai_teacher_message || 'この問題にチャレンジしてみよう！わからないときは「AI先生」ボタンを押してね。'}</p>
+                    ${card.ai_teacher_advice ? `<p class="text-xs text-blue-600"><i class="fas fa-lightbulb mr-1"></i>${card.ai_teacher_advice}</p>` : '<p class="text-xs text-blue-600"><i class="fas fa-lightbulb mr-1"></i>まずは問題をよく読んで、自分の言葉で考えてみよう</p>'}
                     ${card.teacher_help_keywords ? `<p class="text-xs text-gray-500 mt-1"><i class="fas fa-question-circle mr-1"></i>わからないとき先生に聞くキーワード: <strong>${card.teacher_help_keywords}</strong></p>` : ''}
                   </div>
                 </div>
               </div>
-            ` : ''}
 
             <!-- 例題 -->
             ${card.example_problem ? `
@@ -5459,7 +5485,7 @@ async function loadCardPage(cardId) {
                 if (ytId) {
                   return '<div class="mt-4 rounded-xl overflow-hidden border-2 border-gray-200 shadow-sm"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 p-2 bg-gray-50"><i class="fas fa-video mr-1"></i>学習動画：一時停止しながら考えてみよう</p></div>'
                 } else if (vUrl.includes('nhk.or.jp')) {
-                  return '<div class="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-4 shadow-sm"><div class="flex items-center gap-2 mb-3"><span class="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">NHK for School</span><span class="text-sm font-bold text-gray-800">学習動画</span></div><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;border:2px solid #e2e8f0;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" src="' + vUrl + '" allow="autoplay; fullscreen" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-3"><i class="fas fa-info-circle mr-1"></i>NHK for Schoolの動画です。再生できない場合は<a href="' + vUrl + '" target="_blank" class="text-blue-600 underline font-bold">こちらから直接視聴</a>してください。</p></div>'
+                  return '<div class="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-5 shadow-sm"><div class="flex items-center gap-3 mb-4"><span class="bg-blue-600 text-white text-sm font-bold px-4 py-1.5 rounded-full"><i class="fas fa-tv mr-1"></i>NHK for School</span><span class="text-base font-bold text-gray-800">学習動画</span></div><div class="bg-white rounded-xl p-6 text-center border-2 border-blue-200"><i class="fas fa-play-circle text-6xl text-blue-500 mb-4 block"></i><p class="text-sm text-gray-700 mb-4">NHK for School の動画で学習できます。<br>下のボタンを押して動画を見ましょう！</p><a href="' + vUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold text-lg transition shadow-lg hover:shadow-xl"><i class="fas fa-external-link-alt"></i>NHK for School で動画を見る</a></div><p class="text-xs text-gray-400 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>ボタンを押すと NHK for School のサイトが新しいタブで開きます</p></div>'
                 } else if (vUrl) {
                   return '<div class="mt-4 bg-red-50 border-2 border-red-200 rounded-xl p-4"><a href="' + vUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-lg font-bold transition shadow-sm"><i class="fas fa-play-circle text-lg"></i>学習動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>'
                 }
@@ -5489,16 +5515,14 @@ async function loadCardPage(cardId) {
                   <textarea id="answerInput" 
                             rows="6" 
                             class="w-full p-4 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 text-lg"
-                            style="font-size: 20px; line-height: 2.0; resize: vertical; min-height: 180px; caret-color: #000000; cursor: text; color: #1a1a1a; background-color: #ffffff; -webkit-user-select: text; user-select: text; -webkit-appearance: none;"
-                            placeholder="ここをクリックして答えを書いてください（キーボードで入力できます）"
+                            style="font-size: 20px; line-height: 2.0; resize: vertical; min-height: 180px; caret-color: #000000; cursor: text; color: #1a1a1a; background-color: #ffffff; -webkit-user-select: text; user-select: text; -webkit-appearance: none; position: relative; z-index: 10; pointer-events: auto; touch-action: auto; -webkit-text-fill-color: #1a1a1a; opacity: 1;"
+                            placeholder="ここをタップ（クリック）して答えを書いてください"
                             autocomplete="off"
                             autocorrect="off"
                             spellcheck="false"
-                            onfocus="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.2)'; this.placeholder=''"
-                            onblur="this.style.borderColor='#d1d5db'; this.style.boxShadow='none'; if(!this.value) this.placeholder='ここをクリックして答えを書いてください（キーボードで入力できます）'"
-                            onclick="this.focus()"
+                            inputmode="text"
                             ></textarea>
-                  <p class="text-xs text-gray-400 mt-1"><i class="fas fa-keyboard mr-1"></i>キーボードで入力できます。Enterキーで改行します。マウスでクリックしてから入力してください。</p>
+                  <p class="text-xs text-gray-400 mt-1"><i class="fas fa-keyboard mr-1"></i>キーボードで入力できます。タップ（クリック）してから入力してください。</p>
                 </div>
                 
                 <!-- 手書き入力エリア -->
@@ -41941,7 +41965,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                     <div class="bg-white rounded-lg p-3 mb-2 border">
                       <p class="text-sm text-gray-800">${card.problem_text || card.problem_description || ''}</p>
                     </div>
-                    ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" src="' + ytUrl + '" allow="autoplay; fullscreen" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>NHK for Schoolの動画です。再生できない場合は<a href="' + ytUrl + '" target="_blank" class="text-blue-600 underline">こちら</a>から視聴してください。</p></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
+                    ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-play-circle text-4xl text-blue-500 mb-2 block"></i><a href="' + ytUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で見る</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
                     ${tactile ? '<div class="bg-yellow-50 border-l-3 border-yellow-400 p-2 rounded text-xs mb-2"><strong>✋ やってみよう:</strong> ' + tactile + '</div>' : ''}
                     ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
                     <div class="grid grid-cols-2 gap-2 text-xs">
@@ -42162,11 +42186,13 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
         const arch = v4.archetype || {}
         const axes = v4.axes || {}
         
-        // 軸スコアバーの色分け
-        function axisBar(label, score, icon) {
-          const pct = Math.max(0, Math.min(100, score || 0))
+        // 軸スコアバーの色分け（わかりやすい説明付き）
+        function axisBar(label, score, icon, desc) {
+          const s = (typeof score === 'number' && !isNaN(score)) ? score : 0
+          const pct = Math.max(0, Math.min(100, Math.round(s * 100) / 100))
           const color = pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-blue-500' : 'bg-orange-500'
-          return '<div class="mb-1"><div class="flex items-center justify-between text-xs mb-0.5"><span class="font-bold text-gray-600">' + icon + ' ' + label + '</span><span class="text-gray-500">' + pct + '/100</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="' + color + ' h-2 rounded-full transition-all" style="width:' + pct + '%"></div></div></div>'
+          const descHtml = desc ? '<span class="text-[10px] text-gray-400 ml-1">― ' + desc + '</span>' : ''
+          return '<div class="mb-2"><div class="flex items-center justify-between text-xs mb-0.5"><span class="font-bold text-gray-700">' + icon + ' ' + label + descHtml + '</span><span class="text-gray-500 font-bold">' + pct + '/100</span></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div class="' + color + ' h-2.5 rounded-full transition-all" style="width:' + pct + '%"></div></div></div>'
         }
         
         // アーキタイプ別の絵文字
@@ -42220,11 +42246,10 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
             <!-- 基幹軸スコア -->
             <div class="bg-white rounded-xl p-3 border border-indigo-100 mb-3">
               <h4 class="text-sm font-bold text-indigo-700 mb-2"><i class="fas fa-chart-bar mr-1"></i>基幹軸スコア（きかんじくスコア：児童の学びの特性を数値化した中心指標）</h4>
-              ${axisBar('認知的自律性', axes.cognitive_autonomy, '🧠')}
-              ${axisBar('情緒的安定性', axes.emotional_stability, '💚')}
-              ${axisBar('入力チャネル嗜好', axes.entry_channel_preference, '📡')}
-              ${axisBar('方略的成熟度', axes.strategic_maturity, '📐')}
-              ${axisBar('動機的エネルギー', axes.motivational_energy, '⚡')}
+              ${axisBar('認知的自律性 (H)', axes.cognitive_autonomy, '🧠', '自分で考え、学ぶ力')}
+              ${axisBar('情緒的安定性 (G)', axes.emotional_stability, '💚', '安心して学べる心の状態')}
+              ${axisBar('方略的成熟度 (A)', axes.strategic_maturity, '📐', '工夫して学べる力')}
+              ${axisBar('動機的エネルギー (E)', axes.motivational_energy, '⚡', '学びたい気持ちの強さ')}
             </div>
             
             <!-- 分析サマリー -->
