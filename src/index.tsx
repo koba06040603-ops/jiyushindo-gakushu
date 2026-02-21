@@ -7579,6 +7579,7 @@ app.get('/landing', (c) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="AI搭載の自由進度学習支援システム - 個別最適化された学習体験を提供">
         <title>自由進度学習支援システム</title>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
         
         <!-- DNS Prefetch & Preconnect for faster CDN loading -->
         <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
