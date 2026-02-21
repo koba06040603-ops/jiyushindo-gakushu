@@ -207,8 +207,8 @@ window.realtimeManager = new RealtimeCommunicationManager()
 window.RealtimeCommunicationManager = RealtimeCommunicationManager
 
 // CSSアニメーションを追加
-const style = document.createElement('style')
-style.textContent = `
+const realtimeStyle = document.createElement('style')
+realtimeStyle.textContent = `
   @keyframes slide-in-right {
     from {
       transform: translateX(100%);
@@ -235,6 +235,6 @@ style.textContent = `
     animation: slide-in-right 0.3s ease-out;
   }
 `
-document.head.appendChild(style)
+document.head.appendChild(realtimeStyle)
 
 console.log('✅ リアルタイム通信機能を初期化しました')

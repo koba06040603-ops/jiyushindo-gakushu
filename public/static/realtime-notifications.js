@@ -463,8 +463,8 @@ class RealtimeNotificationManager {
 window.realtimeNotificationManager = new RealtimeNotificationManager()
 
 // CSSアニメーションを追加
-const style = document.createElement('style')
-style.textContent = `
+const notifStyle = document.createElement('style')
+notifStyle.textContent = `
   @keyframes slideIn {
     from {
       transform: translateX(100%);
@@ -491,6 +491,6 @@ style.textContent = `
     animation: slideIn 0.3s ease-out;
   }
 `
-document.head.appendChild(style)
+document.head.appendChild(notifStyle)
 
 console.log('✅ realtime-notifications.js 読み込み完了')

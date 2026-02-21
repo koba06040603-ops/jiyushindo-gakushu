@@ -5453,7 +5453,8 @@ async function loadCardPage(cardId) {
               <!-- 動画コンテンツ（YouTube / NHK for School） -->
               ${(() => {
                 const vUrl = card.solution_video_url || ''
-                const ytMatch = vUrl.match(/(?:v=|youtu\\.be\\/)([^&?]+)/)
+                const ytRegex = new RegExp('(?:v=|youtu\\.be/)([^&?]+)')
+                const ytMatch = vUrl.match(ytRegex)
                 const ytId = ytMatch ? ytMatch[1] : ''
                 if (ytId) {
                   return '<div class="mt-4 rounded-xl overflow-hidden border-2 border-gray-200 shadow-sm"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 p-2 bg-gray-50"><i class="fas fa-video mr-1"></i>学習動画：一時停止しながら考えてみよう</p></div>'
