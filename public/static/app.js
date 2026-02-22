@@ -15872,6 +15872,10 @@ window.saveFontSize = saveFontSize
 
 // 学習カード詳細表示モーダル
 function showCardDetail(card) {
+  // card_id → id フォールバック
+  if (!card.id && card.card_id) card.id = card.card_id
+  if (!card.card_id && card.id) card.card_id = card.id
+  
   // カード情報を state に保存
   state.selectedCard = card
   
@@ -15950,11 +15954,21 @@ function showCardDetail(card) {
                 問題・課題
               </h3>
               ${state.auth.user?.role === 'teacher' ? `
-                <div class="flex gap-2 mb-3">
+                <div class="flex flex-wrap gap-2 mb-3">
                   <button onclick="editCardImageUrl(${card.id}, 'problem')" 
                           class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
                     <i class="fas fa-image mr-1"></i>
                     ${card.problem_image_url ? '画像を編集' : '画像を追加'}
+                  </button>
+                  <button onclick="editCardImageUrl(${card.id}, 'video')" 
+                          class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">
+                    <i class="fas fa-video mr-1"></i>
+                    ${card.solution_video_url ? '動画を編集' : '動画を追加'}
+                  </button>
+                  <button onclick="editCardImageUrl(${card.id}, 'answer')" 
+                          class="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700">
+                    <i class="fas fa-image mr-1"></i>
+                    ${card.answer_image_url ? '解答画像を編集' : '解答画像を追加'}
                   </button>
                 </div>
               ` : ''}
@@ -16044,7 +16058,7 @@ function showCardDetail(card) {
                 </h3>
                 <div class="bg-white p-6 rounded-lg border-2 border-green-200">
                   ${state.auth.user?.role === 'teacher' ? `
-                    <button onclick="editCardImageUrl(${card.id}, 'answer')" 
+                    <button onclick="editCardImageUrl(${card.card_id || card.id}, 'answer')" 
                             class="mb-3 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700">
                       <i class="fas fa-image mr-1"></i>
                       ${card.answer_image_url ? '画像URLを編集' : '画像URLを追加'}
@@ -18521,27 +18535,42 @@ function editCardContent(courseIndex, cardIndex) {
             </div>
 
             <!-- 画像・動画URL -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
-              <div>
-                <label class="block text-sm font-bold text-gray-700 mb-2">
-                  <i class="fas fa-image mr-1 text-blue-600"></i>問題画像URL
-                </label>
-                <input type="text" id="edit_problem_image_url" 
-                       value="${card.problem_image_url || ''}"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                       placeholder="https://example.com/image.png">
-                <p class="text-xs text-gray-400 mt-1">図・イラスト・グラフの画像URL</p>
+            <div class="border-t pt-4 mt-4">
+              <p class="text-sm font-bold text-gray-700 mb-3"><i class="fas fa-photo-video mr-1"></i>メディア（画像・動画・イラスト）</p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-gray-600 mb-1">
+                    <i class="fas fa-image mr-1 text-blue-600"></i>問題画像
+                  </label>
+                  <div class="flex gap-1">
+                    <input type="text" id="edit_problem_image_url" 
+                           value="${card.problem_image_url || ''}"
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                           placeholder="URLを入力 or ファイルをアップロード">
+                    <button type="button" onclick="uploadMediaInModal('edit_problem_image_url', 'image')" 
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap">
+                      <i class="fas fa-upload mr-0.5"></i>添付
+                    </button>
+                  </div>
+                  ${card.problem_image_url ? '<img src="' + card.problem_image_url + '" class="mt-1 max-h-24 rounded border" onerror="this.style.display=\'none\'">' : ''}
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-gray-600 mb-1">
+                    <i class="fas fa-video mr-1 text-red-600"></i>動画（YouTube or アップロード）
+                  </label>
+                  <div class="flex gap-1">
+                    <input type="text" id="edit_solution_video_url" 
+                           value="${card.solution_video_url || ''}"
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                           placeholder="YouTube URL or 動画をアップロード">
+                    <button type="button" onclick="uploadMediaInModal('edit_solution_video_url', 'video')" 
+                            class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded-lg text-xs font-bold whitespace-nowrap">
+                      <i class="fas fa-video mr-0.5"></i>添付
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label class="block text-sm font-bold text-gray-700 mb-2">
-                  <i class="fas fa-video mr-1 text-red-600"></i>YouTube URL
-                </label>
-                <input type="text" id="edit_solution_video_url" 
-                       value="${card.solution_video_url || ''}"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                       placeholder="https://www.youtube.com/watch?v=...">
-                <p class="text-xs text-gray-400 mt-1">学習動画のYouTube URL</p>
-              </div>
+              <p class="text-xs text-gray-400 mt-2">📎 画像(JPEG/PNG/GIF/WebP, 10MBまで) 🎬 動画(MP4/WebM/MOV, 100MBまで) — 直接ファイルをアップロードするか、URLを入力してください</p>
             </div>
           </form>
         </div>
@@ -26590,31 +26619,40 @@ window.showResearchDatasetCreator = showResearchDatasetCreator
 
 // 学習カード画像URL編集機能
 async function editCardImageUrl(cardId, imageType) {
-  const typeLabel = imageType === 'problem' ? '問題画像' : '解答画像'
+  const typeLabel = imageType === 'problem' ? '問題画像' : imageType === 'answer' ? '解答画像' : '動画'
+  const isVideo = (imageType === 'video')
   
   // 選択ダイアログ
-  const choice = prompt(
-    `【${typeLabel}の設定】\n\n操作を選んでください:\n\n1 = 画像URLを直接入力\n2 = AIで図・イラストを自動生成\n3 = 画像を削除\n\n番号を入力してください:`,
-    '1'
-  )
+  const options = isVideo
+    ? `【${typeLabel}の設定】\n\n操作を選んでください:\n\n1 = URLを直接入力（YouTube等）\n2 = 動画ファイルをアップロード（MP4/WebM/MOV, 100MBまで）\n3 = 削除\n\n番号を入力してください:`
+    : `【${typeLabel}の設定】\n\n操作を選んでください:\n\n1 = 画像URLを直接入力\n2 = 画像ファイルをアップロード（JPEG/PNG/GIF/WebP, 10MBまで）\n3 = AIで図・イラストを自動生成\n4 = 削除\n\n番号を入力してください:`
+  
+  const choice = prompt(options, isVideo ? '2' : '2')
   
   if (choice === null) return // キャンセル
+  const c = choice.trim()
   
-  if (choice.trim() === '3') {
-    // 削除
+  // 削除
+  if ((!isVideo && c === '4') || (isVideo && c === '3')) {
     try {
-      const fieldName = imageType === 'problem' ? 'problem_image_url' : 'answer_image_url'
+      const fieldName = isVideo ? 'solution_video_url' : (imageType === 'answer' ? 'answer_image_url' : 'problem_image_url')
       await axios.put('/api/card/' + cardId, { [fieldName]: '' })
-      alert('✅ 画像を削除しました')
+      alert('✅ ' + typeLabel + 'を削除しました')
       window.location.reload()
     } catch (error) {
-      alert('画像の削除に失敗しました')
+      alert(typeLabel + 'の削除に失敗しました')
     }
     return
   }
   
-  if (choice.trim() === '2') {
-    // AI生成
+  // ファイルアップロード
+  if (c === '2') {
+    uploadMediaAndSaveToCard(cardId, isVideo ? 'video' : imageType)
+    return
+  }
+  
+  // AI生成（画像のみ）
+  if (!isVideo && c === '3') {
     const genPrompt = prompt(
       '🎨 AI画像生成\n\nどんな図やイラストを生成しますか？\n（例：「折れ線グラフの例」「分数の円グラフ」「温度計の図」等）'
     )
@@ -26629,7 +26667,7 @@ async function editCardImageUrl(cardId, imageType) {
       })
       
       if (res.data.success && res.data.image_url) {
-        const fieldName = imageType === 'problem' ? 'problem_image_url' : 'answer_image_url'
+        const fieldName = imageType === 'answer' ? 'answer_image_url' : 'problem_image_url'
         await axios.put('/api/card/' + cardId, { [fieldName]: res.data.image_url })
         alert('✅ AI画像を生成してカードに設定しました！（' + (res.data.generation_time_ms || 0) + 'ms）')
         window.location.reload()
@@ -26642,7 +26680,7 @@ async function editCardImageUrl(cardId, imageType) {
     return
   }
   
-  // URL直接入力（デフォルト）
+  // URL直接入力（デフォルト: 1）
   const currentUrl = prompt(
     typeLabel + 'のURLを入力してください（削除する場合は空欄にしてください）:'
   )
@@ -26650,18 +26688,18 @@ async function editCardImageUrl(cardId, imageType) {
   if (currentUrl === null) return
   
   try {
-    const fieldName = imageType === 'problem' ? 'problem_image_url' : 'answer_image_url'
+    const fieldName = isVideo ? 'solution_video_url' : (imageType === 'answer' ? 'answer_image_url' : 'problem_image_url')
     const response = await axios.put('/api/card/' + cardId, {
       [fieldName]: currentUrl
     })
     
     if (response.data.success) {
-      alert('✅ 画像URLを更新しました')
+      alert('✅ ' + typeLabel + 'URLを更新しました')
       window.location.reload()
     }
   } catch (error) {
-    console.error('画像URL更新エラー:', error)
-    alert('画像URLの更新に失敗しました')
+    console.error(typeLabel + 'URL更新エラー:', error)
+    alert(typeLabel + 'URLの更新に失敗しました')
   }
 }
 
@@ -42600,22 +42638,39 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                           <label class="text-xs font-bold text-gray-600">解説</label>
                           <textarea id="edit-explanation-${card.card_id || card.id || i}" rows="2" class="w-full border rounded-lg px-3 py-1.5 text-sm">${card.explanation || card.answer_explanation || ''}</textarea>
                         </div>
-                        <div>
-                          <label class="text-xs font-bold text-gray-600">YouTube URL（任意）</label>
-                          <input type="text" id="edit-video-${card.card_id || card.id || i}" value="${(ytUrl).replace(/"/g,'&quot;')}" class="w-full border rounded-lg px-3 py-1.5 text-sm" placeholder="https://www.youtube.com/watch?v=...">
-                        </div>
-                        <div>
-                          <label class="text-xs font-bold text-gray-600"><i class="fas fa-image mr-1"></i>問題画像URL（任意）</label>
-                          <div class="flex gap-1">
-                            <input type="text" id="edit-image-${card.card_id || card.id || i}" value="${(card.problem_image_url || '').replace(/"/g,'&quot;')}" class="flex-1 border rounded-lg px-3 py-1.5 text-sm" placeholder="https://example.com/image.png">
-                            <button onclick="generateCardImage(${card.card_id || card.id || 0}, ${i})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap" title="AIで画像を生成">
-                              <i class="fas fa-magic mr-1"></i>AI生成
-                            </button>
+                        <!-- メディア（画像・動画）セクション -->
+                        <div class="border-t pt-2 mt-2">
+                          <p class="text-xs font-bold text-blue-700 mb-2"><i class="fas fa-photo-video mr-1"></i>画像・動画・イラスト</p>
+                          
+                          <!-- 問題画像 -->
+                          <div class="mb-2">
+                            <label class="text-[10px] font-bold text-gray-500">問題画像</label>
+                            <div class="flex gap-1">
+                              <input type="text" id="edit-image-${card.card_id || card.id || i}" value="${(card.problem_image_url || '').replace(/"/g,'&quot;')}" class="flex-1 border rounded-lg px-2 py-1 text-xs" placeholder="URLを入力 or ファイルをアップロード">
+                              <button onclick="uploadMediaForCard(${card.card_id || card.id || 0}, ${i}, 'image')" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold transition whitespace-nowrap" title="画像をアップロード">
+                                <i class="fas fa-upload mr-0.5"></i>添付
+                              </button>
+                              <button onclick="generateCardImage(${card.card_id || card.id || 0}, ${i})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold transition whitespace-nowrap" title="AIで画像を生成">
+                                <i class="fas fa-magic mr-0.5"></i>AI生成
+                              </button>
+                            </div>
+                            <div id="image-preview-${card.card_id || card.id || i}" class="mt-1 ${card.problem_image_url ? '' : 'hidden'}">
+                              ${card.problem_image_url ? '<img src="' + card.problem_image_url + '" class="max-h-32 rounded border" onerror="this.style.display=\'none\'">' : ''}
+                            </div>
                           </div>
-                          <div id="image-preview-${card.card_id || card.id || i}" class="mt-1 hidden">
-                            <img class="max-h-32 rounded border" />
+                          
+                          <!-- 動画 -->
+                          <div class="mb-1">
+                            <label class="text-[10px] font-bold text-gray-500">動画（YouTube URL or アップロード）</label>
+                            <div class="flex gap-1">
+                              <input type="text" id="edit-video-${card.card_id || card.id || i}" value="${(ytUrl).replace(/"/g,'&quot;')}" class="flex-1 border rounded-lg px-2 py-1 text-xs" placeholder="YouTube URL or 動画をアップロード">
+                              <button onclick="uploadMediaForCard(${card.card_id || card.id || 0}, ${i}, 'video')" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded-lg text-[10px] font-bold transition whitespace-nowrap" title="動画をアップロード">
+                                <i class="fas fa-video mr-0.5"></i>添付
+                              </button>
+                            </div>
+                            <div id="video-preview-${card.card_id || card.id || i}" class="mt-1 hidden"></div>
                           </div>
-                          <p class="text-[10px] text-gray-400 mt-0.5">URLを直接入力するか、「AI生成」で図・イラストを自動生成できます</p>
+                          <p class="text-[10px] text-gray-400">📎 画像(JPEG/PNG/GIF/WebP,10MBまで) 🎬 動画(MP4/WebM/MOV,100MBまで)</p>
                         </div>
                         <div class="border-t pt-2 mt-2">
                           <label class="text-xs font-bold text-purple-600">🤖 AI修正指示（自由入力→AIが修正）</label>
@@ -43069,6 +43124,189 @@ async function generateCardImage(cardId, index) {
   }
 }
 window.generateCardImage = generateCardImage
+
+// ============================================
+// ファイルアップロード共通関数（画像・動画）
+// ============================================
+
+// 隠しinput要素をクリーンアップ
+function _cleanupFileInput(inputId) {
+  const old = document.getElementById(inputId)
+  if (old) old.remove()
+}
+
+// カード編集パネル用: ファイルを選択→R2アップロード→URL欄に反映
+async function uploadMediaForCard(cardId, index, mediaType) {
+  const id = cardId || index
+  const isVideo = (mediaType === 'video')
+  const accept = isVideo ? 'video/mp4,video/webm,video/ogg,video/quicktime' : 'image/jpeg,image/png,image/gif,image/webp'
+  const maxLabel = isVideo ? '100MB' : '10MB'
+  const inputElId = isVideo ? ('edit-video-' + id) : ('edit-image-' + id)
+  const previewElId = isVideo ? ('video-preview-' + id) : ('image-preview-' + id)
+  
+  // 隠しfile inputを作成
+  const fileInputId = '_upload_tmp_' + mediaType + '_' + id
+  _cleanupFileInput(fileInputId)
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.id = fileInputId
+  fileInput.accept = accept
+  fileInput.style.display = 'none'
+  document.body.appendChild(fileInput)
+  
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0]
+    if (!file) { _cleanupFileInput(fileInputId); return }
+    
+    // プレビュー領域
+    const previewDiv = document.getElementById(previewElId)
+    const urlInput = document.getElementById(inputElId)
+    
+    if (previewDiv) {
+      previewDiv.classList.remove('hidden')
+      previewDiv.innerHTML = '<div class="flex items-center gap-2 text-xs text-blue-600"><i class="fas fa-spinner fa-spin"></i>アップロード中... (' + (file.size / 1024 / 1024).toFixed(1) + 'MB)</div>'
+    }
+    
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const endpoint = isVideo ? '/api/upload/video' : '/api/upload/image'
+      const res = await axios.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: isVideo ? 120000 : 30000
+      })
+      
+      if (res.data.success) {
+        const mediaUrl = isVideo ? res.data.video_url : res.data.image_url
+        
+        // URL欄に反映
+        if (urlInput) urlInput.value = mediaUrl
+        
+        // プレビュー
+        if (previewDiv) {
+          if (isVideo) {
+            previewDiv.innerHTML = '<div class="text-xs text-green-600 mb-1"><i class="fas fa-check-circle mr-1"></i>アップロード完了！</div><video src="' + mediaUrl + '" controls class="max-h-32 rounded border" style="max-width:100%"></video>'
+          } else {
+            previewDiv.innerHTML = '<div class="text-xs text-green-600 mb-1"><i class="fas fa-check-circle mr-1"></i>アップロード完了！</div><img src="' + mediaUrl + '" class="max-h-32 rounded border" onerror="this.style.display=\'none\'">'
+          }
+        }
+      } else {
+        throw new Error(res.data.error || 'アップロードに失敗しました')
+      }
+    } catch (err) {
+      console.error('メディアアップロードエラー:', err)
+      if (previewDiv) {
+        previewDiv.innerHTML = '<div class="text-xs text-red-600"><i class="fas fa-exclamation-circle mr-1"></i>' + (err.response?.data?.error || err.message || 'アップロードに失敗しました') + '</div>'
+      }
+    }
+    _cleanupFileInput(fileInputId)
+  })
+  
+  fileInput.click()
+}
+window.uploadMediaForCard = uploadMediaForCard
+
+// 全体配信カード用: ファイルアップロード→カードに直接保存
+async function uploadMediaAndSaveToCard(cardId, imageType) {
+  const isVideo = (imageType === 'video')
+  const accept = isVideo ? 'video/mp4,video/webm,video/ogg,video/quicktime' : 'image/jpeg,image/png,image/gif,image/webp'
+  
+  const fileInputId = '_upload_save_' + imageType + '_' + cardId
+  _cleanupFileInput(fileInputId)
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.id = fileInputId
+  fileInput.accept = accept
+  fileInput.style.display = 'none'
+  document.body.appendChild(fileInput)
+  
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0]
+    if (!file) { _cleanupFileInput(fileInputId); return }
+    
+    try {
+      alert('ファイルをアップロード中です...（' + (file.size / 1024 / 1024).toFixed(1) + 'MB）')
+      
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const endpoint = isVideo ? '/api/upload/video' : '/api/upload/image'
+      const res = await axios.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: isVideo ? 120000 : 30000
+      })
+      
+      if (res.data.success) {
+        const mediaUrl = isVideo ? res.data.video_url : res.data.image_url
+        const fieldName = isVideo ? 'solution_video_url' : (imageType === 'answer' ? 'answer_image_url' : 'problem_image_url')
+        
+        // カードに保存
+        await axios.put('/api/card/' + cardId, { [fieldName]: mediaUrl })
+        alert('✅ ' + (isVideo ? '動画' : '画像') + 'をアップロードしてカードに設定しました！')
+        window.location.reload()
+      } else {
+        throw new Error(res.data.error || 'アップロードに失敗しました')
+      }
+    } catch (err) {
+      alert('アップロードエラー: ' + (err.response?.data?.error || err.message))
+    }
+    _cleanupFileInput(fileInputId)
+  })
+  
+  fileInput.click()
+}
+window.uploadMediaAndSaveToCard = uploadMediaAndSaveToCard
+
+// 編集モーダル内のinput欄にアップロード結果を反映する関数
+async function uploadMediaInModal(inputElId, mediaType) {
+  const isVideo = (mediaType === 'video')
+  const accept = isVideo ? 'video/mp4,video/webm,video/ogg,video/quicktime' : 'image/jpeg,image/png,image/gif,image/webp'
+  
+  const fileInputId = '_upload_modal_' + inputElId
+  _cleanupFileInput(fileInputId)
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.id = fileInputId
+  fileInput.accept = accept
+  fileInput.style.display = 'none'
+  document.body.appendChild(fileInput)
+  
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0]
+    if (!file) { _cleanupFileInput(fileInputId); return }
+    
+    const urlInput = document.getElementById(inputElId)
+    
+    try {
+      if (urlInput) urlInput.value = 'アップロード中...'
+      
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const endpoint = isVideo ? '/api/upload/video' : '/api/upload/image'
+      const res = await axios.post(endpoint, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: isVideo ? 120000 : 30000
+      })
+      
+      if (res.data.success) {
+        const mediaUrl = isVideo ? res.data.video_url : res.data.image_url
+        if (urlInput) urlInput.value = mediaUrl
+        alert('✅ アップロード完了！保存ボタンを押してカードに反映してください。')
+      } else {
+        throw new Error(res.data.error || 'アップロードに失敗しました')
+      }
+    } catch (err) {
+      if (urlInput) urlInput.value = ''
+      alert('アップロードエラー: ' + (err.response?.data?.error || err.message))
+    }
+    _cleanupFileInput(fileInputId)
+  })
+  
+  fileInput.click()
+}
+window.uploadMediaInModal = uploadMediaInModal
 
 // テスト対策の弱点から個別最適化コースを生成
 async function generatePersonalizedFromTestPrep(studentId, curriculumIdsJson, weakTopics) {

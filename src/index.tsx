@@ -1229,6 +1229,16 @@ app.use('/api/*', async (c, next) => {
         }
       }
       
+      // 画像・動画カラムの自動追加（教師が直接メディアを添付するため）
+      for (const col of ['problem_image_url', 'answer_image_url']) {
+        try {
+          await env.DB.prepare(`ALTER TABLE learning_cards ADD COLUMN ${col} TEXT`).run()
+          console.log(`✅ learning_cards に ${col} カラム追加`)
+        } catch (alterErr: any) {
+          // カラム既存の場合は無視
+        }
+      }
+      
       dbInitialized = true
       console.log('✅ DB初期化完了')
     } catch (e: any) {
@@ -3338,6 +3348,7 @@ app.get('/api/curriculum/:id', async (c) => {
             // 解答は learning_cards テーブル自体に correct_answer / explanation がある
             return {
               ...card,
+              id: cardId,  // フロントエンド互換: id = card_id
               hints: hints.results || [],
               answer: card.correct_answer || '',
               answer_explanation: card.explanation || '',
@@ -3507,7 +3518,13 @@ app.get('/api/courses/:courseId/cards', async (c) => {
       ORDER BY card_number
     `).bind(courseId).all()
     
-    return c.json(cards.results)
+    // card_id を id としてもアクセスできるようにマッピング
+    const mappedCards = (cards.results || []).map((card: any) => ({
+      ...card,
+      id: card.card_id || card.id
+    }))
+    
+    return c.json(mappedCards)
   } catch (error) {
     return c.json({ error: 'Database error' }, 500)
   }
@@ -3530,7 +3547,7 @@ app.get('/api/cards/:cardId', async (c) => {
     `).bind(cardId).first()
     
     return c.json({
-      card,
+      card: card ? { ...card as any, id: (card as any).card_id || (card as any).id } : card,
       hints: hints.results,
       answer
     })
@@ -4294,7 +4311,7 @@ app.get('/api/progress/curriculum/:curriculumId/class/:classCode', async (c) => 
         lc.card_title
       FROM student_progress p
       LEFT JOIN courses c ON p.course_id = c.id
-      LEFT JOIN learning_cards lc ON p.learning_card_id = lc.id
+      LEFT JOIN learning_cards lc ON p.learning_card_id = lc.card_id
       WHERE p.curriculum_id = ?
       AND p.student_id IN (
         SELECT id FROM users WHERE class_code = ? AND role = 'student'
@@ -4359,7 +4376,7 @@ app.get('/api/progress-board/class/:classCode', async (c) => {
             lc.card_title
           FROM student_progress sp
           JOIN courses c ON sp.course_id = c.id
-          JOIN learning_cards lc ON sp.learning_card_id = lc.id
+          JOIN learning_cards lc ON sp.learning_card_id = lc.card_id
           WHERE sp.student_id = ? AND sp.curriculum_id = ?
           ORDER BY c.course_level, lc.card_number
         `).bind(student.id, curriculumId).all()
@@ -4501,7 +4518,7 @@ app.get('/api/error-analysis/:studentId/:curriculumId', async (c) => {
           WHEN eh.question_type = 'optional' THEN op.problem_title
         END as question_title
       FROM error_history eh
-      LEFT JOIN learning_cards lc ON eh.question_type = 'learning_card' AND eh.question_id = lc.id
+      LEFT JOIN learning_cards lc ON eh.question_type = 'learning_card' AND eh.question_id = lc.card_id
       LEFT JOIN optional_problems op ON eh.question_type = 'optional' AND eh.question_id = op.id
       WHERE eh.student_id = ? AND eh.curriculum_id = ?
       ORDER BY eh.submitted_at DESC
@@ -4733,7 +4750,7 @@ app.get('/api/help/requests-for-me/:studentId', async (c) => {
       FROM peer_help_requests phr
       INNER JOIN users u ON phr.requester_id = u.id
       INNER JOIN curriculum cur ON phr.curriculum_id = cur.id
-      LEFT JOIN learning_cards lc ON phr.learning_card_id = lc.id
+      LEFT JOIN learning_cards lc ON phr.learning_card_id = lc.card_id
       WHERE phr.helper_id = ? AND phr.status = 'pending'
       ORDER BY phr.created_at DESC
       LIMIT 20
@@ -5058,7 +5075,7 @@ app.post('/api/ai/ask', async (c) => {
   try {
     // 学習カード情報を取得
     const card = await env.DB.prepare(`
-      SELECT * FROM learning_cards WHERE id = ?
+      SELECT * FROM learning_cards WHERE card_id = ?
     `).bind(body.cardId).first()
     
     // 対話履歴を取得（コンテキスト保持）
@@ -5641,7 +5658,7 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
         a.explanation
       FROM courses c
       JOIN learning_cards lc ON c.id = lc.course_id
-      LEFT JOIN answers a ON lc.id = a.learning_card_id
+      LEFT JOIN answers a ON lc.card_id = a.learning_card_id
       WHERE c.curriculum_id = ?
       ORDER BY c.course_level, lc.card_number
     `).bind(curriculumId).all()
@@ -6469,7 +6486,7 @@ app.put('/api/cards/:cardId', async (c) => {
         problem_image_url = COALESCE(?, problem_image_url),
         solution_video_url = COALESCE(?, solution_video_url),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE card_id = ?
     `).bind(
       body.card_title || '',
       body.problem_description || '',
@@ -6676,8 +6693,10 @@ app.put('/api/cards/:cardId', async (c) => {
         real_world_connection = ?,
         answer = ?,
         answer_explanation = ?,
+        problem_image_url = COALESCE(?, problem_image_url),
+        solution_video_url = COALESCE(?, solution_video_url),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE card_id = ?
     `).bind(
       body.card_title || '',
       validateCardType(body.card_type),
@@ -6689,6 +6708,8 @@ app.put('/api/cards/:cardId', async (c) => {
       body.real_world_connection || '',
       body.answer || '',
       body.answer_explanation || '',
+      body.problem_image_url !== undefined ? body.problem_image_url : null,
+      body.solution_video_url !== undefined ? body.solution_video_url : null,
       cardId
     ).run()
     
@@ -7884,7 +7905,7 @@ app.post('/api/ai/diagnosis', async (c) => {
         lc.card_type,
         lc.card_number
       FROM student_progress sp
-      JOIN learning_cards lc ON sp.learning_card_id = lc.id
+      JOIN learning_cards lc ON sp.learning_card_id = lc.card_id
       WHERE sp.student_id = ? AND sp.curriculum_id = ?
       ORDER BY sp.updated_at DESC
       LIMIT 20
@@ -8029,7 +8050,7 @@ app.post('/api/ai/generate-problem', async (c) => {
   try {
     // 学習カード情報を取得
     const card = await env.DB.prepare(`
-      SELECT * FROM learning_cards WHERE id = ?
+      SELECT * FROM learning_cards WHERE card_id = ?
     `).bind(cardId).first()
     
     if (!card) {
@@ -8111,7 +8132,7 @@ app.post('/api/ai/suggest-plan', async (c) => {
     const progress = await env.DB.prepare(`
       SELECT sp.*, lc.card_title, lc.card_number, lc.card_type
       FROM student_progress sp
-      JOIN learning_cards lc ON sp.learning_card_id = lc.id
+      JOIN learning_cards lc ON sp.learning_card_id = lc.card_id
       WHERE sp.student_id = ? AND sp.curriculum_id = ?
       ORDER BY sp.updated_at DESC
     `).bind(studentId, curriculumId).all()
@@ -8208,7 +8229,7 @@ app.post('/api/ai/analyze-errors', async (c) => {
     const weakCards = await env.DB.prepare(`
       SELECT sp.*, lc.card_title, lc.problem_description, lc.card_type
       FROM student_progress sp
-      JOIN learning_cards lc ON sp.learning_card_id = lc.id
+      JOIN learning_cards lc ON sp.learning_card_id = lc.card_id
       WHERE sp.student_id = ? 
         AND sp.curriculum_id = ?
         AND sp.understanding_level <= 2
@@ -8220,7 +8241,7 @@ app.post('/api/ai/analyze-errors', async (c) => {
     const helpCards = await env.DB.prepare(`
       SELECT sp.*, lc.card_title, sp.help_type
       FROM student_progress sp
-      JOIN learning_cards lc ON sp.learning_card_id = lc.id
+      JOIN learning_cards lc ON sp.learning_card_id = lc.card_id
       WHERE sp.student_id = ? 
         AND sp.curriculum_id = ?
         AND sp.help_type IS NOT NULL
@@ -13053,6 +13074,7 @@ app.put('/api/card/:cardId', async (c) => {
       'answer',
       'problem_image_url',
       'answer_image_url',
+      'solution_video_url',
       'visual_support',
       'auditory_support',
       'kinesthetic_support',
@@ -13092,14 +13114,14 @@ app.put('/api/card/:cardId', async (c) => {
     const sql = `
       UPDATE learning_cards
       SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
+      WHERE card_id = ?
     `
     
     await env.DB.prepare(sql).bind(...values).run()
     
     // 更新後のカードを取得
     const card = await env.DB.prepare(`
-      SELECT * FROM learning_cards WHERE id = ?
+      SELECT * FROM learning_cards WHERE card_id = ?
     `).bind(cardId).first()
     
     // 履歴記録
@@ -13147,7 +13169,7 @@ app.post('/api/card/:cardId/suggest-learning-styles', async (c) => {
       FROM learning_cards lc
       JOIN courses co ON lc.course_id = co.id
       JOIN curriculum c ON co.curriculum_id = c.id
-      WHERE lc.id = ?
+      WHERE lc.card_id = ?
     `).bind(cardId).first()
     
     if (!card) {
@@ -15045,7 +15067,7 @@ app.get('/api/cards/:cardId/adapted/:studentId', async (c) => {
   try {
     // 元の学習カード取得
     const card = await env.DB.prepare(`
-      SELECT * FROM learning_cards WHERE id = ?
+      SELECT * FROM learning_cards WHERE card_id = ?
     `).bind(cardId).first()
     
     if (!card) {
@@ -17233,7 +17255,7 @@ app.get('/api/export/student/:studentId/csv', async (c) => {
           WHEN eh.question_type = 'optional' THEN op.problem_title
         END as question_title
       FROM error_history eh
-      LEFT JOIN learning_cards lc ON eh.question_type = 'learning_card' AND eh.question_id = lc.id
+      LEFT JOIN learning_cards lc ON eh.question_type = 'learning_card' AND eh.question_id = lc.card_id
       LEFT JOIN optional_problems op ON eh.question_type = 'optional' AND eh.question_id = op.id
       WHERE eh.student_id = ?
       ${curriculumId ? 'AND eh.curriculum_id = ?' : ''}
@@ -19773,7 +19795,7 @@ app.post('/api/notifications/distribute-card', async (c) => {
       FROM learning_cards lc
       JOIN courses c ON lc.course_id = c.id
       JOIN curriculum cu ON c.curriculum_id = cu.id
-      WHERE lc.id = ?
+      WHERE lc.card_id = ?
     `).bind(cardId).first()
     
     if (!card) {
@@ -19829,7 +19851,7 @@ app.get('/api/notifications/history/:studentId', async (c) => {
         c.course_name,
         u.name as teacher_name
       FROM card_distributions cd
-      JOIN learning_cards lc ON cd.card_id = lc.id
+      JOIN learning_cards lc ON cd.card_id = lc.card_id
       JOIN courses c ON lc.course_id = c.id
       LEFT JOIN users u ON cd.teacher_id = u.id
       WHERE cd.student_id = ?
@@ -19877,7 +19899,7 @@ app.post('/api/learning-styles/generate-problem', async (c) => {
       FROM learning_cards lc
       JOIN courses c ON lc.course_id = c.id
       JOIN curriculum cu ON c.curriculum_id = cu.id
-      WHERE lc.id = ?
+      WHERE lc.card_id = ?
     `).bind(cardId).first()
     
     if (!card) {
@@ -20950,7 +20972,7 @@ app.post('/api/retrieval-practice/start-session', async (c) => {
     
     // カード情報を取得
     const card = await env.DB.prepare(`
-      SELECT * FROM learning_cards WHERE id = ?
+      SELECT * FROM learning_cards WHERE card_id = ?
     `).bind(cardId).first()
     
     return c.json({
@@ -20988,7 +21010,7 @@ app.post('/api/retrieval-practice/submit-answer', async (c) => {
     
     // カードの正解を取得
     const card = await env.DB.prepare(`
-      SELECT answer FROM learning_cards WHERE id = ?
+      SELECT answer FROM learning_cards WHERE card_id = ?
     `).bind(session.card_id).first()
     
     // AI評価を実行（Gemini APIを使用）
@@ -21120,7 +21142,7 @@ app.get('/api/retrieval-practice/sessions/:studentId', async (c) => {
         lc.card_number,
         (rps.accuracy_score + rps.completeness_score + rps.precision_score) / 3 as overall_score
       FROM retrieval_practice_sessions rps
-      JOIN learning_cards lc ON rps.card_id = lc.id
+      JOIN learning_cards lc ON rps.card_id = lc.card_id
       WHERE rps.student_id = ?
       ORDER BY rps.created_at DESC
       LIMIT ?
@@ -21240,14 +21262,14 @@ app.get('/api/retrieval-practice/recommended-cards/:studentId', async (c) => {
         FROM retrieval_practice_effectiveness
         WHERE student_id = ?
         GROUP BY card_id
-      ) rpe ON lc.id = rpe.card_id
+      ) rpe ON lc.card_id = rpe.card_id
       LEFT JOIN (
         SELECT card_id, COUNT(*) as session_count
         FROM retrieval_practice_sessions
         WHERE student_id = ? AND recall_type = ?
         GROUP BY card_id
-      ) rps ON lc.id = rps.card_id
-      WHERE lc.id IN (
+      ) rps ON lc.card_id = rps.card_id
+      WHERE lc.card_id IN (
         SELECT DISTINCT card_id FROM student_progress WHERE student_id = ?
       )
       ORDER BY practice_count ASC, retention_score ASC
@@ -21288,7 +21310,7 @@ app.post('/api/interleaved-practice/start-session', async (c) => {
       SELECT lc.*, cc.concept_name
       FROM learning_cards lc
       LEFT JOIN curriculum_concepts cc ON lc.concept_id = cc.id
-      WHERE lc.id IN (
+      WHERE lc.card_id IN (
         SELECT card_id FROM student_progress WHERE student_id = ?
       )
       ORDER BY RANDOM()
@@ -21383,7 +21405,7 @@ app.post('/api/interleaved-practice/submit-answer', async (c) => {
       SELECT ipp.*, ips.student_id, lc.concept_id
       FROM interleaved_practice_problems ipp
       JOIN interleaved_practice_sessions ips ON ipp.session_id = ips.id
-      JOIN learning_cards lc ON ipp.card_id = lc.id
+      JOIN learning_cards lc ON ipp.card_id = lc.card_id
       WHERE ipp.id = ?
     `).bind(problemId).first()
     
@@ -21407,7 +21429,7 @@ app.post('/api/interleaved-practice/submit-answer', async (c) => {
     const nextProblem = await env.DB.prepare(`
       SELECT ipp.*, lc.*
       FROM interleaved_practice_problems ipp
-      JOIN learning_cards lc ON ipp.card_id = lc.id
+      JOIN learning_cards lc ON ipp.card_id = lc.card_id
       WHERE ipp.session_id = ? AND ipp.answered_at IS NULL
       ORDER BY ipp.problem_order
       LIMIT 1
@@ -21608,7 +21630,7 @@ app.post('/api/ai-teacher/socratic-dialogue', async (c) => {
   try {
     // カード情報取得
     const card = await env.DB.prepare(`
-      SELECT * FROM learning_cards WHERE id = ?
+      SELECT * FROM learning_cards WHERE card_id = ?
     `).bind(cardId).first()
 
     if (!card) {
@@ -24124,7 +24146,7 @@ app.get('/api/analytics/learning-trends/:studentId', authMiddleware, async (c) =
         CAST(SUM(CASE WHEN ll.is_correct = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 as accuracy
       FROM learning_logs ll
       JOIN problems p ON ll.problem_id = p.id
-      JOIN learning_cards lc ON p.card_id = lc.id
+      JOIN learning_cards lc ON p.card_id = lc.card_id
       JOIN courses co ON lc.course_id = co.id
       JOIN curriculum c ON co.curriculum_id = c.id
       WHERE ll.student_id = ?
@@ -24194,7 +24216,7 @@ app.get('/api/analytics/class-comparison', authMiddleware, requireRole('teacher'
         COUNT(ll.id) as total_problems
       FROM learning_logs ll
       JOIN problems p ON ll.problem_id = p.id
-      JOIN learning_cards lc ON p.card_id = lc.id
+      JOIN learning_cards lc ON p.card_id = lc.card_id
       JOIN courses co ON lc.course_id = co.id
       JOIN curriculum c ON co.curriculum_id = c.id
       WHERE ll.school_id = ?
@@ -24233,7 +24255,7 @@ app.get('/api/analytics/weak-points/:studentId', authMiddleware, async (c) => {
         SUM(ll.hint_used) as total_hints
       FROM learning_logs ll
       JOIN problems p ON ll.problem_id = p.id
-      JOIN learning_cards lc ON p.card_id = lc.id
+      JOIN learning_cards lc ON p.card_id = lc.card_id
       JOIN courses co ON lc.course_id = co.id
       JOIN curriculum c ON co.curriculum_id = c.id
       WHERE ll.student_id = ?
@@ -28283,7 +28305,7 @@ app.get('/api/analytics/summary', authMiddleware, async (c) => {
         MAX(ah.current_streak) as max_streak,
         (SELECT current_streak FROM answer_history WHERE student_id = ? ORDER BY answered_at DESC LIMIT 1) as current_streak
       FROM answer_history ah
-      JOIN learning_cards lc ON ah.card_id = lc.id
+      JOIN learning_cards lc ON ah.card_id = lc.card_id
       JOIN courses c ON lc.course_id = c.id
       WHERE ah.student_id = ? 
         AND ah.answered_at >= ?
@@ -28307,7 +28329,7 @@ app.get('/api/analytics/summary', authMiddleware, async (c) => {
         AVG(CASE WHEN ah.is_correct = 1 THEN 1.0 ELSE 0.0 END) * 100 as avg_accuracy,
         SUM(ah.time_spent_seconds) as total_time_seconds
       FROM answer_history ah
-      JOIN learning_cards lc ON ah.card_id = lc.id
+      JOIN learning_cards lc ON ah.card_id = lc.card_id
       JOIN courses c ON lc.course_id = c.id
       WHERE ah.student_id = ? 
         AND ah.answered_at >= ? 
@@ -28357,7 +28379,7 @@ app.get('/api/analytics/subject-stats', authMiddleware, async (c) => {
         AVG(CASE WHEN ah.is_correct = 1 THEN 1.0 ELSE 0.0 END) * 100 as avg_accuracy,
         SUM(ah.time_spent_seconds) / 60.0 as total_time_minutes
       FROM answer_history ah
-      JOIN learning_cards lc ON ah.card_id = lc.id
+      JOIN learning_cards lc ON ah.card_id = lc.card_id
       JOIN courses c ON lc.course_id = c.id
       WHERE ah.student_id = ? 
         AND ah.answered_at >= ?
@@ -28517,7 +28539,7 @@ app.get('/api/export/stats', authMiddleware, async (c) => {
     let query = `
       SELECT COUNT(*) as count
       FROM answer_history ah
-      JOIN learning_cards lc ON ah.card_id = lc.id
+      JOIN learning_cards lc ON ah.card_id = lc.card_id
       JOIN courses c ON lc.course_id = c.id
       WHERE ah.student_id = ?
     `
