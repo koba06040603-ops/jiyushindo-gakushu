@@ -168,6 +168,25 @@ function hintUpdateSQL(schema: HintSchema): string {
 
 // JSON抽出ヘルパー（バッククォート対応）
 function extractJSON(aiResponse: string): any {
+  // ★ 最初に全制御文字を安全な表現に一括置換（JSON文字列内外問わず）
+  // これにより "Bad control character in string literal" エラーを防止
+  let sanitized = ''
+  for (let i = 0; i < aiResponse.length; i++) {
+    const code = aiResponse.charCodeAt(i)
+    if (code < 32) {
+      // タブ、改行、CR以外の制御文字は除去
+      if (code === 9) sanitized += '\\t'
+      else if (code === 10) sanitized += '\n'  // 改行は保持（後で文字列内エスケープ）
+      else if (code === 13) continue  // CRは除去
+      else sanitized += ' '  // その他の制御文字はスペースに
+    } else if (code === 127) {
+      continue // DEL文字は除去
+    } else {
+      sanitized += aiResponse[i]
+    }
+  }
+  aiResponse = sanitized
+
   // ```json ... ``` or ``` ... ``` のパターンを抽出
   let jsonMatch = aiResponse.match(/```(?:json)?\s*\n([\s\S]*?)\n```/)
   let jsonText = jsonMatch ? jsonMatch[1].trim() : aiResponse.trim()
@@ -6072,6 +6091,30 @@ app.get('/api/environment/design/:curriculumId', async (c) => {
   const curriculumId = c.req.param('curriculumId')
   
   try {
+    // テーブルが存在しなければ作成
+    try {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS learning_environment_designs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          curriculum_id INTEGER NOT NULL,
+          expression_creative TEXT,
+          expression_creative_enabled BOOLEAN DEFAULT 0,
+          research_fieldwork TEXT,
+          research_fieldwork_enabled BOOLEAN DEFAULT 0,
+          critical_thinking TEXT,
+          critical_thinking_enabled BOOLEAN DEFAULT 0,
+          social_contribution TEXT,
+          social_contribution_enabled BOOLEAN DEFAULT 0,
+          metacognition_reflection TEXT,
+          metacognition_reflection_enabled BOOLEAN DEFAULT 0,
+          question_generation TEXT,
+          question_generation_enabled BOOLEAN DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run()
+    } catch (e) { /* table may already exist */ }
+    
     const design = await env.DB.prepare(`
       SELECT * FROM learning_environment_designs
       WHERE curriculum_id = ?
@@ -6119,6 +6162,111 @@ app.post('/api/environment/design', async (c) => {
     return c.json({ success: true, id: result.meta.last_row_id })
   } catch (error) {
     return c.json({ error: 'Database error' }, 500)
+  }
+})
+
+// APIルート：学習環境デザインをAIで自動生成
+app.post('/api/environment/design/generate/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  
+  try {
+    // テーブルが存在しなければ作成
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS learning_environment_designs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        curriculum_id INTEGER NOT NULL,
+        expression_creative TEXT,
+        expression_creative_enabled BOOLEAN DEFAULT 0,
+        research_fieldwork TEXT,
+        research_fieldwork_enabled BOOLEAN DEFAULT 0,
+        critical_thinking TEXT,
+        critical_thinking_enabled BOOLEAN DEFAULT 0,
+        social_contribution TEXT,
+        social_contribution_enabled BOOLEAN DEFAULT 0,
+        metacognition_reflection TEXT,
+        metacognition_reflection_enabled BOOLEAN DEFAULT 0,
+        question_generation TEXT,
+        question_generation_enabled BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+
+    // 既に生成済みかチェック
+    const existing = await env.DB.prepare(
+      'SELECT id FROM learning_environment_designs WHERE curriculum_id = ?'
+    ).bind(curriculumId).first()
+    if (existing) return c.json({ success: true, message: 'already exists', id: (existing as any).id })
+
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
+    if (!curriculum) return c.json({ error: 'Curriculum not found' }, 404)
+
+    const apiKey = env.GEMINI_API_KEY
+    if (!apiKey) return c.json({ error: 'API key not configured' }, 500)
+
+    const prompt = `あなたは小学校教師のための学習環境デザインの専門家です。
+以下の単元情報をもとに、6つの学習環境デザイン観点について具体的な活動を提案してください。
+
+【単元情報】
+- 教科: ${curriculum.subject}
+- 学年: ${curriculum.grade}
+- 単元名: ${curriculum.unit_name}
+- 単元目標: ${curriculum.unit_goal || ''}
+
+【6つの観点】各観点について、この単元に合った具体的な活動を1〜2文で提案してください。
+
+以下のJSON形式で回答してください:
+{
+  "expression_creative": "表現・クリエイティブ活動の具体的な提案",
+  "research_fieldwork": "調査・フィールドワーク活動の具体的な提案",
+  "critical_thinking": "多角的考察・クリティカルシンキング活動の具体的な提案",
+  "social_contribution": "社会貢献・デザイン思考活動の具体的な提案",
+  "metacognition_reflection": "メタ認知・振り返り活動の具体的な提案",
+  "question_generation": "問いの生成活動の具体的な提案"
+}
+
+JSON配列ではなくオブジェクトのみ返してください。`
+
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 2000, responseMimeType: 'application/json' }
+        })
+      }
+    )
+    const geminiData = await geminiRes.json() as any
+    const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const design = extractJSON(text) || {}
+
+    const result = await env.DB.prepare(`
+      INSERT INTO learning_environment_designs (
+        curriculum_id,
+        expression_creative, expression_creative_enabled,
+        research_fieldwork, research_fieldwork_enabled,
+        critical_thinking, critical_thinking_enabled,
+        social_contribution, social_contribution_enabled,
+        metacognition_reflection, metacognition_reflection_enabled,
+        question_generation, question_generation_enabled
+      ) VALUES (?, ?, 1, ?, 1, ?, 1, ?, 1, ?, 1, ?, 1)
+    `).bind(
+      curriculumId,
+      design.expression_creative || '',
+      design.research_fieldwork || '',
+      design.critical_thinking || '',
+      design.social_contribution || '',
+      design.metacognition_reflection || '',
+      design.question_generation || ''
+    ).run()
+
+    return c.json({ success: true, id: result.meta.last_row_id, design })
+  } catch (error: any) {
+    console.error('Environment design generation error:', error)
+    return c.json({ error: error.message }, 500)
   }
 })
 
@@ -29969,7 +30117,39 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 
     const geminiData = await geminiResponse.json() as any
     const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const personalizedPlan = extractJSON(geminiText) || {}
+    
+    // ★ 制御文字を徹底除去してからextractJSONを実行
+    let sanitizedGeminiText = geminiText
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // 制御文字除去（タブ・改行・CR以外）
+      .replace(/\r\n/g, '\n')  // CRLF→LF
+      .replace(/\r/g, '\n')    // CR→LF
+    
+    let personalizedPlan: any = {}
+    try {
+      personalizedPlan = extractJSON(sanitizedGeminiText) || {}
+    } catch (parseError: any) {
+      console.warn('⚠️ extractJSON失敗、再試行中:', parseError.message)
+      // より強力な制御文字除去で再試行
+      sanitizedGeminiText = sanitizedGeminiText.replace(/[\x00-\x1F\x7F]/g, (ch: string) => {
+        if (ch === '\n' || ch === '\t') return ch
+        return ''
+      })
+      try {
+        personalizedPlan = extractJSON(sanitizedGeminiText) || {}
+      } catch (e2: any) {
+        console.error('❌ JSON解析完全失敗:', e2.message)
+        // 最終手段: 正規表現でcardsフィールドだけ抽出を試みる
+        const cardsMatch = sanitizedGeminiText.match(/"cards"\s*:\s*\[([\s\S]*)\]/)
+        if (cardsMatch) {
+          try {
+            const cardsText = '[' + cardsMatch[1] + ']'
+            const cleanedCards = cardsText.replace(/[\x00-\x1F\x7F]/g, '')
+            personalizedPlan = { cards: JSON.parse(cleanedCards) }
+            console.log('✅ cards部分のみ抽出成功')
+          } catch { /* 完全失敗 */ }
+        }
+      }
+    }
     
     // cardsが抽出できなかった場合のログと対応
     const extractedCards = personalizedPlan.cards || []

@@ -3370,18 +3370,31 @@ async function loadGuidePage(curriculumId) {
       if (statsResponse.data) learningStats = statsResponse.data
     } catch (e) { console.log('⚠️ 学習統計なし') }
     
+    // 学習環境デザインを取得
+    let environmentDesign = null
+    try {
+      const envDesignRes = await axios.get(`/api/environment/design/${curriculumId}`)
+      environmentDesign = envDesignRes.data
+      if (environmentDesign && environmentDesign.id) {
+        console.log('✅ 学習環境デザイン取得済み:', environmentDesign.id)
+      } else {
+        environmentDesign = null
+      }
+    } catch (e) { console.log('⚠️ 学習環境デザインなし') }
+
     // 欠落データのバックグラウンド自動生成（順次実行）
     const missingIntroProblems = courses.filter(c => !c.introduction_problem)
     const needsAssessment = !commonCheckTest || !commonCheckTest.sample_problems || commonCheckTest.sample_problems.length === 0 || optionalProblems.length === 0
     const needsCourseProblems = courseSelectionProblems.length === 0
-    const hasAnyMissing = missingIntroProblems.length > 0 || needsAssessment || needsCourseProblems
+    const needsEnvironmentDesign = !environmentDesign
+    const hasAnyMissing = missingIntroProblems.length > 0 || needsAssessment || needsCourseProblems || needsEnvironmentDesign
     
     // 自動リロードのループ防止（生成は毎回実行、リロードは1回のみ）
     const autoReloadKey = `autoReload_${curriculumId}`
     const alreadyAutoReloaded = sessionStorage.getItem(autoReloadKey) === 'done'
     
     if (hasAnyMissing) {
-      console.log('🔄 欠落データを自動生成開始...', { missingIntro: missingIntroProblems.length, needsAssessment, needsCourseProblems })
+      console.log('🔄 欠落データを自動生成開始...', { missingIntro: missingIntroProblems.length, needsAssessment, needsCourseProblems, needsEnvironmentDesign })
       // ページ描画後にバックグラウンドで順次生成を実行
       setTimeout(async () => {
         try {
@@ -3411,6 +3424,11 @@ async function loadGuidePage(curriculumId) {
             await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ コース問題生成失敗:', e.message))
             generated++
           }
+          // 学習環境デザインも自動生成（まだ存在しなければ）
+          try {
+            await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, {timeout: 60000})
+            console.log('  ✅ 学習環境デザイン自動生成完了')
+          } catch (e) { console.warn('  ⚠️ 学習環境デザイン生成失敗:', e.message) }
           console.log('✅ バックグラウンド自動生成完了')
           
           if (!alreadyAutoReloaded) {
@@ -5179,7 +5197,7 @@ async function selectCourse(courseId) {
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           ${cards.map((card, index) => `
             <div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition cursor-pointer"
-                 onclick="loadCardPage(${card.id})">
+                 onclick="loadCardPage(${card.card_id})">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xl font-bold text-gray-800">カード ${card.card_number}</h3>
                 <div class="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
@@ -5191,9 +5209,9 @@ async function selectCourse(courseId) {
                 <i class="fas fa-signal mr-2"></i>
                 <span>${card.difficulty_level === 'minimum' ? '基本' : card.difficulty_level === 'standard' ? '標準' : '発展'}</span>
               </div>
-              ${card.real_world_context ? `
+              ${card.real_world_connection ? `
                 <p class="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                  <i class="fas fa-lightbulb mr-1"></i>${card.real_world_context}
+                  <i class="fas fa-lightbulb mr-1"></i>${card.real_world_connection}
                 </p>
               ` : ''}
               <button class="w-full mt-4 bg-indigo-600 text-white py-2 px-4 rounded-lg font-bold hover:bg-indigo-700 transition">
@@ -14314,11 +14332,16 @@ function updateGenerationProgress(message, percent) {
   const progressPercent = document.getElementById('progressPercent')
   
   if (currentTask) currentTask.textContent = message
+  
+  // ★ プログレスバーは常に前進のみ（後退しない）
   if (progressBar) {
-    progressBar.style.width = `${percent}%`
-  }
-  if (progressPercent) {
-    progressPercent.textContent = `${Math.round(percent)}%`
+    const currentWidth = parseFloat(progressBar.style.width) || 0
+    if (percent > currentWidth) {
+      progressBar.style.width = `${percent}%`
+      if (progressPercent) {
+        progressPercent.textContent = `${Math.round(percent)}%`
+      }
+    }
   }
   
   // ステップカードの更新
@@ -14336,6 +14359,11 @@ function updateGenerationProgress(message, percent) {
   }
   
   if (percent >= 95) {
+    // API処理完了時はタイマーを停止
+    if (_realtimeProgressInterval) {
+      clearInterval(_realtimeProgressInterval)
+      _realtimeProgressInterval = null
+    }
     updateStepCard('step4', 'completed', 'ステップ4: 完了')
   }
 }
@@ -14358,7 +14386,9 @@ function updateStepCard(stepId, status, statusText) {
 }
 
 // 実時間ベースのプログレスアニメーション
+let _realtimeProgressInterval = null
 function animateRealtimeProgress(totalTime, qualityMode) {
+  if (_realtimeProgressInterval) clearInterval(_realtimeProgressInterval)
   const startTime = Date.now()
   
   // ステップ定義（実時間配分）
@@ -14411,7 +14441,7 @@ function animateRealtimeProgress(totalTime, qualityMode) {
   
   let currentStepIndex = 0
   
-  const interval = setInterval(() => {
+  _realtimeProgressInterval = setInterval(() => {
     const elapsed = (Date.now() - startTime) / 1000 // 秒
     const progress = Math.min((elapsed / totalTime) * 100, 99) // 99%まで
     
@@ -14421,8 +14451,12 @@ function animateRealtimeProgress(totalTime, qualityMode) {
     const elapsedTime = document.getElementById('elapsedTime')
     
     if (progressBar) {
-      progressBar.style.width = progress + '%'
-      progressPercent.textContent = Math.floor(progress) + '%'
+      // ★ プログレスバーは常に前進のみ（後退しない）
+      const currentWidth = parseFloat(progressBar.style.width) || 0
+      if (progress > currentWidth) {
+        progressBar.style.width = progress + '%'
+        progressPercent.textContent = Math.floor(progress) + '%'
+      }
       elapsedTime.textContent = Math.floor(elapsed) + '秒経過'
     }
     
@@ -14439,10 +14473,14 @@ function animateRealtimeProgress(totalTime, qualityMode) {
       document.getElementById('currentTask').textContent = currentStep.task
       document.getElementById('taskComment').innerHTML = currentStep.comment
       
-      // ステップカード更新
+      // ステップカード更新（既にcompletedのステップは変更しない）
       steps.forEach((step, index) => {
         const stepCard = document.getElementById(`step${step.id}`)
+        if (!stepCard) return
         const statusDiv = stepCard.querySelector('.step-status')
+        
+        // 既にcompletedのステップは飛ばす（APIベースの更新を尊重）
+        if (stepCard.classList.contains('completed')) return
         
         if (index < currentStepIndex) {
           stepCard.className = 'step-card bg-white rounded-xl p-4 shadow text-center border-2 transition-all completed'
@@ -14463,7 +14501,8 @@ function animateRealtimeProgress(totalTime, qualityMode) {
     
     // 100%到達したらクリア
     if (progress >= 99) {
-      clearInterval(interval)
+      clearInterval(_realtimeProgressInterval)
+      _realtimeProgressInterval = null
     }
   }, 100) // 100msごとに更新
 }
@@ -15379,6 +15418,13 @@ async function saveGeneratedUnit(unitData) {
             await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 60000})
             console.log('✅ コース選択問題 完了')
           } catch (e) { console.warn('⚠️ コース選択問題 失敗:', e.message) }
+          
+          // 4. 学習環境デザインAI自動生成（6観点）
+          saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>学習環境デザインを生成中...'
+          try {
+            await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, {timeout: 60000})
+            console.log('✅ 学習環境デザイン 完了')
+          } catch (e) { console.warn('⚠️ 学習環境デザイン 失敗:', e.message) }
           
           console.log('🎉 追加問題生成完了 → 学習のてびきへ遷移')
         } catch (e) {
