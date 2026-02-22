@@ -10,7 +10,8 @@ import {
   changePassword,
   authMiddleware,
   requireRole,
-  requireUserType
+  requireUserType,
+  verifyToken
 } from './auth'
 import { 
   performHealthCheck, 
@@ -2989,51 +2990,37 @@ app.use('/static/*', serveStatic({ root: './' }))
 // ローカル開発用フォールバックは末尾に配置
 
 // APIルート：カリキュラム一覧取得（マルチテナント対応）
-app.get('/api/curriculum', authMiddleware, async (c) => {
+app.get('/api/curriculum', async (c) => {
   const { env } = c
-  const user = c.get('user')
+  
+  // 認証情報を取得（任意 - 認証なしでも動作する）
+  let user: any = null
+  try {
+    const authHeader = c.req.header('Authorization')
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7)
+      user = await verifyToken(token)
+    }
+  } catch (e) {}
   
   try {
-    // school_idでキャッシュキーを分ける
-    const cacheKey = `curriculum:all:${user.school_id}`
+    const query = `
+      SELECT 
+        id, grade, subject, textbook_company, unit_name, 
+        total_hours, unit_goal, non_cognitive_goal
+      FROM curriculum
+      ORDER BY grade, id
+    `
     
-    // Phase 11-1: メトリクス付きキャッシュを使用
-    const { data: cached, cached: fromCache } = await getCachedOrFetchWithMetrics(
-      env.KV,
-      cacheKey,
-      CACHE_TTL.CURRICULUM,
-      async () => {
-        let query = `
-          SELECT 
-            id, school_id, grade, subject, textbook_company, unit_name, 
-            total_hours, unit_goal, non_cognitive_goal
-          FROM curriculum
-        `
-        
-        // 管理者以外はschool_idでフィルタ
-        if (user.role !== 'admin') {
-          query += ` WHERE school_id = ${user.school_id}`
-        }
-        
-        query += ` ORDER BY grade, id`
-        
-        const result = await env.DB.prepare(query).all()
-        
-        // Map id to curriculum_id for frontend compatibility
-        return result.results.map(c => ({
-          ...c,
-          curriculum_id: c.id
-        }))
-      }
-    )
+    const result = await env.DB.prepare(query).all()
     
-    // キャッシュステータスをヘッダーに追加
-    return c.json(cached, {
-      headers: {
-        'X-Cache-Status': fromCache ? 'HIT' : 'MISS',
-        'Cache-Control': 'private, max-age=3600'
-      }
-    })
+    // Map id to curriculum_id for frontend compatibility
+    const data = (result.results || []).map((c: any) => ({
+      ...c,
+      curriculum_id: c.id
+    }))
+    
+    return c.json(data)
   } catch (error) {
     console.error('❌ カリキュラム取得エラー:', error)
     return c.json({ error: 'Database error' }, 500)
@@ -3041,43 +3028,34 @@ app.get('/api/curriculum', authMiddleware, async (c) => {
 })
 
 // APIルート：全カリキュラム一覧取得（マルチテナント対応）
-app.get('/api/curriculum/list', authMiddleware, async (c) => {
+app.get('/api/curriculum/list', async (c) => {
   const { env } = c
-  const user = c.get('user')
+  
+  // 認証情報を取得（任意）
+  let user: any = null
+  try {
+    const authHeader = c.req.header('Authorization')
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      user = await verifyToken(authHeader.substring(7))
+    }
+  } catch (e) {}
   
   try {
-    // school_idでキャッシュキーを分ける
-    const cacheKey = `curriculum:list:${user.school_id}`
+    const query = `
+      SELECT id, grade, subject, unit_name, textbook_company as textbook, created_at
+      FROM curriculum
+      ORDER BY created_at DESC
+    `
     
-    // キャッシュを使用
-    const cached = await getCachedOrFetch(
-      env.KV,
-      cacheKey,
-      CACHE_TTL.CURRICULUM,
-      async () => {
-        let query = `
-          SELECT id, school_id, grade, subject, unit_name, textbook_company as textbook, created_at
-          FROM curriculum
-        `
-        
-        // 管理者以外はschool_idでフィルタ
-        if (user.role !== 'admin') {
-          query += ` WHERE school_id = ${user.school_id}`
-        }
-        
-        query += ` ORDER BY created_at DESC`
-        
-        const result = await env.DB.prepare(query).all()
-        
-        // Map id to curriculum_id for frontend compatibility
-        return result.results.map(c => ({
-          ...c,
-          curriculum_id: c.id
-        }))
-      }
-    )
+    const result = await env.DB.prepare(query).all()
     
-    return c.json(cached)
+    // Map id to curriculum_id for frontend compatibility
+    const data = (result.results || []).map((c: any) => ({
+      ...c,
+      curriculum_id: c.id
+    }))
+    
+    return c.json(data)
   } catch (error) {
     console.error('Curriculum list error:', error)
     return c.json({ error: 'Database error' }, 500)
