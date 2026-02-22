@@ -1172,6 +1172,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedSession = localStorage.getItem('session_token')
   const savedUser = localStorage.getItem('user')
   
+  // axios リクエストインターセプター: 認証トークンを自動付与
+  axios.interceptors.request.use(function(config) {
+    const token = state.auth.sessionToken || localStorage.getItem('session_token')
+    if (token) {
+      config.headers = config.headers || {}
+      config.headers['Authorization'] = 'Bearer ' + token
+    }
+    return config
+  })
+  
   if (savedSession && savedUser) {
     // セッション検証
     verifySession().then(isValid => {
@@ -7953,12 +7963,36 @@ function gradeAnswer(correctAnswer) {
   console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
   
   if (isCorrect) {
+    // 正解音を再生
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+      // 正解の明るい音（ド→ミ→ソ → 高いド）
+      const notes = [523.25, 659.25, 783.99, 1046.50]
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.type = 'sine'
+        osc.frequency.value = freq
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime + i * 0.15)
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.15 + 0.3)
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+        osc.start(audioCtx.currentTime + i * 0.15)
+        osc.stop(audioCtx.currentTime + i * 0.15 + 0.35)
+      })
+    } catch (e) { /* 音声再生失敗時は無視 */ }
+    
     resultDiv.innerHTML = `
-      <div class="bg-green-50 border-2 border-green-400 rounded-xl p-5 text-center animate-bounce-once">
-        <div class="text-5xl mb-3">🎉</div>
-        <p class="text-2xl font-bold text-green-700 mb-2">正解！すごい！</p>
-        <p class="text-sm text-green-600">よくできました。次のカードに進みましょう！</p>
+      <div class="bg-green-50 border-2 border-green-400 rounded-xl p-5 text-center" style="animation: correctPop 0.6s ease-out">
+        <div class="text-5xl mb-3" style="animation: starBurst 0.8s ease-out">🎉</div>
+        <p class="text-2xl font-bold text-green-700 mb-2" style="animation: fadeInUp 0.5s ease-out 0.2s both">正解！すごい！</p>
+        <p class="text-sm text-green-600" style="animation: fadeInUp 0.5s ease-out 0.4s both">よくできました。次のカードに進みましょう！</p>
       </div>
+      <style>
+        @keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes starBurst { 0% { transform: scale(0) rotate(-30deg); } 50% { transform: scale(1.4) rotate(10deg); } 100% { transform: scale(1) rotate(0deg); } }
+        @keyframes fadeInUp { 0% { transform: translateY(15px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+      </style>
     `
     // 採点ボタンを更新
     const gradeBtn = document.getElementById('gradeBtn')
@@ -7968,6 +8002,19 @@ function gradeAnswer(correctAnswer) {
       gradeBtn.onclick = null
     }
   } else {
+    // 不正解の音
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = 330
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4)
+      osc.connect(gain); gain.connect(audioCtx.destination)
+      osc.start(); osc.stop(audioCtx.currentTime + 0.4)
+    } catch (e) {}
+    
     resultDiv.innerHTML = `
       <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-5 text-center">
         <div class="text-5xl mb-3">🤔</div>

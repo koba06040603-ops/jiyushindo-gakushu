@@ -9946,8 +9946,8 @@ app.post('/api/curriculum/save-generated', async (c) => {
         curriculumId,
         courseName,
         courseLevel,
-        course.description || '',
-        course.introduction_problem || ''
+        typeof course.description === 'object' ? JSON.stringify(course.description) : (course.description || ''),
+        typeof course.introduction_problem === 'object' ? JSON.stringify(course.introduction_problem) : (course.introduction_problem || '')
       ).run()
       
       const courseId = courseResult.meta.last_row_id
@@ -9996,10 +9996,16 @@ app.post('/api/curriculum/save-generated', async (c) => {
         if (!['easy', 'standard', 'hard'].includes(diffLevel)) diffLevel = 'standard'
         
         // problem_content と answer にもデータを保存（表示側で使用）
-        const problemText = card.problem_text || card.problem_content || card.problem_description || card.content || ''
-        const problemDesc = card.problem_description || card.problem_content || ''
-        const answerText = card.correct_answer || card.answer || ''
-        const explanationText = card.explanation || card.answer_explanation || ''
+        // D1_TYPE_ERROR防止: オブジェクト/配列が来た場合はJSON.stringifyする
+        const s = (v: any): string => {
+          if (v === null || v === undefined) return ''
+          if (typeof v === 'object') return JSON.stringify(v)
+          return String(v)
+        }
+        const problemText = s(card.problem_text || card.problem_content || card.problem_description || card.content)
+        const problemDesc = s(card.problem_description || card.problem_content)
+        const answerText = s(card.correct_answer || card.answer)
+        const explanationText = s(card.explanation || card.answer_explanation)
         
         const cardResult = await env.DB.prepare(`
           INSERT INTO learning_cards (
@@ -10015,10 +10021,10 @@ app.post('/api/curriculum/save-generated', async (c) => {
             is_active, course_id
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         `).bind(
-          curriculum.subject,
+          s(curriculum.subject),
           gradeNum,
-          curriculum.unit_name,
-          card.card_title || card.title || `カード${ci + 1}`,
+          s(curriculum.unit_name),
+          s(card.card_title || card.title) || `カード${ci + 1}`,
           cardType,
           diffLevel,
           learningTrack,
@@ -10029,21 +10035,21 @@ app.post('/api/curriculum/save-generated', async (c) => {
           answerText, // answer = same as correct_answer
           explanationText,
           explanationText, // answer_explanation = same as explanation
-          card.hint_text || '',
-          card.solution_video_url || card.video_url || '',
-          card.image_url || '',
+          s(card.hint_text),
+          s(card.solution_video_url || card.video_url),
+          s(card.image_url),
           card.card_order ?? card.card_number ?? (ci + 1),
           card.card_number ?? (ci + 1),
           card.estimated_time_minutes || card.time_minutes || 10,
-          card.curriculum_code || '',
-          card.textbook_page || '',
-          card.new_terms || '',
-          card.example_problem || '',
-          card.example_solution || '',
-          card.real_world_connection || '',
-          card.ai_teacher_message || '',
-          card.ai_teacher_advice || '',
-          card.teacher_help_keywords || '',
+          s(card.curriculum_code),
+          s(card.textbook_page),
+          s(card.new_terms),
+          s(card.example_problem),
+          s(card.example_solution),
+          s(card.real_world_connection),
+          s(card.ai_teacher_message),
+          s(card.ai_teacher_advice),
+          s(card.teacher_help_keywords),
           courseId
         ).run()
         
@@ -22468,11 +22474,24 @@ app.post('/api/ai/generate-image', async (c) => {
         // SVGを抽出
         const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i)
         if (svgMatch) {
-          const svgDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMatch[0])))
+          // SVGをR2にアップロード
+          const svgBytes = new TextEncoder().encode(svgMatch[0])
+          const svgFileName = `images/svg-${Date.now()}-${Math.random().toString(36).substring(7)}.svg`
+          let svgUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMatch[0])))
+          
+          try {
+            await env.MEDIA_BUCKET.put(svgFileName, svgBytes.buffer, {
+              httpMetadata: { contentType: 'image/svg+xml' }
+            })
+            svgUrl = `/api/media/${svgFileName}`
+          } catch (r2Err: any) {
+            console.warn('⚠️ SVG R2アップロード失敗:', r2Err.message)
+          }
+          
           const generationTime = Date.now() - startTime
           return c.json({
             success: true,
-            image_url: svgDataUrl,
+            image_url: svgUrl,
             prompt: optimizedPrompt,
             generation_time_ms: generationTime,
             model: 'gemini-2.0-flash-svg',
@@ -22495,10 +22514,32 @@ app.post('/api/ai/generate-image', async (c) => {
       return c.json({ success: false, error: '画像が生成されませんでした' }, 500)
     }
     
-    // Base64画像をdata URLに変換
+    // Base64画像をR2にアップロードしてから永続URLを返す
     const imageBase64 = generatedImages[0].bytesBase64Encoded
     const mimeType = generatedImages[0].mimeType || 'image/png'
-    const imageDataUrl = `data:${mimeType};base64,${imageBase64}`
+    
+    // Base64をバイナリに変換
+    const binaryStr = atob(imageBase64)
+    const bytes = new Uint8Array(binaryStr.length)
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i)
+    }
+    
+    // R2にアップロード
+    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
+    const aiFileName = `images/ai-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
+    let imageUrl = `data:${mimeType};base64,${imageBase64}` // フォールバック
+    
+    try {
+      await env.MEDIA_BUCKET.put(aiFileName, bytes.buffer, {
+        httpMetadata: { contentType: mimeType }
+      })
+      imageUrl = `/api/media/${aiFileName}`
+      console.log(`✅ AI画像をR2にアップロード: ${aiFileName}`)
+    } catch (r2Err: any) {
+      console.warn('⚠️ R2アップロード失敗（data URLを使用）:', r2Err.message)
+      // フォールバック: data URLのまま返す
+    }
     
     const generationTime = Date.now() - startTime
     
@@ -22528,7 +22569,7 @@ app.post('/api/ai/generate-image', async (c) => {
     
     return c.json({
       success: true,
-      image_url: imageDataUrl,
+      image_url: imageUrl,
       prompt: optimizedPrompt,
       generation_time_ms: generationTime,
       model: 'imagen-4.0-fast',
