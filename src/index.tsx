@@ -30097,7 +30097,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 ※ 「〜を学びます」「〜について考えます」等のメタ的記述は problem_text に絶対に書かないこと
 ※ difficulty_levelは全カードで同じにせず、必ず段階的に難しくすること
 ※ v4の制御パラメータに忠実に従ってください
-※ multimediaフィールドでは、NHK for School (https://www.nhk.or.jp/school/) 等の教育動画を可能な限り提案すること
+※ multimediaフィールドでは、教育動画を可能な限り提案すること。youtube_urlにはYouTube動画の実在URLのみを入力し、NHK for Schoolの場合はyoutube_titleに「NHK for School」と明記した上でyoutube_urlには https://www.youtube.com/results?search_query=NHK+for+School+{検索キーワード} 形式のYouTube検索URLを使用すること（NHKの直接URLは使用不可）
 `
 
     // 10. Gemini API呼び出し

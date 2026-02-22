@@ -4189,6 +4189,70 @@ async function loadGuidePage(curriculumId) {
             </div>
             `}
 
+            <!-- 学習環境デザイン（6観点） -->
+            ${environmentDesign ? `
+            <div class="mb-6">
+              <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                <i class="fas fa-palette mr-2 text-teal-600"></i>
+                学習環境デザイン（学びを深める6つの活動）
+              </h3>
+              <p class="text-center text-gray-600 mb-4 text-sm">
+                <i class="fas fa-seedling mr-1 text-green-500"></i>
+                授業の中で取り入れられる、子どもたちの学びを広げる活動のアイデアです。
+              </p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                ${environmentDesign.expression_creative ? `
+                <div class="border-2 border-pink-200 bg-gradient-to-br from-pink-50 to-white rounded-xl p-4 hover:shadow-lg transition">
+                  <div class="flex items-center mb-2">
+                    <div class="w-10 h-10 rounded-full bg-pink-500 text-white flex items-center justify-center text-lg mr-3">🎨</div>
+                    <h4 class="font-bold text-gray-800">表現・創作活動</h4>
+                  </div>
+                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.expression_creative}</p>
+                </div>` : ''}
+                ${environmentDesign.research_fieldwork ? `
+                <div class="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 hover:shadow-lg transition">
+                  <div class="flex items-center mb-2">
+                    <div class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center text-lg mr-3">🔍</div>
+                    <h4 class="font-bold text-gray-800">調査・フィールドワーク</h4>
+                  </div>
+                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.research_fieldwork}</p>
+                </div>` : ''}
+                ${environmentDesign.critical_thinking ? `
+                <div class="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white rounded-xl p-4 hover:shadow-lg transition">
+                  <div class="flex items-center mb-2">
+                    <div class="w-10 h-10 rounded-full bg-purple-500 text-white flex items-center justify-center text-lg mr-3">💡</div>
+                    <h4 class="font-bold text-gray-800">批判的思考・比較活動</h4>
+                  </div>
+                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.critical_thinking}</p>
+                </div>` : ''}
+                ${environmentDesign.social_contribution ? `
+                <div class="border-2 border-green-200 bg-gradient-to-br from-green-50 to-white rounded-xl p-4 hover:shadow-lg transition">
+                  <div class="flex items-center mb-2">
+                    <div class="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center text-lg mr-3">🤝</div>
+                    <h4 class="font-bold text-gray-800">社会貢献・地域連携</h4>
+                  </div>
+                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.social_contribution}</p>
+                </div>` : ''}
+                ${environmentDesign.metacognition_reflection ? `
+                <div class="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-white rounded-xl p-4 hover:shadow-lg transition">
+                  <div class="flex items-center mb-2">
+                    <div class="w-10 h-10 rounded-full bg-yellow-500 text-white flex items-center justify-center text-lg mr-3">🪞</div>
+                    <h4 class="font-bold text-gray-800">メタ認知・振り返り</h4>
+                  </div>
+                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.metacognition_reflection}</p>
+                </div>` : ''}
+                ${environmentDesign.question_generation ? `
+                <div class="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-white rounded-xl p-4 hover:shadow-lg transition">
+                  <div class="flex items-center mb-2">
+                    <div class="w-10 h-10 rounded-full bg-orange-500 text-white flex items-center justify-center text-lg mr-3">❓</div>
+                    <h4 class="font-bold text-gray-800">問い生成・探究活動</h4>
+                  </div>
+                  <p class="text-sm text-gray-700 leading-relaxed">${environmentDesign.question_generation}</p>
+                </div>` : ''}
+              </div>
+            </div>
+            ` : ''}
+
             ${await generateLearningSupportSectionWithData(curriculumId)}
 
             <!-- 印刷・ツールボタン -->
@@ -5561,6 +5625,19 @@ async function loadCardPage(cardId) {
                 <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">${formatText(card.problem_content || card.problem_text || card.problem_description || '')}</pre>
               </div>
               
+              <!-- 問題画像 -->
+              ${card.problem_image_url ? `
+                <div class="mt-4 text-center">
+                  <img src="${card.problem_image_url}" alt="問題の図" class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;">
+                  <p class="text-xs text-gray-500 mt-2"><i class="fas fa-image mr-1"></i>問題の図</p>
+                </div>
+              ` : (() => {
+                // イラスト説明があるが画像がない場合のプレースホルダー
+                const problemText = card.problem_content || card.problem_text || ''
+                const hasIllustrationRef = /イラスト|図|時計|グラフ|表を見|絵を見/.test(problemText)
+                return hasIllustrationRef ? '<div class="mt-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 text-center"><i class="fas fa-image text-3xl text-yellow-400 mb-2 block"></i><p class="text-sm text-yellow-700">この問題には図やイラストが必要ですが、まだ用意されていません。</p><p class="text-xs text-gray-500 mt-1">先生に「画像を追加」してもらうことで図が表示されます。</p></div>' : ''
+              })()}
+              
               <!-- 動画コンテンツ（YouTube / NHK for School） -->
               ${(() => {
                 const vUrl = card.solution_video_url || ''
@@ -5569,8 +5646,12 @@ async function loadCardPage(cardId) {
                 const ytId = ytMatch ? ytMatch[1] : ''
                 if (ytId) {
                   return '<div class="mt-4 rounded-xl overflow-hidden border-2 border-gray-200 shadow-sm"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 p-2 bg-gray-50"><i class="fas fa-video mr-1"></i>学習動画：一時停止しながら考えてみよう</p></div>'
-                } else if (vUrl.includes('nhk.or.jp')) {
-                  return '<div class="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-5 shadow-sm"><div class="flex items-center gap-3 mb-4"><span class="bg-blue-600 text-white text-sm font-bold px-4 py-1.5 rounded-full"><i class="fas fa-tv mr-1"></i>NHK for School</span><span class="text-base font-bold text-gray-800">学習動画</span></div><div class="bg-white rounded-xl p-6 text-center border-2 border-blue-200"><i class="fas fa-play-circle text-6xl text-blue-500 mb-4 block"></i><p class="text-sm text-gray-700 mb-4">NHK for School の動画で学習できます。<br>下のボタンを押して動画を見ましょう！</p><a href="' + vUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold text-lg transition shadow-lg hover:shadow-xl"><i class="fas fa-external-link-alt"></i>NHK for School で動画を見る</a></div><p class="text-xs text-gray-400 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>ボタンを押すと NHK for School のサイトが新しいタブで開きます</p></div>'
+                } else if (vUrl.includes('nhk.or.jp') || vUrl.includes('youtube.com/results')) {
+                  // NHK for School or YouTube検索: 検索リンクとして表示
+                  const cardTitle = (card.card_title || card.unit_name || '').replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 20)
+                  const nhkSearchUrl = 'https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent(cardTitle)
+                  const ytSearchUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent('NHK for School ' + cardTitle)
+                  return '<div class="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-5 shadow-sm"><div class="flex items-center gap-3 mb-4"><span class="bg-blue-600 text-white text-sm font-bold px-4 py-1.5 rounded-full"><i class="fas fa-tv mr-1"></i>NHK for School</span><span class="text-base font-bold text-gray-800">関連する学習動画</span></div><div class="bg-white rounded-xl p-6 text-center border-2 border-blue-200"><i class="fas fa-play-circle text-5xl text-blue-500 mb-4 block"></i><p class="text-sm text-gray-700 mb-4">関連する学習動画を見て学習を深めましょう！</p><div class="flex flex-col sm:flex-row gap-3 justify-center"><a href="' + ytSearchUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"><i class="fab fa-youtube"></i>YouTubeで動画を探す</a><a href="' + nhkSearchUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div><p class="text-xs text-gray-400 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>ボタンを押すと新しいタブで動画を探せます</p></div>'
                 } else if (vUrl) {
                   return '<div class="mt-4 bg-red-50 border-2 border-red-200 rounded-xl p-4"><a href="' + vUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-lg font-bold transition shadow-sm"><i class="fas fa-play-circle text-lg"></i>学習動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>'
                 }
@@ -5684,17 +5765,29 @@ async function loadCardPage(cardId) {
               </div>
 
               <!-- アクションボタン -->
-              <div class="mt-6 flex gap-4">
-                <button onclick="saveProgress()" 
-                        class="flex-1 bg-indigo-600 text-white py-3 px-6 rounded-lg font-bold hover:bg-indigo-700 transition">
-                  <i class="fas fa-save mr-2"></i>
-                  保存して次へ
+              <div class="mt-6 space-y-3">
+                <!-- 採点ボタン（目立つ） -->
+                <button onclick="gradeAnswer('${(card.correct_answer || card.answer || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}')" 
+                        id="gradeBtn"
+                        class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 px-6 rounded-xl font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition shadow-lg">
+                  <i class="fas fa-check-double mr-2"></i>
+                  答え合わせをする
                 </button>
-                <button onclick="showAnswer()" 
-                        class="flex-1 bg-gray-500 text-white py-3 px-6 rounded-lg font-bold hover:bg-gray-600 transition">
-                  <i class="fas fa-eye mr-2"></i>
-                  解答を見る
-                </button>
+                <!-- 採点結果表示エリア -->
+                <div id="gradeResult" class="hidden"></div>
+                
+                <div class="flex gap-4">
+                  <button onclick="saveProgress()" 
+                          class="flex-1 bg-indigo-600 text-white py-3 px-6 rounded-lg font-bold hover:bg-indigo-700 transition">
+                    <i class="fas fa-save mr-2"></i>
+                    保存して次へ
+                  </button>
+                  <button onclick="showAnswer()" 
+                          class="flex-1 bg-gray-500 text-white py-3 px-6 rounded-lg font-bold hover:bg-gray-600 transition">
+                    <i class="fas fa-eye mr-2"></i>
+                    解答を見る
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -5740,7 +5833,7 @@ async function loadCardPage(cardId) {
                       <span>${index === 0 ? '🟢 ヒント1（考える方向）' : index === 1 ? '🟡 ヒント2（具体的手がかり）' : '🟠 ヒント3（答えに近づく）'}</span>
                       <i class="fas fa-chevron-down"></i>
                     </button>
-                    <div id="hint-${index}" class="${index === 0 ? '' : 'hidden'} mt-3 pt-3 border-t">
+                    <div id="hint-${index}" class="hidden mt-3 pt-3 border-t">
                       <pre class="text-gray-700 whitespace-pre-wrap font-sans text-sm">${hint.hint_content || hint.hint_text || ''}</pre>
                       ${hint.thinking_tool_suggestion ? `
                         <div class="mt-3 bg-blue-50 rounded p-3">
@@ -5758,7 +5851,7 @@ async function loadCardPage(cardId) {
                       <span>🟢 ヒント1（考える方向）</span>
                       <i class="fas fa-chevron-down"></i>
                     </button>
-                    <div id="hint-0" class="mt-3 pt-3 border-t">
+                    <div id="hint-0" class="hidden mt-3 pt-3 border-t">
                       <pre class="text-gray-700 whitespace-pre-wrap font-sans text-sm">まず、問題で何を求められているか確認しましょう。\nキーワードに線を引いてみよう。</pre>
                     </div>
                   </div>
@@ -7776,6 +7869,71 @@ function setUnderstanding(level) {
   // 選択されたボタンをハイライト
   const selectedBtn = document.querySelector(`[data-level="${level}"]`)
   selectedBtn.classList.add('bg-indigo-100', 'border-2', 'border-indigo-600')
+}
+
+// 答え合わせ（採点）機能
+function gradeAnswer(correctAnswer) {
+  const answerInput = document.getElementById('answerInput')
+  const studentAnswer = answerInput ? answerInput.value.trim() : ''
+  
+  if (!studentAnswer) {
+    alert('答えを入力してから「答え合わせ」を押してください。')
+    if (answerInput) answerInput.focus()
+    return
+  }
+  
+  const resultDiv = document.getElementById('gradeResult')
+  if (!resultDiv) return
+  
+  // 正解判定（柔軟な比較）
+  const normalize = (s) => s.replace(/[\s　\n\r\t]/g, '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).toLowerCase()
+  const normalizedStudent = normalize(studentAnswer)
+  const normalizedCorrect = normalize(correctAnswer)
+  
+  // 正解判定: 完全一致 or 正解が含まれている or 学生の答えに正解が含まれる
+  const isCorrect = normalizedStudent === normalizedCorrect || 
+                    normalizedCorrect.includes(normalizedStudent) || 
+                    normalizedStudent.includes(normalizedCorrect)
+  
+  if (isCorrect) {
+    resultDiv.innerHTML = `
+      <div class="bg-green-50 border-2 border-green-400 rounded-xl p-5 text-center animate-bounce-once">
+        <div class="text-5xl mb-3">🎉</div>
+        <p class="text-2xl font-bold text-green-700 mb-2">正解！すごい！</p>
+        <p class="text-sm text-green-600">よくできました。次のカードに進みましょう！</p>
+      </div>
+    `
+    // 採点ボタンを更新
+    const gradeBtn = document.getElementById('gradeBtn')
+    if (gradeBtn) {
+      gradeBtn.className = 'w-full bg-green-500 text-white py-4 px-6 rounded-xl font-bold text-lg cursor-default'
+      gradeBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>正解！'
+      gradeBtn.onclick = null
+    }
+  } else {
+    resultDiv.innerHTML = `
+      <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-5 text-center">
+        <div class="text-5xl mb-3">🤔</div>
+        <p class="text-xl font-bold text-yellow-700 mb-2">もう少し！</p>
+        <p class="text-sm text-gray-600 mb-3">ヒントを見てもう一度考えてみよう。</p>
+        <button onclick="document.getElementById('gradeResult').classList.add('hidden'); document.getElementById('answerInput')?.focus()"
+                class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg font-bold transition">
+          <i class="fas fa-redo mr-2"></i>もう一度やってみる
+        </button>
+      </div>
+    `
+  }
+  
+  resultDiv.classList.remove('hidden')
+  resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  
+  // 学習ログ記録
+  logLearningActivity({
+    action: 'grade_answer',
+    cardId: state.selectedCard,
+    isCorrect: isCorrect,
+    studentAnswer: studentAnswer.substring(0, 200)
+  }).catch(() => {})
 }
 
 // 解答表示
@@ -42229,11 +42387,12 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
             
             <!-- 学習カード一覧 -->
             <div class="mb-6">
-              <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+              <h3 class="text-xl font-bold text-gray-800 mb-2 flex items-center">
                 <i class="fas fa-layer-group text-pink-600 mr-2"></i>
                 学習カード（${cards.length}枚）
                 <span class="ml-auto text-xs text-gray-400">教師用プレビュー</span>
               </h3>
+              <p class="text-sm text-gray-500 mb-4"><i class="fas fa-book mr-1"></i>${curriculum.textbook_company || ''} ${curriculum.grade || ''} ${curriculum.subject || ''} ― ${curriculum.unit_name || ''}</p>
               <div class="space-y-4">
                 ${cards.map((card, i) => {
                   const parsed = parseMultimedia(card)
@@ -42261,7 +42420,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                     <div class="bg-white rounded-lg p-3 mb-2 border">
                       <p class="text-sm text-gray-800">${card.problem_text || card.problem_description || ''}</p>
                     </div>
-                    ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-play-circle text-4xl text-blue-500 mb-2 block"></i><a href="' + ytUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で見る</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
+                    ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
                     ${tactile ? '<div class="bg-yellow-50 border-l-3 border-yellow-400 p-2 rounded text-xs mb-2"><strong>✋ やってみよう:</strong> ' + tactile + '</div>' : ''}
                     ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
                     <div class="grid grid-cols-2 gap-2 text-xs">
@@ -42329,6 +42488,14 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                     </div>
                   </div>
                 `}).join('')}
+              </div>
+              <!-- 生徒体験ボタン -->
+              <div class="mt-4 text-center">
+                <button onclick="document.getElementById('personalizedGuideModal').remove(); selectCourse(${courseId})" 
+                        class="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white py-3 px-8 rounded-xl font-bold transition shadow-lg text-sm">
+                  <i class="fas fa-play-circle mr-2"></i>このコースで学習を始める（AI先生・採点・ヒント付き）
+                </button>
+                <p class="text-xs text-gray-400 mt-2">生徒が学習するときと同じ画面（AI先生・ヒント・採点機能付き）で体験できます</p>
               </div>
             </div>
             
@@ -42500,14 +42667,17 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
         const interventionHtml = v4.human_intervention ? '<div class="bg-red-100 border-l-4 border-red-600 p-2 rounded-r text-xs text-red-800 mt-1"><i class="fas fa-hand-paper mr-1"></i>🆘 緊急：人的介入を推奨</div>' : ''
         
         // カードのパーソナライゼーション注記を各カードに反映
+        // ★ 既にHTML生成時にpNoteで表示されている場合はスキップ（重複防止）
         const cardNotes = ad.card_personalization_notes || []
         cardNotes.forEach(function(cn) {
           if (cn.personalization_note) {
-            // card-display-{card_id} の中に注記を追加（既存のものがなければ）
             const noteTarget = document.querySelectorAll('[id^="card-display-"]')
             noteTarget.forEach(function(el) {
-              const existingNote = el.querySelector('.personalization-note-injected')
-              if (!existingNote && el.querySelector('h4') && el.querySelector('h4').textContent.trim() === cn.card_title.trim()) {
+              // 既に理論根拠が表示されていたら絶対に追加しない
+              const allText = el.innerHTML
+              const noteCount = (allText.match(/この問題の理論根拠/g) || []).length
+              if (noteCount > 0) return  // 1つでもあればスキップ
+              if (el.querySelector('h4') && el.querySelector('h4').textContent.trim() === cn.card_title.trim()) {
                 const noteDiv = document.createElement('div')
                 noteDiv.className = 'personalization-note-injected mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs'
                 noteDiv.innerHTML = '<span class="font-bold text-indigo-700"><i class="fas fa-brain mr-1"></i>この問題の理論根拠:</span> <span class="text-indigo-600">' + cn.personalization_note + '</span>'
