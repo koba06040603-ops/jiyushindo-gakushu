@@ -22382,7 +22382,7 @@ app.delete('/api/cards/images/:imageId', async (c) => {
 // AI画像生成API（Gemini Imagen使用）
 app.post('/api/ai/generate-image', async (c) => {
   const { env } = c
-  const { prompt, card_id, teacher_id, negative_prompt, style } = await c.req.json()
+  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio } = await c.req.json()
   
   try {
     const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
@@ -22394,45 +22394,123 @@ app.post('/api/ai/generate-image', async (c) => {
       }, 500)
     }
     
-    // Gemini APIで画像生成（テキストからプロンプト生成）
+    if (!prompt || prompt.trim().length < 3) {
+      return c.json({ success: false, error: 'プロンプトを入力してください（3文字以上）' }, 400)
+    }
+    
     const startTime = Date.now()
     
-    // 画像生成プロンプトの最適化
-    const optimizedPrompt = `${prompt}${style ? `, style: ${style}` : ''}, high quality, detailed, educational illustration`
+    // 教育向け画像生成プロンプトの最適化（日本語→英語変換含む）
+    const optimizedPrompt = `Educational illustration for elementary/middle school students: ${prompt}${style ? `, style: ${style}` : ''}, clear, colorful, child-friendly, high quality, detailed, no text overlay`
     
-    // 注意: Gemini Pro Vision は画像分析用。画像生成にはGemini Imagen APIが必要
-    // ここではダミーURLを返す（実際の実装ではGemini Imagen APIを使用）
-    const dummyImageUrl = `https://via.placeholder.com/800x600.png?text=${encodeURIComponent(prompt.substring(0, 50))}`
+    // Imagen 4 API で画像生成
+    const imagenResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict`,
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': geminiApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instances: [{ prompt: optimizedPrompt }],
+          parameters: {
+            sampleCount: 1,
+            aspectRatio: aspect_ratio || '1:1',
+          }
+        })
+      }
+    )
+    
+    if (!imagenResponse.ok) {
+      const errorText = await imagenResponse.text()
+      console.error('Imagen API エラー:', imagenResponse.status, errorText)
+      
+      // Imagen APIが使えない場合、Gemini 2.0 Flash で SVG 図解を生成するフォールバック
+      console.log('💡 Gemini 2.0 Flash でSVG図解を生成...')
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `以下の学習テーマについて、小学生にわかりやすいSVG画像を1つ生成してください。SVGコードだけを出力してください。余計なテキストは不要です。幅600高さ400で、カラフルでシンプルな図解にしてください。テーマ: ${prompt}` }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
+          })
+        }
+      )
+      
+      if (geminiResponse.ok) {
+        const geminiData = await geminiResponse.json() as any
+        const svgText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        // SVGを抽出
+        const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i)
+        if (svgMatch) {
+          const svgDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMatch[0])))
+          const generationTime = Date.now() - startTime
+          return c.json({
+            success: true,
+            image_url: svgDataUrl,
+            prompt: optimizedPrompt,
+            generation_time_ms: generationTime,
+            model: 'gemini-2.0-flash-svg',
+            message: 'SVG図解をAIで生成しました'
+          })
+        }
+      }
+      
+      return c.json({ 
+        success: false, 
+        error: `画像生成API エラー (${imagenResponse.status}): ${errorText.substring(0, 200)}`,
+        details: 'Imagen APIとSVGフォールバックの両方が失敗しました'
+      }, 500)
+    }
+    
+    const imagenData = await imagenResponse.json() as any
+    const generatedImages = imagenData.predictions || []
+    
+    if (generatedImages.length === 0) {
+      return c.json({ success: false, error: '画像が生成されませんでした' }, 500)
+    }
+    
+    // Base64画像をdata URLに変換
+    const imageBase64 = generatedImages[0].bytesBase64Encoded
+    const mimeType = generatedImages[0].mimeType || 'image/png'
+    const imageDataUrl = `data:${mimeType};base64,${imageBase64}`
     
     const generationTime = Date.now() - startTime
     
-    // 生成履歴を保存
-    const result = await env.DB.prepare(`
-      INSERT INTO ai_generated_images (
-        teacher_id, card_id, prompt, negative_prompt, 
-        ai_model, image_url, generation_time_ms, 
-        generation_params, is_used
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      teacher_id || null,
-      card_id || null,
-      prompt,
-      negative_prompt || null,
-      'gemini-imagen',
-      dummyImageUrl,
-      generationTime,
-      JSON.stringify({ style, optimized_prompt: optimizedPrompt }),
-      false
-    ).run()
+    // 生成履歴を保存（テーブルが存在する場合のみ）
+    try {
+      await env.DB.prepare(`
+        INSERT INTO ai_generated_images (
+          teacher_id, card_id, prompt, negative_prompt, 
+          ai_model, image_url, generation_time_ms, 
+          generation_params, is_used
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        teacher_id || null,
+        card_id || null,
+        prompt,
+        negative_prompt || null,
+        'imagen-4.0-fast',
+        'generated_' + Date.now(),
+        generationTime,
+        JSON.stringify({ style, aspect_ratio, optimized_prompt: optimizedPrompt }),
+        false
+      ).run()
+    } catch (dbErr) {
+      console.warn('画像生成履歴保存スキップ:', dbErr)
+    }
     
     return c.json({
       success: true,
-      generation_id: result.meta.last_row_id,
-      image_url: dummyImageUrl,
+      image_url: imageDataUrl,
       prompt: optimizedPrompt,
       generation_time_ms: generationTime,
-      message: '画像生成完了（デモ版：実際のAI画像生成はGemini Imagen API統合が必要）'
+      model: 'imagen-4.0-fast',
+      message: 'AI画像を生成しました'
     })
   } catch (error: any) {
     console.error('❌ AI画像生成エラー:', error)
@@ -30313,14 +30391,21 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       savedCardIds.push(cardId)
 
       // ヒント自動生成
-      const hints = card.hints || [
-        { hint_level: 1, hint_text: 'まず問題をよく読もう。' },
-        { hint_level: 2, hint_text: '図や絵に書いてみよう。' },
-        { hint_level: 3, hint_text: 'わかるところから始めよう。' }
+      const defaultHints = [
+        { hint_level: 1, hint_text: 'まず問題をよく読もう。キーワードに線を引いてみよう。' },
+        { hint_level: 2, hint_text: '図や絵に書いて整理してみよう。似ている問題を思い出してみよう。' },
+        { hint_level: 3, hint_text: 'わかるところから始めよう。わからないときはAI先生に聞いてみてね！' }
       ]
+      let hints = card.hints || []
+      // ヒントの内容が空の場合はデフォルトを使用
+      if (hints.length === 0 || hints.every((h: any) => !(h.hint_text || h.hint_content || '').trim())) {
+        hints = defaultHints
+      }
       for (const hint of hints) {
+        const hintText = (hint.hint_text || hint.hint_content || '').trim()
+        if (!hintText) continue // 空ヒントはスキップ
         try {
-          await hintExec(env.DB, (s) => hintInsertSQL(s), [cardId, hint.hint_level || hint.hint_number || 1, hint.hint_text || hint.hint_content || ''])
+          await hintExec(env.DB, (s) => hintInsertSQL(s), [cardId, hint.hint_level || hint.hint_number || 1, hintText])
         } catch (hintInsertErr) {
           console.warn('ヒント保存スキップ:', cardId, hintInsertErr)
         }

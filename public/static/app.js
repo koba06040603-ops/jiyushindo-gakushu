@@ -5267,7 +5267,7 @@ async function selectCourse(courseId) {
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           ${cards.map((card, index) => `
             <div class="bg-white rounded-lg shadow-lg p-6 hover:shadow-xl transition cursor-pointer"
-                 onclick="loadCardPage(${card.card_id})">
+                 onclick="loadCardPage(${card.card_id || card.id})">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-xl font-bold text-gray-800">カード ${card.card_number}</h3>
                 <div class="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
@@ -5470,7 +5470,9 @@ async function loadCardPage(cardId) {
     const { card, hints, answer } = response.data
     
     // カードデータにヒントと解答を含める
-    card.hints = hints || []
+    // 空のヒント（hint_text/hint_contentが空）をフィルタリング
+    const validHints = (hints || []).filter(h => (h.hint_content || h.hint_text || '').trim().length > 0)
+    card.hints = validHints
     card.answer = answer?.answer_text || card.correct_answer || card.answer || card.example_solution || ''
     card.answer_explanation = answer?.explanation || card.answer_explanation || card.explanation || ''
     
@@ -7948,7 +7950,7 @@ function gradeAnswer(correctAnswer) {
   
   const isCorrect = exactOrContains || allNumbersMatch || keyValuesMatch
   
-  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctNumbers, studentNumbers, correctKeyValues, isCorrect })
+  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
   
   if (isCorrect) {
     resultDiv.innerHTML = `
@@ -8108,6 +8110,7 @@ window.callTeacher = callTeacher
 window.askFriend = askFriend
 window.setUnderstanding = setUnderstanding
 window.showAnswer = showAnswer
+window.gradeAnswer = gradeAnswer
 window.toggleHintPanel = toggleHintPanel
 window.saveProgress = saveProgress
 window.loadLearningPlan = loadLearningPlan
@@ -15947,11 +15950,13 @@ function showCardDetail(card) {
                 問題・課題
               </h3>
               ${state.auth.user?.role === 'teacher' ? `
-                <button onclick="editCardImageUrl(${card.id}, 'problem')" 
-                        class="mb-3 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
-                  <i class="fas fa-image mr-1"></i>
-                  ${card.problem_image_url ? '画像URLを編集' : '画像URLを追加'}
-                </button>
+                <div class="flex gap-2 mb-3">
+                  <button onclick="editCardImageUrl(${card.id}, 'problem')" 
+                          class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+                    <i class="fas fa-image mr-1"></i>
+                    ${card.problem_image_url ? '画像を編集' : '画像を追加'}
+                  </button>
+                </div>
               ` : ''}
               ${card.problem_image_url ? `
                 <div class="mb-4 text-center">
@@ -26585,25 +26590,73 @@ window.showResearchDatasetCreator = showResearchDatasetCreator
 
 // 学習カード画像URL編集機能
 async function editCardImageUrl(cardId, imageType) {
-  const currentUrl = prompt(
-    imageType === 'problem' 
-      ? '問題画像のURLを入力してください（削除する場合は空欄にしてください）:' 
-      : '解答画像のURLを入力してください（削除する場合は空欄にしてください）:'
+  const typeLabel = imageType === 'problem' ? '問題画像' : '解答画像'
+  
+  // 選択ダイアログ
+  const choice = prompt(
+    `【${typeLabel}の設定】\n\n操作を選んでください:\n\n1 = 画像URLを直接入力\n2 = AIで図・イラストを自動生成\n3 = 画像を削除\n\n番号を入力してください:`,
+    '1'
   )
   
-  if (currentUrl === null) return // キャンセル
+  if (choice === null) return // キャンセル
+  
+  if (choice.trim() === '3') {
+    // 削除
+    try {
+      const fieldName = imageType === 'problem' ? 'problem_image_url' : 'answer_image_url'
+      await axios.put('/api/card/' + cardId, { [fieldName]: '' })
+      alert('✅ 画像を削除しました')
+      window.location.reload()
+    } catch (error) {
+      alert('画像の削除に失敗しました')
+    }
+    return
+  }
+  
+  if (choice.trim() === '2') {
+    // AI生成
+    const genPrompt = prompt(
+      '🎨 AI画像生成\n\nどんな図やイラストを生成しますか？\n（例：「折れ線グラフの例」「分数の円グラフ」「温度計の図」等）'
+    )
+    if (!genPrompt || genPrompt.trim().length < 2) return
+    
+    try {
+      alert('AI画像を生成中です...（数秒かかります）')
+      const res = await axios.post('/api/ai/generate-image', {
+        prompt: genPrompt.trim(),
+        card_id: cardId,
+        style: 'educational illustration, child-friendly'
+      })
+      
+      if (res.data.success && res.data.image_url) {
+        const fieldName = imageType === 'problem' ? 'problem_image_url' : 'answer_image_url'
+        await axios.put('/api/card/' + cardId, { [fieldName]: res.data.image_url })
+        alert('✅ AI画像を生成してカードに設定しました！（' + (res.data.generation_time_ms || 0) + 'ms）')
+        window.location.reload()
+      } else {
+        alert('画像生成に失敗しました: ' + (res.data.error || ''))
+      }
+    } catch (err) {
+      alert('AI画像生成エラー: ' + (err.response?.data?.error || err.message))
+    }
+    return
+  }
+  
+  // URL直接入力（デフォルト）
+  const currentUrl = prompt(
+    typeLabel + 'のURLを入力してください（削除する場合は空欄にしてください）:'
+  )
+  
+  if (currentUrl === null) return
   
   try {
     const fieldName = imageType === 'problem' ? 'problem_image_url' : 'answer_image_url'
-    const response = await axios.put(`/api/card/${cardId}`, {
+    const response = await axios.put('/api/card/' + cardId, {
       [fieldName]: currentUrl
     })
     
     if (response.data.success) {
       alert('✅ 画像URLを更新しました')
-      // モーダルを閉じて再度開く（更新を反映）
-      closeCardDetail()
-      // 再読み込み処理は呼び出し元に委ねる
       window.location.reload()
     }
   } catch (error) {
@@ -42499,6 +42552,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       </div>
                     </div>
                     <div class="bg-white rounded-lg p-3 mb-2 border">
+                      ${card.problem_image_url ? '<div class="mb-2"><img src="' + card.problem_image_url + '" class="max-h-48 rounded border mx-auto" onerror="this.style.display=\'none\'"></div>' : ''}
                       <p class="text-sm text-gray-800">${card.problem_text || card.problem_description || ''}</p>
                     </div>
                     ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
@@ -42514,7 +42568,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                         <span class="text-gray-700 mt-1 block">${card.explanation || card.answer_explanation || ''}</span>
                       </details>
                     </div>
-                    ${card.hint_text ? '<details class="mt-1"><summary class="text-xs text-green-600 cursor-pointer font-bold">ヒントを表示</summary><p class="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">' + card.hint_text + '</p></details>' : ''}
+                    ${(card.hints && card.hints.length > 0) ? '<details class="mt-1"><summary class="text-xs text-green-600 cursor-pointer font-bold"><i class="fas fa-lightbulb mr-1"></i>3段階ヒント（' + card.hints.length + '個）</summary><div class="space-y-1 mt-1">' + card.hints.map(function(h, hi) { return '<div class="bg-' + (hi === 0 ? 'green' : hi === 1 ? 'yellow' : 'orange') + '-50 p-2 rounded border text-xs"><span class="font-bold">' + (hi === 0 ? '🟢 ヒント1' : hi === 1 ? '🟡 ヒント2' : '🟠 ヒント3') + ':</span> ' + (h.hint_content || h.hint_text || '') + '</div>' }).join('') + '</div></details>' : card.hint_text ? '<details class="mt-1"><summary class="text-xs text-green-600 cursor-pointer font-bold">ヒントを表示</summary><p class="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">' + card.hint_text + '</p></details>' : '<p class="text-[10px] text-gray-400 mt-1"><i class="fas fa-lightbulb mr-1"></i>ヒントは「学習を始める」で3段階表示されます</p>'}
                     ${pNote ? '<div class="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs"><span class="font-bold text-indigo-700"><i class="fas fa-brain mr-1"></i>この問題の理論根拠:</span> <span class="text-indigo-600">' + pNote + '</span></div>' : ''}
                     <!-- 編集パネル（非表示） -->
                     <div id="card-edit-panel-${card.card_id || card.id || i}" class="hidden mt-3 bg-white border-2 border-yellow-300 rounded-xl p-4">
@@ -42552,15 +42606,23 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                         </div>
                         <div>
                           <label class="text-xs font-bold text-gray-600"><i class="fas fa-image mr-1"></i>問題画像URL（任意）</label>
-                          <input type="text" id="edit-image-${card.card_id || card.id || i}" value="${(card.problem_image_url || '').replace(/"/g,'&quot;')}" class="w-full border rounded-lg px-3 py-1.5 text-sm" placeholder="https://example.com/image.png">
-                          <p class="text-[10px] text-gray-400 mt-0.5">図・イラスト・グラフなどの画像URLを入力。GoogleドライブやImgurなどの画像URLが使用可能</p>
+                          <div class="flex gap-1">
+                            <input type="text" id="edit-image-${card.card_id || card.id || i}" value="${(card.problem_image_url || '').replace(/"/g,'&quot;')}" class="flex-1 border rounded-lg px-3 py-1.5 text-sm" placeholder="https://example.com/image.png">
+                            <button onclick="generateCardImage(${card.card_id || card.id || 0}, ${i})" class="bg-purple-500 hover:bg-purple-600 text-white px-2 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap" title="AIで画像を生成">
+                              <i class="fas fa-magic mr-1"></i>AI生成
+                            </button>
+                          </div>
+                          <div id="image-preview-${card.card_id || card.id || i}" class="mt-1 hidden">
+                            <img class="max-h-32 rounded border" />
+                          </div>
+                          <p class="text-[10px] text-gray-400 mt-0.5">URLを直接入力するか、「AI生成」で図・イラストを自動生成できます</p>
                         </div>
                         <div class="border-t pt-2 mt-2">
                           <label class="text-xs font-bold text-purple-600">🤖 AI修正指示（自由入力→AIが修正）</label>
                           <textarea id="edit-instruction-${card.card_id || card.id || i}" rows="2" class="w-full border border-purple-200 rounded-lg px-3 py-1.5 text-sm" placeholder="例：もっと難しくして / 問題文をわかりやすくして / 答えを変えて"></textarea>
                         </div>
                         <div class="flex gap-2 mt-2">
-                          <button onclick="saveCardEdit(${card.card_id || card.id || 0}, ${i})" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-bold transition">
+                          <button onclick="saveCardEditV2(${card.card_id || card.id || 0}, ${i})" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-bold transition">
                             <i class="fas fa-check mr-1"></i>手動保存
                           </button>
                           <button onclick="aiRegenerateCard(${card.card_id || card.id || 0}, ${i})" class="flex-1 bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-lg text-sm font-bold transition">
@@ -42577,7 +42639,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
               </div>
               <!-- 生徒体験ボタン -->
               <div class="mt-4 text-center">
-                <button onclick="document.getElementById('personalizedGuideModal').remove(); selectCourse(${courseId})" 
+                <button onclick="startPersonalizedCourseLearning(${courseId}, ${curriculumId})" 
                         class="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white py-3 px-8 rounded-xl font-bold transition shadow-lg text-sm">
                   <i class="fas fa-play-circle mr-2"></i>このコースで学習を始める（AI先生・採点・ヒント付き）
                 </button>
@@ -42852,6 +42914,33 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
 }
 window.showPersonalizedCourseGuide = showPersonalizedCourseGuide
 
+// 個別最適化コースの学習を開始（state設定→selectCourse）
+async function startPersonalizedCourseLearning(courseId, curriculumId) {
+  try {
+    // モーダルを閉じる
+    const modal = document.getElementById('personalizedGuideModal')
+    if (modal) modal.remove()
+    
+    // state.selectedCurriculum を設定（selectCourseで必要）
+    if (!state.selectedCurriculum || state.selectedCurriculum.id !== curriculumId) {
+      try {
+        const currRes = await axios.get('/api/curriculum/' + curriculumId)
+        state.selectedCurriculum = currRes.data.curriculum
+      } catch (e) {
+        console.warn('カリキュラム情報取得失敗:', e)
+        state.selectedCurriculum = { id: curriculumId, unit_name: '個別学習', grade: '', subject: '', textbook_company: '' }
+      }
+    }
+    
+    // コースを選択して学習カード一覧を表示
+    selectCourse(courseId)
+  } catch (err) {
+    console.error('個別最適化コース学習開始エラー:', err)
+    alert('学習の開始に失敗しました。ページを再読み込みしてください。')
+  }
+}
+window.startPersonalizedCourseLearning = startPersonalizedCourseLearning
+
 // カード編集パネルの表示/非表示
 function toggleCardEdit(cardId, index) {
   const panel = document.getElementById('card-edit-panel-' + (cardId || index))
@@ -42914,6 +43003,72 @@ async function aiRegenerateCard(cardId, index) {
   }
 }
 window.aiRegenerateCard = aiRegenerateCard
+
+// AI画像生成（カード編集用）
+async function generateCardImage(cardId, index) {
+  const id = cardId || index
+  const titleEl = document.getElementById('edit-title-' + id)
+  const problemEl = document.getElementById('edit-problem-' + id)
+  const imageInput = document.getElementById('edit-image-' + id)
+  
+  const cardTitle = titleEl ? titleEl.value : ''
+  const problemText = problemEl ? problemEl.value : ''
+  
+  // プロンプト入力ダイアログ
+  const defaultPrompt = cardTitle + (problemText ? '（' + problemText.substring(0, 60) + '）' : '')
+  const userPrompt = prompt(
+    '🎨 AI画像生成\n\nどんな図やイラストを生成しますか？\n（例：「折れ線グラフの例」「分数の円グラフ」「地図」等）\n\nカードの内容から自動入力しています。変更してOKです。',
+    defaultPrompt
+  )
+  
+  if (!userPrompt || userPrompt.trim().length < 2) return
+  
+  // ボタンを無効化
+  const btn = event.target.closest('button')
+  const originalBtnHtml = btn ? btn.innerHTML : ''
+  if (btn) {
+    btn.disabled = true
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'
+  }
+  
+  // プレビュー領域を表示
+  const previewDiv = document.getElementById('image-preview-' + id)
+  if (previewDiv) {
+    previewDiv.classList.remove('hidden')
+    previewDiv.innerHTML = '<div class="flex items-center gap-2 text-xs text-purple-600"><i class="fas fa-spinner fa-spin"></i>AI画像を生成中...</div>'
+  }
+  
+  try {
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: userPrompt.trim(),
+      card_id: cardId,
+      style: 'educational illustration, child-friendly'
+    })
+    
+    if (res.data.success && res.data.image_url) {
+      // 画像URLをセット
+      if (imageInput) imageInput.value = res.data.image_url
+      
+      // プレビュー表示
+      if (previewDiv) {
+        previewDiv.innerHTML = '<div class="text-xs text-green-600 mb-1"><i class="fas fa-check-circle mr-1"></i>生成完了！（' + (res.data.generation_time_ms || 0) + 'ms）</div><img src="' + res.data.image_url + '" class="max-h-40 rounded border" onerror="this.style.display=\'none\'">'
+      }
+    } else {
+      throw new Error(res.data.error || '画像生成に失敗しました')
+    }
+  } catch (err) {
+    console.error('AI画像生成エラー:', err)
+    if (previewDiv) {
+      previewDiv.innerHTML = '<div class="text-xs text-red-600"><i class="fas fa-exclamation-circle mr-1"></i>' + (err.response?.data?.error || err.message || '画像生成に失敗しました') + '</div>'
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false
+      btn.innerHTML = originalBtnHtml
+    }
+  }
+}
+window.generateCardImage = generateCardImage
 
 // テスト対策の弱点から個別最適化コースを生成
 async function generatePersonalizedFromTestPrep(studentId, curriculumIdsJson, weakTopics) {
