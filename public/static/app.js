@@ -7902,16 +7902,30 @@ function gradeAnswer(correctAnswer) {
                     normalizedStudent.includes(normalizedCorrect)
   
   // 判定方法2: 数値キーワードベース判定
-  // 正解から数値（単位付き）を抽出して、生徒の回答にすべて含まれるか
-  const extractNumbers = (s) => {
-    const matches = s.match(/\d+[\.\d]*\s*[度℃%％円個枚本匹人時分秒cmkgmLdlmlkm²³点番目倍割]*/g) || []
-    return matches.map(m => m.replace(/\s/g, ''))
+  // 正解から「値」の部分（コロン後や句読点後の数値）を抽出
+  const extractAnswerValues = (s) => {
+    const values = []
+    // 「：値」パターン（例: "気温：18度"→"18度"）
+    const kvMatches = s.match(/[:：]\s*(\d+[\.\d]*\s*[度℃%％円個枚本匹人時分秒cmkgmLdlmlkm²³点番目倍割]*)/g) || []
+    kvMatches.forEach(m => {
+      const v = m.replace(/^[:：]\s*/, '')
+      if (v) values.push(v)
+    })
+    // 抽出できなかった場合は全数値を取得
+    if (values.length === 0) {
+      const allNums = s.match(/\d+[\.\d]*\s*[度℃%％円個枚本匹人時分秒cmkgmLdlmlkm²³点番目倍割]*/g) || []
+      allNums.forEach(m => values.push(m.replace(/\s/g, '')))
+    }
+    return [...new Set(values)]
   }
-  const correctNumbers = extractNumbers(normalizedCorrect)
-  const studentNumbers = extractNumbers(normalizedStudent)
+  const extractAllNumbers = (s) => {
+    return (s.match(/\d+[\.\d]*\s*[度℃%％円個枚本匹人時分秒cmkgmLdlmlkm²³点番目倍割]*/g) || []).map(m => m.replace(/\s/g, ''))
+  }
+  const correctValues = extractAnswerValues(normalizedCorrect)
+  const studentNumbers = extractAllNumbers(normalizedStudent)
   
-  // 正解の数値がすべて生徒の回答に含まれているか
-  const allNumbersMatch = correctNumbers.length > 0 && correctNumbers.every(num => {
+  // 正解の値がすべて生徒の回答に含まれているか
+  const allNumbersMatch = correctValues.length > 0 && correctValues.every(num => {
     return studentNumbers.some(sNum => sNum === num || sNum.includes(num) || num.includes(sNum))
   })
   
