@@ -2894,7 +2894,13 @@ async function updateUnitList() {
       }
     } catch (error) {
       console.error('単元リスト読み込みエラー:', error)
-      unitSelect.innerHTML = '<p class="text-red-400 text-center py-8"><i class="fas fa-exclamation-triangle mr-2"></i>読み込みエラー</p>'
+      const errMsg = error?.response?.status === 401 ? 'ログインが必要です。ページを再読み込みしてください。' : '読み込みエラー。再度お試しください。'
+      unitSelect.innerHTML = `<p class="text-red-400 text-center py-8"><i class="fas fa-exclamation-triangle mr-2"></i>${errMsg}</p>
+        <div class="text-center mt-2">
+          <button onclick="updateUnitList()" class="text-sm bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-bold transition">
+            <i class="fas fa-sync-alt mr-1"></i>再読み込み
+          </button>
+        </div>`
     }
   } else {
     unitArea.style.display = 'none'
@@ -7885,15 +7891,50 @@ function gradeAnswer(correctAnswer) {
   const resultDiv = document.getElementById('gradeResult')
   if (!resultDiv) return
   
-  // 正解判定（柔軟な比較）
-  const normalize = (s) => s.replace(/[\s　\n\r\t]/g, '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).toLowerCase()
+  // 正解判定（柔軟な比較 - 数値・キーワードベース）
+  const normalize = (s) => s.replace(/[\s　\n\r\t]/g, '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[：:]/g, ':').replace(/[、，,]/g, ',').toLowerCase()
   const normalizedStudent = normalize(studentAnswer)
   const normalizedCorrect = normalize(correctAnswer)
   
-  // 正解判定: 完全一致 or 正解が含まれている or 学生の答えに正解が含まれる
-  const isCorrect = normalizedStudent === normalizedCorrect || 
+  // 判定方法1: 完全一致 or 包含関係
+  const exactOrContains = normalizedStudent === normalizedCorrect || 
                     normalizedCorrect.includes(normalizedStudent) || 
                     normalizedStudent.includes(normalizedCorrect)
+  
+  // 判定方法2: 数値キーワードベース判定
+  // 正解から数値（単位付き）を抽出して、生徒の回答にすべて含まれるか
+  const extractNumbers = (s) => {
+    const matches = s.match(/\d+[\.\d]*\s*[度℃%％円個枚本匹人時分秒cmkgmLdlmlkm²³点番目倍割]*/g) || []
+    return matches.map(m => m.replace(/\s/g, ''))
+  }
+  const correctNumbers = extractNumbers(normalizedCorrect)
+  const studentNumbers = extractNumbers(normalizedStudent)
+  
+  // 正解の数値がすべて生徒の回答に含まれているか
+  const allNumbersMatch = correctNumbers.length > 0 && correctNumbers.every(num => {
+    return studentNumbers.some(sNum => sNum === num || sNum.includes(num) || num.includes(sNum))
+  })
+  
+  // 判定方法3: 正解のキーポイントを抽出して部分一致
+  // 「：」「:」で区切られた値の部分を抽出
+  const extractKeyValues = (s) => {
+    const parts = s.split(/[,:、。．\.\n]/).filter(p => p.length > 0)
+    const values = []
+    parts.forEach(p => {
+      const kv = p.split(/[:：]/)
+      if (kv.length >= 2) values.push(kv[kv.length - 1].trim())
+      // 数値+単位のパターンも抽出
+      const numMatch = p.match(/\d+[\.\d]*\s*[度℃%％円個枚本匹人時分秒cmkgmLdlmlkm²³点番目倍割]+/)
+      if (numMatch) values.push(numMatch[0])
+    })
+    return [...new Set(values)]
+  }
+  const correctKeyValues = extractKeyValues(normalizedCorrect)
+  const keyValuesMatch = correctKeyValues.length > 0 && correctKeyValues.every(v => normalizedStudent.includes(v))
+  
+  const isCorrect = exactOrContains || allNumbersMatch || keyValuesMatch
+  
+  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctNumbers, studentNumbers, correctKeyValues, isCorrect })
   
   if (isCorrect) {
     resultDiv.innerHTML = `
@@ -18459,6 +18500,30 @@ function editCardContent(courseIndex, cardIndex) {
               <textarea id="edit_answer_explanation" rows="3"
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">${card.answer_explanation || ''}</textarea>
             </div>
+
+            <!-- 画像・動画URL -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4 mt-4">
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">
+                  <i class="fas fa-image mr-1 text-blue-600"></i>問題画像URL
+                </label>
+                <input type="text" id="edit_problem_image_url" 
+                       value="${card.problem_image_url || ''}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                       placeholder="https://example.com/image.png">
+                <p class="text-xs text-gray-400 mt-1">図・イラスト・グラフの画像URL</p>
+              </div>
+              <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">
+                  <i class="fas fa-video mr-1 text-red-600"></i>YouTube URL
+                </label>
+                <input type="text" id="edit_solution_video_url" 
+                       value="${card.solution_video_url || ''}"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                       placeholder="https://www.youtube.com/watch?v=...">
+                <p class="text-xs text-gray-400 mt-1">学習動画のYouTube URL</p>
+              </div>
+            </div>
           </form>
         </div>
 
@@ -18510,7 +18575,9 @@ async function saveCardEdit(cardId, courseIndex, cardIndex) {
       example_solution: document.getElementById('edit_example_solution').value,
       real_world_connection: document.getElementById('edit_real_world_connection').value,
       answer: document.getElementById('edit_answer').value,
-      answer_explanation: document.getElementById('edit_answer_explanation').value
+      answer_explanation: document.getElementById('edit_answer_explanation').value,
+      problem_image_url: document.getElementById('edit_problem_image_url')?.value || null,
+      solution_video_url: document.getElementById('edit_solution_video_url')?.value || null
     }
     
     // APIリクエスト
@@ -42469,6 +42536,11 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                           <label class="text-xs font-bold text-gray-600">YouTube URL（任意）</label>
                           <input type="text" id="edit-video-${card.card_id || card.id || i}" value="${(ytUrl).replace(/"/g,'&quot;')}" class="w-full border rounded-lg px-3 py-1.5 text-sm" placeholder="https://www.youtube.com/watch?v=...">
                         </div>
+                        <div>
+                          <label class="text-xs font-bold text-gray-600"><i class="fas fa-image mr-1"></i>問題画像URL（任意）</label>
+                          <input type="text" id="edit-image-${card.card_id || card.id || i}" value="${(card.problem_image_url || '').replace(/"/g,'&quot;')}" class="w-full border rounded-lg px-3 py-1.5 text-sm" placeholder="https://example.com/image.png">
+                          <p class="text-[10px] text-gray-400 mt-0.5">図・イラスト・グラフなどの画像URLを入力。GoogleドライブやImgurなどの画像URLが使用可能</p>
+                        </div>
                         <div class="border-t pt-2 mt-2">
                           <label class="text-xs font-bold text-purple-600">🤖 AI修正指示（自由入力→AIが修正）</label>
                           <textarea id="edit-instruction-${card.card_id || card.id || i}" rows="2" class="w-full border border-purple-200 rounded-lg px-3 py-1.5 text-sm" placeholder="例：もっと難しくして / 問題文をわかりやすくして / 答えを変えて"></textarea>
@@ -42785,6 +42857,7 @@ async function saveCardEditV2(cardId, index) {
       difficulty_level: document.getElementById('edit-difficulty-' + id)?.value,
       explanation: document.getElementById('edit-explanation-' + id)?.value,
       solution_video_url: document.getElementById('edit-video-' + id)?.value,
+      problem_image_url: document.getElementById('edit-image-' + id)?.value || null,
     }
     const res = await axios.put('/api/teacher/edit-card/' + cardId, updates)
     if (res.data.success) {

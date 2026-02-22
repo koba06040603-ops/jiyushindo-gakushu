@@ -6466,6 +6466,8 @@ app.put('/api/cards/:cardId', async (c) => {
         real_world_connection = ?,
         answer = ?,
         answer_explanation = ?,
+        problem_image_url = COALESCE(?, problem_image_url),
+        solution_video_url = COALESCE(?, solution_video_url),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).bind(
@@ -6478,6 +6480,8 @@ app.put('/api/cards/:cardId', async (c) => {
       body.real_world_connection || '',
       body.answer || '',
       body.answer_explanation || '',
+      body.problem_image_url !== undefined ? body.problem_image_url : null,
+      body.solution_video_url !== undefined ? body.solution_video_url : null,
       cardId
     ).run()
     
@@ -30726,6 +30730,8 @@ app.put('/api/teacher/edit-card/:cardId', async (c) => {
     if (updates.estimated_time_minutes !== undefined) { fields.push('estimated_time_minutes = ?'); values.push(updates.estimated_time_minutes) }
     if (updates.solution_video_url !== undefined) { fields.push('solution_video_url = ?'); values.push(updates.solution_video_url) }
     if (updates.image_url !== undefined) { fields.push('image_url = ?'); values.push(updates.image_url) }
+    if (updates.problem_image_url !== undefined) { fields.push('problem_image_url = ?'); values.push(updates.problem_image_url) }
+    if (updates.answer_image_url !== undefined) { fields.push('answer_image_url = ?'); values.push(updates.answer_image_url) }
     
     if (fields.length === 0) return c.json({ success: false, error: '更新するフィールドがありません' }, 400)
     
