@@ -5689,18 +5689,31 @@ async function loadCardPage(cardId) {
               
               <!-- 問題画像 -->
               ${card.problem_image_url ? `
-                <div class="mt-4 text-center">
+                <div class="mt-4 text-center" id="card-image-container-${card.card_id || card.id || 0}">
                   <img src="${card.problem_image_url}" alt="${card._image_description || '問題の図'}" 
                        class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
-                       onerror="this.parentElement.innerHTML='<div class=\\'bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 text-center\\'><i class=\\'fas fa-image text-3xl text-yellow-400 mb-2 block\\'></i><p class=\\'text-sm text-yellow-700\\'>画像を読み込めませんでした</p></div>'">
+                       onerror="this.parentElement.innerHTML='<div class=\\'bg-yellow-50 border-2 border-yellow-200 rounded-lg p-5 text-center\\'><i class=\\'fas fa-image text-4xl text-yellow-400 mb-3 block\\'></i><p class=\\'text-sm text-yellow-800 font-bold mb-2\\'>画像を読み込めませんでした</p><button onclick=\\'generateImageForCard(${card.card_id || card.id || 0}, \\\"${(card._image_description || card.card_title || '').replace(/"/g, '').replace(/'/g, '')}\\\"  )\\' class=\\'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm\\' ><i class=\\'fas fa-magic mr-1\\'></i>AIで図を再生成</button></div>'">
                   <p class="text-xs text-gray-500 mt-2"><i class="fas fa-image mr-1"></i>${card._image_description || '問題の図'}</p>
                 </div>
               ` : (() => {
-                // イラスト説明があるが画像がない場合のプレースホルダー
+                // イラスト説明があるが画像がない場合のプレースホルダー + AI生成ボタン
                 const imgDesc = card._image_description || ''
                 const problemText = card.problem_content || card.problem_text || ''
                 const hasIllustrationRef = imgDesc || /イラスト|図|時計|グラフ|表を見|絵を見/.test(problemText)
-                return hasIllustrationRef ? '<div class="mt-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 text-center"><i class="fas fa-image text-3xl text-yellow-400 mb-2 block"></i><p class="text-sm text-yellow-700">' + (imgDesc || 'この問題には図やイラストが必要ですが、まだ用意されていません。') + '</p><p class="text-xs text-gray-500 mt-1">先生に「画像を追加」してもらうことで図が表示されます。</p></div>' : ''
+                const cardIdVal = card.card_id || card.id || 0
+                if (!hasIllustrationRef) return ''
+                return `<div class="mt-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg p-5 text-center" id="image-placeholder-${cardIdVal}">
+                  <i class="fas fa-image text-4xl text-yellow-400 mb-3 block"></i>
+                  <p class="text-sm text-yellow-800 font-bold mb-1">${imgDesc || 'この問題には図やイラストが必要です'}</p>
+                  <p class="text-xs text-gray-500 mb-3">先生に「画像を追加」してもらうか、AIで自動生成できます。</p>
+                  <div class="flex flex-col sm:flex-row gap-2 justify-center">
+                    <button onclick="generateImageForCard(${cardIdVal}, '${(imgDesc || card.card_title || '').replace(/'/g, "\\'")}')"
+                            class="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow-lg">
+                      <i class="fas fa-magic"></i>AIで図を生成
+                    </button>
+                    ${state.auth?.role === 'teacher' ? '<button onclick="editCardImageUrl(' + cardIdVal + ', \\'problem\\')" class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow"><i class="fas fa-upload"></i>画像を追加</button>' : ''}
+                  </div>
+                </div>`
               })()}
               
               <!-- 動画コンテンツ（YouTube / NHK for School） -->
@@ -6491,9 +6504,17 @@ function updateAIMessage(messageId, newMessage) {
 
 // 問題文をゆっくり読み上げる
 function readCardAloud() {
-  const card = state.selectedCard
+  // window.currentCardDataからカードデータを取得
+  const cardData = window.currentCardData
+  const card = cardData?.card || cardData
   if (!card) {
-    console.warn('readCardAloud: カードが選択されていません')
+    console.warn('readCardAloud: カードデータがありません')
+    // フォールバック：ページ上の問題文テキストを読む
+    const problemEl = document.querySelector('.card-content')
+    if (problemEl) {
+      speakText(problemEl.textContent.trim(), 'female-friendly', 0.8)
+      return
+    }
     return
   }
   const text = card.problem_text || card.problem_content || card.problem_description || ''
@@ -6501,10 +6522,78 @@ function readCardAloud() {
     console.warn('readCardAloud: 読み上げるテキストがありません')
     return
   }
+  // 読み上げ開始のフィードバック
+  const speakerIcon = document.querySelector('[onclick="readCardAloud()"] i.fa-volume-up')
+  if (speakerIcon) {
+    speakerIcon.classList.add('animate-pulse')
+    setTimeout(() => speakerIcon.classList.remove('animate-pulse'), 5000)
+  }
   // ゆっくり読み上げ（速度0.8）
   speakText(text, 'female-friendly', 0.8)
 }
 window.readCardAloud = readCardAloud
+
+// 学習カード上のプレースホルダーからAI画像を生成して保存
+async function generateImageForCard(cardId, description) {
+  if (!cardId) {
+    alert('カードIDが見つかりません')
+    return
+  }
+  
+  const placeholder = document.getElementById('image-placeholder-' + cardId) || 
+                       document.getElementById('card-image-container-' + cardId)
+  
+  // 生成中の表示
+  if (placeholder) {
+    placeholder.innerHTML = `
+      <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-6 text-center">
+        <i class="fas fa-magic text-4xl text-purple-500 mb-3 block animate-pulse"></i>
+        <p class="text-sm text-purple-800 font-bold mb-1">AIが図を生成しています...</p>
+        <p class="text-xs text-gray-500">数秒お待ちください</p>
+        <div class="mt-3"><div class="h-2 bg-purple-200 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse" style="width: 60%"></div></div></div>
+      </div>`
+  }
+  
+  try {
+    const prompt = description || 'educational illustration for this learning card'
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: prompt,
+      card_id: cardId,
+      style: 'educational illustration, child-friendly, simple diagram'
+    })
+    
+    if (res.data.success && res.data.image_url) {
+      // カードに画像URLを保存
+      await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
+      
+      // 画像を表示
+      if (placeholder) {
+        placeholder.innerHTML = `
+          <div class="text-center">
+            <img src="${res.data.image_url}" alt="${description || '問題の図'}" 
+                 class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;">
+            <p class="text-xs text-green-600 mt-2"><i class="fas fa-check-circle mr-1"></i>AIが図を生成しました（${res.data.generation_time_ms || 0}ms）</p>
+          </div>`
+      }
+    } else {
+      throw new Error(res.data.error || '画像生成に失敗しました')
+    }
+  } catch (err) {
+    console.error('AI画像生成エラー:', err)
+    if (placeholder) {
+      placeholder.innerHTML = `
+        <div class="bg-red-50 border-2 border-red-200 rounded-lg p-5 text-center">
+          <i class="fas fa-exclamation-triangle text-3xl text-red-400 mb-2 block"></i>
+          <p class="text-sm text-red-700 mb-2">図の生成に失敗しました: ${err.response?.data?.error || err.message}</p>
+          <button onclick="generateImageForCard(${cardId}, '${(description || '').replace(/'/g, "\\'")}')"
+                  class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+            <i class="fas fa-redo mr-1"></i>再試行
+          </button>
+        </div>`
+    }
+  }
+}
+window.generateImageForCard = generateImageForCard
 
 // 音声合成（テキスト読み上げ）
 async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
@@ -42820,7 +42909,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       </div>
                     </div>
                     <div class="bg-white rounded-lg p-3 mb-2 border">
-                      ${card.problem_image_url ? '<div class="mb-2"><img src="' + card.problem_image_url + '" class="max-h-48 rounded border mx-auto" onerror="this.style.display=\'none\'"></div>' : ''}
+                      ${card.problem_image_url ? '<div class="mb-2" id="guide-img-' + (card.card_id || card.id || i) + '"><img src="' + card.problem_image_url + '" class="max-h-48 rounded border mx-auto" onerror="this.parentElement.innerHTML=\'<div class=\\\'bg-yellow-50 border border-yellow-200 rounded p-3 text-center text-xs\\\'><i class=\\\'fas fa-image text-yellow-400 text-2xl mb-1 block\\\'></i><p class=\\\'text-yellow-700 mb-2\\\'>画像を読み込めません</p><button onclick=\\\'generateImageForCard(' + (card.card_id || card.id || 0) + ', \\\"' + ((card._image_description || card.card_title || '').replace(/"/g, '').replace(/\\/g, '').substring(0, 50)) + '\\\")\\\' class=\\\'bg-purple-500 text-white px-3 py-1 rounded-lg text-xs font-bold\\\'><i class=\\\'fas fa-magic mr-1\\\'></i>AIで再生成</button></div>\'"></div>' : (mm.image_description ? '<div class="mb-2 bg-yellow-50 border border-yellow-200 rounded p-3 text-center" id="guide-img-' + (card.card_id || card.id || i) + '"><i class="fas fa-image text-yellow-400 text-2xl mb-1 block"></i><p class="text-xs text-yellow-700 mb-2">' + mm.image_description + '</p><button onclick="generateImageForCard(' + (card.card_id || card.id || 0) + ', \'' + mm.image_description.replace(/'/g, '').substring(0, 50) + '\')" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fas fa-magic mr-1"></i>AIで図を生成</button></div>' : '')}
                       <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
                     </div>
                     ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
