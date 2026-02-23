@@ -30478,6 +30478,17 @@ function openImageReplaceMenu(cardId) {
           <i class="fas fa-chevron-right" style="color:#d1d5db;"></i>
         </button>
         
+        <!-- ドラッグ&ドロップエリア -->
+        <div style="padding:12px 20px 16px;">
+          <div style="border:2px dashed #d1d5db;border-radius:14px;padding:20px;text-align:center;transition:all .2s;cursor:pointer;background:#f9fafb;"
+               onclick="document.getElementById('image-replace-overlay').remove(); openFilePickerForCard(${cardId})"
+               id="replace-menu-dropzone">
+            <i class="fas fa-cloud-upload-alt" style="font-size:28px;color:#9ca3af;margin-bottom:6px;display:block;"></i>
+            <p style="font-size:14px;font-weight:bold;color:#6b7280;margin:0;">ここに画像をドラッグ&ドロップ</p>
+            <p style="font-size:12px;color:#9ca3af;margin:4px 0 0;">JPG / PNG / PDF / クリップボードからの貼り付けもOK</p>
+          </div>
+        </div>
+        
       </div>
     </div>
   `
@@ -30488,6 +30499,33 @@ function openImageReplaceMenu(cardId) {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) overlay.remove()
   })
+  
+  // メニュー全体をドラッグ&ドロップ対応にする
+  const menuBox = overlay.querySelector('div')
+  if (menuBox) {
+    const prevent = (e) => { e.preventDefault(); e.stopPropagation() }
+    ;['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+      menuBox.addEventListener(evt, prevent, false)
+    })
+    menuBox.addEventListener('dragenter', () => {
+      menuBox.style.boxShadow = '0 0 0 4px #a855f7, 0 25px 60px rgba(0,0,0,0.4)'
+      menuBox.style.background = '#faf5ff'
+    })
+    menuBox.addEventListener('dragleave', (e) => {
+      if (menuBox.contains(e.relatedTarget)) return
+      menuBox.style.boxShadow = '0 25px 60px rgba(0,0,0,0.4)'
+      menuBox.style.background = 'white'
+    })
+    menuBox.addEventListener('drop', (e) => {
+      menuBox.style.boxShadow = '0 25px 60px rgba(0,0,0,0.4)'
+      menuBox.style.background = 'white'
+      const files = e.dataTransfer?.files
+      if (files && files.length > 0) {
+        overlay.remove()
+        uploadFileToCard(cardId, files[0])
+      }
+    })
+  }
 }
 window.openImageReplaceMenu = openImageReplaceMenu
 
@@ -31189,6 +31227,7 @@ window.initDropZone = initDropZone
 
 // ページ表示後にすべてのプレースホルダーにドロップゾーンを初期化
 function initAllDropZones() {
+  // 画像未設定のプレースホルダー
   document.querySelectorAll('[id^="image-placeholder-"]').forEach(el => {
     const cardId = el.id.replace('image-placeholder-', '')
     if (cardId) initDropZone(el, Number(cardId))
@@ -31196,6 +31235,11 @@ function initAllDropZones() {
   // ガイドビューのプレースホルダー
   document.querySelectorAll('[id^="guide-img-"]').forEach(el => {
     const cardId = el.id.replace('guide-img-', '')
+    if (cardId) initDropZone(el, Number(cardId))
+  })
+  // 画像が既にあるコンテナにもD&Dで差し替え可能にする
+  document.querySelectorAll('[id^="card-image-container-"]').forEach(el => {
+    const cardId = el.id.replace('card-image-container-', '')
     if (cardId) initDropZone(el, Number(cardId))
   })
 }
