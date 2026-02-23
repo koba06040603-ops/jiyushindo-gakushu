@@ -3939,6 +3939,33 @@ async function loadGuidePage(curriculumId) {
               </div>
             </div>
             ` : `
+            ${standardCourses.length === 0 ? `
+            <!-- コースが未生成：自動生成UIを表示 -->
+            <div class="mb-6">
+              <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border-2 border-purple-200 text-center">
+                <div class="mb-4">
+                  <div class="inline-flex items-center justify-center w-20 h-20 bg-purple-100 rounded-full mb-4">
+                    <i class="fas fa-wand-magic-sparkles text-3xl text-purple-600"></i>
+                  </div>
+                  <h3 class="text-2xl font-bold text-gray-800 mb-2">
+                    この単元の学習カードがまだありません
+                  </h3>
+                  <p class="text-gray-600">
+                    AIが3コース（じっくり・しっかり・ぐんぐん）×各8〜10枚の学習カードを自動生成します。<br>
+                    約1〜2分で完成します。
+                  </p>
+                </div>
+                <button id="autoGenBtn"
+                  onclick="autoGenerateCardsForCurriculum(${curriculumId})"
+                  class="bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-bold py-5 px-12 rounded-xl text-xl transition shadow-2xl inline-flex items-center group">
+                  <i class="fas fa-play-circle mr-3 text-2xl group-hover:animate-bounce"></i>
+                  学習カードを自動生成する
+                  <i class="fas fa-arrow-right ml-3 group-hover:translate-x-2 transition-transform"></i>
+                </button>
+                <p class="text-xs text-gray-500 mt-3">※ 生成後に内容を確認・編集できます</p>
+              </div>
+            </div>
+            ` : `
             <!-- コース選択問題（統合版：導入問題含む） -->
             <div class="mb-6">
               <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
@@ -4039,6 +4066,7 @@ async function loadGuidePage(curriculumId) {
                 }).join('')}
               </div>
             </div>
+            `}
 
             <!-- チェックテスト（全コース共通） -->
             <div class="mb-6">
@@ -19367,6 +19395,40 @@ window.submitFeedback = submitFeedback
 window.toggleFontSizePanel = toggleFontSizePanel
 window.updateFontSize = updateFontSize
 window.resetFontSize = resetFontSize
+
+// 既存カリキュラムに対して学習カードを自動生成
+async function autoGenerateCardsForCurriculum(curriculumId) {
+  try {
+    // カリキュラム情報を取得
+    const res = await axios.get('/api/curriculum/' + curriculumId)
+    const { curriculum } = res.data
+    
+    if (!curriculum) {
+      alert('カリキュラム情報の取得に失敗しました')
+      return
+    }
+    
+    // executeUnitGenerationと同じパラメータ形式で生成を実行
+    const params = {
+      grade: curriculum.grade,
+      subject: curriculum.subject,
+      textbook: curriculum.textbook_company,
+      unitName: curriculum.unit_name,
+      studentNeeds: '',
+      teacherGoals: '',
+      learningStyle: '',
+      specialSupport: '',
+      qualityMode: 'standard'
+    }
+    
+    lastGenerationParams = params
+    await executeUnitGeneration(params)
+  } catch (error) {
+    console.error('自動生成エラー:', error)
+    alert('学習カードの自動生成に失敗しました: ' + (error.message || '不明なエラー'))
+  }
+}
+window.autoGenerateCardsForCurriculum = autoGenerateCardsForCurriculum
 window.saveFontSize = saveFontSize
 
 // 学習カード詳細表示モーダル
