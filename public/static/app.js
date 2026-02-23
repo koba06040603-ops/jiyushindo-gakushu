@@ -5799,11 +5799,12 @@ async function loadCardPage(cardId) {
                         <i class="fas fa-arrow-right text-sm opacity-70 group-hover:translate-x-1 transition-transform"></i>
                       </button>
                       
+                      <!-- ファイル直接追加ボタン行 -->
                       <div class="flex gap-2">
-                        <button onclick="editCardImageUrl(${cardIdVal}, 'problem')"
-                                class="flex-1 flex items-center justify-center gap-2 bg-white hover:bg-blue-50 text-blue-600 border-2 border-blue-300 hover:border-blue-400 px-4 py-3 rounded-xl font-bold text-sm transition-all shadow-sm hover:shadow-md">
-                          <i class="fas fa-upload"></i>
-                          <span>画像アップロード</span>
+                        <button onclick="openFilePickerForCard(${cardIdVal})"
+                                class="flex-1 flex items-center justify-center gap-2 bg-white hover:bg-orange-50 text-orange-600 border-2 border-orange-300 hover:border-orange-400 px-4 py-3 rounded-xl font-bold text-sm transition-all shadow-sm hover:shadow-md">
+                          <i class="fas fa-file-image"></i>
+                          <span>JPG / PDF を選択</span>
                         </button>
                         <button onclick="quickPasteImageUrl(${cardIdVal})"
                                 class="flex-1 flex items-center justify-center gap-2 bg-white hover:bg-green-50 text-green-600 border-2 border-green-300 hover:border-green-400 px-4 py-3 rounded-xl font-bold text-sm transition-all shadow-sm hover:shadow-md">
@@ -5811,17 +5812,27 @@ async function loadCardPage(cardId) {
                           <span>URL貼り付け</span>
                         </button>
                       </div>
+                      
+                      <!-- ドラッグ&ドロップ案内 -->
+                      <div class="border-2 border-dashed border-gray-300 rounded-xl py-3 px-4 text-center bg-white bg-opacity-50 hover:border-purple-400 hover:bg-purple-50 transition-all cursor-pointer"
+                           onclick="openFilePickerForCard(${cardIdVal})">
+                        <p class="text-xs text-gray-500">
+                          <i class="fas fa-cloud-upload-alt text-gray-400 mr-1"></i>
+                          ここに<strong>ファイルをドラッグ&ドロップ</strong>するか、<strong>Ctrl+V</strong>で画像を貼り付け
+                        </p>
+                        <p class="text-xs text-gray-400 mt-0.5">JPG・PNG・PDF 対応（20MBまで）</p>
+                      </div>
                     </div>
                     
-                    <!-- AI生成の説明 -->
+                    <!-- 説明 -->
                     <div class="bg-white bg-opacity-70 rounded-xl p-3 text-left max-w-sm mx-auto">
                       <p class="text-xs text-gray-600 flex items-start gap-2">
                         <i class="fas fa-robot text-purple-500 mt-0.5 flex-shrink-0"></i>
                         <span><strong>AI自動生成：</strong>ボタンを押すと「<em class="text-purple-700">${aiDesc.substring(0, 40)}</em>」の図をAIが自動で描きます</span>
                       </p>
                       <p class="text-xs text-gray-600 flex items-start gap-2 mt-1">
-                        <i class="fas fa-chalkboard-teacher text-blue-500 mt-0.5 flex-shrink-0"></i>
-                        <span><strong>先生が挿入：</strong>画像アップロードやURL貼り付けで自分の図を追加できます</span>
+                        <i class="fas fa-file-image text-orange-500 mt-0.5 flex-shrink-0"></i>
+                        <span><strong>ファイル追加：</strong>手持ちのJPG・PNG・PDFをドラッグ&ドロップまたは選択で即挿入</span>
                       </p>
                     </div>
                   </div>
@@ -6256,6 +6267,11 @@ async function loadCardPage(cardId) {
     // 触覚ウィジェットを初期化
     if (typeof initTactileWidgets === 'function') {
       initTactileWidgets()
+    }
+
+    // ドロップゾーン初期化（D&D・クリップボード対応）
+    if (typeof initAllDropZones === 'function') {
+      setTimeout(() => initAllDropZones(), 300)
     }
 
   } catch (error) {
@@ -29792,6 +29808,225 @@ async function quickPasteImageUrl(cardId) {
   }
 }
 window.quickPasteImageUrl = quickPasteImageUrl
+
+// ============================================
+// ファイル直接アップロード（JPG/PNG/PDF ドラッグ&ドロップ・ファイル選択・クリップボード対応）
+// ============================================
+
+// ファイルをアップロードしてカードに保存
+async function uploadFileToCard(cardId, file) {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
+  if (!allowedTypes.includes(file.type)) {
+    alert('対応形式: JPG, PNG, GIF, WebP, PDF\n選択されたファイル: ' + file.type)
+    return false
+  }
+  if (file.size > 20 * 1024 * 1024) {
+    alert('ファイルサイズが大きすぎます（上限20MB）')
+    return false
+  }
+  
+  const placeholder = document.getElementById('image-placeholder-' + cardId)
+  const guidePlaceholder = document.getElementById('guide-img-' + cardId)
+  const targetEl = placeholder || guidePlaceholder
+  
+  // アップロード中UI
+  if (targetEl) {
+    targetEl.innerHTML = `
+      <div class="p-8 text-center">
+        <div class="inline-block relative mb-4">
+          <div class="animate-spin rounded-full h-16 w-16 border-4 border-purple-200 border-t-purple-600"></div>
+          <i class="fas fa-cloud-upload-alt absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-purple-600 text-xl"></i>
+        </div>
+        <p class="text-purple-700 font-bold text-lg">アップロード中...</p>
+        <p class="text-sm text-gray-500 mt-1">${file.name} (${(file.size / 1024).toFixed(0)} KB)</p>
+        <div class="w-48 mx-auto bg-gray-200 rounded-full h-2 mt-3">
+          <div class="bg-purple-600 h-2 rounded-full animate-pulse" style="width:70%"></div>
+        </div>
+      </div>
+    `
+  }
+  
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('card_id', String(cardId))
+    
+    const res = await axios.post('/api/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000
+    })
+    
+    if (res.data.success) {
+      const imageUrl = res.data.image_url
+      const isPdf = res.data.is_pdf
+      
+      if (targetEl) {
+        if (isPdf) {
+          // PDF: iframeで表示
+          targetEl.outerHTML = `
+            <div class="mt-4 text-center" id="card-image-container-${cardId}">
+              <div class="border-2 border-gray-200 rounded-lg overflow-hidden shadow-md" style="max-height:500px;">
+                <iframe src="${imageUrl}" class="w-full" style="height:450px; border:none;"></iframe>
+              </div>
+              <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+                <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
+                  <i class="fas fa-check-circle mr-1"></i>PDF保存済み
+                </span>
+                <a href="${imageUrl}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 underline">
+                  <i class="fas fa-external-link-alt mr-1"></i>新しいタブで開く
+                </a>
+                <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+              </div>
+            </div>
+          `
+        } else {
+          // 画像: imgタグで表示
+          targetEl.outerHTML = `
+            <div class="mt-4 text-center" id="card-image-container-${cardId}">
+              <img src="${imageUrl}" alt="問題の図" 
+                   class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;">
+              <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+                <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
+                  <i class="fas fa-check-circle mr-1"></i>保存済み
+                </span>
+                <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+              </div>
+            </div>
+          `
+        }
+      }
+      return true
+    } else {
+      throw new Error(res.data.error || 'アップロード失敗')
+    }
+  } catch (error) {
+    console.error('ファイルアップロードエラー:', error)
+    if (targetEl) {
+      targetEl.innerHTML = `
+        <div class="p-4 text-center">
+          <i class="fas fa-exclamation-triangle text-red-500 text-3xl mb-2 block"></i>
+          <p class="text-red-700 font-bold mb-2">アップロードに失敗しました</p>
+          <p class="text-xs text-gray-500 mb-3">${error.response?.data?.error || error.message || 'ネットワークエラー'}</p>
+          <div class="flex gap-2 justify-center">
+            <button onclick="openFilePickerForCard(${cardId})" class="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold">
+              <i class="fas fa-redo mr-1"></i>もう一度試す
+            </button>
+            <button onclick="quickPasteImageUrl(${cardId})" class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-bold">
+              <i class="fas fa-paste mr-1"></i>URL貼付
+            </button>
+          </div>
+        </div>
+      `
+    }
+    return false
+  }
+}
+window.uploadFileToCard = uploadFileToCard
+
+// カード画像差し替え（既存画像がある場合にファイルピッカーを開く）
+function replaceCardImage(cardId) {
+  openFilePickerForCard(cardId)
+}
+window.replaceCardImage = replaceCardImage
+
+// ファイル選択ダイアログを開く
+function openFilePickerForCard(cardId) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/jpeg,image/png,image/gif,image/webp,application/pdf'
+  input.style.display = 'none'
+  input.onchange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) uploadFileToCard(cardId, file)
+    input.remove()
+  }
+  document.body.appendChild(input)
+  input.click()
+}
+window.openFilePickerForCard = openFilePickerForCard
+
+// ドロップゾーンを初期化する（プレースホルダー要素にD&D機能を付与）
+function initDropZone(element, cardId) {
+  if (!element || element._dropZoneInit) return
+  element._dropZoneInit = true
+  
+  const preventDefaults = (e) => { e.preventDefault(); e.stopPropagation() }
+  ;['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+    element.addEventListener(evt, preventDefaults, false)
+  })
+  
+  // ドラッグ中のハイライト
+  element.addEventListener('dragenter', () => {
+    element.classList.add('ring-4', 'ring-purple-400', 'ring-opacity-70', 'bg-purple-50')
+    element.style.transition = 'all 0.2s ease'
+    // ドロップ案内オーバーレイ表示
+    let overlay = element.querySelector('.drop-overlay')
+    if (!overlay) {
+      overlay = document.createElement('div')
+      overlay.className = 'drop-overlay absolute inset-0 bg-purple-500 bg-opacity-20 rounded-2xl flex items-center justify-center z-20 pointer-events-none'
+      overlay.innerHTML = '<div class="bg-white rounded-xl px-6 py-4 shadow-xl text-center"><i class="fas fa-cloud-upload-alt text-purple-500 text-4xl mb-2 block"></i><p class="font-bold text-purple-700 text-lg">ここにドロップ！</p><p class="text-sm text-gray-500">JPG / PNG / PDF</p></div>'
+      element.style.position = 'relative'
+      element.appendChild(overlay)
+    }
+  })
+  element.addEventListener('dragleave', (e) => {
+    // 子要素へのdragleaveを無視
+    if (element.contains(e.relatedTarget)) return
+    element.classList.remove('ring-4', 'ring-purple-400', 'ring-opacity-70', 'bg-purple-50')
+    const overlay = element.querySelector('.drop-overlay')
+    if (overlay) overlay.remove()
+  })
+  element.addEventListener('drop', (e) => {
+    element.classList.remove('ring-4', 'ring-purple-400', 'ring-opacity-70', 'bg-purple-50')
+    const overlay = element.querySelector('.drop-overlay')
+    if (overlay) overlay.remove()
+    
+    const files = e.dataTransfer?.files
+    if (files && files.length > 0) {
+      uploadFileToCard(cardId, files[0])
+    }
+  })
+  
+  // クリップボード貼り付け対応（Ctrl+V / Cmd+V）
+  element.addEventListener('click', () => {
+    // フォーカスを当ててペーストイベントを受け取れるようにする
+    element.setAttribute('tabindex', '0')
+    element.focus()
+  })
+  element.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of items) {
+      if (item.type.startsWith('image/') || item.type === 'application/pdf') {
+        const file = item.getAsFile()
+        if (file) {
+          e.preventDefault()
+          uploadFileToCard(cardId, file)
+          return
+        }
+      }
+    }
+  })
+}
+window.initDropZone = initDropZone
+
+// ページ表示後にすべてのプレースホルダーにドロップゾーンを初期化
+function initAllDropZones() {
+  document.querySelectorAll('[id^="image-placeholder-"]').forEach(el => {
+    const cardId = el.id.replace('image-placeholder-', '')
+    if (cardId) initDropZone(el, Number(cardId))
+  })
+  // ガイドビューのプレースホルダー
+  document.querySelectorAll('[id^="guide-img-"]').forEach(el => {
+    const cardId = el.id.replace('guide-img-', '')
+    if (cardId) initDropZone(el, Number(cardId))
+  })
+}
+window.initAllDropZones = initAllDropZones
+
+// ============================================
+// 学習スタイル別サンプルページ（プレゼン用サンプル）
+// ============================================
 function showLearningStyleSamples() {
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -45685,11 +45920,12 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                         return '<div class="mb-3 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-dashed border-yellow-300 rounded-xl p-4 text-center" id="guide-img-' + cId + '">' +
                           '<div class="inline-flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full mb-2"><i class="fas fa-image text-2xl text-yellow-500"></i></div>' +
                           (mm.image_description ? '<p class="text-xs text-gray-600 mb-2"><i class="fas fa-info-circle text-blue-400 mr-1"></i>' + mm.image_description + '</p>' : '<p class="text-xs text-gray-500 mb-2">図を追加して学習効果UP!</p>') +
-                          '<div class="flex flex-wrap gap-2 justify-center">' +
+                          '<div class="flex flex-wrap gap-2 justify-center mb-2">' +
                             '<button onclick="generateImageForCard(' + cId + ', \'' + desc + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:shadow-md transition"><i class="fas fa-wand-magic-sparkles"></i>AI生成</button>' +
-                            '<button onclick="editCardImageUrl(' + cId + ', \'problem\')" class="inline-flex items-center gap-1 bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:shadow-md transition"><i class="fas fa-upload"></i>アップロード</button>' +
+                            '<button onclick="openFilePickerForCard(' + cId + ')" class="inline-flex items-center gap-1 bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:shadow-md transition"><i class="fas fa-file-image"></i>JPG/PDF</button>' +
                             '<button onclick="quickPasteImageUrl(' + cId + ')" class="inline-flex items-center gap-1 bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:shadow-md transition"><i class="fas fa-paste"></i>URL貼付</button>' +
                           '</div>' +
+                          '<p class="text-xs text-gray-400"><i class="fas fa-cloud-upload-alt mr-1"></i>ドラッグ&ドロップでも追加OK</p>' +
                         '</div>'
                       })()}
                       <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
@@ -46083,6 +46319,8 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
         renderTactileWidget(el.id, tactileText, cardData || { card_title: '', problem_text: '', _tactile_activity: tactileText })
       }
     })
+    // ガイドビューのドロップゾーンも初期化
+    if (typeof initAllDropZones === 'function') initAllDropZones()
   }, 300)
 }
 window.showPersonalizedCourseGuide = showPersonalizedCourseGuide

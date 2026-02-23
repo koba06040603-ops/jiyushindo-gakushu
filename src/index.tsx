@@ -22744,40 +22744,41 @@ app.post('/api/cards/:cardId/edit-history', async (c) => {
 // Phase 14: ファイルアップロード機能（Cloudflare R2）
 // =============================================================================
 
-// 画像ファイルアップロード
+// 画像ファイルアップロード（JPG/PNG/GIF/WebP/PDF対応）
 app.post('/api/upload/image', async (c) => {
   const { env } = c
   
   try {
     const formData = await c.req.formData()
     const file = formData.get('file') as File
+    const cardId = formData.get('card_id') as string | null
     
     if (!file) {
       return c.json({ success: false, error: 'ファイルが選択されていません' }, 400)
     }
     
-    // ファイルタイプチェック
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+    // ファイルタイプチェック（PDF対応追加）
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
     if (!allowedTypes.includes(file.type)) {
       return c.json({ 
         success: false, 
-        error: 'サポートされていない画像形式です。JPEG、PNG、GIF、WebPのみ対応しています。' 
+        error: 'サポートされていない形式です。JPEG、PNG、GIF、WebP、PDFに対応しています。' 
       }, 400)
     }
     
-    // ファイルサイズチェック（10MB制限）
-    const maxSize = 10 * 1024 * 1024 // 10MB
+    // ファイルサイズチェック（20MB制限 - PDFは大きい場合がある）
+    const maxSize = 20 * 1024 * 1024
     if (file.size > maxSize) {
       return c.json({ 
         success: false, 
-        error: 'ファイルサイズが大きすぎます。10MB以下の画像をアップロードしてください。' 
+        error: 'ファイルサイズが大きすぎます。20MB以下のファイルをアップロードしてください。' 
       }, 400)
     }
     
     // ファイル名生成（タイムスタンプ + ランダム文字列）
     const timestamp = Date.now()
     const randomStr = Math.random().toString(36).substring(7)
-    const extension = file.name.split('.').pop()
+    const extension = file.type === 'application/pdf' ? 'pdf' : (file.name.split('.').pop() || 'jpg')
     const fileName = `images/${timestamp}-${randomStr}.${extension}`
     
     // R2にアップロード
@@ -22788,16 +22789,29 @@ app.post('/api/upload/image', async (c) => {
       }
     })
     
-    // 公開URLを生成（Cloudflare R2のカスタムドメイン設定が必要）
-    // 開発環境では /api/media/{fileName} 経由でアクセス
+    // 公開URLを生成
     const imageUrl = `/api/media/${fileName}`
+    
+    // card_idが指定されていればカードに自動保存
+    if (cardId) {
+      try {
+        await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
+          .bind(imageUrl, Number(cardId))
+          .run()
+        console.log(`✅ カード ${cardId} に画像を自動保存: ${imageUrl}`)
+      } catch (dbErr: any) {
+        console.warn('⚠️ カードへの自動保存失敗:', dbErr.message)
+      }
+    }
     
     return c.json({
       success: true,
       image_url: imageUrl,
       file_name: fileName,
       file_size: file.size,
-      mime_type: file.type
+      mime_type: file.type,
+      is_pdf: file.type === 'application/pdf',
+      card_id: cardId || null
     })
   } catch (error: any) {
     console.error('❌ 画像アップロードエラー:', error)
