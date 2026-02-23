@@ -13355,28 +13355,85 @@ app.post('/api/card/:cardId/media/upload', async (c) => {
   try {
     const formData = await c.req.formData()
     const file = formData.get('file') as File
-    const mediaType = (formData.get('media_type') as string) || 'image'
     const label = (formData.get('label') as string) || ''
     
     if (!file) return c.json({ success: false, error: 'ファイルが選択されていません' }, 400)
     
-    // サイズ制限（画像5MB、動画/音声10MB）
-    const maxSize = mediaType === 'image' ? 5 * 1024 * 1024 : 10 * 1024 * 1024
-    if (file.size > maxSize) {
-      return c.json({ success: false, error: `ファイルサイズ上限: ${mediaType === 'image' ? '5MB' : '10MB'}` }, 400)
+    // ファイルタイプからメディアタイプを自動判定
+    let mediaType = 'image'
+    const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
+    const videoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/mpeg', 'video/x-msvideo', 'video/x-matroska']
+    const audioTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/webm', 'audio/x-m4a', 'audio/flac']
+    
+    if (videoTypes.includes(file.type)) mediaType = 'video'
+    else if (audioTypes.includes(file.type)) mediaType = 'audio'
+    else if (!imageTypes.includes(file.type)) {
+      // 拡張子からも判定
+      const ext = (file.name || '').split('.').pop()?.toLowerCase() || ''
+      if (['mp4','webm','ogg','mov','avi','mkv','m4v'].includes(ext)) mediaType = 'video'
+      else if (['mp3','wav','ogg','m4a','aac','flac','wma'].includes(ext)) mediaType = 'audio'
     }
     
-    // Base64変換
-    const arrayBuffer = await file.arrayBuffer()
-    const uint8Array = new Uint8Array(arrayBuffer)
-    let binary = ''
-    const chunkSize = 8192
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
-      binary += String.fromCharCode(...chunk)
+    // サイズ制限: 画像5MB、動画50MB、音声20MB
+    const maxSizes: Record<string, number> = { image: 5*1024*1024, video: 50*1024*1024, audio: 20*1024*1024 }
+    const maxSize = maxSizes[mediaType] || 50*1024*1024
+    if (file.size > maxSize) {
+      const limitMB = Math.round(maxSize / 1024 / 1024)
+      return c.json({ success: false, error: `ファイルサイズ上限: ${limitMB}MB（現在 ${(file.size/1024/1024).toFixed(1)}MB）` }, 400)
     }
-    const base64 = btoa(binary)
-    const dataUrl = `data:${file.type};base64,${base64}`
+    
+    const arrayBuffer = await file.arrayBuffer()
+    let dataUrl = ''
+    
+    if (mediaType === 'image') {
+      // 画像: Base64 data URLとしてDB直接保存
+      const uint8Array = new Uint8Array(arrayBuffer)
+      let binary = ''
+      const chunkSize = 8192
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+        binary += String.fromCharCode(...chunk)
+      }
+      const base64 = btoa(binary)
+      dataUrl = `data:${file.type};base64,${base64}`
+    } else {
+      // 動画・音声: R2にアップロード → URLで参照
+      const timestamp = Date.now()
+      const randomStr = Math.random().toString(36).substring(2, 8)
+      const ext = (file.name || '').split('.').pop() || (mediaType === 'video' ? 'mp4' : 'mp3')
+      const folder = mediaType === 'video' ? 'videos' : 'audio'
+      const fileName = `${folder}/${timestamp}-${randomStr}.${ext}`
+      
+      try {
+        if (env.MEDIA_BUCKET) {
+          await env.MEDIA_BUCKET.put(fileName, arrayBuffer, {
+            httpMetadata: { contentType: file.type }
+          })
+          dataUrl = `/api/media/${fileName}`
+          console.log(`✅ R2アップロード成功: ${fileName} (${(file.size/1024/1024).toFixed(1)}MB)`)
+        } else {
+          throw new Error('R2 not available')
+        }
+      } catch (r2Err: any) {
+        // R2が使えない場合: 小さいファイルならBase64、大きいファイルはエラー
+        if (file.size <= 5 * 1024 * 1024) {
+          const uint8Array = new Uint8Array(arrayBuffer)
+          let binary = ''
+          const chunkSize = 8192
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+            binary += String.fromCharCode(...chunk)
+          }
+          dataUrl = `data:${file.type};base64,${btoa(binary)}`
+          console.warn(`⚠️ R2不可、Base64フォールバック: ${(file.size/1024).toFixed(0)}KB`)
+        } else {
+          return c.json({ 
+            success: false, 
+            error: `動画/音声ファイルが大きすぎます（${(file.size/1024/1024).toFixed(1)}MB）。5MB以下のファイルか、YouTubeなどのURLで追加してください。`
+          }, 400)
+        }
+      }
+    }
     
     // media_items に追加
     await ensureMediaItemsColumn(env.DB)

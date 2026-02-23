@@ -31459,11 +31459,11 @@ async function removeMediaFromCard(cardId, mediaId) {
 }
 window.removeMediaFromCard = removeMediaFromCard
 
-// ファイル選択ダイアログを開く
+// ファイル選択ダイアログを開く（画像・動画・音声すべて対応）
 function openFilePickerForCard(cardId) {
   const input = document.createElement('input')
   input.type = 'file'
-  input.accept = 'image/jpeg,image/png,image/gif,image/webp,application/pdf'
+  input.accept = 'image/jpeg,image/png,image/gif,image/webp,application/pdf,video/mp4,video/webm,video/ogg,video/quicktime,audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac'
   input.style.display = 'none'
   input.onchange = (e) => {
     const file = e.target.files?.[0]
