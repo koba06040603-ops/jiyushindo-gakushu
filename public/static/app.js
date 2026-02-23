@@ -5716,6 +5716,22 @@ async function loadCardPage(cardId) {
                 </div>`
               })()}
               
+              <!-- インタラクティブ触覚ウィジェット -->
+              ${(() => {
+                const tactile = card._tactile_activity || ''
+                if (!tactile) return ''
+                const cardIdVal = card.card_id || card.id || 0
+                const widgetContainerId = 'tactile-widget-' + cardIdVal
+                return '<div class="mt-4 bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-4 shadow-sm" id="' + widgetContainerId + '-wrapper">' +
+                  '<div class="flex items-center gap-2 mb-3">' +
+                    '<span class="bg-orange-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span>' +
+                    '<span class="text-sm font-bold text-gray-700">' + tactile + '</span>' +
+                  '</div>' +
+                  '<div id="' + widgetContainerId + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[200px] relative"></div>' +
+                  '<p class="text-xs text-gray-500 mt-2 text-center"><i class="fas fa-hand-pointer mr-1"></i>画面をタッチ・ドラッグして操作してみよう</p>' +
+                '</div>'
+              })()}
+              
               <!-- 動画コンテンツ（YouTube / NHK for School） -->
               ${(() => {
                 const vUrl = card.solution_video_url || ''
@@ -6125,6 +6141,11 @@ async function loadCardPage(cardId) {
     window.helpCount = 0
     window.currentCardData = { card, hints, answer }
 
+    // 触覚ウィジェットを初期化
+    if (typeof initTactileWidgets === 'function') {
+      initTactileWidgets()
+    }
+
   } catch (error) {
     console.error('学習カード読み込みエラー:', error)
     alert('データの読み込みに失敗しました')
@@ -6504,34 +6525,110 @@ function updateAIMessage(messageId, newMessage) {
 
 // 問題文をゆっくり読み上げる
 function readCardAloud() {
-  // window.currentCardDataからカードデータを取得
+  console.log('🔊 readCardAloud 呼び出し')
+  
+  // 読み上げ中のアニメーション
+  const allSpeakers = document.querySelectorAll('[onclick="readCardAloud()"] i')
+  allSpeakers.forEach(icon => icon.classList.add('animate-pulse'))
+  
+  // カードデータ取得（複数ソースから試行）
+  let text = ''
   const cardData = window.currentCardData
   const card = cardData?.card || cardData
-  if (!card) {
-    console.warn('readCardAloud: カードデータがありません')
-    // フォールバック：ページ上の問題文テキストを読む
-    const problemEl = document.querySelector('.card-content')
-    if (problemEl) {
-      speakText(problemEl.textContent.trim(), 'female-friendly', 0.8)
-      return
-    }
-    return
+  
+  if (card && typeof card === 'object') {
+    text = card.problem_text || card._audio_instruction || card.problem_content || card.problem_description || card.card_title || ''
+    console.log('🔊 カードデータから取得:', text.substring(0, 50))
   }
-  const text = card.problem_text || card.problem_content || card.problem_description || ''
+  
+  // フォールバック1: ページ上の問題文テキスト
+  if (!text) {
+    const problemEl = document.querySelector('.bg-pink-50 .card-content') || document.querySelector('.card-content')
+    if (problemEl) {
+      text = problemEl.textContent.trim()
+      console.log('🔊 DOM問題文から取得:', text.substring(0, 50))
+    }
+  }
+  
+  // フォールバック2: きいてみよう欄のテキスト
+  if (!text) {
+    const audioEl = document.querySelector('[onclick="readCardAloud()"] .text-green-700')
+    if (audioEl) {
+      text = audioEl.textContent.trim()
+      console.log('🔊 audio_instructionから取得:', text.substring(0, 50))
+    }
+  }
+  
   if (!text) {
     console.warn('readCardAloud: 読み上げるテキストがありません')
+    allSpeakers.forEach(icon => icon.classList.remove('animate-pulse'))
     return
   }
-  // 読み上げ開始のフィードバック
-  const speakerIcon = document.querySelector('[onclick="readCardAloud()"] i.fa-volume-up')
-  if (speakerIcon) {
-    speakerIcon.classList.add('animate-pulse')
-    setTimeout(() => speakerIcon.classList.remove('animate-pulse'), 5000)
-  }
-  // ゆっくり読み上げ（速度0.8）
-  speakText(text, 'female-friendly', 0.8)
+  
+  // 直接Web Speech APIを使用（Google Cloud TTSよりも確実）
+  console.log('🔊 Web Speech API で読み上げ開始（速度0.8）')
+  speakTextDirect(text, 0.8)
+  
+  // アニメーション解除（5秒後、または読み上げ完了時）
+  setTimeout(() => allSpeakers.forEach(icon => icon.classList.remove('animate-pulse')), 8000)
 }
 window.readCardAloud = readCardAloud
+
+// 直接Web Speech APIで読み上げ（TTS APIを経由しない確実な方法）
+function speakTextDirect(text, speed = 0.85) {
+  if (!('speechSynthesis' in window)) {
+    console.warn('⚠️ Web Speech API 非対応')
+    alert('このブラウザは音声読み上げに対応していません')
+    return
+  }
+  
+  // 既存の読み上げを停止
+  speechSynthesis.cancel()
+  
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'ja-JP'
+  utterance.rate = speed
+  utterance.pitch = 1.2  // やや高め（子ども向け）
+  utterance.volume = 1.0
+  
+  // 日本語音声を選択
+  const voices = speechSynthesis.getVoices()
+  let voice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
+    || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Kyoko'))
+    || voices.find(v => v.lang === 'ja-JP')
+    || voices.find(v => v.lang.startsWith('ja'))
+  
+  if (voice) {
+    utterance.voice = voice
+    console.log('🎙️ 音声選択:', voice.name)
+  }
+  
+  // 音声がまだロードされていない場合の対策
+  if (voices.length === 0) {
+    speechSynthesis.onvoiceschanged = () => {
+      const v2 = speechSynthesis.getVoices()
+      const jaVoice = v2.find(v => v.lang === 'ja-JP') || v2.find(v => v.lang.startsWith('ja'))
+      if (jaVoice) utterance.voice = jaVoice
+      speechSynthesis.speak(utterance)
+    }
+    // すぐ試行もする
+    setTimeout(() => {
+      if (!speechSynthesis.speaking) speechSynthesis.speak(utterance)
+    }, 500)
+    return
+  }
+  
+  utterance.onstart = () => console.log('🔊 読み上げ開始')
+  utterance.onend = () => {
+    console.log('✅ 読み上げ完了')
+    document.querySelectorAll('[onclick="readCardAloud()"] i').forEach(icon => icon.classList.remove('animate-pulse'))
+    TactileSounds.play('correct')
+  }
+  utterance.onerror = (e) => console.error('❌ 読み上げエラー:', e.error)
+  
+  speechSynthesis.speak(utterance)
+}
+window.speakTextDirect = speakTextDirect
 
 // 学習カード上のプレースホルダーからAI画像を生成して保存
 async function generateImageForCard(cardId, description) {
@@ -6594,6 +6691,786 @@ async function generateImageForCard(cardId, description) {
   }
 }
 window.generateImageForCard = generateImageForCard
+
+// ====================================================================
+// インタラクティブ触覚ウィジェットエンジン
+// _tactile_activityメタデータからウィジェットタイプを自動判定し描画
+// ====================================================================
+
+// --- 効果音ジェネレーター (Web Audio API) ---
+const TactileSounds = {
+  ctx: null,
+  getCtx() {
+    if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)()
+    return this.ctx
+  },
+  play(type) {
+    try {
+      const ctx = this.getCtx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      const now = ctx.currentTime
+      switch(type) {
+        case 'tap':
+          osc.frequency.setValueAtTime(800, now)
+          osc.frequency.exponentialRampToValueAtTime(400, now + 0.08)
+          gain.gain.setValueAtTime(0.3, now)
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1)
+          osc.start(now); osc.stop(now + 0.1)
+          break
+        case 'correct':
+          osc.type = 'sine'
+          osc.frequency.setValueAtTime(523, now)
+          osc.frequency.setValueAtTime(659, now + 0.1)
+          osc.frequency.setValueAtTime(784, now + 0.2)
+          gain.gain.setValueAtTime(0.3, now)
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4)
+          osc.start(now); osc.stop(now + 0.4)
+          break
+        case 'move':
+          osc.type = 'triangle'
+          osc.frequency.setValueAtTime(300, now)
+          osc.frequency.exponentialRampToValueAtTime(500, now + 0.05)
+          gain.gain.setValueAtTime(0.15, now)
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08)
+          osc.start(now); osc.stop(now + 0.08)
+          break
+        case 'drop':
+          osc.type = 'sine'
+          osc.frequency.setValueAtTime(600, now)
+          osc.frequency.exponentialRampToValueAtTime(200, now + 0.15)
+          gain.gain.setValueAtTime(0.25, now)
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2)
+          osc.start(now); osc.stop(now + 0.2)
+          break
+        case 'step':
+          osc.type = 'square'
+          osc.frequency.setValueAtTime(200, now)
+          gain.gain.setValueAtTime(0.1, now)
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06)
+          osc.start(now); osc.stop(now + 0.06)
+          break
+      }
+    } catch(e) { /* audio context not available */ }
+  }
+}
+
+// --- ウィジェットタイプ自動判定 ---
+function detectWidgetType(tactileText, cardData) {
+  const t = (tactileText || '').toLowerCase()
+  const title = (cardData?.card_title || '').toLowerCase()
+  const problem = (cardData?.problem_text || '').toLowerCase()
+  const all = t + ' ' + title + ' ' + problem
+
+  if (/数直線|すうちょくせん|number.?line/.test(all)) return 'numberline'
+  if (/温度|おんど|気温|℃|温度計|thermometer/.test(all)) return 'thermometer'
+  if (/ブロック|おはじき|色分け|タイル|積み木|block/.test(all)) return 'blocks'
+  if (/歩|あるい|方位|東西|南北|compass|向き/.test(all)) return 'walk'
+  if (/得点|スコア|点数|カード.*計算|score/.test(all)) return 'scorecard'
+  if (/時計|なんじ|何時|とけい|clock/.test(all)) return 'clock'
+  if (/グラフ|棒グラフ|折れ線|chart|graph/.test(all)) return 'graph'
+  if (/図形|三角|四角|丸|しかく|さんかく|shape/.test(all)) return 'shapes'
+  if (/かず|数え|いくつ|counting|おおきい.*かず/.test(all)) return 'counter'
+  if (/さいころ|サイコロ|dice/.test(all)) return 'dice'
+  return 'generic'
+}
+
+// --- メインレンダラー ---
+function renderTactileWidget(containerId, tactileText, cardData) {
+  const container = document.getElementById(containerId)
+  if (!container) return
+
+  const type = detectWidgetType(tactileText, cardData)
+  console.log('🎮 触覚ウィジェット描画:', type, containerId)
+
+  switch(type) {
+    case 'numberline': renderNumberLine(container, cardData); break
+    case 'thermometer': renderThermometer(container, cardData); break
+    case 'blocks': renderBlocks(container, cardData); break
+    case 'walk': renderWalkGame(container, cardData); break
+    case 'scorecard': renderScoreCard(container, cardData); break
+    case 'clock': renderClock(container, cardData); break
+    case 'counter': renderCounter(container, cardData); break
+    case 'dice': renderDice(container, cardData); break
+    default: renderGenericTactile(container, tactileText, cardData); break
+  }
+}
+
+// ========== 数直線ウィジェット ==========
+function renderNumberLine(container, cardData) {
+  const problem = cardData?.problem_text || ''
+  // 問題文から数値を抽出
+  const nums = (problem.match(/-?\d+(\.\d+)?/g) || []).map(Number)
+  const minVal = Math.min(-10, ...nums) - 2
+  const maxVal = Math.max(10, ...nums) + 2
+
+  container.innerHTML = `
+    <div class="p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-bold text-orange-700"><i class="fas fa-ruler-horizontal mr-1"></i>数直線</span>
+        <button onclick="this.closest('[id^=tactile-widget]').querySelector('.nl-marker').style.left='50%'; TactileSounds.play('tap')" 
+                class="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded">リセット</button>
+      </div>
+      <div class="relative bg-gray-100 rounded-lg p-4 select-none" style="touch-action:none">
+        <svg viewBox="0 0 400 80" class="w-full" style="max-height:80px">
+          <line x1="10" y1="40" x2="390" y2="40" stroke="#374151" stroke-width="2"/>
+          <polygon points="385,35 395,40 385,45" fill="#374151"/>
+          ${Array.from({length: maxVal - minVal + 1}, (_, i) => {
+            const val = minVal + i
+            const x = 10 + (i / (maxVal - minVal)) * 380
+            const isMajor = val % 5 === 0 || val === 0
+            return `<line x1="${x}" y1="${isMajor ? 28 : 33}" x2="${x}" y2="${isMajor ? 52 : 47}" stroke="${val === 0 ? '#dc2626' : '#6b7280'}" stroke-width="${isMajor ? 2 : 1}"/>
+              ${isMajor || Math.abs(val) <= 5 ? `<text x="${x}" y="${65}" text-anchor="middle" font-size="${val === 0 ? 14 : 11}" fill="${val === 0 ? '#dc2626' : val < 0 ? '#2563eb' : '#16a34a'}" font-weight="${val === 0 ? 'bold' : 'normal'}">${val}</text>` : ''}`
+          }).join('')}
+        </svg>
+        <div class="relative mt-1" style="height:40px">
+          <div class="nl-marker absolute cursor-grab active:cursor-grabbing" 
+               style="left:50%; top:0; transform:translateX(-50%); z-index:10; touch-action:none"
+               onmousedown="startNLDrag(event, this)" ontouchstart="startNLDrag(event, this)">
+            <div class="flex flex-col items-center">
+              <div class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-lg nl-value">0</div>
+              <div class="w-0 h-0 border-l-[6px] border-r-[6px] border-b-[8px] border-transparent border-b-red-500" style="transform:rotate(180deg)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mt-2 text-center">
+        <span class="text-sm text-gray-600">マーカーをドラッグして数を選ぼう：</span>
+        <span class="text-lg font-bold text-red-600 nl-display">0</span>
+      </div>
+    </div>`
+
+  // ドラッグ設定
+  const track = container.querySelector('.relative.bg-gray-100')
+  window._nlConfig = { minVal, maxVal, track }
+}
+
+function startNLDrag(e, marker) {
+  e.preventDefault()
+  TactileSounds.play('tap')
+  const config = window._nlConfig
+  if (!config) return
+  const track = config.track
+  const rect = track.getBoundingClientRect()
+
+  function onMove(ev) {
+    const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX
+    let pct = (clientX - rect.left) / rect.width
+    pct = Math.max(0, Math.min(1, pct))
+    marker.style.left = (pct * 100) + '%'
+    const val = Math.round(config.minVal + pct * (config.maxVal - config.minVal))
+    marker.querySelector('.nl-value').textContent = val
+    const display = marker.closest('[id^=tactile-widget]').querySelector('.nl-display')
+    if (display) display.textContent = val
+    TactileSounds.play('move')
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    document.removeEventListener('touchmove', onMove)
+    document.removeEventListener('touchend', onUp)
+    TactileSounds.play('drop')
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+  document.addEventListener('touchmove', onMove, {passive: false})
+  document.addEventListener('touchend', onUp)
+}
+window.startNLDrag = startNLDrag
+
+// ========== 温度計ウィジェット ==========
+function renderThermometer(container, cardData) {
+  const problem = cardData?.problem_text || ''
+  const nums = (problem.match(/-?\d+/g) || []).map(Number)
+  const targetTemp = nums.length > 0 ? nums[0] : 5
+
+  container.innerHTML = `
+    <div class="p-4 flex flex-col items-center">
+      <div class="flex items-center gap-1 mb-2 w-full justify-between">
+        <span class="text-sm font-bold text-orange-700"><i class="fas fa-thermometer-half mr-1"></i>温度計を動かしてみよう</span>
+        <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">スライドで温度を変更</span>
+      </div>
+      <div class="flex items-center gap-6 my-2">
+        <div class="relative" style="width:60px; height:240px">
+          <svg viewBox="0 0 60 240" width="60" height="240">
+            <!-- 温度計の外枠 -->
+            <rect x="20" y="10" width="20" height="190" rx="10" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1.5"/>
+            <circle cx="30" cy="215" r="18" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1.5"/>
+            <!-- 温度の液 -->
+            <rect x="23" y="10" width="14" height="190" rx="7" fill="url(#tempGrad)" class="thermo-fill"/>
+            <circle cx="30" cy="215" r="14" fill="#ef4444"/>
+            <!-- 目盛り -->
+            ${Array.from({length: 21}, (_, i) => {
+              const temp = -10 + i
+              const y = 190 - (i / 20) * 180
+              const isMajor = temp % 5 === 0
+              return `<line x1="${isMajor ? 42 : 44}" y1="${y}" x2="52" y2="${y}" stroke="${temp === 0 ? '#dc2626' : '#6b7280'}" stroke-width="${isMajor ? 1.5 : 0.8}"/>
+                ${isMajor ? `<text x="55" y="${y + 4}" font-size="9" fill="${temp < 0 ? '#2563eb' : temp > 0 ? '#dc2626' : '#000'}" font-weight="${temp === 0 ? 'bold' : 'normal'}">${temp}℃</text>` : ''}`
+            }).join('')}
+            <defs><linearGradient id="tempGrad" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#ef4444"/>
+              <stop offset="50%" stop-color="#f97316"/>
+              <stop offset="100%" stop-color="#3b82f6"/>
+            </linearGradient></defs>
+          </svg>
+          <!-- スライダー -->
+          <input type="range" min="-10" max="10" value="0" step="1"
+                 class="thermo-slider absolute"
+                 style="width:190px; transform:rotate(-90deg); transform-origin:0 0; left:58px; top:195px; accent-color:#ef4444"
+                 oninput="updateThermometer(this)">
+        </div>
+        <div class="text-center">
+          <div class="text-5xl font-bold thermo-value" style="color:#ef4444">0℃</div>
+          <div class="mt-2 text-sm text-gray-600">
+            <span class="thermo-label">ちょうど 0℃ だよ</span>
+          </div>
+          <div class="mt-3 flex gap-2">
+            <button onclick="setThermo(this, ${targetTemp})" class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold">
+              ${targetTemp}℃にしよう
+            </button>
+            <button onclick="setThermo(this, 0)" class="bg-gray-300 hover:bg-gray-400 text-gray-700 text-xs px-3 py-1.5 rounded-lg font-bold">
+              リセット
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`
+}
+
+function updateThermometer(slider) {
+  const val = parseInt(slider.value)
+  const wrapper = slider.closest('[id$="-wrapper"]') || slider.closest('[id^="tactile-widget"]')?.parentElement
+  const container = slider.closest('[id^="tactile-widget"]') || wrapper?.querySelector('[id^="tactile-widget"]')
+  if (!container) return
+  const display = container.querySelector('.thermo-value')
+  const label = container.querySelector('.thermo-label')
+  const fill = container.querySelector('.thermo-fill')
+  if (display) {
+    display.textContent = val + '℃'
+    display.style.color = val < 0 ? '#2563eb' : val > 0 ? '#ef4444' : '#6b7280'
+  }
+  if (label) {
+    if (val > 0) label.textContent = '0℃より ' + val + '度 あたたかい'
+    else if (val < 0) label.textContent = '0℃より ' + Math.abs(val) + '度 つめたい'
+    else label.textContent = 'ちょうど 0℃ だよ'
+  }
+  if (fill) {
+    const pct = ((val + 10) / 20) * 100
+    fill.setAttribute('y', (190 - (pct / 100) * 180))
+    fill.setAttribute('height', (pct / 100) * 180 + 10)
+  }
+  TactileSounds.play('move')
+}
+window.updateThermometer = updateThermometer
+
+function setThermo(btn, val) {
+  const container = btn.closest('[id^="tactile-widget"]') || btn.closest('[id$="-wrapper"]')?.querySelector('[id^="tactile-widget"]')
+  if (!container) return
+  const slider = container.querySelector('.thermo-slider')
+  if (slider) { slider.value = val; updateThermometer(slider) }
+  TactileSounds.play('correct')
+}
+window.setThermo = setThermo
+
+// ========== ブロック操作ウィジェット ==========
+function renderBlocks(container, cardData) {
+  const problem = cardData?.problem_text || ''
+  const tactile = cardData?._tactile_activity || ''
+  const isRedBlue = /赤.*青|プラス.*マイナス/.test(tactile)
+
+  container.innerHTML = `
+    <div class="p-4">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-sm font-bold text-orange-700"><i class="fas fa-th-large mr-1"></i>ブロックを動かそう</span>
+        <div class="flex gap-1">
+          <button onclick="addBlock(this, 'plus')" class="bg-red-400 hover:bg-red-500 text-white text-xs px-2 py-1 rounded font-bold">+ブロック</button>
+          <button onclick="addBlock(this, 'minus')" class="bg-blue-400 hover:bg-blue-500 text-white text-xs px-2 py-1 rounded font-bold">-ブロック</button>
+          <button onclick="resetBlocks(this)" class="bg-gray-300 hover:bg-gray-400 text-xs px-2 py-1 rounded font-bold">クリア</button>
+        </div>
+      </div>
+      <div class="flex gap-4 mb-3">
+        <div class="flex-1">
+          <div class="text-xs font-bold text-red-600 mb-1 text-center">プラス（+）</div>
+          <div class="blocks-area blocks-plus bg-red-50 border-2 border-red-200 rounded-lg min-h-[100px] p-2 flex flex-wrap gap-1 content-start"
+               ondrop="dropBlock(event, 'plus')" ondragover="event.preventDefault()"></div>
+        </div>
+        <div class="flex-1">
+          <div class="text-xs font-bold text-blue-600 mb-1 text-center">マイナス（-）</div>
+          <div class="blocks-area blocks-minus bg-blue-50 border-2 border-blue-200 rounded-lg min-h-[100px] p-2 flex flex-wrap gap-1 content-start"
+               ondrop="dropBlock(event, 'minus')" ondragover="event.preventDefault()"></div>
+        </div>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3 text-center">
+        <span class="text-sm text-gray-600">合計：</span>
+        <span class="text-2xl font-bold blocks-total" style="color:#16a34a">0</span>
+        <span class="text-sm text-gray-500 ml-2">(<span class="text-red-500 blocks-plus-count">0</span>個 + <span class="text-blue-500 blocks-minus-count">0</span>個)</span>
+      </div>
+    </div>`
+}
+
+function addBlock(btn, type) {
+  const container = btn.closest('[id^="tactile-widget"]') || btn.closest('[id$="-wrapper"]')?.querySelector('[id^="tactile-widget"]')
+  if (!container) return
+  const area = container.querySelector('.blocks-' + type)
+  if (!area) return
+  const block = document.createElement('div')
+  block.className = 'w-8 h-8 rounded cursor-pointer flex items-center justify-center text-white font-bold text-sm shadow transition-transform hover:scale-110 ' +
+    (type === 'plus' ? 'bg-red-400' : 'bg-blue-400')
+  block.textContent = type === 'plus' ? '+1' : '-1'
+  block.draggable = true
+  block.dataset.type = type
+  block.ondragstart = (e) => e.dataTransfer.setData('text', type)
+  block.onclick = () => { block.remove(); updateBlockCount(container); TactileSounds.play('tap') }
+  area.appendChild(block)
+  updateBlockCount(container)
+  TactileSounds.play('drop')
+}
+window.addBlock = addBlock
+
+function dropBlock(e, targetType) {
+  e.preventDefault()
+  const srcType = e.dataTransfer.getData('text')
+  if (srcType === targetType) return
+  // Opposite blocks cancel each other
+  const container = e.target.closest('[id^="tactile-widget"]')
+  if (!container) return
+  const srcArea = container.querySelector('.blocks-' + srcType)
+  if (srcArea && srcArea.lastChild) { srcArea.lastChild.remove(); updateBlockCount(container) }
+  TactileSounds.play('correct')
+}
+window.dropBlock = dropBlock
+
+function resetBlocks(btn) {
+  const container = btn.closest('[id^="tactile-widget"]') || btn.closest('[id$="-wrapper"]')?.querySelector('[id^="tactile-widget"]')
+  if (!container) return
+  container.querySelector('.blocks-plus').innerHTML = ''
+  container.querySelector('.blocks-minus').innerHTML = ''
+  updateBlockCount(container)
+  TactileSounds.play('tap')
+}
+window.resetBlocks = resetBlocks
+
+function updateBlockCount(container) {
+  const plus = container.querySelectorAll('.blocks-plus > div').length
+  const minus = container.querySelectorAll('.blocks-minus > div').length
+  const total = plus - minus
+  const totalEl = container.querySelector('.blocks-total')
+  const plusCnt = container.querySelector('.blocks-plus-count')
+  const minusCnt = container.querySelector('.blocks-minus-count')
+  if (totalEl) {
+    totalEl.textContent = (total > 0 ? '+' : '') + total
+    totalEl.style.color = total > 0 ? '#dc2626' : total < 0 ? '#2563eb' : '#16a34a'
+  }
+  if (plusCnt) plusCnt.textContent = plus
+  if (minusCnt) minusCnt.textContent = minus
+}
+
+// ========== 歩行ゲームウィジェット ==========
+function renderWalkGame(container, cardData) {
+  const problem = cardData?.problem_text || ''
+  const nums = (problem.match(/-?\d+/g) || []).map(Number)
+  const target = nums.length > 0 ? nums[0] : 5
+
+  container.innerHTML = `
+    <div class="p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-bold text-orange-700"><i class="fas fa-walking mr-1"></i>歩いて動いてみよう</span>
+        <button onclick="resetWalk(this)" class="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded">リセット</button>
+      </div>
+      <div class="relative bg-gradient-to-r from-blue-50 via-gray-50 to-green-50 rounded-lg p-3" style="min-height:120px">
+        <!-- 方向ラベル -->
+        <div class="flex justify-between text-xs font-bold mb-1">
+          <span class="text-blue-600">← 西（マイナス）</span>
+          <span class="text-gray-500">スタート</span>
+          <span class="text-green-600">東（プラス）→</span>
+        </div>
+        <!-- 道 -->
+        <div class="relative bg-yellow-100 border-2 border-yellow-300 rounded-full h-10 mt-2 mb-2">
+          ${Array.from({length: 21}, (_, i) => {
+            const pos = -10 + i
+            const left = (i / 20) * 100
+            return `<div class="absolute top-0 h-full flex items-center justify-center" style="left:${left}%;transform:translateX(-50%)">
+              <div class="w-px h-3 ${pos === 0 ? 'bg-red-500 h-full w-0.5' : 'bg-gray-300'}" style="margin-top:${pos === 0 ? 0 : 6}px"></div>
+            </div>`
+          }).join('')}
+          <!-- キャラクター -->
+          <div class="walk-char absolute top-1/2 transition-all duration-300" style="left:50%; transform:translate(-50%,-50%)">
+            <span class="text-3xl">🚶</span>
+          </div>
+        </div>
+        <!-- 目盛り -->
+        <div class="relative h-4">
+          ${[-10,-5,0,5,10].map(v => {
+            const left = ((v + 10) / 20) * 100
+            return `<span class="absolute text-xs font-bold ${v === 0 ? 'text-red-600' : v < 0 ? 'text-blue-600' : 'text-green-600'}" style="left:${left}%;transform:translateX(-50%)">${v}</span>`
+          }).join('')}
+        </div>
+      </div>
+      <div class="flex items-center justify-center gap-3 mt-3">
+        <button onclick="moveWalk(this, -1)" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-lg shadow">
+          ← 西へ1歩
+        </button>
+        <div class="text-center px-3">
+          <div class="text-xs text-gray-500">現在地</div>
+          <div class="text-2xl font-bold walk-position" style="color:#dc2626">0</div>
+        </div>
+        <button onclick="moveWalk(this, 1)" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-lg shadow">
+          東へ1歩 →
+        </button>
+      </div>
+    </div>`
+
+  container._walkPos = 0
+}
+
+function moveWalk(btn, dir) {
+  const container = btn.closest('[id^="tactile-widget"]') || btn.closest('[id$="-wrapper"]')?.querySelector('[id^="tactile-widget"]')
+  if (!container) return
+  let pos = (container._walkPos || 0) + dir
+  pos = Math.max(-10, Math.min(10, pos))
+  container._walkPos = pos
+  const pct = ((pos + 10) / 20) * 100
+  const char = container.querySelector('.walk-char')
+  const display = container.querySelector('.walk-position')
+  if (char) {
+    char.style.left = pct + '%'
+    char.querySelector('span').style.transform = dir < 0 ? 'scaleX(-1)' : 'scaleX(1)'
+  }
+  if (display) {
+    display.textContent = (pos > 0 ? '+' : '') + pos
+    display.style.color = pos > 0 ? '#16a34a' : pos < 0 ? '#2563eb' : '#dc2626'
+  }
+  TactileSounds.play('step')
+}
+window.moveWalk = moveWalk
+
+function resetWalk(btn) {
+  const container = btn.closest('[id^="tactile-widget"]') || btn.closest('[id$="-wrapper"]')?.querySelector('[id^="tactile-widget"]')
+  if (!container) return
+  container._walkPos = 0
+  const char = container.querySelector('.walk-char')
+  const display = container.querySelector('.walk-position')
+  if (char) char.style.left = '50%'
+  if (display) { display.textContent = '0'; display.style.color = '#dc2626' }
+  TactileSounds.play('tap')
+}
+window.resetWalk = resetWalk
+
+// ========== スコアカードウィジェット ==========
+function renderScoreCard(container, cardData) {
+  container.innerHTML = `
+    <div class="p-4">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-sm font-bold text-orange-700"><i class="fas fa-star mr-1"></i>得点カードで計算</span>
+        <button onclick="resetScoreCards(this)" class="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded">リセット</button>
+      </div>
+      <div class="flex flex-wrap gap-2 mb-3 justify-center score-cards-area">
+        ${[-5,-3,-2,-1,1,2,3,5].map(v => `
+          <button onclick="toggleScoreCard(this, ${v})" 
+                  class="score-btn w-14 h-14 rounded-xl border-2 font-bold text-lg shadow-sm transition-all hover:scale-105 
+                    ${v > 0 ? 'border-red-300 bg-red-50 text-red-600 hover:bg-red-100' : 'border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100'}"
+                  data-val="${v}" data-selected="false">
+            ${v > 0 ? '+' : ''}${v}
+          </button>`).join('')}
+      </div>
+      <div class="bg-gray-50 rounded-lg p-3 text-center">
+        <span class="text-sm text-gray-600">合計得点：</span>
+        <span class="text-3xl font-bold score-total" style="color:#16a34a">0</span>
+        <span class="text-sm text-gray-500 score-detail ml-2"></span>
+      </div>
+    </div>`
+}
+
+function toggleScoreCard(btn, val) {
+  const isSelected = btn.dataset.selected === 'true'
+  btn.dataset.selected = isSelected ? 'false' : 'true'
+  if (!isSelected) {
+    btn.classList.add(val > 0 ? 'ring-2' : 'ring-2', val > 0 ? 'ring-red-500' : 'ring-blue-500', 'scale-110')
+    btn.classList.add('shadow-lg')
+  } else {
+    btn.classList.remove('ring-2', 'ring-red-500', 'ring-blue-500', 'scale-110', 'shadow-lg')
+  }
+  const container = btn.closest('[id^="tactile-widget"]')
+  if (!container) return
+  let total = 0
+  const parts = []
+  container.querySelectorAll('.score-btn[data-selected="true"]').forEach(b => {
+    const v = parseInt(b.dataset.val)
+    total += v
+    parts.push((v > 0 ? '+' : '') + v)
+  })
+  const totalEl = container.querySelector('.score-total')
+  const detail = container.querySelector('.score-detail')
+  if (totalEl) {
+    totalEl.textContent = (total > 0 ? '+' : '') + total
+    totalEl.style.color = total > 0 ? '#dc2626' : total < 0 ? '#2563eb' : '#16a34a'
+  }
+  if (detail) detail.textContent = parts.length > 0 ? '(' + parts.join(' ') + ')' : ''
+  TactileSounds.play(isSelected ? 'tap' : 'drop')
+}
+window.toggleScoreCard = toggleScoreCard
+
+function resetScoreCards(btn) {
+  const container = btn.closest('[id^="tactile-widget"]') || btn.closest('[id$="-wrapper"]')?.querySelector('[id^="tactile-widget"]')
+  if (!container) return
+  container.querySelectorAll('.score-btn').forEach(b => {
+    b.dataset.selected = 'false'
+    b.classList.remove('ring-2', 'ring-red-500', 'ring-blue-500', 'scale-110', 'shadow-lg')
+  })
+  const totalEl = container.querySelector('.score-total')
+  const detail = container.querySelector('.score-detail')
+  if (totalEl) { totalEl.textContent = '0'; totalEl.style.color = '#16a34a' }
+  if (detail) detail.textContent = ''
+  TactileSounds.play('tap')
+}
+window.resetScoreCards = resetScoreCards
+
+// ========== 時計ウィジェット ==========
+function renderClock(container, cardData) {
+  container.innerHTML = `
+    <div class="p-4 flex flex-col items-center">
+      <div class="flex items-center gap-2 mb-2 w-full justify-between">
+        <span class="text-sm font-bold text-orange-700"><i class="fas fa-clock mr-1"></i>時計をうごかそう</span>
+      </div>
+      <div class="relative" style="width:200px;height:200px">
+        <svg viewBox="0 0 200 200" class="w-full h-full">
+          <circle cx="100" cy="100" r="95" fill="white" stroke="#374151" stroke-width="3"/>
+          ${Array.from({length: 12}, (_, i) => {
+            const angle = (i * 30 - 90) * Math.PI / 180
+            const x = 100 + 78 * Math.cos(angle)
+            const y = 100 + 78 * Math.sin(angle)
+            return `<text x="${x}" y="${y + 5}" text-anchor="middle" font-size="16" font-weight="bold" fill="#374151">${i === 0 ? 12 : i}</text>`
+          }).join('')}
+          ${Array.from({length: 60}, (_, i) => {
+            const angle = (i * 6 - 90) * Math.PI / 180
+            const r1 = i % 5 === 0 ? 86 : 90
+            const r2 = 94
+            return `<line x1="${100 + r1 * Math.cos(angle)}" y1="${100 + r1 * Math.sin(angle)}" x2="${100 + r2 * Math.cos(angle)}" y2="${100 + r2 * Math.sin(angle)}" stroke="#9ca3af" stroke-width="${i % 5 === 0 ? 2 : 0.8}"/>`
+          }).join('')}
+          <line class="clock-hour-hand" x1="100" y1="100" x2="100" y2="45" stroke="#1f2937" stroke-width="5" stroke-linecap="round"/>
+          <line class="clock-min-hand" x1="100" y1="100" x2="100" y2="25" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="100" cy="100" r="5" fill="#ef4444"/>
+        </svg>
+      </div>
+      <div class="flex items-center gap-3 mt-3">
+        <div class="flex flex-col items-center">
+          <label class="text-xs text-gray-500 mb-1">じかん</label>
+          <div class="flex items-center gap-1">
+            <button onclick="adjustClock(this, 'hour', -1)" class="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold">-</button>
+            <span class="text-2xl font-bold clock-hour-val w-8 text-center">12</span>
+            <button onclick="adjustClock(this, 'hour', 1)" class="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold">+</button>
+          </div>
+        </div>
+        <span class="text-2xl font-bold text-gray-400 mt-4">:</span>
+        <div class="flex flex-col items-center">
+          <label class="text-xs text-gray-500 mb-1">ふん</label>
+          <div class="flex items-center gap-1">
+            <button onclick="adjustClock(this, 'min', -5)" class="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold">-</button>
+            <span class="text-2xl font-bold clock-min-val w-8 text-center">00</span>
+            <button onclick="adjustClock(this, 'min', 5)" class="bg-gray-200 hover:bg-gray-300 w-7 h-7 rounded-full text-sm font-bold">+</button>
+          </div>
+        </div>
+      </div>
+    </div>`
+  container._clockH = 12
+  container._clockM = 0
+}
+
+function adjustClock(btn, type, delta) {
+  const container = btn.closest('[id^="tactile-widget"]')
+  if (!container) return
+  if (type === 'hour') {
+    container._clockH = ((container._clockH || 12) + delta + 12 - 1) % 12 + 1
+  } else {
+    container._clockM = ((container._clockM || 0) + delta + 60) % 60
+  }
+  updateClockDisplay(container)
+  TactileSounds.play('tap')
+}
+window.adjustClock = adjustClock
+
+function updateClockDisplay(container) {
+  const h = container._clockH || 12
+  const m = container._clockM || 0
+  container.querySelector('.clock-hour-val').textContent = h
+  container.querySelector('.clock-min-val').textContent = String(m).padStart(2, '0')
+  const hourAngle = ((h % 12) * 30 + m * 0.5 - 90) * Math.PI / 180
+  const minAngle = (m * 6 - 90) * Math.PI / 180
+  const hHand = container.querySelector('.clock-hour-hand')
+  const mHand = container.querySelector('.clock-min-hand')
+  if (hHand) { hHand.setAttribute('x2', 100 + 45 * Math.cos(hourAngle)); hHand.setAttribute('y2', 100 + 45 * Math.sin(hourAngle)) }
+  if (mHand) { mHand.setAttribute('x2', 100 + 65 * Math.cos(minAngle)); mHand.setAttribute('y2', 100 + 65 * Math.sin(minAngle)) }
+}
+
+// ========== カウンターウィジェット ==========
+function renderCounter(container, cardData) {
+  container.innerHTML = `
+    <div class="p-4">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-sm font-bold text-orange-700"><i class="fas fa-sort-numeric-up mr-1"></i>かずをかぞえよう</span>
+      </div>
+      <div class="flex items-center justify-center gap-4 mb-3">
+        <button onclick="adjustCounter(this, -1)" class="bg-red-400 hover:bg-red-500 text-white w-12 h-12 rounded-full text-2xl font-bold shadow-lg transition-transform hover:scale-110">-</button>
+        <div class="text-center">
+          <div class="text-5xl font-bold counter-value text-indigo-600">0</div>
+          <div class="counter-dots flex flex-wrap gap-1 justify-center mt-2 max-w-[200px]"></div>
+        </div>
+        <button onclick="adjustCounter(this, 1)" class="bg-green-400 hover:bg-green-500 text-white w-12 h-12 rounded-full text-2xl font-bold shadow-lg transition-transform hover:scale-110">+</button>
+      </div>
+      <div class="flex gap-2 justify-center">
+        <button onclick="setCounter(this, 0)" class="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">リセット</button>
+        <button onclick="setCounter(this, 5)" class="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded">5にする</button>
+        <button onclick="setCounter(this, 10)" class="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded">10にする</button>
+      </div>
+    </div>`
+  container._counterVal = 0
+}
+
+function adjustCounter(btn, delta) {
+  const container = btn.closest('[id^="tactile-widget"]')
+  if (!container) return
+  let val = (container._counterVal || 0) + delta
+  val = Math.max(0, Math.min(30, val))
+  container._counterVal = val
+  updateCounterDisplay(container)
+  TactileSounds.play(delta > 0 ? 'drop' : 'tap')
+}
+window.adjustCounter = adjustCounter
+
+function setCounter(btn, val) {
+  const container = btn.closest('[id^="tactile-widget"]')
+  if (!container) return
+  container._counterVal = val
+  updateCounterDisplay(container)
+  TactileSounds.play('tap')
+}
+window.setCounter = setCounter
+
+function updateCounterDisplay(container) {
+  const val = container._counterVal || 0
+  container.querySelector('.counter-value').textContent = val
+  const dots = container.querySelector('.counter-dots')
+  if (dots) {
+    dots.innerHTML = Array.from({length: val}, (_, i) =>
+      `<div class="w-5 h-5 rounded-full ${i < 5 ? 'bg-red-400' : i < 10 ? 'bg-blue-400' : i < 15 ? 'bg-green-400' : i < 20 ? 'bg-yellow-400' : 'bg-purple-400'} shadow-sm transition-all" style="animation:bounceIn 0.2s ease ${i*0.03}s both"></div>`
+    ).join('')
+  }
+}
+
+// ========== サイコロウィジェット ==========
+function renderDice(container, cardData) {
+  container.innerHTML = `
+    <div class="p-4 text-center">
+      <div class="flex items-center gap-2 mb-3 justify-center">
+        <span class="text-sm font-bold text-orange-700"><i class="fas fa-dice mr-1"></i>サイコロをふろう</span>
+      </div>
+      <div class="flex gap-4 justify-center mb-3">
+        <div class="dice-display bg-white border-3 border-gray-800 rounded-xl w-20 h-20 flex items-center justify-center shadow-lg cursor-pointer transition-transform hover:scale-105"
+             onclick="rollDice(this)" id="dice1">
+          <span class="text-4xl">🎲</span>
+        </div>
+        <div class="dice-display bg-white border-3 border-gray-800 rounded-xl w-20 h-20 flex items-center justify-center shadow-lg cursor-pointer transition-transform hover:scale-105"
+             onclick="rollDice(this)" id="dice2">
+          <span class="text-4xl">🎲</span>
+        </div>
+      </div>
+      <button onclick="rollAllDice(this)" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-xl font-bold text-sm shadow-lg transition-transform hover:scale-105">
+        <i class="fas fa-sync-alt mr-1"></i>サイコロをふる！
+      </button>
+      <div class="mt-3 text-lg font-bold dice-result text-gray-600"></div>
+    </div>`
+}
+
+const diceFaces = ['⚀','⚁','⚂','⚃','⚄','⚅']
+function rollDice(el) {
+  const val = Math.floor(Math.random() * 6) + 1
+  el.dataset.val = val
+  el.innerHTML = `<span class="text-5xl">${diceFaces[val-1]}</span>`
+  el.style.transform = 'rotate(' + (Math.random() * 20 - 10) + 'deg) scale(1.1)'
+  setTimeout(() => el.style.transform = '', 200)
+  TactileSounds.play('drop')
+  updateDiceResult(el.closest('[id^="tactile-widget"]'))
+}
+window.rollDice = rollDice
+
+function rollAllDice(btn) {
+  const container = btn.closest('[id^="tactile-widget"]')
+  if (!container) return
+  container.querySelectorAll('.dice-display').forEach((d, i) => {
+    setTimeout(() => rollDice(d), i * 200)
+  })
+}
+window.rollAllDice = rollAllDice
+
+function updateDiceResult(container) {
+  if (!container) return
+  const dice = container.querySelectorAll('.dice-display')
+  let total = 0; let count = 0
+  dice.forEach(d => { if (d.dataset.val) { total += parseInt(d.dataset.val); count++ } })
+  const result = container.querySelector('.dice-result')
+  if (result && count === 2) result.textContent = '合計：' + total
+}
+
+// ========== 汎用触覚ウィジェット ==========
+function renderGenericTactile(container, tactileText, cardData) {
+  container.innerHTML = `
+    <div class="p-4 text-center">
+      <div class="bg-orange-50 rounded-lg p-4 mb-3">
+        <i class="fas fa-hand-paper text-4xl text-orange-400 mb-2 block"></i>
+        <p class="text-sm text-orange-800 font-bold mb-1">やってみよう！</p>
+        <p class="text-sm text-gray-700">${tactileText}</p>
+      </div>
+      <div class="flex gap-2 justify-center flex-wrap">
+        <button onclick="this.classList.toggle('bg-green-500'); this.classList.toggle('bg-gray-300'); this.classList.toggle('text-white'); TactileSounds.play('correct')" 
+                class="bg-gray-300 px-4 py-2 rounded-full text-sm font-bold transition-all hover:scale-105 shadow">
+          <i class="fas fa-check mr-1"></i>やってみた！
+        </button>
+        <button onclick="this.textContent = parseInt(this.textContent||0) + 1 + '回やったよ！'; this.classList.add('bg-yellow-400'); TactileSounds.play('tap')"
+                class="bg-yellow-300 px-4 py-2 rounded-full text-sm font-bold transition-all hover:scale-105 shadow">
+          0回やったよ！
+        </button>
+      </div>
+    </div>`
+}
+
+// --- ウィジェット初期化（カードロード後に呼ばれる） ---
+function initTactileWidgets() {
+  const cardData = window.currentCardData
+  const card = cardData?.card || cardData
+  if (!card || !card._tactile_activity) return
+  const cardId = card.card_id || card.id || 0
+  const containerId = 'tactile-widget-' + cardId
+  // 少し待ってDOMが描画されてから初期化
+  setTimeout(() => {
+    renderTactileWidget(containerId, card._tactile_activity, card)
+  }, 100)
+}
+window.initTactileWidgets = initTactileWidgets
+window.renderTactileWidget = renderTactileWidget
+window.TactileSounds = TactileSounds
+
+// bounceIn アニメーション用CSS追加
+if (!document.getElementById('tactile-widget-styles')) {
+  const style = document.createElement('style')
+  style.id = 'tactile-widget-styles'
+  style.textContent = `
+    @keyframes bounceIn {
+      0% { transform: scale(0); opacity: 0; }
+      60% { transform: scale(1.2); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .blocks-area > div { transition: transform 0.15s ease; }
+    .blocks-area > div:hover { transform: scale(1.15); }
+    input[type="range"].thermo-slider { cursor: pointer; }
+  `
+  document.head.appendChild(style)
+}
+
+// ====================================================================
+// /インタラクティブ触覚ウィジェットエンジン END
+// ====================================================================
 
 // 音声合成（テキスト読み上げ）
 async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
@@ -42885,6 +43762,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
               </h3>
               <p class="text-sm text-gray-500 mb-4"><i class="fas fa-book mr-1"></i>${curriculum.textbook_company || ''} ${curriculum.grade || ''} ${curriculum.subject || ''} ― ${curriculum.unit_name || ''}</p>
               <div class="space-y-4">
+                ${(() => { window._guideCardsCache = cards; return '' })()}
                 ${cards.map((card, i) => {
                   const parsed = parseMultimedia(card)
                   const mm = parsed.mm
@@ -42913,8 +43791,8 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
                     </div>
                     ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
-                    ${tactile ? '<div class="bg-yellow-50 border-l-3 border-yellow-400 p-2 rounded text-xs mb-2"><strong>✋ やってみよう:</strong> ' + tactile + '</div>' : ''}
-                    ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
+                    ${tactile ? '<div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3 mb-2"><div class="flex items-center gap-2 mb-2"><span class="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span><span class="text-xs text-gray-700">' + tactile + '</span></div><div id="guide-tactile-' + (card.card_id || card.id || i) + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[120px]"></div></div>' : ''}
+                    ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2 cursor-pointer hover:bg-green-100" onclick="speakText(\'' + (card.problem_text || card.problem_content || '').replace(/'/g, '').substring(0, 200) + '\', \'female-friendly\', 0.8); TactileSounds.play(\'tap\')"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
                     <div class="grid grid-cols-2 gap-2 text-xs">
                       <details class="bg-white rounded p-2 border">
                         <summary class="font-bold text-gray-600 cursor-pointer">こたえを見る <i class="fas fa-eye-slash text-gray-400 text-xs"></i></summary>
@@ -43284,6 +44162,24 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
     if (confirm('コース内容の読み込みに失敗しました。\n\n配信ページを新しいタブで開きますか？')) {
       window.open(fallbackUrl, '_blank')
     }
+  }
+
+  // ガイドビュー内の触覚ウィジェットを初期化
+  setTimeout(() => {
+    document.querySelectorAll('[id^="guide-tactile-"]').forEach(el => {
+      const cId = el.id.replace('guide-tactile-', '')
+      // カードデータを探す
+      const allCards = document.querySelectorAll('[id^="card-display-"]')
+      let cardData = null
+      if (window._guideCardsCache) {
+        cardData = window._guideCardsCache.find(c => String(c.card_id || c.id) === cId)
+      }
+      if (el.children.length === 0) {
+        const tactileText = el.closest('.bg-orange-50')?.querySelector('.text-xs.text-gray-700')?.textContent || ''
+        renderTactileWidget(el.id, tactileText, cardData || { card_title: '', problem_text: '', _tactile_activity: tactileText })
+      }
+    })
+  }, 300)
   }
 }
 window.showPersonalizedCourseGuide = showPersonalizedCourseGuide
