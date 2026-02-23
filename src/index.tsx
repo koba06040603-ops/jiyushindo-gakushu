@@ -7514,6 +7514,21 @@ app.get('/guide/:curriculumId', async (c) => {
       cards = (cardsResult.results || []) as any[]
     }
     
+    // 各カードのヒントを取得して付与
+    for (const card of cards as any[]) {
+      try {
+        const hintSchema = getHintSelectQuery()
+        const hintResult = await env.DB.prepare(hintSchema).bind(card.card_id).all()
+        card._hints = (hintResult.results || []).map((h: any) => ({
+          hint_level: h.hint_level || h.level || 0,
+          hint_text: h.hint_text || h.hint_content || h.content || '',
+          thinking_tool_suggestion: h.thinking_tool_suggestion || ''
+        }))
+      } catch (e) {
+        card._hints = []
+      }
+    }
+    
     // メタデータを取得
     const metaResult = await env.DB.prepare('SELECT meta_key, meta_value FROM curriculum_metadata WHERE curriculum_id = ?').bind(curriculumId).all()
     let commonCheckTest = null
@@ -7606,9 +7621,15 @@ app.get('/guide/:curriculumId', async (c) => {
             let ytId = ''
             try { const m = youtubeUrl.match(/(?:v=|youtu\.be\/)([^&?]+)/); if (m) ytId = m[1] } catch {}
             
+            // ヒントを取得（DB取得済みの_hints or JSON格納のhints）
+            let hints: any[] = card._hints || []
+            if (hints.length === 0) {
+              try { hints = JSON.parse(card.hints || '[]') } catch { hints = [] }
+            }
+            
             return `
-            <div class="card" style="background:white; border:2px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:12px; break-inside:avoid;">
-              <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <div class="card" style="background:white; border:2px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:16px; break-inside:avoid;">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
                 <span style="background:${info.color}; color:white; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.85rem;">${idx+1}</span>
                 <strong style="font-size:1rem;">${card.card_title || 'カード ' + (idx+1)}</strong>
                 <span style="margin-left:auto; display:flex; gap:4px; align-items:center;">
@@ -7616,7 +7637,43 @@ app.get('/guide/:curriculumId', async (c) => {
                   ${card.estimated_time_minutes ? `<span style="font-size:0.75rem; background:#f3f4f6; padding:2px 8px; border-radius:8px;">⏱ ${card.estimated_time_minutes}分</span>` : ''}
                 </span>
               </div>
-              ${card.problem_text ? `<div style="background:#f0f9ff; border-left:4px solid ${info.color}; padding:10px 14px; border-radius:0 8px 8px 0; margin-bottom:8px;"><strong>もんだい：</strong>${card.problem_text}</div>` : ''}
+              
+              ${card.new_terms ? `
+              <div style="background:#EFF6FF; border-left:4px solid #3B82F6; padding:8px 12px; border-radius:0 8px 8px 0; margin-bottom:8px;">
+                <strong style="color:#1E40AF; font-size:0.85rem;">📖 新しく学ぶこと：</strong>
+                <span style="font-size:0.9rem;">${card.new_terms}</span>
+              </div>` : ''}
+              
+              <div style="background:#EEF2FF; border:2px solid #C7D2FE; border-radius:10px; padding:10px 12px; margin-bottom:10px;">
+                <div style="display:flex; align-items:flex-start; gap:8px;">
+                  <div style="background:#6366F1; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:0.85rem;">🤖</div>
+                  <div style="flex:1;">
+                    <p style="font-size:0.8rem; font-weight:bold; color:#4338CA; margin-bottom:2px;">💬 AI先生より</p>
+                    <p style="font-size:0.85rem; color:#374151; margin-bottom:2px;">${card.ai_teacher_message || 'この問題にチャレンジしてみよう！わからないときはヒントを見てね。'}</p>
+                    ${card.ai_teacher_advice ? `<p style="font-size:0.78rem; color:#4F46E5;">💡 ${card.ai_teacher_advice}</p>` : ''}
+                    ${card.teacher_help_keywords ? `<p style="font-size:0.75rem; color:#6B7280; margin-top:2px;">❓ 先生に聞くキーワード: <strong>${card.teacher_help_keywords}</strong></p>` : ''}
+                  </div>
+                </div>
+              </div>
+              
+              ${card.example_problem ? `
+              <div style="background:#FFFBEB; border:2px solid #FDE68A; border-radius:10px; padding:10px 12px; margin-bottom:10px;">
+                <p style="font-weight:bold; color:#92400E; font-size:0.85rem; margin-bottom:4px;">💡 例題</p>
+                <p style="font-size:0.9rem; margin-bottom:6px;">${card.example_problem}</p>
+                ${card.example_solution ? `
+                <div style="background:white; border-radius:6px; padding:8px 10px; border:1px solid #FDE68A;">
+                  <p style="font-weight:bold; color:#166534; font-size:0.8rem; margin-bottom:2px;">✅ 解き方</p>
+                  <p style="font-size:0.85rem; color:#374151;">${card.example_solution}</p>
+                </div>` : ''}
+              </div>` : ''}
+              
+              ${card.problem_text ? `<div style="background:#FFF1F2; border-left:4px solid #FB7185; padding:10px 14px; border-radius:0 8px 8px 0; margin-bottom:8px;"><strong style="color:#BE123C; font-size:0.85rem;">もんだい：</strong><span style="font-size:0.95rem;">${card.problem_text}</span></div>` : ''}
+              
+              ${card.real_world_context ? `
+              <div style="background:#F0FDF4; border-left:4px solid #22C55E; padding:6px 12px; border-radius:0 8px 8px 0; margin-bottom:8px; font-size:0.85rem;">
+                <strong>🌍 実生活とのつながり：</strong>${card.real_world_context}
+              </div>` : ''}
+              
               ${ytId ? `
               <div class="no-print" style="margin:8px 0; border-radius:8px; overflow:hidden; background:#000;">
                 <iframe width="100%" height="200" src="https://www.youtube.com/embed/${ytId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope" allowfullscreen style="border-radius:8px;"></iframe>
@@ -7640,9 +7697,48 @@ app.get('/guide/:curriculumId', async (c) => {
               <div style="background:#F5F3FF; border-left:4px solid #8B5CF6; padding:8px 12px; border-radius:0 8px 8px 0; margin:8px 0; font-size:0.85rem; color:#6b7280;">
                 <strong>🖼️ 図：</strong>${imageDesc}
               </div>` : ''}
-              <div style="background:#f9fafb; border:2px solid #d1d5db; border-radius:8px; padding:4px; min-height:60px;">
+              
+              ${card.problem_image_url ? `
+              <div style="text-align:center; margin:8px 0;">
+                ${card.problem_image_url.includes('/api/media/videos/') || /\.(mp4|webm|mov)/i.test(card.problem_image_url) ? `
+                  <video controls style="max-width:100%; max-height:300px; border-radius:8px; border:2px solid #e5e7eb;" preload="metadata">
+                    <source src="${card.problem_image_url}" type="video/mp4">
+                  </video>` : `
+                  <img src="${card.problem_image_url}" alt="問題の図" style="max-width:100%; max-height:300px; border-radius:8px; border:2px solid #e5e7eb;">`}
+              </div>` : ''}
+              
+              ${hints.length > 0 ? `
+              <details style="margin:8px 0; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:0;">
+                <summary style="padding:8px 12px; cursor:pointer; font-weight:bold; color:#92400E; font-size:0.85rem; user-select:none;">
+                  💡 ヒント（${hints.length}つ）- タップして開く
+                </summary>
+                <div style="padding:4px 12px 10px 12px;">
+                  ${hints.map((h: any, hi: number) => `
+                    <div style="background:white; border-radius:6px; padding:6px 10px; margin-top:6px; border:1px solid #FDE68A; font-size:0.85rem;">
+                      <strong style="color:#B45309;">ヒント${hi+1}:</strong> ${h.hint_text || h.hint_content || ''}
+                    </div>
+                  `).join('')}
+                </div>
+              </details>` : ''}
+              
+              <div style="background:#f9fafb; border:2px solid #d1d5db; border-radius:8px; padding:4px; min-height:60px; margin-top:8px;">
                 <textarea style="width:100%; min-height:56px; border:none; background:transparent; font-size:1rem; line-height:1.8; resize:vertical; outline:none; padding:8px; font-family:inherit; color:#1f2937;" placeholder="こたえをかこう：" rows="2"></textarea>
               </div>
+              
+              <details style="margin-top:8px; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:8px; padding:0;">
+                <summary style="padding:8px 12px; cursor:pointer; font-weight:bold; color:#166534; font-size:0.85rem; user-select:none;">
+                  📝 こたえを見る
+                </summary>
+                <div style="padding:4px 12px 10px 12px;">
+                  <div style="background:white; border-radius:6px; padding:8px 10px; border:1px solid #BBF7D0; font-size:0.9rem;">
+                    <strong style="color:#166534;">こたえ：</strong>${card.correct_answer || card.answer || '解答は準備中です'}
+                  </div>
+                  ${card.answer_explanation || card.explanation || card.real_world_connection ? `
+                  <div style="background:white; border-radius:6px; padding:8px 10px; margin-top:6px; border:1px solid #BBF7D0; font-size:0.85rem;">
+                    <strong style="color:#1E40AF;">📖 かいせつ：</strong>${card.answer_explanation || card.explanation || card.real_world_connection || ''}
+                  </div>` : ''}
+                </div>
+              </details>
             </div>
           `}).join('')}
         </div>
@@ -30645,12 +30741,23 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "card_type": "${template.media_type}",
       "difficulty_level": "standard",
       "question_format": "${template.question_format}",
+      "new_terms": "【必須】このカードで新しく学ぶ用語・概念（例：『分数 - 1つのものを等しく分けた大きさを表す数のこと』）。該当なしの場合も前のカードの復習キーワードを入れること",
+      "ai_teacher_message": "【必須】AI先生からの励ましメッセージ。児童の学習タイプに合わせた声かけ（例：『今日はわり算に挑戦だよ！前回の掛け算がバッチリだったから、きっとできるよ！』）",
+      "ai_teacher_advice": "【必須】AI先生からの学習アドバイス。問題を解くための具体的なコツ（例：『まず、何を何で割るのか、問題の中のキーワードに線を引いてみよう』）",
+      "teacher_help_keywords": "【必須】わからないとき先生に聞くためのキーワード（例：『わり算、等分、あまり』）",
+      "example_problem": "【必須】例題の問題文。本番の問題より少し簡単な、理解の足がかりになる問題（例：『6このクッキーを2人で同じ数ずつ分けると、1人何こ？』）",
+      "example_solution": "【必須】例題の解き方。図解を含む丁寧な説明（例：『6÷2=3  6このクッキーを2つのグループに分けると、1グループ3こになります。答え：3こ』）",
+      "real_world_connection": "【推奨】実生活とのつながり（例：『お菓子を友だちと分けるとき、何個ずつになるか考えるときにわり算を使うよ！』）",
       "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
       "problem_description": "問題の背景や文脈の補足（problem_textとは異なる内容にすること）",
       "correct_answer": "正解（具体的な数値・回答）",
       "explanation": "解説（つまずきポイントと解法のコツを含む、児童にわかりやすい言葉で）",
       "hint_text": "段階的ヒント（最初は抽象的→徐々に具体的に）",
-      "hints": ["ヒント1: まずは問題をよく読もう", "ヒント2: 図に描いて考えよう", "ヒント3: 具体的な手がかり"],
+      "hints": [
+        {"hint_level": 1, "hint_text": "ヒント1: まずは問題をよく読もう。大事な数字に線を引いてみよう", "thinking_tool_suggestion": "線引きリーディング"},
+        {"hint_level": 2, "hint_text": "ヒント2: 図や絵に描いて考えてみよう。わかっていることを整理しよう", "thinking_tool_suggestion": "図解整理法"},
+        {"hint_level": 3, "hint_text": "ヒント3: 具体的な手がかり。例題の解き方を参考にしてみよう", "thinking_tool_suggestion": "例題参照法"}
+      ],
       ${template.scaffold_structure.show_worked_example ? '"worked_example": "解法例の全手順",' : ''}
       ${template.scaffold_structure.provide_checklist ? '"checklist": ["手順1", "手順2", "手順3"],' : ''}
       "estimated_time_minutes": 10,
@@ -30690,6 +30797,15 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 ※ 「〜を学びます」「〜について考えます」等のメタ的記述は problem_text に絶対に書かないこと
 ※ difficulty_levelは全カードで同じにせず、必ず段階的に難しくすること
 ※ v4の制御パラメータに忠実に従ってください
+※ 【★★★ AI先生フィールド必須 ★★★】
+  - ai_teacher_message: 全カード必須。児童の学習タイプに合わせた温かい励ましメッセージを生成すること
+  - ai_teacher_advice: 全カード必須。問題を解くための具体的なアドバイス・コツを記述すること
+  - teacher_help_keywords: 全カード必須。児童が先生に質問するときの2〜4個のキーワードを記述すること
+  - new_terms: 全カード必須。新出用語・概念がない場合も復習キーワードを入れること
+  - example_problem: 全カード必須。本番問題より易しい例題を用意し、理解の足がかりとすること
+  - example_solution: 全カード必須。例題の解き方を図解付きで丁寧に説明すること
+  - real_world_connection: 推奨。実生活との関連を記述して学習意欲を高めること
+  - hints: 全カード必須。3段階のヒントをhint_level, hint_text, thinking_tool_suggestionの構造で記述すること
 ※ multimediaフィールドでは、教育動画を可能な限り提案すること。youtube_urlにはYouTube動画の実在URLのみを入力し、NHK for Schoolの場合はyoutube_titleに「NHK for School」と明記した上でyoutube_urlには https://www.youtube.com/results?search_query=NHK+for+School+{検索キーワード} 形式のYouTube検索URLを使用すること（NHKの直接URLは使用不可）
 ※ 【★最重要★】image_description は全カード必須。教科書を使わず学習カードだけで児童が個別学習できるレベルの詳細な図解説明を書くこと
 ※ tactile_activity は全カード必須。具体物操作（おはじき、ブロック、折り紙、カード等）の活動を最低1つ提案すること
@@ -30704,7 +30820,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 8000, responseMimeType: 'application/json' }
+          generationConfig: { temperature: 0.7, maxOutputTokens: 16384, responseMimeType: 'application/json' }
         })
       }
     )
@@ -30906,11 +31022,15 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
 
       // ヒント自動生成
       const defaultHints = [
-        { hint_level: 1, hint_text: 'まず問題をよく読もう。キーワードに線を引いてみよう。' },
-        { hint_level: 2, hint_text: '図や絵に書いて整理してみよう。似ている問題を思い出してみよう。' },
-        { hint_level: 3, hint_text: 'わかるところから始めよう。わからないときはAI先生に聞いてみてね！' }
+        { hint_level: 1, hint_text: 'まず問題をよく読もう。キーワードに線を引いてみよう。', thinking_tool_suggestion: '線引きリーディング' },
+        { hint_level: 2, hint_text: '図や絵に書いて整理してみよう。似ている問題を思い出してみよう。', thinking_tool_suggestion: '図解整理法' },
+        { hint_level: 3, hint_text: 'わかるところから始めよう。わからないときはAI先生に聞いてみてね！', thinking_tool_suggestion: 'AI先生に聞く' }
       ]
       let hints = card.hints || []
+      // 文字列配列の場合はオブジェクト配列に変換
+      if (hints.length > 0 && typeof hints[0] === 'string') {
+        hints = hints.map((h: string, hi: number) => ({ hint_level: hi + 1, hint_text: h, thinking_tool_suggestion: '' }))
+      }
       // ヒントの内容が空の場合はデフォルトを使用
       if (hints.length === 0 || hints.every((h: any) => !(h.hint_text || h.hint_content || '').trim())) {
         hints = defaultHints
@@ -30918,8 +31038,10 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       for (const hint of hints) {
         const hintText = (hint.hint_text || hint.hint_content || '').trim()
         if (!hintText) continue // 空ヒントはスキップ
+        const thinkingTool = hint.thinking_tool_suggestion || ''
+        const fullHintText = thinkingTool ? `${hintText}（${thinkingTool}）` : hintText
         try {
-          await hintExec(env.DB, (s) => hintInsertSQL(s), [cardId, hint.hint_level || hint.hint_number || 1, hintText])
+          await hintExec(env.DB, (s) => hintInsertSQL(s), [cardId, hint.hint_level || hint.hint_number || 1, fullHintText])
         } catch (hintInsertErr) {
           console.warn('ヒント保存スキップ:', cardId, hintInsertErr)
         }

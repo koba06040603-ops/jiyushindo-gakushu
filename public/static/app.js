@@ -47000,9 +47000,48 @@ function showPersonalizedCourseReview(data) {
                   ${card.personalization_note ? '<div class="bg-indigo-50 border border-indigo-200 rounded p-2 mb-2 text-xs"><i class="fas fa-brain text-indigo-500 mr-1"></i><span class="font-bold text-indigo-700">なぜこの問題か:</span> <span class="text-indigo-600">' + card.personalization_note + '</span></div>' : ''}
                   
                   <div class="space-y-2">
+                    <!-- AI先生メッセージ -->
+                    <div class="bg-blue-50 border border-blue-200 rounded p-2">
+                      <div class="flex items-start gap-2">
+                        <span class="text-lg">🤖</span>
+                        <div class="flex-1">
+                          <label class="text-xs font-bold text-blue-700">AI先生メッセージ:</label>
+                          <textarea class="w-full text-sm border rounded p-2 mt-1" rows="1" data-field="ai_teacher_message" data-index="${i}">${card.ai_teacher_message || ''}</textarea>
+                          <label class="text-xs font-bold text-blue-600 mt-1 block">AI先生アドバイス:</label>
+                          <textarea class="w-full text-sm border rounded p-2 mt-1" rows="1" data-field="ai_teacher_advice" data-index="${i}">${card.ai_teacher_advice || ''}</textarea>
+                          <label class="text-xs font-bold text-gray-500 mt-1 block">先生ヘルプキーワード:</label>
+                          <input class="w-full text-sm border rounded p-2 mt-1" data-field="teacher_help_keywords" data-index="${i}" value="${card.teacher_help_keywords || ''}">
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- 新出用語 -->
+                    <div>
+                      <label class="text-xs font-bold text-gray-600">新しく学ぶこと:</label>
+                      <input class="w-full text-sm border rounded p-2 mt-1" data-field="new_terms" data-index="${i}" value="${card.new_terms || ''}">
+                    </div>
+                    
+                    <!-- 例題 -->
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="text-xs font-bold text-yellow-700">例題:</label>
+                        <textarea class="w-full text-sm border rounded p-2 mt-1" rows="2" data-field="example_problem" data-index="${i}">${card.example_problem || ''}</textarea>
+                      </div>
+                      <div>
+                        <label class="text-xs font-bold text-green-700">例題の解き方:</label>
+                        <textarea class="w-full text-sm border rounded p-2 mt-1" rows="2" data-field="example_solution" data-index="${i}">${card.example_solution || ''}</textarea>
+                      </div>
+                    </div>
+                    
                     <div>
                       <label class="text-xs font-bold text-gray-600">問題文:</label>
                       <textarea class="w-full text-sm border rounded p-2 mt-1" rows="2" data-field="problem_text" data-index="${i}">${card.problem_text || ''}</textarea>
+                    </div>
+                    
+                    <!-- 実生活とのつながり -->
+                    <div>
+                      <label class="text-xs font-bold text-green-600">実生活とのつながり:</label>
+                      <input class="w-full text-sm border rounded p-2 mt-1" data-field="real_world_connection" data-index="${i}" value="${card.real_world_connection || ''}">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                       <div>
@@ -47021,7 +47060,7 @@ function showPersonalizedCourseReview(data) {
                     <div class="grid grid-cols-2 gap-2">
                       <div>
                         <label class="text-xs font-bold text-gray-600">動画URL:</label>
-                        <input class="w-full text-sm border rounded p-2 mt-1" data-field="solution_video_url" data-index="${i}" value="${card.solution_video_url || ''}" placeholder="https://...">
+                        <input class="w-full text-sm border rounded p-2 mt-1" data-field="solution_video_url" data-index="${i}" value="${card.solution_video_url || (card.multimedia?.youtube_url || '')}" placeholder="https://...">
                       </div>
                       <div>
                         <label class="text-xs font-bold text-gray-600">図・画像URL:</label>
@@ -47029,12 +47068,28 @@ function showPersonalizedCourseReview(data) {
                       </div>
                     </div>
                     
+                    <!-- ヒント表示 -->
+                    ${card.hints && card.hints.length > 0 ? `
+                    <div class="bg-yellow-50 border border-yellow-200 rounded p-2">
+                      <label class="text-xs font-bold text-yellow-700">💡 ヒント（${card.hints.length}つ）:</label>
+                      <div class="space-y-1 mt-1">
+                        ${(card.hints || []).map((h, hi) => `
+                          <div class="text-xs text-gray-700 bg-white rounded p-1 border border-yellow-100">
+                            <strong class="text-yellow-800">ヒント${hi+1}:</strong> ${typeof h === 'string' ? h : (h.hint_text || '')}
+                            ${typeof h !== 'string' && h.thinking_tool_suggestion ? '<span class="text-blue-500 ml-1">(' + h.thinking_tool_suggestion + ')</span>' : ''}
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>` : ''}
+                    
                     ${card.media_suggestions ? `
                     <div class="bg-yellow-50 rounded-lg p-2 text-xs text-gray-600">
                       <strong class="text-yellow-700">📋 AI提案:</strong>
                       ${card.media_suggestions.needs_video ? `<span class="block">🎬 ${card.media_suggestions.video_description || '動画推奨'}</span>` : ''}
                       ${card.media_suggestions.needs_diagram ? `<span class="block">📐 ${card.media_suggestions.diagram_description || '図解推奨'}</span>` : ''}
                       ${card.media_suggestions.needs_manipulatives ? `<span class="block">🧩 ${card.media_suggestions.manipulatives_description || '具体操作推奨'}</span>` : ''}
+                      ${card.media_suggestions.needs_illustration ? `<span class="block">🖼️ ${card.media_suggestions.illustration_description || '挿絵推奨'}</span>` : ''}
+                      ${card.media_suggestions.needs_manipulative ? `<span class="block">✋ ${card.media_suggestions.manipulative_description || '操作活動推奨'}</span>` : ''}
                     </div>` : ''}
                     
                     ${card.personalization_note ? `
