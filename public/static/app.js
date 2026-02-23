@@ -31407,8 +31407,8 @@ function addMediaToCard(cardId, mediaType) {
       const res = await axios.post('/api/card/' + cardId + '/media/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 180000,
-        maxContentLength: 100 * 1024 * 1024,
-        maxBodyLength: 100 * 1024 * 1024
+        maxContentLength: 50 * 1024 * 1024,
+        maxBodyLength: 50 * 1024 * 1024
       })
       
       if (res.data.success) {
