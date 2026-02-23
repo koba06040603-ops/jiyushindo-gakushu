@@ -7439,13 +7439,18 @@ function renderGenericTactile(container, tactileText, cardData) {
 function initTactileWidgets() {
   const cardData = window.currentCardData
   const card = cardData?.card || cardData
-  if (!card || !card._tactile_activity) return
-  const cardId = card.card_id || card.id || 0
-  const containerId = 'tactile-widget-' + cardId
-  // 少し待ってDOMが描画されてから初期化
-  setTimeout(() => {
-    renderTactileWidget(containerId, card._tactile_activity, card)
-  }, 100)
+  // 触覚ウィジェット
+  if (card && card._tactile_activity) {
+    const cardId = card.card_id || card.id || 0
+    const containerId = 'tactile-widget-' + cardId
+    setTimeout(() => {
+      renderTactileWidget(containerId, card._tactile_activity, card)
+    }, 100)
+  }
+  // 視覚支援ウィジェット（全カードで自動判定）
+  if (typeof initVisualWidgets === 'function') {
+    setTimeout(() => initVisualWidgets(), 200)
+  }
 }
 window.initTactileWidgets = initTactileWidgets
 window.renderTactileWidget = renderTactileWidget
@@ -7470,6 +7475,759 @@ if (!document.getElementById('tactile-widget-styles')) {
 
 // ====================================================================
 // /インタラクティブ触覚ウィジェットエンジン END
+// ====================================================================
+
+// ====================================================================
+// 自動視覚支援ウィジェットエンジン
+// 問題文・教科・単元から自動で視覚的補助(SVG/Canvas)を生成
+// 教科書以上の情報量を目指す
+// ====================================================================
+
+function detectVisualWidget(card) {
+  const problem = (card.problem_text || card.problem_content || card.problem_description || '').toLowerCase()
+  const title = (card.card_title || '').toLowerCase()
+  const unit = (card.unit_name || '').toLowerCase()
+  const subject = (card.subject || '').toLowerCase()
+  const all = problem + ' ' + title + ' ' + unit
+
+  // 分数関連
+  if (/分数|ぶんすう|\d+\/\d+|分の/.test(all)) return 'fraction'
+  // 割合・百分率
+  if (/割合|パーセント|%|百分率|歩合/.test(all)) return 'percentage'
+  // 小数
+  if (/小数|しょうすう|0\.\d/.test(all)) return 'decimal'
+  // 面積・図形の計算
+  if (/面積|cm²|㎡|たて.*よこ|長方形|正方形|三角形.*面積|台形/.test(all)) return 'area'
+  // 角度
+  if (/角度|°|角|分度器/.test(all)) return 'angle'
+  // 速さ・距離・時間
+  if (/速さ|km\/h|m\/s|時速|分速|距離.*時間/.test(all)) return 'speed'
+  // 比・比例
+  if (/比例|反比例|比\b|：/.test(all)) return 'ratio'
+  // 体積
+  if (/体積|cm³|㎤|立方/.test(all)) return 'volume'
+  // 社会科：地図関連
+  if (subject.includes('社会') && /地図|都道府県|世界|大陸|地域|位置/.test(all)) return 'map'
+  // 社会科：歴史
+  if (subject.includes('社会') && /時代|古墳|飛鳥|奈良|平安|鎌倉|室町|江戸|明治|大正|昭和|戦国|縄文|弥生|歴史/.test(all)) return 'timeline'
+  // 理科：実験・観察
+  if (subject.includes('理科') && /実験|観察|顕微鏡|試験管|ビーカー|磁石|電気|回路|天気/.test(all)) return 'science'
+  // 理科：植物・生物
+  if (subject.includes('理科') && /植物|花|葉|根|茎|種子|発芽|光合成|動物|昆虫/.test(all)) return 'biology'
+  // かけ算・九九
+  if (/かけ算|九九|×|掛け/.test(all)) return 'multiplication'
+  // たし算・ひき算（低学年）
+  if (/あわせて|のこり|ちがい|たし算|ひき算/.test(all)) return 'addition'
+  // 単位・量
+  if (/リットル|L|dL|mL|キログラム|kg|g|cm|mm|m\b|メートル|長さ|重さ|かさ/.test(all)) return 'units'
+  // 時刻・時間
+  if (/時刻|時間|なんじ|何時|とけい|午前|午後/.test(all)) return 'time_visual'
+  // 表・グラフ
+  if (/表|グラフ|棒グラフ|折れ線|円グラフ/.test(all)) return 'chart'
+  
+  return null
+}
+
+function renderVisualWidget(containerId, card) {
+  const container = document.getElementById(containerId)
+  if (!container) return false
+  
+  const type = detectVisualWidget(card)
+  if (!type) return false
+  
+  console.log('📊 視覚支援ウィジェット:', type, containerId)
+  
+  switch(type) {
+    case 'fraction': renderFractionVisual(container, card); break
+    case 'percentage': renderPercentageVisual(container, card); break
+    case 'decimal': renderDecimalVisual(container, card); break
+    case 'area': renderAreaVisual(container, card); break
+    case 'multiplication': renderMultiplicationVisual(container, card); break
+    case 'addition': renderAdditionVisual(container, card); break
+    case 'units': renderUnitsVisual(container, card); break
+    case 'map': renderMapVisual(container, card); break
+    case 'timeline': renderTimelineVisual(container, card); break
+    case 'science': renderScienceVisual(container, card); break
+    case 'biology': renderBiologyVisual(container, card); break
+    case 'angle': renderAngleVisual(container, card); break
+    case 'ratio': renderRatioVisual(container, card); break
+    case 'chart': renderChartVisual(container, card); break
+    case 'speed': renderSpeedVisual(container, card); break
+    default: return false
+  }
+  return true
+}
+
+// ========== 分数ビジュアル ==========
+function renderFractionVisual(container, card) {
+  const problem = card.problem_text || card.problem_content || ''
+  // 分数を抽出 (e.g. 1/4, 2/3, ３分の１)
+  const fractions = []
+  const regexSlash = /(\d+)\/(\d+)/g
+  let m
+  while ((m = regexSlash.exec(problem)) !== null) {
+    fractions.push({ num: parseInt(m[1]), den: parseInt(m[2]) })
+  }
+  const regexJp = /(\d+)分の(\d+)/g
+  while ((m = regexJp.exec(problem)) !== null) {
+    fractions.push({ num: parseInt(m[2]), den: parseInt(m[1]) })
+  }
+  if (fractions.length === 0) fractions.push({ num: 1, den: 4 }, { num: 2, den: 3 })
+
+  const colors = ['#ef4444','#3b82f6','#22c55e','#f59e0b','#8b5cf6']
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-purple-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-eye mr-1"></i>みてわかる！分数</span>
+      </div>
+      <div class="flex flex-wrap gap-6 justify-center">
+        ${fractions.map((f, idx) => {
+          const color = colors[idx % colors.length]
+          // ピザ図
+          const slices = Array.from({length: f.den}, (_, i) => {
+            const startAngle = (i / f.den) * 2 * Math.PI - Math.PI / 2
+            const endAngle = ((i + 1) / f.den) * 2 * Math.PI - Math.PI / 2
+            const x1 = 50 + 40 * Math.cos(startAngle)
+            const y1 = 50 + 40 * Math.sin(startAngle)
+            const x2 = 50 + 40 * Math.cos(endAngle)
+            const y2 = 50 + 40 * Math.sin(endAngle)
+            const large = (endAngle - startAngle > Math.PI) ? 1 : 0
+            const filled = i < f.num
+            return '<path d="M50,50 L' + x1 + ',' + y1 + ' A40,40 0 ' + large + ',1 ' + x2 + ',' + y2 + ' Z" fill="' + (filled ? color : '#f3f4f6') + '" stroke="white" stroke-width="2"/>'
+          }).join('')
+          // バー図
+          const barSegments = Array.from({length: f.den}, (_, i) => {
+            const w = 140 / f.den
+            const x = 5 + i * w
+            const filled = i < f.num
+            return '<rect x="' + x + '" y="5" width="' + (w - 1) + '" height="25" rx="2" fill="' + (filled ? color : '#e5e7eb') + '" stroke="white" stroke-width="1"/>'
+          }).join('')
+          return `<div class="text-center">
+            <svg viewBox="0 0 100 100" width="100" height="100" class="mx-auto">
+              ${slices}
+              <circle cx="50" cy="50" r="40" fill="none" stroke="#374151" stroke-width="1.5"/>
+            </svg>
+            <div class="mt-1 text-xl font-bold" style="color:${color}">
+              <span class="inline-block border-b-2 border-current px-1">${f.num}</span><br>
+              <span class="px-1">${f.den}</span>
+            </div>
+            <svg viewBox="0 0 150 35" width="150" height="35" class="mx-auto mt-1">
+              ${barSegments}
+            </svg>
+            <p class="text-xs text-gray-500 mt-1">${f.den}つのうち ${f.num}つ分</p>
+          </div>`
+        }).join('')}
+      </div>
+      ${fractions.length >= 2 ? `
+        <div class="mt-3 bg-white rounded-lg p-3 border text-center">
+          <p class="text-sm font-bold text-purple-700">比べてみよう！</p>
+          <div class="flex items-center justify-center gap-2 mt-1">
+            <span class="text-lg font-bold" style="color:${colors[0]}">${fractions[0].num}/${fractions[0].den}</span>
+            <span class="text-lg text-gray-400">${(fractions[0].num/fractions[0].den) > (fractions[1].num/fractions[1].den) ? '＞' : (fractions[0].num/fractions[0].den) < (fractions[1].num/fractions[1].den) ? '＜' : '＝'}</span>
+            <span class="text-lg font-bold" style="color:${colors[1]}">${fractions[1].num}/${fractions[1].den}</span>
+          </div>
+        </div>
+      ` : ''}
+      <div class="mt-3">
+        <p class="text-xs text-gray-500 mb-1">自分で分数を作ってみよう：</p>
+        <div class="flex items-center gap-2 justify-center">
+          <div class="flex flex-col items-center">
+            <input type="number" id="frac-num-${container.id}" min="0" max="12" value="${fractions[0]?.num || 1}" class="w-12 text-center border-2 border-purple-300 rounded text-lg font-bold" onchange="updateFractionPreview(this)">
+            <div class="w-12 h-0.5 bg-gray-800 my-0.5"></div>
+            <input type="number" id="frac-den-${container.id}" min="1" max="12" value="${fractions[0]?.den || 4}" class="w-12 text-center border-2 border-purple-300 rounded text-lg font-bold" onchange="updateFractionPreview(this)">
+          </div>
+          <div id="frac-preview-${container.id}" class="ml-2"></div>
+        </div>
+      </div>
+    </div>`
+}
+
+function updateFractionPreview(input) {
+  const container = input.closest('[id^="visual-widget-"]') || input.closest('[class*="bg-gradient"]')
+  if (!container) return
+  const cid = container.id || ''
+  const numEl = container.querySelector('[id^="frac-num-"]')
+  const denEl = container.querySelector('[id^="frac-den-"]')
+  const preview = container.querySelector('[id^="frac-preview-"]')
+  if (!numEl || !denEl || !preview) return
+  const num = Math.max(0, Math.min(12, parseInt(numEl.value) || 0))
+  const den = Math.max(1, Math.min(12, parseInt(denEl.value) || 1))
+  const slices = Array.from({length: den}, (_, i) => {
+    const startAngle = (i / den) * 2 * Math.PI - Math.PI / 2
+    const endAngle = ((i + 1) / den) * 2 * Math.PI - Math.PI / 2
+    const x1 = 40 + 30 * Math.cos(startAngle)
+    const y1 = 40 + 30 * Math.sin(startAngle)
+    const x2 = 40 + 30 * Math.cos(endAngle)
+    const y2 = 40 + 30 * Math.sin(endAngle)
+    const large = (endAngle - startAngle > Math.PI) ? 1 : 0
+    return '<path d="M40,40 L' + x1 + ',' + y1 + ' A30,30 0 ' + large + ',1 ' + x2 + ',' + y2 + ' Z" fill="' + (i < num ? '#8b5cf6' : '#e5e7eb') + '" stroke="white" stroke-width="2"/>'
+  }).join('')
+  preview.innerHTML = `<svg viewBox="0 0 80 80" width="80" height="80">${slices}<circle cx="40" cy="40" r="30" fill="none" stroke="#374151" stroke-width="1.5"/></svg>`
+  TactileSounds.play('tap')
+}
+window.updateFractionPreview = updateFractionPreview
+
+// ========== 割合ビジュアル ==========
+function renderPercentageVisual(container, card) {
+  const problem = card.problem_text || ''
+  const percents = (problem.match(/\d+%/g) || []).map(p => parseInt(p))
+  const val = percents[0] || 50
+
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border-2 border-emerald-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-emerald-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-chart-pie mr-1"></i>みてわかる！割合</span>
+      </div>
+      <div class="flex items-center gap-6 justify-center">
+        <div class="relative" style="width:120px;height:120px">
+          <svg viewBox="0 0 120 120" width="120" height="120">
+            <circle cx="60" cy="60" r="50" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1"/>
+            <circle cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="12"
+                    stroke-dasharray="${val * 3.14} ${314 - val * 3.14}"
+                    transform="rotate(-90 60 60)" stroke-linecap="round"/>
+            <text x="60" y="65" text-anchor="middle" font-size="24" font-weight="bold" fill="#065f46">${val}%</text>
+          </svg>
+        </div>
+        <div>
+          <div class="bg-white rounded-lg p-3 border">
+            <div class="w-40 bg-gray-200 rounded-full h-6 overflow-hidden">
+              <div class="bg-emerald-500 h-full rounded-full transition-all flex items-center justify-end pr-1" style="width:${val}%">
+                <span class="text-xs text-white font-bold">${val}%</span>
+              </div>
+            </div>
+            <p class="text-xs text-gray-600 mt-2">100個のうち <strong class="text-emerald-700">${val}個</strong></p>
+            <div class="flex flex-wrap gap-0.5 mt-1" style="max-width:200px">
+              ${Array.from({length: 100}, (_, i) => 
+                '<div class="w-1.5 h-1.5 rounded-sm ' + (i < val ? 'bg-emerald-400' : 'bg-gray-200') + '"></div>'
+              ).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mt-3">
+        <input type="range" min="0" max="100" value="${val}" class="w-full accent-emerald-500"
+               oninput="this.previousElementSibling || 0; const v=this.value; const p=this.closest('[class*=bg-gradient]'); if(p){p.querySelector('text').textContent=v+'%'; p.querySelector('[style*=width]').style.width=v+'%'; p.querySelector('[style*=width] span').textContent=v+'%'; p.querySelectorAll('.w-1\\.5').forEach((d,i)=>{d.className='w-1.5 h-1.5 rounded-sm '+(i<v?'bg-emerald-400':'bg-gray-200')}); const c=p.querySelector('circle[stroke=\\'#10b981\\']'); if(c){c.setAttribute('stroke-dasharray', v*3.14+' '+(314-v*3.14))}; TactileSounds.play('move')}">
+        <p class="text-xs text-gray-500 text-center">スライドで割合を変えてみよう</p>
+      </div>
+    </div>`
+}
+
+// ========== かけ算ビジュアル ==========
+function renderMultiplicationVisual(container, card) {
+  const problem = card.problem_text || ''
+  const nums = problem.match(/(\d+)\s*[×x×]\s*(\d+)/i) || problem.match(/(\d+)\s*かける\s*(\d+)/)
+  const a = nums ? parseInt(nums[1]) : 3
+  const b = nums ? parseInt(nums[2]) : 4
+
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border-2 border-yellow-300">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-yellow-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-th mr-1"></i>みてわかる！かけ算</span>
+      </div>
+      <div class="text-center mb-3">
+        <span class="text-2xl font-bold text-orange-700">${a} × ${b} = ${a*b}</span>
+      </div>
+      <div class="flex justify-center">
+        <div class="inline-grid gap-1 p-2 bg-white rounded-lg border" style="grid-template-columns: repeat(${b}, 1fr)">
+          ${Array.from({length: a * b}, (_, i) =>
+            `<div class="w-7 h-7 rounded-md bg-orange-${300 + Math.floor(i / b) * 50 > 600 ? 400 : 300 + Math.floor(i / b) * 50} flex items-center justify-center text-xs font-bold text-orange-900 shadow-sm">${i + 1}</div>`
+          ).join('')}
+        </div>
+      </div>
+      <p class="text-xs text-gray-600 text-center mt-2">${a}つのまとまりが ${b}列 → 全部で <strong>${a*b}個</strong></p>
+    </div>`
+}
+
+// ========== たし算・ひき算ビジュアル ==========
+function renderAdditionVisual(container, card) {
+  const problem = card.problem_text || ''
+  const nums = (problem.match(/\d+/g) || []).map(Number).slice(0, 3)
+  const a = nums[0] || 5
+  const b = nums[1] || 3
+  const isSubtract = /のこり|ひき算|ちがい|へった/.test(problem)
+
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-sky-50 to-cyan-50 rounded-xl border-2 border-sky-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-sky-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-calculator mr-1"></i>みてわかる！${isSubtract ? 'ひき算' : 'たし算'}</span>
+      </div>
+      <div class="flex items-center justify-center gap-3 flex-wrap">
+        <div class="text-center">
+          <div class="flex gap-1 flex-wrap justify-center bg-white rounded-lg p-2 border" style="max-width:150px">
+            ${Array.from({length: a}, () => '<div class="w-6 h-6 rounded-full bg-red-400 shadow-sm"></div>').join('')}
+          </div>
+          <span class="text-lg font-bold text-red-600">${a}</span>
+        </div>
+        <span class="text-3xl font-bold text-gray-400">${isSubtract ? '−' : '＋'}</span>
+        <div class="text-center">
+          <div class="flex gap-1 flex-wrap justify-center bg-white rounded-lg p-2 border" style="max-width:150px">
+            ${Array.from({length: b}, () => '<div class="w-6 h-6 rounded-full bg-blue-400 shadow-sm"></div>').join('')}
+          </div>
+          <span class="text-lg font-bold text-blue-600">${b}</span>
+        </div>
+        <span class="text-3xl font-bold text-gray-400">＝</span>
+        <div class="text-center">
+          <span class="text-3xl font-bold text-green-600">${isSubtract ? a - b : a + b}</span>
+        </div>
+      </div>
+    </div>`
+}
+
+// ========== 単位ビジュアル ==========
+function renderUnitsVisual(container, card) {
+  const problem = card.problem_text || ''
+  const unit = card.unit_name || ''
+  
+  let content = ''
+  if (/長さ|cm|mm|m\b|メートル/.test(problem + unit)) {
+    content = `<div class="text-center">
+      <p class="text-sm font-bold text-indigo-700 mb-2"><i class="fas fa-ruler mr-1"></i>長さのものさし</p>
+      <svg viewBox="0 0 320 60" class="w-full" style="max-width:320px;max-height:60px">
+        <rect x="10" y="15" width="300" height="25" rx="3" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+        ${Array.from({length: 31}, (_, i) => {
+          const x = 10 + i * 10
+          const isMajor = i % 5 === 0
+          return `<line x1="${x}" y1="${isMajor ? 15 : 22}" x2="${x}" y2="40" stroke="#92400e" stroke-width="${isMajor ? 1.5 : 0.5}"/>
+            ${isMajor ? `<text x="${x}" y="55" text-anchor="middle" font-size="9" fill="#92400e" font-weight="bold">${i}cm</text>` : ''}`
+        }).join('')}
+      </svg>
+      <div class="mt-2 text-xs text-gray-500">
+        <span class="inline-block bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded mr-1">1cm = 10mm</span>
+        <span class="inline-block bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded mr-1">1m = 100cm</span>
+        <span class="inline-block bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">1km = 1000m</span>
+      </div>
+    </div>`
+  } else if (/かさ|リットル|L|dL|mL/.test(problem + unit)) {
+    content = `<div class="text-center">
+      <p class="text-sm font-bold text-blue-700 mb-2"><i class="fas fa-flask mr-1"></i>かさの関係</p>
+      <div class="flex items-end justify-center gap-4">
+        <div class="text-center">
+          <div class="w-16 bg-blue-200 rounded-t border-2 border-blue-400 relative" style="height:80px">
+            <div class="absolute bottom-0 w-full bg-blue-500 rounded-t" style="height:100%"></div>
+            <span class="absolute top-1 left-1/2 -translate-x-1/2 text-xs font-bold text-white">1L</span>
+          </div>
+          <span class="text-xs font-bold">1L</span>
+        </div>
+        <span class="text-lg font-bold text-gray-400 mb-4">＝</span>
+        <div class="flex gap-1 items-end">
+          ${Array.from({length: 10}, (_, i) => `
+            <div class="text-center">
+              <div class="w-5 bg-cyan-200 rounded-t border border-cyan-400 relative" style="height:${80/10}px">
+                <div class="absolute bottom-0 w-full bg-cyan-500 rounded-t" style="height:100%"></div>
+              </div>
+              <span class="text-[6px]">${i+1}</span>
+            </div>`).join('')}
+        </div>
+        <span class="text-xs font-bold mb-4">10dL</span>
+      </div>
+      <div class="mt-2 text-xs text-gray-500">
+        <span class="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded mr-1">1L = 10dL</span>
+        <span class="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded">1L = 1000mL</span>
+      </div>
+    </div>`
+  } else {
+    content = `<div class="text-center">
+      <p class="text-sm font-bold text-amber-700 mb-2"><i class="fas fa-balance-scale mr-1"></i>重さの関係</p>
+      <div class="flex items-center justify-center gap-3 text-xs">
+        <span class="inline-block bg-amber-100 text-amber-800 px-3 py-1 rounded-lg font-bold">1kg = 1000g</span>
+        <span class="inline-block bg-amber-100 text-amber-800 px-3 py-1 rounded-lg font-bold">1t = 1000kg</span>
+      </div>
+      <svg viewBox="0 0 200 100" width="200" height="100" class="mx-auto mt-2">
+        <line x1="100" y1="10" x2="100" y2="30" stroke="#92400e" stroke-width="3"/>
+        <line x1="30" y1="30" x2="170" y2="30" stroke="#92400e" stroke-width="3"/>
+        <line x1="30" y1="30" x2="30" y2="60" stroke="#92400e" stroke-width="2"/>
+        <line x1="170" y1="30" x2="170" y2="60" stroke="#92400e" stroke-width="2"/>
+        <path d="M10,60 Q30,55 50,60 L50,75 Q30,80 10,75 Z" fill="#fef3c7" stroke="#92400e"/>
+        <path d="M150,60 Q170,55 190,60 L190,75 Q170,80 150,75 Z" fill="#fef3c7" stroke="#92400e"/>
+        <text x="30" y="72" text-anchor="middle" font-size="8" font-weight="bold" fill="#92400e">1kg</text>
+        <text x="170" y="72" text-anchor="middle" font-size="8" font-weight="bold" fill="#92400e">1000g</text>
+        <polygon points="100,5 95,15 105,15" fill="#92400e"/>
+      </svg>
+    </div>`
+  }
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-indigo-50 to-violet-50 rounded-xl border-2 border-indigo-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-indigo-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-ruler-combined mr-1"></i>みてわかる！単位</span>
+      </div>
+      ${content}
+    </div>`
+}
+
+// ========== 地図ビジュアル（社会科） ==========
+function renderMapVisual(container, card) {
+  const problem = card.problem_text || ''
+  const title = card.card_title || card.unit_name || ''
+  const all = problem + ' ' + title
+
+  // OpenStreetMap Wikimedia検索URLを生成
+  let searchQuery = title.replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 30)
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-green-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-map-marked-alt mr-1"></i>地図で見てみよう</span>
+      </div>
+      <div class="bg-white rounded-lg border-2 border-green-200 overflow-hidden">
+        <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d13000000!2d137!3d36!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f5!5e0!3m2!1sja!2sjp" 
+                width="100%" height="200" style="border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+      <div class="mt-2 flex flex-wrap gap-2 justify-center">
+        <a href="https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}" target="_blank" 
+           class="inline-flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-search-location"></i>Google Mapsで調べる
+        </a>
+        <a href="https://ja.wikipedia.org/wiki/${encodeURIComponent(searchQuery)}" target="_blank"
+           class="inline-flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fab fa-wikipedia-w"></i>Wikipediaで調べる
+        </a>
+        <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchQuery + ' 地図 写真')}" target="_blank"
+           class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-images"></i>写真を見る
+        </a>
+      </div>
+    </div>`
+}
+
+// ========== 歴史タイムライン（社会科） ==========
+function renderTimelineVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  const problem = card.problem_text || ''
+  
+  const eras = [
+    { name: '縄文', year: -10000, color: '#92400e' },
+    { name: '弥生', year: -300, color: '#a16207' },
+    { name: '古墳', year: 250, color: '#4d7c0f' },
+    { name: '飛鳥', year: 592, color: '#0369a1' },
+    { name: '奈良', year: 710, color: '#7e22ce' },
+    { name: '平安', year: 794, color: '#be123c' },
+    { name: '鎌倉', year: 1185, color: '#0f766e' },
+    { name: '室町', year: 1336, color: '#b45309' },
+    { name: '安土桃山', year: 1573, color: '#dc2626' },
+    { name: '江戸', year: 1603, color: '#1d4ed8' },
+    { name: '明治', year: 1868, color: '#9333ea' },
+    { name: '大正', year: 1912, color: '#c026d3' },
+    { name: '昭和', year: 1926, color: '#059669' },
+    { name: '平成', year: 1989, color: '#2563eb' },
+    { name: '令和', year: 2019, color: '#dc2626' }
+  ]
+  
+  const highlightEra = eras.find(e => (title + problem).includes(e.name))
+  const searchQuery = title.replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 30)
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl border-2 border-amber-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-amber-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-history mr-1"></i>歴史年表</span>
+      </div>
+      <div class="overflow-x-auto pb-2">
+        <div class="flex items-end gap-0.5 min-w-[500px]" style="height:80px">
+          ${eras.map(e => {
+            const isHighlight = highlightEra && e.name === highlightEra.name
+            return `<div class="flex flex-col items-center flex-1 ${isHighlight ? 'transform scale-110' : ''}" style="min-width:30px">
+              <div class="w-full rounded-t ${isHighlight ? 'ring-2 ring-red-500' : ''}" 
+                   style="height:${isHighlight ? 60 : 30}px; background:${e.color}; opacity:${isHighlight ? 1 : 0.6}"></div>
+              <span class="text-[7px] font-bold mt-0.5 ${isHighlight ? 'text-red-600' : 'text-gray-600'}" style="writing-mode:vertical-rl">${e.name}</span>
+            </div>`
+          }).join('')}
+        </div>
+      </div>
+      ${highlightEra ? `
+        <div class="mt-2 bg-white rounded-lg p-3 border-2 border-amber-300 text-center">
+          <span class="text-lg font-bold" style="color:${highlightEra.color}">${highlightEra.name}時代</span>
+          <span class="text-sm text-gray-600 ml-2">(${highlightEra.year > 0 ? highlightEra.year + '年〜' : '紀元前' + Math.abs(highlightEra.year) + '年頃〜'})</span>
+        </div>
+      ` : ''}
+      <div class="mt-2 flex flex-wrap gap-2 justify-center">
+        <a href="https://ja.wikipedia.org/wiki/${encodeURIComponent(searchQuery)}" target="_blank"
+           class="inline-flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fab fa-wikipedia-w"></i>詳しく調べる
+        </a>
+        <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchQuery + ' 歴史 写真 資料')}" target="_blank"
+           class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-images"></i>資料写真を見る
+        </a>
+      </div>
+    </div>`
+}
+
+// ========== 理科ビジュアル ==========
+function renderScienceVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  const problem = card.problem_text || ''
+  const searchQuery = (title + ' ' + (card.unit_name || '')).replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 30)
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-xl border-2 border-cyan-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-cyan-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-flask mr-1"></i>理科の実験・観察</span>
+      </div>
+      <div class="bg-white rounded-lg p-4 border text-center">
+        <i class="fas fa-microscope text-5xl text-cyan-400 mb-3 block"></i>
+        <p class="text-sm text-gray-700 font-bold mb-3">${title}</p>
+        <div class="flex flex-wrap gap-2 justify-center">
+          <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(searchQuery)}" target="_blank"
+             class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+            <i class="fas fa-tv"></i>NHK for School
+          </a>
+          <a href="https://www.youtube.com/results?search_query=${encodeURIComponent('理科 実験 ' + searchQuery)}" target="_blank"
+             class="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+            <i class="fab fa-youtube"></i>実験動画
+          </a>
+          <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchQuery + ' 理科 実験 図解')}" target="_blank"
+             class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+            <i class="fas fa-images"></i>図解を見る
+          </a>
+          <a href="https://ja.wikipedia.org/wiki/${encodeURIComponent(searchQuery)}" target="_blank"
+             class="inline-flex items-center gap-1 bg-gray-600 hover:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+            <i class="fab fa-wikipedia-w"></i>Wikipedia
+          </a>
+        </div>
+      </div>
+    </div>`
+}
+
+// ========== 生物ビジュアル ==========
+function renderBiologyVisual(container, card) {
+  renderScienceVisual(container, card) // 同じUIで対応
+}
+
+// ========== 角度ビジュアル ==========
+function renderAngleVisual(container, card) {
+  const problem = card.problem_text || ''
+  const angles = (problem.match(/\d+°/g) || []).map(a => parseInt(a))
+  const angle = angles[0] || 60
+
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-rose-50 to-pink-50 rounded-xl border-2 border-rose-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-rose-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-drafting-compass mr-1"></i>みてわかる！角度</span>
+      </div>
+      <div class="flex items-center gap-6 justify-center">
+        <svg viewBox="0 0 200 200" width="160" height="160" class="angle-svg">
+          <line x1="100" y1="150" x2="190" y2="150" stroke="#374151" stroke-width="2"/>
+          <line x1="100" y1="150" x2="${100 + 90 * Math.cos(-angle * Math.PI / 180)}" y2="${150 + 90 * Math.sin(-angle * Math.PI / 180)}" stroke="#ef4444" stroke-width="2"/>
+          <path d="M ${100 + 30} 150 A 30 30 0 ${angle > 180 ? 1 : 0} 0 ${100 + 30 * Math.cos(-angle * Math.PI / 180)} ${150 + 30 * Math.sin(-angle * Math.PI / 180)}"
+                fill="none" stroke="#ef4444" stroke-width="2"/>
+          <text x="${100 + 40 * Math.cos(-angle / 2 * Math.PI / 180)}" y="${150 + 40 * Math.sin(-angle / 2 * Math.PI / 180)}" 
+                font-size="14" font-weight="bold" fill="#ef4444" text-anchor="middle" class="angle-label">${angle}°</text>
+          ${[0, 30, 45, 60, 90, 120, 135, 150, 180].map(a => {
+            const x = 100 + 80 * Math.cos(-a * Math.PI / 180)
+            const y = 150 + 80 * Math.sin(-a * Math.PI / 180)
+            return `<text x="${x}" y="${y}" font-size="8" fill="#9ca3af" text-anchor="middle">${a}°</text>`
+          }).join('')}
+        </svg>
+        <div class="text-center">
+          <div class="text-4xl font-bold text-rose-600 angle-display">${angle}°</div>
+          <input type="range" min="0" max="360" value="${angle}" class="w-24 mt-2 accent-rose-500"
+                 oninput="updateAngleVisual(this)">
+          <p class="text-xs text-gray-500 mt-1">角度を変えてみよう</p>
+          <div class="mt-2 text-xs">
+            ${angle === 90 ? '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">直角！</span>' :
+              angle === 180 ? '<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">平角！</span>' :
+              angle < 90 ? '<span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded font-bold">鋭角</span>' :
+              '<span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-bold">鈍角</span>'}
+          </div>
+        </div>
+      </div>
+    </div>`
+}
+
+function updateAngleVisual(slider) {
+  const a = parseInt(slider.value)
+  const container = slider.closest('[class*="bg-gradient"]')
+  if (!container) return
+  const svg = container.querySelector('.angle-svg')
+  const display = container.querySelector('.angle-display')
+  const label = container.querySelector('.angle-label')
+  if (display) display.textContent = a + '°'
+  if (label) label.textContent = a + '°'
+  const line = svg?.querySelectorAll('line')[1]
+  if (line) {
+    line.setAttribute('x2', 100 + 90 * Math.cos(-a * Math.PI / 180))
+    line.setAttribute('y2', 150 + 90 * Math.sin(-a * Math.PI / 180))
+  }
+  const path = svg?.querySelector('path')
+  if (path) {
+    path.setAttribute('d', `M 130 150 A 30 30 0 ${a > 180 ? 1 : 0} 0 ${100 + 30 * Math.cos(-a * Math.PI / 180)} ${150 + 30 * Math.sin(-a * Math.PI / 180)}`)
+  }
+  TactileSounds.play('move')
+}
+window.updateAngleVisual = updateAngleVisual
+
+// ========== 比・比例ビジュアル ==========
+function renderRatioVisual(container, card) {
+  renderPercentageVisual(container, card)
+}
+
+// ========== 小数ビジュアル ==========
+function renderDecimalVisual(container, card) {
+  const problem = card.problem_text || ''
+  const decimals = (problem.match(/\d+\.\d+/g) || []).map(Number)
+  const val = decimals[0] || 0.5
+
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-teal-50 to-green-50 rounded-xl border-2 border-teal-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-teal-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-eye mr-1"></i>みてわかる！小数</span>
+      </div>
+      <div class="text-center mb-2">
+        <span class="text-2xl font-bold text-teal-700">${val}</span>
+      </div>
+      <div class="flex justify-center">
+        <div class="bg-white rounded-lg p-2 border inline-block">
+          <div class="flex gap-0.5">
+            ${Array.from({length: 10}, (_, i) => {
+              const filled = (i + 1) / 10 <= val
+              const partial = !filled && i / 10 < val
+              return `<div class="w-8 h-12 rounded border ${filled ? 'bg-teal-400 border-teal-500' : partial ? 'bg-teal-200 border-teal-300' : 'bg-gray-100 border-gray-200'} flex items-center justify-center text-xs font-bold ${filled ? 'text-white' : 'text-gray-400'}">${(i + 1) / 10}</div>`
+            }).join('')}
+          </div>
+          <div class="flex justify-between text-xs text-gray-500 mt-1 px-1">
+            <span>0</span><span>0.5</span><span>1.0</span>
+          </div>
+        </div>
+      </div>
+    </div>`
+}
+
+// ========== グラフビジュアル ==========
+function renderChartVisual(container, card) {
+  const problem = card.problem_text || ''
+  const nums = (problem.match(/\d+/g) || []).map(Number).filter(n => n > 0 && n < 1000).slice(0, 6)
+  const data = nums.length >= 2 ? nums : [15, 25, 10, 30, 20]
+  const max = Math.max(...data)
+  const labels = ['ア', 'イ', 'ウ', 'エ', 'オ', 'カ']
+  const colors = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899']
+
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-slate-50 to-gray-50 rounded-xl border-2 border-slate-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-slate-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-chart-bar mr-1"></i>グラフで見てみよう</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border">
+        <div class="flex items-end gap-2 justify-center" style="height:120px">
+          ${data.map((d, i) => `
+            <div class="flex flex-col items-center gap-1 flex-1">
+              <span class="text-xs font-bold">${d}</span>
+              <div class="w-full rounded-t transition-all" style="height:${(d / max) * 100}px; background:${colors[i % colors.length]}"></div>
+              <span class="text-xs font-bold text-gray-600">${labels[i]}</span>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`
+}
+
+// ========== 速さビジュアル ==========
+function renderSpeedVisual(container, card) {
+  const problem = card.problem_text || ''
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-orange-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-orange-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-tachometer-alt mr-1"></i>みてわかる！速さ</span>
+      </div>
+      <div class="bg-white rounded-lg p-4 border text-center">
+        <div class="text-sm mb-3">
+          <div class="flex items-center justify-center gap-4">
+            <div class="bg-blue-100 rounded-lg px-4 py-2"><span class="font-bold text-blue-700">速さ</span></div>
+            <span class="text-lg">=</span>
+            <div class="text-center">
+              <div class="bg-red-100 rounded-lg px-4 py-1"><span class="font-bold text-red-700">距離(道のり)</span></div>
+              <div class="border-t-2 border-gray-400 mx-2"></div>
+              <div class="bg-green-100 rounded-lg px-4 py-1"><span class="font-bold text-green-700">時間</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-center gap-2 mt-2 text-xs">
+          <span class="bg-blue-50 border border-blue-200 px-2 py-1 rounded">速さ×時間＝距離</span>
+          <span class="bg-red-50 border border-red-200 px-2 py-1 rounded">距離÷時間＝速さ</span>
+          <span class="bg-green-50 border border-green-200 px-2 py-1 rounded">距離÷速さ＝時間</span>
+        </div>
+      </div>
+    </div>`
+}
+
+// ========== 面積ビジュアル ==========
+function renderAreaVisual(container, card) {
+  const problem = card.problem_text || ''
+  const nums = (problem.match(/\d+/g) || []).map(Number).filter(n => n > 0 && n <= 100)
+  const w = nums[0] || 5
+  const h = nums[1] || 3
+
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-lime-50 to-green-50 rounded-xl border-2 border-lime-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-lime-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-vector-square mr-1"></i>みてわかる！面積</span>
+      </div>
+      <div class="flex items-center gap-4 justify-center">
+        <svg viewBox="0 0 ${Math.max(w*20+40, 120)} ${Math.max(h*20+60, 100)}" width="${Math.min(250, Math.max(w*20+40, 120))}" height="${Math.min(200, Math.max(h*20+60, 100))}">
+          <rect x="20" y="20" width="${w * 20}" height="${h * 20}" fill="#bbf7d0" stroke="#16a34a" stroke-width="2"/>
+          ${Array.from({length: w * h}, (_, i) => {
+            const col = i % w
+            const row = Math.floor(i / w)
+            return `<rect x="${20 + col * 20}" y="${20 + row * 20}" width="20" height="20" fill="none" stroke="#86efac" stroke-width="0.5"/>`
+          }).join('')}
+          <text x="${20 + w * 10}" y="${h * 20 + 45}" text-anchor="middle" font-size="12" font-weight="bold" fill="#16a34a">${w}cm</text>
+          <text x="${w * 20 + 35}" y="${20 + h * 10}" text-anchor="middle" font-size="12" font-weight="bold" fill="#16a34a" transform="rotate(90, ${w * 20 + 35}, ${20 + h * 10})">${h}cm</text>
+        </svg>
+        <div class="text-center">
+          <p class="text-sm text-gray-600">たて × よこ</p>
+          <p class="text-2xl font-bold text-lime-700">${h} × ${w} = ${w * h}</p>
+          <p class="text-sm text-gray-500">${w * h} cm²</p>
+          <p class="text-xs text-gray-400 mt-1">マス目 ${w * h} 個分</p>
+        </div>
+      </div>
+    </div>`
+}
+
+// ========== 視覚ウィジェット自動挿入 ==========
+function initVisualWidgets() {
+  const cardData = window.currentCardData
+  const card = cardData?.card || cardData
+  if (!card) return
+  
+  const cardId = card.card_id || card.id || 0
+  const containerId = 'visual-widget-' + cardId
+  
+  // 既にコンテナがあるか確認、なければ作成
+  let container = document.getElementById(containerId)
+  if (!container) {
+    // 問題画像の前 or 画像プレースホルダーの前に挿入
+    const insertTarget = document.getElementById('card-image-container-' + cardId) 
+      || document.getElementById('image-placeholder-' + cardId)
+      || document.querySelector('.bg-pink-50.border-l-4')?.parentElement
+    
+    if (insertTarget) {
+      container = document.createElement('div')
+      container.id = containerId
+      container.className = 'mt-4 mb-4'
+      insertTarget.parentElement.insertBefore(container, insertTarget)
+    } else {
+      // きいてみようの前に挿入
+      const audioSection = document.querySelector('[onclick="readCardAloud()"]')?.closest('.bg-green-50')
+      if (audioSection) {
+        container = document.createElement('div')
+        container.id = containerId
+        container.className = 'mt-4 mb-4'
+        audioSection.parentElement.insertBefore(container, audioSection)
+      }
+    }
+  }
+  
+  if (container) {
+    setTimeout(() => {
+      const rendered = renderVisualWidget(containerId, card)
+      if (!rendered) container.remove() // レンダリングされなかったら削除
+    }, 150)
+  }
+}
+window.initVisualWidgets = initVisualWidgets
+window.renderVisualWidget = renderVisualWidget
+
+// ====================================================================
+// /自動視覚支援ウィジェットエンジン END
 // ====================================================================
 
 // 音声合成（テキスト読み上げ）
