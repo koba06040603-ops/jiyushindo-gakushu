@@ -5843,6 +5843,17 @@ async function loadCardPage(cardId) {
                 </div>`
               })()}
               
+              <!-- 複数メディアギャラリー（画像・動画・音声） -->
+              <div id="media-gallery-${card.card_id || card.id || 0}" class="mt-3"></div>
+              <script>
+                (function(){
+                  const cid = ${card.card_id || card.id || 0};
+                  if (cid && typeof loadMediaGallery === 'function') {
+                    setTimeout(() => loadMediaGallery(cid), 200);
+                  }
+                })();
+              </script>
+              
               <!-- インタラクティブ触覚ウィジェット -->
               ${(() => {
                 const tactile = card._tactile_activity || ''
@@ -30262,12 +30273,72 @@ window.quickPasteImageUrl = quickPasteImageUrl
 // ファイル直接アップロード（JPG/PNG/PDF ドラッグ&ドロップ・ファイル選択・クリップボード対応）
 // ============================================
 
+// 追加メディアとしてアップロード（media API経由）
+async function addMediaFileToCard(cardId, file, mediaType) {
+  const gallery = document.getElementById('media-gallery-' + cardId)
+  if (gallery) {
+    gallery.innerHTML = `
+      <div class="p-4 text-center">
+        <div class="animate-spin rounded-full h-10 w-10 border-4 border-purple-200 border-t-purple-600 mx-auto mb-2"></div>
+        <p class="text-sm text-purple-700 font-bold">アップロード中... ${file.name}</p>
+      </div>`
+  }
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('media_type', mediaType)
+    formData.append('label', file.name)
+    const res = await axios.post('/api/card/' + cardId + '/media/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000
+    })
+    if (res.data.success) {
+      loadMediaGallery(cardId)
+      return true
+    } else {
+      throw new Error(res.data.error)
+    }
+  } catch (err) {
+    console.error('メディアアップロードエラー:', err)
+    alert('アップロードに失敗しました: ' + (err.response?.data?.error || err.message))
+    loadMediaGallery(cardId)
+    return false
+  }
+}
+window.addMediaFileToCard = addMediaFileToCard
+
 // ファイルをアップロードしてカードに保存
 async function uploadFileToCard(cardId, file) {
-  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
-  if (!allowedTypes.includes(file.type)) {
-    alert('対応形式: JPG, PNG, GIF, WebP, PDF\n選択されたファイル: ' + file.type)
+  const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'application/pdf']
+  const videoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']
+  const audioTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/webm']
+  const allAllowed = [...imageTypes, ...videoTypes, ...audioTypes]
+  
+  if (!allAllowed.includes(file.type)) {
+    alert('対応形式: JPG, PNG, PDF, MP4, WebM, MP3, WAV\n選択されたファイル: ' + file.type)
     return false
+  }
+  
+  // メディアタイプ判定
+  let mediaType = 'image'
+  if (videoTypes.includes(file.type)) mediaType = 'video'
+  else if (audioTypes.includes(file.type)) mediaType = 'audio'
+  
+  // 既に画像があるカードへの画像D&Dの場合、追加メディアとして扱う
+  const existingContainer = document.getElementById('card-image-container-' + cardId)
+  const existingImg = existingContainer?.querySelector('img')
+  if (existingImg && existingImg.src && mediaType === 'image') {
+    // 差し替えか追加かを確認
+    const addNew = confirm('既に画像があります。\n\n「OK」→ 2枚目として追加\n「キャンセル」→ 今の画像を差し替え')
+    if (addNew) {
+      // 追加メディアとしてアップロード
+      return addMediaFileToCard(cardId, file, mediaType)
+    }
+  }
+  
+  // 動画・音声は常に追加メディアとして扱う
+  if (mediaType !== 'image') {
+    return addMediaFileToCard(cardId, file, mediaType)
   }
   if (file.size > 20 * 1024 * 1024) {
     alert('ファイルサイズが大きすぎます（上限20MB）')
@@ -31144,6 +31215,250 @@ window.editorRedo = editorRedo
 window.editorRotate = editorRotate
 window.editorClear = editorClear
 
+// ====================================================================
+// 複数メディアギャラリー（画像・動画・音声をカードに複数添付）
+// ====================================================================
+async function loadMediaGallery(cardId) {
+  const container = document.getElementById('media-gallery-' + cardId)
+  if (!container) return
+  
+  try {
+    const res = await axios.get('/api/card/' + cardId + '/media')
+    if (!res.data.success) return
+    
+    const items = res.data.media_items || []
+    // 1件以下（旧problem_image_urlのみ）でギャラリー不要な場合はボタンだけ表示
+    renderMediaGallery(container, cardId, items)
+  } catch (e) {
+    // API未対応の場合は追加ボタンだけ出す
+    renderMediaGallery(container, cardId, [])
+  }
+}
+window.loadMediaGallery = loadMediaGallery
+
+function renderMediaGallery(container, cardId, items) {
+  // 追加メディア（problem_image_urlとは別のもの）のみ表示
+  const extraItems = items.filter((it, idx) => idx > 0 || items.length > 1)
+  
+  let html = ''
+  
+  // 追加メディアがある場合、ギャラリー表示
+  if (extraItems.length > 0) {
+    html += '<div class="space-y-3 mt-2">'
+    items.forEach((item, idx) => {
+      if (idx === 0) return // 1枚目は既にcard-image-containerで表示済み
+      html += renderMediaItem(item, cardId, idx)
+    })
+    html += '</div>'
+  }
+  
+  // メディア追加ボタン行
+  html += `
+    <div class="mt-3 flex items-center gap-2 flex-wrap justify-center">
+      <button onclick="addMediaToCard(${cardId}, 'image')"
+              class="inline-flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+        <i class="fas fa-image"></i> +画像
+      </button>
+      <button onclick="addMediaToCard(${cardId}, 'video')"
+              class="inline-flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+        <i class="fas fa-video"></i> +動画
+      </button>
+      <button onclick="addMediaToCard(${cardId}, 'audio')"
+              class="inline-flex items-center gap-1.5 bg-green-50 hover:bg-green-100 text-green-600 border border-green-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+        <i class="fas fa-music"></i> +音声
+      </button>
+      ${items.length > 0 ? `<span class="text-xs text-gray-400">${items.length}件のメディア</span>` : ''}
+    </div>
+  `
+  
+  container.innerHTML = html
+}
+
+function renderMediaItem(item, cardId, idx) {
+  const id = item.id || ('item-' + idx)
+  
+  if (item.type === 'image') {
+    return `
+      <div class="text-center relative group" id="media-item-${id}">
+        <img src="${item.url}" alt="${item.label || '画像'}" 
+             class="max-w-full h-auto rounded-lg shadow-sm mx-auto border border-gray-200" style="max-height: 350px;"
+             onerror="this.parentElement.innerHTML='<p class=\\'text-red-500 text-xs p-2\\'>画像読込エラー</p>'">
+        <div class="mt-1 flex items-center justify-center gap-2">
+          <span class="text-xs text-gray-500">${item.label || '画像'}</span>
+          <button onclick="removeMediaFromCard(${cardId}, '${id}')" class="text-xs text-red-400 hover:text-red-600 underline">削除</button>
+        </div>
+      </div>`
+  }
+  
+  if (item.type === 'video') {
+    // YouTube URL判定
+    const ytMatch = (item.url || '').match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]+)/)
+    if (ytMatch) {
+      return `
+        <div class="text-center" id="media-item-${id}">
+          <div class="relative rounded-lg overflow-hidden shadow-sm border border-gray-200 mx-auto" style="max-width:560px;">
+            <iframe src="https://www.youtube.com/embed/${ytMatch[1]}" class="w-full" style="height:315px;" frameborder="0" allowfullscreen></iframe>
+          </div>
+          <div class="mt-1 flex items-center justify-center gap-2">
+            <span class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>${item.label || '動画'}</span>
+            <button onclick="removeMediaFromCard(${cardId}, '${id}')" class="text-xs text-red-400 hover:text-red-600 underline">削除</button>
+          </div>
+        </div>`
+    }
+    // data URL動画
+    return `
+      <div class="text-center" id="media-item-${id}">
+        <video controls class="max-w-full h-auto rounded-lg shadow-sm mx-auto border border-gray-200" style="max-height: 350px;">
+          <source src="${item.url}" type="${item.mime_type || 'video/mp4'}">
+          動画を再生できません
+        </video>
+        <div class="mt-1 flex items-center justify-center gap-2">
+          <span class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>${item.label || '動画'}</span>
+          <button onclick="removeMediaFromCard(${cardId}, '${id}')" class="text-xs text-red-400 hover:text-red-600 underline">削除</button>
+        </div>
+      </div>`
+  }
+  
+  if (item.type === 'audio') {
+    return `
+      <div class="text-center bg-green-50 border border-green-200 rounded-lg p-3" id="media-item-${id}">
+        <i class="fas fa-music text-green-500 text-xl mb-2 block"></i>
+        <audio controls class="mx-auto" style="max-width:100%;">
+          <source src="${item.url}" type="${item.mime_type || 'audio/mpeg'}">
+          音声を再生できません
+        </audio>
+        <div class="mt-1 flex items-center justify-center gap-2">
+          <span class="text-xs text-gray-500">${item.label || '音声'}</span>
+          <button onclick="removeMediaFromCard(${cardId}, '${id}')" class="text-xs text-red-400 hover:text-red-600 underline">削除</button>
+        </div>
+      </div>`
+  }
+  
+  return ''
+}
+
+// メディア追加（種類別ファイルピッカー or URL入力）
+function addMediaToCard(cardId, mediaType) {
+  // 動画のURL追加かファイルアップロードかの選択
+  if (mediaType === 'video') {
+    const choice = confirm('YouTubeなどのURLを貼り付けますか？\n\n「OK」→URL入力\n「キャンセル」→動画ファイルを選択')
+    if (choice) {
+      // URL入力
+      const url = prompt('動画URLを入力（YouTube等）:')
+      if (url && url.trim()) {
+        addMediaUrlToCard(cardId, 'video', url.trim())
+      }
+      return
+    }
+  }
+  
+  if (mediaType === 'audio') {
+    const choice = confirm('音声URLを貼り付けますか？\n\n「OK」→URL入力\n「キャンセル」→音声ファイルを選択')
+    if (choice) {
+      const url = prompt('音声URLを入力:')
+      if (url && url.trim()) {
+        addMediaUrlToCard(cardId, 'audio', url.trim())
+      }
+      return
+    }
+  }
+  
+  // ファイル選択
+  const input = document.createElement('input')
+  input.type = 'file'
+  if (mediaType === 'image') {
+    input.accept = 'image/jpeg,image/png,image/gif,image/webp,application/pdf'
+  } else if (mediaType === 'video') {
+    input.accept = 'video/mp4,video/webm,video/ogg'
+  } else if (mediaType === 'audio') {
+    input.accept = 'audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac'
+  }
+  input.style.display = 'none'
+  input.onchange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    input.remove()
+    
+    // ラベル入力（任意）
+    const label = prompt('メディアのラベル（任意）:', file.name) || file.name
+    
+    // アップロード
+    const gallery = document.getElementById('media-gallery-' + cardId)
+    if (gallery) {
+      gallery.innerHTML = `
+        <div class="p-4 text-center">
+          <div class="animate-spin rounded-full h-10 w-10 border-4 border-blue-200 border-t-blue-600 mx-auto mb-2"></div>
+          <p class="text-sm text-blue-700 font-bold">アップロード中... ${file.name}</p>
+          <p class="text-xs text-gray-500">(${(file.size / 1024).toFixed(0)} KB)</p>
+        </div>`
+    }
+    
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('media_type', mediaType)
+      formData.append('label', label)
+      
+      const res = await axios.post('/api/card/' + cardId + '/media/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000
+      })
+      
+      if (res.data.success) {
+        // ギャラリー再読み込み
+        loadMediaGallery(cardId)
+      } else {
+        throw new Error(res.data.error || 'アップロード失敗')
+      }
+    } catch (err) {
+      console.error('メディアアップロードエラー:', err)
+      alert('アップロードに失敗しました: ' + (err.response?.data?.error || err.message))
+      loadMediaGallery(cardId)
+    }
+  }
+  document.body.appendChild(input)
+  input.click()
+}
+window.addMediaToCard = addMediaToCard
+
+// URL指定でメディア追加
+async function addMediaUrlToCard(cardId, mediaType, url) {
+  const label = prompt('メディアのラベル（任意）:', '') || (mediaType === 'video' ? '動画' : '音声')
+  
+  try {
+    const res = await axios.post('/api/card/' + cardId + '/media', {
+      type: mediaType,
+      url: url,
+      label: label
+    })
+    if (res.data.success) {
+      loadMediaGallery(cardId)
+    } else {
+      alert('追加に失敗: ' + (res.data.error || ''))
+    }
+  } catch (err) {
+    alert('追加に失敗: ' + (err.response?.data?.error || err.message))
+  }
+}
+window.addMediaUrlToCard = addMediaUrlToCard
+
+// メディア削除
+async function removeMediaFromCard(cardId, mediaId) {
+  if (!confirm('このメディアを削除しますか？')) return
+  
+  try {
+    const res = await axios.delete('/api/card/' + cardId + '/media/' + mediaId)
+    if (res.data.success) {
+      loadMediaGallery(cardId)
+    } else {
+      alert('削除に失敗: ' + (res.data.error || ''))
+    }
+  } catch (err) {
+    alert('削除に失敗: ' + (err.response?.data?.error || err.message))
+  }
+}
+window.removeMediaFromCard = removeMediaFromCard
+
 // ファイル選択ダイアログを開く
 function openFilePickerForCard(cardId) {
   const input = document.createElement('input')
@@ -31212,7 +31527,7 @@ function initDropZone(element, cardId) {
     const items = e.clipboardData?.items
     if (!items) return
     for (const item of items) {
-      if (item.type.startsWith('image/') || item.type === 'application/pdf') {
+      if (item.type.startsWith('image/') || item.type.startsWith('video/') || item.type.startsWith('audio/') || item.type === 'application/pdf') {
         const file = item.getAsFile()
         if (file) {
           e.preventDefault()

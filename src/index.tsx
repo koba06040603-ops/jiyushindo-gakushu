@@ -13155,7 +13155,8 @@ app.put('/api/card/:cardId', async (c) => {
       'real_world_connection',
       'new_terms',
       'textbook_page',
-      'learning_style_notes'
+      'learning_style_notes',
+      'media_items'
     ]
     
     const updateFields: string[] = []
@@ -13165,7 +13166,7 @@ app.put('/api/card/:cardId', async (c) => {
       if (field in updates) {
         updateFields.push(`${field} = ?`)
         // JSON型のフィールドは文字列化
-        if (['hints', 'new_terms', 'visual_support', 'auditory_support', 'kinesthetic_support'].includes(field)) {
+        if (['hints', 'new_terms', 'visual_support', 'auditory_support', 'kinesthetic_support', 'media_items'].includes(field)) {
           values.push(JSON.stringify(updates[field]))
         } else {
           values.push(updates[field])
@@ -13217,6 +13218,201 @@ app.put('/api/card/:cardId', async (c) => {
       error: 'カードの更新に失敗しました',
       details: error.message
     }, 500)
+  }
+})
+
+// =============================================================================
+// カード メディア管理API（複数画像・動画・音声対応）
+// media_items: JSON配列 [{type,url,label,order}, ...]
+// =============================================================================
+
+// media_itemsカラムが存在しない場合に自動追加
+async function ensureMediaItemsColumn(db: any) {
+  try {
+    await db.prepare("SELECT media_items FROM learning_cards LIMIT 1").first()
+  } catch (e: any) {
+    if (e.message?.includes('no such column') || e.message?.includes('media_items')) {
+      await db.prepare("ALTER TABLE learning_cards ADD COLUMN media_items TEXT DEFAULT '[]'").run()
+      console.log('✅ media_items カラムを自動追加しました')
+    }
+  }
+}
+
+// メディア一覧取得
+app.get('/api/card/:cardId/media', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  try {
+    await ensureMediaItemsColumn(env.DB)
+    const card = await env.DB.prepare(
+      "SELECT media_items, problem_image_url FROM learning_cards WHERE card_id = ?"
+    ).bind(cardId).first() as any
+    if (!card) return c.json({ success: false, error: 'カードが見つかりません' }, 404)
+    
+    let items: any[] = []
+    try { items = JSON.parse(card.media_items || '[]') } catch(e) { items = [] }
+    
+    // 旧 problem_image_url がありmedia_itemsに未統合なら自動統合
+    if (card.problem_image_url && items.length === 0) {
+      items.push({ type: 'image', url: card.problem_image_url, label: '問題の図', order: 0 })
+    }
+    
+    return c.json({ success: true, media_items: items })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// メディア追加（画像・動画・音声）
+app.post('/api/card/:cardId/media', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  const { type, url, label } = await c.req.json()
+  
+  if (!type || !url) {
+    return c.json({ success: false, error: 'type と url は必須です' }, 400)
+  }
+  if (!['image', 'video', 'audio'].includes(type)) {
+    return c.json({ success: false, error: 'type は image / video / audio のいずれかです' }, 400)
+  }
+  
+  try {
+    await ensureMediaItemsColumn(env.DB)
+    const card = await env.DB.prepare(
+      "SELECT media_items, problem_image_url FROM learning_cards WHERE card_id = ?"
+    ).bind(cardId).first() as any
+    if (!card) return c.json({ success: false, error: 'カードが見つかりません' }, 404)
+    
+    let items: any[] = []
+    try { items = JSON.parse(card.media_items || '[]') } catch(e) { items = [] }
+    
+    // 旧 problem_image_url 自動統合
+    if (card.problem_image_url && items.length === 0) {
+      items.push({ type: 'image', url: card.problem_image_url, label: '問題の図', order: 0 })
+    }
+    
+    const newItem = {
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      type,
+      url,
+      label: label || (type === 'image' ? '画像' : type === 'video' ? '動画' : '音声'),
+      order: items.length,
+      created_at: new Date().toISOString()
+    }
+    items.push(newItem)
+    
+    // 最初の画像はproblem_image_urlにも設定（後方互換）
+    const firstImage = items.find((i: any) => i.type === 'image')
+    const imgUrl = firstImage ? firstImage.url : card.problem_image_url
+    
+    await env.DB.prepare(
+      "UPDATE learning_cards SET media_items = ?, problem_image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE card_id = ?"
+    ).bind(JSON.stringify(items), imgUrl, cardId).run()
+    
+    return c.json({ success: true, item: newItem, media_items: items })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// メディア削除
+app.delete('/api/card/:cardId/media/:mediaId', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  const mediaId = c.req.param('mediaId')
+  
+  try {
+    await ensureMediaItemsColumn(env.DB)
+    const card = await env.DB.prepare(
+      "SELECT media_items FROM learning_cards WHERE card_id = ?"
+    ).bind(cardId).first() as any
+    if (!card) return c.json({ success: false, error: 'カードが見つかりません' }, 404)
+    
+    let items: any[] = []
+    try { items = JSON.parse(card.media_items || '[]') } catch(e) { items = [] }
+    
+    items = items.filter((i: any) => i.id !== mediaId)
+    // order再設定
+    items.forEach((i: any, idx: number) => { i.order = idx })
+    
+    const firstImage = items.find((i: any) => i.type === 'image')
+    
+    await env.DB.prepare(
+      "UPDATE learning_cards SET media_items = ?, problem_image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE card_id = ?"
+    ).bind(JSON.stringify(items), firstImage?.url || null, cardId).run()
+    
+    return c.json({ success: true, media_items: items })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// メディアファイルアップロード→カードに追加
+app.post('/api/card/:cardId/media/upload', async (c) => {
+  const { env } = c
+  const cardId = c.req.param('cardId')
+  
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File
+    const mediaType = (formData.get('media_type') as string) || 'image'
+    const label = (formData.get('label') as string) || ''
+    
+    if (!file) return c.json({ success: false, error: 'ファイルが選択されていません' }, 400)
+    
+    // サイズ制限（画像5MB、動画/音声10MB）
+    const maxSize = mediaType === 'image' ? 5 * 1024 * 1024 : 10 * 1024 * 1024
+    if (file.size > maxSize) {
+      return c.json({ success: false, error: `ファイルサイズ上限: ${mediaType === 'image' ? '5MB' : '10MB'}` }, 400)
+    }
+    
+    // Base64変換
+    const arrayBuffer = await file.arrayBuffer()
+    const uint8Array = new Uint8Array(arrayBuffer)
+    let binary = ''
+    const chunkSize = 8192
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+      binary += String.fromCharCode(...chunk)
+    }
+    const base64 = btoa(binary)
+    const dataUrl = `data:${file.type};base64,${base64}`
+    
+    // media_items に追加
+    await ensureMediaItemsColumn(env.DB)
+    const card = await env.DB.prepare(
+      "SELECT media_items, problem_image_url FROM learning_cards WHERE card_id = ?"
+    ).bind(cardId).first() as any
+    if (!card) return c.json({ success: false, error: 'カードが見つかりません' }, 404)
+    
+    let items: any[] = []
+    try { items = JSON.parse(card.media_items || '[]') } catch(e) { items = [] }
+    
+    if (card.problem_image_url && items.length === 0) {
+      items.push({ type: 'image', url: card.problem_image_url, label: '問題の図', order: 0, id: 'legacy_img' })
+    }
+    
+    const newItem = {
+      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      type: mediaType,
+      url: dataUrl,
+      label: label || file.name || (mediaType === 'image' ? '画像' : mediaType === 'video' ? '動画' : '音声'),
+      order: items.length,
+      mime_type: file.type,
+      file_size: file.size,
+      created_at: new Date().toISOString()
+    }
+    items.push(newItem)
+    
+    const firstImage = items.find((i: any) => i.type === 'image')
+    
+    await env.DB.prepare(
+      "UPDATE learning_cards SET media_items = ?, problem_image_url = ?, updated_at = CURRENT_TIMESTAMP WHERE card_id = ?"
+    ).bind(JSON.stringify(items), firstImage?.url || card.problem_image_url, cardId).run()
+    
+    return c.json({ success: true, item: newItem, media_items: items })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
   }
 })
 
