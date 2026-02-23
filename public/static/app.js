@@ -5715,19 +5715,10 @@ async function loadCardPage(cardId) {
                 </div>
               ` : ''}
               
-              <!-- 問題画像 -->
-              ${card.problem_image_url ? `
-                <div class="mt-4 text-center" id="card-image-container-${card.card_id || card.id || 0}">
-                  <img src="${card.problem_image_url}" alt="${card._image_description || '問題の図'}" 
-                       class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
-                       onerror="handleImageLoadError(this, ${card.card_id || card.id || 0})">
-                  <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
-                    <p class="text-xs text-gray-500"><i class="fas fa-image mr-1"></i>${card._image_description || '問題の図'}</p>
-                    <button onclick="openImageEditor(${card.card_id || card.id || 0})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
-                    <button onclick="replaceCardImage(${card.card_id || card.id || 0})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
-                  </div>
-                </div>
-              ` : (() => {
+              <!-- 問題画像/動画/音声 -->
+              ${card.problem_image_url ? 
+                renderMediaEmbed(card.problem_image_url, card.card_id || card.id || 0, card._image_description || '問題の図')
+              : (() => {
                 // イラスト説明があるが画像がない場合のプレースホルダー + AI生成ボタン
                 const rawImgDesc = card._image_description || ''
                 // プレースホルダー的なテキストを除外（実際の図の説明のみ表示）
@@ -19536,11 +19527,14 @@ function showCardDetail(card) {
                   </button>
                 </div>
               ` : ''}
-              ${card.problem_image_url ? `
-                <div class="mb-4 text-center">
-                  <img src="${card.problem_image_url}" alt="問題画像" class="max-w-full h-auto rounded-lg shadow-md mx-auto" style="max-height: 400px;">
-                </div>
-              ` : ''}
+              ${card.problem_image_url ? (() => {
+                const _pUrl = card.problem_image_url
+                const _ytId = isYouTubeUrl(_pUrl)
+                if (_ytId) return '<div class="mb-4 text-center"><div class="relative rounded-lg overflow-hidden shadow-md border border-gray-200 mx-auto" style="max-width:560px;"><iframe src="https://www.youtube.com/embed/' + _ytId + '" class="w-full" style="height:315px;" frameborder="0" allowfullscreen></iframe></div></div>'
+                if (isVideoUrl(_pUrl)) return '<div class="mb-4 text-center"><video controls class="max-w-full h-auto rounded-lg shadow-md mx-auto" style="max-height:400px;" preload="metadata"><source src="' + _pUrl + '" type="video/mp4">動画を再生できません</video></div>'
+                if (isAudioUrl(_pUrl)) return '<div class="mb-4 text-center bg-green-50 border border-green-200 rounded-lg p-4"><i class="fas fa-music text-green-500 text-2xl mb-2 block"></i><audio controls class="mx-auto" style="max-width:100%;"><source src="' + _pUrl + '" type="audio/mpeg">音声を再生できません</audio></div>'
+                return '<div class="mb-4 text-center"><img src="' + _pUrl + '" alt="問題画像" class="max-w-full h-auto rounded-lg shadow-md mx-auto" style="max-height:400px;"></div>'
+              })() : ''}
               <p class="text-gray-800 whitespace-pre-wrap text-lg">${card.problem_description || 'なし'}</p>
             </div>
 
@@ -30390,18 +30384,90 @@ async function uploadFileToCard(cardId, file) {
   
   // 既に画像があるカードへの画像D&Dの場合、追加メディアとして扱う
   const existingContainer = document.getElementById('card-image-container-' + cardId)
-  const existingImg = existingContainer?.querySelector('img')
-  if (existingImg && existingImg.src && mediaType === 'image') {
+  const existingMedia = existingContainer?.querySelector('img, video, audio, iframe')
+  if (existingMedia && mediaType === 'image') {
     // 差し替えか追加かを確認
-    const addNew = confirm('既に画像があります。\n\n「OK」→ 2枚目として追加\n「キャンセル」→ 今の画像を差し替え')
+    const addNew = confirm('既にメディアがあります。\n\n「OK」→ 追加メディアとして追加\n「キャンセル」→ 今のメディアを差し替え')
     if (addNew) {
       // 追加メディアとしてアップロード
       return addMediaFileToCard(cardId, file, mediaType)
     }
   }
   
-  // 動画・音声は常に追加メディアとして扱う
+  // 動画・音声: カードにメディアがない場合は1枚目として設定、ある場合はギャラリー追加
   if (mediaType !== 'image') {
+    const placeholder = document.getElementById('image-placeholder-' + cardId)
+    const guidePlaceholder = document.getElementById('guide-img-' + cardId)
+    const hasNoMedia = !existingContainer && (placeholder || guidePlaceholder)
+    
+    if (hasNoMedia) {
+      // メディアがないカード: 動画/音声を1枚目メディアとして設定
+      const targetEl = placeholder || guidePlaceholder
+      
+      // サイズチェック
+      const sizeLimits = { video: 50, audio: 20 }
+      const sizeLimit = (sizeLimits[mediaType] || 50) * 1024 * 1024
+      if (file.size > sizeLimit) {
+        alert('ファイルサイズが大きすぎます（上限' + (sizeLimits[mediaType] || 50) + 'MB、現在' + (file.size/1024/1024).toFixed(1) + 'MB）')
+        return false
+      }
+      
+      // アップロード中UI
+      if (targetEl) {
+        targetEl.innerHTML = `
+          <div class="p-8 text-center">
+            <div class="inline-block relative mb-4">
+              <div class="animate-spin rounded-full h-16 w-16 border-4 border-purple-200 border-t-purple-600"></div>
+              <i class="fas fa-cloud-upload-alt absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-purple-600 text-xl"></i>
+            </div>
+            <p class="text-purple-700 font-bold text-lg">${mediaType === 'video' ? '動画' : '音声'}アップロード中...</p>
+            <p class="text-sm text-gray-500 mt-1">${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)</p>
+          </div>`
+      }
+      
+      try {
+        // R2にアップロード
+        const formData = new FormData()
+        formData.append('file', file)
+        const endpoint = mediaType === 'video' ? '/api/upload/video' : '/api/upload/video'
+        const res = await axios.post(endpoint, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 180000,
+          maxContentLength: 50 * 1024 * 1024,
+          maxBodyLength: 50 * 1024 * 1024
+        })
+        
+        if (res.data.success) {
+          const mediaUrl = res.data.video_url || res.data.audio_url || res.data.url
+          // カードのproblem_image_urlに保存
+          await axios.put('/api/card/' + cardId, { problem_image_url: mediaUrl })
+          
+          // 表示を更新
+          if (targetEl) {
+            targetEl.outerHTML = renderMediaEmbed(mediaUrl, cardId, file.name)
+          }
+          // ギャラリーも更新
+          loadMediaGallery(cardId)
+          return true
+        } else {
+          throw new Error(res.data.error || 'アップロード失敗')
+        }
+      } catch (err) {
+        console.error('動画アップロードエラー:', err)
+        if (targetEl) {
+          targetEl.innerHTML = `
+            <div class="p-4 text-center">
+              <i class="fas fa-exclamation-triangle text-red-500 text-3xl mb-2 block"></i>
+              <p class="text-red-700 font-bold mb-2">アップロードに失敗しました</p>
+              <p class="text-xs text-gray-500 mb-2">${err.response?.data?.error || err.message}</p>
+              <button onclick="addMediaToCard(${cardId}, '${mediaType}')" class="text-sm text-blue-600 underline">再試行</button>
+            </div>`
+        }
+        return false
+      }
+    }
+    
+    // メディアが既にあるカード: ギャラリーに追加
     return addMediaFileToCard(cardId, file, mediaType)
   }
   // サイズチェック: 画像5MB、動画50MB、音声20MB
@@ -35091,6 +35157,98 @@ function clearImagePreview() {
   uploadBtn.classList.add('hidden')
   fileInput.value = ''
 }
+
+// URLが動画かどうか判定するヘルパー
+function isVideoUrl(url) {
+  if (!url) return false
+  // R2パス or 拡張子ベースで判定
+  if (/\/api\/media\/(files\/)?videos\//.test(url)) return true
+  if (/\.(mp4|webm|ogg|mov|avi|mkv|m4v)(\?|$)/i.test(url)) return true
+  // data URLの判定
+  if (/^data:video\//i.test(url)) return true
+  return false
+}
+window.isVideoUrl = isVideoUrl
+
+// URLがYouTubeかどうか判定するヘルパー
+function isYouTubeUrl(url) {
+  if (!url) return null
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]+)/)
+  return m ? m[1] : null
+}
+window.isYouTubeUrl = isYouTubeUrl
+
+// URLが音声かどうか判定するヘルパー
+function isAudioUrl(url) {
+  if (!url) return false
+  if (/\/api\/media\/(files\/)?audio\//.test(url)) return true
+  if (/\.(mp3|wav|ogg|m4a|aac|flac|wma)(\?|$)/i.test(url)) return true
+  if (/^data:audio\//i.test(url)) return true
+  return false
+}
+window.isAudioUrl = isAudioUrl
+
+// メディアURLに応じた表示HTMLを生成（カード用）
+function renderMediaEmbed(url, cardId, description, options = {}) {
+  const { showEdit = true, showReplace = true, maxHeight = '400px' } = options
+  const ytId = isYouTubeUrl(url)
+  
+  if (ytId) {
+    return `
+      <div class="mt-4 text-center" id="card-image-container-${cardId}">
+        <div class="relative rounded-lg overflow-hidden shadow-md border-2 border-gray-200 mx-auto" style="max-width:560px;">
+          <iframe src="https://www.youtube.com/embed/${ytId}" class="w-full" style="height:315px;" frameborder="0" allowfullscreen></iframe>
+        </div>
+        <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
+          <p class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>${description || 'YouTube動画'}</p>
+          ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
+        </div>
+      </div>`
+  }
+  
+  if (isVideoUrl(url)) {
+    return `
+      <div class="mt-4 text-center" id="card-image-container-${cardId}">
+        <video controls class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: ${maxHeight};" preload="metadata">
+          <source src="${url}" type="video/mp4">
+          動画を再生できません
+        </video>
+        <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
+          <p class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>${description || '動画'}</p>
+          ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
+        </div>
+      </div>`
+  }
+  
+  if (isAudioUrl(url)) {
+    return `
+      <div class="mt-4 text-center bg-green-50 border-2 border-green-200 rounded-lg p-4" id="card-image-container-${cardId}">
+        <i class="fas fa-music text-green-500 text-3xl mb-2 block"></i>
+        <audio controls class="mx-auto" style="max-width:100%;" preload="metadata">
+          <source src="${url}" type="audio/mpeg">
+          音声を再生できません
+        </audio>
+        <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
+          <p class="text-xs text-gray-500"><i class="fas fa-music mr-1"></i>${description || '音声'}</p>
+          ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
+        </div>
+      </div>`
+  }
+  
+  // デフォルト: 画像
+  return `
+    <div class="mt-4 text-center" id="card-image-container-${cardId}">
+      <img src="${url}" alt="${description || '問題の図'}" 
+           class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: ${maxHeight};"
+           onerror="handleImageLoadError(this, ${cardId})">
+      <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
+        <p class="text-xs text-gray-500"><i class="fas fa-image mr-1"></i>${description || '問題の図'}</p>
+        ${showEdit ? `<button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>` : ''}
+        ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
+      </div>
+    </div>`
+}
+window.renderMediaEmbed = renderMediaEmbed
 
 // ファイルサイズフォーマット
 function formatFileSize(bytes) {
@@ -47513,7 +47671,16 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       </div>
                     </div>
                     <div class="bg-white rounded-lg p-3 mb-2 border">
-                      ${card.problem_image_url ? '<div class="mb-2" id="guide-img-' + (card.card_id || card.id || i) + '"><img src="' + card.problem_image_url + '" class="max-h-48 rounded border mx-auto" onerror="handleImageLoadError(this,' + (card.card_id || card.id || 0) + ')"></div>' : (() => {
+                      ${card.problem_image_url ? (() => {
+                        const _gUrl = card.problem_image_url
+                        const _gCardId = card.card_id || card.id || i
+                        const _gCardIdErr = card.card_id || card.id || 0
+                        const _gYtId = isYouTubeUrl(_gUrl)
+                        if (_gYtId) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><div class="relative rounded-lg overflow-hidden border mx-auto" style="max-width:400px;"><iframe src="https://www.youtube.com/embed/' + _gYtId + '" class="w-full" style="height:225px;" frameborder="0" allowfullscreen></iframe></div></div>'
+                        if (isVideoUrl(_gUrl)) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><video controls class="max-h-48 rounded border mx-auto" preload="metadata"><source src="' + _gUrl + '" type="video/mp4">動画を再生できません</video></div>'
+                        if (isAudioUrl(_gUrl)) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><div class="bg-green-50 border border-green-200 rounded-lg p-2 text-center"><i class="fas fa-music text-green-500 mb-1 block"></i><audio controls class="mx-auto" style="max-width:100%;"><source src="' + _gUrl + '" type="audio/mpeg"></audio></div></div>'
+                        return '<div class="mb-2" id="guide-img-' + _gCardId + '"><img src="' + _gUrl + '" class="max-h-48 rounded border mx-auto" onerror="handleImageLoadError(this,' + _gCardIdErr + ')"></div>'
+                      })() : (() => {
                         const cId = card.card_id || card.id || 0
                         const desc = (mm.image_description || card.card_title || card.unit_name || '').replace(/'/g, '').replace(/"/g, '').substring(0, 60)
                         return '<div class="mb-3 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-dashed border-yellow-300 rounded-xl p-4 text-center" id="guide-img-' + cId + '">' +
@@ -47592,7 +47759,12 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                               </button>
                             </div>
                             <div id="image-preview-${card.card_id || card.id || i}" class="mt-1 ${card.problem_image_url ? '' : 'hidden'}">
-                              ${card.problem_image_url ? '<img src="' + card.problem_image_url + '" class="max-h-32 rounded border" onerror="this.style.display=\'none\'">' : ''}
+                              ${card.problem_image_url ? (() => {
+                                const _tUrl = card.problem_image_url
+                                if (isVideoUrl(_tUrl)) return '<video controls class="max-h-32 rounded border" preload="metadata"><source src="' + _tUrl + '" type="video/mp4"></video>'
+                                if (isAudioUrl(_tUrl)) return '<div class="bg-green-50 border rounded p-1 text-center"><i class="fas fa-music text-green-500 text-xs"></i><audio controls style="max-width:100%;height:24px;"><source src="' + _tUrl + '" type="audio/mpeg"></audio></div>'
+                                return '<img src="' + _tUrl + '" class="max-h-32 rounded border" onerror="this.style.display=\'none\'">'
+                              })() : ''}
                             </div>
                           </div>
                           

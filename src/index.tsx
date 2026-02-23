@@ -7632,15 +7632,16 @@ app.get('/guide/:curriculumId', async (c) => {
                 <strong>✋ やってみよう：</strong>${tactileActivity}
               </div>` : ''}
               ${audioInstruction ? `
-              <div style="background:#F0FDF4; border-left:4px solid #10B981; padding:8px 12px; border-radius:0 8px 8px 0; margin:8px 0; font-size:0.9rem;">
+              <div class="audio-section" style="background:#F0FDF4; border-left:4px solid #10B981; padding:8px 12px; border-radius:0 8px 8px 0; margin:8px 0; font-size:0.9rem; cursor:pointer;" onclick="speakGuideText(this)" data-text="${audioInstruction.replace(/"/g, '&quot;')}">
                 <strong>🔊 きいてみよう：</strong>${audioInstruction}
+                <span style="display:inline-block; margin-left:8px; background:#10B981; color:white; padding:2px 10px; border-radius:12px; font-size:0.75rem; font-weight:bold;">▶ タップして聞く</span>
               </div>` : ''}
               ${imageDesc ? `
               <div style="background:#F5F3FF; border-left:4px solid #8B5CF6; padding:8px 12px; border-radius:0 8px 8px 0; margin:8px 0; font-size:0.85rem; color:#6b7280;">
                 <strong>🖼️ 図：</strong>${imageDesc}
               </div>` : ''}
-              <div style="background:#f9fafb; border:1px dashed #d1d5db; border-radius:8px; padding:12px; min-height:40px;">
-                <span style="color:#9ca3af; font-size:0.85rem;">こたえをかこう：</span>
+              <div style="background:#f9fafb; border:2px solid #d1d5db; border-radius:8px; padding:4px; min-height:60px;">
+                <textarea style="width:100%; min-height:56px; border:none; background:transparent; font-size:1rem; line-height:1.8; resize:vertical; outline:none; padding:8px; font-family:inherit; color:#1f2937;" placeholder="こたえをかこう：" rows="2"></textarea>
               </div>
             </div>
           `}).join('')}
@@ -7669,8 +7670,8 @@ app.get('/guide/:curriculumId', async (c) => {
                 </div>
               `).join('')}
             </div>` : `
-            <div style="background:#f9fafb; border:1px dashed #d1d5db; border-radius:8px; padding:12px; min-height:40px;">
-              <span style="color:#9ca3af; font-size:0.85rem;">こたえをかこう：</span>
+            <div style="background:#f9fafb; border:2px solid #d1d5db; border-radius:8px; padding:4px; min-height:60px;">
+              <textarea style="width:100%; min-height:56px; border:none; background:transparent; font-size:1rem; line-height:1.8; resize:vertical; outline:none; padding:8px; font-family:inherit; color:#1f2937;" placeholder="こたえをかこう：" rows="2"></textarea>
             </div>`}
           </div>
         `).join('')}
@@ -7690,8 +7691,8 @@ app.get('/guide/:curriculumId', async (c) => {
               <strong>${p.problem_title || 'もんだい ' + (i+1)}</strong>
             </div>
             ${p.problem_content ? `<div style="background:#f5f3ff; border-left:4px solid #8B5CF6; padding:10px 14px; border-radius:0 8px 8px 0;">${p.problem_content}</div>` : p.problem_description ? `<div style="background:#f5f3ff; border-left:4px solid #8B5CF6; padding:10px 14px; border-radius:0 8px 8px 0;">${p.problem_description}</div>` : ''}
-            <div style="background:#f9fafb; border:1px dashed #d1d5db; border-radius:8px; padding:12px; min-height:40px; margin-top:8px;">
-              <span style="color:#9ca3af; font-size:0.85rem;">こたえをかこう：</span>
+            <div style="background:#f9fafb; border:2px solid #d1d5db; border-radius:8px; padding:4px; min-height:60px; margin-top:8px;">
+              <textarea style="width:100%; min-height:56px; border:none; background:transparent; font-size:1rem; line-height:1.8; resize:vertical; outline:none; padding:8px; font-family:inherit; color:#1f2937;" placeholder="こたえをかこう：" rows="2"></textarea>
             </div>
           </div>
         `).join('')}
@@ -7799,6 +7800,47 @@ app.get('/guide/:curriculumId', async (c) => {
       自由進度学習支援システム
     </div>
   </div>
+  <script>
+  // 音声読み上げ機能（きいてみよう）
+  function speakGuideText(el) {
+    if (!('speechSynthesis' in window)) {
+      alert('このブラウザは音声読み上げに対応していません。');
+      return;
+    }
+    var text = el.getAttribute('data-text') || el.innerText || '';
+    if (!text) return;
+    
+    // 再生中なら停止
+    if (speechSynthesis.speaking) {
+      speechSynthesis.cancel();
+      el.style.background = '#F0FDF4';
+      return;
+    }
+    
+    // 再生中の表示
+    el.style.background = '#D1FAE5';
+    
+    var utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ja-JP';
+    utterance.rate = 0.85;
+    utterance.pitch = 1.1;
+    
+    // 日本語音声を選択
+    var voices = speechSynthesis.getVoices();
+    var jpVoice = voices.find(function(v) { return v.lang.startsWith('ja'); });
+    if (jpVoice) utterance.voice = jpVoice;
+    
+    utterance.onend = function() { el.style.background = '#F0FDF4'; };
+    utterance.onerror = function() { el.style.background = '#F0FDF4'; };
+    
+    speechSynthesis.speak(utterance);
+  }
+  
+  // 音声ボイス読み込み（一部ブラウザで非同期）
+  if ('speechSynthesis' in window && speechSynthesis.onvoiceschanged !== undefined) {
+    speechSynthesis.onvoiceschanged = function() { speechSynthesis.getVoices(); };
+  }
+  </script>
 </body>
 </html>`)
   } catch (error: any) {
