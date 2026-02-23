@@ -7525,7 +7525,53 @@ function detectVisualWidget(card) {
   // 表・グラフ
   if (/表|グラフ|棒グラフ|折れ線|円グラフ/.test(all)) return 'chart'
   
-  return null
+  // ===== 追加: 教科書レベル以上の視覚支援パターン =====
+  // 正負の数（中学）
+  if (/正負|正の数|負の数|マイナス|＋|ー|プラス.*マイナス|符号|絶対値/.test(all)) return 'positive_negative'
+  // 方程式
+  if (/方程式|=|等式|不等式|移項/.test(all)) return 'equation'
+  // 文字式
+  if (/文字式|文字.*式|式.*表す|xやy|xyを|文字を使/.test(all)) return 'algebra'
+  // 図形（平面・空間）
+  if (/平行|垂直|対角線|ひし形|平行四辺形|台形|多角形|円周|直径|半径|おうぎ形|扇形|弧|弦/.test(all)) return 'geometry'
+  // 対称
+  if (/対称|線対称|点対称|折り返/.test(all)) return 'symmetry'
+  // 確率・場合の数
+  if (/確率|場合の数|組み合わせ|順列|並べ方|選び方|さいころ|コイン/.test(all)) return 'probability'
+  // データ活用・統計
+  if (/平均|ちらばり|度数|ヒストグラム|代表値|最頻値|中央値|範囲|四分位/.test(all)) return 'statistics'
+  // 社会科：地理・産業
+  if (subject.includes('社会') && /農業|漁業|工業|貿易|人口|気候|資源|エネルギー|産業|米|水産/.test(all)) return 'social_industry'
+  // 社会科：政治・経済
+  if (subject.includes('社会') && /憲法|選挙|国会|内閣|裁判|三権|人権|税金|政治|民主/.test(all)) return 'social_government'
+  // 理科：物理
+  if (subject.includes('理科') && /力|ばね|てこ|滑車|圧力|浮力|速度|加速度|仕事|エネルギー|運動/.test(all)) return 'physics'
+  // 理科：化学
+  if (subject.includes('理科') && /元素|原子|分子|化学式|化合|酸化|還元|中和|水溶液|濃度|密度/.test(all)) return 'chemistry'
+  // 理科：地学
+  if (subject.includes('理科') && /地震|火山|岩石|地層|天気|気圧|前線|雲|風|湿度/.test(all)) return 'earth_science'
+  // 国語：漢字
+  if (subject.includes('国語') && /漢字|部首|画数|読み|書き|筆順|音読み|訓読み/.test(all)) return 'kanji'
+  // 国語：文法
+  if (subject.includes('国語') && /主語|述語|修飾語|接続詞|助詞|品詞|文節|敬語|ことわざ|慣用句|四字熟語/.test(all)) return 'grammar'
+  // 英語
+  if (subject.includes('英語') && /英語|アルファベット|単語|文法|be動詞|一般動詞|過去形|現在|未来/.test(all)) return 'english'
+  // 数量関係（一般）
+  if (/何倍|倍|□×|×□|わり算|割り算|余り|あまり/.test(all)) return 'multiplication_division'
+  // 数の概念（低学年）
+  if (/いくつ|なんこ|なんぼん|数え|くらべ|おおい|すくない|おなじ/.test(all)) return 'counting'
+  // 図形の構成・展開図
+  if (/展開図|見取り図|投影図|切断|断面|回転体/.test(all)) return 'net_diagram'
+
+  // ★ 教科マッチング（subject + 一般キーワード）で最低限のビジュアルを保証
+  if (subject.includes('算数') || subject.includes('数学')) return 'math_general'
+  if (subject.includes('社会')) return 'social_general'
+  if (subject.includes('理科')) return 'science_general'
+  if (subject.includes('国語')) return 'kokugo_general'
+  if (subject.includes('英語')) return 'english_general'
+  
+  // それでもマッチしない場合は汎用ビジュアルを返す
+  return 'universal'
 }
 
 function renderVisualWidget(containerId, card) {
@@ -7553,6 +7599,31 @@ function renderVisualWidget(containerId, card) {
     case 'ratio': renderRatioVisual(container, card); break
     case 'chart': renderChartVisual(container, card); break
     case 'speed': renderSpeedVisual(container, card); break
+    // ===== 追加ウィジェット =====
+    case 'positive_negative': renderPositiveNegativeVisual(container, card); break
+    case 'equation': renderEquationVisual(container, card); break
+    case 'algebra': renderAlgebraVisual(container, card); break
+    case 'geometry': renderGeometryVisual(container, card); break
+    case 'symmetry': renderSymmetryVisual(container, card); break
+    case 'probability': renderProbabilityVisual(container, card); break
+    case 'statistics': renderStatisticsVisual(container, card); break
+    case 'social_industry': renderSocialIndustryVisual(container, card); break
+    case 'social_government': renderSocialGovernmentVisual(container, card); break
+    case 'physics': renderPhysicsVisual(container, card); break
+    case 'chemistry': renderChemistryVisual(container, card); break
+    case 'earth_science': renderEarthScienceVisual(container, card); break
+    case 'kanji': renderKanjiVisual(container, card); break
+    case 'grammar': renderGrammarVisual(container, card); break
+    case 'english': renderEnglishVisual(container, card); break
+    case 'multiplication_division': renderMultDivVisual(container, card); break
+    case 'counting': renderCountingVisual(container, card); break
+    case 'net_diagram': renderNetDiagramVisual(container, card); break
+    case 'math_general': renderMathGeneralVisual(container, card); break
+    case 'social_general': renderSocialGeneralVisual(container, card); break
+    case 'science_general': renderScienceGeneralVisual(container, card); break
+    case 'kokugo_general': renderKokugoGeneralVisual(container, card); break
+    case 'english_general': renderEnglishGeneralVisual(container, card); break
+    case 'universal': renderUniversalVisual(container, card); break
     default: return false
   }
   return true
@@ -8149,6 +8220,796 @@ function renderSpeedVisual(container, card) {
     </div>`
 }
 
+// ========== 正負の数ビジュアル ==========
+function renderPositiveNegativeVisual(container, card) {
+  const problem = card.problem_text || card.problem_content || ''
+  const nums = (problem.match(/-?\d+(\.\d+)?/g) || []).map(Number).filter(n => !isNaN(n))
+  const displayNums = nums.length > 0 ? nums.slice(0, 6) : [-5, -2, 0, 3, 7]
+  const minN = Math.min(-10, ...displayNums) - 2
+  const maxN = Math.max(10, ...displayNums) + 2
+  const range = maxN - minN
+  const unit = card.unit_name || ''
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-blue-50 to-red-50 rounded-xl border-2 border-indigo-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-indigo-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-balance-scale mr-1"></i>みてわかる！正負の数</span>
+      </div>
+      <!-- 数直線 -->
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <p class="text-xs font-bold text-indigo-700 mb-2"><i class="fas fa-ruler-horizontal mr-1"></i>数直線（すうちょくせん）</p>
+        <svg viewBox="0 0 420 70" class="w-full" style="max-height:70px">
+          <defs>
+            <linearGradient id="nlGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.15"/>
+              <stop offset="${(-minN / range) * 100}%" stop-color="#f3f4f6" stop-opacity="0.1"/>
+              <stop offset="100%" stop-color="#ef4444" stop-opacity="0.15"/>
+            </linearGradient>
+          </defs>
+          <rect x="10" y="20" width="400" height="20" rx="4" fill="url(#nlGrad)"/>
+          <line x1="10" y1="30" x2="410" y2="30" stroke="#374151" stroke-width="2"/>
+          <polygon points="405,25 415,30 405,35" fill="#374151"/>
+          ${Array.from({length: range + 1}, (_, i) => {
+            const val = minN + i
+            const x = 10 + (i / range) * 400
+            const isMajor = val % 5 === 0 || val === 0
+            const isTarget = displayNums.includes(val)
+            const color = val === 0 ? '#7c3aed' : val < 0 ? '#3b82f6' : '#ef4444'
+            return `<line x1="${x}" y1="${isMajor ? 18 : 24}" x2="${x}" y2="${isMajor ? 42 : 36}" stroke="${isTarget ? '#f59e0b' : color}" stroke-width="${isTarget ? 3 : isMajor ? 1.5 : 0.5}"/>
+              ${isMajor || isTarget ? `<text x="${x}" y="${55}" text-anchor="middle" font-size="${isTarget ? 11 : 9}" fill="${isTarget ? '#f59e0b' : color}" font-weight="${isTarget || val === 0 ? 'bold' : 'normal'}">${val > 0 ? '+' + val : val}</text>` : ''}
+              ${isTarget ? `<circle cx="${x}" cy="14" r="5" fill="#f59e0b"/><text x="${x}" y="17" text-anchor="middle" font-size="7" fill="white" font-weight="bold">★</text>` : ''}
+              ${val === 0 ? `<line x1="${x}" y1="14" x2="${x}" y2="46" stroke="#7c3aed" stroke-width="2.5" stroke-dasharray="3"/>` : ''}`
+          }).join('')}
+          <text x="${10 + (-minN / range) * 400}" y="66" text-anchor="middle" font-size="8" fill="#7c3aed" font-weight="bold">基準(0)</text>
+          <text x="15" y="15" font-size="8" fill="#3b82f6" font-weight="bold">← 負の方向</text>
+          <text x="355" y="15" font-size="8" fill="#ef4444" font-weight="bold">正の方向 →</text>
+        </svg>
+      </div>
+      <!-- コンセプト図 -->
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <div class="bg-blue-50 rounded-lg p-3 border border-blue-200 text-center">
+          <div class="text-3xl mb-1">❄️</div>
+          <p class="text-xs font-bold text-blue-700">負の数（マイナス）</p>
+          <p class="text-xs text-blue-600">0より小さい数</p>
+          <p class="text-xs text-blue-500 mt-1">例: -3℃, -500円</p>
+        </div>
+        <div class="bg-red-50 rounded-lg p-3 border border-red-200 text-center">
+          <div class="text-3xl mb-1">🔥</div>
+          <p class="text-xs font-bold text-red-700">正の数（プラス）</p>
+          <p class="text-xs text-red-600">0より大きい数</p>
+          <p class="text-xs text-red-500 mt-1">例: +3℃, +500円</p>
+        </div>
+      </div>
+      ${/絶対値/.test(problem) ? `
+      <div class="bg-purple-50 rounded-lg p-3 border border-purple-200 mb-3">
+        <p class="text-xs font-bold text-purple-700 mb-1"><i class="fas fa-arrows-alt-h mr-1"></i>絶対値とは？</p>
+        <p class="text-xs text-purple-600">0からの距離（離れている数）。符号を取り除いた数。</p>
+        <div class="flex items-center justify-center gap-3 mt-1">
+          <span class="bg-blue-100 px-2 py-0.5 rounded text-sm font-bold text-blue-700">|-5| = 5</span>
+          <span class="bg-red-100 px-2 py-0.5 rounded text-sm font-bold text-red-700">|+3| = 3</span>
+        </div>
+      </div>` : ''}
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=正負の数+わかりやすい+中学数学" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fab fa-youtube"></i>動画で学ぶ
+        </a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=正負の数" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-tv"></i>NHK for School
+        </a>
+      </div>
+    </div>`
+}
+
+// ========== 方程式ビジュアル ==========
+function renderEquationVisual(container, card) {
+  const problem = card.problem_text || ''
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-amber-50 to-yellow-50 rounded-xl border-2 border-amber-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-amber-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-balance-scale-right mr-1"></i>みてわかる！方程式</span>
+      </div>
+      <div class="bg-white rounded-lg p-4 border mb-3 text-center">
+        <p class="text-sm font-bold text-gray-700 mb-2">方程式 ＝ 天びんのつりあい</p>
+        <svg viewBox="0 0 300 120" class="w-full mx-auto" style="max-height:120px">
+          <polygon points="150,110 140,100 160,100" fill="#8B7355"/>
+          <rect x="145" y="95" width="10" height="20" fill="#A0845C"/>
+          <line x1="50" y1="50" x2="250" y2="50" stroke="#4B3621" stroke-width="4" stroke-linecap="round"/>
+          <rect x="30" y="30" width="80" height="30" rx="5" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+          <text x="70" y="50" text-anchor="middle" font-size="14" fill="#1d4ed8" font-weight="bold">x + 3</text>
+          <rect x="190" y="30" width="80" height="30" rx="5" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+          <text x="230" y="50" text-anchor="middle" font-size="14" fill="#d97706" font-weight="bold">10</text>
+          <text x="150" y="35" text-anchor="middle" font-size="18" fill="#7c3aed" font-weight="bold">=</text>
+        </svg>
+        <p class="text-xs text-gray-500 mt-1">左辺と右辺が等しくなる値を見つけよう</p>
+      </div>
+      <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border mb-3">
+        <p class="text-xs font-bold text-purple-700 mb-2"><i class="fas fa-list-ol mr-1"></i>方程式の解き方ステップ</p>
+        <div class="space-y-1 text-xs text-gray-700">
+          <div class="flex items-center gap-2"><span class="bg-purple-200 text-purple-800 w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs">1</span>等式の性質を使って整理</div>
+          <div class="flex items-center gap-2"><span class="bg-purple-200 text-purple-800 w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs">2</span>移項して文字を左辺に集める</div>
+          <div class="flex items-center gap-2"><span class="bg-purple-200 text-purple-800 w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs">3</span>両辺を同じ数で割る（or かける）</div>
+          <div class="flex items-center gap-2"><span class="bg-purple-200 text-purple-800 w-5 h-5 rounded-full flex items-center justify-center font-bold text-xs">4</span>答えを元の式に代入して確かめ！</div>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=方程式+解き方+わかりやすい" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fab fa-youtube"></i>動画で学ぶ
+        </a>
+      </div>
+    </div>`
+}
+
+// ========== 文字式ビジュアル ==========
+function renderAlgebraVisual(container, card) {
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-cyan-50 to-teal-50 rounded-xl border-2 border-cyan-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-cyan-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-superscript mr-1"></i>みてわかる！文字式</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <p class="text-xs font-bold text-cyan-700 mb-2">文字 ＝ まだわからない数を表す「箱」</p>
+        <div class="flex items-center justify-center gap-3">
+          <div class="flex items-center gap-1">
+            <div class="w-10 h-10 bg-blue-200 border-2 border-blue-500 rounded flex items-center justify-center font-bold text-blue-700 text-lg">x</div>
+            <span class="text-sm">= ?個</span>
+          </div>
+          <span class="text-xl text-gray-400">→</span>
+          <div class="text-sm bg-yellow-100 rounded-lg px-3 py-2 border border-yellow-300">
+            <span class="font-bold">3</span> × <span class="text-blue-700 font-bold bg-blue-100 px-1 rounded">x</span> = <span class="font-bold text-green-700">12</span>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="bg-blue-50 rounded-lg p-2 border text-center">
+          <p class="text-xs font-bold text-blue-700">式で表す</p>
+          <p class="text-xs text-blue-600 mt-1">1個<span class="font-bold">a</span>円のりんご<span class="font-bold">x</span>個</p>
+          <p class="text-sm font-bold text-blue-800 mt-1">= ax 円</p>
+        </div>
+        <div class="bg-green-50 rounded-lg p-2 border text-center">
+          <p class="text-xs font-bold text-green-700">代入する</p>
+          <p class="text-xs text-green-600 mt-1">a=100, x=3のとき</p>
+          <p class="text-sm font-bold text-green-800 mt-1">= 300 円</p>
+        </div>
+      </div>
+    </div>`
+}
+
+// ========== 図形ビジュアル ==========
+function renderGeometryVisual(container, card) {
+  const problem = card.problem_text || ''
+  const unit = card.unit_name || ''
+  const all = problem + ' ' + unit
+  
+  let shapesSvg = ''
+  if (/平行四辺形/.test(all)) {
+    shapesSvg = `<polygon points="40,80 100,80 120,20 60,20" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+      <text x="80" y="55" text-anchor="middle" font-size="10" fill="#1d4ed8">平行四辺形</text>
+      <path d="M45,75 L45,25" stroke="#ef4444" stroke-width="1" stroke-dasharray="3"/><text x="35" y="50" font-size="8" fill="#ef4444">高さ</text>
+      <text x="70" y="88" font-size="8" fill="#3b82f6">底辺</text>`
+  } else if (/ひし形/.test(all)) {
+    shapesSvg = `<polygon points="80,10 140,50 80,90 20,50" fill="#fce7f3" stroke="#ec4899" stroke-width="2"/>
+      <line x1="80" y1="10" x2="80" y2="90" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3"/>
+      <line x1="20" y1="50" x2="140" y2="50" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="3"/>
+      <text x="80" y="55" text-anchor="middle" font-size="10" fill="#be185d">ひし形</text>`
+  } else if (/円|直径|半径|おうぎ/.test(all)) {
+    shapesSvg = `<circle cx="80" cy="50" r="40" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+      <line x1="80" y1="50" x2="120" y2="50" stroke="#ef4444" stroke-width="2"/>
+      <text x="100" y="45" font-size="8" fill="#ef4444" font-weight="bold">半径r</text>
+      <line x1="40" y1="50" x2="120" y2="50" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="3"/>
+      <text x="80" y="70" text-anchor="middle" font-size="8" fill="#3b82f6">直径d=2r</text>
+      <circle cx="80" cy="50" r="2" fill="#374151"/>
+      <text x="80" y="95" text-anchor="middle" font-size="9" fill="#16a34a" font-weight="bold">円周=2πr</text>`
+  } else {
+    shapesSvg = `<polygon points="80,10 140,80 20,80" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+      <text x="80" y="58" text-anchor="middle" font-size="10" fill="#d97706">三角形</text>
+      <path d="M80,10 L80,80" stroke="#ef4444" stroke-width="1" stroke-dasharray="3"/><text x="88" y="50" font-size="8" fill="#ef4444">高さ</text>
+      <rect x="130" y="10" width="50" height="50" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+      <text x="155" y="40" text-anchor="middle" font-size="9" fill="#1d4ed8">正方形</text>`
+  }
+  
+  const searchQ = encodeURIComponent((card.card_title || unit || '図形').replace(/[！!？?]/g, '') + ' 図解 わかりやすい')
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-violet-50 to-fuchsia-50 rounded-xl border-2 border-violet-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-violet-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-shapes mr-1"></i>みてわかる！図形</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <svg viewBox="0 0 200 100" class="w-full mx-auto" style="max-height:100px">${shapesSvg}</svg>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fab fa-youtube"></i>動画で学ぶ
+        </a>
+        <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-images"></i>図を見る
+        </a>
+      </div>
+    </div>`
+}
+
+// ========== 対称ビジュアル ==========
+function renderSymmetryVisual(container, card) {
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl border-2 border-pink-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-pink-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-arrows-alt mr-1"></i>みてわかる！対称</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div class="bg-white rounded-lg p-3 border text-center">
+          <p class="text-xs font-bold text-pink-700 mb-2">線対称</p>
+          <svg viewBox="0 0 100 80" width="100" height="80" class="mx-auto">
+            <line x1="50" y1="5" x2="50" y2="75" stroke="#ec4899" stroke-width="2" stroke-dasharray="4"/>
+            <polygon points="50,10 30,35 20,70 50,55" fill="#fbcfe8" stroke="#ec4899" stroke-width="1.5"/>
+            <polygon points="50,10 70,35 80,70 50,55" fill="#fce7f3" stroke="#ec4899" stroke-width="1.5"/>
+            <text x="50" y="78" text-anchor="middle" font-size="7" fill="#be185d">対称の軸</text>
+          </svg>
+          <p class="text-xs text-pink-600 mt-1">折り返すとぴったり重なる</p>
+        </div>
+        <div class="bg-white rounded-lg p-3 border text-center">
+          <p class="text-xs font-bold text-violet-700 mb-2">点対称</p>
+          <svg viewBox="0 0 100 80" width="100" height="80" class="mx-auto">
+            <polygon points="30,20 60,15 70,45 40,50" fill="#ddd6fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <polygon points="70,60 40,65 30,35 60,30" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+            <circle cx="50" cy="40" r="3" fill="#7c3aed"/>
+            <text x="58" y="42" font-size="7" fill="#7c3aed" font-weight="bold">O</text>
+          </svg>
+          <p class="text-xs text-violet-600 mt-1">180°回転すると重なる</p>
+        </div>
+      </div>
+    </div>`
+}
+
+// ========== 確率ビジュアル ==========
+function renderProbabilityVisual(container, card) {
+  const problem = card.problem_text || ''
+  const hasDice = /さいころ|サイコロ/.test(problem)
+  const hasCoin = /コイン|硬貨/.test(problem)
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border-2 border-yellow-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-yellow-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-dice mr-1"></i>みてわかる！確率</span>
+      </div>
+      ${hasDice ? `
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <p class="text-xs font-bold text-yellow-700 mb-2">サイコロの出る目</p>
+        <div class="flex justify-center gap-2 mb-2">
+          ${[1,2,3,4,5,6].map(n => `<div class="w-10 h-10 bg-white border-2 border-gray-400 rounded-lg flex items-center justify-center text-lg font-bold shadow">${['⚀','⚁','⚂','⚃','⚄','⚅'][n-1]}</div>`).join('')}
+        </div>
+        <p class="text-xs text-gray-600">各目が出る確率 = <span class="font-bold">1/6</span></p>
+      </div>` : ''}
+      ${hasCoin ? `
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <p class="text-xs font-bold text-yellow-700 mb-2">コインの裏表</p>
+        <div class="flex justify-center gap-4 mb-2">
+          <div class="w-14 h-14 bg-yellow-300 border-2 border-yellow-600 rounded-full flex items-center justify-center text-xl font-bold shadow">表</div>
+          <div class="w-14 h-14 bg-gray-300 border-2 border-gray-500 rounded-full flex items-center justify-center text-xl font-bold shadow">裏</div>
+        </div>
+        <p class="text-xs text-gray-600">各面が出る確率 = <span class="font-bold">1/2</span></p>
+      </div>` : ''}
+      <div class="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-lg p-3 border">
+        <p class="text-xs font-bold text-orange-700 mb-1"><i class="fas fa-lightbulb mr-1"></i>確率の公式</p>
+        <div class="text-center bg-white rounded-lg p-2 mt-1">
+          <span class="text-sm font-bold text-orange-800">確率 = </span>
+          <span class="inline-block text-center"><span class="block border-b-2 border-orange-500 px-2 text-sm font-bold text-orange-700">ある事が起こる場合の数</span><span class="block px-2 text-sm font-bold text-orange-700">全ての場合の数</span></span>
+        </div>
+      </div>
+    </div>`
+}
+
+// ========== 統計ビジュアル ==========
+function renderStatisticsVisual(container, card) {
+  const problem = card.problem_text || ''
+  const nums = (problem.match(/\d+/g) || []).map(Number).filter(n => n > 0 && n < 200).slice(0, 10)
+  const data = nums.length >= 3 ? nums : [5, 8, 12, 7, 3, 10, 6, 9]
+  const sorted = [...data].sort((a, b) => a - b)
+  const mean = (data.reduce((a, b) => a + b, 0) / data.length).toFixed(1)
+  const median = data.length % 2 === 0 ? ((sorted[data.length/2 - 1] + sorted[data.length/2]) / 2).toFixed(1) : sorted[Math.floor(data.length/2)]
+  const max = Math.max(...data)
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl border-2 border-teal-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-teal-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-chart-area mr-1"></i>データを整理しよう</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <div class="flex items-end gap-1 justify-center" style="height:80px">
+          ${data.map((d, i) => `<div class="flex flex-col items-center flex-1"><span class="text-xs">${d}</span><div class="w-full rounded-t" style="height:${(d / max) * 65}px; background:${i % 2 === 0 ? '#14b8a6' : '#06b6d4'}"></div></div>`).join('')}
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <div class="bg-blue-50 rounded p-2 text-center"><p class="text-xs text-blue-700 font-bold">平均値</p><p class="text-lg font-bold text-blue-800">${mean}</p></div>
+        <div class="bg-green-50 rounded p-2 text-center"><p class="text-xs text-green-700 font-bold">中央値</p><p class="text-lg font-bold text-green-800">${median}</p></div>
+        <div class="bg-purple-50 rounded p-2 text-center"><p class="text-xs text-purple-700 font-bold">範囲</p><p class="text-lg font-bold text-purple-800">${max - sorted[0]}</p></div>
+      </div>
+    </div>`
+}
+
+// ========== 社会科：産業ビジュアル ==========
+function renderSocialIndustryVisual(container, card) {
+  const problem = card.problem_text || ''
+  const title = card.card_title || card.unit_name || ''
+  const searchQ = encodeURIComponent((title).replace(/[！!？?]/g, '').substring(0, 20) + ' わかりやすい 図解')
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-emerald-50 to-lime-50 rounded-xl border-2 border-emerald-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-emerald-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-industry mr-1"></i>社会科サポート</span>
+        <span class="text-xs text-gray-500">${title}</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <p class="text-xs font-bold text-emerald-700 mb-2"><i class="fas fa-map-marked-alt mr-1"></i>地図で確認しよう</p>
+        <iframe src="https://maps.google.com/maps?q=日本+${encodeURIComponent(title.substring(0,10))}&output=embed&z=5" 
+                class="w-full rounded border" style="height:200px;" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fab fa-youtube"></i>動画で学ぶ
+        </a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-tv"></i>NHK for School
+        </a>
+        <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-images"></i>写真・図を見る
+        </a>
+      </div>
+    </div>`
+}
+
+// ========== 社会科：政治ビジュアル ==========
+function renderSocialGovernmentVisual(container, card) {
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-slate-50 to-zinc-50 rounded-xl border-2 border-slate-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-slate-700 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-landmark mr-1"></i>みてわかる！政治のしくみ</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <p class="text-xs font-bold text-gray-700 mb-2 text-center">三権分立のしくみ</p>
+        <svg viewBox="0 0 300 160" class="w-full mx-auto" style="max-height:160px">
+          <rect x="100" y="5" width="100" height="35" rx="5" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+          <text x="150" y="27" text-anchor="middle" font-size="11" fill="#1d4ed8" font-weight="bold">国会（立法）</text>
+          <rect x="10" y="100" width="100" height="35" rx="5" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+          <text x="60" y="122" text-anchor="middle" font-size="11" fill="#d97706" font-weight="bold">内閣（行政）</text>
+          <rect x="190" y="100" width="100" height="35" rx="5" fill="#fce7f3" stroke="#ec4899" stroke-width="2"/>
+          <text x="240" y="122" text-anchor="middle" font-size="11" fill="#be185d" font-weight="bold">裁判所（司法）</text>
+          <line x1="120" y1="40" x2="60" y2="100" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="180" y1="40" x2="240" y2="100" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="110" y1="117" x2="190" y2="117" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arr)"/>
+          <text x="70" y="70" font-size="7" fill="#6b7280">指名</text>
+          <text x="220" y="70" font-size="7" fill="#6b7280">弾劾裁判</text>
+          <text x="150" y="112" text-anchor="middle" font-size="7" fill="#6b7280">違憲審査</text>
+          <circle cx="150" y="80" r="15" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+          <text x="150" y="84" text-anchor="middle" font-size="8" fill="#16a34a" font-weight="bold">国民</text>
+          <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#6b7280"/></marker></defs>
+        </svg>
+      </div>
+    </div>`
+}
+
+// ========== 理科：物理ビジュアル ==========
+function renderPhysicsVisual(container, card) {
+  const problem = card.problem_text || ''
+  const title = card.card_title || card.unit_name || ''
+  const searchQ = encodeURIComponent(title.replace(/[！!？?]/g, '').substring(0, 20) + ' 実験 わかりやすい')
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border-2 border-orange-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-orange-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-atom mr-1"></i>理科サポート</span>
+        <span class="text-xs text-gray-500">${title}</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        ${/力|ばね/.test(problem) ? `
+        <svg viewBox="0 0 200 100" class="w-full" style="max-height:80px">
+          <rect x="5" y="10" width="10" height="80" fill="#9ca3af"/>
+          <path d="M15,30 L25,35 L17,40 L25,45 L17,50 L25,55 L17,60 L22,63" fill="none" stroke="#374151" stroke-width="2"/>
+          <rect x="22" y="53" width="30" height="20" rx="3" fill="#fbbf24" stroke="#d97706" stroke-width="1.5"/>
+          <text x="37" y="67" text-anchor="middle" font-size="8" fill="#92400e">重さ</text>
+          <line x1="37" y1="73" x2="37" y2="95" stroke="#ef4444" stroke-width="2" marker-end="url(#arrowR)"/>
+          <text x="50" y="90" font-size="8" fill="#ef4444" font-weight="bold">重力</text>
+          <defs><marker id="arrowR" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#ef4444"/></marker></defs>
+        </svg>
+        <p class="text-xs text-center text-gray-500">ばねのびは力の大きさに比例（フックの法則）</p>
+        ` : `<p class="text-sm font-bold text-orange-700 text-center mb-2">🔬 ${title}</p><p class="text-xs text-gray-600 text-center">実験の手順や結果を図で確認しよう</p>`}
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>実験動画</a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>図解</a>
+      </div>
+    </div>`
+}
+
+// ========== 理科：化学ビジュアル ==========
+function renderChemistryVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  const searchQ = encodeURIComponent(title.replace(/[！!？?]/g, '').substring(0, 20) + ' 化学 わかりやすい 図解')
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-sky-50 to-blue-50 rounded-xl border-2 border-sky-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-sky-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-flask mr-1"></i>化学サポート</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <svg viewBox="0 0 200 80" class="w-full mx-auto" style="max-height:80px">
+          <circle cx="40" cy="40" r="18" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+          <text x="40" y="44" text-anchor="middle" font-size="10" fill="#1d4ed8" font-weight="bold">O</text>
+          <circle cx="90" cy="25" r="12" fill="#fecaca" stroke="#ef4444" stroke-width="2"/>
+          <text x="90" y="29" text-anchor="middle" font-size="10" fill="#dc2626" font-weight="bold">H</text>
+          <circle cx="90" cy="55" r="12" fill="#fecaca" stroke="#ef4444" stroke-width="2"/>
+          <text x="90" y="59" text-anchor="middle" font-size="10" fill="#dc2626" font-weight="bold">H</text>
+          <line x1="56" y1="34" x2="78" y2="27" stroke="#6b7280" stroke-width="2"/>
+          <line x1="56" y1="46" x2="78" y2="53" stroke="#6b7280" stroke-width="2"/>
+          <text x="150" y="44" text-anchor="middle" font-size="12" fill="#374151" font-weight="bold">H₂O</text>
+          <text x="150" y="60" text-anchor="middle" font-size="8" fill="#6b7280">（水の分子モデル）</text>
+        </svg>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画</a>
+        <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>図解</a>
+      </div>
+    </div>`
+}
+
+// ========== 理科：地学ビジュアル ==========
+function renderEarthScienceVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  const searchQ = encodeURIComponent(title.replace(/[！!？?]/g, '').substring(0, 20) + ' 地学 図解')
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-amber-50 to-stone-50 rounded-xl border-2 border-amber-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-amber-700 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-mountain mr-1"></i>地学サポート</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <svg viewBox="0 0 250 80" class="w-full" style="max-height:80px">
+          <rect x="0" y="60" width="250" height="20" fill="#a16207" rx="2"/>
+          <rect x="0" y="45" width="250" height="15" fill="#ca8a04" rx="2"/>
+          <rect x="0" y="30" width="250" height="15" fill="#eab308" rx="2"/>
+          <rect x="0" y="15" width="250" height="15" fill="#facc15" rx="2"/>
+          <rect x="0" y="0" width="250" height="15" fill="#84cc16" rx="2"/>
+          <text x="200" y="73" font-size="8" fill="white" font-weight="bold">深い地層</text>
+          <text x="200" y="55" font-size="8" fill="white" font-weight="bold">古い地層</text>
+          <text x="200" y="40" font-size="8" fill="#713f12">砂岩層</text>
+          <text x="200" y="25" font-size="8" fill="#422006">泥岩層</text>
+          <text x="200" y="12" font-size="8" fill="#166534" font-weight="bold">表土</text>
+        </svg>
+        <p class="text-xs text-gray-500 mt-1">地層は下が古く、上が新しい（地層累重の法則）</p>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画</a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+      </div>
+    </div>`
+}
+
+// ========== 国語：漢字ビジュアル ==========
+function renderKanjiVisual(container, card) {
+  const problem = card.problem_text || ''
+  // 漢字を抽出
+  const kanjiChars = (problem.match(/[\u4e00-\u9faf]/g) || []).filter((v, i, a) => a.indexOf(v) === i).slice(0, 6)
+  const title = card.card_title || card.unit_name || '漢字'
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border-2 border-red-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-red-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-pen-nib mr-1"></i>漢字サポート</span>
+      </div>
+      ${kanjiChars.length > 0 ? `
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <div class="flex flex-wrap gap-2 justify-center">
+          ${kanjiChars.map(k => `<div class="w-16 h-16 border-2 border-gray-300 rounded-lg flex items-center justify-center text-3xl font-bold text-gray-800 bg-white shadow-sm hover:bg-red-50 transition cursor-pointer" onclick="window.open('https://www.google.com/search?q=' + encodeURIComponent('${k} 書き順 筆順'), '_blank')" title="クリックで書き順を調べる">${k}</div>`).join('')}
+        </div>
+        <p class="text-xs text-gray-500 text-center mt-2"><i class="fas fa-mouse-pointer mr-1"></i>漢字をクリックして書き順を確認！</p>
+      </div>` : ''}
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' 漢字 書き順')}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>書き順動画</a>
+        <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(title + ' 漢字 部首 図解')}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>漢字カード</a>
+      </div>
+    </div>`
+}
+
+// ========== 国語：文法ビジュアル ==========
+function renderGrammarVisual(container, card) {
+  const problem = card.problem_text || ''
+  const title = card.card_title || card.unit_name || ''
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border-2 border-indigo-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-indigo-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-book mr-1"></i>文法サポート</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <p class="text-xs font-bold text-indigo-700 mb-2">文の成分</p>
+        <div class="flex items-center gap-1 flex-wrap justify-center">
+          <span class="bg-red-100 text-red-700 px-2 py-1 rounded text-sm font-bold border border-red-300">主語</span>
+          <span class="text-gray-400">+</span>
+          <span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm font-bold border border-blue-300">修飾語</span>
+          <span class="text-gray-400">+</span>
+          <span class="bg-green-100 text-green-700 px-2 py-1 rounded text-sm font-bold border border-green-300">述語</span>
+        </div>
+        <div class="mt-2 bg-gray-50 rounded p-2 text-center">
+          <span class="bg-red-100 text-red-700 px-1 rounded text-sm font-bold">花が</span>
+          <span class="bg-blue-100 text-blue-700 px-1 rounded text-sm font-bold">きれいに</span>
+          <span class="bg-green-100 text-green-700 px-1 rounded text-sm font-bold">咲いた。</span>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' 国語 わかりやすい')}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画</a>
+      </div>
+    </div>`
+}
+
+// ========== 英語ビジュアル ==========
+function renderEnglishVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-sky-50 to-indigo-50 rounded-xl border-2 border-sky-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-sky-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-globe mr-1"></i>英語サポート</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <p class="text-sm font-bold text-sky-700 mb-2">${title}</p>
+        <p class="text-xs text-gray-500">単語をクリックして発音を確認しよう</p>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' English lesson kids')}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画で学ぶ</a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+      </div>
+    </div>`
+}
+
+// ========== かけ算・わり算ビジュアル ==========
+function renderMultDivVisual(container, card) {
+  const problem = card.problem_text || card.problem_content || ''
+  const nums = (problem.match(/\d+/g) || []).map(Number).filter(n => n > 0 && n <= 100)
+  const a = nums[0] || 4
+  const b = nums[1] || 3
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-pink-50 to-rose-50 rounded-xl border-2 border-pink-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-pink-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-times mr-1"></i>みてわかる！かけ算・わり算</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <p class="text-xs font-bold text-pink-700 mb-2">${a} × ${b} = ${a * b} を図で見てみよう</p>
+        <div class="inline-grid gap-1 mx-auto" style="grid-template-columns: repeat(${Math.min(b, 10)}, 1.5rem);">
+          ${Array.from({length: Math.min(a * b, 50)}, (_, i) => `<div class="w-6 h-6 rounded-full ${Math.floor(i / b) % 2 === 0 ? 'bg-pink-400' : 'bg-rose-300'} border border-pink-500 flex items-center justify-center text-xs text-white font-bold">${i + 1}</div>`).join('')}
+        </div>
+        <p class="text-xs text-gray-500 mt-2">${b}こずつ ${a}つ分 = ${a * b}こ</p>
+      </div>
+      ${/余|あまり/.test(problem) ? `
+      <div class="bg-yellow-50 rounded-lg p-2 border border-yellow-200 mb-2">
+        <p class="text-xs font-bold text-yellow-700"><i class="fas fa-lightbulb mr-1"></i>あまりのあるわり算</p>
+        <p class="text-xs text-yellow-600">わられる数 ÷ わる数 = 商 ... あまり</p>
+      </div>` : ''}
+    </div>`
+}
+
+// ========== 数え方ビジュアル ==========
+function renderCountingVisual(container, card) {
+  const problem = card.problem_text || card.problem_content || ''
+  const nums = (problem.match(/\d+/g) || []).map(Number).filter(n => n > 0 && n <= 20)
+  const n = nums[0] || 5
+  const fruits = ['🍎', '🍊', '🍌', '🍇', '🍓', '🍑', '🍈', '🍉']
+  const fruit = fruits[Math.floor(Math.random() * fruits.length)]
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-yellow-50 to-green-50 rounded-xl border-2 border-yellow-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-yellow-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-sort-numeric-up mr-1"></i>かぞえてみよう！</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <div class="flex flex-wrap gap-1 justify-center">
+          ${Array.from({length: Math.min(n, 20)}, (_, i) => `<span class="text-2xl cursor-pointer hover:scale-125 transition" onclick="this.style.opacity=this.style.opacity==='0.3'?'1':'0.3';TactileSounds.play('tap')">${fruit}</span>`).join('')}
+        </div>
+        <p class="text-sm font-bold text-gray-700 mt-2">${fruit} は <span class="text-xl text-red-600">${n}</span> こ</p>
+        <p class="text-xs text-gray-500 mt-1"><i class="fas fa-hand-pointer mr-1"></i>タッチして数えてみよう</p>
+      </div>
+    </div>`
+}
+
+// ========== 展開図ビジュアル ==========
+function renderNetDiagramVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  const searchQ = encodeURIComponent(title.replace(/[！!？?]/g, '').substring(0, 20) + ' 展開図 わかりやすい')
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-indigo-50 to-violet-50 rounded-xl border-2 border-indigo-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-indigo-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-cube mr-1"></i>みてわかる！立体と展開図</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <svg viewBox="0 0 200 120" class="w-full mx-auto" style="max-height:120px">
+          <!-- 立方体の見取り図 -->
+          <rect x="30" y="40" width="40" height="40" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+          <polygon points="30,40 50,20 90,20 70,40" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1.5"/>
+          <polygon points="70,40 90,20 90,60 70,80" fill="#93c5fd" stroke="#3b82f6" stroke-width="1.5"/>
+          <text x="50" y="105" text-anchor="middle" font-size="8" fill="#1d4ed8" font-weight="bold">立方体</text>
+          <!-- 展開図 -->
+          <rect x="120" y="30" width="20" height="20" fill="#fecaca" stroke="#ef4444" stroke-width="1"/>
+          <rect x="120" y="50" width="20" height="20" fill="#fecaca" stroke="#ef4444" stroke-width="1"/>
+          <rect x="120" y="70" width="20" height="20" fill="#fecaca" stroke="#ef4444" stroke-width="1"/>
+          <rect x="120" y="90" width="20" height="20" fill="#fecaca" stroke="#ef4444" stroke-width="1"/>
+          <rect x="100" y="50" width="20" height="20" fill="#fed7aa" stroke="#ef4444" stroke-width="1"/>
+          <rect x="140" y="50" width="20" height="20" fill="#fed7aa" stroke="#ef4444" stroke-width="1"/>
+          <text x="140" y="25" text-anchor="middle" font-size="8" fill="#dc2626" font-weight="bold">展開図</text>
+        </svg>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画</a>
+        <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>図を見る</a>
+      </div>
+    </div>`
+}
+
+// ========== 汎用教科ビジュアル（教科別） ==========
+function renderMathGeneralVisual(container, card) {
+  const problem = card.problem_text || card.problem_content || ''
+  const title = card.card_title || ''
+  const unit = card.unit_name || ''
+  const nums = (problem.match(/-?\d+(\.\d+)?/g) || []).map(Number).filter(n => !isNaN(n))
+  const searchQ = encodeURIComponent((title + ' ' + unit).replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 25) + ' 算数 数学 わかりやすい')
+  
+  // 数値がある場合は数直線を表示
+  let numlineHtml = ''
+  if (nums.length >= 1) {
+    const minN = Math.min(0, ...nums) - 2
+    const maxN = Math.max(10, ...nums) + 2
+    const range = maxN - minN || 1
+    numlineHtml = `
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <p class="text-xs font-bold text-indigo-700 mb-1"><i class="fas fa-ruler-horizontal mr-1"></i>数直線で見てみよう</p>
+        <svg viewBox="0 0 400 50" class="w-full" style="max-height:50px">
+          <line x1="10" y1="25" x2="390" y2="25" stroke="#374151" stroke-width="2"/>
+          <polygon points="385,20 395,25 385,30" fill="#374151"/>
+          ${Array.from({length: Math.min(range + 1, 30)}, (_, i) => {
+            const val = minN + i
+            const x = 10 + (i / range) * 380
+            const isTarget = nums.includes(val)
+            return `<line x1="${x}" y1="${val === 0 ? 15 : 20}" x2="${x}" y2="${val === 0 ? 35 : 30}" stroke="${isTarget ? '#ef4444' : '#6b7280'}" stroke-width="${isTarget ? 3 : 0.8}"/>
+              ${val % Math.max(1, Math.round(range / 10)) === 0 || isTarget ? `<text x="${x}" y="44" text-anchor="middle" font-size="${isTarget ? 10 : 8}" fill="${isTarget ? '#ef4444' : '#6b7280'}" font-weight="${isTarget ? 'bold' : 'normal'}">${val}</text>` : ''}
+              ${isTarget ? `<circle cx="${x}" cy="12" r="4" fill="#ef4444"/>` : ''}`
+          }).join('')}
+        </svg>
+      </div>`
+  }
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-blue-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-calculator mr-1"></i>算数・数学サポート</span>
+        <span class="text-xs text-gray-500">${unit}</span>
+      </div>
+      ${numlineHtml}
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画で学ぶ</a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent((unit || title).substring(0, 15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>図解を見る</a>
+      </div>
+    </div>`
+}
+
+function renderSocialGeneralVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  const searchQ = encodeURIComponent(title.replace(/[！!？?]/g, '').substring(0, 20) + ' 社会 わかりやすい')
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border-2 border-emerald-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-emerald-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-globe-asia mr-1"></i>社会科サポート</span>
+        <span class="text-xs text-gray-500">${title}</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <iframe src="https://maps.google.com/maps?q=日本&output=embed&z=4" class="w-full rounded border" style="height:180px;" loading="lazy"></iframe>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画</a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>写真・図</a>
+      </div>
+    </div>`
+}
+
+function renderScienceGeneralVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  const searchQ = encodeURIComponent(title.replace(/[！!？?]/g, '').substring(0, 20) + ' 理科 実験 図解')
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-teal-50 to-emerald-50 rounded-xl border-2 border-teal-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-teal-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-microscope mr-1"></i>理科サポート</span>
+        <span class="text-xs text-gray-500">${title}</span>
+      </div>
+      <div class="bg-white rounded-lg p-3 border mb-3 text-center">
+        <div class="text-4xl mb-2">🔬</div>
+        <p class="text-sm font-bold text-teal-700">実験や観察の動画・写真で理解を深めよう</p>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>実験動画</a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>図解・写真</a>
+      </div>
+    </div>`
+}
+
+function renderKokugoGeneralVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  const searchQ = encodeURIComponent(title.replace(/[！!？?]/g, '').substring(0, 20) + ' 国語 わかりやすい')
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-amber-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-book-open mr-1"></i>国語サポート</span>
+        <span class="text-xs text-gray-500">${title}</span>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画で学ぶ</a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+      </div>
+    </div>`
+}
+
+function renderEnglishGeneralVisual(container, card) {
+  const title = card.card_title || card.unit_name || ''
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-sky-50 to-blue-50 rounded-xl border-2 border-sky-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-sky-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-language mr-1"></i>英語サポート</span>
+        <span class="text-xs text-gray-500">${title}</span>
+      </div>
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' English kids')}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画</a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+      </div>
+    </div>`
+}
+
+// ========== 完全汎用ビジュアル（どの教科にもマッチしなかった場合） ==========
+function renderUniversalVisual(container, card) {
+  const title = card.card_title || ''
+  const unit = card.unit_name || ''
+  const subject = card.subject || ''
+  const problem = card.problem_text || card.problem_content || ''
+  const searchQuery = (title + ' ' + unit).replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 25)
+  
+  // 問題文からキーワードを抽出
+  const keywords = problem.match(/[「」]|[^\s、。!？]{2,6}/g) || []
+  const uniqueKw = [...new Set(keywords)].filter(k => k.length >= 2).slice(0, 5)
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border-2 border-gray-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-gray-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-lightbulb mr-1"></i>学習サポート</span>
+        <span class="text-xs text-gray-500">${subject} ${unit}</span>
+      </div>
+      ${uniqueKw.length > 0 ? `
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <p class="text-xs font-bold text-amber-700 mb-1"><i class="fas fa-key mr-1"></i>この問題のキーワード</p>
+        <div class="flex flex-wrap gap-1">
+          ${uniqueKw.map(kw => `<span class="inline-block bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">${kw}</span>`).join('')}
+        </div>
+      </div>` : ''}
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery + ' わかりやすい 解説')}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fab fa-youtube"></i>動画で学ぶ
+        </a>
+        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(searchQuery)}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-tv"></i>NHK for School
+        </a>
+        <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(searchQuery + ' 図解 わかりやすい')}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-images"></i>図解を見る
+        </a>
+      </div>
+    </div>`
+}
+
 // ========== 面積ビジュアル ==========
 function renderAreaVisual(container, card) {
   const problem = card.problem_text || ''
@@ -8191,38 +9052,134 @@ function initVisualWidgets() {
   const cardId = card.card_id || card.id || 0
   const containerId = 'visual-widget-' + cardId
   
-  // 既にコンテナがあるか確認、なければ作成
+  // 既にコンテナがあれば再利用
   let container = document.getElementById(containerId)
   if (!container) {
-    // 問題画像の前 or 画像プレースホルダーの前に挿入
-    const insertTarget = document.getElementById('card-image-container-' + cardId) 
+    // 挿入位置を決定（優先順位付き）
+    const insertBefore = 
+      // 1. 問題画像コンテナの前
+      document.getElementById('card-image-container-' + cardId)
+      // 2. 画像プレースホルダーの前
       || document.getElementById('image-placeholder-' + cardId)
-      || document.querySelector('.bg-pink-50.border-l-4')?.parentElement
+      // 3. きいてみようの前
+      || document.querySelector('[onclick="readCardAloud()"]')?.closest('.bg-green-50')
+      // 4. 触覚ウィジェットの前
+      || document.getElementById('tactile-widget-' + cardId + '-wrapper')
+      // 5. 動画セクションの前
+      || document.querySelector('.rounded-xl.overflow-hidden.border-2')
+      // 6. 回答欄の前（ほぼ全カードに存在）
+      || document.querySelector('[id="textModeBtn"]')?.closest('.mt-6')
+      // 7. 問題文ブロックの直後（最終フォールバック）
+      || null
     
-    if (insertTarget) {
+    if (insertBefore && insertBefore.parentElement) {
       container = document.createElement('div')
       container.id = containerId
       container.className = 'mt-4 mb-4'
-      insertTarget.parentElement.insertBefore(container, insertTarget)
+      insertBefore.parentElement.insertBefore(container, insertBefore)
     } else {
-      // きいてみようの前に挿入
-      const audioSection = document.querySelector('[onclick="readCardAloud()"]')?.closest('.bg-green-50')
-      if (audioSection) {
+      // 最終手段：問題文ブロック(.bg-pink-50)の次に追加
+      const problemBlock = document.querySelector('.bg-pink-50.border-l-4')
+      if (problemBlock && problemBlock.parentElement) {
         container = document.createElement('div')
         container.id = containerId
         container.className = 'mt-4 mb-4'
-        audioSection.parentElement.insertBefore(container, audioSection)
+        problemBlock.parentElement.insertBefore(container, problemBlock.nextSibling)
       }
     }
   }
   
-  if (container) {
-    setTimeout(() => {
-      const rendered = renderVisualWidget(containerId, card)
-      if (!rendered) container.remove() // レンダリングされなかったら削除
-    }, 150)
-  }
+  if (!container) return
+  
+  // detectVisualWidget は必ず型を返す（universal含む）ので、全カードに視覚支援表示
+  setTimeout(() => {
+    const rendered = renderVisualWidget(containerId, card)
+    if (!rendered) {
+      // 万一 renderVisualWidget が false を返した場合のみフォールバック
+      renderFallbackVisual(container, card)
+    }
+  }, 150)
 }
+
+// 視覚支援が一切ないカードへのフォールバックビジュアル
+function renderFallbackVisual(container, card) {
+  const title = card.card_title || ''
+  const unit = card.unit_name || ''
+  const subject = card.subject || ''
+  const problem = card.problem_text || card.problem_content || ''
+  const grade = card.grade_level || ''
+  
+  // 問題文からキーポイントを抽出してビジュアル化
+  const nums = (problem.match(/-?\d+(\.\d+)?/g) || []).map(Number).filter(n => !isNaN(n))
+  const searchQuery = (title + ' ' + unit).replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 25)
+  
+  // 教科に応じた学習リソースリンク
+  const nhkUrl = 'https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent(searchQuery)
+  const ytUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(searchQuery + ' わかりやすい 解説')
+  const imgUrl = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(searchQuery + ' 図解 わかりやすい')
+  
+  // 問題に数値がある場合は数直線を表示
+  let numlineHtml = ''
+  if (nums.length >= 1 && (subject.includes('数学') || subject.includes('算数'))) {
+    const minN = Math.min(-10, ...nums) - 2
+    const maxN = Math.max(10, ...nums) + 2
+    const range = maxN - minN
+    numlineHtml = `
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        <p class="text-xs font-bold text-indigo-700 mb-1"><i class="fas fa-ruler-horizontal mr-1"></i>数直線で見てみよう</p>
+        <svg viewBox="0 0 400 50" class="w-full" style="max-height:50px">
+          <line x1="10" y1="25" x2="390" y2="25" stroke="#374151" stroke-width="2"/>
+          <polygon points="385,20 395,25 385,30" fill="#374151"/>
+          ${Array.from({length: range + 1}, (_, i) => {
+            const val = minN + i
+            const x = 10 + (i / range) * 380
+            const isMajor = val % 5 === 0 || val === 0
+            const isTarget = nums.includes(val)
+            return `<line x1="${x}" y1="${isMajor ? 15 : 19}" x2="${x}" y2="${isMajor ? 35 : 31}" stroke="${isTarget ? '#ef4444' : val === 0 ? '#dc2626' : '#6b7280'}" stroke-width="${isTarget ? 3 : isMajor ? 1.5 : 0.8}"/>
+              ${isMajor || isTarget ? `<text x="${x}" y="${45}" text-anchor="middle" font-size="${isTarget ? 11 : 9}" fill="${isTarget ? '#ef4444' : val === 0 ? '#dc2626' : val < 0 ? '#2563eb' : '#16a34a'}" font-weight="${isTarget || val === 0 ? 'bold' : 'normal'}">${val}</text>` : ''}
+              ${isTarget ? `<circle cx="${x}" cy="10" r="4" fill="#ef4444"/><text x="${x}" y="8" text-anchor="middle" font-size="6" fill="white" font-weight="bold">★</text>` : ''}`
+          }).join('')}
+        </svg>
+        ${nums.length >= 2 ? `<p class="text-xs text-gray-500 text-center">★印の数 ${nums.slice(0,4).join(', ')} を数直線で確認しよう</p>` : ''}
+      </div>`
+  }
+  
+  // 問題文のキーワードをハイライト表示
+  const keywords = problem.match(/[「」]|正[のな]|負[のな]|＋|ー|加法|減法|乗法|除法|絶対値|累乗|符号|基準|逆数|平均|計算|比べ|大き|小さ|高い|低い/g) || []
+  const uniqueKeywords = [...new Set(keywords)].slice(0, 6)
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border-2 border-indigo-200">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-indigo-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-lightbulb mr-1"></i>学習サポート</span>
+        <span class="text-xs text-gray-500">${subject} ${unit}</span>
+      </div>
+      ${numlineHtml}
+      ${uniqueKeywords.length > 0 ? `
+        <div class="bg-white rounded-lg p-3 border mb-3">
+          <p class="text-xs font-bold text-amber-700 mb-1"><i class="fas fa-key mr-1"></i>この問題のキーワード</p>
+          <div class="flex flex-wrap gap-1">
+            ${uniqueKeywords.map(kw => `<span class="inline-block bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">${kw}</span>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+      <div class="flex flex-wrap gap-2 justify-center">
+        <a href="${ytUrl}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fab fa-youtube"></i>動画で学ぶ
+        </a>
+        <a href="${nhkUrl}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-tv"></i>NHK for School
+        </a>
+        <a href="${imgUrl}" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-images"></i>図解を見る
+        </a>
+      </div>
+    </div>`
+}
+
 window.initVisualWidgets = initVisualWidgets
 window.renderVisualWidget = renderVisualWidget
 
