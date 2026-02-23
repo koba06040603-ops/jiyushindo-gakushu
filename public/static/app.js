@@ -6791,13 +6791,20 @@ async function generateImageForCard(cardId, description) {
       // カードに画像URLを保存
       await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
       
+      const safeDesc = (description || '').replace(/'/g, '').replace(/"/g, '').replace(/\n/g, ' ').substring(0, 100)
       // 画像を表示
       if (placeholder) {
         placeholder.innerHTML = `
-          <div class="text-center">
+          <div class="text-center" id="card-image-container-${cardId}">
             <img src="${res.data.image_url}" alt="${description || '問題の図'}" 
-                 class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;">
-            <p class="text-xs text-green-600 mt-2"><i class="fas fa-check-circle mr-1"></i>AIが図を生成しました（${res.data.generation_time_ms || 0}ms）</p>
+                 class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
+                 onerror="this.parentElement.innerHTML='<div class=\\'bg-orange-50 border-2 border-orange-300 rounded-xl p-5 text-center\\'><i class=\\'fas fa-image text-orange-400 text-3xl mb-2 block\\'></i><p class=\\'text-orange-700 font-bold text-sm mb-3\\'>AI生成画像の読み込みに失敗しました</p><div class=\\'flex flex-col gap-2 max-w-xs mx-auto\\'><button onclick=\\'generateImageForCard(${cardId}, \\\"${safeDesc}\\\")\\'  class=\\'bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-bold\\'>AI再生成</button><div class=\\'flex gap-2\\'><button onclick=\\'openFilePickerForCard(${cardId})\\' class=\\'flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg text-xs font-bold\\'>JPG/PDF</button><button onclick=\\'quickPasteImageUrl(${cardId})\\' class=\\'flex-1 bg-green-500 text-white px-3 py-2 rounded-lg text-xs font-bold\\'>URL貼付</button></div></div></div>'">
+            <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+              <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
+                <i class="fas fa-check-circle mr-1"></i>AIが図を生成しました（${res.data.generation_time_ms || 0}ms）
+              </span>
+              <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+            </div>
           </div>`
       }
     } else {
@@ -6805,16 +6812,47 @@ async function generateImageForCard(cardId, description) {
     }
   } catch (err) {
     console.error('AI画像生成エラー:', err)
+    const safeDesc = (description || '').replace(/'/g, '').replace(/"/g, '').replace(/\n/g, ' ').substring(0, 100)
     if (placeholder) {
       placeholder.innerHTML = `
-        <div class="bg-red-50 border-2 border-red-200 rounded-lg p-5 text-center">
-          <i class="fas fa-exclamation-triangle text-3xl text-red-400 mb-2 block"></i>
-          <p class="text-sm text-red-700 mb-2">図の生成に失敗しました: ${err.response?.data?.error || err.message}</p>
-          <button onclick="generateImageForCard(${cardId}, '${(description || '').replace(/'/g, "\\'")}')"
-                  class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
-            <i class="fas fa-redo mr-1"></i>再試行
-          </button>
+        <div class="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-300 rounded-2xl p-6 text-center shadow-sm">
+          <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-3">
+            <i class="fas fa-exclamation-triangle text-3xl text-red-400"></i>
+          </div>
+          <p class="text-base text-red-700 font-bold mb-1">AI図の生成に失敗しました</p>
+          <p class="text-xs text-gray-500 mb-4">${err.response?.data?.error || err.message || 'サーバーエラー'}</p>
+          
+          <p class="text-sm text-gray-700 font-bold mb-3">別の方法で図を追加できます：</p>
+          
+          <div class="flex flex-col gap-2 max-w-xs mx-auto mb-3">
+            <button onclick="generateImageForCard(${cardId}, '${safeDesc}')"
+                    class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-5 py-3 rounded-xl font-bold text-sm transition shadow-md hover:shadow-lg">
+              <i class="fas fa-redo"></i>
+              <span>AIで再試行</span>
+            </button>
+            <div class="flex gap-2">
+              <button onclick="openFilePickerForCard(${cardId})"
+                      class="flex-1 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-sm">
+                <i class="fas fa-file-image"></i>
+                <span>JPG/PDF</span>
+              </button>
+              <button onclick="quickPasteImageUrl(${cardId})"
+                      class="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-sm">
+                <i class="fas fa-paste"></i>
+                <span>URL貼付</span>
+              </button>
+            </div>
+          </div>
+          
+          <div class="border-2 border-dashed border-gray-300 rounded-xl py-2 px-4 bg-white bg-opacity-50 hover:border-purple-400 transition cursor-pointer"
+               onclick="openFilePickerForCard(${cardId})">
+            <p class="text-xs text-gray-500">
+              <i class="fas fa-cloud-upload-alt mr-1"></i>ここにファイルをドラッグ&ドロップ
+            </p>
+          </div>
         </div>`
+      // ドロップゾーン再初期化
+      if (typeof initDropZone === 'function') initDropZone(placeholder, cardId)
     }
   }
 }
@@ -7654,14 +7692,16 @@ function detectVisualWidget(card) {
   if (subject.includes('理科') && /実験|観察|顕微鏡|試験管|ビーカー|磁石|電気|回路|天気/.test(all)) return 'science'
   // 理科：植物・生物
   if (subject.includes('理科') && /植物|花|葉|根|茎|種子|発芽|光合成|動物|昆虫/.test(all)) return 'biology'
+  // ★時刻・時間（優先度高：午前/午後/時/分を含む問題は時計ウィジェットを最優先）
+  if (/時刻|なんじ|何時|とけい|時計/.test(all)) return 'time_visual'
+  if (/午前|午後/.test(all) && /時|分/.test(all)) return 'time_visual'
+  if (/時間.*分|分間|かかった時間|何分/.test(all)) return 'time_visual'
   // かけ算・九九
   if (/かけ算|九九|×|掛け/.test(all)) return 'multiplication'
   // たし算・ひき算（低学年）
   if (/あわせて|のこり|ちがい|たし算|ひき算/.test(all)) return 'addition'
   // 単位・量
   if (/リットル|L|dL|mL|キログラム|kg|g|cm|mm|m\b|メートル|長さ|重さ|かさ/.test(all)) return 'units'
-  // 時刻・時間
-  if (/時刻|時間|なんじ|何時|とけい|午前|午後/.test(all)) return 'time_visual'
   // 表・グラフ
   if (/表|グラフ|棒グラフ|折れ線|円グラフ/.test(all)) return 'chart'
   
@@ -7739,6 +7779,7 @@ function renderVisualWidget(containerId, card) {
     case 'ratio': renderRatioVisual(container, card); break
     case 'chart': renderChartVisual(container, card); break
     case 'speed': renderSpeedVisual(container, card); break
+    case 'time_visual': renderClockVisual(container, card); break
     // ===== 追加ウィジェット =====
     case 'positive_negative': renderPositiveNegativeVisual(container, card); break
     case 'equation': renderEquationVisual(container, card); break
@@ -8332,6 +8373,171 @@ function renderChartVisual(container, card) {
 }
 
 // ========== 速さビジュアル ==========
+// ============================================
+// 時計ビジュアルウィジェット（時刻・時間の問題用）
+// ============================================
+function renderClockVisual(container, card) {
+  const problem = card.problem_text || card.problem_content || ''
+  
+  // 時刻を抽出（午前/午後 + 数字時数字分 パターン）
+  const timePatterns = []
+  
+  // 「午前8時10分」「午後3時」「8時40分」「3:15」等のパターン
+  const regexFull = /(午前|午後)?\s*(\d{1,2})\s*時\s*(\d{1,2})?\s*分?/g
+  let match
+  while ((match = regexFull.exec(problem)) !== null) {
+    const period = match[1] || ''
+    let hour = parseInt(match[2])
+    const minute = match[3] ? parseInt(match[3]) : 0
+    if (period === '午後' && hour < 12) hour += 12
+    timePatterns.push({ hour: hour % 12, minute, label: match[0].trim(), hour24: hour })
+  }
+  
+  // 「何分かかった」「30分間」等の経過時間
+  const durationMatch = problem.match(/(\d{1,3})\s*分\s*(間|かか)/)
+  
+  // 時刻が見つからなければデフォルト
+  if (timePatterns.length === 0) {
+    timePatterns.push({ hour: 8, minute: 10, label: '8時10分', hour24: 8 })
+    timePatterns.push({ hour: 8, minute: 40, label: '8時40分', hour24: 8 })
+  }
+  
+  // 経過時間を計算
+  let elapsedMin = null
+  if (timePatterns.length >= 2) {
+    const t1 = timePatterns[0].hour24 * 60 + timePatterns[0].minute
+    const t2 = timePatterns[1].hour24 * 60 + timePatterns[1].minute
+    elapsedMin = Math.abs(t2 - t1)
+  } else if (durationMatch) {
+    elapsedMin = parseInt(durationMatch[1])
+  }
+  
+  // 時計SVGを生成する関数
+  function clockSVG(h, m, size, color, label) {
+    const cx = size / 2, cy = size / 2, r = size / 2 - 8
+    // 時針の角度（12時=0度、時計回り）
+    const hourAngle = ((h % 12) + m / 60) * 30 - 90
+    // 分針の角度
+    const minAngle = m * 6 - 90
+    // 時針の長さ
+    const hLen = r * 0.55
+    // 分針の長さ
+    const mLen = r * 0.78
+    
+    const hourRad = hourAngle * Math.PI / 180
+    const minRad = minAngle * Math.PI / 180
+    const hx = cx + Math.cos(hourRad) * hLen
+    const hy = cy + Math.sin(hourRad) * hLen
+    const mx = cx + Math.cos(minRad) * mLen
+    const my = cy + Math.sin(minRad) * mLen
+    
+    // 文字盤の数字
+    let numbers = ''
+    for (let i = 1; i <= 12; i++) {
+      const angle = (i * 30 - 90) * Math.PI / 180
+      const nx = cx + Math.cos(angle) * (r - 14)
+      const ny = cy + Math.sin(angle) * (r - 14)
+      numbers += '<text x="' + nx + '" y="' + ny + '" text-anchor="middle" dominant-baseline="central" font-size="' + (size > 120 ? '13' : '11') + '" font-weight="bold" fill="#374151">' + i + '</text>'
+    }
+    
+    // 目盛り
+    let ticks = ''
+    for (let i = 0; i < 60; i++) {
+      const angle = (i * 6 - 90) * Math.PI / 180
+      const isHour = i % 5 === 0
+      const inner = r - (isHour ? 8 : 4)
+      const outer = r - 1
+      ticks += '<line x1="' + (cx + Math.cos(angle) * inner) + '" y1="' + (cy + Math.sin(angle) * inner) + '" x2="' + (cx + Math.cos(angle) * outer) + '" y2="' + (cy + Math.sin(angle) * outer) + '" stroke="' + (isHour ? '#374151' : '#9CA3AF') + '" stroke-width="' + (isHour ? '2' : '1') + '"/>'
+    }
+    
+    // 分針のハイライト（赤い弧で分の位置を強調）
+    let minHighlight = ''
+    if (m > 0) {
+      const startAngle = -90
+      const endAngle = m * 6 - 90
+      const startRad = startAngle * Math.PI / 180
+      const endRad = endAngle * Math.PI / 180
+      const arcR = r - 22
+      const largeArc = m > 30 ? 1 : 0
+      minHighlight = '<path d="M ' + (cx + Math.cos(startRad) * arcR) + ' ' + (cy + Math.sin(startRad) * arcR) + ' A ' + arcR + ' ' + arcR + ' 0 ' + largeArc + ' 1 ' + (cx + Math.cos(endRad) * arcR) + ' ' + (cy + Math.sin(endRad) * arcR) + '" fill="none" stroke="' + color + '" stroke-width="3" stroke-opacity="0.3"/>'
+    }
+    
+    return '<div class="text-center">' +
+      '<svg viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '">' +
+        '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="white" stroke="' + color + '" stroke-width="3"/>' +
+        '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r - 2) + '" fill="none" stroke="' + color + '" stroke-width="1" stroke-opacity="0.2"/>' +
+        ticks + numbers + minHighlight +
+        '<line x1="' + cx + '" y1="' + cy + '" x2="' + hx + '" y2="' + hy + '" stroke="#1F2937" stroke-width="4" stroke-linecap="round"/>' +
+        '<line x1="' + cx + '" y1="' + cy + '" x2="' + mx + '" y2="' + my + '" stroke="' + color + '" stroke-width="2.5" stroke-linecap="round"/>' +
+        '<circle cx="' + cx + '" cy="' + cy + '" r="4" fill="#1F2937"/>' +
+      '</svg>' +
+      '<p class="font-bold text-sm mt-1" style="color:' + color + '">' + label + '</p>' +
+    '</div>'
+  }
+  
+  // HTMLを構築
+  const colors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B']
+  const clockSize = timePatterns.length === 1 ? 160 : 140
+  
+  let clocksHtml = timePatterns.map((t, i) => 
+    '<div class="flex-shrink-0">' + clockSVG(t.hour, t.minute, clockSize, colors[i % colors.length], t.label) + '</div>'
+  ).join(
+    timePatterns.length >= 2 ? '<div class="flex items-center"><i class="fas fa-arrow-right text-2xl text-gray-400 mx-2"></i></div>' : ''
+  )
+  
+  // 経過時間表示
+  let elapsedHtml = ''
+  if (elapsedMin !== null) {
+    const hours = Math.floor(elapsedMin / 60)
+    const mins = elapsedMin % 60
+    const timeStr = hours > 0 ? hours + '時間' + (mins > 0 ? mins + '分' : '') : mins + '分'
+    elapsedHtml = '<div class="mt-4 bg-yellow-50 border-2 border-yellow-300 rounded-xl p-3 text-center">' +
+      '<div class="flex items-center justify-center gap-3">' +
+        '<i class="fas fa-stopwatch text-yellow-600 text-2xl"></i>' +
+        '<div>' +
+          '<p class="text-sm text-yellow-800 font-bold">経過時間</p>' +
+          '<p class="text-2xl font-black text-yellow-700">' + timeStr + '</p>' +
+        '</div>' +
+      '</div>' +
+      '<p class="text-xs text-gray-500 mt-1"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>長い針（分針）が1周すると60分＝1時間だよ</p>' +
+    '</div>'
+  }
+  
+  // タイムライン表示（2つ以上の時刻がある場合）
+  let timelineHtml = ''
+  if (timePatterns.length >= 2) {
+    const segments = []
+    for (let i = 0; i < timePatterns.length - 1; i++) {
+      const t1 = timePatterns[i].hour24 * 60 + timePatterns[i].minute
+      const t2 = timePatterns[i + 1].hour24 * 60 + timePatterns[i + 1].minute
+      const diff = Math.abs(t2 - t1)
+      segments.push({ from: timePatterns[i].label, to: timePatterns[i + 1].label, min: diff })
+    }
+    timelineHtml = '<div class="mt-3 bg-white rounded-lg p-3 border">' +
+      '<p class="text-xs font-bold text-gray-600 mb-2"><i class="fas fa-ruler-horizontal mr-1"></i>時間の流れ</p>' +
+      '<div class="flex items-center justify-center gap-1 flex-wrap">' +
+        segments.map((s, i) => 
+          '<span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded-full">' + s.from + '</span>' +
+          '<span class="flex items-center"><span class="block w-12 h-0.5 bg-orange-400"></span><span class="text-xs text-orange-600 font-bold -mt-4 block text-center">' + s.min + '分</span></span>' +
+          '<span class="bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded-full">' + s.to + '</span>'
+        ).join('') +
+      '</div>' +
+    '</div>'
+  }
+  
+  container.innerHTML = '<div class="p-4 bg-gradient-to-br from-sky-50 to-blue-50 rounded-xl border-2 border-sky-200">' +
+    '<div class="flex items-center gap-2 mb-3">' +
+      '<span class="bg-sky-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-clock mr-1"></i>とけいで みてみよう</span>' +
+    '</div>' +
+    '<div class="flex items-center justify-center gap-4 flex-wrap">' +
+      clocksHtml +
+    '</div>' +
+    timelineHtml +
+    elapsedHtml +
+    '<p class="text-xs text-gray-500 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>短い針＝時間（じかん）、長い針＝分（ふん）をあらわします</p>' +
+  '</div>'
+}
+
 function renderSpeedVisual(container, card) {
   const problem = card.problem_text || ''
   container.innerHTML = `
