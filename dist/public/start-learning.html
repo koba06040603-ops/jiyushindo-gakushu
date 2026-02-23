@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学習を始める - 自由進度学習システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .shimmer {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
+    
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-graduation-cap text-3xl text-blue-600"></i>
+                    <h1 class="text-2xl font-bold text-gray-800">自由進度学習システム</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="text-sm text-gray-600">ようこそ、<span id="studentName" class="font-semibold"></span>さん</p>
+                        <p class="text-xs text-gray-500" id="classInfo"></p>
+                    </div>
+                    <button onclick="logout()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
+                        <i class="fas fa-sign-out-alt mr-2"></i>ログアウト
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- ウェルカムセクション -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold mb-2">今日も学習を始めましょう！</h2>
+                    <p class="text-blue-100 text-lg">あなたに最適な学習カードを準備しました</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-5xl font-bold" id="streakDays">0</div>
+                    <p class="text-sm text-blue-100">連続学習日数</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- クイックスタートセクション -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- 今日の推薦 -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover cursor-pointer" onclick="startRecommendedLearning()">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-green-100 rounded-full p-3">
+                        <i class="fas fa-magic text-2xl text-green-600"></i>
+                    </div>
+                    <span class="bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">
+                        おすすめ
+                    </span>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">今日の推薦学習</h3>
+                <p class="text-gray-600 text-sm mb-4">AIがあなたに最適な学習を選びました</p>
+                <button class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition">
+                    <i class="fas fa-play mr-2"></i>今すぐ始める
+                </button>
+            </div>
+
+            <!-- 続きから -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover cursor-pointer" onclick="continueLearning()">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-blue-100 rounded-full p-3">
+                        <i class="fas fa-redo text-2xl text-blue-600"></i>
+                    </div>
+                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full">
+                        続ける
+                    </span>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">続きから学習</h3>
+                <p class="text-gray-600 text-sm mb-4">前回の学習の続きを始める</p>
+                <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition">
+                    <i class="fas fa-arrow-right mr-2"></i>続きから
+                </button>
+            </div>
+
+            <!-- 弱点克服 -->
+            <div class="bg-white rounded-xl shadow-lg p-6 card-hover cursor-pointer" onclick="weaknessTraining()">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-red-100 rounded-full p-3">
+                        <i class="fas fa-chart-line text-2xl text-red-600"></i>
+                    </div>
+                    <span class="bg-red-100 text-red-800 text-xs font-semibold px-3 py-1 rounded-full">
+                        重要
+                    </span>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">弱点克服</h3>
+                <p class="text-gray-600 text-sm mb-4">苦手分野を集中トレーニング</p>
+                <button class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition">
+                    <i class="fas fa-dumbbell mr-2"></i>克服する
+                </button>
+            </div>
+
+            <!-- AI問題生成 NEW! -->
+            <a href="/curriculum-problem-generator.html" class="bg-white rounded-xl shadow-lg p-6 card-hover cursor-pointer block">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-full p-3">
+                        <i class="fas fa-brain text-2xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"></i>
+                    </div>
+                    <span class="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                        NEW
+                    </span>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">AI問題生成</h3>
+                <p class="text-gray-600 text-sm mb-4">教科書対応の問題を自動生成</p>
+                <div class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 rounded-lg transition text-center">
+                    <i class="fas fa-sparkles mr-2"></i>生成する
+                </div>
+            </a>
+        </div>
+
+        <!-- 学習進捗サマリー -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-chart-bar mr-2 text-blue-600"></i>今週の学習進捗
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center p-4 bg-blue-50 rounded-lg">
+                    <div class="text-3xl font-bold text-blue-600" id="weeklyStudyTime">0</div>
+                    <p class="text-sm text-gray-600 mt-1">学習時間（分）</p>
+                </div>
+                <div class="text-center p-4 bg-green-50 rounded-lg">
+                    <div class="text-3xl font-bold text-green-600" id="weeklyProblems">0</div>
+                    <p class="text-sm text-gray-600 mt-1">解いた問題数</p>
+                </div>
+                <div class="text-center p-4 bg-purple-50 rounded-lg">
+                    <div class="text-3xl font-bold text-purple-600" id="weeklyAccuracy">0%</div>
+                    <p class="text-sm text-gray-600 mt-1">正答率</p>
+                </div>
+                <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                    <div class="text-3xl font-bold text-yellow-600" id="weeklyCards">0</div>
+                    <p class="text-sm text-gray-600 mt-1">完了したカード</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 推薦学習カード一覧 -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-star mr-2 text-yellow-500"></i>あなたへのおすすめ
+                </h3>
+                <button onclick="refreshRecommendations()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
+                    <i class="fas fa-sync-alt mr-2"></i>更新
+                </button>
+            </div>
+
+            <!-- ローディング状態 -->
+            <div id="loadingCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white rounded-xl shadow-lg p-6 shimmer h-64"></div>
+                <div class="bg-white rounded-xl shadow-lg p-6 shimmer h-64"></div>
+                <div class="bg-white rounded-xl shadow-lg p-6 shimmer h-64"></div>
+            </div>
+
+            <!-- カード一覧 -->
+            <div id="recommendedCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
+                <!-- 動的生成 -->
+            </div>
+        </div>
+
+        <!-- 全カテゴリー表示 -->
+        <div>
+            <h3 class="text-2xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-th-large mr-2 text-purple-600"></i>カテゴリーから選ぶ
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button onclick="filterBySubject('数学')" class="bg-white hover:bg-blue-50 rounded-xl shadow-lg p-6 text-center card-hover">
+                    <i class="fas fa-calculator text-4xl text-blue-600 mb-2"></i>
+                    <p class="font-semibold text-gray-800">数学</p>
+                </button>
+                <button onclick="filterBySubject('国語')" class="bg-white hover:bg-green-50 rounded-xl shadow-lg p-6 text-center card-hover">
+                    <i class="fas fa-book text-4xl text-green-600 mb-2"></i>
+                    <p class="font-semibold text-gray-800">国語</p>
+                </button>
+                <button onclick="filterBySubject('英語')" class="bg-white hover:bg-red-50 rounded-xl shadow-lg p-6 text-center card-hover">
+                    <i class="fas fa-globe text-4xl text-red-600 mb-2"></i>
+                    <p class="font-semibold text-gray-800">英語</p>
+                </button>
+                <button onclick="filterBySubject('理科')" class="bg-white hover:bg-purple-50 rounded-xl shadow-lg p-6 text-center card-hover">
+                    <i class="fas fa-flask text-4xl text-purple-600 mb-2"></i>
+                    <p class="font-semibold text-gray-800">理科</p>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStudentId = null;
+        let recommendedCardsData = [];
+
+        // 初期化
+        async function init() {
+            try {
+                // 認証確認
+                const authResponse = await axios.get('/api/auth/verify');
+                if (!authResponse.data.success) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                currentStudentId = authResponse.data.user.user_id;
+                document.getElementById('studentName').textContent = authResponse.data.user.name;
+                document.getElementById('classInfo').textContent = authResponse.data.user.class_code || '';
+
+                // データ読み込み
+                await Promise.all([
+                    loadWeeklyStats(),
+                    loadRecommendations(),
+                    loadStreakDays()
+                ]);
+            } catch (error) {
+                console.error('初期化エラー:', error);
+                alert('データの読み込みに失敗しました');
+            }
+        }
+
+        // 今週の統計
+        async function loadWeeklyStats() {
+            try {
+                const response = await axios.get(`/api/learning-session/weekly-stats/${currentStudentId}`);
+                if (response.data.success) {
+                    const stats = response.data.stats;
+                    document.getElementById('weeklyStudyTime').textContent = Math.round(stats.total_time || 0);
+                    document.getElementById('weeklyProblems').textContent = stats.total_problems || 0;
+                    document.getElementById('weeklyAccuracy').textContent = Math.round((stats.avg_accuracy || 0) * 100) + '%';
+                    document.getElementById('weeklyCards').textContent = stats.completed_cards || 0;
+                }
+            } catch (error) {
+                console.error('週間統計読み込みエラー:', error);
+            }
+        }
+
+        // 連続学習日数
+        async function loadStreakDays() {
+            try {
+                const response = await axios.get(`/api/learning-session/streak/${currentStudentId}`);
+                if (response.data.success) {
+                    document.getElementById('streakDays').textContent = response.data.streak || 0;
+                }
+            } catch (error) {
+                console.error('連続日数読み込みエラー:', error);
+            }
+        }
+
+        // 推薦カード読み込み
+        async function loadRecommendations() {
+            try {
+                const response = await axios.get(`/api/performance/recommended/${currentStudentId}?limit=6`);
+                if (response.data.success) {
+                    recommendedCardsData = response.data.recommendations;
+                    renderRecommendedCards();
+                }
+            } catch (error) {
+                console.error('推薦カード読み込みエラー:', error);
+            }
+        }
+
+        // カード表示
+        function renderRecommendedCards() {
+            const container = document.getElementById('recommendedCards');
+            const loading = document.getElementById('loadingCards');
+            
+            container.innerHTML = '';
+            
+            if (recommendedCardsData.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">推薦カードがありません</p>
+                    </div>
+                `;
+            } else {
+                recommendedCardsData.forEach(card => {
+                    const difficultyColor = getDifficultyColor(card.difficulty);
+                    const cardHTML = `
+                        <div class="bg-white rounded-xl shadow-lg p-6 card-hover cursor-pointer" onclick="startCard('${card.id}')">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="bg-${difficultyColor}-100 text-${difficultyColor}-800 text-xs font-semibold px-3 py-1 rounded-full">
+                                    ${getDifficultyLabel(card.difficulty)}
+                                </span>
+                                <span class="text-sm text-gray-500">${card.subject}</span>
+                            </div>
+                            <h4 class="text-lg font-bold text-gray-800 mb-2">${card.title}</h4>
+                            <p class="text-sm text-gray-600 mb-4">${card.grade} - ${card.unit_name || ''}</p>
+                            
+                            ${card.weak_score ? `
+                                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4">
+                                    <p class="text-xs text-yellow-800">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                                        弱点理論: ${card.theory_code} (${Math.round(card.weak_score)}点)
+                                    </p>
+                                </div>
+                            ` : ''}
+                            
+                            <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition">
+                                <i class="fas fa-play mr-2"></i>学習開始
+                            </button>
+                        </div>
+                    `;
+                    container.innerHTML += cardHTML;
+                });
+            }
+            
+            loading.classList.add('hidden');
+            container.classList.remove('hidden');
+        }
+
+        // 難易度色
+        function getDifficultyColor(difficulty) {
+            if (difficulty <= 2) return 'green';
+            if (difficulty <= 4) return 'yellow';
+            return 'red';
+        }
+
+        // 難易度ラベル
+        function getDifficultyLabel(difficulty) {
+            if (difficulty <= 2) return '基礎';
+            if (difficulty <= 4) return '標準';
+            return '発展';
+        }
+
+        // 学習開始
+        async function startCard(cardId) {
+            try {
+                // セッション作成
+                const response = await axios.post('/api/learning-session/start', {
+                    studentId: currentStudentId,
+                    cardId: cardId
+                });
+
+                if (response.data.success) {
+                    // 学習画面へ遷移
+                    window.location.href = `/learning-session.html?sessionId=${response.data.sessionId}`;
+                }
+            } catch (error) {
+                console.error('学習開始エラー:', error);
+                alert('学習の開始に失敗しました');
+            }
+        }
+
+        // 今日の推薦学習開始
+        async function startRecommendedLearning() {
+            if (recommendedCardsData.length > 0) {
+                await startCard(recommendedCardsData[0].id);
+            } else {
+                alert('推薦カードがありません');
+            }
+        }
+
+        // 続きから学習
+        async function continueLearning() {
+            try {
+                const response = await axios.get(`/api/learning-session/last-incomplete/${currentStudentId}`);
+                if (response.data.success && response.data.session) {
+                    window.location.href = `/learning-session.html?sessionId=${response.data.session.id}`;
+                } else {
+                    alert('続きから学習できるセッションがありません');
+                }
+            } catch (error) {
+                console.error('続きから学習エラー:', error);
+            }
+        }
+
+        // 弱点克服
+        async function weaknessTraining() {
+            // 弱点理論トップ3のカードを表示
+            const weakCards = recommendedCardsData.filter(c => c.weak_score).slice(0, 3);
+            if (weakCards.length > 0) {
+                await startCard(weakCards[0].id);
+            } else {
+                alert('弱点カードがありません');
+            }
+        }
+
+        // 推薦更新
+        async function refreshRecommendations() {
+            document.getElementById('loadingCards').classList.remove('hidden');
+            document.getElementById('recommendedCards').classList.add('hidden');
+            
+            // キャッシュ無効化
+            await axios.post('/api/performance/invalidate-cache', {
+                studentId: currentStudentId
+            });
+            
+            await loadRecommendations();
+        }
+
+        // 科目フィルタ
+        async function filterBySubject(subject) {
+            window.location.href = `/cards.html?subject=${encodeURIComponent(subject)}`;
+        }
+
+        // ログアウト
+        async function logout() {
+            try {
+                await axios.post('/api/auth/logout');
+                window.location.href = '/login.html';
+            } catch (error) {
+                console.error('ログアウトエラー:', error);
+            }
+        }
+
+        // ページ読み込み時
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

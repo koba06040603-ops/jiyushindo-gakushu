@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>教科書単元データ入力システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-6xl mx-auto bg-white rounded-lg shadow-lg p-8">
+        <h1 class="text-3xl font-bold mb-6">📚 教科書単元データ入力システム</h1>
+        
+        <div class="mb-6 grid grid-cols-3 gap-4">
+            <div>
+                <label class="block mb-2 font-bold">学年</label>
+                <select id="grade" class="w-full p-2 border rounded">
+                    <option>小学1年</option>
+                    <option>小学2年</option>
+                    <option>小学3年</option>
+                    <option>小学4年</option>
+                    <option>小学5年</option>
+                    <option>小学6年</option>
+                    <option>中学1年</option>
+                    <option>中学2年</option>
+                    <option>中学3年</option>
+                </select>
+            </div>
+            <div>
+                <label class="block mb-2 font-bold">教科</label>
+                <select id="subject" class="w-full p-2 border rounded">
+                    <option>算数</option>
+                    <option>数学</option>
+                    <option>国語</option>
+                    <option>理科</option>
+                    <option>社会</option>
+                    <option>英語</option>
+                </select>
+            </div>
+            <div>
+                <label class="block mb-2 font-bold">教科書会社</label>
+                <select id="textbook" class="w-full p-2 border rounded">
+                    <option>東京書籍</option>
+                    <option>大日本図書</option>
+                    <option>学校図書</option>
+                    <option>教育出版</option>
+                    <option>啓林館</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="mb-6">
+            <label class="block mb-2 font-bold">単元名（1行1単元、30単元まで）</label>
+            <textarea id="units" rows="15" class="w-full p-3 border rounded font-mono" 
+                placeholder="例：&#10;かずとすうじ&#10;10までのかず&#10;なんばんめ&#10;..."></textarea>
+            <p class="text-sm text-gray-600 mt-2">💡 教科書の目次をコピー＆ペーストするだけ！</p>
+        </div>
+        
+        <div class="flex gap-4">
+            <button onclick="generateSQL()" class="bg-blue-600 text-white px-6 py-3 rounded font-bold hover:bg-blue-700">
+                📥 SQLを生成してダウンロード
+            </button>
+            <button onclick="copyToClipboard()" class="bg-green-600 text-white px-6 py-3 rounded font-bold hover:bg-green-700">
+                📋 クリップボードにコピー
+            </button>
+            <button onclick="clearForm()" class="bg-gray-600 text-white px-6 py-3 rounded font-bold hover:bg-gray-700">
+                🗑️ クリア
+            </button>
+        </div>
+        
+        <div id="output" class="mt-6 hidden">
+            <h3 class="font-bold mb-2">生成されたSQL：</h3>
+            <textarea id="sql-output" rows="10" class="w-full p-3 border rounded font-mono text-sm bg-gray-50"></textarea>
+            <p class="text-sm text-green-600 mt-2">✅ <span id="count"></span>件の単元データが生成されました</p>
+        </div>
+        
+        <div class="mt-8 p-4 bg-blue-50 rounded">
+            <h3 class="font-bold mb-2">📝 使い方：</h3>
+            <ol class="list-decimal list-inside space-y-1 text-sm">
+                <li>学年、教科、教科書会社を選択</li>
+                <li>教科書の目次から単元名をコピー＆ペースト（1行1単元）</li>
+                <li>「SQLを生成」ボタンをクリック</li>
+                <li>生成されたSQLをファイルに保存</li>
+                <li>次の組合せを入力して繰り返す</li>
+            </ol>
+        </div>
+        
+        <div class="mt-6 p-4 bg-yellow-50 rounded">
+            <h3 class="font-bold mb-2">⚡ 効率化のコツ：</h3>
+            <ul class="list-disc list-inside space-y-1 text-sm">
+                <li>教科書会社の公式PDFから目次をコピー</li>
+                <li>複数の人で分担して入力（1人あたり1,350単元 = 約2時間）</li>
+                <li>同じ教科書会社の複数学年を連続入力</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        function generateSQL() {
+            const grade = document.getElementById('grade').value;
+            const subject = document.getElementById('subject').value;
+            const textbook = document.getElementById('textbook').value;
+            const unitsText = document.getElementById('units').value;
+            
+            const units = unitsText.split('\n')
+                .map(u => u.trim())
+                .filter(u => u.length > 0)
+                .slice(0, 30);  // 最大30単元
+            
+            if (units.length === 0) {
+                alert('単元名を入力してください');
+                return;
+            }
+            
+            let sql = `-- ${textbook} ${grade} ${subject} (${units.length}単元)\n`;
+            sql += `INSERT INTO curriculum (grade, subject, textbook_company, unit_name) VALUES\n`;
+            
+            const values = units.map((unit, index) => {
+                const escapedUnit = unit.replace(/'/g, "''");
+                const comma = index < units.length - 1 ? ',' : ';';
+                return `  ('${grade}', '${subject}', '${textbook}', '${escapedUnit}')${comma}`;
+            });
+            
+            sql += values.join('\n');
+            
+            document.getElementById('sql-output').value = sql;
+            document.getElementById('output').classList.remove('hidden');
+            document.getElementById('count').textContent = units.length;
+        }
+        
+        function copyToClipboard() {
+            const sqlOutput = document.getElementById('sql-output');
+            sqlOutput.select();
+            document.execCommand('copy');
+            alert('✅ クリップボードにコピーしました！');
+        }
+        
+        function clearForm() {
+            document.getElementById('units').value = '';
+            document.getElementById('output').classList.add('hidden');
+        }
+        
+        // 自動カウント表示
+        document.getElementById('units').addEventListener('input', function() {
+            const lines = this.value.split('\n').filter(l => l.trim().length > 0).length;
+            if (lines > 0) {
+                this.placeholder = `現在の入力: ${lines}単元`;
+            }
+        });
+    </script>
+</body>
+</html>

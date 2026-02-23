@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIチューター - 自由進度学習支援システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .chat-message {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .typing-indicator {
+            display: inline-flex;
+            gap: 4px;
+        }
+        
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background-color: #3B82F6;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+            30% { transform: translateY(-10px); opacity: 1; }
+        }
+        
+        .suggestion-card {
+            transition: all 0.3s ease;
+        }
+        
+        .suggestion-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- ヘッダー -->
+    <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-robot text-3xl"></i>
+                <div>
+                    <h1 class="text-2xl font-bold">AIチューター</h1>
+                    <p class="text-sm text-blue-100">いつでも質問できるAI先生 🤖✨</p>
+                </div>
+            </div>
+            <div class="flex gap-4">
+                <a href="/dashboard.html" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 transition">
+                    <i class="fas fa-home mr-2"></i>ダッシュボード
+                </a>
+                <button id="logoutBtn" class="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt mr-2"></i>ログアウト
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4 max-w-6xl">
+        <!-- 学習状況サマリー -->
+        <div id="learningSummary" class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- 動的に生成 -->
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- チャットエリア -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                    <!-- チャットヘッダー -->
+                    <div class="bg-gradient-to-r from-blue-500 to-purple-500 text-white p-4">
+                        <h2 class="text-xl font-bold flex items-center gap-2">
+                            <i class="fas fa-comments"></i>
+                            AIチューターに質問しよう！
+                        </h2>
+                        <p class="text-sm text-blue-100 mt-1">
+                            分からないことがあれば、何でも聞いてね 📚
+                        </p>
+                    </div>
+
+                    <!-- チャット履歴 -->
+                    <div id="chatHistory" class="h-96 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                        <!-- ウェルカムメッセージ -->
+                        <div class="chat-message flex gap-3">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-robot text-white"></i>
+                                </div>
+                            </div>
+                            <div class="flex-1">
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <p class="text-gray-800">
+                                        こんにちは！👋<br>
+                                        私はAIチューターです。勉強で分からないことがあれば、何でも質問してくださいね！<br>
+                                        <br>
+                                        例えば：<br>
+                                        • 「5 + 3 はどうやって計算するの？」<br>
+                                        • 「この漢字の読み方は？」<br>
+                                        • 「理科の実験の手順を教えて！」<br>
+                                        <br>
+                                        一緒に楽しく学びましょう！✨
+                                    </p>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    <span id="aiSource" class="px-2 py-1 bg-blue-100 text-blue-700 rounded">完全無料AI</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 入力エリア -->
+                    <div class="p-4 bg-white border-t">
+                        <!-- 教科・単元選択 -->
+                        <div class="mb-3 grid grid-cols-2 gap-2">
+                            <select id="subjectSelect" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">教科を選択（任意）</option>
+                                <option value="数学">数学</option>
+                                <option value="国語">国語</option>
+                                <option value="理科">理科</option>
+                                <option value="社会">社会</option>
+                                <option value="英語">英語</option>
+                                <option value="その他">その他</option>
+                            </select>
+                            <input 
+                                type="text" 
+                                id="unitInput" 
+                                placeholder="単元名（任意）"
+                                class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            >
+                        </div>
+
+                        <!-- 質問入力 -->
+                        <div class="flex gap-2">
+                            <textarea 
+                                id="questionInput" 
+                                rows="2"
+                                placeholder="質問を入力してください..."
+                                class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                            ></textarea>
+                            <button 
+                                id="sendBtn" 
+                                class="px-6 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <i class="fas fa-paper-plane text-xl"></i>
+                            </button>
+                        </div>
+
+                        <!-- AI情報 -->
+                        <div class="mt-2 text-xs text-gray-500 flex items-center gap-2">
+                            <i class="fas fa-info-circle"></i>
+                            <span>
+                                このAIは完全無料です 💯 
+                                <span class="text-blue-600 font-semibold">Cloudflare Workers AI</span> + 
+                                <span class="text-purple-600 font-semibold">HuggingFace</span> + 
+                                <span class="text-green-600 font-semibold">ルールベースAI</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 会話履歴 -->
+                <div class="mt-6 bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-history text-blue-600"></i>
+                        最近の質問
+                    </h3>
+                    <div id="conversationHistory" class="space-y-3">
+                        <!-- 動的に生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- サイドバー（学習提案） -->
+            <div class="space-y-6">
+                <!-- パーソナライズ提案 -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-lightbulb text-yellow-500"></i>
+                        あなたへのおすすめ
+                    </h3>
+                    <div id="suggestions" class="space-y-3">
+                        <div class="text-center text-gray-500 py-4">
+                            <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                            <p>読み込み中...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- クイック質問テンプレート -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-bolt text-orange-500"></i>
+                        よくある質問
+                    </h3>
+                    <div class="space-y-2">
+                        <button class="w-full text-left px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition quick-question" data-question="計算の手順を教えて">
+                            <i class="fas fa-calculator text-blue-600 mr-2"></i>
+                            計算の手順を教えて
+                        </button>
+                        <button class="w-full text-left px-4 py-3 bg-green-50 hover:bg-green-100 rounded-lg transition quick-question" data-question="漢字の覚え方のコツは？">
+                            <i class="fas fa-language text-green-600 mr-2"></i>
+                            漢字の覚え方のコツは？
+                        </button>
+                        <button class="w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition quick-question" data-question="理科の実験の注意点は？">
+                            <i class="fas fa-flask text-purple-600 mr-2"></i>
+                            理科の実験の注意点は？
+                        </button>
+                        <button class="w-full text-left px-4 py-3 bg-orange-50 hover:bg-orange-100 rounded-lg transition quick-question" data-question="社会の勉強方法を教えて">
+                            <i class="fas fa-globe text-orange-600 mr-2"></i>
+                            社会の勉強方法を教えて
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 統計 -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-chart-line text-green-500"></i>
+                        今月の学習
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">質問した回数</span>
+                            <span id="questionCount" class="text-2xl font-bold text-blue-600">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">解決した問題</span>
+                            <span id="solvedCount" class="text-2xl font-bold text-green-600">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">学習時間</span>
+                            <span id="studyTime" class="text-2xl font-bold text-purple-600">0分</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script src="/text-to-speech.js"></script>
+    <script>
+        // 認証確認
+        const token = localStorage.getItem('token')
+        if (!token) {
+            window.location.href = '/auth-demo.html'
+        }
+
+        // Axios設定
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+
+        // グローバル変数
+        let conversationHistory = []
+
+        // ========================================
+        // 初期化
+        // ========================================
+        
+        async function init() {
+            await Promise.all([
+                loadSuggestions(),
+                loadConversationHistory()
+            ])
+        }
+
+        // ========================================
+        // AIチューターに質問
+        // ========================================
+        
+        async function askQuestion(question, subject = '', unitName = '') {
+            const chatHistory = document.getElementById('chatHistory')
+            const sendBtn = document.getElementById('sendBtn')
+            
+            if (!question || question.trim() === '') {
+                return
+            }
+            
+            // ユーザーメッセージ表示
+            appendUserMessage(question)
+            
+            // 送信ボタン無効化
+            sendBtn.disabled = true
+            
+            // タイピングインジケーター表示
+            const typingId = showTypingIndicator()
+            
+            try {
+                const response = await axios.post('/api/ai-tutor/ask', {
+                    question,
+                    subject,
+                    unitName,
+                    conversationHistory
+                })
+                
+                if (response.data.success) {
+                    const aiResponse = response.data.response
+                    
+                    // AIメッセージ表示
+                    appendAIMessage(aiResponse)
+                    
+                    // 会話履歴に追加
+                    conversationHistory.push({
+                        role: 'user',
+                        content: question,
+                        timestamp: new Date().toISOString()
+                    })
+                    conversationHistory.push({
+                        role: 'assistant',
+                        content: aiResponse.answer,
+                        timestamp: new Date().toISOString()
+                    })
+                    
+                    // 入力クリア
+                    document.getElementById('questionInput').value = ''
+                    document.getElementById('subjectSelect').value = ''
+                    document.getElementById('unitInput').value = ''
+                    
+                    // 会話履歴再読み込み
+                    await loadConversationHistory()
+                } else {
+                    appendErrorMessage('AIチューターの応答に失敗しました')
+                }
+            } catch (error) {
+                console.error('❌ 質問送信エラー:', error)
+                appendErrorMessage('エラーが発生しました。もう一度お試しください。')
+            } finally {
+                // タイピングインジケーター削除
+                removeTypingIndicator(typingId)
+                
+                // 送信ボタン有効化
+                sendBtn.disabled = false
+            }
+        }
+
+        // ========================================
+        // メッセージ表示関数
+        // ========================================
+        
+        function appendUserMessage(message) {
+            const chatHistory = document.getElementById('chatHistory')
+            
+            const messageDiv = document.createElement('div')
+            messageDiv.className = 'chat-message flex justify-end gap-3'
+            messageDiv.innerHTML = `
+                <div class="max-w-lg">
+                    <div class="bg-blue-500 text-white p-4 rounded-lg shadow">
+                        <p>${escapeHtml(message)}</p>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1 text-right">
+                        ${new Date().toLocaleTimeString('ja-JP')}
+                    </div>
+                </div>
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
+                        <i class="fas fa-user text-white"></i>
+                    </div>
+                </div>
+            `
+            
+            chatHistory.appendChild(messageDiv)
+            chatHistory.scrollTop = chatHistory.scrollHeight
+        }
+
+        function appendAIMessage(response) {
+            const chatHistory = document.getElementById('chatHistory')
+            
+            const sourceColors = {
+                'workers-ai': 'bg-blue-100 text-blue-700',
+                'huggingface': 'bg-purple-100 text-purple-700',
+                'rule-based': 'bg-green-100 text-green-700'
+            }
+            
+            const sourceLabels = {
+                'workers-ai': 'Workers AI',
+                'huggingface': 'HuggingFace',
+                'rule-based': 'ルールベースAI'
+            }
+            
+            const messageDiv = document.createElement('div')
+            messageDiv.className = 'chat-message flex gap-3'
+            messageDiv.innerHTML = `
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                        <i class="fas fa-robot text-white"></i>
+                    </div>
+                </div>
+                <div class="flex-1 max-w-lg">
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <p class="text-gray-800 whitespace-pre-wrap">${escapeHtml(response.answer)}</p>
+                        ${response.suggestions ? `
+                            <div class="mt-3 pt-3 border-t">
+                                <p class="text-sm font-semibold text-gray-700 mb-2">💡 ヒント:</p>
+                                <ul class="text-sm text-gray-600 space-y-1">
+                                    ${response.suggestions.map(s => `<li>• ${escapeHtml(s)}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                        <span class="px-2 py-1 ${sourceColors[response.source]} rounded">
+                            ${sourceLabels[response.source]}
+                        </span>
+                        <span>信頼度: ${Math.round(response.confidence * 100)}%</span>
+                        <span>${new Date().toLocaleTimeString('ja-JP')}</span>
+                    </div>
+                </div>
+            `
+            
+            chatHistory.appendChild(messageDiv)
+            chatHistory.scrollTop = chatHistory.scrollHeight
+        }
+
+        function appendErrorMessage(message) {
+            const chatHistory = document.getElementById('chatHistory')
+            
+            const messageDiv = document.createElement('div')
+            messageDiv.className = 'chat-message flex gap-3'
+            messageDiv.innerHTML = `
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-white"></i>
+                    </div>
+                </div>
+                <div class="flex-1 max-w-lg">
+                    <div class="bg-red-50 border border-red-200 p-4 rounded-lg">
+                        <p class="text-red-800">${escapeHtml(message)}</p>
+                    </div>
+                </div>
+            `
+            
+            chatHistory.appendChild(messageDiv)
+            chatHistory.scrollTop = chatHistory.scrollHeight
+        }
+
+        function showTypingIndicator() {
+            const chatHistory = document.getElementById('chatHistory')
+            const id = 'typing-' + Date.now()
+            
+            const typingDiv = document.createElement('div')
+            typingDiv.id = id
+            typingDiv.className = 'chat-message flex gap-3'
+            typingDiv.innerHTML = `
+                <div class="flex-shrink-0">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                        <i class="fas fa-robot text-white"></i>
+                    </div>
+                </div>
+                <div class="flex-1">
+                    <div class="bg-white p-4 rounded-lg shadow inline-block">
+                        <div class="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                </div>
+            `
+            
+            chatHistory.appendChild(typingDiv)
+            chatHistory.scrollTop = chatHistory.scrollHeight
+            
+            return id
+        }
+
+        function removeTypingIndicator(id) {
+            const typingDiv = document.getElementById(id)
+            if (typingDiv) {
+                typingDiv.remove()
+            }
+        }
+
+        // ========================================
+        // 学習提案読み込み
+        // ========================================
+        
+        async function loadSuggestions() {
+            try {
+                const response = await axios.get('/api/ai-tutor/suggestions')
+                
+                if (response.data.success) {
+                    const { suggestions, learningContext } = response.data
+                    const container = document.getElementById('suggestions')
+                    
+                    if (suggestions.length === 0) {
+                        container.innerHTML = `
+                            <div class="text-center text-gray-500 py-4">
+                                <i class="fas fa-star text-3xl text-yellow-400 mb-2"></i>
+                                <p>まだ提案がありません</p>
+                                <p class="text-sm">学習を進めると、AIがあなたに合った提案をします！</p>
+                            </div>
+                        `
+                        return
+                    }
+                    
+                    container.innerHTML = suggestions.map(s => {
+                        const colors = {
+                            'struggle': 'border-red-500 bg-red-50',
+                            'next-step': 'border-blue-500 bg-blue-50'
+                        }
+                        
+                        const icons = {
+                            'struggle': 'fa-exclamation-triangle text-red-500',
+                            'next-step': 'fa-arrow-right text-blue-500'
+                        }
+                        
+                        return `
+                            <div class="suggestion-card border-l-4 ${colors[s.type]} p-4 rounded">
+                                <h4 class="font-semibold mb-2 flex items-center gap-2">
+                                    <i class="fas ${icons[s.type]}"></i>
+                                    ${s.title}
+                                </h4>
+                                <p class="text-sm text-gray-600 mb-2">${s.message}</p>
+                                <ul class="text-sm text-gray-700 space-y-1">
+                                    ${s.items.slice(0, 3).map(item => `<li>• ${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `
+                    }).join('')
+                }
+            } catch (error) {
+                console.error('❌ 提案読み込みエラー:', error)
+            }
+        }
+
+        // ========================================
+        // 会話履歴読み込み
+        // ========================================
+        
+        async function loadConversationHistory() {
+            try {
+                const response = await axios.get('/api/ai-tutor/history?limit=5')
+                
+                if (response.data.success) {
+                    const conversations = response.data.conversations
+                    const container = document.getElementById('conversationHistory')
+                    
+                    if (conversations.length === 0) {
+                        container.innerHTML = `
+                            <div class="text-center text-gray-500 py-4">
+                                <p>まだ質問履歴がありません</p>
+                            </div>
+                        `
+                        return
+                    }
+                    
+                    // 質問カウント更新
+                    document.getElementById('questionCount').textContent = conversations.length
+                    
+                    container.innerHTML = conversations.map(c => `
+                        <div class="border-l-4 border-blue-500 pl-3 py-2 hover:bg-gray-50 cursor-pointer" onclick="repeatQuestion('${escapeHtml(c.question)}')">
+                            <p class="font-semibold text-gray-800">${escapeHtml(c.question)}</p>
+                            <p class="text-sm text-gray-600 mt-1">${escapeHtml(c.answer.substring(0, 100))}...</p>
+                            <div class="text-xs text-gray-500 mt-1">
+                                ${c.subject || '一般'} • ${new Date(c.created_at).toLocaleDateString('ja-JP')}
+                            </div>
+                        </div>
+                    `).join('')
+                }
+            } catch (error) {
+                console.error('❌ 履歴読み込みエラー:', error)
+            }
+        }
+
+        // ========================================
+        // イベントリスナー
+        // ========================================
+        
+        // 質問送信
+        document.getElementById('sendBtn').addEventListener('click', () => {
+            const question = document.getElementById('questionInput').value
+            const subject = document.getElementById('subjectSelect').value
+            const unitName = document.getElementById('unitInput').value
+            askQuestion(question, subject, unitName)
+        })
+
+        // Enterキーで送信
+        document.getElementById('questionInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                document.getElementById('sendBtn').click()
+            }
+        })
+
+        // クイック質問
+        document.querySelectorAll('.quick-question').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const question = btn.getAttribute('data-question')
+                document.getElementById('questionInput').value = question
+                document.getElementById('sendBtn').click()
+            })
+        })
+
+        // 履歴から質問を再利用
+        function repeatQuestion(question) {
+            document.getElementById('questionInput').value = question
+            document.getElementById('questionInput').focus()
+        }
+
+        // ログアウト
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('token')
+            window.location.href = '/auth-demo.html'
+        })
+
+        // ユーティリティ
+        function escapeHtml(text) {
+            const div = document.createElement('div')
+            div.textContent = text
+            return div.innerHTML
+        }
+
+        // 初期化実行
+        init()
+    </script>
+</body>
+</html>

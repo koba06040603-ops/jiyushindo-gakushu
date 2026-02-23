@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>テスト対策プラン - 自由進度学習システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
+    
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="flex items-center space-x-2 hover:opacity-80 transition">
+                        <i class="fas fa-arrow-left text-gray-600"></i>
+                        <span class="text-sm text-gray-600">トップに戻る</span>
+                    </a>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-clipboard-check text-blue-600 mr-2"></i>
+                    テスト対策プラン
+                </h1>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <p class="text-sm text-gray-600">ようこそ、<span id="studentName" class="font-semibold">山田太郎</span>さん</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- ウェルカムセクション -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
+            <div class="text-center">
+                <h2 class="text-3xl font-bold mb-2">テスト対策で自信をつけよう！</h2>
+                <p class="text-blue-100 text-lg">苦手な単元を克服し、得意な単元をさらに伸ばす</p>
+            </div>
+        </div>
+
+        <!-- 3つのプランカード -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            
+            <!-- AI問題生成 -->
+            <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition cursor-pointer" onclick="showAIProblemGenerator()">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-full p-3">
+                        <i class="fas fa-brain text-2xl bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"></i>
+                    </div>
+                    <span class="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                        おすすめ
+                    </span>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">AI問題生成</h3>
+                <p class="text-gray-600 text-sm mb-4">自分に合った問題を自動生成</p>
+                <ul class="text-xs text-gray-500 space-y-1 mb-4">
+                    <li>• 3,807単元から選択</li>
+                    <li>• 15教科完全対応</li>
+                    <li>• 難易度調整可能</li>
+                </ul>
+                <button class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 rounded-lg transition">
+                    <i class="fas fa-sparkles mr-2"></i>問題を生成する
+                </button>
+            </div>
+
+            <!-- 弱点克服プラン -->
+            <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition cursor-pointer" onclick="showWeaknessAnalysis()">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-red-100 rounded-full p-3">
+                        <i class="fas fa-chart-line text-2xl text-red-600"></i>
+                    </div>
+                    <span class="bg-red-100 text-red-800 text-xs font-semibold px-3 py-1 rounded-full">
+                        重要
+                    </span>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">弱点克服プラン</h3>
+                <p class="text-gray-600 text-sm mb-4">AIが苦手分野を分析</p>
+                <ul class="text-xs text-gray-500 space-y-1 mb-4">
+                    <li>• 学習履歴から弱点抽出</li>
+                    <li>• 優先度順に表示</li>
+                    <li>• 集中トレーニング</li>
+                </ul>
+                <button class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition">
+                    <i class="fas fa-dumbbell mr-2"></i>弱点を克服する
+                </button>
+            </div>
+
+            <!-- 総復習プラン -->
+            <div class="bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition cursor-pointer" onclick="showComprehensiveReview()">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="bg-green-100 rounded-full p-3">
+                        <i class="fas fa-book-open text-2xl text-green-600"></i>
+                    </div>
+                    <span class="bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">
+                        基礎固め
+                    </span>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">総復習プラン</h3>
+                <p class="text-gray-600 text-sm mb-4">複数単元を統合して学習</p>
+                <ul class="text-xs text-gray-500 space-y-1 mb-4">
+                    <li>• 単元横断的な問題</li>
+                    <li>• 関連性の理解</li>
+                    <li>• 総合力アップ</li>
+                </ul>
+                <button class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition">
+                    <i class="fas fa-clipboard-list mr-2"></i>総復習を始める
+                </button>
+            </div>
+        </div>
+
+        <!-- AI問題生成セクション -->
+        <div id="aiProblemSection" class="bg-white rounded-xl shadow-lg p-8 mb-8 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                <i class="fas fa-brain text-purple-600 mr-2"></i>
+                AI問題生成
+            </h2>
+            
+            <iframe 
+                src="/curriculum-problem-generator.html" 
+                class="w-full h-screen border-0 rounded-lg"
+                style="min-height: 800px;">
+            </iframe>
+        </div>
+
+        <!-- 学習履歴 -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">
+                <i class="fas fa-history text-blue-600 mr-2"></i>
+                最近のテスト対策
+            </h3>
+            <div id="recentHistory" class="space-y-3">
+                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-4">
+                        <div class="bg-purple-100 rounded-full p-2">
+                            <i class="fas fa-brain text-purple-600"></i>
+                        </div>
+                        <div>
+                            <p class="font-semibold text-gray-800">小学3年 算数 - かけ算</p>
+                            <p class="text-sm text-gray-600">AI問題生成 • 標準 • 5問</p>
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-500">2時間前</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function showAIProblemGenerator() {
+            document.getElementById('aiProblemSection').classList.remove('hidden');
+            document.getElementById('aiProblemSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showWeaknessAnalysis() {
+            alert('弱点克服プランは現在開発中です。\n学習履歴から自動的に苦手分野を分析し、最適な問題を提案します。');
+        }
+
+        function showComprehensiveReview() {
+            alert('総復習プランは現在開発中です。\n複数の単元を横断的に学習できる問題セットを提供します。');
+        }
+    </script>
+
+</body>
+</html>

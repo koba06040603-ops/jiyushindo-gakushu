@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI駆動型個別最適化学習システム導入提案書</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        .slide {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 4rem 2rem;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .slide-number {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+        @media print {
+            .slide {
+                page-break-after: always;
+                min-height: 100vh;
+            }
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 2rem auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Slide Navigation -->
+    <div class="fixed top-4 right-4 z-50 flex gap-2">
+        <button onclick="previousSlide()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+            <i class="fas fa-arrow-left"></i> 前へ
+        </button>
+        <button onclick="nextSlide()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+            次へ <i class="fas fa-arrow-right"></i>
+        </button>
+        <button onclick="window.print()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+            <i class="fas fa-print"></i>
+        </button>
+    </div>
+
+    <!-- Slide 1: 表紙 -->
+    <div class="slide gradient-bg text-white" data-slide="1">
+        <div class="max-w-6xl mx-auto text-center">
+            <h1 class="text-6xl font-bold mb-8">
+                一村から始まる教育改革
+            </h1>
+            <h2 class="text-4xl font-semibold mb-12">
+                AI駆動型個別最適化学習システム<br>導入提案書
+            </h2>
+            <div class="text-2xl mb-8">
+                全ての子どもに最適な学び、世界へ発信する教育モデル
+            </div>
+            <div class="mt-16 text-xl">
+                <div class="mb-4"><i class="fas fa-graduation-cap mr-3"></i>Phase 1-19 完全実装済み</div>
+                <div class="mb-4"><i class="fas fa-chart-line mr-3"></i>2年間のエビデンス構築</div>
+                <div class="mb-4"><i class="fas fa-globe mr-3"></i>全国モデルケースへ</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 2: エグゼクティブサマリー -->
+    <div class="slide bg-white" data-slide="2">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-5xl font-bold text-gray-800 mb-8 border-b-4 border-blue-600 pb-4">
+                エグゼクティブサマリー
+            </h2>
+            <div class="grid grid-cols-2 gap-8 mb-8">
+                <div class="bg-blue-50 p-6 rounded-lg">
+                    <h3 class="text-2xl font-bold text-blue-700 mb-4">提案の核心</h3>
+                    <ul class="space-y-3 text-lg">
+                        <li><i class="fas fa-check-circle text-blue-600 mr-2"></i>Phase 1-19 完全実装済み（20,000行）</li>
+                        <li><i class="fas fa-check-circle text-blue-600 mr-2"></i>2年間の実証研究</li>
+                        <li><i class="fas fa-check-circle text-blue-600 mr-2"></i>一斉授業からの転換</li>
+                        <li><i class="fas fa-check-circle text-blue-600 mr-2"></i>不登校児童支援</li>
+                        <li><i class="fas fa-check-circle text-blue-600 mr-2"></i>全国モデルケース</li>
+                    </ul>
+                </div>
+                <div class="bg-green-50 p-6 rounded-lg">
+                    <h3 class="text-2xl font-bold text-green-700 mb-4">期待される成果</h3>
+                    <ul class="space-y-3 text-lg">
+                        <li><i class="fas fa-arrow-up text-green-600 mr-2"></i>理解度: <strong>30-40%向上</strong></li>
+                        <li><i class="fas fa-clock text-green-600 mr-2"></i>教師負担: <strong>40-50%軽減</strong></li>
+                        <li><i class="fas fa-heart text-green-600 mr-2"></i>不登校復帰率: <strong>60-70%向上</strong></li>
+                        <li><i class="fas fa-trophy text-green-600 mr-2"></i>学会発表: <strong>年4-6回</strong></li>
+                        <li><i class="fas fa-newspaper text-green-600 mr-2"></i>メディア掲載: <strong>3-5回</strong></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="bg-gradient-to-r from-purple-100 to-pink-100 p-6 rounded-lg">
+                <h3 class="text-2xl font-bold text-purple-700 mb-4">投資対効果（ROI）</h3>
+                <div class="grid grid-cols-3 gap-6 text-center">
+                    <div>
+                        <div class="text-4xl font-bold text-purple-600 mb-2">100-220万円</div>
+                        <div class="text-lg text-gray-700">2年間投資額</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl font-bold text-green-600 mb-2">4,000-5,600万円</div>
+                        <div class="text-lg text-gray-700">2年間リターン</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl font-bold text-red-600 mb-2">20-50倍</div>
+                        <div class="text-lg text-gray-700">ROI</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: 現状の課題 -->
+    <div class="slide bg-gradient-to-br from-red-50 to-orange-50" data-slide="3">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-5xl font-bold text-gray-800 mb-8 border-b-4 border-red-600 pb-4">
+                現状の課題 - なぜ今、変革が必要か
+            </h2>
+            <div class="grid grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold text-red-700 mb-4">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>一斉授業の限界
+                    </h3>
+                    <ul class="space-y-3 text-lg">
+                        <li>✗ 理解度の個人差が大きい（1-5まで分散）</li>
+                        <li>✗ 理解が遅い子は置き去り</li>
+                        <li>✗ 理解が早い子は退屈</li>
+                        <li>✗ 40人全員に同じペース</li>
+                        <li>✗ データ不足で把握困難</li>
+                    </ul>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold text-orange-700 mb-4">
+                        <i class="fas fa-user-clock mr-2"></i>教師の過重負担
+                    </h3>
+                    <ul class="space-y-3 text-lg">
+                        <li>✗ 月平均残業80時間以上</li>
+                        <li>✗ 個別対応は物理的に限界</li>
+                        <li>✗ 採点・事務作業に膨大な時間</li>
+                        <li>✗ データなく経験頼み</li>
+                        <li>✗ 働き方改革が進まない</li>
+                    </ul>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold text-purple-700 mb-4">
+                        <i class="fas fa-user-slash mr-2"></i>不登校児童の増加
+                    </h3>
+                    <ul class="space-y-3 text-lg">
+                        <li>✗ 全国で30万人（過去最多）</li>
+                        <li>✗ 学校に行けない = 学べない</li>
+                        <li>✗ 学習遅れが復帰のハードルに</li>
+                        <li>✗ 社会とのつながり喪失</li>
+                    </ul>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold text-blue-700 mb-4">
+                        <i class="fas fa-map-marked-alt mr-2"></i>地方の教育格差
+                    </h3>
+                    <ul class="space-y-3 text-lg">
+                        <li>✗ 都市部との格差拡大</li>
+                        <li>✗ 塾・予備校へのアクセス困難</li>
+                        <li>✗ 教育資源・専門教員不足</li>
+                        <li>✗ 最新手法が届かない</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: システム概要 -->
+    <div class="slide bg-white" data-slide="4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-5xl font-bold text-gray-800 mb-8 border-b-4 border-blue-600 pb-4">
+                システム概要 - Phase 1-19 完全実装
+            </h2>
+            <div class="grid grid-cols-3 gap-6 mb-8">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-700 text-white p-6 rounded-lg text-center">
+                    <div class="text-5xl font-bold mb-2">20,000</div>
+                    <div class="text-xl">総コード行数</div>
+                </div>
+                <div class="bg-gradient-to-br from-green-500 to-green-700 text-white p-6 rounded-lg text-center">
+                    <div class="text-5xl font-bold mb-2">40+</div>
+                    <div class="text-xl">データベーステーブル</div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-purple-700 text-white p-6 rounded-lg text-center">
+                    <div class="text-5xl font-bold mb-2">90+</div>
+                    <div class="text-xl">APIエンドポイント</div>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-6">
+                <div class="bg-blue-50 p-6 rounded-lg">
+                    <h3 class="text-2xl font-bold text-blue-700 mb-4">Phase 1-8: 基本機能</h3>
+                    <ul class="space-y-2 text-lg">
+                        <li>✓ 認証・権限管理</li>
+                        <li>✓ 自由進度学習カード</li>
+                        <li>✓ AI対話（Gemini統合）</li>
+                        <li>✓ 自動問題生成</li>
+                        <li>✓ 進捗追跡</li>
+                    </ul>
+                </div>
+                <div class="bg-green-50 p-6 rounded-lg">
+                    <h3 class="text-2xl font-bold text-green-700 mb-4">Phase 9-14: データ分析</h3>
+                    <ul class="space-y-2 text-lg">
+                        <li>✓ 6つの学習パターン分析</li>
+                        <li>✓ 教師ダッシュボード</li>
+                        <li>✓ 個別最適化カード</li>
+                        <li>✓ AI予測機能</li>
+                        <li>✓ 多言語対応・研究データ</li>
+                    </ul>
+                </div>
+                <div class="bg-purple-50 p-6 rounded-lg">
+                    <h3 class="text-2xl font-bold text-purple-700 mb-4">Phase 15-16: 機械学習</h3>
+                    <ul class="space-y-2 text-lg">
+                        <li>✓ TensorFlow.js統合</li>
+                        <li>✓ リアルタイム学習</li>
+                        <li>✓ A/Bテスト・RCT</li>
+                        <li>✓ 統計分析</li>
+                    </ul>
+                </div>
+                <div class="bg-orange-50 p-6 rounded-lg">
+                    <h3 class="text-2xl font-bold text-orange-700 mb-4">Phase 17-19: 大規模展開</h3>
+                    <ul class="space-y-2 text-lg">
+                        <li>✓ 深層学習（LSTM/Transformer）</li>
+                        <li>✓ マルチモーダル学習</li>
+                        <li>✓ 複数校管理</li>
+                        <li>✓ 研究支援・グローバル展開</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 5: 村長へのメリット -->
+    <div class="slide bg-gradient-to-br from-yellow-50 to-amber-50" data-slide="5">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-5xl font-bold text-gray-800 mb-8 border-b-4 border-yellow-600 pb-4">
+                <i class="fas fa-landmark mr-3"></i>村長へのメリット
+            </h2>
+            <div class="grid grid-cols-2 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-3xl font-bold text-yellow-700 mb-6">投資対効果（ROI）</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <div class="text-sm text-gray-600 mb-1">2年間投資額</div>
+                            <div class="text-4xl font-bold text-red-600">100-220万円</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600 mb-1">2年間リターン</div>
+                            <div class="text-4xl font-bold text-green-600">4,280-5,600万円</div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600 mb-1">ROI（投資対効果）</div>
+                            <div class="text-5xl font-bold text-blue-600">20-50倍</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-3xl font-bold text-green-700 mb-4">具体的なリターン</h3>
+                    <ul class="space-y-3 text-lg">
+                        <li><strong>教師時間削減:</strong> 2,400万円</li>
+                        <li><strong>不登校対応削減:</strong> 600万円</li>
+                        <li><strong>ブランディング:</strong> 1,000-2,000万円</li>
+                        <li><strong>交流人口増:</strong> 80-300万円</li>
+                        <li><strong>人口流入:</strong> 200-300万円</li>
+                    </ul>
+                    <div class="mt-6 p-4 bg-green-100 rounded-lg">
+                        <div class="text-sm text-gray-700 mb-1">長期効果（学力向上）</div>
+                        <div class="text-3xl font-bold text-green-700">村への還元: 1,800万円</div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-r from-blue-100 to-purple-100 p-6 rounded-lg">
+                <h3 class="text-2xl font-bold text-purple-700 mb-4">
+                    <i class="fas fa-star mr-2"></i>村の未来ビジョン
+                </h3>
+                <div class="grid grid-cols-4 gap-4 text-center">
+                    <div>
+                        <div class="text-4xl mb-2">🏆</div>
+                        <div class="font-semibold text-lg">教育改革発祥の地</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl mb-2">📈</div>
+                        <div class="font-semibold text-lg">人口流入促進</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl mb-2">🏢</div>
+                        <div class="font-semibold text-lg">企業誘致</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl mb-2">🌟</div>
+                        <div class="font-semibold text-lg">全国モデル村</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: 予算計画 -->
+    <div class="slide bg-white" data-slide="6">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-5xl font-bold text-gray-800 mb-8 border-b-4 border-green-600 pb-4">
+                予算計画 - 詳細内訳
+            </h2>
+            <div class="grid grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-3xl font-bold text-blue-700 mb-6">初年度（2024年度）</h3>
+                    <div class="space-y-4">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">システム利用料</span>
+                                <span class="text-xl font-bold text-blue-600">82,000円</span>
+                            </div>
+                            <div class="text-sm text-gray-600">Cloudflare + Gemini API</div>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">端末・機器</span>
+                                <span class="text-xl font-bold text-blue-600">0-1,240,000円</span>
+                            </div>
+                            <div class="text-sm text-gray-600">既存端末活用で大幅削減可能</div>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">研修費</span>
+                                <span class="text-xl font-bold text-blue-600">150,000円</span>
+                            </div>
+                            <div class="text-sm text-gray-600">外部講師・教材費</div>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">その他</span>
+                                <span class="text-xl font-bold text-blue-600">150,000円</span>
+                            </div>
+                            <div class="text-sm text-gray-600">印刷費・予備費</div>
+                        </div>
+                        <div class="bg-blue-200 p-4 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xl font-bold">初年度合計</span>
+                                <span class="text-3xl font-bold text-blue-800">422,000円〜</span>
+                            </div>
+                            <div class="text-sm text-gray-700 mt-1">既存端末活用の場合</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-3xl font-bold text-green-700 mb-6">2年目（2025年度）</h3>
+                    <div class="space-y-4">
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">システム利用料</span>
+                                <span class="text-xl font-bold text-green-600">82,000円</span>
+                            </div>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">運用費</span>
+                                <span class="text-xl font-bold text-green-600">150,000円</span>
+                            </div>
+                            <div class="text-sm text-gray-600">メンテナンス・バックアップ</div>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">研究費</span>
+                                <span class="text-xl font-bold text-green-600">300,000円</span>
+                            </div>
+                            <div class="text-sm text-gray-600">学会参加・論文投稿</div>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-semibold">その他</span>
+                                <span class="text-xl font-bold text-green-600">80,000円</span>
+                            </div>
+                        </div>
+                        <div class="bg-green-200 p-4 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xl font-bold">2年目合計</span>
+                                <span class="text-3xl font-bold text-green-800">612,000円</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 bg-purple-100 p-4 rounded-lg">
+                        <div class="text-center">
+                            <div class="text-lg font-semibold text-gray-700 mb-2">2年間総額</div>
+                            <div class="text-4xl font-bold text-purple-700">1,034,000円</div>
+                            <div class="text-sm text-gray-600 mt-1">（既存端末活用の場合）</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Continue with more slides... -->
+    <!-- For brevity, I'll add a few key slides. You can add more based on PROPOSAL_SUMMARY.md -->
+
+    <!-- Final Slide: 今、決断を -->
+    <div class="slide gradient-bg text-white" data-slide="7">
+        <div class="max-w-6xl mx-auto text-center">
+            <h2 class="text-6xl font-bold mb-12">今、決断を</h2>
+            <div class="text-3xl mb-16 leading-relaxed">
+                教育は未来への投資<br>
+                子どもたちは待っている<br>
+                全国に先駆けるチャンス<br>
+                一村から日本を変える
+            </div>
+            <div class="grid grid-cols-2 gap-8 text-left mb-16">
+                <div class="bg-white bg-opacity-20 p-8 rounded-lg backdrop-blur-sm">
+                    <h3 class="text-3xl font-bold mb-4">✅ 今すぐ得られるもの</h3>
+                    <ul class="space-y-3 text-xl">
+                        <li>• 子どもたちの学力向上</li>
+                        <li>• 教師の負担軽減</li>
+                        <li>• 不登校児童の支援</li>
+                        <li>• エビデンスの構築</li>
+                        <li>• 全国モデルとしての地位</li>
+                    </ul>
+                </div>
+                <div class="bg-white bg-opacity-20 p-8 rounded-lg backdrop-blur-sm">
+                    <h3 class="text-3xl font-bold mb-4">⚠️ 先延ばしのリスク</h3>
+                    <ul class="space-y-3 text-xl">
+                        <li>• 1年遅れ = 120名の機会損失</li>
+                        <li>• 全国初のチャンス喪失</li>
+                        <li>• 教育格差の拡大</li>
+                        <li>• 他自治体に先行される</li>
+                        <li>• モデル村の地位を逃す</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="text-4xl font-bold mb-8">
+                2年後、「やってよかった」と言える決断を
+            </div>
+            <div class="text-2xl">
+                <i class="fas fa-graduation-cap mr-3"></i>
+                Phase 1-19 完全実装済み・今すぐ開始可能
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide Counter -->
+    <div class="slide-number">
+        <span id="current-slide">1</span> / <span id="total-slides">7</span>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        
+        document.getElementById('total-slides').textContent = totalSlides;
+        
+        function showSlide(n) {
+            if (n > totalSlides) currentSlide = 1;
+            if (n < 1) currentSlide = totalSlides;
+            else currentSlide = n;
+            
+            slides.forEach((slide, index) => {
+                slide.style.display = (index + 1 === currentSlide) ? 'flex' : 'none';
+            });
+            
+            document.getElementById('current-slide').textContent = currentSlide;
+        }
+        
+        function nextSlide() {
+            showSlide(currentSlide + 1);
+        }
+        
+        function previousSlide() {
+            showSlide(currentSlide - 1);
+        }
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') previousSlide();
+        });
+        
+        // Initialize
+        showSlide(1);
+    </script>
+</body>
+</html>

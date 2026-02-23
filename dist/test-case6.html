@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ケース6: 紙コップとおはじき - 動作確認</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <h1 class="text-3xl font-bold text-gray-800 mb-4">
+        <i class="fas fa-cube mr-2"></i>
+        ケース6: 紙コップとおはじき - 動画デモ
+      </h1>
+      
+      <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p class="text-gray-700">
+          <strong>アニメーションの流れ:</strong>
+        </p>
+        <ol class="list-decimal ml-6 mt-2 text-gray-600 space-y-1">
+          <li><strong>0-1秒:</strong> タイトル「動きで体得」と対象者表示</li>
+          <li><strong>1-2秒:</strong> 問題「3 × 4 = ?」が表示</li>
+          <li><strong>2-3秒:</strong> 紙コップ4個が順番に配置される</li>
+          <li><strong>3-7秒:</strong> 各コップにおはじきが3個ずつ落ちていく</li>
+          <li><strong>7-8秒:</strong> 説明「3個ずつ × 4つのコップ = 3+3+3+3」表示</li>
+          <li><strong>8-10秒:</strong> 答え「= 12個！」が大きく表示され、脈動する</li>
+        </ol>
+      </div>
+
+      <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-6 mb-6">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">
+          <i class="fas fa-play-circle text-blue-600 mr-2"></i>
+          動画プレビュー
+        </h2>
+        <button 
+          onclick="generateVideo()"
+          class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white px-8 py-3 rounded-lg shadow-lg transition-all transform hover:scale-105"
+        >
+          <i class="fas fa-video mr-2"></i>
+          動画を生成する
+        </button>
+      </div>
+
+      <div id="videoPreview" class="hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6">
+          <h3 class="text-lg font-bold text-gray-800 mb-4">
+            <i class="fas fa-tv text-purple-600 mr-2"></i>
+            生成された動画
+          </h3>
+          <div class="border-4 border-blue-200 rounded-lg overflow-hidden shadow-lg">
+            <div id="videoContainer"></div>
+          </div>
+          
+          <div class="mt-4 bg-green-50 border-l-4 border-green-500 p-4">
+            <p class="text-green-800 font-bold mb-2">
+              <i class="fas fa-check-circle mr-2"></i>
+              確認ポイント:
+            </p>
+            <ul class="list-disc ml-6 text-gray-700 space-y-1">
+              <li>紙コップが4個、均等に配置されている</li>
+              <li>紙コップの形状が台形（コップらしい形）になっている</li>
+              <li>おはじきがカラフル（赤・青・緑・黄色）で表示されている</li>
+              <li>おはじきが各コップに3個ずつ落ちていく動きが滑らか</li>
+              <li>答え「= 12個！」が最後に大きく表示される</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div id="loading" class="hidden text-center py-8">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p class="text-gray-600 mt-4">動画を生成中...</p>
+      </div>
+
+      <div id="error" class="hidden bg-red-50 border-l-4 border-red-500 p-4 rounded">
+        <p class="text-red-800 font-bold">
+          <i class="fas fa-exclamation-triangle mr-2"></i>
+          エラーが発生しました
+        </p>
+        <p class="text-red-600 mt-2" id="errorMessage"></p>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-6">
+      <h2 class="text-xl font-bold text-gray-800 mb-4">
+        <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+        実装詳細
+      </h2>
+      <div class="space-y-4 text-gray-700">
+        <div>
+          <h3 class="font-bold text-lg mb-2">紙コップの描画:</h3>
+          <ul class="list-disc ml-6 space-y-1">
+            <li>台形の本体（上辺60px、下辺70px、高さ60px）</li>
+            <li>楕円の縁（横30px、縦8px）</li>
+            <li>淡いグレー色（#f3f4f6）で紙コップらしさを表現</li>
+            <li>内側に影を追加して立体感を演出</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-bold text-lg mb-2">おはじきの描画:</h3>
+          <ul class="list-disc ml-6 space-y-1">
+            <li>放射状グラデーションで立体感を表現</li>
+            <li>4色（赤・青・緑・黄色）で各コップを区別</li>
+            <li>白いハイライトで光沢感を追加</li>
+            <li>落下アニメーションにeaseOutElasticを使用</li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-bold text-lg mb-2">アニメーションの工夫:</h3>
+          <ul class="list-disc ml-6 space-y-1">
+            <li><strong>順次登場:</strong> コップが0.15秒間隔で順番に現れる</li>
+            <li><strong>個別落下:</strong> おはじきが0.3秒間隔で1個ずつ落ちる</li>
+            <li><strong>弾性運動:</strong> easeOutElasticで弾むような動きを実現</li>
+            <li><strong>脈動効果:</strong> 答えが表示後、sin波で脈動するアニメーション</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+  <script>
+    async function generateVideo() {
+      const loading = document.getElementById('loading');
+      const videoPreview = document.getElementById('videoPreview');
+      const error = document.getElementById('error');
+      const videoContainer = document.getElementById('videoContainer');
+      
+      // リセット
+      loading.classList.remove('hidden');
+      videoPreview.classList.add('hidden');
+      error.classList.add('hidden');
+      
+      try {
+        const response = await axios.post('/api/media/generate-video-case', {
+          caseNumber: 6,
+          duration: 10
+        });
+        
+        if (response.data.success) {
+          // iframeで動画を表示
+          videoContainer.innerHTML = `
+            <iframe 
+              srcdoc="${response.data.animationHtml.replace(/"/g, '&quot;')}"
+              style="width: 100%; height: 500px; border: none;"
+              title="ケース6: 紙コップとおはじきアニメーション"
+            ></iframe>
+          `;
+          
+          loading.classList.add('hidden');
+          videoPreview.classList.remove('hidden');
+          
+          console.log('✅ 動画生成成功:', response.data.note);
+        } else {
+          throw new Error('動画生成に失敗しました');
+        }
+      } catch (err) {
+        console.error('❌ エラー:', err);
+        loading.classList.add('hidden');
+        error.classList.remove('hidden');
+        document.getElementById('errorMessage').textContent = err.message;
+      }
+    }
+    
+    // 自動生成（デモ用）
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('✅ ケース6テストページ読み込み完了');
+    });
+  </script>
+</body>
+</html>

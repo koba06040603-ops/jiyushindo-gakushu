@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI先生チャット（音声対応） - 松川村AI学習システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .chat-bubble {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .typing-indicator span {
+            animation: bounce 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes bounce {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-8px);
+            }
+        }
+        .quick-reply-btn {
+            transition: all 0.2s ease;
+        }
+        .quick-reply-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .pulse-animation {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(1.05);
+            }
+        }
+        .speaking-indicator {
+            animation: speaking 0.8s ease-in-out infinite;
+        }
+        @keyframes speaking {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.2);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex flex-col h-screen">
+        <!-- ヘッダー -->
+        <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
+            <div class="max-w-4xl mx-auto px-4 py-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                            <i class="fas fa-robot text-2xl text-indigo-600"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold">AI先生（音声対応）</h1>
+                            <p class="text-sm text-indigo-100">話して質問もOK！</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <select id="gradeSelect" class="px-3 py-2 bg-white bg-opacity-20 text-white border border-white border-opacity-30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white">
+                            <option value="">学年を選択</option>
+                            <option value="1年">小1</option>
+                            <option value="2年">小2</option>
+                            <option value="3年">小3</option>
+                            <option value="4年">小4</option>
+                            <option value="5年">小5</option>
+                            <option value="6年">小6</option>
+                            <option value="中1">中1</option>
+                            <option value="中2">中2</option>
+                            <option value="中3">中3</option>
+                        </select>
+                        <select id="subjectSelect" class="px-3 py-2 bg-white bg-opacity-20 text-white border border-white border-opacity-30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-white">
+                            <option value="総合">すべて</option>
+                            <option value="算数">算数・数学</option>
+                            <option value="国語">国語</option>
+                            <option value="理科">理科</option>
+                            <option value="社会">社会</option>
+                            <option value="英語">英語</option>
+                        </select>
+                        <!-- 音声設定ボタン -->
+                        <button id="voiceSettingsBtn" class="px-3 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg transition" title="音声設定">
+                            <i class="fas fa-sliders-h"></i>
+                        </button>
+                        <button id="historyBtn" class="px-3 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-lg transition" title="会話履歴">
+                            <i class="fas fa-history"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- チャットエリア -->
+        <main class="flex-1 overflow-hidden">
+            <div class="max-w-4xl mx-auto h-full flex flex-col">
+                <!-- メッセージエリア -->
+                <div id="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <!-- 初期メッセージ -->
+                    <div class="flex justify-center">
+                        <div class="bg-white rounded-2xl shadow-sm p-6 max-w-md text-center">
+                            <div class="w-20 h-20 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-robot text-white text-3xl"></i>
+                            </div>
+                            <h2 class="text-xl font-bold text-gray-900 mb-2">AI先生です！</h2>
+                            <p class="text-gray-600 mb-4">わからないことがあったら、なんでも質問してね！ 😊<br>
+                            <span class="text-sm text-indigo-600">🎤 話しかけても、文字で書いてもOKだよ！</span></p>
+                            <div class="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                                <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                                <span>オンライン</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- クイック返信 -->
+                <div id="quickRepliesContainer" class="px-4 pb-2">
+                    <div class="bg-white rounded-xl shadow-sm p-3">
+                        <p class="text-xs text-gray-500 mb-2">よくある質問:</p>
+                        <div class="flex flex-wrap gap-2" id="quickRepliesList">
+                            <!-- 動的に生成 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 入力エリア -->
+                <div class="bg-white border-t border-gray-200 p-4">
+                    <div class="max-w-4xl mx-auto">
+                        <div class="flex items-end space-x-2">
+                            <!-- 音声入力ボタン -->
+                            <button 
+                                id="voiceInputBtn" 
+                                onclick="toggleVoiceInput()"
+                                class="px-4 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition shadow-lg"
+                                title="音声入力"
+                            >
+                                <i id="voiceInputIcon" class="fas fa-microphone"></i>
+                            </button>
+                            <textarea 
+                                id="messageInput" 
+                                rows="1"
+                                class="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                                placeholder="質問を入力してください..."
+                                onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage();}"
+                            ></textarea>
+                            <!-- 音声読み上げ切替 -->
+                            <button 
+                                id="ttsToggleBtn" 
+                                onclick="toggleTTS()"
+                                class="px-4 py-3 bg-green-500 text-white rounded-xl hover:bg-green-600 transition shadow-lg"
+                                title="音声読み上げ ON"
+                            >
+                                <i id="ttsIcon" class="fas fa-volume-up"></i>
+                            </button>
+                            <button 
+                                id="sendBtn" 
+                                onclick="sendMessage()"
+                                class="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium hover:from-indigo-700 hover:to-purple-700 transition shadow-lg"
+                            >
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            <i class="fas fa-lightbulb text-yellow-500 mr-1"></i>
+                            ヒント: 🎤ボタンで音声入力、🔊ボタンで読み上げON/OFF
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 音声設定モーダル -->
+    <div id="voiceSettingsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-gray-900">
+                        <i class="fas fa-sliders-h mr-2 text-indigo-600"></i>音声設定
+                    </h2>
+                    <button id="closeVoiceSettingsBtn" class="text-gray-400 hover:text-gray-600 transition">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <!-- 読み上げ速度 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        読み上げ速度: <span id="rateValue">1.0</span>倍
+                    </label>
+                    <input 
+                        type="range" 
+                        id="speechRate" 
+                        min="0.5" 
+                        max="2.0" 
+                        step="0.1" 
+                        value="1.0"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        oninput="document.getElementById('rateValue').textContent = this.value"
+                    >
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>ゆっくり</span>
+                        <span>ふつう</span>
+                        <span>はやい</span>
+                    </div>
+                </div>
+                
+                <!-- 音量 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        音量: <span id="volumeValue">100</span>%
+                    </label>
+                    <input 
+                        type="range" 
+                        id="speechVolume" 
+                        min="0" 
+                        max="100" 
+                        step="10" 
+                        value="100"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        oninput="document.getElementById('volumeValue').textContent = this.value"
+                    >
+                </div>
+                
+                <!-- 音声の種類 -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        音声の種類
+                    </label>
+                    <select id="voiceSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        <!-- 動的に生成 -->
+                    </select>
+                </div>
+                
+                <!-- テスト -->
+                <button 
+                    onclick="testVoice()"
+                    class="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                >
+                    <i class="fas fa-play mr-2"></i>テスト再生
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 履歴モーダル -->
+    <div id="historyModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-2xl font-bold text-gray-900">
+                        <i class="fas fa-history mr-2 text-indigo-600"></i>会話履歴
+                    </h2>
+                    <button id="closeHistoryBtn" class="text-gray-400 hover:text-gray-600 transition">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div id="historyList" class="space-y-3">
+                    <!-- 動的に生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentConversationId = null;
+        let isTyping = false;
+        let isTTSEnabled = true;
+        let isListening = false;
+        let recognition = null;
+        let synthesis = window.speechSynthesis;
+        let voices = [];
+
+        // Web Speech API初期化
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                console.log('音声認識開始');
+                isListening = true;
+                document.getElementById('voiceInputBtn').classList.add('pulse-animation');
+                document.getElementById('voiceInputIcon').className = 'fas fa-microphone-slash';
+            };
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                document.getElementById('messageInput').value = transcript;
+            };
+
+            recognition.onend = () => {
+                console.log('音声認識終了');
+                isListening = false;
+                document.getElementById('voiceInputBtn').classList.remove('pulse-animation');
+                document.getElementById('voiceInputIcon').className = 'fas fa-microphone';
+            };
+
+            recognition.onerror = (event) => {
+                console.error('音声認識エラー:', event.error);
+                isListening = false;
+                document.getElementById('voiceInputBtn').classList.remove('pulse-animation');
+                document.getElementById('voiceInputIcon').className = 'fas fa-microphone';
+                
+                if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                    showToast('音声認識エラーが発生しました', 'error');
+                }
+            };
+        } else {
+            console.warn('音声認識APIが利用できません');
+            document.getElementById('voiceInputBtn').disabled = true;
+            document.getElementById('voiceInputBtn').classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        // 音声合成の音声リストを取得
+        function loadVoices() {
+            voices = synthesis.getVoices();
+            const voiceSelect = document.getElementById('voiceSelect');
+            voiceSelect.innerHTML = '';
+            
+            // 日本語の音声のみをフィルタ
+            const japaneseVoices = voices.filter(voice => voice.lang.startsWith('ja'));
+            
+            if (japaneseVoices.length === 0) {
+                voiceSelect.innerHTML = '<option>日本語音声が見つかりません</option>';
+                return;
+            }
+            
+            japaneseVoices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                voiceSelect.appendChild(option);
+            });
+        }
+
+        if (synthesis.onvoiceschanged !== undefined) {
+            synthesis.onvoiceschanged = loadVoices;
+        }
+        loadVoices();
+
+        // クイック返信データ
+        const quickReplies = {
+            '総合': [
+                '勉強のやる気が出ない時はどうすればいい？',
+                '効率的な勉強方法を教えて',
+                'テストの前にやることを教えて'
+            ],
+            '算数': [
+                'この問題の解き方を教えて',
+                '分数の計算がわかりません',
+                '図形の面積の求め方を教えて'
+            ],
+            '国語': [
+                'この漢字の意味を教えて',
+                '主語と述語の見つけ方を教えて',
+                '作文の書き方を教えて'
+            ],
+            '理科': [
+                'この実験について教えて',
+                '植物の育ち方について教えて',
+                '星の動きについて教えて'
+            ],
+            '社会': [
+                'この地図の見方を教えて',
+                '都道府県の特徴を教えて',
+                '時代の流れを教えて'
+            ],
+            '英語': [
+                'この単語の意味を教えて',
+                '英語で挨拶する方法を教えて',
+                '簡単な会話を教えて'
+            ]
+        };
+
+        // 音声入力切替
+        function toggleVoiceInput() {
+            if (!recognition) {
+                showToast('音声認識が利用できません', 'error');
+                return;
+            }
+
+            if (isListening) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        }
+
+        // TTS切替
+        function toggleTTS() {
+            isTTSEnabled = !isTTSEnabled;
+            const btn = document.getElementById('ttsToggleBtn');
+            const icon = document.getElementById('ttsIcon');
+            
+            if (isTTSEnabled) {
+                btn.classList.remove('bg-gray-400');
+                btn.classList.add('bg-green-500');
+                btn.title = '音声読み上げ ON';
+                icon.className = 'fas fa-volume-up';
+                showToast('音声読み上げをONにしました', 'success');
+            } else {
+                btn.classList.remove('bg-green-500');
+                btn.classList.add('bg-gray-400');
+                btn.title = '音声読み上げ OFF';
+                icon.className = 'fas fa-volume-mute';
+                showToast('音声読み上げをOFFにしました', 'info');
+                synthesis.cancel(); // 再生中の音声を停止
+            }
+        }
+
+        // テキスト読み上げ
+        function speakText(text) {
+            if (!isTTSEnabled || !synthesis) return;
+            
+            // 既存の読み上げを停止
+            synthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // 設定を適用
+            const rate = parseFloat(document.getElementById('speechRate').value);
+            const volume = parseInt(document.getElementById('speechVolume').value) / 100;
+            const voiceIndex = parseInt(document.getElementById('voiceSelect').value);
+            
+            utterance.rate = rate;
+            utterance.volume = volume;
+            
+            const japaneseVoices = voices.filter(voice => voice.lang.startsWith('ja'));
+            if (japaneseVoices[voiceIndex]) {
+                utterance.voice = japaneseVoices[voiceIndex];
+            }
+            
+            utterance.lang = 'ja-JP';
+            
+            utterance.onstart = () => {
+                console.log('読み上げ開始');
+            };
+            
+            utterance.onend = () => {
+                console.log('読み上げ終了');
+            };
+            
+            utterance.onerror = (event) => {
+                console.error('読み上げエラー:', event);
+            };
+            
+            synthesis.speak(utterance);
+        }
+
+        // 音声テスト
+        function testVoice() {
+            const grade = document.getElementById('gradeSelect').value || '3年';
+            const testTexts = {
+                '1年': 'こんにちは。わたしはAIせんせいです。いっしょにべんきょうしましょう。',
+                '2年': 'こんにちは。私はAI先生です。一しょに勉強しましょう。',
+                '3年': 'こんにちは。私はAI先生です。一緒に勉強しましょう。分からないことがあったら、何でも聞いてくださいね。',
+                '4年': 'こんにちは。私はAI先生です。一緒に勉強しましょう。分からないことがあったら、遠慮なく質問してください。',
+                '5年': 'こんにちは。私はAI先生です。一緒に学習を進めていきましょう。疑問点があれば、いつでも質問してください。',
+                '6年': 'こんにちは。私はAI先生です。効果的に学習を進められるようサポートします。分からないことがあれば、気軽に質問してください。',
+                '中1': 'こんにちは。私はAI先生です。皆さんの学習をサポートします。疑問点や理解できない部分があれば、遠慮なく質問してください。',
+                '中2': 'こんにちは。私はAI先生です。皆さんの学習を効果的にサポートします。論理的に説明しますので、分からない点があれば質問してください。',
+                '中3': 'こんにちは。私はAI先生です。受験も視野に入れた学習サポートを行います。高度な内容でも丁寧に説明しますので、疑問点があれば遠慮なく質問してください。'
+            };
+            speakText(testTexts[grade] || testTexts['3年']);
+        }
+
+        // トースト通知
+        function showToast(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500',
+                warning: 'bg-yellow-500'
+            };
+            
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-20 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // クイック返信表示
+        function updateQuickReplies() {
+            const subject = document.getElementById('subjectSelect').value;
+            const list = document.getElementById('quickRepliesList');
+            const replies = quickReplies[subject] || quickReplies['総合'];
+            
+            list.innerHTML = replies.map(reply => `
+                <button onclick="sendQuickReply('${reply}')" 
+                        class="quick-reply-btn px-3 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200 rounded-lg text-sm text-indigo-700 font-medium">
+                    ${reply}
+                </button>
+            `).join('');
+        }
+
+        // クイック返信送信
+        function sendQuickReply(text) {
+            document.getElementById('messageInput').value = text;
+            sendMessage();
+        }
+
+        // メッセージ送信
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || isTyping) return;
+
+            // ユーザーメッセージ表示
+            addMessage(message, 'user');
+            input.value = '';
+
+            // タイピングインジケーター表示
+            showTypingIndicator();
+            isTyping = true;
+
+            try {
+                const grade = document.getElementById('gradeSelect').value;
+                
+                // API呼び出し
+                const response = await fetch('/api/chat/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        conversation_id: currentConversationId,
+                        grade: grade
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    removeTypingIndicator();
+                    
+                    // 会話IDを保存
+                    if (data.conversation_id) {
+                        currentConversationId = data.conversation_id;
+                    }
+                    
+                    // AI応答を表示
+                    addMessage(data.message.content, 'ai');
+                    
+                    // 音声読み上げ
+                    if (isTTSEnabled) {
+                        speakText(data.message.content);
+                    }
+                } else {
+                    removeTypingIndicator();
+                    addMessage('すみません、エラーが発生しました。もう一度お試しください。', 'ai');
+                }
+            } catch (error) {
+                console.error('送信エラー:', error);
+                removeTypingIndicator();
+                addMessage('通信エラーが発生しました。ネットワーク接続を確認してください。', 'ai');
+            } finally {
+                isTyping = false;
+            }
+        }
+
+        // メッセージ追加
+        function addMessage(text, sender) {
+            const container = document.getElementById('messagesContainer');
+            const isUser = sender === 'user';
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} chat-bubble`;
+            
+            messageDiv.innerHTML = `
+                <div class="max-w-[70%]">
+                    ${!isUser ? `
+                        <div class="flex items-center space-x-2 mb-1">
+                            <div class="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center">
+                                <i class="fas fa-robot text-white text-sm"></i>
+                            </div>
+                            <span class="text-xs text-gray-600 font-medium">AI先生</span>
+                        </div>
+                    ` : ''}
+                    <div class="${isUser 
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' 
+                        : 'bg-white text-gray-800 border border-gray-200'
+                    } rounded-2xl px-4 py-3 shadow-sm">
+                        <p class="text-sm leading-relaxed">${text}</p>
+                    </div>
+                    ${!isUser ? `
+                        <div class="flex items-center space-x-2 mt-2 ml-10">
+                            <button onclick="speakText('${text.replace(/'/g, "\\'")}')" class="text-xs text-gray-500 hover:text-indigo-600 transition">
+                                <i class="fas fa-volume-up mr-1"></i>もう一度聞く
+                            </button>
+                            <button onclick="giveFeedback(true)" class="text-xs text-gray-500 hover:text-green-600 transition">
+                                <i class="fas fa-thumbs-up mr-1"></i>役に立った
+                            </button>
+                            <button onclick="giveFeedback(false)" class="text-xs text-gray-500 hover:text-red-600 transition">
+                                <i class="fas fa-thumbs-down mr-1"></i>役に立たない
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // タイピングインジケーター
+        function showTypingIndicator() {
+            const container = document.getElementById('messagesContainer');
+            const div = document.createElement('div');
+            div.id = 'typingIndicator';
+            div.className = 'flex justify-start';
+            div.innerHTML = `
+                <div class="max-w-[70%]">
+                    <div class="flex items-center space-x-2 mb-1">
+                        <div class="w-8 h-8 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center">
+                            <i class="fas fa-robot text-white text-sm"></i>
+                        </div>
+                        <span class="text-xs text-gray-600 font-medium">AI先生</span>
+                    </div>
+                    <div class="bg-white text-gray-800 border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
+                        <div class="typing-indicator flex space-x-1">
+                            <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                            <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                            <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        // フィードバック
+        function giveFeedback(isHelpful) {
+            showToast(isHelpful ? 'フィードバックありがとう！' : 'フィードバックを送信しました', 'success');
+        }
+
+        // 会話履歴
+        async function loadHistory() {
+            const list = document.getElementById('historyList');
+            list.innerHTML = '<div class="text-center text-gray-500">読み込み中...</div>';
+            
+            try {
+                const response = await fetch('/api/chat/conversations', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.conversations && data.conversations.length > 0) {
+                    list.innerHTML = data.conversations.map(conv => `
+                        <div class="bg-gray-50 rounded-xl p-4 hover:bg-gray-100 cursor-pointer transition" 
+                             onclick="loadConversation(${conv.id})">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-medium text-gray-900">${conv.conversation_title || '無題の会話'}</span>
+                                <span class="text-xs text-gray-500">${formatDate(conv.last_message_at)}</span>
+                            </div>
+                            <p class="text-sm text-gray-600">${conv.message_count}件のメッセージ</p>
+                        </div>
+                    `).join('');
+                } else {
+                    list.innerHTML = '<div class="text-center text-gray-500">まだ会話履歴がありません</div>';
+                }
+            } catch (error) {
+                console.error('履歴取得エラー:', error);
+                list.innerHTML = '<div class="text-center text-red-500">履歴の読み込みに失敗しました</div>';
+            }
+        }
+        
+        // 会話を読み込む
+        async function loadConversation(conversationId) {
+            try {
+                const response = await fetch(`/api/chat/messages/${conversationId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.messages) {
+                    const container = document.getElementById('messagesContainer');
+                    container.innerHTML = '';
+                    
+                    data.messages.forEach(msg => {
+                        addMessage(msg.content, msg.role);
+                    });
+                    
+                    currentConversationId = conversationId;
+                    document.getElementById('historyModal').classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('会話読み込みエラー:', error);
+            }
+        }
+        
+        // 日時フォーマット
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            
+            if (hours < 1) return '今';
+            if (hours < 24) return `${hours}時間前`;
+            if (days < 7) return `${days}日前`;
+            return date.toLocaleDateString('ja-JP');
+        }
+
+        // モーダル制御
+        document.getElementById('voiceSettingsBtn').addEventListener('click', () => {
+            document.getElementById('voiceSettingsModal').classList.remove('hidden');
+        });
+
+        document.getElementById('closeVoiceSettingsBtn').addEventListener('click', () => {
+            document.getElementById('voiceSettingsModal').classList.add('hidden');
+        });
+
+        document.getElementById('historyBtn').addEventListener('click', () => {
+            document.getElementById('historyModal').classList.remove('hidden');
+            loadHistory();
+        });
+
+        document.getElementById('closeHistoryBtn').addEventListener('click', () => {
+            document.getElementById('historyModal').classList.add('hidden');
+        });
+
+        // 教科選択変更時
+        document.getElementById('subjectSelect').addEventListener('change', updateQuickReplies);
+
+        // 初期化
+        updateQuickReplies();
+        
+        // ページ離脱時に音声を停止
+        window.addEventListener('beforeunload', () => {
+            if (recognition && isListening) {
+                recognition.stop();
+            }
+            if (synthesis) {
+                synthesis.cancel();
+            }
+        });
+    </script>
+</body>
+</html>

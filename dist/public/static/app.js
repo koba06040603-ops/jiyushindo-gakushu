@@ -5824,7 +5824,7 @@ async function loadCardPage(cardId) {
                           <i class="fas fa-cloud-upload-alt text-gray-400 mr-1"></i>
                           ここに<strong>ファイルをドラッグ&ドロップ</strong>するか、<strong>Ctrl+V</strong>で画像を貼り付け
                         </p>
-                        <p class="text-xs text-gray-400 mt-0.5">JPG・PNG・PDF 対応（5MBまで）</p>
+                        <p class="text-xs text-gray-400 mt-0.5">JPG・PNG・PDF 対応（20MBまで）</p>
                       </div>
                     </div>
                     
@@ -22077,7 +22077,7 @@ function editCardContent(courseIndex, cardIndex) {
                   </div>
                 </div>
               </div>
-              <p class="text-xs text-gray-400 mt-2">📎 画像(JPEG/PNG/GIF/WebP, 5MBまで) 🎬 動画(MP4/WebM/MOV, 50MBまで) — 直接ファイルをアップロードするか、URLを入力してください</p>
+              <p class="text-xs text-gray-400 mt-2">📎 画像(JPEG/PNG/GIF/WebP, 10MBまで) 🎬 動画(MP4/WebM/MOV, 100MBまで) — 直接ファイルをアップロードするか、URLを入力してください</p>
             </div>
           </form>
         </div>
@@ -30131,8 +30131,8 @@ async function editCardImageUrl(cardId, imageType) {
   
   // 選択ダイアログ
   const options = isVideo
-    ? `【${typeLabel}の設定】\n\n操作を選んでください:\n\n1 = URLを直接入力（YouTube等）\n2 = 動画ファイルをアップロード（MP4/WebM/MOV, 50MBまで）\n3 = 削除\n\n番号を入力してください:`
-    : `【${typeLabel}の設定】\n\n操作を選んでください:\n\n1 = 画像URLを直接入力\n2 = 画像ファイルをアップロード（JPEG/PNG/GIF/WebP, 5MBまで）\n3 = AIで図・イラストを自動生成\n4 = 削除\n\n番号を入力してください:`
+    ? `【${typeLabel}の設定】\n\n操作を選んでください:\n\n1 = URLを直接入力（YouTube等）\n2 = 動画ファイルをアップロード（MP4/WebM/MOV, 100MBまで）\n3 = 削除\n\n番号を入力してください:`
+    : `【${typeLabel}の設定】\n\n操作を選んでください:\n\n1 = 画像URLを直接入力\n2 = 画像ファイルをアップロード（JPEG/PNG/GIF/WebP, 10MBまで）\n3 = AIで図・イラストを自動生成\n4 = 削除\n\n番号を入力してください:`
   
   const choice = prompt(options, isVideo ? '2' : '2')
   
@@ -30290,9 +30290,7 @@ async function addMediaFileToCard(cardId, file, mediaType) {
     formData.append('label', file.name)
     const res = await axios.post('/api/card/' + cardId + '/media/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 180000,
-      maxContentLength: 100 * 1024 * 1024,
-      maxBodyLength: 100 * 1024 * 1024
+      timeout: 60000
     })
     if (res.data.success) {
       loadMediaGallery(cardId)
@@ -30342,11 +30340,8 @@ async function uploadFileToCard(cardId, file) {
   if (mediaType !== 'image') {
     return addMediaFileToCard(cardId, file, mediaType)
   }
-  // サイズチェック: 画像5MB、動画50MB、音声20MB
-  const sizeLimits = { image: 5, video: 50, audio: 20 }
-  const sizeLimit = (sizeLimits[mediaType] || 5) * 1024 * 1024
-  if (file.size > sizeLimit) {
-    alert('ファイルサイズが大きすぎます（上限' + (sizeLimits[mediaType] || 5) + 'MB、現在' + (file.size/1024/1024).toFixed(1) + 'MB）')
+  if (file.size > 20 * 1024 * 1024) {
+    alert('ファイルサイズが大きすぎます（上限20MB）')
     return false
   }
   
@@ -31374,7 +31369,7 @@ function addMediaToCard(cardId, mediaType) {
   if (mediaType === 'image') {
     input.accept = 'image/jpeg,image/png,image/gif,image/webp,application/pdf'
   } else if (mediaType === 'video') {
-    input.accept = 'video/mp4,video/webm,video/ogg,video/quicktime'
+    input.accept = 'video/mp4,video/webm,video/ogg'
   } else if (mediaType === 'audio') {
     input.accept = 'audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac'
   }
@@ -31406,9 +31401,7 @@ function addMediaToCard(cardId, mediaType) {
       
       const res = await axios.post('/api/card/' + cardId + '/media/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 180000,
-        maxContentLength: 100 * 1024 * 1024,
-        maxBodyLength: 100 * 1024 * 1024
+        timeout: 60000
       })
       
       if (res.data.success) {
@@ -31501,7 +31494,7 @@ function initDropZone(element, cardId) {
     if (!overlay) {
       overlay = document.createElement('div')
       overlay.className = 'drop-overlay absolute inset-0 bg-purple-500 bg-opacity-20 rounded-2xl flex items-center justify-center z-20 pointer-events-none'
-      overlay.innerHTML = '<div class="bg-white rounded-xl px-6 py-4 shadow-xl text-center"><i class="fas fa-cloud-upload-alt text-purple-500 text-4xl mb-2 block"></i><p class="font-bold text-purple-700 text-lg">ここにドロップ！</p><p class="text-sm text-gray-500">画像 / 動画(MP4) / 音声 / PDF</p></div>'
+      overlay.innerHTML = '<div class="bg-white rounded-xl px-6 py-4 shadow-xl text-center"><i class="fas fa-cloud-upload-alt text-purple-500 text-4xl mb-2 block"></i><p class="font-bold text-purple-700 text-lg">ここにドロップ！</p><p class="text-sm text-gray-500">JPG / PNG / PDF</p></div>'
       element.style.position = 'relative'
       element.appendChild(overlay)
     }
@@ -34325,7 +34318,7 @@ async function showCardMediaEditor(cardId, cardTitle) {
                   >
                     <i class="fas fa-cloud-upload-alt text-4xl text-blue-400 mb-2"></i>
                     <p class="text-sm text-gray-600">クリックして画像を選択、またはドラッグ&ドロップ</p>
-                    <p class="text-xs text-gray-500 mt-1">JPEG, PNG, GIF, WebP（最大5MB）</p>
+                    <p class="text-xs text-gray-500 mt-1">JPEG, PNG, GIF, WebP（最大10MB）</p>
                   </div>
                   <!-- プレビューエリア -->
                   <div id="image-upload-preview" class="mt-3 hidden">
@@ -34974,10 +34967,10 @@ function handleImageDrop(event) {
 
 // 画像ファイルプレビュー
 function previewImageFile(file) {
-  // ファイルサイズチェック（5MB）
-  const maxSize = 5 * 1024 * 1024
+  // ファイルサイズチェック（10MB）
+  const maxSize = 10 * 1024 * 1024
   if (file.size > maxSize) {
-    alert('ファイルサイズが大きすぎます。5MB以下の画像を選択してください。')
+    alert('ファイルサイズが大きすぎます。10MB以下の画像を選択してください。')
     return
   }
   
@@ -35171,10 +35164,10 @@ function handleVideoDrop(event) {
 
 // 動画ファイルプレビュー
 function previewVideoFile(file) {
-  // ファイルサイズチェック（50MB）
-  const maxSize = 50 * 1024 * 1024
+  // ファイルサイズチェック（100MB）
+  const maxSize = 100 * 1024 * 1024
   if (file.size > maxSize) {
-    alert('ファイルサイズが大きすぎます。50MB以下の動画を選択してください。')
+    alert('ファイルサイズが大きすぎます。100MB以下の動画を選択してください。')
     return
   }
   
@@ -35896,7 +35889,8 @@ async function saveEditedImageOrig() {
   }, 'image/png', 0.9)
 }
 
-// 画像エディタを閉じる → 上で定義済み (closeImageEditor)
+// 画像エディタを閉じる（新版のcloseImageEditorを使用）
+// closeImageEditor is defined in the new Canvas image editor section
 
 // 複数ファイル一括アップロード
 async function uploadMultipleFiles(files, type = 'image') {
@@ -35990,6 +35984,7 @@ window.rotateImage = rotateImage
 window.scaleImage = scaleImage
 window.resetImageEditor = resetImageEditor
 window.saveEditedImage = saveEditedImage
+window.closeImageEditor = closeImageEditor
 window.uploadMultipleFiles = uploadMultipleFiles
 window.generateVideoThumbnail = generateVideoThumbnail
 
@@ -47465,7 +47460,6 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                           '<p class="text-xs text-gray-400"><i class="fas fa-cloud-upload-alt mr-1"></i>ドラッグ&ドロップでも追加OK</p>' +
                         '</div>'
                       })()}
-                      <div id="media-gallery-${card.card_id || card.id || 0}" class="mt-2"></div>
                       <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
                     </div>
                     ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
@@ -47545,7 +47539,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                             </div>
                             <div id="video-preview-${card.card_id || card.id || i}" class="mt-1 hidden"></div>
                           </div>
-                          <p class="text-[10px] text-gray-400">画像(JPEG/PNG/GIF/WebP,5MBまで) 動画(MP4/WebM/MOV,50MBまで)</p>
+                          <p class="text-[10px] text-gray-400">📎 画像(JPEG/PNG/GIF/WebP,10MBまで) 🎬 動画(MP4/WebM/MOV,100MBまで)</p>
                         </div>
                         <div class="border-t pt-2 mt-2">
                           <label class="text-xs font-bold text-purple-600">🤖 AI修正指示（自由入力→AIが修正）</label>
@@ -47859,13 +47853,6 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
     })
     // ガイドビューのドロップゾーンも初期化
     if (typeof initAllDropZones === 'function') initAllDropZones()
-    // ガイドビューの各カードのメディアギャラリーを読み込み
-    if (typeof loadMediaGallery === 'function') {
-      document.querySelectorAll('[id^="media-gallery-"]').forEach(el => {
-        const cid = el.id.replace('media-gallery-', '')
-        if (cid && cid !== '0') loadMediaGallery(cid)
-      })
-    }
   }, 300)
 }
 window.showPersonalizedCourseGuide = showPersonalizedCourseGuide
@@ -48041,7 +48028,7 @@ async function uploadMediaForCard(cardId, index, mediaType) {
   const id = cardId || index
   const isVideo = (mediaType === 'video')
   const accept = isVideo ? 'video/mp4,video/webm,video/ogg,video/quicktime' : 'image/jpeg,image/png,image/gif,image/webp'
-  const maxLabel = isVideo ? '50MB' : '5MB'
+  const maxLabel = isVideo ? '100MB' : '10MB'
   const inputElId = isVideo ? ('edit-video-' + id) : ('edit-image-' + id)
   const previewElId = isVideo ? ('video-preview-' + id) : ('image-preview-' + id)
   

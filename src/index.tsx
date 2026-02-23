@@ -13379,14 +13379,16 @@ app.post('/api/card/:cardId/media/upload', async (c) => {
     const maxSize = maxSizes[mediaType] || 50*1024*1024
     if (file.size > maxSize) {
       const limitMB = Math.round(maxSize / 1024 / 1024)
-      return c.json({ success: false, error: `ファイルサイズ上限: ${limitMB}MB（現在 ${(file.size/1024/1024).toFixed(1)}MB）` }, 400)
+      return c.json({ success: false, error: 'ファイルサイズ上限: ' + limitMB + 'MB（現在 ' + (file.size/1024/1024).toFixed(1) + 'MB）' }, 400)
     }
     
     const arrayBuffer = await file.arrayBuffer()
     let dataUrl = ''
     
+    // 画像(5MB以下): Base64 data URLとしてDB直接保存（最も確実）
+    // 動画/音声: R2にアップロード → URL保存（大容量ファイル対応）
     if (mediaType === 'image') {
-      // 画像: Base64 data URLとしてDB直接保存
+      // 画像はBase64でD1に直接保存
       const uint8Array = new Uint8Array(arrayBuffer)
       let binary = ''
       const chunkSize = 8192
@@ -13395,43 +13397,37 @@ app.post('/api/card/:cardId/media/upload', async (c) => {
         binary += String.fromCharCode(...chunk)
       }
       const base64 = btoa(binary)
-      dataUrl = `data:${file.type};base64,${base64}`
+      dataUrl = 'data:' + file.type + ';base64,' + base64
+      console.log('Image saved as Base64: ' + (file.size/1024/1024).toFixed(1) + 'MB')
     } else {
-      // 動画・音声: R2にアップロード → URLで参照
-      const timestamp = Date.now()
-      const randomStr = Math.random().toString(36).substring(2, 8)
-      const ext = (file.name || '').split('.').pop() || (mediaType === 'video' ? 'mp4' : 'mp3')
-      const folder = mediaType === 'video' ? 'videos' : 'audio'
-      const fileName = `${folder}/${timestamp}-${randomStr}.${ext}`
-      
-      try {
-        if (env.MEDIA_BUCKET) {
-          await env.MEDIA_BUCKET.put(fileName, arrayBuffer, {
-            httpMetadata: { contentType: file.type }
-          })
-          dataUrl = `/api/media/${fileName}`
-          console.log(`✅ R2アップロード成功: ${fileName} (${(file.size/1024/1024).toFixed(1)}MB)`)
-        } else {
-          throw new Error('R2 not available')
+      // 動画・音声はR2にアップロード
+      if (env.MEDIA_BUCKET) {
+        const timestamp = Date.now()
+        const randomStr = Math.random().toString(36).substring(2, 8)
+        const ext = (file.name || '').split('.').pop()?.toLowerCase() || (mediaType === 'video' ? 'mp4' : 'mp3')
+        const r2Key = (mediaType === 'video' ? 'videos' : 'audio') + '/' + timestamp + '-' + randomStr + '.' + ext
+        await env.MEDIA_BUCKET.put(r2Key, arrayBuffer, {
+          httpMetadata: { contentType: file.type }
+        })
+        dataUrl = '/api/media/' + r2Key
+        console.log('R2 upload success: ' + r2Key + ' (' + (file.size/1024/1024).toFixed(1) + 'MB)')
+      } else if (file.size <= 5 * 1024 * 1024) {
+        // R2が無い場合、5MB以下ならBase64にフォールバック
+        const uint8Array = new Uint8Array(arrayBuffer)
+        let binary = ''
+        const chunkSize = 8192
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+          const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+          binary += String.fromCharCode(...chunk)
         }
-      } catch (r2Err: any) {
-        // R2が使えない場合: 小さいファイルならBase64、大きいファイルはエラー
-        if (file.size <= 5 * 1024 * 1024) {
-          const uint8Array = new Uint8Array(arrayBuffer)
-          let binary = ''
-          const chunkSize = 8192
-          for (let i = 0; i < uint8Array.length; i += chunkSize) {
-            const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
-            binary += String.fromCharCode(...chunk)
-          }
-          dataUrl = `data:${file.type};base64,${btoa(binary)}`
-          console.warn(`⚠️ R2不可、Base64フォールバック: ${(file.size/1024).toFixed(0)}KB`)
-        } else {
-          return c.json({ 
-            success: false, 
-            error: `動画/音声ファイルが大きすぎます（${(file.size/1024/1024).toFixed(1)}MB）。5MB以下のファイルか、YouTubeなどのURLで追加してください。`
-          }, 400)
-        }
+        const base64 = btoa(binary)
+        dataUrl = 'data:' + file.type + ';base64,' + base64
+        console.log('Fallback Base64: ' + mediaType + ' ' + (file.size/1024/1024).toFixed(1) + 'MB')
+      } else {
+        return c.json({ 
+          success: false, 
+          error: 'R2ストレージが利用できません。5MB以下のファイルにするか、YouTube URLを使用してください。'
+        }, 500)
       }
     }
     
@@ -23084,22 +23080,25 @@ app.post('/api/upload/video', async (c) => {
       }, 400)
     }
     
-    // ファイルサイズチェック（100MB制限）
-    const maxSize = 100 * 1024 * 1024 // 100MB
+    // ファイルサイズチェック（50MB制限）
+    const maxSize = 50 * 1024 * 1024 // 50MB
     if (file.size > maxSize) {
       return c.json({ 
         success: false, 
-        error: 'ファイルサイズが大きすぎます。100MB以下の動画をアップロードしてください。' 
+        error: 'ファイルサイズが大きすぎます。50MB以下の動画をアップロードしてください。' 
       }, 400)
     }
     
     // ファイル名生成
     const timestamp = Date.now()
-    const randomStr = Math.random().toString(36).substring(7)
-    const extension = file.name.split('.').pop()
-    const fileName = `videos/${timestamp}-${randomStr}.${extension}`
+    const randomStr = Math.random().toString(36).substring(2, 8)
+    const extension = (file.name || '').split('.').pop() || 'mp4'
+    const fileName = 'videos/' + timestamp + '-' + randomStr + '.' + extension
     
     // R2にアップロード
+    if (!env.MEDIA_BUCKET) {
+      return c.json({ success: false, error: 'R2ストレージが設定されていません。動画はYouTubeのURLで追加してください。' }, 500)
+    }
     const arrayBuffer = await file.arrayBuffer()
     await env.MEDIA_BUCKET.put(fileName, arrayBuffer, {
       httpMetadata: {
@@ -23128,32 +23127,40 @@ app.post('/api/upload/video', async (c) => {
 })
 
 // R2からメディアファイル取得（プロキシ）
-app.get('/api/media/*', async (c) => {
+app.get('/api/media/files/*', async (c) => {
   const { env } = c
-  const fileName = c.req.param('*')
+  const rawPath = c.req.path
+  // /api/media/files/ 以降のパスを取得
+  const fileName = rawPath.replace('/api/media/files/', '')
+  
+  if (!fileName) {
+    return c.json({ error: 'ファイル名が指定されていません' }, 400)
+  }
   
   try {
     if (!env.MEDIA_BUCKET) {
-      return c.json({ error: 'R2 MEDIA_BUCKET not bound', key: fileName }, 500)
+      return c.json({ error: 'R2 MEDIA_BUCKET not bound. メディアストレージが設定されていません。' }, 500)
     }
     
     const object = await env.MEDIA_BUCKET.get(fileName)
     
     if (!object) {
-      // デバッグ: キーの先頭を確認
-      console.log(`⚠️ R2 object not found: key="${fileName}", url="${c.req.url}"`)
-      // ファイル名のみでも試す
-      const parts = fileName.split('/')
-      if (parts.length > 1) {
-        const altObject = await env.MEDIA_BUCKET.get(parts[parts.length - 1])
-        if (altObject) {
-          const headers = new Headers()
-          altObject.writeHttpMetadata(headers)
-          headers.set('Cache-Control', 'public, max-age=31536000')
-          return new Response(altObject.body, { headers })
+      console.log('R2 not found: key=' + fileName)
+      // ファイル名のみでフォールバック試行
+      if (fileName && fileName.includes('/')) {
+        const parts = fileName.split('/')
+        const baseName = parts[parts.length - 1] || ''
+        if (baseName) {
+          const altObject = await env.MEDIA_BUCKET.get(baseName)
+          if (altObject) {
+            const headers = new Headers()
+            altObject.writeHttpMetadata(headers)
+            headers.set('Cache-Control', 'public, max-age=31536000')
+            return new Response(altObject.body, { headers })
+          }
         }
       }
-      return c.json({ error: 'not_found', key: fileName, url: c.req.url }, 404)
+      return c.json({ error: 'not_found', key: fileName }, 404)
     }
     
     const headers = new Headers()
@@ -23163,22 +23170,80 @@ app.get('/api/media/*', async (c) => {
     
     return new Response(object.body, { headers })
   } catch (error: any) {
-    console.error('❌ メディア取得エラー:', error, { fileName, url: c.req.url })
-    return c.json({ error: error.message, key: fileName }, 500)
+    console.error('Media fetch error:', error.message)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
+// 旧パス互換: /api/media/* → /api/media/files/* へリダイレクト
+// ただし /api/media-library, /api/media/:mediaKey/tags 等は除外
+app.get('/api/media/*', async (c) => {
+  const { env } = c
+  const rawPath = c.req.path
+  // /api/media/ 以降を取得
+  const rest = rawPath.replace('/api/media/', '')
+  
+  if (!rest) {
+    return c.json({ error: 'ファイル名が指定されていません' }, 400)
+  }
+  
+  // 他のAPIルートへのリクエストは通さない（Honoのルート順序で先にマッチするはず）
+  
+  try {
+    if (!env.MEDIA_BUCKET) {
+      return c.json({ error: 'R2 MEDIA_BUCKET not bound' }, 500)
+    }
+    
+    const object = await env.MEDIA_BUCKET.get(rest)
+    
+    if (!object) {
+      // フォールバック: ファイル名のみで検索
+      if (rest && rest.includes('/')) {
+        const parts = rest.split('/')
+        const baseName = parts[parts.length - 1] || ''
+        if (baseName) {
+          const altObject = await env.MEDIA_BUCKET.get(baseName)
+          if (altObject) {
+            const headers = new Headers()
+            altObject.writeHttpMetadata(headers)
+            headers.set('Cache-Control', 'public, max-age=31536000')
+            return new Response(altObject.body, { headers })
+          }
+        }
+      }
+      return c.json({ error: 'not_found', key: rest }, 404)
+    }
+    
+    const headers = new Headers()
+    object.writeHttpMetadata(headers)
+    headers.set('etag', object.httpEtag)
+    headers.set('Cache-Control', 'public, max-age=31536000')
+    
+    return new Response(object.body, { headers })
+  } catch (error: any) {
+    console.error('Media fetch error:', error.message)
+    return c.json({ error: error.message }, 500)
   }
 })
 
 // R2からメディアファイル削除
 app.delete('/api/media/:fileName', async (c) => {
   const { env } = c
-  const fileName = c.req.param('fileName')
+  const fileName = c.req.param('fileName') || ''
+  
+  if (!fileName) {
+    return c.json({ success: false, error: 'ファイル名が指定されていません' }, 400)
+  }
   
   try {
+    if (!env.MEDIA_BUCKET) {
+      return c.json({ success: false, error: 'R2 MEDIA_BUCKET not bound' }, 500)
+    }
     await env.MEDIA_BUCKET.delete(fileName)
     
     return c.json({ success: true })
   } catch (error: any) {
-    console.error('❌ メディア削除エラー:', error)
+    console.error('Media delete error:', error.message)
     return c.json({ 
       success: false, 
       error: error.message 

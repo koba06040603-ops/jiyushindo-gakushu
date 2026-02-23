@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学習のてびき - 自由進度学習システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <style>
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(79,70,229,0.3); } 50% { box-shadow: 0 0 20px rgba(79,70,229,0.6); } }
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+        .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+        /* コース選択ハイライト */
+        .course-card { transition: all 0.3s ease; cursor: pointer; }
+        .course-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.15); }
+        .course-card.selected { ring: 4px; transform: scale(1.02); }
+
+        /* ローディング */
+        .loading-overlay {
+            position: fixed; inset: 0; background: rgba(255,255,255,0.95);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .spinner { width: 48px; height: 48px; border: 4px solid #e5e7eb; border-top-color: #6366f1;
+            border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 答え表示トグル */
+        .answer-hidden { display: none; }
+
+        /* 選択確認モーダル */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; display: flex; align-items: center; justify-content: center; }
+        .modal-content { background: white; border-radius: 1.5rem; padding: 2rem; max-width: 480px; width: 90%; box-shadow: 0 25px 60px rgba(0,0,0,0.3); }
+
+        /* 印刷用 */
+        @media print {
+            .no-print { display: none !important; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 768px) {
+            .course-grid { grid-template-columns: 1fr !important; }
+            .optional-grid { grid-template-columns: 1fr !important; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
+
+    <!-- ローディング -->
+    <div id="loadingScreen" class="loading-overlay">
+        <div class="spinner mb-4"></div>
+        <p class="text-gray-600 font-bold" id="loadingText">学習のてびきを読み込み中...</p>
+    </div>
+
+    <!-- ヘッダー（児童用） -->
+    <div id="studentHeader" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3 no-print sticky top-0 z-50 shadow-lg">
+        <div class="max-w-5xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-book-reader text-2xl"></i>
+                <div>
+                    <h1 class="text-lg font-bold">学習のてびき</h1>
+                    <p class="text-xs opacity-80" id="headerSubtitle">読み込み中…</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-sm bg-white/20 px-3 py-1 rounded-full" id="studentNameBadge">
+                    <i class="fas fa-user mr-1"></i><span id="studentNameDisplay">---</span>
+                </span>
+                <button onclick="handleLogout()" class="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full transition">
+                    <i class="fas fa-sign-out-alt mr-1"></i>ログアウト
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <div id="guideContent" class="container mx-auto px-4 py-8 max-w-5xl">
+        <!-- JS で動的に描画 -->
+    </div>
+
+    <!-- コース選択確認モーダル -->
+    <div id="courseConfirmModal" class="modal-overlay hidden">
+        <div class="modal-content fade-in">
+            <div class="text-center mb-6">
+                <div class="text-5xl mb-3" id="modalCourseIcon"></div>
+                <h3 class="text-2xl font-bold text-gray-800" id="modalCourseTitle"></h3>
+                <p class="text-gray-600 mt-1" id="modalCourseDesc"></p>
+            </div>
+            <div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6">
+                <p class="text-sm text-blue-800 font-bold text-center mb-2">
+                    <i class="fas fa-info-circle mr-1"></i>このコースをえらぶと…
+                </p>
+                <p class="text-sm text-gray-700 text-center" id="modalCourseDetail"></p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeCourseModal()" class="flex-1 py-3 border-2 border-gray-300 text-gray-600 rounded-xl font-bold hover:bg-gray-50 transition">
+                    <i class="fas fa-arrow-left mr-1"></i>もどる
+                </button>
+                <button onclick="confirmCourseSelection()" class="flex-1 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold hover:from-indigo-700 hover:to-purple-700 transition shadow-lg pulse-glow" id="modalConfirmBtn">
+                    <i class="fas fa-check mr-1"></i>このコースにする！
+                </button>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ========== 状態管理 ==========
+const STATE = {
+    studentId: null,
+    curriculumId: null,
+    curriculum: null,
+    courses: [],
+    courseSelectionProblems: [],
+    commonCheckTest: null,
+    optionalProblems: [],
+    selectedCourseId: null,
+    selectedCourseLevel: null,
+}
+
+// ========== URL パラメータ ==========
+const params = new URLSearchParams(window.location.search)
+STATE.curriculumId = params.get('curriculum_id') || '99001'
+STATE.studentId = params.get('student_id') || localStorage.getItem('user_id') || '1'
+
+// 生徒名表示
+const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
+const studentName = storedUser.name || storedUser.full_name || `生徒${STATE.studentId}`
+document.getElementById('studentNameDisplay').textContent = studentName
+
+// ========== ユーティリティ ==========
+function escapeHtml(str) {
+    if (!str) return ''
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function formatTextWithRuby(text) {
+    if (!text) return ''
+    return text.replace(/([一-龯々]+)（[ぁ-ん]+）/g, '$1')
+}
+
+function handleLogout() {
+    localStorage.removeItem('session_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('user_id')
+    localStorage.removeItem('user_role')
+    localStorage.removeItem('user_name')
+    window.location.href = '/login.html'
+}
+
+function toggleAnswer(problemNum) {
+    const el = document.getElementById(`answer-${problemNum}`)
+    if (!el) return
+    const answerEl = el.querySelector('.answer-text')
+    if (answerEl) answerEl.classList.toggle('hidden')
+}
+
+// ========== データ読み込み ==========
+async function loadGuideData() {
+    try {
+        // カリキュラム基本情報
+        const res = await axios.get(`/api/curriculum/${STATE.curriculumId}`)
+        STATE.curriculum = res.data.curriculum
+        STATE.courses = res.data.courses || []
+
+        // メタデータ（コース選択問題 + チェックテスト）
+        try {
+            const metaRes = await axios.get(`/api/curriculum/${STATE.curriculumId}/metadata`)
+            STATE.courseSelectionProblems = metaRes.data.course_selection_problems || []
+            STATE.commonCheckTest = metaRes.data.common_check_test || null
+        } catch (e) {
+            console.log('⚠️ メタデータなし')
+        }
+
+        // 選択問題
+        try {
+            const optRes = await axios.get(`/api/curriculum/${STATE.curriculumId}/optional-problems`)
+            STATE.optionalProblems = optRes.data.optional_problems || []
+        } catch (e) {
+            console.log('⚠️ 選択問題なし')
+        }
+
+        // 学習サポートコンテンツ
+        let learningSupportHtml = ''
+        try {
+            const lsRes = await axios.get(`/api/curriculum/${STATE.curriculumId}/retrieval-practice`)
+            learningSupportHtml = generateLearningSupportSection(lsRes.data.data)
+        } catch (e) {
+            learningSupportHtml = generateLearningSupportSection(null)
+        }
+
+        renderGuidePage(learningSupportHtml)
+    } catch (error) {
+        console.error('読み込みエラー:', error)
+        document.getElementById('guideContent').innerHTML = `
+            <div class="bg-white rounded-2xl shadow-xl p-8 text-center">
+                <i class="fas fa-exclamation-triangle text-5xl text-yellow-500 mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">読み込みに失敗しました</h2>
+                <p class="text-gray-600 mb-4">学習のてびきデータを取得できませんでした。</p>
+                <button onclick="location.reload()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-bold transition">
+                    <i class="fas fa-redo mr-2"></i>もう一度ためす
+                </button>
+            </div>`
+    } finally {
+        document.getElementById('loadingScreen').style.display = 'none'
+    }
+}
+
+// ========== カードアイテム描画ヘルパー ==========
+function renderCardItem(card, style) {
+    const hasHints = card.hints && card.hints.length > 0
+    const hasAnswer = card.answer || card.correct_answer
+
+    let hintsHtml = ''
+    if (hasHints) {
+        hintsHtml = '<div class="space-y-1">' +
+            card.hints.map(function(h, hi) {
+                return '<div class="bg-yellow-50 rounded p-2 text-xs text-gray-600 border-l-2 border-yellow-400">' +
+                    '<span class="font-bold text-yellow-700">ヒント' + (hi + 1) + ':</span> ' + escapeHtml(h.hint_content || h.hint_text || '') +
+                '</div>'
+            }).join('') +
+        '</div>'
+    }
+
+    let answerHtml = ''
+    if (hasAnswer) {
+        const answerText = escapeHtml(card.answer || card.correct_answer || '')
+        const explanationText = card.explanation || card.answer_explanation || ''
+        answerHtml = '<details>' +
+            '<summary class="text-xs text-green-600 cursor-pointer font-bold"><i class="fas fa-check-circle mr-1"></i>こたえを見る</summary>' +
+            '<div class="mt-1 bg-green-50 rounded-lg p-2 text-xs text-gray-700">' + answerText + '</div>' +
+            (explanationText ? '<div class="mt-1 bg-green-50 rounded-lg p-2 text-xs text-gray-600"><strong>解説:</strong> ' + escapeHtml(explanationText) + '</div>' : '') +
+        '</details>'
+    }
+
+    let problemHtml = ''
+    if (card.problem_text || card.problem_description) {
+        problemHtml = '<div class="bg-gray-50 rounded-lg p-3 text-xs text-gray-700 leading-relaxed">' +
+            '<p class="font-bold text-gray-800 mb-1"><i class="fas fa-question-circle mr-1"></i>問題</p>' +
+            escapeHtml(card.problem_text || card.problem_description || '').replace(/\n/g, '<br>') +
+        '</div>'
+    }
+
+    return '<div class="px-4 py-3">' +
+        '<div class="flex items-center gap-2 cursor-pointer" onclick="this.querySelector(\'.chevron-icon\').classList.toggle(\'rotate-90\'); this.nextElementSibling.classList.toggle(\'hidden\')">' +
+            '<i class="fas fa-chevron-right text-gray-400 text-xs chevron-icon transition-transform"></i>' +
+            '<span class="text-sm font-bold text-gray-700">カード' + (card.card_order || '') + '</span>' +
+            '<span class="text-xs text-gray-500 truncate flex-1">' + escapeHtml(card.card_title || '') + '</span>' +
+            (hasHints ? '<i class="fas fa-lightbulb text-yellow-400 text-xs" title="ヒントあり"></i>' : '') +
+            (hasAnswer ? '<i class="fas fa-check-circle text-green-400 text-xs" title="解答あり"></i>' : '') +
+        '</div>' +
+        '<div class="hidden mt-2 ml-5 space-y-2">' +
+            problemHtml + hintsHtml + answerHtml +
+        '</div>' +
+    '</div>'
+}
+
+// ========== ページ描画 ==========
+function renderGuidePage(learningSupportHtml) {
+    const c = STATE.curriculum
+    const courses = STATE.courses
+    const csp = STATE.courseSelectionProblems
+    const ct = STATE.commonCheckTest
+    const op = STATE.optionalProblems
+
+    // ヘッダー更新
+    document.getElementById('headerSubtitle').textContent = `${c.grade || ''} ${c.subject || ''} ${c.unit_name || ''}`
+
+    // コースカード色定義
+    const courseStyles = [
+        { border: 'border-green-500', bg: 'from-green-50 to-white', badge: 'bg-green-500', icon: 'text-green-600', light: 'border-green-200', mid: 'border-green-300' },
+        { border: 'border-blue-500', bg: 'from-blue-50 to-white', badge: 'bg-blue-500', icon: 'text-blue-600', light: 'border-blue-200', mid: 'border-blue-300' },
+        { border: 'border-purple-500', bg: 'from-purple-50 to-white', badge: 'bg-purple-500', icon: 'text-purple-600', light: 'border-purple-200', mid: 'border-purple-300' }
+    ]
+
+    // コース名マッピング
+    // コース名はDBから取得した実際の名前を使用（フォールバック用のみ定義）
+    const courseNameFallback = { basic: 'じっくりコース', standard: 'しっかりコース', advanced: 'ぐんぐんコース' }
+    const courseDescFallback = { basic: 'ゆっくりていねいに進める', standard: '教科書のペースでバランスよく', advanced: 'はやめに進んで発展問題に挑戦' }
+    const courseIcons = { basic: '🐢', standard: '🐕', advanced: '🐆' }
+    const levelMap = { basic: 'slow', standard: 'steady', advanced: 'fast' }
+
+    const html = `
+        <div class="bg-white rounded-2xl shadow-2xl p-8 fade-in">
+
+            <!-- タイトルセクション -->
+            <div class="text-center mb-6 border-b-4 border-indigo-600 pb-6">
+                <h1 class="text-4xl font-bold text-indigo-700 mb-3">学習のてびき</h1>
+                <div class="grid grid-cols-3 gap-4 text-sm mb-4">
+                    <div class="text-left">
+                        <span class="font-bold">学年：</span>${escapeHtml(c.grade)}年
+                    </div>
+                    <div class="text-center">
+                        <span class="font-bold">組：</span>____ 組
+                    </div>
+                    <div class="text-right">
+                        <span class="font-bold">名前：</span>${escapeHtml(studentName)}
+                    </div>
+                </div>
+                <h2 class="text-3xl font-bold text-gray-800">${escapeHtml(c.unit_name)}</h2>
+            </div>
+
+            <!-- 単元の目標 -->
+            <div class="mb-6">
+                <div class="bg-blue-100 border-l-4 border-blue-600 p-4 rounded-r-lg mb-3">
+                    <h3 class="text-xl font-bold text-blue-800 mb-2 flex items-center">
+                        <i class="fas fa-bullseye mr-2"></i>たんげんのもくひょう
+                    </h3>
+                    <p class="text-gray-800 leading-relaxed">${formatTextWithRuby(c.unit_goal || '')}</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-green-100 border-l-4 border-green-600 p-3 rounded-r-lg">
+                        <h4 class="text-sm font-bold text-green-800 mb-1">
+                            <i class="fas fa-heart mr-1"></i>こころのせいちょう
+                        </h4>
+                        <p class="text-sm text-gray-700">${escapeHtml(c.non_cognitive_goal || '')}</p>
+                    </div>
+                    <div class="bg-purple-100 border-l-4 border-purple-600 p-3 rounded-r-lg">
+                        <h4 class="text-sm font-bold text-purple-800 mb-1">
+                            <i class="fas fa-clock mr-1"></i>じゅぎょうじかん
+                        </h4>
+                        <p class="text-2xl font-bold text-purple-700">ぜんぶで ${c.total_hours || '?'} じかん</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- コースをえらぼう！ -->
+            <div class="mb-6">
+                <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                    <i class="fas fa-route mr-2 text-indigo-600"></i>
+                    コースをえらぼう！（3つのコースから1つえらんでね）
+                </h3>
+                <p class="text-center text-gray-600 mb-4 text-sm">
+                    それぞれのコースの とくちょうが わかる もんだいを しょうかいするよ！
+                </p>
+                <div class="grid grid-cols-3 gap-4 course-grid">
+                    ${courses.map((course, idx) => {
+                        const style = courseStyles[idx] || courseStyles[1]
+                        const problem = csp[idx] || { problem_title: `${course.course_name}の問題`, problem_content: course.description }
+                        const displayName = course.course_name || courseNameFallback[course.course_level] || 'コース'
+                        const displayDesc = course.description || course.course_label || courseDescFallback[course.course_level] || ''
+                        const levelKey = levelMap[course.course_level] || 'steady'
+                        const icon = courseIcons[course.course_level] || '📘'
+
+                        return `
+                        <div class="course-card border-4 ${style.border} bg-gradient-to-br ${style.bg} rounded-xl p-5 hover:shadow-2xl transition"
+                             id="courseCard-${idx}">
+                            <div class="text-center mb-4">
+                                <div class="inline-block px-4 py-1 ${style.badge} text-white rounded-full font-bold mb-2">
+                                    ${idx + 1}
+                                </div>
+                                <h4 class="text-xl font-bold text-gray-800">${icon} ${escapeHtml(displayName)}</h4>
+                                <p class="text-sm text-gray-600 font-medium">${escapeHtml(displayDesc)}</p>
+                            </div>
+
+                            <!-- コース選択問題 -->
+                            <div class="bg-white rounded-lg p-3 mb-3 border-2 ${style.light}">
+                                <p class="text-sm font-bold text-gray-800 mb-1">✨ ${escapeHtml(problem.problem_title)}</p>
+                                <p class="text-xs text-gray-700 leading-relaxed">${escapeHtml(problem.problem_content || problem.problem_description || '')}</p>
+                            </div>
+
+                            <!-- 導入問題 -->
+                            ${course.introduction_problem ? `
+                                <div class="bg-white rounded-lg p-3 border-2 ${style.mid} mb-3">
+                                    <div class="flex items-center mb-2">
+                                        <i class="fas fa-star ${style.icon} mr-2"></i>
+                                        <p class="text-sm font-bold text-gray-800">${escapeHtml(course.introduction_problem.problem_title)}</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded p-2 mb-2 border-l-4 ${style.border}">
+                                        <p class="text-xs text-gray-800 leading-relaxed whitespace-pre-wrap">${escapeHtml(course.introduction_problem.problem_content)}</p>
+                                    </div>
+                                    ${course.introduction_problem.answer ? `
+                                        <div class="bg-yellow-50 rounded p-2 border-l-4 border-yellow-400">
+                                            <p class="text-xs font-bold text-yellow-700 mb-1">
+                                                <i class="fas fa-lightbulb mr-1"></i>こたえのヒント
+                                            </p>
+                                            <p class="text-xs text-gray-700">${escapeHtml(course.introduction_problem.answer)}</p>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+
+                            <!-- 選択ボタン -->
+                            <button onclick="selectCourse(${idx}, '${levelKey}', ${course.id})"
+                                    class="w-full mt-2 py-3 ${style.badge} text-white rounded-lg font-bold text-sm hover:opacity-90 shadow-md transition pulse-glow">
+                                <i class="fas fa-hand-pointer mr-2"></i>このコースで学しゅうする
+                            </button>
+                        </div>`
+                    }).join('')}
+                </div>
+            </div>
+
+            <!-- 学習カード一覧（コースごと） -->
+            <div class="mb-6">
+                <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                    <i class="fas fa-layer-group mr-2 text-indigo-600"></i>
+                    学しゅうカード一らん（コースごとの学しゅう内容）
+                </h3>
+                <p class="text-center text-gray-600 mb-4 text-sm">
+                    それぞれのコースで学しゅうするカードの内容だよ。アコーディオンを開くとくわしく見られるよ！
+                </p>
+                ${courses.map((course, idx) => {
+                    const style = courseStyles[idx] || courseStyles[1]
+                    const displayName = course.course_name || courseNameFallback[course.course_level] || 'コース'
+                    const icon = courseIcons[course.course_level] || ''
+                    const cards = course.cards || []
+                    if (cards.length === 0) return ''
+                    return `
+                    <div class="mb-4 border-2 ${style.border} rounded-xl overflow-hidden">
+                        <div class="px-4 py-3 bg-gradient-to-r ${style.bg} flex items-center justify-between">
+                            <span class="text-base font-bold text-gray-800">${icon} ${escapeHtml(displayName)}</span>
+                            <span class="text-xs bg-white/80 text-gray-600 px-2 py-1 rounded-full">${cards.length}枚のカード</span>
+                        </div>
+                        <div class="divide-y bg-white">
+                            ${cards.map(card => renderCardItem(card, style)).join('')}
+                        </div>
+                    </div>`
+                }).join('')}
+            </div>
+
+            <!-- チェックテスト -->
+            <div class="mb-6">
+                <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                    <i class="fas fa-check-circle mr-2 text-yellow-600"></i>
+                    チェックテスト（学しゅうカードがおわったら、ちょうせんしよう！）
+                </h3>
+                <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-4">
+                    <p class="text-center text-gray-700 mb-3 font-bold">
+                        ⭐ どのコースも共通の基礎基本チェックテスト ⭐<br>
+                        学しゅうカードをぜんぶおわらせたら、チェックテストにちょうせんできます。<br>
+                        ごうかくすると、下の「えらべるもんだい」にすすめるよ！ 🎉
+                    </p>
+                    ${ct && ct.sample_problems && ct.sample_problems.length > 0 ? `
+                        <div class="bg-white rounded-xl p-4 mb-3">
+                            <h4 class="font-bold text-gray-800 text-center mb-3">
+                                📝 ${escapeHtml(ct.test_description || 'チェックテスト')}
+                            </h4>
+                            <p class="text-sm text-gray-600 text-center mb-4">
+                                ${escapeHtml(ct.test_note || '基礎基本を確認する問題です')}
+                            </p>
+                            <div class="space-y-3">
+                                ${ct.sample_problems.map((problem, index) => `
+                                    <div class="border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-white rounded-lg p-3">
+                                        <div class="flex items-start gap-3">
+                                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500 to-orange-600 text-white flex items-center justify-center font-bold flex-shrink-0">
+                                                ${problem.problem_number}
+                                            </div>
+                                            <div class="flex-1">
+                                                <p class="text-sm text-gray-800 mb-2">${escapeHtml(problem.problem_text)}</p>
+                                                <div id="answer-${problem.problem_number}">
+                                                    <button onclick="toggleAnswer(${problem.problem_number})"
+                                                            class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold transition">
+                                                        <i class="fas fa-eye mr-1"></i>答えを表示
+                                                    </button>
+                                                    <div class="hidden answer-text bg-yellow-100 rounded px-3 py-1 text-xs text-gray-600 mt-2">
+                                                        💡 こたえ: ${escapeHtml(problem.answer)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="text-center py-4 text-gray-500">
+                            <i class="fas fa-info-circle mr-1"></i>チェックテストはまだ作成されていません
+                        </div>
+                    `}
+                </div>
+            </div>
+
+            <!-- えらべるもんだい -->
+            <div class="mb-6">
+                <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-gray-300">
+                    <i class="fas fa-star mr-2 text-pink-600"></i>
+                    えらべるもんだい（チェックテストごうかく後、やりたいもんだいをえらぼう！）
+                </h3>
+                <p class="text-center text-gray-600 mb-4 text-sm">
+                    <i class="fas fa-heart mr-2 text-pink-500"></i>
+                    6つの はってん もんだいから、じぶんが やってみたい もんだいを えらべるよ！<br>
+                    どんな ちからが つくのか、かくにんして ちょうせんしよう！
+                </p>
+                ${op.length > 0 ? `
+                    <div class="grid grid-cols-2 gap-4 optional-grid">
+                        ${op.map((problem, index) => `
+                            <div class="border-2 border-pink-200 bg-gradient-to-br from-white to-pink-50 rounded-xl p-4 hover:shadow-lg transition">
+                                <div class="flex items-start mb-2">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center font-bold mr-3 flex-shrink-0">
+                                        ${problem.problem_number || index + 1}
+                                    </div>
+                                    <h4 class="text-base font-bold text-gray-800 flex-1">${escapeHtml(problem.problem_title)}</h4>
+                                </div>
+                                <p class="text-sm text-gray-700 mb-2 leading-relaxed">${escapeHtml(problem.problem_description || problem.problem_content || '')}</p>
+                                ${problem.learning_meaning ? `
+                                    <div class="bg-yellow-100 border-l-4 border-yellow-500 rounded-r-lg p-2 mb-2">
+                                        <p class="text-xs font-semibold text-gray-800 mb-1">
+                                            <i class="fas fa-lightbulb mr-1 text-yellow-600"></i>この もんだいで なにが できるようになる？
+                                        </p>
+                                        <p class="text-xs text-gray-700">${escapeHtml(problem.learning_meaning)}</p>
+                                    </div>
+                                ` : ''}
+                                <div class="flex items-center text-xs">
+                                    <span class="px-2 py-1 rounded-full ${
+                                        problem.difficulty_level === 'medium' ? 'bg-blue-100 text-blue-700' :
+                                        problem.difficulty_level === 'hard' ? 'bg-orange-100 text-orange-700' :
+                                        problem.difficulty_level === 'very_hard' ? 'bg-red-100 text-red-700' :
+                                        'bg-green-100 text-green-700'
+                                    }">
+                                        ${problem.difficulty_level === 'medium' ? '★★ ふつう' :
+                                          problem.difficulty_level === 'hard' ? '★★★ むずかしい' :
+                                          problem.difficulty_level === 'very_hard' ? '★★★★ とてもむずかしい' :
+                                          '★ かんたん'}
+                                    </span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : `
+                    <div class="text-center py-4 text-gray-500">
+                        <i class="fas fa-info-circle mr-1"></i>選択問題はまだ作成されていません
+                    </div>
+                `}
+            </div>
+
+            <!-- 学習サポート -->
+            ${learningSupportHtml}
+
+            <!-- コース選択アクション（画面下部 固定バー風） -->
+            <div class="border-t-4 border-indigo-600 pt-6 mt-8">
+                <div class="text-center mb-4">
+                    <h3 class="text-2xl font-bold text-indigo-700">
+                        <i class="fas fa-hand-point-up mr-2"></i>コースをえらんで学しゅうをはじめよう！
+                    </h3>
+                    <p class="text-gray-600 text-sm mt-1">上のコースカードの「このコースで学しゅうする」ボタンをおしてね</p>
+                </div>
+                <div class="grid grid-cols-3 gap-3 course-grid">
+                    ${courses.map((course, idx) => {
+                        const style = courseStyles[idx] || courseStyles[1]
+                        const displayName = course.course_name || courseNameFallback[course.course_level] || 'コース'
+                        const levelKey = levelMap[course.course_level] || 'steady'
+                        const icon = courseIcons[course.course_level] || '📘'
+                        return `
+                        <button onclick="selectCourse(${idx}, '${levelKey}', ${course.id})"
+                                class="py-4 ${style.badge} text-white rounded-xl font-bold text-lg hover:opacity-90 shadow-lg transition">
+                            ${icon} ${escapeHtml(displayName)}
+                        </button>`
+                    }).join('')}
+                </div>
+            </div>
+
+        </div>
+    `
+
+    document.getElementById('guideContent').innerHTML = html
+}
+
+// ========== 学習サポートセクション ==========
+function generateLearningSupportSection(data) {
+    const defaultFrequent = [
+        { problem_number: 1, problem_title: 'よく出る問題1', problem_content: '', hints: [] },
+        { problem_number: 2, problem_title: 'よく出る問題2', problem_content: '', hints: [] },
+        { problem_number: 3, problem_title: 'よく出る問題3', problem_content: '', hints: [] }
+    ]
+    const defaultApplication = [
+        { problem_number: 1, problem_title: '応用問題1', problem_content: '', hints: [] },
+        { problem_number: 2, problem_title: '応用問題2', problem_content: '', hints: [] },
+        { problem_number: 3, problem_title: '応用問題3', problem_content: '', hints: [] }
+    ]
+    const defaultChecklist = [
+        { item_number: 1, item_text: '基礎の確認', completed: false },
+        { item_number: 2, item_text: '計算の確認', completed: false },
+        { item_number: 3, item_text: '文章題の確認', completed: false }
+    ]
+
+    const freq = data?.frequent_problems || defaultFrequent
+    const app = data?.application_problems || defaultApplication
+    const checklist = data?.review_checklist || defaultChecklist
+
+    return `
+    <div class="mb-6 mt-8">
+        <h3 class="text-2xl font-bold text-center text-gray-800 mb-4 pb-2 border-b-2 border-indigo-300">
+            <i class="fas fa-hands-helping mr-2 text-indigo-600"></i>
+            学習サポート（テストじゅんび）
+        </h3>
+        <p class="text-center text-gray-600 mb-6 text-sm">
+            💡 テストの前に復習しよう！よく出る問題、応用問題、総復習チェックリストを用意したよ！
+        </p>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- よく出る問題 -->
+            <div class="border-4 border-red-400 bg-gradient-to-br from-red-50 to-white rounded-xl p-5">
+                <div class="text-center mb-4">
+                    <div class="inline-flex w-12 h-12 bg-red-500 text-white rounded-full font-bold text-xl items-center justify-center mb-2">10</div>
+                    <h4 class="text-xl font-bold text-gray-800">よく出る問題</h4>
+                    <p class="text-sm text-gray-600">テスト頻出パターン</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 border-2 border-red-200">
+                    <p class="text-sm font-bold text-gray-800 mb-2"><i class="fas fa-fire mr-2 text-red-600"></i>テストによく出る3つの問題</p>
+                    <div class="space-y-2">
+                        ${freq.slice(0, 3).map((p, i) => `
+                            <div class="text-xs bg-red-50 rounded p-2 border-l-2 border-red-400">
+                                <span class="font-bold">${i + 1}.</span> ${escapeHtml(p.problem_title)}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+            <!-- 応用問題 -->
+            <div class="border-4 border-blue-400 bg-gradient-to-br from-blue-50 to-white rounded-xl p-5">
+                <div class="text-center mb-4">
+                    <div class="inline-flex w-12 h-12 bg-blue-500 text-white rounded-full font-bold text-xl items-center justify-center mb-2">11</div>
+                    <h4 class="text-xl font-bold text-gray-800">応用問題</h4>
+                    <p class="text-sm text-gray-600">考える力をのばす</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 border-2 border-blue-200">
+                    <p class="text-sm font-bold text-gray-800 mb-2"><i class="fas fa-brain mr-2 text-blue-600"></i>チャレンジ問題</p>
+                    <div class="space-y-2">
+                        ${app.slice(0, 3).map((p, i) => `
+                            <div class="text-xs bg-blue-50 rounded p-2 border-l-2 border-blue-400">
+                                <span class="font-bold">${i + 1}.</span> ${escapeHtml(p.problem_title)}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+            <!-- 総復習チェックリスト -->
+            <div class="border-4 border-green-400 bg-gradient-to-br from-green-50 to-white rounded-xl p-5">
+                <div class="text-center mb-4">
+                    <div class="inline-flex w-12 h-12 bg-green-500 text-white rounded-full font-bold text-xl items-center justify-center mb-2">12</div>
+                    <h4 class="text-xl font-bold text-gray-800">総復習チェック</h4>
+                    <p class="text-sm text-gray-600">できるか確認しよう</p>
+                </div>
+                <div class="bg-white rounded-lg p-3 border-2 border-green-200">
+                    <div class="space-y-2">
+                        ${checklist.slice(0, 6).map((item, i) => `
+                            <label class="flex items-center gap-2 text-xs bg-green-50 rounded p-2 border-l-2 border-green-400 cursor-pointer">
+                                <input type="checkbox" class="rounded text-green-500">
+                                <span>${escapeHtml(item.item_text)}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`
+}
+
+// ========== コース選択 ==========
+function selectCourse(idx, levelKey, courseId) {
+    STATE.selectedCourseId = courseId
+    STATE.selectedCourseLevel = levelKey
+
+    const course = STATE.courses[idx]
+    const icons = { basic: '🐢', standard: '🐕', advanced: '🐆' }
+    const details = {
+        basic: '基本の学しゅうカードを1まいずつていねいに進めます。わからないところはヒントを使ってじっくり考えよう。',
+        standard: '教科書のペースに合わせて、基本問題と練習問題をバランスよく学びます。',
+        advanced: 'はやいペースで学しゅうカードを進めて、チェックテストの後はたくさんの発展問題にちょうせんできます。'
+    }
+
+    document.getElementById('modalCourseIcon').textContent = icons[course?.course_level] || '📘'
+    document.getElementById('modalCourseTitle').textContent = course?.course_name || 'コース'
+    document.getElementById('modalCourseDesc').textContent = course?.description || course?.course_label || ''
+    document.getElementById('modalCourseDetail').textContent = details[course?.course_level] || ''
+    document.getElementById('courseConfirmModal').classList.remove('hidden')
+}
+
+function closeCourseModal() {
+    document.getElementById('courseConfirmModal').classList.add('hidden')
+}
+
+function confirmCourseSelection() {
+    // student-home.html へ遷移（コース選択済み状態で）
+    const url = `/static/student-home.html?student_id=${STATE.studentId}&curriculum_id=${STATE.curriculumId}&course=${STATE.selectedCourseLevel}`
+    window.location.href = url
+}
+
+// ========== 起動 ==========
+loadGuideData()
+</script>
+</body>
+</html>

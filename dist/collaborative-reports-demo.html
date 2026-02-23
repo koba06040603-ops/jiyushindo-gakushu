@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>協働学習・レポート機能デモ - 自由進度学習支援システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-md sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <h1 class="text-2xl font-bold text-gray-800">
+                    <i class="fas fa-users mr-2 text-blue-600"></i>
+                    協働学習・レポート機能デモ
+                </h1>
+                <div class="flex items-center space-x-4">
+                    <select id="demo-student-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="1">児童1（田中太郎）</option>
+                        <option value="2">児童2（佐藤花子）</option>
+                        <option value="3">児童3（鈴木一郎）</option>
+                    </select>
+                    <a href="/" class="text-blue-600 hover:text-blue-800">
+                        <i class="fas fa-home"></i> ホームへ
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- タブナビゲーション -->
+        <div class="bg-white rounded-lg shadow-md mb-6">
+            <div class="flex border-b">
+                <button class="tab-btn px-6 py-4 font-semibold border-b-2 border-blue-600 text-blue-600" data-tab="collaborative">
+                    <i class="fas fa-users mr-2"></i>
+                    協働学習
+                </button>
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600 transition-colors" data-tab="weekly-reports">
+                    <i class="fas fa-chart-line mr-2"></i>
+                    週次レポート
+                </button>
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600 transition-colors" data-tab="monthly-reports">
+                    <i class="fas fa-calendar-alt mr-2"></i>
+                    月次レポート
+                </button>
+                <button class="tab-btn px-6 py-4 font-semibold text-gray-600 hover:text-blue-600 transition-colors" data-tab="sctn-trend">
+                    <i class="fas fa-chart-area mr-2"></i>
+                    ScTN経年変化
+                </button>
+            </div>
+        </div>
+
+        <!-- 協働学習タブ -->
+        <div id="tab-collaborative" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4">
+                            <i class="fas fa-comments text-blue-600 mr-2"></i>
+                            友達の回答
+                        </h2>
+                        <div class="mb-4">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                問題を選択
+                            </label>
+                            <select id="card-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="1">算数：分数のたし算</option>
+                                <option value="2">国語：物語文の読解</option>
+                                <option value="3">理科：植物の成長</option>
+                                <option value="4">社会：日本の地理</option>
+                            </select>
+                        </div>
+                        <div id="peer-answers-container" class="min-h-[400px]">
+                            <!-- 友達の回答がここに表示されます -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">
+                            <i class="fas fa-chart-pie text-purple-600 mr-2"></i>
+                            協働学習統計
+                        </h3>
+                        <div id="collaboration-stats">
+                            <!-- 統計がここに表示されます -->
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">
+                            <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                            使い方
+                        </h3>
+                        <ul class="space-y-2 text-sm text-gray-700">
+                            <li>
+                                <i class="fas fa-check text-green-600 mr-2"></i>
+                                問題を選んで友達の回答を見る
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-600 mr-2"></i>
+                                役に立った回答にマークする
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-600 mr-2"></i>
+                                友達の回答を評価する
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-600 mr-2"></i>
+                                他の解き方を学ぶ
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 週次レポートタブ -->
+        <div id="tab-weekly-reports" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-chart-line text-green-600 mr-2"></i>
+                        週次レポート
+                    </h2>
+                    <button id="btn-generate-weekly" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        今週のレポートを作成
+                    </button>
+                </div>
+                <div id="weekly-reports-container">
+                    <!-- 週次レポート一覧がここに表示されます -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 月次レポートタブ -->
+        <div id="tab-monthly-reports" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-calendar-alt text-purple-600 mr-2"></i>
+                        月次レポート
+                    </h2>
+                    <button id="btn-generate-monthly" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-plus mr-2"></i>
+                        今月のレポートを作成
+                    </button>
+                </div>
+                <div id="monthly-reports-container">
+                    <!-- 月次レポート一覧がここに表示されます -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ScTN経年変化タブ -->
+        <div id="tab-sctn-trend" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">
+                        <i class="fas fa-chart-area text-blue-600 mr-2"></i>
+                        ScTNスコア経年変化
+                    </h2>
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            表示期間
+                        </label>
+                        <select id="sctn-months-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="3">直近3ヶ月</option>
+                            <option value="6">直近6ヶ月</option>
+                            <option value="12" selected>直近12ヶ月</option>
+                        </select>
+                    </div>
+                    <div style="height: 400px;">
+                        <canvas id="sctn-trend-chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">
+                        <i class="fas fa-chart-line text-purple-600 mr-2"></i>
+                        習熟度推移
+                    </h2>
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            表示期間
+                        </label>
+                        <select id="mastery-days-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="7">直近7日間</option>
+                            <option value="14">直近14日間</option>
+                            <option value="30" selected>直近30日間</option>
+                            <option value="90">直近90日間</option>
+                        </select>
+                    </div>
+                    <div style="height: 400px;">
+                        <canvas id="mastery-trend-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">
+                    <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+                    グラフの見方
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                    <div>
+                        <h4 class="font-semibold mb-2">ScTNスコアについて</h4>
+                        <ul class="space-y-1">
+                            <li><span class="text-blue-600 font-semibold">メタ認知：</span>自分の学習を振り返る力</li>
+                            <li><span class="text-green-600 font-semibold">自己調整：</span>計画的に学習する力</li>
+                            <li><span class="text-orange-600 font-semibold">動機づけ：</span>学習への意欲</li>
+                            <li><span class="text-pink-600 font-semibold">協働学習：</span>友達と学ぶ力</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold mb-2">習熟度について</h4>
+                        <ul class="space-y-1">
+                            <li><span class="text-purple-600 font-semibold">習熟度：</span>0.0〜1.0の範囲で表示</li>
+                            <li><span class="text-green-600 font-semibold">正答率：</span>復習時の正解割合</li>
+                            <li>習熟度が高いほど長期記憶に定着</li>
+                            <li>定期的な復習で習熟度を維持</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 評価モーダルの表示エリア -->
+    <div id="evaluation-modal"></div>
+
+    <!-- スクリプト -->
+    <script src="/static/collaborative-learning-ui.js"></script>
+    <script src="/static/learning-reports-ui.js"></script>
+    <script>
+        // グローバルインスタンス
+        let collaborativeLearningUI
+        let learningReportsUI
+        let currentStudentId = 1
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            // インスタンスを作成
+            collaborativeLearningUI = new CollaborativeLearningUI({
+                studentId: currentStudentId,
+                classCode: 'CLASS001'
+            })
+            
+            learningReportsUI = new LearningReportsUI({
+                studentId: currentStudentId
+            })
+
+            // タブ切り替え
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tabName = btn.dataset.tab
+                    switchTab(tabName)
+                })
+            })
+
+            // 生徒切り替え
+            document.getElementById('demo-student-select').addEventListener('change', (e) => {
+                currentStudentId = parseInt(e.target.value)
+                collaborativeLearningUI.studentId = currentStudentId
+                learningReportsUI.studentId = currentStudentId
+                
+                // 現在のタブを再読み込み
+                const activeTab = document.querySelector('.tab-btn.border-blue-600')
+                if (activeTab) {
+                    switchTab(activeTab.dataset.tab)
+                }
+            })
+
+            // 問題選択
+            document.getElementById('card-select').addEventListener('change', (e) => {
+                const cardId = parseInt(e.target.value)
+                collaborativeLearningUI.loadPeerAnswers(cardId)
+            })
+
+            // レポート生成ボタン
+            document.getElementById('btn-generate-weekly').addEventListener('click', () => {
+                learningReportsUI.generateCurrentWeekReport()
+            })
+
+            document.getElementById('btn-generate-monthly').addEventListener('click', () => {
+                learningReportsUI.generateCurrentMonthReport()
+            })
+
+            // ScTN期間選択
+            document.getElementById('sctn-months-select').addEventListener('change', (e) => {
+                const months = parseInt(e.target.value)
+                learningReportsUI.renderScTNTrendChart('sctn-trend-chart', months)
+            })
+
+            // 習熟度期間選択
+            document.getElementById('mastery-days-select').addEventListener('change', (e) => {
+                const days = parseInt(e.target.value)
+                learningReportsUI.renderMasteryTrendChart('mastery-trend-chart', days)
+            })
+
+            // 初期表示
+            collaborativeLearningUI.loadPeerAnswers(1)
+            collaborativeLearningUI.renderStats()
+        })
+
+        // タブ切り替え関数
+        function switchTab(tabName) {
+            // タブボタンのアクティブ状態を更新
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                if (btn.dataset.tab === tabName) {
+                    btn.classList.add('border-blue-600', 'text-blue-600')
+                    btn.classList.remove('text-gray-600')
+                } else {
+                    btn.classList.remove('border-blue-600', 'text-blue-600')
+                    btn.classList.add('text-gray-600')
+                }
+            })
+
+            // タブコンテンツの表示を切り替え
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden')
+            })
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden')
+
+            // タブごとの初期化処理
+            if (tabName === 'collaborative') {
+                collaborativeLearningUI.loadPeerAnswers(parseInt(document.getElementById('card-select').value))
+                collaborativeLearningUI.renderStats()
+            } else if (tabName === 'weekly-reports') {
+                learningReportsUI.renderWeeklyReports()
+            } else if (tabName === 'monthly-reports') {
+                learningReportsUI.renderMonthlyReports()
+            } else if (tabName === 'sctn-trend') {
+                learningReportsUI.renderScTNTrendChart('sctn-trend-chart', 12)
+                learningReportsUI.renderMasteryTrendChart('mastery-trend-chart', 30)
+            }
+        }
+    </script>
+</body>
+</html>
