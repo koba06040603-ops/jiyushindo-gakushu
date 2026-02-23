@@ -5692,27 +5692,43 @@ async function loadCardPage(cardId) {
                 <div class="mt-4 text-center" id="card-image-container-${card.card_id || card.id || 0}">
                   <img src="${card.problem_image_url}" alt="${card._image_description || '問題の図'}" 
                        class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
-                       onerror="this.parentElement.innerHTML='<div class=\\'bg-yellow-50 border-2 border-yellow-200 rounded-lg p-5 text-center\\'><i class=\\'fas fa-image text-4xl text-yellow-400 mb-3 block\\'></i><p class=\\'text-sm text-yellow-800 font-bold mb-2\\'>画像を読み込めませんでした</p><button onclick=\\'generateImageForCard(${card.card_id || card.id || 0}, \\\"${(card._image_description || card.card_title || '').replace(/"/g, '').replace(/'/g, '')}\\\"  )\\' class=\\'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm\\' ><i class=\\'fas fa-magic mr-1\\'></i>AIで図を再生成</button></div>'">
+                       onerror="this.parentElement.innerHTML='<div class=\\'bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-5 text-center shadow-sm\\'><div class=\\'inline-flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mb-3\\'><i class=\\'fas fa-image text-3xl text-yellow-500\\'></i></div><p class=\\'text-sm text-yellow-800 font-bold mb-3\\'>画像を読み込めませんでした</p><div class=\\'flex flex-col sm:flex-row gap-3 justify-center\\'><button onclick=\\'generateImageForCard(${card.card_id || card.id || 0}, \\\"${(card._image_description || card.card_title || '').replace(/"/g, '').replace(/'/g, '')}\\\")\\'  class=\\'inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-xl font-bold text-base transition shadow-lg\\'><i class=\\'fas fa-magic text-lg\\'></i>AIで図を再生成</button><button onclick=\\'editCardImageUrl(${card.card_id || card.id || 0}, \\\"problem\\\")\\'  class=\\'inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-base transition shadow-lg\\'><i class=\\'fas fa-upload text-lg\\'></i>画像をアップロード</button></div></div>'">
                   <p class="text-xs text-gray-500 mt-2"><i class="fas fa-image mr-1"></i>${card._image_description || '問題の図'}</p>
                 </div>
               ` : (() => {
                 // イラスト説明があるが画像がない場合のプレースホルダー + AI生成ボタン
-                const imgDesc = card._image_description || ''
+                const rawImgDesc = card._image_description || ''
+                // プレースホルダー的なテキストを除外（実際の図の説明のみ表示）
+                const isPlaceholderText = /用意されていません|まだありません|画像を追加|図が必要です|必要ですが/.test(rawImgDesc)
+                const imgDesc = isPlaceholderText ? '' : rawImgDesc
                 const problemText = card.problem_content || card.problem_text || ''
-                const hasIllustrationRef = imgDesc || /イラスト|図|時計|グラフ|表を見|絵を見/.test(problemText)
+                const cardTitle = card.card_title || ''
+                // 全ての学習カードに図を追加できるよう、常にプレースホルダーを表示
+                // （教科書を使わずカードだけで学習できるようにするため）
                 const cardIdVal = card.card_id || card.id || 0
-                if (!hasIllustrationRef) return ''
-                return `<div class="mt-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg p-5 text-center" id="image-placeholder-${cardIdVal}">
-                  <i class="fas fa-image text-4xl text-yellow-400 mb-3 block"></i>
-                  <p class="text-sm text-yellow-800 font-bold mb-1">${imgDesc || 'この問題には図やイラストが必要です'}</p>
-                  <p class="text-xs text-gray-500 mb-3">先生に「画像を追加」してもらうか、AIで自動生成できます。</p>
-                  <div class="flex flex-col sm:flex-row gap-2 justify-center">
-                    <button onclick="generateImageForCard(${cardIdVal}, '${(imgDesc || card.card_title || '').replace(/'/g, "\\'")}')"
-                            class="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow-lg">
-                      <i class="fas fa-magic"></i>AIで図を生成
-                    </button>
-                    ${state.auth?.role === 'teacher' ? '<button onclick="editCardImageUrl(' + cardIdVal + ', \\'problem\\')" class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition shadow"><i class="fas fa-upload"></i>画像を追加</button>' : ''}
+                // AI生成用の説明文を作成
+                const aiDesc = imgDesc || cardTitle || (card.unit_name || '') + ' ' + (problemText || '').substring(0, 50)
+                return `<div class="mt-4 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-5 text-center shadow-sm" id="image-placeholder-${cardIdVal}">
+                  <div class="mb-3">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mb-2">
+                      <i class="fas fa-image text-3xl text-yellow-500"></i>
+                    </div>
+                    ${imgDesc ? '<p class="text-sm text-gray-700 font-bold mb-1"><i class="fas fa-info-circle text-blue-500 mr-1"></i>' + imgDesc + '</p>' : ''}
+                    <p class="text-sm text-yellow-800 font-bold">${imgDesc ? 'この図をAIで生成できます！' : 'この問題の図をAIで自動生成できます！'}</p>
                   </div>
+                  <div class="flex flex-col sm:flex-row gap-3 justify-center mb-3">
+                    <button onclick="generateImageForCard(${cardIdVal}, '${aiDesc.replace(/'/g, "\\'").replace(/\n/g, ' ').substring(0, 100)}')"
+                            class="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-xl font-bold text-base transition shadow-lg transform hover:scale-105">
+                      <i class="fas fa-magic text-lg"></i>
+                      <span>AIで図を自動生成</span>
+                    </button>
+                    <button onclick="editCardImageUrl(${cardIdVal}, 'problem')"
+                            class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-base transition shadow-lg transform hover:scale-105">
+                      <i class="fas fa-upload text-lg"></i>
+                      <span>画像をアップロード</span>
+                    </button>
+                  </div>
+                  <p class="text-xs text-gray-500"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>AIが問題に合った図を自動で作成します。先生が画像を直接アップロードすることもできます。</p>
                 </div>`
               })()}
               
