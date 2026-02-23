@@ -5703,32 +5703,128 @@ async function loadCardPage(cardId) {
                 const imgDesc = isPlaceholderText ? '' : rawImgDesc
                 const problemText = card.problem_content || card.problem_text || ''
                 const cardTitle = card.card_title || ''
-                // 全ての学習カードに図を追加できるよう、常にプレースホルダーを表示
-                // （教科書を使わずカードだけで学習できるようにするため）
                 const cardIdVal = card.card_id || card.id || 0
-                // AI生成用の説明文を作成
-                const aiDesc = imgDesc || cardTitle || (card.unit_name || '') + ' ' + (problemText || '').substring(0, 50)
-                return `<div class="mt-4 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-5 text-center shadow-sm" id="image-placeholder-${cardIdVal}">
-                  <div class="mb-3">
-                    <div class="inline-flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mb-2">
-                      <i class="fas fa-image text-3xl text-yellow-500"></i>
+                const subject = card.subject || ''
+                const unitName = card.unit_name || ''
+                
+                // --- スマートAI生成プロンプトを問題内容から自動構築 ---
+                const smartPromptParts = []
+                if (imgDesc) {
+                  smartPromptParts.push(imgDesc)
+                } else {
+                  // 問題文のキーワードから最適な図の種類を推定
+                  const pt = (problemText + ' ' + cardTitle + ' ' + unitName).toLowerCase()
+                  if (/折れ線グラフ|折れ線/.test(pt)) smartPromptParts.push('折れ線グラフ')
+                  else if (/棒グラフ/.test(pt)) smartPromptParts.push('棒グラフ')
+                  else if (/円グラフ/.test(pt)) smartPromptParts.push('円グラフ')
+                  else if (/表を見|表を読/.test(pt)) smartPromptParts.push('データ表')
+                  else if (/数直線/.test(pt)) smartPromptParts.push('数直線')
+                  else if (/地図|都道府県|地形/.test(pt)) smartPromptParts.push('地図・地理図')
+                  else if (/図形|三角|四角|平行|台形|ひし形|円/.test(pt)) smartPromptParts.push('図形の説明図')
+                  else if (/面積|体積|展開図/.test(pt)) smartPromptParts.push('面積・体積の図解')
+                  else if (/角度|分度器/.test(pt)) smartPromptParts.push('角度の図')
+                  else if (/時計|時刻|時間/.test(pt)) smartPromptParts.push('時計の図')
+                  else if (/温度|気温|天気/.test(pt)) smartPromptParts.push('気温・天気の図')
+                  else if (/比例|反比例/.test(pt)) smartPromptParts.push('比例のグラフ')
+                  else if (/分数/.test(pt)) smartPromptParts.push('分数の図解')
+                  else if (/小数/.test(pt)) smartPromptParts.push('小数の図解')
+                  else if (/植物|花|葉|茎|根/.test(pt)) smartPromptParts.push('植物の観察図')
+                  else if (/昆虫|虫|動物/.test(pt)) smartPromptParts.push('生物の図鑑イラスト')
+                  else if (/天体|月|星|太陽/.test(pt)) smartPromptParts.push('天体の図')
+                  else if (/電気|回路|磁石/.test(pt)) smartPromptParts.push('回路・実験の図')
+                  else if (/漢字/.test(pt)) smartPromptParts.push('漢字の書き順イラスト')
+                  else smartPromptParts.push(cardTitle || unitName || '学習内容の図解')
+                  
+                  // 文脈を追加
+                  if (cardTitle && !smartPromptParts[0].includes(cardTitle.substring(0, 10))) {
+                    smartPromptParts.push(cardTitle.substring(0, 30))
+                  }
+                }
+                const aiDesc = smartPromptParts.join(' - ').replace(/'/g, '').replace(/\n/g, ' ').substring(0, 120)
+                
+                // 図の種類を推定してアイコンを選択
+                const ptLower = (problemText + cardTitle).toLowerCase()
+                let placeholderIcon = 'fa-image'
+                let placeholderColor = 'yellow'
+                if (/グラフ|表/.test(ptLower)) { placeholderIcon = 'fa-chart-line'; placeholderColor = 'blue' }
+                else if (/図形|面積|体積/.test(ptLower)) { placeholderIcon = 'fa-shapes'; placeholderColor = 'green' }
+                else if (/地図|都道府県/.test(ptLower)) { placeholderIcon = 'fa-map-marked-alt'; placeholderColor = 'indigo' }
+                else if (/植物|動物|昆虫/.test(ptLower)) { placeholderIcon = 'fa-leaf'; placeholderColor = 'emerald' }
+                else if (/天体|月|星/.test(ptLower)) { placeholderIcon = 'fa-moon'; placeholderColor = 'purple' }
+                else if (/電気|回路/.test(ptLower)) { placeholderIcon = 'fa-bolt'; placeholderColor = 'amber' }
+                
+                const bgGradient = placeholderColor === 'blue' ? 'from-blue-50 to-indigo-50' :
+                                   placeholderColor === 'green' ? 'from-green-50 to-emerald-50' :
+                                   placeholderColor === 'indigo' ? 'from-indigo-50 to-purple-50' :
+                                   placeholderColor === 'purple' ? 'from-purple-50 to-pink-50' :
+                                   placeholderColor === 'amber' ? 'from-amber-50 to-yellow-50' :
+                                   'from-yellow-50 to-orange-50'
+                const borderColor = placeholderColor === 'blue' ? 'border-blue-300' :
+                                    placeholderColor === 'green' ? 'border-green-300' :
+                                    placeholderColor === 'indigo' ? 'border-indigo-300' :
+                                    placeholderColor === 'purple' ? 'border-purple-300' :
+                                    placeholderColor === 'amber' ? 'border-amber-300' :
+                                    'border-yellow-300'
+                const iconBg = placeholderColor === 'blue' ? 'bg-blue-100 text-blue-500' :
+                               placeholderColor === 'green' ? 'bg-green-100 text-green-500' :
+                               placeholderColor === 'indigo' ? 'bg-indigo-100 text-indigo-500' :
+                               placeholderColor === 'purple' ? 'bg-purple-100 text-purple-500' :
+                               placeholderColor === 'amber' ? 'bg-amber-100 text-amber-500' :
+                               'bg-yellow-100 text-yellow-500'
+                
+                return `<div class="mt-4 bg-gradient-to-br ${bgGradient} border-2 ${borderColor} rounded-2xl p-6 text-center shadow-md relative overflow-hidden" id="image-placeholder-${cardIdVal}">
+                  <!-- 背景装飾 -->
+                  <div class="absolute top-0 right-0 w-32 h-32 opacity-5">
+                    <i class="fas ${placeholderIcon}" style="font-size: 8rem;"></i>
+                  </div>
+                  
+                  <div class="relative z-10">
+                    <!-- アイコンとメッセージ -->
+                    <div class="mb-4">
+                      <div class="inline-flex items-center justify-center w-20 h-20 ${iconBg} rounded-full mb-3 shadow-inner">
+                        <i class="fas ${placeholderIcon} text-4xl"></i>
+                      </div>
+                      ${imgDesc ? '<p class="text-base text-gray-800 font-bold mb-2"><i class="fas fa-info-circle text-blue-500 mr-1"></i>' + imgDesc + '</p>' : ''}
+                      <p class="text-base font-bold text-gray-700 mb-1">${imgDesc ? 'この図をすぐに追加できます！' : 'この問題に合った図を追加しましょう！'}</p>
+                      <p class="text-sm text-gray-500">AI自動生成 or 先生が画像を挿入</p>
                     </div>
-                    ${imgDesc ? '<p class="text-sm text-gray-700 font-bold mb-1"><i class="fas fa-info-circle text-blue-500 mr-1"></i>' + imgDesc + '</p>' : ''}
-                    <p class="text-sm text-yellow-800 font-bold">${imgDesc ? 'この図をAIで生成できます！' : 'この問題の図をAIで自動生成できます！'}</p>
+                    
+                    <!-- メインアクションボタン -->
+                    <div class="flex flex-col gap-3 max-w-sm mx-auto mb-4">
+                      <button onclick="generateImageForCard(${cardIdVal}, '${aiDesc.replace(/'/g, "").replace(/\n/g, ' ')}')"
+                              class="group relative flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 hover:from-purple-600 hover:via-pink-600 hover:to-rose-600 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 hover:-translate-y-0.5"
+                              style="animation: pulse 2s infinite;">
+                        <i class="fas fa-wand-magic-sparkles text-xl group-hover:animate-spin"></i>
+                        <span>AIで図を自動生成</span>
+                        <i class="fas fa-arrow-right text-sm opacity-70 group-hover:translate-x-1 transition-transform"></i>
+                      </button>
+                      
+                      <div class="flex gap-2">
+                        <button onclick="editCardImageUrl(${cardIdVal}, 'problem')"
+                                class="flex-1 flex items-center justify-center gap-2 bg-white hover:bg-blue-50 text-blue-600 border-2 border-blue-300 hover:border-blue-400 px-4 py-3 rounded-xl font-bold text-sm transition-all shadow-sm hover:shadow-md">
+                          <i class="fas fa-upload"></i>
+                          <span>画像アップロード</span>
+                        </button>
+                        <button onclick="quickPasteImageUrl(${cardIdVal})"
+                                class="flex-1 flex items-center justify-center gap-2 bg-white hover:bg-green-50 text-green-600 border-2 border-green-300 hover:border-green-400 px-4 py-3 rounded-xl font-bold text-sm transition-all shadow-sm hover:shadow-md">
+                          <i class="fas fa-paste"></i>
+                          <span>URL貼り付け</span>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <!-- AI生成の説明 -->
+                    <div class="bg-white bg-opacity-70 rounded-xl p-3 text-left max-w-sm mx-auto">
+                      <p class="text-xs text-gray-600 flex items-start gap-2">
+                        <i class="fas fa-robot text-purple-500 mt-0.5 flex-shrink-0"></i>
+                        <span><strong>AI自動生成：</strong>ボタンを押すと「<em class="text-purple-700">${aiDesc.substring(0, 40)}</em>」の図をAIが自動で描きます</span>
+                      </p>
+                      <p class="text-xs text-gray-600 flex items-start gap-2 mt-1">
+                        <i class="fas fa-chalkboard-teacher text-blue-500 mt-0.5 flex-shrink-0"></i>
+                        <span><strong>先生が挿入：</strong>画像アップロードやURL貼り付けで自分の図を追加できます</span>
+                      </p>
+                    </div>
                   </div>
-                  <div class="flex flex-col sm:flex-row gap-3 justify-center mb-3">
-                    <button onclick="generateImageForCard(${cardIdVal}, '${aiDesc.replace(/'/g, "\\'").replace(/\n/g, ' ').substring(0, 100)}')"
-                            class="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-xl font-bold text-base transition shadow-lg transform hover:scale-105">
-                      <i class="fas fa-magic text-lg"></i>
-                      <span>AIで図を自動生成</span>
-                    </button>
-                    <button onclick="editCardImageUrl(${cardIdVal}, 'problem')"
-                            class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-base transition shadow-lg transform hover:scale-105">
-                      <i class="fas fa-upload text-lg"></i>
-                      <span>画像をアップロード</span>
-                    </button>
-                  </div>
-                  <p class="text-xs text-gray-500"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>AIが問題に合った図を自動で作成します。先生が画像を直接アップロードすることもできます。</p>
                 </div>`
               })()}
               
@@ -7482,9 +7578,21 @@ if (!document.getElementById('tactile-widget-styles')) {
       60% { transform: scale(1.2); }
       100% { transform: scale(1); opacity: 1; }
     }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4); }
+      50% { opacity: 0.92; box-shadow: 0 4px 25px rgba(168, 85, 247, 0.7); }
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
     .blocks-area > div { transition: transform 0.15s ease; }
     .blocks-area > div:hover { transform: scale(1.15); }
     input[type="range"].thermo-slider { cursor: pointer; }
+    .ai-generate-btn-shimmer {
+      background-size: 200% auto;
+      animation: shimmer 3s linear infinite;
+    }
   `
   document.head.appendChild(style)
 }
@@ -29629,8 +29737,61 @@ async function editCardImageUrl(cardId, imageType) {
 window.editCardImageUrl = editCardImageUrl
 
 // ============================================
-// 学習スタイル別サンプルページ（プレゼン用サンプル）
+// 画像URL貼り付けクイック挿入（教師向け）
 // ============================================
+async function quickPasteImageUrl(cardId) {
+  const url = prompt('画像のURLを貼り付けてください：\n\n例：\nhttps://example.com/image.png\nhttps://drive.google.com/...\n\n※ Google画像検索やWebサイトで右クリック→「画像のURLをコピー」で取得できます')
+  if (!url || !url.trim()) return
+  
+  const trimmedUrl = url.trim()
+  
+  // 簡易バリデーション
+  if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+    alert('URLは http:// または https:// で始まる必要があります')
+    return
+  }
+  
+  try {
+    // プレースホルダーを読み込み中表示に変更
+    const placeholder = document.getElementById('image-placeholder-' + cardId)
+    if (placeholder) {
+      placeholder.innerHTML = `
+        <div class="p-6 text-center">
+          <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-3"></div>
+          <p class="text-blue-700 font-bold">画像を保存中...</p>
+        </div>
+      `
+    }
+    
+    // APIで保存
+    await axios.put('/api/card/' + cardId, {
+      problem_image_url: trimmedUrl
+    })
+    
+    // プレースホルダーを画像に置き換え
+    if (placeholder) {
+      placeholder.innerHTML = `
+        <div class="text-center">
+          <img src="${trimmedUrl}" alt="問題の図" 
+               class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
+               onerror="this.parentElement.innerHTML='<p class=\\'text-red-500 font-bold p-4\\'>画像を読み込めませんでした。URLを確認してください。</p><button onclick=\\'quickPasteImageUrl(${cardId})\\' class=\\'bg-blue-500 text-white px-4 py-2 rounded-lg font-bold mt-2\\'>別のURLを試す</button>'">
+          <div class="mt-2 flex items-center justify-center gap-2">
+            <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold"><i class="fas fa-check-circle mr-1"></i>保存しました</span>
+            <button onclick="quickPasteImageUrl(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline">変更</button>
+          </div>
+        </div>
+      `
+    }
+  } catch (error) {
+    console.error('画像URL保存エラー:', error)
+    alert('画像URLの保存に失敗しました。もう一度試してください。')
+    // プレースホルダーを元に戻す
+    if (typeof showCard === 'function') {
+      showCard(state.currentCardIndex || 0)
+    }
+  }
+}
+window.quickPasteImageUrl = quickPasteImageUrl
 function showLearningStyleSamples() {
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -45518,7 +45679,19 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       </div>
                     </div>
                     <div class="bg-white rounded-lg p-3 mb-2 border">
-                      ${card.problem_image_url ? '<div class="mb-2" id="guide-img-' + (card.card_id || card.id || i) + '"><img src="' + card.problem_image_url + '" class="max-h-48 rounded border mx-auto" onerror="this.parentElement.innerHTML=\'<div class=\\\'bg-yellow-50 border border-yellow-200 rounded p-3 text-center text-xs\\\'><i class=\\\'fas fa-image text-yellow-400 text-2xl mb-1 block\\\'></i><p class=\\\'text-yellow-700 mb-2\\\'>画像を読み込めません</p><button onclick=\\\'generateImageForCard(' + (card.card_id || card.id || 0) + ', \\\"' + ((card._image_description || card.card_title || '').replace(/"/g, '').replace(/\\/g, '').substring(0, 50)) + '\\\")\\\' class=\\\'bg-purple-500 text-white px-3 py-1 rounded-lg text-xs font-bold\\\'><i class=\\\'fas fa-magic mr-1\\\'></i>AIで再生成</button></div>\'"></div>' : (mm.image_description ? '<div class="mb-2 bg-yellow-50 border border-yellow-200 rounded p-3 text-center" id="guide-img-' + (card.card_id || card.id || i) + '"><i class="fas fa-image text-yellow-400 text-2xl mb-1 block"></i><p class="text-xs text-yellow-700 mb-2">' + mm.image_description + '</p><button onclick="generateImageForCard(' + (card.card_id || card.id || 0) + ', \'' + mm.image_description.replace(/'/g, '').substring(0, 50) + '\')" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fas fa-magic mr-1"></i>AIで図を生成</button></div>' : '')}
+                      ${card.problem_image_url ? '<div class="mb-2" id="guide-img-' + (card.card_id || card.id || i) + '"><img src="' + card.problem_image_url + '" class="max-h-48 rounded border mx-auto" onerror="this.parentElement.innerHTML=\'<div class=\\\'bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center\\\'><i class=\\\'fas fa-image text-yellow-400 text-2xl mb-1 block\\\'></i><p class=\\\'text-yellow-700 text-xs mb-2\\\'>画像を読み込めません</p><div class=\\\'flex gap-2 justify-center\\\'><button onclick=\\\'generateImageForCard(' + (card.card_id || card.id || 0) + ', \\\"' + ((card._image_description || card.card_title || '').replace(/"/g, '').replace(/\\/g, '').substring(0, 50)) + '\\\")\\\' class=\\\'bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold\\\'><i class=\\\'fas fa-magic mr-1\\\'></i>AI再生成</button><button onclick=\\\'quickPasteImageUrl(' + (card.card_id || card.id || 0) + ')\\\' class=\\\'bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold\\\'><i class=\\\'fas fa-paste mr-1\\\'></i>URL貼付</button></div></div>\'"></div>' : (() => {
+                        const cId = card.card_id || card.id || 0
+                        const desc = (mm.image_description || card.card_title || card.unit_name || '').replace(/'/g, '').replace(/"/g, '').substring(0, 60)
+                        return '<div class="mb-3 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-dashed border-yellow-300 rounded-xl p-4 text-center" id="guide-img-' + cId + '">' +
+                          '<div class="inline-flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full mb-2"><i class="fas fa-image text-2xl text-yellow-500"></i></div>' +
+                          (mm.image_description ? '<p class="text-xs text-gray-600 mb-2"><i class="fas fa-info-circle text-blue-400 mr-1"></i>' + mm.image_description + '</p>' : '<p class="text-xs text-gray-500 mb-2">図を追加して学習効果UP!</p>') +
+                          '<div class="flex flex-wrap gap-2 justify-center">' +
+                            '<button onclick="generateImageForCard(' + cId + ', \'' + desc + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:shadow-md transition"><i class="fas fa-wand-magic-sparkles"></i>AI生成</button>' +
+                            '<button onclick="editCardImageUrl(' + cId + ', \'problem\')" class="inline-flex items-center gap-1 bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:shadow-md transition"><i class="fas fa-upload"></i>アップロード</button>' +
+                            '<button onclick="quickPasteImageUrl(' + cId + ')" class="inline-flex items-center gap-1 bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:shadow-md transition"><i class="fas fa-paste"></i>URL貼付</button>' +
+                          '</div>' +
+                        '</div>'
+                      })()}
                       <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
                     </div>
                     ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
@@ -45911,7 +46084,6 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
       }
     })
   }, 300)
-  }
 }
 window.showPersonalizedCourseGuide = showPersonalizedCourseGuide
 
