@@ -5499,6 +5499,9 @@ async function loadCardPage(cardId) {
       console.log('学年情報を設定:', window.aiDetectedGrade)
     }
     
+    // problem_contentがJSON形式の場合パースしてカードデータを補完
+    parseProblemContentJSON(card)
+    
     // ローカルストレージから保存されたフォントサイズを取得
     const savedFontSize = localStorage.getItem('customFontSize')
     const fontSize = savedFontSize ? JSON.parse(savedFontSize) : defaultFontSize
@@ -5639,21 +5642,65 @@ async function loadCardPage(cardId) {
                   <p class="text-sm text-indigo-800">${card.real_world_context}</p>
                 </div>
               ` : ''}
-              <div class="bg-gray-50 rounded-lg p-6">
-                <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">${formatText(card.problem_content || card.problem_text || card.problem_description || '')}</pre>
+              
+              <!-- もんだい：問題文（problem_textを優先、なければproblem_contentのパース済みテキスト） -->
+              <div class="bg-pink-50 border-l-4 border-pink-400 rounded-lg p-5 mb-4">
+                <p class="text-sm font-bold text-pink-600 mb-2"><i class="fas fa-question-circle mr-1"></i>もんだい：</p>
+                <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans leading-relaxed text-lg">${formatText(card.problem_text || card.problem_content || card.problem_description || '')}</pre>
               </div>
+              
+              <!-- 問題の説明（problem_descriptionがproblem_textと異なる場合） -->
+              ${(card.problem_description && card.problem_description !== card.problem_text && card.problem_description !== card.problem_content) ? `
+                <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                  <pre class="card-content text-gray-700 whitespace-pre-wrap font-sans leading-relaxed">${formatText(card.problem_description)}</pre>
+                </div>
+              ` : ''}
+              
+              <!-- 動画ボタン（NHK for School / YouTube） -->
+              ${(() => {
+                const vUrl = card.solution_video_url || ''
+                const ytTitle = card._youtube_title || ''
+                if (vUrl.includes('youtube.com/results') || vUrl.includes('nhk.or.jp')) {
+                  const displayTitle = ytTitle || (card.card_title || '').replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 30)
+                  return '<div class="mb-4"><a href="' + vUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-xl font-bold transition shadow-sm text-sm"><i class="fas fa-play-circle"></i>▶ ' + displayTitle + ' を見る</a></div>'
+                }
+                return ''
+              })()}
+              
+              <!-- きいてみよう（音声読み上げ） -->
+              ${card._audio_instruction ? `
+                <div class="bg-green-50 border-l-3 border-green-400 p-3 rounded mb-4 flex items-center gap-3 cursor-pointer hover:bg-green-100 transition"
+                     onclick="readCardAloud()">
+                  <i class="fas fa-volume-up text-green-600 text-lg"></i>
+                  <div>
+                    <span class="font-bold text-green-800 text-sm">🔊 きいてみよう：</span>
+                    <span class="text-green-700 text-sm">${card._audio_instruction}</span>
+                  </div>
+                </div>
+              ` : ''}
+              
+              <!-- 図の説明 -->
+              ${card._image_description ? `
+                <div class="bg-blue-50 border-l-3 border-blue-400 p-3 rounded mb-4 flex items-center gap-3">
+                  <i class="fas fa-image text-blue-500"></i>
+                  <span class="text-blue-800 text-sm"><strong>🖼 図：</strong>${card._image_description}</span>
+                </div>
+              ` : ''}
               
               <!-- 問題画像 -->
               ${card.problem_image_url ? `
                 <div class="mt-4 text-center">
-                  <img src="${card.problem_image_url}" alt="問題の図" class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;">
-                  <p class="text-xs text-gray-500 mt-2"><i class="fas fa-image mr-1"></i>問題の図</p>
+                  <img src="${card.problem_image_url}" alt="${card._image_description || '問題の図'}" 
+                       class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
+                       onerror="this.parentElement.innerHTML='<div class=\\'bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 text-center\\'><i class=\\'fas fa-image text-3xl text-yellow-400 mb-2 block\\'></i><p class=\\'text-sm text-yellow-700\\'>画像を読み込めませんでした</p></div>'">
+                  <p class="text-xs text-gray-500 mt-2"><i class="fas fa-image mr-1"></i>${card._image_description || '問題の図'}</p>
                 </div>
               ` : (() => {
                 // イラスト説明があるが画像がない場合のプレースホルダー
+                const imgDesc = card._image_description || ''
                 const problemText = card.problem_content || card.problem_text || ''
-                const hasIllustrationRef = /イラスト|図|時計|グラフ|表を見|絵を見/.test(problemText)
-                return hasIllustrationRef ? '<div class="mt-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 text-center"><i class="fas fa-image text-3xl text-yellow-400 mb-2 block"></i><p class="text-sm text-yellow-700">この問題には図やイラストが必要ですが、まだ用意されていません。</p><p class="text-xs text-gray-500 mt-1">先生に「画像を追加」してもらうことで図が表示されます。</p></div>' : ''
+                const hasIllustrationRef = imgDesc || /イラスト|図|時計|グラフ|表を見|絵を見/.test(problemText)
+                return hasIllustrationRef ? '<div class="mt-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 text-center"><i class="fas fa-image text-3xl text-yellow-400 mb-2 block"></i><p class="text-sm text-yellow-700">' + (imgDesc || 'この問題には図やイラストが必要ですが、まだ用意されていません。') + '</p><p class="text-xs text-gray-500 mt-1">先生に「画像を追加」してもらうことで図が表示されます。</p></div>' : ''
               })()}
               
               <!-- 動画コンテンツ（YouTube / NHK for School） -->
@@ -6441,6 +6488,23 @@ function updateAIMessage(messageId, newMessage) {
     aiChat.scrollTop = aiChat.scrollHeight
   }
 }
+
+// 問題文をゆっくり読み上げる
+function readCardAloud() {
+  const card = state.selectedCard
+  if (!card) {
+    console.warn('readCardAloud: カードが選択されていません')
+    return
+  }
+  const text = card.problem_text || card.problem_content || card.problem_description || ''
+  if (!text) {
+    console.warn('readCardAloud: 読み上げるテキストがありません')
+    return
+  }
+  // ゆっくり読み上げ（速度0.8）
+  speakText(text, 'female-friendly', 0.8)
+}
+window.readCardAloud = readCardAloud
 
 // 音声合成（テキスト読み上げ）
 async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
@@ -10017,6 +10081,113 @@ function formatMathNotation(text) {
 }
 
 // テキストをフォーマット（ふりがな削除 + 数式変換）
+// problem_contentがJSON形式の場合にパースしてカードデータを補完する
+// JSON文字列からテキストを抽出するグローバルヘルパー
+function extractTextFromJSON(str) {
+  if (!str || typeof str !== 'string') return str || ''
+  const trimmed = str.trim()
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (parsed.content) return parsed.content
+      // contentがなければ、他のテキストフィールドを探す
+      if (parsed.text) return parsed.text
+      if (parsed.problem_text) return parsed.problem_text
+    } catch(e) {}
+  }
+  return str
+}
+
+// カード全体のJSON問題データをパースして各フィールドに展開
+function parseCardContentFull(card) {
+  if (!card) return
+  // problem_content, problem_description, problem_textを全てクリーンアップ
+  const fields = ['problem_content', 'problem_description', 'problem_text']
+  let bestMM = null
+  let bestPNote = ''
+  let bestQFormat = ''
+  
+  for (const field of fields) {
+    const val = card[field]
+    if (val && typeof val === 'string' && val.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(val.trim())
+        if (parsed.content) card[field] = parsed.content
+        if (parsed.multimedia && !bestMM) bestMM = parsed.multimedia
+        if (parsed.personalization_note && !bestPNote) bestPNote = parsed.personalization_note
+        if (parsed.question_format && !bestQFormat) bestQFormat = parsed.question_format
+      } catch(e) {}
+    }
+  }
+  
+  // multimedia情報を_ prefixed フィールドに設定
+  if (bestMM) {
+    if (bestMM.youtube_url && !card.solution_video_url) card.solution_video_url = bestMM.youtube_url
+    if (bestMM.youtube_title) card._youtube_title = bestMM.youtube_title
+    if (bestMM.image_description) card._image_description = bestMM.image_description
+    if (bestMM.audio_instruction) card._audio_instruction = bestMM.audio_instruction
+    if (bestMM.tactile_activity) card._tactile_activity = bestMM.tactile_activity
+  }
+  if (bestPNote) card._personalization_note = bestPNote
+  if (bestQFormat) card._question_format = bestQFormat
+}
+
+function parseProblemContentJSON(card) {
+  if (!card) return
+  const pc = card.problem_content || ''
+  // JSON形式かどうかチェック（{で始まる）
+  if (pc.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(pc)
+      // contentテキストをproblem_contentに上書き（生JSONの代わりに）
+      if (parsed.content) {
+        card.problem_content = parsed.content
+      }
+      // multimedia情報を抽出
+      if (parsed.multimedia) {
+        const mm = parsed.multimedia
+        // YouTube/NHK動画URLが未設定なら補完
+        if (mm.youtube_url && !card.solution_video_url) {
+          card.solution_video_url = mm.youtube_url
+        }
+        // YouTube動画タイトルを保存
+        if (mm.youtube_title) {
+          card._youtube_title = mm.youtube_title
+        }
+        // イラスト説明を保存
+        if (mm.image_description) {
+          card._image_description = mm.image_description
+        }
+        // 音声読み上げ指示を保存
+        if (mm.audio_instruction) {
+          card._audio_instruction = mm.audio_instruction
+        }
+      }
+      // 個人最適化メモ
+      if (parsed.personalization_note) {
+        card._personalization_note = parsed.personalization_note
+      }
+      // 回答形式
+      if (parsed.question_format) {
+        card._question_format = parsed.question_format
+      }
+    } catch (e) {
+      // JSONパース失敗時はそのまま（テキストとして扱う）
+      console.warn('problem_content JSON parse failed:', e)
+    }
+  }
+  // problem_descriptionも同様にチェック
+  const pd = card.problem_description || ''
+  if (pd.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(pd)
+      if (parsed.content) {
+        card.problem_description = parsed.content
+      }
+    } catch (e) {}
+  }
+}
+
 function formatText(text) {
   if (!text) return ''
   
@@ -15923,6 +16094,9 @@ function showCardDetail(card) {
   if (!card.id && card.card_id) card.id = card.card_id
   if (!card.card_id && card.id) card.card_id = card.id
   
+  // problem_contentがJSON形式の場合パースして補完
+  parseProblemContentJSON(card)
+  
   // カード情報を state に保存
   state.selectedCard = card
   
@@ -16858,6 +17032,11 @@ function showTeacherOverview(unitData) {
   const optionalProblems = unitData.optional_problems || []
   const courseSelectionProblems = unitData.course_selection_problems || []
   const commonCheckTest = unitData.common_check_test || null
+  
+  // 全カードのJSON問題データをパース
+  courses.forEach(course => {
+    (course.cards || []).forEach(card => parseCardContentFull(card))
+  })
   
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -42545,17 +42724,21 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
     
     // マルチメディア解析ヘルパー
     function parseMultimedia(card) {
+      // まずカード全体のJSONフィールドをパース
+      parseCardContentFull(card)
       let mm = {}
-      let pNote = ''
-      let qFormat = ''
-      try { 
-        if (card.problem_content && card.problem_content.startsWith('{')) {
-          const pc = JSON.parse(card.problem_content)
-          mm = pc?.multimedia || {}
-          pNote = pc?.personalization_note || ''
-          qFormat = pc?.question_format || ''
+      let pNote = card._personalization_note || ''
+      let qFormat = card._question_format || ''
+      // _prefixedフィールドからmm構造を作成
+      if (card._youtube_title || card._image_description || card._audio_instruction || card._tactile_activity) {
+        mm = {
+          youtube_url: card.solution_video_url || '',
+          youtube_title: card._youtube_title || '',
+          image_description: card._image_description || '',
+          audio_instruction: card._audio_instruction || '',
+          tactile_activity: card._tactile_activity || ''
         }
-      } catch(e) {}
+      }
       return { mm, pNote, qFormat }
     }
     function getYoutubeId(url) {
@@ -42638,7 +42821,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                     </div>
                     <div class="bg-white rounded-lg p-3 mb-2 border">
                       ${card.problem_image_url ? '<div class="mb-2"><img src="' + card.problem_image_url + '" class="max-h-48 rounded border mx-auto" onerror="this.style.display=\'none\'"></div>' : ''}
-                      <p class="text-sm text-gray-800">${card.problem_text || card.problem_description || ''}</p>
+                      <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
                     </div>
                     ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
                     ${tactile ? '<div class="bg-yellow-50 border-l-3 border-yellow-400 p-2 rounded text-xs mb-2"><strong>✋ やってみよう:</strong> ' + tactile + '</div>' : ''}

@@ -3324,9 +3324,51 @@ app.get('/api/curriculum/:id', async (c) => {
             }
             
             // 解答は learning_cards テーブル自体に correct_answer / explanation がある
+            // problem_content/problem_descriptionがJSON形式の場合、テキストを抽出
+            let parsedProblemText = card.problem_text || ''
+            let videoUrl = card.solution_video_url || ''
+            let youtubeTitle = ''
+            let imageDescription = ''
+            let audioInstruction = ''
+            let tactileActivity = ''
+            let personalizationNote = ''
+            let questionFormat = ''
+            
+            const fieldsToCheck = ['problem_content', 'problem_description']
+            for (const field of fieldsToCheck) {
+              const val = card[field]
+              if (val && typeof val === 'string' && val.trim().startsWith('{')) {
+                try {
+                  const parsed = JSON.parse(val.trim())
+                  if (parsed.content) {
+                    card[field] = parsed.content
+                    if (!parsedProblemText) parsedProblemText = parsed.content
+                  }
+                  if (parsed.multimedia) {
+                    const mm = parsed.multimedia
+                    if (mm.youtube_url && !videoUrl) videoUrl = mm.youtube_url
+                    if (mm.youtube_title) youtubeTitle = mm.youtube_title
+                    if (mm.image_description) imageDescription = mm.image_description
+                    if (mm.audio_instruction) audioInstruction = mm.audio_instruction
+                    if (mm.tactile_activity) tactileActivity = mm.tactile_activity
+                  }
+                  if (parsed.personalization_note) personalizationNote = parsed.personalization_note
+                  if (parsed.question_format) questionFormat = parsed.question_format
+                } catch (e) {}
+              }
+            }
+            
             return {
               ...card,
               id: cardId,  // フロントエンド互換: id = card_id
+              problem_text: parsedProblemText || card.problem_text || '',
+              solution_video_url: videoUrl,
+              _youtube_title: youtubeTitle,
+              _image_description: imageDescription,
+              _audio_instruction: audioInstruction,
+              _tactile_activity: tactileActivity,
+              _personalization_note: personalizationNote,
+              _question_format: questionFormat,
               hints: hints.results || [],
               answer: card.correct_answer || '',
               answer_explanation: card.explanation || '',
@@ -3496,11 +3538,21 @@ app.get('/api/courses/:courseId/cards', async (c) => {
       ORDER BY card_number
     `).bind(courseId).all()
     
-    // card_id を id としてもアクセスできるようにマッピング
-    const mappedCards = (cards.results || []).map((card: any) => ({
-      ...card,
-      id: card.card_id || card.id
-    }))
+    // card_id を id としてもアクセスできるようにマッピング + JSONパース
+    const mappedCards = (cards.results || []).map((card: any) => {
+      const c2 = { ...card, id: card.card_id || card.id }
+      // problem_content/problem_descriptionがJSON形式の場合テキスト抽出
+      for (const field of ['problem_content', 'problem_description']) {
+        const val = c2[field]
+        if (val && typeof val === 'string' && val.trim().startsWith('{')) {
+          try {
+            const parsed = JSON.parse(val.trim())
+            if (parsed.content) c2[field] = parsed.content
+          } catch (e) {}
+        }
+      }
+      return c2
+    })
     
     return c.json(mappedCards)
   } catch (error) {
@@ -3524,8 +3576,43 @@ app.get('/api/cards/:cardId', async (c) => {
       SELECT * FROM answers WHERE learning_card_id = ?
     `).bind(cardId).first()
     
+    // カードデータのJSON問題文をパース
+    if (card) {
+      const cardAny = card as any
+      const fieldsToCheck = ['problem_content', 'problem_description', 'problem_text']
+      let videoUrl = cardAny.solution_video_url || ''
+      let youtubeTitle = ''
+      let imageDescription = ''
+      let audioInstruction = ''
+      let tactileActivity = ''
+      
+      for (const field of fieldsToCheck) {
+        const val = cardAny[field]
+        if (val && typeof val === 'string' && val.trim().startsWith('{')) {
+          try {
+            const parsed = JSON.parse(val.trim())
+            if (parsed.content) cardAny[field] = parsed.content
+            if (parsed.multimedia) {
+              const mm = parsed.multimedia
+              if (mm.youtube_url && !videoUrl) videoUrl = mm.youtube_url
+              if (mm.youtube_title) youtubeTitle = mm.youtube_title
+              if (mm.image_description) imageDescription = mm.image_description
+              if (mm.audio_instruction) audioInstruction = mm.audio_instruction
+              if (mm.tactile_activity) tactileActivity = mm.tactile_activity
+            }
+          } catch (e) {}
+        }
+      }
+      
+      return c.json({
+        card: { ...cardAny, id: cardAny.card_id || cardAny.id, solution_video_url: videoUrl, _youtube_title: youtubeTitle, _image_description: imageDescription, _audio_instruction: audioInstruction, _tactile_activity: tactileActivity },
+        hints: hints.results,
+        answer
+      })
+    }
+    
     return c.json({
-      card: card ? { ...card as any, id: (card as any).card_id || (card as any).id } : card,
+      card: card ? { ...(card as any), id: (card as any).card_id || (card as any).id } : card,
       hints: hints.results,
       answer
     })
