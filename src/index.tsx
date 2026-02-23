@@ -22539,18 +22539,18 @@ app.post('/api/ai/generate-image', async (c) => {
         // SVGを抽出
         const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i)
         if (svgMatch) {
-          // SVGをR2にアップロード
-          const svgBytes = new TextEncoder().encode(svgMatch[0])
-          const svgFileName = `images/svg-${Date.now()}-${Math.random().toString(36).substring(7)}.svg`
-          let svgUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMatch[0])))
+          // SVGをBase64 data URLとして直接使用（R2不要）
+          const svgUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMatch[0])))
           
-          try {
-            await env.MEDIA_BUCKET.put(svgFileName, svgBytes.buffer, {
-              httpMetadata: { contentType: 'image/svg+xml' }
-            })
-            svgUrl = `/api/media/${svgFileName}`
-          } catch (r2Err: any) {
-            console.warn('⚠️ SVG R2アップロード失敗:', r2Err.message)
+          // カードIDがあればDBに保存
+          if (card_id) {
+            try {
+              await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
+                .bind(svgUrl, Number(card_id)).run()
+              console.log(`✅ SVG画像をカード ${card_id} に保存`)
+            } catch (dbErr: any) {
+              console.warn('⚠️ SVG DB保存失敗:', dbErr.message)
+            }
           }
           
           const generationTime = Date.now() - startTime
@@ -22579,31 +22579,20 @@ app.post('/api/ai/generate-image', async (c) => {
       return c.json({ success: false, error: '画像が生成されませんでした' }, 500)
     }
     
-    // Base64画像をR2にアップロードしてから永続URLを返す
+    // Base64画像をdata URLとして直接使用（R2不要・確実に動作）
     const imageBase64 = generatedImages[0].bytesBase64Encoded
     const mimeType = generatedImages[0].mimeType || 'image/png'
+    const imageUrl = `data:${mimeType};base64,${imageBase64}`
     
-    // Base64をバイナリに変換
-    const binaryStr = atob(imageBase64)
-    const bytes = new Uint8Array(binaryStr.length)
-    for (let i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i)
-    }
-    
-    // R2にアップロード
-    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg'
-    const aiFileName = `images/ai-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
-    let imageUrl = `data:${mimeType};base64,${imageBase64}` // フォールバック
-    
-    try {
-      await env.MEDIA_BUCKET.put(aiFileName, bytes.buffer, {
-        httpMetadata: { contentType: mimeType }
-      })
-      imageUrl = `/api/media/${aiFileName}`
-      console.log(`✅ AI画像をR2にアップロード: ${aiFileName}`)
-    } catch (r2Err: any) {
-      console.warn('⚠️ R2アップロード失敗（data URLを使用）:', r2Err.message)
-      // フォールバック: data URLのまま返す
+    // カードIDがあればDBに保存
+    if (card_id) {
+      try {
+        await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
+          .bind(imageUrl, Number(card_id)).run()
+        console.log(`✅ AI画像をカード ${card_id} に保存`)
+      } catch (dbErr: any) {
+        console.warn('⚠️ AI画像DB保存失敗:', dbErr.message)
+      }
     }
     
     const generationTime = Date.now() - startTime
@@ -22741,10 +22730,11 @@ app.post('/api/cards/:cardId/edit-history', async (c) => {
 })
 
 // =============================================================================
-// Phase 14: ファイルアップロード機能（Cloudflare R2）
+// Phase 14: ファイルアップロード機能（Base64 D1直接保存 - R2不要）
 // =============================================================================
 
 // 画像ファイルアップロード（JPG/PNG/GIF/WebP/PDF対応）
+// 画像はBase64 data URLとしてD1データベースに直接保存（R2バインディング問題を回避）
 app.post('/api/upload/image', async (c) => {
   const { env } = c
   
@@ -22766,51 +22756,28 @@ app.post('/api/upload/image', async (c) => {
       }, 400)
     }
     
-    // ファイルサイズチェック（20MB制限 - PDFは大きい場合がある）
-    const maxSize = 20 * 1024 * 1024
+    // ファイルサイズチェック（5MB制限 - Base64化するとD1に保存するため）
+    const maxSize = 5 * 1024 * 1024
     if (file.size > maxSize) {
       return c.json({ 
         success: false, 
-        error: 'ファイルサイズが大きすぎます。20MB以下のファイルをアップロードしてください。' 
+        error: 'ファイルサイズが大きすぎます。5MB以下のファイルをアップロードしてください。' 
       }, 400)
     }
     
-    // ファイル名生成（タイムスタンプ + ランダム文字列）
-    const timestamp = Date.now()
-    const randomStr = Math.random().toString(36).substring(7)
-    const extension = file.type === 'application/pdf' ? 'pdf' : (file.name.split('.').pop() || 'jpg')
-    const fileName = `images/${timestamp}-${randomStr}.${extension}`
-    
     const arrayBuffer = await file.arrayBuffer()
-    let imageUrl = ''
     
-    // R2にアップロードを試みる
-    try {
-      if (env.MEDIA_BUCKET) {
-        await env.MEDIA_BUCKET.put(fileName, arrayBuffer, {
-          httpMetadata: {
-            contentType: file.type
-          }
-        })
-        imageUrl = `/api/media/${fileName}`
-        console.log(`✅ R2アップロード成功: ${fileName}`)
-      } else {
-        throw new Error('R2 MEDIA_BUCKET not bound')
-      }
-    } catch (r2Err: any) {
-      // R2が使えない場合: Base64 data URLとして保存
-      console.warn('⚠️ R2アップロード失敗、Base64フォールバック:', r2Err.message)
-      const uint8Array = new Uint8Array(arrayBuffer)
-      let binary = ''
-      const chunkSize = 8192
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
-        binary += String.fromCharCode(...chunk)
-      }
-      const base64 = btoa(binary)
-      imageUrl = `data:${file.type};base64,${base64}`
-      console.log(`✅ Base64フォールバック成功: ${file.type}, ${base64.length} chars`)
+    // Base64 data URLに変換（確実に動作する方式）
+    const uint8Array = new Uint8Array(arrayBuffer)
+    let binary = ''
+    const chunkSize = 8192
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+      binary += String.fromCharCode(...chunk)
     }
+    const base64 = btoa(binary)
+    const imageUrl = `data:${file.type};base64,${base64}`
+    console.log(`✅ 画像をBase64に変換: ${file.type}, ${(base64.length / 1024).toFixed(0)}KB`)
     
     // card_idが指定されていればカードに自動保存
     if (cardId) {
@@ -22818,7 +22785,7 @@ app.post('/api/upload/image', async (c) => {
         await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
           .bind(imageUrl, Number(cardId))
           .run()
-        console.log(`✅ カード ${cardId} に画像を自動保存: ${imageUrl}`)
+        console.log(`✅ カード ${cardId} に画像を保存`)
       } catch (dbErr: any) {
         console.warn('⚠️ カードへの自動保存失敗:', dbErr.message)
       }
@@ -22827,7 +22794,7 @@ app.post('/api/upload/image', async (c) => {
     return c.json({
       success: true,
       image_url: imageUrl,
-      file_name: fileName,
+      file_name: file.name,
       file_size: file.size,
       mime_type: file.type,
       is_pdf: file.type === 'application/pdf',
@@ -22913,21 +22880,38 @@ app.get('/api/media/*', async (c) => {
   const fileName = c.req.param('*')
   
   try {
+    if (!env.MEDIA_BUCKET) {
+      return c.json({ error: 'R2 MEDIA_BUCKET not bound', key: fileName }, 500)
+    }
+    
     const object = await env.MEDIA_BUCKET.get(fileName)
     
     if (!object) {
-      return c.notFound()
+      // デバッグ: キーの先頭を確認
+      console.log(`⚠️ R2 object not found: key="${fileName}", url="${c.req.url}"`)
+      // ファイル名のみでも試す
+      const parts = fileName.split('/')
+      if (parts.length > 1) {
+        const altObject = await env.MEDIA_BUCKET.get(parts[parts.length - 1])
+        if (altObject) {
+          const headers = new Headers()
+          altObject.writeHttpMetadata(headers)
+          headers.set('Cache-Control', 'public, max-age=31536000')
+          return new Response(altObject.body, { headers })
+        }
+      }
+      return c.json({ error: 'not_found', key: fileName, url: c.req.url }, 404)
     }
     
     const headers = new Headers()
     object.writeHttpMetadata(headers)
     headers.set('etag', object.httpEtag)
-    headers.set('Cache-Control', 'public, max-age=31536000') // 1年キャッシュ
+    headers.set('Cache-Control', 'public, max-age=31536000')
     
     return new Response(object.body, { headers })
   } catch (error: any) {
-    console.error('❌ メディア取得エラー:', error)
-    return c.notFound()
+    console.error('❌ メディア取得エラー:', error, { fileName, url: c.req.url })
+    return c.json({ error: error.message, key: fileName }, 500)
   }
 })
 

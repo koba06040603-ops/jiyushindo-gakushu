@@ -5693,7 +5693,11 @@ async function loadCardPage(cardId) {
                   <img src="${card.problem_image_url}" alt="${card._image_description || '問題の図'}" 
                        class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
                        onerror="handleImageLoadError(this, ${card.card_id || card.id || 0})">
-                  <p class="text-xs text-gray-500 mt-2"><i class="fas fa-image mr-1"></i>${card._image_description || '問題の図'}</p>
+                  <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
+                    <p class="text-xs text-gray-500"><i class="fas fa-image mr-1"></i>${card._image_description || '問題の図'}</p>
+                    <button onclick="openImageEditor(${card.card_id || card.id || 0})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
+                    <button onclick="replaceCardImage(${card.card_id || card.id || 0})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+                  </div>
                 </div>
               ` : (() => {
                 // イラスト説明があるが画像がない場合のプレースホルダー + AI生成ボタン
@@ -6774,8 +6778,9 @@ async function generateImageForCard(cardId, description) {
       <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-6 text-center">
         <i class="fas fa-magic text-4xl text-purple-500 mb-3 block animate-pulse"></i>
         <p class="text-sm text-purple-800 font-bold mb-1">AIが図を生成しています...</p>
-        <p class="text-xs text-gray-500">数秒お待ちください</p>
+        <p class="text-xs text-gray-500">15〜30秒ほどお待ちください</p>
         <div class="mt-3"><div class="h-2 bg-purple-200 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse" style="width: 60%"></div></div></div>
+        <p class="text-xs text-gray-400 mt-3">失敗した場合は手動でJPG/PDFをアップロードできます</p>
       </div>`
   }
   
@@ -6785,14 +6790,16 @@ async function generateImageForCard(cardId, description) {
       prompt: prompt,
       card_id: cardId,
       style: 'educational illustration, child-friendly, simple diagram'
-    })
+    }, { timeout: 60000 })
     
     if (res.data.success && res.data.image_url) {
-      // カードに画像URLを保存
-      await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
+      // サーバー側で既にDBに保存済み（card_idを渡しているため）
+      // 念のためクライアント側からも保存
+      try {
+        await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
+      } catch(e) { console.warn('カード更新スキップ:', e) }
       
-      const safeDesc = (description || '').replace(/'/g, '').replace(/"/g, '').replace(/\n/g, ' ').substring(0, 100)
-      // 画像を表示
+      // 画像を表示（data URLなのでonerrorは基本起きない）
       if (placeholder) {
         placeholder.innerHTML = `
           <div class="text-center" id="card-image-container-${cardId}">
@@ -6803,6 +6810,7 @@ async function generateImageForCard(cardId, description) {
               <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
                 <i class="fas fa-check-circle mr-1"></i>AIが図を生成しました（${res.data.generation_time_ms || 0}ms）
               </span>
+              <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
               <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
             </div>
           </div>`
@@ -6822,19 +6830,19 @@ async function generateImageForCard(cardId, description) {
           <p class="text-base text-red-700 font-bold mb-1">AI図の生成に失敗しました</p>
           <p class="text-xs text-gray-500 mb-4">${err.response?.data?.error || err.message || 'サーバーエラー'}</p>
           
-          <p class="text-sm text-gray-700 font-bold mb-3">別の方法で図を追加できます：</p>
+          <p class="text-sm text-gray-700 font-bold mb-3">📸 手動で図を追加しましょう：</p>
           
           <div class="flex flex-col gap-2 max-w-xs mx-auto mb-3">
-            <button onclick="generateImageForCard(${cardId}, '${safeDesc}')"
-                    class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-5 py-3 rounded-xl font-bold text-sm transition shadow-md hover:shadow-lg">
-              <i class="fas fa-redo"></i>
-              <span>AIで再試行</span>
+            <button onclick="openFilePickerForCard(${cardId})"
+                    class="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white px-5 py-3 rounded-xl font-bold text-sm transition shadow-md hover:shadow-lg">
+              <i class="fas fa-file-image text-lg"></i>
+              <span>📷 JPG / PNG / PDF を選択</span>
             </button>
             <div class="flex gap-2">
-              <button onclick="openFilePickerForCard(${cardId})"
-                      class="flex-1 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-sm">
-                <i class="fas fa-file-image"></i>
-                <span>JPG/PDF</span>
+              <button onclick="generateImageForCard(${cardId}, '${safeDesc}')"
+                      class="flex-1 flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-sm">
+                <i class="fas fa-redo"></i>
+                <span>AI再試行</span>
               </button>
               <button onclick="quickPasteImageUrl(${cardId})"
                       class="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-sm">
@@ -6844,15 +6852,17 @@ async function generateImageForCard(cardId, description) {
             </div>
           </div>
           
-          <div class="border-2 border-dashed border-gray-300 rounded-xl py-2 px-4 bg-white bg-opacity-50 hover:border-purple-400 transition cursor-pointer"
-               onclick="openFilePickerForCard(${cardId})">
-            <p class="text-xs text-gray-500">
-              <i class="fas fa-cloud-upload-alt mr-1"></i>ここにファイルをドラッグ&ドロップ
+          <div class="border-2 border-dashed border-gray-300 rounded-xl py-3 px-4 bg-white bg-opacity-50 hover:border-blue-400 transition cursor-pointer"
+               onclick="openFilePickerForCard(${cardId})"
+               id="image-placeholder-${cardId}">
+            <p class="text-sm text-gray-500">
+              <i class="fas fa-cloud-upload-alt mr-1 text-lg"></i>ここにファイルをドラッグ&ドロップ
             </p>
           </div>
         </div>`
       // ドロップゾーン再初期化
-      if (typeof initDropZone === 'function') initDropZone(placeholder, cardId)
+      const dropTarget = document.getElementById('image-placeholder-' + cardId)
+      if (dropTarget && typeof initDropZone === 'function') initDropZone(dropTarget, cardId)
     }
   }
 }
@@ -30323,11 +30333,13 @@ async function uploadFileToCard(cardId, file) {
           targetEl.outerHTML = `
             <div class="mt-4 text-center" id="card-image-container-${cardId}">
               <img src="${imageUrl}" alt="問題の図" 
-                   class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;">
+                   class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
+                   onerror="handleImageLoadError(this, ${cardId})">
               <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
                 <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
                   <i class="fas fa-check-circle mr-1"></i>保存済み
                 </span>
+                <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
                 <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
               </div>
             </div>
@@ -30367,6 +30379,437 @@ function replaceCardImage(cardId) {
   openFilePickerForCard(cardId)
 }
 window.replaceCardImage = replaceCardImage
+
+// カード画像差し替え（既存画像がある場合にファイルピッカーを開く）
+function replaceCardImage(cardId) {
+  openFilePickerForCard(cardId)
+}
+window.replaceCardImage = replaceCardImage
+
+// ====================================================================
+// 画像エディタ（Canvas ベース）
+// - 描き込み（ペン・マーカー）
+// - テキスト追加
+// - 矢印・丸・四角の描画
+// - 回転
+// - 元に戻す / やり直し
+// - 保存してカードに反映
+// ====================================================================
+function openImageEditor(cardId) {
+  // カードの画像を取得
+  const container = document.getElementById('card-image-container-' + cardId)
+  const img = container ? container.querySelector('img') : null
+  if (!img || !img.src) {
+    alert('編集する画像がありません')
+    return
+  }
+  
+  const imgSrc = img.src
+  
+  // モーダルオーバーレイ
+  const overlay = document.createElement('div')
+  overlay.id = 'image-editor-overlay'
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px;'
+  
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:16px;width:100%;max-width:800px;max-height:95vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.5);">
+      <!-- ヘッダー -->
+      <div style="padding:12px 16px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <i class="fas fa-paint-brush" style="font-size:18px;"></i>
+          <span style="font-weight:bold;font-size:16px;">画像エディタ</span>
+        </div>
+        <button onclick="closeImageEditor()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+      
+      <!-- ツールバー -->
+      <div style="padding:8px 12px;background:#f3f4f6;border-bottom:1px solid #e5e7eb;display:flex;flex-wrap:wrap;gap:4px;align-items:center;flex-shrink:0;" id="editor-toolbar">
+        <!-- 描画ツール -->
+        <div style="display:flex;gap:2px;background:white;border-radius:8px;padding:2px;border:1px solid #e5e7eb;">
+          <button class="ed-tool active" data-tool="pen" title="ペン" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:#6366f1;color:white;">✏️</button>
+          <button class="ed-tool" data-tool="marker" title="マーカー" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">🖍️</button>
+          <button class="ed-tool" data-tool="arrow" title="矢印" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">➡️</button>
+          <button class="ed-tool" data-tool="circle" title="丸" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">⭕</button>
+          <button class="ed-tool" data-tool="rect" title="四角" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">⬜</button>
+          <button class="ed-tool" data-tool="text" title="テキスト" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">Aa</button>
+          <button class="ed-tool" data-tool="eraser" title="消しゴム" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">🧹</button>
+        </div>
+        
+        <!-- 色選択 -->
+        <div style="display:flex;gap:2px;align-items:center;background:white;border-radius:8px;padding:4px 6px;border:1px solid #e5e7eb;">
+          <input type="color" id="ed-color" value="#FF0000" style="width:28px;height:28px;border:none;cursor:pointer;border-radius:4px;">
+          <select id="ed-size" style="border:1px solid #d1d5db;border-radius:4px;padding:2px 4px;font-size:12px;">
+            <option value="2">細い</option>
+            <option value="4" selected>普通</option>
+            <option value="8">太い</option>
+            <option value="16">極太</option>
+          </select>
+        </div>
+        
+        <!-- アクション -->
+        <div style="display:flex;gap:2px;background:white;border-radius:8px;padding:2px;border:1px solid #e5e7eb;">
+          <button onclick="editorUndo()" title="元に戻す" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">↩️</button>
+          <button onclick="editorRedo()" title="やり直し" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">↪️</button>
+          <button onclick="editorRotate()" title="90°回転" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">🔄</button>
+          <button onclick="editorClear()" title="描き込みクリア" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">🗑️</button>
+        </div>
+        
+        <!-- 保存 -->
+        <div style="margin-left:auto;display:flex;gap:4px;">
+          <button onclick="editorSave(${cardId})" style="padding:6px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:bold;background:linear-gradient(135deg,#10b981,#059669);color:white;">
+            💾 保存
+          </button>
+        </div>
+      </div>
+      
+      <!-- キャンバスエリア -->
+      <div style="flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;background:#1f2937;padding:8px;min-height:300px;" id="editor-canvas-area">
+        <canvas id="editor-canvas" style="background:white;border-radius:4px;cursor:crosshair;max-width:100%;touch-action:none;"></canvas>
+      </div>
+      
+      <!-- フッター情報 -->
+      <div style="padding:6px 12px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#6b7280;flex-shrink:0;">
+        <span>💡 ペンで描き込み・テキスト追加で問題に合った図に編集できます</span>
+        <span id="editor-size-info"></span>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(overlay)
+  document.body.style.overflow = 'hidden'
+  
+  // エディタ状態
+  const editorState = {
+    tool: 'pen',
+    color: '#FF0000',
+    lineWidth: 4,
+    isDrawing: false,
+    startX: 0,
+    startY: 0,
+    history: [],
+    historyIndex: -1,
+    rotation: 0,
+    baseImage: null,
+    tempCanvas: null,
+    textMode: false
+  }
+  window._editorState = editorState
+  
+  const canvas = document.getElementById('editor-canvas')
+  const ctx = canvas.getContext('2d')
+  
+  // 画像読み込み
+  const baseImg = new Image()
+  baseImg.crossOrigin = 'anonymous'
+  baseImg.onload = () => {
+    editorState.baseImage = baseImg
+    
+    // キャンバスサイズ設定（最大幅760px）
+    const maxW = 760
+    const scale = Math.min(1, maxW / baseImg.naturalWidth)
+    canvas.width = Math.round(baseImg.naturalWidth * scale)
+    canvas.height = Math.round(baseImg.naturalHeight * scale)
+    
+    ctx.drawImage(baseImg, 0, 0, canvas.width, canvas.height)
+    saveEditorHistory()
+    
+    document.getElementById('editor-size-info').textContent = canvas.width + ' × ' + canvas.height + 'px'
+  }
+  baseImg.onerror = () => {
+    // data URLの場合はCORSの問題なし、それ以外なら代替表示
+    const area = document.getElementById('editor-canvas-area')
+    area.innerHTML = '<div style="color:white;text-align:center;padding:40px;"><i class="fas fa-exclamation-triangle" style="font-size:48px;color:#fbbf24;margin-bottom:16px;display:block;"></i><p style="font-size:18px;font-weight:bold;margin-bottom:8px;">画像を読み込めませんでした</p><p style="font-size:14px;color:#9ca3af;">別の画像をアップロードしてください</p></div>'
+  }
+  baseImg.src = imgSrc
+  
+  // ツール切り替え
+  overlay.querySelectorAll('.ed-tool').forEach(btn => {
+    btn.addEventListener('click', () => {
+      overlay.querySelectorAll('.ed-tool').forEach(b => {
+        b.style.background = 'transparent'
+        b.style.color = 'inherit'
+        b.classList.remove('active')
+      })
+      btn.style.background = '#6366f1'
+      btn.style.color = 'white'
+      btn.classList.add('active')
+      editorState.tool = btn.dataset.tool
+    })
+  })
+  
+  // 色・サイズ変更
+  document.getElementById('ed-color').addEventListener('input', e => { editorState.color = e.target.value })
+  document.getElementById('ed-size').addEventListener('change', e => { editorState.lineWidth = Number(e.target.value) })
+  
+  // 描画イベント（マウス）
+  canvas.addEventListener('mousedown', e => editorStartDraw(e, canvas, ctx, editorState))
+  canvas.addEventListener('mousemove', e => editorMoveDraw(e, canvas, ctx, editorState))
+  canvas.addEventListener('mouseup', e => editorEndDraw(e, canvas, ctx, editorState))
+  canvas.addEventListener('mouseleave', e => editorEndDraw(e, canvas, ctx, editorState))
+  
+  // タッチイベント
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); editorStartDraw(e.touches[0], canvas, ctx, editorState) }, { passive: false })
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); editorMoveDraw(e.touches[0], canvas, ctx, editorState) }, { passive: false })
+  canvas.addEventListener('touchend', e => { e.preventDefault(); editorEndDraw(e, canvas, ctx, editorState) }, { passive: false })
+}
+window.openImageEditor = openImageEditor
+
+function getCanvasPos(e, canvas) {
+  const rect = canvas.getBoundingClientRect()
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+  return {
+    x: (e.clientX - rect.left) * scaleX,
+    y: (e.clientY - rect.top) * scaleY
+  }
+}
+
+function editorStartDraw(e, canvas, ctx, state) {
+  const pos = getCanvasPos(e, canvas)
+  state.isDrawing = true
+  state.startX = pos.x
+  state.startY = pos.y
+  
+  if (state.tool === 'text') {
+    state.isDrawing = false
+    const text = prompt('追加するテキスト:', '')
+    if (text) {
+      const fontSize = Math.max(16, state.lineWidth * 5)
+      ctx.font = `bold ${fontSize}px sans-serif`
+      ctx.fillStyle = state.color
+      ctx.strokeStyle = 'white'
+      ctx.lineWidth = 3
+      ctx.strokeText(text, pos.x, pos.y)
+      ctx.fillText(text, pos.x, pos.y)
+      saveEditorHistory()
+    }
+    return
+  }
+  
+  if (state.tool === 'pen' || state.tool === 'marker' || state.tool === 'eraser') {
+    ctx.beginPath()
+    ctx.moveTo(pos.x, pos.y)
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    if (state.tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.lineWidth = state.lineWidth * 4
+    } else if (state.tool === 'marker') {
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.globalAlpha = 0.4
+      ctx.lineWidth = state.lineWidth * 3
+      ctx.strokeStyle = state.color
+    } else {
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.globalAlpha = 1
+      ctx.lineWidth = state.lineWidth
+      ctx.strokeStyle = state.color
+    }
+  }
+  
+  // 図形の一時キャンバス
+  if (['arrow', 'circle', 'rect'].includes(state.tool)) {
+    state.tempCanvas = document.createElement('canvas')
+    state.tempCanvas.width = canvas.width
+    state.tempCanvas.height = canvas.height
+    state.tempCanvas.getContext('2d').drawImage(canvas, 0, 0)
+  }
+}
+
+function editorMoveDraw(e, canvas, ctx, state) {
+  if (!state.isDrawing) return
+  const pos = getCanvasPos(e, canvas)
+  
+  if (state.tool === 'pen' || state.tool === 'marker' || state.tool === 'eraser') {
+    ctx.lineTo(pos.x, pos.y)
+    ctx.stroke()
+    return
+  }
+  
+  // 図形プレビュー
+  if (['arrow', 'circle', 'rect'].includes(state.tool) && state.tempCanvas) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(state.tempCanvas, 0, 0)
+    
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = state.color
+    ctx.fillStyle = state.color
+    ctx.lineWidth = state.lineWidth
+    ctx.lineCap = 'round'
+    
+    if (state.tool === 'arrow') {
+      // 矢印
+      const dx = pos.x - state.startX
+      const dy = pos.y - state.startY
+      const angle = Math.atan2(dy, dx)
+      const len = Math.sqrt(dx*dx + dy*dy)
+      const headLen = Math.min(20, len * 0.3)
+      
+      ctx.beginPath()
+      ctx.moveTo(state.startX, state.startY)
+      ctx.lineTo(pos.x, pos.y)
+      ctx.stroke()
+      
+      ctx.beginPath()
+      ctx.moveTo(pos.x, pos.y)
+      ctx.lineTo(pos.x - headLen * Math.cos(angle - Math.PI/6), pos.y - headLen * Math.sin(angle - Math.PI/6))
+      ctx.moveTo(pos.x, pos.y)
+      ctx.lineTo(pos.x - headLen * Math.cos(angle + Math.PI/6), pos.y - headLen * Math.sin(angle + Math.PI/6))
+      ctx.stroke()
+    } else if (state.tool === 'circle') {
+      const rx = Math.abs(pos.x - state.startX) / 2
+      const ry = Math.abs(pos.y - state.startY) / 2
+      const cx = (state.startX + pos.x) / 2
+      const cy = (state.startY + pos.y) / 2
+      ctx.beginPath()
+      ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2)
+      ctx.stroke()
+    } else if (state.tool === 'rect') {
+      ctx.beginPath()
+      ctx.strokeRect(state.startX, state.startY, pos.x - state.startX, pos.y - state.startY)
+    }
+  }
+}
+
+function editorEndDraw(e, canvas, ctx, state) {
+  if (!state.isDrawing) return
+  state.isDrawing = false
+  
+  // リセット
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.globalAlpha = 1
+  state.tempCanvas = null
+  
+  saveEditorHistory()
+}
+
+function saveEditorHistory() {
+  const canvas = document.getElementById('editor-canvas')
+  if (!canvas) return
+  const state = window._editorState
+  if (!state) return
+  
+  // 現在位置以降の履歴を削除
+  state.history = state.history.slice(0, state.historyIndex + 1)
+  state.history.push(canvas.toDataURL('image/png'))
+  state.historyIndex = state.history.length - 1
+  
+  // 最大30履歴
+  if (state.history.length > 30) {
+    state.history.shift()
+    state.historyIndex--
+  }
+}
+
+function editorUndo() {
+  const state = window._editorState
+  if (!state || state.historyIndex <= 0) return
+  state.historyIndex--
+  restoreEditorHistory()
+}
+
+function editorRedo() {
+  const state = window._editorState
+  if (!state || state.historyIndex >= state.history.length - 1) return
+  state.historyIndex++
+  restoreEditorHistory()
+}
+
+function restoreEditorHistory() {
+  const canvas = document.getElementById('editor-canvas')
+  const ctx = canvas.getContext('2d')
+  const state = window._editorState
+  
+  const img = new Image()
+  img.onload = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0)
+  }
+  img.src = state.history[state.historyIndex]
+}
+
+function editorRotate() {
+  const canvas = document.getElementById('editor-canvas')
+  const ctx = canvas.getContext('2d')
+  
+  const tempCanvas = document.createElement('canvas')
+  tempCanvas.width = canvas.height
+  tempCanvas.height = canvas.width
+  const tempCtx = tempCanvas.getContext('2d')
+  
+  tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2)
+  tempCtx.rotate(Math.PI / 2)
+  tempCtx.drawImage(canvas, -canvas.width / 2, -canvas.height / 2)
+  
+  canvas.width = tempCanvas.width
+  canvas.height = tempCanvas.height
+  ctx.drawImage(tempCanvas, 0, 0)
+  
+  document.getElementById('editor-size-info').textContent = canvas.width + ' × ' + canvas.height + 'px'
+  saveEditorHistory()
+}
+
+function editorClear() {
+  if (!confirm('描き込みをすべてクリアしますか？元の画像に戻ります。')) return
+  const canvas = document.getElementById('editor-canvas')
+  const ctx = canvas.getContext('2d')
+  const state = window._editorState
+  if (state && state.baseImage) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(state.baseImage, 0, 0, canvas.width, canvas.height)
+    saveEditorHistory()
+  }
+}
+
+async function editorSave(cardId) {
+  const canvas = document.getElementById('editor-canvas')
+  if (!canvas) return
+  
+  // Canvas → Base64 data URL
+  const dataUrl = canvas.toDataURL('image/png')
+  
+  // 保存中UI
+  const toolbar = document.getElementById('editor-toolbar')
+  const originalHTML = toolbar.innerHTML
+  toolbar.innerHTML = '<div style="padding:8px;text-align:center;width:100%;"><i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i>保存中...</div>'
+  
+  try {
+    // APIでカードに保存
+    await axios.put('/api/card/' + cardId, { problem_image_url: dataUrl })
+    
+    // カード上の画像も更新
+    const container = document.getElementById('card-image-container-' + cardId)
+    if (container) {
+      const img = container.querySelector('img')
+      if (img) img.src = dataUrl
+    }
+    
+    // 成功メッセージ
+    toolbar.innerHTML = '<div style="padding:8px;text-align:center;width:100%;color:#059669;font-weight:bold;"><i class="fas fa-check-circle" style="margin-right:8px;"></i>保存しました！</div>'
+    
+    setTimeout(() => {
+      closeImageEditor()
+    }, 1000)
+  } catch (err) {
+    console.error('画像保存エラー:', err)
+    toolbar.innerHTML = originalHTML
+    alert('保存に失敗しました: ' + (err.message || 'エラー'))
+  }
+}
+window.editorSave = editorSave
+
+function closeImageEditor() {
+  const overlay = document.getElementById('image-editor-overlay')
+  if (overlay) overlay.remove()
+  document.body.style.overflow = ''
+  window._editorState = null
+}
+window.closeImageEditor = closeImageEditor
+window.editorUndo = editorUndo
+window.editorRedo = editorRedo
+window.editorRotate = editorRotate
+window.editorClear = editorClear
 
 // ファイル選択ダイアログを開く
 function openFilePickerForCard(cardId) {
