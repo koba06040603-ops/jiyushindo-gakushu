@@ -5692,7 +5692,7 @@ async function loadCardPage(cardId) {
                 <div class="mt-4 text-center" id="card-image-container-${card.card_id || card.id || 0}">
                   <img src="${card.problem_image_url}" alt="${card._image_description || '問題の図'}" 
                        class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
-                       onerror="this.parentElement.innerHTML='<div class=\\'bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-5 text-center shadow-sm\\'><div class=\\'inline-flex items-center justify-center w-16 h-16 bg-yellow-100 rounded-full mb-3\\'><i class=\\'fas fa-image text-3xl text-yellow-500\\'></i></div><p class=\\'text-sm text-yellow-800 font-bold mb-3\\'>画像を読み込めませんでした</p><div class=\\'flex flex-col sm:flex-row gap-3 justify-center\\'><button onclick=\\'generateImageForCard(${card.card_id || card.id || 0}, \\\"${(card._image_description || card.card_title || '').replace(/"/g, '').replace(/'/g, '')}\\\")\\'  class=\\'inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-xl font-bold text-base transition shadow-lg\\'><i class=\\'fas fa-magic text-lg\\'></i>AIで図を再生成</button><button onclick=\\'editCardImageUrl(${card.card_id || card.id || 0}, \\\"problem\\\")\\'  class=\\'inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-base transition shadow-lg\\'><i class=\\'fas fa-upload text-lg\\'></i>画像をアップロード</button></div></div>'">
+                       onerror="handleImageLoadError(this, ${card.card_id || card.id || 0})">
                   <p class="text-xs text-gray-500 mt-2"><i class="fas fa-image mr-1"></i>${card._image_description || '問題の図'}</p>
                 </div>
               ` : (() => {
@@ -6798,7 +6798,7 @@ async function generateImageForCard(cardId, description) {
           <div class="text-center" id="card-image-container-${cardId}">
             <img src="${res.data.image_url}" alt="${description || '問題の図'}" 
                  class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
-                 onerror="this.parentElement.innerHTML='<div class=\\'bg-orange-50 border-2 border-orange-300 rounded-xl p-5 text-center\\'><i class=\\'fas fa-image text-orange-400 text-3xl mb-2 block\\'></i><p class=\\'text-orange-700 font-bold text-sm mb-3\\'>AI生成画像の読み込みに失敗しました</p><div class=\\'flex flex-col gap-2 max-w-xs mx-auto\\'><button onclick=\\'generateImageForCard(${cardId}, \\\"${safeDesc}\\\")\\'  class=\\'bg-purple-500 text-white px-4 py-2 rounded-lg text-sm font-bold\\'>AI再生成</button><div class=\\'flex gap-2\\'><button onclick=\\'openFilePickerForCard(${cardId})\\' class=\\'flex-1 bg-orange-500 text-white px-3 py-2 rounded-lg text-xs font-bold\\'>JPG/PDF</button><button onclick=\\'quickPasteImageUrl(${cardId})\\' class=\\'flex-1 bg-green-500 text-white px-3 py-2 rounded-lg text-xs font-bold\\'>URL貼付</button></div></div></div>'">
+                 onerror="handleImageLoadError(this, ${cardId})">
             <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
               <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
                 <i class="fas fa-check-circle mr-1"></i>AIが図を生成しました（${res.data.generation_time_ms || 0}ms）
@@ -6857,6 +6857,40 @@ async function generateImageForCard(cardId, description) {
   }
 }
 window.generateImageForCard = generateImageForCard
+
+// 画像読み込みエラー時のフォールバックUI（onerrorから呼ばれる）
+function handleImageLoadError(imgEl, cardId) {
+  const parent = imgEl.closest('[id^="card-image-container-"]') || imgEl.parentElement
+  if (!parent) return
+  parent.innerHTML = `
+    <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-5 text-center" id="image-placeholder-${cardId}">
+      <div class="inline-flex items-center justify-center w-14 h-14 bg-orange-100 rounded-full mb-3">
+        <i class="fas fa-image text-2xl text-orange-400"></i>
+      </div>
+      <p class="text-sm text-orange-700 font-bold mb-1">画像の読み込みに失敗しました</p>
+      <p class="text-xs text-gray-500 mb-3">別の方法で図を追加しましょう</p>
+      <div class="flex flex-col gap-2 max-w-xs mx-auto">
+        <button onclick="generateImageForCard(${cardId}, '')"
+                class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition">
+          <i class="fas fa-wand-magic-sparkles"></i> AI再生成
+        </button>
+        <div class="flex gap-2">
+          <button onclick="openFilePickerForCard(${cardId})"
+                  class="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm">
+            <i class="fas fa-file-image mr-1"></i>JPG/PDF
+          </button>
+          <button onclick="quickPasteImageUrl(${cardId})"
+                  class="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm">
+            <i class="fas fa-paste mr-1"></i>URL貼付
+          </button>
+        </div>
+      </div>
+    </div>`
+  // ドロップゾーン再初期化
+  const newPlaceholder = document.getElementById('image-placeholder-' + cardId)
+  if (newPlaceholder && typeof initDropZone === 'function') initDropZone(newPlaceholder, cardId)
+}
+window.handleImageLoadError = handleImageLoadError
 
 // ====================================================================
 // インタラクティブ触覚ウィジェットエンジン
@@ -7668,6 +7702,8 @@ function detectVisualWidget(card) {
   const subject = (card.subject || '').toLowerCase()
   const all = problem + ' ' + title + ' ' + unit
 
+  // ★★ 表・グラフ（最優先：「グラフ」「折れ線」等が含まれれば他より優先）
+  if (/グラフ|折れ線|棒グラフ|円グラフ|ヒストグラム|表を見|表を読/.test(all)) return 'chart'
   // 分数関連
   if (/分数|ぶんすう|\d+\/\d+|分の/.test(all)) return 'fraction'
   // 割合・百分率
@@ -7692,18 +7728,16 @@ function detectVisualWidget(card) {
   if (subject.includes('理科') && /実験|観察|顕微鏡|試験管|ビーカー|磁石|電気|回路|天気/.test(all)) return 'science'
   // 理科：植物・生物
   if (subject.includes('理科') && /植物|花|葉|根|茎|種子|発芽|光合成|動物|昆虫/.test(all)) return 'biology'
-  // ★時刻・時間（優先度高：午前/午後/時/分を含む問題は時計ウィジェットを最優先）
+  // ★時刻・時間（グラフの後：「グラフ」が無い純粋な時計問題のみ）
   if (/時刻|なんじ|何時|とけい|時計/.test(all)) return 'time_visual'
-  if (/午前|午後/.test(all) && /時|分/.test(all)) return 'time_visual'
-  if (/時間.*分|分間|かかった時間|何分/.test(all)) return 'time_visual'
+  if (/午前|午後/.test(all) && /時|分/.test(all) && !/グラフ|気温|変化|調べ/.test(all)) return 'time_visual'
+  if (/かかった時間|何分/.test(all) && !/グラフ|気温/.test(all)) return 'time_visual'
   // かけ算・九九
   if (/かけ算|九九|×|掛け/.test(all)) return 'multiplication'
   // たし算・ひき算（低学年）
   if (/あわせて|のこり|ちがい|たし算|ひき算/.test(all)) return 'addition'
   // 単位・量
   if (/リットル|L|dL|mL|キログラム|kg|g|cm|mm|m\b|メートル|長さ|重さ|かさ/.test(all)) return 'units'
-  // 表・グラフ
-  if (/表|グラフ|棒グラフ|折れ線|円グラフ/.test(all)) return 'chart'
   
   // ===== 追加: 教科書レベル以上の視覚支援パターン =====
   // 正負の数（中学）
@@ -8347,6 +8381,216 @@ function renderDecimalVisual(container, card) {
 
 // ========== グラフビジュアル ==========
 function renderChartVisual(container, card) {
+  const problem = card.problem_text || card.problem_content || ''
+  const title = card.card_title || ''
+  const all = problem + ' ' + title
+  
+  // グラフの種類を判定
+  const isLineChart = /折れ線|変化|推移|気温.*グラフ|グラフ.*気温|人口.*変化/.test(all)
+  const isPieChart = /円グラフ|割合.*グラフ/.test(all)
+  // デフォルトは棒グラフ
+  
+  if (isLineChart) {
+    renderLineChartVisual(container, card)
+  } else if (isPieChart) {
+    renderPieChartVisual(container, card)
+  } else {
+    renderBarChartVisual(container, card)
+  }
+}
+
+// ========== 折れ線グラフ ==========
+function renderLineChartVisual(container, card) {
+  const problem = card.problem_text || card.problem_content || ''
+  const title = card.card_title || card.unit_name || '折れ線グラフ'
+  
+  // 問題文から気温データかどうか判定
+  const isTemperature = /気温|温度|℃/.test(problem)
+  const isPopulation = /人口|人数/.test(problem)
+  
+  // 時刻を抽出（午前○時、○時など）
+  const timeMatches = problem.match(/(\d{1,2})\s*時/g) || []
+  const extractedTimes = timeMatches.map(t => parseInt(t)).filter(n => n >= 0 && n <= 24)
+  
+  // サンプルデータ（問題文に具体的な数値がなければ典型的な気温変化データ）
+  let labels, data, yLabel, yUnit
+  
+  if (isTemperature) {
+    labels = ['6時', '8時', '10時', '12時', '14時', '16時']
+    data = [8, 12, 18, 24, 26, 22]
+    yLabel = '気温'
+    yUnit = '℃'
+  } else if (isPopulation) {
+    labels = ['2000', '2005', '2010', '2015', '2020']
+    data = [120, 135, 148, 152, 145]
+    yLabel = '人数'
+    yUnit = '人'
+  } else {
+    labels = ['月', '火', '水', '木', '金']
+    data = [10, 25, 15, 30, 20]
+    yLabel = '値'
+    yUnit = ''
+  }
+  
+  // 特定の時刻がハイライトされる場合（例：午前10時）
+  const highlightTimes = extractedTimes
+  
+  // SVGグラフ描画
+  const W = 320, H = 200
+  const padL = 45, padR = 15, padT = 20, padB = 35
+  const chartW = W - padL - padR
+  const chartH = H - padT - padB
+  const dataMin = Math.min(...data)
+  const dataMax = Math.max(...data)
+  const yMin = Math.floor(dataMin / 5) * 5 - 5
+  const yMax = Math.ceil(dataMax / 5) * 5 + 5
+  const yRange = yMax - yMin || 1
+  
+  // データポイントの座標
+  const points = data.map((d, i) => ({
+    x: padL + (i / (data.length - 1)) * chartW,
+    y: padT + chartH - ((d - yMin) / yRange) * chartH,
+    val: d,
+    label: labels[i]
+  }))
+  
+  // 折れ線のパス
+  const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')
+  // 塗りつぶし領域
+  const areaPath = linePath + ' L' + points[points.length - 1].x.toFixed(1) + ',' + (padT + chartH) + ' L' + points[0].x.toFixed(1) + ',' + (padT + chartH) + ' Z'
+  
+  // Y軸目盛り
+  const yTicks = []
+  const yStep = yRange <= 20 ? 5 : yRange <= 50 ? 10 : 20
+  for (let v = yMin; v <= yMax; v += yStep) {
+    const yPos = padT + chartH - ((v - yMin) / yRange) * chartH
+    yTicks.push({ y: yPos, val: v })
+  }
+  
+  // ハイライトポイント判定
+  const highlightIndices = []
+  highlightTimes.forEach(ht => {
+    labels.forEach((label, i) => {
+      const labelHour = parseInt(label)
+      if (labelHour === ht) highlightIndices.push(i)
+    })
+  })
+  
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="w-full" style="max-height:250px;">'
+  
+  // 背景グリッド
+  yTicks.forEach(t => {
+    svg += '<line x1="' + padL + '" y1="' + t.y.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + t.y.toFixed(1) + '" stroke="#e5e7eb" stroke-width="0.5"/>'
+    svg += '<text x="' + (padL - 5) + '" y="' + (t.y + 4) + '" text-anchor="end" font-size="10" fill="#6b7280">' + t.val + '</text>'
+  })
+  
+  // X軸・Y軸
+  svg += '<line x1="' + padL + '" y1="' + (padT + chartH) + '" x2="' + (W - padR) + '" y2="' + (padT + chartH) + '" stroke="#374151" stroke-width="1.5"/>'
+  svg += '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (padT + chartH) + '" stroke="#374151" stroke-width="1.5"/>'
+  
+  // 塗りつぶし
+  svg += '<path d="' + areaPath + '" fill="url(#lineGrad)" opacity="0.3"/>'
+  svg += '<defs><linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></linearGradient></defs>'
+  
+  // 折れ線
+  svg += '<path d="' + linePath + '" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round"/>'
+  
+  // データポイントとラベル
+  points.forEach((p, i) => {
+    const isHighlight = highlightIndices.includes(i)
+    const r = isHighlight ? 6 : 4
+    const color = isHighlight ? '#ef4444' : '#3b82f6'
+    
+    svg += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="' + r + '" fill="' + color + '" stroke="white" stroke-width="2"/>'
+    
+    // 値ラベル
+    svg += '<text x="' + p.x.toFixed(1) + '" y="' + (p.y - (isHighlight ? 12 : 8)) + '" text-anchor="middle" font-size="' + (isHighlight ? '11' : '9') + '" font-weight="bold" fill="' + color + '">' + p.val + yUnit + '</text>'
+    
+    // ハイライトポイントの強調
+    if (isHighlight) {
+      svg += '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="10" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.6"/>'
+    }
+    
+    // X軸ラベル
+    svg += '<text x="' + p.x.toFixed(1) + '" y="' + (padT + chartH + 15) + '" text-anchor="middle" font-size="9" fill="#374151" font-weight="' + (isHighlight ? 'bold' : 'normal') + '">' + p.label + '</text>'
+  })
+  
+  // 軸ラベル
+  svg += '<text x="' + (W / 2) + '" y="' + (H - 2) + '" text-anchor="middle" font-size="10" fill="#6b7280">時刻</text>'
+  svg += '<text x="12" y="' + (H / 2) + '" text-anchor="middle" font-size="10" fill="#6b7280" transform="rotate(-90,12,' + (H / 2) + ')">' + yLabel + '(' + yUnit + ')</text>'
+  
+  svg += '</svg>'
+  
+  // 最高/最低値
+  const maxVal = Math.max(...data)
+  const minVal = Math.min(...data)
+  const maxIdx = data.indexOf(maxVal)
+  const minIdx = data.indexOf(minVal)
+  
+  container.innerHTML = '<div class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">' +
+    '<div class="flex items-center gap-2 mb-3">' +
+      '<span class="bg-blue-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-chart-line mr-1"></i>折れ線グラフ</span>' +
+      '<span class="text-sm text-gray-600 font-bold">' + (card.card_title || '') + '</span>' +
+    '</div>' +
+    '<div class="bg-white rounded-xl p-3 border shadow-inner">' + svg + '</div>' +
+    '<div class="mt-3 grid grid-cols-2 gap-2">' +
+      '<div class="bg-red-50 rounded-lg p-2 text-center border border-red-200">' +
+        '<p class="text-xs text-red-600 font-bold">一番高い</p>' +
+        '<p class="text-lg font-black text-red-700">' + maxVal + yUnit + '</p>' +
+        '<p class="text-xs text-gray-500">' + labels[maxIdx] + '</p>' +
+      '</div>' +
+      '<div class="bg-blue-50 rounded-lg p-2 text-center border border-blue-200">' +
+        '<p class="text-xs text-blue-600 font-bold">一番低い</p>' +
+        '<p class="text-lg font-black text-blue-700">' + minVal + yUnit + '</p>' +
+        '<p class="text-xs text-gray-500">' + labels[minIdx] + '</p>' +
+      '</div>' +
+    '</div>' +
+    (highlightIndices.length > 0 ? '<div class="mt-2 bg-yellow-50 rounded-lg p-2 text-center border border-yellow-200"><p class="text-xs text-yellow-800"><i class="fas fa-search text-yellow-600 mr-1"></i><strong class="text-red-600">' + highlightIndices.map(i => labels[i]).join('、') + '</strong>のポイントが赤で強調されています</p></div>' : '') +
+    '<p class="text-xs text-gray-500 mt-2 text-center"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>横軸は時間の流れ、縦軸は数の大きさをあらわします。点が高いほど数が大きいよ！</p>' +
+  '</div>'
+}
+
+// ========== 円グラフ ==========
+function renderPieChartVisual(container, card) {
+  const problem = card.problem_text || ''
+  const nums = (problem.match(/\d+/g) || []).map(Number).filter(n => n > 0 && n <= 100).slice(0, 5)
+  const data = nums.length >= 2 ? nums : [35, 25, 20, 15, 5]
+  const total = data.reduce((s, v) => s + v, 0)
+  const labels = ['ア', 'イ', 'ウ', 'エ', 'オ']
+  const colors = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6']
+  
+  const cx = 80, cy = 80, r = 70
+  let startAngle = -90
+  let paths = ''
+  data.forEach((d, i) => {
+    const angle = (d / total) * 360
+    const endAngle = startAngle + angle
+    const startRad = startAngle * Math.PI / 180
+    const endRad = endAngle * Math.PI / 180
+    const largeArc = angle > 180 ? 1 : 0
+    const x1 = cx + r * Math.cos(startRad)
+    const y1 = cy + r * Math.sin(startRad)
+    const x2 = cx + r * Math.cos(endRad)
+    const y2 = cy + r * Math.sin(endRad)
+    paths += '<path d="M' + cx + ',' + cy + ' L' + x1.toFixed(1) + ',' + y1.toFixed(1) + ' A' + r + ',' + r + ' 0 ' + largeArc + ' 1 ' + x2.toFixed(1) + ',' + y2.toFixed(1) + ' Z" fill="' + colors[i % 5] + '" stroke="white" stroke-width="2"/>'
+    // ラベル
+    const midRad = ((startAngle + endAngle) / 2) * Math.PI / 180
+    const lx = cx + (r * 0.6) * Math.cos(midRad)
+    const ly = cy + (r * 0.6) * Math.sin(midRad)
+    if (angle > 15) {
+      paths += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 4) + '" text-anchor="middle" font-size="10" font-weight="bold" fill="white">' + Math.round(d / total * 100) + '%</text>'
+    }
+    startAngle = endAngle
+  })
+  
+  container.innerHTML = '<div class="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">' +
+    '<div class="flex items-center gap-2 mb-3"><span class="bg-purple-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-chart-pie mr-1"></i>円グラフ</span></div>' +
+    '<div class="flex items-center justify-center gap-4"><svg viewBox="0 0 160 160" width="160" height="160">' + paths + '</svg>' +
+    '<div class="text-sm">' + data.map((d, i) => '<div class="flex items-center gap-2 mb-1"><div class="w-3 h-3 rounded" style="background:' + colors[i % 5] + '"></div><span class="text-xs">' + labels[i] + ': ' + d + ' (' + Math.round(d / total * 100) + '%)</span></div>').join('') + '</div></div></div>'
+}
+
+// ========== 棒グラフ ==========
+function renderBarChartVisual(container, card) {
   const problem = card.problem_text || ''
   const nums = (problem.match(/\d+/g) || []).map(Number).filter(n => n > 0 && n < 1000).slice(0, 6)
   const data = nums.length >= 2 ? nums : [15, 25, 10, 30, 20]
@@ -8354,22 +8598,11 @@ function renderChartVisual(container, card) {
   const labels = ['ア', 'イ', 'ウ', 'エ', 'オ', 'カ']
   const colors = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899']
 
-  container.innerHTML = `
-    <div class="p-4 bg-gradient-to-br from-slate-50 to-gray-50 rounded-xl border-2 border-slate-200">
-      <div class="flex items-center gap-2 mb-3">
-        <span class="bg-slate-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-chart-bar mr-1"></i>グラフで見てみよう</span>
-      </div>
-      <div class="bg-white rounded-lg p-3 border">
-        <div class="flex items-end gap-2 justify-center" style="height:120px">
-          ${data.map((d, i) => `
-            <div class="flex flex-col items-center gap-1 flex-1">
-              <span class="text-xs font-bold">${d}</span>
-              <div class="w-full rounded-t transition-all" style="height:${(d / max) * 100}px; background:${colors[i % colors.length]}"></div>
-              <span class="text-xs font-bold text-gray-600">${labels[i]}</span>
-            </div>`).join('')}
-        </div>
-      </div>
-    </div>`
+  container.innerHTML = '<div class="p-4 bg-gradient-to-br from-slate-50 to-gray-50 rounded-xl border-2 border-slate-200">' +
+    '<div class="flex items-center gap-2 mb-3"><span class="bg-slate-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-chart-bar mr-1"></i>棒グラフで見てみよう</span></div>' +
+    '<div class="bg-white rounded-lg p-3 border"><div class="flex items-end gap-2 justify-center" style="height:120px">' +
+    data.map((d, i) => '<div class="flex flex-col items-center gap-1 flex-1"><span class="text-xs font-bold">' + d + '</span><div class="w-full rounded-t transition-all" style="height:' + ((d / max) * 100) + 'px; background:' + colors[i % colors.length] + '"></div><span class="text-xs font-bold text-gray-600">' + labels[i] + '</span></div>').join('') +
+    '</div></div></div>'
 }
 
 // ========== 速さビジュアル ==========
@@ -46120,7 +46353,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       </div>
                     </div>
                     <div class="bg-white rounded-lg p-3 mb-2 border">
-                      ${card.problem_image_url ? '<div class="mb-2" id="guide-img-' + (card.card_id || card.id || i) + '"><img src="' + card.problem_image_url + '" class="max-h-48 rounded border mx-auto" onerror="this.parentElement.innerHTML=\'<div class=\\\'bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center\\\'><i class=\\\'fas fa-image text-yellow-400 text-2xl mb-1 block\\\'></i><p class=\\\'text-yellow-700 text-xs mb-2\\\'>画像を読み込めません</p><div class=\\\'flex gap-2 justify-center\\\'><button onclick=\\\'generateImageForCard(' + (card.card_id || card.id || 0) + ', \\\"' + ((card._image_description || card.card_title || '').replace(/"/g, '').replace(/\\/g, '').substring(0, 50)) + '\\\")\\\' class=\\\'bg-purple-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold\\\'><i class=\\\'fas fa-magic mr-1\\\'></i>AI再生成</button><button onclick=\\\'quickPasteImageUrl(' + (card.card_id || card.id || 0) + ')\\\' class=\\\'bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold\\\'><i class=\\\'fas fa-paste mr-1\\\'></i>URL貼付</button></div></div>\'"></div>' : (() => {
+                      ${card.problem_image_url ? '<div class="mb-2" id="guide-img-' + (card.card_id || card.id || i) + '"><img src="' + card.problem_image_url + '" class="max-h-48 rounded border mx-auto" onerror="handleImageLoadError(this,' + (card.card_id || card.id || 0) + ')"></div>' : (() => {
                         const cId = card.card_id || card.id || 0
                         const desc = (mm.image_description || card.card_title || card.unit_name || '').replace(/'/g, '').replace(/"/g, '').substring(0, 60)
                         return '<div class="mb-3 bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-dashed border-yellow-300 rounded-xl p-4 text-center" id="guide-img-' + cId + '">' +

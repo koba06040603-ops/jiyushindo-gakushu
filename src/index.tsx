@@ -22781,16 +22781,36 @@ app.post('/api/upload/image', async (c) => {
     const extension = file.type === 'application/pdf' ? 'pdf' : (file.name.split('.').pop() || 'jpg')
     const fileName = `images/${timestamp}-${randomStr}.${extension}`
     
-    // R2にアップロード
     const arrayBuffer = await file.arrayBuffer()
-    await env.MEDIA_BUCKET.put(fileName, arrayBuffer, {
-      httpMetadata: {
-        contentType: file.type
-      }
-    })
+    let imageUrl = ''
     
-    // 公開URLを生成
-    const imageUrl = `/api/media/${fileName}`
+    // R2にアップロードを試みる
+    try {
+      if (env.MEDIA_BUCKET) {
+        await env.MEDIA_BUCKET.put(fileName, arrayBuffer, {
+          httpMetadata: {
+            contentType: file.type
+          }
+        })
+        imageUrl = `/api/media/${fileName}`
+        console.log(`✅ R2アップロード成功: ${fileName}`)
+      } else {
+        throw new Error('R2 MEDIA_BUCKET not bound')
+      }
+    } catch (r2Err: any) {
+      // R2が使えない場合: Base64 data URLとして保存
+      console.warn('⚠️ R2アップロード失敗、Base64フォールバック:', r2Err.message)
+      const uint8Array = new Uint8Array(arrayBuffer)
+      let binary = ''
+      const chunkSize = 8192
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+        binary += String.fromCharCode(...chunk)
+      }
+      const base64 = btoa(binary)
+      imageUrl = `data:${file.type};base64,${base64}`
+      console.log(`✅ Base64フォールバック成功: ${file.type}, ${base64.length} chars`)
+    }
     
     // card_idが指定されていればカードに自動保存
     if (cardId) {
