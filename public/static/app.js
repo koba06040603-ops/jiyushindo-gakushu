@@ -30374,17 +30374,312 @@ async function uploadFileToCard(cardId, file) {
 }
 window.uploadFileToCard = uploadFileToCard
 
-// カード画像差し替え（既存画像がある場合にファイルピッカーを開く）
+// ====================================================================
+// 画像差し替えメニュー（フルメニュー版）
+// AI再生成（プロンプト編集可）、ファイル選択、カメラ撮影、URL貼付
+// ====================================================================
 function replaceCardImage(cardId) {
-  openFilePickerForCard(cardId)
+  openImageReplaceMenu(cardId)
 }
 window.replaceCardImage = replaceCardImage
 
-// カード画像差し替え（既存画像がある場合にファイルピッカーを開く）
-function replaceCardImage(cardId) {
-  openFilePickerForCard(cardId)
+function openImageReplaceMenu(cardId) {
+  // 既存メニューがあれば閉じる
+  const existing = document.getElementById('image-replace-overlay')
+  if (existing) existing.remove()
+  
+  // カードのデータを取得してプロンプトヒントに使う
+  let cardTitle = ''
+  let problemText = ''
+  let unitName = ''
+  try {
+    const cd = window.currentCardData || {}
+    const c = cd.card || {}
+    cardTitle = c.card_title || c.title || ''
+    problemText = c.problem_content || c.problem_text || ''
+    unitName = c.unit_name || ''
+  } catch(e) {}
+  const defaultPrompt = [cardTitle, unitName, problemText].filter(Boolean).join(' ').substring(0, 200)
+  
+  const overlay = document.createElement('div')
+  overlay.id = 'image-replace-overlay'
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;'
+  
+  overlay.innerHTML = `
+    <div style="background:white;border-radius:20px;width:100%;max-width:520px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.4);animation:slideUp .3s ease;">
+      <style>
+        @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .replace-btn { display:flex;align-items:center;gap:12px;width:100%;padding:16px 20px;border:none;background:white;cursor:pointer;text-align:left;transition:background .15s;border-bottom:1px solid #f3f4f6; }
+        .replace-btn:hover { background:#f9fafb; }
+        .replace-btn:active { background:#f3f4f6; }
+        .replace-icon { width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0; }
+      </style>
+      
+      <!-- ヘッダー -->
+      <div style="padding:20px 24px 12px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <h3 style="font-size:18px;font-weight:bold;color:#111827;margin:0;">🔄 画像を差し替え</h3>
+          <p style="font-size:13px;color:#6b7280;margin:4px 0 0;">問題に合った図を設定しましょう</p>
+        </div>
+        <button onclick="document.getElementById('image-replace-overlay').remove()" 
+                style="width:36px;height:36px;border-radius:50%;border:none;background:#f3f4f6;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;color:#6b7280;">✕</button>
+      </div>
+      
+      <!-- メニュー -->
+      <div style="padding:4px 0 8px;">
+      
+        <!-- 1. AI再生成（プロンプト編集可能） -->
+        <button class="replace-btn" onclick="showAiRegenerateDialog(${cardId})" id="btn-ai-regen">
+          <div class="replace-icon" style="background:linear-gradient(135deg,#a855f7,#ec4899);color:white;">🪄</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:bold;font-size:15px;color:#111827;">AIで別の図を生成</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:2px;">プロンプトを編集して、問題に合った図をAIに作らせる</div>
+          </div>
+          <i class="fas fa-chevron-right" style="color:#d1d5db;"></i>
+        </button>
+        
+        <!-- 2. 手持ちの画像ファイルを選択 -->
+        <button class="replace-btn" onclick="document.getElementById('image-replace-overlay').remove(); openFilePickerForCard(${cardId})">
+          <div class="replace-icon" style="background:linear-gradient(135deg,#3b82f6,#06b6d4);color:white;">📁</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:bold;font-size:15px;color:#111827;">ファイルを選択</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:2px;">JPG / PNG / PDF をパソコンから選ぶ</div>
+          </div>
+          <i class="fas fa-chevron-right" style="color:#d1d5db;"></i>
+        </button>
+        
+        <!-- 3. カメラで撮影（教科書の写真） -->
+        <button class="replace-btn" onclick="document.getElementById('image-replace-overlay').remove(); openCameraForCard(${cardId})">
+          <div class="replace-icon" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;">📸</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:bold;font-size:15px;color:#111827;">カメラで撮影</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:2px;">教科書やプリントの図を撮影して貼付</div>
+          </div>
+          <i class="fas fa-chevron-right" style="color:#d1d5db;"></i>
+        </button>
+        
+        <!-- 4. URL貼り付け -->
+        <button class="replace-btn" onclick="document.getElementById('image-replace-overlay').remove(); quickPasteImageUrl(${cardId})">
+          <div class="replace-icon" style="background:linear-gradient(135deg,#10b981,#14b8a6);color:white;">🔗</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:bold;font-size:15px;color:#111827;">URLを貼り付け</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:2px;">Web上の画像URLを直接入力</div>
+          </div>
+          <i class="fas fa-chevron-right" style="color:#d1d5db;"></i>
+        </button>
+        
+        <!-- 5. 簡単な編集（描き込み） -->
+        <button class="replace-btn" onclick="document.getElementById('image-replace-overlay').remove(); openImageEditor(${cardId})" style="border-bottom:none;">
+          <div class="replace-icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;">✏️</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:bold;font-size:15px;color:#111827;">描き込み編集</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:2px;">今の画像にペンやテキストで補足を追加</div>
+          </div>
+          <i class="fas fa-chevron-right" style="color:#d1d5db;"></i>
+        </button>
+        
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(overlay)
+  
+  // オーバーレイクリックで閉じる
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove()
+  })
 }
-window.replaceCardImage = replaceCardImage
+window.openImageReplaceMenu = openImageReplaceMenu
+
+// AI再生成ダイアログ（プロンプト編集可能）
+function showAiRegenerateDialog(cardId) {
+  const menuOverlay = document.getElementById('image-replace-overlay')
+  
+  // カードのデータからデフォルトプロンプトを構築
+  let defaultPrompt = ''
+  try {
+    const cd = window.currentCardData || {}
+    const c = cd.card || {}
+    const parts = []
+    if (c.subject) parts.push(c.subject)
+    if (c.unit_name) parts.push(c.unit_name)
+    if (c.card_title) parts.push(c.card_title)
+    const problem = c.problem_content || c.problem_text || ''
+    if (problem) parts.push(problem.substring(0, 150))
+    defaultPrompt = parts.join(' / ')
+  } catch(e) {}
+  
+  if (menuOverlay) {
+    menuOverlay.innerHTML = `
+      <div style="background:white;border-radius:20px;width:100%;max-width:560px;overflow:hidden;box-shadow:0 25px 60px rgba(0,0,0,0.4);animation:slideUp .3s ease;">
+        <!-- ヘッダー -->
+        <div style="padding:20px 24px 12px;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <button onclick="openImageReplaceMenu(${cardId})" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;">←</button>
+            <h3 style="font-size:18px;font-weight:bold;margin:0;">🪄 AIで別の図を生成</h3>
+          </div>
+          <p style="font-size:13px;opacity:0.9;margin:0;">プロンプト（指示文）を編集して、問題に合った図を作りましょう</p>
+        </div>
+        
+        <div style="padding:16px 24px 24px;">
+          <!-- プロンプト入力 -->
+          <label style="font-size:13px;font-weight:bold;color:#374151;display:block;margin-bottom:6px;">
+            <i class="fas fa-pencil-alt" style="margin-right:4px;color:#a855f7;"></i>
+            どんな図を生成しますか？（日本語OK）
+          </label>
+          <textarea id="ai-regen-prompt" rows="4" 
+                    style="width:100%;padding:12px;border:2px solid #e5e7eb;border-radius:12px;font-size:14px;resize:vertical;font-family:inherit;box-sizing:border-box;transition:border-color .2s;"
+                    onfocus="this.style.borderColor='#a855f7'"
+                    onblur="this.style.borderColor='#e5e7eb'"
+                    placeholder="例: 午前8時から午後3時までの気温の変化を示す折れ線グラフ。横軸は時刻、縦軸は気温（℃）"
+          >${defaultPrompt}</textarea>
+          
+          <!-- プロンプトのヒント -->
+          <div style="margin-top:8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:10px 12px;">
+            <p style="font-size:12px;color:#7c3aed;font-weight:bold;margin:0 0 4px;">💡 良いプロンプトのコツ</p>
+            <ul style="font-size:11px;color:#6b7280;margin:0;padding-left:16px;line-height:1.6;">
+              <li>具体的に: 「グラフ」→「午前10時に15℃、午後2時に23℃の折れ線グラフ」</li>
+              <li>要素を指定: 「目盛り付き」「ラベル付き」「色分け」など</li>
+              <li>形式を指定: 「棒グラフ」「時計の文字盤」「地図」「数直線」など</li>
+            </ul>
+          </div>
+          
+          <!-- スタイル選択 -->
+          <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;">
+            <button onclick="setAiStyle('シンプルな図解')" class="ai-style-btn" style="padding:6px 12px;border:1px solid #d1d5db;border-radius:20px;background:white;cursor:pointer;font-size:12px;transition:all .15s;">📐 シンプル図解</button>
+            <button onclick="setAiStyle('カラフルなイラスト')" class="ai-style-btn" style="padding:6px 12px;border:1px solid #d1d5db;border-radius:20px;background:white;cursor:pointer;font-size:12px;transition:all .15s;">🎨 カラフル</button>
+            <button onclick="setAiStyle('教科書風の正確な図')" class="ai-style-btn" style="padding:6px 12px;border:1px solid #d1d5db;border-radius:20px;background:white;cursor:pointer;font-size:12px;transition:all .15s;">📖 教科書風</button>
+            <button onclick="setAiStyle('手書き風のやさしいイラスト')" class="ai-style-btn" style="padding:6px 12px;border:1px solid #d1d5db;border-radius:20px;background:white;cursor:pointer;font-size:12px;transition:all .15s;">✍️ 手書き風</button>
+          </div>
+          
+          <!-- 生成ボタン -->
+          <button onclick="executeAiRegenerate(${cardId})" id="ai-regen-btn"
+                  style="margin-top:16px;width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#a855f7,#ec4899);color:white;font-size:16px;font-weight:bold;cursor:pointer;transition:all .15s;box-shadow:0 4px 12px rgba(168,85,247,0.3);">
+            🪄 この内容で生成する
+          </button>
+          
+          <p style="font-size:11px;color:#9ca3af;text-align:center;margin-top:8px;">
+            生成には15〜30秒かかります。失敗した場合はプロンプトを変えて再試行できます。
+          </p>
+        </div>
+      </div>
+    `
+  }
+}
+window.showAiRegenerateDialog = showAiRegenerateDialog
+
+function setAiStyle(style) {
+  const ta = document.getElementById('ai-regen-prompt')
+  if (ta) {
+    ta.value = ta.value.replace(/\s*\[スタイル:.*?\]\s*$/, '') + ' [スタイル: ' + style + ']'
+  }
+  // ボタンのハイライト
+  document.querySelectorAll('.ai-style-btn').forEach(b => {
+    b.style.background = 'white'
+    b.style.borderColor = '#d1d5db'
+    b.style.color = 'inherit'
+  })
+  event.target.style.background = '#a855f7'
+  event.target.style.borderColor = '#a855f7'
+  event.target.style.color = 'white'
+}
+window.setAiStyle = setAiStyle
+
+async function executeAiRegenerate(cardId) {
+  const ta = document.getElementById('ai-regen-prompt')
+  const btn = document.getElementById('ai-regen-btn')
+  const prompt = ta ? ta.value.trim() : ''
+  
+  if (!prompt) {
+    alert('プロンプトを入力してください')
+    return
+  }
+  
+  // 生成中UI
+  if (btn) {
+    btn.disabled = true
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i>AIが生成中... しばらくお待ちください'
+    btn.style.opacity = '0.7'
+  }
+  
+  try {
+    // スタイル抽出
+    const styleMatch = prompt.match(/\[スタイル:\s*(.+?)\]/)
+    const style = styleMatch ? styleMatch[1] : 'educational illustration'
+    const cleanPrompt = prompt.replace(/\s*\[スタイル:.*?\]\s*$/, '').trim()
+    
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: cleanPrompt,
+      card_id: cardId,
+      style: style
+    }, { timeout: 60000 })
+    
+    if (res.data.success && res.data.image_url) {
+      // カードに保存
+      try {
+        await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
+      } catch(e) { console.warn('カード更新スキップ:', e) }
+      
+      // カード上の画像を更新
+      const container = document.getElementById('card-image-container-' + cardId)
+      if (container) {
+        container.innerHTML = `
+          <img src="${res.data.image_url}" alt="AI生成画像" 
+               class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
+               onerror="handleImageLoadError(this, ${cardId})">
+          <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+            <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
+              <i class="fas fa-check-circle mr-1"></i>AI生成完了（${res.data.generation_time_ms || 0}ms）
+            </span>
+            <button onclick="openImageReplaceMenu(${cardId})" class="text-xs text-orange-500 hover:text-orange-700 underline font-bold">🔄 差し替え</button>
+            <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
+          </div>
+        `
+      }
+      
+      // メニューを閉じる
+      const overlay = document.getElementById('image-replace-overlay')
+      if (overlay) overlay.remove()
+      
+    } else {
+      throw new Error(res.data.error || '生成失敗')
+    }
+  } catch (err) {
+    console.error('AI再生成エラー:', err)
+    if (btn) {
+      btn.disabled = false
+      btn.innerHTML = '🪄 この内容で生成する'
+      btn.style.opacity = '1'
+    }
+    // エラーメッセージ表示
+    const errDiv = document.createElement('div')
+    errDiv.style.cssText = 'margin-top:8px;padding:10px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;'
+    errDiv.innerHTML = `
+      <p style="font-size:13px;color:#dc2626;font-weight:bold;margin:0 0 4px;">⚠️ 生成に失敗しました</p>
+      <p style="font-size:12px;color:#6b7280;margin:0;">${err.response?.data?.error || err.message || 'サーバーエラー'}</p>
+      <p style="font-size:11px;color:#9ca3af;margin:4px 0 0;">プロンプトを変えて再試行するか、手動で画像を追加してください。</p>
+    `
+    btn.parentElement.appendChild(errDiv)
+  }
+}
+window.executeAiRegenerate = executeAiRegenerate
+
+// カメラ撮影→カードに即貼付（教科書・プリントの撮影用）
+function openCameraForCard(cardId) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.capture = 'environment' // 背面カメラ優先
+  input.style.display = 'none'
+  input.onchange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) uploadFileToCard(cardId, file)
+    input.remove()
+  }
+  document.body.appendChild(input)
+  input.click()
+}
+window.openCameraForCard = openCameraForCard
 
 // ====================================================================
 // 画像エディタ（Canvas ベース）
@@ -35235,12 +35530,8 @@ async function saveEditedImageOrig() {
   }, 'image/png', 0.9)
 }
 
-// 画像エディタを閉じる
-function closeImageEditor() {
-  const modal = document.getElementById('image-editor-modal')
-  if (modal) modal.remove()
-  imageEditorState = { originalImage: null, editedCanvas: null, rotation: 0, scale: 1.0 }
-}
+// 画像エディタを閉じる（新版のcloseImageEditorを使用）
+// closeImageEditor is defined in the new Canvas image editor section
 
 // 複数ファイル一括アップロード
 async function uploadMultipleFiles(files, type = 'image') {
