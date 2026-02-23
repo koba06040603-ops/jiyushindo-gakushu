@@ -1,3 +1,0 @@
-This is a placeholder for the 512x512 app icon.
-In production, replace this with an actual PNG image.
-Same design as 192x192 but larger resolution.

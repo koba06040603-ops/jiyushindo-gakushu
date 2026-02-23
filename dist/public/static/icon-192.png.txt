@@ -1,9 +1,0 @@
-This is a placeholder for the 192x192 app icon.
-In production, replace this with an actual PNG image.
-You can use tools like:
-- Figma
-- Canva  
-- Adobe Express
-- Or any image editor
-
-Recommended: A simple graduation cap icon with the app's theme color (#6366f1)
