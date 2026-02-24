@@ -6903,26 +6903,37 @@ function handleImageLoadError(imgEl, cardId) {
   const parent = imgEl.closest('[id^="card-image-container-"]') || imgEl.parentElement
   if (!parent) return
   parent.innerHTML = `
-    <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-5 text-center" id="image-placeholder-${cardId}">
-      <div class="inline-flex items-center justify-center w-14 h-14 bg-orange-100 rounded-full mb-3">
-        <i class="fas fa-image text-2xl text-orange-400"></i>
+    <div class="bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-6 text-center" id="image-placeholder-${cardId}">
+      <div class="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-3">
+        <i class="fas fa-image text-3xl text-orange-400"></i>
       </div>
-      <p class="text-sm text-orange-700 font-bold mb-1">画像の読み込みに失敗しました</p>
-      <p class="text-xs text-gray-500 mb-3">別の方法で図を追加しましょう</p>
-      <div class="flex flex-col gap-2 max-w-xs mx-auto">
+      <p class="text-base text-orange-700 font-bold mb-1">画像の読み込みに失敗しました</p>
+      <p class="text-sm text-gray-500 mb-4">以下の方法で図を追加できます</p>
+      <div class="flex flex-col gap-3 max-w-sm mx-auto">
         <button onclick="generateImageForCard(${cardId}, '')"
-                class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition">
-          <i class="fas fa-wand-magic-sparkles"></i> AI再生成
+                class="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-bold text-sm shadow-md hover:shadow-lg transition">
+          <i class="fas fa-wand-magic-sparkles"></i> AIで図を自動生成
         </button>
         <div class="flex gap-2">
           <button onclick="openFilePickerForCard(${cardId})"
-                  class="flex-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm">
-            <i class="fas fa-file-image mr-1"></i>JPG/PDF
+                  class="flex-1 flex items-center justify-center gap-1 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2.5 rounded-xl text-sm font-bold transition shadow-sm">
+            <i class="fas fa-file-image"></i> ファイル選択
+          </button>
+          <button onclick="pasteImageFromClipboard(${cardId})"
+                  class="flex-1 flex items-center justify-center gap-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2.5 rounded-xl text-sm font-bold transition shadow-sm">
+            <i class="fas fa-paste"></i> 貼り付け
           </button>
           <button onclick="quickPasteImageUrl(${cardId})"
-                  class="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm">
-            <i class="fas fa-paste mr-1"></i>URL貼付
+                  class="flex-1 flex items-center justify-center gap-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2.5 rounded-xl text-sm font-bold transition shadow-sm">
+            <i class="fas fa-link"></i> URL
           </button>
+        </div>
+        <div class="border-2 border-dashed border-gray-300 rounded-xl py-3 px-4 bg-white bg-opacity-50 hover:border-purple-400 hover:bg-purple-50 transition cursor-pointer"
+             onclick="openFilePickerForCard(${cardId})">
+          <p class="text-xs text-gray-500">
+            <i class="fas fa-cloud-upload-alt text-gray-400 mr-1"></i>
+            <strong>ドラッグ&ドロップ</strong>、<strong>Ctrl+V</strong>、<strong>右クリック→貼り付け</strong>で画像追加
+          </p>
         </div>
       </div>
     </div>`
@@ -30306,7 +30317,7 @@ async function quickPasteImageUrl(cardId) {
         <div class="text-center">
           <img src="${trimmedUrl}" alt="問題の図" 
                class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
-               onerror="this.parentElement.innerHTML='<p class=\\'text-red-500 font-bold p-4\\'>画像を読み込めませんでした。URLを確認してください。</p><button onclick=\\'quickPasteImageUrl(${cardId})\\' class=\\'bg-blue-500 text-white px-4 py-2 rounded-lg font-bold mt-2\\'>別のURLを試す</button>'">
+               onerror="handleImageLoadError(this, ${cardId})">
           <div class="mt-2 flex items-center justify-center gap-2">
             <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold"><i class="fas fa-check-circle mr-1"></i>保存しました</span>
             <button onclick="quickPasteImageUrl(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline">変更</button>
@@ -30672,12 +30683,22 @@ function openImageReplaceMenu(cardId) {
           <i class="fas fa-chevron-right" style="color:#d1d5db;"></i>
         </button>
         
-        <!-- 5. 簡単な編集（描き込み） -->
+        <!-- 5. クリップボードから貼り付け -->
+        <button class="replace-btn" onclick="document.getElementById('image-replace-overlay').remove(); pasteImageFromClipboard(${cardId})">
+          <div class="replace-icon" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:white;"><i class="fas fa-paste"></i></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:bold;font-size:15px;color:#111827;">クリップボードから貼り付け</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:2px;">コピーした画像をそのまま貼り付け</div>
+          </div>
+          <i class="fas fa-chevron-right" style="color:#d1d5db;"></i>
+        </button>
+        
+        <!-- 6. 簡単な編集（描き込み・トリミング） -->
         <button class="replace-btn" onclick="document.getElementById('image-replace-overlay').remove(); openImageEditor(${cardId})" style="border-bottom:none;">
           <div class="replace-icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;">✏️</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:bold;font-size:15px;color:#111827;">描き込み編集</div>
-            <div style="font-size:12px;color:#6b7280;margin-top:2px;">今の画像にペンやテキストで補足を追加</div>
+            <div style="font-weight:bold;font-size:15px;color:#111827;">編集・トリミング・拡大縮小</div>
+            <div style="font-size:12px;color:#6b7280;margin-top:2px;">描き込み・切り抜き・サイズ変更</div>
           </div>
           <i class="fas fa-chevron-right" style="color:#d1d5db;"></i>
         </button>
@@ -30983,13 +31004,25 @@ function openImageEditor(cardId) {
           </select>
         </div>
         
+        <!-- 拡大・縮小・トリミング -->
+        <div style="display:flex;gap:2px;background:white;border-radius:8px;padding:2px;border:1px solid #e5e7eb;">
+          <button onclick="editorZoom(1.25)" title="拡大" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">🔍+</button>
+          <button onclick="editorZoom(0.8)" title="縮小" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">🔍-</button>
+          <button id="ed-crop-btn" onclick="editorToggleCrop()" title="トリミング" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">✂️</button>
+          <button onclick="editorRotate()" title="90°回転" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">🔄</button>
+        </div>
+        
         <!-- アクション -->
         <div style="display:flex;gap:2px;background:white;border-radius:8px;padding:2px;border:1px solid #e5e7eb;">
           <button onclick="editorUndo()" title="元に戻す" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">↩️</button>
           <button onclick="editorRedo()" title="やり直し" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">↪️</button>
-          <button onclick="editorRotate()" title="90°回転" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">🔄</button>
           <button onclick="editorClear()" title="描き込みクリア" style="padding:6px 10px;border:none;border-radius:6px;cursor:pointer;font-size:14px;background:transparent;">🗑️</button>
         </div>
+        
+        <!-- トリミング適用ボタン（非表示） -->
+        <button id="ed-crop-apply" onclick="editorApplyCrop()" style="display:none;padding:6px 12px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:bold;background:#ef4444;color:white;">
+          ✂️ トリミング適用
+        </button>
         
         <!-- 保存 -->
         <div style="margin-left:auto;display:flex;gap:4px;">
@@ -31006,7 +31039,7 @@ function openImageEditor(cardId) {
       
       <!-- フッター情報 -->
       <div style="padding:6px 12px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#6b7280;flex-shrink:0;">
-        <span>💡 ペンで描き込み・テキスト追加で問題に合った図に編集できます</span>
+        <span>💡 描き込み・テキスト追加・トリミング（✂️）・拡大縮小（🔍）で画像を編集</span>
         <span id="editor-size-info"></span>
       </div>
     </div>
@@ -31028,7 +31061,10 @@ function openImageEditor(cardId) {
     rotation: 0,
     baseImage: null,
     tempCanvas: null,
-    textMode: false
+    textMode: false,
+    cropMode: false,
+    cropStart: null,
+    cropEnd: null
   }
   window._editorState = editorState
   
@@ -31053,7 +31089,6 @@ function openImageEditor(cardId) {
     document.getElementById('editor-size-info').textContent = canvas.width + ' × ' + canvas.height + 'px'
   }
   baseImg.onerror = () => {
-    // data URLの場合はCORSの問題なし、それ以外なら代替表示
     const area = document.getElementById('editor-canvas-area')
     area.innerHTML = '<div style="color:white;text-align:center;padding:40px;"><i class="fas fa-exclamation-triangle" style="font-size:48px;color:#fbbf24;margin-bottom:16px;display:block;"></i><p style="font-size:18px;font-weight:bold;margin-bottom:8px;">画像を読み込めませんでした</p><p style="font-size:14px;color:#9ca3af;">別の画像をアップロードしてください</p></div>'
   }
@@ -31062,6 +31097,8 @@ function openImageEditor(cardId) {
   // ツール切り替え
   overlay.querySelectorAll('.ed-tool').forEach(btn => {
     btn.addEventListener('click', () => {
+      // トリミングモード中なら解除
+      if (editorState.cropMode) editorToggleCrop()
       overlay.querySelectorAll('.ed-tool').forEach(b => {
         b.style.background = 'transparent'
         b.style.color = 'inherit'
@@ -31103,6 +31140,15 @@ function getCanvasPos(e, canvas) {
 
 function editorStartDraw(e, canvas, ctx, state) {
   const pos = getCanvasPos(e, canvas)
+  
+  // トリミングモード
+  if (state.cropMode) {
+    state.cropStart = { x: pos.x, y: pos.y }
+    state.cropEnd = null
+    state.isDrawing = true
+    return
+  }
+  
   state.isDrawing = true
   state.startX = pos.x
   state.startY = pos.y
@@ -31156,6 +31202,13 @@ function editorStartDraw(e, canvas, ctx, state) {
 function editorMoveDraw(e, canvas, ctx, state) {
   if (!state.isDrawing) return
   const pos = getCanvasPos(e, canvas)
+  
+  // トリミングモード: 矩形を描画
+  if (state.cropMode && state.cropStart) {
+    state.cropEnd = { x: pos.x, y: pos.y }
+    editorRedrawCrop()
+    return
+  }
   
   if (state.tool === 'pen' || state.tool === 'marker' || state.tool === 'eraser') {
     ctx.lineTo(pos.x, pos.y)
@@ -31212,6 +31265,9 @@ function editorMoveDraw(e, canvas, ctx, state) {
 function editorEndDraw(e, canvas, ctx, state) {
   if (!state.isDrawing) return
   state.isDrawing = false
+  
+  // トリミングモードではヒストリー不要
+  if (state.cropMode) return
   
   // リセット
   ctx.globalCompositeOperation = 'source-over'
@@ -31347,6 +31403,176 @@ window.editorUndo = editorUndo
 window.editorRedo = editorRedo
 window.editorRotate = editorRotate
 window.editorClear = editorClear
+
+// 画像エディタ: 拡大・縮小
+function editorZoom(factor) {
+  const canvas = document.getElementById('editor-canvas')
+  const ctx = canvas.getContext('2d')
+  if (!canvas || !window._editorState) return
+  
+  // 現在の内容をtempに保存
+  const tempCanvas = document.createElement('canvas')
+  tempCanvas.width = canvas.width
+  tempCanvas.height = canvas.height
+  tempCanvas.getContext('2d').drawImage(canvas, 0, 0)
+  
+  // 新しいサイズ
+  const newW = Math.round(canvas.width * factor)
+  const newH = Math.round(canvas.height * factor)
+  
+  // 最小/最大制限
+  if (newW < 50 || newH < 50 || newW > 3000 || newH > 3000) return
+  
+  canvas.width = newW
+  canvas.height = newH
+  ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, newW, newH)
+  
+  saveEditorHistory()
+  const info = document.getElementById('editor-size-info')
+  if (info) info.textContent = newW + ' × ' + newH + 'px'
+}
+window.editorZoom = editorZoom
+
+// 画像エディタ: トリミングモード切り替え
+function editorToggleCrop() {
+  const state = window._editorState
+  if (!state) return
+  
+  state.cropMode = !state.cropMode
+  state.cropStart = null
+  state.cropEnd = null
+  
+  const canvas = document.getElementById('editor-canvas')
+  const cropBtn = document.getElementById('ed-crop-btn')
+  const cropApply = document.getElementById('ed-crop-apply')
+  
+  if (state.cropMode) {
+    canvas.style.cursor = 'crosshair'
+    if (cropBtn) { cropBtn.style.background = '#ef4444'; cropBtn.style.color = 'white' }
+    if (cropApply) cropApply.style.display = 'inline-block'
+    // クロップベース画像をキャッシュ
+    const cacheImg = new Image()
+    cacheImg.onload = () => { state._cropBaseImg = cacheImg }
+    if (state.history.length > 0 && state.historyIndex >= 0) {
+      cacheImg.src = state.history[state.historyIndex]
+    }
+    showPasteToast('トリミングモード: ドラッグで範囲を選択してください')
+  } else {
+    canvas.style.cursor = 'crosshair'
+    if (cropBtn) { cropBtn.style.background = 'transparent'; cropBtn.style.color = 'inherit' }
+    if (cropApply) cropApply.style.display = 'none'
+    state._cropBaseImg = null
+    // リドロー（トリミング矩形を消す）
+    editorRedrawCrop()
+  }
+}
+window.editorToggleCrop = editorToggleCrop
+
+// トリミング矩形を描画
+function editorRedrawCrop() {
+  const canvas = document.getElementById('editor-canvas')
+  const state = window._editorState
+  if (!canvas || !state) return
+  
+  const ctx = canvas.getContext('2d')
+  
+  // 履歴から復元（描き込みを保持）- 同期的にキャッシュ画像を使用
+  if (state._cropBaseImg) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(state._cropBaseImg, 0, 0)
+  } else if (state.history.length > 0 && state.historyIndex >= 0) {
+    // 初回: キャッシュ画像を作成
+    const img = new Image()
+    img.onload = () => {
+      state._cropBaseImg = img
+      editorRedrawCrop() // 再度呼び出し
+    }
+    img.src = state.history[state.historyIndex]
+    return
+  }
+  
+  if (!state.cropMode || !state.cropStart || !state.cropEnd) return
+  
+  const sx = Math.min(state.cropStart.x, state.cropEnd.x)
+  const sy = Math.min(state.cropStart.y, state.cropEnd.y)
+  const sw = Math.abs(state.cropEnd.x - state.cropStart.x)
+  const sh = Math.abs(state.cropEnd.y - state.cropStart.y)
+  
+  // 暗くする
+  ctx.fillStyle = 'rgba(0,0,0,0.4)'
+  ctx.fillRect(0, 0, canvas.width, sy)
+  ctx.fillRect(0, sy, sx, sh)
+  ctx.fillRect(sx + sw, sy, canvas.width - sx - sw, sh)
+  ctx.fillRect(0, sy + sh, canvas.width, canvas.height - sy - sh)
+  
+  // 選択枠
+  ctx.strokeStyle = '#fff'
+  ctx.lineWidth = 2
+  ctx.setLineDash([6, 4])
+  ctx.strokeRect(sx, sy, sw, sh)
+  ctx.setLineDash([])
+  
+  // サイズ表示
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  ctx.font = 'bold 12px sans-serif'
+  ctx.fillText(Math.round(sw) + ' x ' + Math.round(sh), sx + 4, sy > 16 ? sy - 4 : sy + 14)
+}
+
+// トリミング適用
+function editorApplyCrop() {
+  const canvas = document.getElementById('editor-canvas')
+  const state = window._editorState
+  if (!canvas || !state || !state.cropStart || !state.cropEnd) {
+    alert('トリミング範囲をドラッグで選択してください')
+    return
+  }
+  
+  // 選択範囲を計算
+  const sx = Math.round(Math.min(state.cropStart.x, state.cropEnd.x))
+  const sy = Math.round(Math.min(state.cropStart.y, state.cropEnd.y))
+  const sw = Math.round(Math.abs(state.cropEnd.x - state.cropStart.x))
+  const sh = Math.round(Math.abs(state.cropEnd.y - state.cropStart.y))
+  
+  if (sw < 10 || sh < 10) {
+    alert('トリミング範囲が小さすぎます')
+    return
+  }
+  
+  // クリーンな履歴画像からクロップ
+  const srcImg = new Image()
+  srcImg.onload = () => {
+    // srcImgをtempCanvasに描画してgetImageDataで切り出す
+    const tempCanvas = document.createElement('canvas')
+    tempCanvas.width = srcImg.width
+    tempCanvas.height = srcImg.height
+    const tempCtx = tempCanvas.getContext('2d')
+    tempCtx.drawImage(srcImg, 0, 0)
+    
+    const cropData = tempCtx.getImageData(sx, sy, sw, sh)
+    
+    canvas.width = sw
+    canvas.height = sh
+    canvas.getContext('2d').putImageData(cropData, 0, 0)
+    
+    // トリミングモード解除
+    state.cropMode = false
+    state.cropStart = null
+    state.cropEnd = null
+    const cropBtn = document.getElementById('ed-crop-btn')
+    const cropApply = document.getElementById('ed-crop-apply')
+    if (cropBtn) { cropBtn.style.background = 'transparent'; cropBtn.style.color = 'inherit' }
+    if (cropApply) cropApply.style.display = 'none'
+    
+    saveEditorHistory()
+    
+    const info = document.getElementById('editor-size-info')
+    if (info) info.textContent = sw + ' × ' + sh + 'px'
+    
+    showPasteToast('トリミングしました！')
+  }
+  srcImg.src = state.history[state.historyIndex]
+}
+window.editorApplyCrop = editorApplyCrop
 
 // ====================================================================
 // 複数メディアギャラリー（画像・動画・音声をカードに複数添付）
@@ -35595,13 +35821,21 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
   // デフォルト: 画像
   return `
     <div class="mt-4 text-center" id="card-image-container-${cardId}">
-      <img src="${url}" alt="${description || '問題の図'}" 
-           class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: ${maxHeight};"
-           onerror="handleImageLoadError(this, ${cardId})">
+      <div class="relative group inline-block cursor-pointer" onclick="replaceCardImage(${cardId})">
+        <img src="${url}" alt="${description || '問題の図'}" 
+             class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200 transition group-hover:brightness-90" style="max-height: ${maxHeight};"
+             onerror="handleImageLoadError(this, ${cardId})">
+        <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
+          <div class="flex gap-2">
+            <span class="bg-white bg-opacity-90 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold shadow-lg"><i class="fas fa-edit mr-1"></i>編集</span>
+            <span class="bg-white bg-opacity-90 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold shadow-lg"><i class="fas fa-sync-alt mr-1"></i>差し替え</span>
+          </div>
+        </div>
+      </div>
       <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
         <p class="text-xs text-gray-500"><i class="fas fa-image mr-1"></i>${description || '問題の図'}</p>
-        ${showEdit ? `<button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>` : ''}
-        ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
+        ${showEdit ? `<button onclick="event.stopPropagation(); openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-crop-alt mr-1"></i>編集・トリミング</button>` : ''}
+        ${showReplace ? `<button onclick="event.stopPropagation(); replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
       </div>
     </div>`
 }
