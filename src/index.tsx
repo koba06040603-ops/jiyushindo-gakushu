@@ -10232,7 +10232,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
       
       // メタデータ更新
       await env.DB.prepare(`
-        UPDATE curriculum SET total_hours = ?, unit_goal = ?, non_cognitive_goal = ?, updated_at = CURRENT_TIMESTAMP
+        UPDATE curriculum SET total_hours = ?, unit_goal = ?, non_cognitive_goal = ?
         WHERE id = ?
       `).bind(
         curriculum.total_hours || 8,
