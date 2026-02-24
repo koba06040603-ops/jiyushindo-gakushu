@@ -5841,9 +5841,9 @@ async function loadCardPage(cardId) {
                            onclick="openFilePickerForCard(${cardIdVal})">
                         <p class="text-xs text-gray-500">
                           <i class="fas fa-cloud-upload-alt text-gray-400 mr-1"></i>
-                          ここに<strong>ファイルをドラッグ&ドロップ</strong>するか、<strong>Ctrl+V</strong>で画像を貼り付け
+                          ここに<strong>ファイルをドラッグ&ドロップ</strong>、<strong>Ctrl+V</strong>、または<strong>右クリック→貼り付け</strong>で画像を追加
                         </p>
-                        <p class="text-xs text-gray-400 mt-0.5">JPG・PNG・PDF 対応（5MBまで）</p>
+                        <p class="text-xs text-gray-400 mt-0.5">JPG・PNG・PDF 対応（10MBまで）・右クリックで貼り付け可</p>
                       </div>
                     </div>
                     
@@ -31694,6 +31694,363 @@ function initAllDropZones() {
   })
 }
 window.initAllDropZones = initAllDropZones
+
+// ============================================
+// 右クリック貼り付け & グローバルペースト機能
+// コピーした画像を右クリック→貼り付けで挿入可能にする
+// ============================================
+
+// カスタム右クリックコンテキストメニュー
+;(function initContextMenuPaste() {
+  // メニューHTML
+  const menuHTML = `
+    <div id="paste-context-menu" style="display:none; position:fixed; z-index:99999; min-width:200px;" 
+         class="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+      <div class="px-3 py-2 bg-gradient-to-r from-purple-50 to-blue-50 border-b border-gray-100">
+        <span class="text-xs font-bold text-gray-500"><i class="fas fa-image mr-1"></i>画像操作</span>
+      </div>
+      <button id="ctx-paste-image" class="w-full text-left px-4 py-3 hover:bg-purple-50 flex items-center gap-3 transition-colors group">
+        <span class="w-8 h-8 rounded-lg bg-purple-100 group-hover:bg-purple-200 flex items-center justify-center transition">
+          <i class="fas fa-paste text-purple-600"></i>
+        </span>
+        <div>
+          <span class="text-sm font-bold text-gray-800 block">画像を貼り付け</span>
+          <span class="text-xs text-gray-400">クリップボードから</span>
+        </div>
+        <span class="ml-auto text-xs text-gray-300 font-mono">Ctrl+V</span>
+      </button>
+      <button id="ctx-pick-file" class="w-full text-left px-4 py-3 hover:bg-orange-50 flex items-center gap-3 transition-colors border-t border-gray-50 group">
+        <span class="w-8 h-8 rounded-lg bg-orange-100 group-hover:bg-orange-200 flex items-center justify-center transition">
+          <i class="fas fa-file-image text-orange-600"></i>
+        </span>
+        <div>
+          <span class="text-sm font-bold text-gray-800 block">ファイルを選択</span>
+          <span class="text-xs text-gray-400">JPG / PNG / PDF</span>
+        </div>
+      </button>
+      <button id="ctx-paste-url" class="w-full text-left px-4 py-3 hover:bg-green-50 flex items-center gap-3 transition-colors border-t border-gray-50 group">
+        <span class="w-8 h-8 rounded-lg bg-green-100 group-hover:bg-green-200 flex items-center justify-center transition">
+          <i class="fas fa-link text-green-600"></i>
+        </span>
+        <div>
+          <span class="text-sm font-bold text-gray-800 block">URL を貼り付け</span>
+          <span class="text-xs text-gray-400">画像URLを入力</span>
+        </div>
+      </button>
+    </div>`
+  
+  // DOM Ready で追加
+  function injectMenu() {
+    if (document.getElementById('paste-context-menu')) return
+    const div = document.createElement('div')
+    div.innerHTML = menuHTML
+    document.body.appendChild(div.firstElementChild)
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectMenu)
+  } else {
+    injectMenu()
+  }
+  
+  let _ctxCardId = null
+
+  // カード要素から cardId を抽出するヘルパー
+  function findCardIdFromElement(el) {
+    // 直接 ID から取得
+    const idPatterns = [
+      { prefix: 'image-placeholder-', regex: /^image-placeholder-(\d+)$/ },
+      { prefix: 'card-image-container-', regex: /^card-image-container-(\d+)$/ },
+      { prefix: 'guide-img-', regex: /^guide-img-(\d+)$/ },
+      { prefix: 'media-gallery-', regex: /^media-gallery-(\d+)$/ },
+    ]
+    
+    let node = el
+    for (let i = 0; i < 15 && node; i++) {
+      if (node.id) {
+        for (const p of idPatterns) {
+          const m = node.id.match(p.regex)
+          if (m) return Number(m[1])
+        }
+      }
+      // data-card-id 属性
+      if (node.dataset && node.dataset.cardId) return Number(node.dataset.cardId)
+      // onclick 属性にcard IDが含まれるか
+      const onclick = node.getAttribute && node.getAttribute('onclick')
+      if (onclick) {
+        const m = onclick.match(/(?:openFilePickerForCard|quickPasteImageUrl|generateImageForCard|uploadFileToCard)\s*\(\s*(\d+)/)
+        if (m) return Number(m[1])
+      }
+      node = node.parentElement
+    }
+    
+    // 最後のフォールバック: 現在表示中のカード
+    if (window.currentCardData) {
+      return window.currentCardData.card_id || window.currentCardData.id
+    }
+    return null
+  }
+
+  // 右クリックイベント
+  document.addEventListener('contextmenu', (e) => {
+    const cardId = findCardIdFromElement(e.target)
+    if (!cardId) return // カード外では通常メニューを表示
+    
+    // 画像関連エリアかチェック（プレースホルダー、画像コンテナ、カード本体）
+    let isImageArea = false
+    let node = e.target
+    for (let i = 0; i < 15 && node; i++) {
+      if (node.id && (
+        node.id.startsWith('image-placeholder-') ||
+        node.id.startsWith('card-image-container-') ||
+        node.id.startsWith('guide-img-') ||
+        node.id.startsWith('media-gallery-')
+      )) {
+        isImageArea = true
+        break
+      }
+      // カードページ全体でも有効にする
+      if (node.classList && (
+        node.classList.contains('card-page-content') ||
+        node.classList.contains('learning-card-body')
+      )) {
+        isImageArea = true
+        break
+      }
+      // id="app" に到達した場合、カードビュー内なら有効
+      if (node.id === 'app' && window.currentCardData) {
+        isImageArea = true
+        break
+      }
+      node = node.parentElement
+    }
+    
+    if (!isImageArea) return
+    
+    e.preventDefault()
+    _ctxCardId = cardId
+    
+    const menu = document.getElementById('paste-context-menu')
+    if (!menu) return
+    
+    // メニュー位置を調整（画面外に出ないように）
+    const menuW = 220, menuH = 200
+    let x = e.clientX, y = e.clientY
+    if (x + menuW > window.innerWidth) x = window.innerWidth - menuW - 8
+    if (y + menuH > window.innerHeight) y = window.innerHeight - menuH - 8
+    
+    menu.style.left = x + 'px'
+    menu.style.top = y + 'px'
+    menu.style.display = 'block'
+    
+    // アニメーション
+    menu.style.opacity = '0'
+    menu.style.transform = 'scale(0.95)'
+    menu.style.transition = 'opacity 0.15s ease, transform 0.15s ease'
+    requestAnimationFrame(() => {
+      menu.style.opacity = '1'
+      menu.style.transform = 'scale(1)'
+    })
+  })
+  
+  // メニュー外クリックで閉じる
+  document.addEventListener('click', () => {
+    const menu = document.getElementById('paste-context-menu')
+    if (menu) menu.style.display = 'none'
+  })
+  document.addEventListener('scroll', () => {
+    const menu = document.getElementById('paste-context-menu')
+    if (menu) menu.style.display = 'none'
+  }, true)
+  
+  // メニューアクション: 貼り付け
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#ctx-paste-image')
+    if (!btn || !_ctxCardId) return
+    const menu = document.getElementById('paste-context-menu')
+    if (menu) menu.style.display = 'none'
+    await pasteImageFromClipboard(_ctxCardId)
+  })
+  
+  // メニューアクション: ファイル選択
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#ctx-pick-file')
+    if (!btn || !_ctxCardId) return
+    const menu = document.getElementById('paste-context-menu')
+    if (menu) menu.style.display = 'none'
+    if (typeof openFilePickerForCard === 'function') openFilePickerForCard(_ctxCardId)
+  })
+  
+  // メニューアクション: URL貼り付け
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#ctx-paste-url')
+    if (!btn || !_ctxCardId) return
+    const menu = document.getElementById('paste-context-menu')
+    if (menu) menu.style.display = 'none'
+    if (typeof quickPasteImageUrl === 'function') quickPasteImageUrl(_ctxCardId)
+  })
+})();
+
+// クリップボードから画像を読み取ってアップロード
+async function pasteImageFromClipboard(cardId) {
+  try {
+    // Clipboard API で読み取り
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+      alert('このブラウザはクリップボードの読み取りに対応していません。\nCtrl+V でも貼り付けできます。')
+      return
+    }
+    
+    const clipboardItems = await navigator.clipboard.read()
+    let imageBlob = null
+    
+    for (const item of clipboardItems) {
+      // 画像タイプを探す
+      for (const type of item.types) {
+        if (type.startsWith('image/')) {
+          imageBlob = await item.getType(type)
+          break
+        }
+      }
+      if (imageBlob) break
+    }
+    
+    if (!imageBlob) {
+      // テキストとして画像URLがコピーされている場合
+      try {
+        const text = await navigator.clipboard.readText()
+        if (text && /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg|bmp)/i.test(text.trim())) {
+          const useUrl = confirm('クリップボードに画像URLがあります:\n' + text.trim().substring(0, 80) + '\n\nこのURLを画像として設定しますか？')
+          if (useUrl) {
+            await axios.put('/api/card/' + cardId, { problem_image_url: text.trim() })
+            // UI更新
+            const placeholder = document.getElementById('image-placeholder-' + cardId)
+            const container = document.getElementById('card-image-container-' + cardId)
+            const target = placeholder || container
+            if (target) {
+              target.outerHTML = `
+                <div class="mt-4 text-center" id="card-image-container-${cardId}">
+                  <img src="${text.trim()}" alt="問題の図" 
+                       class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
+                       onerror="handleImageLoadError(this, ${cardId})">
+                  <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+                    <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
+                      <i class="fas fa-check-circle mr-1"></i>保存済み
+                    </span>
+                    <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+                  </div>
+                </div>`
+            }
+            showPasteToast('画像URLを設定しました')
+            return
+          }
+        }
+      } catch(_) {}
+      
+      alert('クリップボードに画像がありません。\n\n画像をコピーしてからもう一度お試しください。\n（画像を右クリック→「画像をコピー」など）')
+      return
+    }
+    
+    // Blob を File オブジェクトに変換
+    const ext = imageBlob.type.split('/')[1] || 'png'
+    const fileName = 'pasted-image-' + Date.now() + '.' + ext
+    const file = new File([imageBlob], fileName, { type: imageBlob.type })
+    
+    showPasteToast('画像を貼り付け中...')
+    
+    // 既存のアップロード関数を利用
+    const result = await uploadFileToCard(cardId, file)
+    if (result) {
+      showPasteToast('画像を貼り付けました！')
+    }
+  } catch (err) {
+    console.error('クリップボード貼り付けエラー:', err)
+    if (err.name === 'NotAllowedError') {
+      alert('クリップボードへのアクセスが許可されていません。\n\nブラウザの設定でクリップボードへのアクセスを許可するか、\nCtrl+V で貼り付けてください。')
+    } else {
+      alert('貼り付けに失敗しました: ' + (err.message || '不明なエラー'))
+    }
+  }
+}
+window.pasteImageFromClipboard = pasteImageFromClipboard
+
+// 貼り付け成功トースト通知
+function showPasteToast(message) {
+  let toast = document.getElementById('paste-toast')
+  if (!toast) {
+    toast = document.createElement('div')
+    toast.id = 'paste-toast'
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;transition:opacity 0.3s ease,transform 0.3s ease;'
+    document.body.appendChild(toast)
+  }
+  toast.innerHTML = `
+    <div class="flex items-center gap-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-2xl shadow-2xl">
+      <i class="fas fa-paste text-lg"></i>
+      <span class="font-bold text-sm">${message}</span>
+    </div>`
+  toast.style.opacity = '1'
+  toast.style.transform = 'translateX(-50%) translateY(0)'
+  
+  clearTimeout(toast._hideTimer)
+  toast._hideTimer = setTimeout(() => {
+    toast.style.opacity = '0'
+    toast.style.transform = 'translateX(-50%) translateY(10px)'
+  }, 2500)
+}
+
+// グローバル Ctrl+V / Cmd+V ペーストハンドラー
+// ドロップゾーンにフォーカスが無くても、カードページ表示中なら画像を貼り付ける
+document.addEventListener('paste', (e) => {
+  // テキスト入力中は通常のペースト動作を優先
+  const activeEl = document.activeElement
+  if (activeEl && (
+    activeEl.tagName === 'INPUT' || 
+    activeEl.tagName === 'TEXTAREA' || 
+    activeEl.isContentEditable
+  )) {
+    // ただし画像が含まれていたら画像ペーストを優先するか確認
+    const hasImage = Array.from(e.clipboardData?.items || []).some(it => it.type.startsWith('image/'))
+    if (!hasImage) return // テキストのみ→通常ペースト
+  }
+  
+  const items = e.clipboardData?.items
+  if (!items) return
+  
+  let imageItem = null
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      imageItem = item
+      break
+    }
+  }
+  if (!imageItem) return
+  
+  // カード ID を検出
+  let cardId = null
+  
+  // 1. 現在のカードページ
+  if (window.currentCardData) {
+    cardId = window.currentCardData.card_id || window.currentCardData.id
+  }
+  
+  // 2. ページ上のプレースホルダーから推測
+  if (!cardId) {
+    const placeholder = document.querySelector('[id^="image-placeholder-"]')
+    if (placeholder) {
+      const m = placeholder.id.match(/image-placeholder-(\d+)/)
+      if (m) cardId = Number(m[1])
+    }
+  }
+  
+  if (!cardId) return // カードが特定できない
+  
+  e.preventDefault()
+  const file = imageItem.getAsFile()
+  if (file) {
+    showPasteToast('画像を貼り付け中...')
+    uploadFileToCard(cardId, file).then(ok => {
+      if (ok) showPasteToast('画像を貼り付けました！')
+    })
+  }
+})
 
 // ============================================
 // 学習スタイル別サンプルページ（プレゼン用サンプル）
