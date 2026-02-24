@@ -6866,18 +6866,18 @@ async function generateImageForCard(cardId, description) {
   const placeholder = document.getElementById('image-placeholder-' + cardId) || 
                        document.getElementById('card-image-container-' + cardId)
   
-  // 生成中の表示
+  // 生成中の表示（プログレスバー修正：滑らかな左→右アニメーション）
   if (placeholder) {
     placeholder.innerHTML = `
       <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-2xl p-6 text-center">
-        <div class="inline-flex items-center justify-center w-20 h-20 bg-purple-100 rounded-full mb-3">
-          <i class="fas fa-wand-magic-sparkles text-3xl text-purple-500 animate-pulse"></i>
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-3">
+          <i class="fas fa-wand-magic-sparkles text-2xl text-purple-500 animate-pulse"></i>
         </div>
-        <p class="text-base text-purple-800 font-bold mb-1">🎨 Gemini が教育用の図を生成中...</p>
-        <p class="text-sm text-gray-600 mb-2">問題内容を分析して最適な図を描いています</p>
-        <div class="mt-3 max-w-xs mx-auto"><div class="h-2.5 bg-purple-200 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 rounded-full" style="animation: loading-bar 2s ease-in-out infinite;"></div></div></div>
-        <p class="text-xs text-gray-400 mt-3">15〜45秒ほどお待ちください</p>
-        <style>@keyframes loading-bar { 0% { width: 10%; } 50% { width: 80%; } 100% { width: 10%; } }</style>
+        <p class="text-base text-purple-800 font-bold mb-1">AI が問題を分析中...</p>
+        <p class="text-sm text-gray-600 mb-2">最適な図解を判断しています</p>
+        <div class="mt-3 max-w-xs mx-auto"><div class="h-2 bg-purple-200 rounded-full overflow-hidden"><div class="h-full bg-purple-500 rounded-full" style="width:0%; animation: smooth-progress 8s ease-out forwards;"></div></div></div>
+        <p class="text-xs text-gray-400 mt-3">5〜15秒ほどお待ちください</p>
+        <style>@keyframes smooth-progress { 0% { width: 5%; } 30% { width: 40%; } 60% { width: 65%; } 80% { width: 80%; } 100% { width: 92%; } }</style>
       </div>`
   }
   
@@ -6891,13 +6891,6 @@ async function generateImageForCard(cardId, description) {
     const unitName = cd.unit_name || ''
     const subject = cd.subject || ''
     const gradeLevel = cd.grade_level || cd.grade || ''
-    
-    console.log('📋 generateImageForCard コンテキスト:', { 
-      cardId, 
-      promptDesc: (description||'').substring(0,50), 
-      problemText: problemText.substring(0,80),
-      cardTitle, unitName, subject, gradeLevel 
-    })
     
     const prompt = description || cardTitle || 'この学習カードの教育用図解'
     const res = await axios.post('/api/ai/generate-image', {
@@ -6916,7 +6909,7 @@ async function generateImageForCard(cardId, description) {
     const aiDesc = res.data.ai_description || ''
     
     if (res.data.success && res.data.type === 'html' && res.data.html_content) {
-      // HTML図解が返された場合
+      // HTML図解（表）が返された場合
       if (placeholder) {
         placeholder.innerHTML = `
           <div id="card-image-container-${cardId}">
@@ -6925,22 +6918,84 @@ async function generateImageForCard(cardId, description) {
             </div>
             <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
               <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
-                <i class="fas fa-check-circle mr-1"></i>${modelName}で生成（${(genTime/1000).toFixed(1)}秒）
+                <i class="fas fa-check-circle mr-1"></i>${modelName}（${(genTime/1000).toFixed(1)}秒）
               </span>
               <button onclick="generateImageForCard(${cardId}, '${(description || '').replace(/'/g, '').replace(/\n/g, ' ').substring(0, 80)}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-redo mr-1"></i>再生成</button>
-              <button onclick="generateImageForCardAsImage(${cardId}, '${(description || '').replace(/'/g, '').replace(/\n/g, ' ').substring(0, 80)}')" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-image mr-1"></i>画像で生成</button>
               <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
             </div>
           </div>`
       }
+    } else if (res.data.success && res.data.type === 'suggestion' && res.data.suggestion) {
+      // AI提案コメント方式（グラフ・図形・イラスト等）
+      const s = res.data.suggestion
+      const importanceColor = s.importance === 'high' ? 'red' : s.importance === 'medium' ? 'amber' : 'gray'
+      const importanceLabel = s.importance === 'high' ? '📌 この問題に図は必須' : s.importance === 'medium' ? '💡 あると理解が深まる' : '📝 なくても問題ない'
+      const safeDesc = (description || '').replace(/'/g, '').replace(/"/g, '').replace(/\\n/g, ' ').substring(0, 100)
+      
+      if (placeholder) {
+        placeholder.innerHTML = `
+          <div id="card-image-container-${cardId}" class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-2xl p-5 shadow-sm">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="inline-flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
+                <i class="fas fa-lightbulb text-xl text-blue-600"></i>
+              </div>
+              <div>
+                <p class="text-sm font-bold text-blue-900">📊 AI教材アドバイス</p>
+                <p class="text-xs text-gray-500">${importanceLabel}</p>
+              </div>
+            </div>
+            
+            <div class="bg-white rounded-xl p-4 mb-3 border border-blue-200">
+              <p class="text-sm font-bold text-gray-800 mb-2">
+                <i class="fas fa-chart-bar text-blue-500 mr-1"></i>
+                おすすめ: <span class="text-blue-700">${s.diagram_type || 'ビジュアル教材'}</span>
+              </p>
+              <p class="text-sm text-gray-700 mb-2">${s.description || ''}</p>
+              ${s.data_points ? `<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mb-2"><p class="text-xs font-bold text-yellow-800 mb-1">📐 含めるべきデータ:</p><p class="text-xs text-yellow-700">${s.data_points}</p></div>` : ''}
+              ${s.creation_tips ? `<div class="bg-green-50 border border-green-200 rounded-lg p-2 mb-2"><p class="text-xs font-bold text-green-800 mb-1">💡 作り方のヒント:</p><p class="text-xs text-green-700">${s.creation_tips}</p></div>` : ''}
+              ${s.search_keywords ? `<div class="bg-purple-50 border border-purple-200 rounded-lg p-2"><p class="text-xs font-bold text-purple-800 mb-1">🔍 画像検索キーワード:</p><p class="text-xs text-purple-700">${s.search_keywords}</p></div>` : ''}
+            </div>
+            
+            <p class="text-xs text-gray-500 mb-3 text-center">
+              ⬇️ 以下のボタンから図を追加できます
+            </p>
+            
+            <div class="flex flex-col gap-2">
+              <div class="flex gap-2">
+                <button onclick="openFilePickerForCard(${cardId})"
+                        class="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-md">
+                  <i class="fas fa-file-image"></i>
+                  <span>📷 ファイル選択</span>
+                </button>
+                <button onclick="quickPasteImageUrl(${cardId})"
+                        class="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-md">
+                  <i class="fas fa-paste"></i>
+                  <span>📋 URL貼付</span>
+                </button>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="generateImageForCardAsImage(${cardId}, '${safeDesc}')"
+                        class="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-md">
+                  <i class="fas fa-wand-magic-sparkles"></i>
+                  <span>🎨 AI画像で試す</span>
+                </button>
+                <button onclick="openCameraForCard && openCameraForCard(${cardId})"
+                        class="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-md">
+                  <i class="fas fa-camera"></i>
+                  <span>📸 カメラ撮影</span>
+                </button>
+              </div>
+            </div>
+            
+            <p class="text-xs text-gray-400 mt-2 text-center">${modelName}（${(genTime/1000).toFixed(1)}秒）</p>
+          </div>`
+      }
     } else if (res.data.success && res.data.image_url) {
-      // サーバー側で既にDBに保存済み（card_idを渡しているため）
-      // 念のためクライアント側からも保存
+      // 画像が返された場合
       try {
         await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
       } catch(e) { console.warn('カード更新スキップ:', e) }
       
-      // 画像を表示
       if (placeholder) {
         placeholder.innerHTML = `
           <div class="text-center" id="card-image-container-${cardId}">
@@ -6949,7 +7004,7 @@ async function generateImageForCard(cardId, description) {
                  onerror="handleImageLoadError(this, ${cardId})">
             <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
               <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
-                <i class="fas fa-check-circle mr-1"></i>${modelName}で生成（${(genTime/1000).toFixed(1)}秒）
+                <i class="fas fa-check-circle mr-1"></i>${modelName}（${(genTime/1000).toFixed(1)}秒）
               </span>
               <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
               <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
