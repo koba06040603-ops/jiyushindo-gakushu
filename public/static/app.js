@@ -6856,6 +6856,68 @@ async function generateImageForCardAsImage(cardId, description) {
 }
 window.generateImageForCardAsImage = generateImageForCardAsImage
 
+// Nano Banana Pro で高精度画像生成
+async function generateImageForCardNBPro(cardId, description) {
+  if (!cardId) return
+  const placeholder = document.getElementById('image-placeholder-' + cardId) || 
+                       document.getElementById('card-image-container-' + cardId)
+  if (placeholder) {
+    placeholder.innerHTML = `
+      <div class="bg-gradient-to-br from-pink-50 to-purple-50 border-2 border-pink-300 rounded-2xl p-6 text-center">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-pink-100 rounded-full mb-3">
+          <i class="fas fa-star text-2xl text-pink-500 animate-pulse"></i>
+        </div>
+        <p class="text-sm text-pink-800 font-bold">Nano Banana Pro で高精度画像を生成中...</p>
+        <p class="text-xs text-gray-500 mt-1">15〜40秒ほどお待ちください（高品質モデル）</p>
+        <div class="mt-3 max-w-xs mx-auto"><div class="h-2 bg-pink-200 rounded-full overflow-hidden"><div class="h-full bg-pink-500 rounded-full" style="width:0%; animation: smooth-progress 30s ease-out forwards;"></div></div></div>
+      </div>`
+  }
+  try {
+    const rawCd = window.currentCardData || {}
+    const cd = rawCd.card || rawCd
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: description || cd.card_title || cd.title || '教育用図解',
+      card_id: cardId,
+      problem_text: cd.problem_content || cd.problem_text || cd.content || '',
+      card_title: cd.card_title || cd.title || '',
+      unit_name: cd.unit_name || '',
+      subject: cd.subject || '',
+      grade: cd.grade_level || cd.grade || '',
+      prefer_image: true,
+      prefer_model: 'nano_banana_pro'
+    }, { timeout: 120000 })
+    if (res.data.success && res.data.image_url) {
+      try { await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url }) } catch(e) {}
+      if (placeholder) {
+        const safeDesc = (description||'').replace(/'/g,'').replace(/"/g,'').replace(/\n/g,' ').substring(0,60)
+        placeholder.innerHTML = `
+          <div class="text-center" id="card-image-container-${cardId}">
+            <img src="${res.data.image_url}" alt="${description || '問題の図'}" 
+                 class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-pink-200" style="max-height: 400px;">
+            <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+              <span class="bg-pink-100 text-pink-700 text-xs px-3 py-1 rounded-full font-bold">
+                <i class="fas fa-star mr-1"></i>${res.data.model || 'Nano Banana Pro'}（${((res.data.generation_time_ms||0)/1000).toFixed(1)}秒）
+              </span>
+              <button onclick="generateImageForCard(${cardId}, '${safeDesc}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-chart-line mr-1"></i>グラフで再生成</button>
+              <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
+              <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+            </div>
+            ${res.data.ai_description ? '<p class="text-xs text-gray-500 mt-1">' + res.data.ai_description.substring(0, 100) + '</p>' : ''}
+          </div>`
+      }
+    } else {
+      throw new Error(res.data.error || '高精度画像生成に失敗')
+    }
+  } catch (err) {
+    if (placeholder) {
+      placeholder.innerHTML = `<div class="p-4 text-center text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>高精度画像生成に失敗: ${err.message || 'エラー'}<br>
+        <button onclick="generateImageForCard(${cardId})" class="mt-2 text-sm text-blue-500 underline">グラフ・図解で再試行</button>
+        <button onclick="generateImageForCardAsImage(${cardId}, '')" class="mt-2 ml-2 text-sm text-purple-500 underline">通常AI画像で試す</button></div>`
+    }
+  }
+}
+window.generateImageForCardNBPro = generateImageForCardNBPro
+
 // 学習カード上のプレースホルダーからAI画像を生成して保存
 async function generateImageForCard(cardId, description) {
   if (!cardId) {
@@ -6925,6 +6987,60 @@ async function generateImageForCard(cardId, description) {
             </div>
           </div>`
       }
+    } else if (res.data.success && res.data.type === 'jsxgraph' && res.data.jsxgraph_config) {
+      // JSXGraph インタラクティブ作図が返された場合
+      const jsxConfig = res.data.jsxgraph_config
+      const containerId = 'jsxgraph-container-' + cardId
+      const safeDesc = (description || '').replace(/'/g, '').replace(/"/g, '').replace(/\n/g, ' ').substring(0, 100)
+      
+      if (placeholder) {
+        placeholder.innerHTML = `
+          <div id="card-image-container-${cardId}">
+            <div class="bg-white rounded-lg shadow-md border-2 border-blue-200 p-3 overflow-hidden">
+              <div id="${containerId}" style="width:100%; height:400px; max-width:600px; margin:0 auto;"></div>
+            </div>
+            <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+              <span class="bg-blue-100 text-blue-700 text-xs px-3 py-1 rounded-full font-bold">
+                <i class="fas fa-chart-line mr-1"></i>${modelName}（${(genTime/1000).toFixed(1)}秒）
+              </span>
+              <button onclick="generateImageForCard(${cardId}, '${safeDesc}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-redo mr-1"></i>再生成</button>
+              <button onclick="generateImageForCardAsImage(${cardId}, '${safeDesc}')" class="text-xs text-orange-500 hover:text-orange-700 underline"><i class="fas fa-image mr-1"></i>AI画像で試す</button>
+              <button onclick="generateImageForCardNBPro(${cardId}, '${safeDesc}')" class="text-xs text-pink-500 hover:text-pink-700 underline"><i class="fas fa-star mr-1"></i>高精度画像</button>
+              <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+            </div>
+          </div>`
+        
+        // JSXGraphの描画をスケジュール（DOMが更新された後に実行）
+        setTimeout(() => {
+          if (typeof window.renderMathInteractive === 'function') {
+            try {
+              window.renderMathInteractive(containerId, jsxConfig)
+              console.log('✅ JSXGraph描画成功:', jsxConfig.type, jsxConfig.title)
+            } catch (e) {
+              console.error('❌ JSXGraph描画エラー:', e)
+              document.getElementById(containerId).innerHTML = '<p class="text-red-500 text-center p-4">グラフの描画に失敗しました</p>'
+            }
+          } else {
+            console.warn('⚠️ renderMathInteractive未読み込み、リトライ...')
+            // JSXGraph CDNがまだロードされていない場合、リトライ
+            let retries = 0
+            const retryInterval = setInterval(() => {
+              retries++
+              if (typeof window.renderMathInteractive === 'function') {
+                clearInterval(retryInterval)
+                try {
+                  window.renderMathInteractive(containerId, jsxConfig)
+                } catch (e) {
+                  console.error('JSXGraph描画リトライエラー:', e)
+                }
+              } else if (retries > 10) {
+                clearInterval(retryInterval)
+                document.getElementById(containerId).innerHTML = '<p class="text-orange-500 text-center p-4">グラフライブラリの読み込みに失敗しました</p>'
+              }
+            }, 500)
+          }
+        }, 100)
+      }
     } else if (res.data.success && res.data.type === 'suggestion' && res.data.suggestion) {
       // AI提案コメント方式（グラフ・図形・イラスト等）
       const s = res.data.suggestion
@@ -6979,6 +7095,13 @@ async function generateImageForCard(cardId, description) {
                   <i class="fas fa-wand-magic-sparkles"></i>
                   <span>🎨 AI画像で試す</span>
                 </button>
+                <button onclick="generateImageForCardNBPro(${cardId}, '${safeDesc}')"
+                        class="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-md">
+                  <i class="fas fa-star"></i>
+                  <span>⭐ 高精度画像</span>
+                </button>
+              </div>
+              <div class="flex gap-2">
                 <button onclick="openCameraForCard && openCameraForCard(${cardId})"
                         class="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition shadow-md">
                   <i class="fas fa-camera"></i>

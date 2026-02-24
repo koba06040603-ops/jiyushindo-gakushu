@@ -7505,6 +7505,7 @@ app.get('/test-buttons.html', async (c) => {
     </script>
     
     <script src="/static/ocr-handler.js"></script>
+    <script src="/static/math-interactive.js?v=${Date.now()}"></script>
     <script src="/static/app.js?v=${Date.now()}"></script>
     
     <script>
@@ -8180,6 +8181,7 @@ app.get('/landing', (c) => {
               '/static/learning-styles.js',
               '/static/phase3-demo-data.js',
               '/static/phase3.js',
+              '/static/math-interactive.js',
               '/static/app.js'
             ]
             
@@ -23058,10 +23060,10 @@ app.delete('/api/cards/images/:imageId', async (c) => {
   }
 })
 
-// AI画像生成API（Gemini Imagen使用）
+// AI画像生成API（Gemini Imagen使用）- JSXGraph + Nano Banana Pro 統合版
 app.post('/api/ai/generate-image', async (c) => {
   const { env } = c
-  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade, prefer_image } = await c.req.json()
+  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade, prefer_image, prefer_model } = await c.req.json()
   
   try {
     const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
@@ -23090,16 +23092,21 @@ app.post('/api/ai/generate-image', async (c) => {
     }
     const userContext = contextParts.join('\n')
     
-    // ========== 問題内容の分析: 表系かグラフ/図形系かを判定 ==========
+    // ========== 問題内容の分析: 表/グラフ/図形/その他を判定 ==========
     const allText = `${prompt} ${card_title || ''} ${unit_name || ''} ${problem_text || ''}`.toLowerCase()
     const isTableType = /表にまとめ|二つのことがら|整理しよう|クロス集計|二元表|表に整理|整理のしかた|仲間分け|分類/.test(allText)
-    const isGraphType = /折れ線グラフ|棒グラフ|ぼうグラフ|円グラフ|帯グラフ|グラフ/.test(allText)
-    const isDiagramType = /数直線|図形|三角形|四角形|平行四辺形|台形|ひし形|角|直角|円|球|面積|体積|展開図|見取図|対称/.test(allText)
+    const isGraphType = /折れ線グラフ|棒グラフ|ぼうグラフ|円グラフ|帯グラフ|グラフをかく|グラフを書|グラフを読/.test(allText)
+    const isProportionType = /比例|反比例|y\s*=\s*\d|比例のグラフ|反比例のグラフ/.test(allText)
+    const isGeometryType = /直線|コンパス|垂直|平行|作図|三角形|四角形|平行四辺形|台形|ひし形|角度|直角|円をかく|二等辺三角形|正三角形|正方形|長方形/.test(allText)
+    const isNumberLineType = /数直線|数のせん|数の線/.test(allText)
+    const isDiagramType = /面積|体積|展開図|見取図|対称|図形/.test(allText)
     const isMapOrImage = /地図|写真|実験|観察|植物|動物|天気|星|月|太陽/.test(allText)
     
-    // ========== 第1候補: 表（テーブル）のみHTML生成 ==========
-    // 表系は Gemini 2.0 Flash のテキスト生成で正確に作れる
-    if (isTableType && !prefer_image) {
+    // JSXGraph対応チェック（グラフ・比例・反比例・コンパス・直線・数直線・図形）
+    const canUseJSXGraph = isGraphType || isProportionType || isGeometryType || isNumberLineType
+    
+    // ========== 第1候補: 表（テーブル）HTML生成 ==========
+    if (isTableType && !prefer_image && prefer_model !== 'nano_banana_pro') {
       console.log('🎨 表（テーブル）をHTML生成:', prompt.substring(0, 80))
       
       try {
@@ -23139,10 +23146,7 @@ HTMLコードだけを出力（コードブロック不要）:`
             },
             body: JSON.stringify({
               contents: [{ role: 'user', parts: [{ text: htmlPrompt }] }],
-              generationConfig: { 
-                temperature: 0.2, 
-                maxOutputTokens: 8192,
-              }
+              generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
             })
           }
         )
@@ -23150,11 +23154,7 @@ HTMLコードだけを出力（コードブロック不要）:`
         if (htmlResponse.ok) {
           const htmlData = await htmlResponse.json() as any
           let htmlText = htmlData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-          
-          // HTMLコードを抽出（マークダウンのコードブロックを除去）
           htmlText = htmlText.replace(/```html\s*/gi, '').replace(/```\s*/g, '').trim()
-          
-          // <div で始まるHTMLブロックを抽出
           const divMatch = htmlText.match(/<div[\s\S]*<\/div>/i)
           
           if (divMatch && divMatch[0].length > 50) {
@@ -23178,16 +23178,176 @@ HTMLコードだけを出力（コードブロック不要）:`
           }
         }
         
-        console.log('💡 表HTML生成失敗、提案モードへ...')
+        console.log('💡 表HTML生成失敗、JSXGraph/提案モードへ...')
       } catch (htmlErr: any) {
         console.warn('⚠️ 表HTML生成エラー:', htmlErr.message)
       }
     }
     
-    // ========== 第2候補: AI提案コメント方式 ==========
-    // グラフ・図形・イラストなどは正確に自動生成できないため、
-    // AIが「どんな図を入れるべきか」を提案し、先生が手動で追加する
-    if (!prefer_image) {
+    // ========== 第2候補: JSXGraph インタラクティブ作図 ==========
+    // 折れ線グラフ・棒グラフ・比例・反比例・コンパス・直線・数直線・図形
+    if (canUseJSXGraph && !prefer_image && prefer_model !== 'nano_banana_pro') {
+      console.log('📐 JSXGraph作図モード:', prompt.substring(0, 80))
+      
+      try {
+        // JSXGraph設定JSON生成用のタイプ判定
+        let jsxType = 'generic'
+        if (isProportionType && /反比例/.test(allText)) jsxType = 'inverse_proportion'
+        else if (isProportionType) jsxType = 'proportion'
+        else if (/折れ線/.test(allText)) jsxType = 'line_graph'
+        else if (/棒グラフ|ぼうグラフ/.test(allText)) jsxType = 'bar_graph'
+        else if (isNumberLineType) jsxType = 'number_line'
+        else if (/コンパス|円をかく/.test(allText)) jsxType = 'compass'
+        else if (/直線|垂直|平行|作図/.test(allText)) jsxType = 'line_drawing'
+        else if (isGeometryType) jsxType = 'geometry'
+        
+        const jsxPrompt = `あなたは日本の小学校・中学校の算数/数学の教科書に載るインタラクティブ図を生成する専門家です。
+以下の問題に合った JSXGraph 描画設定を JSON 形式で生成してください。
+
+【出力形式】
+JSONのみ出力してください（コードブロック不要、説明文不要）。
+
+【JSONスキーマ】
+{
+  "type": "${jsxType}",
+  "title": "図のタイトル（日本語）",
+  "interactive": false,
+  "width": "100%",
+  "height": "400px",
+  "data": { ... タイプ別のデータ ... }
+}
+
+【タイプ別の data 構造】
+
+■ line_graph（折れ線グラフ）:
+{
+  "labels": ["6時", "8時", "10時", ...],
+  "values": [8, 12, 18, ...],
+  "x_label": "時刻",
+  "y_label": "気温",
+  "y_unit": "℃"
+}
+
+■ bar_graph（棒グラフ）:
+{
+  "labels": ["犬", "猫", "うさぎ", ...],
+  "values": [8, 12, 5, ...]
+}
+
+■ proportion（比例 y=ax）:
+{
+  "a": 3,
+  "max_x": 8,
+  "points": [{"x": 1, "y": 3}, {"x": 2, "y": 6}, ...]
+}
+
+■ inverse_proportion（反比例 y=a/x）:
+{
+  "a": 12,
+  "max_x": 10,
+  "max_y": 15,
+  "points": [{"x": 1, "y": 12}, {"x": 2, "y": 6}, ...]
+}
+
+■ compass（コンパスで円をかく）:
+{
+  "range": 8,
+  "circles": [{"cx": 4, "cy": 4, "r": 2, "label": "中心O", "r_label": "半径2cm"}]
+}
+
+■ line_drawing（直線を引く）:
+{
+  "range": 10,
+  "lines": [{"x1": 1, "y1": 2, "x2": 7, "y2": 5, "type": "segment", "p1_label": "A", "p2_label": "B"}]
+}
+※ type: "segment"（線分）, "ray"（半直線）, "line"（直線）
+
+■ number_line（数直線）:
+{
+  "min": 0, "max": 10, "step": 1,
+  "markers": [{"value": 3, "label": "3/4", "color": "#ef4444"}]
+}
+
+■ geometry（図形）:
+{
+  "range": 10,
+  "shapes": [
+    {"type": "polygon", "vertices": [[1,1],[5,1],[5,4],[1,4]], "vertex_labels": ["A","B","C","D"], "color": "#3b82f6"},
+    {"type": "circle", "cx": 5, "cy": 5, "r": 3, "color": "#ef4444"},
+    {"type": "angle", "points": [[3,1],[1,1],[1,4]], "labels": ["B","A","D"], "angle_label": "90°"}
+  ]
+}
+
+【重要ルール】
+1. 問題文にある数値・データを「すべて正確に」JSONに反映すること
+2. タイトルは問題のテーマを日本語で書くこと
+3. ラベルは日本語を使うこと
+4. データが問題文にない場合は、適切な例題データを入れること
+5. interactive は false に設定（閲覧用）
+
+${userContext}
+
+JSON形式のみ出力:`
+
+        const jsxResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'x-goog-api-key': geminiApiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: jsxPrompt }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 4096 }
+            })
+          }
+        )
+        
+        if (jsxResponse.ok) {
+          const jsxData = await jsxResponse.json() as any
+          let jsxText = jsxData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          
+          // JSON抽出（コードブロック除去）
+          jsxText = jsxText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+          
+          // JSONパース
+          let jsxConfig: any = null
+          try {
+            jsxConfig = JSON.parse(jsxText)
+          } catch {
+            // JSONが { で始まる部分を抽出して再トライ
+            const jsonMatch = jsxText.match(/\{[\s\S]*\}/)
+            if (jsonMatch) {
+              try { jsxConfig = JSON.parse(jsonMatch[0]) } catch {}
+            }
+          }
+          
+          if (jsxConfig && jsxConfig.type) {
+            const generationTime = Date.now() - startTime
+            console.log(`✅ JSXGraph設定生成成功 (${generationTime}ms, type=${jsxConfig.type})`)
+            
+            return c.json({
+              success: true,
+              type: 'jsxgraph',
+              jsxgraph_config: jsxConfig,
+              prompt: prompt.substring(0, 200),
+              generation_time_ms: generationTime,
+              model: 'gemini-2.0-flash (JSXGraph)',
+              message: `${jsxConfig.title || 'インタラクティブ図'}を生成しました`
+            })
+          }
+        }
+        
+        console.log('💡 JSXGraph設定生成失敗、提案モードへ...')
+      } catch (jsxErr: any) {
+        console.warn('⚠️ JSXGraph設定生成エラー:', jsxErr.message)
+      }
+    }
+    
+    // ========== 第3候補: AI提案コメント方式 ==========
+    // 上記で対応できなかった場合（地図・写真・その他）
+    if (!prefer_image && prefer_model !== 'nano_banana_pro') {
       console.log('💡 AI図解提案モード:', prompt.substring(0, 80))
       
       try {
@@ -23218,10 +23378,7 @@ JSON形式で出力してください:`
             },
             body: JSON.stringify({
               contents: [{ role: 'user', parts: [{ text: suggestionPrompt }] }],
-              generationConfig: { 
-                temperature: 0.3, 
-                maxOutputTokens: 2048,
-              }
+              generationConfig: { temperature: 0.3, maxOutputTokens: 2048 }
             })
           }
         )
@@ -23229,15 +23386,12 @@ JSON形式で出力してください:`
         if (suggestionResponse.ok) {
           const suggestionData = await suggestionResponse.json() as any
           let suggestionText = suggestionData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-          
-          // JSONを抽出
           suggestionText = suggestionText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
           
           let suggestion: any = {}
           try {
             suggestion = JSON.parse(suggestionText)
           } catch {
-            // JSONパース失敗時はテキストから情報を抽出
             suggestion = {
               diagram_type: isGraphType ? 'グラフ' : isDiagramType ? '図形' : isMapOrImage ? '写真・イラスト' : '図解',
               description: suggestionText.substring(0, 100),
@@ -23266,9 +23420,9 @@ JSON形式で出力してください:`
       }
     }
     
-    // ========== 第3候補: 画像生成（prefer_image=true の場合のみ、または上記すべて失敗時） ==========
-    // ユーザーが明示的に「画像で生成」を選んだ場合
-    console.log('🎨 画像生成モード:', prefer_image ? '(ユーザー指定)' : '(フォールバック)')
+    // ========== 第4候補: AI画像生成 ==========
+    // prefer_image=true / prefer_model指定 / 上記すべて失敗時
+    console.log('🎨 画像生成モード:', prefer_image ? '(ユーザー指定)' : '(フォールバック)', prefer_model || '')
     
     const systemInstruction = `あなたは日本の小学校・中学校の教科書に載るような、正確で分かりやすい教育用の図やイラストを生成する専門家です。
 
@@ -23282,8 +23436,81 @@ JSON形式で出力してください:`
 
     const userPrompt = userContext
     
+    // Nano Banana Pro (gemini-3-pro-image-preview) を優先試行（prefer_model指定時）
+    if (prefer_model === 'nano_banana_pro') {
+      try {
+        console.log('🎨 Nano Banana Pro (gemini-3-pro-image-preview) で高精度画像生成...')
+        const proResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'x-goog-api-key': geminiApiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: 'user',
+                  parts: [{ text: `${systemInstruction}\n\n${userPrompt}\n\nこの内容に合った正確な教育用の図を1つ生成してください。数値・ラベル・軸の表記はすべて正確に。` }]
+                }
+              ],
+              generationConfig: {
+                responseModalities: ['TEXT', 'IMAGE'],
+                temperature: 0.3,
+              }
+            })
+          }
+        )
+        
+        if (proResponse.ok) {
+          const proData = await proResponse.json() as any
+          const parts = proData.candidates?.[0]?.content?.parts || []
+          
+          let imageUrl = ''
+          let responseText = ''
+          
+          for (const part of parts) {
+            if (part.inlineData) {
+              const mimeType = part.inlineData.mimeType || 'image/png'
+              imageUrl = `data:${mimeType};base64,${part.inlineData.data}`
+            }
+            if (part.text) responseText += part.text
+          }
+          
+          if (imageUrl) {
+            if (card_id) {
+              try {
+                await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
+                  .bind(imageUrl, Number(card_id)).run()
+              } catch (dbErr: any) {
+                console.warn('⚠️ DB保存失敗:', dbErr.message)
+              }
+            }
+            
+            const generationTime = Date.now() - startTime
+            console.log(`✅ Nano Banana Pro画像生成成功 (${generationTime}ms)`)
+            return c.json({
+              success: true,
+              image_url: imageUrl,
+              type: 'image',
+              prompt: userPrompt.substring(0, 300),
+              generation_time_ms: generationTime,
+              model: 'Nano Banana Pro (gemini-3-pro)',
+              ai_description: responseText.substring(0, 200),
+              message: 'Nano Banana Pro で高精度画像を生成しました'
+            })
+          }
+        }
+        console.log('💡 Nano Banana Pro失敗、Nano Bananaにフォールバック...')
+      } catch (proErr: any) {
+        console.warn('⚠️ Nano Banana Proエラー:', proErr.message)
+      }
+    }
+    
     // Nano Banana (gemini-2.5-flash-image) で画像生成
     try {
+      console.log('🎨 Nano Banana (gemini-2.5-flash-image) で画像生成...')
       const geminiImageResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
         {
@@ -23319,9 +23546,7 @@ JSON形式で出力してください:`
             const mimeType = part.inlineData.mimeType || 'image/png'
             imageUrl = `data:${mimeType};base64,${part.inlineData.data}`
           }
-          if (part.text) {
-            responseText += part.text
-          }
+          if (part.text) responseText += part.text
         }
         
         if (imageUrl) {
