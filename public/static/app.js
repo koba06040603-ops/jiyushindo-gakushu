@@ -6814,22 +6814,38 @@ async function generateImageForCard(cardId, description) {
   // 生成中の表示
   if (placeholder) {
     placeholder.innerHTML = `
-      <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-6 text-center">
-        <i class="fas fa-magic text-4xl text-purple-500 mb-3 block animate-pulse"></i>
-        <p class="text-sm text-purple-800 font-bold mb-1">AIが図を生成しています...</p>
-        <p class="text-xs text-gray-500">15〜30秒ほどお待ちください</p>
-        <div class="mt-3"><div class="h-2 bg-purple-200 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse" style="width: 60%"></div></div></div>
-        <p class="text-xs text-gray-400 mt-3">失敗した場合は手動でJPG/PDFをアップロードできます</p>
+      <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-2xl p-6 text-center">
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-purple-100 rounded-full mb-3">
+          <i class="fas fa-wand-magic-sparkles text-3xl text-purple-500 animate-pulse"></i>
+        </div>
+        <p class="text-base text-purple-800 font-bold mb-1">🎨 Gemini が教育用の図を生成中...</p>
+        <p class="text-sm text-gray-600 mb-2">問題内容を分析して最適な図を描いています</p>
+        <div class="mt-3 max-w-xs mx-auto"><div class="h-2.5 bg-purple-200 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 rounded-full" style="animation: loading-bar 2s ease-in-out infinite;"></div></div></div>
+        <p class="text-xs text-gray-400 mt-3">15〜45秒ほどお待ちください</p>
+        <style>@keyframes loading-bar { 0% { width: 10%; } 50% { width: 80%; } 100% { width: 10%; } }</style>
       </div>`
   }
   
   try {
-    const prompt = description || 'educational illustration for this learning card'
+    // 現在のカードデータから問題文・コンテキストを取得
+    const cd = window.currentCardData || {}
+    const problemText = cd.problem_content || cd.problem_text || ''
+    const cardTitle = cd.card_title || ''
+    const unitName = cd.unit_name || ''
+    const subject = cd.subject || ''
+    const gradeLevel = cd.grade_level || ''
+    
+    const prompt = description || cardTitle || 'この学習カードの教育用図解'
     const res = await axios.post('/api/ai/generate-image', {
       prompt: prompt,
       card_id: cardId,
-      style: 'educational illustration, child-friendly, simple diagram'
-    }, { timeout: 60000 })
+      problem_text: problemText,
+      card_title: cardTitle,
+      unit_name: unitName,
+      subject: subject,
+      grade: gradeLevel,
+      style: 'educational diagram'
+    }, { timeout: 90000 })
     
     if (res.data.success && res.data.image_url) {
       // サーバー側で既にDBに保存済み（card_idを渡しているため）
@@ -6838,7 +6854,11 @@ async function generateImageForCard(cardId, description) {
         await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
       } catch(e) { console.warn('カード更新スキップ:', e) }
       
-      // 画像を表示（data URLなのでonerrorは基本起きない）
+      const modelName = res.data.model || 'AI'
+      const genTime = res.data.generation_time_ms || 0
+      const aiDesc = res.data.ai_description || ''
+      
+      // 画像を表示
       if (placeholder) {
         placeholder.innerHTML = `
           <div class="text-center" id="card-image-container-${cardId}">
@@ -6847,11 +6867,13 @@ async function generateImageForCard(cardId, description) {
                  onerror="handleImageLoadError(this, ${cardId})">
             <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
               <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
-                <i class="fas fa-check-circle mr-1"></i>AIが図を生成しました（${res.data.generation_time_ms || 0}ms）
+                <i class="fas fa-check-circle mr-1"></i>${modelName}で生成（${(genTime/1000).toFixed(1)}秒）
               </span>
               <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
               <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+              <button onclick="generateImageForCard(${cardId}, '${(description || '').replace(/'/g, '').replace(/\n/g, ' ').substring(0, 80)}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-redo mr-1"></i>再生成</button>
             </div>
+            ${aiDesc ? '<p class="text-xs text-gray-500 mt-1">' + aiDesc.substring(0, 100) + '</p>' : ''}
           </div>`
       }
     } else {
@@ -30618,12 +30640,18 @@ async function editCardImageUrl(cardId, imageType) {
     if (!genPrompt || genPrompt.trim().length < 2) return
     
     try {
-      alert('AI画像を生成中です...（数秒かかります）')
+      alert('Gemini で教育用の図を生成中です...（15〜45秒かかります）')
+      const cd = window.currentCardData || {}
       const res = await axios.post('/api/ai/generate-image', {
         prompt: genPrompt.trim(),
         card_id: cardId,
-        style: 'educational illustration, child-friendly'
-      })
+        problem_text: cd.problem_content || cd.problem_text || '',
+        card_title: cd.card_title || '',
+        unit_name: cd.unit_name || '',
+        subject: cd.subject || '',
+        grade: cd.grade_level || '',
+        style: 'educational diagram'
+      }, { timeout: 90000 })
       
       if (res.data.success && res.data.image_url) {
         const fieldName = imageType === 'answer' ? 'answer_image_url' : 'problem_image_url'
@@ -31227,11 +31255,19 @@ async function executeAiRegenerate(cardId) {
     const style = styleMatch ? styleMatch[1] : 'educational illustration'
     const cleanPrompt = prompt.replace(/\s*\[スタイル:.*?\]\s*$/, '').trim()
     
+    const cd = window.currentCardData || {}
+    const cardData = cd.card || cd || {}
+    
     const res = await axios.post('/api/ai/generate-image', {
       prompt: cleanPrompt,
       card_id: cardId,
-      style: style
-    }, { timeout: 60000 })
+      style: style,
+      problem_text: cardData.problem_content || cardData.problem_text || '',
+      card_title: cardData.card_title || '',
+      unit_name: cardData.unit_name || '',
+      subject: cardData.subject || '',
+      grade: cardData.grade_level || ''
+    }, { timeout: 90000 })
     
     if (res.data.success && res.data.image_url) {
       // カードに保存
@@ -31248,7 +31284,7 @@ async function executeAiRegenerate(cardId) {
                onerror="handleImageLoadError(this, ${cardId})">
           <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
             <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
-              <i class="fas fa-check-circle mr-1"></i>AI生成完了（${res.data.generation_time_ms || 0}ms）
+              <i class="fas fa-check-circle mr-1"></i>${res.data.model || 'AI'}で生成（${((res.data.generation_time_ms || 0)/1000).toFixed(1)}秒）
             </span>
             <button onclick="openImageReplaceMenu(${cardId})" class="text-xs text-orange-500 hover:text-orange-700 underline font-bold">🔄 差し替え</button>
             <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
@@ -31429,7 +31465,10 @@ function openImageEditor(cardId) {
   
   // 画像読み込み
   const baseImg = new Image()
-  baseImg.crossOrigin = 'anonymous'
+  // data: URLやSVG data URLにはcrossOriginを設定しない（設定するとエラーになる）
+  if (!imgSrc.startsWith('data:')) {
+    baseImg.crossOrigin = 'anonymous'
+  }
   baseImg.onload = () => {
     editorState.baseImage = baseImg
     

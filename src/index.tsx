@@ -23061,7 +23061,7 @@ app.delete('/api/cards/images/:imageId', async (c) => {
 // AI画像生成API（Gemini Imagen使用）
 app.post('/api/ai/generate-image', async (c) => {
   const { env } = c
-  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio } = await c.req.json()
+  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade } = await c.req.json()
   
   try {
     const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
@@ -23079,10 +23079,240 @@ app.post('/api/ai/generate-image', async (c) => {
     
     const startTime = Date.now()
     
-    // 教育向け画像生成プロンプトの最適化（日本語→英語変換含む）
-    const optimizedPrompt = `Educational illustration for elementary/middle school students: ${prompt}${style ? `, style: ${style}` : ''}, clear, colorful, child-friendly, high quality, detailed, no text overlay`
+    // ========== 教育用の高精度プロンプト構築 ==========
+    // 問題文の具体的な数値・内容を活用して正確な図を生成する
+    const contextParts: string[] = []
     
-    // Imagen 4 API で画像生成
+    // 学年・教科の情報
+    if (grade || subject) {
+      contextParts.push(`対象: 日本の${grade || ''}${subject || ''}の授業`)
+    }
+    
+    // 単元名
+    if (unit_name) {
+      contextParts.push(`単元: ${unit_name}`)
+    }
+    
+    // カードタイトル
+    if (card_title) {
+      contextParts.push(`テーマ: ${card_title}`)
+    }
+    
+    // ユーザーの直接指示（プレースホルダーの説明 or 手動入力）
+    contextParts.push(`内容: ${prompt}`)
+    
+    // 問題文があれば、数値やデータを抽出して図に反映させる
+    if (problem_text && problem_text.length > 5) {
+      contextParts.push(`問題文（この内容に合った正確な図を生成してください）:\n${problem_text.substring(0, 500)}`)
+    }
+    
+    // 図の種類を自動判定してスタイル指示を追加
+    const allText = `${prompt} ${card_title || ''} ${unit_name || ''} ${problem_text || ''}`.toLowerCase()
+    let diagramStyle = ''
+    
+    if (/折れ線グラフ|折れ線/.test(allText)) {
+      diagramStyle = '折れ線グラフを正確に描いてください。X軸とY軸にラベルと数値を入れ、データ点を線で結んでください。'
+    } else if (/棒グラフ/.test(allText)) {
+      diagramStyle = '棒グラフを正確に描いてください。各棒にラベルと数値を入れ、Y軸に目盛りをつけてください。'
+    } else if (/円グラフ/.test(allText)) {
+      diagramStyle = '円グラフを正確に描いてください。各項目の割合をパーセントで表示し、色分けと凡例をつけてください。'
+    } else if (/表|データ/.test(allText) && /見|読|整理/.test(allText)) {
+      diagramStyle = 'データ表を見やすく描いてください。行と列を整理し、ヘッダーを太字にしてください。'
+    } else if (/数直線/.test(allText)) {
+      diagramStyle = '数直線を正確に描いてください。目盛り、矢印、数値を入れてください。'
+    } else if (/地図|都道府県|地形/.test(allText)) {
+      diagramStyle = '地図を分かりやすく描いてください。地名、方位、縮尺を入れてください。'
+    } else if (/図形|三角|四角|平行|台形|ひし形/.test(allText)) {
+      diagramStyle = '幾何学的な図形を正確に描いてください。辺の長さ、角度、記号を入れ、数学的に正しくしてください。'
+    } else if (/面積|体積|展開図/.test(allText)) {
+      diagramStyle = '面積や体積の図を正確に描いてください。寸法線と数値を入れてください。'
+    } else if (/角度|分度器/.test(allText)) {
+      diagramStyle = '角度の図を正確に描いてください。角度の数値と弧を入れてください。'
+    } else if (/時計|時刻/.test(allText)) {
+      diagramStyle = '時計の文字盤を正確に描いてください。時針と分針を問題の時刻に合わせてください。'
+    } else if (/分数/.test(allText)) {
+      diagramStyle = '分数を視覚的に表現してください。円や長方形を等分して色を塗り、分数との対応を示してください。'
+    } else if (/小数|かけ算|わり算/.test(allText)) {
+      diagramStyle = '計算の過程や概念を図解してください。数値を正確に表示してください。'
+    } else if (/植物|花|葉|茎|根|光合成/.test(allText)) {
+      diagramStyle = '植物の図を科学的に正確に描いてください。各部分に名前のラベルをつけてください。'
+    } else if (/昆虫|虫|動物/.test(allText)) {
+      diagramStyle = '生物の図を科学的に正確に描いてください。各部位に名前のラベルをつけてください。'
+    } else if (/天体|月|星|太陽|地球/.test(allText)) {
+      diagramStyle = '天体の図を科学的に描いてください。名称と関係性を示してください。'
+    } else if (/電気|回路|磁石|電池/.test(allText)) {
+      diagramStyle = '回路図を正確に描いてください。回路記号を使い、電流の向きを示してください。'
+    } else if (/比例|反比例/.test(allText)) {
+      diagramStyle = '比例・反比例のグラフを座標軸と共に正確に描いてください。'
+    }
+    
+    if (diagramStyle) {
+      contextParts.push(diagramStyle)
+    }
+    
+    // 最終プロンプトの組み立て
+    const systemInstruction = `あなたは日本の小学校・中学校の教科書に載るような、正確で分かりやすい教育用の図やイラストを生成する専門家です。
+
+以下のルールに必ず従ってください：
+1. 数値やデータは問題文から正確に読み取り、図に反映すること
+2. ラベル、単位、目盛りなどの文字は日本語で大きく読みやすく書くこと
+3. 色使いはカラフルで見やすく、小学生でも理解しやすいこと
+4. 教科書品質の正確さと見やすさを両立すること
+5. 背景は白または淡い色で、図が主役になるようにすること
+6. 余計な装飾は避け、学習に必要な情報に集中すること`
+
+    const userPrompt = contextParts.join('\n\n')
+    
+    console.log('🎨 Gemini 2.5 Flash Image で図を生成:', userPrompt.substring(0, 200))
+    
+    // ========== Gemini 2.5 Flash Image / Nano Banana（ネイティブ画像生成） ==========
+    const geminiImageResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': geminiApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemInstruction}\n\n${userPrompt}\n\nこの内容に合った正確な教育用の図を1つ生成してください。` }]
+            }
+          ],
+          generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE'],
+            temperature: 0.4,
+          }
+        })
+      }
+    )
+    
+    if (geminiImageResponse.ok) {
+      const geminiData = await geminiImageResponse.json() as any
+      const parts = geminiData.candidates?.[0]?.content?.parts || []
+      
+      let imageUrl = ''
+      let responseText = ''
+      
+      for (const part of parts) {
+        if (part.inlineData) {
+          const mimeType = part.inlineData.mimeType || 'image/png'
+          imageUrl = `data:${mimeType};base64,${part.inlineData.data}`
+        }
+        if (part.text) {
+          responseText += part.text
+        }
+      }
+      
+      if (imageUrl) {
+        // カードIDがあればDBに保存
+        if (card_id) {
+          try {
+            await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
+              .bind(imageUrl, Number(card_id)).run()
+            console.log(`✅ AI画像をカード ${card_id} に保存`)
+          } catch (dbErr: any) {
+            console.warn('⚠️ AI画像DB保存失敗:', dbErr.message)
+          }
+        }
+        
+        const generationTime = Date.now() - startTime
+        
+        // 履歴保存（テーブルが存在する場合のみ）
+        try {
+          await env.DB.prepare(`
+            INSERT INTO ai_generated_images (
+              teacher_id, card_id, prompt, negative_prompt, 
+              ai_model, image_url, generation_time_ms, 
+              generation_params, is_used
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            teacher_id || null, card_id || null, prompt,
+            negative_prompt || null, 'gemini-2.5-flash-image',
+            'generated_' + Date.now(), generationTime,
+            JSON.stringify({ style, aspect_ratio, user_prompt: userPrompt.substring(0, 500) }),
+            false
+          ).run()
+        } catch (dbErr) {
+          console.warn('画像生成履歴保存スキップ:', dbErr)
+        }
+        
+        return c.json({
+          success: true,
+          image_url: imageUrl,
+          prompt: userPrompt.substring(0, 300),
+          generation_time_ms: generationTime,
+          model: 'Nano Banana (gemini-2.5-flash-image)',
+          ai_description: responseText.substring(0, 200),
+          message: 'Gemini ネイティブ画像生成で図を作成しました'
+        })
+      }
+    }
+    
+    // フォールバック 1: gemini-2.0-flash-exp-image-generation
+    console.log('💡 フォールバック: gemini-2.0-flash-exp-image-generation で画像生成...')
+    const fallback1Response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': geminiApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemInstruction}\n\n${userPrompt}\n\nこの内容に合った正確な教育用の図を1つ生成してください。` }]
+            }
+          ],
+          generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE'],
+            temperature: 0.4,
+          }
+        })
+      }
+    )
+    
+    if (fallback1Response.ok) {
+      const fb1Data = await fallback1Response.json() as any
+      const parts = fb1Data.candidates?.[0]?.content?.parts || []
+      
+      let imageUrl = ''
+      for (const part of parts) {
+        if (part.inlineData) {
+          const mimeType = part.inlineData.mimeType || 'image/png'
+          imageUrl = `data:${mimeType};base64,${part.inlineData.data}`
+        }
+      }
+      
+      if (imageUrl) {
+        if (card_id) {
+          try {
+            await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
+              .bind(imageUrl, Number(card_id)).run()
+          } catch (dbErr: any) {
+            console.warn('⚠️ DB保存失敗:', dbErr.message)
+          }
+        }
+        
+        return c.json({
+          success: true,
+          image_url: imageUrl,
+          prompt: userPrompt.substring(0, 300),
+          generation_time_ms: Date.now() - startTime,
+          model: 'gemini-2.0-flash-exp',
+          message: 'Gemini 2.0 Flash で図を生成しました'
+        })
+      }
+    }
+    
+    // フォールバック 2: Imagen 4
+    console.log('💡 フォールバック: Imagen 4 で画像生成...')
+    const imagenPrompt = `Educational diagram for Japanese elementary school: ${prompt}. Clear labels in Japanese, accurate data, textbook quality, white background, colorful, child-friendly`
+    
     const imagenResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict`,
       {
@@ -23092,129 +23322,98 @@ app.post('/api/ai/generate-image', async (c) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          instances: [{ prompt: optimizedPrompt }],
-          parameters: {
-            sampleCount: 1,
-            aspectRatio: aspect_ratio || '1:1',
-          }
+          instances: [{ prompt: imagenPrompt }],
+          parameters: { sampleCount: 1, aspectRatio: aspect_ratio || '4:3' }
         })
       }
     )
     
-    if (!imagenResponse.ok) {
-      const errorText = await imagenResponse.text()
-      console.error('Imagen API エラー:', imagenResponse.status, errorText)
+    if (imagenResponse.ok) {
+      const imagenData = await imagenResponse.json() as any
+      const generatedImages = imagenData.predictions || []
       
-      // Imagen APIが使えない場合、Gemini 2.0 Flash で SVG 図解を生成するフォールバック
-      console.log('💡 Gemini 2.0 Flash でSVG図解を生成...')
-      const geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `以下の学習テーマについて、小学生にわかりやすいSVG画像を1つ生成してください。SVGコードだけを出力してください。余計なテキストは不要です。幅600高さ400で、カラフルでシンプルな図解にしてください。テーマ: ${prompt}` }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
-          })
-        }
-      )
-      
-      if (geminiResponse.ok) {
-        const geminiData = await geminiResponse.json() as any
-        const svgText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-        // SVGを抽出
-        const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i)
-        if (svgMatch) {
-          // SVGをBase64 data URLとして直接使用（R2不要）
-          const svgUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMatch[0])))
-          
-          // カードIDがあればDBに保存
-          if (card_id) {
-            try {
-              await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
-                .bind(svgUrl, Number(card_id)).run()
-              console.log(`✅ SVG画像をカード ${card_id} に保存`)
-            } catch (dbErr: any) {
-              console.warn('⚠️ SVG DB保存失敗:', dbErr.message)
-            }
+      if (generatedImages.length > 0) {
+        const imageBase64 = generatedImages[0].bytesBase64Encoded
+        const mimeType = generatedImages[0].mimeType || 'image/png'
+        const imageUrl = `data:${mimeType};base64,${imageBase64}`
+        
+        if (card_id) {
+          try {
+            await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
+              .bind(imageUrl, Number(card_id)).run()
+          } catch (dbErr: any) {
+            console.warn('⚠️ DB保存失敗:', dbErr.message)
           }
-          
-          const generationTime = Date.now() - startTime
-          return c.json({
-            success: true,
-            image_url: svgUrl,
-            prompt: optimizedPrompt,
-            generation_time_ms: generationTime,
-            model: 'gemini-2.0-flash-svg',
-            message: 'SVG図解をAIで生成しました'
-          })
         }
-      }
-      
-      return c.json({ 
-        success: false, 
-        error: `画像生成API エラー (${imagenResponse.status}): ${errorText.substring(0, 200)}`,
-        details: 'Imagen APIとSVGフォールバックの両方が失敗しました'
-      }, 500)
-    }
-    
-    const imagenData = await imagenResponse.json() as any
-    const generatedImages = imagenData.predictions || []
-    
-    if (generatedImages.length === 0) {
-      return c.json({ success: false, error: '画像が生成されませんでした' }, 500)
-    }
-    
-    // Base64画像をdata URLとして直接使用（R2不要・確実に動作）
-    const imageBase64 = generatedImages[0].bytesBase64Encoded
-    const mimeType = generatedImages[0].mimeType || 'image/png'
-    const imageUrl = `data:${mimeType};base64,${imageBase64}`
-    
-    // カードIDがあればDBに保存
-    if (card_id) {
-      try {
-        await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
-          .bind(imageUrl, Number(card_id)).run()
-        console.log(`✅ AI画像をカード ${card_id} に保存`)
-      } catch (dbErr: any) {
-        console.warn('⚠️ AI画像DB保存失敗:', dbErr.message)
+        
+        return c.json({
+          success: true,
+          image_url: imageUrl,
+          prompt: imagenPrompt.substring(0, 300),
+          generation_time_ms: Date.now() - startTime,
+          model: 'imagen-4.0-fast',
+          message: 'Imagen 4 で画像を生成しました'
+        })
       }
     }
     
-    const generationTime = Date.now() - startTime
+    // フォールバック 3: SVG生成
+    console.log('💡 最終フォールバック: SVG図解を生成...')
+    const svgResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `あなたは教育用SVG図解の専門家です。以下の学習内容について、教科書品質のSVG画像を1つだけ生成してください。
+
+ルール:
+- SVGコードだけを出力（説明文不要）
+- 幅800 高さ600
+- 日本語ラベル・数値を必ず含める
+- カラフルで見やすい配色
+- 数学的・科学的に正確であること
+- フォントはsans-serif、文字サイズは最低14px
+
+テーマ: ${userPrompt}` }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 8192 }
+        })
+      }
+    )
     
-    // 生成履歴を保存（テーブルが存在する場合のみ）
-    try {
-      await env.DB.prepare(`
-        INSERT INTO ai_generated_images (
-          teacher_id, card_id, prompt, negative_prompt, 
-          ai_model, image_url, generation_time_ms, 
-          generation_params, is_used
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        teacher_id || null,
-        card_id || null,
-        prompt,
-        negative_prompt || null,
-        'imagen-4.0-fast',
-        'generated_' + Date.now(),
-        generationTime,
-        JSON.stringify({ style, aspect_ratio, optimized_prompt: optimizedPrompt }),
-        false
-      ).run()
-    } catch (dbErr) {
-      console.warn('画像生成履歴保存スキップ:', dbErr)
+    if (svgResponse.ok) {
+      const svgData = await svgResponse.json() as any
+      const svgText = svgData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i)
+      if (svgMatch) {
+        const svgUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgMatch[0])))
+        
+        if (card_id) {
+          try {
+            await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
+              .bind(svgUrl, Number(card_id)).run()
+          } catch (dbErr: any) {
+            console.warn('⚠️ SVG DB保存失敗:', dbErr.message)
+          }
+        }
+        
+        return c.json({
+          success: true,
+          image_url: svgUrl,
+          prompt: userPrompt.substring(0, 300),
+          generation_time_ms: Date.now() - startTime,
+          model: 'gemini-2.0-flash-svg',
+          message: 'SVG図解を生成しました'
+        })
+      }
     }
     
-    return c.json({
-      success: true,
-      image_url: imageUrl,
-      prompt: optimizedPrompt,
-      generation_time_ms: generationTime,
-      model: 'imagen-4.0-fast',
-      message: 'AI画像を生成しました'
-    })
+    return c.json({ 
+      success: false, 
+      error: '全ての画像生成モデルが失敗しました。ファイルを手動でアップロードしてください。',
+      details: 'Gemini Image / Imagen / SVG すべて試行済み'
+    }, 500)
+    
   } catch (error: any) {
     console.error('❌ AI画像生成エラー:', error)
     return c.json({ 
@@ -23390,7 +23589,7 @@ app.post('/api/upload/image', async (c) => {
     // card_idが指定されていればカードに自動保存
     if (cardId) {
       try {
-        await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
+        await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
           .bind(imageUrl, Number(cardId))
           .run()
         console.log(`✅ カード ${cardId} に画像を保存`)
