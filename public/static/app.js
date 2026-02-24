@@ -30471,7 +30471,7 @@ async function uploadFileToCard(cardId, file) {
     return addMediaFileToCard(cardId, file, mediaType)
   }
   // サイズチェック: 画像5MB、動画50MB、音声20MB
-  const sizeLimits = { image: 5, video: 50, audio: 20 }
+  const sizeLimits = { image: 10, video: 50, audio: 20 }
   const sizeLimit = (sizeLimits[mediaType] || 5) * 1024 * 1024
   if (file.size > sizeLimit) {
     alert('ファイルサイズが大きすぎます（上限' + (sizeLimits[mediaType] || 5) + 'MB、現在' + (file.size/1024/1024).toFixed(1) + 'MB）')
@@ -35102,10 +35102,10 @@ function handleImageDrop(event) {
 
 // 画像ファイルプレビュー
 function previewImageFile(file) {
-  // ファイルサイズチェック（5MB）
-  const maxSize = 5 * 1024 * 1024
+  // ファイルサイズチェック（10MB）
+  const maxSize = 10 * 1024 * 1024
   if (file.size > maxSize) {
-    alert('ファイルサイズが大きすぎます。5MB以下の画像を選択してください。')
+    alert('ファイルサイズが大きすぎます。10MB以下の画像を選択してください。')
     return
   }
   

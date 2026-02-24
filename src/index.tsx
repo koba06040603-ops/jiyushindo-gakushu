@@ -13276,6 +13276,45 @@ app.put('/api/card/:cardId', async (c) => {
   const updates = await c.req.json()
   
   try {
+    // Base64画像がR2対応サイズを超える場合はR2にアップロード
+    const imageFields = ['problem_image_url', 'answer_image_url']
+    for (const field of imageFields) {
+      if (updates[field] && typeof updates[field] === 'string' && updates[field].startsWith('data:')) {
+        const base64Data = updates[field]
+        // Base64データが750KBを超える場合はR2にアップロード
+        if (base64Data.length > 750 * 1024 && env.MEDIA_BUCKET) {
+          try {
+            // data:image/png;base64,... を解析
+            const match = base64Data.match(/^data:([^;]+);base64,(.+)$/)
+            if (match) {
+              const mimeType = match[1]
+              const b64 = match[2]
+              const binaryStr = atob(b64)
+              const bytes = new Uint8Array(binaryStr.length)
+              for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i)
+              
+              const ext = mimeType === 'image/png' ? 'png' : 
+                          mimeType === 'image/gif' ? 'gif' : 
+                          mimeType === 'image/webp' ? 'webp' : 
+                          mimeType === 'application/pdf' ? 'pdf' : 'jpg'
+              const timestamp = Date.now()
+              const randomStr = Math.random().toString(36).substring(2, 8)
+              const r2Key = `images/${timestamp}-${randomStr}.${ext}`
+              
+              await env.MEDIA_BUCKET.put(r2Key, bytes.buffer, {
+                httpMetadata: { contentType: mimeType }
+              })
+              updates[field] = `/api/media/${r2Key}`
+              console.log(`✅ Base64→R2変換: ${field} → ${r2Key} (${(bytes.length/1024).toFixed(0)}KB)`)
+            }
+          } catch (r2Err: any) {
+            console.warn(`⚠️ R2アップロード失敗、Base64で保存を試行: ${r2Err.message}`)
+            // R2失敗時はそのまま進む（DB保存を試みる）
+          }
+        }
+      }
+    }
+    
     // 更新可能なフィールド
     const allowedFields = [
       'card_title',
@@ -13513,7 +13552,7 @@ app.post('/api/card/:cardId/media/upload', async (c) => {
     }
     
     // サイズ制限: 画像5MB、動画50MB、音声20MB
-    const maxSizes: Record<string, number> = { image: 5*1024*1024, video: 50*1024*1024, audio: 20*1024*1024 }
+    const maxSizes: Record<string, number> = { image: 10*1024*1024, video: 50*1024*1024, audio: 20*1024*1024 }
     const maxSize = maxSizes[mediaType] || 50*1024*1024
     if (file.size > maxSize) {
       const limitMB = Math.round(maxSize / 1024 / 1024)
@@ -13523,10 +13562,23 @@ app.post('/api/card/:cardId/media/upload', async (c) => {
     const arrayBuffer = await file.arrayBuffer()
     let dataUrl = ''
     
-    // 画像(5MB以下): Base64 data URLとしてDB直接保存（最も確実）
-    // 動画/音声: R2にアップロード → URL保存（大容量ファイル対応）
-    if (mediaType === 'image') {
-      // 画像はBase64でD1に直接保存
+    // 画像・動画・音声: R2にアップロード → URL保存（推奨）
+    // R2がない場合のみ小さい画像はBase64フォールバック
+    if (env.MEDIA_BUCKET) {
+      // R2にアップロード（全メディアタイプ対応）
+      const timestamp = Date.now()
+      const randomStr = Math.random().toString(36).substring(2, 8)
+      const ext = (file.name || '').split('.').pop()?.toLowerCase() || 
+                  (mediaType === 'video' ? 'mp4' : mediaType === 'audio' ? 'mp3' : 'jpg')
+      const folder = mediaType === 'video' ? 'videos' : mediaType === 'audio' ? 'audio' : 'images'
+      const r2Key = folder + '/' + timestamp + '-' + randomStr + '.' + ext
+      await env.MEDIA_BUCKET.put(r2Key, arrayBuffer, {
+        httpMetadata: { contentType: file.type }
+      })
+      dataUrl = '/api/media/' + r2Key
+      console.log('R2 upload success: ' + r2Key + ' (' + (file.size/1024/1024).toFixed(1) + 'MB)')
+    } else if (mediaType === 'image' && file.size <= 750 * 1024) {
+      // R2なし + 画像 + 750KB以下: Base64フォールバック（D1のSQLITE_TOOBIG回避）
       const uint8Array = new Uint8Array(arrayBuffer)
       let binary = ''
       const chunkSize = 8192
@@ -13536,37 +13588,24 @@ app.post('/api/card/:cardId/media/upload', async (c) => {
       }
       const base64 = btoa(binary)
       dataUrl = 'data:' + file.type + ';base64,' + base64
-      console.log('Image saved as Base64: ' + (file.size/1024/1024).toFixed(1) + 'MB')
-    } else {
-      // 動画・音声はR2にアップロード
-      if (env.MEDIA_BUCKET) {
-        const timestamp = Date.now()
-        const randomStr = Math.random().toString(36).substring(2, 8)
-        const ext = (file.name || '').split('.').pop()?.toLowerCase() || (mediaType === 'video' ? 'mp4' : 'mp3')
-        const r2Key = (mediaType === 'video' ? 'videos' : 'audio') + '/' + timestamp + '-' + randomStr + '.' + ext
-        await env.MEDIA_BUCKET.put(r2Key, arrayBuffer, {
-          httpMetadata: { contentType: file.type }
-        })
-        dataUrl = '/api/media/' + r2Key
-        console.log('R2 upload success: ' + r2Key + ' (' + (file.size/1024/1024).toFixed(1) + 'MB)')
-      } else if (file.size <= 5 * 1024 * 1024) {
-        // R2が無い場合、5MB以下ならBase64にフォールバック
-        const uint8Array = new Uint8Array(arrayBuffer)
-        let binary = ''
-        const chunkSize = 8192
-        for (let i = 0; i < uint8Array.length; i += chunkSize) {
-          const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
-          binary += String.fromCharCode(...chunk)
-        }
-        const base64 = btoa(binary)
-        dataUrl = 'data:' + file.type + ';base64,' + base64
-        console.log('Fallback Base64: ' + mediaType + ' ' + (file.size/1024/1024).toFixed(1) + 'MB')
-      } else {
-        return c.json({ 
-          success: false, 
-          error: 'R2ストレージが利用できません。5MB以下のファイルにするか、YouTube URLを使用してください。'
-        }, 500)
+      console.log('Base64 fallback (image): ' + (file.size/1024).toFixed(0) + 'KB')
+    } else if (file.size <= 750 * 1024) {
+      // R2なし + 750KB以下: Base64フォールバック
+      const uint8Array = new Uint8Array(arrayBuffer)
+      let binary = ''
+      const chunkSize = 8192
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+        binary += String.fromCharCode(...chunk)
       }
+      const base64 = btoa(binary)
+      dataUrl = 'data:' + file.type + ';base64,' + base64
+      console.log('Fallback Base64: ' + mediaType + ' ' + (file.size/1024).toFixed(0) + 'KB')
+    } else {
+      return c.json({ 
+        success: false, 
+        error: 'R2ストレージが利用できません。750KB以下のファイルにするか、YouTube URLを使用してください。'
+      }, 500)
     }
     
     // media_items に追加
@@ -23117,11 +23156,11 @@ app.post('/api/cards/:cardId/edit-history', async (c) => {
 })
 
 // =============================================================================
-// Phase 14: ファイルアップロード機能（Base64 D1直接保存 - R2不要）
+// Phase 14: ファイルアップロード機能（R2優先・Base64フォールバック）
 // =============================================================================
 
 // 画像ファイルアップロード（JPG/PNG/GIF/WebP/PDF対応）
-// 画像はBase64 data URLとしてD1データベースに直接保存（R2バインディング問題を回避）
+// R2バケットが利用可能な場合はR2に保存、なければBase64でDB保存
 app.post('/api/upload/image', async (c) => {
   const { env } = c
   
@@ -23143,28 +23182,50 @@ app.post('/api/upload/image', async (c) => {
       }, 400)
     }
     
-    // ファイルサイズチェック（5MB制限 - Base64化するとD1に保存するため）
-    const maxSize = 5 * 1024 * 1024
+    // ファイルサイズチェック（10MB制限 - R2対応で引き上げ）
+    const maxSize = 10 * 1024 * 1024
     if (file.size > maxSize) {
       return c.json({ 
         success: false, 
-        error: 'ファイルサイズが大きすぎます。5MB以下のファイルをアップロードしてください。' 
+        error: 'ファイルサイズが大きすぎます。10MB以下のファイルをアップロードしてください。' 
       }, 400)
     }
     
     const arrayBuffer = await file.arrayBuffer()
+    let imageUrl = ''
     
-    // Base64 data URLに変換（確実に動作する方式）
-    const uint8Array = new Uint8Array(arrayBuffer)
-    let binary = ''
-    const chunkSize = 8192
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
-      binary += String.fromCharCode(...chunk)
+    // R2バケットが利用可能ならR2にアップロード（推奨）
+    if (env.MEDIA_BUCKET) {
+      const timestamp = Date.now()
+      const randomStr = Math.random().toString(36).substring(2, 8)
+      const ext = file.type === 'application/pdf' ? 'pdf' : 
+                  file.type === 'image/png' ? 'png' : 
+                  file.type === 'image/gif' ? 'gif' : 
+                  file.type === 'image/webp' ? 'webp' : 'jpg'
+      const r2Key = `images/${timestamp}-${randomStr}.${ext}`
+      await env.MEDIA_BUCKET.put(r2Key, arrayBuffer, {
+        httpMetadata: { contentType: file.type }
+      })
+      imageUrl = `/api/media/${r2Key}`
+      console.log(`✅ R2に画像保存: ${r2Key} (${(file.size/1024/1024).toFixed(1)}MB)`)
+    } else if (file.size <= 750 * 1024) {
+      // R2なし + 750KB以下: Base64フォールバック（D1のSQLITE_TOOBIG回避）
+      const uint8Array = new Uint8Array(arrayBuffer)
+      let binary = ''
+      const chunkSize = 8192
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length))
+        binary += String.fromCharCode(...chunk)
+      }
+      const base64 = btoa(binary)
+      imageUrl = `data:${file.type};base64,${base64}`
+      console.log(`✅ Base64フォールバック: ${file.type}, ${(base64.length / 1024).toFixed(0)}KB`)
+    } else {
+      return c.json({ 
+        success: false, 
+        error: `R2ストレージが利用できないため、750KB以下の画像のみ対応しています（現在 ${(file.size/1024/1024).toFixed(1)}MB）。画像を圧縮するか、管理者にR2設定を依頼してください。`
+      }, 400)
     }
-    const base64 = btoa(binary)
-    const imageUrl = `data:${file.type};base64,${base64}`
-    console.log(`✅ 画像をBase64に変換: ${file.type}, ${(base64.length / 1024).toFixed(0)}KB`)
     
     // card_idが指定されていればカードに自動保存
     if (cardId) {
