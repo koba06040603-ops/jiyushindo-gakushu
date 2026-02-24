@@ -23093,99 +23093,23 @@ app.post('/api/ai/generate-image', async (c) => {
     const userContext = contextParts.join('\n')
     
     // ========== 問題内容の分析: 表/グラフ/図形/その他を判定 ==========
-    const allText = `${prompt} ${card_title || ''} ${unit_name || ''} ${problem_text || ''}`.toLowerCase()
-    const isTableType = /表にまとめ|二つのことがら|整理しよう|クロス集計|二元表|表に整理|整理のしかた|仲間分け|分類/.test(allText)
-    const isGraphType = /折れ線グラフ|棒グラフ|ぼうグラフ|円グラフ|帯グラフ|グラフをかく|グラフを書|グラフを読/.test(allText)
+    const allText = `${prompt} ${card_title || ''} ${unit_name || ''} ${problem_text || ''}`
+    const isGraphType = /折れ線グラフ|棒グラフ|ぼうグラフ|円グラフ|帯グラフ|グラフをかく|グラフを書|グラフを読|グラフで見/.test(allText)
     const isProportionType = /比例|反比例|y\s*=\s*\d|比例のグラフ|反比例のグラフ/.test(allText)
     const isGeometryType = /直線|コンパス|垂直|平行|作図|三角形|四角形|平行四辺形|台形|ひし形|角度|直角|円をかく|二等辺三角形|正三角形|正方形|長方形/.test(allText)
     const isNumberLineType = /数直線|数のせん|数の線/.test(allText)
     const isDiagramType = /面積|体積|展開図|見取図|対称|図形/.test(allText)
     const isMapOrImage = /地図|写真|実験|観察|植物|動物|天気|星|月|太陽/.test(allText)
+    // 表判定 — ただしグラフ系キーワードが同時にある場合はグラフを優先
+    const isTableType = !isGraphType && !isProportionType && /表にまとめ|二つのことがら|整理しよう|クロス集計|二元表|表に整理|整理のしかた|仲間分け|分類/.test(allText)
     
     // JSXGraph対応チェック（グラフ・比例・反比例・コンパス・直線・数直線・図形）
     const canUseJSXGraph = isGraphType || isProportionType || isGeometryType || isNumberLineType
     
-    // ========== 第1候補: 表（テーブル）HTML生成 ==========
-    if (isTableType && !prefer_image && prefer_model !== 'nano_banana_pro') {
-      console.log('🎨 表（テーブル）をHTML生成:', prompt.substring(0, 80))
-      
-      try {
-        const htmlPrompt = `あなたは日本の小学校の教科書に載るような、正確で見やすい表を HTML と インラインCSS だけで作る専門家です。
-
-以下の問題に合った「教育用の表」を1つだけ生成してください。
-
-【出力形式】
-- <div style="..."> で始まり </div> で終わるHTMLブロック1つだけ
-- マークダウンのコードブロック(\`\`\`)で囲まないこと
-- 説明文は一切不要。HTMLのみ
-
-【スタイルルール】
-- すべてのCSSはインラインstyle属性で書くこと（<style>タグ不使用）
-- 表には border-collapse:collapse を必ず使う
-- セルの padding: 10px 15px
-- フォントサイズ: ヘッダー16px以上、データ18px以上、タイトル20px以上
-- ヘッダー行: 濃い色の背景 + 白文字
-- データ行: 交互に薄い背景色
-- 合計行/合計列がある場合は太字 + 区切り線で強調
-- 配色: カラフルで見やすく、背景は白系
-- max-width: 600px, font-family: sans-serif
-- 問題文にある数値・データをすべて正確に反映すること
-- 二元表（クロス集計表）の場合、合計行と合計列を必ず含めること
-
-${userContext}
-
-HTMLコードだけを出力（コードブロック不要）:`
-
-        const htmlResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
-          {
-            method: 'POST',
-            headers: {
-              'x-goog-api-key': geminiApiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{ role: 'user', parts: [{ text: htmlPrompt }] }],
-              generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
-            })
-          }
-        )
-        
-        if (htmlResponse.ok) {
-          const htmlData = await htmlResponse.json() as any
-          let htmlText = htmlData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-          htmlText = htmlText.replace(/```html\s*/gi, '').replace(/```\s*/g, '').trim()
-          const divMatch = htmlText.match(/<div[\s\S]*<\/div>/i)
-          
-          if (divMatch && divMatch[0].length > 50) {
-            let cleanHtml = divMatch[0]
-              .replace(/<script[\s\S]*?<\/script>/gi, '')
-              .replace(/\bon\w+\s*=/gi, 'data-disabled=')
-              .replace(/javascript:/gi, '')
-            
-            const generationTime = Date.now() - startTime
-            console.log(`✅ 表HTML生成成功 (${generationTime}ms, ${cleanHtml.length}文字)`)
-            
-            return c.json({
-              success: true,
-              html_content: cleanHtml,
-              type: 'html',
-              prompt: prompt.substring(0, 200),
-              generation_time_ms: generationTime,
-              model: 'gemini-2.0-flash (HTML表)',
-              message: 'HTML表を生成しました'
-            })
-          }
-        }
-        
-        console.log('💡 表HTML生成失敗、JSXGraph/提案モードへ...')
-      } catch (htmlErr: any) {
-        console.warn('⚠️ 表HTML生成エラー:', htmlErr.message)
-      }
-    }
+    console.log(`📊 問題分析: table=${isTableType}, graph=${isGraphType}, proportion=${isProportionType}, geometry=${isGeometryType}, numberLine=${isNumberLineType}, jsxgraph=${canUseJSXGraph}`)
     
-    // ========== 第2候補: JSXGraph インタラクティブ作図 ==========
-    // 折れ線グラフ・棒グラフ・比例・反比例・コンパス・直線・数直線・図形
+    // ========== 第1候補: JSXGraph インタラクティブ作図 ==========
+    // グラフ/比例/反比例/コンパス/直線/数直線/図形 → 最優先でJSXGraph
     if (canUseJSXGraph && !prefer_image && prefer_model !== 'nano_banana_pro') {
       console.log('📐 JSXGraph作図モード:', prompt.substring(0, 80))
       
@@ -23195,7 +23119,7 @@ HTMLコードだけを出力（コードブロック不要）:`
         if (isProportionType && /反比例/.test(allText)) jsxType = 'inverse_proportion'
         else if (isProportionType) jsxType = 'proportion'
         else if (/折れ線/.test(allText)) jsxType = 'line_graph'
-        else if (/棒グラフ|ぼうグラフ/.test(allText)) jsxType = 'bar_graph'
+        else if (/棒グラフ|ぼうグラフ|グラフで見/.test(allText)) jsxType = 'bar_graph'
         else if (isNumberLineType) jsxType = 'number_line'
         else if (/コンパス|円をかく/.test(allText)) jsxType = 'compass'
         else if (/直線|垂直|平行|作図/.test(allText)) jsxType = 'line_drawing'
@@ -23307,16 +23231,12 @@ JSON形式のみ出力:`
         if (jsxResponse.ok) {
           const jsxData = await jsxResponse.json() as any
           let jsxText = jsxData.candidates?.[0]?.content?.parts?.[0]?.text || ''
-          
-          // JSON抽出（コードブロック除去）
           jsxText = jsxText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
           
-          // JSONパース
           let jsxConfig: any = null
           try {
             jsxConfig = JSON.parse(jsxText)
           } catch {
-            // JSONが { で始まる部分を抽出して再トライ
             const jsonMatch = jsxText.match(/\{[\s\S]*\}/)
             if (jsonMatch) {
               try { jsxConfig = JSON.parse(jsonMatch[0]) } catch {}
@@ -23339,9 +23259,89 @@ JSON形式のみ出力:`
           }
         }
         
-        console.log('💡 JSXGraph設定生成失敗、提案モードへ...')
+        console.log('💡 JSXGraph設定生成失敗、次の候補へ...')
       } catch (jsxErr: any) {
         console.warn('⚠️ JSXGraph設定生成エラー:', jsxErr.message)
+      }
+    }
+    
+    // ========== 第2候補: 表（テーブル）HTML生成 ==========
+    // 表系のみ（グラフキーワードがない場合）
+    if (isTableType && !prefer_image && prefer_model !== 'nano_banana_pro') {
+      console.log('🎨 表（テーブル）をHTML生成:', prompt.substring(0, 80))
+      
+      try {
+        const htmlPrompt = `あなたは日本の小学校の教科書に載るような、正確で見やすい表を HTML と インラインCSS だけで作る専門家です。
+
+以下の問題に合った「教育用の表」を1つだけ生成してください。
+
+【出力形式】
+- <div style="..."> で始まり </div> で終わるHTMLブロック1つだけ
+- マークダウンのコードブロック(\`\`\`)で囲まないこと
+- 説明文は一切不要。HTMLのみ
+
+【スタイルルール】
+- すべてのCSSはインラインstyle属性で書くこと（<style>タグ不使用）
+- 表には border-collapse:collapse を必ず使う
+- セルの padding: 10px 15px
+- フォントサイズ: ヘッダー16px以上、データ18px以上、タイトル20px以上
+- ヘッダー行: 濃い色の背景 + 白文字
+- データ行: 交互に薄い背景色
+- 合計行/合計列がある場合は太字 + 区切り線で強調
+- 配色: カラフルで見やすく、背景は白系
+- max-width: 600px, font-family: sans-serif
+- 問題文にある数値・データをすべて正確に反映すること
+- 二元表（クロス集計表）の場合、合計行と合計列を必ず含めること
+
+${userContext}
+
+HTMLコードだけを出力（コードブロック不要）:`
+
+        const htmlResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'x-goog-api-key': geminiApiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: htmlPrompt }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+            })
+          }
+        )
+        
+        if (htmlResponse.ok) {
+          const htmlData = await htmlResponse.json() as any
+          let htmlText = htmlData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          htmlText = htmlText.replace(/```html\s*/gi, '').replace(/```\s*/g, '').trim()
+          const divMatch = htmlText.match(/<div[\s\S]*<\/div>/i)
+          
+          if (divMatch && divMatch[0].length > 50) {
+            let cleanHtml = divMatch[0]
+              .replace(/<script[\s\S]*?<\/script>/gi, '')
+              .replace(/\bon\w+\s*=/gi, 'data-disabled=')
+              .replace(/javascript:/gi, '')
+            
+            const generationTime = Date.now() - startTime
+            console.log(`✅ 表HTML生成成功 (${generationTime}ms, ${cleanHtml.length}文字)`)
+            
+            return c.json({
+              success: true,
+              html_content: cleanHtml,
+              type: 'html',
+              prompt: prompt.substring(0, 200),
+              generation_time_ms: generationTime,
+              model: 'gemini-2.0-flash (HTML表)',
+              message: 'HTML表を生成しました'
+            })
+          }
+        }
+        
+        console.log('💡 表HTML生成失敗、JSXGraph/提案モードへ...')
+      } catch (htmlErr: any) {
+        console.warn('⚠️ 表HTML生成エラー:', htmlErr.message)
       }
     }
     
