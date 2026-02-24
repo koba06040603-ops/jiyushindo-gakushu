@@ -23063,7 +23063,7 @@ app.delete('/api/cards/images/:imageId', async (c) => {
 // AI画像生成API（Gemini Imagen使用）- JSXGraph + Nano Banana Pro 統合版
 app.post('/api/ai/generate-image', async (c) => {
   const { env } = c
-  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade, prefer_image, prefer_model } = await c.req.json()
+  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade, prefer_image, prefer_model, answer_text, answer_explanation, custom_prompt } = await c.req.json()
   
   try {
     const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
@@ -23089,6 +23089,17 @@ app.post('/api/ai/generate-image', async (c) => {
     contextParts.push(`内容: ${prompt}`)
     if (problem_text && problem_text.length > 5) {
       contextParts.push(`問題文:\n${problem_text.substring(0, 600)}`)
+    }
+    // 解答テキストを含める（正確な数値のために重要）
+    if (answer_text && answer_text.length > 1) {
+      contextParts.push(`\n【重要: この問題の正解・解答データ】\n${answer_text.substring(0, 500)}`)
+    }
+    if (answer_explanation && answer_explanation.length > 1) {
+      contextParts.push(`解答の解説: ${answer_explanation.substring(0, 300)}`)
+    }
+    // ユーザーが手動で指定したプロンプト（最優先）
+    if (custom_prompt && custom_prompt.length > 1) {
+      contextParts.push(`\n【ユーザー追加指示】\n${custom_prompt.substring(0, 500)}`)
     }
     const userContext = contextParts.join('\n')
     
@@ -23203,11 +23214,13 @@ JSONのみ出力してください（コードブロック不要、説明文不�
 }
 
 【重要ルール】
-1. 問題文にある数値・データを「すべて正確に」JSONに反映すること
-2. タイトルは問題のテーマを日本語で書くこと
-3. ラベルは日本語を使うこと
-4. データが問題文にない場合は、適切な例題データを入れること
-5. interactive は false に設定（閲覧用）
+1. 問題文と解答にある数値・データを「すべて正確に」JSONに反映すること
+2. 【最重要】解答データ（正解の数値）がある場合、そのデータを最優先でグラフに使用すること
+3. 解答に「9時は18度」「最高気温は14時で24度」等とある場合、その正確な数値をグラフのデータ点に反映すること
+4. タイトルは問題のテーマを日本語で書くこと
+5. ラベルは日本語を使うこと
+6. データが問題文にも解答にもない場合のみ、適切な例題データを入れること
+7. interactive は false に設定（閲覧用）
 
 ${userContext}
 
@@ -23452,7 +23465,7 @@ JSON形式で出力してください:`
               contents: [
                 {
                   role: 'user',
-                  parts: [{ text: `${systemInstruction}\n\n${userPrompt}\n\nこの内容に合った正確な教育用の図を1つ生成してください。数値・ラベル・軸の表記はすべて正確に。` }]
+                  parts: [{ text: `${systemInstruction}\n\n${userPrompt}\n\n【最重要】解答データの数値が含まれている場合は、それを正確にグラフ・図に反映してください。\nこの内容に合った正確な教育用の図を1つ生成してください。数値・ラベル・軸の表記はすべて正確に。` }]
                 }
               ],
               generationConfig: {

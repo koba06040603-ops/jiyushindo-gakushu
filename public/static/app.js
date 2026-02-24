@@ -6819,6 +6819,9 @@ async function generateImageForCardAsImage(cardId, description) {
   try {
     const rawCd = window.currentCardData || {}
     const cd = rawCd.card || rawCd
+    const answerObj = rawCd.answer || {}
+    const answerText = cd.answer || cd.correct_answer || answerObj.answer_text || answerObj.answer_content || ''
+    const answerExplanation = cd.answer_explanation || cd.explanation || answerObj.explanation || ''
     const res = await axios.post('/api/ai/generate-image', {
       prompt: description || cd.card_title || cd.title || '教育用図解',
       card_id: cardId,
@@ -6827,22 +6830,28 @@ async function generateImageForCardAsImage(cardId, description) {
       unit_name: cd.unit_name || '',
       subject: cd.subject || '',
       grade: cd.grade_level || cd.grade || '',
+      answer_text: answerText,
+      answer_explanation: answerExplanation,
       prefer_image: true
     }, { timeout: 90000 })
     if (res.data.success && res.data.image_url) {
       try { await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url }) } catch(e) {}
       if (placeholder) {
+        const safeDesc = (description||'').replace(/'/g,'').replace(/"/g,'').replace(/\n/g,' ').substring(0,60)
         placeholder.innerHTML = `
           <div class="text-center" id="card-image-container-${cardId}">
             <img src="${res.data.image_url}" alt="${description || '問題の図'}" 
                  class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;">
             <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
               <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
-                <i class="fas fa-check-circle mr-1"></i>${res.data.model || 'AI'}で生成
+                <i class="fas fa-check-circle mr-1"></i>${res.data.model || 'AI'}（${((res.data.generation_time_ms||0)/1000).toFixed(1)}秒）
               </span>
-              <button onclick="generateImageForCard(${cardId}, '${(description||'').replace(/'/g,'').substring(0,60)}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-redo mr-1"></i>HTML図解で再生成</button>
+              <button onclick="openPromptImageGenerate(${cardId}, 'nb_pro')" class="text-xs text-pink-500 hover:text-pink-700 underline"><i class="fas fa-star mr-1"></i>高精度画像</button>
+              <button onclick="generateImageForCard(${cardId}, '${safeDesc}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-chart-line mr-1"></i>グラフで再生成</button>
               <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
+              <button onclick="deleteCardImage(${cardId})" class="text-xs text-red-400 hover:text-red-600 underline"><i class="fas fa-trash mr-1"></i>削除</button>
             </div>
+            ${res.data.ai_description ? '<p class="text-xs text-gray-500 mt-1">' + res.data.ai_description.substring(0, 100) + '</p>' : ''}
           </div>`
       }
     } else {
@@ -6875,6 +6884,9 @@ async function generateImageForCardNBPro(cardId, description) {
   try {
     const rawCd = window.currentCardData || {}
     const cd = rawCd.card || rawCd
+    const answerObj = rawCd.answer || {}
+    const answerText = cd.answer || cd.correct_answer || answerObj.answer_text || answerObj.answer_content || ''
+    const answerExplanation = cd.answer_explanation || cd.explanation || answerObj.explanation || ''
     const res = await axios.post('/api/ai/generate-image', {
       prompt: description || cd.card_title || cd.title || '教育用図解',
       card_id: cardId,
@@ -6883,6 +6895,8 @@ async function generateImageForCardNBPro(cardId, description) {
       unit_name: cd.unit_name || '',
       subject: cd.subject || '',
       grade: cd.grade_level || cd.grade || '',
+      answer_text: answerText,
+      answer_explanation: answerExplanation,
       prefer_image: true,
       prefer_model: 'nano_banana_pro'
     }, { timeout: 120000 })
@@ -6898,9 +6912,11 @@ async function generateImageForCardNBPro(cardId, description) {
               <span class="bg-pink-100 text-pink-700 text-xs px-3 py-1 rounded-full font-bold">
                 <i class="fas fa-star mr-1"></i>${res.data.model || 'Nano Banana Pro'}（${((res.data.generation_time_ms||0)/1000).toFixed(1)}秒）
               </span>
+              <button onclick="openPromptImageGenerate(${cardId}, 'nb_pro')" class="text-xs text-pink-500 hover:text-pink-700 underline"><i class="fas fa-star mr-1"></i>プロンプト指定で再生成</button>
               <button onclick="generateImageForCard(${cardId}, '${safeDesc}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-chart-line mr-1"></i>グラフで再生成</button>
               <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
-              <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+              <button onclick="deleteCardImage(${cardId})" class="text-xs text-red-400 hover:text-red-600 underline"><i class="fas fa-trash mr-1"></i>削除</button>
+              <button onclick="openPromptImageGenerate(${cardId}, 'replace')" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
             </div>
             ${res.data.ai_description ? '<p class="text-xs text-gray-500 mt-1">' + res.data.ai_description.substring(0, 100) + '</p>' : ''}
           </div>`
@@ -6917,6 +6933,283 @@ async function generateImageForCardNBPro(cardId, description) {
   }
 }
 window.generateImageForCardNBPro = generateImageForCardNBPro
+
+// ========== JSXGraphデータ編集モーダル ==========
+function openJSXGraphEditor(cardId) {
+  const config = window['jsxConfig_' + cardId]
+  if (!config) { alert('グラフデータが見つかりません'); return }
+  
+  const d = config.data || {}
+  let editHtml = ''
+  
+  if (config.type === 'line_graph' || config.type === 'bar_graph') {
+    const labels = d.labels || []
+    const values = d.values || []
+    editHtml = `
+      <div class="mb-3">
+        <label class="block text-sm font-bold text-gray-700 mb-1">タイトル</label>
+        <input type="text" id="jsx-edit-title" value="${config.title || ''}" class="w-full p-2 border rounded text-sm">
+      </div>
+      ${config.type === 'line_graph' ? `
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <div><label class="block text-xs font-bold text-gray-600 mb-1">X軸ラベル</label><input type="text" id="jsx-edit-xlabel" value="${d.x_label || ''}" class="w-full p-1.5 border rounded text-sm"></div>
+        <div><label class="block text-xs font-bold text-gray-600 mb-1">Y軸ラベル</label><input type="text" id="jsx-edit-ylabel" value="${d.y_label || ''}" class="w-full p-1.5 border rounded text-sm"></div>
+      </div>` : ''}
+      <div class="mb-3">
+        <label class="block text-sm font-bold text-gray-700 mb-1">データ（ラベル : 値）<span class="text-xs text-gray-400 ml-2">× でデータ点を削除</span></label>
+        <div id="jsx-edit-rows" class="space-y-1 max-h-60 overflow-y-auto pr-1">
+          ${labels.map((l, i) => `
+            <div class="flex gap-2 items-center jsx-data-row">
+              <span class="text-xs text-gray-400 w-5 text-right">${i+1}.</span>
+              <input type="text" value="${l}" class="flex-1 p-1.5 border rounded text-sm jsx-label" placeholder="ラベル">
+              <input type="number" value="${values[i] || 0}" step="any" class="w-24 p-1.5 border rounded text-sm jsx-value" placeholder="値">
+              <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-sm px-1"><i class="fas fa-times-circle"></i></button>
+            </div>
+          `).join('')}
+        </div>
+        <button onclick="addJSXDataRow()" class="mt-2 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1 rounded-full font-bold"><i class="fas fa-plus mr-1"></i>データ行を追加</button>
+      </div>
+      ${d.y_unit ? `<div class="mb-2"><label class="block text-xs font-bold text-gray-600 mb-1">Y軸単位</label><input type="text" id="jsx-edit-unit" value="${d.y_unit || ''}" class="w-24 p-1.5 border rounded text-sm"></div>` : ''}
+      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mt-2">
+        <p class="text-xs text-yellow-800"><i class="fas fa-lightbulb mr-1"></i>ヒント: 解答の正確な数値に合わせてデータを修正してください</p>
+      </div>`
+  } else if (config.type === 'proportion' || config.type === 'inverse_proportion') {
+    const pts = d.points || []
+    editHtml = `
+      <div class="mb-3">
+        <label class="block text-sm font-bold text-gray-700 mb-1">タイトル</label>
+        <input type="text" id="jsx-edit-title" value="${config.title || ''}" class="w-full p-2 border rounded text-sm">
+      </div>
+      <div class="mb-3">
+        <label class="block text-sm font-bold text-gray-700 mb-1">定数 a = ${config.type === 'proportion' ? '（y = a × x）' : '（y = a / x）'}</label>
+        <input type="number" id="jsx-edit-a" value="${d.a || 1}" step="0.5" class="w-24 p-1.5 border rounded text-sm">
+      </div>
+      <div class="mb-3">
+        <label class="block text-sm font-bold text-gray-700 mb-1">データ点（x, y）</label>
+        <div id="jsx-edit-rows" class="space-y-1 max-h-48 overflow-y-auto">
+          ${pts.map((p, i) => `
+            <div class="flex gap-2 items-center jsx-data-row">
+              <span class="text-xs text-gray-400 w-5 text-right">${i+1}.</span>
+              <span class="text-xs text-gray-500">x:</span>
+              <input type="number" value="${p.x}" step="any" class="w-16 p-1.5 border rounded text-sm jsx-x" placeholder="x">
+              <span class="text-xs text-gray-500">y:</span>
+              <input type="number" value="${p.y}" step="any" class="w-16 p-1.5 border rounded text-sm jsx-y" placeholder="y">
+              <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-sm px-1"><i class="fas fa-times-circle"></i></button>
+            </div>
+          `).join('')}
+        </div>
+        <button onclick="addJSXPointRow()" class="mt-2 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-3 py-1 rounded-full font-bold"><i class="fas fa-plus mr-1"></i>データ点を追加</button>
+      </div>`
+  } else {
+    editHtml = `
+      <div class="mb-3">
+        <label class="block text-sm font-bold text-gray-700 mb-1">JSON設定（上級者向け）</label>
+        <textarea id="jsx-edit-json" rows="10" class="w-full p-2 border rounded text-xs font-mono">${JSON.stringify(config, null, 2)}</textarea>
+      </div>`
+  }
+  
+  // モーダル表示
+  const modal = document.createElement('div')
+  modal.id = 'jsx-editor-modal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-edit text-blue-500 mr-2"></i>グラフデータ編集</h3>
+        <button onclick="document.getElementById('jsx-editor-modal').remove()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+      </div>
+      ${editHtml}
+      <div class="flex gap-3 mt-4">
+        <button onclick="applyJSXGraphEdit(${cardId})" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition"><i class="fas fa-check mr-1"></i>適用して再描画</button>
+        <button onclick="document.getElementById('jsx-editor-modal').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-xl font-bold text-sm transition">キャンセル</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+}
+window.openJSXGraphEditor = openJSXGraphEditor
+
+// データ行追加ヘルパー（棒・折れ線グラフ用）
+function addJSXDataRow() {
+  const rows = document.getElementById('jsx-edit-rows')
+  if (!rows) return
+  const count = rows.querySelectorAll('.jsx-data-row').length + 1
+  rows.insertAdjacentHTML('beforeend', `
+    <div class="flex gap-2 items-center jsx-data-row">
+      <span class="text-xs text-gray-400 w-5 text-right">${count}.</span>
+      <input type="text" class="flex-1 p-1.5 border rounded text-sm jsx-label" placeholder="ラベル">
+      <input type="number" step="any" class="w-24 p-1.5 border rounded text-sm jsx-value" placeholder="値">
+      <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-sm px-1"><i class="fas fa-times-circle"></i></button>
+    </div>`)
+}
+window.addJSXDataRow = addJSXDataRow
+
+// データ点追加ヘルパー（比例・反比例用）
+function addJSXPointRow() {
+  const rows = document.getElementById('jsx-edit-rows')
+  if (!rows) return
+  const count = rows.querySelectorAll('.jsx-data-row').length + 1
+  rows.insertAdjacentHTML('beforeend', `
+    <div class="flex gap-2 items-center jsx-data-row">
+      <span class="text-xs text-gray-400 w-5 text-right">${count}.</span>
+      <span class="text-xs text-gray-500">x:</span>
+      <input type="number" step="any" class="w-16 p-1.5 border rounded text-sm jsx-x" placeholder="x">
+      <span class="text-xs text-gray-500">y:</span>
+      <input type="number" step="any" class="w-16 p-1.5 border rounded text-sm jsx-y" placeholder="y">
+      <button onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 text-sm px-1"><i class="fas fa-times-circle"></i></button>
+    </div>`)
+}
+window.addJSXPointRow = addJSXPointRow
+
+// JSXGraphの編集を適用
+function applyJSXGraphEdit(cardId) {
+  const config = window['jsxConfig_' + cardId]
+  if (!config) return
+  
+  const titleEl = document.getElementById('jsx-edit-title')
+  if (titleEl) config.title = titleEl.value
+  
+  if (config.type === 'line_graph' || config.type === 'bar_graph') {
+    const labelEls = document.querySelectorAll('#jsx-edit-rows .jsx-label')
+    const valueEls = document.querySelectorAll('#jsx-edit-rows .jsx-value')
+    config.data.labels = Array.from(labelEls).map(el => el.value).filter(v => v)
+    config.data.values = Array.from(valueEls).map(el => parseFloat(el.value) || 0)
+    // 空ラベルの値を除外
+    const validIndices = config.data.labels.map((l, i) => l ? i : -1).filter(i => i >= 0)
+    config.data.labels = validIndices.map(i => config.data.labels[i])
+    config.data.values = validIndices.map(i => config.data.values[i])
+    const unitEl = document.getElementById('jsx-edit-unit')
+    if (unitEl) config.data.y_unit = unitEl.value
+    const xlabelEl = document.getElementById('jsx-edit-xlabel')
+    if (xlabelEl) config.data.x_label = xlabelEl.value
+    const ylabelEl = document.getElementById('jsx-edit-ylabel')
+    if (ylabelEl) config.data.y_label = ylabelEl.value
+  } else if (config.type === 'proportion' || config.type === 'inverse_proportion') {
+    const aEl = document.getElementById('jsx-edit-a')
+    if (aEl) config.data.a = parseFloat(aEl.value) || 1
+    const xEls = document.querySelectorAll('#jsx-edit-rows .jsx-x')
+    const yEls = document.querySelectorAll('#jsx-edit-rows .jsx-y')
+    config.data.points = Array.from(xEls).map((el, i) => ({
+      x: parseFloat(el.value) || 0,
+      y: parseFloat(yEls[i]?.value) || 0
+    })).filter(p => p.x !== 0 || p.y !== 0)
+  } else {
+    const jsonEl = document.getElementById('jsx-edit-json')
+    if (jsonEl) {
+      try {
+        const newConfig = JSON.parse(jsonEl.value)
+        Object.assign(config, newConfig)
+      } catch (e) { alert('JSON形式が正しくありません'); return }
+    }
+  }
+  
+  // モーダル閉じる
+  document.getElementById('jsx-editor-modal')?.remove()
+  
+  // 再描画
+  const containerId = 'jsxgraph-container-' + cardId
+  const container = document.getElementById(containerId)
+  if (container && typeof window.renderMathInteractive === 'function') {
+    container.innerHTML = ''
+    try {
+      JXG.JSXGraph.freeBoard(container)
+    } catch(e) {}
+    window.renderMathInteractive(containerId, config)
+    console.log('✅ JSXGraphデータ編集適用:', config.type, config.data.labels?.length || 0, 'データ点')
+  }
+}
+window.applyJSXGraphEdit = applyJSXGraphEdit
+
+// カード画像を削除
+function deleteCardImage(cardId) {
+  if (!confirm('この図を削除しますか？')) return
+  const placeholder = document.getElementById('card-image-container-' + cardId) || document.getElementById('image-placeholder-' + cardId)
+  if (placeholder) {
+    placeholder.innerHTML = `
+      <div class="border-2 border-dashed border-gray-300 rounded-xl py-8 px-4 text-center bg-gray-50">
+        <i class="fas fa-image text-4xl text-gray-300 mb-2"></i>
+        <p class="text-sm text-gray-500 mb-3">図が削除されました</p>
+        <div class="flex gap-2 justify-center">
+          <button onclick="generateImageForCard(${cardId}, '')" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-xs font-bold"><i class="fas fa-wand-magic-sparkles mr-1"></i>AI図解を再生成</button>
+          <button onclick="openFilePickerForCard(${cardId})" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold"><i class="fas fa-file-image mr-1"></i>ファイル選択</button>
+        </div>
+      </div>`
+  }
+  // DBからも削除
+  axios.put('/api/card/' + cardId, { problem_image_url: '' }).catch(() => {})
+}
+window.deleteCardImage = deleteCardImage
+
+// ========== プロンプト入力付き画像生成モーダル ==========
+function openPromptImageGenerate(cardId, mode) {
+  const rawCd = window.currentCardData || {}
+  const cd = rawCd.card || rawCd
+  const answerObj = rawCd.answer || {}
+  const answerText = cd.answer || cd.correct_answer || answerObj.answer_text || answerObj.answer_content || ''
+  const problemText = cd.problem_content || cd.problem_text || cd.content || ''
+  const cardTitle = cd.card_title || cd.title || ''
+  const answerExplanation = cd.answer_explanation || cd.explanation || answerObj.explanation || ''
+  
+  const defaultPrompt = `${cardTitle}\n${problemText.substring(0, 300)}${answerText ? '\n\n【正解の数値・解答データ】\n' + answerText : ''}${answerExplanation ? '\n【解説】' + answerExplanation.substring(0, 200) : ''}`
+  
+  const modeLabel = mode === 'nb_pro' ? '⭐ Nano Banana Pro 高精度画像' : mode === 'jsxgraph' ? '📊 JSXGraphグラフ再生成' : '🔄 AI画像で差し替え'
+  const modeColor = mode === 'nb_pro' ? 'pink' : mode === 'jsxgraph' ? 'blue' : 'purple'
+  
+  const modal = document.createElement('div')
+  modal.id = 'prompt-gen-modal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-gray-800">${modeLabel}</h3>
+        <button onclick="document.getElementById('prompt-gen-modal').remove()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+      </div>
+      
+      <div class="mb-3">
+        <label class="block text-sm font-bold text-gray-700 mb-1">
+          <i class="fas fa-pencil-alt text-${modeColor}-500 mr-1"></i>プロンプト（図の内容を指定）
+        </label>
+        <textarea id="prompt-gen-text" rows="8" class="w-full p-3 border-2 border-${modeColor}-200 rounded-xl text-sm focus:border-${modeColor}-400 focus:outline-none">${defaultPrompt}</textarea>
+        <p class="text-xs text-gray-400 mt-1">💡 解答の数値やデータを含めると、より正確なグラフ・図が生成されます。自由に編集してください。</p>
+      </div>
+      
+      ${answerText ? `
+      <div class="bg-green-50 border border-green-200 rounded-xl p-3 mb-3">
+        <p class="text-xs font-bold text-green-800 mb-1"><i class="fas fa-check-circle mr-1"></i>この問題の解答データ（自動取得済）:</p>
+        <p class="text-xs text-green-700 whitespace-pre-wrap">${answerText.substring(0, 300)}</p>
+        <button onclick="document.getElementById('prompt-gen-text').value += '\\n\\n' + document.querySelector('.answer-data-copy').textContent" class="text-xs text-green-600 underline mt-1"><i class="fas fa-copy mr-1"></i>プロンプトに追加</button>
+        <span class="answer-data-copy hidden">${answerText.substring(0, 300)}</span>
+      </div>` : `
+      <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-3">
+        <p class="text-xs font-bold text-yellow-800"><i class="fas fa-exclamation-triangle mr-1"></i>解答データが未設定です</p>
+        <p class="text-xs text-yellow-700">プロンプトに正解の数値を直接入力すると精度が上がります（例: 「9時=18℃、14時=24℃」）</p>
+      </div>`}
+      
+      <div class="flex gap-3 mt-4">
+        <button onclick="executePromptImageGenerate(${cardId}, '${mode}')" class="flex-1 bg-${modeColor}-500 hover:bg-${modeColor}-600 text-white py-2.5 rounded-xl font-bold text-sm transition">
+          <i class="fas fa-${mode === 'nb_pro' ? 'star' : mode === 'jsxgraph' ? 'chart-line' : 'image'} mr-1"></i>生成開始
+        </button>
+        <button onclick="document.getElementById('prompt-gen-modal').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-xl font-bold text-sm transition">キャンセル</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+}
+window.openPromptImageGenerate = openPromptImageGenerate
+
+function executePromptImageGenerate(cardId, mode) {
+  const promptText = document.getElementById('prompt-gen-text')?.value || ''
+  document.getElementById('prompt-gen-modal')?.remove()
+  
+  if (mode === 'nb_pro') {
+    generateImageForCardNBPro(cardId, promptText)
+  } else if (mode === 'replace') {
+    generateImageForCardAsImage(cardId, promptText)
+  } else if (mode === 'jsxgraph') {
+    generateImageForCard(cardId, promptText)
+  } else {
+    generateImageForCard(cardId, promptText)
+  }
+}
+window.executePromptImageGenerate = executePromptImageGenerate
 
 // 学習カード上のプレースホルダーからAI画像を生成して保存
 async function generateImageForCard(cardId, description) {
@@ -6953,8 +7246,14 @@ async function generateImageForCard(cardId, description) {
     const unitName = cd.unit_name || ''
     const subject = cd.subject || ''
     const gradeLevel = cd.grade_level || cd.grade || ''
+    // 解答テキストも取得（グラフの正確な数値に使う）
+    const answerObj = rawCd.answer || {}
+    const answerText = cd.answer || cd.correct_answer || answerObj.answer_text || answerObj.answer_content || ''
+    const answerExplanation = cd.answer_explanation || cd.explanation || answerObj.explanation || ''
     
     const prompt = description || cardTitle || 'この学習カードの教育用図解'
+    // descriptionがユーザー手動入力の長いプロンプトの場合、custom_promptとして送信
+    const isCustomPrompt = description && description.length > 50
     const res = await axios.post('/api/ai/generate-image', {
       prompt: prompt,
       card_id: cardId,
@@ -6963,6 +7262,9 @@ async function generateImageForCard(cardId, description) {
       unit_name: unitName,
       subject: subject,
       grade: gradeLevel,
+      answer_text: answerText,
+      answer_explanation: answerExplanation,
+      custom_prompt: isCustomPrompt ? description : '',
       style: 'educational diagram'
     }, { timeout: 90000 })
     
@@ -6983,7 +7285,9 @@ async function generateImageForCard(cardId, description) {
                 <i class="fas fa-check-circle mr-1"></i>${modelName}（${(genTime/1000).toFixed(1)}秒）
               </span>
               <button onclick="generateImageForCard(${cardId}, '${(description || '').replace(/'/g, '').replace(/\n/g, ' ').substring(0, 80)}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-redo mr-1"></i>再生成</button>
-              <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+              <button onclick="deleteCardImage(${cardId})" class="text-xs text-red-400 hover:text-red-600 underline"><i class="fas fa-trash mr-1"></i>削除</button>
+              <button onclick="openPromptImageGenerate(${cardId}, 'nb_pro')" class="text-xs text-pink-500 hover:text-pink-700 underline"><i class="fas fa-star mr-1"></i>高精度画像</button>
+              <button onclick="openPromptImageGenerate(${cardId}, 'replace')" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
             </div>
           </div>`
       }
@@ -6994,6 +7298,9 @@ async function generateImageForCard(cardId, description) {
       const safeDesc = (description || '').replace(/'/g, '').replace(/"/g, '').replace(/\n/g, ' ').substring(0, 100)
       
       if (placeholder) {
+        // JSXConfigをグローバルに保存（編集用）
+        window['jsxConfig_' + cardId] = jsxConfig
+        
         placeholder.innerHTML = `
           <div id="card-image-container-${cardId}">
             <div class="bg-white rounded-lg shadow-md border-2 border-blue-200 p-3 overflow-hidden">
@@ -7003,10 +7310,11 @@ async function generateImageForCard(cardId, description) {
               <span class="bg-blue-100 text-blue-700 text-xs px-3 py-1 rounded-full font-bold">
                 <i class="fas fa-chart-line mr-1"></i>${modelName}（${(genTime/1000).toFixed(1)}秒）
               </span>
-              <button onclick="generateImageForCard(${cardId}, '${safeDesc}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-redo mr-1"></i>再生成</button>
-              <button onclick="generateImageForCardAsImage(${cardId}, '${safeDesc}')" class="text-xs text-orange-500 hover:text-orange-700 underline"><i class="fas fa-image mr-1"></i>AI画像で試す</button>
-              <button onclick="generateImageForCardNBPro(${cardId}, '${safeDesc}')" class="text-xs text-pink-500 hover:text-pink-700 underline"><i class="fas fa-star mr-1"></i>高精度画像</button>
-              <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+              <button onclick="openJSXGraphEditor(${cardId})" class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"><i class="fas fa-edit mr-1"></i>データ編集</button>
+              <button onclick="deleteCardImage(${cardId})" class="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"><i class="fas fa-trash mr-1"></i>削除</button>
+              <button onclick="openPromptImageGenerate(${cardId}, 'jsxgraph')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-redo mr-1"></i>プロンプト指定で再生成</button>
+              <button onclick="openPromptImageGenerate(${cardId}, 'nb_pro')" class="text-xs text-pink-500 hover:text-pink-700 underline"><i class="fas fa-star mr-1"></i>高精度画像</button>
+              <button onclick="openPromptImageGenerate(${cardId}, 'replace')" class="text-xs text-gray-500 hover:text-gray-700 underline"><i class="fas fa-exchange-alt mr-1"></i>差し替え</button>
             </div>
           </div>`
         
