@@ -3627,25 +3627,76 @@ app.post('/api/progress', async (c) => {
   const body = await c.req.json()
   
   try {
-    const result = await env.DB.prepare(`
-      INSERT INTO student_progress 
-        (student_id, curriculum_id, course_id, learning_card_id, 
-         status, understanding_level, help_requested_from, help_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      body.student_id,
-      body.curriculum_id,
-      body.course_id,
-      body.learning_card_id,
-      body.status,
-      body.understanding_level,
-      body.help_requested_from,
-      body.help_count || 0
-    ).run()
+    // 値を安全に数値に変換（オブジェクトが渡された場合のフォールバック）
+    const studentId = typeof body.student_id === 'object' ? (body.student_id?.id || 0) : (body.student_id || 0)
+    const cardId = typeof body.learning_card_id === 'object' ? (body.learning_card_id?.card_id || body.learning_card_id?.id || 0) : (body.learning_card_id || 0)
     
-    return c.json({ success: true, id: result.meta.last_row_id })
-  } catch (error) {
-    return c.json({ error: 'Database error' }, 500)
+    // テーブルスキーマに合わせてカラムを自動追加（不足分）
+    const columnsToAdd = [
+      { name: 'understanding_level', type: 'INTEGER DEFAULT 0' },
+      { name: 'help_requested_from', type: 'TEXT' },
+      { name: 'help_count', type: 'INTEGER DEFAULT 0' },
+      { name: 'curriculum_id', type: 'INTEGER' },
+      { name: 'course_id', type: 'INTEGER' }
+    ]
+    for (const col of columnsToAdd) {
+      try {
+        await env.DB.prepare(`ALTER TABLE student_progress ADD COLUMN ${col.name} ${col.type}`).run()
+      } catch (e: any) {
+        // カラムが既に存在する場合は無視
+      }
+    }
+    
+    const curriculumId = typeof body.curriculum_id === 'object' ? (body.curriculum_id?.id || 0) : (body.curriculum_id || 0)
+    const courseId = typeof body.course_id === 'object' ? (body.course_id?.id || body.course_id?.course_id || 0) : (body.course_id || 0)
+    
+    // 既存レコードがあれば更新、なければ挿入（UPSERT）
+    const existing = await env.DB.prepare(
+      `SELECT progress_id FROM student_progress WHERE student_id = ? AND card_id = ?`
+    ).bind(studentId, cardId).first()
+    
+    if (existing) {
+      await env.DB.prepare(`
+        UPDATE student_progress SET
+          status = ?, attempt_count = attempt_count + 1,
+          mastery_score = ?, understanding_level = ?,
+          help_requested_from = ?, help_count = ?,
+          last_attempt_date = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE progress_id = ?
+      `).bind(
+        body.status || 'completed',
+        (body.understanding_level || 0) / 100.0,
+        body.understanding_level || 0,
+        body.help_requested_from || null,
+        body.help_count || 0,
+        existing.progress_id
+      ).run()
+      return c.json({ success: true, id: existing.progress_id, updated: true })
+    } else {
+      const result = await env.DB.prepare(`
+        INSERT INTO student_progress 
+          (student_id, card_id, status, attempt_count, correct_count,
+           mastery_score, understanding_level, help_requested_from, help_count,
+           curriculum_id, course_id, last_attempt_date)
+        VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `).bind(
+        studentId,
+        cardId,
+        body.status || 'completed',
+        (body.understanding_level || 0) >= 60 ? 1 : 0,
+        (body.understanding_level || 0) / 100.0,
+        body.understanding_level || 0,
+        body.help_requested_from || null,
+        body.help_count || 0,
+        curriculumId,
+        courseId
+      ).run()
+      return c.json({ success: true, id: result.meta.last_row_id })
+    }
+  } catch (error: any) {
+    console.error('Progress save error:', error.message, JSON.stringify(body).substring(0, 200))
+    return c.json({ error: 'Database error', details: error.message }, 500)
   }
 })
 
@@ -5113,6 +5164,90 @@ app.get('/api/reports/class/:classCode/summary', async (c) => {
       error: 'クラスサマリー生成に失敗しました',
       details: error.message
     }, 500)
+  }
+})
+
+// =============================================================================
+// AIルート：回答分析・パーソナライズドヒント生成
+// =============================================================================
+
+app.post('/api/ai/analyze-answer', async (c) => {
+  const { env } = c
+  const { question, correctAnswer, studentAnswer, subject, grade, cardTitle } = await c.req.json()
+  
+  const apiKey = env.GEMINI_API_KEY
+  if (!apiKey) {
+    return c.json({
+      success: false,
+      analysis: 'AI分析は現在利用できません。',
+      hint: '正解と自分の答えを比べてみましょう。'
+    })
+  }
+  
+  try {
+    const prompt = `あなたは優しい${grade || '小学校'}の${subject || '算数'}の先生です。
+子どもが問題に間違えました。子どもの考え方を読み取り、どこで間違えたのか分かりやすく教えてください。
+
+【問題】
+${question}
+
+【正解】
+${correctAnswer}
+
+【子どもの回答】
+${studentAnswer}
+
+以下のJSON形式で回答してください。子ども向けに優しく、具体的に説明してください：
+{
+  "where_wrong": "どこが間違っているか（1-2文。子ども向け）",
+  "why_wrong": "なぜ間違えたと思われるか（子どもの考え方の推測。1-2文）",
+  "hint": "正解に近づくためのヒント（答えそのものは言わない。1-2文）",
+  "encouragement": "励ましの一言（1文）"
+}
+JSONのみ出力。`
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { 
+            temperature: 0.7, 
+            maxOutputTokens: 500,
+            thinkingConfig: { thinkingBudget: 0 }
+          }
+        })
+      }
+    )
+    
+    const data = await response.json() as any
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSONを抽出
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const analysis = JSON.parse(jsonMatch[0])
+      return c.json({ success: true, ...analysis })
+    }
+    
+    return c.json({
+      success: true,
+      where_wrong: '答えが正解と違うようです。',
+      why_wrong: 'もう少し考えてみましょう。',
+      hint: '問題をもう一度よく読んでみよう。',
+      encouragement: 'がんばれ！きっとできるよ！'
+    })
+  } catch (error: any) {
+    console.error('AI answer analysis error:', error.message)
+    return c.json({
+      success: false,
+      where_wrong: '答えが正解と違うようです。',
+      why_wrong: '',
+      hint: '正解と自分の答えを比べて、違いを見つけてみよう。',
+      encouragement: 'もう一度やってみよう！'
+    })
   }
 })
 
@@ -23270,33 +23405,48 @@ app.post('/api/upload/video', async (c) => {
       return c.json({ success: false, error: 'ファイルが選択されていません' }, 400)
     }
     
-    // ファイルタイプチェック
-    const allowedTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']
-    if (!allowedTypes.includes(file.type)) {
-      return c.json({ 
-        success: false, 
-        error: 'サポートされていない動画形式です。MP4、WebM、OGG、MOVのみ対応しています。' 
-      }, 400)
+    // ファイルタイプチェック（動画 + 音声に対応）
+    const videoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime']
+    const audioTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/aac', 'audio/webm', 'audio/x-m4a', 'audio/flac', 'audio/mp3']
+    const allowedTypes = [...videoTypes, ...audioTypes]
+    
+    // MIMEタイプまたは拡張子で判定
+    let mediaType = 'video'
+    if (audioTypes.includes(file.type)) {
+      mediaType = 'audio'
+    } else if (!videoTypes.includes(file.type)) {
+      // 拡張子から判定
+      const ext = (file.name || '').split('.').pop()?.toLowerCase() || ''
+      if (['mp3','wav','ogg','m4a','aac','flac','wma','opus'].includes(ext)) {
+        mediaType = 'audio'
+      } else if (!['mp4','webm','mov','avi','mkv','m4v'].includes(ext)) {
+        return c.json({ 
+          success: false, 
+          error: '対応形式: 動画(MP4,WebM,MOV)・音声(MP3,WAV,OGG,M4A,AAC)\n選択されたファイル: ' + file.type 
+        }, 400)
+      }
     }
     
-    // ファイルサイズチェック（50MB制限）
-    const maxSize = 50 * 1024 * 1024 // 50MB
+    // ファイルサイズチェック（動画50MB、音声20MB）
+    const maxSize = mediaType === 'audio' ? 20 * 1024 * 1024 : 50 * 1024 * 1024
     if (file.size > maxSize) {
+      const limitMB = Math.round(maxSize / 1024 / 1024)
       return c.json({ 
         success: false, 
-        error: 'ファイルサイズが大きすぎます。50MB以下の動画をアップロードしてください。' 
+        error: 'ファイルサイズが大きすぎます。' + limitMB + 'MB以下のファイルをアップロードしてください。（現在' + (file.size/1024/1024).toFixed(1) + 'MB）' 
       }, 400)
     }
     
     // ファイル名生成
     const timestamp = Date.now()
     const randomStr = Math.random().toString(36).substring(2, 8)
-    const extension = (file.name || '').split('.').pop() || 'mp4'
-    const fileName = 'videos/' + timestamp + '-' + randomStr + '.' + extension
+    const extension = (file.name || '').split('.').pop() || (mediaType === 'audio' ? 'mp3' : 'mp4')
+    const folder = mediaType === 'audio' ? 'audio' : 'videos'
+    const fileName = folder + '/' + timestamp + '-' + randomStr + '.' + extension
     
     // R2にアップロード
     if (!env.MEDIA_BUCKET) {
-      return c.json({ success: false, error: 'R2ストレージが設定されていません。動画はYouTubeのURLで追加してください。' }, 500)
+      return c.json({ success: false, error: 'R2ストレージが設定されていません。URLで追加してください。' }, 500)
     }
     const arrayBuffer = await file.arrayBuffer()
     await env.MEDIA_BUCKET.put(fileName, arrayBuffer, {
@@ -23306,21 +23456,26 @@ app.post('/api/upload/video', async (c) => {
     })
     
     // 公開URLを生成
-    const videoUrl = `/api/media/${fileName}`
+    const mediaUrl = `/api/media/${fileName}`
+    
+    console.log('✅ メディアアップロード成功:', mediaType, fileName, (file.size/1024/1024).toFixed(1) + 'MB')
     
     return c.json({
       success: true,
-      video_url: videoUrl,
+      video_url: mediaUrl,
+      audio_url: mediaUrl,
+      url: mediaUrl,
+      media_type: mediaType,
       file_name: fileName,
       file_size: file.size,
       mime_type: file.type
     })
   } catch (error: any) {
-    console.error('❌ 動画アップロードエラー:', error)
+    console.error('❌ メディアアップロードエラー:', error)
     return c.json({ 
       success: false, 
       error: error.message,
-      details: '動画のアップロードに失敗しました'
+      details: 'メディアのアップロードに失敗しました'
     }, 500)
   }
 })
@@ -23366,6 +23521,7 @@ app.get('/api/media/files/*', async (c) => {
     object.writeHttpMetadata(headers)
     headers.set('etag', object.httpEtag)
     headers.set('Cache-Control', 'public, max-age=31536000')
+    headers.set('Accept-Ranges', 'bytes')
     
     return new Response(object.body, { headers })
   } catch (error: any) {
@@ -23417,6 +23573,7 @@ app.get('/api/media/*', async (c) => {
     object.writeHttpMetadata(headers)
     headers.set('etag', object.httpEtag)
     headers.set('Cache-Control', 'public, max-age=31536000')
+    headers.set('Accept-Ranges', 'bytes')
     
     return new Response(object.body, { headers })
   } catch (error: any) {

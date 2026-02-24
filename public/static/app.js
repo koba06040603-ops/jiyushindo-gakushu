@@ -5879,10 +5879,11 @@ async function loadCardPage(cardId) {
                 if (!tactile) return ''
                 const cardIdVal = card.card_id || card.id || 0
                 const widgetContainerId = 'tactile-widget-' + cardIdVal
-                return '<div class="mt-4 bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-4 shadow-sm" id="' + widgetContainerId + '-wrapper">' +
+                return '<div class="mt-4 bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-4 shadow-sm relative" id="' + widgetContainerId + '-wrapper">' +
                   '<div class="flex items-center gap-2 mb-3">' +
                     '<span class="bg-orange-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span>' +
                     '<span class="text-sm font-bold text-gray-700">' + tactile + '</span>' +
+                    '<button onclick="this.closest(\'[id$=-wrapper]\').style.display=\'none\'" class="ml-auto text-gray-400 hover:text-red-500 text-xs px-2 py-1 rounded hover:bg-red-50 transition" title="このウィジェットを非表示"><i class="fas fa-times"></i> 非表示</button>' +
                   '</div>' +
                   '<div id="' + widgetContainerId + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[200px] relative"></div>' +
                   '<p class="text-xs text-gray-500 mt-2 text-center"><i class="fas fa-hand-pointer mr-1"></i>画面をタッチ・ドラッグして操作してみよう</p>' +
@@ -6027,15 +6028,15 @@ async function loadCardPage(cardId) {
                 <!-- 採点結果表示エリア -->
                 <div id="gradeResult" class="hidden"></div>
                 
-                <div class="flex gap-4">
+                <div class="flex gap-3">
                   <button onclick="saveProgress()" 
-                          class="flex-1 bg-indigo-600 text-white py-3 px-6 rounded-lg font-bold hover:bg-indigo-700 transition">
-                    <i class="fas fa-save mr-2"></i>
+                          class="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-lg font-bold hover:bg-indigo-700 transition text-sm">
+                    <i class="fas fa-save mr-1"></i>
                     保存して次へ
                   </button>
                   <button onclick="showAnswer()" 
-                          class="flex-1 bg-gray-500 text-white py-3 px-6 rounded-lg font-bold hover:bg-gray-600 transition">
-                    <i class="fas fa-eye mr-2"></i>
+                          class="flex-1 bg-gray-500 text-white py-3 px-4 rounded-lg font-bold hover:bg-gray-600 transition text-sm">
+                    <i class="fas fa-eye mr-1"></i>
                     解答を見る
                   </button>
                 </div>
@@ -6297,6 +6298,14 @@ async function loadCardPage(cardId) {
     window.currentHelpType = null
     window.helpCount = 0
     window.currentCardData = { card, hints, answer }
+
+    // 一問一答モードを初期化（複数の小問がある場合）
+    const problemText = card.problem_text || card.problem_content || card.problem_description || ''
+    const correctAnswerText = card.correct_answer || card.answer || answer?.answer_content || ''
+    const cardIdForQA = card.card_id || card.id || 0
+    if (typeof initQAStepMode === 'function') {
+      setTimeout(() => initQAStepMode(problemText, correctAnswerText, cardIdForQA), 100)
+    }
 
     // 触覚ウィジェットを初期化
     if (typeof initTactileWidgets === 'function') {
@@ -11264,8 +11273,273 @@ function setUnderstanding(level) {
   selectedBtn.classList.add('bg-indigo-100', 'border-2', 'border-indigo-600')
 }
 
+// ============================================
+// 一問一答システム
+// ============================================
+window.qaStepState = {
+  questions: [],       // [{question, answer, index}]
+  currentStep: 0,
+  totalSteps: 0,
+  results: [],         // [{correct, studentAnswer, correctAnswer}]
+  originalProblem: '', // 元の問題文
+  originalAnswer: '',  // 元の正解
+  active: false
+}
+
+// 問題文を小問に分割する
+function parseSubQuestions(problemText, answerText) {
+  const lines = problemText.split('\n').map(l => l.trim()).filter(Boolean)
+  const answerLines = answerText.split('\n').map(l => l.trim()).filter(Boolean)
+  
+  // 小問パターン（(1) (2), ①②, ⑴⑵, 問1 問2, (ア)(イ) etc.）
+  const subQPatterns = [
+    /^[\(（]\s*(\d+)\s*[\)）]/,        // (1) (2) (3)
+    /^(\d+)\s*[\.\)）]/,               // 1. 2. 3) 
+    /^([①②③④⑤⑥⑦⑧⑨⑩])/,           // ①②③
+    /^[\(（]\s*([ア-オ])\s*[\)）]/,     // (ア)(イ)
+    /^[\(（]\s*([a-e])\s*[\)）]/i,      // (a)(b)
+    /^問\s*(\d+)/                       // 問1 問2
+  ]
+  
+  const questions = []
+  let contextLines = [] // 共通の問題文（小問の前に来るテキスト）
+  let currentQ = null
+  
+  for (const line of lines) {
+    let isSubQ = false
+    for (const pat of subQPatterns) {
+      if (pat.test(line)) {
+        isSubQ = true
+        break
+      }
+    }
+    
+    if (isSubQ) {
+      if (currentQ) questions.push(currentQ)
+      currentQ = { text: line, lines: [line] }
+    } else if (currentQ) {
+      currentQ.text += '\n' + line
+      currentQ.lines.push(line)
+    } else {
+      contextLines.push(line)
+    }
+  }
+  if (currentQ) questions.push(currentQ)
+  
+  // 小問が見つからなかった場合 → 1問として扱う
+  if (questions.length <= 1) {
+    return [{
+      question: problemText,
+      answer: answerText,
+      index: 0
+    }]
+  }
+  
+  // 正解テキストも同様に分割
+  const parsedAnswers = []
+  let currentA = null
+  for (const line of answerLines) {
+    let isSubA = false
+    for (const pat of subQPatterns) {
+      if (pat.test(line)) {
+        isSubA = true
+        break
+      }
+    }
+    if (isSubA) {
+      if (currentA) parsedAnswers.push(currentA)
+      currentA = line
+    } else if (currentA) {
+      currentA += '\n' + line
+    } else {
+      // コンテキスト行（無視）
+    }
+  }
+  if (currentA) parsedAnswers.push(currentA)
+  
+  // 分割結果がない場合、行ごとに分割を試みる
+  if (parsedAnswers.length === 0 && answerLines.length > 0) {
+    // 改行やカンマで区切られた回答
+    const splitAns = answerText.split(/[,、\n]/).map(s => s.trim()).filter(Boolean)
+    splitAns.forEach(a => parsedAnswers.push(a))
+  }
+  
+  const context = contextLines.join('\n')
+  
+  return questions.map((q, i) => ({
+    question: (context ? context + '\n\n' : '') + q.text,
+    answer: parsedAnswers[i] || answerText, // フォールバック：全体の正解
+    context: context,
+    subQuestion: q.text,
+    index: i
+  }))
+}
+
+// 一問一答モードを初期化
+function initQAStepMode(problemText, answerText, cardId) {
+  const qs = parseSubQuestions(problemText, answerText)
+  
+  window.qaStepState = {
+    questions: qs,
+    currentStep: 0,
+    totalSteps: qs.length,
+    results: [],
+    originalProblem: problemText,
+    originalAnswer: answerText,
+    active: qs.length > 1,
+    cardId: cardId
+  }
+  
+  if (qs.length > 1) {
+    renderQAStep()
+  }
+}
+
+// 現在のステップを表示
+function renderQAStep() {
+  const st = window.qaStepState
+  if (!st.active) return
+  
+  const step = st.currentStep
+  const q = st.questions[step]
+  if (!q) return
+  
+  // 問題文エリアを更新
+  const problemDiv = document.querySelector('.bg-pink-50.border-l-4.border-pink-400')
+  if (problemDiv) {
+    // 進捗バー
+    const progress = Math.round(((step) / st.totalSteps) * 100)
+    const completedCount = st.results.length
+    const correctCount = st.results.filter(r => r.correct).length
+    
+    problemDiv.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm font-bold text-pink-600"><i class="fas fa-question-circle mr-1"></i>もんだい：</p>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold text-pink-500 bg-pink-100 px-2 py-0.5 rounded-full">${step + 1} / ${st.totalSteps}</span>
+          ${correctCount > 0 ? `<span class="text-xs text-green-600">✓${correctCount}</span>` : ''}
+        </div>
+      </div>
+      <!-- 進捗バー -->
+      <div class="w-full bg-pink-200 rounded-full h-2 mb-3">
+        <div class="bg-gradient-to-r from-pink-400 to-rose-500 h-2 rounded-full transition-all duration-500" style="width:${progress}%"></div>
+      </div>
+      ${q.context ? `<pre class="card-content text-gray-700 whitespace-pre-wrap font-sans leading-relaxed text-base mb-3">${formatText(q.context)}</pre>` : ''}
+      <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans leading-relaxed text-lg font-bold">${formatText(q.subQuestion || q.question)}</pre>
+    `
+  }
+  
+  // 採点ボタンを更新
+  const gradeBtn = document.getElementById('gradeBtn')
+  if (gradeBtn) {
+    const escapedAnswer = (q.answer || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')
+    gradeBtn.className = 'w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 px-6 rounded-xl font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition shadow-lg'
+    gradeBtn.innerHTML = '<i class="fas fa-check-double mr-2"></i>答え合わせをする'
+    gradeBtn.onclick = () => gradeAnswer(q.answer)
+  }
+  
+  // 回答欄をクリア＆フォーカス
+  const answerInput = document.getElementById('answerInput')
+  if (answerInput) {
+    answerInput.value = ''
+    answerInput.focus()
+  }
+  
+  // 前の結果を非表示
+  const resultDiv = document.getElementById('gradeResult')
+  if (resultDiv) resultDiv.classList.add('hidden')
+}
+
+// 次の問題に進む
+function goToNextQAStep() {
+  const st = window.qaStepState
+  if (!st.active) return
+  
+  st.currentStep++
+  
+  if (st.currentStep >= st.totalSteps) {
+    // 全問完了 → 結果表示
+    showQAResults()
+  } else {
+    renderQAStep()
+  }
+}
+
+// 全問完了の結果表示
+function showQAResults() {
+  const st = window.qaStepState
+  const correct = st.results.filter(r => r.correct).length
+  const total = st.totalSteps
+  const percent = Math.round((correct / total) * 100)
+  
+  const resultDiv = document.getElementById('gradeResult')
+  if (!resultDiv) return
+  
+  const emoji = percent >= 80 ? '🎉' : percent >= 50 ? '👍' : '💪'
+  const msg = percent >= 80 ? 'すばらしい！' : percent >= 50 ? 'よくがんばりました！' : 'もう少しがんばろう！'
+  
+  resultDiv.innerHTML = `
+    <div class="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-xl p-6 text-center">
+      <div class="text-6xl mb-3">${emoji}</div>
+      <p class="text-2xl font-bold text-indigo-700 mb-2">${msg}</p>
+      <p class="text-lg text-gray-700 mb-4">${total}問中 <span class="text-green-600 font-bold text-2xl">${correct}</span> 問正解！</p>
+      
+      <!-- 各問の結果 -->
+      <div class="text-left space-y-2 mb-4">
+        ${st.results.map((r, i) => `
+          <div class="flex items-center gap-2 p-2 rounded-lg ${r.correct ? 'bg-green-50' : 'bg-red-50'}">
+            <span class="text-lg">${r.correct ? '✅' : '❌'}</span>
+            <span class="text-sm text-gray-700 flex-1">(${i + 1}) ${r.correct ? '正解' : 'あなたの答え: ' + (r.studentAnswer || '').substring(0, 30)}</span>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div class="flex gap-2 justify-center">
+        ${correct < total ? `
+        <button onclick="retryWrongQASteps()" 
+                class="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-redo mr-2"></i>間違えた問題をやり直す
+        </button>` : ''}
+        <button onclick="saveProgress()" 
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold transition shadow">
+          <i class="fas fa-save mr-2"></i>保存して次へ
+        </button>
+      </div>
+    </div>
+  `
+  resultDiv.classList.remove('hidden')
+  
+  // 理解度を自動設定
+  window.currentUnderstandingLevel = percent
+  setUnderstanding(percent >= 80 ? 5 : percent >= 60 ? 4 : percent >= 40 ? 3 : percent >= 20 ? 2 : 1)
+}
+
+// 間違えた問題だけやり直す
+function retryWrongQASteps() {
+  const st = window.qaStepState
+  const wrongIndices = st.results.map((r, i) => r.correct ? -1 : i).filter(i => i >= 0)
+  
+  if (wrongIndices.length === 0) return
+  
+  // 間違えた問題だけの新しいステップリストを作成
+  const retryQuestions = wrongIndices.map(i => st.questions[i])
+  st.questions = retryQuestions
+  st.totalSteps = retryQuestions.length
+  st.currentStep = 0
+  st.results = []
+  st.active = true
+  
+  renderQAStep()
+}
+
+window.initQAStepMode = initQAStepMode
+window.renderQAStep = renderQAStep
+window.goToNextQAStep = goToNextQAStep
+window.showQAResults = showQAResults
+window.retryWrongQASteps = retryWrongQASteps
+
 // 答え合わせ（採点）機能
-function gradeAnswer(correctAnswer) {
+async function gradeAnswer(correctAnswer) {
   const answerInput = document.getElementById('answerInput')
   const studentAnswer = answerInput ? answerInput.value.trim() : ''
   
@@ -11361,7 +11635,12 @@ function gradeAnswer(correctAnswer) {
       <div class="bg-green-50 border-2 border-green-400 rounded-xl p-5 text-center" style="animation: correctPop 0.6s ease-out">
         <div class="text-5xl mb-3" style="animation: starBurst 0.8s ease-out">🎉</div>
         <p class="text-2xl font-bold text-green-700 mb-2" style="animation: fadeInUp 0.5s ease-out 0.2s both">正解！すごい！</p>
-        <p class="text-sm text-green-600" style="animation: fadeInUp 0.5s ease-out 0.4s both">よくできました。次のカードに進みましょう！</p>
+        <p class="text-sm text-green-600" style="animation: fadeInUp 0.5s ease-out 0.4s both">よくできました。${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? '次の問題に進みましょう！' : '次のカードに進みましょう！'}</p>
+        ${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? `
+        <button onclick="window.qaStepState.results.push({correct:true, studentAnswer:'', correctAnswer:''}); goToNextQAStep()" 
+                class="mt-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-lg transition shadow-lg" style="animation: fadeInUp 0.5s ease-out 0.6s both">
+          <i class="fas fa-arrow-right mr-2"></i>次の問題へ（${window.qaStepState.currentStep + 2}/${window.qaStepState.totalSteps}）
+        </button>` : ''}
       </div>
       <style>
         @keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
@@ -11369,6 +11648,14 @@ function gradeAnswer(correctAnswer) {
         @keyframes fadeInUp { 0% { transform: translateY(15px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
       </style>
     `
+    // 一問一答モードの結果を記録
+    if (window.qaStepState?.active) {
+      // 最後の問題の場合は結果を記録して全問結果を表示
+      if (window.qaStepState.currentStep >= window.qaStepState.totalSteps - 1) {
+        window.qaStepState.results.push({ correct: true, studentAnswer, correctAnswer })
+        setTimeout(() => showQAResults(), 1500)
+      }
+    }
     // 採点ボタンを更新
     const gradeBtn = document.getElementById('gradeBtn')
     if (gradeBtn) {
@@ -11390,17 +11677,102 @@ function gradeAnswer(correctAnswer) {
       osc.start(); osc.stop(audioCtx.currentTime + 0.4)
     } catch (e) {}
     
+    // AI分析中のUI表示
     resultDiv.innerHTML = `
       <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-5 text-center">
         <div class="text-5xl mb-3">🤔</div>
         <p class="text-xl font-bold text-yellow-700 mb-2">もう少し！</p>
-        <p class="text-sm text-gray-600 mb-3">ヒントを見てもう一度考えてみよう。</p>
-        <button onclick="document.getElementById('gradeResult').classList.add('hidden'); document.getElementById('answerInput')?.focus()"
-                class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg font-bold transition">
-          <i class="fas fa-redo mr-2"></i>もう一度やってみる
-        </button>
+        <div class="flex items-center justify-center gap-2 text-sm text-gray-600 mb-3">
+          <div class="animate-spin rounded-full h-4 w-4 border-2 border-purple-400 border-t-transparent"></div>
+          <span>あなたの考えを読み取っています...</span>
+        </div>
       </div>
     `
+    resultDiv.classList.remove('hidden')
+    
+    // AIで回答を分析
+    try {
+      const cardData = typeof state.selectedCard === 'object' ? state.selectedCard : (window.currentCardData || {})
+      const question = cardData?.problem_content || cardData?.problem_text || document.querySelector('.text-pink-700, .problem-text')?.textContent || ''
+      const subject = cardData?.subject || state.selectedCurriculum?.subject || ''
+      const grade = cardData?.grade || state.selectedCurriculum?.grade || ''
+      const cardTitle = cardData?.card_title || ''
+      
+      const aiRes = await axios.post('/api/ai/analyze-answer', {
+        question: question.substring(0, 500),
+        correctAnswer: correctAnswer,
+        studentAnswer: studentAnswer,
+        subject: subject,
+        grade: grade,
+        cardTitle: cardTitle
+      }, { timeout: 15000 })
+      
+      const analysis = aiRes.data
+      
+      resultDiv.innerHTML = `
+        <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-5">
+          <div class="text-center mb-4">
+            <div class="text-5xl mb-2">🤔</div>
+            <p class="text-xl font-bold text-yellow-700">もう少し！</p>
+          </div>
+          
+          ${analysis.where_wrong ? `
+          <div class="bg-white rounded-lg p-3 mb-3 border border-orange-200">
+            <p class="text-sm font-bold text-orange-600 mb-1"><i class="fas fa-search mr-1"></i>ここが違うよ</p>
+            <p class="text-sm text-gray-700">${analysis.where_wrong}</p>
+          </div>` : ''}
+          
+          ${analysis.why_wrong ? `
+          <div class="bg-white rounded-lg p-3 mb-3 border border-blue-200">
+            <p class="text-sm font-bold text-blue-600 mb-1"><i class="fas fa-lightbulb mr-1"></i>こう考えたのかな？</p>
+            <p class="text-sm text-gray-700">${analysis.why_wrong}</p>
+          </div>` : ''}
+          
+          ${analysis.hint ? `
+          <div class="bg-purple-50 rounded-lg p-3 mb-3 border border-purple-200">
+            <p class="text-sm font-bold text-purple-600 mb-1"><i class="fas fa-magic mr-1"></i>ヒント</p>
+            <p class="text-sm text-gray-700">${analysis.hint}</p>
+          </div>` : ''}
+          
+          ${analysis.encouragement ? `
+          <p class="text-center text-sm text-green-600 font-bold mb-3"><i class="fas fa-star mr-1"></i>${analysis.encouragement}</p>
+          ` : ''}
+          
+          <div class="flex gap-2 justify-center flex-wrap">
+            <button onclick="document.getElementById('gradeResult').classList.add('hidden'); document.getElementById('answerInput').value=''; document.getElementById('answerInput')?.focus()"
+                    class="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2.5 rounded-lg font-bold transition shadow">
+              <i class="fas fa-redo mr-2"></i>もう一度やってみる
+            </button>
+            ${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? `
+            <button onclick="window.qaStepState.results.push({correct:false, studentAnswer:'${studentAnswer.replace(/'/g, "\\'")}', correctAnswer:''}); goToNextQAStep()"
+                    class="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2.5 rounded-lg font-bold transition shadow">
+              <i class="fas fa-arrow-right mr-2"></i>次の問題へ
+            </button>` : ''}
+          </div>
+        </div>
+      `
+    } catch (aiError) {
+      console.error('AI分析エラー:', aiError)
+      // AI分析失敗時のフォールバック
+      resultDiv.innerHTML = `
+        <div class="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-5 text-center">
+          <div class="text-5xl mb-3">🤔</div>
+          <p class="text-xl font-bold text-yellow-700 mb-2">もう少し！</p>
+          <p class="text-sm text-gray-600 mb-3">ヒントを見てもう一度考えてみよう。</p>
+          <div class="flex gap-2 justify-center flex-wrap">
+            <button onclick="document.getElementById('gradeResult').classList.add('hidden'); document.getElementById('answerInput').value=''; document.getElementById('answerInput')?.focus()"
+                    class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg font-bold transition">
+              <i class="fas fa-redo mr-2"></i>もう一度やってみる
+            </button>
+            ${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? `
+            <button onclick="window.qaStepState.results.push({correct:false, studentAnswer:'', correctAnswer:''}); goToNextQAStep()"
+                    class="bg-gray-400 hover:bg-gray-500 text-white px-5 py-2 rounded-lg font-bold transition">
+              <i class="fas fa-arrow-right mr-2"></i>次の問題へ
+            </button>` : ''}
+          </div>
+        </div>
+      `
+    }
   }
   
   resultDiv.classList.remove('hidden')
@@ -11453,6 +11825,14 @@ async function saveProgress(teacherCall = false) {
   }
   
   try {
+    // カードIDを安全に取得（オブジェクトの場合はIDを抽出）
+    const cardId = typeof state.selectedCard === 'object' 
+      ? (state.selectedCard?.card_id || state.selectedCard?.id || 0)
+      : (state.selectedCard || 0)
+    const cardTitle = typeof state.selectedCard === 'object'
+      ? (state.selectedCard?.card_title || '')
+      : ''
+    
     // 解答時間を計算（秒単位）
     let answerTime = 0
     if (learningSession.currentCardStartTime) {
@@ -11464,37 +11844,42 @@ async function saveProgress(teacherCall = false) {
     
     // 学習ログを記録
     await logLearningActivity({
-      cardId: state.selectedCard,
+      cardId: cardId,
       unitId: state.selectedCurriculum?.id,
       courseType: state.selectedCourse,
       isCorrect: isCorrect,
       answerTime: answerTime,
       hintCount: window.helpCount || 0,
-      retryCount: 0,  // TODO: 再試行回数のトラッキング実装
+      retryCount: 0,
       difficulty: getDifficultyLevel(state.selectedCourse),
-      problemType: getProblemType(state.selectedCard?.card_title || '')
+      problemType: getProblemType(cardTitle)
     })
+    
+    // courseIdを安全に取得
+    const courseId = typeof state.selectedCourse === 'object'
+      ? (state.selectedCourse?.id || state.selectedCourse?.course_id || 0)
+      : (state.selectedCourse || 0)
     
     // 進捗を保存
     await axios.post('/api/progress', {
-      student_id: state.student.id,
-      curriculum_id: state.selectedCurriculum.id,
-      course_id: state.selectedCourse,
-      learning_card_id: state.selectedCard,
+      student_id: state.student?.id || 1,
+      curriculum_id: state.selectedCurriculum?.id || 0,
+      course_id: courseId,
+      learning_card_id: cardId,
       status: 'completed',
-      understanding_level: window.currentUnderstandingLevel,
-      help_requested_from: window.currentHelpType,
-      help_count: window.helpCount
+      understanding_level: window.currentUnderstandingLevel || 0,
+      help_requested_from: window.currentHelpType || null,
+      help_count: window.helpCount || 0
     })
     
     // WebSocket通知を送信
     sendProgressUpdate(
-      state.student.id,
-      state.selectedCurriculum.id,
-      state.selectedCourse,
-      state.selectedCard,
+      state.student?.id || 1,
+      state.selectedCurriculum?.id || 0,
+      courseId,
+      cardId,
       'completed',
-      window.currentUnderstandingLevel
+      window.currentUnderstandingLevel || 0
     )
     
     // バックグラウンドでプロファイルを更新（5問ごと）
@@ -30405,25 +30790,15 @@ async function uploadFileToCard(cardId, file) {
     }
   }
   
-  // 動画・音声: カードにメディアがない場合は1枚目として設定、ある場合はギャラリー追加
+  // 動画・音声: 常にmedia API経由でアップロード（media_items管理の一貫性を保つ）
   if (mediaType !== 'image') {
     const placeholder = document.getElementById('image-placeholder-' + cardId)
     const guidePlaceholder = document.getElementById('guide-img-' + cardId)
     const hasNoMedia = !existingContainer && (placeholder || guidePlaceholder)
     
     if (hasNoMedia) {
-      // メディアがないカード: 動画/音声を1枚目メディアとして設定
+      // メディアがないカード: アップロード中UIを表示
       const targetEl = placeholder || guidePlaceholder
-      
-      // サイズチェック
-      const sizeLimits = { video: 50, audio: 20 }
-      const sizeLimit = (sizeLimits[mediaType] || 50) * 1024 * 1024
-      if (file.size > sizeLimit) {
-        alert('ファイルサイズが大きすぎます（上限' + (sizeLimits[mediaType] || 50) + 'MB、現在' + (file.size/1024/1024).toFixed(1) + 'MB）')
-        return false
-      }
-      
-      // アップロード中UI
       if (targetEl) {
         targetEl.innerHTML = `
           <div class="p-8 text-center">
@@ -30435,51 +30810,30 @@ async function uploadFileToCard(cardId, file) {
             <p class="text-sm text-gray-500 mt-1">${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)</p>
           </div>`
       }
-      
-      try {
-        // R2にアップロード
-        const formData = new FormData()
-        formData.append('file', file)
-        const endpoint = mediaType === 'video' ? '/api/upload/video' : '/api/upload/video'
-        const res = await axios.post(endpoint, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 180000,
-          maxContentLength: 50 * 1024 * 1024,
-          maxBodyLength: 50 * 1024 * 1024
-        })
-        
-        if (res.data.success) {
-          const mediaUrl = res.data.video_url || res.data.audio_url || res.data.url
-          // カードのproblem_image_urlに保存
-          await axios.put('/api/card/' + cardId, { problem_image_url: mediaUrl })
-          
-          // 表示を更新
-          if (targetEl) {
-            targetEl.outerHTML = renderMediaEmbed(mediaUrl, cardId, file.name)
-          }
-          // ギャラリーも更新
-          loadMediaGallery(cardId)
-          return true
-        } else {
-          throw new Error(res.data.error || 'アップロード失敗')
-        }
-      } catch (err) {
-        console.error('動画アップロードエラー:', err)
-        if (targetEl) {
-          targetEl.innerHTML = `
-            <div class="p-4 text-center">
-              <i class="fas fa-exclamation-triangle text-red-500 text-3xl mb-2 block"></i>
-              <p class="text-red-700 font-bold mb-2">アップロードに失敗しました</p>
-              <p class="text-xs text-gray-500 mb-2">${err.response?.data?.error || err.message}</p>
-              <button onclick="addMediaToCard(${cardId}, '${mediaType}')" class="text-sm text-blue-600 underline">再試行</button>
-            </div>`
-        }
-        return false
-      }
     }
     
-    // メディアが既にあるカード: ギャラリーに追加
-    return addMediaFileToCard(cardId, file, mediaType)
+    // media upload API経由でアップロード（media_itemsに正しく登録される）
+    const result = await addMediaFileToCard(cardId, file, mediaType)
+    
+    if (result && hasNoMedia) {
+      // メディアがなかったカード: メイン表示領域を更新
+      try {
+        const mediaRes = await axios.get('/api/card/' + cardId + '/media')
+        if (mediaRes.data.success) {
+          const items = mediaRes.data.media_items || []
+          const firstItem = items.find(it => it.type === mediaType)
+          if (firstItem) {
+            const targetEl = document.getElementById('image-placeholder-' + cardId) || document.getElementById('guide-img-' + cardId)
+            if (targetEl) {
+              targetEl.outerHTML = renderMediaEmbed(firstItem.url, cardId, firstItem.label || file.name)
+            }
+            // problem_image_urlも更新
+            await axios.put('/api/card/' + cardId, { problem_image_url: firstItem.url }).catch(() => {})
+          }
+        }
+      } catch (e) { console.error('メイン表示更新エラー:', e) }
+    }
+    return result
   }
   // サイズチェック: 画像5MB、動画50MB、音声20MB
   const sizeLimits = { image: 10, video: 50, audio: 20 }
@@ -30561,6 +30915,8 @@ async function uploadFileToCard(cardId, file) {
           `
         }
       }
+      // ギャラリーも更新（追加画像ボタンを表示するため）
+      loadMediaGallery(cardId)
       return true
     } else {
       throw new Error(res.data.error || 'アップロード失敗')
@@ -31596,16 +31952,22 @@ async function loadMediaGallery(cardId) {
 window.loadMediaGallery = loadMediaGallery
 
 function renderMediaGallery(container, cardId, items) {
-  // 追加メディア（problem_image_urlとは別のもの）のみ表示
-  const extraItems = items.filter((it, idx) => idx > 0 || items.length > 1)
+  // メイン表示エリア（card-image-container）に既にメディアがあるかチェック
+  const mainContainer = document.getElementById('card-image-container-' + cardId)
+  const hasMainMedia = mainContainer && mainContainer.querySelector('img, video, audio, iframe')
   
   let html = ''
   
   // 追加メディアがある場合、ギャラリー表示
+  // メイン表示エリアにメディアがある場合は1枚目をスキップ
+  // メイン表示エリアにメディアがない場合は全て表示
+  const startIdx = hasMainMedia ? 1 : 0
+  const extraItems = items.filter((it, idx) => idx >= startIdx)
+  
   if (extraItems.length > 0) {
     html += '<div class="space-y-3 mt-2">'
     items.forEach((item, idx) => {
-      if (idx === 0) return // 1枚目は既にcard-image-containerで表示済み
+      if (idx < startIdx) return // メイン表示エリアに表示済みのアイテムはスキップ
       html += renderMediaItem(item, cardId, idx)
     })
     html += '</div>'
@@ -31667,8 +32029,9 @@ function renderMediaItem(item, cardId, idx) {
     // data URL動画
     return `
       <div class="text-center" id="media-item-${id}">
-        <video controls class="max-w-full h-auto rounded-lg shadow-sm mx-auto border border-gray-200" style="max-height: 350px;">
+        <video controls class="max-w-full h-auto rounded-lg shadow-sm mx-auto border border-gray-200" style="max-height: 350px;" preload="metadata">
           <source src="${item.url}" type="${item.mime_type || 'video/mp4'}">
+          <source src="${item.url}">
           動画を再生できません
         </video>
         <div class="mt-1 flex items-center justify-center gap-2">
@@ -31679,14 +32042,16 @@ function renderMediaItem(item, cardId, idx) {
   }
   
   if (item.type === 'audio') {
+    const audioMime = item.mime_type || 'audio/mpeg'
     return `
-      <div class="text-center bg-green-50 border border-green-200 rounded-lg p-3" id="media-item-${id}">
-        <i class="fas fa-music text-green-500 text-xl mb-2 block"></i>
-        <audio controls class="mx-auto" style="max-width:100%;">
-          <source src="${item.url}" type="${item.mime_type || 'audio/mpeg'}">
+      <div class="text-center bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 shadow-sm" id="media-item-${id}">
+        <i class="fas fa-music text-green-500 text-2xl mb-2 block"></i>
+        <audio controls class="mx-auto w-full" style="max-width:350px;" preload="auto">
+          <source src="${item.url}" type="${audioMime}">
+          <source src="${item.url}">
           音声を再生できません
         </audio>
-        <div class="mt-1 flex items-center justify-center gap-2">
+        <div class="mt-2 flex items-center justify-center gap-2">
           <span class="text-xs text-gray-500">${item.label || '音声'}</span>
           <button onclick="removeMediaFromCard(${cardId}, '${id}')" class="text-xs text-red-400 hover:text-red-600 underline">削除</button>
         </div>
@@ -35794,6 +36159,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
       <div class="mt-4 text-center" id="card-image-container-${cardId}">
         <video controls class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: ${maxHeight};" preload="metadata">
           <source src="${url}" type="video/mp4">
+          <source src="${url}">
           動画を再生できません
         </video>
         <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
@@ -35804,14 +36170,21 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
   }
   
   if (isAudioUrl(url)) {
+    // 拡張子からMIMEタイプを推定
+    const audioExt = (url.match(/\.(\w+)(?:\?|$)/i) || [])[1] || ''
+    const audioMimeMap = { mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4', aac: 'audio/aac', flac: 'audio/flac', wma: 'audio/x-ms-wma', opus: 'audio/opus', webm: 'audio/webm' }
+    const audioMime = audioMimeMap[audioExt.toLowerCase()] || 'audio/mpeg'
     return `
-      <div class="mt-4 text-center bg-green-50 border-2 border-green-200 rounded-lg p-4" id="card-image-container-${cardId}">
-        <i class="fas fa-music text-green-500 text-3xl mb-2 block"></i>
-        <audio controls class="mx-auto" style="max-width:100%;" preload="metadata">
-          <source src="${url}" type="audio/mpeg">
+      <div class="mt-4 text-center bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5 shadow-sm" id="card-image-container-${cardId}">
+        <div class="mb-3">
+          <i class="fas fa-music text-green-500 text-4xl"></i>
+        </div>
+        <audio controls class="mx-auto w-full" style="max-width:400px;" preload="auto">
+          <source src="${url}" type="${audioMime}">
+          <source src="${url}">
           音声を再生できません
         </audio>
-        <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
+        <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
           <p class="text-xs text-gray-500"><i class="fas fa-music mr-1"></i>${description || '音声'}</p>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
         </div>
