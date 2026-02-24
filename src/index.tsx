@@ -3402,18 +3402,22 @@ app.get('/api/curriculum/:id', async (c) => {
     try {
       // 本番スキーマ: problem_id(PK), curriculum_id, problem_number, problem_title, problem_description, problem_content, difficulty_level, learning_meaning
       const optionalProblems = await env.DB.prepare(`
-        SELECT problem_id, curriculum_id, problem_number, problem_title, 
-               problem_description, problem_content, difficulty_level,
-               created_at
+        SELECT problem_id, unit_id, problem_title, problem_type,
+               difficulty_level, content, created_at
         FROM optional_problems 
-        WHERE curriculum_id = ?
-        ORDER BY problem_number, problem_id
+        WHERE unit_id = ?
+        ORDER BY problem_id
       `).bind(id).all()
-      optionalWithNumber = (optionalProblems.results || []).map((p: any, idx: number) => ({
-        ...p,
-        problem_number: p.problem_number || idx + 1,
-        problem_type: p.difficulty_level || 'optional'
-      }))
+      optionalWithNumber = (optionalProblems.results || []).map((p: any, idx: number) => {
+        let parsed = {}
+        try { parsed = typeof p.content === 'string' ? JSON.parse(p.content) : (p.content || {}) } catch(e) {}
+        return {
+          ...p,
+          ...(parsed as any),
+          problem_number: (parsed as any).problem_number || idx + 1,
+          problem_type: p.problem_type || p.difficulty_level || 'optional'
+        }
+      })
     } catch (optErr: any) {
       console.warn('選択問題取得エラー:', optErr.message)
       optionalWithNumber = []
@@ -3574,7 +3578,7 @@ app.get('/api/cards/:cardId', async (c) => {
     const hints = await hintQuery(env.DB, (s) => hintSelectSQL(s), [cardId])
     
     const answer = await env.DB.prepare(`
-      SELECT * FROM answers WHERE learning_card_id = ?
+      SELECT * FROM answers WHERE card_id = ?
     `).bind(cardId).first()
     
     // カードデータのJSON問題文をパース
@@ -3617,8 +3621,9 @@ app.get('/api/cards/:cardId', async (c) => {
       hints: hints.results,
       answer
     })
-  } catch (error) {
-    return c.json({ error: 'Database error' }, 500)
+  } catch (error: any) {
+    console.error('Card fetch error:', cardId, error.message)
+    return c.json({ error: 'Database error', details: error.message }, 500)
   }
 })
 
@@ -5859,7 +5864,7 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
         a.explanation
       FROM courses c
       JOIN learning_cards lc ON c.id = lc.course_id
-      LEFT JOIN answers a ON lc.card_id = a.learning_card_id
+      LEFT JOIN answers a ON lc.card_id = a.card_id
       WHERE c.curriculum_id = ?
       ORDER BY c.course_level, lc.card_number
     `).bind(curriculumId).all()
@@ -5867,16 +5872,16 @@ app.get('/api/answers/curriculum/:curriculumId', async (c) => {
     // 選択問題の解答
     const optionalAnswers = await env.DB.prepare(`
       SELECT 
-        op.problem_number,
+        op.problem_id,
         op.problem_title,
-        op.problem_description,
-        op.learning_meaning,
+        op.content,
+        op.difficulty_level,
         a.answer_content,
         a.explanation
       FROM optional_problems op
-      LEFT JOIN answers a ON op.id = a.optional_problem_id
-      WHERE op.curriculum_id = ?
-      ORDER BY op.problem_number
+      LEFT JOIN answers a ON op.problem_id = a.optional_problem_id
+      WHERE op.unit_id = ?
+      ORDER BY op.problem_id
     `).bind(curriculumId).all()
     
     return c.json({
@@ -12237,15 +12242,13 @@ app.get('/api/curriculum/:curriculumId/optional-problems', async (c) => {
   const curriculumId = c.req.param('curriculumId')
   
   try {
-    // 本番スキーマ: problem_id, curriculum_id, problem_number, problem_title, 
-    //   problem_description, problem_content, difficulty_level, learning_meaning
+    // 実スキーマ: problem_id, unit_id, problem_title, problem_type, difficulty_level, content, created_at
     const problems = await env.DB.prepare(`
-      SELECT problem_id, curriculum_id, problem_number, problem_title, 
-             problem_description, problem_content, difficulty_level,
-             learning_meaning, created_at
+      SELECT problem_id, unit_id, problem_title, problem_type,
+             difficulty_level, content, created_at
       FROM optional_problems 
-      WHERE curriculum_id = ? 
-      ORDER BY problem_number, problem_id
+      WHERE unit_id = ? 
+      ORDER BY problem_id
     `).bind(curriculumId).all()
     
     // problem_number を付与
