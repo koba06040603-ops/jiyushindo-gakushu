@@ -1486,7 +1486,7 @@ app.post('/api/debug/cleanup-duplicates', async (c) => {
             await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
           }
           await env.DB.prepare(`DELETE FROM courses WHERE curriculum_id = ?`).bind(delId).run()
-          await env.DB.prepare(`DELETE FROM optional_problems WHERE curriculum_id = ?`).bind(delId).run()
+          await env.DB.prepare(`DELETE FROM optional_problems WHERE unit_id = ?`).bind(delId).run()
           await env.DB.prepare(`DELETE FROM curriculum_metadata WHERE curriculum_id = ?`).bind(delId).run()
           await env.DB.prepare(`DELETE FROM curriculum WHERE id = ?`).bind(delId).run()
         }
@@ -1720,7 +1720,8 @@ app.get('/api/class/:classId/heatmap', async (c) => {
     let unitQuery = `
       SELECT DISTINCT c.id, c.unit_name
       FROM curriculum c
-      JOIN learning_cards lc ON c.id = lc.curriculum_id
+      JOIN courses co ON c.id = co.curriculum_id
+      JOIN learning_cards lc ON co.id = lc.course_id
       WHERE 1=1
     `;
     const unitParams: any[] = [];
@@ -7686,7 +7687,7 @@ app.get('/guide/:curriculumId', async (c) => {
     }
     
     // 選択問題を取得
-    const optResult = await env.DB.prepare('SELECT * FROM optional_problems WHERE curriculum_id = ? ORDER BY problem_number').bind(curriculumId).all()
+    const optResult = await env.DB.prepare('SELECT * FROM optional_problems WHERE unit_id = ? ORDER BY problem_id').bind(curriculumId).all()
     optionalProblems = (optResult.results || []) as any[]
     
     // 個別コースの場合：個別用がなければカードベースの確認テスト・課題を自動生成
@@ -10226,7 +10227,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
         await env.DB.prepare(`DELETE FROM learning_cards WHERE course_id = ?`).bind(course.id).run()
       }
       await env.DB.prepare(`DELETE FROM courses WHERE curriculum_id = ?`).bind(curriculumId).run()
-      await env.DB.prepare(`DELETE FROM optional_problems WHERE curriculum_id = ?`).bind(curriculumId).run()
+      await env.DB.prepare(`DELETE FROM optional_problems WHERE unit_id = ?`).bind(curriculumId).run()
       await env.DB.prepare(`DELETE FROM curriculum_metadata WHERE curriculum_id = ?`).bind(curriculumId).run()
       
       // メタデータ更新
@@ -10345,6 +10346,22 @@ app.post('/api/curriculum/save-generated', async (c) => {
         const answerText = s(card.correct_answer || card.answer)
         const explanationText = s(card.explanation || card.answer_explanation)
         
+        // 不足カラムを自動追加
+        const missingCols = [
+          { name: 'problem_content', type: 'TEXT DEFAULT \'\''},
+          { name: 'answer', type: 'TEXT DEFAULT \'\''},
+          { name: 'answer_explanation', type: 'TEXT DEFAULT \'\''},
+          { name: 'card_number', type: 'INTEGER DEFAULT 0'},
+          { name: 'textbook_page', type: 'TEXT DEFAULT \'\''},
+          { name: 'new_terms', type: 'TEXT DEFAULT \'\''},
+          { name: 'example_problem', type: 'TEXT DEFAULT \'\''},
+          { name: 'example_solution', type: 'TEXT DEFAULT \'\''},
+          { name: 'real_world_connection', type: 'TEXT DEFAULT \'\''},
+        ]
+        for (const col of missingCols) {
+          try { await env.DB.prepare(`ALTER TABLE learning_cards ADD COLUMN ${col.name} ${col.type}`).run() } catch(e) {}
+        }
+        
         const cardResult = await env.DB.prepare(`
           INSERT INTO learning_cards (
             subject, grade_level, unit_name, card_title, card_type,
@@ -10428,17 +10445,19 @@ app.post('/api/curriculum/save-generated', async (c) => {
       const problem = optionalProblems[pi]
       await env.DB.prepare(`
         INSERT INTO optional_problems (
-          curriculum_id, problem_number, problem_title, problem_description,
-          problem_content, difficulty_level, learning_meaning
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          unit_id, problem_title, problem_type, difficulty_level, content
+        ) VALUES (?, ?, ?, ?, ?)
       `).bind(
         curriculumId,
-        problem.problem_number || (pi + 1),
         problem.problem_title || problem.title || '選択問題',
-        problem.problem_description || problem.content || problem.problem_content || '',
-        problem.problem_content || problem.content || problem.problem_description || '',
+        problem.problem_type || 'optional',
         problem.difficulty_level || 'standard',
-        problem.learning_meaning || ''
+        JSON.stringify({
+          problem_number: problem.problem_number || (pi + 1),
+          problem_description: problem.problem_description || problem.content || problem.problem_content || '',
+          problem_content: problem.problem_content || problem.content || problem.problem_description || '',
+          learning_meaning: problem.learning_meaning || ''
+        })
       ).run()
     }
     
@@ -12017,17 +12036,19 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
         // 本番スキーマ: problem_id, curriculum_id, problem_number, problem_title, problem_description, problem_content, difficulty_level, learning_meaning
         await env.DB.prepare(`
           INSERT INTO optional_problems (
-            curriculum_id, problem_number, problem_title, problem_description,
-            problem_content, difficulty_level, learning_meaning
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            unit_id, problem_title, problem_type, difficulty_level, content
+          ) VALUES (?, ?, ?, ?, ?)
         `).bind(
           curriculumId,
-          problem.problem_number || (oi + 1),
           problem.problem_title || '問題',
-          problem.problem_description || problem.problem_content || problem.content || '',
-          problem.problem_content || problem.problem_description || problem.content || '',
+          problem.problem_type || 'optional',
           problem.difficulty_level || 'standard',
-          problem.learning_meaning || ''
+          JSON.stringify({
+            problem_number: problem.problem_number || (oi + 1),
+            problem_description: problem.problem_description || problem.problem_content || problem.content || '',
+            problem_content: problem.problem_content || problem.problem_description || problem.content || '',
+            learning_meaning: problem.learning_meaning || ''
+          })
         ).run()
       }
     } else {
@@ -12558,17 +12579,19 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
       for (const problem of additionalProblems.optional_problems) {
         await env.DB.prepare(`
           INSERT INTO optional_problems (
-            curriculum_id, problem_number, problem_title, problem_content, problem_description,
-            difficulty_level, learning_meaning
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            unit_id, problem_title, problem_type, difficulty_level, content
+          ) VALUES (?, ?, ?, ?, ?)
         `).bind(
           curriculumId,
-          problem.problem_number,
           problem.problem_title || '問題',
-          problem.problem_content || problem.problem_description || '問題内容',
-          problem.problem_description || problem.problem_content || '問題の説明',
+          problem.problem_type || 'optional',
           problem.difficulty_level || 'medium',
-          problem.learning_meaning || ''
+          JSON.stringify({
+            problem_number: problem.problem_number,
+            problem_content: problem.problem_content || problem.problem_description || '問題内容',
+            problem_description: problem.problem_description || problem.problem_content || '問題の説明',
+            learning_meaning: problem.learning_meaning || ''
+          })
         ).run()
       }
     }
@@ -12770,7 +12793,7 @@ app.delete('/api/curriculum/:id', async (c) => {
     
     // 5. 選択問題を削除
     await env.DB.prepare(`
-      DELETE FROM optional_problems WHERE curriculum_id = ?
+      DELETE FROM optional_problems WHERE unit_id = ?
     `).bind(id).run()
     console.log(`  - 選択問題削除完了`)
     
@@ -12903,23 +12926,20 @@ app.post('/api/curriculum/:id/duplicate', async (c) => {
     
     // 選択問題をコピー
     const optionalProblems = await env.DB.prepare(`
-      SELECT * FROM optional_problems WHERE curriculum_id = ?
+      SELECT * FROM optional_problems WHERE unit_id = ?
     `).bind(sourceId).all()
     
     for (const problem of optionalProblems.results) {
       await env.DB.prepare(`
         INSERT INTO optional_problems (
-          curriculum_id, problem_number, problem_title, 
-          problem_description, problem_content, difficulty_level, learning_meaning
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          unit_id, problem_title, problem_type, difficulty_level, content
+        ) VALUES (?, ?, ?, ?, ?)
       `).bind(
         newCurriculumId,
-        (problem as any).problem_number,
         (problem as any).problem_title,
-        (problem as any).problem_description,
-        (problem as any).problem_content,
+        (problem as any).problem_type || 'optional',
         (problem as any).difficulty_level,
-        (problem as any).learning_meaning
+        (problem as any).content || '{}'
       ).run()
     }
     
@@ -13068,7 +13088,7 @@ app.post('/api/curriculum/:id/optional-problem', async (c) => {
   try {
     // 既存の問題数を取得して次の番号を決定
     const countResult: any = await env.DB.prepare(`
-      SELECT COUNT(*) as count FROM optional_problems WHERE curriculum_id = ?
+      SELECT COUNT(*) as count FROM optional_problems WHERE unit_id = ?
     `).bind(curriculumId).first()
     
     const nextProblemNumber = (countResult?.count || 0) + 1
@@ -13077,17 +13097,19 @@ app.post('/api/curriculum/:id/optional-problem', async (c) => {
     
     const result = await env.DB.prepare(`
       INSERT INTO optional_problems (
-        curriculum_id, problem_number, problem_title, 
-        problem_description, problem_content, problem_category, learning_meaning
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        unit_id, problem_title, problem_type, difficulty_level, content
+      ) VALUES (?, ?, ?, ?, ?)
     `).bind(
       curriculumId,
-      nextProblemNumber,
       problem_title || '問題',
-      problem_description || '問題の説明',
-      problem_content || problem_description || '問題内容',
-      problem_category || 'other',
-      learning_meaning || ''
+      problem_category || 'optional',
+      'standard',
+      JSON.stringify({
+        problem_number: nextProblemNumber,
+        problem_description: problem_description || '問題の説明',
+        problem_content: problem_content || problem_description || '問題内容',
+        learning_meaning: learning_meaning || ''
+      })
     ).run()
     
     console.log('✅ 選択問題追加成功:', result.meta.last_row_id)
@@ -34133,7 +34155,7 @@ app.get('/api/student-learning/tebiki', async (c) => {
         // curriculum_id で再試行（別スキーマ対応）
         const optRes2 = await env.DB.prepare(`
           SELECT *, ROW_NUMBER() OVER (ORDER BY problem_id) AS problem_number 
-          FROM optional_problems WHERE curriculum_id = ?
+          FROM optional_problems WHERE unit_id = ?
         `).bind(curriculum.id).all()
         optionalProblems = optRes2.results || []
       } catch {}
