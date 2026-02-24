@@ -23061,7 +23061,7 @@ app.delete('/api/cards/images/:imageId', async (c) => {
 // AI画像生成API（Gemini Imagen使用）
 app.post('/api/ai/generate-image', async (c) => {
   const { env } = c
-  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade } = await c.req.json()
+  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade, prefer_image } = await c.req.json()
   
   try {
     const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
@@ -23079,76 +23079,127 @@ app.post('/api/ai/generate-image', async (c) => {
     
     const startTime = Date.now()
     
-    // ========== 教育用の高精度プロンプト構築 ==========
-    // 問題文の具体的な数値・内容を活用して正確な図を生成する
+    // ========== コンテキスト情報の構築 ==========
     const contextParts: string[] = []
-    
-    // 学年・教科の情報
-    if (grade || subject) {
-      contextParts.push(`対象: 日本の${grade || ''}${subject || ''}の授業`)
-    }
-    
-    // 単元名
-    if (unit_name) {
-      contextParts.push(`単元: ${unit_name}`)
-    }
-    
-    // カードタイトル
-    if (card_title) {
-      contextParts.push(`テーマ: ${card_title}`)
-    }
-    
-    // ユーザーの直接指示（プレースホルダーの説明 or 手動入力）
+    if (grade || subject) contextParts.push(`対象: 日本の${grade || ''}${subject || ''}の授業`)
+    if (unit_name) contextParts.push(`単元: ${unit_name}`)
+    if (card_title) contextParts.push(`テーマ: ${card_title}`)
     contextParts.push(`内容: ${prompt}`)
-    
-    // 問題文があれば、数値やデータを抽出して図に反映させる
     if (problem_text && problem_text.length > 5) {
-      contextParts.push(`問題文（この内容に合った正確な図を生成してください）:\n${problem_text.substring(0, 500)}`)
+      contextParts.push(`問題文:\n${problem_text.substring(0, 600)}`)
+    }
+    const userContext = contextParts.join('\n')
+    
+    // ========== 第1候補: HTML/CSS図解生成（Geminiテキスト生成） ==========
+    // 表・グラフ・図形などの構造的な図はHTMLで生成する方が正確
+    if (!prefer_image) {
+      console.log('🎨 HTML図解生成を試行:', prompt.substring(0, 80))
+      
+      try {
+        const htmlPrompt = `あなたは日本の小学校の教科書に載る図解・表・グラフを HTML と インラインCSS だけで作る専門家です。
+
+以下の問題に合った「教育用の図解」を1つだけ生成してください。
+
+【出力形式】
+- <div style="..."> で始まり </div> で終わるHTMLブロック1つだけ
+- マークダウンのコードブロック(\`\`\`)で囲まないこと
+- 説明文は一切不要。HTMLのみ
+
+【スタイルルール】
+- すべてのCSSはインラインstyle属性で書くこと（<style>タグ不使用）
+- 表にはborder-collapse:collapseを必ず使う
+- フォントサイズ: 最低14px、重要な数字は18px以上、タイトルは20px以上
+- 配色: カラフルで見やすく、背景は白系
+- max-width: 600px
+- font-family: sans-serif
+- 問題文の数値・データを正確に反映
+
+【図の種類ガイド】
+- 表・二元表 → <table>で作成（合計行・合計列を含む）
+- 折れ線グラフ → インラインSVGの<polyline>で描画（軸ラベル・目盛り付き）
+- 棒グラフ → divのheight%またはインラインSVGの<rect>で描画
+- 円グラフ → SVGまたはconic-gradient
+- 数直線 → SVGで描画
+- 図形 → SVGで描画
+
+${userContext}
+
+HTMLコードだけを出力（コードブロック不要）:`
+
+        const htmlApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`
+        console.log('📡 HTML生成API呼び出し:', htmlApiUrl.substring(0, 80))
+        
+        const htmlResponse = await fetch(htmlApiUrl, {
+          method: 'POST',
+          headers: {
+            'x-goog-api-key': geminiApiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: htmlPrompt }] }],
+            generationConfig: { 
+              temperature: 0.3, 
+              maxOutputTokens: 8192,
+            }
+          })
+        })
+        
+        console.log('📡 HTML生成API応答:', htmlResponse.status, htmlResponse.statusText)
+        
+        if (htmlResponse.ok) {
+          const htmlData = await htmlResponse.json() as any
+          let htmlText = htmlData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+          
+          console.log('📝 HTML生成レスポンス長:', htmlText.length, '文字, 先頭100:', htmlText.substring(0, 100))
+          
+          // HTMLコードを抽出（マークダウンのコードブロックを除去）
+          htmlText = htmlText.replace(/```html\s*/gi, '').replace(/```\s*/g, '').trim()
+          
+          // <div で始まるHTMLブロックを抽出（greedy matchで最後の</div>まで取得）
+          const divMatch = htmlText.match(/<div[\s\S]*<\/div>/i)
+          
+          if (divMatch && divMatch[0].length > 50) {
+            let cleanHtml = divMatch[0]
+            
+            // <style>タグの内容をインラインに変換する代わりに、scopedなクラス名で安全化
+            // style タグ内のCSSをそのまま残す（shadow DOMではないが、問題ない）
+            
+            // セキュリティ: script タグとイベントハンドラを除去
+            cleanHtml = cleanHtml
+              .replace(/<script[\s\S]*?<\/script>/gi, '')
+              .replace(/\bon\w+\s*=/gi, 'data-disabled=')
+              .replace(/javascript:/gi, '')
+            
+            const generationTime = Date.now() - startTime
+            console.log(`✅ HTML図解生成成功 (${generationTime}ms, ${cleanHtml.length}文字)`)
+            
+            return c.json({
+              success: true,
+              html_content: cleanHtml,
+              type: 'html',
+              prompt: prompt.substring(0, 200),
+              generation_time_ms: generationTime,
+              model: 'gemini-2.0-flash (HTML)',
+              message: 'HTML図解を生成しました'
+            })
+          } else {
+            console.warn('⚠️ HTML抽出失敗: divMatch=', divMatch ? `長さ${divMatch[0].length}` : 'null', ', テキスト先頭200:', htmlText.substring(0, 200))
+          }
+        } else {
+          const errBody = await htmlResponse.text()
+          console.warn('⚠️ HTML生成APIエラー:', htmlResponse.status, errBody.substring(0, 300))
+        }
+        
+        console.log('💡 HTML図解生成失敗、画像生成にフォールバック...')
+      } catch (htmlErr: any) {
+        console.warn('⚠️ HTML図解生成エラー:', htmlErr.message, htmlErr.stack?.substring(0, 200))
+      }
     }
     
-    // 図の種類を自動判定してスタイル指示を追加
+    // ========== 画像生成フォールバック ==========
+    // HTML図解が失敗した場合、または prefer_image=true の場合
+    
     const allText = `${prompt} ${card_title || ''} ${unit_name || ''} ${problem_text || ''}`.toLowerCase()
-    let diagramStyle = ''
-    
-    if (/折れ線グラフ|折れ線/.test(allText)) {
-      diagramStyle = '折れ線グラフを正確に描いてください。X軸とY軸にラベルと数値を入れ、データ点を線で結んでください。'
-    } else if (/棒グラフ/.test(allText)) {
-      diagramStyle = '棒グラフを正確に描いてください。各棒にラベルと数値を入れ、Y軸に目盛りをつけてください。'
-    } else if (/円グラフ/.test(allText)) {
-      diagramStyle = '円グラフを正確に描いてください。各項目の割合をパーセントで表示し、色分けと凡例をつけてください。'
-    } else if (/表|データ/.test(allText) && /見|読|整理/.test(allText)) {
-      diagramStyle = 'データ表を見やすく描いてください。行と列を整理し、ヘッダーを太字にしてください。'
-    } else if (/数直線/.test(allText)) {
-      diagramStyle = '数直線を正確に描いてください。目盛り、矢印、数値を入れてください。'
-    } else if (/地図|都道府県|地形/.test(allText)) {
-      diagramStyle = '地図を分かりやすく描いてください。地名、方位、縮尺を入れてください。'
-    } else if (/図形|三角|四角|平行|台形|ひし形/.test(allText)) {
-      diagramStyle = '幾何学的な図形を正確に描いてください。辺の長さ、角度、記号を入れ、数学的に正しくしてください。'
-    } else if (/面積|体積|展開図/.test(allText)) {
-      diagramStyle = '面積や体積の図を正確に描いてください。寸法線と数値を入れてください。'
-    } else if (/角度|分度器/.test(allText)) {
-      diagramStyle = '角度の図を正確に描いてください。角度の数値と弧を入れてください。'
-    } else if (/時計|時刻/.test(allText)) {
-      diagramStyle = '時計の文字盤を正確に描いてください。時針と分針を問題の時刻に合わせてください。'
-    } else if (/分数/.test(allText)) {
-      diagramStyle = '分数を視覚的に表現してください。円や長方形を等分して色を塗り、分数との対応を示してください。'
-    } else if (/小数|かけ算|わり算/.test(allText)) {
-      diagramStyle = '計算の過程や概念を図解してください。数値を正確に表示してください。'
-    } else if (/植物|花|葉|茎|根|光合成/.test(allText)) {
-      diagramStyle = '植物の図を科学的に正確に描いてください。各部分に名前のラベルをつけてください。'
-    } else if (/昆虫|虫|動物/.test(allText)) {
-      diagramStyle = '生物の図を科学的に正確に描いてください。各部位に名前のラベルをつけてください。'
-    } else if (/天体|月|星|太陽|地球/.test(allText)) {
-      diagramStyle = '天体の図を科学的に描いてください。名称と関係性を示してください。'
-    } else if (/電気|回路|磁石|電池/.test(allText)) {
-      diagramStyle = '回路図を正確に描いてください。回路記号を使い、電流の向きを示してください。'
-    } else if (/比例|反比例/.test(allText)) {
-      diagramStyle = '比例・反比例のグラフを座標軸と共に正確に描いてください。'
-    }
-    
-    if (diagramStyle) {
-      contextParts.push(diagramStyle)
-    }
     
     // 最終プロンプトの組み立て
     const systemInstruction = `あなたは日本の小学校・中学校の教科書に載るような、正確で分かりやすい教育用の図やイラストを生成する専門家です。
@@ -23161,9 +23212,9 @@ app.post('/api/ai/generate-image', async (c) => {
 5. 背景は白または淡い色で、図が主役になるようにすること
 6. 余計な装飾は避け、学習に必要な情報に集中すること`
 
-    const userPrompt = contextParts.join('\n\n')
+    const userPrompt = userContext
     
-    console.log('🎨 Gemini 2.5 Flash Image で図を生成:', userPrompt.substring(0, 200))
+    console.log('🎨 画像生成フォールバック:', userPrompt.substring(0, 200))
     
     // ========== Gemini 2.5 Flash Image / Nano Banana（ネイティブ画像生成） ==========
     const geminiImageResponse = await fetch(

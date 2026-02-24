@@ -6801,6 +6801,61 @@ function speakTextDirect(text, speed = 0.85) {
 }
 window.speakTextDirect = speakTextDirect
 
+// 画像生成を強制する関数（HTML図解ではなくAI画像）
+async function generateImageForCardAsImage(cardId, description) {
+  if (!cardId) return
+  const placeholder = document.getElementById('image-placeholder-' + cardId) || 
+                       document.getElementById('card-image-container-' + cardId)
+  if (placeholder) {
+    placeholder.innerHTML = `
+      <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-2xl p-6 text-center">
+        <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-3">
+          <i class="fas fa-image text-2xl text-blue-500 animate-pulse"></i>
+        </div>
+        <p class="text-sm text-blue-800 font-bold">Nano Banana で画像を生成中...</p>
+        <p class="text-xs text-gray-500 mt-1">10〜30秒ほどお待ちください</p>
+      </div>`
+  }
+  try {
+    const rawCd = window.currentCardData || {}
+    const cd = rawCd.card || rawCd
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: description || cd.card_title || cd.title || '教育用図解',
+      card_id: cardId,
+      problem_text: cd.problem_content || cd.problem_text || cd.content || '',
+      card_title: cd.card_title || cd.title || '',
+      unit_name: cd.unit_name || '',
+      subject: cd.subject || '',
+      grade: cd.grade_level || cd.grade || '',
+      prefer_image: true
+    }, { timeout: 90000 })
+    if (res.data.success && res.data.image_url) {
+      try { await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url }) } catch(e) {}
+      if (placeholder) {
+        placeholder.innerHTML = `
+          <div class="text-center" id="card-image-container-${cardId}">
+            <img src="${res.data.image_url}" alt="${description || '問題の図'}" 
+                 class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;">
+            <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+              <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
+                <i class="fas fa-check-circle mr-1"></i>${res.data.model || 'AI'}で生成
+              </span>
+              <button onclick="generateImageForCard(${cardId}, '${(description||'').replace(/'/g,'').substring(0,60)}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-redo mr-1"></i>HTML図解で再生成</button>
+              <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
+            </div>
+          </div>`
+      }
+    } else {
+      throw new Error(res.data.error || '画像生成に失敗')
+    }
+  } catch (err) {
+    if (placeholder) {
+      placeholder.innerHTML = `<div class="p-4 text-center text-red-600"><i class="fas fa-exclamation-triangle mr-1"></i>画像生成に失敗: ${err.message || 'エラー'}<br><button onclick="generateImageForCard(${cardId})" class="mt-2 text-sm text-blue-500 underline">HTML図解で再試行</button></div>`
+    }
+  }
+}
+window.generateImageForCardAsImage = generateImageForCardAsImage
+
 // 学習カード上のプレースホルダーからAI画像を生成して保存
 async function generateImageForCard(cardId, description) {
   if (!cardId) {
@@ -6828,12 +6883,21 @@ async function generateImageForCard(cardId, description) {
   
   try {
     // 現在のカードデータから問題文・コンテキストを取得
-    const cd = window.currentCardData || {}
-    const problemText = cd.problem_content || cd.problem_text || ''
-    const cardTitle = cd.card_title || ''
+    // currentCardData は { card, hints, answer } の場合と card 直接の場合がある
+    const rawCd = window.currentCardData || {}
+    const cd = rawCd.card || rawCd  // ネストされている場合はcard部分を取得
+    const problemText = cd.problem_content || cd.problem_text || cd.content || ''
+    const cardTitle = cd.card_title || cd.title || ''
     const unitName = cd.unit_name || ''
     const subject = cd.subject || ''
-    const gradeLevel = cd.grade_level || ''
+    const gradeLevel = cd.grade_level || cd.grade || ''
+    
+    console.log('📋 generateImageForCard コンテキスト:', { 
+      cardId, 
+      promptDesc: (description||'').substring(0,50), 
+      problemText: problemText.substring(0,80),
+      cardTitle, unitName, subject, gradeLevel 
+    })
     
     const prompt = description || cardTitle || 'この学習カードの教育用図解'
     const res = await axios.post('/api/ai/generate-image', {
@@ -6847,16 +6911,34 @@ async function generateImageForCard(cardId, description) {
       style: 'educational diagram'
     }, { timeout: 90000 })
     
-    if (res.data.success && res.data.image_url) {
+    const modelName = res.data.model || 'AI'
+    const genTime = res.data.generation_time_ms || 0
+    const aiDesc = res.data.ai_description || ''
+    
+    if (res.data.success && res.data.type === 'html' && res.data.html_content) {
+      // HTML図解が返された場合
+      if (placeholder) {
+        placeholder.innerHTML = `
+          <div id="card-image-container-${cardId}">
+            <div class="bg-white rounded-lg shadow-md border-2 border-gray-200 p-4 overflow-auto" style="max-height: 500px;">
+              ${res.data.html_content}
+            </div>
+            <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+              <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
+                <i class="fas fa-check-circle mr-1"></i>${modelName}で生成（${(genTime/1000).toFixed(1)}秒）
+              </span>
+              <button onclick="generateImageForCard(${cardId}, '${(description || '').replace(/'/g, '').replace(/\n/g, ' ').substring(0, 80)}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-redo mr-1"></i>再生成</button>
+              <button onclick="generateImageForCardAsImage(${cardId}, '${(description || '').replace(/'/g, '').replace(/\n/g, ' ').substring(0, 80)}')" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-image mr-1"></i>画像で生成</button>
+              <button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
+            </div>
+          </div>`
+      }
+    } else if (res.data.success && res.data.image_url) {
       // サーバー側で既にDBに保存済み（card_idを渡しているため）
       // 念のためクライアント側からも保存
       try {
         await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
       } catch(e) { console.warn('カード更新スキップ:', e) }
-      
-      const modelName = res.data.model || 'AI'
-      const genTime = res.data.generation_time_ms || 0
-      const aiDesc = res.data.ai_description || ''
       
       // 画像を表示
       if (placeholder) {
@@ -30641,15 +30723,16 @@ async function editCardImageUrl(cardId, imageType) {
     
     try {
       alert('Gemini で教育用の図を生成中です...（15〜45秒かかります）')
-      const cd = window.currentCardData || {}
+      const rawCd = window.currentCardData || {}
+      const cd = rawCd.card || rawCd
       const res = await axios.post('/api/ai/generate-image', {
         prompt: genPrompt.trim(),
         card_id: cardId,
-        problem_text: cd.problem_content || cd.problem_text || '',
-        card_title: cd.card_title || '',
+        problem_text: cd.problem_content || cd.problem_text || cd.content || '',
+        card_title: cd.card_title || cd.title || '',
         unit_name: cd.unit_name || '',
         subject: cd.subject || '',
-        grade: cd.grade_level || '',
+        grade: cd.grade_level || cd.grade || '',
         style: 'educational diagram'
       }, { timeout: 90000 })
       
@@ -31269,7 +31352,26 @@ async function executeAiRegenerate(cardId) {
       grade: cardData.grade_level || ''
     }, { timeout: 90000 })
     
-    if (res.data.success && res.data.image_url) {
+    if (res.data.success && res.data.type === 'html' && res.data.html_content) {
+      // HTML図解が返された場合
+      const container = document.getElementById('card-image-container-' + cardId) ||
+                        document.getElementById('image-placeholder-' + cardId)
+      if (container) {
+        container.innerHTML = `
+          <div class="bg-white rounded-lg shadow-md border-2 border-gray-200 p-4 overflow-auto" style="max-height: 500px;">
+            ${res.data.html_content}
+          </div>
+          <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
+            <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
+              <i class="fas fa-check-circle mr-1"></i>${res.data.model || 'AI'}で生成（${((res.data.generation_time_ms || 0)/1000).toFixed(1)}秒）
+            </span>
+            <button onclick="openImageReplaceMenu(${cardId})" class="text-xs text-orange-500 hover:text-orange-700 underline font-bold">🔄 差し替え</button>
+          </div>
+        `
+      }
+      const overlay = document.getElementById('image-replace-overlay')
+      if (overlay) overlay.remove()
+    } else if (res.data.success && res.data.image_url) {
       // カードに保存
       try {
         await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
