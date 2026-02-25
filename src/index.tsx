@@ -9590,19 +9590,35 @@ app.post('/api/ai/generate-course', async (c) => {
       try {
         console.log(`🔄 コース生成試行 ${attempt}/${MAX_RETRIES}...`)
         
-      const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
+      // AbortControllerでタイムアウト制御（90秒）
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 90000)
+      
+      let response: Response
+      try {
+        response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
           maxOutputTokens: 32768,  // 16384 → 32768 に増加（gemini-2.5-pro は最大32K対応）
           topP: 0.9,
           topK: 20
         }
       })
     })
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+        if (fetchError.name === 'AbortError') {
+          console.error(`❌ Gemini API タイムアウト（90秒）: 試行 ${attempt}/${MAX_RETRIES}`)
+          throw new Error('Gemini API接続がタイムアウトしました（90秒）。再試行します。')
+        }
+        throw fetchError
+      }
+      clearTimeout(timeoutId)
     
     if (!response.ok) {
       const errorText = await response.text()
@@ -9613,6 +9629,10 @@ app.post('/api/ai/generate-course', async (c) => {
         errorBody: errorText.substring(0, 500),
         headers: Object.fromEntries(response.headers.entries())
       })
+      // 429/5xx はリトライ可能
+      if (response.status === 429 || response.status >= 500) {
+        throw new Error(`Gemini API ${response.status}: ${errorText.substring(0, 200)}`)
+      }
       throw new Error(`Gemini API ${response.status}: ${errorText.substring(0, 200)}`)
     }
     
@@ -9782,9 +9802,9 @@ app.post('/api/ai/generate-course', async (c) => {
           throw attemptError
         }
         
-        // 再試行の前に待機（段階的バックオフ）
-        const delayMs = 2000 * attempt  // 2秒、4秒、6秒...
-        console.log(`⏳ ${delayMs}ms 待機してリトライします...`)
+        // 再試行の前に待機（段階的バックオフ — レート制限対策で長めに）
+        const delayMs = 5000 * attempt  // 5秒、10秒、15秒...
+        console.log(`⏳ ${delayMs}ms 待機してリトライします...（段階的バックオフ）`)
         await new Promise(resolve => setTimeout(resolve, delayMs))
       }
     }

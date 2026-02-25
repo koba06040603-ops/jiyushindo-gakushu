@@ -18482,38 +18482,68 @@ async function executeUnitGeneration(params) {
     
     const generatedCourses = []
     
-    // 各コースを順番に生成
+    // 各コースを順番に生成（API レート制限対策: コース間にディレイを挿入）
     for (let i = 0; i < courseDefinitions.length; i++) {
       const courseDef = courseDefinitions[i]
       const progressPercent = 25 + (i * 25)  // 25%, 50%, 75%
       
-      console.log(`📝 ステップ${i+2}/4: ${courseDef.info.name}を生成中...`)
-      updateGenerationProgress(`${courseDef.info.name}の学習カードを生成しています...`, progressPercent)
-      
-      try {
-        const courseResponse = await axios.post('/api/ai/generate-course', {
-          grade,
-          subject,
-          textbook,
-          unitName,
-          unitGoal,
-          courseLevel: courseDef.level,
-          courseInfo: courseDef.info,
-          customization
-        })
-        
-        if (courseResponse.data.error) {
-          console.error(`❌ ${courseDef.info.name}の生成エラー:`, courseResponse.data.error)
-          throw new Error(`${courseDef.info.name}の生成に失敗しました`)
-        }
-        
-        generatedCourses.push(courseResponse.data.course)
-        console.log(`✅ ${courseDef.info.name}の生成完了（${courseResponse.data.course.cards.length}枚）`)
-        
-      } catch (courseError) {
-        console.error(`❌ ${courseDef.info.name}の生成中にエラー:`, courseError)
-        throw new Error(`${courseDef.info.name}の生成に失敗しました: ${courseError.message}`)
+      // 2番目以降のコース生成前に3秒間のディレイを挿入（Gemini APIレート制限対策）
+      if (i > 0) {
+        console.log(`⏳ APIレート制限対策: 3秒間待機中...`)
+        updateGenerationProgress(`次のコース生成まで少しお待ちください...`, progressPercent - 5)
+        await new Promise(resolve => setTimeout(resolve, 3000))
       }
+      
+      console.log(`📝 ステップ${i+2}/4: ${courseDef.info.name}を生成中...`)
+      updateGenerationProgress(`${courseDef.info.name}の学習カードを生成しています...（約30〜60秒）`, progressPercent)
+      
+      // 最大2回リトライ（フロントエンド側）
+      let courseResponse = null
+      let lastError = null
+      for (let retry = 0; retry < 3; retry++) {
+        try {
+          if (retry > 0) {
+            console.log(`🔄 ${courseDef.info.name} リトライ ${retry}/2...`)
+            updateGenerationProgress(`${courseDef.info.name}を再生成しています... (リトライ ${retry}/2)`, progressPercent)
+            // リトライ前に5秒待機（レート制限回避）
+            await new Promise(resolve => setTimeout(resolve, 5000))
+          }
+          
+          courseResponse = await axios.post('/api/ai/generate-course', {
+            grade,
+            subject,
+            textbook,
+            unitName,
+            unitGoal,
+            courseLevel: courseDef.level,
+            courseInfo: courseDef.info,
+            customization
+          }, { timeout: 120000 })  // 120秒タイムアウト
+          
+          if (courseResponse.data.error) {
+            console.error(`❌ ${courseDef.info.name}の生成エラー:`, courseResponse.data.error)
+            lastError = new Error(`${courseDef.info.name}の生成に失敗しました: ${courseResponse.data.error}`)
+            courseResponse = null
+            continue
+          }
+          
+          // 成功
+          break
+          
+        } catch (retryError) {
+          console.error(`❌ ${courseDef.info.name} 試行${retry+1}失敗:`, retryError.message)
+          lastError = retryError
+          courseResponse = null
+        }
+      }
+      
+      if (!courseResponse) {
+        console.error(`❌ ${courseDef.info.name}の生成に全リトライ失敗:`, lastError)
+        throw new Error(`${courseDef.info.name}の生成に失敗しました: ${lastError?.message || 'Unknown error'}`)
+      }
+      
+      generatedCourses.push(courseResponse.data.course)
+      console.log(`✅ ${courseDef.info.name}の生成完了（${courseResponse.data.course.cards.length}枚）`)
     }
     
     // 生成されたコースをunitDataに統合（配列として直接設定）
@@ -48344,7 +48374,7 @@ async function generatePersonalizedCourse(studentId, curriculumId) {
     const response = await axios.post('/api/teacher/generate-personalized-course', {
       student_id: studentId,
       curriculum_id: curriculumId
-    })
+    }, { timeout: 120000 })
     
     hideLoading()
     
