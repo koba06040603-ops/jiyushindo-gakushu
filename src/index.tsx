@@ -8157,7 +8157,7 @@ app.get('/guide/:curriculumId', async (c) => {
     html += '<div class="help-bar no-print">';
     html += '<button class="help-btn" style="background:#DBEAFE;color:#1E40AF;" onclick="toggleAITeacher(' + currentPage + ')"><i class="fas fa-robot"></i>AI先生</button>';
     html += '<button class="help-btn" style="background:#DCFCE7;color:#166534;" onclick="toggleHints(' + currentPage + ')"><i class="fas fa-lightbulb"></i>ヒント</button>';
-    html += '<button class="help-btn" style="background:#FEF3C7;color:#92400E;" onclick="speakGuideText(document.querySelector(\\'.problem-box\\'))" data-text="' + (c.problem_text||'').replace(/"/g,'&quot;').substring(0,300) + '"><i class="fas fa-volume-up"></i>読み上げ</button>';
+    html += '<button class="help-btn" style="background:#FEF3C7;color:#92400E;" onclick="speakGuideText(document.querySelector(\\x27.problem-box\\x27))" data-text="' + (c.problem_text||'').replace(/"/g,'&quot;').substring(0,300) + '"><i class="fas fa-volume-up"></i>読み上げ</button>';
     html += '<button class="help-btn" style="background:#FCE7F3;color:#BE185D;" onclick="callTeacherGuide()"><i class="fas fa-chalkboard-teacher"></i>先生ヘルプ</button>';
     html += '<button class="help-btn" style="background:#F3E8FF;color:#6D28D9;" onclick="askFriendGuide()"><i class="fas fa-user-friends"></i>友達に聞く</button>';
     html += '</div>';
@@ -8182,7 +8182,7 @@ app.get('/guide/:curriculumId', async (c) => {
     html += '<div id="ai-chat-' + currentPage + '" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;margin-bottom:8px;">';
     html += '<div class="ai-chat-msg ai-msg">こんにちは！この問題についてわからないことがあったら聞いてね。</div>';
     html += '</div>';
-    html += '<div style="display:flex;gap:6px;"><input type="text" id="ai-input-' + currentPage + '" placeholder="質問を入力..." style="flex:1;border:2px solid #C7D2FE;border-radius:10px;padding:8px 12px;font-size:0.9rem;outline:none;" onkeydown="if(event.key===\'Enter\')sendAIMessage(' + currentPage + ')">';
+    html += '<div style="display:flex;gap:6px;"><input type="text" id="ai-input-' + currentPage + '" placeholder="質問を入力..." style="flex:1;border:2px solid #C7D2FE;border-radius:10px;padding:8px 12px;font-size:0.9rem;outline:none;" onkeydown="if(event.key===\\x27Enter\\x27)sendAIMessage(' + currentPage + ')">';
     html += '<button onclick="sendAIMessage(' + currentPage + ')" style="background:#4F46E5;color:white;border:none;border-radius:10px;padding:8px 16px;font-weight:bold;cursor:pointer;"><i class="fas fa-paper-plane"></i></button></div>';
     html += '</div>';
 
@@ -8386,7 +8386,7 @@ app.get('/guide/:curriculumId', async (c) => {
         '<p style="font-size:1.5rem;font-weight:900;color:#059669;margin:8px 0;">正解！すごい！</p>' +
         '<p style="font-size:0.9rem;color:#10B981;">よくできました！</p>' +
         '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">' +
-        (currentPage < totalPages - 1 ? '<button onclick="navigateCard(1)" style="background:#4F46E5;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:1rem;"><i class="fas fa-arrow-right" style="margin-right:6px;"></i>次のカードへ</button>' : '<button onclick="alert(\'🎉 すべて完了！\')" style="background:#10B981;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-flag-checkered" style="margin-right:6px;"></i>全部できた！</button>') +
+        (currentPage < totalPages - 1 ? '<button onclick="navigateCard(1)" style="background:#4F46E5;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:1rem;"><i class="fas fa-arrow-right" style="margin-right:6px;"></i>次のカードへ</button>' : '<button onclick="alert(\\x27🎉 すべて完了！\\x27)" style="background:#10B981;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-flag-checkered" style="margin-right:6px;"></i>全部できた！</button>') +
         '</div></div>';
     } else {
       // 不正解音
@@ -8404,7 +8404,7 @@ app.get('/guide/:curriculumId', async (c) => {
         '<p style="font-size:1.2rem;font-weight:bold;color:#92400E;margin:8px 0;">もう少し！</p>' +
         '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:12px;">ヒントを見て、もう一度考えてみよう。</p>' +
         '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
-        '<button onclick="document.getElementById(\'grade-result-' + page + '\').style.display=\'none\';document.getElementById(\'answer-' + page + '\').value=\\'\\';document.getElementById(\'answer-' + page + '\').focus();" style="background:#F59E0B;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-redo" style="margin-right:6px;"></i>もう一度</button>' +
+        '<button onclick="document.getElementById(\\x27grade-result-' + page + '\\x27).style.display=\\x27none\\x27;document.getElementById(\\x27answer-' + page + '\\x27).value=\\x27\\x27;document.getElementById(\\x27answer-' + page + '\\x27).focus();" style="background:#F59E0B;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-redo" style="margin-right:6px;"></i>もう一度</button>' +
         '<button onclick="toggleHints(' + page + ')" style="background:#8B5CF6;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-lightbulb" style="margin-right:6px;"></i>ヒントを見る</button>' +
         '</div></div>';
     }
@@ -8447,7 +8447,7 @@ app.get('/guide/:curriculumId', async (c) => {
     } else if (/時計|なんじ|とけい/.test(t)) {
       renderClockWidget(container);
     } else {
-      container.innerHTML = '<div style="padding:12px;text-align:center;"><button onclick="this.classList.toggle(\\'active\\');this.style.background=this.classList.contains(\\'active\\')?\\' #10B981\\':\\'#E5E7EB\\';this.style.color=this.classList.contains(\\'active\\')?\\' white\\':\\'#374151\\';" style="background:#E5E7EB;color:#374151;border:none;padding:10px 20px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:0.9rem;transition:all 0.2s;"><i class="fas fa-check" style="margin-right:6px;"></i>やってみた！</button></div>';
+      container.innerHTML = '<div style="padding:12px;text-align:center;"><button onclick="this.classList.toggle(\\x27active\\x27);this.style.background=this.classList.contains(\\x27active\\x27)?\\x27#10B981\\x27:\\x27#E5E7EB\\x27;this.style.color=this.classList.contains(\\x27active\\x27)?\\x27white\\x27:\\x27#374151\\x27;" style="background:#E5E7EB;color:#374151;border:none;padding:10px 20px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:0.9rem;transition:all 0.2s;"><i class="fas fa-check" style="margin-right:6px;"></i>やってみた！</button></div>';
     }
   }
 
@@ -8509,10 +8509,10 @@ app.get('/guide/:curriculumId', async (c) => {
       '<p style="font-size:0.85rem;font-weight:bold;color:#92400E;margin-bottom:8px;">ブロックをタップして数えよう</p>' +
       '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">' +
       '<div><p style="font-size:0.75rem;color:#DC2626;font-weight:bold;">赤 (' + redCount + ')</p><div style="display:flex;flex-wrap:wrap;gap:3px;max-width:150px;">' +
-      Array.from({length:Math.min(redCount,30)},function(){return '<div onclick="this.style.opacity=this.style.opacity===\\'0.3\\'?\\'1\\':\\'0.3\\'" style="width:20px;height:20px;border-radius:4px;background:#EF4444;cursor:pointer;transition:opacity 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></div>';}).join('') +
+      Array.from({length:Math.min(redCount,30)},function(){return '<div onclick="this.style.opacity=this.style.opacity===\\x270.3\\x27?\\x271\\x27:\\x270.3\\x27" style="width:20px;height:20px;border-radius:4px;background:#EF4444;cursor:pointer;transition:opacity 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></div>';}).join('') +
       '</div></div>' +
       '<div><p style="font-size:0.75rem;color:#2563EB;font-weight:bold;">青 (' + blueCount + ')</p><div style="display:flex;flex-wrap:wrap;gap:3px;max-width:150px;">' +
-      Array.from({length:Math.min(blueCount,30)},function(){return '<div onclick="this.style.opacity=this.style.opacity===\\'0.3\\'?\\'1\\':\\'0.3\\'" style="width:20px;height:20px;border-radius:4px;background:#3B82F6;cursor:pointer;transition:opacity 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></div>';}).join('') +
+      Array.from({length:Math.min(blueCount,30)},function(){return '<div onclick="this.style.opacity=this.style.opacity===\\x270.3\\x27?\\x271\\x27:\\x270.3\\x27" style="width:20px;height:20px;border-radius:4px;background:#3B82F6;cursor:pointer;transition:opacity 0.2s;box-shadow:0 1px 2px rgba(0,0,0,0.15);"></div>';}).join('') +
       '</div></div></div></div>';
   }
 
