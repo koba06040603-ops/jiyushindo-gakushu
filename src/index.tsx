@@ -9567,13 +9567,10 @@ app.post('/api/ai/generate-course', async (c) => {
 7. 問題の難易度は教科書の目標水準（学習指導要領）に合わせること
 8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること`
 
-    // 【最新】Gemini 2.5 Flash を使用（最も高速・安定）
-    const modelName = 'gemini-3-flash-preview'  // 最新の Gemini 2.5 Flash
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
+    // 【修正】gemini-2.0-flash を優先（高速・安定・思考トークンなし）
+    // gemini-3-flash-preview は思考トークンにより大量生成で90秒超タイムアウトが頻発するため
+    const models = ['gemini-2.0-flash', 'gemini-3-flash-preview']
     
-    console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
-    
-    console.log(`📡 ${modelName} APIを呼び出します（コース生成用）...`)
     console.log(`📋 コース情報:`, {
       コース名: courseInfo.name,
       レベル: courseLevel,
@@ -9583,38 +9580,46 @@ app.post('/api/ai/generate-course', async (c) => {
     })
     
     let courseData = null
-    const MAX_RETRIES = 3  // 【新規】最大再試行回数
+    const MAX_RETRIES = 2  // 最大再試行回数（2回に削減 — 合計タイムアウト防止）
     
-    // 【新規】再試行ロジック
+    // 再試行ロジック（モデルフォールバック付き）
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        console.log(`🔄 コース生成試行 ${attempt}/${MAX_RETRIES}...`)
+        const modelName = models[Math.min(attempt - 1, models.length - 1)]
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
+        console.log(`🔄 コース生成試行 ${attempt}/${MAX_RETRIES} (${modelName})...`)
         
-      // AbortControllerでタイムアウト制御（90秒）
+      // AbortControllerでタイムアウト制御（60秒 — wrangler 90秒制限に余裕を持たせる）
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 90000)
+      const timeoutId = setTimeout(() => controller.abort(), 60000)
       
       let response: Response
       try {
+        // gemini-3-flash-preview の場合は思考トークンを無効化（速度改善のため）
+        const genConfig: any = {
+          temperature: 0.2,
+          maxOutputTokens: 16384,
+          topP: 0.9,
+          topK: 20
+        }
+        if (modelName.includes('gemini-3') || modelName.includes('gemini-2.5')) {
+          genConfig.thinkingConfig = { thinkingBudget: 0 }
+        }
+        
         response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-          maxOutputTokens: 32768,  // 16384 → 32768 に増加（gemini-2.5-pro は最大32K対応）
-          topP: 0.9,
-          topK: 20
-        }
+          generationConfig: genConfig
       })
     })
       } catch (fetchError: any) {
         clearTimeout(timeoutId)
         if (fetchError.name === 'AbortError') {
-          console.error(`❌ Gemini API タイムアウト（90秒）: 試行 ${attempt}/${MAX_RETRIES}`)
-          throw new Error('Gemini API接続がタイムアウトしました（90秒）。再試行します。')
+          console.error(`❌ Gemini API タイムアウト（60秒）: 試行 ${attempt}/${MAX_RETRIES} (${modelName})`)
+          throw new Error(`Gemini API接続がタイムアウトしました（60秒）。モデル: ${modelName}`)
         }
         throw fetchError
       }
