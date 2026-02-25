@@ -5279,9 +5279,21 @@ async function selectCourse(courseId) {
     
     state.selectedCourse = courseId
     
+    // カード一覧をグローバルに保存（ページネーション用）
+    window._courseCardsList = cards.map(c => c.card_id || c.id).filter(Boolean)
+    window._courseCardsData = cards
+    console.log('📚 コースカード一覧保存:', window._courseCardsList.length, '枚')
+    
     // 学習セッションを開始（初回のみ）
     if (!learningSession.sessionId) {
       await startLearningSession(state.selectedCurriculum?.id)
+    }
+
+    // ★ 1ページ目のカードを直接表示（カード一覧をスキップして1枚ずつ進行）
+    if (cards.length > 0) {
+      const firstCardId = cards[0].card_id || cards[0].id
+      loadCardPage(firstCardId)
+      return
     }
 
     const app = document.getElementById('app')
@@ -5457,6 +5469,12 @@ async function startCourseStudy(curriculumId, courseId) {
     // state を更新
     state.selectedCurriculum = curriculum
     state.courses = courses
+    state.selectedCourse = courseId
+    
+    // カード一覧をグローバルに保存（ページネーション用）
+    window._courseCardsList = selectedCourse.cards.map(c => c.card_id || c.id).filter(Boolean)
+    window._courseCardsData = selectedCourse.cards
+    console.log('📚 コースカード一覧保存:', window._courseCardsList.length, '枚')
     
     // 最初のカードを表示
     const firstCard = selectedCourse.cards[0]
@@ -5557,15 +5575,44 @@ async function loadCardPage(cardId) {
         }
       </style>
       <div class="container mx-auto px-4 py-8">
+        <!-- ページネーションナビ（上部） -->
+        ${(() => {
+          const cardsList = window._courseCardsList || []
+          const currentIdx = cardsList.indexOf(card.card_id || card.id)
+          const total = cardsList.length || Math.max(card.card_number || 1, 1)
+          const num = currentIdx >= 0 ? currentIdx + 1 : (card.card_number || 1)
+          const prevId = currentIdx > 0 ? cardsList[currentIdx - 1] : null
+          const nextId = currentIdx >= 0 && currentIdx < cardsList.length - 1 ? cardsList[currentIdx + 1] : null
+          return `
+          <div class="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl shadow-lg p-4 mb-4 text-white">
+            <div class="flex items-center justify-between">
+              <button onclick="${prevId ? 'loadCardPage(' + prevId + ')' : 'loadGuidePage(' + (state.selectedCurriculum?.id || 0) + ')'}" 
+                      class="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition font-bold text-sm">
+                <i class="fas fa-chevron-left"></i>
+                ${prevId ? '前のカード' : 'てびきに戻る'}
+              </button>
+              <div class="text-center">
+                <div class="flex items-center gap-2 justify-center">
+                  ${cardsList.map((_, i) => '<div class="w-3 h-3 rounded-full ' + (i === currentIdx ? 'bg-white shadow-lg scale-125' : 'bg-white bg-opacity-40') + ' transition-all"></div>').join('')}
+                </div>
+                <p class="text-xs mt-1 opacity-90">${num} / ${total} まいめ</p>
+              </div>
+              <button onclick="${nextId ? 'loadCardPage(' + nextId + ')' : ''}" 
+                      class="flex items-center gap-2 ${nextId ? 'bg-white bg-opacity-20 hover:bg-opacity-30' : 'bg-white bg-opacity-10 cursor-not-allowed'} px-4 py-2 rounded-lg transition font-bold text-sm"
+                      ${nextId ? '' : 'disabled'}>
+                ${nextId ? '次のカード' : '最後のカード'}
+                <i class="fas fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>`
+        })()}
+
         <!-- ヘッダー -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <button onclick="selectCourse(${state.selectedCourse})" class="text-indigo-600 hover:text-indigo-800 mb-4">
-            <i class="fas fa-arrow-left mr-2"></i>学習カード一覧に戻る
-          </button>
           <div class="flex items-center justify-between">
             <div>
               <h1 class="text-3xl font-bold text-indigo-600 mb-2">
-                学習カード ${card.card_number}
+                <i class="fas fa-bookmark mr-2"></i>カード ${card.card_number}
               </h1>
               <h2 class="card-title text-gray-800">${formatText(card.card_title)}</h2>
               <p class="text-sm text-gray-500 mt-1"><i class="fas fa-book mr-1"></i>${state.selectedCurriculum?.textbook_company || ''} ${state.selectedCurriculum?.grade || ''} ${state.selectedCurriculum?.subject || ''} ― ${state.selectedCurriculum?.unit_name || ''}</p>
@@ -5660,21 +5707,24 @@ async function loadCardPage(cardId) {
             ` : ''}
 
             <!-- 問題 -->
-            <div class="bg-white rounded-lg shadow-lg p-6">
-              <h3 class="card-heading font-bold text-gray-800 mb-4">
-                <i class="fas fa-pencil-alt mr-2 text-indigo-600"></i>問題
-              </h3>
+            <div class="bg-white rounded-xl shadow-xl p-6 border-2 border-indigo-200 relative overflow-hidden">
+              <!-- 問題マーク大型バッジ -->
+              <div class="absolute -top-1 -left-1 bg-gradient-to-br from-red-500 to-pink-600 text-white px-6 py-2 rounded-br-2xl shadow-lg z-10">
+                <span class="text-lg font-black tracking-wider"><i class="fas fa-pencil-alt mr-2"></i>もんだい</span>
+              </div>
+              <div class="h-8"></div>
+              
               ${card.real_world_context ? `
-                <div class="bg-indigo-50 rounded-lg p-3 mb-4 flex items-start">
-                  <i class="fas fa-globe mr-2 text-indigo-600 mt-1"></i>
-                  <p class="text-sm text-indigo-800">${card.real_world_context}</p>
+                <div class="bg-indigo-50 rounded-xl p-4 mb-4 flex items-start border border-indigo-200">
+                  <i class="fas fa-globe mr-2 text-indigo-600 mt-1 text-lg"></i>
+                  <p class="text-base text-indigo-800">${card.real_world_context}</p>
                 </div>
               ` : ''}
               
-              <!-- もんだい：問題文（problem_textを優先、なければproblem_contentのパース済みテキスト） -->
-              <div class="bg-pink-50 border-l-4 border-pink-400 rounded-lg p-5 mb-4">
-                <p class="text-sm font-bold text-pink-600 mb-2"><i class="fas fa-question-circle mr-1"></i>もんだい：</p>
-                <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans leading-relaxed text-lg">${formatText(card.problem_text || card.problem_content || card.problem_description || '')}</pre>
+              <!-- もんだい：大きく目立つ問題文 -->
+              <div class="bg-gradient-to-br from-yellow-50 via-orange-50 to-pink-50 border-4 border-orange-400 rounded-2xl p-6 mb-4 shadow-inner relative">
+                <div class="absolute top-2 right-2 bg-orange-400 text-white text-xs font-bold px-2 py-1 rounded-full"><i class="fas fa-question-circle mr-1"></i>よく読もう</div>
+                <pre class="card-content text-gray-900 whitespace-pre-wrap font-sans leading-loose font-bold" style="font-size: 1.4em;">${formatText(card.problem_text || card.problem_content || card.problem_description || '')}</pre>
               </div>
               
               <!-- 問題の説明（problem_descriptionがproblem_textと異なる場合） -->
@@ -5890,29 +5940,32 @@ async function loadCardPage(cardId) {
                 '</div>'
               })()}
               
-              <!-- 動画コンテンツ（YouTube / NHK for School） -->
+              <!-- 動画コンテンツ / 外部リンク（YouTube / NHK / Gemini等） -->
               ${(() => {
                 const vUrl = card.solution_video_url || ''
                 const ytRegex = new RegExp('(?:v=|youtu\\.be/)([^&?]+)')
                 const ytMatch = vUrl.match(ytRegex)
                 const ytId = ytMatch ? ytMatch[1] : ''
                 if (ytId) {
-                  return '<div class="mt-4 rounded-xl overflow-hidden border-2 border-gray-200 shadow-sm"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 p-2 bg-gray-50"><i class="fas fa-video mr-1"></i>学習動画：一時停止しながら考えてみよう</p></div>'
+                  return '<div class="mt-4 rounded-xl overflow-hidden border-2 border-gray-200 shadow-sm"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><div class="p-2 bg-gray-50 flex items-center justify-between"><p class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>学習動画：一時停止しながら考えてみよう</p><button onclick="deleteCardMedia(' + (card.card_id||card.id||0) + ')" class="text-xs text-red-500 hover:text-red-700"><i class="fas fa-trash mr-1"></i>削除</button></div></div>'
                 } else if (vUrl.includes('nhk.or.jp') || vUrl.includes('youtube.com/results')) {
-                  // NHK for School or YouTube検索: 検索リンクとして表示
                   const cardTitle = (card.card_title || card.unit_name || '').replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 20)
                   const nhkSearchUrl = 'https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent(cardTitle)
                   const ytSearchUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent('NHK for School ' + cardTitle)
-                  return '<div class="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-5 shadow-sm"><div class="flex items-center gap-3 mb-4"><span class="bg-blue-600 text-white text-sm font-bold px-4 py-1.5 rounded-full"><i class="fas fa-tv mr-1"></i>NHK for School</span><span class="text-base font-bold text-gray-800">関連する学習動画</span></div><div class="bg-white rounded-xl p-6 text-center border-2 border-blue-200"><i class="fas fa-play-circle text-5xl text-blue-500 mb-4 block"></i><p class="text-sm text-gray-700 mb-4">関連する学習動画を見て学習を深めましょう！</p><div class="flex flex-col sm:flex-row gap-3 justify-center"><a href="' + ytSearchUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"><i class="fab fa-youtube"></i>YouTubeで動画を探す</a><a href="' + nhkSearchUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div><p class="text-xs text-gray-400 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>ボタンを押すと新しいタブで動画を探せます</p></div>'
+                  return '<div class="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-5 shadow-sm"><div class="flex items-center gap-3 mb-4"><span class="bg-blue-600 text-white text-sm font-bold px-4 py-1.5 rounded-full"><i class="fas fa-tv mr-1"></i>NHK for School</span><span class="text-base font-bold text-gray-800">関連する学習動画</span></div><div class="bg-white rounded-xl p-6 text-center border-2 border-blue-200"><i class="fas fa-play-circle text-5xl text-blue-500 mb-4 block"></i><p class="text-sm text-gray-700 mb-4">関連する学習動画を見て学習を深めましょう！</p><div class="flex flex-col sm:flex-row gap-3 justify-center"><a href="' + ytSearchUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"><i class="fab fa-youtube"></i>YouTubeで動画を探す</a><a href="' + nhkSearchUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div></div>'
+                } else if (vUrl.includes('gemini.google.com')) {
+                  // Gemini共有リンク
+                  return '<div class="mt-4 bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-300 rounded-xl p-5 shadow-sm text-center"><div class="mb-3"><i class="fas fa-sparkles text-purple-500 text-4xl"></i></div><p class="text-sm font-bold text-purple-800 mb-3">Gemini共有リンク（問題を確認しよう）</p><a href="' + vUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-xl font-bold transition shadow-lg text-base"><i class="fas fa-external-link-alt"></i>Geminiを開いて問題を見る</a><div class="mt-3 flex items-center justify-center gap-2"><button onclick="deleteCardMedia(' + (card.card_id||card.id||0) + ')" class="text-xs text-red-500 hover:text-red-700"><i class="fas fa-trash mr-1"></i>削除</button></div></div>'
                 } else if (vUrl) {
-                  return '<div class="mt-4 bg-red-50 border-2 border-red-200 rounded-xl p-4"><a href="' + vUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-lg font-bold transition shadow-sm"><i class="fas fa-play-circle text-lg"></i>学習動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>'
+                  // その他のURL（一般的な外部リンク）
+                  return '<div class="mt-4 bg-gradient-to-br from-gray-50 to-blue-50 border-2 border-gray-300 rounded-xl p-4 shadow-sm text-center"><a href="' + vUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-bold transition shadow-sm"><i class="fas fa-external-link-alt text-lg"></i>参考資料を開く</a><div class="mt-2"><button onclick="deleteCardMedia(' + (card.card_id||card.id||0) + ')" class="text-xs text-red-500 hover:text-red-700"><i class="fas fa-trash mr-1"></i>削除</button></div></div>'
                 }
                 return ''
               })()}
               
               <!-- 回答欄 -->
-              <div class="mt-6">
-                <label class="block text-sm font-bold text-gray-700 mb-2">あなたの答えを書きましょう</label>
+              <div class="mt-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-2xl p-5">
+                <label class="block text-lg font-black text-blue-800 mb-3"><i class="fas fa-pen-fancy mr-2"></i>こたえを書こう！</label>
                 
                 <!-- タブ切り替え -->
                 <div class="flex gap-2 mb-2">
@@ -6021,22 +6074,28 @@ async function loadCardPage(cardId) {
                 <!-- 採点ボタン（目立つ） -->
                 <button onclick="gradeAnswer('${(card.correct_answer || card.answer || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}')" 
                         id="gradeBtn"
-                        class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 px-6 rounded-xl font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition shadow-lg">
-                  <i class="fas fa-check-double mr-2"></i>
+                        class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-5 px-6 rounded-2xl font-black text-xl hover:from-green-600 hover:to-emerald-700 transition shadow-xl border-2 border-green-400">
+                  <i class="fas fa-check-double mr-2 text-2xl"></i>
                   答え合わせをする
                 </button>
                 <!-- 採点結果表示エリア -->
                 <div id="gradeResult" class="hidden"></div>
                 
                 <div class="flex gap-3">
-                  <button onclick="saveProgress()" 
-                          class="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-lg font-bold hover:bg-indigo-700 transition text-sm">
-                    <i class="fas fa-save mr-1"></i>
-                    保存して次へ
-                  </button>
+                  ${(() => {
+                    const cardsList = window._courseCardsList || []
+                    const currentIdx = cardsList.indexOf(card.card_id || card.id)
+                    const nextId = currentIdx >= 0 && currentIdx < cardsList.length - 1 ? cardsList[currentIdx + 1] : null
+                    return `
+                  <button onclick="saveProgressAndNext(${nextId || 0})" 
+                          class="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-4 px-4 rounded-xl font-black hover:from-indigo-700 hover:to-blue-700 transition text-base shadow-lg">
+                    <i class="fas fa-arrow-right mr-2"></i>
+                    ${nextId ? '保存して次のカードへ' : '保存して終了'}
+                  </button>`
+                  })()}
                   <button onclick="showAnswer()" 
-                          class="flex-1 bg-gray-500 text-white py-3 px-4 rounded-lg font-bold hover:bg-gray-600 transition text-sm">
-                    <i class="fas fa-eye mr-1"></i>
+                          class="flex-1 bg-gray-500 text-white py-4 px-4 rounded-xl font-bold hover:bg-gray-600 transition text-base">
+                    <i class="fas fa-eye mr-2"></i>
                     解答を見る
                   </button>
                 </div>
@@ -6152,11 +6211,11 @@ async function loadCardPage(cardId) {
               </div>
             `}
 
-            <!-- AI先生エリア -->
-            <div id="aiTeacherArea" class="hidden bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
+            <!-- AI先生エリア（デフォルト表示） -->
+            <div id="aiTeacherArea" class="bg-gradient-to-b from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6 shadow-md">
               <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-bold text-blue-800">
-                  <i class="fas fa-robot mr-2"></i>AI先生
+                <h3 class="text-lg font-black text-blue-800">
+                  <i class="fas fa-robot mr-2 text-2xl"></i>AI先生にきいてみよう！
                 </h3>
                 <button onclick="toggleAutoVoice()" 
                         id="autoVoiceToggle"
@@ -6282,14 +6341,48 @@ async function loadCardPage(cardId) {
                 <i class="fas fa-chart-line mr-2"></i>あなたの進捗
               </h3>
               <div class="text-sm text-gray-600">
-                <p>カード ${card.card_number} / 6</p>
+                ${(() => {
+                  const cardsList = window._courseCardsList || []
+                  const currentIdx = cardsList.indexOf(card.card_id || card.id)
+                  const total = cardsList.length || 6
+                  const num = currentIdx >= 0 ? currentIdx + 1 : (card.card_number || 1)
+                  return `<p class="font-bold">カード ${num} / ${total}</p>
                 <div class="w-full bg-gray-200 rounded-full h-3 mt-2">
-                  <div class="bg-indigo-600 h-3 rounded-full" style="width: ${(card.card_number / 6) * 100}%"></div>
-                </div>
+                  <div class="bg-indigo-600 h-3 rounded-full transition-all" style="width: ${(num / total) * 100}%"></div>
+                </div>`
+                })()}
               </div>
             </div>
           </div>
         </div>
+        
+        <!-- 下部ページネーション（固定バー） -->
+        ${(() => {
+          const cardsList2 = window._courseCardsList || []
+          const currentIdx2 = cardsList2.indexOf(card.card_id || card.id)
+          const prevId2 = currentIdx2 > 0 ? cardsList2[currentIdx2 - 1] : null
+          const nextId2 = currentIdx2 >= 0 && currentIdx2 < cardsList2.length - 1 ? cardsList2[currentIdx2 + 1] : null
+          return `
+        <div class="mt-6 bg-white rounded-xl shadow-xl p-4 border-2 border-indigo-200 sticky bottom-4 z-40">
+          <div class="flex items-center justify-between">
+            <button onclick="${prevId2 ? 'loadCardPage(' + prevId2 + '); window.scrollTo(0,0);' : 'loadGuidePage(' + (state.selectedCurriculum?.id || 0) + ')'}" 
+                    class="flex items-center gap-2 ${prevId2 ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'} px-5 py-3 rounded-xl transition font-bold text-sm">
+              <i class="fas fa-chevron-left"></i>
+              ${prevId2 ? '前' : '戻る'}
+            </button>
+            <div class="flex items-center gap-1">
+              ${cardsList2.map((id, i) => '<button onclick="loadCardPage(' + id + '); window.scrollTo(0,0);" class="w-8 h-8 rounded-full text-xs font-bold ' + (i === currentIdx2 ? 'bg-indigo-600 text-white shadow-lg scale-110' : 'bg-gray-100 text-gray-600 hover:bg-indigo-100') + ' transition-all">' + (i + 1) + '</button>').join('')}
+            </div>
+            <button onclick="${nextId2 ? 'loadCardPage(' + nextId2 + '); window.scrollTo(0,0);' : ''}" 
+                    class="flex items-center gap-2 ${nextId2 ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} px-5 py-3 rounded-xl transition font-bold text-sm"
+                    ${nextId2 ? '' : 'disabled'}>
+              ${nextId2 ? '次' : '終了'}
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>`
+        })()}
+
       </div>
     `
 
@@ -6366,8 +6459,12 @@ function toggleHint(index) {
 // AI先生表示
 function showAITeacher() {
   const aiArea = document.getElementById('aiTeacherArea')
-  aiArea.classList.remove('hidden')
-  aiArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  if (aiArea) {
+    aiArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    // AI入力欄にフォーカス
+    const input = document.getElementById('aiQuestionInput')
+    if (input) setTimeout(() => input.focus(), 300)
+  }
   window.currentHelpType = 'ai'
   window.helpCount++
   
@@ -12479,8 +12576,14 @@ async function saveProgress(teacherCall = false) {
     
     if (!teacherCall) {
       alert('保存しました！次のカードに進みましょう。')
-      // 次のカードに進む（今は学習カード一覧に戻る）
-      selectCourse(state.selectedCourse)
+      // 次のカードに進む
+      const cardsList = window._courseCardsList || []
+      const currentIdx = cardsList.indexOf(state.selectedCard)
+      if (currentIdx >= 0 && currentIdx < cardsList.length - 1) {
+        loadCardPage(cardsList[currentIdx + 1])
+      } else {
+        selectCourse(state.selectedCourse)
+      }
     }
   } catch (error) {
     console.error('進捗保存エラー:', error)
@@ -12495,6 +12598,24 @@ async function saveProgress(teacherCall = false) {
     }
   }
 }
+
+// 保存して次のカードへ進む（ページネーション対応）
+async function saveProgressAndNext(nextCardId) {
+  try {
+    await saveProgress(true)
+  } catch (e) {
+    console.warn('保存エラー（続行）:', e)
+  }
+  if (nextCardId && nextCardId > 0) {
+    loadCardPage(nextCardId)
+  } else {
+    alert('全てのカードを完了しました！おつかれさまでした！')
+    if (state.selectedCurriculum?.id) {
+      loadGuidePage(state.selectedCurriculum.id)
+    }
+  }
+}
+window.saveProgressAndNext = saveProgressAndNext
 
 // グローバルスコープに関数を登録
 window.showHelpMenu = showHelpMenu
@@ -31295,7 +31416,7 @@ window.editCardImageUrl = editCardImageUrl
 // 画像URL貼り付けクイック挿入（教師向け）
 // ============================================
 async function quickPasteImageUrl(cardId) {
-  const url = prompt('画像のURLを貼り付けてください：\n\n例：\nhttps://example.com/image.png\nhttps://drive.google.com/...\n\n※ Google画像検索やWebサイトで右クリック→「画像のURLをコピー」で取得できます')
+  const url = prompt('URLを貼り付けてください：\n\n対応URL:\n・画像URL（png, jpg, gif, webp...）\n・YouTube動画URL\n・Gemini共有リンク\n・NHK for School リンク\n・Google Drive / Googleスライド\n・その他の外部リンク（参考資料として保存）\n\n例：\nhttps://gemini.google.com/share/d03081003278\nhttps://example.com/image.png')
   if (!url || !url.trim()) return
   
   const trimmedUrl = url.trim()
@@ -31313,33 +31434,84 @@ async function quickPasteImageUrl(cardId) {
       placeholder.innerHTML = `
         <div class="p-6 text-center">
           <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mb-3"></div>
-          <p class="text-blue-700 font-bold">画像を保存中...</p>
+          <p class="text-blue-700 font-bold">URLを保存中...</p>
         </div>
       `
     }
     
-    // APIで保存
-    await axios.put('/api/card/' + cardId, {
-      problem_image_url: trimmedUrl
-    })
+    // URLの種類を判定
+    const isImage = /\.(png|jpg|jpeg|gif|webp|svg|bmp|tiff?)(\?|$)/i.test(trimmedUrl)
+    const isYT = /youtube\.com|youtu\.be/i.test(trimmedUrl)
+    const isGemini = /gemini\.google\.com\/share/i.test(trimmedUrl)
+    const isNHK = /nhk\.or\.jp/i.test(trimmedUrl)
+    const isGDrive = /drive\.google\.com|docs\.google\.com|slides\.google\.com/i.test(trimmedUrl)
     
-    // プレースホルダーを画像に置き換え
+    // 画像URLの場合はproblem_image_urlに保存
+    if (isImage) {
+      await axios.put('/api/card/' + cardId, { problem_image_url: trimmedUrl })
+    } else {
+      // 非画像URL（Gemini、YouTube、NHK等）→ solution_video_url に保存
+      await axios.put('/api/card/' + cardId, { solution_video_url: trimmedUrl })
+    }
+    
+    // プレースホルダーを適切な表示に置き換え
     if (placeholder) {
-      placeholder.innerHTML = `
-        <div class="text-center">
-          <img src="${trimmedUrl}" alt="問題の図" 
-               class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
-               onerror="handleImageLoadError(this, ${cardId})">
-          <div class="mt-2 flex items-center justify-center gap-2">
-            <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold"><i class="fas fa-check-circle mr-1"></i>保存しました</span>
-            <button onclick="quickPasteImageUrl(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline">変更</button>
-          </div>
-        </div>
-      `
+      if (isImage) {
+        placeholder.innerHTML = `
+          <div class="text-center">
+            <img src="${trimmedUrl}" alt="問題の図" 
+                 class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
+                 onerror="handleImageLoadError(this, ${cardId})">
+            <div class="mt-2 flex items-center justify-center gap-2">
+              <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold"><i class="fas fa-check-circle mr-1"></i>保存しました</span>
+              <button onclick="quickPasteImageUrl(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline">変更</button>
+              <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
+            </div>
+          </div>`
+      } else if (isYT) {
+        const ytMatch = trimmedUrl.match(/(?:v=|youtu\.be\/)([^&?]+)/)
+        const ytId = ytMatch ? ytMatch[1] : ''
+        if (ytId) {
+          placeholder.innerHTML = `
+            <div class="text-center">
+              <div class="relative rounded-lg overflow-hidden shadow-md border-2 border-gray-200 mx-auto" style="max-width:560px;">
+                <iframe src="https://www.youtube.com/embed/${ytId}" class="w-full" style="height:315px;" frameborder="0" allowfullscreen></iframe>
+              </div>
+              <div class="mt-2 flex items-center justify-center gap-2">
+                <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold"><i class="fas fa-check-circle mr-1"></i>YouTube動画を保存</span>
+                <button onclick="quickPasteImageUrl(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline">変更</button>
+                <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
+              </div>
+            </div>`
+        }
+      } else {
+        // Gemini、NHK、Google Drive等 → iframeまたはリンクボタンで表示
+        const label = isGemini ? 'Gemini共有リンク' : isNHK ? 'NHK for School' : isGDrive ? 'Google資料' : '参考リンク'
+        const icon = isGemini ? 'fa-sparkles' : isNHK ? 'fa-tv' : isGDrive ? 'fa-file-alt' : 'fa-link'
+        const color = isGemini ? 'purple' : isNHK ? 'blue' : isGDrive ? 'green' : 'gray'
+        placeholder.innerHTML = `
+          <div class="bg-gradient-to-br from-${color}-50 to-${color}-100 border-2 border-${color}-300 rounded-xl p-5 text-center shadow-sm">
+            <div class="mb-3">
+              <i class="fas ${icon} text-${color}-500 text-4xl"></i>
+            </div>
+            <p class="text-sm font-bold text-${color}-800 mb-2">${label}</p>
+            <a href="${trimmedUrl}" target="_blank" rel="noopener" 
+               class="inline-flex items-center gap-2 bg-${color}-600 hover:bg-${color}-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg text-sm">
+              <i class="fas fa-external-link-alt"></i>
+              リンクを開いて確認する
+            </a>
+            <div class="mt-3 flex items-center justify-center gap-2">
+              <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold"><i class="fas fa-check-circle mr-1"></i>保存しました</span>
+              <button onclick="quickPasteImageUrl(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline">変更</button>
+              <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">生徒はこのリンクから問題を確認できます</p>
+          </div>`
+      }
     }
   } catch (error) {
-    console.error('画像URL保存エラー:', error)
-    alert('画像URLの保存に失敗しました。もう一度試してください。')
+    console.error('URL保存エラー:', error)
+    alert('URLの保存に失敗しました。もう一度試してください。')
     // プレースホルダーを元に戻す
     if (typeof showCard === 'function') {
       showCard(state.currentCardIndex || 0)
@@ -31347,6 +31519,23 @@ async function quickPasteImageUrl(cardId) {
   }
 }
 window.quickPasteImageUrl = quickPasteImageUrl
+
+// カードメディア削除（図・動画・URL）
+async function deleteCardMedia(cardId) {
+  if (!confirm('この図/メディアを削除しますか？')) return
+  try {
+    await axios.put('/api/card/' + cardId, { 
+      problem_image_url: '', 
+      solution_video_url: '' 
+    })
+    // カードを再読み込み
+    loadCardPage(cardId)
+  } catch (error) {
+    console.error('メディア削除エラー:', error)
+    alert('削除に失敗しました')
+  }
+}
+window.deleteCardMedia = deleteCardMedia
 
 // ============================================
 // ファイル直接アップロード（JPG/PNG/PDF ドラッグ&ドロップ・ファイル選択・クリップボード対応）
@@ -36807,6 +36996,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
         <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
           <p class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>${description || 'YouTube動画'}</p>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
+          <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
         </div>
       </div>`
   }
@@ -36822,6 +37012,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
         <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
           <p class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>${description || '動画'}</p>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
+          <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
         </div>
       </div>`
   }
@@ -36836,14 +37027,19 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
         <div class="mb-3">
           <i class="fas fa-music text-green-500 text-4xl"></i>
         </div>
-        <audio controls class="mx-auto w-full" style="max-width:400px;" preload="auto">
+        <p class="text-sm font-bold text-green-800 mb-2"><i class="fas fa-headphones mr-1"></i>音声を聞いてみよう</p>
+        <audio controls class="mx-auto w-full" style="max-width:400px;" preload="auto" controlslist="nodownload">
           <source src="${url}" type="${audioMime}">
+          <source src="${url}" type="audio/mpeg">
+          <source src="${url}" type="audio/mp4">
           <source src="${url}">
           音声を再生できません
         </audio>
+        <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>再生ボタンを押して音声を聞きましょう</p>
         <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
           <p class="text-xs text-gray-500"><i class="fas fa-music mr-1"></i>${description || '音声'}</p>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
+          <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
         </div>
       </div>`
   }
@@ -36864,8 +37060,9 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
       </div>
       <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
         <p class="text-xs text-gray-500"><i class="fas fa-image mr-1"></i>${description || '問題の図'}</p>
-        ${showEdit ? `<button onclick="event.stopPropagation(); openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-crop-alt mr-1"></i>編集・トリミング</button>` : ''}
+        ${showEdit ? `<button onclick="event.stopPropagation(); openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-crop-alt mr-1"></i>編集</button>` : ''}
         ${showReplace ? `<button onclick="event.stopPropagation(); replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
+        <button onclick="event.stopPropagation(); deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
       </div>
     </div>`
 }
@@ -49798,8 +49995,26 @@ async function startPersonalizedCourseLearning(courseId, curriculumId) {
       }
     }
     
-    // コースを選択して学習カード一覧を表示
-    selectCourse(courseId)
+    // カード一覧を取得してグローバルに保存（ページネーション用）
+    try {
+      const cardsRes = await axios.get('/api/courses/' + courseId + '/cards')
+      const cards = cardsRes.data || []
+      window._courseCardsList = cards.map(c => c.card_id || c.id).filter(Boolean)
+      window._courseCardsData = cards
+      console.log('📚 個別コースカード保存:', window._courseCardsList.length, '枚')
+    } catch (e) {
+      console.warn('カード一覧取得失敗:', e)
+      window._courseCardsList = []
+    }
+    
+    state.selectedCourse = courseId
+    
+    // 最初のカードを直接表示（1ページずつ表示）
+    if (window._courseCardsList && window._courseCardsList.length > 0) {
+      loadCardPage(window._courseCardsList[0])
+    } else {
+      selectCourse(courseId)
+    }
   } catch (err) {
     console.error('個別最適化コース学習開始エラー:', err)
     alert('学習の開始に失敗しました。ページを再読み込みしてください。')
