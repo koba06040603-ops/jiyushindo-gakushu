@@ -9567,9 +9567,9 @@ app.post('/api/ai/generate-course', async (c) => {
 7. 問題の難易度は教科書の目標水準（学習指導要領）に合わせること
 8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること`
 
-    // 【修正】gemini-2.0-flash を優先（高速・安定・思考トークンなし）
-    // gemini-3-flash-preview は思考トークンにより大量生成で90秒超タイムアウトが頻発するため
-    const models = ['gemini-2.0-flash', 'gemini-3-flash-preview']
+    // gemini-3-flash-preview をプライマリ（thinking有効で最速28秒、出力品質も最高）
+    // フォールバック: gemini-2.0-flash（thinking不要、同等速度）
+    const models = ['gemini-3-flash-preview', 'gemini-2.0-flash']
     
     console.log(`📋 コース情報:`, {
       コース名: courseInfo.name,
@@ -9580,46 +9580,40 @@ app.post('/api/ai/generate-course', async (c) => {
     })
     
     let courseData = null
-    const MAX_RETRIES = 2  // 最大再試行回数（2回に削減 — 合計タイムアウト防止）
+    const MAX_RETRIES = 2
     
-    // 再試行ロジック（モデルフォールバック付き）
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const modelName = models[Math.min(attempt - 1, models.length - 1)]
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
         console.log(`🔄 コース生成試行 ${attempt}/${MAX_RETRIES} (${modelName})...`)
         
-      // AbortControllerでタイムアウト制御（60秒 — wrangler 90秒制限に余裕を持たせる）
+      // AbortControllerでタイムアウト制御（75秒 — ベンチマーク結果28-30秒に十分な余裕）
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 60000)
+      const timeoutId = setTimeout(() => controller.abort(), 75000)
       
       let response: Response
       try {
-        // gemini-3-flash-preview の場合は思考トークンを無効化（速度改善のため）
-        const genConfig: any = {
-          temperature: 0.2,
-          maxOutputTokens: 16384,
-          topP: 0.9,
-          topK: 20
-        }
-        if (modelName.includes('gemini-3') || modelName.includes('gemini-2.5')) {
-          genConfig.thinkingConfig = { thinkingBudget: 0 }
-        }
-        
+        // thinking有効のまま（ベンチマーク:thinking有効28秒 vs 無効51秒 — 有効の方が速い）
         response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: genConfig
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 16384,
+            topP: 0.9,
+            topK: 20
+          }
       })
     })
       } catch (fetchError: any) {
         clearTimeout(timeoutId)
         if (fetchError.name === 'AbortError') {
-          console.error(`❌ Gemini API タイムアウト（60秒）: 試行 ${attempt}/${MAX_RETRIES} (${modelName})`)
-          throw new Error(`Gemini API接続がタイムアウトしました（60秒）。モデル: ${modelName}`)
+          console.error(`❌ Gemini API タイムアウト（75秒）: 試行 ${attempt}/${MAX_RETRIES} (${modelName})`)
+          throw new Error(`Gemini API接続がタイムアウトしました（75秒）。モデル: ${modelName}`)
         }
         throw fetchError
       }
