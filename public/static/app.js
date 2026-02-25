@@ -5864,7 +5864,7 @@ async function loadCardPage(cardId) {
                     
                     <!-- メインアクションボタン -->
                     <div class="flex flex-col gap-3 max-w-sm mx-auto mb-4">
-                      <button onclick="generateImageForCard(${cardIdVal}, '${aiDesc.replace(/'/g, "").replace(/\n/g, ' ')}')"
+                      <button onclick="openPromptImageGenerate(${cardIdVal}, 'replace')"
                               class="group relative flex items-center justify-center gap-3 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 hover:from-purple-600 hover:via-pink-600 hover:to-rose-600 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 hover:-translate-y-0.5"
                               style="animation: pulse 2s infinite;">
                         <i class="fas fa-wand-magic-sparkles text-xl group-hover:animate-spin"></i>
@@ -8705,32 +8705,38 @@ window.updateFractionPreview = updateFractionPreview
 function renderPercentageVisual(container, card) {
   const problem = card.problem_text || ''
   const percents = (problem.match(/\d+%/g) || []).map(p => parseInt(p))
-  const val = percents[0] || 50
+  let val = percents[0] || 50
+  // 100分のXのパターンを検出
+  const bunMatch = problem.match(/(\d+)分の(\d+)/) || problem.match(/(\d+)個のうち(\d+)/)
+  if (bunMatch) val = Math.round(parseInt(bunMatch[2]) / parseInt(bunMatch[1]) * 100)
+
+  // ユニークID生成
+  const uid = 'pct-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)
 
   container.innerHTML = `
     <div class="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border-2 border-emerald-200">
       <div class="flex items-center gap-2 mb-3">
         <span class="bg-emerald-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-chart-pie mr-1"></i>みてわかる！割合</span>
       </div>
-      <div class="flex items-center gap-6 justify-center">
+      <div class="flex items-center gap-6 justify-center flex-wrap">
         <div class="relative" style="width:120px;height:120px">
           <svg viewBox="0 0 120 120" width="120" height="120">
             <circle cx="60" cy="60" r="50" fill="#e5e7eb" stroke="#9ca3af" stroke-width="1"/>
-            <circle cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="12"
+            <circle id="${uid}-circle" cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="12"
                     stroke-dasharray="${val * 3.14} ${314 - val * 3.14}"
                     transform="rotate(-90 60 60)" stroke-linecap="round"/>
-            <text x="60" y="65" text-anchor="middle" font-size="24" font-weight="bold" fill="#065f46">${val}%</text>
+            <text id="${uid}-text" x="60" y="65" text-anchor="middle" font-size="24" font-weight="bold" fill="#065f46">${val}%</text>
           </svg>
         </div>
         <div>
           <div class="bg-white rounded-lg p-3 border">
             <div class="w-40 bg-gray-200 rounded-full h-6 overflow-hidden">
-              <div class="bg-emerald-500 h-full rounded-full transition-all flex items-center justify-end pr-1" style="width:${val}%">
-                <span class="text-xs text-white font-bold">${val}%</span>
+              <div id="${uid}-bar" class="bg-emerald-500 h-full rounded-full transition-all flex items-center justify-end pr-1" style="width:${val}%">
+                <span id="${uid}-bartext" class="text-xs text-white font-bold">${val}%</span>
               </div>
             </div>
-            <p class="text-xs text-gray-600 mt-2">100個のうち <strong class="text-emerald-700">${val}個</strong></p>
-            <div class="flex flex-wrap gap-0.5 mt-1" style="max-width:200px">
+            <p class="text-xs text-gray-600 mt-2">100個のうち <strong id="${uid}-count" class="text-emerald-700">${val}個</strong></p>
+            <div id="${uid}-dots" class="flex flex-wrap gap-0.5 mt-1" style="max-width:200px">
               ${Array.from({length: 100}, (_, i) => 
                 '<div class="w-1.5 h-1.5 rounded-sm ' + (i < val ? 'bg-emerald-400' : 'bg-gray-200') + '"></div>'
               ).join('')}
@@ -8739,11 +8745,32 @@ function renderPercentageVisual(container, card) {
         </div>
       </div>
       <div class="mt-3">
-        <input type="range" min="0" max="100" value="${val}" class="w-full accent-emerald-500"
-               oninput="this.previousElementSibling || 0; const v=this.value; const p=this.closest('[class*=bg-gradient]'); if(p){p.querySelector('text').textContent=v+'%'; p.querySelector('[style*=width]').style.width=v+'%'; p.querySelector('[style*=width] span').textContent=v+'%'; p.querySelectorAll('.w-1\\.5').forEach((d,i)=>{d.className='w-1.5 h-1.5 rounded-sm '+(i<v?'bg-emerald-400':'bg-gray-200')}); const c=p.querySelector('circle[stroke=\\'#10b981\\']'); if(c){c.setAttribute('stroke-dasharray', v*3.14+' '+(314-v*3.14))}; TactileSounds.play('move')}">
+        <input type="range" min="0" max="100" value="${val}" class="w-full accent-emerald-500" data-uid="${uid}"
+               oninput="window._updatePercentWidget(this.dataset.uid, parseInt(this.value))">
         <p class="text-xs text-gray-500 text-center">スライドで割合を変えてみよう</p>
       </div>
     </div>`
+}
+
+// スライダー連動更新関数（グローバル）
+window._updatePercentWidget = function(uid, v) {
+  const circle = document.getElementById(uid + '-circle')
+  const text = document.getElementById(uid + '-text')
+  const bar = document.getElementById(uid + '-bar')
+  const bartext = document.getElementById(uid + '-bartext')
+  const count = document.getElementById(uid + '-count')
+  const dots = document.getElementById(uid + '-dots')
+  if (circle) circle.setAttribute('stroke-dasharray', (v * 3.14) + ' ' + (314 - v * 3.14))
+  if (text) text.textContent = v + '%'
+  if (bar) bar.style.width = v + '%'
+  if (bartext) bartext.textContent = v + '%'
+  if (count) count.textContent = v + '個'
+  if (dots) {
+    dots.innerHTML = Array.from({length: 100}, (_, i) =>
+      '<div class="w-1.5 h-1.5 rounded-sm ' + (i < v ? 'bg-emerald-400' : 'bg-gray-200') + '"></div>'
+    ).join('')
+  }
+  if (typeof TactileSounds !== 'undefined') TactileSounds.play('move')
 }
 
 // ========== かけ算ビジュアル ==========
@@ -12294,7 +12321,27 @@ async function gradeAnswer(correctAnswer) {
   const correctKeyValues = extractKeyValues(normalizedCorrect)
   const keyValuesMatch = correctKeyValues.length > 0 && correctKeyValues.every(v => normalizedStudent.includes(v))
   
-  const isCorrect = exactOrContains || allNumbersMatch || keyValuesMatch
+  const isCorrect = exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
+    // 追加判定: 人名・選択肢判定（「Aさん」「Bさん」など比較問題）
+    const personMatch = normalizedCorrect.match(/([abcABC][さくんちゃん]*|[ア-ン]+さん)/) 
+    if (personMatch && normalizedStudent.includes(personMatch[0])) return true
+    // 分数判定（X分のY = Y/X）
+    const fracs = normalizedCorrect.match(/\d+分の\d+|\d+\/\d+/g) || []
+    if (fracs.length > 0 && fracs.every(f => {
+      const normalized = f.replace(/(\d+)分の(\d+)/, '$2/$1')
+      return normalizedStudent.includes(normalized) || normalizedStudent.includes(f)
+    })) return true
+    // 小数判定
+    const decs = normalizedCorrect.match(/\d+\.\d+/g) || []
+    if (decs.length > 0 && decs.every(d => normalizedStudent.includes(d))) return true
+    // 主要キーワード一致（正解に含まれるキー名詞が半分以上回答に含まれる）
+    const coreKeywords = normalizedCorrect.replace(/[0-9.,:、。]/g, '').split(/\s+/).filter(w => w.length >= 2)
+    if (coreKeywords.length > 0) {
+      const matchCount = coreKeywords.filter(kw => normalizedStudent.includes(kw)).length
+      if (matchCount >= Math.ceil(coreKeywords.length * 0.4)) return true
+    }
+    return false
+  })()
   
   console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
   
@@ -49549,10 +49596,11 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                         const _gCardId = card.card_id || card.id || i
                         const _gCardIdErr = card.card_id || card.id || 0
                         const _gYtId = isYouTubeUrl(_gUrl)
-                        if (_gYtId) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><div class="relative rounded-lg overflow-hidden border mx-auto" style="max-width:400px;"><iframe src="https://www.youtube.com/embed/' + _gYtId + '" class="w-full" style="height:225px;" frameborder="0" allowfullscreen></iframe></div></div>'
-                        if (isVideoUrl(_gUrl)) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><video controls class="max-h-48 rounded border mx-auto" preload="metadata"><source src="' + _gUrl + '" type="video/mp4">動画を再生できません</video></div>'
-                        if (isAudioUrl(_gUrl)) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><div class="bg-green-50 border border-green-200 rounded-lg p-2 text-center"><i class="fas fa-music text-green-500 mb-1 block"></i><audio controls class="mx-auto" style="max-width:100%;"><source src="' + _gUrl + '" type="audio/mpeg"></audio></div></div>'
-                        return '<div class="mb-2" id="guide-img-' + _gCardId + '"><img src="' + _gUrl + '" class="max-h-48 rounded border mx-auto" onerror="handleImageLoadError(this,' + _gCardIdErr + ')"></div>'
+                        const _editBtns = '<div class="mt-1 flex items-center justify-center gap-2 flex-wrap"><button onclick="quickPasteImageUrl(' + _gCardIdErr + ')" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button><button onclick="deleteCardMedia(' + _gCardIdErr + ')" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button><button onclick="openPromptImageGenerate(' + _gCardIdErr + ', \'replace\')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-magic mr-1"></i>AI再生成</button></div>'
+                        if (_gYtId) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><div class="relative rounded-lg overflow-hidden border mx-auto" style="max-width:400px;"><iframe src="https://www.youtube.com/embed/' + _gYtId + '" class="w-full" style="height:225px;" frameborder="0" allowfullscreen></iframe></div>' + _editBtns + '</div>'
+                        if (isVideoUrl(_gUrl)) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><video controls class="max-h-48 rounded border mx-auto" preload="metadata"><source src="' + _gUrl + '" type="video/mp4">動画を再生できません</video>' + _editBtns + '</div>'
+                        if (isAudioUrl(_gUrl)) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><div class="bg-green-50 border border-green-200 rounded-lg p-2 text-center"><i class="fas fa-music text-green-500 mb-1 block"></i><audio controls class="mx-auto" style="max-width:100%;"><source src="' + _gUrl + '" type="audio/mpeg"><source src="' + _gUrl + '" type="audio/mp4"><source src="' + _gUrl + '" type="audio/wav"></audio></div>' + _editBtns + '</div>'
+                        return '<div class="mb-2" id="guide-img-' + _gCardId + '"><img src="' + _gUrl + '" class="max-h-48 rounded border mx-auto cursor-pointer hover:opacity-80 transition" onclick="replaceCardImage(' + _gCardIdErr + ')" onerror="handleImageLoadError(this,' + _gCardIdErr + ')">' + _editBtns + '</div>'
                       })() : (() => {
                         const cId = card.card_id || card.id || 0
                         const desc = (mm.image_description || card.card_title || card.unit_name || '').replace(/'/g, '').replace(/"/g, '').substring(0, 60)
