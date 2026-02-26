@@ -1045,7 +1045,23 @@ function getDifficultyLabel(level) {
     'advanced': 'はってん',
     'very_hard': 'とてもむずかしい'
   }
-  return labels[level] || level || 'ふつう'
+  return labels[level] || 'ふつう'
+}
+
+// カードタイプの日本語ラベル
+function getCardTypeLabel(type) {
+  const labels = {
+    'main': 'メイン',
+    'basic': 'きほん',
+    'standard': 'ふつう',
+    'advanced': 'はってん',
+    'review': 'ふりかえり',
+    'practice': 'れんしゅう',
+    'challenge': 'チャレンジ',
+    'introduction': 'どうにゅう',
+    'summary': 'まとめ'
+  }
+  return labels[type] || 'メイン'
 }
 
 // 学習プロファイル更新（バックグラウンド）
@@ -3955,8 +3971,8 @@ async function loadGuidePage(curriculumId) {
               </div>
             </div>
             ` : `
-            ${standardCourses.length === 0 ? `
-            <!-- コースが未生成：自動生成UIを表示 -->
+            ${standardCourses.length === 0 || standardCourses.reduce((sum, c) => sum + (c.cards?.length || 0), 0) === 0 ? `
+            <!-- コースが未生成 or カード0枚：自動生成UIを表示 -->
             <div class="mb-6">
               <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-8 border-2 border-purple-200 text-center">
                 <div class="mb-4">
@@ -15560,7 +15576,7 @@ async function loadCardManagementPage(courseId) {
                   card.card_type === 'advanced' ? 'bg-purple-100 text-purple-800' :
                   'bg-blue-100 text-blue-800'
                 }">
-                  ${card.card_type}
+                  ${getCardTypeLabel(card.card_type)}
                 </span>
               </div>
               
@@ -19642,7 +19658,7 @@ function showUnitPreview(unitData, modelUsed) {
                     <i class="fas fa-check-square mr-1"></i>選択式 ${index + 1}
                   </span>
                   <span class="text-xs text-gray-600">
-                    ${problem.difficulty_level || '標準'}
+                    ${getDifficultyLabel(problem.difficulty_level)}
                   </span>
                 </div>
                 <h3 class="font-bold text-gray-800 mb-2">${problem.problem_title}</h3>
@@ -22111,7 +22127,7 @@ function showTeacherOverview(unitData) {
                         <span class="bg-${course.color_code}-100 text-${course.color_code}-800 px-3 py-1 rounded-full text-sm font-bold">
                           カード ${card.card_number}
                         </span>
-                        <span class="text-sm text-gray-500">${card.card_type || 'main'}</span>
+                        <span class="text-sm text-gray-500">${getCardTypeLabel(card.card_type)}</span>
                       </div>
                       <h3 class="text-lg font-bold text-gray-800 mb-2">
                         ${card.card_title}
@@ -22631,7 +22647,7 @@ function showTeacherOverview(unitData) {
                   </h3>
                   <div class="flex items-center gap-2">
                     <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-                      難易度: ${problem.difficulty_level || '標準'}
+                      難易度: ${getDifficultyLabel(problem.difficulty_level)}
                     </span>
                     <button onclick="editTeacherOptionalProblem(${index})" 
                             class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded transition">
@@ -22870,11 +22886,11 @@ async function bulkEditField(fieldName) {
   
   let newValue
   if (fieldName === 'difficulty_level') {
-    newValue = prompt('難易度を選択してください:\n1: minimum (基礎)\n2: standard (標準)\n3: advanced (発展)')
+    newValue = prompt('難易度を選択してください:\n1: きほん\n2: ふつう\n3: はってん')
     const levels = { '1': 'minimum', '2': 'standard', '3': 'advanced' }
     newValue = levels[newValue]
   } else if (fieldName === 'card_type') {
-    newValue = prompt('カードタイプを選択してください:\n1: main (メイン)\n2: optional (選択)\n3: check (チェック)')
+    newValue = prompt('カードタイプを選択してください:\n1: メイン\n2: 選択\n3: チェック')
     const types = { '1': 'main', '2': 'optional', '3': 'check' }
     newValue = types[newValue]
   }
@@ -49669,9 +49685,9 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                           <div>
                             <label class="text-xs font-bold text-gray-600">難易度</label>
                             <select id="edit-difficulty-${card.card_id || card.id || i}" class="w-full border rounded-lg px-3 py-1.5 text-sm">
-                              <option value="easy" ${card.difficulty_level === 'easy' ? 'selected' : ''}>きほん (easy)</option>
-                              <option value="standard" ${card.difficulty_level === 'standard' ? 'selected' : ''}>しっかり (standard)</option>
-                              <option value="hard" ${card.difficulty_level === 'hard' ? 'selected' : ''}>チャレンジ (hard)</option>
+                              <option value="easy" ${card.difficulty_level === 'easy' ? 'selected' : ''}>きほん</option>
+                              <option value="standard" ${card.difficulty_level === 'standard' ? 'selected' : ''}>しっかり</option>
+                              <option value="hard" ${card.difficulty_level === 'hard' ? 'selected' : ''}>チャレンジ</option>
                             </select>
                           </div>
                         </div>

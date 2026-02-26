@@ -8027,7 +8027,16 @@ app.get('/guide/:curriculumId', async (c) => {
     </div>
 
     <!-- カード表示エリア -->
-    <div id="cardContainer"></div>
+    <div id="cardContainer">
+      ${allCardsFlat.length === 0 ? `
+      <div class="card-box" style="text-align:center; padding:48px 24px;">
+        <div style="font-size:3rem; margin-bottom:16px;">📝</div>
+        <h3 style="font-size:1.4rem; font-weight:bold; color:#1f2937; margin-bottom:12px;">この単元の学習カードはまだ作成されていません</h3>
+        <p style="color:#6b7280; font-size:0.95rem; margin-bottom:16px;">先生がAIで学習カードを生成すると、ここに表示されます。</p>
+        <p style="color:#9ca3af; font-size:0.8rem;">トップページの「AIで学習カードを作成する」から生成できます。</p>
+      </div>
+      ` : ''}
+    </div>
 
     <!-- ナビゲーションバー -->
     <div class="nav-bar no-print" id="navBar">
