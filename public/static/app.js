@@ -2871,13 +2871,13 @@ async function updateUnitList() {
         // カード形式で表示
         unitSelect.innerHTML = ''
         
-        curricula.forEach(item => {
+        curricula.forEach((item, idx) => {
           const card = document.createElement('div')
           card.className = 'bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-400 hover:shadow-md transition cursor-pointer flex items-center justify-between group'
           card.innerHTML = `
             <div class="flex-1" onclick="selectUnit(${item.id})">
-              <p class="font-bold text-gray-800 group-hover:text-purple-700 transition"><i class="fas fa-book-open mr-2 text-purple-400"></i>${item.unit_order}. ${item.unit_name}</p>
-              <p class="text-sm text-gray-500 ml-7">${item.grade}年 ${item.subject} - ${item.textbook_company}</p>
+              <p class="font-bold text-gray-800 group-hover:text-purple-700 transition"><i class="fas fa-book-open mr-2 text-purple-400"></i>${idx + 1}. ${item.unit_name}</p>
+              <p class="text-sm text-gray-500 ml-7">${item.grade} ${item.subject} - ${item.textbook_company}</p>
             </div>
             <div class="flex gap-2">
               <button 
@@ -3825,7 +3825,7 @@ async function loadGuidePage(curriculumId) {
               <h1 class="text-4xl font-bold text-indigo-700 mb-3">学習のてびき</h1>
               <div class="grid grid-cols-3 gap-4 text-sm mb-4">
                 <div class="text-left">
-                  <span class="font-bold">学年：</span>${curriculum.grade}年
+                  <span class="font-bold">学年：</span>${curriculum.grade}
                 </div>
                 <div class="text-center">
                   <span class="font-bold">組：</span>____ 組
@@ -4486,7 +4486,7 @@ async function loadLearningPlanPage(curriculumId) {
               <h2 class="text-2xl font-bold text-gray-800">${curriculum.unit_name}</h2>
               <div class="grid grid-cols-3 gap-4 text-sm mt-4">
                 <div class="text-left">
-                  <span class="font-bold">学年：</span>${curriculum.grade}年
+                  <span class="font-bold">学年：</span>${curriculum.grade}
                 </div>
                 <div class="text-center">
                   <span class="font-bold">組：</span>____ 組
@@ -5079,7 +5079,7 @@ async function showIntegratedPrintPreview(curriculumId) {
           <h1 class="text-2xl font-bold text-center mb-3 border-b-2 border-indigo-600 pb-2">学習のてびき</h1>
           <h2 class="text-xl font-bold text-center mb-3">${curriculum.unit_name}</h2>
           <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
-            <div><strong>学年：</strong>${curriculum.grade}年</div>
+            <div><strong>学年：</strong>${curriculum.grade}</div>
             <div><strong>組：</strong>____ 組</div>
             <div><strong>名前：</strong>____________________</div>
           </div>
@@ -5154,7 +5154,7 @@ async function showIntegratedPrintPreview(curriculumId) {
           <h1 class="text-2xl font-bold text-center mb-3 border-b-2 border-green-600 pb-2">学習計画表</h1>
           <h2 class="text-xl font-bold text-center mb-3">${curriculum.unit_name}</h2>
           <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
-            <div><strong>学年：</strong>${curriculum.grade}年</div>
+            <div><strong>学年：</strong>${curriculum.grade}</div>
             <div><strong>組：</strong>____ 組</div>
             <div><strong>名前：</strong>____________________</div>
           </div>
@@ -12718,7 +12718,7 @@ async function loadLearningPlan(curriculumId) {
             学習計画表
           </h1>
           <p class="text-xl text-gray-800">
-            ${curriculum.grade}年 ${curriculum.subject} - ${curriculum.unit_name}
+            ${curriculum.grade} ${curriculum.subject} - ${curriculum.unit_name}
           </p>
         </div>
 
@@ -13094,7 +13094,7 @@ async function loadAnswersTab(curriculumId) {
             解答と解説
           </h1>
           <p class="text-xl text-gray-800">
-            ${curriculum.grade}年 ${curriculum.subject} - ${curriculum.unit_name}
+            ${curriculum.grade} ${curriculum.subject} - ${curriculum.unit_name}
           </p>
         </div>
 
@@ -13598,7 +13598,7 @@ async function loadProgressBoard(curriculumId, curriculumId2 = null) {
             </div>
           </div>
           <div class="mt-2 text-sm md:text-base text-gray-700">
-            ${curriculums.map(c => `${c.curriculum.grade}年 ${c.curriculum.subject} - ${c.curriculum.unit_name}`).join(' / ')}
+            ${curriculums.map(c => `${c.curriculum.grade} ${c.curriculum.subject} - ${c.curriculum.unit_name}`).join(' / ')}
           </div>
         </div>
 
@@ -14699,7 +14699,7 @@ async function loadEnvironmentDesignPage(curriculumId) {
             </h1>
           </div>
           <div class="text-sm text-gray-600">
-            ${curriculum.curriculum.grade}年 ${curriculum.curriculum.subject} 「${curriculum.curriculum.unit_name}」
+            ${curriculum.curriculum.grade} ${curriculum.curriculum.subject} 「${curriculum.curriculum.unit_name}」
           </div>
         </div>
       </div>
@@ -14842,7 +14842,7 @@ async function loadEvaluationPage(curriculumId) {
             </h1>
           </div>
           <div class="text-sm text-gray-600">
-            ${curriculum.curriculum.grade}年 ${curriculum.curriculum.subject} 「${curriculum.curriculum.unit_name}」
+            ${curriculum.curriculum.grade} ${curriculum.curriculum.subject} 「${curriculum.curriculum.unit_name}」
           </div>
         </div>
       </div>
@@ -48203,7 +48203,7 @@ async function showTestPrepModal() {
                         <div class="font-bold text-gray-800">${curr.subject} - ${curr.unit_name}</div>
                         <div class="text-sm text-gray-600 mt-1">
                           <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs mr-2">
-                            <i class="fas fa-graduation-cap mr-1"></i>${curr.grade}年
+                            <i class="fas fa-graduation-cap mr-1"></i>${curr.grade}
                           </span>
                           <span class="text-gray-500">${curr.unit_goal || '単元目標'}</span>
                         </div>
@@ -48323,7 +48323,7 @@ function updateSelectionSummary() {
           <ul class="ml-4 mt-1 space-y-1">
             ${selectedSubjects.map(s => `
               <li class="text-sm">
-                <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs mr-1">${s.grade}年</span>
+                <span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs mr-1">${s.grade}</span>
                 ${s.subject} - ${s.unitName}
               </li>
             `).join('')}

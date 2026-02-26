@@ -11021,7 +11021,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
     }
     
     // AIプロンプト：コース関連問題 + 検索練習コンテンツ
-    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の問題と学習サポートコンテンツを生成。
+    const prompt = `${curriculum.grade} ${curriculum.subject}「${curriculum.unit_name}」の問題と学習サポートコンテンツを生成。
 
 【必須：3つのコース】
 1. ${courses.results[0]?.course_name || 'ゆっくりコース'}
@@ -11916,7 +11916,7 @@ ${diag.ai_profile_summary ? `- AI分析要約: ${diag.ai_profile_summary}` : ''}
 あなたは児童生徒の学習を支援する教育AIです。以下の学習データと初期診断プロフィールを分析し、**個々の学習特性**を深く理解した上で、個別最適化された問題推奨を行ってください。
 
 【カリキュラム情報】
-- 学年: 小学${curriculum.grade}年
+- 学年: ${curriculum.grade}
 - 教科: ${curriculum.subject}
 - 単元名: ${curriculum.unit_name}
 - 単元目標: ${curriculum.unit_goal || '未設定'}
@@ -12242,7 +12242,7 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
 あなたは児童生徒の学習計画を立てる教育AIです。以下のデータから、**個々の学習特性を深く考慮した**最適な学習計画を作成してください。
 
 【カリキュラム情報】
-- 学年: 小学${curriculum.grade}年
+- 学年: ${curriculum.grade}
 - 教科: ${curriculum.subject}
 - 単元名: ${curriculum.unit_name}
 - 単元目標: ${curriculum.unit_goal || '未設定'}
@@ -12420,7 +12420,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
     }
     
     // AIプロンプト：評価問題のみ
-    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の評価問題を生成。
+    const prompt = `${curriculum.grade} ${curriculum.subject}「${curriculum.unit_name}」の評価問題を生成。
 
 【必須：JSONのみ出力】
 {
@@ -12604,7 +12604,7 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
       `${i+1}. ${c.course_name || `コース${i+1}`}: ${c.description || ''}`
     ).join('\n')
     
-    const prompt = `小学${curriculum.grade}年 ${curriculum.subject}「${curriculum.unit_name}」の${numCourses}つのコースの導入問題を生成。
+    const prompt = `${curriculum.grade} ${curriculum.subject}「${curriculum.unit_name}」の${numCourses}つのコースの導入問題を生成。
 
 【${numCourses}つのコース】
 ${courseList}
@@ -30696,7 +30696,7 @@ ${targetScore ? `- 目標点数: ${targetScore}点` : ''}
 
 【対象範囲】（${subjectDetails.length}教科・単元）
 ${subjectDetails.map((detail, index) => `
-${index + 1}. ${detail.subject} - ${detail.unitName}（${detail.grade}年）
+${index + 1}. ${detail.subject} - ${detail.unitName}（${detail.grade}）
    - 単元目標: ${detail.unitGoal || '未設定'}
    - 学習実績: ${detail.stats.total_attempts}問挑戦、正答率${detail.stats.accuracy}%、平均${detail.stats.avg_time}秒
    - ヒント使用: ${detail.stats.hint_usage}回
@@ -32264,7 +32264,7 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
 - 動機的エネルギーが${(v4Axes.motivational_energy || 50) >= 60 ? '高い' : '低い'}→ ${(v4Axes.motivational_energy || 50) >= 60 ? '発展的な問題で意欲を伸ばす' : '成功体験を積ませる易しめの問題から始める'}
 ` : ''
         
-        const prompt = `あなたは小学校${curriculum.grade}の${curriculum.subject}の教師です。
+        const prompt = `あなたは${curriculum.grade}の${curriculum.subject}の教師です。
 以下の個別学習カードの内容に基づいて、この児童専用のチェックテスト（6問）と選択課題（4問）を作成してください。
 
 単元名: ${curriculum.unit_name}
