@@ -913,6 +913,11 @@ async function recordHistory(
   changedFields?: any
 ) {
   try {
+    // undefined値のガード（D1はundefinedをバインドできない）
+    if (targetId === undefined || targetId === null || action === undefined) {
+      console.warn('⚠️ 履歴記録スキップ: targetIdまたはactionがundefined')
+      return
+    }
     const idField = table === 'curriculum_history' ? 'curriculum_id' : 'card_id'
     
     await db.prepare(`
@@ -920,9 +925,9 @@ async function recordHistory(
       VALUES (?, ?, ?, ?)
     `).bind(
       targetId,
-      action,
+      action || 'unknown',
       changedFields ? JSON.stringify(changedFields) : null,
-      JSON.stringify(snapshot)
+      snapshot ? JSON.stringify(snapshot) : '{}'
     ).run()
     
     console.log(`📝 履歴記録: ${table}, action=${action}, id=${targetId}`)
@@ -3933,18 +3938,19 @@ app.post('/api/learning/log', authMiddleware, async (c) => {
 // 学習セッション開始API
 app.post('/api/learning/session/start', async (c) => {
   const { env } = c
-  const { student_id, unit_id, session_id } = await c.req.json()
+  const body = await c.req.json()
+  const student_id = body.student_id
+  const unit_id = body.unit_id || null
   
   try {
-    await env.DB.prepare(`
+    const result = await env.DB.prepare(`
       INSERT INTO learning_sessions (
-        student_id, unit_id, session_id,
-        started_at, is_active
-      ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 1)
-    `).bind(student_id, unit_id, session_id).run()
+        student_id, unit_id, session_start, is_active
+      ) VALUES (?, ?, CURRENT_TIMESTAMP, 1)
+    `).bind(student_id || 0, unit_id).run()
     
-    return c.json({ success: true, session_id })
-  } catch (error) {
+    return c.json({ success: true, session_id: result.meta.last_row_id })
+  } catch (error: any) {
     console.error('セッション開始エラー:', error)
     return c.json({ success: false, error: error.message }, 500)
   }
@@ -3953,29 +3959,24 @@ app.post('/api/learning/session/start', async (c) => {
 // 学習セッション終了API
 app.post('/api/learning/session/end', async (c) => {
   const { env } = c
-  const { session_id, total_problems, correct_problems, total_hints_used, total_ai_requests } = await c.req.json()
+  const body = await c.req.json()
   
   try {
     await env.DB.prepare(`
       UPDATE learning_sessions
-      SET ended_at = CURRENT_TIMESTAMP,
+      SET session_end = CURRENT_TIMESTAMP,
           is_active = 0,
-          total_problems = ?,
-          correct_problems = ?,
-          total_hints_used = ?,
-          total_ai_requests = ?,
-          updated_at = CURRENT_TIMESTAMP
+          problems_solved = ?,
+          correct_answers = ?
       WHERE session_id = ?
     `).bind(
-      total_problems || 0,
-      correct_problems || 0,
-      total_hints_used || 0,
-      total_ai_requests || 0,
-      session_id
+      body.total_problems || 0,
+      body.correct_problems || 0,
+      body.session_id || 0
     ).run()
     
     return c.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error('セッション終了エラー:', error)
     return c.json({ success: false, error: error.message }, 500)
   }
@@ -14095,14 +14096,7 @@ app.put('/api/card/:cardId', async (c) => {
     `).bind(cardId).first()
     
     // 履歴記録
-    await recordHistory(env.DB, {
-      type: 'card',
-      action: 'update_learning_styles',
-      idField: 'card_id',
-      idValue: parseInt(cardId),
-      changedFields: updateFields.map(f => f.split(' = ')[0]),
-      snapshot: card
-    })
+    await recordHistory(env.DB, 'card_history', parseInt(cardId), 'update_learning_styles', card, updateFields.map((f: string) => f.split(' = ')[0]))
     
     return c.json({
       success: true,
@@ -14584,12 +14578,7 @@ app.post('/api/curriculum/:id/rollback/:historyId', async (c) => {
     `).bind(curriculumId).first()
     
     if (currentCurriculum) {
-      await recordHistory(env, 'curriculum_history', curriculumId, {
-        action: 'rollback_before',
-        changed_by: 1, // システムユーザー
-        data_before: JSON.stringify(currentCurriculum),
-        data_after: historyRecord.data_before
-      })
+      await recordHistory(env.DB, 'curriculum_history', curriculumId, 'rollback_before', currentCurriculum)
     }
     
     // 履歴データをパース
@@ -14616,12 +14605,7 @@ app.post('/api/curriculum/:id/rollback/:historyId', async (c) => {
     ).run()
     
     // ロールバック完了を履歴に記録
-    await recordHistory(env, 'curriculum_history', curriculumId, {
-      action: 'rollback_complete',
-      changed_by: 1,
-      data_before: JSON.stringify(currentCurriculum),
-      data_after: JSON.stringify(rollbackData)
-    })
+    await recordHistory(env.DB, 'curriculum_history', curriculumId, 'rollback_complete', currentCurriculum)
     
     return c.json({
       success: true,
@@ -32027,7 +32011,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   ]
 }
 
-※ カードは${template.recommended_card_count}枚生成（最低6枚、推奨8枚以上）
+※ カードは${Math.min(template.recommended_card_count, 5)}枚生成（最低3枚、最大5枚。品質優先）
 ※ problem_textは「〜しましょう」「〜を求めましょう」等の具体的な指示文にすること
 ※ 「〜を学びます」「〜について考えます」等のメタ的記述は problem_text に絶対に書かないこと
 ※ difficulty_levelは全カードで同じにせず、必ず段階的に難しくすること
@@ -32047,20 +32031,47 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 ※ audio_instruction は全カード必須。問題文の読み上げと取り組み方のガイダンスを優しい言葉で記述すること
 `
 
-    // 10. Gemini API呼び出し
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 16384, responseMimeType: 'application/json' }
-        })
+    // 10. Gemini API呼び出し（フォールバック付き、タイムアウト対策）
+    const courseModels = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    let geminiResponse: Response | null = null
+    let lastError = ''
+    
+    for (const model of courseModels) {
+      try {
+        console.log(`🎓 個別コース生成: ${model} で試行中...`)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 55000) // 55秒タイムアウト
+        
+        geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 8192, responseMimeType: 'application/json' }
+            })
+          }
+        )
+        clearTimeout(timeoutId)
+        
+        if (geminiResponse.ok) {
+          console.log(`✅ 個別コース生成: ${model} 成功`)
+          break
+        } else {
+          lastError = `${model}: HTTP ${geminiResponse.status}`
+          console.warn(`⚠️ ${lastError}`)
+          geminiResponse = null
+        }
+      } catch (err: any) {
+        lastError = `${model}: ${err.name === 'AbortError' ? 'タイムアウト(55s)' : err.message}`
+        console.warn(`⚠️ ${lastError}`)
+        geminiResponse = null
       }
-    )
-
-    if (!geminiResponse.ok) throw new Error(`Gemini APIエラー: ${geminiResponse.status}`)
+    }
+    
+    if (!geminiResponse || !geminiResponse.ok) throw new Error(`全モデル失敗: ${lastError}`)
 
     const geminiData = await geminiResponse.json() as any
     const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''

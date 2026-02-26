@@ -10895,6 +10895,10 @@ function initVisualWidgets() {
       // 万一 renderVisualWidget が false を返した場合のみフォールバック
       renderFallbackVisual(container, card)
     }
+    // ★ 作図問題なら回答ウィジェットを差し替え
+    if (typeof initConstructionAnswerWidget === 'function') {
+      try { initConstructionAnswerWidget(card) } catch (e) { console.warn('作図ウィジェット初期化エラー:', e) }
+    }
   }, 150)
 }
 
@@ -12380,6 +12384,210 @@ function isDiagonalCross(points1, points2) {
 
 window.toggleAutoVoice = toggleAutoVoice
 window.switchAnswerMode = switchAnswerMode
+
+// ========================================
+// 作図問題用：手順並べ替え回答ウィジェット
+// ========================================
+function initConstructionAnswerWidget(card) {
+  const problem = (card.problem_text || card.problem_description || card.card_title || '').toLowerCase()
+  
+  // 作図問題かどうか判定
+  const isConstruction = /垂直二等分線|角の二等分線|垂線|平行線|作図|コンパス.*定規|定規.*コンパス/.test(problem)
+  if (!isConstruction) return false
+  
+  const answerArea = document.getElementById('textAnswerArea')
+  if (!answerArea) return false
+  
+  // 手順の選択肢を作図タイプごとに定義
+  let correctSteps = []
+  let shuffledSteps = []
+  
+  if (/垂直二等分線|中点/.test(problem)) {
+    correctSteps = [
+      'コンパスで線分の半分より長い半径をとる',
+      '点Aにコンパスの針を置き、上下に円弧をかく',
+      '同じ半径で点Bにコンパスの針を置き、上下に円弧をかく',
+      '2つの円弧の交点（上と下）を見つける',
+      '2つの交点を定規で結んで直線をひく'
+    ]
+  } else if (/角の二等分線|角.*二等分/.test(problem)) {
+    correctSteps = [
+      '角の頂点にコンパスの針を置き、2辺に交わる円弧をかく',
+      '一方の交点にコンパスの針を置き、円弧をかく',
+      'もう一方の交点にも同じ半径で円弧をかく',
+      '2つの円弧の交点を見つける',
+      '頂点と交点を定規で結んで直線をひく'
+    ]
+  } else if (/垂線|垂直.*線/.test(problem)) {
+    correctSteps = [
+      '直線上の点にコンパスの針を置き、左右に同じ長さの点をとる',
+      '左の点にコンパスの針を置き、円弧をかく',
+      '右の点にも同じ半径で円弧をかく',
+      '2つの円弧の交点を見つける',
+      '元の点と交点を定規で結んで垂線をひく'
+    ]
+  } else if (/平行線/.test(problem)) {
+    correctSteps = [
+      '直線上の1点を通る斜めの線を引く',
+      'その線と直線の交点の角度をコンパスで写し取る',
+      '通る点で同じ角度の円弧をかく',
+      '角度を合わせて交点を見つける',
+      '定規で交点を通る直線をひく（平行線完成）'
+    ]
+  } else {
+    // 一般的な作図
+    correctSteps = [
+      '問題の条件を確認する',
+      'コンパスで必要な長さをとる',
+      '円弧をかいて交点を見つける',
+      '定規で線を結ぶ',
+      '作図が正しいか確認する'
+    ]
+  }
+  
+  // シャッフル
+  shuffledSteps = [...correctSteps].sort(() => Math.random() - 0.5)
+  // 万が一同じ順序ならもう一度シャッフル
+  if (shuffledSteps.every((s, i) => s === correctSteps[i])) {
+    shuffledSteps.reverse()
+  }
+  
+  // ウィジェットのHTML
+  answerArea.innerHTML = `
+    <div class="construction-answer-widget">
+      <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-3">
+        <p class="text-sm font-bold text-amber-800 mb-2">
+          <i class="fas fa-sort-numeric-up mr-2"></i>作図の手順を正しい順番に並べかえよう！
+        </p>
+        <p class="text-xs text-amber-600">カードをタップして選んでね。選んだ順番に番号がつくよ。</p>
+      </div>
+      <div id="constructionSteps" class="space-y-2">
+        ${shuffledSteps.map((step, i) => `
+          <div class="construction-step-card cursor-pointer border-2 border-gray-200 rounded-xl p-3 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center gap-3"
+               data-step-text="${step}"
+               data-selected-order=""
+               onclick="toggleConstructionStep(this)">
+            <div class="step-number w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center font-bold text-sm shrink-0">
+              ?
+            </div>
+            <span class="text-sm font-medium text-gray-700 flex-1">${step}</span>
+            <i class="fas fa-grip-vertical text-gray-300"></i>
+          </div>
+        `).join('')}
+      </div>
+      <div class="flex gap-2 mt-3">
+        <button onclick="resetConstructionSteps()" 
+                class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-bold text-sm hover:bg-gray-300 transition">
+          <i class="fas fa-redo mr-1"></i>やりなおす
+        </button>
+      </div>
+    </div>
+  `
+  
+  // 正解を hidden input に保存（gradeAnswer用）
+  const answerInput = document.getElementById('answerInput')
+  if (!answerInput) {
+    const hiddenInput = document.createElement('textarea')
+    hiddenInput.id = 'answerInput'
+    hiddenInput.style.display = 'none'
+    answerArea.appendChild(hiddenInput)
+  }
+  
+  // 正解データをwindowに保存
+  window._constructionCorrectSteps = correctSteps
+  window._constructionSelectedOrder = []
+  
+  return true
+}
+
+let _constructionStepCounter = 0
+
+function toggleConstructionStep(el) {
+  const currentOrder = el.getAttribute('data-selected-order')
+  const numberDiv = el.querySelector('.step-number')
+  
+  if (currentOrder) {
+    // 選択解除
+    el.setAttribute('data-selected-order', '')
+    el.classList.remove('border-blue-500', 'bg-blue-50', 'ring-2', 'ring-blue-300')
+    el.classList.add('border-gray-200', 'bg-white')
+    numberDiv.textContent = '?'
+    numberDiv.classList.remove('bg-blue-500', 'text-white')
+    numberDiv.classList.add('bg-gray-200', 'text-gray-500')
+    
+    // 番号を振り直す
+    reorderConstructionSteps()
+  } else {
+    // 選択
+    const allSteps = document.querySelectorAll('#constructionSteps .construction-step-card[data-selected-order]')
+    let maxOrder = 0
+    allSteps.forEach(s => {
+      const o = parseInt(s.getAttribute('data-selected-order'))
+      if (o > maxOrder) maxOrder = o
+    })
+    const newOrder = maxOrder + 1
+    el.setAttribute('data-selected-order', String(newOrder))
+    el.classList.remove('border-gray-200', 'bg-white')
+    el.classList.add('border-blue-500', 'bg-blue-50', 'ring-2', 'ring-blue-300')
+    numberDiv.textContent = String(newOrder)
+    numberDiv.classList.remove('bg-gray-200', 'text-gray-500')
+    numberDiv.classList.add('bg-blue-500', 'text-white')
+    
+    // サウンドフィードバック
+    try { new Audio('data:audio/wav;base64,UklGRl4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToAAAB/f39+fn19fHt6eXh3dnV0c3FwcG9ubW1sa2pqaWhoZ2dmZWVkZGNjYmJhYWBgYGBfX19fXl5eXl5e').play() } catch {}
+  }
+  
+  // answerInputに現在の並び順を書き込み
+  updateConstructionAnswerInput()
+}
+
+function reorderConstructionSteps() {
+  const allSteps = [...document.querySelectorAll('#constructionSteps .construction-step-card')]
+  const selected = allSteps
+    .filter(s => s.getAttribute('data-selected-order'))
+    .sort((a, b) => parseInt(a.getAttribute('data-selected-order')) - parseInt(b.getAttribute('data-selected-order')))
+  
+  selected.forEach((s, i) => {
+    const newOrder = i + 1
+    s.setAttribute('data-selected-order', String(newOrder))
+    const numberDiv = s.querySelector('.step-number')
+    numberDiv.textContent = String(newOrder)
+  })
+  
+  updateConstructionAnswerInput()
+}
+
+function updateConstructionAnswerInput() {
+  const allSteps = [...document.querySelectorAll('#constructionSteps .construction-step-card')]
+  const ordered = allSteps
+    .filter(s => s.getAttribute('data-selected-order'))
+    .sort((a, b) => parseInt(a.getAttribute('data-selected-order')) - parseInt(b.getAttribute('data-selected-order')))
+    .map(s => s.getAttribute('data-step-text'))
+  
+  const answerInput = document.getElementById('answerInput')
+  if (answerInput) {
+    answerInput.value = ordered.join(' → ')
+  }
+}
+
+function resetConstructionSteps() {
+  const allSteps = document.querySelectorAll('#constructionSteps .construction-step-card')
+  allSteps.forEach(el => {
+    el.setAttribute('data-selected-order', '')
+    el.classList.remove('border-blue-500', 'bg-blue-50', 'ring-2', 'ring-blue-300')
+    el.classList.add('border-gray-200', 'bg-white')
+    const numberDiv = el.querySelector('.step-number')
+    numberDiv.textContent = '?'
+    numberDiv.classList.remove('bg-blue-500', 'text-white')
+    numberDiv.classList.add('bg-gray-200', 'text-gray-500')
+  })
+  const answerInput = document.getElementById('answerInput')
+  if (answerInput) answerInput.value = ''
+}
+
+window.initConstructionAnswerWidget = initConstructionAnswerWidget
+window.toggleConstructionStep = toggleConstructionStep
+window.resetConstructionSteps = resetConstructionSteps
 window.clearAnswerHandwriting = clearAnswerHandwriting
 window.undoAnswerHandwriting = undoAnswerHandwriting
 window.undoHandwriting = undoHandwriting
@@ -12845,6 +13053,16 @@ async function gradeAnswer(correctAnswer) {
   const answerInput = document.getElementById('answerInput')
   const studentAnswer = answerInput ? answerInput.value.trim() : ''
   
+  // 作図問題：全手順を選んだかチェック
+  if (window._constructionCorrectSteps && !studentAnswer) {
+    const allSteps = document.querySelectorAll('#constructionSteps .construction-step-card')
+    const selectedCount = [...allSteps].filter(s => s.getAttribute('data-selected-order')).length
+    if (selectedCount < window._constructionCorrectSteps.length) {
+      alert(`すべての手順を選んでください（${selectedCount}/${window._constructionCorrectSteps.length}）`)
+      return
+    }
+  }
+  
   if (!studentAnswer) {
     alert('答えを入力してから「答え合わせ」を押してください。')
     if (answerInput) answerInput.focus()
@@ -12925,7 +13143,23 @@ async function gradeAnswer(correctAnswer) {
   const correctKeyValues = extractKeyValues(normalizedCorrect)
   const keyValuesMatch = correctKeyValues.length > 0 && correctKeyValues.every(v => normalizedStudent.includes(v))
   
-  const isCorrect = openEndedMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
+  // ★ 作図手順並べ替え判定
+  let constructionMatch = false
+  let constructionPartialScore = 0
+  if (window._constructionCorrectSteps && normalizedStudent.includes('→')) {
+    const studentSteps = studentAnswer.split(' → ').map(s => s.trim())
+    const correctSteps = window._constructionCorrectSteps
+    if (studentSteps.length === correctSteps.length) {
+      let matchCount = 0
+      for (let i = 0; i < correctSteps.length; i++) {
+        if (studentSteps[i] === correctSteps[i]) matchCount++
+      }
+      constructionPartialScore = Math.round((matchCount / correctSteps.length) * 100)
+      constructionMatch = matchCount === correctSteps.length
+    }
+  }
+  
+  const isCorrect = constructionMatch || openEndedMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
     // 追加判定: 人名・選択肢判定（「Aさん」「Bさん」など比較問題）
     const personMatch = normalizedCorrect.match(/([abcABC][さくんちゃん]*|[ア-ン]+さん)/) 
     if (personMatch && normalizedStudent.includes(personMatch[0])) return true
@@ -12947,7 +13181,43 @@ async function gradeAnswer(correctAnswer) {
     return false
   })()
   
-  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
+  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect, constructionMatch, constructionPartialScore })
+  
+  // ★ 作図問題の部分正解フィードバック（不正解だが手順を並べた場合）
+  if (!isCorrect && window._constructionCorrectSteps && constructionPartialScore > 0) {
+    const correctSteps = window._constructionCorrectSteps
+    const studentSteps = studentAnswer.split(' → ').map(s => s.trim())
+    
+    resultDiv.innerHTML = `
+      <div class="bg-amber-50 border-2 border-amber-400 rounded-xl p-5" style="animation: correctPop 0.6s ease-out">
+        <div class="text-center mb-4">
+          <div class="text-4xl mb-2">${constructionPartialScore >= 60 ? '💪' : '🤔'}</div>
+          <p class="text-xl font-bold text-amber-700">${constructionPartialScore}点！${constructionPartialScore >= 60 ? 'おしい！' : 'もう少し！'}</p>
+          <p class="text-sm text-amber-600">手順の順番をもう一度たしかめてみよう</p>
+        </div>
+        <div class="space-y-2 mt-3">
+          <p class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-check-circle mr-1 text-green-500"></i>正しい順番：</p>
+          ${correctSteps.map((step, i) => {
+            const isStepCorrect = studentSteps[i] === step
+            return `<div class="flex items-center gap-2 p-2 rounded-lg ${isStepCorrect ? 'bg-green-50 border border-green-300' : 'bg-red-50 border border-red-300'}">
+              <span class="w-6 h-6 rounded-full ${isStepCorrect ? 'bg-green-500' : 'bg-red-500'} text-white text-xs font-bold flex items-center justify-center shrink-0">${i + 1}</span>
+              <span class="text-sm ${isStepCorrect ? 'text-green-700' : 'text-red-700'}">${step}</span>
+              <i class="fas ${isStepCorrect ? 'fa-check text-green-500' : 'fa-times text-red-500'} ml-auto"></i>
+            </div>`
+          }).join('')}
+        </div>
+        <button onclick="resetConstructionSteps(); document.getElementById('gradeResult').classList.add('hidden')"
+                class="mt-4 w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl font-bold transition hover:from-blue-600 hover:to-indigo-700">
+          <i class="fas fa-redo mr-2"></i>もう一度チャレンジ！
+        </button>
+      </div>
+      <style>
+        @keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+      </style>
+    `
+    resultDiv.classList.remove('hidden')
+    return
+  }
   
   if (isCorrect) {
     // 正解音を再生
