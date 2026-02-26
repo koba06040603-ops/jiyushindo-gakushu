@@ -8627,7 +8627,9 @@ function detectVisualWidget(card) {
   if (/かけ算|九九|×|掛け/.test(all)) return 'multiplication'
   // たし算・ひき算（低学年）
   if (/あわせて|のこり|ちがい|たし算|ひき算/.test(all)) return 'addition'
-  // 単位・量
+  // ★ 作図（コンパス・定規）— 「cm」を含むが単位問題ではないケースをunitsより先にキャッチ
+  if (/作図|コンパス|定規.*使|垂直二等分線|角の二等分線|二等分線|垂線|平行線.*引|ひく|円弧|perpendicular/.test(all)) return 'construction'
+  // 単位・量（作図ではない長さ・重さ・かさの問題）
   if (/リットル|L|dL|mL|キログラム|kg|g|cm|mm|m\b|メートル|長さ|重さ|かさ/.test(all)) return 'units'
   
   // ===== 追加: 教科書レベル以上の視覚支援パターン =====
@@ -8700,6 +8702,7 @@ function renderVisualWidget(containerId, card) {
     case 'area': renderAreaVisual(container, card); break
     case 'multiplication': renderMultiplicationVisual(container, card); break
     case 'addition': renderAdditionVisual(container, card); break
+    case 'construction': renderConstructionVisual(container, card); break
     case 'units': renderUnitsVisual(container, card); break
     case 'map': renderMapVisual(container, card); break
     case 'timeline': renderTimelineVisual(container, card); break
@@ -9013,6 +9016,214 @@ function renderAdditionVisual(container, card) {
         <div class="text-center">
           <span class="text-3xl font-bold text-green-600">${isSubtract ? a - b : a + b}</span>
         </div>
+      </div>
+    </div>`
+}
+
+// ========== 作図ビジュアル（コンパス・定規） ==========
+function renderConstructionVisual(container, card) {
+  const problem = (card.problem_text || card.problem_description || '').toLowerCase()
+  const title = card.card_title || card.unit_name || ''
+  
+  // 作図の種類を判定
+  const isPerpBisector = /垂直二等分線|中点/.test(problem + title)
+  const isAngleBisector = /角の二等分線|角.*二等分/.test(problem + title)
+  const isPerpendicular = /垂線|垂直.*線.*ひ|直角/.test(problem + title) && !isPerpBisector
+  const isParallel = /平行線|平行.*ひ/.test(problem + title)
+  
+  // 線分の長さを抽出
+  const lengthMatch = problem.match(/(\d+)\s*cm/)
+  const lineLength = lengthMatch ? parseInt(lengthMatch[1]) : 6
+  
+  let svgContent = ''
+  let stepsList = ''
+  let constructionTitle = '作図の方法'
+  
+  if (isPerpBisector) {
+    constructionTitle = '垂直二等分線の作図'
+    // SVG: 垂直二等分線
+    svgContent = `
+      <svg viewBox="0 0 400 300" class="w-full" style="max-height:250px;">
+        <!-- 背景グリッド -->
+        <defs>
+          <pattern id="grid-cb" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e7eb" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="400" height="300" fill="url(#grid-cb)" opacity="0.5"/>
+        
+        <!-- 線分AB -->
+        <line x1="80" y1="200" x2="320" y2="200" stroke="#1e293b" stroke-width="3"/>
+        <circle cx="80" cy="200" r="5" fill="#1e293b"/>
+        <circle cx="320" cy="200" r="5" fill="#1e293b"/>
+        <text x="70" y="225" font-size="16" font-weight="bold" fill="#1e293b">A</text>
+        <text x="315" y="225" font-size="16" font-weight="bold" fill="#1e293b">B</text>
+        <text x="175" y="220" font-size="12" fill="#6b7280">${lineLength}cm</text>
+        
+        <!-- 中点マーク -->
+        <line x1="200" y1="195" x2="200" y2="205" stroke="#1e293b" stroke-width="2"/>
+        
+        <!-- Aを中心とした円弧（赤） -->
+        <path d="M 200,80 A 160,160 0 0,0 200,320" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="6,3" opacity="0.7">
+          <animate attributeName="stroke-dashoffset" from="300" to="0" dur="2s" fill="freeze"/>
+        </path>
+        
+        <!-- Bを中心とした円弧（青） -->
+        <path d="M 200,80 A 160,160 0 0,1 200,320" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="6,3" opacity="0.7">
+          <animate attributeName="stroke-dashoffset" from="300" to="0" dur="2s" begin="0.5s" fill="freeze"/>
+        </path>
+        
+        <!-- 交点 -->
+        <circle cx="200" cy="80" r="5" fill="#8b5cf6" opacity="0">
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="1.5s" fill="freeze"/>
+        </circle>
+        <circle cx="200" cy="320" r="5" fill="#8b5cf6" opacity="0">
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="1.5s" fill="freeze"/>
+        </circle>
+        
+        <!-- 垂直二等分線（緑） -->
+        <line x1="200" y1="50" x2="200" y2="280" stroke="#22c55e" stroke-width="3" stroke-dasharray="300" stroke-dashoffset="300">
+          <animate attributeName="stroke-dashoffset" from="300" to="0" dur="1s" begin="2s" fill="freeze"/>
+        </line>
+        
+        <!-- 直角マーク -->
+        <rect x="200" y="190" width="10" height="10" fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0">
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="3s" fill="freeze"/>
+        </rect>
+        
+        <!-- ラベル -->
+        <text x="210" y="70" font-size="11" fill="#22c55e" font-weight="bold" opacity="0">垂直二等分線
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="3s" fill="freeze"/>
+        </text>
+        <text x="15" y="145" font-size="10" fill="#ef4444" opacity="0.8">① Aが中心の円弧</text>
+        <text x="260" y="145" font-size="10" fill="#3b82f6" opacity="0.8">② Bが中心の円弧</text>
+      </svg>`
+    stepsList = `
+      <div class="space-y-2 mt-3">
+        <div class="flex items-start gap-2"><span class="bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">1</span><span class="text-sm">点A にコンパスの針を置き、線分の半分より長い半径で<span class="text-red-600 font-bold">円弧</span>をかく</span></div>
+        <div class="flex items-start gap-2"><span class="bg-blue-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">2</span><span class="text-sm">同じ半径で、点B にコンパスの針を置き<span class="text-blue-600 font-bold">円弧</span>をかく</span></div>
+        <div class="flex items-start gap-2"><span class="bg-purple-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">3</span><span class="text-sm">2つの円弧の<span class="text-purple-600 font-bold">交点</span>を見つける（上と下の2つ）</span></div>
+        <div class="flex items-start gap-2"><span class="bg-green-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">4</span><span class="text-sm">2つの交点を定規で結ぶ → <span class="text-green-600 font-bold">垂直二等分線</span>の完成！</span></div>
+      </div>`
+  } else if (isAngleBisector) {
+    constructionTitle = '角の二等分線の作図'
+    svgContent = `
+      <svg viewBox="0 0 400 300" class="w-full" style="max-height:250px;">
+        <defs>
+          <pattern id="grid-ab" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e7eb" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="400" height="300" fill="url(#grid-ab)" opacity="0.5"/>
+        
+        <!-- 角の2辺 -->
+        <line x1="80" y1="240" x2="350" y2="240" stroke="#1e293b" stroke-width="3"/>
+        <line x1="80" y1="240" x2="280" y2="60" stroke="#1e293b" stroke-width="3"/>
+        <circle cx="80" cy="240" r="5" fill="#1e293b"/>
+        <text x="60" y="255" font-size="16" font-weight="bold" fill="#1e293b">O</text>
+        
+        <!-- 頂点からの等距離点（P, Q） -->
+        <circle cx="180" cy="240" r="4" fill="#ef4444" opacity="0">
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="0.5s" fill="freeze"/>
+        </circle>
+        <circle cx="156" cy="174" r="4" fill="#ef4444" opacity="0">
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="0.5s" fill="freeze"/>
+        </circle>
+        <text x="180" y="260" font-size="11" fill="#ef4444" opacity="0">P
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="0.5s" fill="freeze"/>
+        </text>
+        <text x="140" y="170" font-size="11" fill="#ef4444" opacity="0">Q
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="0.5s" fill="freeze"/>
+        </text>
+        
+        <!-- Oを中心とした円弧（赤） -->
+        <path d="M 180,240 A 100,100 0 0,0 156,174" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3" opacity="0">
+          <animate attributeName="opacity" from="0" to="0.7" dur="0.5s" begin="0.3s" fill="freeze"/>
+        </path>
+        
+        <!-- P,Qからの等距離円弧（青） -->
+        <path d="M 230,190 A 80,80 0 0,0 220,200" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="5,3" opacity="0">
+          <animate attributeName="opacity" from="0" to="0.7" dur="0.5s" begin="1s" fill="freeze"/>
+        </path>
+        
+        <!-- 二等分線（緑） -->
+        <line x1="80" y1="240" x2="300" y2="120" stroke="#22c55e" stroke-width="3" stroke-dasharray="300" stroke-dashoffset="300">
+          <animate attributeName="stroke-dashoffset" from="300" to="0" dur="1s" begin="1.5s" fill="freeze"/>
+        </line>
+        
+        <!-- 角度弧 -->
+        <path d="M 120,240 A 40,40 0 0,0 110,216" fill="none" stroke="#f59e0b" stroke-width="2" opacity="0">
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="2.5s" fill="freeze"/>
+        </path>
+        <text x="125" y="225" font-size="10" fill="#f59e0b" opacity="0">等しい角
+          <animate attributeName="opacity" from="0" to="1" dur="0.3s" begin="2.5s" fill="freeze"/>
+        </text>
+      </svg>`
+    stepsList = `
+      <div class="space-y-2 mt-3">
+        <div class="flex items-start gap-2"><span class="bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">1</span><span class="text-sm">頂点O にコンパスの針を置き、2辺に<span class="text-red-600 font-bold">等しい距離の点P, Q</span>をとる</span></div>
+        <div class="flex items-start gap-2"><span class="bg-blue-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">2</span><span class="text-sm">P, Q からそれぞれ同じ半径で<span class="text-blue-600 font-bold">円弧</span>をかき、交点Rを見つける</span></div>
+        <div class="flex items-start gap-2"><span class="bg-green-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0">3</span><span class="text-sm">O と R を定規で結ぶ → <span class="text-green-600 font-bold">角の二等分線</span>の完成！</span></div>
+      </div>`
+  } else {
+    // 汎用作図
+    constructionTitle = '作図のポイント'
+    svgContent = `
+      <svg viewBox="0 0 400 200" class="w-full" style="max-height:180px;">
+        <defs>
+          <pattern id="grid-gen" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e7eb" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+        <rect width="400" height="200" fill="url(#grid-gen)" opacity="0.5"/>
+        
+        <!-- コンパスイラスト -->
+        <g transform="translate(100,30)">
+          <line x1="50" y1="10" x2="30" y2="130" stroke="#64748b" stroke-width="3"/>
+          <line x1="50" y1="10" x2="90" y2="120" stroke="#64748b" stroke-width="3"/>
+          <circle cx="50" cy="8" r="5" fill="#64748b"/>
+          <circle cx="30" cy="132" r="3" fill="#ef4444"/>
+          <path d="M 90,120 A 65,65 0 0,1 30,130" fill="none" stroke="#3b82f6" stroke-width="2" stroke-dasharray="5,3"/>
+          <text x="20" y="160" font-size="11" fill="#64748b" text-anchor="middle">コンパス</text>
+        </g>
+        
+        <!-- 定規イラスト -->
+        <g transform="translate(220,50)">
+          <rect x="0" y="30" width="160" height="20" rx="3" fill="#fbbf24" stroke="#d97706" stroke-width="1.5" opacity="0.8"/>
+          ${Array.from({length: 9}, (_, i) => '<line x1="' + (10 + i * 18) + '" y1="30" x2="' + (10 + i * 18) + '" y2="' + (i % 2 === 0 ? '38' : '35') + '" stroke="#92400e" stroke-width="1"/>').join('')}
+          <text x="80" y="80" font-size="11" fill="#64748b" text-anchor="middle">定規</text>
+        </g>
+        
+        <text x="200" y="180" font-size="12" fill="#4b5563" text-anchor="middle" font-weight="bold">正確に作図するには道具の使い方が大切！</text>
+      </svg>`
+    stepsList = `
+      <div class="space-y-2 mt-3">
+        <div class="flex items-start gap-2"><span class="bg-amber-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0"><i class="fas fa-compass"></i></span><span class="text-sm"><span class="font-bold">コンパス</span>: 針をしっかり固定し、スムーズに回す</span></div>
+        <div class="flex items-start gap-2"><span class="bg-amber-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0"><i class="fas fa-ruler"></i></span><span class="text-sm"><span class="font-bold">定規</span>: 2点を正確に結ぶ。ずれないようにしっかり押さえる</span></div>
+        <div class="flex items-start gap-2"><span class="bg-amber-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center shrink-0"><i class="fas fa-pencil-alt"></i></span><span class="text-sm"><span class="font-bold">線</span>: 薄い線で作図し、完成したら濃くなぞる</span></div>
+      </div>`
+  }
+  
+  const searchQ = encodeURIComponent((title || constructionTitle) + ' 作図 やり方')
+  
+  container.innerHTML = `
+    <div class="p-4 bg-gradient-to-br from-indigo-50 to-sky-50 rounded-xl border-2 border-indigo-200 widget-animate-in" style="position:relative;overflow:hidden;">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="bg-indigo-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-drafting-compass mr-1"></i>${constructionTitle}</span>
+      </div>
+      
+      <div class="bg-white rounded-xl p-3 border-2 border-indigo-100 shadow-sm mb-3">
+        ${svgContent}
+      </div>
+      
+      <div class="bg-indigo-50 rounded-lg p-3 border border-indigo-200">
+        <p class="text-xs font-bold text-indigo-700 mb-1"><i class="fas fa-list-ol mr-1"></i>作図の手順</p>
+        ${stepsList}
+      </div>
+      
+      <div class="flex flex-wrap gap-2 justify-center mt-3">
+        <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画で見る</a>
+        <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>図解を見る</a>
       </div>
     </div>`
 }

@@ -10429,7 +10429,7 @@ ${customInfo}
     "unit_name": "${unitName}",
     "total_hours": 8,
     "unit_goal": "学習目標（100文字以内。難しい漢字には直後に（ひらがな）をつける。例：国会（こっかい））",
-    "non_cognitive_goal": "非認知目標（80文字以内。漢字のみ使用、ふりがな・括弧は一切含めない）"
+    "non_cognitive_goal": "非認知目標（80文字以内。漢字のみ使用、ふりがな・括弧は一切含めない。文末は必ず「。」で終わること）"
   }
 }
 
@@ -10802,7 +10802,8 @@ app.post('/api/curriculum/save-generated', async (c) => {
       `).bind(
         curriculum.total_hours || 8,
         curriculum.unit_goal || '',
-        curriculum.non_cognitive_goal || '',
+        // 文末に「。」がなければ自動補完
+        ((curriculum.non_cognitive_goal || '').replace(/\s+$/,'').replace(/([^。．.])$/, '$1。')),
         curriculumId
       ).run()
     } else {
@@ -10819,7 +10820,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
         curriculum.unit_name,
         curriculum.total_hours || 8,
         curriculum.unit_goal || '',
-        curriculum.non_cognitive_goal || ''
+        ((curriculum.non_cognitive_goal || '').replace(/\s+$/,'').replace(/([^。．.])$/, '$1。'))
       ).run()
       
       curriculumId = curriculumResult.meta.last_row_id as number
