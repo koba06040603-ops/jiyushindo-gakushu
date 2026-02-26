@@ -10896,6 +10896,8 @@ function initVisualWidgets() {
       renderFallbackVisual(container, card)
     }
     // ★ 作図問題なら回答ウィジェットを差し替え
+    // 前の作図状態をクリア
+    window._constructionStates = {}
     if (typeof initConstructionAnswerWidget === 'function') {
       try { initConstructionAnswerWidget(card) } catch (e) { console.warn('作図ウィジェット初期化エラー:', e) }
     }
@@ -12385,209 +12387,597 @@ function isDiagonalCross(points1, points2) {
 window.toggleAutoVoice = toggleAutoVoice
 window.switchAnswerMode = switchAnswerMode
 
-// ========================================
-// 作図問題用：手順並べ替え回答ウィジェット
-// ========================================
+// ============================================================
+// 作図問題用：Canvas描画実技シミュレーター
+// コンパス（円弧描画）+ 定規（直線描画）で実際に手を動かして作図
+// ============================================================
+
 function initConstructionAnswerWidget(card) {
   const problem = (card.problem_text || card.problem_description || card.card_title || '').toLowerCase()
-  
-  // 作図問題かどうか判定
   const isConstruction = /垂直二等分線|角の二等分線|垂線|平行線|作図|コンパス.*定規|定規.*コンパス/.test(problem)
   if (!isConstruction) return false
-  
+
   const answerArea = document.getElementById('textAnswerArea')
   if (!answerArea) return false
-  
-  // 手順の選択肢を作図タイプごとに定義
-  let correctSteps = []
-  let shuffledSteps = []
-  
-  if (/垂直二等分線|中点/.test(problem)) {
-    correctSteps = [
-      'コンパスで線分の半分より長い半径をとる',
-      '点Aにコンパスの針を置き、上下に円弧をかく',
-      '同じ半径で点Bにコンパスの針を置き、上下に円弧をかく',
-      '2つの円弧の交点（上と下）を見つける',
-      '2つの交点を定規で結んで直線をひく'
-    ]
-  } else if (/角の二等分線|角.*二等分/.test(problem)) {
-    correctSteps = [
-      '角の頂点にコンパスの針を置き、2辺に交わる円弧をかく',
-      '一方の交点にコンパスの針を置き、円弧をかく',
-      'もう一方の交点にも同じ半径で円弧をかく',
-      '2つの円弧の交点を見つける',
-      '頂点と交点を定規で結んで直線をひく'
-    ]
-  } else if (/垂線|垂直.*線/.test(problem)) {
-    correctSteps = [
-      '直線上の点にコンパスの針を置き、左右に同じ長さの点をとる',
-      '左の点にコンパスの針を置き、円弧をかく',
-      '右の点にも同じ半径で円弧をかく',
-      '2つの円弧の交点を見つける',
-      '元の点と交点を定規で結んで垂線をひく'
-    ]
-  } else if (/平行線/.test(problem)) {
-    correctSteps = [
-      '直線上の1点を通る斜めの線を引く',
-      'その線と直線の交点の角度をコンパスで写し取る',
-      '通る点で同じ角度の円弧をかく',
-      '角度を合わせて交点を見つける',
-      '定規で交点を通る直線をひく（平行線完成）'
-    ]
-  } else {
-    // 一般的な作図
-    correctSteps = [
-      '問題の条件を確認する',
-      'コンパスで必要な長さをとる',
-      '円弧をかいて交点を見つける',
-      '定規で線を結ぶ',
-      '作図が正しいか確認する'
-    ]
-  }
-  
-  // シャッフル
-  shuffledSteps = [...correctSteps].sort(() => Math.random() - 0.5)
-  // 万が一同じ順序ならもう一度シャッフル
-  if (shuffledSteps.every((s, i) => s === correctSteps[i])) {
-    shuffledSteps.reverse()
-  }
-  
-  // ウィジェットのHTML
+
+  // 作図タイプ判定
+  let constructionType = 'general'
+  if (/垂直二等分線|中点/.test(problem)) constructionType = 'perp_bisector'
+  else if (/角の二等分線|角.*二等分/.test(problem)) constructionType = 'angle_bisector'
+  else if (/垂線|垂直/.test(problem)) constructionType = 'perpendicular'
+  else if (/平行線/.test(problem)) constructionType = 'parallel'
+
+  const lineLength = parseInt((problem.match(/(\d+)\s*cm/) || [])[1]) || 6
+  const uid = 'cw_' + Date.now()
+
   answerArea.innerHTML = `
-    <div class="construction-answer-widget">
-      <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 mb-3">
-        <p class="text-sm font-bold text-amber-800 mb-2">
-          <i class="fas fa-sort-numeric-up mr-2"></i>作図の手順を正しい順番に並べかえよう！
+    <div class="construction-canvas-widget" id="${uid}">
+      <div class="bg-indigo-50 border-2 border-indigo-300 rounded-xl p-3 mb-2">
+        <p class="text-sm font-bold text-indigo-800 mb-1">
+          <i class="fas fa-drafting-compass mr-1"></i>作図してみよう！
         </p>
-        <p class="text-xs text-amber-600">カードをタップして選んでね。選んだ順番に番号がつくよ。</p>
+        <p class="text-xs text-indigo-600">道具をえらんで、画面の上で作図しよう。コンパスは中心をタップしてからドラッグで円弧、定規は2点をタップで直線がひけるよ。</p>
       </div>
-      <div id="constructionSteps" class="space-y-2">
-        ${shuffledSteps.map((step, i) => `
-          <div class="construction-step-card cursor-pointer border-2 border-gray-200 rounded-xl p-3 bg-white hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center gap-3"
-               data-step-text="${step}"
-               data-selected-order=""
-               onclick="toggleConstructionStep(this)">
-            <div class="step-number w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center font-bold text-sm shrink-0">
-              ?
-            </div>
-            <span class="text-sm font-medium text-gray-700 flex-1">${step}</span>
-            <i class="fas fa-grip-vertical text-gray-300"></i>
-          </div>
-        `).join('')}
-      </div>
-      <div class="flex gap-2 mt-3">
-        <button onclick="resetConstructionSteps()" 
-                class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg font-bold text-sm hover:bg-gray-300 transition">
-          <i class="fas fa-redo mr-1"></i>やりなおす
+
+      <!-- ツール選択バー -->
+      <div class="flex gap-2 mb-2 flex-wrap">
+        <button onclick="setConstructionTool('${uid}','compass')" id="${uid}_btn_compass"
+                class="flex-1 min-w-0 bg-red-500 text-white px-3 py-2 rounded-lg font-bold text-sm border-2 border-red-600 shadow-md transition hover:bg-red-600">
+          <i class="fas fa-compass mr-1"></i>コンパス
+        </button>
+        <button onclick="setConstructionTool('${uid}','ruler')" id="${uid}_btn_ruler"
+                class="flex-1 min-w-0 bg-yellow-500 text-gray-800 px-3 py-2 rounded-lg font-bold text-sm border-2 border-yellow-600 shadow-md transition hover:bg-yellow-600 opacity-60">
+          <i class="fas fa-ruler mr-1"></i>定規
+        </button>
+        <button onclick="constructionUndo('${uid}')" 
+                class="bg-gray-400 text-white px-3 py-2 rounded-lg font-bold text-sm hover:bg-gray-500 transition">
+          <i class="fas fa-undo"></i>
+        </button>
+        <button onclick="constructionClear('${uid}')"
+                class="bg-gray-300 text-gray-700 px-3 py-2 rounded-lg font-bold text-sm hover:bg-gray-400 transition">
+          <i class="fas fa-trash"></i>
         </button>
       </div>
+
+      <!-- ツール状態表示 -->
+      <div id="${uid}_status" class="text-xs text-center text-gray-500 mb-1 h-5">
+        <i class="fas fa-compass text-red-500"></i> コンパス：中心をタップしてからドラッグで円弧
+      </div>
+
+      <!-- Canvas -->
+      <div class="relative bg-white border-2 border-gray-300 rounded-xl overflow-hidden shadow-inner" style="touch-action:none;">
+        <canvas id="${uid}_canvas" width="600" height="450" 
+                style="width:100%; height:auto; display:block; cursor:crosshair;"
+                onpointerdown="constructionPointerDown(event,'${uid}')"
+                onpointermove="constructionPointerMove(event,'${uid}')"
+                onpointerup="constructionPointerUp(event,'${uid}')"
+                onpointerleave="constructionPointerUp(event,'${uid}')"></canvas>
+      </div>
+
+      <!-- 描いた図形の情報 -->
+      <div id="${uid}_info" class="mt-2 text-xs text-gray-500 text-center">円弧: 0 / 直線: 0</div>
     </div>
   `
-  
-  // 正解を hidden input に保存（gradeAnswer用）
-  const answerInput = document.getElementById('answerInput')
+
+  // hidden answerInput を確保
+  let answerInput = document.getElementById('answerInput')
   if (!answerInput) {
-    const hiddenInput = document.createElement('textarea')
-    hiddenInput.id = 'answerInput'
-    hiddenInput.style.display = 'none'
-    answerArea.appendChild(hiddenInput)
+    answerInput = document.createElement('textarea')
+    answerInput.id = 'answerInput'
+    answerInput.style.display = 'none'
+    answerArea.appendChild(answerInput)
   }
+
+  // 作図状態を初期化
+  const state = {
+    uid,
+    type: constructionType,
+    tool: 'compass',
+    shapes: [],        // { type:'arc', cx, cy, r, startAngle, endAngle } or { type:'line', x1,y1, x2,y2 }
+    phase: 'idle',     // 'idle', 'compass_center_set', 'drawing_arc', 'ruler_first_set'
+    tempCenter: null,
+    tempStart: null,
+    tempRadius: 0,
+    presetPoints: [],  // 問題で与えられた固定点
+    lineLength,
+  }
+
+  // 問題に応じた初期描画（線分ABなど）
+  const canvas = document.getElementById(uid + '_canvas')
+  const ctx = canvas.getContext('2d')
   
-  // 正解データをwindowに保存
-  window._constructionCorrectSteps = correctSteps
-  window._constructionSelectedOrder = []
+  drawGrid(ctx, canvas.width, canvas.height)
   
+  if (constructionType === 'perp_bisector') {
+    const ax = 120, ay = 300, bx = 480, by = 300
+    state.presetPoints = [{x:ax, y:ay, label:'A'}, {x:bx, y:by, label:'B'}]
+    state.presetLine = {x1:ax, y1:ay, x2:bx, y2:by}
+    drawPreset(ctx, state)
+  } else if (constructionType === 'angle_bisector') {
+    const ox = 100, oy = 350
+    const ax = 500, ay = 350
+    const bx = 380, by = 80
+    state.presetPoints = [{x:ox, y:oy, label:'O'}, {x:ax, y:ay, label:'A'}, {x:bx, y:by, label:'B'}]
+    state.presetLines = [{x1:ox, y1:oy, x2:ax, y2:ay}, {x1:ox, y1:oy, x2:bx, y2:by}]
+    drawPreset(ctx, state)
+  } else if (constructionType === 'perpendicular') {
+    const ax = 60, ay = 280, bx = 540, by = 280
+    const px = 300, py = 280
+    state.presetPoints = [{x:ax, y:ay, label:'A'}, {x:bx, y:by, label:'B'}, {x:px, y:py, label:'P'}]
+    state.presetLine = {x1:ax, y1:ay, x2:bx, y2:by}
+    drawPreset(ctx, state)
+  } else {
+    // 汎用：空のキャンバス
+    state.presetPoints = []
+  }
+
+  window._constructionStates = window._constructionStates || {}
+  window._constructionStates[uid] = state
+  window._constructionCorrectSteps = null // 手順並べ替えは無効化
+
   return true
 }
 
-let _constructionStepCounter = 0
+// --- 描画ヘルパー ---
+function drawGrid(ctx, w, h) {
+  ctx.save()
+  ctx.strokeStyle = '#e5e7eb'
+  ctx.lineWidth = 0.5
+  for (let x = 0; x <= w; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke() }
+  for (let y = 0; y <= h; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke() }
+  ctx.restore()
+}
 
-function toggleConstructionStep(el) {
-  const currentOrder = el.getAttribute('data-selected-order')
-  const numberDiv = el.querySelector('.step-number')
-  
-  if (currentOrder) {
-    // 選択解除
-    el.setAttribute('data-selected-order', '')
-    el.classList.remove('border-blue-500', 'bg-blue-50', 'ring-2', 'ring-blue-300')
-    el.classList.add('border-gray-200', 'bg-white')
-    numberDiv.textContent = '?'
-    numberDiv.classList.remove('bg-blue-500', 'text-white')
-    numberDiv.classList.add('bg-gray-200', 'text-gray-500')
-    
-    // 番号を振り直す
-    reorderConstructionSteps()
-  } else {
-    // 選択
-    const allSteps = document.querySelectorAll('#constructionSteps .construction-step-card[data-selected-order]')
-    let maxOrder = 0
-    allSteps.forEach(s => {
-      const o = parseInt(s.getAttribute('data-selected-order'))
-      if (o > maxOrder) maxOrder = o
-    })
-    const newOrder = maxOrder + 1
-    el.setAttribute('data-selected-order', String(newOrder))
-    el.classList.remove('border-gray-200', 'bg-white')
-    el.classList.add('border-blue-500', 'bg-blue-50', 'ring-2', 'ring-blue-300')
-    numberDiv.textContent = String(newOrder)
-    numberDiv.classList.remove('bg-gray-200', 'text-gray-500')
-    numberDiv.classList.add('bg-blue-500', 'text-white')
-    
-    // サウンドフィードバック
-    try { new Audio('data:audio/wav;base64,UklGRl4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToAAAB/f39+fn19fHt6eXh3dnV0c3FwcG9ubW1sa2pqaWhoZ2dmZWVkZGNjYmJhYWBgYGBfX19fXl5eXl5e').play() } catch {}
+function drawPreset(ctx, state) {
+  ctx.save()
+  // 固定線分
+  ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 3
+  if (state.presetLine) {
+    ctx.beginPath(); ctx.moveTo(state.presetLine.x1, state.presetLine.y1); ctx.lineTo(state.presetLine.x2, state.presetLine.y2); ctx.stroke()
   }
-  
-  // answerInputに現在の並び順を書き込み
-  updateConstructionAnswerInput()
-}
-
-function reorderConstructionSteps() {
-  const allSteps = [...document.querySelectorAll('#constructionSteps .construction-step-card')]
-  const selected = allSteps
-    .filter(s => s.getAttribute('data-selected-order'))
-    .sort((a, b) => parseInt(a.getAttribute('data-selected-order')) - parseInt(b.getAttribute('data-selected-order')))
-  
-  selected.forEach((s, i) => {
-    const newOrder = i + 1
-    s.setAttribute('data-selected-order', String(newOrder))
-    const numberDiv = s.querySelector('.step-number')
-    numberDiv.textContent = String(newOrder)
+  if (state.presetLines) {
+    state.presetLines.forEach(l => { ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke() })
+  }
+  // 固定点
+  state.presetPoints.forEach(p => {
+    ctx.fillStyle = '#1e293b'
+    ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.fill()
+    ctx.font = 'bold 16px sans-serif'
+    ctx.fillText(p.label, p.x - 5, p.y + 22)
   })
-  
-  updateConstructionAnswerInput()
+  // 長さ表示
+  if (state.presetLine) {
+    const mx = (state.presetLine.x1 + state.presetLine.x2) / 2
+    const my = state.presetLine.y1 + 20
+    ctx.fillStyle = '#6b7280'; ctx.font = '12px sans-serif'
+    ctx.fillText(state.lineLength + 'cm', mx - 15, my + 5)
+  }
+  ctx.restore()
 }
 
-function updateConstructionAnswerInput() {
-  const allSteps = [...document.querySelectorAll('#constructionSteps .construction-step-card')]
-  const ordered = allSteps
-    .filter(s => s.getAttribute('data-selected-order'))
-    .sort((a, b) => parseInt(a.getAttribute('data-selected-order')) - parseInt(b.getAttribute('data-selected-order')))
-    .map(s => s.getAttribute('data-step-text'))
+function redrawConstruction(uid) {
+  const state = window._constructionStates[uid]
+  if (!state) return
+  const canvas = document.getElementById(uid + '_canvas')
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
   
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  drawGrid(ctx, canvas.width, canvas.height)
+  drawPreset(ctx, state)
+
+  // 描いた図形を再描画
+  state.shapes.forEach((s, i) => {
+    ctx.save()
+    if (s.type === 'arc') {
+      ctx.strokeStyle = ['#ef4444','#3b82f6','#8b5cf6','#f59e0b','#10b981'][i % 5]
+      ctx.lineWidth = 2.5
+      ctx.setLineDash([6, 4])
+      ctx.beginPath()
+      ctx.arc(s.cx, s.cy, s.r, s.startAngle, s.endAngle)
+      ctx.stroke()
+      // 中心マーク
+      ctx.setLineDash([])
+      ctx.fillStyle = ctx.strokeStyle
+      ctx.beginPath(); ctx.arc(s.cx, s.cy, 3, 0, Math.PI * 2); ctx.fill()
+    } else if (s.type === 'line') {
+      ctx.strokeStyle = '#22c55e'
+      ctx.lineWidth = 2.5
+      ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke()
+      // 端点マーク
+      ctx.fillStyle = '#22c55e'
+      ctx.beginPath(); ctx.arc(s.x1, s.y1, 3, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(s.x2, s.y2, 3, 0, Math.PI * 2); ctx.fill()
+    }
+    ctx.restore()
+  })
+
+  // 情報更新
+  const arcCount = state.shapes.filter(s => s.type === 'arc').length
+  const lineCount = state.shapes.filter(s => s.type === 'line').length
+  const info = document.getElementById(uid + '_info')
+  if (info) info.textContent = `円弧: ${arcCount} / 直線: ${lineCount}`
+
+  // answerInput にデータを書き込み（採点用）
+  updateConstructionAnswer(uid)
+}
+
+function updateConstructionAnswer(uid) {
+  const state = window._constructionStates[uid]
+  if (!state) return
   const answerInput = document.getElementById('answerInput')
   if (answerInput) {
-    answerInput.value = ordered.join(' → ')
+    answerInput.value = JSON.stringify({
+      constructionType: state.type,
+      shapes: state.shapes,
+      presetPoints: state.presetPoints.map(p => ({x:p.x, y:p.y})),
+    })
   }
 }
 
-function resetConstructionSteps() {
-  const allSteps = document.querySelectorAll('#constructionSteps .construction-step-card')
-  allSteps.forEach(el => {
-    el.setAttribute('data-selected-order', '')
-    el.classList.remove('border-blue-500', 'bg-blue-50', 'ring-2', 'ring-blue-300')
-    el.classList.add('border-gray-200', 'bg-white')
-    const numberDiv = el.querySelector('.step-number')
-    numberDiv.textContent = '?'
-    numberDiv.classList.remove('bg-blue-500', 'text-white')
-    numberDiv.classList.add('bg-gray-200', 'text-gray-500')
+// --- ツール切り替え ---
+function setConstructionTool(uid, tool) {
+  const state = window._constructionStates[uid]
+  if (!state) return
+  state.tool = tool
+  state.phase = 'idle'
+  state.tempCenter = null
+  state.tempStart = null
+
+  // ボタンUI更新
+  const compassBtn = document.getElementById(uid + '_btn_compass')
+  const rulerBtn = document.getElementById(uid + '_btn_ruler')
+  if (compassBtn && rulerBtn) {
+    if (tool === 'compass') {
+      compassBtn.classList.remove('opacity-60'); compassBtn.classList.add('ring-2','ring-red-400')
+      rulerBtn.classList.add('opacity-60'); rulerBtn.classList.remove('ring-2','ring-yellow-400')
+    } else {
+      rulerBtn.classList.remove('opacity-60'); rulerBtn.classList.add('ring-2','ring-yellow-400')
+      compassBtn.classList.add('opacity-60'); compassBtn.classList.remove('ring-2','ring-red-400')
+    }
+  }
+  
+  const statusEl = document.getElementById(uid + '_status')
+  if (statusEl) {
+    statusEl.innerHTML = tool === 'compass'
+      ? '<i class="fas fa-compass text-red-500"></i> コンパス：中心をタップしてからドラッグで円弧'
+      : '<i class="fas fa-ruler text-yellow-600"></i> 定規：始点をタップ → 終点をタップで直線'
+  }
+
+  // プレビュー消去
+  redrawConstruction(uid)
+}
+
+// --- ポインタイベント ---
+function getCanvasPos(e, uid) {
+  const canvas = document.getElementById(uid + '_canvas')
+  if (!canvas) return {x:0, y:0}
+  const rect = canvas.getBoundingClientRect()
+  const scaleX = canvas.width / rect.width
+  const scaleY = canvas.height / rect.height
+  return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY }
+}
+
+// 近くのプリセット点にスナップ（30px以内）
+function snapToPoint(pos, state) {
+  let closest = null, minDist = 30
+  const allPoints = [...state.presetPoints]
+  // 円弧の交点も検出してスナップ対象に
+  const intersections = findArcIntersections(state.shapes)
+  intersections.forEach(p => allPoints.push({x:p.x, y:p.y, label:''}))
+  
+  allPoints.forEach(p => {
+    const d = Math.sqrt((pos.x - p.x)**2 + (pos.y - p.y)**2)
+    if (d < minDist) { minDist = d; closest = {x:p.x, y:p.y} }
   })
-  const answerInput = document.getElementById('answerInput')
-  if (answerInput) answerInput.value = ''
+  return closest || pos
+}
+
+// 2つの円弧の交点を算出
+function findArcIntersections(shapes) {
+  const arcs = shapes.filter(s => s.type === 'arc')
+  const points = []
+  for (let i = 0; i < arcs.length; i++) {
+    for (let j = i + 1; j < arcs.length; j++) {
+      const pts = circleCircleIntersect(arcs[i].cx, arcs[i].cy, arcs[i].r, arcs[j].cx, arcs[j].cy, arcs[j].r)
+      pts.forEach(p => points.push(p))
+    }
+  }
+  return points
+}
+
+function circleCircleIntersect(cx1,cy1,r1, cx2,cy2,r2) {
+  const dx = cx2 - cx1, dy = cy2 - cy1
+  const d = Math.sqrt(dx*dx + dy*dy)
+  if (d > r1 + r2 || d < Math.abs(r1 - r2) || d === 0) return []
+  const a = (r1*r1 - r2*r2 + d*d) / (2*d)
+  const h = Math.sqrt(Math.max(0, r1*r1 - a*a))
+  const mx = cx1 + a * dx / d, my = cy1 + a * dy / d
+  return [
+    { x: mx + h * dy / d, y: my - h * dx / d },
+    { x: mx - h * dy / d, y: my + h * dx / d }
+  ]
+}
+
+function constructionPointerDown(e, uid) {
+  e.preventDefault()
+  const state = window._constructionStates[uid]
+  if (!state) return
+  const pos = snapToPoint(getCanvasPos(e, uid), state)
+
+  if (state.tool === 'compass') {
+    // コンパス：中心を決定
+    state.tempCenter = pos
+    state.phase = 'compass_center_set'
+    state.tempRadius = 0
+    
+    const statusEl = document.getElementById(uid + '_status')
+    if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> ドラッグして円弧の半径と範囲を決めよう！'
+    
+    // プレビュー：中心マーク
+    const canvas = document.getElementById(uid + '_canvas')
+    const ctx = canvas.getContext('2d')
+    redrawConstruction(uid)
+    ctx.save()
+    ctx.fillStyle = '#ef4444'
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2); ctx.fill()
+    ctx.fillStyle = 'rgba(239,68,68,0.15)'
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2); ctx.fill()
+    ctx.restore()
+
+  } else if (state.tool === 'ruler') {
+    if (state.phase !== 'ruler_first_set') {
+      // 定規：始点を決定
+      state.tempStart = pos
+      state.phase = 'ruler_first_set'
+      
+      const statusEl = document.getElementById(uid + '_status')
+      if (statusEl) statusEl.innerHTML = '<i class="fas fa-ruler text-yellow-600"></i> 終点をタップ！'
+      
+      // プレビュー：始点マーク
+      const canvas = document.getElementById(uid + '_canvas')
+      const ctx = canvas.getContext('2d')
+      redrawConstruction(uid)
+      ctx.save()
+      ctx.fillStyle = '#22c55e'
+      ctx.beginPath(); ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2); ctx.fill()
+      ctx.restore()
+    } else {
+      // 定規：終点 → 直線確定
+      state.shapes.push({ type: 'line', x1: state.tempStart.x, y1: state.tempStart.y, x2: pos.x, y2: pos.y })
+      state.phase = 'idle'
+      state.tempStart = null
+      
+      const statusEl = document.getElementById(uid + '_status')
+      if (statusEl) statusEl.innerHTML = '<i class="fas fa-ruler text-yellow-600"></i> 定規：始点をタップ → 終点をタップで直線'
+      
+      redrawConstruction(uid)
+      playConstructionSound('line')
+    }
+  }
+}
+
+function constructionPointerMove(e, uid) {
+  const state = window._constructionStates[uid]
+  if (!state || state.tool !== 'compass' || state.phase !== 'compass_center_set') return
+  e.preventDefault()
+
+  const pos = getCanvasPos(e, uid)
+  const cx = state.tempCenter.x, cy = state.tempCenter.y
+  const r = Math.sqrt((pos.x - cx)**2 + (pos.y - cy)**2)
+  if (r < 10) return
+
+  state.tempRadius = r
+  const angle = Math.atan2(pos.y - cy, pos.x - cx)
+
+  // プレビュー描画
+  const canvas = document.getElementById(uid + '_canvas')
+  const ctx = canvas.getContext('2d')
+  redrawConstruction(uid)
+  
+  ctx.save()
+  // 半径ガイドライン
+  ctx.strokeStyle = 'rgba(239,68,68,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([4,4])
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pos.x, pos.y); ctx.stroke()
+  // 円弧プレビュー
+  ctx.strokeStyle = 'rgba(239,68,68,0.5)'; ctx.lineWidth = 2.5; ctx.setLineDash([6,4])
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke()
+  // 半径値表示
+  ctx.setLineDash([])
+  ctx.fillStyle = '#ef4444'; ctx.font = '11px sans-serif'
+  ctx.fillText(Math.round(r) + 'px', (cx + pos.x)/2 + 5, (cy + pos.y)/2 - 5)
+  // 中心マーク
+  ctx.fillStyle = '#ef4444'
+  ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill()
+  ctx.restore()
+}
+
+function constructionPointerUp(e, uid) {
+  const state = window._constructionStates[uid]
+  if (!state || state.tool !== 'compass' || state.phase !== 'compass_center_set') return
+
+  if (state.tempRadius < 15) {
+    // 半径が小さすぎる：キャンセル
+    state.phase = 'idle'
+    const statusEl = document.getElementById(uid + '_status')
+    if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> コンパス：中心をタップしてからドラッグで円弧'
+    redrawConstruction(uid)
+    return
+  }
+
+  // 円弧を確定（全円で描く。部分円弧はスワイプ方向から推定も可能だが、全円の方が使いやすい）
+  state.shapes.push({
+    type: 'arc',
+    cx: state.tempCenter.x, cy: state.tempCenter.y,
+    r: state.tempRadius,
+    startAngle: 0, endAngle: Math.PI * 2
+  })
+  state.phase = 'idle'
+  state.tempCenter = null
+  state.tempRadius = 0
+
+  const statusEl = document.getElementById(uid + '_status')
+  if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> コンパス：中心をタップしてからドラッグで円弧'
+
+  redrawConstruction(uid)
+  playConstructionSound('arc')
+}
+
+function constructionUndo(uid) {
+  const state = window._constructionStates[uid]
+  if (!state) return
+  state.shapes.pop()
+  state.phase = 'idle'
+  redrawConstruction(uid)
+}
+
+function constructionClear(uid) {
+  const state = window._constructionStates[uid]
+  if (!state) return
+  state.shapes = []
+  state.phase = 'idle'
+  redrawConstruction(uid)
+}
+
+function playConstructionSound(type) {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ac.createOscillator()
+    const gain = ac.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = type === 'arc' ? 523 : 659
+    gain.gain.setValueAtTime(0.15, ac.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + 0.2)
+    osc.connect(gain); gain.connect(ac.destination)
+    osc.start(); osc.stop(ac.currentTime + 0.2)
+  } catch(e) {}
+}
+
+// --- 作図の採点（幾何学的判定） ---
+function gradeConstructionDrawing(uid) {
+  const state = window._constructionStates[uid]
+  if (!state) return { score: 0, feedback: '作図データがありません' }
+
+  const arcs = state.shapes.filter(s => s.type === 'arc')
+  const lines = state.shapes.filter(s => s.type === 'line')
+  const results = []
+  let score = 0
+
+  if (state.type === 'perp_bisector') {
+    // 垂直二等分線の判定
+    const A = state.presetPoints[0], B = state.presetPoints[1]
+    const midX = (A.x + B.x) / 2, midY = (A.y + B.y) / 2
+    
+    // 1. 円弧を2つ以上描いたか
+    if (arcs.length >= 2) { 
+      results.push({ok: true, text: '✅ 円弧を2つ描けた'}) 
+      score += 20
+    } else {
+      results.push({ok: false, text: '❌ 円弧が2つ必要（AとBを中心に1つずつ）'})
+    }
+
+    // 2. 円弧の中心がA, Bに近いか
+    const arcAtA = arcs.find(a => Math.sqrt((a.cx - A.x)**2 + (a.cy - A.y)**2) < 30)
+    const arcAtB = arcs.find(a => Math.sqrt((a.cx - B.x)**2 + (a.cy - B.y)**2) < 30)
+    if (arcAtA && arcAtB) {
+      results.push({ok: true, text: '✅ AとBを中心に円弧を描けた'})
+      score += 20
+    } else {
+      results.push({ok: false, text: '❌ 円弧の中心をAとBにしよう'})
+    }
+
+    // 3. 2つの円弧の半径がほぼ同じか
+    if (arcAtA && arcAtB && Math.abs(arcAtA.r - arcAtB.r) < 20) {
+      results.push({ok: true, text: '✅ 同じ半径で円弧を描けた'})
+      score += 15
+    } else if (arcAtA && arcAtB) {
+      results.push({ok: false, text: '⚠️ 2つの円弧の半径を同じにしよう'})
+    }
+
+    // 4. 直線を描いたか
+    if (lines.length >= 1) {
+      results.push({ok: true, text: '✅ 直線を引けた'})
+      score += 15
+    } else {
+      results.push({ok: false, text: '❌ 交点を結ぶ直線を引こう'})
+    }
+
+    // 5. 直線が中点を通るか
+    if (lines.length >= 1) {
+      const L = lines[lines.length - 1]
+      const distToMid = pointToLineDistance(midX, midY, L.x1, L.y1, L.x2, L.y2)
+      if (distToMid < 25) {
+        results.push({ok: true, text: '✅ 直線が中点を通っている'})
+        score += 15
+      } else {
+        results.push({ok: false, text: '⚠️ 直線が線分ABの中点を通るようにしよう'})
+      }
+    }
+
+    // 6. 直線がABに垂直か
+    if (lines.length >= 1) {
+      const L = lines[lines.length - 1]
+      const lineAngle = Math.atan2(L.y2 - L.y1, L.x2 - L.x1) * 180 / Math.PI
+      const abAngle = Math.atan2(B.y - A.y, B.x - A.x) * 180 / Math.PI
+      const angleDiff = Math.abs(((lineAngle - abAngle + 180) % 180) - 90)
+      if (angleDiff < 15) {
+        results.push({ok: true, text: '✅ 垂直に交わっている！'})
+        score += 15
+      } else {
+        results.push({ok: false, text: '⚠️ 線分ABと垂直（90°）になるようにしよう'})
+      }
+    }
+
+  } else if (state.type === 'angle_bisector') {
+    const O = state.presetPoints[0], A = state.presetPoints[1], B = state.presetPoints[2]
+    
+    if (arcs.length >= 1) { results.push({ok: true, text: '✅ 円弧を描けた'}); score += 25 }
+    else results.push({ok: false, text: '❌ Oを中心に円弧を描こう'})
+
+    if (arcs.length >= 3) { results.push({ok: true, text: '✅ 3つ以上の円弧を描けた'}); score += 25 }
+    else if (arcs.length >= 2) { results.push({ok: true, text: '⚠️ もう少し円弧が必要かも'}); score += 15 }
+    
+    if (lines.length >= 1) { results.push({ok: true, text: '✅ 二等分線を引けた'}); score += 25 }
+    else results.push({ok: false, text: '❌ 頂点Oから交点を通る直線を引こう'})
+
+    // 二等分線がOを通るか
+    if (lines.length >= 1) {
+      const L = lines[lines.length - 1]
+      const distToO = pointToLineDistance(O.x, O.y, L.x1, L.y1, L.x2, L.y2)
+      if (distToO < 25) { results.push({ok: true, text: '✅ 直線が頂点Oを通っている'}); score += 25 }
+      else results.push({ok: false, text: '⚠️ 直線が頂点Oを通るようにしよう'})
+    }
+
+  } else {
+    // 汎用判定
+    if (arcs.length >= 1) { score += 30; results.push({ok: true, text: '✅ 円弧を描けた'}) }
+    if (lines.length >= 1) { score += 30; results.push({ok: true, text: '✅ 直線を引けた'}) }
+    if (arcs.length >= 2) { score += 20; results.push({ok: true, text: '✅ 複数の円弧を使えた'}) }
+    if (arcs.length + lines.length >= 3) { score += 20; results.push({ok: true, text: '✅ 十分な作図ステップ'}) }
+    if (score === 0) results.push({ok: false, text: '❌ コンパスと定規を使って作図してみよう'})
+  }
+
+  return { score: Math.min(100, score), results, type: state.type }
+}
+
+function pointToLineDistance(px, py, x1, y1, x2, y2) {
+  const A = px - x1, B = py - y1, C = x2 - x1, D = y2 - y1
+  const dot = A * C + B * D
+  const lenSq = C * C + D * D
+  let t = lenSq !== 0 ? dot / lenSq : -1
+  t = Math.max(0, Math.min(1, t))
+  const xx = x1 + t * C, yy = y1 + t * D
+  return Math.sqrt((px - xx)**2 + (py - yy)**2)
 }
 
 window.initConstructionAnswerWidget = initConstructionAnswerWidget
-window.toggleConstructionStep = toggleConstructionStep
-window.resetConstructionSteps = resetConstructionSteps
+window.setConstructionTool = setConstructionTool
+window.constructionPointerDown = constructionPointerDown
+window.constructionPointerMove = constructionPointerMove
+window.constructionPointerUp = constructionPointerUp
+window.constructionUndo = constructionUndo
+window.constructionClear = constructionClear
+window.gradeConstructionDrawing = gradeConstructionDrawing
 window.clearAnswerHandwriting = clearAnswerHandwriting
 window.undoAnswerHandwriting = undoAnswerHandwriting
 window.undoHandwriting = undoHandwriting
@@ -13053,17 +13443,88 @@ async function gradeAnswer(correctAnswer) {
   const answerInput = document.getElementById('answerInput')
   const studentAnswer = answerInput ? answerInput.value.trim() : ''
   
-  // 作図問題：全手順を選んだかチェック
-  if (window._constructionCorrectSteps && !studentAnswer) {
-    const allSteps = document.querySelectorAll('#constructionSteps .construction-step-card')
-    const selectedCount = [...allSteps].filter(s => s.getAttribute('data-selected-order')).length
-    if (selectedCount < window._constructionCorrectSteps.length) {
-      alert(`すべての手順を選んでください（${selectedCount}/${window._constructionCorrectSteps.length}）`)
-      return
-    }
+  // ★ 作図Canvas実技モードの判定
+  const constructionState = window._constructionStates && Object.values(window._constructionStates)[0]
+  if (constructionState && studentAnswer.startsWith('{')) {
+    try {
+      const data = JSON.parse(studentAnswer)
+      if (data.constructionType && data.shapes) {
+        const uid = constructionState.uid
+        const gradeResult = gradeConstructionDrawing(uid)
+        const resultDiv = document.getElementById('gradeResult')
+        if (!resultDiv) return
+        
+        const isPass = gradeResult.score >= 60
+        
+        if (isPass) {
+          // 正解音
+          try {
+            const ac = new (window.AudioContext || window.webkitAudioContext)()
+            ;[523, 659, 784].forEach((freq, i) => {
+              const osc = ac.createOscillator(); const gain = ac.createGain()
+              osc.type = 'triangle'; osc.frequency.value = freq
+              gain.gain.setValueAtTime(0.2, ac.currentTime + i*0.15)
+              gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + i*0.15 + 0.3)
+              osc.connect(gain); gain.connect(ac.destination)
+              osc.start(ac.currentTime + i*0.15); osc.stop(ac.currentTime + i*0.15 + 0.35)
+            })
+          } catch(e) {}
+        }
+        
+        resultDiv.innerHTML = `
+          <div class="${isPass ? 'bg-green-50 border-2 border-green-400' : 'bg-amber-50 border-2 border-amber-400'} rounded-xl p-5" style="animation: correctPop 0.6s ease-out">
+            <div class="text-center mb-3">
+              <div class="text-5xl mb-2">${isPass ? (gradeResult.score >= 90 ? '🎉' : '👏') : '💪'}</div>
+              <p class="text-2xl font-bold ${isPass ? 'text-green-700' : 'text-amber-700'}">${gradeResult.score}点！${isPass ? (gradeResult.score >= 90 ? 'すばらしい！' : 'よくできた！') : 'もう少し！'}</p>
+            </div>
+            <div class="space-y-2 mt-3">
+              ${gradeResult.results.map(r => `
+                <div class="flex items-center gap-2 p-2 rounded-lg ${r.ok ? 'bg-green-50' : 'bg-red-50'}">
+                  <span class="text-base">${r.text}</span>
+                </div>
+              `).join('')}
+            </div>
+            ${!isPass ? `
+              <div class="mt-4 bg-blue-50 rounded-lg p-3">
+                <p class="text-sm font-bold text-blue-800 mb-1"><i class="fas fa-lightbulb mr-1"></i>ヒント</p>
+                <p class="text-xs text-blue-700">上の図解を参考にして、もう一度やってみよう！「元に戻す」ボタンで最後の操作を取り消せるよ。</p>
+              </div>
+              <button onclick="document.getElementById('gradeResult').classList.add('hidden')"
+                      class="mt-3 w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl font-bold transition hover:from-blue-600 hover:to-indigo-700">
+                <i class="fas fa-redo mr-2"></i>もう一度チャレンジ！
+              </button>
+            ` : `
+              <div class="mt-3 text-center">
+                <p class="text-sm text-green-600">作図の実技がしっかりできています！</p>
+              </div>
+            `}
+          </div>
+          <style>
+            @keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+          </style>
+        `
+        resultDiv.classList.remove('hidden')
+        
+        // 合格ならgradeButtonを更新
+        if (isPass) {
+          const gradeBtn = document.getElementById('gradeBtn')
+          if (gradeBtn) {
+            gradeBtn.className = 'w-full bg-green-500 text-white py-4 px-6 rounded-xl font-bold text-lg cursor-default'
+            gradeBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>作図クリア！'
+            gradeBtn.onclick = null
+          }
+        }
+        return
+      }
+    } catch(e) { /* JSON解析失敗→通常の採点に進む */ }
   }
   
   if (!studentAnswer) {
+    // 作図Canvasがある場合
+    if (constructionState) {
+      alert('コンパスや定規を使って作図してから「答え合わせ」を押してください。')
+      return
+    }
     alert('答えを入力してから「答え合わせ」を押してください。')
     if (answerInput) answerInput.focus()
     return
@@ -13143,23 +13604,7 @@ async function gradeAnswer(correctAnswer) {
   const correctKeyValues = extractKeyValues(normalizedCorrect)
   const keyValuesMatch = correctKeyValues.length > 0 && correctKeyValues.every(v => normalizedStudent.includes(v))
   
-  // ★ 作図手順並べ替え判定
-  let constructionMatch = false
-  let constructionPartialScore = 0
-  if (window._constructionCorrectSteps && normalizedStudent.includes('→')) {
-    const studentSteps = studentAnswer.split(' → ').map(s => s.trim())
-    const correctSteps = window._constructionCorrectSteps
-    if (studentSteps.length === correctSteps.length) {
-      let matchCount = 0
-      for (let i = 0; i < correctSteps.length; i++) {
-        if (studentSteps[i] === correctSteps[i]) matchCount++
-      }
-      constructionPartialScore = Math.round((matchCount / correctSteps.length) * 100)
-      constructionMatch = matchCount === correctSteps.length
-    }
-  }
-  
-  const isCorrect = constructionMatch || openEndedMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
+  const isCorrect = openEndedMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
     // 追加判定: 人名・選択肢判定（「Aさん」「Bさん」など比較問題）
     const personMatch = normalizedCorrect.match(/([abcABC][さくんちゃん]*|[ア-ン]+さん)/) 
     if (personMatch && normalizedStudent.includes(personMatch[0])) return true
@@ -13181,43 +13626,7 @@ async function gradeAnswer(correctAnswer) {
     return false
   })()
   
-  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect, constructionMatch, constructionPartialScore })
-  
-  // ★ 作図問題の部分正解フィードバック（不正解だが手順を並べた場合）
-  if (!isCorrect && window._constructionCorrectSteps && constructionPartialScore > 0) {
-    const correctSteps = window._constructionCorrectSteps
-    const studentSteps = studentAnswer.split(' → ').map(s => s.trim())
-    
-    resultDiv.innerHTML = `
-      <div class="bg-amber-50 border-2 border-amber-400 rounded-xl p-5" style="animation: correctPop 0.6s ease-out">
-        <div class="text-center mb-4">
-          <div class="text-4xl mb-2">${constructionPartialScore >= 60 ? '💪' : '🤔'}</div>
-          <p class="text-xl font-bold text-amber-700">${constructionPartialScore}点！${constructionPartialScore >= 60 ? 'おしい！' : 'もう少し！'}</p>
-          <p class="text-sm text-amber-600">手順の順番をもう一度たしかめてみよう</p>
-        </div>
-        <div class="space-y-2 mt-3">
-          <p class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-check-circle mr-1 text-green-500"></i>正しい順番：</p>
-          ${correctSteps.map((step, i) => {
-            const isStepCorrect = studentSteps[i] === step
-            return `<div class="flex items-center gap-2 p-2 rounded-lg ${isStepCorrect ? 'bg-green-50 border border-green-300' : 'bg-red-50 border border-red-300'}">
-              <span class="w-6 h-6 rounded-full ${isStepCorrect ? 'bg-green-500' : 'bg-red-500'} text-white text-xs font-bold flex items-center justify-center shrink-0">${i + 1}</span>
-              <span class="text-sm ${isStepCorrect ? 'text-green-700' : 'text-red-700'}">${step}</span>
-              <i class="fas ${isStepCorrect ? 'fa-check text-green-500' : 'fa-times text-red-500'} ml-auto"></i>
-            </div>`
-          }).join('')}
-        </div>
-        <button onclick="resetConstructionSteps(); document.getElementById('gradeResult').classList.add('hidden')"
-                class="mt-4 w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl font-bold transition hover:from-blue-600 hover:to-indigo-700">
-          <i class="fas fa-redo mr-2"></i>もう一度チャレンジ！
-        </button>
-      </div>
-      <style>
-        @keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
-      </style>
-    `
-    resultDiv.classList.remove('hidden')
-    return
-  }
+  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
   
   if (isCorrect) {
     // 正解音を再生
