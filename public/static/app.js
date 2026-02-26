@@ -146,6 +146,94 @@
     .fade-in {
       animation: fadeIn 0.3s ease-out !important;
     }
+    
+    /* ========== 動的ウィジェット アニメーション ========== */
+    @keyframes widgetSlideIn {
+      from { opacity: 0; transform: translateY(20px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes widgetBounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    @keyframes widgetPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+      50% { transform: scale(1.05); box-shadow: 0 0 20px 5px rgba(99, 102, 241, 0.2); }
+    }
+    @keyframes widgetShake {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-3deg); }
+      75% { transform: rotate(3deg); }
+    }
+    @keyframes widgetGlow {
+      0%, 100% { box-shadow: 0 0 5px rgba(236, 72, 153, 0.3); }
+      50% { box-shadow: 0 0 20px rgba(236, 72, 153, 0.6), 0 0 40px rgba(236, 72, 153, 0.2); }
+    }
+    @keyframes confettiFall {
+      0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100px) rotate(720deg); opacity: 0; }
+    }
+    @keyframes starPop {
+      0% { transform: scale(0) rotate(0deg); opacity: 0; }
+      50% { transform: scale(1.3) rotate(180deg); opacity: 1; }
+      100% { transform: scale(1) rotate(360deg); opacity: 1; }
+    }
+    @keyframes ripple {
+      0% { transform: scale(0.8); opacity: 1; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+    .widget-animate-in { animation: widgetSlideIn 0.5s ease-out forwards !important; }
+    .widget-bounce { animation: widgetBounce 0.6s ease !important; }
+    .widget-pulse { animation: widgetPulse 2s ease-in-out infinite !important; }
+    .widget-shake { animation: widgetShake 0.4s ease !important; }
+    .widget-glow { animation: widgetGlow 2s ease-in-out infinite !important; }
+    
+    /* タッチ対応ドラッグ要素 */
+    .draggable-item {
+      cursor: grab !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      touch-action: none !important;
+      transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+    }
+    .draggable-item:active {
+      cursor: grabbing !important;
+      transform: scale(1.1) !important;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.2) !important;
+      z-index: 100 !important;
+    }
+    .drop-zone {
+      transition: background-color 0.2s ease, border-color 0.2s ease !important;
+    }
+    .drop-zone.drag-over {
+      background-color: rgba(99, 102, 241, 0.1) !important;
+      border-color: #6366f1 !important;
+      box-shadow: inset 0 0 10px rgba(99, 102, 241, 0.2) !important;
+    }
+    
+    /* インタラクティブ分数バー */
+    .fraction-bar-segment {
+      cursor: pointer !important;
+      transition: all 0.2s ease !important;
+    }
+    .fraction-bar-segment:hover {
+      filter: brightness(1.2) !important;
+      transform: scaleY(1.15) !important;
+    }
+    .fraction-bar-segment.selected {
+      filter: brightness(1.3) !important;
+      outline: 3px solid #fff !important;
+      outline-offset: -2px !important;
+    }
+    
+    /* リップルエフェクト（タッチフィードバック）*/
+    .touch-ripple {
+      position: absolute !important;
+      border-radius: 50% !important;
+      background: rgba(255,255,255,0.5) !important;
+      animation: ripple 0.6s ease-out !important;
+      pointer-events: none !important;
+    }
   `
   document.head.appendChild(cursorFixStyle)
   
@@ -8567,8 +8655,13 @@ function detectVisualWidget(card) {
   if (subject.includes('理科') && /元素|原子|分子|化学式|化合|酸化|還元|中和|水溶液|濃度|密度/.test(all)) return 'chemistry'
   // 理科：地学
   if (subject.includes('理科') && /地震|火山|岩石|地層|天気|気圧|前線|雲|風|湿度/.test(all)) return 'earth_science'
-  // 国語：漢字（漢字練習・書き取り問題のみ。読解・詩・作文は除外）
-  if (subject.includes('国語') && /漢字|部首|画数|筆順|音読み|訓読み|書き取り|新出漢字/.test(all) && !/詩|読みましょう|読んで|物語|作者|気持ち|場面|文章|段落|説明文|語り手|作文/.test(all)) return 'kanji'
+  // 国語：漢字（漢字練習・書き取り問題のみ。読解・詩・作文・音読は完全除外）
+  // ステップ1: 単元名やタイトルに詩・読解・作文系のキーワードがあれば漢字ではない
+  const unitAndTitle = (title + ' ' + unit).toLowerCase()
+  const isReadingOrPoetryContext = /詩|物語|読みましょう|読んで|音読|声に出し|読み取|読み方|読書|作者|気持ち|場面|文章|段落|説明文|語り手|作文|俳句|短歌|百人一首|古文|古典|感想|鑑賞|暗唱|朗読|表現|読解/.test(unitAndTitle)
+  // ステップ2: 漢字問題はタイトルか単元名に「漢字」が直接含まれるものだけ
+  const isExplicitKanjiUnit = /漢字|新出漢字|書き取り/.test(unitAndTitle)
+  if (subject.includes('国語') && isExplicitKanjiUnit && !isReadingOrPoetryContext) return 'kanji'
   // 国語：文法
   if (subject.includes('国語') && /主語|述語|修飾語|接続詞|助詞|品詞|文節|敬語|ことわざ|慣用句|四字熟語/.test(all)) return 'grammar'
   // 英語
@@ -8666,14 +8759,16 @@ function renderFractionVisual(container, card) {
   const colors = ['#ef4444','#3b82f6','#22c55e','#f59e0b','#8b5cf6']
   
   container.innerHTML = `
-    <div class="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">
+    <div class="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200 widget-animate-in" style="position:relative;overflow:hidden;">
       <div class="flex items-center gap-2 mb-3">
-        <span class="bg-purple-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-eye mr-1"></i>みてわかる！分数</span>
+        <span class="bg-purple-500 text-white text-sm font-bold px-3 py-1 rounded-full widget-pulse"><i class="fas fa-hand-pointer mr-1"></i>さわって学ぼう！分数</span>
       </div>
+      <p class="text-xs text-purple-600 mb-2 text-center"><i class="fas fa-info-circle mr-1"></i>ピザをタップして、色を変えてみよう！</p>
       <div class="flex flex-wrap gap-6 justify-center">
         ${fractions.map((f, idx) => {
           const color = colors[idx % colors.length]
-          // ピザ図
+          const uid = container.id + '-frac-' + idx
+          // ピザ図（インタラクティブ版）
           const slices = Array.from({length: f.den}, (_, i) => {
             const startAngle = (i / f.den) * 2 * Math.PI - Math.PI / 2
             const endAngle = ((i + 1) / f.den) * 2 * Math.PI - Math.PI / 2
@@ -8683,29 +8778,29 @@ function renderFractionVisual(container, card) {
             const y2 = 50 + 40 * Math.sin(endAngle)
             const large = (endAngle - startAngle > Math.PI) ? 1 : 0
             const filled = i < f.num
-            return '<path d="M50,50 L' + x1 + ',' + y1 + ' A40,40 0 ' + large + ',1 ' + x2 + ',' + y2 + ' Z" fill="' + (filled ? color : '#f3f4f6') + '" stroke="white" stroke-width="2"/>'
+            return '<path data-frac-uid="' + uid + '" data-slice="' + i + '" data-den="' + f.den + '" d="M50,50 L' + x1 + ',' + y1 + ' A40,40 0 ' + large + ',1 ' + x2 + ',' + y2 + ' Z" fill="' + (filled ? color : '#f3f4f6') + '" stroke="white" stroke-width="2" style="cursor:pointer;transition:all 0.2s ease" onclick="toggleFractionSlice(this,\\x27' + color + '\\x27)"/>'
           }).join('')
-          // バー図
+          // バー図（タップ可能）
           const barSegments = Array.from({length: f.den}, (_, i) => {
             const w = 140 / f.den
             const x = 5 + i * w
             const filled = i < f.num
-            return '<rect x="' + x + '" y="5" width="' + (w - 1) + '" height="25" rx="2" fill="' + (filled ? color : '#e5e7eb') + '" stroke="white" stroke-width="1"/>'
+            return '<rect data-frac-uid="' + uid + '-bar" data-slice="' + i + '" data-den="' + f.den + '" x="' + x + '" y="5" width="' + (w - 1) + '" height="25" rx="4" fill="' + (filled ? color : '#e5e7eb') + '" stroke="white" stroke-width="1" style="cursor:pointer;transition:all 0.3s ease" onclick="toggleFractionSlice(this,\\x27' + color + '\\x27)"/>'
           }).join('')
-          return `<div class="text-center">
-            <svg viewBox="0 0 100 100" width="100" height="100" class="mx-auto">
-              ${slices}
-              <circle cx="50" cy="50" r="40" fill="none" stroke="#374151" stroke-width="1.5"/>
-            </svg>
-            <div class="mt-1 text-xl font-bold" style="color:${color}">
-              <span class="inline-block border-b-2 border-current px-1">${f.num}</span><br>
-              <span class="px-1">${f.den}</span>
-            </div>
-            <svg viewBox="0 0 150 35" width="150" height="35" class="mx-auto mt-1">
-              ${barSegments}
-            </svg>
-            <p class="text-xs text-gray-500 mt-1">${f.den}つのうち ${f.num}つ分</p>
-          </div>`
+          return '<div class="text-center" style="animation:widgetSlideIn 0.4s ease ' + (idx * 0.15) + 's both">' +
+            '<svg viewBox="0 0 100 100" width="110" height="110" class="mx-auto drop-shadow-md">' +
+              slices +
+              '<circle cx="50" cy="50" r="40" fill="none" stroke="#374151" stroke-width="1.5"/>' +
+            '</svg>' +
+            '<div id="frac-count-' + uid + '" class="mt-1 text-xl font-bold" style="color:' + color + '">' +
+              '<span class="inline-block border-b-2 border-current px-1">' + f.num + '</span><br>' +
+              '<span class="px-1">' + f.den + '</span>' +
+            '</div>' +
+            '<svg viewBox="0 0 150 35" width="150" height="35" class="mx-auto mt-1">' +
+              barSegments +
+            '</svg>' +
+            '<p class="text-xs text-gray-500 mt-1">' + f.den + 'つのうち <span id="frac-filled-' + uid + '">' + f.num + '</span>つ分</p>' +
+          '</div>'
         }).join('')}
       </div>
       ${fractions.length >= 2 ? `
@@ -8756,6 +8851,38 @@ function updateFractionPreview(input) {
   TactileSounds.play('tap')
 }
 window.updateFractionPreview = updateFractionPreview
+
+// ========== インタラクティブ分数スライス切り替え ==========
+function toggleFractionSlice(el, color) {
+  const isFilled = el.getAttribute('fill') !== '#f3f4f6' && el.getAttribute('fill') !== '#e5e7eb'
+  const emptyColor = el.tagName === 'rect' ? '#e5e7eb' : '#f3f4f6'
+  el.setAttribute('fill', isFilled ? emptyColor : color)
+  // アニメーション
+  el.style.transform = 'scale(1.15)'
+  setTimeout(() => { el.style.transform = 'scale(1)' }, 200)
+  // タップ音
+  try { TactileSounds.play('tap') } catch(e) {}
+  // 同じグループの塗り数を数えて表示を更新
+  const uid = el.getAttribute('data-frac-uid')
+  if (uid) {
+    const siblings = document.querySelectorAll('[data-frac-uid="' + uid + '"]')
+    let filledCount = 0
+    siblings.forEach(s => {
+      if (s.getAttribute('fill') !== emptyColor && s.getAttribute('fill') !== '#f3f4f6' && s.getAttribute('fill') !== '#e5e7eb') filledCount++
+    })
+    const den = parseInt(el.getAttribute('data-den')) || 1
+    const baseUid = uid.replace(/-bar$/, '')
+    const countEl = document.getElementById('frac-count-' + baseUid)
+    const filledEl = document.getElementById('frac-filled-' + baseUid)
+    if (countEl) {
+      countEl.innerHTML = '<span class="inline-block border-b-2 border-current px-1">' + filledCount + '</span><br><span class="px-1">' + den + '</span>'
+      countEl.classList.add('widget-bounce')
+      setTimeout(() => countEl.classList.remove('widget-bounce'), 600)
+    }
+    if (filledEl) filledEl.textContent = filledCount
+  }
+}
+window.toggleFractionSlice = toggleFractionSlice
 
 // ========== 割合ビジュアル ==========
 function renderPercentageVisual(container, card) {
@@ -10102,9 +10229,16 @@ function renderEarthScienceVisual(container, card) {
 // ========== 国語：漢字ビジュアル ==========
 function renderKanjiVisual(container, card) {
   const problem = card.problem_text || ''
-  // 漢字を抽出
-  const kanjiChars = (problem.match(/[\u4e00-\u9faf]/g) || []).filter((v, i, a) => a.indexOf(v) === i).slice(0, 6)
   const title = card.card_title || card.unit_name || '漢字'
+  const newTerms = card.new_terms || ''
+  // 新出漢字フィールドがあればそこから漢字を抽出（より正確）
+  // なければ問題文から抽出（ただし一般的な漢字=教/科/書/読 等は除外）
+  const commonKanji = '教科書読詩作文章問題答解説明内容確認選次以下上中正解不同様各全部分出入前後左右大小高低長短新古'
+  let kanjiSource = newTerms || problem
+  const kanjiChars = (kanjiSource.match(/[\u4e00-\u9faf]/g) || [])
+    .filter(k => !commonKanji.includes(k))
+    .filter((v, i, a) => a.indexOf(v) === i)
+    .slice(0, 6)
   
   container.innerHTML = `
     <div class="p-4 bg-gradient-to-br from-red-50 to-orange-50 rounded-xl border-2 border-red-200">
@@ -10291,7 +10425,7 @@ function renderMathGeneralVisual(container, card) {
   }
   
   container.innerHTML = `
-    <div class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
+    <div class="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 widget-animate-in">
       <div class="flex items-center gap-2 mb-3">
         <span class="bg-blue-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-calculator mr-1"></i>算数・数学サポート</span>
         <span class="text-xs text-gray-500">${unit}</span>
@@ -10348,13 +10482,56 @@ function renderScienceGeneralVisual(container, card) {
 
 function renderKokugoGeneralVisual(container, card) {
   const title = card.card_title || card.unit_name || ''
+  const problem = card.problem_text || card.problem_description || ''
   const searchQ = encodeURIComponent(title.replace(/[！!？?]/g, '').substring(0, 20) + ' 国語 わかりやすい')
+  
+  // 詩・物語・読み物の判定
+  const isPoetry = /詩|俳句|短歌|百人一首/.test(title + ' ' + problem)
+  const isStory = /物語|お話|読みましょう|読んで|場面|気持ち/.test(title + ' ' + problem)
+  
+  // 問題文から重要キーワードを抽出（名詞的なもの）
+  const keywords = (problem.match(/「[^」]+」/g) || []).slice(0, 5)
+  const importantWords = problem.replace(/[「」『』（）()。、!！?？\n\r]/g, ' ').split(/\s+/).filter(w => w.length >= 2 && w.length <= 8).slice(0, 8)
+  const uniqueWords = [...new Set([...keywords, ...importantWords.slice(0, 5)])]
+  
   container.innerHTML = `
-    <div class="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200">
+    <div class="p-4 bg-gradient-to-br ${isPoetry ? 'from-rose-50 to-amber-50' : isStory ? 'from-emerald-50 to-teal-50' : 'from-amber-50 to-orange-50'} rounded-xl border-2 ${isPoetry ? 'border-rose-200' : isStory ? 'border-emerald-200' : 'border-amber-200'} widget-animate-in" style="position:relative;overflow:hidden;">
       <div class="flex items-center gap-2 mb-3">
-        <span class="bg-amber-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-book-open mr-1"></i>国語サポート</span>
+        <span class="bg-${isPoetry ? 'rose' : isStory ? 'emerald' : 'amber'}-600 text-white text-sm font-bold px-3 py-1 rounded-full">
+          <i class="fas ${isPoetry ? 'fa-feather-alt' : isStory ? 'fa-book-reader' : 'fa-book-open'} mr-1"></i>
+          ${isPoetry ? '詩を楽しもう' : isStory ? 'お話を読もう' : '国語サポート'}
+        </span>
         <span class="text-xs text-gray-500">${title}</span>
       </div>
+      
+      ${isPoetry ? `
+      <div class="bg-white rounded-lg p-4 border mb-3 text-center" style="font-family:'Noto Serif JP',serif;">
+        <p class="text-sm text-gray-500 mb-2"><i class="fas fa-music mr-1"></i>声に出して読んでみよう</p>
+        <div id="poetry-lines-${container.id}" class="text-lg leading-loose text-gray-800">
+          ${problem.split(/[。\n]/).filter(l => l.trim()).slice(0, 6).map((line, i) => 
+            '<span class="poetry-line inline-block px-1 py-0.5 rounded cursor-pointer transition-all hover:bg-rose-100" style="animation:widgetSlideIn 0.3s ease ' + (i*0.1) + 's both" onclick="highlightPoetryLine(this)">' + line.trim() + '</span><br>'
+          ).join('')}
+        </div>
+        <div class="mt-3 flex flex-wrap gap-1 justify-center">
+          <button onclick="readPoetryAloud('${container.id}')" class="bg-rose-500 hover:bg-rose-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+            <i class="fas fa-volume-up mr-1"></i>音読
+          </button>
+          <button onclick="shufflePoetryWords('${container.id}')" class="bg-amber-500 hover:bg-amber-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
+            <i class="fas fa-random mr-1"></i>ことばシャッフル
+          </button>
+        </div>
+      </div>
+      ` : `
+      <div class="bg-white rounded-lg p-3 border mb-3">
+        ${uniqueWords.length > 0 ? `
+        <p class="text-xs font-bold text-gray-600 mb-2"><i class="fas fa-key mr-1"></i>キーワード</p>
+        <div class="flex flex-wrap gap-1 justify-center">
+          ${uniqueWords.map((w, i) => '<span class="inline-block bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full font-bold cursor-pointer hover:bg-amber-200 transition" style="animation:widgetSlideIn 0.2s ease ' + (i*0.05) + 's both" onclick="this.classList.toggle(\\x27ring-2\\x27);this.classList.toggle(\\x27ring-amber-400\\x27)">' + w + '</span>').join('')}
+        </div>
+        ` : '<p class="text-sm text-gray-500 text-center">学習サポート</p>'}
+      </div>
+      `}
+      
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画で学ぶ</a>
         <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
@@ -10390,7 +10567,7 @@ function renderUniversalVisual(container, card) {
   const uniqueKw = [...new Set(keywords)].filter(k => k.length >= 2).slice(0, 5)
   
   container.innerHTML = `
-    <div class="p-4 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border-2 border-gray-200">
+    <div class="p-4 bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl border-2 border-gray-200 widget-animate-in">
       <div class="flex items-center gap-2 mb-3">
         <span class="bg-gray-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-lightbulb mr-1"></i>学習サポート</span>
         <span class="text-xs text-gray-500">${subject} ${unit}</span>
@@ -10591,6 +10768,68 @@ function renderFallbackVisual(container, card) {
 
 window.initVisualWidgets = initVisualWidgets
 window.renderVisualWidget = renderVisualWidget
+
+// ========== 動的ウィジェット: 詩の音読ハイライト ==========
+function highlightPoetryLine(el) {
+  // 前の選択を解除
+  el.parentElement.querySelectorAll('.poetry-line').forEach(l => {
+    l.classList.remove('bg-rose-200', 'font-bold', 'text-rose-700')
+  })
+  el.classList.add('bg-rose-200', 'font-bold', 'text-rose-700')
+  el.classList.add('widget-bounce')
+  setTimeout(() => el.classList.remove('widget-bounce'), 600)
+  try { TactileSounds.play('tap') } catch(e) {}
+}
+window.highlightPoetryLine = highlightPoetryLine
+
+function readPoetryAloud(containerId) {
+  if (!('speechSynthesis' in window)) { alert('お使いのブラウザでは音声読み上げができません'); return }
+  const container = document.getElementById(containerId) || document.querySelector('[id$="' + containerId + '"]')?.closest('[id^="visual-widget"]')
+  if (!container) return
+  const lines = container.querySelectorAll('.poetry-line')
+  if (lines.length === 0) return
+  
+  let idx = 0
+  function speakNext() {
+    if (idx >= lines.length) {
+      lines.forEach(l => l.classList.remove('bg-rose-200', 'font-bold', 'text-rose-700'))
+      return
+    }
+    lines.forEach(l => l.classList.remove('bg-rose-200', 'font-bold', 'text-rose-700'))
+    lines[idx].classList.add('bg-rose-200', 'font-bold', 'text-rose-700')
+    lines[idx].scrollIntoView({ behavior: 'smooth', block: 'center' })
+    
+    const utter = new SpeechSynthesisUtterance(lines[idx].textContent)
+    utter.lang = 'ja-JP'
+    utter.rate = 0.85
+    utter.onend = () => { idx++; setTimeout(speakNext, 300) }
+    speechSynthesis.speak(utter)
+  }
+  speechSynthesis.cancel()
+  speakNext()
+}
+window.readPoetryAloud = readPoetryAloud
+
+function shufflePoetryWords(containerId) {
+  const poetryDiv = document.getElementById('poetry-lines-' + containerId)
+  if (!poetryDiv) return
+  const lines = Array.from(poetryDiv.querySelectorAll('.poetry-line'))
+  if (lines.length < 2) return
+  // シャッフル
+  for (let i = lines.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [lines[i], lines[j]] = [lines[j], lines[i]]
+  }
+  poetryDiv.innerHTML = ''
+  lines.forEach((l, i) => {
+    l.style.animation = 'widgetSlideIn 0.3s ease ' + (i * 0.1) + 's both'
+    l.classList.add('bg-amber-100', 'border', 'border-amber-300', 'mb-1')
+    poetryDiv.appendChild(l)
+    poetryDiv.appendChild(document.createElement('br'))
+  })
+  try { TactileSounds.play('shuffle') } catch(e) {}
+}
+window.shufflePoetryWords = shufflePoetryWords
 
 // ====================================================================
 // /自動視覚支援ウィジェットエンジン END
