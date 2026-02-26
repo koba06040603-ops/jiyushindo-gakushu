@@ -2950,8 +2950,72 @@ async function updateUnitList() {
 }
 
 // 単元を選択
-function selectUnit(curriculumId) {
+async function selectUnit(curriculumId) {
   state.selectedCurriculumId = curriculumId
+  
+  // まずカリキュラムのカード数を確認
+  try {
+    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    const { curriculum, courses } = response.data
+    const totalCards = (courses || []).reduce((sum, c) => sum + (c.cards?.length || 0), 0)
+    
+    if (totalCards === 0) {
+      // カードが0枚：生成確認ダイアログを表示
+      state.selectedCurriculum = curriculum
+      state.courses = courses || []
+      
+      const app = document.getElementById('app')
+      app.innerHTML = `
+        <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
+          <div class="container mx-auto px-4 max-w-3xl">
+            <button onclick="renderTopPage()" class="text-indigo-600 hover:text-indigo-800 flex items-center text-lg font-semibold transition mb-6">
+              <i class="fas fa-arrow-left mr-2"></i>トップページにもどる
+            </button>
+            
+            <div class="bg-white rounded-2xl shadow-2xl p-8 text-center">
+              <div class="mb-6">
+                <div class="inline-flex items-center justify-center w-24 h-24 bg-purple-100 rounded-full mb-4">
+                  <i class="fas fa-wand-magic-sparkles text-4xl text-purple-600"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">${curriculum.unit_name}</h2>
+                <p class="text-gray-500">${curriculum.grade} ${curriculum.subject} — ${curriculum.textbook_company || ''}</p>
+              </div>
+              
+              <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-6 mb-6">
+                <p class="text-lg text-yellow-800 font-bold mb-2">
+                  <i class="fas fa-info-circle mr-2"></i>この単元の学習カードはまだ生成されていません
+                </p>
+                <p class="text-sm text-yellow-700">
+                  AIが3コース（じっくり・しっかり・ぐんぐん）×各8〜10枚の学習カードを自動生成します。<br>
+                  約1〜2分で完成します。
+                </p>
+              </div>
+              
+              <div class="flex flex-col gap-4 max-w-md mx-auto">
+                <button onclick="autoGenerateCardsForCurriculum(${curriculumId})"
+                  class="bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-bold py-5 px-8 rounded-xl text-xl transition shadow-2xl flex items-center justify-center group">
+                  <i class="fas fa-play-circle mr-3 text-2xl group-hover:animate-bounce"></i>
+                  学習カードを自動生成する
+                  <i class="fas fa-arrow-right ml-3 group-hover:translate-x-2 transition-transform"></i>
+                </button>
+                <button onclick="loadGuidePage(${curriculumId})"
+                  class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-xl transition">
+                  <i class="fas fa-book-open mr-2"></i>そのまま学習のてびきを開く（カードなし）
+                </button>
+              </div>
+              
+              <p class="text-xs text-gray-400 mt-4">※ 生成後に内容を確認・編集できます</p>
+            </div>
+          </div>
+        </div>
+      `
+      return
+    }
+  } catch (e) {
+    console.warn('カード数確認エラー、てびきページに遷移:', e.message)
+  }
+  
+  // カードがある場合は通常通りてびきページへ
   loadGuidePage(curriculumId)
 }
 
