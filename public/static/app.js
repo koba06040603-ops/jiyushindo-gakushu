@@ -12935,7 +12935,8 @@ function gradeConstructionDrawing(uid) {
     else results.push({ok: false, text: '❌ Oを中心に円弧を描こう'})
 
     if (arcs.length >= 3) { results.push({ok: true, text: '✅ 3つ以上の円弧を描けた'}); score += 25 }
-    else if (arcs.length >= 2) { results.push({ok: true, text: '⚠️ もう少し円弧が必要かも'}); score += 15 }
+    else if (arcs.length >= 2) { results.push({ok: false, text: '❌ もう1つ円弧が必要（辺上の2点から交点を求めよう）'}); score += 15 }
+    else { results.push({ok: false, text: '❌ 3つの円弧が必要（O中心→辺上の2点中心→交点）'}) }
     
     if (lines.length >= 1) { results.push({ok: true, text: '✅ 二等分線を引けた'}); score += 25 }
     else results.push({ok: false, text: '❌ 頂点Oから交点を通る直線を引こう'})
@@ -13454,13 +13455,15 @@ async function gradeAnswer(correctAnswer) {
         const resultDiv = document.getElementById('gradeResult')
         if (!resultDiv) return
         
-        const isPass = gradeResult.score >= 60
+        // ★ 作図は全項目クリア（100点）のみ合格
+        const isPerfect = gradeResult.results.every(r => r.ok)
+        const failedItems = gradeResult.results.filter(r => !r.ok)
         
-        if (isPass) {
+        if (isPerfect) {
           // 正解音
           try {
             const ac = new (window.AudioContext || window.webkitAudioContext)()
-            ;[523, 659, 784].forEach((freq, i) => {
+            ;[523, 659, 784, 1047].forEach((freq, i) => {
               const osc = ac.createOscillator(); const gain = ac.createGain()
               osc.type = 'triangle'; osc.frequency.value = freq
               gain.gain.setValueAtTime(0.2, ac.currentTime + i*0.15)
@@ -13471,42 +13474,53 @@ async function gradeAnswer(correctAnswer) {
           } catch(e) {}
         }
         
-        resultDiv.innerHTML = `
-          <div class="${isPass ? 'bg-green-50 border-2 border-green-400' : 'bg-amber-50 border-2 border-amber-400'} rounded-xl p-5" style="animation: correctPop 0.6s ease-out">
+        resultDiv.innerHTML = isPerfect ? `
+          <div class="bg-green-50 border-2 border-green-400 rounded-xl p-5" style="animation: correctPop 0.6s ease-out">
             <div class="text-center mb-3">
-              <div class="text-5xl mb-2">${isPass ? (gradeResult.score >= 90 ? '🎉' : '👏') : '💪'}</div>
-              <p class="text-2xl font-bold ${isPass ? 'text-green-700' : 'text-amber-700'}">${gradeResult.score}点！${isPass ? (gradeResult.score >= 90 ? 'すばらしい！' : 'よくできた！') : 'もう少し！'}</p>
+              <div class="text-5xl mb-2">🎉</div>
+              <p class="text-2xl font-bold text-green-700">完璧な作図！</p>
+              <p class="text-sm text-green-600 mt-1">すべての手順が正しくできています！</p>
             </div>
             <div class="space-y-2 mt-3">
               ${gradeResult.results.map(r => `
-                <div class="flex items-center gap-2 p-2 rounded-lg ${r.ok ? 'bg-green-50' : 'bg-red-50'}">
+                <div class="flex items-center gap-2 p-2 rounded-lg bg-green-50">
                   <span class="text-base">${r.text}</span>
                 </div>
               `).join('')}
             </div>
-            ${!isPass ? `
-              <div class="mt-4 bg-blue-50 rounded-lg p-3">
-                <p class="text-sm font-bold text-blue-800 mb-1"><i class="fas fa-lightbulb mr-1"></i>ヒント</p>
-                <p class="text-xs text-blue-700">上の図解を参考にして、もう一度やってみよう！「元に戻す」ボタンで最後の操作を取り消せるよ。</p>
-              </div>
-              <button onclick="document.getElementById('gradeResult').classList.add('hidden')"
-                      class="mt-3 w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl font-bold transition hover:from-blue-600 hover:to-indigo-700">
-                <i class="fas fa-redo mr-2"></i>もう一度チャレンジ！
-              </button>
-            ` : `
-              <div class="mt-3 text-center">
-                <p class="text-sm text-green-600">作図の実技がしっかりできています！</p>
-              </div>
-            `}
           </div>
-          <style>
-            @keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
-          </style>
+          <style>@keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }</style>
+        ` : `
+          <div class="bg-amber-50 border-2 border-amber-400 rounded-xl p-5" style="animation: correctPop 0.6s ease-out">
+            <div class="text-center mb-3">
+              <div class="text-4xl mb-2">💪</div>
+              <p class="text-xl font-bold text-amber-700">あと少し！</p>
+              <p class="text-sm text-amber-600 mt-1">下のチェックリストを確認して、もう一度やってみよう</p>
+            </div>
+            <div class="space-y-2 mt-3">
+              <p class="text-xs font-bold text-gray-700 mb-1">チェックリスト：</p>
+              ${gradeResult.results.map(r => `
+                <div class="flex items-center gap-2 p-2 rounded-lg ${r.ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
+                  <span class="text-base">${r.text}</span>
+                </div>
+              `).join('')}
+            </div>
+            <div class="mt-4 bg-blue-50 rounded-lg p-3">
+              <p class="text-sm font-bold text-blue-800 mb-1"><i class="fas fa-lightbulb mr-1"></i>できていないところ</p>
+              <ul class="text-xs text-blue-700 space-y-1">
+                ${failedItems.map(r => `<li>・${r.text.replace(/^[❌⚠️]\s*/, '')}</li>`).join('')}
+              </ul>
+            </div>
+            <button onclick="document.getElementById('gradeResult').classList.add('hidden')"
+                    class="mt-3 w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 rounded-xl font-bold transition hover:from-blue-600 hover:to-indigo-700">
+              <i class="fas fa-redo mr-2"></i>もう一度チャレンジ！
+            </button>
+          </div>
+          <style>@keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }</style>
         `
         resultDiv.classList.remove('hidden')
         
-        // 合格ならgradeButtonを更新
-        if (isPass) {
+        if (isPerfect) {
           const gradeBtn = document.getElementById('gradeBtn')
           if (gradeBtn) {
             gradeBtn.className = 'w-full bg-green-500 text-white py-4 px-6 rounded-xl font-bold text-lg cursor-default'
@@ -13552,6 +13566,29 @@ async function gradeAnswer(correctAnswer) {
       return normalizedStudent.includes(normEx) || normEx.includes(normalizedStudent)
     })
     console.log('📝 自由記述判定:', { examples, openEndedMatch, normalizedStudent })
+  }
+  
+  // 判定方法0b: 性格・特徴・理由など複数回答可の問題
+  // 正解が「A、B、C」のように読点区切りで複数の短い特徴を列挙している場合、
+  // そのうち1つでも回答に含まれていれば正解とする
+  let multiTraitMatch = false
+  const correctTraits = normalizedCorrect.split(/[、,。・\/]/).map(s => s.trim()).filter(s => s.length >= 2 && s.length <= 20)
+  if (correctTraits.length >= 2 && !normalizedCorrect.match(/\d{2,}/)) {
+    // 数値が主体でない、かつ2つ以上の短い語句に分割できる場合
+    multiTraitMatch = correctTraits.some(trait => {
+      // 生徒の回答が特徴語句を含む or 特徴語句が生徒の回答を含む
+      return normalizedStudent.includes(trait) || trait.includes(normalizedStudent)
+    })
+    // さらに: 生徒の回答を分割して各語句が正解の特徴と部分一致するかも判定
+    if (!multiTraitMatch) {
+      const studentParts = normalizedStudent.split(/[、,。・\/]/).map(s => s.trim()).filter(s => s.length >= 2)
+      multiTraitMatch = studentParts.some(sp => 
+        correctTraits.some(trait => sp.includes(trait) || trait.includes(sp))
+      )
+    }
+    if (multiTraitMatch) {
+      console.log('📝 性格・特徴判定:', { correctTraits, multiTraitMatch, normalizedStudent })
+    }
   }
   
   // 判定方法1: 完全一致 or 包含関係
@@ -13604,7 +13641,7 @@ async function gradeAnswer(correctAnswer) {
   const correctKeyValues = extractKeyValues(normalizedCorrect)
   const keyValuesMatch = correctKeyValues.length > 0 && correctKeyValues.every(v => normalizedStudent.includes(v))
   
-  const isCorrect = openEndedMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
+  const isCorrect = openEndedMatch || multiTraitMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
     // 追加判定: 人名・選択肢判定（「Aさん」「Bさん」など比較問題）
     const personMatch = normalizedCorrect.match(/([abcABC][さくんちゃん]*|[ア-ン]+さん)/) 
     if (personMatch && normalizedStudent.includes(personMatch[0])) return true
