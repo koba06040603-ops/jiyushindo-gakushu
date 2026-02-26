@@ -3652,7 +3652,7 @@ async function loadGuidePage(curriculumId) {
                   ` : `
                   <div class="bg-white rounded-lg p-3 border border-dashed border-gray-300 text-center">
                     <i class="fas fa-clipboard-check text-gray-400 text-lg mb-1"></i>
-                    <p class="text-xs text-gray-500">Step 1で生成すると、ここに表示されます</p>
+                    <p class="text-xs text-gray-500">ステップ1で生成すると、ここに表示されます</p>
                   </div>`}
                 </div>
               </div>
@@ -3918,21 +3918,21 @@ async function loadGuidePage(curriculumId) {
                     <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-pink-100 flex items-center justify-center">
                       <i class="fas fa-robot text-pink-600 text-xl"></i>
                     </div>
-                    <h4 class="font-bold text-pink-800 text-sm mb-1">Step 1</h4>
+                    <h4 class="font-bold text-pink-800 text-sm mb-1">ステップ 1</h4>
                     <p class="text-xs text-gray-600">AIが児童データを分析し個別カードを生成</p>
                   </div>
                   <div class="bg-white rounded-xl p-4 text-center border-2 border-orange-200 shadow-sm">
                     <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-orange-100 flex items-center justify-center">
                       <i class="fas fa-clipboard-check text-orange-600 text-xl"></i>
                     </div>
-                    <h4 class="font-bold text-orange-800 text-sm mb-1">Step 2</h4>
+                    <h4 class="font-bold text-orange-800 text-sm mb-1">ステップ 2</h4>
                     <p class="text-xs text-gray-600">教師が内容を確認・編集</p>
                   </div>
                   <div class="bg-white rounded-xl p-4 text-center border-2 border-green-200 shadow-sm">
                     <div class="w-12 h-12 mx-auto mb-2 rounded-full bg-green-100 flex items-center justify-center">
                       <i class="fas fa-paper-plane text-green-600 text-xl"></i>
                     </div>
-                    <h4 class="font-bold text-green-800 text-sm mb-1">Step 3</h4>
+                    <h4 class="font-bold text-green-800 text-sm mb-1">ステップ 3</h4>
                     <p class="text-xs text-gray-600">児童に個別配信して学習開始</p>
                   </div>
                 </div>
@@ -6941,7 +6941,7 @@ async function generateImageForCardAsImage(cardId, description) {
         <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-3">
           <i class="fas fa-image text-2xl text-blue-500 animate-pulse"></i>
         </div>
-        <p class="text-sm text-blue-800 font-bold">Nano Banana で画像を生成中...</p>
+        <p class="text-sm text-blue-800 font-bold">AIで画像を生成中...</p>
         <p class="text-xs text-gray-500 mt-1">10〜30秒ほどお待ちください</p>
       </div>`
   }
@@ -7005,7 +7005,7 @@ async function generateImageForCardNBPro(cardId, description) {
         <div class="inline-flex items-center justify-center w-16 h-16 bg-pink-100 rounded-full mb-3">
           <i class="fas fa-star text-2xl text-pink-500 animate-pulse"></i>
         </div>
-        <p class="text-sm text-pink-800 font-bold">Nano Banana Pro で高精度画像を生成中...</p>
+        <p class="text-sm text-pink-800 font-bold">AIで高精度画像を生成中...</p>
         <p class="text-xs text-gray-500 mt-1">15〜40秒ほどお待ちください（高品質モデル）</p>
         <div class="mt-3 max-w-xs mx-auto"><div class="h-2 bg-pink-200 rounded-full overflow-hidden"><div class="h-full bg-pink-500 rounded-full" style="width:0%; animation: smooth-progress 30s ease-out forwards;"></div></div></div>
       </div>`
@@ -7039,7 +7039,7 @@ async function generateImageForCardNBPro(cardId, description) {
                  class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-pink-200" style="max-height: 400px;">
             <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
               <span class="bg-pink-100 text-pink-700 text-xs px-3 py-1 rounded-full font-bold">
-                <i class="fas fa-star mr-1"></i>${res.data.model || 'Nano Banana Pro'}（${((res.data.generation_time_ms||0)/1000).toFixed(1)}秒）
+                <i class="fas fa-star mr-1"></i>${res.data.model || 'AI高精度画像'}（${((res.data.generation_time_ms||0)/1000).toFixed(1)}秒）
               </span>
               <button onclick="openPromptImageGenerate(${cardId}, 'nb_pro')" class="text-xs text-pink-500 hover:text-pink-700 underline"><i class="fas fa-star mr-1"></i>プロンプト指定で再生成</button>
               <button onclick="generateImageForCard(${cardId}, '${safeDesc}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-chart-line mr-1"></i>グラフで再生成</button>
@@ -7280,7 +7280,7 @@ function openPromptImageGenerate(cardId, mode) {
   
   const defaultPrompt = `${cardTitle}\n${problemText.substring(0, 300)}${answerText ? '\n\n【正解の数値・解答データ】\n' + answerText : ''}${answerExplanation ? '\n【解説】' + answerExplanation.substring(0, 200) : ''}`
   
-  const modeLabel = mode === 'nb_pro' ? '⭐ Nano Banana Pro 高精度画像' : mode === 'jsxgraph' ? '📊 JSXGraphグラフ再生成' : '🔄 AI画像で差し替え'
+  const modeLabel = mode === 'nb_pro' ? '⭐ AI高精度画像' : mode === 'jsxgraph' ? '📊 JSXGraphグラフ再生成' : '🔄 AI画像で差し替え'
   const modeColor = mode === 'nb_pro' ? 'pink' : mode === 'jsxgraph' ? 'blue' : 'purple'
   
   const modal = document.createElement('div')
@@ -20212,7 +20212,7 @@ async function showPersonalizedDeliveryPanel(curriculumId) {
     const approved = personalizedCourses.filter(c => approvedIds.includes(c.id))
     
     if (approved.length === 0) {
-      alert('配信可能な承認済みコースがありません。先にStep 2で承認してください。')
+      alert('配信可能な承認済みコースがありません。先にステップ2で承認してください。')
       return
     }
     
@@ -30026,9 +30026,9 @@ function showLearningStyleChart(patterns) {
           VAKモデルは、学習者の優勢な感覚モダリティを3つに分類します：
         </p>
         <ul class="text-sm text-gray-700 space-y-1 ml-4">
-          <li>• <strong>Visual（視覚型）</strong>: 図解、動画、カラーコーディングを好む</li>
-          <li>• <strong>Auditory（聴覚型）</strong>: 音声説明、議論、リズムを好む</li>
-          <li>• <strong>Kinesthetic（体感型）</strong>: 実践、操作、身体活動を好む</li>
+          <li>• <strong>視覚型</strong>: 図解、動画、カラーコーディングを好む</li>
+          <li>• <strong>聴覚型</strong>: 音声説明、議論、リズムを好む</li>
+          <li>• <strong>体感型</strong>: 実践、操作、身体活動を好む</li>
         </ul>
       </div>
     </div>
@@ -33610,7 +33610,7 @@ function showLearningStyleSamples() {
               <div class="text-center mb-4">
                 <i class="fas fa-eye text-5xl text-red-600 mb-2"></i>
                 <h3 class="text-2xl font-bold text-red-800">視覚優位</h3>
-                <p class="text-sm text-red-700 font-bold">Visual Learner</p>
+                <p class="text-sm text-red-700 font-bold">見て学ぶタイプ</p>
               </div>
               <ul class="space-y-2 text-gray-800 text-sm">
                 <li>✓ 図表・イラスト・グラフで理解しやすい</li>
@@ -33624,7 +33624,7 @@ function showLearningStyleSamples() {
               <div class="text-center mb-4">
                 <i class="fas fa-volume-up text-5xl text-green-600 mb-2"></i>
                 <h3 class="text-2xl font-bold text-green-800">聴覚優位</h3>
-                <p class="text-sm text-green-700 font-bold">Auditory Learner</p>
+                <p class="text-sm text-green-700 font-bold">聞いて学ぶタイプ</p>
               </div>
               <ul class="space-y-2 text-gray-800 text-sm">
                 <li>✓ 言葉での説明が理解しやすい</li>
@@ -33638,7 +33638,7 @@ function showLearningStyleSamples() {
               <div class="text-center mb-4">
                 <i class="fas fa-hands text-5xl text-blue-600 mb-2"></i>
                 <h3 class="text-2xl font-bold text-blue-800">体験優位</h3>
-                <p class="text-sm text-blue-700 font-bold">Kinesthetic Learner</p>
+                <p class="text-sm text-blue-700 font-bold">体験して学ぶタイプ</p>
               </div>
               <ul class="space-y-2 text-gray-800 text-sm">
                 <li>✓ 実際に体を動かして学ぶ</li>
