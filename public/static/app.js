@@ -1032,6 +1032,22 @@ function getDifficultyLevel(courseLevel) {
   return 'medium'
 }
 
+// 難易度レベルの日本語表示ラベル
+function getDifficultyLabel(level) {
+  const labels = {
+    'easy': 'きほん',
+    'minimum': 'きほん',
+    'basic': 'きほん',
+    'standard': 'ふつう',
+    'medium': 'ふつう',
+    'normal': 'ふつう',
+    'hard': 'チャレンジ',
+    'advanced': 'はってん',
+    'very_hard': 'とてもむずかしい'
+  }
+  return labels[level] || level || 'ふつう'
+}
+
 // 学習プロファイル更新（バックグラウンド）
 async function updateLearningProfile() {
   try {
@@ -5327,7 +5343,7 @@ async function selectCourse(courseId) {
               <h4 class="text-lg font-bold text-gray-700 mb-3">${card.card_title}</h4>
               <div class="flex items-center text-sm text-gray-500 mb-3">
                 <i class="fas fa-signal mr-2"></i>
-                <span>${card.difficulty_level === 'minimum' ? '基本' : card.difficulty_level === 'standard' ? '標準' : '発展'}</span>
+                <span>${getDifficultyLabel(card.difficulty_level)}</span>
               </div>
               ${card.real_world_connection ? `
                 <p class="text-xs text-gray-600 bg-gray-50 rounded p-2">
@@ -22543,7 +22559,7 @@ function showTeacherOverview(unitData) {
                     </div>
                     <div class="flex-1">
                       <span class="text-xs bg-yellow-200 text-yellow-800 px-3 py-1 rounded-full font-bold">
-                        難易度: ${problem.difficulty || 'basic'}
+                        難易度: ${getDifficultyLabel(problem.difficulty)}
                       </span>
                     </div>
                   </div>
@@ -48860,7 +48876,7 @@ function showPersonalizedCourseReview(data) {
                     <span class="text-xs px-2 py-1 rounded-full ${
                       card.difficulty_level === 'easy' ? 'bg-green-100 text-green-700' :
                       card.difficulty_level === 'hard' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                    }">${card.difficulty_level || 'standard'}</span>
+                    }">${getDifficultyLabel(card.difficulty_level)}</span>
                   </div>
                   ${card.personalization_note ? '<div class="bg-indigo-50 border border-indigo-200 rounded p-2 mb-2 text-xs"><i class="fas fa-brain text-indigo-500 mr-1"></i><span class="font-bold text-indigo-700">なぜこの問題か:</span> <span class="text-indigo-600">' + card.personalization_note + '</span></div>' : ''}
                   
@@ -50838,7 +50854,7 @@ async function showTeacherSupportDashboard(curriculumId) {
                     var diffColor = cn.difficulty_level === 'easy' ? 'bg-green-100 text-green-700' : cn.difficulty_level === 'hard' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
                     return '<div class="flex items-start gap-2 text-xs">' +
                       '<span class="w-5 h-5 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-xs shrink-0">' + (i+1) + '</span>' +
-                      '<div class="flex-1"><span class="font-bold text-gray-800">' + (cn.card_title || '') + '</span> <span class="' + diffColor + ' px-1.5 py-0.5 rounded-full text-xs">' + (cn.difficulty_level || '') + '</span>' +
+                      '<div class="flex-1"><span class="font-bold text-gray-800">' + (cn.card_title || '') + '</span> <span class="' + diffColor + ' px-1.5 py-0.5 rounded-full text-xs">' + getDifficultyLabel(cn.difficulty_level) + '</span>' +
                       (cn.personalization_note ? '<p class="text-indigo-600 mt-0.5"><i class="fas fa-brain mr-1"></i>' + cn.personalization_note + '</p>' : '<p class="text-gray-400">（根拠未生成）</p>') +
                       '</div></div>'
                   }).join('') +
