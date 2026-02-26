@@ -7212,11 +7212,15 @@ ${cardContext ? `
 ${cardContext.problem_description}
 
 📚 新しく習う言葉: ${cardContext.new_terms || 'なし'}
+${cardContext.answer ? `\n📝 正解・模範解答:\n${cardContext.answer}` : ''}
+${cardContext.hints ? `\n💡 ヒント:\n${cardContext.hints}` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 💡 あなたは上記の問題について質問されています。
    「問題が見えない」「わからない」とは絶対に言わないでください。
    上記の学習内容を参照して、必ず具体的に答えてください。
+   質問が上記の問題内容に関連する場合は、問題文の内容を参照して丁寧に説明してください。
+   子どもが問題文の一部を使って質問した場合でも、問題全体の文脈を踏まえて回答してください。
 ` : ''}
 
 【絶対ルール】
@@ -7281,9 +7285,9 @@ ${cardContext.problem_description}
     }
     
     // 会話履歴を含めてリクエスト
+    // Gemini API: system_instructionで指示を渡し、contentsは会話履歴のみ
     const contents = conversationHistory && conversationHistory.length > 0
       ? [
-          { parts: [{ text: systemPrompt }] },
           ...conversationHistory.map((msg: any) => ({
             role: msg.role === 'user' ? 'user' : 'model',
             parts: [{ text: msg.text }]
@@ -7291,12 +7295,7 @@ ${cardContext.problem_description}
           { role: 'user', parts: [{ text: message }] }
         ]
       : [
-          {
-            parts: [
-              { text: systemPrompt },
-              { text: `子どもの質問: ${message}` }
-            ]
-          }
+          { role: 'user', parts: [{ text: message }] }
         ]
 
     console.log('🚀 Calling Gemini API...')
@@ -7307,6 +7306,7 @@ ${cardContext.problem_description}
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
         contents,
         generationConfig: {
           temperature: 0.8,
@@ -8326,7 +8326,58 @@ app.get('/guide/:curriculumId', async (c) => {
 
   function askFriendGuide() {
     var card = ALL_CARDS[currentPage] || {};
-    alert('🤝 友達に聞いてみよう！\\n\\nまわりで同じカードをやっている友達に、\\n「' + (card.card_title || 'この問題') + '」について相談してみましょう。\\n\\nヒント: 自分の考えを先に伝えてから聞くと、\\nもっとわかりやすくなるよ！');
+    var cardId = card.id || card.card_id || 0;
+    var curriculumId = CURRICULUM.id || 0;
+    
+    // 友達リストをAPIから取得
+    fetch('/api/help/available-helpers/class1/' + curriculumId + '/' + cardId)
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        var helpers = data.helpers || [];
+        if (helpers.length === 0) {
+          // ヘルパーがいない場合は一般的なアドバイスを表示
+          showFriendModal(card, []);
+          return;
+        }
+        showFriendModal(card, helpers);
+      })
+      .catch(function() {
+        showFriendModal(card, []);
+      });
+  }
+
+  function showFriendModal(card, helpers) {
+    var existing = document.getElementById('friendModal');
+    if (existing) existing.remove();
+    
+    var modal = document.createElement('div');
+    modal.id = 'friendModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+    
+    var helperHTML = '';
+    if (helpers.length > 0) {
+      helperHTML = '<div style=\"margin-bottom:16px;\"><p style=\"font-weight:bold;color:#059669;margin-bottom:8px;\">🎉 この問題をクリアした友達：</p>';
+      helpers.forEach(function(h) {
+        helperHTML += '<div style=\"background:#ECFDF5;border:2px solid #6EE7B7;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:12px;\">' +
+          '<div style=\"width:40px;height:40px;border-radius:50%;background:#34D399;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;\">' + (h.student_number || '?') + '</div>' +
+          '<div><p style=\"font-weight:bold;font-size:1.1em;\">' + (h.name || '友達') + '</p><p style=\"font-size:0.85em;color:#6B7280;\">完了カード: ' + (h.total_completed || 0) + '枚</p></div></div>';
+      });
+      helperHTML += '</div>';
+    } else {
+      helperHTML = '<div style=\"background:#FEF3C7;border:2px solid #FCD34D;border-radius:12px;padding:16px;margin-bottom:16px;\">' +
+        '<p style=\"font-weight:bold;color:#92400E;\">まだこの問題をクリアした友達はいません。</p>' +
+        '<p style=\"font-size:0.9em;color:#78350F;margin-top:4px;\">まわりで同じカードをやっている友達に「' + (card.card_title || 'この問題') + '」について相談してみましょう。</p></div>';
+    }
+    
+    modal.innerHTML = '<div style=\"background:white;border-radius:16px;max-width:480px;width:100%;max-height:80vh;overflow:auto;padding:24px;box-shadow:0 25px 50px rgba(0,0,0,0.25);\">' +
+      '<h2 style=\"font-size:1.5em;font-weight:bold;color:#7C3AED;margin-bottom:16px;\">🤝 友達に聞いてみよう</h2>' +
+      helperHTML +
+      '<div style=\"background:#F0F9FF;border-radius:12px;padding:12px;margin-bottom:16px;\">' +
+        '<p style=\"font-size:0.9em;color:#1E40AF;\">💡 ヒント: 自分の考えを先に伝えてから聞くと、もっとわかりやすくなるよ！</p></div>' +
+      '<button onclick=\"this.closest(\\\'#friendModal\\\').remove()\" style=\"width:100%;background:#6B7280;color:white;font-weight:bold;padding:12px;border:none;border-radius:12px;font-size:1em;cursor:pointer;\">OK</button></div>';
+    
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
   }
 
   // === 採点機能 ===
@@ -8369,8 +8420,18 @@ app.get('/guide/:curriculumId', async (c) => {
     if (cDecs.length > 0) {
       decMatch = cDecs.every(function(d) { return ns.includes(d); });
     }
+    // 自由記述・例示型判定（「例：A、B、Cなど」→ いずれかにマッチすればOK）
+    var openEndedMatch = false;
+    if (/例[：:]|など$|等$|〜$|いずれか|のような|が考えられ/.test(nc)) {
+      var cleanedNc = nc.replace(/^例[：:]\\s*/, '').replace(/[、,]\\s*など$/, '').replace(/など$/, '').replace(/等$/, '');
+      var examples = cleanedNc.split(/[、,]/).filter(function(s) { return s.length >= 2; });
+      openEndedMatch = examples.some(function(ex) {
+        var nex = norm(ex);
+        return ns.includes(nex) || nex.includes(ns);
+      });
+    }
     
-    var isCorrect = exact || numMatch || kwMatch || fracMatch || decMatch;
+    var isCorrect = exact || numMatch || kwMatch || fracMatch || decMatch || openEndedMatch;
     
     resultDiv.style.display = 'block';
     
@@ -9992,6 +10053,13 @@ app.post('/api/ai/generate-course', async (c) => {
 - 各カードにAI先生からの励ましメッセージと学び方のアドバイスを含める
 - 3段階ヒントは「考える方向性」→「具体的手がかり」→「答えに近づく導き」の順に
 - 先生に質問するための「先生ヘルプ」用のキーワードを含める
+
+【超重要：一問一答形式】
+- 各カードには必ず1つの明確な問いだけを含めること
+- 「〜は何ですか。また、〜はどうですか。」のように複数の問いを1つの問題文に入れてはいけない
+- 複数の観点を問いたい場合は、別々のカードに分ける
+- answer（正解）は問題文に対して1つの明確な答えにする
+- 自由記述の場合は「例：A、B、Cなど」の形式で複数の解答例を示す
 
 【重要】以下のJSON形式で、必ず完全な${numCards}枚のカードを生成してください：
 

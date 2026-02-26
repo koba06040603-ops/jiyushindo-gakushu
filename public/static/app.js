@@ -6675,9 +6675,11 @@ async function askAI() {
     const cardData = window.currentCardData
     const card = cardData?.card || cardData // 構造に対応
     const cardContext = card ? {
-      card_title: card.card_title,
-      problem_description: card.problem_description,
-      new_terms: card.new_terms
+      card_title: card.card_title || '',
+      problem_description: card.problem_description || card.problem_text || card.problem_content || '',
+      new_terms: card.new_terms || '',
+      answer: card.correct_answer || card.answer || card.example_solution || '',
+      hints: Array.isArray(card.hints) ? card.hints.map(h => typeof h === 'string' ? h : h.hint_text || '').join('、') : ''
     } : null
     
     // 会話履歴をAPIに送信する形式に変換
@@ -8565,8 +8567,8 @@ function detectVisualWidget(card) {
   if (subject.includes('理科') && /元素|原子|分子|化学式|化合|酸化|還元|中和|水溶液|濃度|密度/.test(all)) return 'chemistry'
   // 理科：地学
   if (subject.includes('理科') && /地震|火山|岩石|地層|天気|気圧|前線|雲|風|湿度/.test(all)) return 'earth_science'
-  // 国語：漢字
-  if (subject.includes('国語') && /漢字|部首|画数|読み|書き|筆順|音読み|訓読み/.test(all)) return 'kanji'
+  // 国語：漢字（漢字練習・書き取り問題のみ。読解・詩・作文は除外）
+  if (subject.includes('国語') && /漢字|部首|画数|筆順|音読み|訓読み|書き取り|新出漢字/.test(all) && !/詩|読みましょう|読んで|物語|作者|気持ち|場面|文章|段落|説明文|語り手|作文/.test(all)) return 'kanji'
   // 国語：文法
   if (subject.includes('国語') && /主語|述語|修飾語|接続詞|助詞|品詞|文節|敬語|ことわざ|慣用句|四字熟語/.test(all)) return 'grammar'
   // 英語
@@ -12094,8 +12096,60 @@ function parseSubQuestions(problemText, answerText) {
   }
   if (currentQ) questions.push(currentQ)
   
-  // 小問が見つからなかった場合 → 1問として扱う
+  // 小問が見つからなかった場合 → 「また、」「そして」「さらに」で分割を試みる
   if (questions.length <= 1) {
+    const fullText = problemText.replace(/\n/g, ' ')
+    // 「〜ですか。また、〜」「〜なさい。そして、〜」「〜しょう。さらに、〜」パターン
+    const splitPatterns = [
+      /([^。]+(?:ですか|ください|なさい|ましょう|しょう)[。？?])\s*(?:また[、,]|そして[、,]|さらに[、,]|次に[、,]|それから[、,])/g
+    ]
+    
+    let splitParts = []
+    for (const pat of splitPatterns) {
+      const fullCopy = fullText
+      let lastIndex = 0
+      let match
+      pat.lastIndex = 0
+      while ((match = pat.exec(fullCopy)) !== null) {
+        splitParts.push(match[1].trim())
+        lastIndex = match.index + match[1].length
+      }
+      if (splitParts.length > 0) {
+        // 残りの部分を最後の小問として追加
+        const remaining = fullText.substring(lastIndex).replace(/^\s*(?:また[、,]|そして[、,]|さらに[、,]|次に[、,]|それから[、,])\s*/, '').trim()
+        if (remaining) splitParts.push(remaining)
+        break
+      }
+    }
+    
+    // 分割できなかった場合、「。」で終わる質問文を区切る（2つ以上の質問がある場合）
+    if (splitParts.length <= 1) {
+      // 「〜は誰ですか。」「〜はどのような様子ですか。」のようなパターンを探す
+      const questionSentences = fullText.match(/[^。]*(?:ですか|ください|なさい|ましょう|しょう|でしょう)[。？?]/g) || []
+      if (questionSentences.length >= 2) {
+        // 共通部分（文頭の導入文）を検出
+        let contextPart = ''
+        const firstQStart = fullText.indexOf(questionSentences[0])
+        if (firstQStart > 0) {
+          contextPart = fullText.substring(0, firstQStart).trim()
+        }
+        splitParts = questionSentences.map(q => (contextPart ? contextPart + ' ' : '') + q.trim())
+      }
+    }
+    
+    if (splitParts.length >= 2) {
+      // 正解テキストも分割
+      const splitAnswers = splitAnswerText(answerText, splitParts.length)
+      return splitParts.map((q, i) => ({
+        question: q,
+        answer: splitAnswers[i] || answerText,
+        context: '',
+        subQuestion: q,
+        index: i
+      }))
+    }
+    
+    // 分割できなかった場合 → 1問として扱う
     return [{
       question: problemText,
       answer: answerText,
@@ -12141,6 +12195,36 @@ function parseSubQuestions(problemText, answerText) {
     subQuestion: q.text,
     index: i
   }))
+}
+
+// 正解テキストを小問数に合わせて分割する
+function splitAnswerText(answerText, numParts) {
+  if (!answerText) return Array(numParts).fill('')
+  
+  // 「。」区切りで文を分割
+  const sentences = answerText.split(/(?<=[。？?])\s*/).filter(Boolean)
+  if (sentences.length >= numParts) {
+    const result = []
+    const perPart = Math.ceil(sentences.length / numParts)
+    for (let i = 0; i < numParts; i++) {
+      result.push(sentences.slice(i * perPart, (i + 1) * perPart).join(''))
+    }
+    return result
+  }
+  
+  // 「、」区切り
+  const parts = answerText.split(/[、,\n]/).map(s => s.trim()).filter(Boolean)
+  if (parts.length >= numParts) {
+    const result = []
+    const perPart = Math.ceil(parts.length / numParts)
+    for (let i = 0; i < numParts; i++) {
+      result.push(parts.slice(i * perPart, (i + 1) * perPart).join('、'))
+    }
+    return result
+  }
+  
+  // 分割できない場合は全体を各問に割り当て
+  return Array(numParts).fill(answerText)
 }
 
 // 一問一答モードを初期化
@@ -12325,6 +12409,22 @@ async function gradeAnswer(correctAnswer) {
   const normalizedStudent = normalize(studentAnswer)
   const normalizedCorrect = normalize(correctAnswer)
   
+  // 判定方法0: 自由記述・例示型回答の判定
+  // 「例：〜」「〜など」「〜等」の場合、例示のいずれかに合致すれば正解
+  const isOpenEndedAnswer = /例[：:]|など$|等$|〜$|いずれか|のような|が考えられ/.test(normalizedCorrect)
+  let openEndedMatch = false
+  if (isOpenEndedAnswer) {
+    // 「例：A、B、C、など」からA,B,Cを抽出
+    const cleanedCorrect = normalizedCorrect.replace(/^例[：:]\s*/, '').replace(/[、,]\s*など$/, '').replace(/など$/, '').replace(/等$/, '')
+    const examples = cleanedCorrect.split(/[、,]/).map(s => s.trim()).filter(s => s.length >= 2)
+    // 生徒の回答がいずれかの例示に含まれている or 例示が回答に含まれている
+    openEndedMatch = examples.some(ex => {
+      const normEx = normalize(ex)
+      return normalizedStudent.includes(normEx) || normEx.includes(normalizedStudent)
+    })
+    console.log('📝 自由記述判定:', { examples, openEndedMatch, normalizedStudent })
+  }
+  
   // 判定方法1: 完全一致 or 包含関係
   const exactOrContains = normalizedStudent === normalizedCorrect || 
                     normalizedCorrect.includes(normalizedStudent) || 
@@ -12375,7 +12475,7 @@ async function gradeAnswer(correctAnswer) {
   const correctKeyValues = extractKeyValues(normalizedCorrect)
   const keyValuesMatch = correctKeyValues.length > 0 && correctKeyValues.every(v => normalizedStudent.includes(v))
   
-  const isCorrect = exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
+  const isCorrect = openEndedMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
     // 追加判定: 人名・選択肢判定（「Aさん」「Bさん」など比較問題）
     const personMatch = normalizedCorrect.match(/([abcABC][さくんちゃん]*|[ア-ン]+さん)/) 
     if (personMatch && normalizedStudent.includes(personMatch[0])) return true
