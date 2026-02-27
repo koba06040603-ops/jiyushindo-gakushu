@@ -12445,14 +12445,13 @@ function initConstructionAnswerWidget(card) {
       </div>
 
       <!-- Canvas -->
-      <div class="relative bg-white border-2 border-gray-300 rounded-xl overflow-hidden shadow-inner" style="touch-action:none;">
+      <div class="relative bg-white border-2 border-gray-300 rounded-xl shadow-inner" style="touch-action:none; overflow:visible;">
         <canvas id="${uid}_canvas" width="600" height="450" 
-                style="width:100%; height:auto; display:block; cursor:crosshair;"
-                onpointerdown="constructionPointerDown(event,'${uid}')"
-                onpointermove="constructionPointerMove(event,'${uid}')"
-                onpointerup="constructionPointerUp(event,'${uid}')"
-                onpointerleave="constructionPointerUp(event,'${uid}')"></canvas>
+                style="width:100%; height:auto; display:block; cursor:crosshair; touch-action:none; -ms-touch-action:none; -webkit-touch-callout:none;"></canvas>
       </div>
+
+      <!-- デバッグ情報 -->
+      <div id="${uid}_debug" class="mt-1 text-xs text-orange-500 text-center hidden"></div>
 
       <!-- 描いた図形の情報 -->
       <div id="${uid}_info" class="mt-2 text-xs text-gray-500 text-center">円弧: 0 / 直線: 0</div>
@@ -12484,7 +12483,114 @@ function initConstructionAnswerWidget(card) {
 
   // 問題に応じた初期描画（線分ABなど）
   const canvas = document.getElementById(uid + '_canvas')
+  if (!canvas) { console.error('Canvas not found:', uid + '_canvas'); return false }
   const ctx = canvas.getContext('2d')
+  
+  // ★ イベントリスナーをプログラムで登録
+  // ポインターイベント（最優先）
+  const pDown = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log('🖱️ pointerdown on canvas:', uid, e.pointerType, e.clientX, e.clientY)
+    constructionPointerDown(e, uid)
+  }
+  const pMove = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    constructionPointerMove(e, uid)
+  }
+  const pUp = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    constructionPointerUp(e, uid)
+  }
+  canvas.addEventListener('pointerdown', pDown, { passive: false, capture: false })
+  canvas.addEventListener('pointermove', pMove, { passive: false, capture: false })
+  canvas.addEventListener('pointerup', pUp, { passive: false, capture: false })
+  canvas.addEventListener('pointerleave', pUp, { passive: false })
+  canvas.addEventListener('pointercancel', pUp, { passive: false })
+  
+  // マウスイベント（PointerEvent非対応 or フォールバック）
+  canvas.addEventListener('mousedown', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log('🖱️ mousedown on canvas:', uid)
+    constructionPointerDown(e, uid)
+  }, { passive: false })
+  canvas.addEventListener('mousemove', (e) => {
+    e.preventDefault()
+    constructionPointerMove(e, uid)
+  }, { passive: false })
+  canvas.addEventListener('mouseup', (e) => {
+    e.preventDefault()
+    constructionPointerUp(e, uid)
+  }, { passive: false })
+  
+  // タッチイベントフォールバック
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const touch = e.touches[0]
+    console.log('👆 touchstart on canvas:', uid, touch.clientX, touch.clientY)
+    constructionPointerDown({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} }, uid)
+  }, { passive: false })
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const touch = e.touches[0]
+    constructionPointerMove({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} }, uid)
+  }, { passive: false })
+  canvas.addEventListener('touchend', (e) => {
+    e.preventDefault()
+    constructionPointerUp({ preventDefault: ()=>{}, stopPropagation: ()=>{} }, uid)
+  }, { passive: false })
+  
+  // クリックイベント（最終フォールバック - ポインターが全く機能しない場合）
+  canvas.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log('🖱️ click on canvas (fallback):', uid)
+    // クリック = ポインターイベントが動いていない場合の応急対応
+    const st = window._constructionStates[uid]
+    if (st && !st._lastPointerTime || (Date.now() - (st?._lastPointerTime || 0)) > 500) {
+      constructionPointerDown(e, uid)
+      // 即座にupも発火（定規モードの場合はタップ2回で直線）
+      setTimeout(() => constructionPointerUp(e, uid), 50)
+    }
+  }, { passive: false })
+  
+  // Canvas要素のスタイルを強制（他のCSSで上書きされないように）
+  canvas.style.pointerEvents = 'auto'
+  canvas.style.touchAction = 'none'
+  canvas.style.userSelect = 'none'
+  canvas.style.webkitUserSelect = 'none'
+  canvas.style.msTouchAction = 'none'
+  canvas.style.webkitTouchCallout = 'none'
+  canvas.style.position = 'relative'
+  canvas.style.zIndex = '50'
+  
+  // 親要素チェーンの touch-action を修正（スクロール干渉防止）
+  let parent = canvas.parentElement
+  while (parent && parent !== document.body) {
+    const cs = getComputedStyle(parent)
+    if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
+      console.log('⚠️ 作図Canvas: スクロール可能な親を検出:', parent.tagName, parent.className?.substring(0, 50))
+    }
+    parent = parent.parentElement
+  }
+  
+  // canvas内のrect確認
+  const rect = canvas.getBoundingClientRect()
+  console.log('✅ 作図Canvas初期化完了:', uid, 'size:', canvas.width, 'x', canvas.height, 'rect:', rect.width.toFixed(0), 'x', rect.height.toFixed(0), 'at', rect.left.toFixed(0), ',', rect.top.toFixed(0))
+  
+  if (rect.width === 0 || rect.height === 0) {
+    console.error('❌ Canvas表示サイズが0です！レイアウトが完了していない可能性があります')
+    // 遅延で再試行
+    setTimeout(() => {
+      const r2 = canvas.getBoundingClientRect()
+      console.log('🔄 Canvas再チェック:', r2.width.toFixed(0), 'x', r2.height.toFixed(0))
+    }, 500)
+  }
   
   drawGrid(ctx, canvas.width, canvas.height)
   
@@ -12700,10 +12806,36 @@ function circleCircleIntersect(cx1,cy1,r1, cx2,cy2,r2) {
 }
 
 function constructionPointerDown(e, uid) {
-  e.preventDefault()
+  if (e.preventDefault) e.preventDefault()
+  if (e.stopPropagation) e.stopPropagation()
   const state = window._constructionStates[uid]
-  if (!state) return
-  const pos = snapToPoint(getCanvasPos(e, uid), state)
+  if (!state) { 
+    console.warn('No construction state for', uid, 'available:', Object.keys(window._constructionStates || {}))
+    // デバッグ表示
+    const debugEl = document.getElementById(uid + '_debug')
+    if (debugEl) { debugEl.textContent = '⚠ state未検出: ' + uid; debugEl.classList.remove('hidden') }
+    return 
+  }
+  
+  // タイムスタンプ記録（click fallbackとの重複防止）
+  state._lastPointerTime = Date.now()
+  
+  // ポインタキャプチャ（ドラッグ中にcanvas外に出ても追跡）
+  const canvas = document.getElementById(uid + '_canvas')
+  if (canvas && e.pointerId !== undefined) {
+    try { canvas.setPointerCapture(e.pointerId) } catch(ex) { console.warn('setPointerCapture failed:', ex) }
+  }
+  
+  const rawPos = getCanvasPos(e, uid)
+  const pos = snapToPoint(rawPos, state)
+  console.log('🎯 作図タップ:', state.tool, 'raw:', rawPos, 'snapped:', pos, 'phase:', state.phase)
+  
+  // デバッグUI更新
+  const debugEl = document.getElementById(uid + '_debug')
+  if (debugEl) {
+    debugEl.textContent = `✅ ${state.tool} (${Math.round(pos.x)},${Math.round(pos.y)}) phase:${state.phase}`
+    debugEl.classList.remove('hidden')
+  }
 
   if (state.tool === 'compass') {
     // コンパス：中心を決定
@@ -12760,7 +12892,7 @@ function constructionPointerDown(e, uid) {
 function constructionPointerMove(e, uid) {
   const state = window._constructionStates[uid]
   if (!state || state.tool !== 'compass' || state.phase !== 'compass_center_set') return
-  e.preventDefault()
+  if (e.preventDefault) e.preventDefault()
 
   const pos = getCanvasPos(e, uid)
   const cx = state.tempCenter.x, cy = state.tempCenter.y
