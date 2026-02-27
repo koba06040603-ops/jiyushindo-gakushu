@@ -8616,6 +8616,34 @@ app.get('/guide/:curriculumId', async (c) => {
     html += moodAdvice;
     html += '</div></div></div>';
 
+    // === F3: Kolb経験学習サイクル表示（4段階のうち現在地を表示） ===
+    // 経験学習理論: CE(具体的経験)→RO(省察的観察)→AC(抽象的概念化)→AE(能動的実験)
+    (function() {
+      var kolbPhases = [
+        { id: 'CE', name: 'やってみる', icon: '🖐️', color: '#F59E0B', desc: '体験' },
+        { id: 'RO', name: 'ふりかえる', icon: '👀', color: '#3B82F6', desc: '観察' },
+        { id: 'AC', name: 'まとめる', icon: '📐', color: '#8B5CF6', desc: '概念化' },
+        { id: 'AE', name: 'ためす', icon: '🔬', color: '#10B981', desc: '実験' }
+      ];
+      // v4制御から入口段階を取得（デフォルトはAC）
+      var entryPhase = (window._v4Session && window._v4Session.kolbPhase) || 'AC';
+      // カード位置に基づくサイクル段階を推定
+      var phaseIdx = kolbPhases.findIndex(function(p) { return p.id === entryPhase; });
+      if (phaseIdx < 0) phaseIdx = 2;
+      var cycleStep = (phaseIdx + Math.floor(currentPage / Math.max(1, Math.ceil(totalPages / 4)))) % 4;
+      var currentKolb = kolbPhases[cycleStep];
+      html += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:8px;padding:6px 10px;background:linear-gradient(90deg,' + currentKolb.color + '10,' + currentKolb.color + '05);border-radius:10px;border:1px solid ' + currentKolb.color + '40;">';
+      kolbPhases.forEach(function(p, i) {
+        var isCurrent = (i === cycleStep);
+        html += '<div style="flex:1;text-align:center;padding:3px;border-radius:8px;' + (isCurrent ? 'background:' + p.color + ';color:white;font-weight:bold;box-shadow:0 2px 6px ' + p.color + '40;' : 'color:' + p.color + ';opacity:0.5;') + 'font-size:0.65rem;">';
+        html += '<div style="font-size:0.9rem;">' + p.icon + '</div>';
+        html += '<div>' + p.name + '</div>';
+        html += '</div>';
+        if (i < 3) html += '<div style="color:#D1D5DB;font-size:0.7rem;">→</div>';
+      });
+      html += '</div>';
+    })();
+
     // 新出語句
     if (c.new_terms) {
       html += '<div style="background:#EFF6FF;border-left:4px solid #3B82F6;padding:10px 14px;border-radius:0 10px 10px 0;margin-bottom:12px;"><strong style="color:#1E40AF;font-size:0.85rem;">📖 新しく学ぶこと：</strong><span style="font-size:0.9rem;">' + c.new_terms + '</span></div>';
@@ -8649,6 +8677,32 @@ app.get('/guide/:curriculumId', async (c) => {
       html += '<div class="problem-box"><span class="problem-badge"><i class="fas fa-pencil-alt" style="margin-right:6px;"></i>もんだい</span>';
       html += '<p style="font-size:1.15rem;line-height:1.8;margin-top:4px;font-weight:bold;color:#1f2937;">' + c.problem_text + '</p></div>';
     }
+
+    // === F10: 教科固有の「見方・考え方」プロンプト ===
+    // Alexander MDL理論: 教科固有の思考フレームを意識的に使えるようにする
+    (function() {
+      var subject = (CURRENT_SUBJECT || '').toLowerCase();
+      var grade = parseInt(CURRENT_GRADE || '3');
+      var thinkingPrompts = {
+        '算数': { icon: '🔢', prompts: ['数や式で表すとどうなるかな？', '図にかくとわかりやすくなるよ', 'きまりを見つけてみよう'] },
+        '数学': { icon: '📊', prompts: ['式に表して考えてみよう', '既習事項とつなげて考えよう', '別の方法でも解けないか？'] },
+        '国語': { icon: '📝', prompts: ['筆者は何を伝えたいのかな？', '大事な言葉に注目してみよう', '自分の言葉で説明してみよう'] },
+        '理科': { icon: '🔬', prompts: ['予想を立ててから確かめよう', '条件を変えたらどうなるかな？', '結果から何がわかるかな？'] },
+        '社会': { icon: '🗺️', prompts: ['いつ・どこで・だれが？を整理しよう', '地図や資料を使って考えよう', 'くらしとどうつながっているかな？'] },
+        '英語': { icon: '🌐', prompts: ['場面を想像しながら読もう', '知っている言葉を使って伝えてみよう', 'パターンを見つけてみよう'] }
+      };
+      var subjectKey = Object.keys(thinkingPrompts).find(function(k) {
+        return (subject || '').indexOf(k) >= 0 || (CURRENT_SUBJECT || '').indexOf(k) >= 0;
+      });
+      if (subjectKey) {
+        var tp = thinkingPrompts[subjectKey];
+        var prompt = tp.prompts[currentPage % tp.prompts.length];
+        html += '<div style="background:linear-gradient(135deg,#FDF4FF,#FAE8FF);border-left:4px solid #C084FC;padding:8px 12px;border-radius:0 8px 8px 0;margin:6px 0;font-size:0.8rem;display:flex;align-items:center;gap:8px;">';
+        html += '<span style="font-size:1.2rem;">' + tp.icon + '</span>';
+        html += '<div><strong style="color:#7C3AED;">' + subjectKey + 'の見方・考え方</strong><br><span style="color:#6B21A8;">' + prompt + '</span></div>';
+        html += '</div>';
+      }
+    })();
 
     // 実生活とのつながり
     if (c.real_world_context) {
@@ -8823,7 +8877,8 @@ app.get('/guide/:curriculumId', async (c) => {
     lastReflectionAt: 0,       // 最後にミニ振り返りを出した回答数
     reflectionInterval: 5,     // N問ごとにミニ振り返り（v4 F5制御）
     microSuccessEnabled: true, // マイクロ成功フィードバック（v4 F8制御）
-    metacogPromptEnabled: true // メタ認知プロンプト（v4 F9制御）
+    metacogPromptEnabled: true, // メタ認知プロンプト（v4 F9制御）
+    kolbPhase: 'AC'            // F3: 経験学習サイクルの入口段階
   };
 
   // 気分→声がけパラメータマッピング
@@ -9386,6 +9441,42 @@ app.get('/guide/:curriculumId', async (c) => {
         else if (window._v4Session.totalCorrect > 1) microMessages = ['また正解！確実に力がついてる！', 'ナイス！わかってきたね！'];
       }
 
+      // === F2: 成長マインドセット称賛（Dweck 2006） ===
+      // 努力称賛→プロセス称賛→方略称賛の段階で声がけを最適化
+      var mindsetPraise = '';
+      (function() {
+        var answered = window._v4Session.totalAnswered;
+        var correct = window._v4Session.totalCorrect;
+        var rate = correct / Math.max(1, answered);
+        // 方略称賛: 正答率高い＋連続正解 → 「やり方がよかった」
+        if (rate >= 0.7 && window._consecutiveCorrects >= 2) {
+          var strategyPraises = [
+            '💎 今のやり方、とてもいいね！この方法を覚えておこう。',
+            '💎 ちゃんと考えてから答えたのがよかったね！',
+            '💎 自分で解き方を選べているのがすばらしい！'
+          ];
+          mindsetPraise = strategyPraises[Math.floor(Math.random() * strategyPraises.length)];
+        }
+        // プロセス称賛: 正答率中 → 「がんばり方がいい」
+        else if (rate >= 0.4) {
+          var processPraises = [
+            '🌟 あきらめないで考えたのがよかったね！',
+            '🌟 ていねいに取り組めているね！',
+            '🌟 少しずつ確実に進んでいるよ！'
+          ];
+          mindsetPraise = processPraises[Math.floor(Math.random() * processPraises.length)];
+        }
+        // 努力称賛: 正答率低い → 「がんばっている」
+        else {
+          var effortPraises = [
+            '💪 チャレンジしたことがえらい！',
+            '💪 がんばっているね！その気持ちが大事！',
+            '💪 むずかしい問題にもトライできたね！'
+          ];
+          mindsetPraise = effortPraises[Math.floor(Math.random() * effortPraises.length)];
+        }
+      })();
+
       aiCoachOnCorrect(page); // 合いの手：正解声がけ
 
       // F5: ミニ振り返りチェック（N問ごと）
@@ -9434,6 +9525,7 @@ app.get('/guide/:curriculumId', async (c) => {
       resultDiv.innerHTML = '<div style="background:#F0FDF4;border:3px solid #10B981;border-radius:16px;padding:20px;text-align:center;animation:correctPop 0.6s ease-out;">' +
         '<div style="font-size:4rem;animation:starBurst 0.8s ease-out;">🎉</div>' +
         '<p style="font-size:1.5rem;font-weight:900;color:#059669;margin:8px 0;">正解！すごい！</p>' +
+        (mindsetPraise ? '<p style="font-size:0.85rem;color:#7C3AED;font-weight:bold;margin:4px 0;background:#F5F3FF;display:inline-block;padding:4px 12px;border-radius:20px;">' + mindsetPraise + '</p>' : '') +
         microHTML +
         growthHTML +
         '<p style="font-size:0.9rem;color:#10B981;">よくできました！</p>' +
