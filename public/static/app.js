@@ -12450,7 +12450,13 @@ function initConstructionAnswerWidget(card) {
       <!-- Canvas -->
       <div class="relative bg-white border-2 border-gray-300 rounded-xl shadow-inner" style="touch-action:none; overflow:visible;">
         <canvas id="${uid}_canvas" width="600" height="450" 
-                style="width:100%; height:auto; display:block; cursor:crosshair; touch-action:none; -ms-touch-action:none; -webkit-touch-callout:none;"></canvas>
+                onpointerdown="if(window.constructionPointerDown){event.preventDefault();event.stopPropagation();window.constructionPointerDown(event,'${uid}')}"
+                onpointermove="if(window.constructionPointerMove){event.preventDefault();event.stopPropagation();window.constructionPointerMove(event,'${uid}')}"
+                onpointerup="if(window.constructionPointerUp){event.preventDefault();event.stopPropagation();window.constructionPointerUp(event,'${uid}')}"
+                onmousedown="if(window.constructionPointerDown){event.preventDefault();event.stopPropagation();window.constructionPointerDown(event,'${uid}')}"
+                onmousemove="if(window.constructionPointerMove){event.preventDefault();window.constructionPointerMove(event,'${uid}')}"
+                onmouseup="if(window.constructionPointerUp){event.preventDefault();window.constructionPointerUp(event,'${uid}')}"
+                style="width:100%; height:auto; display:block; cursor:crosshair; touch-action:none; -ms-touch-action:none; -webkit-touch-callout:none; pointer-events:auto; position:relative; z-index:50;"></canvas>
       </div>
 
       <!-- デバッグ情報 -->
@@ -12493,24 +12499,66 @@ function initConstructionAnswerWidget(card) {
   // 重要: pointer/mouse/touchの二重発火を防ぐためフラグ管理
   let _pointerHandled = false
   
+  // 共通のタップ処理関数
+  function handleCanvasTap(e, source) {
+    try {
+      const st = window._constructionStates[uid]
+      if (!st) {
+        console.error('❌ 作図state未検出:', uid, 'keys:', Object.keys(window._constructionStates || {}))
+        return
+      }
+      console.log('🎯 Canvas tap from ' + source + ':', uid, 'tool:', st.tool, 'pos:', e.clientX, e.clientY)
+      
+      // 視覚フィードバック（タップ位置に赤い点を描画）
+      try {
+        const c = document.getElementById(uid + '_canvas')
+        if (c) {
+          const r = c.getBoundingClientRect()
+          const sx = c.width / r.width
+          const sy = c.height / r.height
+          const px = (e.clientX - r.left) * sx
+          const py = (e.clientY - r.top) * sy
+          const cx2 = c.getContext('2d')
+          cx2.save()
+          cx2.fillStyle = 'red'
+          cx2.beginPath()
+          cx2.arc(px, py, 8, 0, Math.PI * 2)
+          cx2.fill()
+          cx2.restore()
+        }
+      } catch(vErr) { console.warn('visual feedback error:', vErr) }
+      
+      constructionPointerDown(e, uid)
+    } catch(err) {
+      console.error('❌ handleCanvasTap error:', err.message, err.stack)
+    }
+  }
+  
+  function handleCanvasMove(e) {
+    try { constructionPointerMove(e, uid) } catch(err) { console.error('❌ move error:', err) }
+  }
+  
+  function handleCanvasUp(e) {
+    try { constructionPointerUp(e, uid) } catch(err) { console.error('❌ up error:', err) }
+  }
+  
   // ポインターイベント（最優先）
   const pDown = (e) => {
     e.preventDefault()
     e.stopPropagation()
     _pointerHandled = true
-    setTimeout(() => { _pointerHandled = false }, 100) // 100ms後にリセット
-    console.log('🖱️ pointerdown on canvas:', uid, e.pointerType, e.clientX, e.clientY)
-    constructionPointerDown(e, uid)
+    setTimeout(() => { _pointerHandled = false }, 300)
+    handleCanvasTap(e, 'pointer')
   }
   const pMove = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    constructionPointerMove(e, uid)
+    handleCanvasMove(e)
   }
   const pUp = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    constructionPointerUp(e, uid)
+    handleCanvasUp(e)
   }
   canvas.addEventListener('pointerdown', pDown, { passive: false, capture: false })
   canvas.addEventListener('pointermove', pMove, { passive: false, capture: false })
@@ -12520,21 +12568,20 @@ function initConstructionAnswerWidget(card) {
   
   // マウスイベント（PointerEvent非対応 or フォールバック）
   canvas.addEventListener('mousedown', (e) => {
-    if (_pointerHandled) return // pointer で既に処理済み
+    if (_pointerHandled) return
     e.preventDefault()
     e.stopPropagation()
-    console.log('🖱️ mousedown on canvas:', uid)
-    constructionPointerDown(e, uid)
+    handleCanvasTap(e, 'mouse')
   }, { passive: false })
   canvas.addEventListener('mousemove', (e) => {
     if (_pointerHandled) return
     e.preventDefault()
-    constructionPointerMove(e, uid)
+    handleCanvasMove(e)
   }, { passive: false })
   canvas.addEventListener('mouseup', (e) => {
     if (_pointerHandled) return
     e.preventDefault()
-    constructionPointerUp(e, uid)
+    handleCanvasUp(e)
   }, { passive: false })
   
   // タッチイベントフォールバック
@@ -12543,33 +12590,30 @@ function initConstructionAnswerWidget(card) {
     e.preventDefault()
     e.stopPropagation()
     const touch = e.touches[0]
-    console.log('👆 touchstart on canvas:', uid, touch.clientX, touch.clientY)
-    constructionPointerDown({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} }, uid)
+    handleCanvasTap({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} }, 'touch')
   }, { passive: false })
   canvas.addEventListener('touchmove', (e) => {
     if (_pointerHandled) return
     e.preventDefault()
     e.stopPropagation()
     const touch = e.touches[0]
-    constructionPointerMove({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} }, uid)
+    handleCanvasMove({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} })
   }, { passive: false })
   canvas.addEventListener('touchend', (e) => {
     if (_pointerHandled) return
     e.preventDefault()
-    constructionPointerUp({ preventDefault: ()=>{}, stopPropagation: ()=>{} }, uid)
+    handleCanvasUp({ preventDefault: ()=>{}, stopPropagation: ()=>{} })
   }, { passive: false })
   
-  // クリックイベント（最終フォールバック - pointer/mouse/touchすべて動かない場合のみ）
+  // クリックイベント（最終フォールバック）
   canvas.addEventListener('click', (e) => {
-    if (_pointerHandled) return
+    // pointerdownが最近発火していればスキップ
+    const st = window._constructionStates[uid]
+    if (st && st._lastPointerTime && (Date.now() - st._lastPointerTime) < 500) return
     e.preventDefault()
     e.stopPropagation()
     console.log('🖱️ click on canvas (fallback):', uid)
-    const st = window._constructionStates[uid]
-    if (st && (!st._lastPointerTime || (Date.now() - (st._lastPointerTime || 0)) > 500)) {
-      constructionPointerDown(e, uid)
-      // 定規モードの場合のために即座にupは発火しない（ユーザーが2回クリックする）
-    }
+    handleCanvasTap(e, 'click-fallback')
   }, { passive: false })
   
   // Canvas要素のスタイルを強制（他のCSSで上書きされないように）
