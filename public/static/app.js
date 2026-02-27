@@ -6092,7 +6092,7 @@ async function loadCardPage(cardId) {
                   return '<div class="mt-4 rounded-xl overflow-hidden border-2 border-gray-200 shadow-sm"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><div class="p-2 bg-gray-50 flex items-center justify-between"><p class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>学習動画：一時停止しながら考えてみよう</p><button onclick="deleteCardMedia(' + (card.card_id||card.id||0) + ')" class="text-xs text-red-500 hover:text-red-700"><i class="fas fa-trash mr-1"></i>削除</button></div></div>'
                 } else if (vUrl.includes('nhk.or.jp') || vUrl.includes('youtube.com/results')) {
                   const cardTitle = (card.card_title || card.unit_name || '').replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 20)
-                  const nhkSearchUrl = 'https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent(cardTitle)
+                  const nhkSearchUrl = 'https://edu.web.nhk/school/?q=' + encodeURIComponent(cardTitle)
                   const ytSearchUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent('NHK for School ' + cardTitle)
                   return '<div class="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-5 shadow-sm"><div class="flex items-center gap-3 mb-4"><span class="bg-blue-600 text-white text-sm font-bold px-4 py-1.5 rounded-full"><i class="fas fa-tv mr-1"></i>NHK for School</span><span class="text-base font-bold text-gray-800">関連する学習動画</span></div><div class="bg-white rounded-xl p-6 text-center border-2 border-blue-200"><i class="fas fa-play-circle text-5xl text-blue-500 mb-4 block"></i><p class="text-sm text-gray-700 mb-4">関連する学習動画を見て学習を深めましょう！</p><div class="flex flex-col sm:flex-row gap-3 justify-center"><a href="' + ytSearchUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"><i class="fab fa-youtube"></i>YouTubeで動画を探す</a><a href="' + nhkSearchUrl + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div></div>'
                 } else if (vUrl.includes('gemini.google.com')) {
@@ -8603,8 +8603,9 @@ function detectVisualWidget(card) {
   if (/小数|しょうすう|0\.\d/.test(all)) return 'decimal'
   // 面積・図形の計算
   if (/面積|cm²|㎡|たて.*よこ|長方形|正方形|三角形.*面積|台形/.test(all)) return 'area'
-  // 角度
-  if (/角度|°|角|分度器/.test(all)) return 'angle'
+  // 角度（小学生向け分度器問題のみ：「何度」「角度を測」「分度器」のような直接的な角度計測問題）
+  // 中学の「∠BAC」「錯角」「同位角」「平行線と角」等の図形問題は geometry として扱う
+  if (/分度器|角度.*測|角度.*求め|何度で|角の大きさ/.test(all) && !/∠|錯角|同位角|対頂角|平行.*角|角.*等し|合同|相似/.test(all)) return 'angle'
   // 速さ・距離・時間
   if (/速さ|km\/h|m\/s|時速|分速|距離.*時間/.test(all)) return 'speed'
   // 比・比例
@@ -8639,8 +8640,8 @@ function detectVisualWidget(card) {
   if (/方程式|=|等式|不等式|移項/.test(all)) return 'equation'
   // 文字式
   if (/文字式|文字.*式|式.*表す|xやy|xyを|文字を使/.test(all)) return 'algebra'
-  // 図形（平面・空間）
-  if (/平行|垂直|対角線|ひし形|平行四辺形|台形|多角形|円周|直径|半径|おうぎ形|扇形|弧|弦/.test(all)) return 'geometry'
+  // 図形（平面・空間）— 中学の角の性質問題を含む
+  if (/平行|垂直|対角線|ひし形|平行四辺形|台形|多角形|円周|直径|半径|おうぎ形|扇形|弧|弦|∠|錯角|同位角|対頂角|合同|相似|二等辺三角形|正三角形|内角|外角/.test(all)) return 'geometry'
   // 対称
   if (/対称|線対称|点対称|折り返/.test(all)) return 'symmetry'
   // 確率・場合の数
@@ -9422,7 +9423,7 @@ function renderScienceVisual(container, card) {
         <i class="fas fa-microscope text-5xl text-cyan-400 mb-3 block"></i>
         <p class="text-sm text-gray-700 font-bold mb-3">${title}</p>
         <div class="flex flex-wrap gap-2 justify-center">
-          <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(searchQuery)}" target="_blank"
+          <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(searchQuery)}" target="_blank"
              class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
             <i class="fas fa-tv"></i>NHK for School
           </a>
@@ -10041,7 +10042,7 @@ function renderPositiveNegativeVisual(container, card) {
            class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
           <i class="fab fa-youtube"></i>動画で学ぶ
         </a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=正負の数" target="_blank" rel="noopener"
+        <a href="https://edu.web.nhk/school/?q=正負の数" target="_blank" rel="noopener"
            class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
           <i class="fas fa-tv"></i>NHK for School
         </a>
@@ -10300,7 +10301,7 @@ function renderSocialIndustryVisual(container, card) {
            class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
           <i class="fab fa-youtube"></i>動画で学ぶ
         </a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener"
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener"
            class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
           <i class="fas fa-tv"></i>NHK for School
         </a>
@@ -10370,7 +10371,7 @@ function renderPhysicsVisual(container, card) {
       </div>
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>実験動画</a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
         <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>図解</a>
       </div>
     </div>`
@@ -10432,7 +10433,7 @@ function renderEarthScienceVisual(container, card) {
       </div>
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画</a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
       </div>
     </div>`
 }
@@ -10515,7 +10516,7 @@ function renderEnglishVisual(container, card) {
       </div>
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' English lesson kids')}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画で学ぶ</a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(title)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
       </div>
     </div>`
 }
@@ -10644,7 +10645,7 @@ function renderMathGeneralVisual(container, card) {
       ${numlineHtml}
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画で学ぶ</a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent((unit || title).substring(0, 15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent((unit || title).substring(0, 15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
         <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>図解を見る</a>
       </div>
     </div>`
@@ -10664,7 +10665,7 @@ function renderSocialGeneralVisual(container, card) {
       </div>
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画</a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
         <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>写真・図</a>
       </div>
     </div>`
@@ -10685,7 +10686,7 @@ function renderScienceGeneralVisual(container, card) {
       </div>
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>実験動画</a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
         <a href="https://www.google.com/search?tbm=isch&q=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-purple-500 hover:bg-purple-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-images"></i>図解・写真</a>
       </div>
     </div>`
@@ -10745,7 +10746,7 @@ function renderKokugoGeneralVisual(container, card) {
       
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画で学ぶ</a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
       </div>
     </div>`
 }
@@ -10760,7 +10761,7 @@ function renderEnglishGeneralVisual(container, card) {
       </div>
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(title + ' English kids')}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fab fa-youtube"></i>動画</a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(title.substring(0,15))}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow"><i class="fas fa-tv"></i>NHK</a>
       </div>
     </div>`
 }
@@ -10795,7 +10796,7 @@ function renderUniversalVisual(container, card) {
            class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
           <i class="fab fa-youtube"></i>動画で学ぶ
         </a>
-        <a href="https://www.nhk.or.jp/school/search/?keyword=${encodeURIComponent(searchQuery)}" target="_blank" rel="noopener"
+        <a href="https://edu.web.nhk/school/?q=${encodeURIComponent(searchQuery)}" target="_blank" rel="noopener"
            class="inline-flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">
           <i class="fas fa-tv"></i>NHK for School
         </a>
@@ -10917,7 +10918,7 @@ function renderFallbackVisual(container, card) {
   const searchQuery = (title + ' ' + unit).replace(/[！!？?「」『』（）()【】]/g, '').substring(0, 25)
   
   // 教科に応じた学習リソースリンク
-  const nhkUrl = 'https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent(searchQuery)
+  const nhkUrl = 'https://edu.web.nhk/school/?q=' + encodeURIComponent(searchQuery)
   const ytUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(searchQuery + ' わかりやすい 解説')
   const imgUrl = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(searchQuery + ' 図解 わかりやすい')
   
@@ -51149,7 +51150,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       <div id="media-gallery-${card.card_id || card.id || 0}" class="mt-2"></div>
                       <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
                     </div>
-                    ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://www.nhk.or.jp/school/search/?keyword=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
+                    ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://edu.web.nhk/school/?q=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
                     ${tactile ? '<div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3 mb-2"><div class="flex items-center gap-2 mb-2"><span class="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span><span class="text-xs text-gray-700">' + tactile + '</span></div><div id="guide-tactile-' + (card.card_id || card.id || i) + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[120px]"></div></div>' : ''}
                     ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2 cursor-pointer hover:bg-green-100" onclick="speakText(\'' + (card.problem_text || card.problem_content || '').replace(/'/g, '').substring(0, 200) + '\', \'female-friendly\', 0.8); TactileSounds.play(\'tap\')"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
                     <div class="grid grid-cols-2 gap-2 text-xs">
