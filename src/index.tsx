@@ -8783,7 +8783,7 @@ app.get('/guide/:curriculumId', async (c) => {
     
     // Suno情報
     html += '<div style="text-align:center;font-size:0.65rem;color:#9CA3AF;margin-top:4px;">';
-    html += '💡 <a href="https://suno.com" target="_blank" style="color:#7C3AED;">Suno</a>で本格的な4分の曲も作れるよ（1日5曲無料）！歌詞もAIが提案します。</div>';
+    html += '💡 <a href="https://suno.com" target="_blank" style="color:#7C3AED;">Suno</a>で本格的な曲も作れるよ（4分以下・1日5曲無料）！歌詞もAIが提案します。</div>';
     
     // 結果表示エリア
     html += '<div id="song-result-' + page + '"></div>';
@@ -9048,7 +9048,7 @@ app.get('/guide/:curriculumId', async (c) => {
 
         // Sunoで本格曲を作るセクション
         html += '<details style="margin-bottom:10px;background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;">';
-        html += '<summary style="padding:10px 14px;cursor:pointer;font-weight:bold;color:#92400E;font-size:0.85rem;user-select:none;">🎹 Sunoで本格的な4分の曲を作る（1日5曲無料！）</summary>';
+        html += '<summary style="padding:10px 14px;cursor:pointer;font-weight:bold;color:#92400E;font-size:0.85rem;user-select:none;">🎹 Sunoで本格的な曲を作る（4分以下・1日5曲無料！）</summary>';
         html += '<div style="padding:6px 14px 14px;">';
         
         // Sunoスタイルプロンプト（コピー用）
@@ -12800,53 +12800,106 @@ app.post('/api/ai/tts', async (c) => {
       style: stylePrompt.substring(0, 50)
     })
     
-    const ttsResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'x-goog-api-key': geminiApiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: ttsPrompt }]
-          }],
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: voiceName
+    // === ステップ1: Gemini 3.1 Flash Native Audio を試行 ===
+    // Gemini 3.1はネイティブ音声出力に対応（より自然な発話）
+    let audioGenerated = false
+    let audioBase64 = ''
+    let audioMime = ''
+    let usedModel = ''
+    
+    try {
+      const nativeAudioResp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `以下のテキストを日本語で自然に音読してください。${stylePrompt}\n\n${text.substring(0, 3000)}` }] }],
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              temperature: 0.4,
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: voiceName }
                 }
               }
             }
-          }
-        })
+          })
+        }
+      )
+      
+      if (nativeAudioResp.ok) {
+        const nativeData = await nativeAudioResp.json() as any
+        const audioPart = nativeData.candidates?.[0]?.content?.parts?.[0]
+        if (audioPart?.inlineData?.data) {
+          audioBase64 = audioPart.inlineData.data
+          audioMime = audioPart.inlineData.mimeType || 'audio/L16;rate=24000'
+          usedModel = 'gemini-3.1-flash-preview (Native Audio)'
+          audioGenerated = true
+          console.log('✅ Gemini 3.1 Native Audio 生成成功')
+        }
       }
-    )
-    
-    if (!ttsResponse.ok) {
-      const errorText = await ttsResponse.text()
-      console.error('❌ Gemini TTS API エラー:', ttsResponse.status, errorText.substring(0, 200))
-      throw new Error(`Gemini TTS API エラー: ${ttsResponse.status}`)
+    } catch (e: any) {
+      console.log('⚠️ Gemini 3.1 Native Audio 失敗、TTS専用モデルにフォールバック:', e.message)
     }
     
-    const ttsData = await ttsResponse.json() as any
-    const audioPart = ttsData.candidates?.[0]?.content?.parts?.[0]
+    // === ステップ2: Gemini 2.5 Flash TTS にフォールバック ===
+    if (!audioGenerated) {
+      const ttsResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'x-goog-api-key': geminiApiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: ttsPrompt }]
+            }],
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: voiceName
+                  }
+                }
+              }
+            }
+          })
+        }
+      )
+      
+      if (!ttsResponse.ok) {
+        const errorText = await ttsResponse.text()
+        console.error('❌ Gemini TTS API エラー:', ttsResponse.status, errorText.substring(0, 200))
+        throw new Error(`Gemini TTS API エラー: ${ttsResponse.status}`)
+      }
+      
+      const ttsData = await ttsResponse.json() as any
+      const audioPart = ttsData.candidates?.[0]?.content?.parts?.[0]
+      
+      if (audioPart?.inlineData?.data) {
+        audioBase64 = audioPart.inlineData.data
+        audioMime = audioPart.inlineData.mimeType || 'audio/L16;rate=24000'
+        usedModel = 'gemini-2.5-flash-preview-tts'
+        audioGenerated = true
+      }
+    }
     
-    if (audioPart?.inlineData?.data) {
+    if (audioGenerated) {
       const generationTime = Date.now() - startTime
-      console.log(`✅ Gemini TTS 音声生成成功 (${generationTime}ms, voice=${voiceName})`)
+      console.log(`✅ TTS 音声生成成功 (${generationTime}ms, model=${usedModel}, voice=${voiceName})`)
       
       return c.json({
         success: true,
-        audioContent: audioPart.inlineData.data,  // base64 encoded PCM (24kHz, 16bit, mono)
-        audioFormat: 'pcm',  // PCM形式（WAVヘッダーなし）
+        audioContent: audioBase64,
+        audioFormat: 'pcm',
         sampleRate: 24000,
         channels: 1,
         bitsPerSample: 16,
-        method: 'gemini-tts',
+        method: usedModel,
         voice: voiceName,
         generation_time_ms: generationTime
       })
@@ -21562,6 +21615,11 @@ app.get('/theory-demo', (c) => {
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">「今やっていることの意味」がわかり、学習に能動的に参加するようになる</p>
                 </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/static/student-guide.html?curriculum_id=99001" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習のてびき（コース選択→導入カードでKolbサイクル表示）</a>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（カード進行中にCE→RO→AC→AEバー表示）</a>
+                </div>
             </div>
         </div>
     </div>
@@ -21606,6 +21664,11 @@ app.get('/theory-demo', (c) => {
                 <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">「自分でできた！」の体験が積み重なり自己効力感が育つ。挫折しても安全に戻れる安心感</p>
+                </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（ヒント段階表示・足場レベルバーが正解数に応じて変動）</a>
+                    <p class="text-xs text-gray-500 mt-1">💡 3問連続正解でヒント詳細度が自動低下、間違いで再増加する様子を確認できます</p>
                 </div>
             </div>
         </div>
@@ -21664,6 +21727,11 @@ app.get('/theory-demo', (c) => {
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">「やらされている」→「自分で選んでやっている」。内発的動機が高まり、学習への主体性が育つ</p>
                 </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/static/student-guide.html?curriculum_id=99001" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習のてびき（3コース選択UI）</a>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（三軸自己選択: 順番・難易度・解き方を自分で選択）</a>
+                </div>
             </div>
         </div>
     </div>
@@ -21705,6 +21773,11 @@ app.get('/theory-demo', (c) => {
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">「振り返る習慣」が身につき、テストでも自分でペース配分ができるようになる</p>
                 </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（7問ごとにミニ振り返りダイアログが自動表示）</a>
+                    <a href="/progress-board-demo.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 進捗ボード（セッション全体の正解率・学習時間を可視化）</a>
+                </div>
             </div>
         </div>
     </div>
@@ -21745,6 +21818,11 @@ app.get('/theory-demo', (c) => {
                 <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">「間違えても大丈夫」「努力すれば伸びる」という信念が育ち、難問にも粘り強く取り組める</p>
+                </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（正解/不正解時のプロセス褒めフィードバック）</a>
+                    <p class="text-xs text-gray-500 mt-1">💡 不正解時に「ここまでの考え方は合ってるよ！」と部分正答を認めるメッセージが表示されます</p>
                 </div>
             </div>
         </div>
@@ -21791,6 +21869,11 @@ app.get('/theory-demo', (c) => {
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">テスト前の一夜漬けではなく「少しずつ確実に定着させる」学習習慣が身につく</p>
                 </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/spaced-learning-progress-demo.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 間隔反復デモ（忘却リスク表示・復習タイミング可視化）</a>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（復習リマインダー通知が自動表示）</a>
+                </div>
             </div>
         </div>
     </div>
@@ -21828,6 +21911,11 @@ app.get('/theory-demo', (c) => {
                 <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">「なんとなく間違えた」ではなく「ここが弱い」と自覚でき、自分で弱点を克服する力が育つ</p>
+                </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（不正解時の「どこでつまずいた？」選択肢ダイアログ）</a>
+                    <p class="text-xs text-gray-500 mt-1">💡 選択結果に応じてAI先生の次回ヒントの出し方が自動調整されます</p>
                 </div>
             </div>
         </div>
@@ -21870,6 +21958,11 @@ app.get('/theory-demo', (c) => {
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">「解き方がわからない」→「先生ならこう考える」を参考に、自分の解法を構築できるようになる</p>
                 </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（「AI先生の考え方」ボタンで思考プロセスが段階表示）</a>
+                    <p class="text-xs text-gray-500 mt-1">💡 Gemini 3.1が問題ごとに「まず→次に→だから」のステップを自動生成します</p>
+                </div>
             </div>
         </div>
     </div>
@@ -21900,7 +21993,7 @@ app.get('/theory-demo', (c) => {
                                 <p class="text-lg">🎵</p>
                                 <p class="text-xs font-bold text-violet-700">学習ソング生成</p>
                                 <p class="text-xs text-violet-500">Gemini 3.1で30秒</p>
-                                <p class="text-xs text-violet-400">+ Sunoで4分の本格曲</p>
+                                <p class="text-xs text-violet-400">+ Sunoで4分以下の本格曲</p>
                             </div>
                             <div class="flex-1 bg-red-100 rounded-lg p-2 text-center border border-red-200">
                                 <p class="text-lg">🎬</p>
@@ -21926,6 +22019,12 @@ app.get('/theory-demo', (c) => {
                 <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">テキストが苦手な児童も視覚・聴覚から学べる。「3の段の歌」を口ずさみながら九九を覚える等</p>
+                </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/static/student-guide.html?curriculum_id=99001" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習のてびき（導入カードのストーリーブック画像・学習ソング・学習動画ボタン）</a>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（🎵学習ソング生成＋🎬Veo 3.1動画生成が実際に動作）</a>
+                    <p class="text-xs text-gray-500 mt-1">💡 Suno連携で4分以下の本格学習ソングも作成可能（1日5曲無料）</p>
                 </div>
             </div>
         </div>
@@ -21977,6 +22076,12 @@ app.get('/theory-demo', (c) => {
                     <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
                     <p class="text-xs text-green-600">「勉強＝つまらない」→「なにこれ面白そう！」。最初の1問で学習モードに入れる</p>
                 </div>
+                <div class="mt-3 p-2 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <p class="text-xs font-bold text-indigo-700"><i class="fas fa-external-link-alt mr-1"></i>実際のシステムで確認</p>
+                    <a href="/static/student-guide.html?curriculum_id=99001" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習のてびき（各コースの導入問題＋ストーリーブック画像＋好奇心フック表示）</a>
+                    <a href="/static/student-home.html" target="_blank" class="text-xs text-indigo-500 hover:underline block mt-1">→ 学習画面（導入カードのストーリー仕立て問題文・「やってみよう！」演出）</a>
+                    <p class="text-xs text-gray-500 mt-1">💡 ARCS 4要素（注意→関連→自信→満足）がすべて導入カードに組み込まれています</p>
+                </div>
             </div>
         </div>
     </div>
@@ -22019,6 +22124,67 @@ app.get('/theory-demo', (c) => {
     </div>
 
     <!-- フッター -->
+    <div class="bg-white rounded-xl p-6 shadow-sm border-2 border-indigo-300 mb-6">
+        <h2 class="text-lg font-bold text-indigo-800 mb-3"><i class="fas fa-link mr-2"></i>実際のシステム画面一覧（村長向けデモリンク集）</h2>
+        <div class="grid md:grid-cols-2 gap-3">
+            <a href="/static/student-guide.html?curriculum_id=99001" target="_blank" class="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200 hover:shadow-md transition">
+                <div class="bg-blue-500 text-white rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-book-open"></i></div>
+                <div>
+                    <p class="text-sm font-bold text-blue-800">学習のてびき</p>
+                    <p class="text-xs text-gray-500">コース選択・導入問題・ストーリーブック画像</p>
+                </div>
+            </a>
+            <a href="/static/student-home.html" target="_blank" class="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200 hover:shadow-md transition">
+                <div class="bg-green-500 text-white rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-graduation-cap"></i></div>
+                <div>
+                    <p class="text-sm font-bold text-green-800">学習画面（生徒用）</p>
+                    <p class="text-xs text-gray-500">カード学習・足場かけ・三軸選択・AI先生</p>
+                </div>
+            </a>
+            <a href="/static/parent-dashboard.html" target="_blank" class="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200 hover:shadow-md transition">
+                <div class="bg-purple-500 text-white rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-home"></i></div>
+                <div>
+                    <p class="text-sm font-bold text-purple-800">保護者ダッシュボード</p>
+                    <p class="text-xs text-gray-500">子どもの学習進捗を家庭で確認</p>
+                </div>
+            </a>
+            <a href="/teacher-dashboard-demo.html" target="_blank" class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200 hover:shadow-md transition">
+                <div class="bg-amber-500 text-white rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-chalkboard-teacher"></i></div>
+                <div>
+                    <p class="text-sm font-bold text-amber-800">教師ダッシュボード</p>
+                    <p class="text-xs text-gray-500">クラス全体の学習分析・カリキュラム管理</p>
+                </div>
+            </a>
+            <a href="/spaced-learning-progress-demo.html" target="_blank" class="flex items-center gap-3 p-3 bg-red-50 rounded-lg border border-red-200 hover:shadow-md transition">
+                <div class="bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-calendar-alt"></i></div>
+                <div>
+                    <p class="text-sm font-bold text-red-800">間隔反復デモ</p>
+                    <p class="text-xs text-gray-500">忘却曲線・復習タイミング可視化</p>
+                </div>
+            </a>
+            <a href="/gamification-demo.html" target="_blank" class="flex items-center gap-3 p-3 bg-pink-50 rounded-lg border border-pink-200 hover:shadow-md transition">
+                <div class="bg-pink-500 text-white rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-trophy"></i></div>
+                <div>
+                    <p class="text-sm font-bold text-pink-800">ゲーミフィケーション</p>
+                    <p class="text-xs text-gray-500">バッジ・レベル・ランキング要素</p>
+                </div>
+            </a>
+            <a href="/progress-board-demo.html" target="_blank" class="flex items-center gap-3 p-3 bg-teal-50 rounded-lg border border-teal-200 hover:shadow-md transition">
+                <div class="bg-teal-500 text-white rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-chart-bar"></i></div>
+                <div>
+                    <p class="text-sm font-bold text-teal-800">進捗ボード</p>
+                    <p class="text-xs text-gray-500">全体のカード進捗・達成状況</p>
+                </div>
+            </a>
+            <a href="/static/curriculum-problem-generator.html" target="_blank" class="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-200 hover:shadow-md transition">
+                <div class="bg-indigo-500 text-white rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-magic"></i></div>
+                <div>
+                    <p class="text-sm font-bold text-indigo-800">AI問題自動生成</p>
+                    <p class="text-xs text-gray-500">カリキュラムからAIが学習カード・問題を生成</p>
+                </div>
+            </a>
+        </div>
+    </div>
     <div class="text-center py-6 text-sm text-gray-400">
         <p>AI駆動型個別最適化学習システム — 教育理論実装マップ</p>
         <p class="mt-1"><a href="/proposal" class="text-indigo-500 hover:underline">← 提案書に戻る</a></p>
@@ -23364,7 +23530,7 @@ Requirements:
       },
       suno_info: {
         available: true,
-        free_tier: '1日5曲無料（約4分/曲）',
+        free_tier: '1日5曲無料（4分以下/曲）',
         url: 'https://suno.com',
         how_to: 'Sunoにアクセス → Create → 下の歌詞をペースト → スタイルを入力 → Generate',
         suno_prompt: songData.suno_prompt || '',
@@ -23499,7 +23665,7 @@ Requirements:
 
 // ========== Suno歌詞自動提案API ==========
 // Suno用に最適化された歌詞とスタイルプロンプトを生成
-// Sunoは1日5曲無料（約4分/曲）で作れる
+// Sunoは1日5曲無料（4分以下/曲）で作れる
 app.post('/api/ai/generate-suno-lyrics', async (c) => {
   const { grade, subject, unit_name, topic, song_type } = await c.req.json()
   const apiKey = c.env.GEMINI_API_KEY
@@ -23511,7 +23677,7 @@ ${grade || '小学'}${subject || ''}の「${unit_name || topic || '学習内容'
 
 【曲の種類】${song_type || '暗記補助ソング（九九、公式、年号など）'}
 
-Sunoは約4分の曲を生成できます。1日5曲まで無料で作れます。
+Sunoは4分以下の曲を生成できます。1日5曲まで無料で作れます。
 
 以下のJSON形式で回答:
 {
@@ -23545,7 +23711,7 @@ Sunoは約4分の曲を生成できます。1日5曲まで無料で作れます�
         lyrics_data: result,
         suno_info: {
           url: 'https://suno.com',
-          free_tier: '1日5曲無料（約4分/曲）',
+          free_tier: '1日5曲無料（4分以下/曲）',
           how_to_steps: [
             '1. https://suno.com にアクセス（Googleアカウントでログイン可）',
             '2. 「Create」ボタンをクリック',
