@@ -13423,11 +13423,11 @@ app.post('/api/curriculum/:id/duplicate', async (c) => {
     `).bind(
       newGrade || sourceCurriculum.grade,
       newSubject || sourceCurriculum.subject,
-      newTextbook || sourceCurriculum.textbook_company,
+      newTextbook || sourceCurriculum.textbook_company || null,
       newUnitName || `${sourceCurriculum.unit_name}（コピー）`,
-      sourceCurriculum.total_hours,
-      sourceCurriculum.unit_goal,
-      sourceCurriculum.non_cognitive_goal
+      sourceCurriculum.total_hours || null,
+      sourceCurriculum.unit_goal || null,
+      sourceCurriculum.non_cognitive_goal || null
     ).run()
     
     const newCurriculumId = newCurriculum.meta.last_row_id
@@ -13445,11 +13445,11 @@ app.post('/api/curriculum/:id/duplicate', async (c) => {
         ) VALUES (?, ?, ?, ?, ?, ?)
       `).bind(
         newCurriculumId,
-        (course as any).course_level,
-        (course as any).course_name,
-        (course as any).course_label,
-        (course as any).color_code,
-        (course as any).introduction_problem
+        (course as any).course_level || null,
+        (course as any).course_name || null,
+        (course as any).course_label || null,
+        (course as any).color_code || null,
+        (course as any).introduction_problem || null
       ).run()
       
       const newCourseId = newCourse.meta.last_row_id
@@ -13468,16 +13468,16 @@ app.post('/api/curriculum/:id/duplicate', async (c) => {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           newCourseId,
-          (card as any).card_number,
-          (card as any).card_title,
-          (card as any).card_type,
-          (card as any).problem_description,
-          (card as any).new_terms,
-          (card as any).example_problem,
-          (card as any).example_solution,
-          (card as any).real_world_connection,
-          (card as any).answer,
-          (card as any).textbook_page
+          (card as any).card_number || null,
+          (card as any).card_title || null,
+          (card as any).card_type || null,
+          (card as any).problem_description || null,
+          (card as any).new_terms || null,
+          (card as any).example_problem || null,
+          (card as any).example_solution || null,
+          (card as any).real_world_connection || null,
+          (card as any).answer || null,
+          (card as any).textbook_page || null
         ).run()
       }
     }
