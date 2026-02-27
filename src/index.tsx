@@ -8480,6 +8480,48 @@ app.get('/guide/:curriculumId', async (c) => {
     renderCurrentCard();
     renderNavDots();
     updateNavButtons();
+
+    // === F6: 間隔反復リマインダー（今日復習すべきカードの表示） ===
+    if (STUDENT_ID_PARAM) {
+      fetch('/api/spaced-learning/today-reviews/' + STUDENT_ID_PARAM)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var reviews = data.reviews || [];
+          if (reviews.length > 0) {
+            var reminderEl = document.getElementById('spacedLearningReminder');
+            if (!reminderEl) {
+              reminderEl = document.createElement('div');
+              reminderEl.id = 'spacedLearningReminder';
+              var container = document.getElementById('cardContainer');
+              if (container) container.parentElement.insertBefore(reminderEl, container);
+            }
+            reminderEl.innerHTML = '<div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border:2px solid #93C5FD;border-radius:14px;padding:14px 18px;margin-bottom:12px;">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
+              '<p style="font-weight:bold;color:#1D4ED8;font-size:0.9rem;"><i class="fas fa-brain" style="margin-right:6px;"></i>F6 今日の復習カード（' + reviews.length + '枚）</p>' +
+              '<button onclick="this.closest(\\x27#spacedLearningReminder\\x27).style.display=\\x27none\\x27" style="background:none;border:none;color:#93C5FD;cursor:pointer;font-size:1rem;">✕</button></div>' +
+              '<p style="font-size:0.8rem;color:#3B82F6;margin-bottom:8px;">忘れる前に復習すると記憶が定着するよ！</p>' +
+              '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + 
+              reviews.slice(0, 5).map(function(r) { return '<span style="background:white;border:1px solid #BFDBFE;border-radius:8px;padding:4px 8px;font-size:0.75rem;color:#1E40AF;">' + (r.card_title || r.title || 'カード') + '</span>'; }).join('') +
+              (reviews.length > 5 ? '<span style="font-size:0.75rem;color:#6B7280;">+' + (reviews.length - 5) + '枚</span>' : '') +
+              '</div></div>';
+          }
+        }).catch(function() {});
+
+      // === F6: 忘却リスクカードも取得 ===
+      fetch('/api/spaced-learning/forgetting-risk/' + STUDENT_ID_PARAM)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var riskCards = (data.cards || []).filter(function(c) { return c.risk && c.risk > 0.6; });
+          if (riskCards.length > 0 && !document.getElementById('forgettingRiskAlert')) {
+            var alertEl = document.createElement('div');
+            alertEl.id = 'forgettingRiskAlert';
+            var container = document.getElementById('cardContainer');
+            if (container) container.parentElement.insertBefore(alertEl, container);
+            alertEl.innerHTML = '<div style="background:#FEF2F2;border:2px solid #FECACA;border-radius:14px;padding:10px 14px;margin-bottom:8px;">' +
+              '<p style="font-size:0.8rem;color:#991B1B;"><i class="fas fa-exclamation-triangle" style="margin-right:4px;"></i>忘れかけのカードが' + riskCards.length + '枚！今日復習すると効果的です</p></div>';
+          }
+        }).catch(function() {});
+    }
   }
 
   // === ページ種別判定 ===
