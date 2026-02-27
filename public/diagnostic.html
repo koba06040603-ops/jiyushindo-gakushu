@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>じゅんびチェック</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+  @keyframes slideIn { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+  @keyframes confetti { 0% { transform: translateY(0) rotate(0); opacity:1; } 100% { transform: translateY(-80px) rotate(360deg); opacity:0; } }
+  .slide-in { animation: slideIn .5s ease-out; }
+  .answer-btn { transition: all .2s; }
+  .answer-btn:hover { transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .answer-btn.selected { ring: 3px; transform: scale(1.02); }
+  .progress-fill { transition: width .5s ease; }
+  body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+</style>
+</head>
+<body class="p-4">
+<div class="max-w-2xl mx-auto">
+
+  <!-- ヘッダー -->
+  <div class="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-6 mb-4 text-center slide-in">
+    <div class="text-4xl mb-2">🧩</div>
+    <h1 class="text-2xl font-bold text-indigo-800 mb-1">じゅんびチェック</h1>
+    <p class="text-gray-600 text-sm" id="subtitleText">きみの学び方を教えてね！</p>
+    <p class="text-indigo-600 font-bold mt-2 hidden" id="studentNameDisplay"></p>
+    <!-- プログレスバー -->
+    <div class="mt-4 bg-gray-200 rounded-full h-3 overflow-hidden">
+      <div id="progressBar" class="progress-fill bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full" style="width:0%"></div>
+    </div>
+    <p id="progressText" class="text-xs text-gray-500 mt-1">0 / 10 問</p>
+  </div>
+
+  <!-- 質問エリア -->
+  <div id="questionArea" class="slide-in"></div>
+
+  <!-- 結果エリア -->
+  <div id="resultArea" class="hidden"></div>
+
+</div>
+
+<script>
+// URLパラメータを取得
+const params = new URLSearchParams(window.location.search);
+const CURRICULUM_ID = params.get('curriculum_id') || '0';
+const STUDENT_ID = params.get('student_id') || '0';
+const STUDENT_NAME = params.get('name') || '';
+const RETURN_URL = params.get('return') || ('/guide/' + CURRICULUM_ID + (STUDENT_NAME ? '?name=' + encodeURIComponent(STUDENT_NAME) + '&student_id=' + STUDENT_ID : '?student_id=' + STUDENT_ID));
+
+// カリキュラム情報（URLパラメータから取得、またはAPIフォールバック）
+var UNIT_NAME = params.get('unit_name') || '学習単元';
+var SUBJECT = params.get('subject') || '';
+var GRADE = params.get('grade') || '';
+
+// 初期化
+async function initDiagnostic() {
+  // URLパラメータにカリキュラム情報がない場合、APIから取得
+  if (UNIT_NAME === '学習単元' && CURRICULUM_ID && CURRICULUM_ID !== '0') {
+    try {
+      var res = await fetch('/api/curriculum/' + CURRICULUM_ID);
+      var data = await res.json();
+      if (data && data.unit_name) {
+        UNIT_NAME = data.unit_name;
+        SUBJECT = data.subject || SUBJECT;
+        GRADE = data.grade || GRADE;
+      }
+    } catch(e) { console.log('カリキュラム情報取得スキップ'); }
+  }
+  
+  // サブタイトル更新
+  document.getElementById('subtitleText').textContent = UNIT_NAME + ' — きみの学び方を教えてね！';
+  document.title = 'じゅんびチェック — ' + UNIT_NAME;
+  
+  // 学生名表示
+  if (STUDENT_NAME) {
+    const nameEl = document.getElementById('studentNameDisplay');
+    nameEl.textContent = STUDENT_NAME + ' さん';
+    nameEl.classList.remove('hidden');
+  }
+  
+  // 質問の動的更新（単元名・教科名の置換）
+  updateQuestionsWithContext();
+  
+  // 最初の質問を表示
+  renderQuestion();
+}
+
+// ===== 適性診断の質問定義 =====
+var QUESTIONS = [
+  {
+    id: 'q1', category: 'learning_style',
+    text: 'あたらしいことを おぼえるとき、どれがいちばん やりやすい？',
+    emoji: '📖',
+    options: [
+      { value: 'visual', text: '絵や図を見る', emoji: '🖼️', color: 'bg-blue-50 border-blue-300 text-blue-800' },
+      { value: 'auditory', text: '先生の話をきく', emoji: '👂', color: 'bg-green-50 border-green-300 text-green-800' },
+      { value: 'kinesthetic', text: 'じっさいにやってみる', emoji: '✋', color: 'bg-orange-50 border-orange-300 text-orange-800' },
+      { value: 'read_write', text: 'ノートに書く', emoji: '✏️', color: 'bg-purple-50 border-purple-300 text-purple-800' }
+    ]
+  },
+  {
+    id: 'q2', category: 'learning_style',
+    text: 'じゅぎょうで「なるほど！」と思うのはどんなとき？',
+    emoji: '💡',
+    options: [
+      { value: 'visual', text: '動画や写真を見たとき', emoji: '📺', color: 'bg-blue-50 border-blue-300 text-blue-800' },
+      { value: 'auditory', text: '友だちと話し合ったとき', emoji: '💬', color: 'bg-green-50 border-green-300 text-green-800' },
+      { value: 'kinesthetic', text: '工作や実験をしたとき', emoji: '🔬', color: 'bg-orange-50 border-orange-300 text-orange-800' },
+      { value: 'read_write', text: '教科書をじっくり読んだとき', emoji: '📚', color: 'bg-purple-50 border-purple-300 text-purple-800' }
+    ]
+  },
+  {
+    id: 'q3', category: 'learning_style',
+    text: 'テストのまえ、どんなべんきょうがいちばん うまくいく？',
+    emoji: '📝',
+    options: [
+      { value: 'visual', text: 'まとめの図を作る', emoji: '🗺️', color: 'bg-blue-50 border-blue-300 text-blue-800' },
+      { value: 'auditory', text: '声に出して読む', emoji: '🗣️', color: 'bg-green-50 border-green-300 text-green-800' },
+      { value: 'kinesthetic', text: '何度もれんしゅう問題をとく', emoji: '🏃', color: 'bg-orange-50 border-orange-300 text-orange-800' },
+      { value: 'read_write', text: 'ノートを何度も読み返す', emoji: '📓', color: 'bg-purple-50 border-purple-300 text-purple-800' }
+    ]
+  },
+  {
+    id: 'q4', category: 'resilience',
+    text: 'むずかしい問題にであったら、どうする？',
+    emoji: '💪',
+    options: [
+      { value: 5, text: 'ぜったいあきらめない！何度でもちょうせんする', emoji: '🔥', color: 'bg-red-50 border-red-300 text-red-800' },
+      { value: 4, text: 'ちょっとかんがえてからヒントをもらう', emoji: '🤔', color: 'bg-yellow-50 border-yellow-300 text-yellow-800' },
+      { value: 3, text: 'やり方を変えてもう一回やってみる', emoji: '🔄', color: 'bg-green-50 border-green-300 text-green-800' },
+      { value: 2, text: 'すぐに先生か友だちにきく', emoji: '🙋', color: 'bg-blue-50 border-blue-300 text-blue-800' }
+    ]
+  },
+  {
+    id: 'q5', category: 'error_strategy',
+    text: 'まちがえたとき、いちばんやりたいことは？',
+    emoji: '❌',
+    options: [
+      { value: 'retry', text: 'もう一回じぶんでやりなおす', emoji: '🔁', color: 'bg-green-50 border-green-300 text-green-800' },
+      { value: 'hint', text: 'ヒントをもらってかんがえる', emoji: '💡', color: 'bg-yellow-50 border-yellow-300 text-yellow-800' },
+      { value: 'friend', text: '友だちに教えてもらう', emoji: '👫', color: 'bg-pink-50 border-pink-300 text-pink-800' },
+      { value: 'skip', text: 'べつの問題からやる', emoji: '⏭️', color: 'bg-gray-50 border-gray-300 text-gray-800' }
+    ]
+  },
+  {
+    id: 'q6', category: 'pace',
+    text: 'べんきょうするとき、どのスピードがすき？',
+    emoji: '⏰',
+    options: [
+      { value: 'slow', text: 'ゆっくりじっくり🐢', emoji: '🐢', color: 'bg-green-50 border-green-300 text-green-800' },
+      { value: 'steady', text: 'ふつうのはやさ🐕', emoji: '🐕', color: 'bg-blue-50 border-blue-300 text-blue-800' },
+      { value: 'fast', text: 'どんどんすすむ🐆', emoji: '🐆', color: 'bg-orange-50 border-orange-300 text-orange-800' }
+    ]
+  },
+  {
+    id: 'q7', category: 'prior_knowledge',
+    text: 'この単元について、どのくらい知ってる？',
+    emoji: '📊',
+    options: [
+      { value: 1, text: 'ぜんぜん知らない', emoji: '🌱', color: 'bg-gray-50 border-gray-300 text-gray-800' },
+      { value: 2, text: 'ちょっとだけ聞いたことがある', emoji: '🌿', color: 'bg-green-50 border-green-300 text-green-800' },
+      { value: 3, text: 'まあまあ知ってる', emoji: '🌳', color: 'bg-blue-50 border-blue-300 text-blue-800' },
+      { value: 5, text: 'けっこうとくい！', emoji: '🏆', color: 'bg-yellow-50 border-yellow-300 text-yellow-800' }
+    ]
+  },
+  {
+    id: 'q8', category: 'subject_affinity',
+    text: 'この教科はすき？',
+    emoji: '❤️',
+    options: [
+      { value: 5, text: 'だいすき！', emoji: '😍', color: 'bg-pink-50 border-pink-300 text-pink-800' },
+      { value: 4, text: 'まあまあすき', emoji: '😊', color: 'bg-green-50 border-green-300 text-green-800' },
+      { value: 3, text: 'ふつう', emoji: '😐', color: 'bg-gray-50 border-gray-300 text-gray-800' },
+      { value: 2, text: 'ちょっとにがて', emoji: '😅', color: 'bg-blue-50 border-blue-300 text-blue-800' },
+      { value: 1, text: 'にがて…', emoji: '😰', color: 'bg-red-50 border-red-300 text-red-800' }
+    ]
+  },
+  {
+    id: 'q9', category: 'motivation',
+    text: 'べんきょうするとき、どれがいちばんだいじ？',
+    emoji: '🌟',
+    options: [
+      { value: 'autonomy', text: 'じぶんでえらべること', emoji: '🎯', color: 'bg-indigo-50 border-indigo-300 text-indigo-800' },
+      { value: 'competence', text: '「できた！」とかんじること', emoji: '✨', color: 'bg-yellow-50 border-yellow-300 text-yellow-800' },
+      { value: 'relatedness', text: '友だちといっしょにやること', emoji: '🤝', color: 'bg-pink-50 border-pink-300 text-pink-800' },
+      { value: 'fun', text: 'たのしいこと', emoji: '🎉', color: 'bg-green-50 border-green-300 text-green-800' }
+    ]
+  },
+  {
+    id: 'q10', category: 'anxiety',
+    text: 'あたらしい単元をはじめるとき、どんなきもち？',
+    emoji: '🎭',
+    options: [
+      { value: 1, text: 'ワクワクする！はやくやりたい！', emoji: '🚀', color: 'bg-green-50 border-green-300 text-green-800' },
+      { value: 2, text: 'たのしみだけどちょっとドキドキ', emoji: '😊', color: 'bg-blue-50 border-blue-300 text-blue-800' },
+      { value: 4, text: 'できるかなってしんぱい', emoji: '😟', color: 'bg-yellow-50 border-yellow-300 text-yellow-800' },
+      { value: 5, text: 'すごくしんぱい…', emoji: '😰', color: 'bg-red-50 border-red-300 text-red-800' }
+    ]
+  }
+];
+
+function updateQuestionsWithContext() {
+  // q7: 単元名を反映
+  if (UNIT_NAME && UNIT_NAME !== '学習単元') {
+    QUESTIONS[6].text = '「' + UNIT_NAME + '」について、どのくらい知ってる？';
+  }
+  // q8: 教科名を反映
+  if (SUBJECT) {
+    QUESTIONS[7].text = SUBJECT + 'はすき？';
+  }
+}
+
+var currentQ = 0;
+var answers = {};
+
+function renderQuestion() {
+  var q = QUESTIONS[currentQ];
+  var pct = Math.round((currentQ / QUESTIONS.length) * 100);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressText').textContent = currentQ + ' / ' + QUESTIONS.length + ' 問';
+
+  var optHtml = '';
+  q.options.forEach(function(opt) {
+    var sel = answers[q.id] === opt.value ? 'ring-4 ring-indigo-400 scale-[1.02]' : '';
+    var valAttr = typeof opt.value === 'string' ? "'" + opt.value + "'" : opt.value;
+    optHtml += '<button onclick="selectAnswer(\'' + q.id + '\', ' + valAttr + ', this)" ' +
+      'class="answer-btn w-full p-4 rounded-xl border-2 ' + opt.color + ' ' + sel + ' flex items-center gap-3 text-left">' +
+      '<span class="text-3xl">' + opt.emoji + '</span>' +
+      '<span class="font-bold text-lg">' + opt.text + '</span>' +
+      '</button>';
+  });
+
+  var prevBtn = currentQ > 0 
+    ? '<button onclick="prevQ()" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 rounded-xl font-bold transition"><i class="fas fa-arrow-left mr-1"></i>もどる</button>' 
+    : '<div></div>';
+  var nextLabel = currentQ < QUESTIONS.length - 1 
+    ? 'つぎへ <i class="fas fa-arrow-right ml-1"></i>' 
+    : 'けっかを見る <i class="fas fa-check ml-1"></i>';
+  var disabledAttr = (!answers[q.id] && answers[q.id] !== 0) ? 'disabled' : '';
+
+  document.getElementById('questionArea').innerHTML = 
+    '<div class="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-6 slide-in">' +
+      '<div class="text-center mb-6">' +
+        '<span class="text-5xl block mb-3">' + q.emoji + '</span>' +
+        '<h2 class="text-xl font-bold text-gray-800">' + q.text + '</h2>' +
+      '</div>' +
+      '<div class="space-y-3">' + optHtml + '</div>' +
+      '<div class="flex justify-between mt-6">' +
+        prevBtn +
+        '<button id="nextBtn" onclick="nextQ()" class="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold transition disabled:opacity-40" ' + disabledAttr + '>' +
+          nextLabel +
+        '</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function selectAnswer(qId, val, btn) {
+  answers[qId] = val;
+  var allBtns = btn.parentElement.querySelectorAll('.answer-btn');
+  for (var i = 0; i < allBtns.length; i++) {
+    allBtns[i].classList.remove('ring-4', 'ring-indigo-400', 'scale-[1.02]');
+  }
+  btn.classList.add('ring-4', 'ring-indigo-400', 'scale-[1.02]');
+  document.getElementById('nextBtn').disabled = false;
+}
+
+function prevQ() { if (currentQ > 0) { currentQ--; renderQuestion(); } }
+
+function nextQ() {
+  var q = QUESTIONS[currentQ];
+  if (!answers[q.id] && answers[q.id] !== 0) return;
+  if (currentQ < QUESTIONS.length - 1) { currentQ++; renderQuestion(); }
+  else { submitDiagnostic(); }
+}
+
+async function submitDiagnostic() {
+  document.getElementById('progressBar').style.width = '100%';
+  document.getElementById('progressText').textContent = QUESTIONS.length + ' / ' + QUESTIONS.length + ' 問 — 送信中…';
+  document.getElementById('questionArea').innerHTML = '<div class="bg-white/95 rounded-2xl shadow-xl p-8 text-center"><div class="text-5xl mb-4 animate-bounce">🔄</div><p class="text-xl font-bold text-indigo-800">けっかをまとめています…</p></div>';
+
+  // 集計
+  var styleCounts = { visual: 0, auditory: 0, kinesthetic: 0, read_write: 0 };
+  ['q1','q2','q3'].forEach(function(k) { if (answers[k]) styleCounts[answers[k]]++; });
+  var sortedStyles = Object.entries(styleCounts).sort(function(a,b) { return b[1]-a[1]; });
+  var dominant = sortedStyles[0][0];
+  // タイが多い場合はbalanced
+  if (sortedStyles[0][1] === sortedStyles[1][1]) dominant = 'balanced';
+
+  var payload = {
+    student_id: STUDENT_ID || 0,
+    curriculum_id: parseInt(CURRICULUM_ID) || 0,
+    unit_name: UNIT_NAME,
+    subject: SUBJECT,
+    grade: GRADE,
+    learning_style: { dominant: dominant, counts: styleCounts },
+    non_cognitive: { resilience: answers.q4 || 3, error_strategy: answers.q5 || 'hint' },
+    self_regulation: { pace: answers.q6 || 'steady', session_length: 'medium' },
+    readiness: { prior_knowledge: answers.q7 || 3, subject_affinity: answers.q8 || 3 },
+    raw_answers: answers
+  };
+
+  var profile = null;
+  try {
+    var res = await fetch('/api/student-learning/initial-diagnostic', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    var data = await res.json();
+    if (data.success) profile = data.profile;
+  } catch(e) { console.error('診断保存エラー:', e); }
+
+  showResult(profile || payload);
+}
+
+function showResult(profile) {
+  var styleEmoji = { visual:'🖼️ 見てわかるタイプ', auditory:'👂 聞いてわかるタイプ', kinesthetic:'✋ やってみてわかるタイプ', read_write:'✏️ 読み書きでわかるタイプ', balanced:'⚖️ バランスタイプ' };
+  var paceEmoji = { slow:'🐢 じっくりコース', steady:'🐕 ふつうコース', fast:'🐆 どんどんコース' };
+  var resilience = profile.resilience || 3;
+  var stars = '';
+  for (var i = 0; i < Math.min(5, resilience); i++) stars += '⭐';
+  var ls = profile.learning_style;
+  if (typeof ls === 'object' && ls.dominant) ls = ls.dominant;
+  var styleName = styleEmoji[ls] || styleEmoji.balanced;
+  var pace = profile.pace || (profile.self_regulation && profile.self_regulation.pace) || 'steady';
+  var paceName = paceEmoji[pace] || paceEmoji.steady;
+  var priorK = profile.prior_knowledge || (profile.readiness && profile.readiness.prior_knowledge) || 3;
+  var affinity = profile.subject_affinity || (profile.readiness && profile.readiness.subject_affinity) || 3;
+  var levelEmojis = ['🌱','🌿','🌳','🌲','🏆'];
+
+  document.getElementById('questionArea').classList.add('hidden');
+  var resultArea = document.getElementById('resultArea');
+  resultArea.classList.remove('hidden');
+  
+  var aiSummaryHtml = '';
+  if (profile.ai_summary) {
+    aiSummaryHtml = '<div class="bg-indigo-50 rounded-xl p-4 border border-indigo-200 mb-6 text-left"><p class="text-xs text-indigo-600 font-bold mb-1">✨ AI先生のまとめ</p><p class="text-sm text-indigo-800">' + profile.ai_summary + '</p></div>';
+  }
+
+  resultArea.innerHTML = 
+    '<div class="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-6 slide-in text-center">' +
+      '<div class="text-5xl mb-3">🎉</div>' +
+      '<h2 class="text-2xl font-bold text-indigo-800 mb-2">じゅんびチェック完了！</h2>' +
+      '<p class="text-gray-600 mb-6">きみの学び方がわかったよ！</p>' +
+
+      '<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left mb-6">' +
+        '<div class="bg-blue-50 rounded-xl p-4 border border-blue-200">' +
+          '<p class="text-xs text-blue-600 font-bold mb-1">学び方タイプ</p>' +
+          '<p class="text-lg font-bold text-blue-800">' + styleName + '</p>' +
+        '</div>' +
+        '<div class="bg-green-50 rounded-xl p-4 border border-green-200">' +
+          '<p class="text-xs text-green-600 font-bold mb-1">すすめ方</p>' +
+          '<p class="text-lg font-bold text-green-800">' + paceName + '</p>' +
+        '</div>' +
+        '<div class="bg-yellow-50 rounded-xl p-4 border border-yellow-200">' +
+          '<p class="text-xs text-yellow-600 font-bold mb-1">チャレンジ度</p>' +
+          '<p class="text-lg font-bold text-yellow-800">' + stars + '</p>' +
+        '</div>' +
+        '<div class="bg-purple-50 rounded-xl p-4 border border-purple-200">' +
+          '<p class="text-xs text-purple-600 font-bold mb-1">この単元の知識</p>' +
+          '<p class="text-lg font-bold text-purple-800">' + levelEmojis[Math.min(4, priorK-1)] + ' レベル ' + priorK + '</p>' +
+        '</div>' +
+      '</div>' +
+
+      aiSummaryHtml +
+
+      '<a href="' + RETURN_URL + '" class="block w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-xl font-bold text-xl transition shadow-lg text-center no-underline" style="text-decoration:none;">' +
+        '<i class="fas fa-book-open mr-2"></i>学習をはじめる！' +
+      '</a>' +
+    '</div>';
+}
+
+// ページ読み込み時に初期化
+initDiagnostic();
+</script>
+</body>
+</html>

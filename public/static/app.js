@@ -1420,6 +1420,42 @@ async function renderTopPage() {
       </div>
       \` : ''}
 
+      <!-- 12理論統合システム インフォグラフィック（全ユーザー表示） -->
+      <div class="bg-white rounded-2xl shadow-xl mb-8 overflow-hidden border-2 border-indigo-200">
+        <div class="bg-gradient-to-r from-indigo-700 to-purple-800 p-5">
+          <h2 class="text-xl font-bold text-white flex items-center">
+            <i class="fas fa-brain mr-2"></i>v4統合制御エンジン — 12の教育理論で子どもの「今の姿」を理解する
+          </h2>
+          <p class="text-indigo-100 text-sm mt-1">一人ひとりの学び方を12の視座で多角的に理解し、最適な学習環境をAIが動的に調整します</p>
+        </div>
+        <div class="p-6">
+          <details class="mb-4">
+            <summary class="cursor-pointer text-sm font-bold text-indigo-800 hover:text-indigo-600 transition flex items-center gap-2">
+              <i class="fas fa-images"></i>理論体系のインフォグラフィック（クリックで表示）
+              <i class="fas fa-chevron-down text-xs text-gray-400"></i>
+            </summary>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="text-center">
+                <p class="text-xs font-bold text-gray-700 mb-2">12理論統合因果モデル全体図</p>
+                <img src="https://www.genspark.ai/api/files/s/4srO0CeK?cache_control=3600" alt="v4統合制御エンジン — 12理論統合因果モデル" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+              </div>
+              <div class="text-center">
+                <p class="text-xs font-bold text-gray-700 mb-2">8つの学びの姿（アーキタイプマップ）</p>
+                <img src="https://www.genspark.ai/api/files/s/ElbBRESm?cache_control=3600" alt="8つの学びの姿 — アーキタイプマップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+              </div>
+              <div class="text-center">
+                <p class="text-xs font-bold text-gray-700 mb-2">12理論の因果関係マップ</p>
+                <img src="https://www.genspark.ai/api/files/s/kRUrdjQk?cache_control=3600" alt="12理論の因果関係マップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+              </div>
+              <div class="text-center">
+                <p class="text-xs font-bold text-gray-700 mb-2">統合制御パラメータ算出フロー</p>
+                <img src="https://www.genspark.ai/api/files/s/LHc2NmjO?cache_control=3600" alt="統合制御パラメータ算出フロー" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
       \${state.auth.user && (state.auth.user.role === 'teacher' || state.auth.user.role === 'admin') ? \`
       <!-- 個別最適化ロジック可視化 -->
       <div class="bg-white rounded-2xl shadow-xl mb-8 overflow-hidden border-2 border-indigo-200">
@@ -21748,8 +21784,9 @@ async function showStudentLinkGenerator(curriculumId) {
           </thead>
           <tbody>
             ${students.map(s => {
-              const name = s.name || s.id || ''
-              const url = baseUrl + '?name=' + encodeURIComponent(name)
+              const name = s.name || s.student_name || s.id || ''
+              const sid = s.student_id || s.id || ''
+              const url = baseUrl + '?name=' + encodeURIComponent(name) + (sid ? '&student_id=' + encodeURIComponent(sid) : '')
               return `
               <tr class="border-b hover:bg-blue-50">
                 <td class="py-2 px-3 font-bold text-gray-700"><i class="fas fa-user-graduate text-gray-400 mr-1"></i>${name}</td>

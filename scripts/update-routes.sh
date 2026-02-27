@@ -30,6 +30,7 @@ cat > dist/_routes.json << 'EOF'
     "/curriculum-problem-generator.html",
     "/dashboard.html",
     "/data-export.html",
+    "/diagnostic.html",
     "/download-correct-pdf.html",
     "/download-pptx.html",
     "/download-slides.html",

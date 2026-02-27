@@ -7635,6 +7635,56 @@ app.get('/test-buttons.html', async (c) => {
 // 追加のルート設定は不要
 
 // =============================================================================
+// 児童用：個別最適化 適性診断アンケート（じゅんびチェック）
+// /diagnostic/:curriculumId で児童がブラウザから受験できる
+// =============================================================================
+app.get('/diagnostic/:curriculumId', async (c) => {
+  const { env } = c
+  const curriculumId = c.req.param('curriculumId')
+  const studentName = c.req.query('name') || ''
+  const studentId = c.req.query('student_id') || ''
+  const returnUrl = c.req.query('return') || ''
+
+  // カリキュラム情報を取得
+  let curriculum: any = null
+  try {
+    curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first()
+  } catch {}
+
+  const unitName = curriculum?.unit_name || '学習単元'
+  const subject = curriculum?.subject || ''
+  const grade = curriculum?.grade || ''
+
+  // リダイレクト先URLの構築
+  const guideReturnUrl = returnUrl || ('/guide/' + curriculumId + '?student_id=' + studentId + (studentName ? '&name=' + encodeURIComponent(studentName) : ''))
+
+  // diagnostic.html を返す（クエリパラメータを引き継ぎ）
+  const htmlUrl = new URL(c.req.url)
+  const diagnosticUrl = '/diagnostic.html?curriculum_id=' + curriculumId
+    + '&student_id=' + encodeURIComponent(studentId)
+    + '&name=' + encodeURIComponent(studentName)
+    + '&return=' + encodeURIComponent(guideReturnUrl)
+    + '&unit_name=' + encodeURIComponent(unitName)
+    + '&subject=' + encodeURIComponent(subject)
+    + '&grade=' + encodeURIComponent(grade)
+
+  return c.redirect(diagnosticUrl)
+})
+
+// カリキュラム基本情報API（認証不要 - 診断ページ用）
+app.get('/api/curriculum/:id', async (c) => {
+  const { env } = c
+  try {
+    const id = c.req.param('id')
+    const row = await env.DB.prepare('SELECT id, unit_name, grade, subject, textbook_company FROM curriculum WHERE id = ?').bind(id).first()
+    if (!row) return c.json({ error: 'not found' }, 404)
+    return c.json(row)
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500)
+  }
+})
+
+// =============================================================================
 // トップページ
 // =============================================================================
 
@@ -7648,11 +7698,39 @@ app.get('/guide/:curriculumId', async (c) => {
   const curriculumId = c.req.param('curriculumId')
   const studentName = c.req.query('name') || ''
   const courseId = c.req.query('course') || '' // 個別コース指定
+  const studentIdParam = c.req.query('student_id') || ''
   
   try {
     // カリキュラム情報を取得
     const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
     if (!curriculum) return c.html('<h1>カリキュラムが見つかりません</h1>', 404)
+    
+    // 診断チェック：student_id が指定されている場合、診断済みか確認
+    let diagnosticCompleted = false
+    let diagnosticProfile: any = null
+    if (studentIdParam) {
+      try {
+        const diag = await env.DB.prepare(
+          'SELECT * FROM initial_diagnostics WHERE student_id = ? AND curriculum_id = ? ORDER BY created_at DESC LIMIT 1'
+        ).bind(parseInt(studentIdParam), parseInt(curriculumId)).first() as any
+        if (diag) {
+          diagnosticCompleted = true
+          diagnosticProfile = {
+            learning_style: diag.learning_style_dominant || 'balanced',
+            resilience: diag.resilience,
+            pace: diag.preferred_pace,
+            prior_knowledge: diag.prior_knowledge,
+            subject_affinity: diag.subject_affinity,
+            ai_summary: diag.ai_profile_summary || null
+          }
+        }
+      } catch (tableErr: any) {
+        // テーブルが存在しない場合はスキップ
+        if (tableErr.message && tableErr.message.includes('no such table')) {
+          console.log('initial_diagnostics テーブル未作成 → 診断チェックスキップ')
+        }
+      }
+    }
     
     let courses: any[] = []
     let cards: any[] = []
@@ -8058,6 +8136,40 @@ app.get('/guide/:curriculumId', async (c) => {
       ${studentName ? `<p style="margin-top:8px; font-size:1rem;">👤 ${studentName} さん</p>` : ''}
     </div>
     
+    ${studentIdParam && !diagnosticCompleted ? `
+    <div class="no-print" id="diagnosticBanner" style="background: linear-gradient(135deg, #FEF3C7, #FDE68A); border: 3px solid #F59E0B; border-radius: 16px; padding: 20px; margin-bottom: 16px; text-align: center;">
+      <div style="font-size: 2.5rem; margin-bottom: 8px;">🧩</div>
+      <h3 style="font-size: 1.2rem; font-weight: 900; color: #92400E; margin-bottom: 6px;">まずは「じゅんびチェック」をしよう！</h3>
+      <p style="font-size: 0.9rem; color: #78350F; margin-bottom: 12px; line-height: 1.6;">
+        きみの学び方を教えてくれると、AIがきみにぴったりの学習をとどけるよ。<br>
+        <span style="font-size: 0.8rem; color: #92400E;">🕐 かかる時間：1〜2分 ・ 10問のかんたんなしつもん</span>
+      </p>
+      <a href="/diagnostic/${curriculumId}?student_id=${studentIdParam}${studentName ? '&name=' + encodeURIComponent(studentName) : ''}&return=${encodeURIComponent('/guide/' + curriculumId + '?student_id=' + studentIdParam + (studentName ? '&name=' + encodeURIComponent(studentName) : '') + (courseId ? '&course=' + courseId : ''))}"
+         style="display: inline-block; background: linear-gradient(135deg, #4F46E5, #7C3AED); color: white; padding: 14px 32px; border-radius: 14px; font-weight: 900; font-size: 1.1rem; text-decoration: none; box-shadow: 0 4px 12px rgba(79,70,229,0.4);">
+        🚀 じゅんびチェックをはじめる！
+      </a>
+      <p style="font-size: 0.75rem; color: #A16207; margin-top: 8px; cursor: pointer;" onclick="document.getElementById('diagnosticBanner').style.display='none'">
+        あとでやる（スキップしてカードを見る）
+      </p>
+    </div>
+    ` : ''}
+    ${studentIdParam && diagnosticCompleted ? `
+    <div class="no-print" style="background: linear-gradient(135deg, #DCFCE7, #BBF7D0); border: 2px solid #22C55E; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 1.5rem;">✅</span>
+      <div style="flex: 1; min-width: 200px;">
+        <p style="font-size: 0.85rem; font-weight: bold; color: #166534;">じゅんびチェック済み</p>
+        <p style="font-size: 0.75rem; color: #15803D;">
+          学び方: ${{visual:'🖼️見る',auditory:'👂聞く',kinesthetic:'✋やる',read_write:'✏️読み書き',balanced:'⚖️バランス'}[diagnosticProfile?.learning_style || 'balanced'] || '⚖️バランス'}
+          ・すすめ方: ${{slow:'🐢じっくり',steady:'🐕ふつう',fast:'🐆どんどん'}[diagnosticProfile?.pace || 'steady'] || '🐕ふつう'}
+        </p>
+      </div>
+      <a href="/diagnostic/${curriculumId}?student_id=${studentIdParam}${studentName ? '&name=' + encodeURIComponent(studentName) : ''}&return=${encodeURIComponent('/guide/' + curriculumId + '?student_id=' + studentIdParam + (studentName ? '&name=' + encodeURIComponent(studentName) : '') + (courseId ? '&course=' + courseId : ''))}"
+         style="background: #22C55E; color: white; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; text-decoration: none; white-space: nowrap;">
+        🔄 もう一度やる
+      </a>
+    </div>
+    ` : ''}
+
     <div class="no-print" style="display:flex; gap:8px; margin-bottom:12px; justify-content:center; flex-wrap:wrap;">
       <button onclick="window.print()" style="background:#4F46E5; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">🖨️ 印刷</button>
       <button onclick="window.history.length > 1 ? window.history.back() : window.close()" style="background:#6B7280; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">← 戻る</button>
@@ -8095,6 +8207,8 @@ app.get('/guide/:curriculumId', async (c) => {
   var CURRICULUM = ${JSON.stringify({ id: curriculumId, unit_name: curriculum.unit_name, grade: curriculum.grade, subject: curriculum.subject, unit_goal: curriculum.unit_goal })};
   var IS_PERSONALIZED = ${isPersonalized ? 'true' : 'false'};
   var COURSE_ID = ${courseId ? `'${courseId}'` : 'null'};
+  var STUDENT_ID = '${studentIdParam}';
+  var DIAGNOSTIC_COMPLETED = ${diagnosticCompleted ? 'true' : 'false'};
   var currentPage = 0;
   // 学習カード + チェックテスト(1) + えらべるもんだい(1) = totalPages
   var hasCheckTest = CHECK_PROBLEMS.length > 0;
