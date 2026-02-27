@@ -8522,6 +8522,41 @@ app.get('/guide/:curriculumId', async (c) => {
           }
         }).catch(function() {});
     }
+
+    // === F8: 自律性支援 — 学習順序の選択権を児童に与える ===
+    // 自己決定理論: 「自分で決めた」体験が内発的動機づけを高める
+    if (ALL_CARDS.length >= 3) {
+      setTimeout(function() {
+        var choiceArea = document.getElementById('learningChoiceArea');
+        if (choiceArea) return; // 既に表示済み
+        choiceArea = document.createElement('div');
+        choiceArea.id = 'learningChoiceArea';
+        var container = document.getElementById('cardContainer');
+        if (container) container.parentElement.insertBefore(choiceArea, container);
+        
+        // カードの種類を分析して選択肢を提示
+        var easyCards = [];
+        var challengeCards = [];
+        var funCards = [];
+        ALL_CARDS.forEach(function(c, idx) {
+          var diff = c.difficulty_level || 'standard';
+          if (diff === 'easy' || diff === 'basic') easyCards.push(idx);
+          else if (diff === 'hard' || diff === 'challenge') challengeCards.push(idx);
+          if (c.real_world_context || c.real_world_connection) funCards.push(idx);
+        });
+
+        choiceArea.innerHTML = '<div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px solid #C4B5FD;border-radius:16px;padding:16px;margin-bottom:12px;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+          '<p style="font-weight:bold;color:#6D28D9;font-size:0.95rem;">🎯 今日はどこからやる？</p>' +
+          '<button onclick="this.closest(\\x27#learningChoiceArea\\x27).style.display=\\x27none\\x27" style="background:none;border:none;color:#C4B5FD;cursor:pointer;">✕</button></div>' +
+          '<p style="font-size:0.8rem;color:#7C3AED;margin:6px 0 10px;">自分で決めてやると、もっと力がつくよ！</p>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+          '<button onclick="goToCard(0);this.closest(\\x27#learningChoiceArea\\x27).innerHTML=\\x27<p style=color:#6D28D9;font-weight:bold;text-align:center;padding:8px>✅ 最初から順番にやる！がんばろう！</p>\\x27" style="flex:1;min-width:100px;background:white;border:2px solid #A78BFA;border-radius:12px;padding:10px 8px;cursor:pointer;text-align:center;"><div style="font-size:1.3rem;">📚</div><div style="font-size:0.8rem;font-weight:bold;color:#6D28D9;">順番にやる</div></button>' +
+          (challengeCards.length > 0 ? '<button onclick="goToCard(' + challengeCards[0] + ');this.closest(\\x27#learningChoiceArea\\x27).innerHTML=\\x27<p style=color:#6D28D9;font-weight:bold;text-align:center;padding:8px>✅ チャレンジ問題に挑戦！かっこいい！</p>\\x27" style="flex:1;min-width:100px;background:white;border:2px solid #F59E0B;border-radius:12px;padding:10px 8px;cursor:pointer;text-align:center;"><div style="font-size:1.3rem;">🔥</div><div style="font-size:0.8rem;font-weight:bold;color:#B45309;">チャレンジ！</div></button>' : '') +
+          (easyCards.length > 0 ? '<button onclick="goToCard(' + easyCards[0] + ');this.closest(\\x27#learningChoiceArea\\x27).innerHTML=\\x27<p style=color:#6D28D9;font-weight:bold;text-align:center;padding:8px>✅ 基本からしっかり！いい選択だね！</p>\\x27" style="flex:1;min-width:100px;background:white;border:2px solid #10B981;border-radius:12px;padding:10px 8px;cursor:pointer;text-align:center;"><div style="font-size:1.3rem;">🌱</div><div style="font-size:0.8rem;font-weight:bold;color:#059669;">基本から</div></button>' : '') +
+          '</div></div>';
+      }, 300);
+    }
   }
 
   // === ページ種別判定 ===
@@ -8687,6 +8722,17 @@ app.get('/guide/:curriculumId', async (c) => {
     html += '<div style="margin-top:16px;"><p style="font-size:0.9rem;font-weight:bold;color:#1E40AF;margin-bottom:6px;"><i class="fas fa-pen" style="margin-right:4px;"></i>こたえをかこう：</p>';
     html += '<div class="answer-box"><textarea id="answer-' + currentPage + '" placeholder="こたえをここに書こう" rows="3"></textarea></div></div>';
 
+    // === F9: ノート撮影ボタン（Gemini 3.1による手書き思考過程分析） ===
+    html += '<div class="no-print" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+    html += '<label for="handwriting-upload-' + currentPage + '" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#F0F9FF,#E0F2FE);border:2px solid #7DD3FC;border-radius:10px;padding:6px 12px;cursor:pointer;font-size:0.8rem;font-weight:bold;color:#0369A1;"><i class="fas fa-camera"></i>ノート撮影</label>';
+    html += '<input type="file" id="handwriting-upload-' + currentPage + '" accept="image/*" capture="environment" style="display:none;" onchange="analyzeHandwriting(' + currentPage + ', this)">';
+    html += '<span style="font-size:0.7rem;color:#9CA3AF;">計算や考え方を写真にとると、AIがよみとるよ</span>';
+    html += '</div>';
+    html += '<div id="handwriting-result-' + currentPage + '" style="display:none;margin-top:8px;"></div>';
+
+    // === F8: 解法アプローチ選択（自己選択による自律性支援） ===
+    html += '<div id="approach-area-' + currentPage + '" class="no-print" style="margin-top:8px;"></div>';
+
     // 答え合わせボタン
     html += '<button class="grade-btn no-print" onclick="gradeGuideAnswer(' + currentPage + ')" style="margin-top:8px;"><i class="fas fa-check-double" style="margin-right:8px;"></i>答え合わせをする</button>';
 
@@ -8733,6 +8779,9 @@ app.get('/guide/:curriculumId', async (c) => {
     // === 合いの手システム：カード表示時の声がけ + 動的適応 ===
     setTimeout(function() { aiCoachOnCardOpen(currentPage, c); }, 500);
     startThinkingTimer(currentPage); // 一定時間経過で励まし声がけ
+
+    // === F8: 解法アプローチ選択の遅延読み込み ===
+    setTimeout(function() { loadApproachChoices(currentPage); }, 800);
 
     // === F7: 足場レベルに応じたUI動的調整 ===
     setTimeout(function() {
@@ -9450,9 +9499,266 @@ app.get('/guide/:curriculumId', async (c) => {
         '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
         '<button onclick="document.getElementById(\\x27grade-result-' + page + '\\x27).style.display=\\x27none\\x27;document.getElementById(\\x27answer-' + page + '\\x27).value=\\x27\\x27;document.getElementById(\\x27answer-' + page + '\\x27).focus();" style="background:#F59E0B;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-redo" style="margin-right:6px;"></i>もう一度</button>' +
         '<button onclick="toggleHints(' + page + ')" style="background:#8B5CF6;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-lightbulb" style="margin-right:6px;"></i>ヒントを見る</button>' +
+        '<button onclick="showThinkAloud(' + page + ')" style="background:#0EA5E9;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-brain" style="margin-right:6px;"></i>解き方を見る</button>' +
         '</div>' + metacogHTML + '</div>';
     }
     resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // === F5: 思考発話モデリング（解き方のステップバイステップ表示） ===
+  // Zimmerman SRL理論: 「熟達者の思考プロセスを可視化する」ことで自己調整能力を育てる
+  function showThinkAloud(page) {
+    var card = ALL_CARDS[page];
+    if (!card) return;
+
+    var resultDiv = document.getElementById('grade-result-' + page);
+    if (!resultDiv) return;
+
+    // 既にthink-aloudが表示されているかチェック
+    if (document.getElementById('think-aloud-' + page)) return;
+
+    var taDiv = document.createElement('div');
+    taDiv.id = 'think-aloud-' + page;
+    taDiv.style.cssText = 'background:#F0F9FF;border:2px solid #7DD3FC;border-radius:14px;padding:16px;margin-top:12px;text-align:left;';
+    taDiv.innerHTML = '<p style="font-weight:bold;color:#0369A1;font-size:0.9rem;margin-bottom:8px;"><i class="fas fa-brain" style="margin-right:6px;"></i>AI先生の考え方</p>' +
+      '<div id="think-aloud-content-' + page + '" style="font-size:0.85rem;color:#374151;line-height:1.7;"><i class="fas fa-spinner fa-spin"></i> 考え方を整理しています...</div>';
+    resultDiv.appendChild(taDiv);
+    taDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // AI APIに解法プロセスの生成をリクエスト
+    fetch('/api/ai/think-aloud', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_title: card.card_title || '',
+        problem_text: card.problem_text || '',
+        correct_answer: card.correct_answer || card.answer || '',
+        explanation: card.answer_explanation || card.explanation || '',
+        grade: card.grade || CURRICULUM.grade || '',
+        subject: card.subject || CURRICULUM.subject || ''
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var contentEl = document.getElementById('think-aloud-content-' + page);
+      if (contentEl && data.success && data.steps) {
+        var stepsHTML = '';
+        data.steps.forEach(function(step, idx) {
+          stepsHTML += '<div style="display:flex;gap:8px;margin-bottom:10px;align-items:flex-start;">' +
+            '<div style="background:#0EA5E9;color:white;border-radius:50%;min-width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:bold;">' + (idx+1) + '</div>' +
+            '<div><p style="font-weight:bold;margin-bottom:2px;">' + (step.thought || '') + '</p>' +
+            '<p style="color:#6B7280;font-size:0.8rem;">' + (step.action || '') + '</p></div></div>';
+        });
+        contentEl.innerHTML = stepsHTML +
+          '<div style="background:#DBEAFE;border-radius:8px;padding:8px;margin-top:8px;text-align:center;">' +
+          '<p style="font-size:0.8rem;color:#1D4ED8;font-weight:bold;">💡 この考え方を真似して、もう一度やってみよう！</p></div>';
+
+        // 代替アプローチがあれば表示（F8: 解法の多様性 × 自己選択）
+        if (data.alternative_approaches && data.alternative_approaches.length > 0) {
+          var altHTML = '<div style="background:#FAF5FF;border:1px solid #D8B4FE;border-radius:8px;padding:8px;margin-top:8px;">' +
+            '<p style="font-size:0.8rem;font-weight:bold;color:#7C3AED;margin-bottom:4px;"><i class="fas fa-route" style="margin-right:4px;"></i>ほかのやり方もあるよ！</p>';
+          data.alternative_approaches.forEach(function(alt) {
+            altHTML += '<p style="font-size:0.78rem;color:#6D28D9;">• <strong>' + (alt.name || '') + '</strong>: ' + (alt.description || '') + '</p>';
+          });
+          altHTML += '</div>';
+          contentEl.innerHTML += altHTML;
+        }
+
+        // TTS で読み上げ（オプション）
+        if (data.steps.length > 0) {
+          var summaryText = data.steps.map(function(s, i) { return 'ステップ' + (i+1) + '。' + s.thought; }).join('。');
+          contentEl.innerHTML += '<button onclick="speakGuideText(this)" data-text="' + summaryText.replace(/"/g, '&quot;').substring(0, 500) + '" style="margin-top:8px;background:none;border:1px solid #7DD3FC;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:0.75rem;color:#0369A1;"><i class="fas fa-volume-up" style="margin-right:4px;"></i>読み上げ</button>';
+        }
+      } else if (contentEl) {
+        contentEl.innerHTML = '<p style="color:#6B7280;">解き方の生成に失敗しました。AI先生に質問してみてね。</p>';
+      }
+    })
+    .catch(function() {
+      var contentEl = document.getElementById('think-aloud-content-' + page);
+      if (contentEl) contentEl.innerHTML = '<p style="color:#6B7280;">接続エラー。AI先生に質問してみてね。</p>';
+    });
+  }
+
+  // === F9: 手書きノート・計算過程のAI分析（Gemini 3.1 マルチモーダル） ===
+  // 児童がノートに書いた計算式やメモを撮影 → AIが思考過程を読み取り、
+  // 間違いの場所を特定し、「ここまではよくできてる」と褒めた上でアドバイス
+  function analyzeHandwriting(page, inputEl) {
+    var file = inputEl.files && inputEl.files[0];
+    if (!file) return;
+
+    var resultDiv = document.getElementById('handwriting-result-' + page);
+    if (!resultDiv) return;
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<div style="background:#F0F9FF;border:2px solid #7DD3FC;border-radius:12px;padding:12px;text-align:center;">' +
+      '<i class="fas fa-spinner fa-spin" style="color:#0369A1;margin-right:6px;"></i>' +
+      '<span style="color:#0369A1;font-size:0.85rem;font-weight:bold;">ノートをよみとり中...</span></div>';
+
+    var card = ALL_CARDS[page];
+    var studentAnswer = '';
+    var answerEl = document.getElementById('answer-' + page);
+    if (answerEl) studentAnswer = answerEl.value || '';
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var imageData = e.target.result;
+
+      fetch('/api/ai/analyze-handwriting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageData: imageData,
+          card_title: card ? card.card_title || '' : '',
+          problem_text: card ? card.problem_text || '' : '',
+          correct_answer: card ? (card.correct_answer || card.answer || '') : '',
+          grade: card ? (card.grade || '') : '',
+          subject: card ? (card.subject || '') : '',
+          student_answer: studentAnswer
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.success && data.analysis) {
+          var a = data.analysis;
+          var html = '<div style="background:linear-gradient(135deg,#F0F9FF,#EFF6FF);border:2px solid #93C5FD;border-radius:14px;padding:14px;">';
+          html += '<p style="font-weight:bold;color:#1D4ED8;font-size:0.9rem;margin-bottom:8px;"><i class="fas fa-search" style="margin-right:6px;"></i>AIがよみとった内容</p>';
+
+          // 撮影画像のサムネイル
+          html += '<div style="text-align:center;margin-bottom:8px;"><img src="' + imageData + '" style="max-width:200px;max-height:150px;border-radius:8px;border:2px solid #BFDBFE;"></div>';
+
+          // よみとった文字
+          if (a.recognized_text) {
+            html += '<div style="background:white;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:0.8rem;border:1px solid #DBEAFE;">' +
+              '<strong style="color:#374151;">よみとった文字：</strong><br>' +
+              '<code style="white-space:pre-wrap;color:#1F2937;">' + (a.recognized_text || '').replace(/</g,'&lt;') + '</code></div>';
+          }
+
+          // 褒めるポイント
+          if (a.praise_points && a.praise_points.length > 0) {
+            html += '<div style="background:#F0FDF4;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:0.8rem;border:1px solid #BBF7D0;">';
+            a.praise_points.forEach(function(p) { html += '<p style="color:#166534;"><i class="fas fa-star" style="color:#F59E0B;margin-right:4px;"></i>' + p + '</p>'; });
+            html += '</div>';
+          }
+
+          // 思考過程ステップ
+          if (a.thinking_process && a.thinking_process.length > 0) {
+            html += '<div style="margin-bottom:8px;">';
+            a.thinking_process.forEach(function(step) {
+              var color = step.correct ? '#166534' : '#DC2626';
+              var icon = step.correct ? 'fa-check-circle' : 'fa-times-circle';
+              html += '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px;font-size:0.8rem;">' +
+                '<i class="fas ' + icon + '" style="color:' + color + ';margin-top:3px;"></i>' +
+                '<span style="color:#374151;">' + step.what_child_did + (step.note ? ' <em style="color:#9CA3AF;">(' + step.note + ')</em>' : '') + '</span></div>';
+            });
+            html += '</div>';
+          }
+
+          // 間違い分析
+          if (a.error_location && a.error_location.found) {
+            html += '<div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:8px;padding:10px;margin-bottom:8px;">' +
+              '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;"><i class="fas fa-lightbulb" style="margin-right:4px;"></i>ここを直すともっとよくなるよ</p>' +
+              '<p style="font-size:0.8rem;color:#78350F;">' + (a.error_location.description || '') + '</p>' +
+              '<p style="font-size:0.85rem;color:#166534;font-weight:bold;margin-top:6px;">' + (a.error_location.encouragement || '') + '</p></div>';
+          }
+
+          // アドバイス
+          if (a.suggestion) {
+            html += '<div style="background:#DBEAFE;border-radius:8px;padding:8px 10px;font-size:0.8rem;color:#1E40AF;">' +
+              '<i class="fas fa-arrow-right" style="margin-right:4px;"></i>' + a.suggestion + '</div>';
+          }
+
+          html += '</div>';
+          resultDiv.innerHTML = html;
+        } else {
+          resultDiv.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px;font-size:0.8rem;color:#DC2626;">よみとりに失敗しました。もう一度撮影してみてね。</div>';
+        }
+      })
+      .catch(function() {
+        resultDiv.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px;font-size:0.8rem;color:#DC2626;">接続エラー。もう一度やってみてね。</div>';
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // === F8: 解法アプローチ選択UI（複数の導出経路から自己選択） ===
+  // 自己決定理論: 「どうやって解くか」を自分で選ぶ → 自律性の根幹
+  // 例: 平行四辺形 → ①三角形から ②長方形から ③公式で → どれも正しいが入口が違う
+  function loadApproachChoices(page) {
+    var area = document.getElementById('approach-area-' + page);
+    if (!area || area.dataset.loaded) return;
+    area.dataset.loaded = 'true';
+
+    var card = ALL_CARDS[page];
+    if (!card) return;
+
+    area.innerHTML = '<div style="text-align:center;padding:6px;"><i class="fas fa-spinner fa-spin" style="color:#8B5CF6;"></i> <span style="font-size:0.75rem;color:#8B5CF6;">解き方を考え中...</span></div>';
+
+    fetch('/api/ai/suggest-approaches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_title: card.card_title || '',
+        problem_text: card.problem_text || '',
+        grade: card.grade || CURRICULUM.grade || '',
+        subject: card.subject || CURRICULUM.subject || '',
+        hint_text: (card.hint_text || card._hints?.map(function(h){return h.content}).join(' ') || '').substring(0, 300)
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.approaches && data.approaches.length >= 2) {
+        var typeLabel = { deductive: '公式から', inductive: '具体例から', visual: '図で考える', experimental: '試してみる' };
+        var diffColor = { easy: '#10B981', standard: '#3B82F6', challenge: '#F59E0B' };
+        var html = '<div style="background:linear-gradient(135deg,#FAF5FF,#F3E8FF);border:2px solid #D8B4FE;border-radius:14px;padding:12px;margin-top:4px;">';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;">';
+        html += '<p style="font-weight:bold;color:#7C3AED;font-size:0.85rem;"><i class="fas fa-route" style="margin-right:6px;"></i>どのやり方で解く？</p>';
+        html += '<button onclick="this.closest(\\x27[id^=approach-area]\\x27).innerHTML=\\x27\\x27" style="background:none;border:none;color:#D8B4FE;cursor:pointer;font-size:0.8rem;">✕</button></div>';
+        html += '<p style="font-size:0.75rem;color:#9333EA;margin:4px 0 8px;">自分で選んで解くと、もっと力がつくよ！</p>';
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+
+        data.approaches.forEach(function(ap) {
+          var borderColor = diffColor[ap.difficulty] || '#8B5CF6';
+          html += '<button onclick="selectApproach(' + page + ',this,\\x27' + (ap.name || '').replace(/'/g,'') + '\\x27)" ' +
+            'style="flex:1;min-width:90px;background:white;border:2px solid ' + borderColor + ';border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;">' +
+            '<div style="font-size:1.4rem;">' + (ap.icon || '🔍') + '</div>' +
+            '<div style="font-size:0.75rem;font-weight:bold;color:#374151;margin:2px 0;">' + (ap.name || '') + '</div>' +
+            '<div style="font-size:0.65rem;color:#9CA3AF;">' + (typeLabel[ap.thinking_type] || '') + '</div>' +
+            '</button>';
+        });
+
+        html += '</div></div>';
+        area.innerHTML = html;
+      } else {
+        area.innerHTML = '';
+      }
+    })
+    .catch(function() {
+      area.innerHTML = '';
+    });
+  }
+
+  // 解法選択時のフィードバック
+  function selectApproach(page, btn, approachName) {
+    // 選ばれたボタンをハイライト
+    var siblings = btn.parentElement.querySelectorAll('button');
+    siblings.forEach(function(s) { s.style.opacity = '0.5'; s.style.transform = 'scale(0.95)'; });
+    btn.style.opacity = '1';
+    btn.style.transform = 'scale(1.05)';
+    btn.style.boxShadow = '0 4px 12px rgba(139,92,246,0.3)';
+
+    // 選択メッセージ
+    var container = btn.closest('[id^=approach-area]');
+    if (container) {
+      var msg = document.createElement('div');
+      msg.style.cssText = 'text-align:center;padding:6px;margin-top:6px;';
+      msg.innerHTML = '<p style="font-size:0.8rem;font-weight:bold;color:#7C3AED;">✅「' + approachName + '」で挑戦！いい選択だね！</p>';
+      container.appendChild(msg);
+    }
+
+    // 記録（学習ログ用）
+    window._selectedApproach = window._selectedApproach || {};
+    window._selectedApproach[page] = approachName;
+
+    showCoachBubble('「' + approachName + '」で考えてみよう！がんばれ！', 'encourage', 3000, false);
   }
 
   // === F5: ミニ振り返り送信 ===
@@ -21022,6 +21328,226 @@ app.post('/api/ai/generate-hint-image', async (c) => {
   } catch (e) { console.warn('Hint image generation error:', e) }
 
   return c.json({ success: false, error: '図の生成に失敗しました' })
+})
+
+// ========== F5/F9: 思考発話モデリング（Think-Aloud）API ==========
+// Zimmerman SRL理論: 熟達者の思考プロセスを可視化 → 自己調整能力の育成
+// Vygotsky: 学習者の最近接発達領域内でモデリングを提供
+app.post('/api/ai/think-aloud', async (c) => {
+  const { card_title, problem_text, correct_answer, explanation, grade, subject } = await c.req.json()
+  const apiKey = c.env.GEMINI_API_KEY
+  if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
+
+  try {
+    const prompt = `あなたは小学${grade || ''}年生の${subject || '算数'}の先生です。
+子どもにわかるように、この問題の「考え方のプロセス」をステップバイステップで教えてください。
+
+【問題】${card_title || ''}: ${problem_text || ''}
+【正解】${correct_answer || ''}
+【解説】${explanation || ''}
+
+■ 以下の形式でJSONを出力してください:
+{
+  "steps": [
+    { "thought": "まず何をするか（考えたこと）", "action": "具体的にやること" },
+    { "thought": "次に何を考えたか", "action": "具体的にやること" }
+  ],
+  "key_insight": "この問題で一番大事な考え方（1文）",
+  "alternative_approaches": [
+    { "name": "別のやり方の名前", "description": "簡単な説明" }
+  ]
+}
+
+■ ルール:
+- ステップは2〜5個。小学生が読める平易な日本語で
+- 「考えたこと」は「うーん、まず○○を見てみよう」のような内言
+- 代替アプローチがあれば1〜2個提案（例: 図を描く方法、式で解く方法 等）
+- 代替アプローチがなければ空配列[]`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.6, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+        })
+      }
+    )
+
+    if (resp.ok) {
+      const data = await resp.json() as any
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+      const result = JSON.parse(text)
+      return c.json({ success: true, steps: result.steps || [], key_insight: result.key_insight || '', alternative_approaches: result.alternative_approaches || [] })
+    }
+
+    return c.json({ success: false, error: 'AI応答エラー' })
+  } catch (e: any) {
+    console.error('think-aloud error:', e.message)
+    return c.json({ success: false, error: e.message })
+  }
+})
+
+// ========== F9: 手書き計算・思考過程のAI画像分析API ==========
+// Gemini 3.1 のマルチモーダル能力で児童の手書きノート/計算式を読み取り、
+// 思考過程を推測し、間違いの箇所と原因を特定する
+app.post('/api/ai/analyze-handwriting', async (c) => {
+  const { imageData, card_title, problem_text, correct_answer, grade, subject, student_answer } = await c.req.json()
+  const apiKey = c.env.GEMINI_API_KEY
+  if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
+  if (!imageData) return c.json({ success: false, error: '画像データがありません' })
+
+  try {
+    console.log('🔍 Gemini 3.1 手書き分析開始...')
+    const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '')
+
+    const prompt = `あなたは小学${grade || ''}年生の${subject || '算数'}の先生です。
+児童がノートや紙に書いた手書きの計算過程・メモ・考え方を画像で受け取りました。
+
+【問題】${card_title || ''}: ${problem_text || ''}
+【正解】${correct_answer || ''}
+${student_answer ? `【児童の入力した答え】${student_answer}` : ''}
+
+■ 画像から読み取れる児童の思考過程を分析し、以下のJSON形式で回答してください:
+{
+  "recognized_text": "画像から読み取れた文字・数式（改行は\\nで表現）",
+  "thinking_process": [
+    { "step": 1, "what_child_did": "児童がやったこと", "correct": true/false, "note": "補足" }
+  ],
+  "error_location": {
+    "found": true/false,
+    "step": 0,
+    "description": "間違いの説明（やさしい言葉で）",
+    "cause": "likely_cause（計算ミス/概念の誤解/手順の飛ばし/読み間違い）",
+    "encouragement": "ここまではよくできていたよ！○○のところだけもう一回考えてみよう"
+  },
+  "praise_points": ["よかった点1", "よかった点2"],
+  "suggestion": "次にどうすればいいかのアドバイス（1〜2文）"
+}
+
+■ ルール:
+- 児童の思考の「良いところ」を必ず見つけて褒める
+- 間違いは「責める」のではなく「ここまでは合ってる、ここだけ直そう」の姿勢
+- 小学生にわかる平易な日本語で
+- 画像が不鮮明でも、読み取れる範囲で分析する`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { text: prompt },
+            { inlineData: { mimeType: 'image/png', data: base64Image } }
+          ] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 3000, responseMimeType: 'application/json' }
+        })
+      }
+    )
+
+    if (resp.ok) {
+      const data = await resp.json() as any
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+      const result = JSON.parse(text)
+      console.log('✅ 手書き分析完了')
+      return c.json({ success: true, analysis: result })
+    }
+
+    // フォールバック: gemini-3-flash-preview
+    console.log('⚠️ 3.1失敗、gemini-3-flash-previewにフォールバック...')
+    const resp2 = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { text: prompt },
+            { inlineData: { mimeType: 'image/png', data: base64Image } }
+          ] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 3000, responseMimeType: 'application/json' }
+        })
+      }
+    )
+
+    if (resp2.ok) {
+      const data2 = await resp2.json() as any
+      const text2 = data2.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+      return c.json({ success: true, analysis: JSON.parse(text2) })
+    }
+
+    return c.json({ success: false, error: '画像分析に失敗しました' })
+  } catch (e: any) {
+    console.error('handwriting analysis error:', e.message)
+    return c.json({ success: false, error: e.message })
+  }
+})
+
+// ========== F8: 解法アプローチ提案API（複数の導出経路を提示）==========
+// 自己決定理論: 「どのやり方で解くか」を自分で選ぶ → 自律性の支援
+// 例: 平行四辺形の面積 → ①三角形2つに分ける方法 ②長方形から切り取る方法 ③公式を使う方法
+app.post('/api/ai/suggest-approaches', async (c) => {
+  const { card_title, problem_text, grade, subject, hint_text } = await c.req.json()
+  const apiKey = c.env.GEMINI_API_KEY
+  if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
+
+  try {
+    const prompt = `あなたは小学${grade || ''}年生の${subject || '算数'}の先生です。
+この問題には複数の解き方（アプローチ）があります。児童が自分で選べるように提案してください。
+
+【問題】${card_title || ''}: ${problem_text || ''}
+${hint_text ? `【ヒント情報】${hint_text}` : ''}
+
+■ 以下のJSON形式で2〜3個の解法アプローチを提案してください:
+{
+  "approaches": [
+    {
+      "id": "approach_1",
+      "name": "やり方の名前（児童にわかる言葉で）",
+      "icon": "絵文字1つ",
+      "description": "どんなやり方か（1〜2文）",
+      "thinking_type": "deductive/inductive/visual/experimental",
+      "difficulty": "easy/standard/challenge",
+      "first_hint": "最初の一歩のヒント"
+    }
+  ],
+  "connection_note": "これらの解き方がどうつながっているか（1文、教師向け参考）"
+}
+
+■ ルール:
+- 必ず2個以上のアプローチを提案
+- thinking_type: deductive（公式から→演繹）, inductive（具体例から→帰納）, visual（図で考える）, experimental（試してみる）
+- 児童が選びやすい短い名前をつける（例: 「図で考えるやり方」「式で考えるやり方」「切って並べるやり方」）
+- 各アプローチは本当に異なる思考経路であること（言い換えではなく別の方法）
+- 平行四辺形なら「三角形の公式から導く」「長方形に変形する」「公式を使う」等`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+        })
+      }
+    )
+
+    if (resp.ok) {
+      const data = await resp.json() as any
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+      const result = JSON.parse(text)
+      return c.json({ success: true, approaches: result.approaches || [], connection_note: result.connection_note || '' })
+    }
+
+    return c.json({ success: false, error: 'アプローチ生成に失敗' })
+  } catch (e: any) {
+    console.error('suggest-approaches error:', e.message)
+    return c.json({ success: false, error: e.message })
+  }
 })
 
 // ========== Veo 3.1 AI動画生成API ==========
