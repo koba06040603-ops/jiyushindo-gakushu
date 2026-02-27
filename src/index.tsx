@@ -5346,6 +5346,29 @@ app.post('/api/ai/ask', async (c) => {
       JSON.stringify({ cardTitle: card?.card_title })
     ).run()
     
+    // 今日のきもちチェックインを取得してAI先生の口調に反映
+    let moodContext = ''
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const moodRow = await env.DB.prepare(`
+        SELECT mood, affect_state FROM mood_checkins 
+        WHERE student_id = ? AND date(created_at) = ?
+        ORDER BY created_at DESC LIMIT 1
+      `).bind(body.studentId, today).first() as any
+      if (moodRow) {
+        const moodToneMap: Record<string, string> = {
+          'excited': 'この子は今日ワクワクしています。元気よく、チャレンジを促してOKです。',
+          'happy': 'この子は今日楽しい気分です。ポジティブな声かけを続けましょう。',
+          'calm': 'この子は今日落ち着いています。通常のペースで進めましょう。',
+          'tired': 'この子は今日つかれています。やさしい口調で、短く簡潔に、無理させないでください。',
+          'anxious': 'この子は今日しんぱいな気持ちです。とても優しく安心させる口調で。「だいじょうぶだよ」「まちがえてもOK」を多用。ヒントを積極的に提示。',
+          'frustrated': 'この子は今日イライラしています。共感から入り（「むずかしいよね」）、かんたんな部分から一緒に進めましょう。',
+          'sad': 'この子は今日かなしい気持ちです。最もやさしく接して。「いっしょにやろう」「先生にそうだんしてね」と伝えて。ヒントを積極的に出す。'
+        }
+        moodContext = `\n【今日のきもち状態】\n${moodToneMap[moodRow.mood] || ''}\n`
+      }
+    } catch {}
+
     // Gemini APIにリクエスト
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
@@ -5393,7 +5416,7 @@ app.post('/api/ai/ask', async (c) => {
 【学習カード情報】
 タイトル: ${card?.card_title || ''}
 問題: ${body.context || ''}
-
+${moodContext}
 ${historyContext ? `【これまでの対話】\n${historyContext}\n` : ''}
 
 【児童・生徒の質問】
@@ -7732,6 +7755,19 @@ app.get('/guide/:curriculumId', async (c) => {
       }
     }
     
+    // 今日のきもちチェックイン取得
+    let todayMood: any = null
+    if (studentIdParam) {
+      try {
+        const today = new Date().toISOString().slice(0, 10)
+        todayMood = await env.DB.prepare(`
+          SELECT * FROM mood_checkins 
+          WHERE student_id = ? AND curriculum_id = ? AND date(created_at) = ?
+          ORDER BY created_at DESC LIMIT 1
+        `).bind(parseInt(studentIdParam), parseInt(curriculumId), today).first() as any
+      } catch {}
+    }
+    
     // 個別最適化コースの存在チェック（診断済み＋ガイドページが個別コース以外の場合）
     let existingPersonalizedCourse: any = null
     if (studentIdParam && !courseId) {
@@ -7921,6 +7957,11 @@ app.get('/guide/:curriculumId', async (c) => {
                   <div style="background:#6366F1; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:0.85rem;">🤖</div>
                   <div style="flex:1;">
                     <p style="font-size:0.8rem; font-weight:bold; color:#4338CA; margin-bottom:2px;">💬 AI先生より</p>
+                    ${todayMood ? `<p id="ssrMoodGreeting" style="font-size:0.85rem; color:#EA580C; font-weight:bold; margin-bottom:2px;">🌈 ${{
+                      'excited':'ワクワクしているんだね！いいかんじ！','happy':'たのしい気持ちで来てくれたね！','calm':'落ち着いた気持ちだね。集中できそう！',
+                      'tired':'つかれているんだね。むりしなくていいよ。','anxious':'しんぱいなことがあるんだね。だいじょうぶ、いっしょにやろう。',
+                      'frustrated':'イライラしてるんだね。気持ちはわかるよ。','sad':'かなしい気持ちなんだね。でも来てくれてありがとう。'
+                    }[todayMood.mood] || ''}</p>` : ''}
                     <p style="font-size:0.85rem; color:#374151; margin-bottom:2px;">${card.ai_teacher_message || 'この問題にチャレンジしてみよう！わからないときはヒントを見てね。'}</p>
                     ${card.ai_teacher_advice ? `<p style="font-size:0.78rem; color:#4F46E5;">💡 ${card.ai_teacher_advice}</p>` : ''}
                     ${card.teacher_help_keywords ? `<p style="font-size:0.75rem; color:#6B7280; margin-top:2px;">❓ 先生に聞くキーワード: <strong>${card.teacher_help_keywords}</strong></p>` : ''}
@@ -8154,6 +8195,50 @@ app.get('/guide/:curriculumId', async (c) => {
       ${studentName ? `<p style="margin-top:8px; font-size:1rem;">👤 ${studentName} さん</p>` : ''}
     </div>
     
+    ${studentIdParam ? `
+    <!-- きもちチェックイン -->
+    <div class="no-print" id="moodCheckinArea" style="margin-bottom: 14px;">
+      ${todayMood ? `
+      <div id="moodCheckedBanner" style="background: linear-gradient(135deg, #FFF7ED, #FFEDD5); border: 2px solid #FB923C; border-radius: 14px; padding: 14px 18px; text-align: center;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
+          <span style="font-size: 1.8rem;">${{'excited':'🤩','happy':'😊','calm':'😌','tired':'😴','anxious':'😰','frustrated':'😤','sad':'😢'}[todayMood.mood] || '😊'}</span>
+          <div>
+            <p style="font-size: 0.85rem; font-weight: bold; color: #9A3412;">きょうのきもち: ${{
+              'excited':'ワクワク！','happy':'たのしい！','calm':'おちついてる','tired':'ちょっとつかれた','anxious':'しんぱい…','frustrated':'イライラ…','sad':'かなしい…'
+            }[todayMood.mood] || 'ふつう'}</p>
+            <p id="moodAiGreeting" style="font-size: 0.75rem; color: #C2410C; margin-top: 2px;"></p>
+          </div>
+          <button onclick="document.getElementById('moodSelectPanel').style.display='flex'; document.getElementById('moodCheckedBanner').style.display='none';"
+                  style="background: #FB923C; color: white; border: none; padding: 5px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: bold; cursor: pointer; white-space: nowrap;">🔄 かえる</button>
+        </div>
+      </div>
+      <div id="moodSelectPanel" style="display: none; flex-direction: column; align-items: center; background: linear-gradient(135deg, #FFF7ED, #FEF3C7); border: 3px solid #FB923C; border-radius: 16px; padding: 18px; text-align: center;">
+        <p style="font-size: 1.1rem; font-weight: 900; color: #9A3412; margin-bottom: 12px;">🌈 きょうのきもちは？</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;" id="moodButtons">
+          <button class="mood-btn" data-mood="excited" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('excited')">🤩<br><span style="font-size:0.6rem; font-weight:bold;">ワクワク</span></button>
+          <button class="mood-btn" data-mood="happy" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('happy')">😊<br><span style="font-size:0.6rem; font-weight:bold;">たのしい</span></button>
+          <button class="mood-btn" data-mood="calm" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('calm')">😌<br><span style="font-size:0.6rem; font-weight:bold;">ふつう</span></button>
+          <button class="mood-btn" data-mood="tired" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('tired')">😴<br><span style="font-size:0.6rem; font-weight:bold;">つかれた</span></button>
+          <button class="mood-btn" data-mood="anxious" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('anxious')">😰<br><span style="font-size:0.6rem; font-weight:bold;">しんぱい</span></button>
+        </div>
+        <p style="font-size: 0.65rem; color: #A16207; margin-top: 8px;">タップ1つでOK！ きもちに合わせてAI先生がやさしくサポートするよ</p>
+      </div>
+      ` : `
+      <div id="moodSelectPanel" style="display: flex; flex-direction: column; align-items: center; background: linear-gradient(135deg, #FFF7ED, #FEF3C7); border: 3px solid #FB923C; border-radius: 16px; padding: 18px; text-align: center;">
+        <p style="font-size: 1.1rem; font-weight: 900; color: #9A3412; margin-bottom: 12px;">🌈 きょうのきもちをおしえてね！</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;" id="moodButtons">
+          <button class="mood-btn" data-mood="excited" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('excited')">🤩<br><span style="font-size:0.6rem; font-weight:bold;">ワクワク</span></button>
+          <button class="mood-btn" data-mood="happy" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('happy')">😊<br><span style="font-size:0.6rem; font-weight:bold;">たのしい</span></button>
+          <button class="mood-btn" data-mood="calm" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('calm')">😌<br><span style="font-size:0.6rem; font-weight:bold;">ふつう</span></button>
+          <button class="mood-btn" data-mood="tired" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('tired')">😴<br><span style="font-size:0.6rem; font-weight:bold;">つかれた</span></button>
+          <button class="mood-btn" data-mood="anxious" style="font-size: 2rem; background: white; border: 3px solid #FDE68A; border-radius: 16px; padding: 10px 14px; cursor: pointer; transition: all 0.2s; min-width: 65px;" onclick="submitMoodCheckin('anxious')">😰<br><span style="font-size:0.6rem; font-weight:bold;">しんぱい</span></button>
+        </div>
+        <p style="font-size: 0.65rem; color: #A16207; margin-top: 8px;">タップ1つでOK！ きもちに合わせてAI先生がやさしくサポートするよ</p>
+      </div>
+      `}
+    </div>
+    ` : ''}
+    
     ${studentIdParam && !diagnosticCompleted ? `
     <div class="no-print" id="diagnosticBanner" style="background: linear-gradient(135deg, #FEF3C7, #FDE68A); border: 3px solid #F59E0B; border-radius: 16px; padding: 20px; margin-bottom: 16px; text-align: center;">
       <div style="font-size: 2.5rem; margin-bottom: 8px;">🧩</div>
@@ -8256,6 +8341,66 @@ app.get('/guide/:curriculumId', async (c) => {
   var completedCards = {};
   var aiConversation = [];
   var editMode = false;
+
+  // === 今日のきもちデータ ===
+  var TODAY_MOOD = ${todayMood ? `'${todayMood.mood}'` : 'null'};
+  var TODAY_MOOD_DATA = ${todayMood ? JSON.stringify({ mood: todayMood.mood, affect_state: todayMood.affect_state, arousal: todayMood.arousal, valence: todayMood.valence }) : 'null'};
+
+  // きもちチェックインの送信
+  function submitMoodCheckin(mood) {
+    // ボタンをハイライト
+    var btns = document.querySelectorAll('.mood-btn');
+    btns.forEach(function(b) { b.style.opacity = '0.4'; b.style.transform = 'scale(0.9)'; });
+    var selected = document.querySelector('[data-mood="' + mood + '"]');
+    if (selected) { selected.style.opacity = '1'; selected.style.transform = 'scale(1.15)'; selected.style.border = '3px solid #F97316'; }
+
+    fetch('/api/student-learning/mood-checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: parseInt(STUDENT_ID_PARAM), curriculum_id: parseInt(CURRICULUM_ID_PARAM), mood: mood })
+    }).then(function(res) { return res.json(); }).then(function(data) {
+      if (data.success) {
+        TODAY_MOOD = mood;
+        TODAY_MOOD_DATA = { mood: mood, affect_state: data.affect_state, arousal: data.arousal, valence: data.valence };
+
+        // UI更新：選択パネルをバナーに変更
+        var moodEmojis = { excited: '🤩', happy: '😊', calm: '😌', tired: '😴', anxious: '😰', frustrated: '😤', sad: '😢' };
+        var moodLabels = { excited: 'ワクワク！', happy: 'たのしい！', calm: 'おちついてる', tired: 'ちょっとつかれた', anxious: 'しんぱい…', frustrated: 'イライラ…', sad: 'かなしい…' };
+        var area = document.getElementById('moodCheckinArea');
+        if (area) {
+          area.innerHTML = '<div style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);border:2px solid #FB923C;border-radius:14px;padding:14px 18px;text-align:center;animation:slideIn 0.5s ease;">' +
+            '<div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">' +
+            '<span style="font-size:1.8rem;">' + (moodEmojis[mood] || '😊') + '</span>' +
+            '<div>' +
+            '<p style="font-size:0.85rem;font-weight:bold;color:#9A3412;">きょうのきもち: ' + (moodLabels[mood] || 'ふつう') + '</p>' +
+            '<p style="font-size:0.75rem;color:#C2410C;margin-top:2px;">' + (data.ai_message ? data.ai_message.greeting : '') + '</p>' +
+            '</div>' +
+            '<button onclick="showMoodReselect()" style="background:#FB923C;color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;white-space:nowrap;">🔄 かえる</button>' +
+            '</div></div>';
+        }
+
+        // AI先生メッセージをグローバルに保存（学習カード表示で使用）
+        window._moodAiMessage = data.ai_message || {};
+        window._moodRecommendations = data.recommendations || {};
+      }
+    }).catch(function(err) { console.error('きもちチェックインエラー:', err); });
+  }
+
+  function showMoodReselect() {
+    var area = document.getElementById('moodCheckinArea');
+    if (area) {
+      area.innerHTML = '<div id="moodSelectPanel" style="display:flex;flex-direction:column;align-items:center;background:linear-gradient(135deg,#FFF7ED,#FEF3C7);border:3px solid #FB923C;border-radius:16px;padding:18px;text-align:center;">' +
+        '<p style="font-size:1.1rem;font-weight:900;color:#9A3412;margin-bottom:12px;">🌈 きょうのきもちは？</p>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">' +
+        '<button class="mood-btn" data-mood="excited" style="font-size:2rem;background:white;border:3px solid #FDE68A;border-radius:16px;padding:10px 14px;cursor:pointer;transition:all 0.2s;min-width:65px;" onclick="submitMoodCheckin(\\\'excited\\\')">' + '🤩<br><span style="font-size:0.6rem;font-weight:bold;">ワクワク</span></button>' +
+        '<button class="mood-btn" data-mood="happy" style="font-size:2rem;background:white;border:3px solid #FDE68A;border-radius:16px;padding:10px 14px;cursor:pointer;transition:all 0.2s;min-width:65px;" onclick="submitMoodCheckin(\\\'happy\\\')">' + '😊<br><span style="font-size:0.6rem;font-weight:bold;">たのしい</span></button>' +
+        '<button class="mood-btn" data-mood="calm" style="font-size:2rem;background:white;border:3px solid #FDE68A;border-radius:16px;padding:10px 14px;cursor:pointer;transition:all 0.2s;min-width:65px;" onclick="submitMoodCheckin(\\\'calm\\\')">' + '😌<br><span style="font-size:0.6rem;font-weight:bold;">ふつう</span></button>' +
+        '<button class="mood-btn" data-mood="tired" style="font-size:2rem;background:white;border:3px solid #FDE68A;border-radius:16px;padding:10px 14px;cursor:pointer;transition:all 0.2s;min-width:65px;" onclick="submitMoodCheckin(\\\'tired\\\')">' + '😴<br><span style="font-size:0.6rem;font-weight:bold;">つかれた</span></button>' +
+        '<button class="mood-btn" data-mood="anxious" style="font-size:2rem;background:white;border:3px solid #FDE68A;border-radius:16px;padding:10px 14px;cursor:pointer;transition:all 0.2s;min-width:65px;" onclick="submitMoodCheckin(\\\'anxious\\\')">' + '😰<br><span style="font-size:0.6rem;font-weight:bold;">しんぱい</span></button>' +
+        '</div>' +
+        '<p style="font-size:0.65rem;color:#A16207;margin-top:8px;">タップ1つでOK！</p></div>';
+    }
+  }
 
   // === 個別最適化コース生成（ガイドページから） ===
   function requestPersonalizedCourseFromGuide() {
@@ -8375,13 +8520,23 @@ app.get('/guide/:curriculumId', async (c) => {
     var diffBadge = c.difficulty_level==='easy'?'<span style="background:#DCFCE7;color:#166534;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:bold;">きほん</span>':c.difficulty_level==='hard'?'<span style="background:#FEE2E2;color:#991B1B;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:bold;">★チャレンジ</span>':'<span style="background:#DBEAFE;color:#1E40AF;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:bold;">しっかり</span>';
     html += diffBadge + '</div>';
 
-    // AI先生メッセージ
+    // AI先生メッセージ（きもちチェックイン対応）
+    var moodGreeting = '';
+    var moodAdvice = '';
+    if (window._moodAiMessage && window._moodAiMessage.greeting) {
+      moodGreeting = '<p style="font-size:0.85rem;color:#EA580C;font-weight:bold;margin-bottom:4px;">🌈 ' + window._moodAiMessage.greeting + '</p>';
+    }
+    if (window._moodRecommendations && window._moodRecommendations.hint_proactive && currentPage === 0) {
+      moodAdvice = '<p style="font-size:0.8rem;color:#B45309;margin-top:4px;">💛 ヒントをさきに見てもOKだよ！</p>';
+    }
     html += '<div style="background:linear-gradient(135deg,#EEF2FF,#F5F3FF);border:2px solid #C7D2FE;border-radius:12px;padding:12px;margin-bottom:12px;">';
     html += '<div style="display:flex;align-items:flex-start;gap:10px;">';
     html += '<div style="background:#6366F1;color:white;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem;">🤖</div>';
     html += '<div><p style="font-size:0.8rem;font-weight:bold;color:#4338CA;">💬 AI先生より</p>';
+    html += moodGreeting;
     html += '<p style="font-size:0.9rem;color:#374151;">' + (c.ai_teacher_message || 'この問題にチャレンジしてみよう！') + '</p>';
     if (c.ai_teacher_advice) html += '<p style="font-size:0.8rem;color:#4F46E5;margin-top:4px;">💡 ' + c.ai_teacher_advice + '</p>';
+    html += moodAdvice;
     html += '</div></div></div>';
 
     // 新出語句
@@ -8475,7 +8630,7 @@ app.get('/guide/:curriculumId', async (c) => {
     html += '<div class="ai-teacher-box" id="ai-teacher-' + currentPage + '">';
     html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="background:#6366F1;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">🤖</span><strong style="color:#4338CA;">AI先生に質問しよう</strong></div>';
     html += '<div id="ai-chat-' + currentPage + '" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;margin-bottom:8px;">';
-    html += '<div class="ai-chat-msg ai-msg">こんにちは！この問題についてわからないことがあったら聞いてね。</div>';
+    html += '<div class="ai-chat-msg ai-msg">' + getAIMoodGreeting() + '</div>';
     html += '</div>';
     html += '<div style="display:flex;gap:6px;"><input type="text" id="ai-input-' + currentPage + '" placeholder="質問を入力..." style="flex:1;border:2px solid #C7D2FE;border-radius:10px;padding:8px 12px;font-size:0.9rem;outline:none;" onkeydown="if(event.key===\\x27Enter\\x27)sendAIMessage(' + currentPage + ')">';
     html += '<button onclick="sendAIMessage(' + currentPage + ')" style="background:#4F46E5;color:white;border:none;border-radius:10px;padding:8px 16px;font-weight:bold;cursor:pointer;"><i class="fas fa-paper-plane"></i></button></div>';
@@ -8527,7 +8682,263 @@ app.get('/guide/:curriculumId', async (c) => {
     if (tactile) {
       setTimeout(function() { initGuideWidget(currentPage, tactile, c); }, 200);
     }
+
+    // === 合いの手システム：カード表示時の声がけ + 動的適応 ===
+    setTimeout(function() { aiCoachOnCardOpen(currentPage, c); }, 500);
+    startThinkingTimer(currentPage); // 一定時間経過で励まし声がけ
   }
+
+  // ============================================================
+  // AI先生「合いの手」エンジン — 感情ゲーティング理論ベース
+  // ============================================================
+  // Pekrun (2006) Control-Value Theory:
+  //   感情状態が学習行動の「ゲート」として機能する
+  //   → 不安/退屈/疲労時はゲートが閉じ、学習効率が著しく低下
+  //   → AI先生の声がけで感情調整し、ゲートを開く
+
+  // グローバル状態
+  window._cardTimers = window._cardTimers || {};
+  window._consecutiveErrors = window._consecutiveErrors || 0;
+  window._consecutiveCorrects = window._consecutiveCorrects || 0;
+  window._coachBubbleCount = window._coachBubbleCount || 0;
+
+  // 気分→声がけパラメータマッピング
+  function getMoodCoachParams() {
+    var mood = TODAY_MOOD || 'calm';
+    var params = {
+      // チェックテストは学力保証のため絶対スキップ不可。全カード必須。
+      // autoHint（ヒント自動展開）と gentleMode（やさしい声がけ）で支援する
+      excited:    { tone: 'energetic', emoji: '🔥', maxDifficulty: 'hard',   autoHint: false, encourageChallenge: true,  gentleMode: false, minStructure: 'low' },
+      happy:      { tone: 'positive',  emoji: '😊', maxDifficulty: 'hard',   autoHint: false, encourageChallenge: false, gentleMode: false, minStructure: 'low' },
+      calm:       { tone: 'neutral',   emoji: '📚', maxDifficulty: 'hard',   autoHint: false, encourageChallenge: false, gentleMode: false, minStructure: 'medium' },
+      tired:      { tone: 'gentle',    emoji: '🌙', maxDifficulty: 'standard', autoHint: true,  encourageChallenge: false, gentleMode: true,  minStructure: 'high' },
+      anxious:    { tone: 'calming',   emoji: '🤗', maxDifficulty: 'standard', autoHint: true,  encourageChallenge: false, gentleMode: true,  minStructure: 'high' },
+      frustrated: { tone: 'empathic',  emoji: '💪', maxDifficulty: 'standard', autoHint: true,  encourageChallenge: false, gentleMode: true,  minStructure: 'high' },
+      sad:        { tone: 'caring',    emoji: '🌈', maxDifficulty: 'easy',   autoHint: true,  encourageChallenge: false, gentleMode: true,  minStructure: 'max' }
+    };
+    return params[mood] || params['calm'];
+  }
+
+  // 吹き出し表示関数
+  function showCoachBubble(message, type, duration) {
+    type = type || 'info';
+    duration = duration || 6000;
+    window._coachBubbleCount++;
+    var bubbleId = 'coach-bubble-' + window._coachBubbleCount;
+    var colors = {
+      encourage: { bg: '#F0FDF4', border: '#22C55E', text: '#166534', icon: '💚' },
+      warn:      { bg: '#FFFBEB', border: '#F59E0B', text: '#92400E', icon: '⚠️' },
+      comfort:   { bg: '#FFF1F2', border: '#F43F5E', text: '#881337', icon: '💗' },
+      celebrate: { bg: '#EFF6FF', border: '#3B82F6', text: '#1E40AF', icon: '🎉' },
+      info:      { bg: '#F5F3FF', border: '#8B5CF6', text: '#5B21B6', icon: '💬' },
+      crisis:    { bg: '#FEF2F2', border: '#EF4444', text: '#991B1B', icon: '🆘' }
+    };
+    var c = colors[type] || colors.info;
+    var container = document.getElementById('cardContainer');
+    if (!container) return;
+    var bubble = document.createElement('div');
+    bubble.id = bubbleId;
+    bubble.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);max-width:360px;width:calc(100% - 32px);background:' + c.bg + ';border:2px solid ' + c.border + ';border-radius:16px;padding:12px 16px;box-shadow:0 8px 25px rgba(0,0,0,0.15);z-index:1000;animation:coachSlideUp 0.4s ease-out forwards;display:flex;align-items:flex-start;gap:10px;';
+    bubble.innerHTML = '<span style="font-size:1.3rem;flex-shrink:0;">' + c.icon + '</span>' +
+      '<div style="flex:1;"><p style="font-size:0.85rem;color:' + c.text + ';font-weight:bold;line-height:1.5;">' + message + '</p></div>' +
+      '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:' + c.text + ';cursor:pointer;font-size:1rem;opacity:0.5;flex-shrink:0;">✕</button>';
+    document.body.appendChild(bubble);
+    setTimeout(function() {
+      var el = document.getElementById(bubbleId);
+      if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.5s'; setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 500); }
+    }, duration);
+  }
+
+  // === トリガー1: カード表示時 ===
+  function aiCoachOnCardOpen(page, card) {
+    var p = getMoodCoachParams();
+    var diff = card.difficulty_level || 'standard';
+
+    // 動的適応1: 難易度が高い＋つらい気分 → スキップはしない、ヒント展開＋やさしい声がけで支援
+    if (p.gentleMode && diff === 'hard') {
+      showCoachBubble(
+        'ちょっとむずかしいもんだいだけど、いっしょにやってみよう！ヒントを先に見てね。' + p.emoji,
+        'info', 8000
+      );
+      // ヒントを自動展開して足場を最大化
+      setTimeout(function() {
+        var hintsEl = document.getElementById('hints-' + page);
+        if (hintsEl) { hintsEl.style.display = 'block'; }
+      }, 800);
+      return; // 開始声がけはこの1つに集約
+    }
+
+    // 動的適応2: ヒント自動展開（不安・疲労時）
+    if (p.autoHint) {
+      setTimeout(function() {
+        var hintsEl = document.getElementById('hints-' + page);
+        if (hintsEl) { hintsEl.style.display = 'block'; }
+      }, 1500);
+    }
+
+    // 動的適応3: 連続不正解時の危機介入（「やめていい」ではなく「先生に聞こう」）
+    if (window._consecutiveErrors >= 3) {
+      showCoachBubble(
+        'むずかしかったね。' + (p.gentleMode ? 'ヒントをよく見て、AI先生にも聞いてみよう🤗' : 'ヒントを見て、ゆっくり考えてみよう！') +
+        ' 先生に手をあげて聞いてもいいからね。', 'crisis', 10000
+      );
+      // 危機介入時はヒントを強制展開
+      setTimeout(function() {
+        var hintsEl = document.getElementById('hints-' + page);
+        if (hintsEl) { hintsEl.style.display = 'block'; }
+      }, 500);
+      return;
+    }
+
+    // 気分に応じた開始声がけ
+    var openingMessages = {
+      excited: [
+        'やる気まんまんだね！このもんだいもいっきにいこう！🔥',
+        'いいかんじ！どんどんチャレンジしよう！✨',
+        'ワクワクパワー全開だね！かっこいい！'
+      ],
+      happy: [
+        'いい笑顔だね！きょうも楽しく学ぼう！',
+        'たのしい気分で学べるのがいちばん！😊',
+        'この調子でがんばろう！きみならできる！'
+      ],
+      calm: [
+        'じっくり考えてみよう。' + (page === 0 ? 'きょうも一緒にがんばろうね。' : ''),
+        'おちついて取りくめているね。いい感じ！',
+      ],
+      tired: [
+        'むりしなくていいよ。できるところだけやってみよう。',
+        'つかれてるときは、ヒントを見ながらでOKだよ。',
+        'ゆっくりでだいじょうぶ。少しずつ進もう🌙'
+      ],
+      anxious: [
+        'だいじょうぶだよ。いっしょに一つずつやっていこう。🤗',
+        'まちがえてもぜんぜんOK！ヒントも使ってね。',
+        'しんぱいしなくていいよ。先生がいるからね。'
+      ],
+      frustrated: [
+        'イライラするときもあるよね。わかるよ。💪',
+        'かんたんなところから、ひとつずつ「できた！」をふやそう。',
+        'むずかしいよね。でもきみはがんばってる。えらい！'
+      ],
+      sad: [
+        'きょうはむりしなくていいからね。🌈',
+        'すこしだけでもいいから、ヒントを見ながらやってみよう。',
+        'かなしい気持ちのときは、先生に話してもいいんだよ。'
+      ]
+    };
+    var mood = TODAY_MOOD || 'calm';
+    var msgs = openingMessages[mood] || openingMessages.calm;
+    var msg = msgs[Math.floor(Math.random() * msgs.length)];
+
+    // 連続正解時のチャレンジ促進
+    if (window._consecutiveCorrects >= 3 && p.encourageChallenge) {
+      msg = '3問れんぞくせいかい！すごい！🎯 もっとむずかしい問題にもチャレンジしてみる？';
+    } else if (window._consecutiveCorrects >= 2 && !p.gentleMode) {
+      msg = 'れんぞくせいかい！いい調子だね！' + p.emoji;
+    }
+
+    // 最初のカード以外は控えめに（2回に1回だけ表示）
+    if (page > 0 && Math.random() > 0.5 && window._consecutiveErrors < 2) return;
+
+    showCoachBubble(msg, p.gentleMode ? 'comfort' : 'encourage', 5000);
+  }
+
+  // === トリガー2: 一定時間経過（考え中の励まし） ===
+  function startThinkingTimer(page) {
+    if (window._cardTimers[page]) clearTimeout(window._cardTimers[page]);
+    var p = getMoodCoachParams();
+    var delay = p.gentleMode ? 45000 : 60000; // 疲労・不安時は早めに声がけ
+    window._cardTimers[page] = setTimeout(function() {
+      var resultDiv = document.getElementById('grade-result-' + page);
+      if (resultDiv && resultDiv.style.display === 'block') return; // 既に解答済みなら不要
+      var msgs = {
+        gentle: ['じっくり考えてるんだね。えらい！ヒントを見てもいいよ。', 'むずかしかったらAI先生に聞いてみてね。むりしないで🌙'],
+        calming: ['ゆっくりでだいじょうぶ。ヒントボタンを押してみて。🤗', 'しんぱいしないで。わからなかったら「こたえを見る」もOKだよ。'],
+        empathic: ['時間をかけてがんばってるね。えらい！💪', 'むずかしいよね。ヒントか先生に聞いてみよう。'],
+        energetic: ['ファイト！もう少しで答えが見えてくるよ！🔥'],
+        positive: ['いい集中力だね！もう少しがんばってみよう！'],
+        neutral: ['ヒントを使ってもいいよ。'],
+        caring: ['ヒントを見ながら、ゆっくりやってみよう。わからなかったら先生に聞いてね🌈']
+      };
+      var tonemsgs = msgs[p.tone] || msgs.neutral;
+      showCoachBubble(tonemsgs[Math.floor(Math.random() * tonemsgs.length)], 'info', 7000);
+    }, delay);
+  }
+
+  // === トリガー3: 正解時の声がけ ===
+  function aiCoachOnCorrect(page) {
+    window._consecutiveCorrects++;
+    window._consecutiveErrors = 0;
+    var p = getMoodCoachParams();
+    if (window._cardTimers[page]) clearTimeout(window._cardTimers[page]);
+    var celebrations = {
+      energetic: ['🔥 さいこう！どんどんいこう！', 'かんぺき！きみ、天才かも？！✨', 'すごすぎる！つぎもいける！'],
+      positive: ['😊 やったね！いい感じ！', 'すばらしい！この調子！', 'うれしいね！よくがんばった！'],
+      neutral: ['正解！よくできました。', 'いいね！つぎもがんばろう。'],
+      gentle: ['できたね！えらい！🌙 つかれてない？', 'すごい！むりしないでね。'],
+      calming: ['できたね！だいじょうぶ、うまくいってるよ。🤗', 'せいかい！しんぱいすることなかったね。'],
+      empathic: ['できた！やればできるじゃん！💪', 'せいかい！イライラがふっとんだね！'],
+      caring: ['できたね…！すごいよ。🌈 むりしてない？', 'がんばったね。えらいよ。']
+    };
+    var msgs = celebrations[p.tone] || celebrations.neutral;
+    showCoachBubble(msgs[Math.floor(Math.random() * msgs.length)], 'celebrate', 4000);
+  }
+
+  // === トリガー4: 不正解時の声がけ ===
+  function aiCoachOnIncorrect(page) {
+    window._consecutiveErrors++;
+    window._consecutiveCorrects = 0;
+    var p = getMoodCoachParams();
+    if (window._cardTimers[page]) clearTimeout(window._cardTimers[page]);
+    var comforts = {
+      energetic: ['おしい！つぎはぜったいいける！🔥', 'まちがいは成長のチャンス！もういっかい！'],
+      positive: ['もうすこし！ヒントを見てみよう😊', 'おしかったね！考え方はあってるかも！'],
+      neutral: ['もう一度考えてみよう。ヒントが助けになるよ。'],
+      gentle: ['だいじょうぶだよ。ヒントを見ながらやってみよう🌙', 'むりしないでね。ゆっくりでいいよ。'],
+      calming: ['まちがえてもぜんぜんOKだよ。🤗', 'しんぱいしないで。ヒントを見て、もういちどやってみよう。'],
+      empathic: ['むずかしいよね、わかるよ。💪 ヒントを見てみようか。', 'イライラするよね。でもあきらめないきみはかっこいい。'],
+      caring: ['だいじょうぶ。まちがえることは悪いことじゃないよ。🌈', 'つらかったら「こたえを見る」を使ってもいいからね。']
+    };
+    var msgs = comforts[p.tone] || comforts.neutral;
+    var msg = msgs[Math.floor(Math.random() * msgs.length)];
+
+    // 連続不正解2回目で自動ヒント展開
+    if (window._consecutiveErrors >= 2 && p.autoHint) {
+      var hintsEl = document.getElementById('hints-' + page);
+      if (hintsEl) hintsEl.style.display = 'block';
+      msg += ' ヒントを開いたよ！';
+    }
+
+    showCoachBubble(msg, window._consecutiveErrors >= 3 ? 'crisis' : 'comfort', 6000);
+  }
+
+  // === トリガー5: ヒント表示時 ===
+  var _originalToggleHints = typeof toggleHints === 'function' ? toggleHints : null;
+
+  // === トリガー6: AI先生チャット開始時の挨拶カスタマイズ ===
+  function getAIMoodGreeting() {
+    var mood = TODAY_MOOD || 'calm';
+    var greetings = {
+      excited: 'やる気いっぱいだね！なんでも聞いて！🔥',
+      happy: 'こんにちは！たのしく学ぼうね！😊',
+      calm: 'こんにちは！この問題についてわからないことがあったら聞いてね。',
+      tired: 'むりしなくていいよ。かんたんに説明するね🌙',
+      anxious: 'だいじょうぶ、やさしく教えるからね。なんでも聞いて🤗',
+      frustrated: 'いっしょに考えよう。ゆっくりでいいからね💪',
+      sad: 'ここにいるよ。なんでも聞いてね🌈'
+    };
+    return greetings[mood] || greetings.calm;
+  }
+
+  // ============================================================
+  // CSS: 合いの手アニメーション
+  // ============================================================
+  (function() {
+    var style = document.createElement('style');
+    style.textContent = '@keyframes coachSlideUp { from { transform: translateX(-50%) translateY(20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }';
+    document.head.appendChild(style);
+  })();
 
   // === ナビゲーション ===
   function navigateCard(dir) {
@@ -8749,6 +9160,7 @@ app.get('/guide/:curriculumId', async (c) => {
     if (isCorrect) {
       completedCards[page] = true;
       renderNavDots();
+      aiCoachOnCorrect(page); // 合いの手：正解声がけ
       // 正解音
       try {
         var ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -8770,6 +9182,7 @@ app.get('/guide/:curriculumId', async (c) => {
         (currentPage < totalPages - 1 ? '<button onclick="navigateCard(1)" style="background:#4F46E5;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:1rem;"><i class="fas fa-arrow-right" style="margin-right:6px;"></i>次のカードへ</button>' : '<button onclick="alert(\\x27🎉 すべて完了！\\x27)" style="background:#10B981;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-flag-checkered" style="margin-right:6px;"></i>全部できた！</button>') +
         '</div></div>';
     } else {
+      aiCoachOnIncorrect(page); // 合いの手：不正解声がけ
       // 不正解音
       try {
         var ac2 = new (window.AudioContext || window.webkitAudioContext)();
@@ -8780,10 +9193,11 @@ app.get('/guide/:curriculumId', async (c) => {
         o2.connect(g2); g2.connect(ac2.destination); o2.start(); o2.stop(ac2.currentTime+0.4);
       } catch(e){}
       
+      var gentleMode = getMoodCoachParams().gentleMode;
       resultDiv.innerHTML = '<div style="background:#FFFBEB;border:3px solid #F59E0B;border-radius:16px;padding:20px;text-align:center;">' +
-        '<div style="font-size:3rem;">🤔</div>' +
-        '<p style="font-size:1.2rem;font-weight:bold;color:#92400E;margin:8px 0;">もう少し！</p>' +
-        '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:12px;">ヒントを見て、もう一度考えてみよう。</p>' +
+        '<div style="font-size:3rem;">' + (gentleMode ? '🌟' : '🤔') + '</div>' +
+        '<p style="font-size:1.2rem;font-weight:bold;color:#92400E;margin:8px 0;">' + (gentleMode ? 'おしいね！' : 'もう少し！') + '</p>' +
+        '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:12px;">' + (gentleMode ? 'ヒントを見ながらやってみよう。むりしないでね。' : 'ヒントを見て、もう一度考えてみよう。') + '</p>' +
         '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
         '<button onclick="document.getElementById(\\x27grade-result-' + page + '\\x27).style.display=\\x27none\\x27;document.getElementById(\\x27answer-' + page + '\\x27).value=\\x27\\x27;document.getElementById(\\x27answer-' + page + '\\x27).focus();" style="background:#F59E0B;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-redo" style="margin-right:6px;"></i>もう一度</button>' +
         '<button onclick="toggleHints(' + page + ')" style="background:#8B5CF6;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-lightbulb" style="margin-right:6px;"></i>ヒントを見る</button>' +
@@ -9100,8 +9514,121 @@ app.get('/guide/:curriculumId', async (c) => {
     }).catch(function(err) { alert('保存エラー: ' + err.message); });
   }
 
-  // 初期化
-  initGuide();
+  // =============================================================
+  // 「今日のきもち」チェックイン — 学習前の感情確認
+  // =============================================================
+  var moodData = null; // チェックイン結果を保持
+
+  function showMoodCheckin() {
+    // student_idがない場合はスキップ
+    if (!STUDENT_ID_PARAM) { initGuide(); return; }
+    
+    // 今日すでにチェックインしているか確認
+    fetch('/api/student-learning/mood-today?student_id=' + STUDENT_ID_PARAM + '&curriculum_id=' + CURRICULUM_ID_PARAM)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.has_checkin) {
+          // 既にチェックイン済み → スキップ
+          moodData = data;
+          initGuide();
+        } else {
+          renderMoodOverlay();
+        }
+      })
+      .catch(function() { initGuide(); });
+  }
+
+  function renderMoodOverlay() {
+    var overlay = document.createElement('div');
+    overlay.id = 'moodOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn 0.3s ease;';
+    overlay.innerHTML =
+      '<div style="background:white;border-radius:24px;padding:28px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 25px 50px rgba(0,0,0,0.25);animation:slideIn 0.4s ease;">' +
+        '<div style="font-size:2.5rem;margin-bottom:8px;">🌈</div>' +
+        '<h2 style="font-size:1.3rem;font-weight:900;color:#312E81;margin-bottom:4px;">今日のきもちは？</h2>' +
+        '<p style="font-size:0.8rem;color:#6B7280;margin-bottom:20px;">タップして教えてね。きみに合った学習にするよ！</p>' +
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;" id="moodBtns">' +
+          moodBtn('excited', '🤩', 'ワクワク！', '#FEF3C7', '#92400E') +
+          moodBtn('happy', '😊', 'たのしい', '#DCFCE7', '#166534') +
+          moodBtn('calm', '😌', 'おちつき', '#DBEAFE', '#1E40AF') +
+          moodBtn('tired', '😴', 'つかれた', '#E5E7EB', '#374151') +
+          moodBtn('anxious', '😰', 'しんぱい', '#FEE2E2', '#991B1B') +
+          moodBtn('frustrated', '😤', 'イライラ', '#FFE4E6', '#9F1239') +
+        '</div>' +
+        '<p onclick="skipMoodCheckin()" style="font-size:0.7rem;color:#9CA3AF;cursor:pointer;margin:0;">スキップ →</p>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  }
+
+  function moodBtn(mood, emoji, label, bg, color) {
+    return '<button onclick="submitMood(\\'' + mood + '\\')" style="background:' + bg + ';border:2px solid transparent;border-radius:16px;padding:12px 8px;cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;align-items:center;gap:4px;" ' +
+      'onmouseover="this.style.transform=\\'scale(1.08)\\';this.style.borderColor=\\'' + color + '\\'" ' +
+      'onmouseout="this.style.transform=\\'scale(1)\\';this.style.borderColor=\\'transparent\\'">' +
+      '<span style="font-size:2rem;">' + emoji + '</span>' +
+      '<span style="font-size:0.75rem;font-weight:bold;color:' + color + ';">' + label + '</span>' +
+    '</button>';
+  }
+
+  function submitMood(mood) {
+    var btns = document.getElementById('moodBtns');
+    if (btns) btns.querySelectorAll('button').forEach(function(b) { b.disabled = true; b.style.opacity = '0.5'; });
+
+    fetch('/api/student-learning/mood-checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: parseInt(STUDENT_ID_PARAM), curriculum_id: parseInt(CURRICULUM_ID_PARAM), mood: mood })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      moodData = data;
+      var overlay = document.getElementById('moodOverlay');
+      if (overlay) {
+        // 応答メッセージを表示
+        overlay.querySelector('div').innerHTML =
+          '<div style="font-size:3rem;margin-bottom:12px;">' + 
+            (mood === 'excited' ? '🤩' : mood === 'happy' ? '😊' : mood === 'calm' ? '😌' : mood === 'tired' ? '😴' : mood === 'anxious' ? '😰' : '😤') +
+          '</div>' +
+          '<h3 style="font-size:1.1rem;font-weight:bold;color:#312E81;margin-bottom:8px;">' + (data.ai_message ? data.ai_message.greeting : 'ありがとう！') + '</h3>' +
+          '<p style="font-size:0.85rem;color:#4B5563;margin-bottom:16px;line-height:1.5;">' + (data.ai_message ? data.ai_message.advice : 'さあ、はじめよう！') + '</p>' +
+          '<button onclick="closeMoodOverlay()" style="background:linear-gradient(135deg,#4F46E5,#7C3AED);color:white;border:none;padding:12px 32px;border-radius:12px;font-weight:bold;font-size:1rem;cursor:pointer;">学習をはじめる！</button>';
+      }
+    }).catch(function() { closeMoodOverlay(); });
+  }
+
+  function skipMoodCheckin() { closeMoodOverlay(); }
+  function closeMoodOverlay() {
+    var overlay = document.getElementById('moodOverlay');
+    if (overlay) { overlay.style.opacity = '0'; setTimeout(function() { overlay.remove(); }, 300); }
+    initGuide();
+    applyMoodToCards();
+  }
+
+  // 気分データをカード表示に反映
+  function applyMoodToCards() {
+    if (!moodData || !moodData.affect_state) return;
+    var state = moodData.affect_state;
+    // カード上部にAI先生の気分対応メッセージを追加
+    var msgDiv = document.getElementById('moodAiMessage');
+    if (!msgDiv) {
+      msgDiv = document.createElement('div');
+      msgDiv.id = 'moodAiMessage';
+      msgDiv.className = 'no-print';
+      var container = document.querySelector('.container');
+      var cardContainer = document.getElementById('cardContainer');
+      if (container && cardContainer) container.insertBefore(msgDiv, cardContainer);
+    }
+    if (moodData.ai_message) {
+      var toneColors = {
+        'encouraging': { bg: '#FEF9C3', border: '#EAB308', icon: '💪', textColor: '#854D0E' },
+        'calming':     { bg: '#EDE9FE', border: '#8B5CF6', icon: '🫂', textColor: '#5B21B6' },
+        'neutral':     { bg: '#F0F9FF', border: '#0EA5E9', icon: '📖', textColor: '#0C4A6E' }
+      };
+      var tone = toneColors[moodData.ai_message.tone] || toneColors['neutral'];
+      msgDiv.style.cssText = 'background:' + tone.bg + ';border:2px solid ' + tone.border + ';border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;';
+      msgDiv.innerHTML = '<span style="font-size:1.5rem;">' + tone.icon + '</span><div><p style="font-size:0.8rem;font-weight:bold;color:' + tone.textColor + ';">AI先生より</p><p style="font-size:0.75rem;color:' + tone.textColor + ';">' + moodData.ai_message.advice + '</p></div>';
+    }
+  }
+
+  // 初期化: チェックインから開始
+  showMoodCheckin();
   </script>
 </body>
 </html>`)
@@ -36121,6 +36648,162 @@ app.post('/api/student-learning/initial-diagnostic', async (c) => {
   } catch (error) {
     console.error('初期診断保存エラー:', error)
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// =============================================================================
+// 「今日のきもち」チェックイン — 感情ゲーティング(F12)のリアルタイム入力
+// =============================================================================
+
+// --- 気分チェックイン保存 ---
+app.post('/api/student-learning/mood-checkin', async (c) => {
+  const { env } = c
+  try {
+    const { student_id, curriculum_id, mood, arousal, note } = await c.req.json()
+    if (!student_id || !mood) {
+      return c.json({ success: false, error: 'student_id と mood が必要です' }, 400)
+    }
+
+    // テーブル作成
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS mood_checkins (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      curriculum_id INTEGER,
+      mood TEXT NOT NULL,
+      arousal INTEGER DEFAULT 50,
+      valence INTEGER DEFAULT 50,
+      note TEXT DEFAULT '',
+      affect_state TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run()
+
+    // mood → arousal/valence マッピング
+    const moodMap: Record<string, { arousal: number, valence: number, state: string }> = {
+      'excited':     { arousal: 80, valence: 70,  state: 'excited' },      // 🤩 ワクワク
+      'happy':       { arousal: 55, valence: 60,  state: 'comfortable' },   // 😊 たのしい
+      'calm':        { arousal: 40, valence: 30,  state: 'comfortable' },   // 😌 おちついてる
+      'tired':       { arousal: 25, valence: -10, state: 'bored' },         // 😴 つかれた
+      'anxious':     { arousal: 70, valence: -40, state: 'anxious' },       // 😰 しんぱい
+      'frustrated':  { arousal: 65, valence: -50, state: 'frustrated' },    // 😤 イライラ
+      'sad':         { arousal: 20, valence: -60, state: 'crisis' },        // 😢 かなしい
+    }
+    const mapped = moodMap[mood] || { arousal: 50, valence: 0, state: 'comfortable' }
+    const finalArousal = arousal ?? mapped.arousal
+    const finalValence = mapped.valence
+
+    await env.DB.prepare(`
+      INSERT INTO mood_checkins (student_id, curriculum_id, mood, arousal, valence, note, affect_state, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).bind(
+      parseInt(String(student_id)),
+      curriculum_id ? parseInt(String(curriculum_id)) : null,
+      mood,
+      finalArousal,
+      finalValence,
+      note || '',
+      mapped.state
+    ).run()
+
+    // 感情に応じたAI先生メッセージ生成
+    const moodMessages: Record<string, { greeting: string, tone: string, advice: string }> = {
+      'excited': {
+        greeting: 'ワクワクしているんだね！いいかんじ！',
+        tone: 'encouraging',
+        advice: 'その気持ちのまま、どんどんチャレンジしていこう！'
+      },
+      'happy': {
+        greeting: 'たのしい気持ちで来てくれたね！うれしいよ！',
+        tone: 'encouraging',
+        advice: '楽しみながら学べる日だね。じっくりやっていこう！'
+      },
+      'calm': {
+        greeting: '落ち着いた気持ちだね。集中できそう！',
+        tone: 'neutral',
+        advice: 'いいペースで進められそうだね。自分のペースでやろう。'
+      },
+      'tired': {
+        greeting: 'つかれているんだね。むりしなくていいよ。',
+        tone: 'calming',
+        advice: '今日はかんたんなところからはじめよう。すこしずつでだいじょうぶ！'
+      },
+      'anxious': {
+        greeting: 'しんぱいなことがあるんだね。だいじょうぶ、いっしょにやろう。',
+        tone: 'calming',
+        advice: 'まちがえてもぜんぜんOK！ヒントもあるから安心してね。'
+      },
+      'frustrated': {
+        greeting: 'イライラしてるんだね。気持ちはわかるよ。',
+        tone: 'calming',
+        advice: 'かんたんなもんだいからやって、「できた！」をふやそう。'
+      },
+      'sad': {
+        greeting: 'かなしい気持ちなんだね。でも来てくれてありがとう。',
+        tone: 'calming',
+        advice: 'ヒントを見ながら、すこしずつやってみよう。先生にそうだんしてもいいよ。'
+      }
+    }
+    const msg = moodMessages[mood] || moodMessages['calm']
+
+    // 感情ゲーティングによる学習推奨パラメータ
+    // ※チェックテスト含め全カード必須（学力保証）。card_countは常にfull。
+    // 代わりにhint_proactive（ヒント先出し）とscaffold_level（足場の量）で適応。
+    const recommendations: Record<string, any> = {
+      'excited':    { difficulty_max: 'hard', pace: 'fast', card_count: 'full', hint_proactive: false, scaffold_level: 'minimal' },
+      'happy':      { difficulty_max: 'standard', pace: 'steady', card_count: 'full', hint_proactive: false, scaffold_level: 'normal' },
+      'calm':       { difficulty_max: 'standard', pace: 'steady', card_count: 'full', hint_proactive: false, scaffold_level: 'normal' },
+      'tired':      { difficulty_max: 'standard', pace: 'slow', card_count: 'full', hint_proactive: true, scaffold_level: 'high' },
+      'anxious':    { difficulty_max: 'standard', pace: 'slow', card_count: 'full', hint_proactive: true, scaffold_level: 'high' },
+      'frustrated': { difficulty_max: 'standard', pace: 'slow', card_count: 'full', hint_proactive: true, scaffold_level: 'high' },
+      'sad':        { difficulty_max: 'easy', pace: 'slow', card_count: 'full', hint_proactive: true, scaffold_level: 'maximum' },
+    }
+
+    return c.json({
+      success: true,
+      affect_state: mapped.state,
+      arousal: finalArousal,
+      valence: finalValence,
+      ai_message: msg,
+      recommendations: recommendations[mood] || recommendations['calm']
+    })
+  } catch (error: any) {
+    console.error('気分チェックインエラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// --- 今日の気分取得 ---
+app.get('/api/student-learning/mood-today', async (c) => {
+  const { env } = c
+  try {
+    const student_id = c.req.query('student_id')
+    const curriculum_id = c.req.query('curriculum_id')
+    if (!student_id) return c.json({ has_checkin: false })
+
+    // 今日のチェックインを取得
+    const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+    const checkin = await env.DB.prepare(`
+      SELECT * FROM mood_checkins 
+      WHERE student_id = ? AND date(created_at) = ?
+      ${curriculum_id ? 'AND curriculum_id = ?' : ''}
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(...(curriculum_id 
+      ? [parseInt(student_id), today, parseInt(curriculum_id)]
+      : [parseInt(student_id), today])
+    ).first() as any
+
+    if (checkin) {
+      return c.json({
+        has_checkin: true,
+        mood: checkin.mood,
+        affect_state: checkin.affect_state,
+        arousal: checkin.arousal,
+        valence: checkin.valence,
+        checked_at: checkin.created_at
+      })
+    }
+    return c.json({ has_checkin: false })
+  } catch {
+    return c.json({ has_checkin: false })
   }
 })
 

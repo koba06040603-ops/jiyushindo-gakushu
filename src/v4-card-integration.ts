@@ -108,6 +108,14 @@ interface StudentRawData {
     max_score: number
     weakness_areas?: string[]
   }
+  // mood_checkins (今日の最新 — 本人申告の感情データ)
+  moodCheckin?: {
+    mood: string                           // excited/happy/calm/tired/anxious/frustrated/sad
+    arousal: number                        // 0-100
+    valence: number                        // -100 to 100
+    affect_state: string                   // comfortable/excited/anxious/bored/frustrated/crisis/flow
+    checked_at: string                     // ISO datetime
+  }
   // 学年
   grade_level?: number
 }
@@ -336,22 +344,53 @@ export function buildProfilesFromD1(raw: StudentRawData): AllTheoryProfiles {
   }
 
   // ============ F12: 感情-認知統合 ============
+  // 行動データからの推定値を基本とする
+  let estimatedArousal = clamp(
+    50 + (resilience - 50) * 0.3 + (testFatigue > 60 ? -15 : 0) + (correctRate > 0.7 ? 10 : correctRate < 0.3 ? -10 : 0),
+    15, 90)
+  let estimatedValence = clamp(
+    (avgConfidence - 50) * 0.4 + (correctRate - 0.5) * 40 + (subjectAffinity - 50) * 0.3,
+    -80, 80)
+  let estimatedAnxiety = anxietyLevel
+  let estimatedBoredom = clamp(
+    (correctRate > 0.9 ? 30 : 10) + (100 - subjectAffinity) * 0.3 + (testFatigue > 60 ? 20 : 0),
+    5, 80)
+  let estimatedFlow = clamp(
+    (correctRate >= 0.6 && correctRate <= 0.85 ? 0.4 : 0.15)
+    + (avgConfidence > 60 ? 0.1 : 0) + (testFocus > 60 ? 0.1 : 0)
+    + (anxietyLevel < 40 ? 0.1 : 0), 0.05, 0.9)
+
+  // 本人申告の気分データがある場合、推定値を上書き（自己申告優先）
+  if (raw.moodCheckin) {
+    const mc = raw.moodCheckin
+    // 本人申告のarousal/valenceを80%の重みで反映（行動データ20%を維持）
+    estimatedArousal = clamp(mc.arousal * 0.8 + estimatedArousal * 0.2, 15, 90)
+    estimatedValence = clamp(mc.valence * 0.8 + estimatedValence * 0.2, -80, 80)
+    // 気分に基づく不安・退屈度の調整
+    if (mc.mood === 'anxious' || mc.mood === 'frustrated') {
+      estimatedAnxiety = clamp(Math.max(estimatedAnxiety, 65), 5, 95)
+      estimatedFlow = clamp(estimatedFlow * 0.5, 0.05, 0.9)
+    } else if (mc.mood === 'tired' || mc.mood === 'sad') {
+      estimatedBoredom = clamp(Math.max(estimatedBoredom, 50), 5, 80)
+      estimatedArousal = clamp(Math.min(estimatedArousal, 35), 15, 90)
+      estimatedFlow = clamp(estimatedFlow * 0.3, 0.05, 0.9)
+    } else if (mc.mood === 'excited') {
+      estimatedAnxiety = clamp(Math.min(estimatedAnxiety, 20), 5, 95)
+      estimatedBoredom = clamp(Math.min(estimatedBoredom, 15), 5, 80)
+      estimatedFlow = clamp(Math.max(estimatedFlow, 0.5), 0.05, 0.9)
+    } else if (mc.mood === 'happy') {
+      estimatedAnxiety = clamp(Math.min(estimatedAnxiety, 30), 5, 95)
+      estimatedFlow = clamp(Math.max(estimatedFlow, 0.35), 0.05, 0.9)
+    }
+  }
+
   const F12: F12_AffectProfile = {
-    current_arousal: clamp(
-      50 + (resilience - 50) * 0.3 + (testFatigue > 60 ? -15 : 0) + (correctRate > 0.7 ? 10 : correctRate < 0.3 ? -10 : 0),
-      15, 90),
-    current_valence: clamp(
-      (avgConfidence - 50) * 0.4 + (correctRate - 0.5) * 40 + (subjectAffinity - 50) * 0.3,
-      -80, 80),
+    current_arousal: estimatedArousal,
+    current_valence: estimatedValence,
     academic_enjoyment: clamp(subjectAffinity * 0.5 + avgConfidence * 0.3 + correctRate * 20, 5, 95),
-    academic_anxiety: anxietyLevel,
-    academic_boredom: clamp(
-      (correctRate > 0.9 ? 30 : 10) + (100 - subjectAffinity) * 0.3 + (testFatigue > 60 ? 20 : 0),
-      5, 80),
-    flow_state_probability: clamp(
-      (correctRate >= 0.6 && correctRate <= 0.85 ? 0.4 : 0.15)
-      + (avgConfidence > 60 ? 0.1 : 0) + (testFocus > 60 ? 0.1 : 0)
-      + (anxietyLevel < 40 ? 0.1 : 0), 0.05, 0.9),
+    academic_anxiety: estimatedAnxiety,
+    academic_boredom: estimatedBoredom,
+    flow_state_probability: estimatedFlow,
   }
 
   return { F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12 }
@@ -381,7 +420,7 @@ export async function fetchStudentRawData(
   curriculumId?: number,
 ): Promise<StudentRawData> {
   // 並列クエリ実行
-  const [diagResult, answerResult, reflResult, hourlyResult, testResult, metaResult, perfResult] = await Promise.all([
+  const [diagResult, answerResult, reflResult, hourlyResult, testResult, metaResult, perfResult, moodResult] = await Promise.all([
     // 初期診断（最新1件 — curriculum_idがあればそのカリキュラムの診断を優先）
     (curriculumId
       ? DB.prepare(
@@ -455,6 +494,15 @@ export async function fetchStudentRawData(
     DB.prepare(
       'SELECT * FROM test_performance_feedback WHERE student_id = ? ORDER BY created_at DESC LIMIT 1'
     ).bind(studentId).first().catch(() => null),
+
+    // 今日のきもちチェックイン（最新1件 — 本人申告の感情データ）
+    DB.prepare(`
+      SELECT mood, arousal, valence, affect_state, created_at 
+      FROM mood_checkins 
+      WHERE student_id = ? AND date(created_at) = date('now')
+      ${curriculumId ? 'AND curriculum_id = ?' : ''}
+      ORDER BY created_at DESC LIMIT 1
+    `).bind(...(curriculumId ? [studentId, curriculumId] : [studentId])).first().catch(() => null),
   ])
 
   // 連続正解・連続不正解を算出（直近20件から）
@@ -593,6 +641,18 @@ export async function fetchStudentRawData(
       score: p.score ?? 0,
       max_score: p.max_score ?? 100,
       weakness_areas: weaknessAreas,
+    }
+  }
+
+  // 本人申告の感情データ（行動推定よりも優先される）
+  if (moodResult) {
+    const m = moodResult as any
+    result.moodCheckin = {
+      mood: m.mood,
+      arousal: m.arousal ?? 50,
+      valence: m.valence ?? 0,
+      affect_state: m.affect_state || 'comfortable',
+      checked_at: m.created_at,
     }
   }
 
