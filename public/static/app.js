@@ -572,7 +572,7 @@ console.log('📦 Available functions:', typeof renderTopPage, typeof showTopPag
 
 // axios グローバルタイムアウト設定（30秒）
 if (typeof axios !== 'undefined') {
-  axios.defaults.timeout = 30000
+  axios.defaults.timeout = 60000
 }
 
 // グローバル状態管理
@@ -20271,7 +20271,7 @@ async function executeUnitGeneration(params) {
       unitName,
       customization,
       qualityMode
-    })
+    }, { timeout: 120000 })  // 120秒タイムアウト
 
     if (unitInfoResponse.data.error) {
       throw new Error(unitInfoResponse.data.error)
@@ -21951,7 +21951,7 @@ async function saveGeneratedUnit(unitData) {
   
   try {
     console.log('📡 API呼び出し: /api/curriculum/save-generated')
-    const response = await axios.post('/api/curriculum/save-generated', unitData)
+    const response = await axios.post('/api/curriculum/save-generated', unitData, { timeout: 120000 })
     console.log('📥 APIレスポンス:', response.data)
     
     if (response.data.success) {
@@ -22734,7 +22734,7 @@ async function generateSimilarProblem(cardId) {
   button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>生成中...'
   
   try {
-    const response = await axios.post(`/api/cards/${cardId}/generate-similar`)
+    const response = await axios.post(`/api/cards/${cardId}/generate-similar`, {}, { timeout: 90000 })
     if (response.data.success) {
       // 新しい問題を表示（タブを問題に切り替え）
       alert('✨ 新しい問題を生成しました！\n\n' + response.data.problem.problem_text)
@@ -22774,7 +22774,7 @@ async function generateAndShowSimilarProblem(cardId) {
   window.practiceHintUsed = false
   
   try {
-    const response = await axios.post(`/api/cards/${cardId}/generate-similar`)
+    const response = await axios.post(`/api/cards/${cardId}/generate-similar`, {}, { timeout: 90000 })
     console.log('類似問題生成レスポンス:', response.data)
     
     if (response.data.success && response.data.problem) {
