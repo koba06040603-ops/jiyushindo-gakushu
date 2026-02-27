@@ -8108,11 +8108,43 @@ app.get('/guide/:curriculumId', async (c) => {
       </div>
     ` : ''
 
-    // 全カードデータをJSONに
+    // 全カードデータをJSONに（導入問題カードも含む）
     const allCardsFlat: any[] = []
     for (const course of courses as any[]) {
       const cCards = courseCards[course.id] || []
       const info = levelInfo[course.course_level] || { name: course.course_name, color: '#6366F1', emoji: '📚' }
+      
+      // ★ 導入問題を各コースの先頭に「導入カード」として挿入
+      // 文章表示（常時）＋ストーリーブック画像（任意選択）の両方を提供
+      let introData: any = null
+      if (course.introduction_problem) {
+        try {
+          introData = typeof course.introduction_problem === 'string' 
+            ? JSON.parse(course.introduction_problem) 
+            : course.introduction_problem
+        } catch (e) { /* skip */ }
+      }
+      if (introData && (introData.problem_title || introData.problem_content)) {
+        allCardsFlat.push({
+          _isIntroCard: true,
+          _introData: introData,
+          _courseId: course.id,
+          _courseInfo: info,
+          _courseName: course.course_name || info.name,
+          _courseLevel: course.course_level,
+          card_title: introData.problem_title || `${info.emoji} ${info.name}の導入`,
+          problem_text: introData.problem_content || '',
+          story_hook: introData.story_hook || '',
+          visual_scene: introData.visual_scene || '',
+          storybook_image_url: introData.storybook_image_url || '',
+          correct_answer: introData.answer || '',
+          difficulty_level: course.course_level === 'basic' ? 'easy' : course.course_level === 'advanced' ? 'hard' : 'standard',
+          _mm: {},
+          _hints: [],
+          _cardIndex: -1
+        })
+      }
+      
       cCards.forEach((card: any, idx: number) => {
         let mm: any = {}
         try { if (card.problem_content && card.problem_content.startsWith('{')) mm = JSON.parse(card.problem_content)?.multimedia || {} } catch {}
@@ -8178,6 +8210,10 @@ app.get('/guide/:curriculumId', async (c) => {
     @keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
     @keyframes starBurst { 0% { transform: scale(0) rotate(-30deg); } 50% { transform: scale(1.4) rotate(10deg); } 100% { transform: scale(1) rotate(0deg); } }
     @keyframes confetti { 0% { transform: translateY(0) rotate(0); opacity:1; } 100% { transform: translateY(-100px) rotate(720deg); opacity:0; } }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    @keyframes progressBar { 0% { width:10%; margin-left:0; } 50% { width:60%; margin-left:20%; } 100% { width:10%; margin-left:90%; } }
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
     @media print { .no-print { display: none !important; } .card-page { display: block !important; page-break-after: always; } }
     @media (max-width: 640px) { .header h1 { font-size: 1.4rem; } .card-box { padding: 16px; } .help-btn { min-width: 65px; padding: 8px 10px; font-size: 0.75rem; } .help-btn i { font-size: 1.1rem; } }
     .percentage-widget input[type=range] { width: 100%; accent-color: #10b981; cursor: pointer; }
@@ -8635,6 +8671,315 @@ app.get('/guide/:curriculumId', async (c) => {
     return 'card';
   }
 
+  // === ★ 導入問題カード専用レンダリング ===
+  // 目的：「難易度提示」ではなく「学びへの誘い」
+  // 文章表示（常時）＋ストーリーブック画像（見たい人向けの選択肢）
+  function renderIntroCard(c, page) {
+    var container = document.getElementById('cardContainer');
+    if (!container) return;
+    var info = c._courseInfo || {};
+    var levelLabels = { basic: 'じっくりコース', standard: 'しっかりコース', advanced: 'ぐんぐんコース' };
+    var levelEmoji = { basic: '🐢', standard: '🐇', advanced: '🚀' };
+    var levelName = levelLabels[c._courseLevel] || c._courseName || 'コース';
+    var emoji = levelEmoji[c._courseLevel] || info.emoji || '📚';
+
+    var html = '<div class="card-box" style="border:3px solid ' + (info.color||'#6366F1') + '; position:relative; overflow:hidden;">';
+    
+    // 導入カードバッジ
+    html += '<div style="position:absolute;top:0;right:0;background:linear-gradient(135deg,' + (info.color||'#6366F1') + ',' + (info.color||'#6366F1') + 'CC);color:white;padding:6px 16px 6px 24px;border-radius:0 0 0 20px;font-size:0.75rem;font-weight:bold;">';
+    html += '🌟 ' + levelName + ' 導入</div>';
+
+    // ヘッダー：ワクワク感のあるタイトル
+    html += '<div style="text-align:center; margin:8px 0 16px 0;">';
+    html += '<div style="font-size:2.5rem; margin-bottom:8px; animation: starBurst 0.6s ease;">' + emoji + '</div>';
+    html += '<h2 style="font-size:1.3rem; font-weight:900; color:' + (info.color||'#4F46E5') + '; margin-bottom:4px; line-height:1.4;">' + (c.card_title || '学びのとびら') + '</h2>';
+    html += '<p style="font-size:0.8rem; color:#9CA3AF;">このコースで学ぶ内容を、まず体験してみよう！</p>';
+    html += '</div>';
+
+    // ストーリーブック画像エリア（キャッシュ済みなら表示、なければ生成ボタン）
+    html += '<div id="storybook-area-' + page + '" style="margin-bottom:16px;">';
+    if (c.storybook_image_url) {
+      // 既にキャッシュされた画像がある場合
+      html += '<div style="border-radius:12px; overflow:hidden; border:2px solid #E5E7EB; margin-bottom:8px;">';
+      html += '<img src="' + c.storybook_image_url + '" alt="導入イラスト" style="width:100%; display:block; border-radius:10px;" />';
+      html += '</div>';
+    } else {
+      // 画像なし：プレースホルダー＋生成ボタン（選択肢として提供）
+      html += '<div id="storybook-placeholder-' + page + '" style="background:linear-gradient(135deg,#FEF3C7,#FECACA20,#DBEAFE30);border:2px dashed #D1D5DB;border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:all 0.3s;" onclick="generateStorybookImage(' + page + ')">';
+      html += '<div style="font-size:2rem;margin-bottom:8px;animation:float 3s ease-in-out infinite;">🎨</div>';
+      html += '<p style="font-size:0.85rem;font-weight:bold;color:#6B7280;">📖 ストーリーブック画像を見てみる？</p>';
+      html += '<p style="font-size:0.7rem;color:#9CA3AF;margin-top:4px;">タップするとAIが絵本風のイラストを作るよ（10-20秒）</p>';
+      html += '<button style="margin-top:10px;background:linear-gradient(135deg,#F59E0B,#EF4444);color:white;border:none;padding:8px 20px;border-radius:20px;font-weight:bold;font-size:0.8rem;cursor:pointer;box-shadow:0 2px 8px rgba(245,158,11,0.3);" onclick="event.stopPropagation();generateStorybookImage(' + page + ');">🖼️ イラストを作る！</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // ★ 問題文（文章表示：常に表示。テキストで読みたい人のため）
+    html += '<div style="background:linear-gradient(135deg,#FFF7ED,#FFFBEB);border:3px solid #FDE68A;border-radius:14px;padding:18px;margin-bottom:14px;position:relative;">';
+    html += '<div style="position:absolute;top:-14px;left:14px;background:linear-gradient(135deg,#F59E0B,#EF4444);color:white;padding:4px 16px;border-radius:20px;font-weight:900;font-size:0.8rem;">✨ やってみよう！</div>';
+    html += '<div style="margin-top:6px;">';
+    // ストーリー仕立ての問題文
+    html += '<p style="font-size:1.1rem;line-height:2;color:#1F2937;font-weight:500;">' + (c.problem_text || '') + '</p>';
+    // 好奇心フック（story_hook）
+    if (c.story_hook) {
+      html += '<p style="margin-top:12px;font-size:1rem;font-weight:bold;color:#DC2626;text-align:center;padding:8px;background:#FEF2F2;border-radius:10px;border:2px solid #FECACA;">🤔 ' + c.story_hook + '</p>';
+    }
+    html += '</div></div>';
+
+    // 回答エリア
+    html += '<div class="answer-box" style="border-color:' + (info.color||'#d1d5db') + ';">';
+    html += '<textarea id="intro-answer-' + page + '" style="width:100%;min-height:70px;border:none;background:transparent;font-size:1.05rem;line-height:1.8;resize:vertical;outline:none;padding:12px;font-family:inherit;" placeholder="考えたことを書いてみよう！正解じゃなくてOK 😊"></textarea>';
+    html += '</div>';
+
+    // 手書きキャンバス（導入問題でも使える）
+    html += '<div style="margin:10px 0;text-align:center;">';
+    html += '<button class="help-btn" style="background:#FEF3C7;color:#92400E;display:inline-flex;padding:8px 16px;" onclick="toggleDrawCanvas(' + page + ')"><i class="fas fa-pencil-alt"></i> 手書きメモ</button>';
+    html += '<button class="help-btn" style="background:#E0E7FF;color:#4338CA;display:inline-flex;padding:8px 16px;" onclick="document.getElementById(\\x27notePhotoInput-' + page + '\\x27).click()"><i class="fas fa-camera"></i> ノート写真</button>';
+    html += '</div>';
+    html += '<div id="draw-canvas-container-' + page + '" style="display:none;margin:10px 0;"></div>';
+    html += '<input type="file" id="notePhotoInput-' + page + '" accept="image/*" capture="environment" style="display:none" onchange="analyzeNotePhoto(' + page + ', this)">';
+    html += '<div id="note-analysis-' + page + '"></div>';
+
+    // こたえ表示（details で折りたたみ）
+    if (c.correct_answer) {
+      html += '<details style="margin-top:12px;background:#F0FDF4;border:2px solid #BBF7D0;border-radius:12px;">';
+      html += '<summary style="padding:10px 14px;cursor:pointer;font-weight:bold;color:#166534;font-size:0.9rem;user-select:none;">📝 こたえと解説を見る</summary>';
+      html += '<div style="padding:6px 14px 14px 14px;"><div style="background:white;border-radius:8px;padding:10px 14px;border:1px solid #BBF7D0;font-size:0.95rem;line-height:1.8;">';
+      html += '<strong style="color:#166534;">💡</strong> ' + c.correct_answer;
+      html += '</div></div></details>';
+    }
+
+    // 「次の学習へ進もう」ボタン
+    html += '<div style="text-align:center;margin-top:18px;">';
+    html += '<button onclick="navigateCard(1)" style="background:linear-gradient(135deg,' + (info.color||'#4F46E5') + ',' + (info.color||'#4F46E5') + 'DD);color:white;border:none;padding:14px 36px;border-radius:14px;font-size:1rem;font-weight:bold;cursor:pointer;box-shadow:0 4px 12px ' + (info.color||'#4F46E5') + '40;transition:all 0.2s;">';
+    html += '✨ 学習カードへ進もう！ <i class="fas fa-arrow-right" style="margin-left:6px;"></i></button>';
+    html += '</div>';
+
+    // 🎵 今後の拡張予告（音楽・動画）＋ 生成された提案がある場合は表示
+    var songIdea = c._introData ? (c._introData.learning_song_idea || '') : '';
+    var videoIdea = c._introData ? (c._introData.learning_video_idea || '') : '';
+    if (songIdea || videoIdea) {
+      html += '<div style="margin-top:14px;padding:12px 14px;background:linear-gradient(135deg,#F5F3FF,#EEF2FF);border:2px solid #DDD6FE;border-radius:12px;">';
+      if (songIdea) {
+        html += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:' + (videoIdea ? '10px' : '0') + ';">';
+        html += '<span style="font-size:1.5rem;flex-shrink:0;">🎵</span>';
+        html += '<div><strong style="font-size:0.8rem;color:#7C3AED;">学習ソングのアイデア</strong>';
+        html += '<p style="font-size:0.85rem;color:#4C1D95;margin-top:2px;">' + songIdea + '</p>';
+        html += '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">💡 AIで30秒の歌を作ったり、Sunoで本格的な曲にすることもできるよ！先生にリクエストしてみてね。</p>';
+        html += '</div></div>';
+      }
+      if (videoIdea) {
+        html += '<div style="display:flex;align-items:flex-start;gap:8px;">';
+        html += '<span style="font-size:1.5rem;flex-shrink:0;">🎬</span>';
+        html += '<div><strong style="font-size:0.8rem;color:#7C3AED;">動画で見るともっとわかる！</strong>';
+        html += '<p style="font-size:0.85rem;color:#4C1D95;margin-top:2px;">' + videoIdea + '</p>';
+        html += '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">💡 AIで学習動画を作る機能を準備中！PCならではのリッチな体験ができるよ。</p>';
+        html += '</div></div>';
+      }
+      html += '</div>';
+    } else {
+      html += '<div style="margin-top:14px;padding:10px 14px;background:linear-gradient(135deg,#F5F3FF,#EEF2FF);border:1px solid #DDD6FE;border-radius:10px;font-size:0.7rem;color:#7C3AED;text-align:center;">';
+      html += '🎵 <strong>ヒント：</strong>記憶に残る歌（九九の歌など）をAIで作ることもできるよ！';
+      html += '先生に「学習ソングを作って」とリクエストしてみてね。';
+      html += '<br>🎬 動画で学ぶ（火山の噴火、水の循環など）も準備中！</div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+    updateNavigation();
+    
+    // 手書きキャンバスの初期化用にグローバル関数を確認
+    if (typeof initDrawCanvas === 'function') {
+      // キャンバスは toggleDrawCanvas 呼び出し時に初期化される
+    }
+  }
+
+  // === ★ ストーリーブック画像の非同期生成 ===
+  // Gemini 3.1 Nano Banana 2 で絵本風イラストを生成
+  // 生成中はアニメーション付きプレースホルダーを表示し、完了後に差し替え
+  function generateStorybookImage(page) {
+    var c = ALL_CARDS[page];
+    if (!c || !c._isIntroCard) return;
+    var placeholder = document.getElementById('storybook-placeholder-' + page);
+    var area = document.getElementById('storybook-area-' + page);
+    if (!area) return;
+    
+    // 生成中UI
+    area.innerHTML = '<div style="background:linear-gradient(135deg,#DBEAFE,#F5F3FF,#FECACA20);border:2px solid #C7D2FE;border-radius:12px;padding:24px;text-align:center;">' +
+      '<div class="storybook-loading-spinner" style="display:inline-block;width:48px;height:48px;border:4px solid #E5E7EB;border-top:4px solid #6366F1;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:12px;"></div>' +
+      '<p style="font-size:0.9rem;font-weight:bold;color:#4F46E5;">🎨 ストーリーブック画像を描いています...</p>' +
+      '<p style="font-size:0.75rem;color:#9CA3AF;margin-top:4px;">AIが絵本風のイラストを作成中（10〜20秒）</p>' +
+      '<div style="margin-top:12px;height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden;">' +
+      '<div style="height:100%;background:linear-gradient(90deg,#6366F1,#EC4899,#F59E0B);width:30%;animation:progressBar 3s ease-in-out infinite;border-radius:2px;"></div></div>' +
+      '</div>';
+    
+    // API呼び出し
+    fetch('/api/ai/generate-intro-storybook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        course_id: c._courseId || null,
+        visual_scene: c.visual_scene || '',
+        problem_title: c.card_title || '',
+        problem_content: c.problem_text || '',
+        grade: CURRICULUM.grade || '',
+        subject: CURRICULUM.subject || '',
+        unit_name: CURRICULUM.unit_name || ''
+      })
+    }).then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.success && data.image_url) {
+        // 成功：画像を表示
+        c.storybook_image_url = data.image_url; // キャッシュ
+        area.innerHTML = '<div style="border-radius:12px;overflow:hidden;border:2px solid #E5E7EB;margin-bottom:8px;animation:correctPop 0.4s ease;">' +
+          '<img src="' + data.image_url + '" alt="導入イラスト" style="width:100%;display:block;border-radius:10px;" />' +
+          '</div>' +
+          '<p style="text-align:center;font-size:0.7rem;color:#9CA3AF;">' +
+          (data.cached ? '📦 保存済み画像' : '🎨 AI生成 (' + Math.round((data.generation_time_ms||0)/1000) + '秒)') + '</p>';
+      } else {
+        // 失敗：再試行ボタン
+        area.innerHTML = '<div style="background:#FEF2F2;border:2px dashed #FECACA;border-radius:12px;padding:16px;text-align:center;">' +
+          '<p style="font-size:0.85rem;color:#DC2626;">😅 画像の生成に失敗しました</p>' +
+          '<button onclick="generateStorybookImage(' + page + ')" style="margin-top:8px;background:#EF4444;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 もう一回ためす</button>' +
+          '<p style="font-size:0.7rem;color:#9CA3AF;margin-top:6px;">文章だけでも学べるよ！そのまま進んでOK 👍</p></div>';
+      }
+    }).catch(function(err) {
+      area.innerHTML = '<div style="background:#FEF2F2;border:2px dashed #FECACA;border-radius:12px;padding:16px;text-align:center;">' +
+        '<p style="font-size:0.85rem;color:#DC2626;">😅 通信エラーが起きました</p>' +
+        '<button onclick="generateStorybookImage(' + page + ')" style="margin-top:8px;background:#EF4444;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 もう一回ためす</button>' +
+        '<p style="font-size:0.7rem;color:#9CA3AF;margin-top:6px;">文章だけでも大丈夫！ 📖</p></div>';
+    });
+  }
+
+  // === ★ ノート写真のAI解析（手書きメモ・筆算・計算式対応） ===
+  // PC手書きキャンバスだけでなく、実際のノートの写真からもOCR+AI解析
+  function analyzeNotePhoto(page, inputEl) {
+    var file = inputEl.files && inputEl.files[0];
+    if (!file) return;
+    var resultArea = document.getElementById('note-analysis-' + page);
+    if (!resultArea) return;
+    
+    // ファイルをbase64に変換
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var imageData = e.target.result;
+      var c = ALL_CARDS[page] || {};
+      
+      // 読み込み中UI
+      resultArea.innerHTML = '<div style="background:linear-gradient(135deg,#EEF2FF,#F5F3FF);border:2px solid #C7D2FE;border-radius:12px;padding:16px;text-align:center;margin:10px 0;">' +
+        '<div style="display:inline-block;width:32px;height:32px;border:3px solid #E5E7EB;border-top:3px solid #6366F1;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:8px;"></div>' +
+        '<p style="font-size:0.85rem;font-weight:bold;color:#4F46E5;">📸 ノートの写真をAIが読み取り中...</p>' +
+        '<p style="font-size:0.7rem;color:#9CA3AF;">筆算・計算式・メモも解析します</p>' +
+        '<div style="margin:8px auto;max-width:200px;"><img src="' + imageData + '" style="width:100%;border-radius:8px;border:1px solid #E5E7EB;"></div>' +
+        '</div>';
+      
+      // API呼び出し（既存のhandwriting解析エンドポイントを利用、photo_typeを追加）
+      fetch('/api/ai/analyze-handwriting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_data: imageData,
+          card_title: c.card_title || '',
+          problem_text: c.problem_text || '',
+          correct_answer: c.correct_answer || c.answer || '',
+          grade: CURRICULUM.grade || '',
+          subject: CURRICULUM.subject || '',
+          student_answer: document.getElementById('intro-answer-' + page)
+            ? document.getElementById('intro-answer-' + page).value 
+            : (document.getElementById('answer-' + page) ? document.getElementById('answer-' + page).value : ''),
+          photo_type: 'note_photo',
+          analysis_focus: 'calculation_memo'
+        })
+      }).then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.success && data.analysis) {
+          var a = data.analysis;
+          var rhtml = '<div style="background:white;border:2px solid #C7D2FE;border-radius:12px;padding:14px;margin:10px 0;">';
+          rhtml += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">';
+          rhtml += '<span style="font-size:1.5rem;">📸</span>';
+          rhtml += '<div><strong style="color:#4338CA;font-size:0.9rem;">ノート写真の解析結果</strong>';
+          rhtml += '<p style="font-size:0.7rem;color:#9CA3AF;">AI先生がノートを読み取りました</p></div></div>';
+          
+          // サムネイル
+          rhtml += '<div style="text-align:center;margin-bottom:10px;"><img src="' + imageData + '" style="max-width:180px;max-height:120px;border-radius:8px;border:1px solid #E5E7EB;"></div>';
+          
+          // 読み取ったテキスト
+          if (a.recognized_text) {
+            rhtml += '<div style="background:#EFF6FF;border-left:4px solid #3B82F6;padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:8px;">';
+            rhtml += '<strong style="font-size:0.8rem;color:#1E40AF;">📝 読み取った内容：</strong>';
+            rhtml += '<p style="font-size:0.9rem;font-family:monospace;white-space:pre-wrap;margin-top:4px;">' + a.recognized_text + '</p></div>';
+          }
+          
+          // 褒めポイント
+          if (a.praise_points && a.praise_points.length > 0) {
+            rhtml += '<div style="background:#F0FDF4;border-left:4px solid #22C55E;padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:8px;">';
+            rhtml += '<strong style="font-size:0.8rem;color:#166534;">✨ いいところ：</strong>';
+            a.praise_points.forEach(function(p) { rhtml += '<p style="font-size:0.85rem;margin-top:2px;">👏 ' + p + '</p>'; });
+            rhtml += '</div>';
+          }
+          
+          // 思考プロセス
+          if (a.thinking_steps && a.thinking_steps.length > 0) {
+            rhtml += '<div style="background:#FFFBEB;padding:8px 12px;border-radius:8px;border:1px solid #FDE68A;margin-bottom:8px;">';
+            rhtml += '<strong style="font-size:0.8rem;color:#92400E;">🧠 考え方のプロセス：</strong>';
+            a.thinking_steps.forEach(function(step, si) {
+              var icon = step.correct !== false ? '✅' : '❌';
+              rhtml += '<div style="display:flex;align-items:flex-start;gap:6px;margin-top:4px;font-size:0.85rem;">';
+              rhtml += '<span>' + icon + '</span><span>' + (step.description || step) + '</span></div>';
+            });
+            rhtml += '</div>';
+          }
+          
+          // エラー箇所
+          if (a.error_location) {
+            rhtml += '<div style="background:#FEF2F2;border-left:4px solid #EF4444;padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:8px;">';
+            rhtml += '<strong style="font-size:0.8rem;color:#991B1B;">📍 まちがいポイント：</strong>';
+            rhtml += '<p style="font-size:0.85rem;margin-top:2px;">' + (a.error_location.description || a.error_location) + '</p>';
+            if (a.error_location.encouragement) {
+              rhtml += '<p style="font-size:0.8rem;color:#DC2626;font-weight:bold;margin-top:4px;">💪 ' + a.error_location.encouragement + '</p>';
+            }
+            rhtml += '</div>';
+          }
+          
+          // 提案
+          if (a.suggestion) {
+            rhtml += '<div style="background:#F5F3FF;border-left:4px solid #8B5CF6;padding:8px 12px;border-radius:0 8px 8px 0;">';
+            rhtml += '<strong style="font-size:0.8rem;color:#6D28D9;">💡 アドバイス：</strong>';
+            rhtml += '<p style="font-size:0.85rem;margin-top:2px;">' + a.suggestion + '</p></div>';
+          }
+          
+          // 回答欄に挿入ボタン
+          if (a.recognized_text) {
+            rhtml += '<div style="text-align:center;margin-top:10px;">';
+            rhtml += '<button onclick="insertNoteText(' + page + ',\\x27' + (a.recognized_text||'').replace(/'/g,"\\'").replace(/\n/g,'\\n').substring(0,200) + '\\x27)" style="background:#4F46E5;color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.8rem;font-weight:bold;cursor:pointer;">📋 回答欄にコピー</button>';
+            rhtml += '</div>';
+          }
+          
+          rhtml += '</div>';
+          resultArea.innerHTML = rhtml;
+        } else {
+          resultArea.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px;text-align:center;margin:10px 0;">' +
+            '<p style="font-size:0.85rem;color:#DC2626;">😅 ノートの読み取りに失敗しました</p>' +
+            '<p style="font-size:0.75rem;color:#9CA3AF;margin-top:4px;">もう一度撮影してみてね。明るい場所で撮ると読み取りやすいよ！</p></div>';
+        }
+      }).catch(function(err) {
+        resultArea.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px;text-align:center;margin:10px 0;">' +
+          '<p style="font-size:0.85rem;color:#DC2626;">😅 通信エラーが起きました</p></div>';
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  // ノート写真から読み取ったテキストを回答欄にコピー
+  function insertNoteText(page, text) {
+    var textarea = document.getElementById('intro-answer-' + page) || document.getElementById('answer-' + page);
+    if (textarea) {
+      textarea.value = (textarea.value ? textarea.value + '\\n' : '') + text;
+      textarea.style.animation = 'editPulse 0.5s ease';
+      setTimeout(function() { textarea.style.animation = ''; }, 600);
+    }
+  }
+
   // === カードをレンダリング ===
   function renderCurrentCard() {
     var pageType = getPageType(currentPage);
@@ -8642,6 +8987,10 @@ app.get('/guide/:curriculumId', async (c) => {
     if (pageType === 'optional') { renderOptionalPage(); return; }
     var c = ALL_CARDS[currentPage];
     if (!c) return;
+    
+    // ★ 導入問題カードの場合は専用レンダリング
+    if (c._isIntroCard) { renderIntroCard(c, currentPage); return; }
+    
     var container = document.getElementById('cardContainer');
     var mm = c._mm || {};
     var hints = c._hints || [];
@@ -8873,9 +9222,12 @@ app.get('/guide/:curriculumId', async (c) => {
     html += '<div class="no-print" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
     html += '<label for="handwriting-upload-' + currentPage + '" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#F0F9FF,#E0F2FE);border:2px solid #7DD3FC;border-radius:10px;padding:6px 12px;cursor:pointer;font-size:0.8rem;font-weight:bold;color:#0369A1;"><i class="fas fa-camera"></i>ノート撮影</label>';
     html += '<input type="file" id="handwriting-upload-' + currentPage + '" accept="image/*" capture="environment" style="display:none;" onchange="analyzeHandwriting(' + currentPage + ', this)">';
-    html += '<span style="font-size:0.7rem;color:#9CA3AF;">計算や考え方を写真にとると、AIがよみとるよ</span>';
+    html += '<label for="notePhotoInput-' + currentPage + '" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border:2px solid #93C5FD;border-radius:10px;padding:6px 12px;cursor:pointer;font-size:0.8rem;font-weight:bold;color:#1D4ED8;"><i class="fas fa-image"></i>メモ写真</label>';
+    html += '<input type="file" id="notePhotoInput-' + currentPage + '" accept="image/*" style="display:none;" onchange="analyzeNotePhoto(' + currentPage + ', this)">';
+    html += '<span style="font-size:0.7rem;color:#9CA3AF;">計算・筆算・メモを写真にとると、AIが読み取って分析するよ</span>';
     html += '</div>';
     html += '<div id="handwriting-result-' + currentPage + '" style="display:none;margin-top:8px;"></div>';
+    html += '<div id="note-analysis-' + currentPage + '"></div>';
 
     // === F8: 解法アプローチ選択（自己選択による自律性支援） ===
     html += '<div id="approach-area-' + currentPage + '" class="no-print" style="margin-top:8px;"></div>';
@@ -15123,6 +15475,8 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 })
 
 // APIルート：導入問題のみを生成（軽量・高速）
+// ★ 導入問題は「難易度提示」ではなく「学習への誘い」が本質
+// 意欲（やってみたい！）・高揚感（ワクワク！）・親近感（身近！）を引き出す
 app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
   const { env } = c
   const curriculumId = c.req.param('curriculumId')
@@ -15164,19 +15518,54 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
       `${i+1}. ${c.course_name || `コース${i+1}`}: ${c.description || ''}`
     ).join('\n')
     
-    const prompt = `${curriculum.grade} ${curriculum.subject}「${curriculum.unit_name}」の${numCourses}つのコースの導入問題を生成。
+    const prompt = `あなたは${curriculum.grade}の${curriculum.subject}の、子どもの心をつかむのが得意な先生です。
+「${curriculum.unit_name}」の${numCourses}つのコースの**導入問題**を作ってください。
+
+★★★ 最も大切なこと ★★★
+導入問題は「テスト」ではありません。「学びへの招待状」です。
+以下の3つの感情を引き出すことが目的です：
+
+1. **意欲**（やってみたい！）
+   - 「答えが気になる！」「解きたい！」と思えるなぞなぞ風・パズル風の出し方
+   - 児童の好奇心をくすぐる「不思議」や「意外性」を含める
+   
+2. **高揚感**（ワクワク！ウキウキ！）
+   - 冒険・探検・発見・宝さがし・謎解きなどのストーリー要素
+   - 「すごい！」「おもしろい！」と思える導入
+   
+3. **親近感**（自分の生活と関係ある！）
+   - お菓子、おこづかい、遊び、給食、習い事、家族、友達など身近な題材
+   - 「あ、これ知ってる！」と思える日常の場面設定
 
 【${numCourses}つのコース】
 ${courseList}
 
-【JSON出力（導入問題${numCourses}題のみ）】
+【JSON出力】
 {
   "introduction_problems": [
 ${courses.results.map((_: any, i: number) => 
-  `    {"course_number": ${i+1}, "problem_title": "タイトル（20字以内）", "problem_content": "具体的な数字を含む問題文（80-150字）", "answer": "解答と解説（50-100字）"}`
+  `    {
+      "course_number": ${i+1},
+      "problem_title": "ワクワクするタイトル（20字以内）",
+      "problem_content": "ストーリー仕立ての問題文。『ある日〜』のような語り出しで、児童を物語の中に引き込む。日常の具体的な場面を使い、考えたくなる仕掛けを入れる（100-200字）",
+      "story_hook": "1行の好奇心フック（『答え、わかるかな？』のような問いかけ）",
+      "visual_scene": "この問題のイラスト用の場面描写（英語30-50語。教育的で温かみのある絵本風イラストの指示）",
+      "answer": "解答と解説。『すごいね！実は〜なんだよ！』のような驚きを含む解説（50-100字）",
+      "learning_song_idea": "この学習内容の記憶を助ける歌のアイデア（例：『3の段のリズム♪ 3,6,9,12〜』）。歌が不要な内容なら空文字",
+      "learning_video_idea": "動画で見せると効果的な場面（例：『火山が噴火する様子』『水が蒸発する実験』）。動画不要なら空文字"
+    }`
 ).join(',\n')}
   ]
-}`
+}
+
+■ 重要なルール:
+- 導入問題は難易度選別のためではなく、「この単元って面白そう！」と思わせるためのもの
+- 各コースの導入問題はそのコースの学習内容に自然につながるが、難しすぎない
+- ストーリー要素を入れて物語に引き込む（冒険、なぞなぞ、発見、チャレンジ等）
+- visual_sceneは英語で、温かい絵本風の教育的イラストを描けるような場面指示にする
+- story_hookは児童の好奇心を刺激する1行の問いかけ
+- learning_song_ideaは、記憶を助ける歌・リズム・語呂合わせのアイデア。九九の歌、元素記号の歌のような暗記補助。Sunoなどの作曲AIで歌を作るための歌詞の参考にもなる。歌が適さない内容なら空文字
+- learning_video_ideaは、動画で見せると理解が飛躍的に深まる場面。自然現象（火山噴火、天体運動）、実験映像、歴史的場面の再現など。PCの強みを活かしたリッチコンテンツ。動画不要なら空文字`
 
     // フォールバック機能付きAPI呼び出し
     const models = ['gemini-3.1-flash-preview', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
@@ -15196,8 +15585,8 @@ ${courses.results.map((_: any, i: number) =>
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: { 
-                temperature: 0.7, 
-                maxOutputTokens: 4000,
+                temperature: 0.8, 
+                maxOutputTokens: 6000,
                 responseMimeType: 'application/json'
               }
             })
@@ -21929,6 +22318,115 @@ app.post('/api/ai/generate-hint-image', async (c) => {
   return c.json({ success: false, error: '図の生成に失敗しました' })
 })
 
+// ========== 導入問題ストーリーブック画像生成API ==========
+// Gemini 3.1 Flash Image (Nano Banana 2) で絵本風のイラストを生成
+// 導入問題のストーリーに合わせた、子どもの心をつかむビジュアルを作る
+// ★ 非同期：フロントエンドから呼ばれてバックグラウンドで画像生成→完成次第返却
+app.post('/api/ai/generate-intro-storybook', async (c) => {
+  const startTime = Date.now()
+  const { course_id, visual_scene, problem_title, problem_content, grade, subject, unit_name } = await c.req.json()
+  const apiKey = c.env.GEMINI_API_KEY
+  if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
+
+  // 既にキャッシュされた画像があるか確認
+  if (course_id) {
+    try {
+      const cached = await c.env.DB.prepare(
+        'SELECT introduction_problem FROM courses WHERE id = ?'
+      ).bind(course_id).first() as any
+      if (cached?.introduction_problem) {
+        const intro = typeof cached.introduction_problem === 'string' 
+          ? JSON.parse(cached.introduction_problem) 
+          : cached.introduction_problem
+        if (intro.storybook_image_url) {
+          return c.json({
+            success: true,
+            image_url: intro.storybook_image_url,
+            cached: true,
+            generation_time_ms: Date.now() - startTime
+          })
+        }
+      }
+    } catch (e) { /* continue to generate */ }
+  }
+
+  // ストーリーブック画像のプロンプト構築
+  const imagePrompt = `Create a warm, inviting children's educational storybook illustration for a Japanese elementary school student.
+
+Scene: ${visual_scene || `A cheerful classroom scene related to ${subject || 'math'} lesson about "${unit_name || problem_title}"`}
+
+Style requirements:
+- Warm, colorful watercolor/picture book illustration style
+- Cute, friendly Japanese school children characters (age ${grade ? grade.replace(/[^0-9]/g, '') : '8'}-10)
+- Bright, inviting colors that make children excited to learn
+- Educational context visible but not overwhelming
+- Clean composition suitable for a learning card header
+- Aspect ratio 16:9, suitable as a banner image
+- NO text in the image (text will be added separately)
+- Feeling: warm, curious, adventurous, fun`
+
+  try {
+    console.log('🎨 導入ストーリーブック画像生成開始...')
+    const resp = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: imagePrompt }] }],
+          generationConfig: { 
+            responseModalities: ['TEXT', 'IMAGE'],
+            temperature: 0.6
+          }
+        })
+      }
+    )
+
+    if (resp.ok) {
+      const data = await resp.json() as any
+      const parts = data?.candidates?.[0]?.content?.parts || []
+      for (const part of parts) {
+        if (part.inlineData?.mimeType?.startsWith('image/')) {
+          const base64 = part.inlineData.data
+          const imageUrl = `data:${part.inlineData.mimeType};base64,${base64}`
+          
+          // DBにキャッシュ保存（course_idがある場合）
+          if (course_id) {
+            try {
+              const existingData = await c.env.DB.prepare(
+                'SELECT introduction_problem FROM courses WHERE id = ?'
+              ).bind(course_id).first() as any
+              let introObj: any = {}
+              if (existingData?.introduction_problem) {
+                try { introObj = JSON.parse(existingData.introduction_problem) } catch (e) {}
+              }
+              introObj.storybook_image_url = imageUrl
+              await c.env.DB.prepare(
+                'UPDATE courses SET introduction_problem = ? WHERE id = ?'
+              ).bind(JSON.stringify(introObj), course_id).run()
+              console.log(`✅ ストーリーブック画像をコース${course_id}に保存`)
+            } catch (e) { console.warn('画像キャッシュ保存失敗:', e) }
+          }
+
+          return c.json({
+            success: true,
+            image_url: imageUrl,
+            cached: false,
+            model: 'Nano Banana 2 (gemini-3.1-flash-image-preview)',
+            generation_time_ms: Date.now() - startTime
+          })
+        }
+      }
+    }
+
+    console.warn('⚠️ ストーリーブック画像: レスポンスに画像なし')
+  } catch (e: any) {
+    console.warn('ストーリーブック画像生成エラー:', e.message)
+  }
+
+  return c.json({ success: false, error: 'ストーリーブック画像の生成に失敗しました', generation_time_ms: Date.now() - startTime })
+})
+
 // ========== F5/F9: 思考発話モデリング（Think-Aloud）API ==========
 // Zimmerman SRL理論: 熟達者の思考プロセスを可視化 → 自己調整能力の育成
 // Vygotsky: 学習者の最近接発達領域内でモデリングを提供
@@ -21993,19 +22491,34 @@ app.post('/api/ai/think-aloud', async (c) => {
 // Gemini 3.1 のマルチモーダル能力で児童の手書きノート/計算式を読み取り、
 // 思考過程を推測し、間違いの箇所と原因を特定する
 app.post('/api/ai/analyze-handwriting', async (c) => {
-  const { imageData, card_title, problem_text, correct_answer, grade, subject, student_answer, source } = await c.req.json()
+  const { imageData, image_data, card_title, problem_text, correct_answer, grade, subject, student_answer, source, photo_type, analysis_focus } = await c.req.json()
   const apiKey = c.env.GEMINI_API_KEY
   if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
-  if (!imageData) return c.json({ success: false, error: '画像データがありません' })
+  const actualImageData = imageData || image_data
+  if (!actualImageData) return c.json({ success: false, error: '画像データがありません' })
 
   try {
     const isCanvas = source === 'canvas_memo';
-    console.log(isCanvas ? '🖊️ Gemini 3.1 キャンバス手書き分析開始...' : '🔍 Gemini 3.1 手書き分析開始...')
-    const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '')
+    const isNotePhoto = photo_type === 'note_photo';
+    const isCalcMemo = analysis_focus === 'calculation_memo';
+    console.log(isNotePhoto ? '📸 ノート写真AI分析開始...' : isCanvas ? '🖊️ キャンバス手書き分析開始...' : '🔍 手書き分析開始...')
+    const base64Image = actualImageData.replace(/^data:image\/\w+;base64,/, '')
 
-    const sourceContext = isCanvas 
+    const sourceContext = isNotePhoto
+      ? '児童が実際のノートやプリント、メモ用紙に手書きした内容の写真です。筆算、計算式、図、考え方のメモ、落書きなど様々な内容が含まれている可能性があります。ノートの罫線や汚れがあっても内容を正確に読み取ってください。特に筆算の位取り、繰り上がりの数字（小さく書かれた数字）、消しゴムの跡なども注意して読み取ります。'
+      : isCanvas 
       ? '児童がパソコンの画面上の「計算メモパッド」（キャンバス）に手書き（マウス/タッチ/ペン）で書いた計算過程・筆算・メモ・図です。紙のノートではなくデジタル手書きなので、線が太めだったり不安定なことがありますが、内容を正確に読み取ってください。'
       : '児童がノートや紙に書いた手書きの計算過程・メモ・考え方を画像で受け取りました。';
+
+    const analysisExtra = isNotePhoto ? `
+■ ノート写真特有の分析ポイント:
+- 筆算があれば、繰り上がり（小さく書かれた数字）も含めて正確に再現
+- 途中式や計算メモも全て読み取り、思考の流れを追跡
+- 図やイラストが描かれていれば、何を表現しようとしたか解釈
+- 複数の計算や問題が写っている場合は、それぞれを分けて分析
+- 消しゴムの跡や書き直しがあれば、試行錯誤の過程として褒める
+- 字が丁寧に書けている場合はそれも褒めポイント
+- ノートの使い方（余白の取り方、筆算の配置）も評価` : '';
 
     const prompt = `あなたは小学${grade || ''}年生の${subject || '算数'}の先生です。
 ${sourceContext}
@@ -22017,18 +22530,23 @@ ${student_answer ? `【児童の入力した答え】${student_answer}` : ''}
 ■ 画像から読み取れる児童の思考過程を分析し、以下のJSON形式で回答してください:
 {
   "recognized_text": "画像から読み取れた文字・数式（改行は\\nで表現。筆算は位取りを整えて再現）",
-  "thinking_process": [
-    { "step": 1, "what_child_did": "児童がやったこと（具体的に）", "correct": true/false, "note": "補足（なぜ正しいか/間違いか）" }
+  "thinking_steps": [
+    { "step": 1, "description": "児童がやったこと（具体的に）", "correct": true, "note": "補足" }
   ],
   "error_location": {
-    "found": true/false,
+    "found": true,
     "step": 0,
     "description": "間違いの説明（やさしい言葉で、「ここまでは合っているよ」を含める）",
-    "cause": "likely_cause（計算ミス/概念の誤解/手順の飛ばし/読み間違い/繰り上がり忘れ/位取りの誤り）",
+    "cause": "原因カテゴリ（計算ミス/概念の誤解/手順の飛ばし/読み間違い/繰り上がり忘れ/位取りの誤り）",
     "encouragement": "ここまではよくできていたよ！○○のところだけもう一回考えてみよう"
   },
   "praise_points": ["よかった点1（具体的に何が良かったか）", "よかった点2"],
-  "suggestion": "次にどうすればいいかのアドバイス（1〜2文。具体的な次の一歩）"
+  "suggestion": "次にどうすればいいかのアドバイス（1〜2文。具体的な次の一歩）"${isNotePhoto ? `,
+  "note_quality": {
+    "neatness": "字の丁寧さへのコメント",
+    "organization": "ノートの使い方へのコメント",
+    "effort_signs": ["試行錯誤の痕跡（消した跡、書き直し等）"]
+  }` : ''}
 }
 
 ■ ルール:
@@ -22038,7 +22556,7 @@ ${student_answer ? `【児童の入力した答え】${student_answer}` : ''}
 - 画像が不鮮明でも、読み取れる範囲で分析する
 - 筆算があれば、繰り上がり・繰り下がり・位取りの正確さも確認
 - 計算式があれば、各ステップの正誤を丁寧に追跡
-- 図やメモがあれば、考え方の意図を読み取って褒める`
+- 図やメモがあれば、考え方の意図を読み取って褒める${analysisExtra}`
 
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
@@ -22059,7 +22577,7 @@ ${student_answer ? `【児童の入力した答え】${student_answer}` : ''}
       const data = await resp.json() as any
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
       const result = JSON.parse(text)
-      console.log('✅ 手書き分析完了')
+      console.log('✅ 手書き分析完了' + (isNotePhoto ? '（ノート写真）' : ''))
       return c.json({ success: true, analysis: result })
     }
 
