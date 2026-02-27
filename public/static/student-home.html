@@ -713,6 +713,9 @@
 
 <!-- ===== JavaScript ===== -->
 <script>
+// axios グローバルタイムアウト設定（15秒）
+axios.defaults.timeout = 15000
+
 // ========== 状態管理 ==========
 const STATE = {
     studentId: null,
@@ -1120,11 +1123,25 @@ function updateTebikiFab(show) {
 
 // ========== 初期化 ==========
 async function init() {
+    // 安全策: 15秒後にもloadingScreenが表示されていたら強制的に隠す
+    const loadingSafetyTimer = setTimeout(() => {
+        const ls = document.getElementById('loadingScreen')
+        if (ls && !ls.classList.contains('hidden')) {
+            console.warn('⚠️ loadingScreen safety timeout: forcing hide after 15s')
+            ls.classList.add('hidden')
+            // エラーだった場合はphase0を表示
+            const phase0 = document.getElementById('phase0')
+            if (phase0 && phase0.classList.contains('hidden')) {
+                showPhase0()
+            }
+        }
+    }, 15000)
+
     try {
         // まず初期診断が済んでいるかチェック
         let diagDone = false
         try {
-            const diagCheck = await axios.get(`/api/student-learning/diagnostic-status?student_id=${STATE.studentId}&curriculum_id=${STATE.curriculumId}`)
+            const diagCheck = await axios.get(`/api/student-learning/diagnostic-status?student_id=${STATE.studentId}&curriculum_id=${STATE.curriculumId}`, { timeout: 10000 })
             diagDone = diagCheck.data.completed === true
             if (diagDone && diagCheck.data.profile) {
                 STATE.diagnosticProfile = diagCheck.data.profile
@@ -1138,7 +1155,7 @@ async function init() {
 
         if (planIdParam) {
             // 既存計画の読み込み（計画がある＝診断済みの可能性が高い）
-            const res = await axios.get(`/api/student-learning/plan/${planIdParam}`)
+            const res = await axios.get(`/api/student-learning/plan/${planIdParam}`, { timeout: 10000 })
             if (res.data.success) {
                 STATE.planId = parseInt(planIdParam)
                 STATE.plan = res.data.plan
@@ -1162,13 +1179,13 @@ async function init() {
             }
         } else {
             // 生徒の最新の active plan を探す
-            const res = await axios.get(`/api/student-learning/plans/${STATE.studentId}`)
+            const res = await axios.get(`/api/student-learning/plans/${STATE.studentId}`, { timeout: 10000 })
             if (res.data.success && res.data.plans.length > 0) {
                 const activePlan = res.data.plans.find(p => p.status === 'active')
                 if (activePlan) {
                     STATE.planId = activePlan.id
                     // リロード
-                    const planRes = await axios.get(`/api/student-learning/plan/${activePlan.id}`)
+                    const planRes = await axios.get(`/api/student-learning/plan/${activePlan.id}`, { timeout: 10000 })
                     STATE.plan = planRes.data.plan
                     STATE.rows = planRes.data.rows
                     STATE.reflections = planRes.data.reflections
@@ -1194,6 +1211,7 @@ async function init() {
         }
     } catch(e) {
         console.error('Init error:', e)
+        document.getElementById('loadingScreen').classList.add('hidden')
         showPhase0()
     }
 
@@ -1204,6 +1222,7 @@ async function init() {
         selectCourse(STATE.selectedCourse)
     }
 
+    clearTimeout(loadingSafetyTimer)
     document.getElementById('loadingScreen').classList.add('hidden')
     // てびきデータの事前読み込み（curriculum_idまたはunit_nameで取得試行）
     loadTebikiData()

@@ -570,6 +570,11 @@ window.addEventListener('unhandledrejection', (event) => {
 console.log('✅ app.js loaded successfully')
 console.log('📦 Available functions:', typeof renderTopPage, typeof showTopPage)
 
+// axios グローバルタイムアウト設定（30秒）
+if (typeof axios !== 'undefined') {
+  axios.defaults.timeout = 30000
+}
+
 // グローバル状態管理
 const state = {
   currentView: 'top', // 'top', 'guide', 'card', 'progress', 'login'
