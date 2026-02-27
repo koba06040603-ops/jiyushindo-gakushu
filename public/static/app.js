@@ -12448,19 +12448,20 @@ function initConstructionAnswerWidget(card) {
       </div>
 
       <!-- Canvas -->
-      <div class="relative bg-white border-2 border-gray-300 rounded-xl shadow-inner" style="touch-action:none; overflow:visible;">
+      <div class="relative bg-white border-2 border-gray-300 rounded-xl shadow-inner" style="touch-action:none; overflow:visible; position:relative;">
         <canvas id="${uid}_canvas" width="600" height="450" 
-                onpointerdown="if(window.constructionPointerDown){event.preventDefault();event.stopPropagation();window.constructionPointerDown(event,'${uid}')}"
-                onpointermove="if(window.constructionPointerMove){event.preventDefault();event.stopPropagation();window.constructionPointerMove(event,'${uid}')}"
-                onpointerup="if(window.constructionPointerUp){event.preventDefault();event.stopPropagation();window.constructionPointerUp(event,'${uid}')}"
-                onmousedown="if(window.constructionPointerDown){event.preventDefault();event.stopPropagation();window.constructionPointerDown(event,'${uid}')}"
-                onmousemove="if(window.constructionPointerMove){event.preventDefault();window.constructionPointerMove(event,'${uid}')}"
-                onmouseup="if(window.constructionPointerUp){event.preventDefault();window.constructionPointerUp(event,'${uid}')}"
+                onpointerdown="(function(ev,u){ev.preventDefault();ev.stopPropagation();var d=document.getElementById(u+'_debug');if(d){d.textContent='pointer:'+ev.clientX+','+ev.clientY+' t='+Date.now()%10000;}if(window.constructionPointerDown){try{window.constructionPointerDown(ev,u)}catch(e){if(d)d.textContent='ERR:'+e.message}}})(event,'${uid}')"
+                onpointermove="(function(ev,u){ev.preventDefault();ev.stopPropagation();if(window.constructionPointerMove){try{window.constructionPointerMove(ev,u)}catch(e){console.error('move err',e)}}})(event,'${uid}')"
+                onpointerup="(function(ev,u){ev.preventDefault();ev.stopPropagation();if(window.constructionPointerUp){try{window.constructionPointerUp(ev,u)}catch(e){console.error('up err',e)}}})(event,'${uid}')"
+                ontouchstart="(function(ev,u){ev.preventDefault();var t=ev.touches[0];var d=document.getElementById(u+'_debug');if(d){d.textContent='touch:'+Math.round(t.clientX)+','+Math.round(t.clientY);}var fakeEv={clientX:t.clientX,clientY:t.clientY,pointerId:undefined,preventDefault:function(){},stopPropagation:function(){}};if(window.constructionPointerDown){try{window.constructionPointerDown(fakeEv,u)}catch(e){if(d)d.textContent='TERR:'+e.message}}})(event,'${uid}')"
+                ontouchmove="(function(ev,u){ev.preventDefault();var t=ev.touches[0];var fakeEv={clientX:t.clientX,clientY:t.clientY,preventDefault:function(){},stopPropagation:function(){}};if(window.constructionPointerMove){try{window.constructionPointerMove(fakeEv,u)}catch(e){}}})(event,'${uid}')"
+                ontouchend="(function(ev,u){ev.preventDefault();var fakeEv={clientX:0,clientY:0,preventDefault:function(){},stopPropagation:function(){}};if(window.constructionPointerUp){try{window.constructionPointerUp(fakeEv,u)}catch(e){}}})(event,'${uid}')"
+                onclick="(function(ev,u){var d=document.getElementById(u+'_debug');if(d){d.textContent='click:'+ev.clientX+','+ev.clientY+' t='+Date.now()%10000;}if(window.constructionPointerDown){try{window.constructionPointerDown(ev,u)}catch(e){if(d)d.textContent='CERR:'+e.message}}})(event,'${uid}')"
                 style="width:100%; height:auto; display:block; cursor:crosshair; touch-action:none; -ms-touch-action:none; -webkit-touch-callout:none; pointer-events:auto; position:relative; z-index:50;"></canvas>
       </div>
 
-      <!-- デバッグ情報 -->
-      <div id="${uid}_debug" class="mt-1 text-xs text-orange-500 text-center hidden"></div>
+      <!-- デバッグ情報（常に表示） -->
+      <div id="${uid}_debug" class="mt-1 text-xs text-orange-600 text-center font-mono bg-orange-50 p-1 rounded">タップ待機中...</div>
 
       <!-- 描いた図形の情報 -->
       <div id="${uid}_info" class="mt-2 text-xs text-gray-500 text-center">円弧: 0 / 直線: 0</div>
@@ -12745,16 +12746,29 @@ function circleCircleIntersect(cx1,cy1,r1, cx2,cy2,r2) {
 }
 
 function constructionPointerDown(e, uid) {
+  console.log('🎯 constructionPointerDown呼び出し uid:', uid, 'type:', e?.type, 'states:', Object.keys(window._constructionStates || {}))
   if (e.preventDefault) e.preventDefault()
   if (e.stopPropagation) e.stopPropagation()
+  
+  // デバッグ表示更新
+  const debugEl = document.getElementById(uid + '_debug')
+  
   const state = window._constructionStates[uid]
   if (!state) { 
     console.warn('No construction state for', uid, 'available:', Object.keys(window._constructionStates || {}))
+    if (debugEl) debugEl.textContent = '❌ state不在 uid=' + uid + ' keys=' + Object.keys(window._constructionStates || {}).join(',')
     return 
   }
   
+  // 二重発火防止（50ms以内の再呼出を無視：pointer+mouse同時発火のみブロック）
+  const now = Date.now()
+  if (state._lastPointerTime && now - state._lastPointerTime < 50) {
+    console.log('⏭️ 二重発火スキップ:', now - state._lastPointerTime, 'ms')
+    return
+  }
+  
   // タイムスタンプ記録
-  state._lastPointerTime = Date.now()
+  state._lastPointerTime = now
   
   // ポインタキャプチャ
   try {
@@ -12767,6 +12781,7 @@ function constructionPointerDown(e, uid) {
   const rawPos = getCanvasPos(e, uid)
   const pos = snapToPoint(rawPos, state)
   console.log('🎯 作図タップ:', state.tool, 'pos:', Math.round(pos.x), Math.round(pos.y), 'phase:', state.phase)
+  if (debugEl) debugEl.textContent = '✅ ' + state.tool + ' pos:' + Math.round(pos.x) + ',' + Math.round(pos.y) + ' phase:' + state.phase
 
   try {
     if (state.tool === 'compass') {
@@ -12832,6 +12847,7 @@ function constructionPointerDown(e, uid) {
     }
   } catch(err) {
     console.error('❌ constructionPointerDown error:', err.message, err.stack)
+    if (debugEl) debugEl.textContent = '❌ ERR: ' + err.message
   }
 }
 
