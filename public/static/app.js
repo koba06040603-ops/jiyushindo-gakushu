@@ -12419,7 +12419,7 @@ function initConstructionAnswerWidget(card) {
         <p class="text-sm font-bold text-indigo-800 mb-1">
           <i class="fas fa-drafting-compass mr-1"></i>作図してみよう！
         </p>
-        <p class="text-xs text-indigo-600">道具をえらんで、画面の上で作図しよう。コンパスは中心をタップしてからドラッグで円弧、定規は2点をタップで直線がひけるよ。</p>
+        <p class="text-xs text-indigo-600">道具をえらんで、画面の上で作図しよう。コンパスは①中心をタップ→②通る点をタップで円弧、定規は①始点タップ→②終点タップで直線がひけるよ。</p>
       </div>
 
       <!-- ツール選択バー -->
@@ -12444,7 +12444,7 @@ function initConstructionAnswerWidget(card) {
 
       <!-- ツール状態表示 -->
       <div id="${uid}_status" class="text-xs text-center text-gray-500 mb-1 h-5">
-        <i class="fas fa-compass text-red-500"></i> コンパス：中心をタップしてからドラッグで円弧
+        <i class="fas fa-compass text-red-500"></i> コンパス：①中心タップ → ②通る点タップで円弧
       </div>
 
       <!-- Canvas -->
@@ -12686,7 +12686,7 @@ function setConstructionTool(uid, tool) {
   const statusEl = document.getElementById(uid + '_status')
   if (statusEl) {
     statusEl.innerHTML = tool === 'compass'
-      ? '<i class="fas fa-compass text-red-500"></i> コンパス：中心をタップしてからドラッグで円弧'
+      ? '<i class="fas fa-compass text-red-500"></i> コンパス：①中心タップ → ②通る点タップで円弧'
       : '<i class="fas fa-ruler text-yellow-600"></i> 定規：始点をタップ → 終点をタップで直線'
   }
 
@@ -12697,7 +12697,31 @@ function setConstructionTool(uid, tool) {
 // --- ポインタイベント ---
 function getCanvasPos(e, uid) {
   const canvas = document.getElementById(uid + '_canvas')
-  if (!canvas) return {x:0, y:0}
+  if (!canvas) {
+    console.warn('getCanvasPos: canvas not found for', uid)
+    return {x:0, y:0}
+  }
+  // 防御: getBoundingClientRect が存在しない場合（非DOM要素等）
+  if (typeof canvas.getBoundingClientRect !== 'function') {
+    console.error('getCanvasPos: getBoundingClientRect not available on:', typeof canvas, canvas.tagName, canvas.nodeName)
+    // e.target から直接 canvas を取得する試み
+    const actualCanvas = e.target && e.target.tagName === 'CANVAS' ? e.target : null
+    if (actualCanvas && typeof actualCanvas.getBoundingClientRect === 'function') {
+      const rect = actualCanvas.getBoundingClientRect()
+      const scaleX = actualCanvas.width / rect.width
+      const scaleY = actualCanvas.height / rect.height
+      return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY }
+    }
+    // offsetX/offsetY フォールバック
+    if (e.offsetX !== undefined) {
+      const cw = canvas.width || 600
+      const ch = canvas.height || 450
+      const ow = canvas.offsetWidth || cw
+      const oh = canvas.offsetHeight || ch
+      return { x: e.offsetX * (cw / ow), y: e.offsetY * (ch / oh) }
+    }
+    return {x:0, y:0}
+  }
   const rect = canvas.getBoundingClientRect()
   const scaleX = canvas.width / rect.width
   const scaleY = canvas.height / rect.height
@@ -12746,92 +12770,119 @@ function circleCircleIntersect(cx1,cy1,r1, cx2,cy2,r2) {
 }
 
 function constructionPointerDown(e, uid) {
-  console.log('🎯 constructionPointerDown呼び出し uid:', uid, 'type:', e?.type, 'states:', Object.keys(window._constructionStates || {}))
-  if (e.preventDefault) e.preventDefault()
-  if (e.stopPropagation) e.stopPropagation()
+  console.log('🎯 constructionPointerDown uid:', uid, 'type:', e?.type)
+  try { if (e.preventDefault) e.preventDefault() } catch(ex) {}
+  try { if (e.stopPropagation) e.stopPropagation() } catch(ex) {}
   
   // デバッグ表示更新
   const debugEl = document.getElementById(uid + '_debug')
   
   const state = window._constructionStates[uid]
   if (!state) { 
-    console.warn('No construction state for', uid, 'available:', Object.keys(window._constructionStates || {}))
-    if (debugEl) debugEl.textContent = '❌ state不在 uid=' + uid + ' keys=' + Object.keys(window._constructionStates || {}).join(',')
+    console.warn('No construction state for', uid)
+    if (debugEl) debugEl.textContent = '❌ state不在 uid=' + uid
     return 
   }
   
-  // 二重発火防止（50ms以内の再呼出を無視：pointer+mouse同時発火のみブロック）
+  // 二重発火防止（80ms以内）
   const now = Date.now()
-  if (state._lastPointerTime && now - state._lastPointerTime < 50) {
-    console.log('⏭️ 二重発火スキップ:', now - state._lastPointerTime, 'ms')
+  if (state._lastPointerTime && now - state._lastPointerTime < 80) {
     return
   }
-  
-  // タイムスタンプ記録
   state._lastPointerTime = now
   
-  // ポインタキャプチャ
-  try {
-    const canvas = document.getElementById(uid + '_canvas')
-    if (canvas && e.pointerId !== undefined) {
-      canvas.setPointerCapture(e.pointerId)
-    }
-  } catch(ex) {}
-  
-  const rawPos = getCanvasPos(e, uid)
+  // 座標取得（複数方式で堅牢に）
+  const rawPos = getCanvasPosRobust(e, uid, state)
   const pos = snapToPoint(rawPos, state)
   console.log('🎯 作図タップ:', state.tool, 'pos:', Math.round(pos.x), Math.round(pos.y), 'phase:', state.phase)
-  if (debugEl) debugEl.textContent = '✅ ' + state.tool + ' pos:' + Math.round(pos.x) + ',' + Math.round(pos.y) + ' phase:' + state.phase
+  if (debugEl) debugEl.textContent = '✅ ' + state.tool + ' (' + Math.round(pos.x) + ',' + Math.round(pos.y) + ') phase:' + state.phase
 
   try {
+    const canvas = document.getElementById(uid + '_canvas')
+    const ctx = canvas ? canvas.getContext('2d') : null
+
     if (state.tool === 'compass') {
-      // コンパス：中心を決定
-      state.tempCenter = pos
-      state.phase = 'compass_center_set'
-      state.tempRadius = 0
-      
-      const statusEl = document.getElementById(uid + '_status')
-      if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> ドラッグして円弧の半径と範囲を決めよう！'
-      
-      // プレビュー：中心マーク
-      const canvas = document.getElementById(uid + '_canvas')
-      if (canvas) {
-        const ctx = canvas.getContext('2d')
+      if (state.phase !== 'compass_center_set') {
+        // ★ コンパス 第1クリック：中心を設定
+        state.tempCenter = pos
+        state.phase = 'compass_center_set'
+        state.tempRadius = 0
+        
+        const statusEl = document.getElementById(uid + '_status')
+        if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> 次に、円弧を通る点をタップ！'
+        
+        // 中心マーク描画
+        if (ctx) {
+          redrawConstruction(uid)
+          ctx.save()
+          ctx.fillStyle = '#ef4444'
+          ctx.beginPath(); ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2); ctx.fill()
+          ctx.fillStyle = 'rgba(239,68,68,0.15)'
+          ctx.beginPath(); ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2); ctx.fill()
+          ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.setLineDash([4,4])
+          ctx.beginPath(); ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2); ctx.stroke()
+          ctx.restore()
+        }
+        if (debugEl) debugEl.textContent = '🔴 中心設定済み (' + Math.round(pos.x) + ',' + Math.round(pos.y) + ') → 円弧通過点をタップ'
+
+      } else {
+        // ★ コンパス 第2クリック：半径確定 → 円弧描画
+        const cx = state.tempCenter.x, cy = state.tempCenter.y
+        const r = Math.sqrt((pos.x - cx)**2 + (pos.y - cy)**2)
+        
+        if (r < 10) {
+          // 近すぎ→キャンセル
+          if (debugEl) debugEl.textContent = '⚠️ 近すぎ（' + Math.round(r) + 'px）→やり直し'
+          state.phase = 'idle'
+          state.tempCenter = null
+          const statusEl = document.getElementById(uid + '_status')
+          if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> コンパス：中心をタップ → 円弧通過点をタップ'
+          redrawConstruction(uid)
+          return
+        }
+        
+        state.shapes.push({
+          type: 'arc', cx: cx, cy: cy, r: r,
+          startAngle: 0, endAngle: Math.PI * 2
+        })
+        state.phase = 'idle'
+        state.tempCenter = null
+        state.tempRadius = 0
+        
+        const statusEl = document.getElementById(uid + '_status')
+        if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> コンパス：中心をタップ → 円弧通過点をタップ'
+        
         redrawConstruction(uid)
-        ctx.save()
-        ctx.fillStyle = '#ef4444'
-        ctx.beginPath(); ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2); ctx.fill()
-        ctx.fillStyle = 'rgba(239,68,68,0.2)'
-        ctx.beginPath(); ctx.arc(pos.x, pos.y, 15, 0, Math.PI * 2); ctx.fill()
-        ctx.restore()
+        playConstructionSound('arc')
+        if (debugEl) debugEl.textContent = '✅ 円弧追加！半径' + Math.round(r) + 'px'
       }
 
     } else if (state.tool === 'ruler') {
       if (state.phase !== 'ruler_first_set') {
-        // 定規：始点を決定
+        // ★ 定規 第1クリック：始点を設定
         state.tempStart = pos
         state.phase = 'ruler_first_set'
         
         const statusEl = document.getElementById(uid + '_status')
         if (statusEl) statusEl.innerHTML = '<i class="fas fa-ruler text-yellow-600"></i> 終点をタップ！'
         
-        // プレビュー：始点マーク
-        const canvas = document.getElementById(uid + '_canvas')
-        if (canvas) {
-          const ctx = canvas.getContext('2d')
+        // 始点マーク描画
+        if (ctx) {
           redrawConstruction(uid)
           ctx.save()
           ctx.fillStyle = '#22c55e'
-          ctx.beginPath(); ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2); ctx.fill()
-          ctx.fillStyle = 'rgba(34,197,94,0.2)'
-          ctx.beginPath(); ctx.arc(pos.x, pos.y, 15, 0, Math.PI * 2); ctx.fill()
+          ctx.beginPath(); ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2); ctx.fill()
+          ctx.fillStyle = 'rgba(34,197,94,0.15)'
+          ctx.beginPath(); ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2); ctx.fill()
           ctx.restore()
         }
+        if (debugEl) debugEl.textContent = '🟢 始点設定 (' + Math.round(pos.x) + ',' + Math.round(pos.y) + ') → 終点をタップ'
+
       } else {
-        // 定規：終点 → 直線確定
+        // ★ 定規 第2クリック：終点 → 直線描画
         const dist = Math.sqrt((pos.x - state.tempStart.x)**2 + (pos.y - state.tempStart.y)**2)
-        if (dist < 5) {
-          console.log('⚠️ 始点と終点が近すぎ、無視')
+        if (dist < 10) {
+          if (debugEl) debugEl.textContent = '⚠️ 近すぎ（' + Math.round(dist) + 'px）→やり直し'
           return
         }
         state.shapes.push({ type: 'line', x1: state.tempStart.x, y1: state.tempStart.y, x2: pos.x, y2: pos.y })
@@ -12843,6 +12894,7 @@ function constructionPointerDown(e, uid) {
         
         redrawConstruction(uid)
         playConstructionSound('line')
+        if (debugEl) debugEl.textContent = '✅ 直線追加！'
       }
     }
   } catch(err) {
@@ -12851,71 +12903,135 @@ function constructionPointerDown(e, uid) {
   }
 }
 
-function constructionPointerMove(e, uid) {
-  const state = window._constructionStates[uid]
-  if (!state || state.tool !== 'compass' || state.phase !== 'compass_center_set') return
-  if (e.preventDefault) e.preventDefault()
-  if (e.stopPropagation) e.stopPropagation()
-
-  const pos = getCanvasPos(e, uid)
-  const cx = state.tempCenter.x, cy = state.tempCenter.y
-  const r = Math.sqrt((pos.x - cx)**2 + (pos.y - cy)**2)
-  if (r < 10) return
-
-  state.tempRadius = r
-  const angle = Math.atan2(pos.y - cy, pos.x - cx)
-
-  // プレビュー描画
-  const canvas = document.getElementById(uid + '_canvas')
-  const ctx = canvas.getContext('2d')
-  redrawConstruction(uid)
+// 堅牢な座標取得（複数フォールバック）
+function getCanvasPosRobust(e, uid, state) {
+  // 方法1: getBoundingClientRect
+  try {
+    const canvas = document.getElementById(uid + '_canvas')
+    if (canvas && typeof canvas.getBoundingClientRect === 'function' && e.clientX !== undefined) {
+      const rect = canvas.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        const scaleX = canvas.width / rect.width
+        const scaleY = canvas.height / rect.height
+        return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY }
+      }
+    }
+  } catch(ex) { console.warn('getCanvasPos方法1失敗:', ex.message) }
   
-  ctx.save()
-  // 半径ガイドライン
-  ctx.strokeStyle = 'rgba(239,68,68,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([4,4])
-  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pos.x, pos.y); ctx.stroke()
-  // 円弧プレビュー
-  ctx.strokeStyle = 'rgba(239,68,68,0.5)'; ctx.lineWidth = 2.5; ctx.setLineDash([6,4])
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke()
-  // 半径値表示
-  ctx.setLineDash([])
-  ctx.fillStyle = '#ef4444'; ctx.font = '11px sans-serif'
-  ctx.fillText(Math.round(r) + 'px', (cx + pos.x)/2 + 5, (cy + pos.y)/2 - 5)
-  // 中心マーク
-  ctx.fillStyle = '#ef4444'
-  ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill()
-  ctx.restore()
+  // 方法2: e.target から取得
+  try {
+    const target = e.target
+    if (target && target.tagName === 'CANVAS' && typeof target.getBoundingClientRect === 'function') {
+      const rect = target.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        const scaleX = target.width / rect.width
+        const scaleY = target.height / rect.height
+        return { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY }
+      }
+    }
+  } catch(ex) { console.warn('getCanvasPos方法2失敗:', ex.message) }
+  
+  // 方法3: offsetX/offsetY
+  try {
+    if (e.offsetX !== undefined && e.offsetY !== undefined) {
+      const canvas = document.getElementById(uid + '_canvas')
+      const cw = (canvas && canvas.width) || 600
+      const ch = (canvas && canvas.height) || 450
+      const ow = (canvas && canvas.offsetWidth) || cw
+      const oh = (canvas && canvas.offsetHeight) || ch
+      return { x: e.offsetX * (cw / ow), y: e.offsetY * (ch / oh) }
+    }
+  } catch(ex) { console.warn('getCanvasPos方法3失敗:', ex.message) }
+  
+  // 方法4: pageX + scroll offset
+  try {
+    const canvas = document.getElementById(uid + '_canvas')
+    if (canvas && e.pageX !== undefined) {
+      const rect = canvas.getBoundingClientRect()
+      const scrollX = window.pageXOffset || document.documentElement.scrollLeft
+      const scrollY = window.pageYOffset || document.documentElement.scrollTop
+      const scaleX = canvas.width / (rect.width || canvas.width)
+      const scaleY = canvas.height / (rect.height || canvas.height)
+      return { x: (e.pageX - rect.left - scrollX) * scaleX, y: (e.pageY - rect.top - scrollY) * scaleY }
+    }
+  } catch(ex) {}
+  
+  return { x: 300, y: 225 } // 最終フォールバック: キャンバス中央
+}
+
+function constructionPointerMove(e, uid) {
+  // ドラッグ非対応モード（クリック2回方式）では不要だが、
+  // ポインタイベントが動作する環境向けにプレビュー表示
+  const state = window._constructionStates[uid]
+  if (!state) return
+  try { if (e.preventDefault) e.preventDefault() } catch(ex) {}
+  
+  if (state.tool === 'compass' && state.phase === 'compass_center_set' && state.tempCenter) {
+    // コンパス：半径プレビュー
+    const pos = getCanvasPosRobust(e, uid, state)
+    const cx = state.tempCenter.x, cy = state.tempCenter.y
+    const r = Math.sqrt((pos.x - cx)**2 + (pos.y - cy)**2)
+    if (r < 10) return
+    
+    state.tempRadius = r
+    const canvas = document.getElementById(uid + '_canvas')
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    redrawConstruction(uid)
+    
+    ctx.save()
+    ctx.strokeStyle = 'rgba(239,68,68,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([4,4])
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pos.x, pos.y); ctx.stroke()
+    ctx.strokeStyle = 'rgba(239,68,68,0.5)'; ctx.lineWidth = 2.5; ctx.setLineDash([6,4])
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = '#ef4444'; ctx.font = '11px sans-serif'
+    ctx.fillText(Math.round(r) + 'px', (cx + pos.x)/2 + 5, (cy + pos.y)/2 - 5)
+    ctx.fillStyle = '#ef4444'
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill()
+    ctx.restore()
+    
+  } else if (state.tool === 'ruler' && state.phase === 'ruler_first_set' && state.tempStart) {
+    // 定規：直線プレビュー
+    const pos = getCanvasPosRobust(e, uid, state)
+    const canvas = document.getElementById(uid + '_canvas')
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    redrawConstruction(uid)
+    
+    ctx.save()
+    ctx.strokeStyle = 'rgba(34,197,94,0.4)'; ctx.lineWidth = 2; ctx.setLineDash([6,4])
+    ctx.beginPath(); ctx.moveTo(state.tempStart.x, state.tempStart.y); ctx.lineTo(pos.x, pos.y); ctx.stroke()
+    ctx.fillStyle = '#22c55e'
+    ctx.beginPath(); ctx.arc(state.tempStart.x, state.tempStart.y, 5, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2); ctx.fill()
+    ctx.restore()
+  }
 }
 
 function constructionPointerUp(e, uid) {
+  // クリック2回方式では pointerUp での確定は不要
+  // ドラッグ操作が動作する環境向け互換性維持
   const state = window._constructionStates[uid]
-  if (!state || state.tool !== 'compass' || state.phase !== 'compass_center_set') return
-
-  if (state.tempRadius < 15) {
-    // 半径が小さすぎる：キャンセル
+  if (!state) return
+  // ドラッグでの円弧確定（ポインタイベント対応環境のみ）
+  if (state.tool === 'compass' && state.phase === 'compass_center_set' && state.tempRadius >= 15) {
+    state.shapes.push({
+      type: 'arc',
+      cx: state.tempCenter.x, cy: state.tempCenter.y,
+      r: state.tempRadius,
+      startAngle: 0, endAngle: Math.PI * 2
+    })
     state.phase = 'idle'
+    state.tempCenter = null
+    state.tempRadius = 0
     const statusEl = document.getElementById(uid + '_status')
-    if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> コンパス：中心をタップしてからドラッグで円弧'
+    if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> コンパス：中心をタップ → 円弧通過点をタップ'
     redrawConstruction(uid)
-    return
+    playConstructionSound('arc')
+    const debugEl = document.getElementById(uid + '_debug')
+    if (debugEl) debugEl.textContent = '✅ 円弧追加！(ドラッグ)'
   }
-
-  // 円弧を確定（全円で描く。部分円弧はスワイプ方向から推定も可能だが、全円の方が使いやすい）
-  state.shapes.push({
-    type: 'arc',
-    cx: state.tempCenter.x, cy: state.tempCenter.y,
-    r: state.tempRadius,
-    startAngle: 0, endAngle: Math.PI * 2
-  })
-  state.phase = 'idle'
-  state.tempCenter = null
-  state.tempRadius = 0
-
-  const statusEl = document.getElementById(uid + '_status')
-  if (statusEl) statusEl.innerHTML = '<i class="fas fa-compass text-red-500"></i> コンパス：中心をタップしてからドラッグで円弧'
-
-  redrawConstruction(uid)
-  playConstructionSound('arc')
 }
 
 function constructionUndo(uid) {
