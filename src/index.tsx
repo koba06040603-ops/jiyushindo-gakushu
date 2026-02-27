@@ -8755,34 +8755,40 @@ app.get('/guide/:curriculumId', async (c) => {
     html += '✨ 学習カードへ進もう！ <i class="fas fa-arrow-right" style="margin-left:6px;"></i></button>';
     html += '</div>';
 
-    // 🎵 今後の拡張予告（音楽・動画）＋ 生成された提案がある場合は表示
+    // 🎵🎬 音楽・動画生成パネル（実際に動作するボタン）
     var songIdea = c._introData ? (c._introData.learning_song_idea || '') : '';
     var videoIdea = c._introData ? (c._introData.learning_video_idea || '') : '';
-    if (songIdea || videoIdea) {
-      html += '<div style="margin-top:14px;padding:12px 14px;background:linear-gradient(135deg,#F5F3FF,#EEF2FF);border:2px solid #DDD6FE;border-radius:12px;">';
-      if (songIdea) {
-        html += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:' + (videoIdea ? '10px' : '0') + ';">';
-        html += '<span style="font-size:1.5rem;flex-shrink:0;">🎵</span>';
-        html += '<div><strong style="font-size:0.8rem;color:#7C3AED;">学習ソングのアイデア</strong>';
-        html += '<p style="font-size:0.85rem;color:#4C1D95;margin-top:2px;">' + songIdea + '</p>';
-        html += '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">💡 AIで30秒の歌を作ったり、Sunoで本格的な曲にすることもできるよ！先生にリクエストしてみてね。</p>';
-        html += '</div></div>';
-      }
-      if (videoIdea) {
-        html += '<div style="display:flex;align-items:flex-start;gap:8px;">';
-        html += '<span style="font-size:1.5rem;flex-shrink:0;">🎬</span>';
-        html += '<div><strong style="font-size:0.8rem;color:#7C3AED;">動画で見るともっとわかる！</strong>';
-        html += '<p style="font-size:0.85rem;color:#4C1D95;margin-top:2px;">' + videoIdea + '</p>';
-        html += '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">💡 AIで学習動画を作る機能を準備中！PCならではのリッチな体験ができるよ。</p>';
-        html += '</div></div>';
-      }
-      html += '</div>';
-    } else {
-      html += '<div style="margin-top:14px;padding:10px 14px;background:linear-gradient(135deg,#F5F3FF,#EEF2FF);border:1px solid #DDD6FE;border-radius:10px;font-size:0.7rem;color:#7C3AED;text-align:center;">';
-      html += '🎵 <strong>ヒント：</strong>記憶に残る歌（九九の歌など）をAIで作ることもできるよ！';
-      html += '先生に「学習ソングを作って」とリクエストしてみてね。';
-      html += '<br>🎬 動画で学ぶ（火山の噴火、水の循環など）も準備中！</div>';
+    html += '<div style="margin-top:14px;padding:14px;background:linear-gradient(135deg,#F5F3FF,#EEF2FF);border:2px solid #DDD6FE;border-radius:12px;">';
+    html += '<div style="text-align:center;margin-bottom:10px;"><strong style="font-size:0.9rem;color:#6D28D9;">🎶 もっと楽しく学ぶツール</strong></div>';
+    
+    // 音楽・動画生成ボタン
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">';
+    html += '<button onclick="generateLearningSong(' + page + ')" style="flex:1;min-width:140px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:white;border:none;padding:10px 14px;border-radius:12px;font-weight:bold;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;box-shadow:0 2px 8px rgba(124,58,237,0.3);">';
+    html += '<span style="font-size:1.2rem;">🎵</span> 学習ソングを作る</button>';
+    html += '<button onclick="generateLearningVideo(' + page + ')" style="flex:1;min-width:140px;background:linear-gradient(135deg,#DC2626,#B91C1C);color:white;border:none;padding:10px 14px;border-radius:12px;font-weight:bold;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;box-shadow:0 2px 8px rgba(220,38,38,0.3);">';
+    html += '<span style="font-size:1.2rem;">🎬</span> 学習動画を作る</button>';
+    html += '</div>';
+    
+    // ソング/ビデオのアイデア表示
+    if (songIdea) {
+      html += '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;background:white;border-radius:8px;padding:8px 10px;border:1px solid #E9D5FF;">';
+      html += '<span style="flex-shrink:0;">🎵</span>';
+      html += '<div style="font-size:0.78rem;color:#4C1D95;"><strong>歌のアイデア：</strong>' + songIdea + '</div></div>';
     }
+    if (videoIdea) {
+      html += '<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:6px;background:white;border-radius:8px;padding:8px 10px;border:1px solid #FECDD3;">';
+      html += '<span style="flex-shrink:0;">🎬</span>';
+      html += '<div style="font-size:0.78rem;color:#991B1B;"><strong>動画で見たい場面：</strong>' + videoIdea + '</div></div>';
+    }
+    
+    // Suno情報
+    html += '<div style="text-align:center;font-size:0.65rem;color:#9CA3AF;margin-top:4px;">';
+    html += '💡 <a href="https://suno.com" target="_blank" style="color:#7C3AED;">Suno</a>で本格的な4分の曲も作れるよ（1日5曲無料）！歌詞もAIが提案します。</div>';
+    
+    // 結果表示エリア
+    html += '<div id="song-result-' + page + '"></div>';
+    html += '<div id="video-result-' + page + '"></div>';
+    html += '</div>';
 
     html += '</div>';
     container.innerHTML = html;
@@ -8977,6 +8983,234 @@ app.get('/guide/:curriculumId', async (c) => {
       textarea.value = (textarea.value ? textarea.value + '\\n' : '') + text;
       textarea.style.animation = 'editPulse 0.5s ease';
       setTimeout(function() { textarea.style.animation = ''; }, 600);
+    }
+  }
+
+  // ========================================
+  // ★ 学習ソング生成（Gemini 3.1 30秒音楽 + Suno歌詞提案）
+  // ========================================
+  function generateLearningSong(page) {
+    var c = ALL_CARDS[page];
+    if (!c) return;
+    var resultArea = document.getElementById('song-result-' + page);
+    if (!resultArea) return;
+    var introData = c._introData || {};
+    var songIdea = introData.learning_song_idea || c.card_title || '';
+
+    // 生成中UI
+    resultArea.innerHTML = 
+      '<div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px solid #C4B5FD;border-radius:14px;padding:18px;text-align:center;margin-top:10px;">' +
+      '<div style="font-size:2rem;margin-bottom:8px;animation:float 2s ease-in-out infinite;">🎵</div>' +
+      '<p style="font-size:0.9rem;font-weight:bold;color:#6D28D9;">学習ソングを作成中...</p>' +
+      '<p style="font-size:0.75rem;color:#8B5CF6;margin-top:4px;">Gemini AIが歌詞とSunoスタイルを考えています（5〜10秒）</p>' +
+      '<div style="margin-top:10px;height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden;">' +
+      '<div style="height:100%;background:linear-gradient(90deg,#7C3AED,#EC4899,#F59E0B);width:40%;animation:progressBar 2s ease-in-out infinite;border-radius:2px;"></div></div>' +
+      '</div>';
+
+    // Suno歌詞生成API呼び出し
+    fetch('/api/ai/generate-suno-lyrics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grade: CURRICULUM.grade || '',
+        subject: CURRICULUM.subject || '',
+        unit_name: CURRICULUM.unit_name || '',
+        topic: songIdea,
+        song_type: songIdea ? '「' + songIdea + '」をテーマにした学習ソング' : '暗記補助ソング'
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.lyrics_data) {
+        var ld = data.lyrics_data;
+        var si = data.suno_info || {};
+        var html = '<div style="background:white;border:2px solid #C4B5FD;border-radius:14px;padding:16px;margin-top:10px;">';
+        
+        // タイトル
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">';
+        html += '<span style="font-size:1.5rem;">🎵</span>';
+        html += '<div><strong style="color:#6D28D9;font-size:1rem;">' + (ld.song_title || '学習ソング') + '</strong>';
+        html += '<p style="font-size:0.7rem;color:#8B5CF6;margin-top:2px;">' + (ld.memory_technique || 'リズム記憶法') + '</p></div></div>';
+
+        // 短い歌詞プレビュー
+        html += '<div style="background:#F5F3FF;border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid #DDD6FE;">';
+        html += '<p style="font-size:0.75rem;font-weight:bold;color:#7C3AED;margin-bottom:6px;">🎤 ショートバージョン（30秒）</p>';
+        html += '<pre style="font-size:0.8rem;color:#4C1D95;white-space:pre-wrap;line-height:1.6;font-family:inherit;margin:0;">' + (ld.short_version_lyrics || ld.suno_lyrics || '').substring(0, 400) + '</pre>';
+        html += '</div>';
+
+        // 覚えられる内容
+        if (ld.learning_content) {
+          html += '<div style="background:#F0FDF4;border-left:4px solid #22C55E;padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:10px;">';
+          html += '<strong style="font-size:0.75rem;color:#166534;">📚 この歌で覚えられること：</strong>';
+          html += '<p style="font-size:0.8rem;color:#374151;margin-top:2px;">' + (Array.isArray(ld.learning_content) ? ld.learning_content.join('、') : ld.learning_content) + '</p>';
+          html += '</div>';
+        }
+
+        // Sunoで本格曲を作るセクション
+        html += '<details style="margin-bottom:10px;background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;">';
+        html += '<summary style="padding:10px 14px;cursor:pointer;font-weight:bold;color:#92400E;font-size:0.85rem;user-select:none;">🎹 Sunoで本格的な4分の曲を作る（1日5曲無料！）</summary>';
+        html += '<div style="padding:6px 14px 14px;">';
+        
+        // Sunoスタイルプロンプト（コピー用）
+        html += '<div style="margin-bottom:8px;">';
+        html += '<p style="font-size:0.75rem;font-weight:bold;color:#92400E;margin-bottom:4px;">🎨 スタイル欄にコピペ：</p>';
+        html += '<div style="background:white;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.8rem;font-family:monospace;position:relative;cursor:pointer;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline=\\x272px solid #22C55E\\x27;setTimeout(function(){this.style.outline=\\x27none\\x27;}.bind(this),1000);">' + (ld.suno_style_prompt || 'upbeat J-pop, children educational song, catchy melody, clear Japanese vocals') + '<span style="position:absolute;top:4px;right:6px;font-size:0.65rem;color:#9CA3AF;">📋タップでコピー</span></div>';
+        html += '</div>';
+
+        // Suno歌詞（コピー用）
+        html += '<div style="margin-bottom:8px;">';
+        html += '<p style="font-size:0.75rem;font-weight:bold;color:#92400E;margin-bottom:4px;">📝 歌詞欄にコピペ：</p>';
+        html += '<div style="background:white;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.75rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;cursor:pointer;position:relative;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline=\\x272px solid #22C55E\\x27;setTimeout(function(){this.style.outline=\\x27none\\x27;}.bind(this),1000);">' + (ld.suno_lyrics || '') + '<span style="position:absolute;top:4px;right:6px;font-size:0.65rem;color:#9CA3AF;">📋タップでコピー</span></div>';
+        html += '</div>';
+
+        // Suno使い方ステップ
+        if (si.how_to_steps) {
+          html += '<div style="background:#EFF6FF;border-radius:8px;padding:8px 12px;">';
+          html += '<p style="font-size:0.75rem;font-weight:bold;color:#1E40AF;margin-bottom:4px;">📖 Sunoの使い方：</p>';
+          si.how_to_steps.forEach(function(step) {
+            html += '<p style="font-size:0.7rem;color:#374151;margin-top:2px;">' + step + '</p>';
+          });
+          html += '</div>';
+        }
+        html += '</div></details>';
+
+        // 使い方のヒント
+        if (ld.usage_tips) {
+          html += '<div style="display:flex;align-items:flex-start;gap:6px;background:#EEF2FF;border-radius:8px;padding:8px 10px;border:1px solid #C7D2FE;">';
+          html += '<span style="flex-shrink:0;">💡</span>';
+          html += '<p style="font-size:0.75rem;color:#4338CA;">' + ld.usage_tips + '</p></div>';
+        }
+
+        html += '</div>';
+        resultArea.innerHTML = html;
+      } else {
+        resultArea.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px;text-align:center;margin-top:10px;">' +
+          '<p style="font-size:0.85rem;color:#DC2626;">😅 歌の作成に失敗しました</p>' +
+          '<button onclick="generateLearningSong(' + page + ')" style="margin-top:8px;background:#7C3AED;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 もう一回</button></div>';
+      }
+    })
+    .catch(function(err) {
+      resultArea.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px;text-align:center;margin-top:10px;">' +
+        '<p style="font-size:0.85rem;color:#DC2626;">😅 通信エラー: ' + err.message + '</p>' +
+        '<button onclick="generateLearningSong(' + page + ')" style="margin-top:8px;background:#7C3AED;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 再試行</button></div>';
+    });
+  }
+
+  // ========================================
+  // ★ 学習動画生成（Veo 3.1 非同期 + ポーリング）
+  // ========================================
+  function generateLearningVideo(page) {
+    var c = ALL_CARDS[page];
+    if (!c) return;
+    var resultArea = document.getElementById('video-result-' + page);
+    if (!resultArea) return;
+    var introData = c._introData || {};
+    var videoIdea = introData.learning_video_idea || '';
+    var subject = CURRICULUM.subject || '';
+    var grade = CURRICULUM.grade || '';
+    var unit = CURRICULUM.unit_name || '';
+
+    // 動画プロンプトを構築
+    var videoPrompt = '';
+    if (videoIdea) {
+      videoPrompt = '日本の' + grade + subject + '「' + unit + '」の教育動画。' + videoIdea + '。子どもが見て理解しやすい映像。やさしい色使い、ゆっくりとした動き。';
+    } else {
+      videoPrompt = '日本の' + grade + subject + '「' + unit + '」の学習内容を視覚的に表現した教育動画。' + (c.card_title || '') + '。子ども向けの親しみやすいアニメーション風。';
+    }
+
+    // 生成中UI
+    resultArea.innerHTML = 
+      '<div style="background:linear-gradient(135deg,#FEF2F2,#FFF1F2);border:2px solid #FECACA;border-radius:14px;padding:18px;text-align:center;margin-top:10px;">' +
+      '<div style="font-size:2rem;margin-bottom:8px;animation:float 2s ease-in-out infinite;">🎬</div>' +
+      '<p style="font-size:0.9rem;font-weight:bold;color:#DC2626;">学習動画を生成中...</p>' +
+      '<p style="font-size:0.75rem;color:#EF4444;margin-top:4px;">Veo 3.1が動画を作成しています（30〜90秒）</p>' +
+      '<div id="video-progress-' + page + '" style="margin-top:10px;height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden;">' +
+      '<div style="height:100%;background:linear-gradient(90deg,#DC2626,#F59E0B,#10B981);width:20%;animation:progressBar 4s ease-in-out infinite;border-radius:2px;"></div></div>' +
+      '<p id="video-status-text-' + page + '" style="font-size:0.7rem;color:#9CA3AF;margin-top:6px;">AIに動画リクエストを送信中...</p>' +
+      '</div>';
+
+    // Veo 3.1 APIリクエスト
+    fetch('/api/ai/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: videoPrompt,
+        card_title: c.card_title || unit,
+        subject: subject,
+        grade: grade,
+        tactile_type: detectIntroTactileType(c),
+        aspect_ratio: '16:9'
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.operationName) {
+        var statusEl = document.getElementById('video-status-text-' + page);
+        if (statusEl) statusEl.textContent = '動画生成を開始しました。完了まで待っています...';
+        pollIntroVideoStatus(data.operationName, page);
+      } else {
+        showIntroVideoError(page, data.error || '動画生成を開始できませんでした');
+      }
+    })
+    .catch(function(e) {
+      showIntroVideoError(page, 'ネットワークエラー: ' + e.message);
+    });
+  }
+
+  function detectIntroTactileType(card) {
+    var t = ((card.card_title || '') + ' ' + (card.problem_text || '') + ' ' + ((card._introData || {}).learning_video_idea || '')).toLowerCase();
+    if (/数え|かぞ|おはじき|ブロック|いくつ|九九|かけ算/.test(t)) return 'counting';
+    if (/図形|三角|四角|円|面積|体積|展開|角度/.test(t)) return 'geometry';
+    if (/実験|観察|やってみ|噴火|蒸発|沸騰/.test(t)) return 'experiment';
+    if (/植物|動物|天気|星|月|太陽|自然|火山|地震/.test(t)) return 'nature';
+    return 'general';
+  }
+
+  function pollIntroVideoStatus(operationName, page) {
+    var pollCount = 0;
+    var maxPolls = 30;
+    function poll() {
+      pollCount++;
+      if (pollCount > maxPolls) {
+        showIntroVideoError(page, '動画生成がタイムアウトしました。もう一度お試しください。');
+        return;
+      }
+      var statusEl = document.getElementById('video-status-text-' + page);
+      if (statusEl) statusEl.textContent = 'ステータス確認中... (' + (pollCount * 10) + '秒経過)';
+
+      fetch('/api/ai/video-status?operation=' + encodeURIComponent(operationName))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.done && data.videoUrl) {
+          var resultArea = document.getElementById('video-result-' + page);
+          if (resultArea) {
+            resultArea.innerHTML = '<div style="margin-top:10px;border-radius:14px;overflow:hidden;border:2px solid #E5E7EB;box-shadow:0 4px 12px rgba(0,0,0,0.1);">' +
+              '<video controls playsinline style="width:100%;max-height:280px;border-radius:12px;" poster="">' +
+              '<source src="/api/ai/video-download?uri=' + encodeURIComponent(data.videoUrl) + '" type="video/mp4">' +
+              '</video>' +
+              '<div style="padding:8px 12px;background:linear-gradient(135deg,#F0FDF4,#ECFDF5);">' +
+              '<p style="font-size:0.8rem;font-weight:bold;color:#166534;">🎬 AI学習動画が完成！</p>' +
+              '<p style="font-size:0.7rem;color:#6B7280;">PCの強みを活かしたリッチ映像で学ぼう</p>' +
+              '</div></div>';
+          }
+        } else if (data.done && !data.videoUrl) {
+          showIntroVideoError(page, data.error || '動画生成に失敗しました');
+        } else {
+          setTimeout(poll, 10000);
+        }
+      })
+      .catch(function() { setTimeout(poll, 10000); });
+    }
+    setTimeout(poll, 10000);
+  }
+
+  function showIntroVideoError(page, message) {
+    var resultArea = document.getElementById('video-result-' + page);
+    if (resultArea) {
+      resultArea.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px;text-align:center;margin-top:10px;">' +
+        '<p style="font-size:0.85rem;color:#DC2626;">😅 ' + message + '</p>' +
+        '<button onclick="generateLearningVideo(' + page + ')" style="margin-top:8px;background:#DC2626;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 もう一度</button>' +
+        '<p style="font-size:0.7rem;color:#9CA3AF;margin-top:4px;">テキストとイラストでも十分学べるよ！</p></div>';
     }
   }
 
@@ -21227,6 +21461,598 @@ app.get('/proposal', (c) => {
 </html>`)
 })
 
+// ==============================================
+// 村長向け「教育理論 → 具体的実装」対応デモページ
+// 各機能がどの学術理論に基づき、実際にどう動くかを示す
+// ==============================================
+app.get('/theory-demo', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教育理論と具体的実装の対応 — AI学習システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .theory-card { transition: all 0.3s; border-left: 6px solid; }
+        .theory-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .impl-tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: bold; }
+        .demo-screenshot { border: 2px solid #E5E7EB; border-radius: 12px; overflow: hidden; background: #F9FAFB; }
+        .mock-ui { font-family: 'Hiragino Kaku Gothic Pro', 'Meiryo', sans-serif; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .theory-section { animation: fadeIn 0.5s ease-out; }
+        .kolb-step { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+        .scaffold-bar { height: 20px; border-radius: 10px; transition: width 1s ease; }
+        .nav-pill { padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; border: 2px solid transparent; }
+        .nav-pill:hover { background: #EEF2FF; }
+        .nav-pill.active { background: #4F46E5; color: white; border-color: #4F46E5; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- ヘッダー -->
+    <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white py-8 px-6">
+        <div class="max-w-5xl mx-auto">
+            <p class="text-sm opacity-80 mb-2">📋 村長向け資料</p>
+            <h1 class="text-3xl font-bold mb-2">教育理論 → 具体的実装の対応表</h1>
+            <p class="text-lg opacity-90">「なぜこの機能があるのか」を学術的根拠とともに示します</p>
+            <p class="text-sm opacity-70 mt-2">各項目: <strong>理論名</strong> → <strong>システムでの実装方法</strong> → <strong>児童に起こる変化</strong></p>
+        </div>
+    </div>
+
+    <!-- ナビゲーション -->
+    <div class="sticky top-0 bg-white border-b shadow-sm z-50 px-4 py-3">
+        <div class="max-w-5xl mx-auto flex flex-wrap gap-2">
+            <span class="nav-pill active" onclick="scrollToSection('kolb')">🖐️ Kolb経験学習</span>
+            <span class="nav-pill" onclick="scrollToSection('scaffold')">🛡️ 足場かけ</span>
+            <span class="nav-pill" onclick="scrollToSection('sdt')">🎯 自己決定理論</span>
+            <span class="nav-pill" onclick="scrollToSection('srl')">🧠 自己調整学習</span>
+            <span class="nav-pill" onclick="scrollToSection('dweck')">🌱 成長マインドセット</span>
+            <span class="nav-pill" onclick="scrollToSection('ebbinghaus')">📅 忘却曲線</span>
+            <span class="nav-pill" onclick="scrollToSection('metacog')">🔍 メタ認知</span>
+            <span class="nav-pill" onclick="scrollToSection('thinkaloud')">💭 思考発話</span>
+            <span class="nav-pill" onclick="scrollToSection('multimodal')">🎵 多感覚学習</span>
+            <span class="nav-pill" onclick="scrollToSection('intro')">✨ 導入問題</span>
+        </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto py-8 px-4 space-y-10">
+
+    <!-- ① Kolb 経験学習サイクル -->
+    <div id="kolb" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #F59E0B;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-amber-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">🖐️</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Kolb 経験学習サイクル（1984）</h2>
+                <p class="text-sm text-gray-500 mt-1">David A. Kolb "Experiential Learning"</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-amber-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">学びは4段階のサイクルを回ることで深まる：<br>
+                <strong>CE（具体的経験）→ RO（省察的観察）→ AC（抽象的概念化）→ AE（能動的実験）</strong><br>
+                単に教わるだけでなく「やってみる→ふりかえる→まとめる→ためす」を繰り返す。</p>
+                <div class="flex items-center justify-center gap-2 mt-4 p-3 bg-amber-50 rounded-lg">
+                    <div class="kolb-step bg-amber-400 text-white font-bold text-sm">🖐️<br>CE</div>
+                    <span class="text-amber-400">→</span>
+                    <div class="kolb-step bg-blue-400 text-white font-bold text-sm">👀<br>RO</div>
+                    <span class="text-blue-400">→</span>
+                    <div class="kolb-step bg-purple-400 text-white font-bold text-sm">📐<br>AC</div>
+                    <span class="text-purple-400">→</span>
+                    <div class="kolb-step bg-green-400 text-white font-bold text-sm">🔬<br>AE</div>
+                </div>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ 実際のカード画面に表示されるUI</p>
+                    <div class="flex items-center gap-1 p-2 bg-gradient-to-r from-amber-50 to-amber-25 rounded-lg border border-amber-200">
+                        <div class="flex-1 text-center p-1 rounded bg-amber-400 text-white text-xs font-bold">🖐️ やってみる</div>
+                        <span class="text-gray-300 text-xs">→</span>
+                        <div class="flex-1 text-center p-1 rounded text-blue-400 opacity-50 text-xs">👀 ふりかえる</div>
+                        <span class="text-gray-300 text-xs">→</span>
+                        <div class="flex-1 text-center p-1 rounded text-purple-400 opacity-50 text-xs">📐 まとめる</div>
+                        <span class="text-gray-300 text-xs">→</span>
+                        <div class="flex-1 text-center p-1 rounded text-green-400 opacity-50 text-xs">🔬 ためす</div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">→ カードを進めるごとに現在地のハイライトが移動し、「いまどの段階か」を児童が自覚</p>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">「今やっていることの意味」がわかり、学習に能動的に参加するようになる</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ② 足場かけ（Scaffolding）/ Vygotsky ZPD -->
+    <div id="scaffold" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #8B5CF6;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-purple-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">🛡️</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Vygotsky 最近接発達領域（ZPD）＋足場かけ</h2>
+                <p class="text-sm text-gray-500 mt-1">Vygotsky (1978) / Wood, Bruner & Ross (1976)</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-purple-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">子どもが「一人ではまだできないが、助けがあればできる」領域（ZPD）で学ぶのが最も効果的。<br>
+                <strong>最初は手厚く支援し、できるようになったら段階的に支援を減らす（フェーディング）。</strong></p>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ 足場レベルの自動フェーディング</p>
+                    <div class="space-y-2">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span class="font-bold">🛡️ 足場レベル 100%</span><span class="text-gray-400">学習開始時</span></div>
+                            <div class="scaffold-bar bg-purple-500" style="width:100%;"></div>
+                            <p class="text-xs text-gray-500 mt-1">→ ヒントボタン常時表示・AI先生が積極的にアドバイス</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span class="font-bold">🛡️ → 60%</span><span class="text-green-600">3問連続正解後</span></div>
+                            <div class="scaffold-bar bg-purple-400" style="width:60%;"></div>
+                            <p class="text-xs text-gray-500 mt-1">→ ヒントの詳しさが減少、自力で考える時間が増える</p>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1"><span class="font-bold">🛡️ → 20%</span><span class="text-green-600">さらに正解が続くと</span></div>
+                            <div class="scaffold-bar bg-purple-300" style="width:20%;"></div>
+                            <p class="text-xs text-gray-500 mt-1">→ ほぼ自力モード。間違えたら再び足場を増やす（安心設計）</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">「自分でできた！」の体験が積み重なり自己効力感が育つ。挫折しても安全に戻れる安心感</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ③ 自己決定理論 (SDT) -->
+    <div id="sdt" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #10B981;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-green-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">🎯</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">自己決定理論（SDT）</h2>
+                <p class="text-sm text-gray-500 mt-1">Deci & Ryan (1985, 2000) — 自律性・有能感・関係性の3欲求</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-green-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">内発的動機づけを高めるには3つの基本的心理欲求を満たすこと：<br>
+                <strong>① 自律性</strong>: 自分で決められる<br>
+                <strong>② 有能感</strong>: 「できる」と感じられる<br>
+                <strong>③ 関係性</strong>: 認めてもらえる、つながりがある</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体（三軸自己選択UI）</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ 児童が自分で3つの軸を選択</p>
+                    <div class="space-y-3">
+                        <div>
+                            <p class="text-xs font-bold text-green-700 mb-1">軸1: どの順番で学ぶ？</p>
+                            <div class="flex gap-1">
+                                <span class="impl-tag bg-green-100 text-green-700">📖 順番に</span>
+                                <span class="impl-tag bg-orange-100 text-orange-700">🏔️ むずかしいのから</span>
+                                <span class="impl-tag bg-blue-100 text-blue-700">🎈 かんたんから</span>
+                                <span class="impl-tag bg-pink-100 text-pink-700">🌍 生活問題から</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-green-700 mb-1">軸2: どのレベルで解く？</p>
+                            <div class="flex gap-1">
+                                <span class="impl-tag bg-emerald-100 text-emerald-700">🐢 きほん</span>
+                                <span class="impl-tag bg-sky-100 text-sky-700">🐇 ふつう</span>
+                                <span class="impl-tag bg-red-100 text-red-700">🚀 むずかしめ</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-green-700 mb-1">軸3: どうやって考える？</p>
+                            <div class="flex gap-1">
+                                <span class="impl-tag bg-indigo-100 text-indigo-700">📐 きまりから（演繹）</span>
+                                <span class="impl-tag bg-amber-100 text-amber-700">🔍 例から（帰納）</span>
+                                <span class="impl-tag bg-teal-100 text-teal-700">🖼️ 図で考える</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">「やらされている」→「自分で選んでやっている」。内発的動機が高まり、学習への主体性が育つ</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ④ 自己調整学習 (SRL) -->
+    <div id="srl" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #0EA5E9;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-sky-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">🧠</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">自己調整学習（SRL）</h2>
+                <p class="text-sm text-gray-500 mt-1">Zimmerman (1986, 2000) — 予見・遂行・自己省察の3フェーズモデル</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-sky-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">「学び方を学ぶ」力。以下の3段階を自分で回せるようになること：<br>
+                <strong>① 予見</strong>: 目標設定・計画<br>
+                <strong>② 遂行</strong>: 方略の実行・自己監視<br>
+                <strong>③ 自己省察</strong>: 結果の評価・原因分析<br>
+                N問ごとにミニ振り返りを行い、このサイクルを習慣化する。</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ 7問ごとにミニ振り返りが自動表示</p>
+                    <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-3">
+                        <p class="font-bold text-blue-700 text-sm">🔄 ここまでの学習をふりかえろう！</p>
+                        <p class="text-xs text-gray-600 mt-1">📊 7問中5問正解（71%）</p>
+                        <div class="mt-2 space-y-1">
+                            <p class="text-xs text-blue-600">🤔 どの問題がむずかしかった？</p>
+                            <p class="text-xs text-blue-600">💡 次の7問はどうやって進める？</p>
+                            <p class="text-xs text-blue-600">🎯 目標: 次は6問正解を目指そう！</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">→ 足場レベル・正解率が自動追跡され、セッション全体の進捗を可視化</p>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">「振り返る習慣」が身につき、テストでも自分でペース配分ができるようになる</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑤ 成長マインドセット -->
+    <div id="dweck" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #22C55E;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-green-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">🌱</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">成長マインドセット</h2>
+                <p class="text-sm text-gray-500 mt-1">Carol Dweck (2006) — "Mindset: The New Psychology of Success"</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-green-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">「頭がいい/悪い」は固定ではなく、<strong>努力で伸びる</strong>という信念が学力に影響する。<br>
+                正解したとき「すごい！天才！」ではなく<strong>「努力の過程」を褒める</strong>ことが重要。<br>
+                「間違い＝悪いこと」ではなく「間違い＝脳が成長するチャンス」と伝える。</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ 正解・不正解時のAIフィードバック（実際の画面）</p>
+                    <div class="space-y-2">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-2">
+                            <p class="text-xs font-bold text-green-700">✅ 正解したとき</p>
+                            <p class="text-sm text-green-800">"よく考えたね！その<strong>考え方の工夫</strong>がすばらしい！🌟"</p>
+                            <p class="text-xs text-green-600 mt-1">→ 「結果」でなく「プロセス」を称賛</p>
+                        </div>
+                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-2">
+                            <p class="text-xs font-bold text-amber-700">❌ 不正解のとき</p>
+                            <p class="text-sm text-amber-800">"ここまでの考え方は合ってるよ！<strong>ここだけ</strong>もう一回考えてみよう 💪"</p>
+                            <p class="text-xs text-amber-600 mt-1">→ 部分的正答を認め、再チャレンジを促す</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">「間違えても大丈夫」「努力すれば伸びる」という信念が育ち、難問にも粘り強く取り組める</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑥ Ebbinghaus 忘却曲線 / 間隔反復 -->
+    <div id="ebbinghaus" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #EF4444;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-red-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">📅</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">Ebbinghaus 忘却曲線 ＋ 間隔反復法</h2>
+                <p class="text-sm text-gray-500 mt-1">Ebbinghaus (1885) / Leitner System / Spaced Repetition</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-red-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">学んだことは時間とともに急速に忘れる（1日後に74%忘却）。<br>
+                <strong>「忘れかけたタイミング」で復習すると記憶が強化される</strong>。<br>
+                1日→3日→7日→14日→30日… と間隔を広げながら復習する「間隔反復法」が最も効率的。</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ 今日復習すべきカードの自動リマインダー</p>
+                    <div class="bg-red-50 border-2 border-red-200 rounded-lg p-3">
+                        <p class="font-bold text-red-700 text-sm">⏰ 今日のふくしゅうカード</p>
+                        <div class="mt-2 space-y-1">
+                            <div class="flex items-center gap-2 bg-white rounded p-1.5 border">
+                                <span class="text-xs">🔴</span>
+                                <span class="text-xs flex-1">三角形の面積（3日前に学習・正解率60%）</span>
+                                <span class="impl-tag bg-red-100 text-red-600">忘却リスク高</span>
+                            </div>
+                            <div class="flex items-center gap-2 bg-white rounded p-1.5 border">
+                                <span class="text-xs">🟡</span>
+                                <span class="text-xs flex-1">分数のたし算（7日前に学習・正解率80%）</span>
+                                <span class="impl-tag bg-yellow-100 text-yellow-600">復習推奨</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">→ 各カードの学習日・正解率から自動的に「今日復習すべき」カードを算出</p>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">テスト前の一夜漬けではなく「少しずつ確実に定着させる」学習習慣が身につく</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑦ メタ認知 -->
+    <div id="metacog" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #EC4899;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-pink-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">🔍</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">メタ認知</h2>
+                <p class="text-sm text-gray-500 mt-1">Flavell (1979) / Brown (1987) — 「自分の思考について考える」能力</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-pink-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">「何がわかっていて、何がわかっていないか」を自分で判断できる力。<br>
+                <strong>不正解時に「なぜ間違えたか」を分析する機会</strong>を与えることが、メタ認知を育てる最も効果的な方法。</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ 不正解時のメタ認知プロンプト</p>
+                    <div class="bg-pink-50 border-2 border-pink-200 rounded-lg p-3">
+                        <p class="font-bold text-pink-700 text-sm">🤔 どこでつまずいたか考えてみよう</p>
+                        <div class="mt-2 space-y-2">
+                            <button class="w-full text-left bg-white border rounded p-2 text-xs hover:bg-pink-50">① 問題の意味がわからなかった</button>
+                            <button class="w-full text-left bg-white border rounded p-2 text-xs hover:bg-pink-50">② やり方はわかったけど計算ミスした</button>
+                            <button class="w-full text-left bg-white border rounded p-2 text-xs hover:bg-pink-50">③ やり方自体がわからなかった</button>
+                            <button class="w-full text-left bg-white border rounded p-2 text-xs hover:bg-pink-50">④ うっかりミス（読み間違いなど）</button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">→ 選択結果に応じて次のヒントの出し方が変わる（個別最適化）</p>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">「なんとなく間違えた」ではなく「ここが弱い」と自覚でき、自分で弱点を克服する力が育つ</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑧ 思考発話 -->
+    <div id="thinkaloud" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #0EA5E9;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-sky-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">💭</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">思考発話モデリング（Think-Aloud）</h2>
+                <p class="text-sm text-gray-500 mt-1">Zimmerman SRL + Rosenshine (2012) の直接教授法</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-sky-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">熟達者（先生）が問題を解くときの<strong>「頭の中の声」を可視化</strong>して見せること。<br>
+                「まず何を見るか → 次に何を考えるか → どう判断するか」をステップバイステップで示す。<br>
+                児童はこれを真似ることで、自分でも問題解決の手順を構築できるようになる。</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ AIが生成する「解き方のプロセス」</p>
+                    <div class="bg-sky-50 border-2 border-sky-200 rounded-lg p-3 space-y-2">
+                        <p class="font-bold text-sky-700 text-sm">🧠 AI先生の考え方</p>
+                        <div class="flex gap-2 items-start">
+                            <span class="bg-sky-200 text-sky-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                            <div class="text-xs"><strong>💭 考え:</strong> 「まず問題文を読んで、何を求められているか確認しよう」<br><strong>✏️ やること:</strong> 「求めるもの」に線を引く</div>
+                        </div>
+                        <div class="flex gap-2 items-start">
+                            <span class="bg-sky-200 text-sky-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                            <div class="text-xs"><strong>💭 考え:</strong> 「底辺と高さがわかっているから公式が使えそう」<br><strong>✏️ やること:</strong> 底辺×高さ÷2 を計算</div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">→ 問題ごとにGemini AIがリアルタイム生成。代替アプローチも提示</p>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">「解き方がわからない」→「先生ならこう考える」を参考に、自分の解法を構築できるようになる</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑨ 多感覚学習（音楽・動画・ストーリーブック） -->
+    <div id="multimodal" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #7C3AED;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-violet-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">🎵</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">多感覚学習（マルチモーダル）＋ AI生成コンテンツ</h2>
+                <p class="text-sm text-gray-500 mt-1">Mayer (2001) マルチメディア学習理論 / Paivio (1971) 二重符号化理論</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-violet-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">人間は<strong>テキスト＋視覚＋聴覚の複数チャネル</strong>で情報を受け取ると記憶定着率が高まる。<br>
+                さらに<strong>リズム・メロディは記憶符号化を促進</strong>する（音楽記憶効果）。<br>
+                PCの強みを活かし、テキストだけでなく画像・動画・音楽をAIで即時生成。</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ 導入カードの多感覚メディアボタン</p>
+                    <div class="space-y-2">
+                        <div class="flex gap-2">
+                            <div class="flex-1 bg-violet-100 rounded-lg p-2 text-center border border-violet-200">
+                                <p class="text-lg">🎵</p>
+                                <p class="text-xs font-bold text-violet-700">学習ソング生成</p>
+                                <p class="text-xs text-violet-500">Gemini 3.1で30秒</p>
+                                <p class="text-xs text-violet-400">+ Sunoで4分の本格曲</p>
+                            </div>
+                            <div class="flex-1 bg-red-100 rounded-lg p-2 text-center border border-red-200">
+                                <p class="text-lg">🎬</p>
+                                <p class="text-xs font-bold text-red-700">学習動画生成</p>
+                                <p class="text-xs text-red-500">Veo 3.1で教育動画</p>
+                                <p class="text-xs text-red-400">火山噴火・実験等</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="flex-1 bg-amber-100 rounded-lg p-2 text-center border border-amber-200">
+                                <p class="text-lg">🎨</p>
+                                <p class="text-xs font-bold text-amber-700">ストーリーブック画像</p>
+                                <p class="text-xs text-amber-500">絵本風イラストで導入</p>
+                            </div>
+                            <div class="flex-1 bg-blue-100 rounded-lg p-2 text-center border border-blue-200">
+                                <p class="text-lg">✋</p>
+                                <p class="text-xs font-bold text-blue-700">触覚・体感アクティビティ</p>
+                                <p class="text-xs text-blue-500">手を動かして学ぶ</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">テキストが苦手な児童も視覚・聴覚から学べる。「3の段の歌」を口ずさみながら九九を覚える等</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⑩ 導入問題設計（動機づけ理論の統合） -->
+    <div id="intro" class="theory-section theory-card bg-white rounded-xl p-6 shadow-sm" style="border-color: #F59E0B;">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="bg-amber-100 rounded-full w-14 h-14 flex items-center justify-center text-2xl flex-shrink-0">✨</div>
+            <div>
+                <h2 class="text-xl font-bold text-gray-800">導入問題設計（ジミニ・ストーリーブック要素）</h2>
+                <p class="text-sm text-gray-500 mt-1">Keller ARCS動機づけモデル (1987) — 注意・関連性・自信・満足感</p>
+            </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div>
+                <h3 class="font-bold text-amber-700 mb-2"><i class="fas fa-book mr-1"></i>理論の要点</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">学習への<strong>第一印象</strong>が全体の学習意欲を決定づける。導入問題は「テスト」ではなく「学びへの招待状」。<br>
+                <strong>3つの感情を刺激する：</strong><br>
+                ① <strong>やってみたい</strong>（Motivation）— ストーリー仕立てで好奇心を刺激<br>
+                ② <strong>ワクワク</strong>（Excitement）— 絵本風イラスト＋驚きの要素<br>
+                ③ <strong>親近感</strong>（Familiarity）— 日常生活の場面（おやつ、お買い物、友達）<br>
+                難易度表示はするが、それは「ふるい」ではなく「レベルに合った冒険の入口」として機能。</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-indigo-700 mb-2"><i class="fas fa-laptop-code mr-1"></i>実装の具体</h3>
+                <div class="demo-screenshot p-3 mock-ui text-sm">
+                    <p class="text-xs text-gray-400 mb-2">▼ 導入カードの構成要素</p>
+                    <div class="bg-amber-50 border-2 border-amber-200 rounded-lg p-3 space-y-2">
+                        <div class="text-center">
+                            <span class="text-2xl">🌟</span>
+                            <p class="font-bold text-amber-700">学びのとびら</p>
+                        </div>
+                        <div class="bg-gradient-to-r from-yellow-100 to-orange-100 rounded p-2 text-center border border-dashed border-amber-300">
+                            <p class="text-xs">🎨 ストーリーブック画像（タップで生成）</p>
+                        </div>
+                        <div class="bg-white rounded p-2 border border-amber-200">
+                            <p class="text-xs font-bold text-red-600">✨ やってみよう！</p>
+                            <p class="text-xs text-gray-700">ストーリー仕立ての問題文がここに表示</p>
+                            <p class="text-xs font-bold text-red-500 mt-1 bg-red-50 rounded p-1 text-center">🤔 答え、わかるかな？</p>
+                        </div>
+                        <div class="flex gap-1 justify-center">
+                            <span class="impl-tag bg-violet-100 text-violet-700">🎵 歌を作る</span>
+                            <span class="impl-tag bg-red-100 text-red-700">🎬 動画を作る</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                    <p class="text-xs font-bold text-green-700">📊 児童に起こる変化</p>
+                    <p class="text-xs text-green-600">「勉強＝つまらない」→「なにこれ面白そう！」。最初の1問で学習モードに入れる</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- まとめ: 全体のつながり -->
+    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 border-2 border-indigo-200">
+        <h2 class="text-xl font-bold text-indigo-800 mb-4"><i class="fas fa-project-diagram mr-2"></i>すべての理論はつながっている</h2>
+        <div class="grid md:grid-cols-3 gap-4 text-sm">
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <p class="font-bold text-indigo-700 mb-2">🚪 入口（導入問題）</p>
+                <p class="text-gray-600">ARCS動機づけモデルで「やりたい！」を引き出し、ストーリーブック・音楽・動画で多感覚からアプローチ</p>
+                <div class="flex flex-wrap gap-1 mt-2">
+                    <span class="impl-tag bg-amber-100 text-amber-700">ARCS</span>
+                    <span class="impl-tag bg-violet-100 text-violet-700">多感覚</span>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <p class="font-bold text-green-700 mb-2">📈 学習中</p>
+                <p class="text-gray-600">SDTで自律性を保ちながら、ZPD+足場かけで「できるギリギリ」に挑戦。Kolbサイクルで深い理解へ</p>
+                <div class="flex flex-wrap gap-1 mt-2">
+                    <span class="impl-tag bg-green-100 text-green-700">SDT</span>
+                    <span class="impl-tag bg-purple-100 text-purple-700">ZPD</span>
+                    <span class="impl-tag bg-amber-100 text-amber-700">Kolb</span>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <p class="font-bold text-blue-700 mb-2">🔄 定着・成長</p>
+                <p class="text-gray-600">間隔反復で忘却に抗い、SRL＋メタ認知で「学び方」自体を学ぶ。成長マインドセットで粘り強さを培う</p>
+                <div class="flex flex-wrap gap-1 mt-2">
+                    <span class="impl-tag bg-red-100 text-red-700">忘却曲線</span>
+                    <span class="impl-tag bg-sky-100 text-sky-700">SRL</span>
+                    <span class="impl-tag bg-green-100 text-green-700">Dweck</span>
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 p-3 bg-white rounded-lg border border-indigo-200 text-center">
+            <p class="text-sm text-indigo-700 font-bold">この循環により、「教わる→自分で学べる→学び続ける」人材を育てます</p>
+            <p class="text-xs text-gray-500 mt-1">すべての実装は国際的に認められた教育心理学のエビデンスに基づいています</p>
+        </div>
+    </div>
+
+    <!-- フッター -->
+    <div class="text-center py-6 text-sm text-gray-400">
+        <p>AI駆動型個別最適化学習システム — 教育理論実装マップ</p>
+        <p class="mt-1"><a href="/proposal" class="text-indigo-500 hover:underline">← 提案書に戻る</a></p>
+    </div>
+
+    </div>
+
+    <script>
+        function scrollToSection(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.querySelectorAll('.nav-pill').forEach(function(el) { el.classList.remove('active'); });
+            event.target.classList.add('active');
+        }
+
+        // スクロールに応じてナビゲーションのアクティブ状態を更新
+        var sections = ['kolb','scaffold','sdt','srl','dweck','ebbinghaus','metacog','thinkaloud','multimodal','intro'];
+        window.addEventListener('scroll', function() {
+            var scrollPos = window.scrollY + 120;
+            var active = '';
+            sections.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el && el.offsetTop <= scrollPos) active = id;
+            });
+            if (active) {
+                document.querySelectorAll('.nav-pill').forEach(function(el) {
+                    el.classList.toggle('active', el.textContent.toLowerCase().indexOf(active) >= 0 || el.getAttribute('onclick').indexOf(active) >= 0);
+                });
+            }
+        });
+    </script>
+</body>
+</html>`)
+})
+
 // ============================================
 // データエクスポートAPI
 // ============================================
@@ -22425,6 +23251,375 @@ Style requirements:
   }
 
   return c.json({ success: false, error: 'ストーリーブック画像の生成に失敗しました', generation_time_ms: Date.now() - startTime })
+})
+
+// ========== 学習ソング生成API（Gemini 3.1 Native Audio） ==========
+// Gemini 3.1は30秒の音声/音楽を生成可能
+// 九九の歌、元素記号の歌、歴史年号の歌など記憶を助けるソングを生成
+app.post('/api/ai/generate-learning-song', async (c) => {
+  const startTime = Date.now()
+  const { course_id, song_idea, grade, subject, unit_name, card_title, problem_text } = await c.req.json()
+  const apiKey = c.env.GEMINI_API_KEY
+  if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
+
+  try {
+    console.log('🎵 学習ソング生成開始...')
+    
+    // まず歌詞をテキストモデルで生成
+    const lyricsPrompt = `あなたは子ども向けの教育ソング作詞の天才です。
+${grade || '小学'}${subject || '算数'}の「${unit_name || card_title || '学習内容'}」に関する、記憶に残る学習ソングの歌詞を作ってください。
+
+${song_idea ? `【アイデア】${song_idea}` : ''}
+${problem_text ? `【学習内容】${problem_text}` : ''}
+
+■ ルール:
+- 30秒以内で歌える短い歌（4〜8行程度）
+- リズムが良く、口ずさみやすいメロディをイメージ
+- 学習内容が自然に組み込まれている（無理に詰め込まない）
+- 小学生が「楽しい！」と思える歌詞
+- 繰り返しのフレーズで記憶に残りやすく
+
+以下のJSON形式で回答:
+{
+  "title": "歌のタイトル（キャッチーに）",
+  "lyrics": "歌詞全文（改行は\\nで）",
+  "melody_hint": "メロディのイメージ（例：アップテンポで明るく、○○の曲調で）",
+  "suno_prompt": "Sunoで曲を作るときのスタイルプロンプト（英語、例：upbeat Japanese children's educational pop song）",
+  "suno_lyrics": "Sunoに渡すための歌詞フォーマット（[Verse][Chorus]等のタグ付き）",
+  "memory_technique": "この歌がどんな記憶法に基づいているか（リズム記憶法、語呂合わせ等）"
+}`
+
+    // テキストモデルで歌詞生成
+    const lyricsResp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: lyricsPrompt }] }],
+          generationConfig: { temperature: 0.9, maxOutputTokens: 2000, responseMimeType: 'application/json' }
+        })
+      }
+    )
+    
+    let songData: any = {}
+    if (lyricsResp.ok) {
+      const lyricsData = await lyricsResp.json() as any
+      const lyricsText = lyricsData.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+      try { songData = JSON.parse(lyricsText) } catch { songData = { title: '学習ソング', lyrics: lyricsText } }
+    }
+    
+    // Gemini 3.1 Native Audio で実際の音楽を生成（30秒）
+    let audioUrl = ''
+    let audioGenerated = false
+    try {
+      const audioPrompt = `Create a 30-second cheerful, catchy children's educational song in Japanese.
+Title: ${songData.title || 'Learning Song'}
+Style: ${songData.suno_prompt || 'Upbeat Japanese children educational pop song, clear vocals, memorable melody'}
+Lyrics: ${songData.lyrics || song_idea || 'A fun learning song'}
+
+Requirements:
+- Bright, cheerful melody suitable for elementary school children
+- Clear, singable vocals
+- Catchy hook that aids memorization
+- About 30 seconds long`
+
+      const audioResp = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: audioPrompt }] }],
+            generationConfig: { 
+              responseModalities: ['AUDIO'],
+              temperature: 0.8
+            }
+          })
+        }
+      )
+
+      if (audioResp.ok) {
+        const audioData = await audioResp.json() as any
+        const parts = audioData?.candidates?.[0]?.content?.parts || []
+        for (const part of parts) {
+          if (part.inlineData?.mimeType?.startsWith('audio/')) {
+            audioUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+            audioGenerated = true
+            console.log('✅ 学習ソング音声生成成功')
+            break
+          }
+        }
+      }
+    } catch (audioErr: any) {
+      console.warn('⚠️ 音声生成失敗（歌詞のみ返却）:', audioErr.message)
+    }
+
+    return c.json({
+      success: true,
+      song: {
+        ...songData,
+        audio_url: audioUrl || null,
+        audio_generated: audioGenerated
+      },
+      suno_info: {
+        available: true,
+        free_tier: '1日5曲無料（約4分/曲）',
+        url: 'https://suno.com',
+        how_to: 'Sunoにアクセス → Create → 下の歌詞をペースト → スタイルを入力 → Generate',
+        suno_prompt: songData.suno_prompt || '',
+        suno_lyrics: songData.suno_lyrics || ''
+      },
+      generation_time_ms: Date.now() - startTime
+    })
+  } catch (e: any) {
+    console.error('学習ソング生成エラー:', e.message)
+    return c.json({ success: false, error: e.message, generation_time_ms: Date.now() - startTime })
+  }
+})
+
+// ========== 学習動画生成API ==========
+// PCの強みを活かしたリッチコンテンツ（火山噴火、水の循環、歴史的場面など）
+// Veo 3.1で8秒の教育動画を生成
+app.post('/api/ai/generate-learning-video', async (c) => {
+  const startTime = Date.now()
+  const { course_id, video_idea, grade, subject, unit_name, card_title } = await c.req.json()
+  const apiKey = c.env.GEMINI_API_KEY
+  if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
+
+  try {
+    console.log('🎬 学習動画生成開始...')
+    
+    // 教育動画用プロンプト構築
+    const videoPrompt = `Create an educational video for Japanese ${grade || 'elementary school'} ${subject || 'science'} class.
+
+Topic: ${video_idea || unit_name || card_title || 'educational content'}
+Unit: ${unit_name || card_title || ''}
+
+Requirements:
+- Visually stunning and engaging for children aged 8-12
+- Realistic but safe and educational content  
+- Slow enough for children to observe and understand
+- Bright, clear visuals with good lighting
+- No text overlays (narration will be added separately)
+- 8 seconds showing the most impactful moment
+- Camera angle that gives the best educational perspective`
+
+    // Veo 3.1 API呼び出し
+    const veoResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning`,
+      {
+        method: 'POST',
+        headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instances: [{ prompt: videoPrompt }],
+          parameters: {
+            aspectRatio: '16:9',
+            personGeneration: 'dont_allow',
+            durationSeconds: 8,
+            enhancePrompt: true
+          }
+        })
+      }
+    )
+
+    if (!veoResponse.ok) {
+      const errText = await veoResponse.text()
+      console.error('Veo API error:', errText)
+      return c.json({
+        success: false,
+        error: '動画生成APIエラー',
+        fallback_search: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${subject || ''} ${unit_name || video_idea || ''} 小学生 教育`)}`,
+        nhk_search: `https://www.nhk.or.jp/school/keyword/?kw=${encodeURIComponent(unit_name || video_idea || '')}`,
+        generation_time_ms: Date.now() - startTime
+      })
+    }
+
+    const operationData = await veoResponse.json() as any
+    const operationName = operationData.name
+    
+    if (!operationName) {
+      return c.json({
+        success: false,
+        error: '動画生成ジョブの開始に失敗しました',
+        generation_time_ms: Date.now() - startTime
+      })
+    }
+
+    // ポーリングで完了を待つ（最大90秒）
+    let videoUrl = ''
+    for (let i = 0; i < 18; i++) {
+      await new Promise(resolve => setTimeout(resolve, 5000))
+      
+      const pollResp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+        { headers: { 'x-goog-api-key': apiKey } }
+      )
+      
+      if (pollResp.ok) {
+        const pollData = await pollResp.json() as any
+        if (pollData.done) {
+          const videos = pollData.response?.generateVideoResponse?.generatedSamples || []
+          if (videos.length > 0 && videos[0].video?.uri) {
+            videoUrl = videos[0].video.uri
+            break
+          }
+        }
+      }
+    }
+
+    if (videoUrl) {
+      console.log('✅ 学習動画生成成功')
+      return c.json({
+        success: true,
+        video_url: videoUrl,
+        operation_name: operationName,
+        generation_time_ms: Date.now() - startTime
+      })
+    } else {
+      return c.json({
+        success: false,
+        status: 'processing',
+        operation_name: operationName,
+        message: '動画はまだ生成中です。しばらくしてから確認してください。',
+        fallback_search: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${subject || ''} ${unit_name || video_idea || ''} 小学生 教育`)}`,
+        generation_time_ms: Date.now() - startTime
+      })
+    }
+  } catch (e: any) {
+    console.error('学習動画生成エラー:', e.message)
+    return c.json({ 
+      success: false, 
+      error: e.message,
+      fallback_search: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${subject || ''} ${unit_name || video_idea || ''} 教育`)}`,
+      generation_time_ms: Date.now() - startTime 
+    })
+  }
+})
+
+// ========== Suno歌詞自動提案API ==========
+// Suno用に最適化された歌詞とスタイルプロンプトを生成
+// Sunoは1日5曲無料（約4分/曲）で作れる
+app.post('/api/ai/generate-suno-lyrics', async (c) => {
+  const { grade, subject, unit_name, topic, song_type } = await c.req.json()
+  const apiKey = c.env.GEMINI_API_KEY
+  if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
+
+  try {
+    const prompt = `あなたはSuno AI（AIの作曲サービス）用に歌詞を作る専門家です。
+${grade || '小学'}${subject || ''}の「${unit_name || topic || '学習内容'}」に関する学習ソングの歌詞を、Sunoで最高の結果が出るように作成してください。
+
+【曲の種類】${song_type || '暗記補助ソング（九九、公式、年号など）'}
+
+Sunoは約4分の曲を生成できます。1日5曲まで無料で作れます。
+
+以下のJSON形式で回答:
+{
+  "song_title": "曲のタイトル",
+  "suno_style_prompt": "Sunoのスタイル欄に入力する文（英語40語以内。例：upbeat J-pop, children's educational song, catchy melody, clear Japanese vocals, 120bpm）",
+  "suno_lyrics": "Sunoの歌詞欄にコピペする歌詞（[Intro][Verse][Chorus][Bridge][Outro]タグ付き。日本語。繰り返しは明示的に記述。4分程度の長さ）",
+  "short_version_lyrics": "30秒の短いバージョン（Gemini音声生成用。[Verse][Chorus]のみ）",
+  "learning_content": "この歌で覚えられる学習内容のリスト",
+  "memory_technique": "使用している記憶術（リズム記憶法、語呂合わせ、ストーリー記憶等）",
+  "usage_tips": "この歌の効果的な使い方（例：朝の会で流す、テスト前に聞く等）"
+}`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.9, maxOutputTokens: 4000, responseMimeType: 'application/json' }
+        })
+      }
+    )
+
+    if (resp.ok) {
+      const data = await resp.json() as any
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+      const result = JSON.parse(text)
+      return c.json({
+        success: true,
+        lyrics_data: result,
+        suno_info: {
+          url: 'https://suno.com',
+          free_tier: '1日5曲無料（約4分/曲）',
+          how_to_steps: [
+            '1. https://suno.com にアクセス（Googleアカウントでログイン可）',
+            '2. 「Create」ボタンをクリック',
+            '3. 「Custom」モードを選択',
+            '4. スタイル欄に上の「suno_style_prompt」をペースト',
+            '5. 歌詞欄に「suno_lyrics」をペースト',
+            '6. 「Create」で生成開始（約1-2分）',
+            '7. 完成した曲をダウンロードして授業で使用！'
+          ]
+        }
+      })
+    }
+
+    return c.json({ success: false, error: '歌詞生成に失敗しました' })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message })
+  }
+})
+
+// ========== Gemini 3.1 学習ソング30秒音楽生成API ==========
+// 記憶補助としての音楽（リズム記憶法）: 九九の歌、元素記号の歌のような暗記補助を即座にAI生成
+app.post('/api/ai/generate-learning-music', async (c) => {
+  const { lyrics, topic, grade, subject, unit_name } = await c.req.json()
+  const apiKey = c.env.GEMINI_API_KEY
+  if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
+
+  try {
+    const shortLyrics = (lyrics || '').substring(0, 500) || `${grade || '小学'}${subject || ''}の${unit_name || topic || '学習'}に関する簡単な歌`
+    
+    const prompt = `以下の歌詞を子ども向けの明るいメロディで歌ってください。楽しく覚えやすいリズムで、日本語で歌ってください。
+
+歌詞:
+${shortLyrics}
+
+スタイル: 子ども向けJ-POP風、明るくキャッチー、テンポ120BPM、はっきりした歌声`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 4096,
+            responseModalities: ['TEXT', 'AUDIO']
+          }
+        })
+      }
+    )
+
+    if (resp.ok) {
+      const data = await resp.json() as any
+      const parts = data.candidates?.[0]?.content?.parts || []
+      let audioUrl = ''
+      for (const part of parts) {
+        if (part.inlineData?.mimeType?.startsWith('audio/')) {
+          audioUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+          break
+        }
+      }
+
+      if (audioUrl) {
+        return c.json({ success: true, audio_url: audioUrl, duration_seconds: 30, model: 'gemini-3.1-flash' })
+      }
+    }
+
+    // フォールバック: テキストのみ返す
+    return c.json({ success: true, audio_url: '', note: 'テキスト音楽生成はフォールバックモードです。Sunoで本格曲をお試しください。' })
+  } catch (e: any) {
+    console.error('learning-music error:', e.message)
+    return c.json({ success: false, error: e.message })
+  }
 })
 
 // ========== F5/F9: 思考発話モデリング（Think-Aloud）API ==========
