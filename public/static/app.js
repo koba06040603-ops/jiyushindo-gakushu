@@ -10129,10 +10129,119 @@ function renderAlgebraVisual(container, card) {
 function renderGeometryVisual(container, card) {
   const problem = card.problem_text || ''
   const unit = card.unit_name || ''
-  const all = problem + ' ' + unit
+  const title = card.card_title || ''
+  const all = problem + ' ' + unit + ' ' + title
   
   let shapesSvg = ''
-  if (/平行四辺形/.test(all)) {
+  let svgViewBox = '0 0 200 100'
+  let svgMaxHeight = '100px'
+  let tipText = ''
+
+  if (/平行線.*角|錯角|同位角|対頂角|∠.*平行|AB\s*\/\/|AB.*CD.*角|平行.*性質/.test(all)) {
+    // 平行線と角度の性質（錯角・同位角・対頂角）
+    svgViewBox = '0 0 300 160'
+    svgMaxHeight = '160px'
+    shapesSvg = `
+      <!-- 平行線 l, m -->
+      <line x1="20" y1="50" x2="280" y2="50" stroke="#3b82f6" stroke-width="2.5"/>
+      <line x1="20" y1="120" x2="280" y2="120" stroke="#3b82f6" stroke-width="2.5"/>
+      <!-- 平行マーク -->
+      <line x1="132" y1="44" x2="138" y2="56" stroke="#3b82f6" stroke-width="1.5"/>
+      <line x1="138" y1="44" x2="144" y2="56" stroke="#3b82f6" stroke-width="1.5"/>
+      <line x1="132" y1="114" x2="138" y2="126" stroke="#3b82f6" stroke-width="1.5"/>
+      <line x1="138" y1="114" x2="144" y2="126" stroke="#3b82f6" stroke-width="1.5"/>
+      <!-- 直線名 -->
+      <text x="284" y="54" font-size="12" fill="#3b82f6" font-weight="bold" font-style="italic">l</text>
+      <text x="284" y="124" font-size="12" fill="#3b82f6" font-weight="bold" font-style="italic">m</text>
+      <!-- 横断線 -->
+      <line x1="80" y1="10" x2="200" y2="155" stroke="#374151" stroke-width="2"/>
+      <!-- 角マーク：錯角（a と c） -->
+      <path d="M130,50 A15,15 0 0,1 141,62" fill="none" stroke="#ef4444" stroke-width="2"/>
+      <text x="147" y="63" font-size="11" fill="#ef4444" font-weight="bold">a</text>
+      <path d="M150,120 A15,15 0 0,1 139,108" fill="none" stroke="#ef4444" stroke-width="2"/>
+      <text x="127" y="112" font-size="11" fill="#ef4444" font-weight="bold">c</text>
+      <!-- 角マーク：同位角（a と b） -->
+      <path d="M130,50 A18,18 0 0,0 115,38" fill="none" stroke="#16a34a" stroke-width="2"/>
+      <text x="106" y="38" font-size="11" fill="#16a34a" font-weight="bold">b</text>
+      <path d="M150,120 A18,18 0 0,0 135,108" fill="none" stroke="#16a34a" stroke-width="2"/>
+      <text x="126" y="100" font-size="11" fill="#16a34a" font-weight="bold">b'</text>
+      <!-- 凡例 -->
+      <rect x="5" y="140" width="290" height="18" rx="3" fill="#f0f9ff"/>
+      <text x="150" y="153" text-anchor="middle" font-size="9" fill="#1e40af">
+        <tspan fill="#ef4444" font-weight="bold">a=c 錯角</tspan>　
+        <tspan fill="#16a34a" font-weight="bold">a=b' 同位角</tspan>　
+        l // m のとき等しい
+      </text>`
+    tipText = '平行線に横断線が交わると、錯角・同位角が等しくなります'
+  } else if (/合同/.test(all)) {
+    // 合同な三角形
+    svgViewBox = '0 0 300 120'
+    svgMaxHeight = '120px'
+    shapesSvg = `
+      <polygon points="20,100 100,100 60,25" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+      <text x="20" y="112" font-size="10" fill="#1d4ed8" font-weight="bold">A</text>
+      <text x="100" y="112" font-size="10" fill="#1d4ed8" font-weight="bold">B</text>
+      <text x="55" y="20" font-size="10" fill="#1d4ed8" font-weight="bold">C</text>
+      <text x="60" y="80" text-anchor="middle" font-size="9" fill="#3b82f6">≡</text>
+      <polygon points="170,100 250,100 210,25" fill="#fce7f3" stroke="#ec4899" stroke-width="2"/>
+      <text x="170" y="112" font-size="10" fill="#be185d" font-weight="bold">D</text>
+      <text x="250" y="112" font-size="10" fill="#be185d" font-weight="bold">E</text>
+      <text x="205" y="20" font-size="10" fill="#be185d" font-weight="bold">F</text>
+      <text x="135" y="65" text-anchor="middle" font-size="16" fill="#7c3aed" font-weight="bold">≡</text>
+      <!-- 条件 -->
+      <text x="150" y="115" text-anchor="middle" font-size="8" fill="#6b7280">3辺 / 2辺+挟角 / 1辺+両端角</text>`
+    tipText = '合同条件：3辺が等しい、2辺と挟角が等しい、1辺と両端の角が等しい'
+  } else if (/相似/.test(all)) {
+    // 相似な三角形
+    svgViewBox = '0 0 300 120'
+    svgMaxHeight = '120px'
+    shapesSvg = `
+      <polygon points="20,100 90,100 55,40" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+      <text x="20" y="112" font-size="9" fill="#1d4ed8" font-weight="bold">A</text>
+      <text x="90" y="112" font-size="9" fill="#1d4ed8" font-weight="bold">B</text>
+      <text x="50" y="36" font-size="9" fill="#1d4ed8" font-weight="bold">C</text>
+      <polygon points="150,105 270,105 210,15" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+      <text x="150" y="115" font-size="9" fill="#d97706" font-weight="bold">D</text>
+      <text x="270" y="115" font-size="9" fill="#d97706" font-weight="bold">E</text>
+      <text x="205" y="12" font-size="9" fill="#d97706" font-weight="bold">F</text>
+      <text x="120" y="70" text-anchor="middle" font-size="14" fill="#7c3aed" font-weight="bold">∽</text>
+      <text x="150" y="8" font-size="8" fill="#6b7280">相似比 = 対応する辺の比</text>`
+    tipText = '相似条件：3組の辺の比が等しい、2組の辺の比と挟角が等しい、2組の角がそれぞれ等しい'
+  } else if (/内角|外角|多角形.*角/.test(all)) {
+    // 内角・外角
+    svgViewBox = '0 0 300 130'
+    svgMaxHeight = '130px'
+    shapesSvg = `
+      <!-- 三角形 -->
+      <polygon points="30,110 130,110 80,25" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+      <path d="M45,110 A20,20 0 0,0 40,95" fill="none" stroke="#ef4444" stroke-width="2"/>
+      <text x="35" y="100" font-size="8" fill="#ef4444" font-weight="bold">a</text>
+      <path d="M115,110 A20,20 0 0,1 118,95" fill="none" stroke="#16a34a" stroke-width="2"/>
+      <text x="122" y="100" font-size="8" fill="#16a34a" font-weight="bold">b</text>
+      <path d="M73,38 A15,15 0 0,1 87,38" fill="none" stroke="#3b82f6" stroke-width="2"/>
+      <text x="78" y="48" font-size="8" fill="#3b82f6" font-weight="bold">c</text>
+      <text x="80" y="125" text-anchor="middle" font-size="8" fill="#7c3aed" font-weight="bold">a+b+c=180°</text>
+      <!-- 五角形 -->
+      <polygon points="220,20 265,55 250,105 190,105 175,55" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+      <text x="220" y="75" text-anchor="middle" font-size="8" fill="#d97706">五角形</text>
+      <text x="220" y="125" text-anchor="middle" font-size="8" fill="#d97706" font-weight="bold">内角和=(n-2)×180°</text>`
+    tipText = '三角形の内角の和は180°、n角形の内角の和は(n-2)×180°'
+  } else if (/二等辺三角形|正三角形/.test(all)) {
+    // 二等辺三角形・正三角形
+    svgViewBox = '0 0 280 110'
+    svgMaxHeight = '110px'
+    shapesSvg = `
+      <polygon points="50,95 130,95 90,15" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+      <!-- 等辺マーク -->
+      <line x1="67" y1="52" x2="73" y2="58" stroke="#ef4444" stroke-width="2"/>
+      <line x1="107" y1="52" x2="113" y2="58" stroke="#ef4444" stroke-width="2"/>
+      <text x="90" y="78" text-anchor="middle" font-size="8" fill="#1d4ed8" font-weight="bold">二等辺三角形</text>
+      <text x="90" y="108" text-anchor="middle" font-size="7" fill="#6b7280">底角が等しい</text>
+      <polygon points="190,95 260,95 225,15" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+      <text x="225" y="68" text-anchor="middle" font-size="8" fill="#16a34a" font-weight="bold">正三角形</text>
+      <text x="225" y="108" text-anchor="middle" font-size="7" fill="#6b7280">全角60°</text>`
+    tipText = '二等辺三角形は底角が等しく、正三角形は全ての辺と角が等しい（各60°）'
+  } else if (/平行四辺形/.test(all)) {
     shapesSvg = `<polygon points="40,80 100,80 120,20 60,20" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
       <text x="80" y="55" text-anchor="middle" font-size="10" fill="#1d4ed8">平行四辺形</text>
       <path d="M45,75 L45,25" stroke="#ef4444" stroke-width="1" stroke-dasharray="3"/><text x="35" y="50" font-size="8" fill="#ef4444">高さ</text>
@@ -10151,6 +10260,7 @@ function renderGeometryVisual(container, card) {
       <circle cx="80" cy="50" r="2" fill="#374151"/>
       <text x="80" y="95" text-anchor="middle" font-size="9" fill="#16a34a" font-weight="bold">円周=2πr</text>`
   } else {
+    // 一般的な図形（三角形・四角形）
     shapesSvg = `<polygon points="80,10 140,80 20,80" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
       <text x="80" y="58" text-anchor="middle" font-size="10" fill="#d97706">三角形</text>
       <path d="M80,10 L80,80" stroke="#ef4444" stroke-width="1" stroke-dasharray="3"/><text x="88" y="50" font-size="8" fill="#ef4444">高さ</text>
@@ -10166,8 +10276,11 @@ function renderGeometryVisual(container, card) {
         <span class="bg-violet-600 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-shapes mr-1"></i>みてわかる！図形</span>
       </div>
       <div class="bg-white rounded-lg p-3 border mb-3 text-center">
-        <svg viewBox="0 0 200 100" class="w-full mx-auto" style="max-height:100px">${shapesSvg}</svg>
+        <svg viewBox="${svgViewBox}" class="w-full mx-auto" style="max-height:${svgMaxHeight}">${shapesSvg}</svg>
       </div>
+      ${tipText ? `<div class="bg-violet-50 rounded-lg p-2 mb-3 border border-violet-200">
+        <p class="text-xs text-violet-700"><i class="fas fa-lightbulb mr-1 text-yellow-500"></i>${tipText}</p>
+      </div>` : ''}
       <div class="flex flex-wrap gap-2 justify-center">
         <a href="https://www.youtube.com/results?search_query=${searchQ}" target="_blank" rel="noopener"
            class="inline-flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition shadow">

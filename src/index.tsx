@@ -10090,7 +10090,7 @@ app.post('/api/ai/generate-course', async (c) => {
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
       "example_problem": "例題（具体的な数字と場面）",
       "example_solution": "解き方の丁寧な説明（途中式・図解の指示を含む）",
-      "real_world_connection": "実生活とのつながり（なぜこの学習が大切か）",
+      "real_world_connection": "実生活とのつながり（※問題内容に直接関係する具体例のみ記述すること）",
       "answer": "正解（具体的に）",
       "answer_explanation": "なぜその答えになるか（考え方の道筋を含む80-150字）",
       "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）",
@@ -31971,7 +31971,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "teacher_help_keywords": "【必須】わからないとき先生に聞くためのキーワード（例：『わり算、等分、あまり』）",
       "example_problem": "【必須】例題の問題文。本番の問題より少し簡単な、理解の足がかりになる問題（例：『6このクッキーを2人で同じ数ずつ分けると、1人何こ？』）",
       "example_solution": "【必須】例題の解き方。図解を含む丁寧な説明（例：『6÷2=3  6このクッキーを2つのグループに分けると、1グループ3こになります。答え：3こ』）",
-      "real_world_connection": "【推奨】実生活とのつながり（例：『お菓子を友だちと分けるとき、何個ずつになるか考えるときにわり算を使うよ！』）",
+      "real_world_connection": "【推奨】実生活とのつながり。※問題の数学的内容に直接関連する具体例を書くこと。（例：わり算→『お菓子を友だちと分けるとき、何個ずつになるか考えるときにわり算を使うよ！』、角度→『建物の屋根や橋は角度を計算して設計されているよ！』）。問題と無関係な例を書かないこと",
       "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
       "problem_description": "問題の背景や文脈の補足（problem_textとは異なる内容にすること）",
       "correct_answer": "正解（具体的な数値・回答）",
@@ -32028,7 +32028,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   - new_terms: 全カード必須。新出用語・概念がない場合も復習キーワードを入れること
   - example_problem: 全カード必須。本番問題より易しい例題を用意し、理解の足がかりとすること
   - example_solution: 全カード必須。例題の解き方を図解付きで丁寧に説明すること
-  - real_world_connection: 推奨。実生活との関連を記述して学習意欲を高めること
+  - real_world_connection: 推奨。実生活との関連を記述して学習意欲を高めること。※必ず「その問題の数学的内容」に直接関連する実例を書くこと。例：「角度の性質」→「建築や橋の設計で角度の計算が使われる」。無関係な例（線路のレールなど）は絶対に書かないこと
   - hints: 全カード必須。3段階のヒントをhint_level, hint_text, thinking_tool_suggestionの構造で記述すること
 ※ multimediaフィールドでは、教育動画を可能な限り提案すること。youtube_urlにはYouTube動画の実在URLのみを入力し、NHK for Schoolの場合はyoutube_titleに「NHK for School」と明記した上でyoutube_urlには https://www.youtube.com/results?search_query=NHK+for+School+{検索キーワード} 形式のYouTube検索URLを使用すること（NHKの直接URLは使用不可）
 ※ 【★最重要★】image_description は全カード必須。教科書を使わず学習カードだけで児童が個別学習できるレベルの詳細な図解説明を書くこと
