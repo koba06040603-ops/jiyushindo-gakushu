@@ -8720,9 +8720,10 @@ app.get('/guide/:curriculumId', async (c) => {
   }
 
   // 吹き出し表示関数
-  function showCoachBubble(message, type, duration) {
+  function showCoachBubble(message, type, duration, speakAloud) {
     type = type || 'info';
     duration = duration || 6000;
+    speakAloud = speakAloud !== false; // デフォルトで読み上げる
     window._coachBubbleCount++;
     var bubbleId = 'coach-bubble-' + window._coachBubbleCount;
     var colors = {
@@ -8741,8 +8742,22 @@ app.get('/guide/:curriculumId', async (c) => {
     bubble.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);max-width:360px;width:calc(100% - 32px);background:' + c.bg + ';border:2px solid ' + c.border + ';border-radius:16px;padding:12px 16px;box-shadow:0 8px 25px rgba(0,0,0,0.15);z-index:1000;animation:coachSlideUp 0.4s ease-out forwards;display:flex;align-items:flex-start;gap:10px;';
     bubble.innerHTML = '<span style="font-size:1.3rem;flex-shrink:0;">' + c.icon + '</span>' +
       '<div style="flex:1;"><p style="font-size:0.85rem;color:' + c.text + ';font-weight:bold;line-height:1.5;">' + message + '</p></div>' +
+      '<button onclick="speakGuideText(null, null); this.title=\\x27読み上げ\\x27" data-text="' + message.replace(/"/g, '&quot;').replace(/<[^>]*>/g, '').substring(0, 300) + '" style="background:none;border:none;cursor:pointer;font-size:1rem;opacity:0.6;flex-shrink:0;" title="読み上げ"><i class="fas fa-volume-up"></i></button>' +
       '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:' + c.text + ';cursor:pointer;font-size:1rem;opacity:0.5;flex-shrink:0;">✕</button>';
     document.body.appendChild(bubble);
+    
+    // 合いの手を音声でも読み上げ（TTS有効時）
+    if (speakAloud && message.length < 100) {
+      var plainText = message.replace(/<[^>]*>/g, '');
+      if (plainText.length > 2 && !_ttsPlaying) {
+        // 短い声がけのみ自動読み上げ（長文は手動で）
+        setTimeout(function() {
+          var fakeEl = { getAttribute: function() { return plainText; }, querySelector: function() { return null; } };
+          speakGuideText(fakeEl);
+        }, 500);
+      }
+    }
+    
     setTimeout(function() {
       var el = document.getElementById(bubbleId);
       if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.5s'; setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 500); }
@@ -9206,21 +9221,108 @@ app.get('/guide/:curriculumId', async (c) => {
     resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  // === 音声読み上げ ===
-  function speakGuideText(el) {
-    if (!('speechSynthesis' in window)) { alert('このブラウザは音声読み上げに対応していません。'); return; }
+  // === 音声読み上げ（Gemini TTS + Web Speech API フォールバック） ===
+  var _ttsAudioCtx = null;
+  var _ttsPlaying = false;
+  var _ttsCurrentSource = null;
+
+  function speakGuideText(el, moodOverride) {
     var text = '';
     if (el && el.getAttribute) text = el.getAttribute('data-text') || '';
     if (!text && el) text = el.innerText || '';
     if (!text) { var card = ALL_CARDS[currentPage]; text = card ? (card.problem_text || card.card_title || '') : ''; }
     if (!text) return;
-    if (speechSynthesis.speaking) { speechSynthesis.cancel(); return; }
+
+    // 再生中ならストップ
+    if (_ttsPlaying) {
+      if (_ttsCurrentSource) { try { _ttsCurrentSource.stop(); } catch(e){} }
+      if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel();
+      _ttsPlaying = false;
+      return;
+    }
+
+    _ttsPlaying = true;
+
+    // ボタンUIを変更
+    if (el && el.querySelector) {
+      var icon = el.querySelector('i.fa-volume-up');
+      if (icon) { icon.className = 'fas fa-spinner fa-spin'; }
+    }
+
+    // Gemini TTS APIを呼び出す
+    var currentMood = moodOverride || (window._currentMood || '');
+    fetch('/api/ai/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.substring(0, 2000), mood: currentMood, voiceType: 'female-friendly' })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.audioContent && data.audioFormat === 'pcm') {
+        // Gemini TTS: PCM 24kHz 16bit mono → Web Audio API で再生
+        playPcmAudio(data.audioContent, data.sampleRate || 24000, function() {
+          _ttsPlaying = false;
+          restoreVolumeIcon(el);
+        });
+      } else if (data.success && data.audioContent) {
+        // MP3形式のフォールバック
+        var audioSrc = 'data:audio/mp3;base64,' + data.audioContent;
+        var audio = new Audio(audioSrc);
+        audio.onended = function() { _ttsPlaying = false; restoreVolumeIcon(el); };
+        audio.onerror = function() { fallbackWebSpeech(text, el); };
+        audio.play().catch(function() { fallbackWebSpeech(text, el); });
+      } else {
+        fallbackWebSpeech(text, el);
+      }
+    })
+    .catch(function() {
+      fallbackWebSpeech(text, el);
+    });
+  }
+
+  function playPcmAudio(base64Data, sampleRate, onEnd) {
+    try {
+      if (!_ttsAudioCtx) _ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var raw = atob(base64Data);
+      var bytes = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      // 16bit PCM → Float32
+      var samples = bytes.length / 2;
+      var float32 = new Float32Array(samples);
+      var dv = new DataView(bytes.buffer);
+      for (var j = 0; j < samples; j++) {
+        float32[j] = dv.getInt16(j * 2, true) / 32768.0;
+      }
+      var buffer = _ttsAudioCtx.createBuffer(1, float32.length, sampleRate);
+      buffer.getChannelData(0).set(float32);
+      var source = _ttsAudioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(_ttsAudioCtx.destination);
+      source.onended = onEnd;
+      _ttsCurrentSource = source;
+      source.start(0);
+    } catch (e) {
+      console.warn('PCM再生エラー:', e);
+      if (onEnd) onEnd();
+    }
+  }
+
+  function fallbackWebSpeech(text, el) {
+    if (!('speechSynthesis' in window)) { _ttsPlaying = false; restoreVolumeIcon(el); return; }
     var u = new SpeechSynthesisUtterance(text);
     u.lang = 'ja-JP'; u.rate = 0.85; u.pitch = 1.1;
     var voices = speechSynthesis.getVoices();
     var jpV = voices.find(function(v){return v.lang.startsWith('ja');});
     if (jpV) u.voice = jpV;
+    u.onend = function() { _ttsPlaying = false; restoreVolumeIcon(el); };
     speechSynthesis.speak(u);
+  }
+
+  function restoreVolumeIcon(el) {
+    if (el && el.querySelector) {
+      var icon = el.querySelector('i.fa-spinner');
+      if (icon) { icon.className = 'fas fa-volume-up'; }
+    }
   }
   if ('speechSynthesis' in window && speechSynthesis.onvoiceschanged !== undefined) {
     speechSynthesis.onvoiceschanged = function() { speechSynthesis.getVoices(); };
@@ -9242,7 +9344,11 @@ app.get('/guide/:curriculumId', async (c) => {
     } else if (/時計|なんじ|とけい/.test(t)) {
       renderClockWidget(container);
     } else {
-      container.innerHTML = '<div style="padding:12px;text-align:center;"><button onclick="this.classList.toggle(\\x27active\\x27);this.style.background=this.classList.contains(\\x27active\\x27)?\\x27#10B981\\x27:\\x27#E5E7EB\\x27;this.style.color=this.classList.contains(\\x27active\\x27)?\\x27white\\x27:\\x27#374151\\x27;" style="background:#E5E7EB;color:#374151;border:none;padding:10px 20px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:0.9rem;transition:all 0.2s;"><i class="fas fa-check" style="margin-right:6px;"></i>やってみた！</button></div>';
+      container.innerHTML = '<div style="padding:12px;text-align:center;">' +
+        '<button onclick="this.classList.toggle(\\x27active\\x27);this.style.background=this.classList.contains(\\x27active\\x27)?\\x27#10B981\\x27:\\x27#E5E7EB\\x27;this.style.color=this.classList.contains(\\x27active\\x27)?\\x27white\\x27:\\x27#374151\\x27;" style="background:#E5E7EB;color:#374151;border:none;padding:10px 20px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:0.9rem;transition:all 0.2s;margin-right:8px;"><i class="fas fa-check" style="margin-right:6px;"></i>やってみた！</button>' +
+        '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:#7C3AED;color:white;border:none;padding:10px 20px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:0.9rem;transition:all 0.2s;"><i class="fas fa-video" style="margin-right:6px;"></i>AI動画をつくる</button>' +
+        '<div id="ai-video-area-' + page + '" style="margin-top:12px;"></div>' +
+        '</div>';
     }
   }
 
@@ -9292,6 +9398,105 @@ app.get('/guide/:curriculumId', async (c) => {
         dotsHtml += '<div style="width:6px;height:6px;border-radius:2px;background:' + (i<val?'#10b981':'#e5e7eb') + ';"></div>';
       }
       dots.innerHTML = dotsHtml;
+    }
+  }
+
+  // === AI動画生成（Veo 3.1）===
+  function requestAIVideo(page) {
+    var card = ALL_CARDS[page];
+    if (!card) return;
+    var btn = document.getElementById('ai-video-btn-' + page);
+    var area = document.getElementById('ai-video-area-' + page);
+    if (!area) return;
+    
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>動画を生成中...'; }
+    area.innerHTML = '<div style="padding:16px;text-align:center;background:#F5F3FF;border-radius:12px;"><i class="fas fa-film" style="font-size:2rem;color:#7C3AED;margin-bottom:8px;display:block;"></i><p style="font-size:0.85rem;color:#5B21B6;font-weight:bold;">AI動画を生成しています...<br><span style="font-weight:normal;font-size:0.75rem;">30〜60秒ほどかかります</span></p></div>';
+    
+    var prompt = (card._tactile_activity || card.card_title || '') + '。' + (card.problem_text || '').substring(0, 200);
+    
+    fetch('/api/ai/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt,
+        card_id: card.card_id || card.id,
+        card_title: card.card_title,
+        subject: window._currentSubject || '',
+        grade: window._currentGrade || '',
+        tactile_type: detectTactileType(card)
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.operationName) {
+        pollVideoStatus(data.operationName, page);
+      } else {
+        showVideoError(page, data.error || '動画生成を開始できませんでした');
+      }
+    })
+    .catch(function(e) {
+      showVideoError(page, 'ネットワークエラー: ' + e.message);
+    });
+  }
+
+  function detectTactileType(card) {
+    var t = ((card._tactile_activity || '') + ' ' + (card.card_title || '') + ' ' + (card.problem_text || '')).toLowerCase();
+    if (/数え|かぞ|おはじき|ブロック|いくつ/.test(t)) return 'counting';
+    if (/図形|三角|四角|円|面積|体積|展開/.test(t)) return 'geometry';
+    if (/実験|観察|やってみ/.test(t)) return 'experiment';
+    if (/植物|動物|天気|星|月|太陽|自然/.test(t)) return 'nature';
+    return 'general';
+  }
+
+  function pollVideoStatus(operationName, page) {
+    var pollCount = 0;
+    var maxPolls = 30; // 最大5分（10秒×30回）
+    
+    function poll() {
+      pollCount++;
+      if (pollCount > maxPolls) {
+        showVideoError(page, '動画生成がタイムアウトしました。もう一度お試しください。');
+        return;
+      }
+      
+      fetch('/api/ai/video-status?operation=' + encodeURIComponent(operationName))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.done && data.videoUrl) {
+          // 完了！動画を表示
+          var area = document.getElementById('ai-video-area-' + page);
+          var btn = document.getElementById('ai-video-btn-' + page);
+          if (btn) { btn.innerHTML = '<i class="fas fa-check" style="margin-right:6px;"></i>動画完成！'; btn.style.background = '#10B981'; }
+          if (area) {
+            area.innerHTML = '<div style="margin-top:8px;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.1);">' +
+              '<video controls playsinline style="width:100%;max-height:300px;border-radius:12px;" poster="">' +
+              '<source src="/api/ai/video-download?uri=' + encodeURIComponent(data.videoUrl) + '" type="video/mp4">' +
+              'お使いのブラウザは動画再生に対応していません。' +
+              '</video>' +
+              '<p style="text-align:center;font-size:0.7rem;color:#6b7280;padding:4px;">🎬 AI先生が作った学習動画</p>' +
+              '</div>';
+          }
+        } else if (data.done && !data.videoUrl) {
+          showVideoError(page, data.error || '動画生成に失敗しました');
+        } else {
+          // まだ生成中 → 10秒後に再チェック
+          setTimeout(poll, 10000);
+        }
+      })
+      .catch(function() {
+        setTimeout(poll, 10000);
+      });
+    }
+    
+    setTimeout(poll, 10000); // 最初のチェックは10秒後
+  }
+
+  function showVideoError(page, message) {
+    var area = document.getElementById('ai-video-area-' + page);
+    var btn = document.getElementById('ai-video-btn-' + page);
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-video" style="margin-right:6px;"></i>もう一度試す'; btn.style.background = '#7C3AED'; }
+    if (area) {
+      area.innerHTML = '<p style="font-size:0.8rem;color:#EF4444;padding:8px;text-align:center;"><i class="fas fa-exclamation-triangle" style="margin-right:4px;"></i>' + message + '</p>';
     }
   }
 
@@ -10706,129 +10911,147 @@ app.post('/api/ai/ocr', async (c) => {
   }
 })
 
-// APIルート：Google Cloud Text-to-Speech（音声合成）
+// APIルート：Gemini TTS 音声合成（Gemini 2.5 Flash Preview TTS）
+// 日本語対応・30種のボイス・感情コントロール可能
 app.post('/api/ai/tts', async (c) => {
   const { env } = c
-  const { text, voiceType = 'female-friendly', speed = 1.0, pitch = 0 } = await c.req.json()
+  const { text, voiceType = 'female-friendly', speed = 1.0, mood, style } = await c.req.json()
   
-  const apiKey = env.GOOGLE_CLOUD_API_KEY
+  const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
   
-  // APIキーがない場合は、Web Speech API へフォールバックすることをクライアントに通知
-  if (!apiKey || apiKey === 'your-google-cloud-api-key-here') {
-    console.log('⚠️ Google Cloud APIキーが未設定 → Web Speech API を使用')
+  if (!geminiApiKey) {
+    console.log('⚠️ Gemini APIキーが未設定 → Web Speech API を使用')
     return c.json({
       success: false,
       fallbackToWebSpeech: true,
-      error: 'Google Cloud API キーが設定されていません'
+      error: 'Gemini API キーが設定されていません'
     })
   }
   
+  if (!text || text.trim().length < 1) {
+    return c.json({ success: false, error: 'テキストが空です' }, 400)
+  }
+  
   try {
-    console.log('🎤 Google Cloud TTS API 呼び出し:', {
-      textLength: text.length,
-      voiceType,
-      speed,
-      pitch
-    })
+    const startTime = Date.now()
     
-    // 音声タイプに応じた設定
-    let voiceConfig: any = {
-      languageCode: 'ja-JP',
-      ssmlGender: 'FEMALE'
-    }
-    
-    // 音声名の選択
+    // ボイスタイプに応じたGemini TTS ボイス選択
+    // Kore=Firm, Puck=Upbeat, Aoede=Breezy, Leda=Youthful, 
+    // Sulafat=Warm, Achird=Friendly, Achernar=Soft, Fenrir=Excitable
+    let voiceName = 'Aoede'  // デフォルト: やさしい雰囲気
     switch(voiceType) {
       case 'female-friendly':
-        voiceConfig.name = 'ja-JP-Neural2-B'  // 優しい女性の声
-        break
-      case 'male-friendly':
-        voiceConfig.name = 'ja-JP-Neural2-C'  // 優しい男性の声
-        voiceConfig.ssmlGender = 'MALE'
+        voiceName = 'Aoede'    // Breezy — やさしい女性的ボイス
         break
       case 'female-energetic':
-        voiceConfig.name = 'ja-JP-Neural2-A'  // 元気な女性の声
+        voiceName = 'Leda'     // Youthful — 元気な若い声
+        break
+      case 'male-friendly':
+        voiceName = 'Sulafat'  // Warm — あたたかい男性的ボイス
         break
       case 'male-energetic':
-        voiceConfig.name = 'ja-JP-Neural2-D'  // 元気な男性の声
-        voiceConfig.ssmlGender = 'MALE'
+        voiceName = 'Puck'     // Upbeat — 元気な男性的ボイス
+        break
+      case 'calm':
+        voiceName = 'Achernar' // Soft — おだやかな声
+        break
+      case 'excited':
+        voiceName = 'Fenrir'   // Excitable — ワクワクした声
         break
       default:
-        voiceConfig.name = 'ja-JP-Neural2-B'
+        voiceName = 'Aoede'
     }
     
-    // Google Cloud TTS API リクエスト
-    const requestBody = {
-      input: { text },
-      voice: voiceConfig,
-      audioConfig: {
-        audioEncoding: 'MP3',
-        speakingRate: Math.max(0.25, Math.min(4.0, speed)),  // 0.25-4.0 の範囲
-        pitch: Math.max(-20, Math.min(20, pitch))  // -20 ~ 20 の範囲
-      }
+    // 気分に応じたスタイル指示を構築
+    let stylePrompt = ''
+    if (mood === 'tired' || mood === 'sad') {
+      stylePrompt = 'ゆっくり、やさしく、落ち着いた声で読んでください。'
+      voiceName = 'Achernar' // Soft
+    } else if (mood === 'anxious' || mood === 'frustrated') {
+      stylePrompt = 'やさしく、ていねいに、安心できるように読んでください。'
+      voiceName = 'Sulafat' // Warm
+    } else if (mood === 'excited') {
+      stylePrompt = '明るく、楽しそうに、テンポよく読んでください。'
+      voiceName = 'Fenrir' // Excitable
+    } else {
+      stylePrompt = 'やさしい先生のように、わかりやすく読んでください。'
     }
     
-    const response = await fetch(
-      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
+    // カスタムスタイル指示がある場合は上書き
+    if (style) {
+      stylePrompt = style
+    }
+    
+    const ttsPrompt = `${stylePrompt}\n\n${text.substring(0, 5000)}`
+    
+    console.log('🎤 Gemini TTS API 呼び出し:', {
+      textLength: text.length,
+      voiceName,
+      mood: mood || 'none',
+      style: stylePrompt.substring(0, 50)
+    })
+    
+    const ttsResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`,
       {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'x-goog-api-key': geminiApiKey,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: ttsPrompt }]
+          }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: voiceName
+                }
+              }
+            }
+          }
+        })
       }
     )
     
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ Google Cloud TTS API エラー:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorBody: errorText
-      })
-      
-      let errorMessage = `Google Cloud TTS API エラー: ${response.status} ${response.statusText}`
-      
-      // エラーメッセージを詳細に解析
-      try {
-        const errorJson = JSON.parse(errorText)
-        errorMessage += ` - ${errorJson.error?.message || '詳細不明'}`
-      } catch (e) {
-        errorMessage += ` - ${errorText}`
-      }
-      
-      throw new Error(errorMessage)
+    if (!ttsResponse.ok) {
+      const errorText = await ttsResponse.text()
+      console.error('❌ Gemini TTS API エラー:', ttsResponse.status, errorText.substring(0, 200))
+      throw new Error(`Gemini TTS API エラー: ${ttsResponse.status}`)
     }
     
-    const data = await response.json()
+    const ttsData = await ttsResponse.json() as any
+    const audioPart = ttsData.candidates?.[0]?.content?.parts?.[0]
     
-    if (data.audioContent) {
-      console.log('✅ Google Cloud TTS 音声生成成功')
+    if (audioPart?.inlineData?.data) {
+      const generationTime = Date.now() - startTime
+      console.log(`✅ Gemini TTS 音声生成成功 (${generationTime}ms, voice=${voiceName})`)
+      
       return c.json({
         success: true,
-        audioContent: data.audioContent,  // base64 encoded MP3
-        method: 'google-cloud-tts'
+        audioContent: audioPart.inlineData.data,  // base64 encoded PCM (24kHz, 16bit, mono)
+        audioFormat: 'pcm',  // PCM形式（WAVヘッダーなし）
+        sampleRate: 24000,
+        channels: 1,
+        bitsPerSample: 16,
+        method: 'gemini-tts',
+        voice: voiceName,
+        generation_time_ms: generationTime
       })
     } else {
       throw new Error('音声データが生成されませんでした')
     }
     
   } catch (error: any) {
-    console.error('❌ TTSエラー:', error)
-    console.error('❌ TTSエラー詳細:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    })
+    console.error('❌ TTSエラー:', error.message)
     
     return c.json({
       success: false,
       fallbackToWebSpeech: true,
-      error: error.message,
-      errorDetails: {
-        name: error.name,
-        message: error.message
-      }
+      error: error.message
     }, 500)
   }
 })
@@ -20421,6 +20644,211 @@ app.post('/api/media/generate-image', async (c) => {
   })
 })
 
+// ========== Veo 3.1 AI動画生成API ==========
+// 触覚刺激動画・さわってまなぼう用のリアルAI動画生成
+// 非同期: リクエスト → operationName返却 → クライアントがポーリング → 完了時にビデオURL返却
+
+// Step 1: 動画生成リクエスト開始
+app.post('/api/ai/generate-video', async (c) => {
+  const { env } = c
+  const { prompt, card_id, card_title, subject, grade, tactile_type, aspect_ratio } = await c.req.json()
+  
+  const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
+  if (!geminiApiKey) {
+    return c.json({ success: false, error: 'Gemini API キーが設定されていません' }, 500)
+  }
+  
+  if (!prompt || prompt.trim().length < 5) {
+    return c.json({ success: false, error: 'プロンプトを入力してください（5文字以上）' }, 400)
+  }
+  
+  try {
+    const startTime = Date.now()
+    
+    // 教育用動画プロンプト構築
+    let videoPrompt = ''
+    if (tactile_type) {
+      // さわってまなぼう用: 触覚体験を補完する短い動画
+      const tactileContext = `日本の${grade || '小学校'}${subject || '算数'}の授業で使う教育動画。`
+      const toneGuide = 'やさしい色使い、ゆっくりとした動き、子どもが見て理解しやすい。テキストは日本語。'
+      
+      switch(tactile_type) {
+        case 'counting':
+          videoPrompt = `${tactileContext} ${prompt}。物がゆっくり一つずつ出現し、数が増えていく様子をアニメーションで見せる。${toneGuide}`
+          break
+        case 'geometry':
+          videoPrompt = `${tactileContext} ${prompt}。図形がゆっくり回転したり展開したりして、形の特徴がわかるようにする。${toneGuide}`
+          break
+        case 'experiment':
+          videoPrompt = `${tactileContext} ${prompt}。実験の手順を一つずつ見せる。安全で楽しそうな雰囲気。${toneGuide}`
+          break
+        case 'nature':
+          videoPrompt = `${tactileContext} ${prompt}。自然の様子をゆっくり観察するような映像。美しい色彩。${toneGuide}`
+          break
+        default:
+          videoPrompt = `${tactileContext} ${prompt}。${toneGuide}`
+      }
+    } else {
+      videoPrompt = prompt.substring(0, 2000)
+    }
+    
+    if (card_title) videoPrompt += ` テーマ: ${card_title}`
+    
+    console.log('🎬 Veo 3.1 動画生成リクエスト:', videoPrompt.substring(0, 100))
+    
+    // Veo 3.1 API: predictLongRunning
+    const veoResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning`,
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': geminiApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          instances: [{
+            prompt: videoPrompt
+          }],
+          parameters: {
+            aspectRatio: aspect_ratio || '16:9'
+          }
+        })
+      }
+    )
+    
+    if (!veoResponse.ok) {
+      const errorText = await veoResponse.text()
+      console.error('❌ Veo 3.1 API エラー:', veoResponse.status, errorText.substring(0, 300))
+      throw new Error(`Veo 3.1 API エラー: ${veoResponse.status}`)
+    }
+    
+    const veoData = await veoResponse.json() as any
+    const operationName = veoData.name
+    
+    if (!operationName) {
+      throw new Error('Operation name が取得できませんでした')
+    }
+    
+    const requestTime = Date.now() - startTime
+    console.log(`✅ Veo 3.1 動画生成開始 (${requestTime}ms), operation: ${operationName}`)
+    
+    return c.json({
+      success: true,
+      operationName: operationName,
+      status: 'processing',
+      message: '動画を生成中です。30〜60秒ほどお待ちください。',
+      request_time_ms: requestTime
+    })
+    
+  } catch (error: any) {
+    console.error('❌ Veo 3.1 動画生成エラー:', error.message)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// Step 2: 動画生成ステータスチェック（ポーリング用）
+app.get('/api/ai/video-status', async (c) => {
+  const { env } = c
+  const operationName = c.req.query('operation')
+  
+  const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
+  if (!geminiApiKey || !operationName) {
+    return c.json({ success: false, error: 'パラメータ不足' }, 400)
+  }
+  
+  try {
+    const statusResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/${operationName}`,
+      {
+        method: 'GET',
+        headers: {
+          'x-goog-api-key': geminiApiKey,
+        }
+      }
+    )
+    
+    if (!statusResponse.ok) {
+      throw new Error(`ステータス取得エラー: ${statusResponse.status}`)
+    }
+    
+    const statusData = await statusResponse.json() as any
+    
+    if (statusData.done) {
+      // 完了！ビデオURIを取得
+      const videoUri = statusData.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri
+      
+      if (videoUri) {
+        // ビデオをダウンロードしてbase64で返す（Cloudflare Workers環境で直接ファイル保存不可のため）
+        console.log('✅ Veo 3.1 動画生成完了:', videoUri.substring(0, 80))
+        
+        return c.json({
+          success: true,
+          done: true,
+          videoUrl: videoUri,  // Gemini API認証付きURL
+          status: 'completed',
+          message: '動画が完成しました！'
+        })
+      } else {
+        return c.json({
+          success: false,
+          done: true,
+          status: 'failed',
+          error: '動画生成に失敗しました',
+          details: JSON.stringify(statusData.response || statusData.error || {}).substring(0, 500)
+        })
+      }
+    } else {
+      return c.json({
+        success: true,
+        done: false,
+        status: 'processing',
+        message: '動画を生成中です...'
+      })
+    }
+    
+  } catch (error: any) {
+    console.error('❌ ステータスチェックエラー:', error.message)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// Step 3: Veo 動画ダウンロードプロキシ（APIキー認証が必要なため）
+app.get('/api/ai/video-download', async (c) => {
+  const { env } = c
+  const videoUri = c.req.query('uri')
+  
+  const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
+  if (!geminiApiKey || !videoUri) {
+    return c.json({ success: false, error: 'パラメータ不足' }, 400)
+  }
+  
+  try {
+    const videoResponse = await fetch(videoUri, {
+      headers: {
+        'x-goog-api-key': geminiApiKey,
+      },
+      redirect: 'follow'
+    })
+    
+    if (!videoResponse.ok) {
+      throw new Error(`動画ダウンロードエラー: ${videoResponse.status}`)
+    }
+    
+    const videoData = await videoResponse.arrayBuffer()
+    
+    return new Response(videoData, {
+      headers: {
+        'Content-Type': 'video/mp4',
+        'Content-Disposition': 'inline; filename="learning-video.mp4"',
+        'Cache-Control': 'public, max-age=3600'
+      }
+    })
+  } catch (error: any) {
+    console.error('❌ 動画ダウンロードエラー:', error.message)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 // メディア生成API - 動画生成（Canvas アニメーション）
 app.post('/api/media/generate-video', async (c) => {
   const { prompt, duration } = await c.req.json()
@@ -25087,17 +25515,17 @@ JSON形式で出力してください:`
             })
           }
         }
-        console.log('💡 Nano Banana Pro失敗、Nano Bananaにフォールバック...')
+        console.log('💡 Nano Banana Pro失敗、Nano Banana 2にフォールバック...')
       } catch (proErr: any) {
         console.warn('⚠️ Nano Banana Proエラー:', proErr.message)
       }
     }
     
-    // Nano Banana (gemini-2.5-flash-image) で画像生成
+    // Nano Banana 2 (gemini-3.1-flash-image-preview) で画像生成【デフォルト】
     try {
-      console.log('🎨 Nano Banana (gemini-2.5-flash-image) で画像生成...')
+      console.log('🎨 Nano Banana 2 (gemini-3.1-flash-image-preview) で画像生成...')
       const geminiImageResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
         {
           method: 'POST',
           headers: {
@@ -25151,14 +25579,82 @@ JSON形式で出力してください:`
             type: 'image',
             prompt: userPrompt.substring(0, 300),
             generation_time_ms: generationTime,
-            model: 'Nano Banana (gemini-2.5-flash-image)',
+            model: 'Nano Banana 2 (gemini-3.1-flash-image)',
             ai_description: responseText.substring(0, 200),
-            message: 'Gemini ネイティブ画像生成で図を作成しました'
+            message: 'Nano Banana 2 で画像を生成しました'
           })
         }
       }
     } catch (imgErr: any) {
-      console.warn('⚠️ Nano Banana画像生成エラー:', imgErr.message)
+      console.warn('⚠️ Nano Banana 2画像生成エラー:', imgErr.message)
+    }
+    
+    // フォールバック: 旧 Nano Banana (gemini-2.5-flash-image)
+    try {
+      console.log('💡 フォールバック: Nano Banana (gemini-2.5-flash-image)...')
+      const nbResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent`,
+        {
+          method: 'POST',
+          headers: {
+            'x-goog-api-key': geminiApiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: `${systemInstruction}\n\n${userPrompt}\n\nこの内容に合った正確な教育用の図を1つ生成してください。` }]
+              }
+            ],
+            generationConfig: {
+              responseModalities: ['TEXT', 'IMAGE'],
+              temperature: 0.4,
+            }
+          })
+        }
+      )
+      
+      if (nbResponse.ok) {
+        const nbData = await nbResponse.json() as any
+        const parts = nbData.candidates?.[0]?.content?.parts || []
+        
+        let imageUrl = ''
+        let responseText = ''
+        
+        for (const part of parts) {
+          if (part.inlineData) {
+            const mimeType = part.inlineData.mimeType || 'image/png'
+            imageUrl = `data:${mimeType};base64,${part.inlineData.data}`
+          }
+          if (part.text) responseText += part.text
+        }
+        
+        if (imageUrl) {
+          if (card_id) {
+            try {
+              await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
+                .bind(imageUrl, Number(card_id)).run()
+            } catch (dbErr: any) {
+              console.warn('⚠️ DB保存失敗:', dbErr.message)
+            }
+          }
+          
+          const generationTime = Date.now() - startTime
+          return c.json({
+            success: true,
+            image_url: imageUrl,
+            type: 'image',
+            prompt: userPrompt.substring(0, 300),
+            generation_time_ms: generationTime,
+            model: 'Nano Banana (gemini-2.5-flash-image)',
+            ai_description: responseText.substring(0, 200),
+            message: 'Nano Banana で画像を生成しました（フォールバック）'
+          })
+        }
+      }
+    } catch (nbErr: any) {
+      console.warn('⚠️ Nano Bananaフォールバックエラー:', nbErr.message)
     }
     
     // フォールバック: Imagen 4
