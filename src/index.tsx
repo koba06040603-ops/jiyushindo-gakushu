@@ -3476,6 +3476,30 @@ app.get('/api/curriculum/:id/metadata', async (c) => {
   }
 })
 
+// APIルート：カリキュラムメタデータの個別保存（guide編集用）
+app.post('/api/curriculum/:id/metadata', async (c) => {
+  const { env } = c
+  const id = c.req.param('id')
+  const body = await c.req.json() as any
+  
+  try {
+    const { meta_key, meta_value } = body
+    if (!meta_key || !meta_value) {
+      return c.json({ error: 'meta_key and meta_value are required' }, 400)
+    }
+    
+    await env.DB.prepare(`
+      INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+      ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
+    `).bind(id, meta_key, meta_value).run()
+    
+    return c.json({ success: true })
+  } catch (error: any) {
+    console.error('メタデータ保存エラー:', error)
+    return c.json({ error: error.message }, 500)
+  }
+})
+
 // APIルート：カリキュラムメタデータの更新
 app.put('/api/curriculum/:id/metadata', async (c) => {
   const { env } = c
@@ -7721,8 +7745,8 @@ app.get('/guide/:curriculumId', async (c) => {
       }
       if (personalizedOptionalProblems.length === 0 && cards.length > 0) {
         personalizedOptionalProblems = [
-          { problem_title: 'ふりかえり問題', problem_content: `今日学んだ${curriculum.unit_name}の内容で、一番大切だと思ったことを書きましょう。なぜそう思ったかも説明してください。` },
-          { problem_title: 'チャレンジ問題', problem_content: `${curriculum.unit_name}の内容を使って、自分でオリジナルの問題を1つ作ってみましょう。その答えも考えてください。` },
+          { problem_title: `${curriculum.unit_name}でお買い物チャレンジ`, problem_content: `今日学んだ「${curriculum.unit_name}」の内容を使って、お買い物の場面で使える問題を考えてみよう。たとえば、おかしを3つ買ったら全部でいくらになるかな？自分で数をきめて計算してみよう。` },
+          { problem_title: `友だちにクイズを出そう！`, problem_content: `「${curriculum.unit_name}」で学んだことを使って、友だちに出すクイズを1問つくってみよう。答えも書いてね。友だちが「おもしろい！」と思うクイズにしよう。` },
         ]
       }
       // 個別コースの場合は個別用を使う
@@ -8020,6 +8044,8 @@ app.get('/guide/:curriculumId', async (c) => {
     @media print { .no-print { display: none !important; } .card-page { display: block !important; page-break-after: always; } }
     @media (max-width: 640px) { .header h1 { font-size: 1.4rem; } .card-box { padding: 16px; } .help-btn { min-width: 65px; padding: 8px 10px; font-size: 0.75rem; } .help-btn i { font-size: 1.1rem; } }
     .percentage-widget input[type=range] { width: 100%; accent-color: #10b981; cursor: pointer; }
+    .edit-highlight { animation: editPulse 0.5s ease; }
+    @keyframes editPulse { 0% { box-shadow: 0 0 0 0 rgba(245,158,11,0.5); } 100% { box-shadow: 0 0 0 8px rgba(245,158,11,0); } }
   </style>
 </head>
 <body>
@@ -8035,6 +8061,8 @@ app.get('/guide/:curriculumId', async (c) => {
     <div class="no-print" style="display:flex; gap:8px; margin-bottom:12px; justify-content:center; flex-wrap:wrap;">
       <button onclick="window.print()" style="background:#4F46E5; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">🖨️ 印刷</button>
       <button onclick="window.history.length > 1 ? window.history.back() : window.close()" style="background:#6B7280; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">← 戻る</button>
+      <button onclick="copyGuideUrl()" id="copyUrlBtn" style="background:#10B981; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">📋 URLをコピー</button>
+      <button onclick="toggleEditMode()" id="editModeBtn" style="background:#F59E0B; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">✏️ 編集モード</button>
     </div>
 
     <!-- カード表示エリア -->
@@ -8064,11 +8092,42 @@ app.get('/guide/:curriculumId', async (c) => {
   var ALL_CARDS = ${JSON.stringify(allCardsFlat)};
   var CHECK_PROBLEMS = ${JSON.stringify(checkProblems)};
   var OPT_PROBLEMS = ${JSON.stringify(optProblems)};
-  var CURRICULUM = ${JSON.stringify({ unit_name: curriculum.unit_name, grade: curriculum.grade, subject: curriculum.subject, unit_goal: curriculum.unit_goal })};
+  var CURRICULUM = ${JSON.stringify({ id: curriculumId, unit_name: curriculum.unit_name, grade: curriculum.grade, subject: curriculum.subject, unit_goal: curriculum.unit_goal })};
+  var IS_PERSONALIZED = ${isPersonalized ? 'true' : 'false'};
+  var COURSE_ID = ${courseId ? `'${courseId}'` : 'null'};
   var currentPage = 0;
-  var totalPages = ALL_CARDS.length;
+  // 学習カード + チェックテスト(1) + えらべるもんだい(1) = totalPages
+  var hasCheckTest = CHECK_PROBLEMS.length > 0;
+  var hasOptional = OPT_PROBLEMS.length > 0;
+  var totalPages = ALL_CARDS.length + (hasCheckTest ? 1 : 0) + (hasOptional ? 1 : 0);
   var completedCards = {};
   var aiConversation = [];
+  var editMode = false;
+
+  // === URLコピー ===
+  function copyGuideUrl() {
+    var url = window.location.href;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(function() {
+        var btn = document.getElementById('copyUrlBtn');
+        btn.textContent = '✅ コピーしました！';
+        setTimeout(function() { btn.textContent = '📋 URLをコピー'; }, 2000);
+      });
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = url; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+      alert('URLをコピーしました：\\n' + url);
+    }
+  }
+
+  // === 編集モード切替 ===
+  function toggleEditMode() {
+    editMode = !editMode;
+    var btn = document.getElementById('editModeBtn');
+    btn.textContent = editMode ? '🔒 編集モード OFF' : '✏️ 編集モード';
+    btn.style.background = editMode ? '#EF4444' : '#F59E0B';
+    renderCurrentCard();
+  }
 
   // === ページ初期化 ===
   function initGuide() {
@@ -8077,8 +8136,23 @@ app.get('/guide/:curriculumId', async (c) => {
     updateNavButtons();
   }
 
+  // === ページ種別判定 ===
+  function getPageType(page) {
+    if (page < ALL_CARDS.length) return 'card';
+    var afterCards = page - ALL_CARDS.length;
+    if (hasCheckTest && afterCards === 0) return 'checktest';
+    if (hasOptional) {
+      if (hasCheckTest && afterCards === 1) return 'optional';
+      if (!hasCheckTest && afterCards === 0) return 'optional';
+    }
+    return 'card';
+  }
+
   // === カードをレンダリング ===
   function renderCurrentCard() {
+    var pageType = getPageType(currentPage);
+    if (pageType === 'checktest') { renderCheckTestPage(); return; }
+    if (pageType === 'optional') { renderOptionalPage(); return; }
     var c = ALL_CARDS[currentPage];
     if (!c) return;
     var container = document.getElementById('cardContainer');
@@ -8228,6 +8302,22 @@ app.get('/guide/:curriculumId', async (c) => {
       html += '<div style="margin-top:8px;background:#f3f4f6;border-radius:8px;padding:8px 12px;font-size:0.8rem;color:#6b7280;"><i class="fas fa-question-circle" style="margin-right:4px;"></i>先生に聞くキーワード: <strong>' + c.teacher_help_keywords + '</strong></div>';
     }
 
+    // 編集パネル（編集モード時のみ表示）
+    if (editMode) {
+      var cid = c.card_id || c.id || 0;
+      html += '<div style="margin-top:16px;border:3px solid #F59E0B;border-radius:16px;padding:16px;background:#FFFBEB;">';
+      html += '<h4 style="font-weight:bold;color:#92400E;font-size:1rem;margin-bottom:12px;"><i class="fas fa-edit" style="margin-right:6px;"></i>カード編集</h4>';
+      html += '<div style="margin-bottom:8px;"><label style="font-size:0.8rem;font-weight:bold;color:#6b7280;">タイトル</label><input type="text" id="guide-edit-title" value="' + (c.card_title||'').replace(/"/g,'&quot;') + '" style="width:100%;border:2px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:0.9rem;"></div>';
+      html += '<div style="margin-bottom:8px;"><label style="font-size:0.8rem;font-weight:bold;color:#6b7280;">問題文</label><textarea id="guide-edit-problem" rows="3" style="width:100%;border:2px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:0.9rem;resize:vertical;">' + (c.problem_text||'') + '</textarea></div>';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
+      html += '<div><label style="font-size:0.8rem;font-weight:bold;color:#6b7280;">正解</label><input type="text" id="guide-edit-answer" value="' + (c.correct_answer||c.answer||'').replace(/"/g,'&quot;') + '" style="width:100%;border:2px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:0.9rem;"></div>';
+      html += '<div><label style="font-size:0.8rem;font-weight:bold;color:#6b7280;">難易度</label><select id="guide-edit-difficulty" style="width:100%;border:2px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:0.9rem;"><option value="easy"' + (c.difficulty_level==='easy'?' selected':'') + '>きほん</option><option value="standard"' + (c.difficulty_level==='standard'?' selected':'') + '>しっかり</option><option value="hard"' + (c.difficulty_level==='hard'?' selected':'') + '>チャレンジ</option></select></div></div>';
+      html += '<div style="margin-bottom:8px;"><label style="font-size:0.8rem;font-weight:bold;color:#6b7280;">解説</label><textarea id="guide-edit-explanation" rows="2" style="width:100%;border:2px solid #d1d5db;border-radius:8px;padding:8px 12px;font-size:0.9rem;resize:vertical;">' + (c.answer_explanation||c.explanation||'') + '</textarea></div>';
+      html += '<div style="display:flex;gap:8px;"><button onclick="saveGuideCardEdit(' + cid + ')" style="flex:1;background:#10B981;color:white;border:none;padding:10px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.9rem;"><i class="fas fa-check" style="margin-right:4px;"></i>保存</button>';
+      html += '<button onclick="toggleEditMode()" style="flex:1;background:#6B7280;color:white;border:none;padding:10px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.9rem;">キャンセル</button></div>';
+      html += '</div>';
+    }
+
     html += '</div>';
     container.innerHTML = html;
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -8263,7 +8353,12 @@ app.get('/guide/:curriculumId', async (c) => {
       var cls = 'nav-dot';
       if (i === currentPage) cls += ' active';
       if (completedCards[i]) cls += ' done';
-      html += '<button class="' + cls + '" onclick="goToCard(' + i + ')">' + (i+1) + '</button>';
+      var label = '';
+      var pt = getPageType(i);
+      if (pt === 'card') { label = '' + (i+1); }
+      else if (pt === 'checktest') { label = '✅'; }
+      else if (pt === 'optional') { label = '⭐'; }
+      html += '<button class="' + cls + '" onclick="goToCard(' + i + ')" title="' + (pt === 'checktest' ? 'チェックテスト' : pt === 'optional' ? 'えらべるもんだい' : 'カード'+(i+1)) + '" style="' + (pt !== 'card' ? 'font-size:0.9rem;' : '') + '">' + label + '</button>';
     }
     dots.innerHTML = html;
   }
@@ -8620,6 +8715,188 @@ app.get('/guide/:curriculumId', async (c) => {
     container.innerHTML = '<div style="padding:12px;text-align:center;"><svg viewBox="0 0 120 120" width="120" height="120"><circle cx="60" cy="60" r="55" fill="white" stroke="#374151" stroke-width="3"/>' +
       [1,2,3,4,5,6,7,8,9,10,11,12].map(function(n){var a=(n*30-90)*Math.PI/180;return '<text x="'+(60+42*Math.cos(a))+'" y="'+(64+42*Math.sin(a))+'" text-anchor="middle" font-size="12" font-weight="bold" fill="#374151">'+n+'</text>';}).join('') +
       '<line x1="60" y1="60" x2="60" y2="25" stroke="#1f2937" stroke-width="3" stroke-linecap="round"/><line x1="60" y1="60" x2="85" y2="60" stroke="#4F46E5" stroke-width="2" stroke-linecap="round"/><circle cx="60" cy="60" r="3" fill="#EF4444"/></svg><p style="font-size:0.75rem;color:#6b7280;margin-top:4px;">時計を見て考えよう</p></div>';
+  }
+
+  // === チェックテストページ ===
+  function renderCheckTestPage() {
+    var container = document.getElementById('cardContainer');
+    var html = '<div class="card-box">';
+    html += '<div style="text-align:center;margin-bottom:16px;"><span style="background:#EF4444;color:white;padding:6px 20px;border-radius:20px;font-weight:bold;font-size:1rem;">✅ チェックテスト（' + CHECK_PROBLEMS.length + 'もん）</span></div>';
+    
+    CHECK_PROBLEMS.forEach(function(p, i) {
+      html += '<div style="background:white;border:2px solid #fecaca;border-radius:12px;padding:14px;margin-bottom:12px;">';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+      html += '<span style="background:#EF4444;color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.85rem;">' + (i+1) + '</span>';
+      html += '<strong style="flex:1;font-size:0.95rem;">' + (p.problem_text || p.question || '') + '</strong>';
+      if (p.difficulty === 'advanced') html += '<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:8px;font-size:0.7rem;font-weight:bold;">★発展</span>';
+      html += '</div>';
+      
+      if (p.choices && p.choices.length > 0) {
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;">';
+        p.choices.forEach(function(ch) { html += '<div style="background:#fff5f5;border:2px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:0.9rem;">' + ch + '</div>'; });
+        html += '</div>';
+      } else {
+        html += '<div class="answer-box"><textarea placeholder="こたえをかこう：" rows="2"></textarea></div>';
+      }
+      
+      html += '<details style="margin-top:6px;"><summary style="font-size:0.8rem;color:#EF4444;cursor:pointer;font-weight:bold;">📝 こたえを見る</summary>';
+      html += '<div style="background:#FEF2F2;border-radius:8px;padding:8px 12px;margin-top:4px;font-size:0.85rem;">';
+      if (p.correct_choice) html += '<strong>正解：</strong>' + p.correct_choice + ' ';
+      if (p.answer) html += '<strong>答え：</strong>' + p.answer + ' ';
+      if (p.explanation) html += '<br>' + p.explanation;
+      html += '</div></details>';
+
+      // 編集モード
+      if (editMode) {
+        html += '<div style="margin-top:8px;border-top:2px dashed #fecaca;padding-top:8px;">';
+        html += '<div style="margin-bottom:4px;"><label style="font-size:0.75rem;font-weight:bold;color:#6b7280;">問題文</label><textarea id="check-edit-text-' + i + '" rows="2" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:6px;font-size:0.85rem;">' + (p.problem_text||'') + '</textarea></div>';
+        if (p.choices && p.choices.length > 0) {
+          html += '<div style="margin-bottom:4px;"><label style="font-size:0.75rem;font-weight:bold;color:#6b7280;">選択肢（改行区切り）</label><textarea id="check-edit-choices-' + i + '" rows="2" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:6px;font-size:0.85rem;">' + p.choices.join('\\n') + '</textarea></div>';
+          html += '<div style="margin-bottom:4px;"><label style="font-size:0.75rem;font-weight:bold;color:#6b7280;">正解</label><input type="text" id="check-edit-correct-' + i + '" value="' + (p.correct_choice||'').replace(/"/g,'&quot;') + '" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:6px;font-size:0.85rem;"></div>';
+        } else {
+          html += '<div style="margin-bottom:4px;"><label style="font-size:0.75rem;font-weight:bold;color:#6b7280;">答え</label><input type="text" id="check-edit-answer-' + i + '" value="' + (p.answer||'').replace(/"/g,'&quot;') + '" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:6px;font-size:0.85rem;"></div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+
+    if (editMode && CHECK_PROBLEMS.length > 0) {
+      html += '<button onclick="saveCheckTestEdits()" style="width:100%;background:#10B981;color:white;border:none;padding:12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.95rem;margin-top:8px;"><i class="fas fa-check" style="margin-right:6px;"></i>チェックテストを保存</button>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // === えらべるもんだいページ ===
+  function renderOptionalPage() {
+    var container = document.getElementById('cardContainer');
+    var html = '<div class="card-box">';
+    html += '<div style="text-align:center;margin-bottom:16px;"><span style="background:#8B5CF6;color:white;padding:6px 20px;border-radius:20px;font-weight:bold;font-size:1rem;">⭐ えらべるもんだい（' + OPT_PROBLEMS.length + 'もん）</span></div>';
+    html += '<p style="text-align:center;color:#6b7280;font-size:0.85rem;margin-bottom:16px;">やってみたい問題をえらんでチャレンジしよう！</p>';
+    
+    OPT_PROBLEMS.forEach(function(p, i) {
+      var content = p.problem_content || p.problem_description || p.content || '';
+      if (typeof content === 'object') {
+        content = content.problem_description || content.problem_content || JSON.stringify(content);
+      }
+      // optional_problems テーブルからのデータの場合、contentフィールドがJSONの場合がある
+      if (typeof content === 'string' && content.startsWith('{')) {
+        try { var parsed = JSON.parse(content); content = parsed.problem_description || parsed.problem_content || content; } catch(e) {}
+      }
+      var title = p.problem_title || 'もんだい ' + (i+1);
+      
+      html += '<div style="background:white;border:2px solid #ddd6fe;border-radius:12px;padding:14px;margin-bottom:12px;">';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+      html += '<span style="background:#8B5CF6;color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:0.85rem;">' + (i+1) + '</span>';
+      html += '<strong style="font-size:0.95rem;color:#5B21B6;">' + title + '</strong>';
+      html += '</div>';
+      html += '<div style="background:#f5f3ff;border-left:4px solid #8B5CF6;padding:10px 14px;border-radius:0 8px 8px 0;font-size:0.9rem;line-height:1.6;">' + content + '</div>';
+      html += '<div class="answer-box" style="margin-top:8px;"><textarea placeholder="こたえをかこう：" rows="3"></textarea></div>';
+      
+      // 編集モード
+      if (editMode) {
+        html += '<div style="margin-top:8px;border-top:2px dashed #ddd6fe;padding-top:8px;">';
+        html += '<div style="margin-bottom:4px;"><label style="font-size:0.75rem;font-weight:bold;color:#6b7280;">タイトル</label><input type="text" id="opt-edit-title-' + i + '" value="' + title.replace(/"/g,'&quot;') + '" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:6px;font-size:0.85rem;"></div>';
+        html += '<div style="margin-bottom:4px;"><label style="font-size:0.75rem;font-weight:bold;color:#6b7280;">問題文</label><textarea id="opt-edit-content-' + i + '" rows="3" style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:6px;font-size:0.85rem;">' + content + '</textarea></div>';
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    
+    if (editMode && OPT_PROBLEMS.length > 0) {
+      html += '<button onclick="saveOptionalEdits()" style="width:100%;background:#10B981;color:white;border:none;padding:12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.95rem;margin-top:8px;"><i class="fas fa-check" style="margin-right:6px;"></i>えらべるもんだいを保存</button>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // === カード編集保存 ===
+  function saveGuideCardEdit(cardId) {
+    var title = document.getElementById('guide-edit-title')?.value || '';
+    var problem = document.getElementById('guide-edit-problem')?.value || '';
+    var answer = document.getElementById('guide-edit-answer')?.value || '';
+    var difficulty = document.getElementById('guide-edit-difficulty')?.value || 'standard';
+    var explanation = document.getElementById('guide-edit-explanation')?.value || '';
+    
+    fetch('/api/teacher/edit-card/' + cardId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_title: title,
+        problem_text: problem,
+        correct_answer: answer,
+        difficulty_level: difficulty,
+        explanation: explanation
+      })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.success) {
+        // ローカルデータも更新
+        var c = ALL_CARDS[currentPage];
+        if (c) { c.card_title = title; c.problem_text = problem; c.correct_answer = answer; c.difficulty_level = difficulty; c.answer_explanation = explanation; c.explanation = explanation; }
+        alert('✅ カードを保存しました！');
+        renderCurrentCard();
+      } else { alert('保存に失敗しました: ' + (data.error || '')); }
+    }).catch(function(err) { alert('保存エラー: ' + err.message); });
+  }
+
+  // === チェックテスト編集保存 ===
+  function saveCheckTestEdits() {
+    var updated = CHECK_PROBLEMS.map(function(p, i) {
+      var textEl = document.getElementById('check-edit-text-' + i);
+      var choicesEl = document.getElementById('check-edit-choices-' + i);
+      var correctEl = document.getElementById('check-edit-correct-' + i);
+      var answerEl = document.getElementById('check-edit-answer-' + i);
+      var newP = Object.assign({}, p);
+      if (textEl) newP.problem_text = textEl.value;
+      if (choicesEl) newP.choices = choicesEl.value.split('\\n').filter(function(s){return s.trim();});
+      if (correctEl) newP.correct_choice = correctEl.value;
+      if (answerEl) newP.answer = answerEl.value;
+      return newP;
+    });
+    
+    var metaKey = IS_PERSONALIZED ? 'personalized_check_test_' + COURSE_ID : 'common_check_test';
+    var payload = { test_title: 'チェックテスト', test_description: '', sample_problems: updated };
+    
+    fetch('/api/curriculum/' + CURRICULUM.id + '/metadata', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ meta_key: metaKey, meta_value: JSON.stringify(payload) })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.success) {
+        CHECK_PROBLEMS = updated;
+        alert('✅ チェックテストを保存しました！');
+        renderCheckTestPage();
+      } else { alert('保存に失敗しました: ' + (data.error || '')); }
+    }).catch(function(err) { alert('保存エラー: ' + err.message); });
+  }
+
+  // === えらべるもんだい編集保存 ===
+  function saveOptionalEdits() {
+    var updated = OPT_PROBLEMS.map(function(p, i) {
+      var titleEl = document.getElementById('opt-edit-title-' + i);
+      var contentEl = document.getElementById('opt-edit-content-' + i);
+      var newP = Object.assign({}, p);
+      if (titleEl) newP.problem_title = titleEl.value;
+      if (contentEl) newP.problem_content = contentEl.value;
+      return newP;
+    });
+    
+    var metaKey = IS_PERSONALIZED ? 'personalized_optional_' + COURSE_ID : 'common_optional';
+    
+    fetch('/api/curriculum/' + CURRICULUM.id + '/metadata', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ meta_key: metaKey, meta_value: JSON.stringify(updated) })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+      if (data.success) {
+        OPT_PROBLEMS = updated;
+        alert('✅ えらべるもんだいを保存しました！');
+        renderOptionalPage();
+      } else { alert('保存に失敗しました: ' + (data.error || '')); }
+    }).catch(function(err) { alert('保存エラー: ' + err.message); });
   }
 
   // 初期化
@@ -12530,14 +12807,28 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
     ]
   },
   "optional_problems": [
-    {"problem_number": 1, "problem_title": "実生活問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "実生活で役立つ力がつく（20字以上）", "difficulty_level": "medium"},
-    {"problem_number": 2, "problem_title": "考え方問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "深く理解できる（20字以上）", "difficulty_level": "medium"},
-    {"problem_number": 3, "problem_title": "他教科問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "他教科でも使える（20字以上）", "difficulty_level": "hard"},
-    {"problem_number": 4, "problem_title": "応用問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "組み合わせて考える力（20字以上）", "difficulty_level": "hard"},
-    {"problem_number": 5, "problem_title": "探究問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "不思議さに気づく（20字以上）", "difficulty_level": "very_hard"},
-    {"problem_number": 6, "problem_title": "創造問題", "problem_description": "具体的な数字を含む問題文（50字以上）", "learning_meaning": "新しい方法を考える（20字以上）", "difficulty_level": "very_hard"}
+    {"problem_number": 1, "problem_title": "（具体的で魅力的なタイトル）", "problem_description": "（80字以上の具体的な問題文。実社会・日常場面を題材に）", "learning_meaning": "（この問題で身につく力の説明。20字以上）", "difficulty_level": "medium"},
+    {"problem_number": 2, "problem_title": "（同上）", "problem_description": "（同上）", "learning_meaning": "（同上）", "difficulty_level": "medium"},
+    {"problem_number": 3, "problem_title": "（同上）", "problem_description": "（同上）", "learning_meaning": "（同上）", "difficulty_level": "hard"},
+    {"problem_number": 4, "problem_title": "（同上）", "problem_description": "（同上）", "learning_meaning": "（同上）", "difficulty_level": "hard"},
+    {"problem_number": 5, "problem_title": "（同上）", "problem_description": "（同上）", "learning_meaning": "（同上）", "difficulty_level": "very_hard"},
+    {"problem_number": 6, "problem_title": "（同上）", "problem_description": "（同上）", "learning_meaning": "（同上）", "difficulty_level": "very_hard"}
   ]
-}`
+}
+
+【★★★ 選択課題（えらべるもんだい）の最重要ルール ★★★】
+選択課題は児童が「やってみたい！」と思える、ワクワクする具体的な問題にすること。
+■ 禁止事項：
+- 「〜を振り返ろう」「〜を探してみよう」等の抽象的・メタ的な指示は絶対禁止
+- タイトルに「実生活問題」「考え方問題」等の分類名をそのまま使うのは禁止
+■ 必須事項：
+- 全6問すべてに具体的な数値・場面・ストーリーを含む問題文を書くこと
+- タイトルは中身がわかる魅力的なものにすること（例：「遊園地のコース設計」「宝の地図を読み解こう」）
+- 実社会・日常生活に即した場面設定にすること（買い物、料理、スポーツ、建築、ゲーム、旅行、自然現象など）
+- problem_descriptionは80字以上の具体的な問題文にすること
+■ 6問の方向性（タイトルは自由に工夫）：
+1問目：身近な生活場面の問題 / 2問目：発展チャレンジ問題 / 3問目：他教科・実社会と結びつく問題
+4問目：友達と取り組めるゲーム型問題 / 5問目：本物の仕事場面を題材にした問題 / 6問目：知的好奇心を刺激する探究型問題`
 
     // フォールバック機能付きAPI呼び出し
     const models = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
@@ -32389,23 +32680,38 @@ ${cardSummary}
     ]
   },
   "optional_problems": [
-    {"problem_title": "ふりかえり問題", "problem_content": "学習内容を振り返り、自分の言葉でまとめる具体的な指示"},
-    {"problem_title": "チャレンジ問題", "problem_content": "発展的な計算・思考問題"},
-    {"problem_title": "つなげる問題", "problem_content": "日常生活・他教科と結びつける問題"},
-    {"problem_title": "つくる問題", "problem_content": "自分でオリジナル問題を作って、友だちと解き合う課題"},
-    {"problem_title": "実力アップ問題", "problem_content": "少し難しい応用問題で実力を試す"},
-    {"problem_title": "探究問題", "problem_content": "不思議に思ったことを深掘りする問題"}
+    {"problem_title": "（具体的で興味を引くタイトル）", "problem_content": "（80字以上の具体的な問題文）", "personalization_reason": "（この児童に出す理由）"},
+    ... 全6問
   ]
 }
 
-重要:
+【チェックテストのルール】
 - 全6問のうち3〜4問は選択肢付き（choices配列とcorrect_choice）にすること
 - 残りの2〜3問は記述式（choicesなし）で自由に答えさせること
 - 難易度はbasic(2問)→standard(2問)→advanced(2問)と段階的に上げること
 - 学習カードの内容を踏まえた具体的な問題にすること（「〜を学ぼう」等のメタ記述禁止）
+
+【★★★ 選択課題（えらべるもんだい）の最重要ルール ★★★】
+選択課題は児童が「やってみたい！」と思える、ワクワクする具体的な問題にすること。
+■ 禁止事項：
+- 「〜を振り返ろう」「〜を探してみよう」「〜を調べてみよう」等の抽象的・メタ的な指示は絶対禁止
+- 「オリジナル問題を作ろう」等の丸投げ指示は禁止
+- タイトルに「ふりかえり問題」「チャレンジ問題」「つなげる問題」等の分類名をそのまま使うのは禁止
+■ 必須事項：
+- 全6問すべてに具体的な数値・場面・ストーリーを含む問題文を書くこと
+- タイトルは中身がわかる魅力的なものにすること（例：「遊園地のコース設計」「宝の地図を読み解こう」）
+- 実社会・日常生活に即した場面設定にすること（買い物、料理、スポーツ、建築、ゲーム、旅行、自然現象など）
+- 問題を読んだだけで「やってみたい！」と感じる内容にすること
+- problem_contentは80字以上の具体的な問題文にすること
+■ 6問の方向性（タイトルは自由に工夫すること）：
+1問目：今日学んだ内容を使って解ける身近な生活場面の問題
+2問目：学んだ内容の一歩先にチャレンジする発展問題
+3問目：他教科（理科・社会・体育・音楽等）や実社会と結びつく問題
+4問目：友達と協力して取り組めるゲーム型・クイズ型の問題
+5問目：本物の仕事や社会で使われている場面を題材にした問題
+6問目：「なぜ？」「もし〜だったら？」という知的好奇心を刺激する探究型問題
+
 - 児童の学年に合った言葉遣いにすること（ひらがな多め、簡潔に）
-- problem_contentとproblem_titleは異なる内容にすること
-- 選択課題は6問で、ふりかえり・チャレンジ・つなげる・つくる・実力アップ・探究の6種にすること
 - ★12理論統合分析の結果を踏まえ、この児童のタイプに最適化された出題をすること
 - ★各問題に personalization_reason フィールドを追加し、「なぜこの児童にこの問題を出すのか」を1文で説明すること`
         
@@ -32540,19 +32846,35 @@ ${cardSummary}
     ]
   },
   "optional_problems": [
-    {"problem_title": "ふりかえり問題", "problem_content": "学習内容を振り返る具体的な指示"},
-    {"problem_title": "チャレンジ問題", "problem_content": "発展的な問題"},
-    {"problem_title": "つなげる問題", "problem_content": "日常生活と結びつける問題"},
-    {"problem_title": "つくる問題", "problem_content": "オリジナル問題を作る課題"},
-    {"problem_title": "実力アップ問題", "problem_content": "応用問題で実力を試す"},
-    {"problem_title": "探究問題", "problem_content": "深掘りする問題"}
+    {"problem_title": "（具体的で興味を引くタイトル）", "problem_content": "（80字以上の具体的な問題文）"},
+    ... 全6問
   ]
 }
 
-重要:
+【チェックテストのルール】
 - 全6問のうち3〜4問は選択肢付き（choices配列とcorrect_choice）にすること
 - 難易度はbasic(2問)→standard(2問)→advanced(2問)と段階的に上げること
 - 学習カードの内容を踏まえた具体的な問題にすること
+
+【★★★ 選択課題（えらべるもんだい）の最重要ルール ★★★】
+選択課題は児童が「やってみたい！」と思える、ワクワクする具体的な問題にすること。
+■ 禁止事項：
+- 「〜を振り返ろう」「〜を探してみよう」「〜を調べてみよう」等の抽象的・メタ的な指示は絶対禁止
+- 「オリジナル問題を作ろう」等の丸投げ指示は禁止
+- タイトルに「ふりかえり問題」「チャレンジ問題」「つなげる問題」等の分類名をそのまま使うのは禁止
+■ 必須事項：
+- 全6問すべてに具体的な数値・場面・ストーリーを含む問題文を書くこと
+- タイトルは中身がわかる魅力的なものにすること（例：「遊園地のコース設計」「宝の地図を読み解こう」）
+- 実社会・日常生活に即した場面設定にすること（買い物、料理、スポーツ、建築、ゲーム、旅行、自然現象など）
+- 問題を読んだだけで「やってみたい！」と感じる内容にすること
+- problem_contentは80字以上の具体的な問題文にすること
+■ 6問の方向性（タイトルは自由に工夫すること）：
+1問目：今日学んだ内容を使って解ける身近な生活場面の問題
+2問目：学んだ内容の一歩先にチャレンジする発展問題
+3問目：他教科（理科・社会・体育・音楽等）や実社会と結びつく問題
+4問目：友達と協力して取り組めるゲーム型・クイズ型の問題
+5問目：本物の仕事や社会で使われている場面を題材にした問題
+6問目：「なぜ？」「もし〜だったら？」という知的好奇心を刺激する探究型問題
 - 児童の学年に合った言葉遣いにすること`
 
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
