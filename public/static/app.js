@@ -12460,8 +12460,8 @@ function initConstructionAnswerWidget(card) {
                 style="width:100%; height:auto; display:block; cursor:crosshair; touch-action:none; -ms-touch-action:none; -webkit-touch-callout:none; pointer-events:auto; position:relative; z-index:50;"></canvas>
       </div>
 
-      <!-- デバッグ情報（常に表示） -->
-      <div id="${uid}_debug" class="mt-1 text-xs text-orange-600 text-center font-mono bg-orange-50 p-1 rounded">タップ待機中...</div>
+      <!-- デバッグ情報（非表示） -->
+      <div id="${uid}_debug" class="mt-1 text-xs text-orange-600 text-center font-mono hidden"></div>
 
       <!-- 描いた図形の情報 -->
       <div id="${uid}_info" class="mt-2 text-xs text-gray-500 text-center">円弧: 0 / 直線: 0</div>
