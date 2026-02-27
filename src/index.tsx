@@ -8603,10 +8603,10 @@ app.get('/guide/:curriculumId', async (c) => {
       html += '<span style="display:inline-block;margin-left:8px;background:#10B981;color:white;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:bold;">▶ タップ</span></div>';
     }
 
-    // お助けボタン
+    // お助けボタン（F7足場レベルに応じて表示調整）
     html += '<div class="help-bar no-print">';
     html += '<button class="help-btn" style="background:#DBEAFE;color:#1E40AF;" onclick="toggleAITeacher(' + currentPage + ')"><i class="fas fa-robot"></i>AI先生</button>';
-    html += '<button class="help-btn" style="background:#DCFCE7;color:#166534;" onclick="toggleHints(' + currentPage + ')"><i class="fas fa-lightbulb"></i>ヒント</button>';
+    html += '<button class="help-btn hint-btn-scaffold" id="hint-btn-' + currentPage + '" style="background:#DCFCE7;color:#166534;" onclick="toggleHints(' + currentPage + ')"><i class="fas fa-lightbulb"></i>ヒント</button>';
     html += '<button class="help-btn" style="background:#FEF3C7;color:#92400E;" onclick="speakGuideText(document.querySelector(\\x27.problem-box\\x27))" data-text="' + (c.problem_text||'').replace(/"/g,'&quot;').substring(0,300) + '"><i class="fas fa-volume-up"></i>読み上げ</button>';
     html += '<button class="help-btn" style="background:#FCE7F3;color:#BE185D;" onclick="callTeacherGuide()"><i class="fas fa-chalkboard-teacher"></i>先生ヘルプ</button>';
     html += '<button class="help-btn" style="background:#F3E8FF;color:#6D28D9;" onclick="askFriendGuide()"><i class="fas fa-user-friends"></i>友達に聞く</button>';
@@ -8691,6 +8691,19 @@ app.get('/guide/:curriculumId', async (c) => {
     // === 合いの手システム：カード表示時の声がけ + 動的適応 ===
     setTimeout(function() { aiCoachOnCardOpen(currentPage, c); }, 500);
     startThinkingTimer(currentPage); // 一定時間経過で励まし声がけ
+
+    // === F7: 足場レベルに応じたUI動的調整 ===
+    setTimeout(function() {
+      var scaffoldLevel = (window._v4Session || {}).scaffoldLevel || 1.0;
+      var hintBtn = document.getElementById('hint-btn-' + currentPage);
+      if (hintBtn && scaffoldLevel <= 0.4) {
+        // 足場が低い = 自力モード → ヒントボタンの色を薄く、テキスト変更
+        hintBtn.innerHTML = '<i class="fas fa-lightbulb"></i>自分でやる！';
+        hintBtn.style.background = '#F3F4F6';
+        hintBtn.style.color = '#9CA3AF';
+        hintBtn.title = 'ヒントなし挑戦モード中！困ったら押してね';
+      }
+    }, 100);
   }
 
   // ============================================================
@@ -8706,6 +8719,21 @@ app.get('/guide/:curriculumId', async (c) => {
   window._consecutiveErrors = window._consecutiveErrors || 0;
   window._consecutiveCorrects = window._consecutiveCorrects || 0;
   window._coachBubbleCount = window._coachBubbleCount || 0;
+  // === v4理論統合セッション制御 ===
+  // F5: 自己調整学習 — N問ごとのミニ振り返り
+  // F7: 足場かけ — 正解連続で足場を自動フェーディング
+  // F8: 動機づけ — マイクロ成功フィードバック
+  // F9: メタ認知 — 不正解時の思考分析ステップ
+  window._v4Session = window._v4Session || {
+    totalAnswered: 0,          // セッション中の回答数
+    totalCorrect: 0,           // セッション中の正解数
+    scaffoldLevel: 1.0,        // 足場レベル (1.0=フル, 0=なし)
+    scaffoldFadeCount: 0,      // 足場フェーディング連続正解カウンタ
+    lastReflectionAt: 0,       // 最後にミニ振り返りを出した回答数
+    reflectionInterval: 5,     // N問ごとにミニ振り返り（v4 F5制御）
+    microSuccessEnabled: true, // マイクロ成功フィードバック（v4 F8制御）
+    metacogPromptEnabled: true // メタ認知プロンプト（v4 F9制御）
+  };
 
   // 気分→声がけパラメータマッピング
   function getMoodCoachParams() {
@@ -9239,7 +9267,39 @@ app.get('/guide/:curriculumId', async (c) => {
     if (isCorrect) {
       completedCards[page] = true;
       renderNavDots();
+      
+      // === v4セッション制御更新 ===
+      window._v4Session.totalAnswered++;
+      window._v4Session.totalCorrect++;
+      window._v4Session.scaffoldFadeCount++;
+
+      // F7: 足場自動フェーディング（正解3連続で足場レベルを段階的に下げる）
+      var fadeThreshold = 3; // v4 controls.scaffold.success_threshold_to_fade
+      if (window._v4Session.scaffoldFadeCount >= fadeThreshold && window._v4Session.scaffoldLevel > 0.2) {
+        window._v4Session.scaffoldLevel = Math.max(0.2, window._v4Session.scaffoldLevel - 0.2);
+        window._v4Session.scaffoldFadeCount = 0;
+        // 足場が減ったことを伝える
+        if (window._v4Session.scaffoldLevel <= 0.4) {
+          showCoachBubble('ヒントなし挑戦モード！自分の力でどんどんいこう！💪', 'celebrate', 4000, false);
+        } else {
+          showCoachBubble('調子いいね！少しずつ自分でやれるようにしていこう。', 'encourage', 3000, false);
+        }
+      }
+
+      // F8: マイクロ成功フィードバック（小さな正解ごとの即時称賛バリエーション）
+      var microMessages = [];
+      if (window._v4Session.microSuccessEnabled) {
+        var streak = window._consecutiveCorrects + 1;
+        if (streak >= 5) microMessages = ['5連続正解！天才かも！🏆', 'すごすぎる…！止まらないね！🚀'];
+        else if (streak >= 3) microMessages = ['3連続！その調子！🔥', '連続正解キープ！いい流れ！⚡'];
+        else if (window._v4Session.totalCorrect > 1) microMessages = ['また正解！確実に力がついてる！', 'ナイス！わかってきたね！'];
+      }
+
       aiCoachOnCorrect(page); // 合いの手：正解声がけ
+
+      // F5: ミニ振り返りチェック（N問ごと）
+      var shouldReflect = (window._v4Session.totalAnswered - window._v4Session.lastReflectionAt) >= window._v4Session.reflectionInterval;
+
       // 正解音
       try {
         var ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -9253,14 +9313,53 @@ app.get('/guide/:curriculumId', async (c) => {
         });
       } catch(e){}
       
+      // マイクロ成功メッセージ
+      var microHTML = '';
+      if (microMessages.length > 0) {
+        var mm = microMessages[Math.floor(Math.random() * microMessages.length)];
+        microHTML = '<p style="font-size:0.85rem;color:#059669;font-weight:bold;margin:4px 0;animation:correctPop 0.5s ease-out;">' + mm + '</p>';
+      }
+
+      // 成長トラッカー表示
+      var growthHTML = '<div style="display:flex;align-items:center;gap:6px;justify-content:center;margin:8px 0;font-size:0.8rem;color:#6B7280;">' +
+        '<span>📊 ' + window._v4Session.totalCorrect + '/' + window._v4Session.totalAnswered + '問正解</span>' +
+        '<span style="color:#10B981;">(' + Math.round(window._v4Session.totalCorrect / window._v4Session.totalAnswered * 100) + '%)</span>' +
+        (window._v4Session.scaffoldLevel < 1.0 ? '<span style="color:#8B5CF6;">🛡️→' + Math.round(window._v4Session.scaffoldLevel * 100) + '%</span>' : '') +
+        '</div>';
+
+      // F5: ミニ振り返りUI（N問ごと）
+      var reflectionHTML = '';
+      if (shouldReflect) {
+        window._v4Session.lastReflectionAt = window._v4Session.totalAnswered;
+        reflectionHTML = '<div id="mini-reflection-' + page + '" style="background:#F5F3FF;border:2px solid #C4B5FD;border-radius:12px;padding:12px;margin-top:10px;text-align:left;">' +
+          '<p style="font-weight:bold;color:#6D28D9;font-size:0.9rem;margin-bottom:8px;">📝 ちょっと振り返り（' + window._v4Session.totalAnswered + '問やったよ！）</p>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' +
+          '<button onclick="submitMiniReflection(' + page + ',\\x27good\\x27,this)" class="refl-btn" style="flex:1;min-width:80px;padding:8px;border:2px solid #A78BFA;border-radius:10px;background:white;cursor:pointer;font-size:0.85rem;">😊 わかってきた</button>' +
+          '<button onclick="submitMiniReflection(' + page + ',\\x27ok\\x27,this)" class="refl-btn" style="flex:1;min-width:80px;padding:8px;border:2px solid #FCD34D;border-radius:10px;background:white;cursor:pointer;font-size:0.85rem;">🤔 まあまあ</button>' +
+          '<button onclick="submitMiniReflection(' + page + ',\\x27hard\\x27,this)" class="refl-btn" style="flex:1;min-width:80px;padding:8px;border:2px solid #F87171;border-radius:10px;background:white;cursor:pointer;font-size:0.85rem;">😰 むずかしい</button>' +
+          '</div></div>';
+      }
+
       resultDiv.innerHTML = '<div style="background:#F0FDF4;border:3px solid #10B981;border-radius:16px;padding:20px;text-align:center;animation:correctPop 0.6s ease-out;">' +
         '<div style="font-size:4rem;animation:starBurst 0.8s ease-out;">🎉</div>' +
         '<p style="font-size:1.5rem;font-weight:900;color:#059669;margin:8px 0;">正解！すごい！</p>' +
+        microHTML +
+        growthHTML +
         '<p style="font-size:0.9rem;color:#10B981;">よくできました！</p>' +
         '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">' +
         (currentPage < totalPages - 1 ? '<button onclick="navigateCard(1)" style="background:#4F46E5;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:1rem;"><i class="fas fa-arrow-right" style="margin-right:6px;"></i>次のカードへ</button>' : '<button onclick="alert(\\x27🎉 すべて完了！\\x27)" style="background:#10B981;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-flag-checkered" style="margin-right:6px;"></i>全部できた！</button>') +
-        '</div></div>';
+        '</div>' + reflectionHTML + '</div>';
     } else {
+      // === v4セッション制御更新（不正解） ===
+      window._v4Session.totalAnswered++;
+      window._v4Session.scaffoldFadeCount = 0; // 足場フェーディングリセット
+
+      // F7: 足場復帰（間違えたら足場レベルを戻す）
+      if (window._v4Session.scaffoldLevel < 0.8) {
+        window._v4Session.scaffoldLevel = Math.min(1.0, window._v4Session.scaffoldLevel + 0.3);
+        showCoachBubble('大丈夫！ヒントをつけて一緒にやろう。', 'comfort', 4000, false);
+      }
+
       aiCoachOnIncorrect(page); // 合いの手：不正解声がけ
       // 不正解音
       try {
@@ -9273,16 +9372,129 @@ app.get('/guide/:curriculumId', async (c) => {
       } catch(e){}
       
       var gentleMode = getMoodCoachParams().gentleMode;
+
+      // F9: メタ認知プロンプト（不正解時に自己分析を促す）
+      var metacogHTML = '';
+      if (window._v4Session.metacogPromptEnabled && window._consecutiveErrors >= 1) {
+        metacogHTML = '<div style="background:#F0F9FF;border:2px solid #93C5FD;border-radius:12px;padding:10px;margin-top:10px;text-align:left;">' +
+          '<p style="font-weight:bold;color:#1D4ED8;font-size:0.85rem;margin-bottom:6px;">🧠 考えてみよう</p>' +
+          '<div style="display:flex;flex-direction:column;gap:4px;">' +
+          '<label style="font-size:0.8rem;color:#374151;display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 0;">' +
+          '<input type="radio" name="metacog-' + page + '" value="forgot" style="accent-color:#3B82F6;"> やり方をわすれた</label>' +
+          '<label style="font-size:0.8rem;color:#374151;display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 0;">' +
+          '<input type="radio" name="metacog-' + page + '" value="misread" style="accent-color:#3B82F6;"> もんだいをよみまちがえた</label>' +
+          '<label style="font-size:0.8rem;color:#374151;display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 0;">' +
+          '<input type="radio" name="metacog-' + page + '" value="calc_error" style="accent-color:#3B82F6;"> 計算をまちがえた</label>' +
+          '<label style="font-size:0.8rem;color:#374151;display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 0;">' +
+          '<input type="radio" name="metacog-' + page + '" value="no_idea" style="accent-color:#3B82F6;"> どうやるかわからない</label>' +
+          '</div>' +
+          '<button onclick="submitMetacogReflection(' + page + ')" style="margin-top:6px;background:#3B82F6;color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:bold;cursor:pointer;">おくる</button>' +
+          '</div>';
+      }
+
+      // 成長トラッカー表示（不正解時も表示）
+      var growthHTML2 = '';
+      if (window._v4Session.totalAnswered > 1) {
+        growthHTML2 = '<div style="font-size:0.75rem;color:#9CA3AF;margin:6px 0;">' +
+          '📊 ' + window._v4Session.totalCorrect + '/' + window._v4Session.totalAnswered + '問正解 (' + Math.round(window._v4Session.totalCorrect / window._v4Session.totalAnswered * 100) + '%)' +
+          '</div>';
+      }
+
       resultDiv.innerHTML = '<div style="background:#FFFBEB;border:3px solid #F59E0B;border-radius:16px;padding:20px;text-align:center;">' +
         '<div style="font-size:3rem;">' + (gentleMode ? '🌟' : '🤔') + '</div>' +
         '<p style="font-size:1.2rem;font-weight:bold;color:#92400E;margin:8px 0;">' + (gentleMode ? 'おしいね！' : 'もう少し！') + '</p>' +
         '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:12px;">' + (gentleMode ? 'ヒントを見ながらやってみよう。むりしないでね。' : 'ヒントを見て、もう一度考えてみよう。') + '</p>' +
+        growthHTML2 +
         '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
         '<button onclick="document.getElementById(\\x27grade-result-' + page + '\\x27).style.display=\\x27none\\x27;document.getElementById(\\x27answer-' + page + '\\x27).value=\\x27\\x27;document.getElementById(\\x27answer-' + page + '\\x27).focus();" style="background:#F59E0B;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-redo" style="margin-right:6px;"></i>もう一度</button>' +
         '<button onclick="toggleHints(' + page + ')" style="background:#8B5CF6;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-lightbulb" style="margin-right:6px;"></i>ヒントを見る</button>' +
-        '</div></div>';
+        '</div>' + metacogHTML + '</div>';
     }
     resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // === F5: ミニ振り返り送信 ===
+  function submitMiniReflection(page, level, btn) {
+    // ボタンの見た目を変更
+    var container = btn.closest('#mini-reflection-' + page);
+    if (!container) return;
+    var buttons = container.querySelectorAll('.refl-btn');
+    buttons.forEach(function(b) { b.disabled = true; b.style.opacity = '0.5'; });
+    btn.style.opacity = '1'; btn.style.background = '#DDD6FE'; btn.style.borderColor = '#7C3AED';
+    
+    var messages = {
+      good: ['いいね！この調子でいこう！✨', '自信ついてきたね！次も頑張ろう！'],
+      ok: ['わからないところはヒントを使ってOK！📝', 'ゆっくりでいいよ。確実にいこう。'],
+      hard: ['むずかしいよね。ヒントと先生を頼ってね。🤗', '大丈夫！一緒にやっていこう。💪']
+    };
+    var ms = messages[level] || messages.ok;
+    var msg = ms[Math.floor(Math.random() * ms.length)];
+    
+    container.innerHTML = '<p style="color:#6D28D9;font-weight:bold;font-size:0.85rem;text-align:center;padding:8px;">✅ ' + msg + '</p>';
+
+    // v4制御パラメータ動的調整
+    if (level === 'hard') {
+      // F7: 足場レベルを上げる（困っている）
+      window._v4Session.scaffoldLevel = Math.min(1.0, window._v4Session.scaffoldLevel + 0.2);
+      window._v4Session.reflectionInterval = 3; // もっと頻繁に聞く
+    } else if (level === 'good') {
+      // F7: 足場を少し下げる余地あり
+      window._v4Session.reflectionInterval = 7; // 間隔を広げる
+    }
+
+    // APIにセッションログを送信（非同期）
+    fetch('/api/student-learning/session-reflection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: (state.auth.user || {}).id,
+        reflection_level: level,
+        total_answered: window._v4Session.totalAnswered,
+        total_correct: window._v4Session.totalCorrect,
+        scaffold_level: window._v4Session.scaffoldLevel,
+        card_page: page
+      })
+    }).catch(function() {});
+  }
+
+  // === F9: メタ認知セルフ分析送信 ===
+  function submitMetacogReflection(page) {
+    var selected = document.querySelector('input[name="metacog-' + page + '"]:checked');
+    if (!selected) { alert('ひとつ選んでね！'); return; }
+    var reason = selected.value;
+    
+    var adviceMap = {
+      forgot: '前のカードに戻って、もう一度やり方を確認してみよう！📖',
+      misread: 'ゆっくり問題文を読み直してみよう。大事な数字に○をつけるといいよ！🔍',
+      calc_error: '計算はあってる？ひっ算でもう一度確認してみよう！✏️',
+      no_idea: 'ヒントを見てみよう！先生に聞いてもいいよ！💡'
+    };
+    
+    var advice = adviceMap[reason] || 'ヒントを見てもう一度やってみよう！';
+    var container = selected.closest('div[style*="F0F9FF"]');
+    if (container) {
+      container.innerHTML = '<p style="color:#1D4ED8;font-weight:bold;font-size:0.85rem;">💡 ' + advice + '</p>';
+    }
+
+    // 自動でヒントを開く（"no_idea"の場合）
+    if (reason === 'no_idea' || reason === 'forgot') {
+      var hintsEl = document.getElementById('hints-' + page);
+      if (hintsEl) hintsEl.style.display = 'block';
+    }
+
+    // APIにメタ認知ログを送信（非同期）
+    fetch('/api/student-learning/metacog-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: (state.auth.user || {}).id,
+        card_page: page,
+        card_id: (ALL_CARDS[page] || {}).id,
+        error_reason: reason,
+        consecutive_errors: window._consecutiveErrors,
+        scaffold_level: window._v4Session.scaffoldLevel
+      })
+    }).catch(function() {});
   }
 
   // === 音声読み上げ（Gemini TTS + Web Speech API フォールバック） ===
@@ -37720,6 +37932,68 @@ app.get('/api/student-learning/personalized-course-status', async (c) => {
     return c.json({ exists: false })
   } catch {
     return c.json({ exists: false })
+  }
+})
+
+// --- F5: セッションミニ振り返りログ保存 ---
+app.post('/api/student-learning/session-reflection', async (c) => {
+  try {
+    const { student_id, reflection_level, total_answered, total_correct, scaffold_level, card_page } = await c.req.json()
+    if (!student_id) return c.json({ success: false, error: 'student_id required' })
+    
+    // テーブル作成（初回のみ）
+    await c.env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS session_reflections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id TEXT NOT NULL,
+        reflection_level TEXT NOT NULL,
+        total_answered INTEGER DEFAULT 0,
+        total_correct INTEGER DEFAULT 0,
+        scaffold_level REAL DEFAULT 1.0,
+        card_page INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    await c.env.DB.prepare(
+      `INSERT INTO session_reflections (student_id, reflection_level, total_answered, total_correct, scaffold_level, card_page)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(student_id, reflection_level || 'ok', total_answered || 0, total_correct || 0, scaffold_level || 1.0, card_page || 0).run()
+    
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message })
+  }
+})
+
+// --- F9: メタ認知セルフ分析ログ保存 ---
+app.post('/api/student-learning/metacog-log', async (c) => {
+  try {
+    const { student_id, card_page, card_id, error_reason, consecutive_errors, scaffold_level } = await c.req.json()
+    if (!student_id) return c.json({ success: false, error: 'student_id required' })
+    
+    // テーブル作成（初回のみ）
+    await c.env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS metacognition_self_analysis (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id TEXT NOT NULL,
+        card_id INTEGER,
+        card_page INTEGER,
+        error_reason TEXT NOT NULL,
+        consecutive_errors INTEGER DEFAULT 0,
+        scaffold_level REAL DEFAULT 1.0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run()
+    
+    await c.env.DB.prepare(
+      `INSERT INTO metacognition_self_analysis (student_id, card_id, card_page, error_reason, consecutive_errors, scaffold_level)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(student_id, card_id || null, card_page || 0, error_reason || 'unknown', consecutive_errors || 0, scaffold_level || 1.0).run()
+    
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message })
   }
 })
 
