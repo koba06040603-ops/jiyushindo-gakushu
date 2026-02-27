@@ -1823,7 +1823,9 @@ app.get('/api/class/:classId/distribution', async (c) => {
 
   try {
     const students = await env.DB.prepare(`
-      SELECT id FROM students WHERE class_id = ?
+      SELECT s.student_id as id FROM students s
+      LEFT JOIN class_enrollments ce ON s.student_id = ce.student_id
+      WHERE ce.class_id = ?
     `).bind(classId).all();
 
     const studentIds = students.results.map((s: any) => s.id);
@@ -1913,15 +1915,16 @@ app.get('/api/class/:classId/needs-attention', async (c) => {
 
     const needsAttention = await env.DB.prepare(`
       SELECT 
-        s.id,
-        s.name,
+        s.student_id as id,
+        s.student_name as name,
         COUNT(ah.id) as problem_count,
         AVG(CASE WHEN ah.is_correct = 1 THEN 100.0 ELSE 0.0 END) as accuracy,
         MAX(ah.created_at) as last_activity
       FROM students s
-      LEFT JOIN answer_history ah ON s.id = ah.student_id AND ah.created_at >= ?
-      WHERE s.class_id = ?
-      GROUP BY s.id, s.name
+      LEFT JOIN answer_history ah ON s.student_id = ah.student_id AND ah.created_at >= ?
+      LEFT JOIN class_enrollments ce ON s.student_id = ce.student_id
+      WHERE ce.class_id = ?
+      GROUP BY s.student_id, s.student_name
       HAVING problem_count < 5 OR accuracy < 60 OR last_activity IS NULL
       ORDER BY accuracy ASC
     `).bind(oneWeekAgo.toISOString(), classId).all();
@@ -2881,9 +2884,9 @@ app.get('/api/notifications', async (c) => {
     let query = `
       SELECT 
         n.*,
-        u.name as from_user_name
+        u.full_name as from_user_name
       FROM notifications n
-      LEFT JOIN users u ON n.from_user_id = u.id
+      LEFT JOIN users u ON n.from_user_id = u.user_id
       WHERE n.to_user_id = ?
     `
     const params = [parseInt(userId)]
@@ -3951,7 +3954,7 @@ app.post('/api/learning/session/start', async (c) => {
     
     return c.json({ success: true, session_id: result.meta.last_row_id })
   } catch (error: any) {
-    console.error('セッション開始エラー:', error)
+    console.error('セッション開始エラー:', error.message)
     return c.json({ success: false, error: error.message }, 500)
   }
 })
@@ -4142,8 +4145,10 @@ app.get('/api/analytics/class/:classCode', async (c) => {
         SUM(total_hints_used) as total_hints_used,
         SUM(total_ai_requests) as total_ai_requests
       FROM learning_sessions ls
-      JOIN students s ON ls.student_id = s.id
-      WHERE s.class_code = ?
+      JOIN students s ON ls.student_id = s.student_id
+      JOIN class_enrollments ce ON s.student_id = ce.student_id
+      JOIN classes cl ON ce.class_id = cl.class_id
+      WHERE cl.class_code = ?
         AND ls.ended_at IS NOT NULL
         AND DATE(ls.started_at) >= DATE('now', '-30 days')
     `).bind(classCode).first()
@@ -4151,19 +4156,21 @@ app.get('/api/analytics/class/:classCode', async (c) => {
     // 学生別パフォーマンス
     const studentPerformance = await env.DB.prepare(`
       SELECT 
-        s.id,
-        s.name,
-        s.student_number,
+        s.student_id as id,
+        s.student_name as name,
+        s.student_name as student_number,
         COUNT(ls.id) as session_count,
         ROUND(AVG(CASE WHEN ls.correct_problems > 0 THEN (ls.correct_problems * 1.0 / ls.total_problems) * 100 ELSE 0 END), 1) as avg_correct_rate,
         SUM(ls.total_problems) as problems_solved,
         SUM(ls.total_hints_used) as hints_used
       FROM students s
-      LEFT JOIN learning_sessions ls ON s.id = ls.student_id
+      LEFT JOIN learning_sessions ls ON s.student_id = ls.student_id
         AND ls.ended_at IS NOT NULL
         AND DATE(ls.started_at) >= DATE('now', '-30 days')
-      WHERE s.class_code = ?
-      GROUP BY s.id, s.name, s.student_number
+      JOIN class_enrollments ce ON s.student_id = ce.student_id
+      JOIN classes cl ON ce.class_id = cl.class_id
+      WHERE cl.class_code = ?
+      GROUP BY s.student_id, s.student_name
       ORDER BY avg_correct_rate DESC
     `).bind(classCode).all()
     
@@ -4175,8 +4182,10 @@ app.get('/api/analytics/class/:classCode', async (c) => {
         COUNT(DISTINCT student_id) as active_students,
         SUM(total_problems) as problems_solved
       FROM learning_sessions ls
-      JOIN students s ON ls.student_id = s.id
-      WHERE s.class_code = ?
+      JOIN students s ON ls.student_id = s.student_id
+      JOIN class_enrollments ce ON s.student_id = ce.student_id
+      JOIN classes cl ON ce.class_id = cl.class_id
+      WHERE cl.class_code = ?
         AND ended_at IS NOT NULL
         AND DATE(started_at) >= DATE('now', '-30 days')
       GROUP BY DATE(started_at)
@@ -4377,8 +4386,8 @@ app.get('/api/progress/class/:classCode', async (c) => {
   try {
     const progress = await env.DB.prepare(`
       SELECT 
-        u.name,
-        u.student_number,
+        u.full_name,
+        COALESCE(u.username, '') as student_number,
         p.curriculum_id,
         p.course_id,
         p.learning_card_id,
@@ -4390,10 +4399,10 @@ app.get('/api/progress/class/:classCode', async (c) => {
         c.course_level,
         c.course_display_name
       FROM student_progress p
-      JOIN users u ON p.student_id = u.id
+      JOIN users u ON p.student_id = u.user_id
       LEFT JOIN courses c ON p.course_id = c.id
-      WHERE u.class_code = ?
-      ORDER BY u.student_number, p.created_at DESC
+      WHERE u.school_id = ?
+      ORDER BY u.username, p.created_at DESC
     `).bind(classCode).all()
     
     return c.json(progress.results)
@@ -4862,7 +4871,7 @@ app.get('/api/help/requests-for-me/:studentId', async (c) => {
       SELECT 
         phr.id,
         phr.requester_id,
-        u.name as requester_name,
+        u.full_name as requester_name,
         phr.curriculum_id,
         cur.unit_name,
         phr.learning_card_id,
@@ -4871,7 +4880,7 @@ app.get('/api/help/requests-for-me/:studentId', async (c) => {
         phr.status,
         phr.created_at
       FROM peer_help_requests phr
-      INNER JOIN users u ON phr.requester_id = u.id
+      INNER JOIN users u ON phr.requester_id = u.user_id
       INNER JOIN curriculum cur ON phr.curriculum_id = cur.id
       LEFT JOIN learning_cards lc ON phr.learning_card_id = lc.card_id
       WHERE phr.helper_id = ? AND phr.status = 'pending'
@@ -4918,8 +4927,8 @@ app.get('/api/reports/weekly/:classCode', async (c) => {
     // 期間内の進捗データを集計
     const weeklyStats = await env.DB.prepare(`
       SELECT 
-        u.name as student_name,
-        u.student_number,
+        u.full_name as student_name,
+        COALESCE(u.username, '') as student_number,
         COUNT(DISTINCT sp.learning_card_id) as completed_cards,
         AVG(sp.understanding_level) as avg_understanding,
         SUM(CASE WHEN sp.help_type = 'ai' THEN 1 ELSE 0 END) as ai_help_count,
@@ -4927,12 +4936,12 @@ app.get('/api/reports/weekly/:classCode', async (c) => {
         SUM(CASE WHEN sp.help_type = 'friend' THEN 1 ELSE 0 END) as friend_help_count,
         SUM(CASE WHEN sp.help_type = 'hint' THEN 1 ELSE 0 END) as hint_help_count
       FROM users u
-      LEFT JOIN student_progress sp ON u.id = sp.student_id
+      LEFT JOIN student_progress sp ON u.user_id = sp.student_id
         AND sp.status = 'completed'
         AND DATE(sp.completed_at) BETWEEN ? AND ?
-      WHERE u.class_code = ? AND u.role = 'student'
-      GROUP BY u.id, u.name, u.student_number
-      ORDER BY u.student_number
+      WHERE u.school_id = ? AND u.user_type = 'student'
+      GROUP BY u.user_id, u.full_name, u.username
+      ORDER BY u.username
     `).bind(startDate, endDate, classCode).all()
     
     return c.json({
@@ -4965,18 +4974,18 @@ app.get('/api/reports/monthly/:classCode', async (c) => {
     // 月次統計
     const monthlyStats = await env.DB.prepare(`
       SELECT 
-        u.name as student_name,
-        u.student_number,
+        u.full_name as student_name,
+        COALESCE(u.username, '') as student_number,
         COUNT(DISTINCT sp.learning_card_id) as completed_cards,
         AVG(sp.understanding_level) as avg_understanding,
         COUNT(DISTINCT DATE(sp.created_at)) as active_days,
         SUM(CASE WHEN sp.help_type IS NOT NULL THEN 1 ELSE 0 END) as total_help_count
       FROM users u
-      LEFT JOIN student_progress sp ON u.id = sp.student_id
+      LEFT JOIN student_progress sp ON u.user_id = sp.student_id
         AND DATE(sp.created_at) BETWEEN ? AND ?
-      WHERE u.class_code = ? AND u.role = 'student'
-      GROUP BY u.id, u.name, u.student_number
-      ORDER BY u.student_number
+      WHERE u.school_id = ? AND u.user_type = 'student'
+      GROUP BY u.user_id, u.full_name, u.username
+      ORDER BY u.username
     `).bind(startDate, endDate, classCode).all()
     
     // カリキュラム別進捗
@@ -4990,8 +4999,8 @@ app.get('/api/reports/monthly/:classCode', async (c) => {
       LEFT JOIN student_progress sp ON cur.id = sp.curriculum_id
         AND sp.status = 'completed'
         AND DATE(sp.completed_at) BETWEEN ? AND ?
-      JOIN users u ON sp.student_id = u.id
-      WHERE u.class_code = ?
+      JOIN users u ON sp.student_id = u.user_id
+      WHERE u.school_id = ?
       GROUP BY cur.id, cur.unit_name, cur.subject
     `).bind(startDate, endDate, classCode).all()
     
@@ -5078,7 +5087,7 @@ app.get('/api/reports/class/:classCode/summary', async (c) => {
   try {
     // クラスの全生徒取得
     const students = await env.DB.prepare(`
-      SELECT s.student_id, s.name
+      SELECT s.student_id, s.student_name as name
       FROM students s
       JOIN class_enrollments ce ON s.student_id = ce.student_id
       JOIN classes c ON ce.class_id = c.class_id
@@ -5979,9 +5988,9 @@ app.get('/api/evaluations/student/:studentId/curriculum/:curriculumId', async (c
   
   try {
     const evaluation = await env.DB.prepare(`
-      SELECT e.*, u.name as student_name
+      SELECT e.*, u.full_name as student_name
       FROM evaluations e
-      JOIN users u ON e.student_id = u.id
+      JOIN users u ON e.student_id = u.user_id
       WHERE e.student_id = ? AND e.curriculum_id = ?
       ORDER BY e.created_at DESC
       LIMIT 1
@@ -6115,9 +6124,9 @@ app.get('/api/evaluations/three-point/student/:studentId/curriculum/:curriculumI
   
   try {
     const evaluation = await env.DB.prepare(`
-      SELECT e.*, u.name as student_name
+      SELECT e.*, u.full_name as student_name
       FROM three_point_evaluations e
-      JOIN users u ON e.student_id = u.id
+      JOIN users u ON e.student_id = u.user_id
       WHERE e.student_id = ? AND e.curriculum_id = ?
       ORDER BY e.created_at DESC
       LIMIT 1
@@ -6204,9 +6213,9 @@ app.get('/api/evaluations/non-cognitive/student/:studentId/curriculum/:curriculu
   
   try {
     const evaluation = await env.DB.prepare(`
-      SELECT e.*, u.name as student_name
+      SELECT e.*, u.full_name as student_name
       FROM non_cognitive_evaluations e
-      JOIN users u ON e.student_id = u.id
+      JOIN users u ON e.student_id = u.user_id
       WHERE e.student_id = ? AND e.curriculum_id = ?
       ORDER BY e.created_at DESC
       LIMIT 1
@@ -14529,9 +14538,9 @@ app.get('/api/curriculum/:id/history', async (c) => {
     const history = await env.DB.prepare(`
       SELECT 
         h.*,
-        u.name as changed_by_name
+        u.full_name as changed_by_name
       FROM curriculum_history h
-      LEFT JOIN users u ON h.changed_by = u.id
+      LEFT JOIN users u ON h.changed_by = u.user_id
       WHERE h.curriculum_id = ?
       ORDER BY h.created_at DESC
       LIMIT 50
@@ -14714,9 +14723,9 @@ async function requireAuth(c: any, next: any) {
   
   try {
     const session = await env.DB.prepare(`
-      SELECT s.*, u.id as user_id, u.name, u.email, u.role, u.class_code
+      SELECT s.*, u.user_id as user_id, u.full_name as name, u.email, u.user_type as role, u.username, u.school_id
       FROM user_sessions s
-      JOIN users u ON s.user_id = u.id
+      JOIN users u ON s.user_id = u.user_id
       WHERE s.session_token = ? AND s.expires_at > datetime('now') AND u.is_active = 1
     `).bind(token).first()
     
@@ -14727,10 +14736,10 @@ async function requireAuth(c: any, next: any) {
     // コンテキストにユーザー情報を保存
     c.set('user', {
       id: session.user_id,
-      name: session.name,
-      email: session.email,
-      role: session.role,
-      class_code: session.class_code
+      name: session.name || session.username || '',
+      email: session.email || '',
+      role: session.role || 'student',
+      class_code: session.school_id || ''
     })
     
     await next()
@@ -14952,9 +14961,9 @@ app.post('/api/auth/refresh', async (c) => {
   
   try {
     const session = await env.DB.prepare(`
-      SELECT s.*, u.id as user_id, u.name, u.email, u.role, u.class_code, u.student_number
+      SELECT s.*, u.user_id as user_id, u.full_name, u.email, u.user_type, u.school_id, COALESCE(u.username, '') as student_number
       FROM user_sessions s
-      JOIN users u ON s.user_id = u.id
+      JOIN users u ON s.user_id = u.user_id
       WHERE s.refresh_token = ? AND s.refresh_expires_at > datetime('now') AND u.is_active = 1
     `).bind(refresh_token).first()
     
@@ -16601,7 +16610,7 @@ app.get('/api/research/summary/:classCode', async (c) => {
   try {
     // クラス全体の統計
     const students = await env.DB.prepare(`
-      SELECT id FROM users WHERE class_code = ? AND role = 'student'
+      SELECT user_id as id FROM users WHERE school_id = ? AND user_type = 'student'
     `).bind(classCode).all()
     
     const studentIds = (students.results || []).map((s: any) => s.id)
@@ -17038,13 +17047,13 @@ app.get('/api/cross-school/analytics/:municipalityId', async (c) => {
       // 学校ごとの統計
       const stats = await env.DB.prepare(`
         SELECT 
-          COUNT(DISTINCT u.id) as total_students,
+          COUNT(DISTINCT u.user_id) as total_students,
           AVG(sp.understanding_level) as avg_understanding,
           AVG(sp.completion_time_minutes) as avg_completion_time,
           COUNT(sp.id) as total_cards_completed
         FROM users u
-        LEFT JOIN student_progress sp ON u.id = sp.student_id AND sp.status = 'completed'
-        WHERE u.class_code LIKE ? AND u.role = 'student'
+        LEFT JOIN student_progress sp ON u.user_id = sp.student_id AND sp.status = 'completed'
+        WHERE u.school_id LIKE ? AND u.user_type = 'student'
       `).bind(`${school.school_code}%`).first()
       
       schoolStats.push({
@@ -17490,13 +17499,9 @@ app.get('/api/coordinator/cross-school-analytics', async (c) => {
       
       // 学校ごとの生徒データ
       const students = await env.DB.prepare(`
-        SELECT id FROM users 
-        WHERE role = 'student' 
-        AND class_code IN (
-          SELECT class_code FROM users WHERE role = 'teacher' AND id IN (
-            SELECT user_id FROM teachers WHERE school_id = ?
-          )
-        )
+        SELECT user_id as id FROM users 
+        WHERE user_type = 'student' 
+        AND school_id = ?
       `).bind(schoolId).all()
       
       // 平均理解度
@@ -18538,9 +18543,9 @@ app.get('/api/export/class/:classCode/csv', async (c) => {
   try {
     // クラスの生徒一覧
     const students = await env.DB.prepare(`
-      SELECT id, name, student_number FROM users 
-      WHERE class_code = ? AND role = 'student'
-      ORDER BY student_number
+      SELECT user_id as id, full_name as name, username as student_number FROM users 
+      WHERE school_id = ? AND user_type = 'student'
+      ORDER BY username
     `).bind(classCode).all()
     
     if (students.results.length === 0) {
@@ -18870,9 +18875,9 @@ app.get('/api/statistics/class/:classCode', async (c) => {
   try {
     // クラスの生徒一覧
     const students = await env.DB.prepare(`
-      SELECT id, name, student_number FROM users 
-      WHERE class_code = ? AND role = 'student'
-      ORDER BY student_number
+      SELECT user_id as id, full_name as name, username as student_number FROM users 
+      WHERE school_id = ? AND user_type = 'student'
+      ORDER BY username
     `).bind(classCode).all()
     
     // デモ用：生徒が見つからない場合はモックデータを返す
@@ -18984,15 +18989,15 @@ app.get('/api/statistics/class/:classCode', async (c) => {
     // 学習時間の分布
     let learningTimeDistQuery = env.DB.prepare(`
       SELECT 
-        u.name,
-        u.student_number,
+        u.full_name,
+        COALESCE(u.username, '') as student_number,
         COALESCE(SUM(p.total_learning_time), 0) as total_time,
         COUNT(DISTINCT p.curriculum_id) as completed_curriculums
       FROM users u
-      LEFT JOIN progress p ON u.id = p.student_id
-      WHERE u.class_code = ? AND u.role = 'student'
+      LEFT JOIN progress p ON u.user_id = p.student_id
+      WHERE u.school_id = ? AND u.user_type = 'student'
       ${curriculumId ? 'AND p.curriculum_id = ?' : ''}
-      GROUP BY u.id, u.name, u.student_number
+      GROUP BY u.user_id, u.full_name, u.username
       ORDER BY total_time DESC
     `)
     
@@ -19059,8 +19064,8 @@ app.get('/api/statistics/noncognitive/:classCode', async (c) => {
   
   try {
     const students = await env.DB.prepare(`
-      SELECT id, name FROM users 
-      WHERE class_code = ? AND role = 'student'
+      SELECT user_id as id, full_name as name FROM users 
+      WHERE school_id = ? AND user_type = 'student'
     `).bind(classCode).all()
     
     if (students.results.length === 0) {
@@ -20550,9 +20555,9 @@ app.get('/api/teacher-observations/:studentId', async (c) => {
   
   try {
     const observations = await env.DB.prepare(`
-      SELECT o.*, u.name as teacher_name, c.unit_name
+      SELECT o.*, u.full_name as teacher_name, c.unit_name
       FROM teacher_observations o
-      LEFT JOIN users u ON o.created_by = u.id
+      LEFT JOIN users u ON o.created_by = u.user_id
       LEFT JOIN curriculum c ON o.curriculum_id = c.id
       WHERE o.student_id = ?
       ORDER BY o.observation_date DESC, o.created_at DESC
@@ -20996,7 +21001,7 @@ app.post('/api/notifications/distribute-card', async (c) => {
         cu.unit_name
       FROM learning_cards lc
       JOIN courses c ON lc.course_id = c.id
-      JOIN curriculum cu ON c.curriculum_id = cu.id
+      JOIN curriculum cu ON c.curriculum_id = cu.user_id
       WHERE lc.card_id = ?
     `).bind(cardId).first()
     
@@ -21037,9 +21042,9 @@ app.get('/api/notifications/history/:studentId', async (c) => {
     const messages = await env.DB.prepare(`
       SELECT 
         tm.*,
-        u.name as teacher_name
+        u.full_name as teacher_name
       FROM teacher_messages tm
-      LEFT JOIN users u ON tm.teacher_id = u.id
+      LEFT JOIN users u ON tm.teacher_id = u.user_id
       WHERE tm.student_id = ?
       ORDER BY tm.created_at DESC
       LIMIT ?
@@ -21051,11 +21056,11 @@ app.get('/api/notifications/history/:studentId', async (c) => {
         cd.*,
         lc.card_title,
         c.course_name,
-        u.name as teacher_name
+        u.full_name as teacher_name
       FROM card_distributions cd
       JOIN learning_cards lc ON cd.card_id = lc.card_id
       JOIN courses c ON lc.course_id = c.id
-      LEFT JOIN users u ON cd.teacher_id = u.id
+      LEFT JOIN users u ON cd.teacher_id = u.user_id
       WHERE cd.student_id = ?
       ORDER BY cd.created_at DESC
       LIMIT ?
@@ -21100,7 +21105,7 @@ app.post('/api/learning-styles/generate-problem', async (c) => {
         cu.subject
       FROM learning_cards lc
       JOIN courses c ON lc.course_id = c.id
-      JOIN curriculum cu ON c.curriculum_id = cu.id
+      JOIN curriculum cu ON c.curriculum_id = cu.user_id
       WHERE lc.card_id = ?
     `).bind(cardId).first()
     
@@ -21541,7 +21546,7 @@ app.get('/api/collaborative/peer-answers/:cardId', async (c) => {
       SELECT 
         pa.id,
         pa.student_id,
-        u.name as student_name,
+        u.full_name as student_name,
         pa.answer_text,
         pa.approach_type,
         pa.is_public,
@@ -21552,12 +21557,12 @@ app.get('/api/collaborative/peer-answers/:cardId', async (c) => {
         COUNT(DISTINCT pv.id) as view_count,
         COUNT(DISTINCT ph.id) as helpful_count
       FROM peer_answers pa
-      JOIN users u ON pa.student_id = u.id
+      JOIN users u ON pa.student_id = u.user_id
       LEFT JOIN peer_evaluations pe ON pa.id = pe.answer_id
       LEFT JOIN peer_answer_views pv ON pa.id = pv.answer_id
       LEFT JOIN peer_helpful_marks ph ON pa.id = ph.answer_id
       WHERE pa.card_id = ? 
-        AND u.class_code = ?
+        AND u.school_id = ?
         AND pa.is_public = 1
         AND pa.student_id != ?
       GROUP BY pa.id
@@ -21806,20 +21811,20 @@ app.get('/api/collaborative/class-activity/:classCode', async (c) => {
   try {
     const result = await env.DB.prepare(`
       SELECT 
-        u.id as student_id,
-        u.name as student_name,
+        u.user_id as student_id,
+        u.full_name as student_name,
         COUNT(DISTINCT pa.id) as answers_shared,
         COUNT(DISTINCT pe.id) as evaluations_given,
         AVG(CASE WHEN pe2.answer_id IS NOT NULL THEN pe2.rating END) as avg_rating_received,
         COUNT(DISTINCT phm.id) as helpful_marks_received
       FROM users u
-      LEFT JOIN peer_answers pa ON u.id = pa.student_id AND pa.is_public = 1
-      LEFT JOIN peer_evaluations pe ON u.id = pe.evaluator_id
-      LEFT JOIN peer_answers pa2 ON u.id = pa2.student_id
+      LEFT JOIN peer_answers pa ON u.user_id = pa.student_id AND pa.is_public = 1
+      LEFT JOIN peer_evaluations pe ON u.user_id = pe.evaluator_id
+      LEFT JOIN peer_answers pa2 ON u.user_id = pa2.student_id
       LEFT JOIN peer_evaluations pe2 ON pa2.id = pe2.answer_id
       LEFT JOIN peer_helpful_marks phm ON pa2.id = phm.answer_id
-      WHERE u.class_code = ?
-      GROUP BY u.id
+      WHERE u.school_id = ?
+      GROUP BY u.user_id
       ORDER BY (answers_shared + evaluations_given) DESC
       LIMIT 50
     `).bind(classCode).all()
@@ -21982,11 +21987,11 @@ app.post('/api/reports/monthly/:studentId', async (c) => {
         COUNT(DISTINCT pe.id) as evaluations_given,
         AVG(pe2.rating) as avg_rating_received
       FROM users u
-      LEFT JOIN peer_answers pa ON u.id = pa.student_id
-      LEFT JOIN peer_evaluations pe ON u.id = pe.evaluator_id
-      LEFT JOIN peer_answers pa2 ON u.id = pa2.student_id
+      LEFT JOIN peer_answers pa ON u.user_id = pa.student_id
+      LEFT JOIN peer_evaluations pe ON u.user_id = pe.evaluator_id
+      LEFT JOIN peer_answers pa2 ON u.user_id = pa2.student_id
       LEFT JOIN peer_evaluations pe2 ON pa2.id = pe2.answer_id
-      WHERE u.id = ?
+      WHERE u.user_id = ?
         AND pa.created_at BETWEEN ? AND ?
     `).bind(studentId, monthStart, monthEnd).first()
     
@@ -29293,11 +29298,11 @@ app.get('/api/teacher/classes', authMiddleware, requireRole(['teacher', 'admin']
         c.class_name,
         c.grade,
         c.class_code,
-        COUNT(s.id) as student_count
+        COUNT(ce.student_id) as student_count
       FROM classes c
-      LEFT JOIN students s ON c.id = s.class_id
+      LEFT JOIN class_enrollments ce ON c.class_id = ce.class_id
       WHERE c.school_id = ?
-      GROUP BY c.id
+      GROUP BY c.class_id
       ORDER BY c.grade, c.class_name
     `).bind(user.school_id || 1).all()
     
@@ -29570,10 +29575,10 @@ app.get('/api/collaborative/sessions', authMiddleware, async (c) => {
     const sessions = await env.DB.prepare(`
       SELECT 
         cs.*,
-        s.name as creator_name,
+        s.student_name as creator_name,
         COUNT(DISTINCT sp.student_id) as participant_count
       FROM collaborative_sessions cs
-      JOIN students s ON cs.creator_student_id = s.id
+      JOIN students s ON cs.creator_student_id = s.student_id
       LEFT JOIN session_participants sp ON cs.id = sp.session_id AND sp.is_active = 1
       WHERE cs.status IN ('waiting', 'active')
       GROUP BY cs.id

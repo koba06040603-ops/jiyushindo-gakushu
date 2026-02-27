@@ -12393,11 +12393,14 @@ window.switchAnswerMode = switchAnswerMode
 // ============================================================
 
 function initConstructionAnswerWidget(card) {
+  console.log('🏗️ initConstructionAnswerWidget 呼び出し:', card?.card_title, card?.problem_text?.substring(0, 50))
   const problem = (card.problem_text || card.problem_description || card.card_title || '').toLowerCase()
   const isConstruction = /垂直二等分線|角の二等分線|垂線|平行線|作図|コンパス.*定規|定規.*コンパス/.test(problem)
+  console.log('🏗️ 作図判定:', isConstruction, 'problem:', problem.substring(0, 50))
   if (!isConstruction) return false
 
   const answerArea = document.getElementById('textAnswerArea')
+  console.log('🏗️ textAnswerArea:', answerArea ? '✅発見' : '❌なし', answerArea?.parentElement?.tagName)
   if (!answerArea) return false
 
   // 作図タイプ判定
@@ -12487,10 +12490,15 @@ function initConstructionAnswerWidget(card) {
   const ctx = canvas.getContext('2d')
   
   // ★ イベントリスナーをプログラムで登録
+  // 重要: pointer/mouse/touchの二重発火を防ぐためフラグ管理
+  let _pointerHandled = false
+  
   // ポインターイベント（最優先）
   const pDown = (e) => {
     e.preventDefault()
     e.stopPropagation()
+    _pointerHandled = true
+    setTimeout(() => { _pointerHandled = false }, 100) // 100ms後にリセット
     console.log('🖱️ pointerdown on canvas:', uid, e.pointerType, e.clientX, e.clientY)
     constructionPointerDown(e, uid)
   }
@@ -12512,22 +12520,26 @@ function initConstructionAnswerWidget(card) {
   
   // マウスイベント（PointerEvent非対応 or フォールバック）
   canvas.addEventListener('mousedown', (e) => {
+    if (_pointerHandled) return // pointer で既に処理済み
     e.preventDefault()
     e.stopPropagation()
     console.log('🖱️ mousedown on canvas:', uid)
     constructionPointerDown(e, uid)
   }, { passive: false })
   canvas.addEventListener('mousemove', (e) => {
+    if (_pointerHandled) return
     e.preventDefault()
     constructionPointerMove(e, uid)
   }, { passive: false })
   canvas.addEventListener('mouseup', (e) => {
+    if (_pointerHandled) return
     e.preventDefault()
     constructionPointerUp(e, uid)
   }, { passive: false })
   
   // タッチイベントフォールバック
   canvas.addEventListener('touchstart', (e) => {
+    if (_pointerHandled) return
     e.preventDefault()
     e.stopPropagation()
     const touch = e.touches[0]
@@ -12535,27 +12547,28 @@ function initConstructionAnswerWidget(card) {
     constructionPointerDown({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} }, uid)
   }, { passive: false })
   canvas.addEventListener('touchmove', (e) => {
+    if (_pointerHandled) return
     e.preventDefault()
     e.stopPropagation()
     const touch = e.touches[0]
     constructionPointerMove({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: ()=>{}, stopPropagation: ()=>{} }, uid)
   }, { passive: false })
   canvas.addEventListener('touchend', (e) => {
+    if (_pointerHandled) return
     e.preventDefault()
     constructionPointerUp({ preventDefault: ()=>{}, stopPropagation: ()=>{} }, uid)
   }, { passive: false })
   
-  // クリックイベント（最終フォールバック - ポインターが全く機能しない場合）
+  // クリックイベント（最終フォールバック - pointer/mouse/touchすべて動かない場合のみ）
   canvas.addEventListener('click', (e) => {
+    if (_pointerHandled) return
     e.preventDefault()
     e.stopPropagation()
     console.log('🖱️ click on canvas (fallback):', uid)
-    // クリック = ポインターイベントが動いていない場合の応急対応
     const st = window._constructionStates[uid]
-    if (st && !st._lastPointerTime || (Date.now() - (st?._lastPointerTime || 0)) > 500) {
+    if (st && (!st._lastPointerTime || (Date.now() - (st._lastPointerTime || 0)) > 500)) {
       constructionPointerDown(e, uid)
-      // 即座にupも発火（定規モードの場合はタップ2回で直線）
-      setTimeout(() => constructionPointerUp(e, uid), 50)
+      // 定規モードの場合のために即座にupは発火しない（ユーザーが2回クリックする）
     }
   }, { passive: false })
   
@@ -12893,6 +12906,7 @@ function constructionPointerMove(e, uid) {
   const state = window._constructionStates[uid]
   if (!state || state.tool !== 'compass' || state.phase !== 'compass_center_set') return
   if (e.preventDefault) e.preventDefault()
+  if (e.stopPropagation) e.stopPropagation()
 
   const pos = getCanvasPos(e, uid)
   const cx = state.tempCenter.x, cy = state.tempCenter.y

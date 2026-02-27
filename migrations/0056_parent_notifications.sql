@@ -148,7 +148,7 @@ BEGIN
     psr.parent_id,
     NEW.student_id,
     'learning_start',
-    (SELECT name FROM users WHERE id = NEW.student_id) || 'さんが学習を開始しました',
+    COALESCE((SELECT full_name FROM users WHERE user_id = NEW.student_id), 'ユーザー') || 'さんが学習を開始しました',
     '科目: ' || COALESCE(NEW.subject, '未選択') || '
 開始時刻: ' || strftime('%H:%M', NEW.session_start),
     'in_app',
@@ -180,7 +180,7 @@ BEGIN
     psr.parent_id,
     NEW.student_id,
     'learning_end',
-    (SELECT name FROM users WHERE id = NEW.student_id) || 'さんが学習を終了しました',
+    COALESCE((SELECT full_name FROM users WHERE user_id = NEW.student_id), 'ユーザー') || 'さんが学習を終了しました',
     '学習時間: ' || (NEW.duration_seconds / 60) || '分
 解いた問題: ' || NEW.problems_solved || '問
 正答率: ' || ROUND(CAST(NEW.correct_answers AS REAL) / NULLIF(NEW.problems_solved, 0) * 100, 1) || '%',
