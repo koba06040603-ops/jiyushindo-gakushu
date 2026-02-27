@@ -51474,14 +51474,33 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
               `).join('')}
             </div>`
         } else {
+          // チェックテストがない場合、自動生成を実行
           checkSection.innerHTML = `
             <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
               <i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>
               チェックテスト
             </h3>
             <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center">
-              <p class="text-sm text-gray-700">配信ページを開くと、個別用チェックテストが自動生成されます。</p>
+              <i class="fas fa-spinner fa-spin text-yellow-500 mr-1"></i>
+              <p class="text-sm text-gray-700">AIがチェックテスト・選択課題を生成中です...（約30秒）</p>
             </div>`
+          // 自動生成API呼び出し
+          try {
+            const genRes = await axios.post('/api/teacher/generate-personalized-assessment/' + cid, {}, { timeout: 90000 })
+            if (genRes.data.success && genRes.data.check_test) {
+              const pct = genRes.data.check_test
+              checkSection.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>個別チェックテスト（' + (pct.sample_problems?.length || 0) + '問）</h3><div class="space-y-3">' + (pct.sample_problems || []).map(function(p, pi) { return '<div class="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-1"><div class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-xs">' + (pi+1) + '</div><p class="text-sm font-bold text-gray-800">' + (p.problem_text||'') + '</p></div>' + (p.choices && p.choices.length > 0 ? '<div class="grid grid-cols-2 gap-2 mt-2">' + p.choices.map(function(ch) { return '<div class="bg-white border border-yellow-200 rounded-lg px-3 py-1.5 text-xs">' + ch + '</div>' }).join('') + '</div>' + (p.correct_choice ? '<details class="mt-1"><summary class="text-xs text-yellow-600 cursor-pointer font-bold">正解を見る</summary><p class="text-xs text-gray-600 mt-1">正解: ' + p.correct_choice + (p.explanation ? ' — ' + p.explanation : '') + '</p></details>' : '') : '') + '</div>' }).join('') + '</div>'
+            }
+            // 選択課題も更新
+            const optS = document.getElementById('personalized-optional-section')
+            if (optS && genRes.data.optional_problems && genRes.data.optional_problems.length > 0) {
+              const opts = genRes.data.optional_problems
+              optS.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-star text-pink-600 mr-2"></i>えらべるもんだい（' + opts.length + '問）</h3><div class="space-y-3">' + opts.map(function(p, pi) { return '<div class="bg-pink-50 border-2 border-pink-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-1"><div class="w-6 h-6 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-xs">' + (pi+1) + '</div><span class="text-sm font-bold text-pink-800">' + (p.problem_title||'') + '</span></div><p class="text-sm text-gray-700 ml-8">' + (p.problem_content||'') + '</p></div>' }).join('') + '</div>'
+            }
+          } catch (genErr) {
+            console.warn('個別評価問題自動生成エラー:', genErr)
+            checkSection.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>チェックテスト</h3><div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center"><p class="text-sm text-gray-700">チェックテストの生成に失敗しました。配信ページを開くと自動生成されます。</p><button onclick="retryGenerateAssessment(' + cid + ', ' + curriculumId + ')" class="mt-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-redo mr-1"></i>再生成</button></div>'
+          }
         }
       }
       
@@ -51513,7 +51532,8 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
               えらべるもんだい
             </h3>
             <div class="bg-pink-50 border-2 border-pink-300 rounded-xl p-4 text-center">
-              <p class="text-sm text-gray-700">配信ページを開くと、個別用選択課題が自動生成されます。</p>
+              <i class="fas fa-spinner fa-spin text-pink-500 mr-1"></i>
+              <p class="text-sm text-gray-700">チェックテストと一緒に生成中です...</p>
             </div>`
         }
       }
@@ -51691,6 +51711,27 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
 }
 window.showPersonalizedCourseGuide = showPersonalizedCourseGuide
 
+// 個別評価問題の再生成
+async function retryGenerateAssessment(courseId, curriculumId) {
+  try {
+    const checkSection = document.getElementById('personalized-check-test-section')
+    const optSection = document.getElementById('personalized-optional-section')
+    if (checkSection) checkSection.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4"><i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>チェックテスト</h3><div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center"><i class="fas fa-spinner fa-spin text-yellow-500 mr-1"></i><p class="text-sm text-gray-700">AIが生成中...（約30秒）</p></div>'
+    if (optSection) optSection.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4"><i class="fas fa-star text-pink-600 mr-2"></i>えらべるもんだい</h3><div class="bg-pink-50 border-2 border-pink-300 rounded-xl p-4 text-center"><i class="fas fa-spinner fa-spin text-pink-500 mr-1"></i><p class="text-sm text-gray-700">生成中...</p></div>'
+    
+    const genRes = await axios.post('/api/teacher/generate-personalized-assessment/' + courseId, {}, { timeout: 90000 })
+    if (genRes.data.success) {
+      // 成功時はモーダルを再描画
+      document.getElementById('personalizedGuideModal')?.remove()
+      showPersonalizedCourseGuide(courseId, curriculumId)
+    }
+  } catch (e) {
+    console.error('再生成エラー:', e)
+    alert('生成に失敗しました: ' + (e.message || 'Unknown'))
+  }
+}
+window.retryGenerateAssessment = retryGenerateAssessment
+
 // 個別最適化コースの学習を開始（state設定→selectCourse）
 async function startPersonalizedCourseLearning(courseId, curriculumId) {
   try {
@@ -51744,8 +51785,18 @@ window.startPersonalizedCourseLearning = startPersonalizedCourseLearning
 
 // カード編集パネルの表示/非表示
 function toggleCardEdit(cardId, index) {
-  const panel = document.getElementById('card-edit-panel-' + (cardId || index))
-  if (panel) panel.classList.toggle('hidden')
+  // Try multiple possible panel IDs
+  let panel = document.getElementById('card-edit-panel-' + cardId)
+  if (!panel && index !== undefined) panel = document.getElementById('card-edit-panel-' + index)
+  if (panel) {
+    panel.classList.toggle('hidden')
+    if (!panel.classList.contains('hidden')) {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  } else {
+    console.warn('Edit panel not found:', { cardId, index })
+    alert('編集パネルが見つかりません。ページを再読み込みしてください。')
+  }
 }
 window.toggleCardEdit = toggleCardEdit
 

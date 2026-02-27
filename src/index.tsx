@@ -8034,6 +8034,7 @@ app.get('/guide/:curriculumId', async (c) => {
     
     <div class="no-print" style="display:flex; gap:8px; margin-bottom:12px; justify-content:center; flex-wrap:wrap;">
       <button onclick="window.print()" style="background:#4F46E5; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">🖨️ 印刷</button>
+      <button onclick="window.history.length > 1 ? window.history.back() : window.close()" style="background:#6B7280; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">← 戻る</button>
     </div>
 
     <!-- カード表示エリア -->
@@ -32459,6 +32460,142 @@ ${cardSummary}
   } catch (error) {
     console.error('個別最適化コース配信エラー:', error)
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// 個別用チェックテスト・選択課題をオンデマンド生成するAPI
+app.post('/api/teacher/generate-personalized-assessment/:courseId', async (c) => {
+  const { env } = c
+  const courseId = Number(c.req.param('courseId'))
+  
+  try {
+    const apiKey = env.GEMINI_API_KEY
+    if (!apiKey) return c.json({ error: 'GEMINI_API_KEY未設定' }, 500)
+    
+    // コース情報を取得
+    const course = await env.DB.prepare('SELECT * FROM courses WHERE id = ?').bind(courseId).first() as any
+    if (!course) return c.json({ error: 'コースが見つかりません' }, 404)
+    
+    const curriculumId = course.curriculum_id
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculumId).first() as any
+    if (!curriculum) return c.json({ error: 'カリキュラムが見つかりません' }, 404)
+    
+    // カード取得
+    const cardsResult = await env.DB.prepare('SELECT * FROM learning_cards WHERE course_id = ? ORDER BY card_number').bind(courseId).all()
+    const cards = (cardsResult.results || []) as any[]
+    
+    if (cards.length === 0) return c.json({ error: 'カードがありません' }, 400)
+    
+    const cardSummary = cards.map((card: any, i: number) => 
+      `カード${i+1}: ${card.card_title || ''} - ${(card.problem_text || '').substring(0, 100)}`
+    ).join('\n')
+    
+    // v4分析データを取得
+    let v4Section = ''
+    try {
+      const studentMatch = course.course_name?.match(/ID:(\d+)/)
+      if (studentMatch) {
+        const metaRes = await env.DB.prepare(
+          "SELECT meta_value FROM curriculum_metadata WHERE curriculum_id = ? AND meta_key = ?"
+        ).bind(curriculumId, `personalized_course_student_${studentMatch[1]}`).first() as any
+        if (metaRes?.meta_value) {
+          const parsed = JSON.parse(metaRes.meta_value)
+          const v4 = parsed.v4_analysis
+          if (v4) {
+            const arch = v4.archetype || {}
+            const axes = v4.axes || {}
+            v4Section = `
+【★ この児童の12理論統合分析結果 ★】
+- 学習タイプ: ${arch.name_ja || '不明'}
+- 認知的自律性: ${axes.cognitive_autonomy || 50}/100
+- 情緒的安定性: ${axes.emotional_stability || 50}/100
+- 方略的成熟度: ${axes.strategic_maturity || 50}/100
+- 動機的エネルギー: ${axes.motivational_energy || 50}/100`
+          }
+        }
+      }
+    } catch (e) { console.warn('v4分析取得エラー:', e) }
+    
+    const prompt = `あなたは${curriculum.grade}の${curriculum.subject}の教師です。
+以下の個別学習カードの内容に基づいて、この児童専用のチェックテスト（6問）と選択課題（6問）を作成してください。
+
+単元名: ${curriculum.unit_name}
+${v4Section}
+
+学習カード内容:
+${cardSummary}
+
+以下のJSON形式で出力してください:
+{
+  "check_test": {
+    "test_title": "個別チェックテスト",
+    "test_description": "学習カードの理解度を確認するテスト（6もん）",
+    "sample_problems": [
+      {"problem_number": 1, "problem_text": "具体的な問題文", "difficulty": "basic", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3", "エ: 選択肢4"], "correct_choice": "ア", "explanation": "なぜこれが正解か"},
+      {"problem_number": 2, "problem_text": "問題文", "difficulty": "basic"},
+      {"problem_number": 3, "problem_text": "問題文", "difficulty": "standard", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3"], "correct_choice": "イ", "explanation": "解説"},
+      {"problem_number": 4, "problem_text": "問題文", "difficulty": "standard"},
+      {"problem_number": 5, "problem_text": "応用問題文", "difficulty": "advanced", "choices": ["ア: 選択肢1", "イ: 選択肢2", "ウ: 選択肢3", "エ: 選択肢4"], "correct_choice": "ウ", "explanation": "解説"},
+      {"problem_number": 6, "problem_text": "発展問題文", "difficulty": "advanced"}
+    ]
+  },
+  "optional_problems": [
+    {"problem_title": "ふりかえり問題", "problem_content": "学習内容を振り返る具体的な指示"},
+    {"problem_title": "チャレンジ問題", "problem_content": "発展的な問題"},
+    {"problem_title": "つなげる問題", "problem_content": "日常生活と結びつける問題"},
+    {"problem_title": "つくる問題", "problem_content": "オリジナル問題を作る課題"},
+    {"problem_title": "実力アップ問題", "problem_content": "応用問題で実力を試す"},
+    {"problem_title": "探究問題", "problem_content": "深掘りする問題"}
+  ]
+}
+
+重要:
+- 全6問のうち3〜4問は選択肢付き（choices配列とcorrect_choice）にすること
+- 難易度はbasic(2問)→standard(2問)→advanced(2問)と段階的に上げること
+- 学習カードの内容を踏まえた具体的な問題にすること
+- 児童の学年に合った言葉遣いにすること`
+
+    const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 4000, responseMimeType: 'application/json' }
+      })
+    })
+    
+    if (!geminiRes.ok) return c.json({ error: 'Gemini API エラー: ' + geminiRes.status }, 500)
+    
+    const geminiData = await geminiRes.json() as any
+    const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const parsed = JSON.parse(text)
+    
+    // チェックテスト保存
+    if (parsed.check_test) {
+      await env.DB.prepare(`
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+        ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
+      `).bind(curriculumId, `personalized_check_test_${courseId}`, JSON.stringify(parsed.check_test)).run()
+    }
+    
+    // 選択課題保存
+    if (parsed.optional_problems) {
+      await env.DB.prepare(`
+        INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+        ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
+      `).bind(curriculumId, `personalized_optional_${courseId}`, JSON.stringify(parsed.optional_problems)).run()
+    }
+    
+    console.log(`✅ 個別評価問題生成完了: course_id=${courseId}`)
+    
+    return c.json({
+      success: true,
+      check_test: parsed.check_test || null,
+      optional_problems: parsed.optional_problems || []
+    })
+  } catch (error: any) {
+    console.error('個別評価問題生成エラー:', error)
+    return c.json({ error: error.message || 'Unknown error' }, 500)
   }
 })
 
