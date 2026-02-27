@@ -335,7 +335,21 @@ function showResult(profile) {
   
   var aiSummaryHtml = '';
   if (profile.ai_summary) {
-    aiSummaryHtml = '<div class="bg-indigo-50 rounded-xl p-4 border border-indigo-200 mb-6 text-left"><p class="text-xs text-indigo-600 font-bold mb-1">✨ AI先生のまとめ</p><p class="text-sm text-indigo-800">' + profile.ai_summary + '</p></div>';
+    aiSummaryHtml = '<div class="bg-indigo-50 rounded-xl p-4 border border-indigo-200 mb-4 text-left"><p class="text-xs text-indigo-600 font-bold mb-1">✨ AI先生のまとめ</p><p class="text-sm text-indigo-800">' + profile.ai_summary + '</p></div>';
+  }
+
+  // 個別最適化コースボタン（student_idとcurriculum_idが有効な場合のみ表示）
+  var personalizedBtnHtml = '';
+  if (STUDENT_ID && STUDENT_ID !== '0' && CURRICULUM_ID && CURRICULUM_ID !== '0') {
+    personalizedBtnHtml = 
+      '<div id="personalizedSection" class="mb-4">' +
+        '<button id="genCourseBtn" onclick="requestPersonalizedCourse()" ' +
+          'class="w-full py-4 bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white rounded-xl font-bold text-lg transition shadow-lg flex items-center justify-center gap-2" style="border:none;cursor:pointer;">' +
+          '<span class="text-2xl">✨</span>' +
+          '<span>きみだけの学習コースを作る！</span>' +
+        '</button>' +
+        '<p class="text-xs text-gray-500 mt-2 text-center">AIがきみの学び方にぴったりのもんだいを作るよ（約15秒）</p>' +
+      '</div>';
   }
 
   resultArea.innerHTML = 
@@ -364,11 +378,106 @@ function showResult(profile) {
       '</div>' +
 
       aiSummaryHtml +
+      personalizedBtnHtml +
 
       '<a href="' + RETURN_URL + '" class="block w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-xl font-bold text-xl transition shadow-lg text-center no-underline" style="text-decoration:none;">' +
         '<i class="fas fa-book-open mr-2"></i>学習をはじめる！' +
       '</a>' +
     '</div>';
+  
+  // 既に個別コースがあるかチェック
+  if (STUDENT_ID && STUDENT_ID !== '0' && CURRICULUM_ID && CURRICULUM_ID !== '0') {
+    checkExistingPersonalizedCourse();
+  }
+}
+
+// 既存の個別コースを確認
+async function checkExistingPersonalizedCourse() {
+  try {
+    var res = await fetch('/api/student-learning/personalized-course-status?student_id=' + STUDENT_ID + '&curriculum_id=' + CURRICULUM_ID);
+    var data = await res.json();
+    if (data.exists) {
+      var section = document.getElementById('personalizedSection');
+      if (section) {
+        var guideUrl = '/guide/' + CURRICULUM_ID + '?course=' + data.course_id + '&student_id=' + STUDENT_ID + (STUDENT_NAME ? '&name=' + encodeURIComponent(STUDENT_NAME) : '');
+        section.innerHTML = 
+          '<div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-300">' +
+            '<div class="flex items-center gap-2 mb-2">' +
+              '<span class="text-2xl">🎯</span>' +
+              '<p class="font-bold text-green-800 text-sm">' + data.course_name + '（' + data.card_count + '枚のカード）</p>' +
+            '</div>' +
+            '<a href="' + guideUrl + '" class="block w-full py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl font-bold text-center transition shadow-md" style="text-decoration:none;">' +
+              '🚀 きみだけのコースで学習する！' +
+            '</a>' +
+          '</div>';
+      }
+    }
+  } catch (e) { console.log('コース確認スキップ:', e); }
+}
+
+// 個別最適化コースを生成
+async function requestPersonalizedCourse() {
+  var btn = document.getElementById('genCourseBtn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="text-2xl animate-bounce">🤖</span><span>AIがきみだけのコースを作っています…</span>';
+  btn.classList.remove('from-pink-500', 'to-orange-500', 'hover:from-pink-600', 'hover:to-orange-600');
+  btn.classList.add('from-gray-400', 'to-gray-500', 'cursor-wait');
+  
+  var noteEl = btn.nextElementSibling;
+  if (noteEl) noteEl.textContent = '⏳ しばらくまってね（約15〜30秒かかります）';
+
+  try {
+    var res = await fetch('/api/student-learning/request-personalized-course', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: parseInt(STUDENT_ID), curriculum_id: parseInt(CURRICULUM_ID) })
+    });
+    var data = await res.json();
+    
+    if (data.success) {
+      var courseId = data.course_id;
+      var guideUrl = '/guide/' + CURRICULUM_ID + '?course=' + courseId + '&student_id=' + STUDENT_ID + (STUDENT_NAME ? '&name=' + encodeURIComponent(STUDENT_NAME) : '');
+      var section = document.getElementById('personalizedSection');
+      if (section) {
+        section.innerHTML = 
+          '<div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-300 slide-in">' +
+            '<div class="text-center mb-3">' +
+              '<span class="text-4xl">🎉</span>' +
+              '<h3 class="text-lg font-bold text-green-800 mt-1">' + (data.message || 'きみだけのコースができたよ！') + '</h3>' +
+              '<p class="text-sm text-green-600">' + (data.course_name || 'きみだけのコース') + '（' + (data.card_count || '?') + '枚のカード）</p>' +
+              (data.archetype ? '<p class="text-xs text-green-500 mt-1">学びのタイプ: ' + data.archetype.name_ja + '</p>' : '') +
+            '</div>' +
+            '<a href="' + guideUrl + '" class="block w-full py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white rounded-xl font-bold text-center transition shadow-md text-lg" style="text-decoration:none;">' +
+              '🚀 きみだけのコースで学習する！' +
+            '</a>' +
+          '</div>';
+      }
+    } else {
+      btn.innerHTML = '<span class="text-2xl">😢</span><span>' + (data.error || 'うまくいかなかったよ…') + '</span>';
+      btn.classList.remove('from-gray-400', 'to-gray-500', 'cursor-wait');
+      btn.classList.add('from-red-400', 'to-red-500');
+      if (noteEl) noteEl.textContent = 'もう一度やってみるか、先生にお願いしてね';
+      // 3秒後にリトライ可能にする
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="text-2xl">🔄</span><span>もう一度ためす</span>';
+        btn.classList.remove('from-red-400', 'to-red-500');
+        btn.classList.add('from-pink-500', 'to-orange-500', 'hover:from-pink-600', 'hover:to-orange-600');
+        btn.onclick = requestPersonalizedCourse;
+      }, 3000);
+    }
+  } catch (e) {
+    console.error('個別コース生成エラー:', e);
+    btn.innerHTML = '<span class="text-2xl">😢</span><span>つうしんエラー…</span>';
+    if (noteEl) noteEl.textContent = 'ネットワークをたしかめて、もう一度やってみてね';
+    setTimeout(function() {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="text-2xl">🔄</span><span>もう一度ためす</span>';
+      btn.classList.remove('from-gray-400', 'to-gray-500', 'cursor-wait');
+      btn.classList.add('from-pink-500', 'to-orange-500');
+    }, 3000);
+  }
 }
 
 // ページ読み込み時に初期化

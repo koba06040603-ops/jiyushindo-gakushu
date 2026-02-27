@@ -382,10 +382,23 @@ export async function fetchStudentRawData(
 ): Promise<StudentRawData> {
   // 並列クエリ実行
   const [diagResult, answerResult, reflResult, hourlyResult, testResult, metaResult, perfResult] = await Promise.all([
-    // 初期診断（最新1件）
-    DB.prepare(
-      'SELECT * FROM initial_diagnostics WHERE student_id = ? ORDER BY created_at DESC LIMIT 1'
-    ).bind(studentId).first().catch(() => null),
+    // 初期診断（最新1件 — curriculum_idがあればそのカリキュラムの診断を優先）
+    (curriculumId
+      ? DB.prepare(
+          'SELECT * FROM initial_diagnostics WHERE student_id = ? AND curriculum_id = ? ORDER BY created_at DESC LIMIT 1'
+        ).bind(studentId, curriculumId).first().catch(() => null)
+      : DB.prepare(
+          'SELECT * FROM initial_diagnostics WHERE student_id = ? ORDER BY created_at DESC LIMIT 1'
+        ).bind(studentId).first().catch(() => null)
+    ).then(async (result) => {
+      // curriculum_id指定で見つからない場合は全体から最新を取得（フォールバック）
+      if (!result && curriculumId) {
+        return DB.prepare(
+          'SELECT * FROM initial_diagnostics WHERE student_id = ? ORDER BY created_at DESC LIMIT 1'
+        ).bind(studentId).first().catch(() => null)
+      }
+      return result
+    }),
 
     // 解答統計（student_card_answers集約）
     curriculumId

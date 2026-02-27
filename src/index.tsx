@@ -7732,6 +7732,24 @@ app.get('/guide/:curriculumId', async (c) => {
       }
     }
     
+    // 個別最適化コースの存在チェック（診断済み＋ガイドページが個別コース以外の場合）
+    let existingPersonalizedCourse: any = null
+    if (studentIdParam && !courseId) {
+      try {
+        existingPersonalizedCourse = await env.DB.prepare(`
+          SELECT c.id, c.course_name,
+            (SELECT COUNT(*) FROM learning_cards lc WHERE lc.course_id = c.id) as card_count
+          FROM courses c 
+          WHERE c.curriculum_id = ? AND c.course_level = 'personalized'
+            AND c.course_name LIKE ?
+          ORDER BY c.created_at DESC LIMIT 1
+        `).bind(parseInt(curriculumId), `%ID:${studentIdParam}）%`).first() as any
+        if (existingPersonalizedCourse && !(existingPersonalizedCourse as any).card_count) {
+          existingPersonalizedCourse = null
+        }
+      } catch {}
+    }
+    
     let courses: any[] = []
     let cards: any[] = []
     let isPersonalized = false
@@ -8154,19 +8172,37 @@ app.get('/guide/:curriculumId', async (c) => {
     </div>
     ` : ''}
     ${studentIdParam && diagnosticCompleted ? `
-    <div class="no-print" style="background: linear-gradient(135deg, #DCFCE7, #BBF7D0); border: 2px solid #22C55E; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-      <span style="font-size: 1.5rem;">✅</span>
-      <div style="flex: 1; min-width: 200px;">
-        <p style="font-size: 0.85rem; font-weight: bold; color: #166534;">じゅんびチェック済み</p>
-        <p style="font-size: 0.75rem; color: #15803D;">
-          学び方: ${{visual:'🖼️見る',auditory:'👂聞く',kinesthetic:'✋やる',read_write:'✏️読み書き',balanced:'⚖️バランス'}[diagnosticProfile?.learning_style || 'balanced'] || '⚖️バランス'}
-          ・すすめ方: ${{slow:'🐢じっくり',steady:'🐕ふつう',fast:'🐆どんどん'}[diagnosticProfile?.pace || 'steady'] || '🐕ふつう'}
-        </p>
+    <div class="no-print" style="background: linear-gradient(135deg, #DCFCE7, #BBF7D0); border: 2px solid #22C55E; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <span style="font-size: 1.5rem;">✅</span>
+        <div style="flex: 1; min-width: 200px;">
+          <p style="font-size: 0.85rem; font-weight: bold; color: #166534;">じゅんびチェック済み</p>
+          <p style="font-size: 0.75rem; color: #15803D;">
+            学び方: ${{visual:'🖼️見る',auditory:'👂聞く',kinesthetic:'✋やる',read_write:'✏️読み書き',balanced:'⚖️バランス'}[diagnosticProfile?.learning_style || 'balanced'] || '⚖️バランス'}
+            ・すすめ方: ${{slow:'🐢じっくり',steady:'🐕ふつう',fast:'🐆どんどん'}[diagnosticProfile?.pace || 'steady'] || '🐕ふつう'}
+          </p>
+        </div>
+        <a href="/diagnostic/${curriculumId}?student_id=${studentIdParam}${studentName ? '&name=' + encodeURIComponent(studentName) : ''}&return=${encodeURIComponent('/guide/' + curriculumId + '?student_id=' + studentIdParam + (studentName ? '&name=' + encodeURIComponent(studentName) : '') + (courseId ? '&course=' + courseId : ''))}"
+           style="background: #22C55E; color: white; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; text-decoration: none; white-space: nowrap;">
+          🔄 もう一度やる
+        </a>
       </div>
-      <a href="/diagnostic/${curriculumId}?student_id=${studentIdParam}${studentName ? '&name=' + encodeURIComponent(studentName) : ''}&return=${encodeURIComponent('/guide/' + curriculumId + '?student_id=' + studentIdParam + (studentName ? '&name=' + encodeURIComponent(studentName) : '') + (courseId ? '&course=' + courseId : ''))}"
-         style="background: #22C55E; color: white; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; text-decoration: none; white-space: nowrap;">
-        🔄 もう一度やる
-      </a>
+      ${existingPersonalizedCourse ? `
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #BBF7D0;">
+        <a href="/guide/${curriculumId}?course=${(existingPersonalizedCourse as any).id}&student_id=${studentIdParam}${studentName ? '&name=' + encodeURIComponent(studentName) : ''}"
+           style="display: block; background: linear-gradient(135deg, #EC4899, #8B5CF6); color: white; padding: 10px 16px; border-radius: 10px; font-weight: bold; text-decoration: none; text-align: center; font-size: 0.9rem;">
+          ✨ きみだけのコース（${(existingPersonalizedCourse as any).card_count}枚）で学習する
+        </a>
+      </div>
+      ` : `
+      <div id="personalizedCourseBanner" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #BBF7D0;">
+        <button onclick="requestPersonalizedCourseFromGuide()" id="guideGenBtn"
+           style="display: block; width: 100%; background: linear-gradient(135deg, #F472B6, #C084FC); color: white; padding: 10px 16px; border-radius: 10px; font-weight: bold; border: none; cursor: pointer; font-size: 0.9rem; transition: all 0.2s;">
+          ✨ きみだけの学習コースをAIに作ってもらう！
+        </button>
+        <p style="font-size: 0.65rem; color: #6B7280; text-align: center; margin-top: 4px;">じゅんびチェックの結果をもとに、きみに最適なもんだいをAIが作るよ（約15秒）</p>
+      </div>
+      `}
     </div>
     ` : ''}
 
@@ -8209,6 +8245,9 @@ app.get('/guide/:curriculumId', async (c) => {
   var COURSE_ID = ${courseId ? `'${courseId}'` : 'null'};
   var STUDENT_ID = '${studentIdParam}';
   var DIAGNOSTIC_COMPLETED = ${diagnosticCompleted ? 'true' : 'false'};
+  var STUDENT_ID_PARAM = '${studentIdParam}';
+  var CURRICULUM_ID_PARAM = '${curriculumId}';
+  var STUDENT_NAME_PARAM = '${(studentName || '').replace(/'/g, "\\'")}';
   var currentPage = 0;
   // 学習カード + チェックテスト(1) + えらべるもんだい(1) = totalPages
   var hasCheckTest = CHECK_PROBLEMS.length > 0;
@@ -8217,6 +8256,54 @@ app.get('/guide/:curriculumId', async (c) => {
   var completedCards = {};
   var aiConversation = [];
   var editMode = false;
+
+  // === 個別最適化コース生成（ガイドページから） ===
+  function requestPersonalizedCourseFromGuide() {
+    var btn = document.getElementById('guideGenBtn');
+    if (!btn || !STUDENT_ID_PARAM || !CURRICULUM_ID_PARAM) return;
+    btn.disabled = true;
+    btn.textContent = '🤖 AIがきみだけのコースを作っています…（約15秒）';
+    btn.style.background = 'linear-gradient(135deg, #9CA3AF, #6B7280)';
+    btn.style.cursor = 'wait';
+
+    fetch('/api/student-learning/request-personalized-course', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: parseInt(STUDENT_ID_PARAM), curriculum_id: parseInt(CURRICULUM_ID_PARAM) })
+    }).then(function(res) { return res.json(); }).then(function(data) {
+      var banner = document.getElementById('personalizedCourseBanner');
+      if (data.success) {
+        var courseId = data.course_id;
+        var guideUrl = '/guide/' + CURRICULUM_ID_PARAM + '?course=' + courseId + '&student_id=' + STUDENT_ID_PARAM + (STUDENT_NAME_PARAM ? '&name=' + encodeURIComponent(STUDENT_NAME_PARAM) : '');
+        if (banner) {
+          banner.innerHTML = '<a href="' + guideUrl + '" style="display:block;background:linear-gradient(135deg,#EC4899,#8B5CF6);color:white;padding:10px 16px;border-radius:10px;font-weight:bold;text-decoration:none;text-align:center;font-size:0.9rem;">✨ ' + (data.course_name || 'きみだけのコース') + '（' + (data.card_count || '?') + '枚）で学習する！</a>' +
+            '<p style="font-size:0.65rem;color:#6B7280;text-align:center;margin-top:4px;">🎉 できたよ！クリックして学習をはじめよう</p>';
+        }
+      } else {
+        if (btn) {
+          btn.textContent = '😢 ' + (data.error || 'うまくいかなかったよ');
+          btn.style.background = 'linear-gradient(135deg, #F87171, #EF4444)';
+          setTimeout(function() {
+            btn.disabled = false;
+            btn.textContent = '🔄 もう一度ためす';
+            btn.style.background = 'linear-gradient(135deg, #F472B6, #C084FC)';
+            btn.style.cursor = 'pointer';
+          }, 3000);
+        }
+      }
+    }).catch(function(err) {
+      if (btn) {
+        btn.textContent = '😢 つうしんエラー…';
+        btn.style.background = 'linear-gradient(135deg, #F87171, #EF4444)';
+        setTimeout(function() {
+          btn.disabled = false;
+          btn.textContent = '🔄 もう一度ためす';
+          btn.style.background = 'linear-gradient(135deg, #F472B6, #C084FC)';
+          btn.style.cursor = 'pointer';
+        }, 3000);
+      }
+    });
+  }
 
   // === URLコピー ===
   function copyGuideUrl() {
@@ -36034,6 +36121,300 @@ app.post('/api/student-learning/initial-diagnostic', async (c) => {
   } catch (error) {
     console.error('初期診断保存エラー:', error)
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 児童向け：個別最適化コースリクエスト（診断結果→自動コース生成） ---
+app.post('/api/student-learning/request-personalized-course', async (c) => {
+  const { env } = c
+  const startTime = Date.now()
+  try {
+    const { student_id, curriculum_id } = await c.req.json()
+    if (!student_id || !curriculum_id) {
+      return c.json({ success: false, error: 'student_id と curriculum_id が必要です' }, 400)
+    }
+    const apiKey = env.GEMINI_API_KEY
+    if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+      return c.json({ success: false, error: 'AI生成機能が設定されていません。先生にお願いしてね。' }, 503)
+    }
+
+    // 1. 診断済みか確認
+    let diagExists = false
+    try {
+      const diag = await env.DB.prepare(
+        'SELECT id FROM initial_diagnostics WHERE student_id = ? AND curriculum_id = ? LIMIT 1'
+      ).bind(parseInt(String(student_id)), parseInt(String(curriculum_id))).first()
+      diagExists = !!diag
+    } catch {}
+    if (!diagExists) {
+      return c.json({ success: false, error: 'じゅんびチェックがまだ完了していません。先にチェックをしてね！', needs_diagnostic: true }, 400)
+    }
+
+    // 2. 既存の個別コースがあるかチェック（コース名にID:student_idパターンを含むか）
+    let existingCourse: any = null
+    try {
+      existingCourse = await env.DB.prepare(`
+        SELECT c.id, c.course_name, c.created_at, 
+          (SELECT COUNT(*) FROM learning_cards lc WHERE lc.course_id = c.id) as card_count
+        FROM courses c 
+        WHERE c.curriculum_id = ? AND c.course_level = 'personalized'
+          AND c.course_name LIKE ?
+        ORDER BY c.created_at DESC LIMIT 1
+      `).bind(parseInt(String(curriculum_id)), `%ID:${student_id}）%`).first()
+    } catch {}
+
+    if (existingCourse && (existingCourse as any).card_count > 0) {
+      // 既存コースがある場合はそのIDを返す
+      return c.json({
+        success: true,
+        already_exists: true,
+        course_id: (existingCourse as any).id,
+        course_name: (existingCourse as any).course_name,
+        card_count: (existingCourse as any).card_count,
+        message: 'きみだけのコースはもう作ってあるよ！'
+      })
+    }
+
+    // 3. カリキュラム情報を取得
+    const curriculum = await env.DB.prepare('SELECT * FROM curriculum WHERE id = ?').bind(curriculum_id).first() as any
+    if (!curriculum) return c.json({ success: false, error: 'カリキュラムが見つかりません' }, 404)
+
+    // 4. 既存コースのカード情報を取得（ベースライン）
+    const baseCourses = await env.DB.prepare(`
+      SELECT c.*, 
+        (SELECT COUNT(*) FROM learning_cards lc WHERE lc.course_id = c.id) as card_count
+      FROM courses c WHERE c.curriculum_id = ? ORDER BY c.course_level
+    `).bind(curriculum_id).all()
+    let baseCards: any[] = []
+    for (const course of (baseCourses.results || []) as any[]) {
+      const cards = await env.DB.prepare(`
+        SELECT * FROM learning_cards WHERE course_id = ? ORDER BY card_order
+      `).bind(course.id).all()
+      baseCards = baseCards.concat((cards.results || []).map((card: any) => ({
+        ...card, course_name: course.course_name, course_level: course.course_level
+      })))
+    }
+
+    // 5. v4統合エンジン実行
+    const rawData = await fetchStudentRawData(env.DB, parseInt(String(student_id)), parseInt(String(curriculum_id)))
+    const profiles = buildProfilesFromD1(rawData)
+    const behavior = await buildBehaviorFromD1(env.DB, parseInt(String(student_id)), parseInt(String(curriculum_id)))
+    const v4Result = computeIntegratedControls(profiles, behavior)
+    const arch = ARCHETYPES[v4Result.archetype]
+    const template = determineCardTemplate(v4Result.controls, v4Result.archetype)
+    const v4PromptSection = buildV4PromptSection(v4Result.controls, v4Result.archetype, v4Result.axes)
+
+    // 6. Gemini AIでカード生成
+    const prompt = `
+あなたは12の教育理論を統合したAI教育システムです。
+児童がじゅんびチェック（適性診断）を完了しました。その結果に基づいて、この児童に最適化された学習カードを生成してください。
+
+【カリキュラム情報】
+- 教科: ${curriculum.subject}
+- 単元: ${curriculum.unit_name}
+- 学年: ${curriculum.grade}
+- 単元目標: ${curriculum.unit_goal || '未設定'}
+
+【既存コースの学習カード（ベースライン参考）】
+${baseCards.slice(0, 6).map((card: any) => `- [${card.course_name}] ${card.card_title}: ${(card.problem_text || '').substring(0, 50)}`).join('\n')}
+
+${v4PromptSection}
+
+【カード構造テンプレート（v4制御パラメータで決定済み）】
+- メディアタイプ: ${template.media_type}
+- 問題形式: ${template.question_format}
+- ヒント段階数: ${template.scaffold_structure.hint_levels}
+- 推奨カード数: ${template.recommended_card_count}枚
+- 1枚あたり推定時間: ${template.recommended_time_per_card}分
+
+【重要ルール】
+1. problem_textは児童が直接解く具体的な問題文にすること
+2. 児童の学習スタイルに合わせたメディア指示を含めること
+3. ${curriculum.grade}の児童にふさわしい言葉遣いにすること
+
+【出力JSON形式】
+{
+  "course_name": "きみだけの${curriculum.subject}コース",
+  "analysis_summary": "この児童の特性分析（2文）",
+  "recommended_approach": "推奨する指導アプローチ（1文）",
+  "cards": [
+    {
+      "card_title": "カードタイトル",
+      "card_description": "カードの説明（1文）",
+      "problem_text": "具体的な問題文",
+      "hint_text": "ヒント（段階的に3つ）",
+      "answer_text": "答え",
+      "explanation_text": "解説",
+      "ai_teacher_message": "AI先生からの励ましメッセージ",
+      "difficulty": "基礎/標準/応用",
+      "estimated_minutes": 5,
+      "new_terms": "新しい用語（あれば）",
+      "real_world_connection": "日常生活との関連"
+    }
+  ]
+}
+
+JSON のみ出力してください。`
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`
+    const geminiRes = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 8000 }
+      })
+    })
+    const geminiData = await geminiRes.json() as any
+    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSONパース
+    let parsed: any = null
+    try {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+      if (jsonMatch) parsed = JSON.parse(jsonMatch[0])
+    } catch (e) {
+      console.error('AI応答パースエラー:', e)
+      return c.json({ success: false, error: 'AIの回答を理解できませんでした。もう一度やってみてね。' }, 500)
+    }
+    if (!parsed || !parsed.cards || parsed.cards.length === 0) {
+      return c.json({ success: false, error: 'AIがカードを生成できませんでした' }, 500)
+    }
+
+    // 7. DBに保存（既存スキーマに合わせて student_id はコース名に含める）
+    const courseName = parsed.course_name || `きみだけの${curriculum.subject}コース`
+    const courseNameWithId = `${courseName}（ID:${student_id}）`
+    const courseResult = await env.DB.prepare(`
+      INSERT INTO courses (curriculum_id, course_name, course_level, description, created_at)
+      VALUES (?, ?, 'personalized', ?, datetime('now'))
+    `).bind(curriculum_id, courseNameWithId, parsed.analysis_summary || '個別最適化コース').run()
+    const courseId = courseResult.meta.last_row_id
+
+    for (let i = 0; i < parsed.cards.length; i++) {
+      const card = parsed.cards[i]
+      const diffLevel = card.difficulty === '応用' ? 'hard' : card.difficulty === '基礎' ? 'easy' : 'standard'
+      // hint_textが配列の場合は文字列に変換
+      let hintText = card.hint_text || ''
+      if (Array.isArray(hintText)) hintText = hintText.join('\n')
+      if (typeof hintText === 'object') hintText = JSON.stringify(hintText)
+      // answer_textも同様
+      let answerText = card.answer_text || card.answer || ''
+      if (typeof answerText === 'object') answerText = JSON.stringify(answerText)
+      let explanationText = card.explanation_text || card.explanation || ''
+      if (typeof explanationText === 'object') explanationText = JSON.stringify(explanationText)
+
+      await env.DB.prepare(`
+        INSERT INTO learning_cards (
+          course_id, card_number, card_order, card_title, card_type,
+          subject, grade_level, unit_name, difficulty_level, learning_track,
+          problem_text, problem_description, correct_answer, answer, explanation, answer_explanation,
+          hint_text, estimated_time_minutes,
+          ai_teacher_message, new_terms, real_world_connection, example_problem, example_solution,
+          is_active, created_at
+        ) VALUES (?, ?, ?, ?, 'standard', ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+      `).bind(
+        courseId, i + 1, i + 1,
+        card.card_title || `カード${i + 1}`, 
+        curriculum.subject, parseInt(String(curriculum.grade).replace(/[^0-9]/g, '')) || 5, curriculum.unit_name,
+        diffLevel,
+        card.problem_text || '',
+        card.card_description || card.problem_text || '',
+        String(answerText),
+        String(answerText),
+        String(explanationText),
+        String(explanationText),
+        String(hintText),
+        card.estimated_minutes || 5,
+        card.ai_teacher_message || '',
+        typeof card.new_terms === 'object' ? JSON.stringify(card.new_terms) : (card.new_terms || ''),
+        card.real_world_connection || '',
+        card.example_problem || '',
+        card.example_solution || ''
+      ).run()
+    }
+
+    // 8. メタデータ保存（テーブルがない場合は作成）
+    try {
+      await env.DB.prepare(`CREATE TABLE IF NOT EXISTS personalized_course_metadata (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        course_id INTEGER NOT NULL,
+        curriculum_id INTEGER,
+        student_id INTEGER,
+        analysis_summary TEXT DEFAULT '',
+        recommended_approach TEXT DEFAULT '',
+        archetype_id TEXT DEFAULT '',
+        archetype_name TEXT DEFAULT '',
+        v4_axes TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`).run()
+      await env.DB.prepare(`
+        INSERT INTO personalized_course_metadata 
+        (course_id, curriculum_id, student_id, analysis_summary, recommended_approach, 
+         archetype_id, archetype_name, v4_axes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `).bind(
+        courseId, curriculum_id, student_id,
+        parsed.analysis_summary || '',
+        parsed.recommended_approach || '',
+        v4Result.archetype,
+        arch.name_ja,
+        JSON.stringify(v4Result.axes)
+      ).run()
+    } catch (metaErr) {
+      // メタデータ保存はオプション — 失敗しても本体は成功
+      console.log('メタデータ保存スキップ:', metaErr)
+    }
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`✅ 児童個別コース生成完了: student=${student_id}, course=${courseId}, cards=${parsed.cards.length}, time=${elapsed}s`)
+
+    return c.json({
+      success: true,
+      course_id: courseId,
+      course_name: courseName,
+      card_count: parsed.cards.length,
+      analysis_summary: parsed.analysis_summary || '',
+      archetype: { id: v4Result.archetype, name_ja: arch.name_ja },
+      elapsed_seconds: parseFloat(elapsed),
+      message: 'きみだけの学習コースができたよ！'
+    })
+
+  } catch (error: any) {
+    console.error('児童向け個別コース生成エラー:', error)
+    return c.json({ success: false, error: error.message || 'エラーが発生しました' }, 500)
+  }
+})
+
+// --- 児童向け：個別コース存在確認API ---
+app.get('/api/student-learning/personalized-course-status', async (c) => {
+  const { env } = c
+  try {
+    const student_id = c.req.query('student_id')
+    const curriculum_id = c.req.query('curriculum_id')
+    if (!student_id || !curriculum_id) {
+      return c.json({ exists: false })
+    }
+    const course = await env.DB.prepare(`
+      SELECT c.id, c.course_name, c.created_at,
+        (SELECT COUNT(*) FROM learning_cards lc WHERE lc.course_id = c.id) as card_count
+      FROM courses c 
+      WHERE c.curriculum_id = ? AND c.course_level = 'personalized'
+        AND c.course_name LIKE ?
+      ORDER BY c.created_at DESC LIMIT 1
+    `).bind(parseInt(curriculum_id), `%ID:${student_id}）%`).first() as any
+
+    if (course && course.card_count > 0) {
+      return c.json({
+        exists: true,
+        course_id: course.id,
+        course_name: course.course_name,
+        card_count: course.card_count,
+        created_at: course.created_at
+      })
+    }
+    return c.json({ exists: false })
+  } catch {
+    return c.json({ exists: false })
   }
 })
 
