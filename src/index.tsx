@@ -8523,8 +8523,9 @@ app.get('/guide/:curriculumId', async (c) => {
         }).catch(function() {});
     }
 
-    // === F8: 自律性支援 — 学習順序の選択権を児童に与える ===
+    // === F8: 自律性支援 — 学習の3軸自己選択（順序・難易度・解法） ===
     // 自己決定理論: 「自分で決めた」体験が内発的動機づけを高める
+    // 3つの選択軸: (1)どこからやるか (2)どの難易度から解くか (3)どのやり方で解くか
     if (ALL_CARDS.length >= 3) {
       setTimeout(function() {
         var choiceArea = document.getElementById('learningChoiceArea');
@@ -8536,25 +8537,88 @@ app.get('/guide/:curriculumId', async (c) => {
         
         // カードの種類を分析して選択肢を提示
         var easyCards = [];
+        var standardCards = [];
         var challengeCards = [];
         var funCards = [];
         ALL_CARDS.forEach(function(c, idx) {
           var diff = c.difficulty_level || 'standard';
           if (diff === 'easy' || diff === 'basic') easyCards.push(idx);
           else if (diff === 'hard' || diff === 'challenge') challengeCards.push(idx);
+          else standardCards.push(idx);
           if (c.real_world_context || c.real_world_connection) funCards.push(idx);
         });
 
-        choiceArea.innerHTML = '<div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px solid #C4B5FD;border-radius:16px;padding:16px;margin-bottom:12px;">' +
+        // 選択記録用
+        window._learningChoices = window._learningChoices || { order: null, difficulty: null, thinkingStyle: null };
+
+        var innerHTML = '<div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px solid #C4B5FD;border-radius:16px;padding:16px;margin-bottom:12px;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;">' +
-          '<p style="font-weight:bold;color:#6D28D9;font-size:0.95rem;">🎯 今日はどこからやる？</p>' +
-          '<button onclick="this.closest(\\x27#learningChoiceArea\\x27).style.display=\\x27none\\x27" style="background:none;border:none;color:#C4B5FD;cursor:pointer;">✕</button></div>' +
-          '<p style="font-size:0.8rem;color:#7C3AED;margin:6px 0 10px;">自分で決めてやると、もっと力がつくよ！</p>' +
-          '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
-          '<button onclick="goToCard(0);this.closest(\\x27#learningChoiceArea\\x27).innerHTML=\\x27<p style=color:#6D28D9;font-weight:bold;text-align:center;padding:8px>✅ 最初から順番にやる！がんばろう！</p>\\x27" style="flex:1;min-width:100px;background:white;border:2px solid #A78BFA;border-radius:12px;padding:10px 8px;cursor:pointer;text-align:center;"><div style="font-size:1.3rem;">📚</div><div style="font-size:0.8rem;font-weight:bold;color:#6D28D9;">順番にやる</div></button>' +
-          (challengeCards.length > 0 ? '<button onclick="goToCard(' + challengeCards[0] + ');this.closest(\\x27#learningChoiceArea\\x27).innerHTML=\\x27<p style=color:#6D28D9;font-weight:bold;text-align:center;padding:8px>✅ チャレンジ問題に挑戦！かっこいい！</p>\\x27" style="flex:1;min-width:100px;background:white;border:2px solid #F59E0B;border-radius:12px;padding:10px 8px;cursor:pointer;text-align:center;"><div style="font-size:1.3rem;">🔥</div><div style="font-size:0.8rem;font-weight:bold;color:#B45309;">チャレンジ！</div></button>' : '') +
-          (easyCards.length > 0 ? '<button onclick="goToCard(' + easyCards[0] + ');this.closest(\\x27#learningChoiceArea\\x27).innerHTML=\\x27<p style=color:#6D28D9;font-weight:bold;text-align:center;padding:8px>✅ 基本からしっかり！いい選択だね！</p>\\x27" style="flex:1;min-width:100px;background:white;border:2px solid #10B981;border-radius:12px;padding:10px 8px;cursor:pointer;text-align:center;"><div style="font-size:1.3rem;">🌱</div><div style="font-size:0.8rem;font-weight:bold;color:#059669;">基本から</div></button>' : '') +
-          '</div></div>';
+          '<p style="font-weight:bold;color:#6D28D9;font-size:0.95rem;">🎯 今日の学び方を自分で決めよう！</p>' +
+          '<button onclick="this.closest(\\x27#learningChoiceArea\\x27).style.display=\\x27none\\x27" style="background:none;border:none;color:#C4B5FD;cursor:pointer;font-size:1.2rem;">✕</button></div>' +
+          '<p style="font-size:0.8rem;color:#7C3AED;margin:4px 0 10px;">自分で選んでやると、もっと力がつくよ！（自己決定理論）</p>';
+
+        // === 軸1: どこからやるか（順序の選択） ===
+        innerHTML += '<div style="margin-bottom:10px;">' +
+          '<p style="font-size:0.8rem;font-weight:bold;color:#4C1D95;margin-bottom:6px;">① どこからやる？</p>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+          '<button onclick="goToCard(0);window._learningChoices.order=\\x27sequential\\x27;document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ 最初から順番に！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #A78BFA;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">📚</div><div style="font-size:0.75rem;font-weight:bold;color:#6D28D9;">順番に</div></button>';
+
+        if (challengeCards.length > 0) {
+          innerHTML += '<button onclick="goToCard(' + challengeCards[0] + ');window._learningChoices.order=\\x27challenge_first\\x27;document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ チャレンジから！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #F59E0B;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">🔥</div><div style="font-size:0.75rem;font-weight:bold;color:#B45309;">むずかしいのから</div></button>';
+        }
+        if (easyCards.length > 0) {
+          innerHTML += '<button onclick="goToCard(' + easyCards[0] + ');window._learningChoices.order=\\x27easy_first\\x27;document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ 基本から！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #10B981;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">🌱</div><div style="font-size:0.75rem;font-weight:bold;color:#059669;">かんたんから</div></button>';
+        }
+        if (funCards.length > 0) {
+          innerHTML += '<button onclick="goToCard(' + funCards[0] + ');window._learningChoices.order=\\x27fun_first\\x27;document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ 生活につながる問題から！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #06B6D4;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">🌍</div><div style="font-size:0.75rem;font-weight:bold;color:#0E7490;">生活問題から</div></button>';
+        }
+        innerHTML += '</div>' +
+          '<p id="choiceConfirm1" style="display:none;font-size:0.8rem;color:#059669;font-weight:bold;margin-top:4px;text-align:center;"></p></div>';
+
+        // === 軸2: どの難易度でやるか（全体の難易度選択） ===
+        innerHTML += '<div style="margin-bottom:10px;">' +
+          '<p style="font-size:0.8rem;font-weight:bold;color:#4C1D95;margin-bottom:6px;">② どのレベルでやる？</p>' +
+          '<div style="display:flex;gap:6px;">' +
+          '<button onclick="window._learningChoices.difficulty=\\x27easy\\x27;document.getElementById(\\x27choiceConfirm2\\x27).innerHTML=\\x27✅ 基本をしっかり！\\x27;document.getElementById(\\x27choiceConfirm2\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27基本をしっかりやるのは大切だね！\\x27,\\x27encourage\\x27,3000,false)" style="flex:1;background:white;border:2px solid #10B981;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;"><div style="font-size:1.1rem;">🌱</div><div style="font-size:0.7rem;font-weight:bold;color:#059669;">きほん</div></button>' +
+          '<button onclick="window._learningChoices.difficulty=\\x27standard\\x27;document.getElementById(\\x27choiceConfirm2\\x27).innerHTML=\\x27✅ バランスよく！\\x27;document.getElementById(\\x27choiceConfirm2\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27バランスよくやるのはいい作戦だね！\\x27,\\x27encourage\\x27,3000,false)" style="flex:1;background:white;border:2px solid #3B82F6;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;"><div style="font-size:1.1rem;">📘</div><div style="font-size:0.7rem;font-weight:bold;color:#1D4ED8;">ふつう</div></button>' +
+          '<button onclick="window._learningChoices.difficulty=\\x27hard\\x27;document.getElementById(\\x27choiceConfirm2\\x27).innerHTML=\\x27✅ チャレンジ！\\x27;document.getElementById(\\x27choiceConfirm2\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27チャレンジ精神がすばらしい！\\x27,\\x27celebrate\\x27,3000,false)" style="flex:1;background:white;border:2px solid #EF4444;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;"><div style="font-size:1.1rem;">🔥</div><div style="font-size:0.7rem;font-weight:bold;color:#DC2626;">むずかしめ</div></button>' +
+          '</div>' +
+          '<p id="choiceConfirm2" style="display:none;font-size:0.8rem;color:#059669;font-weight:bold;margin-top:4px;text-align:center;"></p></div>';
+
+        // === 軸3: どのやり方で解くか（考え方の選択＝演繹法・帰納法・視覚的方法） ===
+        // 自己決定理論×メタ認知(F9): 解法を自己選択できることが自律性を高める
+        // 平行四辺形の例: ①三角形の公式の応用(演繹) ②長方形に変形(視覚的) ③公式で(手続的)
+        innerHTML += '<div style="margin-bottom:10px;">' +
+          '<p style="font-size:0.8rem;font-weight:bold;color:#4C1D95;margin-bottom:6px;">③ どうやって考える？（考え方のタイプ）</p>' +
+          '<p style="font-size:0.7rem;color:#7C3AED;margin-bottom:6px;">問題ごとに「解き方」が出てくるよ。自分に合う考え方をえらぼう！</p>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+          '<button onclick="window._learningChoices.thinkingStyle=\\x27deductive\\x27;document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ 公式・きまりから考える！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27きまりを使って考えるのは算数の力！\\x27,\\x27encourage\\x27,3000,false)" ' +
+          'style="flex:1;min-width:90px;background:white;border:2px solid #6366F1;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;">' +
+          '<div style="font-size:1.1rem;">📐</div>' +
+          '<div style="font-size:0.7rem;font-weight:bold;color:#4338CA;">きまりから考える</div>' +
+          '<div style="font-size:0.6rem;color:#818CF8;">（演繹的）</div></button>' +
+          '<button onclick="window._learningChoices.thinkingStyle=\\x27inductive\\x27;document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ 例から発見する！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27自分で見つけるのはすごい力！\\x27,\\x27celebrate\\x27,3000,false)" ' +
+          'style="flex:1;min-width:90px;background:white;border:2px solid #F59E0B;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;">' +
+          '<div style="font-size:1.1rem;">🔍</div>' +
+          '<div style="font-size:0.7rem;font-weight:bold;color:#B45309;">例からみつける</div>' +
+          '<div style="font-size:0.6rem;color:#D97706;">（帰納的）</div></button>' +
+          '<button onclick="window._learningChoices.thinkingStyle=\\x27visual\\x27;document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ 図で考える！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27図で考えるのはとても大事！\\x27,\\x27encourage\\x27,3000,false)" ' +
+          'style="flex:1;min-width:90px;background:white;border:2px solid #10B981;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;">' +
+          '<div style="font-size:1.1rem;">🖼️</div>' +
+          '<div style="font-size:0.7rem;font-weight:bold;color:#059669;">図でかんがえる</div>' +
+          '<div style="font-size:0.6rem;color:#10B981;">（視覚的）</div></button>' +
+          '<button onclick="window._learningChoices.thinkingStyle=\\x27experimental\\x27;document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ やってみて考える！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27試行錯誤は学びの第一歩！\\x27,\\x27celebrate\\x27,3000,false)" ' +
+          'style="flex:1;min-width:90px;background:white;border:2px solid #EC4899;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;">' +
+          '<div style="font-size:1.1rem;">🧪</div>' +
+          '<div style="font-size:0.7rem;font-weight:bold;color:#BE185D;">ためしてみる</div>' +
+          '<div style="font-size:0.6rem;color:#EC4899;">（実験的）</div></button>' +
+          '</div>' +
+          '<p id="choiceConfirm3" style="display:none;font-size:0.8rem;color:#059669;font-weight:bold;margin-top:4px;text-align:center;"></p>' +
+          '<div style="margin-top:6px;background:white;border:1px solid #E9D5FF;border-radius:8px;padding:6px 10px;font-size:0.65rem;color:#6B21A8;">' +
+          '💡 問題ごとにも「どの解き方がいいか」選べるよ！（例：平行四辺形の面積 → 三角形から導く／長方形に変形する／公式を使う）</div></div>';
+
+        innerHTML += '</div>';
+        choiceArea.innerHTML = innerHTML;
       }, 300);
     }
   }
@@ -8775,6 +8839,35 @@ app.get('/guide/:curriculumId', async (c) => {
     // 回答入力欄
     html += '<div style="margin-top:16px;"><p style="font-size:0.9rem;font-weight:bold;color:#1E40AF;margin-bottom:6px;"><i class="fas fa-pen" style="margin-right:4px;"></i>こたえをかこう：</p>';
     html += '<div class="answer-box"><textarea id="answer-' + currentPage + '" placeholder="こたえをここに書こう" rows="3"></textarea></div></div>';
+
+    // === F9+F1: 画面上の手書きキャンバス（筆算・計算メモ・図を描ける） ===
+    // 身体感覚チャネル(F1)×メタ認知(F9): パソコン上で手書きの思考過程を残せる
+    html += '<div class="no-print" style="margin-top:8px;">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+    html += '<button id="toggle-canvas-' + currentPage + '" onclick="toggleDrawCanvas(' + currentPage + ')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#FFF7ED,#FFEDD5);border:2px solid #FB923C;border-radius:10px;padding:6px 12px;cursor:pointer;font-size:0.8rem;font-weight:bold;color:#C2410C;"><i class="fas fa-pencil-ruler"></i>計算メモ・筆算パッド</button>';
+    html += '<span style="font-size:0.7rem;color:#9CA3AF;">画面上で筆算や図を書けるよ</span>';
+    html += '</div>';
+    html += '<div id="canvas-area-' + currentPage + '" style="display:none;">';
+    html += '<div style="background:white;border:2px solid #FED7AA;border-radius:12px;padding:8px;position:relative;">';
+    // ツールバー
+    html += '<div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;align-items:center;">';
+    html += '<button onclick="setCanvasTool(' + currentPage + ',\\x27pen\\x27,\\x27#1E40AF\\x27,2)" style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">🖊️ ペン</button>';
+    html += '<button onclick="setCanvasTool(' + currentPage + ',\\x27pen\\x27,\\x27#DC2626\\x27,3)" style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">🔴 赤</button>';
+    html += '<button onclick="setCanvasTool(' + currentPage + ',\\x27pen\\x27,\\x27#059669\\x27,3)" style="background:#D1FAE5;border:1px solid #6EE7B7;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">🟢 緑</button>';
+    html += '<button onclick="setCanvasTool(' + currentPage + ',\\x27pen\\x27,\\x27#1E40AF\\x27,5)" style="background:#BFDBFE;border:1px solid #60A5FA;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">🖊️ 太</button>';
+    html += '<button onclick="setCanvasTool(' + currentPage + ',\\x27eraser\\x27,\\x27white\\x27,20)" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">消しゴム</button>';
+    html += '<button onclick="undoCanvas(' + currentPage + ')" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;" title="もどす">↩️</button>';
+    html += '<button onclick="clearCanvas(' + currentPage + ')" style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">🗑️</button>';
+    html += '<span style="flex:1;"></span>';
+    html += '<button onclick="captureCanvasForAI(' + currentPage + ')" style="background:linear-gradient(135deg,#8B5CF6,#6366F1);color:white;border:none;border-radius:8px;padding:4px 10px;font-size:0.75rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(99,102,241,0.3);">🤖 AIによみとってもらう</button>';
+    html += '</div>';
+    // キャンバス本体（方眼風、大きめサイズ、筆算に十分な高さ）
+    html += '<canvas id="draw-canvas-' + currentPage + '" width="680" height="340" style="width:100%;height:auto;min-height:200px;border:1px solid #E5E7EB;border-radius:8px;cursor:crosshair;touch-action:none;background:repeating-linear-gradient(0deg,transparent,transparent 19px,#F3F4F6 19px,#F3F4F6 20px),repeating-linear-gradient(90deg,transparent,transparent 19px,#F3F4F6 19px,#F3F4F6 20px);"></canvas>';
+    // キャンバスの使い方ガイド（初めて使う児童向け）
+    html += '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;text-align:center;">指やペンで筆算・計算式・図をかけるよ。書いたら「AIによみとってもらう」ボタンをおそう！</p>';
+    html += '</div>';
+    html += '<div id="canvas-ai-result-' + currentPage + '" style="margin-top:6px;"></div>';
+    html += '</div></div>';
 
     // === F9: ノート撮影ボタン（Gemini 3.1による手書き思考過程分析） ===
     html += '<div class="no-print" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
@@ -9592,6 +9685,7 @@ app.get('/guide/:curriculumId', async (c) => {
         '<button onclick="document.getElementById(\\x27grade-result-' + page + '\\x27).style.display=\\x27none\\x27;document.getElementById(\\x27answer-' + page + '\\x27).value=\\x27\\x27;document.getElementById(\\x27answer-' + page + '\\x27).focus();" style="background:#F59E0B;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-redo" style="margin-right:6px;"></i>もう一度</button>' +
         '<button onclick="toggleHints(' + page + ')" style="background:#8B5CF6;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-lightbulb" style="margin-right:6px;"></i>ヒントを見る</button>' +
         '<button onclick="showThinkAloud(' + page + ')" style="background:#0EA5E9;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-brain" style="margin-right:6px;"></i>解き方を見る</button>' +
+        '<button onclick="toggleDrawCanvas(' + page + ');document.getElementById(\\x27canvas-area-' + page + '\\x27).scrollIntoView({behavior:\\x27smooth\\x27})" style="background:#FB923C;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-pencil-ruler" style="margin-right:6px;"></i>筆算メモで考える</button>' +
         '</div>' + metacogHTML + '</div>';
     }
     resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -9771,9 +9865,394 @@ app.get('/guide/:curriculumId', async (c) => {
     reader.readAsDataURL(file);
   }
 
+  // =====================================================================
+  // === F9+F1: 画面上手書きキャンバス — Canvas API完全実装 ===
+  // 身体感覚チャネル(F1)×メタ認知(F9)×思考発話(F5)
+  // パソコン上で筆算・計算メモ・図を描き、思考過程をAIが読み取る
+  // =====================================================================
+
+  // キャンバス状態管理（ページ別）
+  window._canvasStates = window._canvasStates || {};
+
+  function getCanvasState(page) {
+    if (!window._canvasStates[page]) {
+      window._canvasStates[page] = {
+        isDrawing: false,
+        tool: 'pen',
+        color: '#1E40AF',
+        lineWidth: 2,
+        history: [],      // Undo用の履歴スナップショット
+        historyIndex: -1,
+        lastPoint: null,
+        pressure: 1.0      // 筆圧対応
+      };
+    }
+    return window._canvasStates[page];
+  }
+
+  // キャンバスの表示トグル
+  function toggleDrawCanvas(page) {
+    var area = document.getElementById('canvas-area-' + page);
+    if (!area) return;
+    var isHidden = area.style.display === 'none';
+    area.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      initDrawCanvas(page);
+    }
+  }
+
+  // キャンバス初期化（ペン・タッチ・マウス対応）
+  function initDrawCanvas(page) {
+    var canvas = document.getElementById('draw-canvas-' + page);
+    if (!canvas || canvas.dataset.initialized) return;
+    canvas.dataset.initialized = 'true';
+
+    var ctx = canvas.getContext('2d');
+    var state = getCanvasState(page);
+
+    // 高DPI対応: デバイスピクセル比でキャンバス解像度を上げる
+    var dpr = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+
+    // 方眼の再描画
+    drawGrid(ctx, rect.width, rect.height);
+
+    // 初回スナップショット保存
+    saveCanvasSnapshot(page);
+
+    // --- マウスイベント ---
+    canvas.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      startDraw(page, e.offsetX, e.offsetY, 1.0);
+    });
+    canvas.addEventListener('mousemove', function(e) {
+      e.preventDefault();
+      moveDraw(page, e.offsetX, e.offsetY, 1.0);
+    });
+    canvas.addEventListener('mouseup', function(e) {
+      endDraw(page);
+    });
+    canvas.addEventListener('mouseleave', function(e) {
+      endDraw(page);
+    });
+
+    // --- タッチイベント（タブレット・スマホ）---
+    canvas.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+      var touch = e.touches[0];
+      var r = canvas.getBoundingClientRect();
+      var pressure = touch.force || 0.5;
+      startDraw(page, touch.clientX - r.left, touch.clientY - r.top, pressure);
+    }, { passive: false });
+    canvas.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+      var touch = e.touches[0];
+      var r = canvas.getBoundingClientRect();
+      var pressure = touch.force || 0.5;
+      moveDraw(page, touch.clientX - r.left, touch.clientY - r.top, pressure);
+    }, { passive: false });
+    canvas.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      endDraw(page);
+    });
+
+    // --- ポインターイベント（ペンタブ・スタイラス対応）---
+    if (window.PointerEvent) {
+      canvas.addEventListener('pointerdown', function(e) {
+        if (e.pointerType === 'mouse') return; // マウスは上で処理済み
+        e.preventDefault();
+        var r = canvas.getBoundingClientRect();
+        startDraw(page, e.clientX - r.left, e.clientY - r.top, e.pressure || 0.5);
+      });
+      canvas.addEventListener('pointermove', function(e) {
+        if (e.pointerType === 'mouse') return;
+        e.preventDefault();
+        var r = canvas.getBoundingClientRect();
+        moveDraw(page, e.clientX - r.left, e.clientY - r.top, e.pressure || 0.5);
+      });
+      canvas.addEventListener('pointerup', function(e) {
+        if (e.pointerType === 'mouse') return;
+        endDraw(page);
+      });
+    }
+  }
+
+  // 方眼罫線を描画
+  function drawGrid(ctx, w, h) {
+    ctx.save();
+    ctx.strokeStyle = '#F3F4F6';
+    ctx.lineWidth = 0.5;
+    for (var x = 0; x <= w; x += 20) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    }
+    for (var y = 0; y <= h; y += 20) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 描画開始
+  function startDraw(page, x, y, pressure) {
+    var state = getCanvasState(page);
+    state.isDrawing = true;
+    state.lastPoint = { x: x, y: y };
+    state.pressure = pressure || 1.0;
+  }
+
+  // 描画中
+  function moveDraw(page, x, y, pressure) {
+    var state = getCanvasState(page);
+    if (!state.isDrawing || !state.lastPoint) return;
+    var canvas = document.getElementById('draw-canvas-' + page);
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+
+    ctx.beginPath();
+    ctx.moveTo(state.lastPoint.x, state.lastPoint.y);
+    ctx.lineTo(x, y);
+    if (state.tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.lineWidth = state.lineWidth;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = state.color;
+      // 筆圧による太さ変動（ペンタブ対応）
+      var pw = (pressure || state.pressure || 0.5);
+      ctx.lineWidth = state.lineWidth * (0.5 + pw);
+    }
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    state.lastPoint = { x: x, y: y };
+  }
+
+  // 描画終了（スナップショット保存）
+  function endDraw(page) {
+    var state = getCanvasState(page);
+    if (!state.isDrawing) return;
+    state.isDrawing = false;
+    state.lastPoint = null;
+    saveCanvasSnapshot(page);
+  }
+
+  // キャンバスのスナップショットを保存（Undo用）
+  function saveCanvasSnapshot(page) {
+    var canvas = document.getElementById('draw-canvas-' + page);
+    if (!canvas) return;
+    var state = getCanvasState(page);
+    // 現在位置以降の履歴を破棄
+    state.history = state.history.slice(0, state.historyIndex + 1);
+    state.history.push(canvas.toDataURL());
+    state.historyIndex = state.history.length - 1;
+    // 最大30スナップショット保持
+    if (state.history.length > 30) {
+      state.history.shift();
+      state.historyIndex--;
+    }
+  }
+
+  // ツール切り替え
+  function setCanvasTool(page, tool, color, lineWidth) {
+    var state = getCanvasState(page);
+    state.tool = tool;
+    state.color = color;
+    state.lineWidth = lineWidth;
+    // アクティブボタン表示
+    var area = document.getElementById('canvas-area-' + page);
+    if (area) {
+      var btns = area.querySelectorAll('button');
+      btns.forEach(function(b) { b.style.fontWeight = 'normal'; b.style.boxShadow = 'none'; });
+    }
+  }
+
+  // 全消し
+  function clearCanvas(page) {
+    var canvas = document.getElementById('draw-canvas-' + page);
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var dpr = window.devicePixelRatio || 1;
+    var w = canvas.width / dpr;
+    var h = canvas.height / dpr;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid(ctx, w, h);
+    saveCanvasSnapshot(page);
+  }
+
+  // Undo（一つ前に戻す）
+  function undoCanvas(page) {
+    var state = getCanvasState(page);
+    if (state.historyIndex <= 0) return;
+    state.historyIndex--;
+    restoreCanvasSnapshot(page, state.history[state.historyIndex]);
+  }
+
+  // Redo（一つ先に進む）
+  function redoCanvas(page) {
+    var state = getCanvasState(page);
+    if (state.historyIndex >= state.history.length - 1) return;
+    state.historyIndex++;
+    restoreCanvasSnapshot(page, state.history[state.historyIndex]);
+  }
+
+  // スナップショットからキャンバスを復元
+  function restoreCanvasSnapshot(page, dataUrl) {
+    var canvas = document.getElementById('draw-canvas-' + page);
+    if (!canvas || !dataUrl) return;
+    var ctx = canvas.getContext('2d');
+    var img = new Image();
+    img.onload = function() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = dataUrl;
+  }
+
+  // =====================================================================
+  // === キャンバス手書き → AI解析（Gemini 3.1 思考過程分析）===
+  // 計算式・筆算・メモ・図から、思考の良い点と間違い箇所を検出
+  // =====================================================================
+  function captureCanvasForAI(page) {
+    var canvas = document.getElementById('draw-canvas-' + page);
+    var resultDiv = document.getElementById('canvas-ai-result-' + page);
+    if (!canvas || !resultDiv) return;
+
+    // キャンバスが空かチェック
+    var state = getCanvasState(page);
+    if (state.history.length <= 1) {
+      resultDiv.innerHTML = '<div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.8rem;color:#92400E;text-align:center;">まず何か書いてからAIによみとってもらおう！</div>';
+      return;
+    }
+
+    resultDiv.innerHTML = '<div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px solid #C4B5FD;border-radius:12px;padding:12px;text-align:center;">' +
+      '<i class="fas fa-spinner fa-spin" style="color:#7C3AED;font-size:1.2rem;"></i>' +
+      '<p style="color:#7C3AED;font-size:0.85rem;font-weight:bold;margin-top:6px;">AIが計算メモをよみとっています...</p>' +
+      '<p style="font-size:0.7rem;color:#A78BFA;">筆算・式・図から考え方を分析中</p></div>';
+
+    // キャンバスをbase64画像に変換
+    var imageData = canvas.toDataURL('image/png');
+
+    var card = ALL_CARDS[page];
+    var studentAnswer = '';
+    var answerEl = document.getElementById('answer-' + page);
+    if (answerEl) studentAnswer = answerEl.value || '';
+
+    fetch('/api/ai/analyze-handwriting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageData: imageData,
+        card_title: card ? card.card_title || '' : '',
+        problem_text: card ? card.problem_text || '' : '',
+        correct_answer: card ? (card.correct_answer || card.answer || '') : '',
+        grade: card ? (card.grade || '') : '',
+        subject: card ? (card.subject || '') : '',
+        student_answer: studentAnswer,
+        source: 'canvas_memo'  // ノート写真ではなくキャンバスからの入力であることを明示
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.analysis) {
+        var a = data.analysis;
+        var html = '<div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px solid #C4B5FD;border-radius:14px;padding:14px;">';
+        html += '<p style="font-weight:bold;color:#7C3AED;font-size:0.9rem;margin-bottom:8px;"><i class="fas fa-brain" style="margin-right:6px;"></i>AIが読みとった計算メモ</p>';
+
+        // 読み取った文字・式
+        if (a.recognized_text) {
+          html += '<div style="background:white;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:0.85rem;border:1px solid #E9D5FF;">' +
+            '<strong style="color:#4C1D95;">📝 よみとった式・メモ：</strong><br>' +
+            '<code style="white-space:pre-wrap;color:#1F2937;font-size:0.9rem;font-family:monospace;">' + (a.recognized_text || '').replace(/</g,'&lt;') + '</code></div>';
+        }
+
+        // 褒めるポイント
+        if (a.praise_points && a.praise_points.length > 0) {
+          html += '<div style="background:#F0FDF4;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:0.8rem;border:1px solid #BBF7D0;">';
+          html += '<p style="font-weight:bold;color:#166534;margin-bottom:4px;">💎 すごいね！</p>';
+          a.praise_points.forEach(function(p) {
+            html += '<p style="color:#166534;margin:2px 0;"><i class="fas fa-star" style="color:#F59E0B;margin-right:4px;"></i>' + p + '</p>';
+          });
+          html += '</div>';
+        }
+
+        // 思考ステップ分析（筆算のどこまで合っているかを可視化）
+        if (a.thinking_process && a.thinking_process.length > 0) {
+          html += '<div style="margin-bottom:8px;background:white;border-radius:8px;padding:8px 10px;border:1px solid #E9D5FF;">';
+          html += '<p style="font-weight:bold;color:#4C1D95;font-size:0.8rem;margin-bottom:4px;">🔍 考え方のステップ</p>';
+          a.thinking_process.forEach(function(step, idx) {
+            var color = step.correct ? '#166534' : '#DC2626';
+            var bgColor = step.correct ? '#F0FDF4' : '#FEF2F2';
+            var icon = step.correct ? 'fa-check-circle' : 'fa-times-circle';
+            html += '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:4px;font-size:0.8rem;background:' + bgColor + ';padding:4px 6px;border-radius:6px;">' +
+              '<span style="color:' + color + ';font-weight:bold;min-width:16px;">Step' + (idx + 1) + '</span>' +
+              '<i class="fas ' + icon + '" style="color:' + color + ';margin-top:3px;flex-shrink:0;"></i>' +
+              '<span style="color:#374151;">' + step.what_child_did + (step.note ? ' <em style="color:#9CA3AF;font-size:0.75rem;">(' + step.note + ')</em>' : '') + '</span></div>';
+          });
+          html += '</div>';
+        }
+
+        // 間違い箇所の特定とアドバイス
+        if (a.error_location && a.error_location.found) {
+          html += '<div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:10px;padding:10px;margin-bottom:8px;">' +
+            '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;"><i class="fas fa-lightbulb" style="margin-right:4px;color:#F59E0B;"></i>ここを見直してみよう</p>' +
+            '<p style="font-size:0.85rem;color:#78350F;margin-bottom:6px;">' + (a.error_location.description || '') + '</p>';
+          if (a.error_location.cause) {
+            var causeLabels = {
+              '計算ミス': '🔢 計算のまちがい', '概念の誤解': '💭 考え方のまちがい',
+              '手順の飛ばし': '📋 手順のとばし', '読み間違い': '👀 読みまちがい'
+            };
+            html += '<p style="font-size:0.75rem;color:#A16207;"><span style="background:#FDE68A;padding:1px 6px;border-radius:4px;">' + (causeLabels[a.error_location.cause] || a.error_location.cause) + '</span></p>';
+          }
+          html += '<p style="font-size:0.85rem;color:#166534;font-weight:bold;margin-top:6px;background:#F0FDF4;padding:6px 8px;border-radius:6px;">' + (a.error_location.encouragement || 'ここまではとてもよくできているよ！') + '</p></div>';
+        }
+
+        // 次のアドバイス
+        if (a.suggestion) {
+          html += '<div style="background:linear-gradient(135deg,#DBEAFE,#E0E7FF);border-radius:8px;padding:8px 10px;font-size:0.85rem;color:#1E40AF;">' +
+            '<i class="fas fa-arrow-right" style="margin-right:4px;"></i>' + a.suggestion + '</div>';
+        }
+
+        // 回答欄への反映ボタン（読み取った答えがあれば）
+        if (a.recognized_text && a.recognized_text.includes('=')) {
+          var lastEq = a.recognized_text.split('=').pop().trim();
+          if (lastEq) {
+            html += '<div style="text-align:center;margin-top:8px;">' +
+              '<button onclick="var el=document.getElementById(\\x27answer-' + page + '\\x27);if(el){el.value=\\x27' + lastEq.replace(/'/g,'') + '\\x27;};this.innerHTML=\\x27✅ 入力した！\\x27;this.disabled=true;" ' +
+              'style="background:#6366F1;color:white;border:none;border-radius:8px;padding:6px 14px;font-size:0.8rem;font-weight:bold;cursor:pointer;">' +
+              '📋 「' + lastEq.substring(0, 20) + '」を答え欄に入れる</button></div>';
+          }
+        }
+
+        html += '</div>';
+        resultDiv.innerHTML = html;
+
+        // 分析結果をセッションに記録（学習ログ用）
+        window._canvasAnalysisLog = window._canvasAnalysisLog || [];
+        window._canvasAnalysisLog.push({
+          page: page,
+          timestamp: new Date().toISOString(),
+          has_error: !!(a.error_location && a.error_location.found),
+          steps_count: a.thinking_process ? a.thinking_process.length : 0,
+          source: 'canvas'
+        });
+      } else {
+        resultDiv.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px;font-size:0.8rem;color:#DC2626;text-align:center;">よみとりがうまくいきませんでした。もう少し大きく書いてみてね。</div>';
+      }
+    })
+    .catch(function(err) {
+      resultDiv.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px;font-size:0.8rem;color:#DC2626;text-align:center;">接続エラーが起きました。もう一度やってみてね。</div>';
+    });
+  }
+
   // === F8: 解法アプローチ選択UI（複数の導出経路から自己選択） ===
   // 自己決定理論: 「どうやって解くか」を自分で選ぶ → 自律性の根幹
-  // 例: 平行四辺形 → ①三角形から ②長方形から ③公式で → どれも正しいが入口が違う
+  // 例: 平行四辺形 → ①三角形の公式の応用(演繹) ②長方形に変形(視覚的) ③具体例から規則を見つける(帰納) 
+  // 「選択肢がある = 自己選択ができる = 自律性が育つ」という考え方
   function loadApproachChoices(page) {
     var area = document.getElementById('approach-area-' + page);
     if (!area || area.dataset.loaded) return;
@@ -9781,6 +10260,9 @@ app.get('/guide/:curriculumId', async (c) => {
 
     var card = ALL_CARDS[page];
     if (!card) return;
+
+    // 児童が事前に選んだ思考スタイルを取得
+    var preferredStyle = (window._learningChoices && window._learningChoices.thinkingStyle) || '';
 
     area.innerHTML = '<div style="text-align:center;padding:6px;"><i class="fas fa-spinner fa-spin" style="color:#8B5CF6;"></i> <span style="font-size:0.75rem;color:#8B5CF6;">解き方を考え中...</span></div>';
 
@@ -9792,32 +10274,47 @@ app.get('/guide/:curriculumId', async (c) => {
         problem_text: card.problem_text || '',
         grade: card.grade || CURRICULUM.grade || '',
         subject: card.subject || CURRICULUM.subject || '',
-        hint_text: (card.hint_text || card._hints?.map(function(h){return h.content}).join(' ') || '').substring(0, 300)
+        hint_text: (card.hint_text || card._hints?.map(function(h){return h.content}).join(' ') || '').substring(0, 300),
+        preferred_thinking_style: preferredStyle  // 児童の好みを渡す
       })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.success && data.approaches && data.approaches.length >= 2) {
-        var typeLabel = { deductive: '公式から', inductive: '具体例から', visual: '図で考える', experimental: '試してみる' };
+        var typeLabel = { deductive: '📐 きまりから（演繹）', inductive: '🔍 例から（帰納）', visual: '🖼️ 図で考える', experimental: '🧪 ためしてみる' };
+        var typeColor = { deductive: '#6366F1', inductive: '#F59E0B', visual: '#10B981', experimental: '#EC4899' };
         var diffColor = { easy: '#10B981', standard: '#3B82F6', challenge: '#F59E0B' };
         var html = '<div style="background:linear-gradient(135deg,#FAF5FF,#F3E8FF);border:2px solid #D8B4FE;border-radius:14px;padding:12px;margin-top:4px;">';
         html += '<div style="display:flex;align-items:center;justify-content:space-between;">';
         html += '<p style="font-weight:bold;color:#7C3AED;font-size:0.85rem;"><i class="fas fa-route" style="margin-right:6px;"></i>どのやり方で解く？</p>';
         html += '<button onclick="this.closest(\\x27[id^=approach-area]\\x27).innerHTML=\\x27\\x27" style="background:none;border:none;color:#D8B4FE;cursor:pointer;font-size:0.8rem;">✕</button></div>';
-        html += '<p style="font-size:0.75rem;color:#9333EA;margin:4px 0 8px;">自分で選んで解くと、もっと力がつくよ！</p>';
+        html += '<p style="font-size:0.75rem;color:#9333EA;margin:4px 0 8px;">同じ問題でもいろんな解き方があるよ。自分で選んで解くと、もっと力がつくよ！</p>';
         html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
 
         data.approaches.forEach(function(ap) {
-          var borderColor = diffColor[ap.difficulty] || '#8B5CF6';
-          html += '<button onclick="selectApproach(' + page + ',this,\\x27' + (ap.name || '').replace(/'/g,'') + '\\x27)" ' +
-            'style="flex:1;min-width:90px;background:white;border:2px solid ' + borderColor + ';border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;">' +
+          var borderColor = typeColor[ap.thinking_type] || diffColor[ap.difficulty] || '#8B5CF6';
+          // 児童の好みの思考スタイルと一致する場合にハイライト
+          var isPreferred = preferredStyle && ap.thinking_type === preferredStyle;
+          var extraStyle = isPreferred ? 'box-shadow:0 0 0 3px ' + borderColor + '40;' : '';
+          html += '<button onclick="selectApproach(' + page + ',this,\\x27' + (ap.name || '').replace(/'/g,'') + '\\x27,\\x27' + (ap.thinking_type || '') + '\\x27)" ' +
+            'style="flex:1;min-width:90px;background:white;border:2px solid ' + borderColor + ';border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;' + extraStyle + '">' +
             '<div style="font-size:1.4rem;">' + (ap.icon || '🔍') + '</div>' +
             '<div style="font-size:0.75rem;font-weight:bold;color:#374151;margin:2px 0;">' + (ap.name || '') + '</div>' +
-            '<div style="font-size:0.65rem;color:#9CA3AF;">' + (typeLabel[ap.thinking_type] || '') + '</div>' +
+            '<div style="font-size:0.65rem;color:' + borderColor + ';font-weight:bold;">' + (typeLabel[ap.thinking_type] || '') + '</div>' +
+            (ap.first_hint ? '<div style="font-size:0.6rem;color:#9CA3AF;margin-top:2px;">ヒント: ' + ap.first_hint.substring(0, 30) + '</div>' : '') +
+            (isPreferred ? '<div style="font-size:0.6rem;color:' + borderColor + ';margin-top:2px;font-weight:bold;">⭐ あなたの好みに近い</div>' : '') +
             '</button>';
         });
 
-        html += '</div></div>';
+        html += '</div>';
+
+        // 解法のつながりメモ（教師向け参考、児童にも一部表示）
+        if (data.connection_note) {
+          html += '<div style="margin-top:8px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:6px 10px;font-size:0.7rem;color:#9A3412;">' +
+            '<strong>🔗 つながり：</strong>' + data.connection_note + '</div>';
+        }
+
+        html += '</div>';
         area.innerHTML = html;
       } else {
         area.innerHTML = '';
@@ -9828,8 +10325,8 @@ app.get('/guide/:curriculumId', async (c) => {
     });
   }
 
-  // 解法選択時のフィードバック
-  function selectApproach(page, btn, approachName) {
+  // 解法選択時のフィードバック（思考タイプ情報付き）
+  function selectApproach(page, btn, approachName, thinkingType) {
     // 選ばれたボタンをハイライト
     var siblings = btn.parentElement.querySelectorAll('button');
     siblings.forEach(function(s) { s.style.opacity = '0.5'; s.style.transform = 'scale(0.95)'; });
@@ -9837,18 +10334,28 @@ app.get('/guide/:curriculumId', async (c) => {
     btn.style.transform = 'scale(1.05)';
     btn.style.boxShadow = '0 4px 12px rgba(139,92,246,0.3)';
 
+    // 思考タイプ別の励ましメッセージ
+    var typeMessages = {
+      deductive: '公式やきまりを使って考えるのは、とても論理的だね！',
+      inductive: '具体的な例からきまりを見つけるのは、発見の力！',
+      visual: '図や絵で考えるのは、イメージする力が育つよ！',
+      experimental: '試してみることは、科学者と同じ方法だね！'
+    };
+    var typeMsg = typeMessages[thinkingType] || '';
+
     // 選択メッセージ
     var container = btn.closest('[id^=approach-area]');
     if (container) {
       var msg = document.createElement('div');
       msg.style.cssText = 'text-align:center;padding:6px;margin-top:6px;';
-      msg.innerHTML = '<p style="font-size:0.8rem;font-weight:bold;color:#7C3AED;">✅「' + approachName + '」で挑戦！いい選択だね！</p>';
+      msg.innerHTML = '<p style="font-size:0.8rem;font-weight:bold;color:#7C3AED;">✅「' + approachName + '」で挑戦！いい選択だね！</p>' +
+        (typeMsg ? '<p style="font-size:0.75rem;color:#6D28D9;margin-top:2px;">' + typeMsg + '</p>' : '');
       container.appendChild(msg);
     }
 
-    // 記録（学習ログ用）
+    // 記録（学習ログ用 — 思考タイプも記録）
     window._selectedApproach = window._selectedApproach || {};
-    window._selectedApproach[page] = approachName;
+    window._selectedApproach[page] = { name: approachName, thinkingType: thinkingType || 'unknown' };
 
     showCoachBubble('「' + approachName + '」で考えてみよう！がんばれ！', 'encourage', 3000, false);
   }
@@ -21486,17 +21993,22 @@ app.post('/api/ai/think-aloud', async (c) => {
 // Gemini 3.1 のマルチモーダル能力で児童の手書きノート/計算式を読み取り、
 // 思考過程を推測し、間違いの箇所と原因を特定する
 app.post('/api/ai/analyze-handwriting', async (c) => {
-  const { imageData, card_title, problem_text, correct_answer, grade, subject, student_answer } = await c.req.json()
+  const { imageData, card_title, problem_text, correct_answer, grade, subject, student_answer, source } = await c.req.json()
   const apiKey = c.env.GEMINI_API_KEY
   if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
   if (!imageData) return c.json({ success: false, error: '画像データがありません' })
 
   try {
-    console.log('🔍 Gemini 3.1 手書き分析開始...')
+    const isCanvas = source === 'canvas_memo';
+    console.log(isCanvas ? '🖊️ Gemini 3.1 キャンバス手書き分析開始...' : '🔍 Gemini 3.1 手書き分析開始...')
     const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '')
 
+    const sourceContext = isCanvas 
+      ? '児童がパソコンの画面上の「計算メモパッド」（キャンバス）に手書き（マウス/タッチ/ペン）で書いた計算過程・筆算・メモ・図です。紙のノートではなくデジタル手書きなので、線が太めだったり不安定なことがありますが、内容を正確に読み取ってください。'
+      : '児童がノートや紙に書いた手書きの計算過程・メモ・考え方を画像で受け取りました。';
+
     const prompt = `あなたは小学${grade || ''}年生の${subject || '算数'}の先生です。
-児童がノートや紙に書いた手書きの計算過程・メモ・考え方を画像で受け取りました。
+${sourceContext}
 
 【問題】${card_title || ''}: ${problem_text || ''}
 【正解】${correct_answer || ''}
@@ -21504,26 +22016,29 @@ ${student_answer ? `【児童の入力した答え】${student_answer}` : ''}
 
 ■ 画像から読み取れる児童の思考過程を分析し、以下のJSON形式で回答してください:
 {
-  "recognized_text": "画像から読み取れた文字・数式（改行は\\nで表現）",
+  "recognized_text": "画像から読み取れた文字・数式（改行は\\nで表現。筆算は位取りを整えて再現）",
   "thinking_process": [
-    { "step": 1, "what_child_did": "児童がやったこと", "correct": true/false, "note": "補足" }
+    { "step": 1, "what_child_did": "児童がやったこと（具体的に）", "correct": true/false, "note": "補足（なぜ正しいか/間違いか）" }
   ],
   "error_location": {
     "found": true/false,
     "step": 0,
-    "description": "間違いの説明（やさしい言葉で）",
-    "cause": "likely_cause（計算ミス/概念の誤解/手順の飛ばし/読み間違い）",
+    "description": "間違いの説明（やさしい言葉で、「ここまでは合っているよ」を含める）",
+    "cause": "likely_cause（計算ミス/概念の誤解/手順の飛ばし/読み間違い/繰り上がり忘れ/位取りの誤り）",
     "encouragement": "ここまではよくできていたよ！○○のところだけもう一回考えてみよう"
   },
-  "praise_points": ["よかった点1", "よかった点2"],
-  "suggestion": "次にどうすればいいかのアドバイス（1〜2文）"
+  "praise_points": ["よかった点1（具体的に何が良かったか）", "よかった点2"],
+  "suggestion": "次にどうすればいいかのアドバイス（1〜2文。具体的な次の一歩）"
 }
 
 ■ ルール:
-- 児童の思考の「良いところ」を必ず見つけて褒める
+- 児童の思考の「良いところ」を必ず見つけて褒める（筆算を書いた/図を描いた/途中式を書いた等）
 - 間違いは「責める」のではなく「ここまでは合ってる、ここだけ直そう」の姿勢
 - 小学生にわかる平易な日本語で
-- 画像が不鮮明でも、読み取れる範囲で分析する`
+- 画像が不鮮明でも、読み取れる範囲で分析する
+- 筆算があれば、繰り上がり・繰り下がり・位取りの正確さも確認
+- 計算式があれば、各ステップの正誤を丁寧に追跡
+- 図やメモがあれば、考え方の意図を読み取って褒める`
 
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
@@ -21582,16 +22097,20 @@ ${student_answer ? `【児童の入力した答え】${student_answer}` : ''}
 // 自己決定理論: 「どのやり方で解くか」を自分で選ぶ → 自律性の支援
 // 例: 平行四辺形の面積 → ①三角形2つに分ける方法 ②長方形から切り取る方法 ③公式を使う方法
 app.post('/api/ai/suggest-approaches', async (c) => {
-  const { card_title, problem_text, grade, subject, hint_text } = await c.req.json()
+  const { card_title, problem_text, grade, subject, hint_text, preferred_thinking_style } = await c.req.json()
   const apiKey = c.env.GEMINI_API_KEY
   if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
 
   try {
+    const preferenceNote = preferred_thinking_style 
+      ? `\n【児童の好みの思考スタイル】${preferred_thinking_style}（この考え方に合うアプローチを1つ含めてください。ただし、他のアプローチも必ず提示してください）` 
+      : '';
+
     const prompt = `あなたは小学${grade || ''}年生の${subject || '算数'}の先生です。
 この問題には複数の解き方（アプローチ）があります。児童が自分で選べるように提案してください。
 
 【問題】${card_title || ''}: ${problem_text || ''}
-${hint_text ? `【ヒント情報】${hint_text}` : ''}
+${hint_text ? `【ヒント情報】${hint_text}` : ''}${preferenceNote}
 
 ■ 以下のJSON形式で2〜3個の解法アプローチを提案してください:
 {
@@ -21603,18 +22122,20 @@ ${hint_text ? `【ヒント情報】${hint_text}` : ''}
       "description": "どんなやり方か（1〜2文）",
       "thinking_type": "deductive/inductive/visual/experimental",
       "difficulty": "easy/standard/challenge",
-      "first_hint": "最初の一歩のヒント"
+      "first_hint": "最初の一歩のヒント（1文）"
     }
   ],
-  "connection_note": "これらの解き方がどうつながっているか（1文、教師向け参考）"
+  "connection_note": "これらの解き方がどうつながっているか（1〜2文。児童にも伝わる平易な言葉で）"
 }
 
 ■ ルール:
-- 必ず2個以上のアプローチを提案
-- thinking_type: deductive（公式から→演繹）, inductive（具体例から→帰納）, visual（図で考える）, experimental（試してみる）
+- 必ず2個以上のアプローチを提案（できれば3個）
+- thinking_type: deductive（公式・きまりから→演繹法）, inductive（具体例からきまりを見つける→帰納法）, visual（図で考える）, experimental（試してみる）
 - 児童が選びやすい短い名前をつける（例: 「図で考えるやり方」「式で考えるやり方」「切って並べるやり方」）
 - 各アプローチは本当に異なる思考経路であること（言い換えではなく別の方法）
-- 平行四辺形なら「三角形の公式から導く」「長方形に変形する」「公式を使う」等`
+- 例: 平行四辺形の面積なら「三角形の公式の応用から導く（演繹）」「長方形に変形する（視覚的）」「方眼紙のマスを数える（帰納的）」等
+- 例: 分数のたし算なら「通分して計算（手続的/演繹）」「図に色をぬる（視覚的）」「小数に直して考える（実験的）」等
+- connection_note は「どの方法でも同じ答えになるよ。でも考え方が違うんだ」のような児童に伝わる表現で`
 
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
