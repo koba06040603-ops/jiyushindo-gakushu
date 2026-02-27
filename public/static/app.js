@@ -5448,7 +5448,7 @@ async function selectCourse(courseId) {
       <div class="container mx-auto px-4 py-8">
         <!-- ヘッダー -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <button onclick="loadGuidePage(${state.selectedCurriculum.id})" class="text-indigo-600 hover:text-indigo-800 mb-4">
+          <button onclick="goBackToGuide()" class="text-indigo-600 hover:text-indigo-800 mb-4">
             <i class="fas fa-arrow-left mr-2"></i>学習のてびきに戻る
           </button>
           <h1 class="text-3xl font-bold text-indigo-600 mb-2">
@@ -5618,6 +5618,11 @@ async function startCourseStudy(curriculumId, courseId) {
     state.courses = courses
     state.selectedCourse = courseId
     
+    // 通常コース学習なので個別最適フラグをクリア
+    window._isPersonalizedCourse = false
+    window._personalizedCourseId = null
+    window._personalizedCurriculumId = null
+    
     // カード一覧をグローバルに保存（ページネーション用）
     window._courseCardsList = selectedCourse.cards.map(c => c.card_id || c.id).filter(Boolean)
     window._courseCardsData = selectedCourse.cards
@@ -5649,6 +5654,19 @@ async function startCourseStudy(curriculumId, courseId) {
 window.renderTopPage = renderTopPage
 window.loadGuidePage = loadGuidePage
 window.startCourseStudy = startCourseStudy
+
+// 個別最適コースかどうかに応じて適切なてびきに戻るヘルパー
+function goBackToGuide() {
+  if (window._isPersonalizedCourse && window._personalizedCourseId && window._personalizedCurriculumId) {
+    console.log('🔙 個別最適コースのてびきに戻る:', { courseId: window._personalizedCourseId, curriculumId: window._personalizedCurriculumId })
+    showPersonalizedCourseGuide(window._personalizedCourseId, window._personalizedCurriculumId)
+  } else {
+    console.log('🔙 通常のてびきに戻る:', state.selectedCurriculum?.id)
+    loadGuidePage(state.selectedCurriculum?.id || 0)
+  }
+}
+window.goBackToGuide = goBackToGuide
+
 window.loadTeacherOverview = loadTeacherOverview
 window.loadLearningPlanPage = loadLearningPlanPage
 window.updatePlanHours = updatePlanHours
@@ -5733,7 +5751,7 @@ async function loadCardPage(cardId) {
           return `
           <div class="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl shadow-lg p-4 mb-4 text-white">
             <div class="flex items-center justify-between">
-              <button onclick="${prevId ? 'loadCardPage(' + prevId + ')' : 'loadGuidePage(' + (state.selectedCurriculum?.id || 0) + ')'}" 
+              <button onclick="${prevId ? 'loadCardPage(' + prevId + ')' : 'goBackToGuide()'}" 
                       class="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition font-bold text-sm">
                 <i class="fas fa-chevron-left"></i>
                 ${prevId ? '前のカード' : 'てびきに戻る'}
@@ -6512,7 +6530,7 @@ async function loadCardPage(cardId) {
           return `
         <div class="mt-6 bg-white rounded-xl shadow-xl p-4 border-2 border-indigo-200 sticky bottom-4 z-40">
           <div class="flex items-center justify-between">
-            <button onclick="${prevId2 ? 'loadCardPage(' + prevId2 + '); window.scrollTo(0,0);' : 'loadGuidePage(' + (state.selectedCurriculum?.id || 0) + ')'}" 
+            <button onclick="${prevId2 ? 'loadCardPage(' + prevId2 + '); window.scrollTo(0,0);' : 'goBackToGuide()'}" 
                     class="flex items-center gap-2 ${prevId2 ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'} px-5 py-3 rounded-xl transition font-bold text-sm">
               <i class="fas fa-chevron-left"></i>
               ${prevId2 ? '前' : '戻る'}
@@ -14279,7 +14297,7 @@ async function saveProgress(teacherCall = false) {
       if (currentIdx >= 0 && currentIdx < cardsList.length - 1) {
         loadCardPage(cardsList[currentIdx + 1])
       } else {
-        selectCourse(state.selectedCourse)
+        goBackToGuide()
       }
     }
   } catch (error) {
@@ -14307,9 +14325,7 @@ async function saveProgressAndNext(nextCardId) {
     loadCardPage(nextCardId)
   } else {
     alert('全てのカードを完了しました！おつかれさまでした！')
-    if (state.selectedCurriculum?.id) {
-      loadGuidePage(state.selectedCurriculum.id)
-    }
+    goBackToGuide()
   }
 }
 window.saveProgressAndNext = saveProgressAndNext
@@ -51706,6 +51722,12 @@ async function startPersonalizedCourseLearning(courseId, curriculumId) {
     }
     
     state.selectedCourse = courseId
+    
+    // 個別最適コースフラグを設定（戻るボタン用）
+    window._isPersonalizedCourse = true
+    window._personalizedCourseId = courseId
+    window._personalizedCurriculumId = curriculumId
+    console.log('🎯 個別最適コースフラグ設定:', { courseId, curriculumId })
     
     // 最初のカードを直接表示（1ページずつ表示）
     if (window._courseCardsList && window._courseCardsList.length > 0) {

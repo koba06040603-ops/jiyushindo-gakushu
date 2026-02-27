@@ -8307,25 +8307,29 @@ app.get('/guide/:curriculumId', async (c) => {
     chat.scrollTop = chat.scrollHeight;
     
     var card = ALL_CARDS[page];
-    fetch('/api/ai/chat', {
+    fetch('/api/ai-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: msg,
-        context: { problem: card.problem_text || '', card_title: card.card_title || '', grade: CURRICULUM.grade || '', subject: CURRICULUM.subject || '' },
-        conversation_history: aiConversation
+        cardContext: { card_title: card.card_title || '', problem_description: card.problem_text || card.problem_content || '', new_terms: card.new_terms || '', answer: card.correct_answer || card.answer || '', hints: '' },
+        conversationHistory: aiConversation.map(function(c) { return { role: c.role, text: c.content }; }),
+        studentGrade: CURRICULUM.grade || null
       })
     }).then(function(r) { return r.json(); }).then(function(data) {
       var loading = document.getElementById('ai-loading-' + page);
       if (loading) loading.remove();
-      var reply = data.reply || data.message || 'ごめんね、もう一度聞いてみて。';
+      var reply = data.response || data.reply || data.message || 'ごめんね、もう一度聞いてみて。';
       chat.innerHTML += '<div class="ai-chat-msg ai-msg">' + reply + '</div>';
       aiConversation.push({ role: 'user', content: msg });
       aiConversation.push({ role: 'assistant', content: reply });
       chat.scrollTop = chat.scrollHeight;
-    }).catch(function() {
+    }).catch(function(err) {
+      console.error('AI chat error:', err);
       var loading = document.getElementById('ai-loading-' + page);
-      if (loading) loading.innerHTML = 'ごめんね、もう一度きいてみてね。';
+      if (loading) { loading.remove(); }
+      chat.innerHTML += '<div class="ai-chat-msg ai-msg">ごめんね、接続エラーが発生しました。もう一度試してみてね。</div>';
+      chat.scrollTop = chat.scrollHeight;
     });
   }
 
@@ -32360,7 +32364,7 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
 ` : ''
         
         const prompt = `あなたは${curriculum.grade}の${curriculum.subject}の教師です。
-以下の個別学習カードの内容に基づいて、この児童専用のチェックテスト（6問）と選択課題（4問）を作成してください。
+以下の個別学習カードの内容に基づいて、この児童専用のチェックテスト（6問）と選択課題（6問）を作成してください。
 
 単元名: ${curriculum.unit_name}
 学年: ${curriculum.grade}
@@ -32387,7 +32391,9 @@ ${cardSummary}
     {"problem_title": "ふりかえり問題", "problem_content": "学習内容を振り返り、自分の言葉でまとめる具体的な指示"},
     {"problem_title": "チャレンジ問題", "problem_content": "発展的な計算・思考問題"},
     {"problem_title": "つなげる問題", "problem_content": "日常生活・他教科と結びつける問題"},
-    {"problem_title": "つくる問題", "problem_content": "自分でオリジナル問題を作って、友だちと解き合う課題"}
+    {"problem_title": "つくる問題", "problem_content": "自分でオリジナル問題を作って、友だちと解き合う課題"},
+    {"problem_title": "実力アップ問題", "problem_content": "少し難しい応用問題で実力を試す"},
+    {"problem_title": "探究問題", "problem_content": "不思議に思ったことを深掘りする問題"}
   ]
 }
 
@@ -32398,7 +32404,7 @@ ${cardSummary}
 - 学習カードの内容を踏まえた具体的な問題にすること（「〜を学ぼう」等のメタ記述禁止）
 - 児童の学年に合った言葉遣いにすること（ひらがな多め、簡潔に）
 - problem_contentとproblem_titleは異なる内容にすること
-- 選択課題は4問で、ふりかえり・チャレンジ・つなげる・つくるの4種にすること
+- 選択課題は6問で、ふりかえり・チャレンジ・つなげる・つくる・実力アップ・探究の6種にすること
 - ★12理論統合分析の結果を踏まえ、この児童のタイプに最適化された出題をすること
 - ★各問題に personalization_reason フィールドを追加し、「なぜこの児童にこの問題を出すのか」を1文で説明すること`
         
