@@ -11670,21 +11670,20 @@ app.get('/landing', (c) => {
         <link rel="icon" type="image/svg+xml" href="/favicon.svg">
         
         <!-- DNS Prefetch & Preconnect for faster CDN loading -->
-        <link rel="dns-prefetch" href="https://cdn.tailwindcss.com">
         <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
         <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
-        <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
         <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
         
         <!-- Preload Critical Resources -->
-        <link rel="preload" href="https://cdn.tailwindcss.com" as="script">
         <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" as="style">
         <link rel="preload" href="/static/styles.css?v=${Date.now()}" as="style">
         <link rel="preload" href="/static/app.js?v=${Date.now()}" as="script">
         
         <!-- Stylesheets -->
-        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="/static/tailwind-minimal.css" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+        <!-- Tailwind CDN: 非同期で後から読み込み（完全なスタイル適用用） -->
+        <script>var _tw=document.createElement('script');_tw.src='https://cdn.tailwindcss.com';_tw.async=true;document.head.appendChild(_tw);</script>
         
         <!-- Deferred Libraries (non-critical) -->
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
