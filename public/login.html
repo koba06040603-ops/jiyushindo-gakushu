@@ -65,14 +65,18 @@
         <!-- デモログイン -->
         <div class="mt-6 pt-5 border-t border-gray-100">
             <p class="text-xs text-center text-gray-400 mb-3">テスト用かんたんログイン</p>
-            <div class="grid grid-cols-2 gap-2">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
                 <button onclick="demoLogin('student')"
                     class="flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2.5 rounded-xl text-sm font-medium transition border border-blue-200">
-                    <i class="fas fa-user-graduate"></i>児童としてログイン
+                    <i class="fas fa-user-graduate"></i>児童
                 </button>
                 <button onclick="demoLogin('teacher')"
                     class="flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 py-2.5 rounded-xl text-sm font-medium transition border border-emerald-200">
-                    <i class="fas fa-chalkboard-teacher"></i>教師としてログイン
+                    <i class="fas fa-chalkboard-teacher"></i>教師
+                </button>
+                <button onclick="demoLogin('admin')"
+                    style="display:flex;align-items:center;justify-content:center;gap:0.5rem;background:#faf5ff;color:#7c3aed;padding:0.625rem;border-radius:0.75rem;font-size:0.875rem;font-weight:500;border:1px solid #e9d5ff;cursor:pointer;transition:all 0.15s;">
+                    <i class="fas fa-shield-alt"></i>管理者
                 </button>
             </div>
         </div>
@@ -116,7 +120,9 @@ function hideError() {
 }
 
 function redirectByRole(role, userId) {
-    if (role === 'teacher' || role === 'admin') {
+    if (role === 'admin') {
+        window.location.href = '/admin-dashboard.html'
+    } else if (role === 'teacher') {
         window.location.href = '/landing'
     } else {
         // 児童生徒 → 学習のてびきページ（教師版と同じリッチ表示、教師ボタンなし）
@@ -167,7 +173,8 @@ async function demoLogin(role) {
     // デモユーザーの情報をlocalStorageに直接セット
     const demoUsers = {
         student: { id: 1, name: 'テスト児童', email: 'student@demo.jp', role: 'student', class_code: 'DEMO01' },
-        teacher: { id: 100, name: 'テスト教師', email: 'teacher@demo.jp', role: 'teacher', class_code: 'DEMO01' }
+        teacher: { id: 100, name: 'テスト教師', email: 'teacher@demo.jp', role: 'teacher', class_code: 'DEMO01' },
+        admin: { id: 200, name: '管理者', email: 'admin@demo.jp', role: 'admin', class_code: 'DEMO01' }
     }
     const user = demoUsers[role]
 
