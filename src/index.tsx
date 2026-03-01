@@ -7205,7 +7205,7 @@ app.post('/api/ai-chat', async (c) => {
   console.log('🤖 AI Chat API called')
   
   try {
-    const { message, cardContext, conversationHistory, studentGrade } = await c.req.json()
+    const { message, cardContext, conversationHistory, studentGrade, learningChoices } = await c.req.json()
     
     console.log('📝 Request data:', {
       message: message?.substring(0, 50),
@@ -7278,6 +7278,15 @@ ${cardContext.hints ? `\n💡 ヒント:\n${cardContext.hints}` : ''}
    上記の学習内容を参照して、必ず具体的に答えてください。
    質問が上記の問題内容に関連する場合は、問題文の内容を参照して丁寧に説明してください。
    子どもが問題文の一部を使って質問した場合でも、問題全体の文脈を踏まえて回答してください。
+` : ''}
+${learningChoices ? `
+【児童の学習スタイル選択】
+${learningChoices.difficulty ? `- 選択した難易度: ${learningChoices.difficulty === 'easy' ? 'きほん（基本をしっかり）' : learningChoices.difficulty === 'hard' ? 'むずかしめ（チャレンジ）' : 'ふつう（バランス）'}` : ''}
+${learningChoices.thinkingStyle ? `- 好みの考え方: ${learningChoices.thinkingStyle === 'deductive' ? '演繹的（きまりから考える）' : learningChoices.thinkingStyle === 'inductive' ? '帰納的（例から発見する）' : learningChoices.thinkingStyle === 'visual' ? '視覚的（図で考える）' : '実験的（試行錯誤）'}` : ''}
+${learningChoices.order ? `- 学習順序の好み: ${learningChoices.order}` : ''}
+→ この児童の好みに合わせて、説明のアプローチを調整してください。
+  例: 難易度「きほん」なら基礎から丁寧に。「むずかしめ」なら発展的な内容も含める。
+  考え方が「視覚的」なら図や具体例を多く。「演繹的」なら公式やルールから説明。
 ` : ''}
 
 【絶対ルール】
@@ -8587,6 +8596,19 @@ app.get('/guide/:curriculumId', async (c) => {
         // 選択記録用
         window._learningChoices = window._learningChoices || { order: null, difficulty: null, thinkingStyle: null };
 
+        // 選択ボタンのハイライト関数
+        window.selectLearningChoice = function(group, value, btn) {
+          // 同グループの全ボタンをリセット
+          var container = btn.parentElement;
+          var buttons = container.querySelectorAll('button');
+          buttons.forEach(function(b) { b.style.boxShadow = 'none'; b.style.transform = 'scale(1)'; b.style.opacity = '1'; });
+          // 選択ボタンを強調
+          btn.style.boxShadow = '0 0 0 3px #7C3AED, 0 4px 12px rgba(124,58,237,0.4)';
+          btn.style.transform = 'scale(1.05)';
+          // 非選択を薄く
+          buttons.forEach(function(b) { if (b !== btn) { b.style.opacity = '0.5'; } });
+        };
+
         var innerHTML = '<div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px solid #C4B5FD;border-radius:16px;padding:16px;margin-bottom:12px;">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;">' +
           '<p style="font-weight:bold;color:#6D28D9;font-size:0.95rem;">🎯 今日の学び方を自分で決めよう！</p>' +
@@ -8597,16 +8619,16 @@ app.get('/guide/:curriculumId', async (c) => {
         innerHTML += '<div style="margin-bottom:10px;">' +
           '<p style="font-size:0.8rem;font-weight:bold;color:#4C1D95;margin-bottom:6px;">① どこからやる？</p>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
-          '<button onclick="goToCard(0);window._learningChoices.order=\\x27sequential\\x27;document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ 最初から順番に！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #A78BFA;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">📚</div><div style="font-size:0.75rem;font-weight:bold;color:#6D28D9;">順番に</div></button>';
+          '<button onclick="goToCard(0);window._learningChoices.order=\\x27sequential\\x27;selectLearningChoice(\\x27order\\x27,\\x27sequential\\x27,this);document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ 最初から順番に！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #A78BFA;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">📚</div><div style="font-size:0.75rem;font-weight:bold;color:#6D28D9;">順番に</div></button>';
 
         if (challengeCards.length > 0) {
-          innerHTML += '<button onclick="goToCard(' + challengeCards[0] + ');window._learningChoices.order=\\x27challenge_first\\x27;document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ チャレンジから！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #F59E0B;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">🔥</div><div style="font-size:0.75rem;font-weight:bold;color:#B45309;">むずかしいのから</div></button>';
+          innerHTML += '<button onclick="goToCard(' + challengeCards[0] + ');window._learningChoices.order=\\x27challenge_first\\x27;selectLearningChoice(\\x27order\\x27,\\x27challenge\\x27,this);document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ チャレンジから！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #F59E0B;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">🔥</div><div style="font-size:0.75rem;font-weight:bold;color:#B45309;">むずかしいのから</div></button>';
         }
         if (easyCards.length > 0) {
-          innerHTML += '<button onclick="goToCard(' + easyCards[0] + ');window._learningChoices.order=\\x27easy_first\\x27;document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ 基本から！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #10B981;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">🌱</div><div style="font-size:0.75rem;font-weight:bold;color:#059669;">かんたんから</div></button>';
+          innerHTML += '<button onclick="goToCard(' + easyCards[0] + ');window._learningChoices.order=\\x27easy_first\\x27;selectLearningChoice(\\x27order\\x27,\\x27easy\\x27,this);document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ 基本から！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #10B981;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">🌱</div><div style="font-size:0.75rem;font-weight:bold;color:#059669;">かんたんから</div></button>';
         }
         if (funCards.length > 0) {
-          innerHTML += '<button onclick="goToCard(' + funCards[0] + ');window._learningChoices.order=\\x27fun_first\\x27;document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ 生活につながる問題から！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #06B6D4;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">🌍</div><div style="font-size:0.75rem;font-weight:bold;color:#0E7490;">生活問題から</div></button>';
+          innerHTML += '<button onclick="goToCard(' + funCards[0] + ');window._learningChoices.order=\\x27fun_first\\x27;selectLearningChoice(\\x27order\\x27,\\x27fun\\x27,this);document.getElementById(\\x27choiceConfirm1\\x27).innerHTML=\\x27✅ 生活につながる問題から！\\x27;document.getElementById(\\x27choiceConfirm1\\x27).style.display=\\x27block\\x27" style="flex:1;min-width:80px;background:white;border:2px solid #06B6D4;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;transition:all 0.2s;"><div style="font-size:1.1rem;">🌍</div><div style="font-size:0.75rem;font-weight:bold;color:#0E7490;">生活問題から</div></button>';
         }
         innerHTML += '</div>' +
           '<p id="choiceConfirm1" style="display:none;font-size:0.8rem;color:#059669;font-weight:bold;margin-top:4px;text-align:center;"></p></div>';
@@ -8615,9 +8637,9 @@ app.get('/guide/:curriculumId', async (c) => {
         innerHTML += '<div style="margin-bottom:10px;">' +
           '<p style="font-size:0.8rem;font-weight:bold;color:#4C1D95;margin-bottom:6px;">② どのレベルでやる？</p>' +
           '<div style="display:flex;gap:6px;">' +
-          '<button onclick="window._learningChoices.difficulty=\\x27easy\\x27;document.getElementById(\\x27choiceConfirm2\\x27).innerHTML=\\x27✅ 基本をしっかり！\\x27;document.getElementById(\\x27choiceConfirm2\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27基本をしっかりやるのは大切だね！\\x27,\\x27encourage\\x27,3000,false)" style="flex:1;background:white;border:2px solid #10B981;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;"><div style="font-size:1.1rem;">🌱</div><div style="font-size:0.7rem;font-weight:bold;color:#059669;">きほん</div></button>' +
-          '<button onclick="window._learningChoices.difficulty=\\x27standard\\x27;document.getElementById(\\x27choiceConfirm2\\x27).innerHTML=\\x27✅ バランスよく！\\x27;document.getElementById(\\x27choiceConfirm2\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27バランスよくやるのはいい作戦だね！\\x27,\\x27encourage\\x27,3000,false)" style="flex:1;background:white;border:2px solid #3B82F6;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;"><div style="font-size:1.1rem;">📘</div><div style="font-size:0.7rem;font-weight:bold;color:#1D4ED8;">ふつう</div></button>' +
-          '<button onclick="window._learningChoices.difficulty=\\x27hard\\x27;document.getElementById(\\x27choiceConfirm2\\x27).innerHTML=\\x27✅ チャレンジ！\\x27;document.getElementById(\\x27choiceConfirm2\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27チャレンジ精神がすばらしい！\\x27,\\x27celebrate\\x27,3000,false)" style="flex:1;background:white;border:2px solid #EF4444;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;"><div style="font-size:1.1rem;">🔥</div><div style="font-size:0.7rem;font-weight:bold;color:#DC2626;">むずかしめ</div></button>' +
+          '<button onclick="window._learningChoices.difficulty=\\x27easy\\x27;selectLearningChoice(\\x27diff\\x27,\\x27easy\\x27,this);document.getElementById(\\x27choiceConfirm2\\x27).innerHTML=\\x27✅ 基本をしっかり！\\x27;document.getElementById(\\x27choiceConfirm2\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27基本をしっかりやるのは大切だね！\\x27,\\x27encourage\\x27,3000,false)" style="flex:1;background:white;border:2px solid #10B981;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;"><div style="font-size:1.1rem;">🌱</div><div style="font-size:0.7rem;font-weight:bold;color:#059669;">きほん</div></button>' +
+          '<button onclick="window._learningChoices.difficulty=\\x27standard\\x27;selectLearningChoice(\\x27diff\\x27,\\x27standard\\x27,this);document.getElementById(\\x27choiceConfirm2\\x27).innerHTML=\\x27✅ バランスよく！\\x27;document.getElementById(\\x27choiceConfirm2\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27バランスよくやるのはいい作戦だね！\\x27,\\x27encourage\\x27,3000,false)" style="flex:1;background:white;border:2px solid #3B82F6;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;"><div style="font-size:1.1rem;">📘</div><div style="font-size:0.7rem;font-weight:bold;color:#1D4ED8;">ふつう</div></button>' +
+          '<button onclick="window._learningChoices.difficulty=\\x27hard\\x27;selectLearningChoice(\\x27diff\\x27,\\x27hard\\x27,this);document.getElementById(\\x27choiceConfirm2\\x27).innerHTML=\\x27✅ チャレンジ！\\x27;document.getElementById(\\x27choiceConfirm2\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27チャレンジ精神がすばらしい！\\x27,\\x27celebrate\\x27,3000,false)" style="flex:1;background:white;border:2px solid #EF4444;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;"><div style="font-size:1.1rem;">🔥</div><div style="font-size:0.7rem;font-weight:bold;color:#DC2626;">むずかしめ</div></button>' +
           '</div>' +
           '<p id="choiceConfirm2" style="display:none;font-size:0.8rem;color:#059669;font-weight:bold;margin-top:4px;text-align:center;"></p></div>';
 
@@ -8628,22 +8650,22 @@ app.get('/guide/:curriculumId', async (c) => {
           '<p style="font-size:0.8rem;font-weight:bold;color:#4C1D95;margin-bottom:6px;">③ どうやって考える？（考え方のタイプ）</p>' +
           '<p style="font-size:0.7rem;color:#7C3AED;margin-bottom:6px;">問題ごとに「解き方」が出てくるよ。自分に合う考え方をえらぼう！</p>' +
           '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
-          '<button onclick="window._learningChoices.thinkingStyle=\\x27deductive\\x27;document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ 公式・きまりから考える！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27きまりを使って考えるのは算数の力！\\x27,\\x27encourage\\x27,3000,false)" ' +
+          '<button onclick="window._learningChoices.thinkingStyle=\\x27deductive\\x27;selectLearningChoice(\\x27think\\x27,\\x27deductive\\x27,this);document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ 公式・きまりから考える！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27きまりを使って考えるのは算数の力！\\x27,\\x27encourage\\x27,3000,false)" ' +
           'style="flex:1;min-width:90px;background:white;border:2px solid #6366F1;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;">' +
           '<div style="font-size:1.1rem;">📐</div>' +
           '<div style="font-size:0.7rem;font-weight:bold;color:#4338CA;">きまりから考える</div>' +
           '<div style="font-size:0.6rem;color:#818CF8;">（演繹的）</div></button>' +
-          '<button onclick="window._learningChoices.thinkingStyle=\\x27inductive\\x27;document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ 例から発見する！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27自分で見つけるのはすごい力！\\x27,\\x27celebrate\\x27,3000,false)" ' +
+          '<button onclick="window._learningChoices.thinkingStyle=\\x27inductive\\x27;selectLearningChoice(\\x27think\\x27,\\x27inductive\\x27,this);document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ 例から発見する！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27自分で見つけるのはすごい力！\\x27,\\x27celebrate\\x27,3000,false)" ' +
           'style="flex:1;min-width:90px;background:white;border:2px solid #F59E0B;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;">' +
           '<div style="font-size:1.1rem;">🔍</div>' +
           '<div style="font-size:0.7rem;font-weight:bold;color:#B45309;">例からみつける</div>' +
           '<div style="font-size:0.6rem;color:#D97706;">（帰納的）</div></button>' +
-          '<button onclick="window._learningChoices.thinkingStyle=\\x27visual\\x27;document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ 図で考える！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27図で考えるのはとても大事！\\x27,\\x27encourage\\x27,3000,false)" ' +
+          '<button onclick="window._learningChoices.thinkingStyle=\\x27visual\\x27;selectLearningChoice(\\x27think\\x27,\\x27visual\\x27,this);document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ 図で考える！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27図で考えるのはとても大事！\\x27,\\x27encourage\\x27,3000,false)" ' +
           'style="flex:1;min-width:90px;background:white;border:2px solid #10B981;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;">' +
           '<div style="font-size:1.1rem;">🖼️</div>' +
           '<div style="font-size:0.7rem;font-weight:bold;color:#059669;">図でかんがえる</div>' +
           '<div style="font-size:0.6rem;color:#10B981;">（視覚的）</div></button>' +
-          '<button onclick="window._learningChoices.thinkingStyle=\\x27experimental\\x27;document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ やってみて考える！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27試行錯誤は学びの第一歩！\\x27,\\x27celebrate\\x27,3000,false)" ' +
+          '<button onclick="window._learningChoices.thinkingStyle=\\x27experimental\\x27;selectLearningChoice(\\x27think\\x27,\\x27experimental\\x27,this);document.getElementById(\\x27choiceConfirm3\\x27).innerHTML=\\x27✅ やってみて考える！\\x27;document.getElementById(\\x27choiceConfirm3\\x27).style.display=\\x27block\\x27;showCoachBubble(\\x27試行錯誤は学びの第一歩！\\x27,\\x27celebrate\\x27,3000,false)" ' +
           'style="flex:1;min-width:90px;background:white;border:2px solid #EC4899;border-radius:12px;padding:8px 6px;cursor:pointer;text-align:center;">' +
           '<div style="font-size:1.1rem;">🧪</div>' +
           '<div style="font-size:0.7rem;font-weight:bold;color:#BE185D;">ためしてみる</div>' +
@@ -8762,6 +8784,10 @@ app.get('/guide/:curriculumId', async (c) => {
     html += '<div style="text-align:center;margin-bottom:10px;"><strong style="font-size:0.9rem;color:#6D28D9;">🎶 もっと楽しく学ぶツール</strong></div>';
     
     // 音楽・動画生成ボタン
+    html += '<div style="margin-bottom:8px;">';
+    html += '<label style="font-size:0.7rem;font-weight:bold;color:#6D28D9;">生成プロンプト（任意：空欄ならカード情報から自動生成）</label>';
+    html += '<input type="text" id="gen-prompt-intro-' + page + '" style="width:100%;border:2px solid #DDD6FE;border-radius:10px;padding:8px 12px;font-size:0.8rem;outline:none;box-sizing:border-box;" placeholder="例：この単元を楽しく覚える歌 / アニメーション動画">';
+    html += '</div>';
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">';
     html += '<button onclick="generateLearningSong(' + page + ')" style="flex:1;min-width:140px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:white;border:none;padding:10px 14px;border-radius:12px;font-weight:bold;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;box-shadow:0 2px 8px rgba(124,58,237,0.3);">';
     html += '<span style="font-size:1.2rem;">🎵</span> 学習ソングを作る</button>';
@@ -8996,6 +9022,9 @@ app.get('/guide/:curriculumId', async (c) => {
     if (!resultArea) return;
     var introData = c._introData || {};
     var songIdea = introData.learning_song_idea || c.card_title || '';
+    var customPrompt = '';
+    var promptEl = document.getElementById('gen-prompt-intro-' + page);
+    if (promptEl) customPrompt = promptEl.value.trim();
 
     // NB2 生成中UI
     resultArea.innerHTML = 
@@ -9014,10 +9043,11 @@ app.get('/guide/:curriculumId', async (c) => {
       body: JSON.stringify({
         card_title: c.card_title || '',
         problem_text: (c.problem_text || '').substring(0, 400),
-        topic: songIdea,
+        topic: customPrompt || songIdea,
         subject: CURRICULUM.subject || '',
         grade: CURRICULUM.grade || '',
-        unit_name: CURRICULUM.unit_name || ''
+        unit_name: CURRICULUM.unit_name || '',
+        custom_prompt: customPrompt
       })
     })
     .then(function(r) { return r.json(); })
@@ -9219,10 +9249,15 @@ app.get('/guide/:curriculumId', async (c) => {
     var subject = CURRICULUM.subject || '';
     var grade = CURRICULUM.grade || '';
     var unit = CURRICULUM.unit_name || '';
+    var customPrompt = '';
+    var promptEl = document.getElementById('gen-prompt-intro-' + page);
+    if (promptEl) customPrompt = promptEl.value.trim();
 
     // 動画プロンプトを構築
     var videoPrompt = '';
-    if (videoIdea) {
+    if (customPrompt) {
+      videoPrompt = '日本の' + grade + subject + '「' + unit + '」の教育動画。' + customPrompt + '。子どもが見て理解しやすい映像。';
+    } else if (videoIdea) {
       videoPrompt = '日本の' + grade + subject + '「' + unit + '」の教育動画。' + videoIdea + '。子どもが見て理解しやすい映像。やさしい色使い、ゆっくりとした動き。';
     } else {
       videoPrompt = '日本の' + grade + subject + '「' + unit + '」の学習内容を視覚的に表現した教育動画。' + (c.card_title || '') + '。子ども向けの親しみやすいアニメーション風。';
@@ -10063,7 +10098,8 @@ app.get('/guide/:curriculumId', async (c) => {
         message: msg,
         cardContext: { card_title: card.card_title || '', problem_description: card.problem_text || card.problem_content || '', new_terms: card.new_terms || '', answer: card.correct_answer || card.answer || '', hints: '' },
         conversationHistory: aiConversation.map(function(c) { return { role: c.role, text: c.content }; }),
-        studentGrade: CURRICULUM.grade || null
+        studentGrade: CURRICULUM.grade || null,
+        learningChoices: window._learningChoices || {}
       })
     }).then(function(r) { return r.json(); }).then(function(data) {
       var loading = document.getElementById('ai-loading-' + page);
@@ -10588,11 +10624,27 @@ app.get('/guide/:curriculumId', async (c) => {
 
   // キャンバスの表示トグル
   function toggleDrawCanvas(page) {
-    var area = document.getElementById('canvas-area-' + page);
+    var area = document.getElementById('canvas-area-' + page) || document.getElementById('draw-canvas-container-' + page);
     if (!area) return;
     var isHidden = area.style.display === 'none';
     area.style.display = isHidden ? 'block' : 'none';
     if (isHidden) {
+      // 導入カード用: コンテナ内にキャンバスがなければ動的に生成
+      if (!document.getElementById('draw-canvas-' + page)) {
+        area.innerHTML = '<div style="background:white;border:2px solid #FED7AA;border-radius:12px;padding:8px;position:relative;">' +
+          '<div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;align-items:center;">' +
+          '<button onclick="setCanvasTool(' + page + ',\\x27pen\\x27,\\x27#1E40AF\\x27,2)" style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">🖊️ ペン</button>' +
+          '<button onclick="setCanvasTool(' + page + ',\\x27pen\\x27,\\x27#DC2626\\x27,3)" style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">🔴 赤</button>' +
+          '<button onclick="setCanvasTool(' + page + ',\\x27pen\\x27,\\x27#059669\\x27,3)" style="background:#D1FAE5;border:1px solid #6EE7B7;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">🟢 緑</button>' +
+          '<button onclick="setCanvasTool(' + page + ',\\x27eraser\\x27,\\x27white\\x27,20)" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">消しゴム</button>' +
+          '<button onclick="undoCanvas(' + page + ')" style="background:#F3F4F6;border:1px solid #D1D5DB;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">↩️</button>' +
+          '<button onclick="clearCanvas(' + page + ')" style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:6px;padding:3px 8px;font-size:0.7rem;cursor:pointer;">🗑️</button>' +
+          '<span style="flex:1;"></span>' +
+          '<button onclick="sendCanvasToAI(' + page + ')" style="background:#7C3AED;color:white;border:none;padding:4px 12px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;"><i class="fas fa-paper-plane" style="margin-right:4px;"></i>AIに送る</button>' +
+          '</div>' +
+          '<canvas id="draw-canvas-' + page + '" style="width:100%;height:200px;border-radius:8px;border:1px solid #E5E7EB;background:white;touch-action:none;cursor:crosshair;"></canvas>' +
+          '</div>';
+      }
       initDrawCanvas(page);
     }
   }
@@ -10760,7 +10812,7 @@ app.get('/guide/:curriculumId', async (c) => {
     state.color = color;
     state.lineWidth = lineWidth;
     // アクティブボタン表示
-    var area = document.getElementById('canvas-area-' + page);
+    var area = document.getElementById('canvas-area-' + page) || document.getElementById('draw-canvas-container-' + page);
     if (area) {
       var btns = area.querySelectorAll('button');
       btns.forEach(function(b) { b.style.fontWeight = 'normal'; b.style.boxShadow = 'none'; });
@@ -10971,7 +11023,8 @@ app.get('/guide/:curriculumId', async (c) => {
         grade: card.grade || CURRICULUM.grade || '',
         subject: card.subject || CURRICULUM.subject || '',
         hint_text: (card.hint_text || card._hints?.map(function(h){return h.content}).join(' ') || '').substring(0, 300),
-        preferred_thinking_style: preferredStyle  // 児童の好みを渡す
+        preferred_thinking_style: preferredStyle,  // 児童の好みを渡す
+        preferred_difficulty: (window._learningChoices && window._learningChoices.difficulty) || ''  // 選択した難易度
       })
     })
     .then(function(r) { return r.json(); })
@@ -24816,7 +24869,7 @@ ${student_answer ? `【児童の入力した答え】${student_answer}` : ''}
 // 自己決定理論: 「どのやり方で解くか」を自分で選ぶ → 自律性の支援
 // 例: 平行四辺形の面積 → ①三角形2つに分ける方法 ②長方形から切り取る方法 ③公式を使う方法
 app.post('/api/ai/suggest-approaches', async (c) => {
-  const { card_title, problem_text, grade, subject, hint_text, preferred_thinking_style } = await c.req.json()
+  const { card_title, problem_text, grade, subject, hint_text, preferred_thinking_style, preferred_difficulty } = await c.req.json()
   const apiKey = c.env.GEMINI_API_KEY
   if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
 
@@ -24824,12 +24877,15 @@ app.post('/api/ai/suggest-approaches', async (c) => {
     const preferenceNote = preferred_thinking_style 
       ? `\n【児童の好みの思考スタイル】${preferred_thinking_style}（この考え方に合うアプローチを1つ含めてください。ただし、他のアプローチも必ず提示してください）` 
       : '';
+    const difficultyNote = preferred_difficulty
+      ? `\n【児童が選択した難易度】${preferred_difficulty === 'easy' ? 'きほん（基本をしっかり）' : preferred_difficulty === 'hard' ? 'むずかしめ（チャレンジ）' : 'ふつう（バランス）'}（この難易度に合わせたアプローチの難易度を調整してください）`
+      : '';
 
     const prompt = `あなたは小学${grade || ''}年生の${subject || '算数'}の先生です。
 この問題には複数の解き方（アプローチ）があります。児童が自分で選べるように提案してください。
 
 【問題】${card_title || ''}: ${problem_text || ''}
-${hint_text ? `【ヒント情報】${hint_text}` : ''}${preferenceNote}
+${hint_text ? `【ヒント情報】${hint_text}` : ''}${preferenceNote}${difficultyNote}
 
 ■ 以下のJSON形式で2〜3個の解法アプローチを提案してください:
 {

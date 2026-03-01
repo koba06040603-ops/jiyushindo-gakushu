@@ -12940,6 +12940,100 @@ function isDiagonalCross(points1, points2) {
 window.toggleAutoVoice = toggleAutoVoice
 window.switchAnswerMode = switchAnswerMode
 
+// ====================================================================
+// 教師用プレビュー: 音楽・動画・画像AI生成
+// ====================================================================
+function getTeacherCardData(cardId, index) {
+  const cards = window._guideCardsCache || []
+  const card = cards[index] || {}
+  const prompt = document.getElementById('gen-prompt-' + cardId)?.value?.trim() || ''
+  return { card, prompt, cardId, index }
+}
+
+async function teacherGenerateSong(cardId, index) {
+  const { card, prompt } = getTeacherCardData(cardId, index)
+  const area = document.getElementById('teacher-gen-result-' + cardId)
+  if (!area) return
+  area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-purple-500 text-xl"></i><p class="text-xs text-purple-600 mt-1 font-bold">NB2が学習ソングを作曲中...</p></div>'
+  try {
+    const res = await axios.post('/api/ai/generate-nb2-music', {
+      card_id: cardId, card_title: card.card_title || '',
+      problem_text: card.problem_text || '', subject: card.subject || '',
+      grade: card.grade || '', unit_name: card.unit_name || '',
+      custom_prompt: prompt
+    })
+    const d = res.data
+    if (d.success) {
+      const sd = d.song_data || {}
+      let html = '<div class="bg-white rounded-lg p-3 border border-purple-200 mt-2">'
+      html += '<p class="font-bold text-purple-700 text-sm">🎵 ' + (sd.song_title || '学習ソング') + '</p>'
+      if (sd.genre) html += '<p class="text-[10px] text-gray-500">' + sd.genre + (sd.tempo_bpm ? ' / ' + sd.tempo_bpm + 'BPM' : '') + '</p>'
+      if (sd.lyrics) html += '<pre class="text-xs text-gray-700 mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">' + sd.lyrics + '</pre>'
+      if (d.cover_image_url) html += '<img src="' + d.cover_image_url + '" class="max-h-24 rounded mt-1 mx-auto">'
+      html += '<p class="text-[10px] text-gray-400 mt-1">' + d.model + ' / ' + Math.round(d.generation_time_ms / 1000) + '秒</p>'
+      html += '<button onclick="teacherGenerateSong(' + cardId + ',' + index + ')" class="text-xs text-purple-500 underline mt-1">🔄 再生成</button>'
+      html += '</div>'
+      area.innerHTML = html
+    } else {
+      area.innerHTML = '<p class="text-xs text-red-500">生成失敗: ' + (d.error || '') + '</p>'
+    }
+  } catch (e) {
+    area.innerHTML = '<p class="text-xs text-red-500">通信エラー: ' + e.message + '</p>'
+  }
+}
+
+async function teacherGenerateVideo(cardId, index) {
+  const { card, prompt } = getTeacherCardData(cardId, index)
+  const area = document.getElementById('teacher-gen-result-' + cardId)
+  if (!area) return
+  area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-red-500 text-xl"></i><p class="text-xs text-red-600 mt-1 font-bold">Veo 3.1が動画を生成中（30〜90秒）...</p></div>'
+  try {
+    const videoPrompt = prompt || ('日本の' + (card.grade || '') + (card.subject || '') + '「' + (card.unit_name || '') + '」の' + (card.card_title || '') + '。子どもにわかりやすい教育動画。')
+    const res = await axios.post('/api/ai/generate-video', {
+      prompt: videoPrompt, card_id: cardId, card_title: card.card_title || '',
+      subject: card.subject || '', grade: card.grade || ''
+    })
+    const d = res.data
+    if (d.success && d.video_url) {
+      area.innerHTML = '<div class="bg-white rounded-lg p-3 border border-red-200 mt-2"><p class="font-bold text-red-700 text-sm">🎬 学習動画</p><video controls class="w-full rounded mt-1" style="max-height:200px;" preload="metadata"><source src="' + d.video_url + '" type="video/mp4"></video><p class="text-[10px] text-gray-400 mt-1">Veo 3.1 / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</p><button onclick="teacherGenerateVideo(' + cardId + ',' + index + ')" class="text-xs text-red-500 underline mt-1">🔄 再生成</button></div>'
+    } else if (d.status === 'processing') {
+      area.innerHTML = '<div class="bg-yellow-50 rounded-lg p-3 border border-yellow-200 mt-2"><p class="text-sm font-bold text-yellow-700">⏳ 動画生成中...</p><p class="text-xs text-gray-500">30〜90秒後にこのページをリロードしてください</p><p class="text-[10px] text-gray-400 mt-1">Operation: ' + (d.operationName || '') + '</p></div>'
+    } else {
+      const yt = d.fallback_youtube_url || ''
+      area.innerHTML = '<div class="bg-white rounded-lg p-3 border mt-2"><p class="text-sm text-gray-700">動画生成に時間がかかっています。</p>' + (yt ? '<a href="' + yt + '" target="_blank" class="text-xs text-blue-500 underline">YouTube検索で代替動画を探す</a>' : '') + '</div>'
+    }
+  } catch (e) {
+    area.innerHTML = '<p class="text-xs text-red-500">通信エラー: ' + e.message + '</p>'
+  }
+}
+
+async function teacherGenerateImage(cardId, index) {
+  const { card, prompt } = getTeacherCardData(cardId, index)
+  const area = document.getElementById('teacher-gen-result-' + cardId)
+  if (!area) return
+  area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-pink-500 text-xl"></i><p class="text-xs text-pink-600 mt-1 font-bold">NB2がAI画像を生成中...</p></div>'
+  try {
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: prompt || (card.card_title || ''), card_id: cardId,
+      card_title: card.card_title || '', problem_text: card.problem_text || '',
+      subject: card.subject || '', grade: card.grade || '',
+      unit_name: card.unit_name || '', prefer_image: true
+    })
+    const d = res.data
+    if (d.success && d.image_url) {
+      area.innerHTML = '<div class="bg-white rounded-lg p-3 border border-pink-200 mt-2"><p class="font-bold text-pink-700 text-sm">🎨 AI画像</p><img src="' + d.image_url + '" class="w-full rounded mt-1 border" style="max-height:200px;object-fit:contain;"><p class="text-[10px] text-gray-400 mt-1">' + (d.model || 'NB2') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</p><button onclick="teacherGenerateImage(' + cardId + ',' + index + ')" class="text-xs text-pink-500 underline mt-1">🔄 再生成</button></div>'
+    } else {
+      area.innerHTML = '<p class="text-xs text-red-500">画像生成失敗</p>'
+    }
+  } catch (e) {
+    area.innerHTML = '<p class="text-xs text-red-500">通信エラー: ' + e.message + '</p>'
+  }
+}
+
+window.teacherGenerateSong = teacherGenerateSong
+window.teacherGenerateVideo = teacherGenerateVideo
+window.teacherGenerateImage = teacherGenerateImage
+
 // ============================================================
 // 作図問題用：Canvas描画実技シミュレーター
 // コンパス（円弧描画）+ 定規（直線描画）で実際に手を動かして作図
@@ -51836,6 +51930,29 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                     </div>
                     ${(card.hints && card.hints.length > 0) ? '<details class="mt-1"><summary class="text-xs text-green-600 cursor-pointer font-bold"><i class="fas fa-lightbulb mr-1"></i>3段階ヒント（' + card.hints.length + '個）</summary><div class="space-y-1 mt-1">' + card.hints.map(function(h, hi) { return '<div class="bg-' + (hi === 0 ? 'green' : hi === 1 ? 'yellow' : 'orange') + '-50 p-2 rounded border text-xs"><span class="font-bold">' + (hi === 0 ? '🟢 ヒント1' : hi === 1 ? '🟡 ヒント2' : '🟠 ヒント3') + ':</span> ' + (h.hint_content || h.hint_text || '') + '</div>' }).join('') + '</div></details>' : card.hint_text ? '<details class="mt-1"><summary class="text-xs text-green-600 cursor-pointer font-bold">ヒントを表示</summary><p class="text-xs text-gray-600 mt-1 bg-white p-2 rounded border">' + card.hint_text + '</p></details>' : '<p class="text-[10px] text-gray-400 mt-1"><i class="fas fa-lightbulb mr-1"></i>ヒントは「学習を始める」で3段階表示されます</p>'}
                     ${pNote ? '<div class="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-2 text-xs"><span class="font-bold text-indigo-700"><i class="fas fa-brain mr-1"></i>この問題の理論根拠:</span> <span class="text-indigo-600">' + pNote + '</span></div>' : ''}
+                    <!-- 🎵🎬 音楽・動画・AI画像生成パネル（教師用プレビュー） -->
+                    <div class="mt-3 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-3">
+                      <p class="text-xs font-bold text-purple-700 mb-2"><i class="fas fa-magic mr-1"></i>多感覚AI生成ツール</p>
+                      <div class="space-y-2">
+                        <!-- プロンプト入力欄 -->
+                        <div>
+                          <label class="text-[10px] font-bold text-gray-500">生成プロンプト（任意：空欄ならカード情報から自動生成）</label>
+                          <input type="text" id="gen-prompt-${card.card_id || card.id || i}" class="w-full border border-purple-200 rounded-lg px-2 py-1 text-xs" placeholder="例：九九の3の段を楽しく覚える歌 / 平行移動のアニメーション動画">
+                        </div>
+                        <div class="flex gap-2 flex-wrap">
+                          <button onclick="teacherGenerateSong(${card.card_id || card.id || 0}, ${i})" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-violet-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition">
+                            <i class="fas fa-music"></i>🎵 学習ソング生成
+                          </button>
+                          <button onclick="teacherGenerateVideo(${card.card_id || card.id || 0}, ${i})" class="inline-flex items-center gap-1 bg-gradient-to-r from-red-500 to-pink-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition">
+                            <i class="fas fa-video"></i>🎬 学習動画生成
+                          </button>
+                          <button onclick="teacherGenerateImage(${card.card_id || card.id || 0}, ${i})" class="inline-flex items-center gap-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition">
+                            <i class="fas fa-palette"></i>🎨 AI画像生成
+                          </button>
+                        </div>
+                        <div id="teacher-gen-result-${card.card_id || card.id || i}" class="mt-1"></div>
+                      </div>
+                    </div>
                     <!-- 編集パネル（非表示） -->
                     <div id="card-edit-panel-${card.card_id || card.id || i}" class="hidden mt-3 bg-white border-2 border-yellow-300 rounded-xl p-4">
                       <h5 class="font-bold text-yellow-700 mb-2"><i class="fas fa-edit mr-1"></i>カード編集</h5>
