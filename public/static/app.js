@@ -4587,17 +4587,30 @@ async function loadGuidePage(curriculumId) {
                       <span class="text-sm text-gray-600 ml-2">(${course.cards?.length || 0}枚)</span>
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      ${(course.cards || []).map(card => `
-                        <button onclick="showLearningCard(${JSON.stringify(card).replace(/"/g, '&quot;')}, ${curriculumId}, ${course.course_id})"
-                                class="bg-white border-2 border-${course.color_code || 'blue'}-200 hover:border-${course.color_code || 'blue'}-400 rounded-lg p-4 text-left transition shadow hover:shadow-lg">
-                          <div class="flex items-start justify-between">
+                      ${(course.cards || []).map((card, ci) => `
+                        <div class="bg-white border-2 border-${course.color_code || 'blue'}-200 rounded-lg p-4 text-left transition shadow hover:shadow-lg">
+                          <div class="flex items-start justify-between mb-2">
                             <div class="flex-1">
                               <p class="text-sm text-${course.color_code || 'blue'}-600 font-bold mb-1">カード ${card.card_number}</p>
                               <p class="font-bold text-gray-800">${card.card_title}</p>
+                              ${card.problem_text || card.problem_description ? '<p class="text-xs text-gray-600 mt-1">' + (card.problem_text || card.problem_description || '').substring(0, 80) + '...</p>' : ''}
                             </div>
-                            <i class="fas fa-chevron-right text-${course.color_code || 'blue'}-400"></i>
+                            <span class="text-xs px-2 py-0.5 rounded-full font-bold ${card.difficulty_level === 'easy' ? 'bg-green-100 text-green-700' : card.difficulty_level === 'hard' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}">${card.difficulty_level === 'easy' ? 'きほん' : card.difficulty_level === 'hard' ? 'チャレンジ' : 'しっかり'}</span>
                           </div>
-                        </button>
+                          <details class="mt-2">
+                            <summary class="text-xs text-purple-600 cursor-pointer font-bold"><i class="fas fa-magic mr-1"></i>多感覚AI生成ツール</summary>
+                            <div class="mt-2 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-2 space-y-2">
+                              <input type="text" id="group-gen-prompt-${card.id || ci}" class="w-full border border-purple-200 rounded px-2 py-1 text-[10px]" placeholder="生成プロンプト（任意）">
+                              <div class="flex gap-1 flex-wrap">
+                                <button onclick="groupCardGenerate('song', ${card.id || 0}, ${ci}, '${(course.course_name||'').replace(/'/g,'')}', '${(card.card_title||'').replace(/'/g,'')}')" class="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-2 py-1 rounded text-[10px] font-bold">🎵 30秒おぼえうた</button>
+                                <button onclick="groupCardGenerate('suno', ${card.id || 0}, ${ci}, '${(course.course_name||'').replace(/'/g,'')}', '${(card.card_title||'').replace(/'/g,'')}')" class="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-2 py-1 rounded text-[10px] font-bold">🎤 Sunoフル曲</button>
+                                <button onclick="groupCardGenerate('video', ${card.id || 0}, ${ci}, '${(course.course_name||'').replace(/'/g,'')}', '${(card.card_title||'').replace(/'/g,'')}')" class="bg-gradient-to-r from-red-500 to-pink-600 text-white px-2 py-1 rounded text-[10px] font-bold">🎬 動画</button>
+                                <button onclick="groupCardGenerate('image', ${card.id || 0}, ${ci}, '${(course.course_name||'').replace(/'/g,'')}', '${(card.card_title||'').replace(/'/g,'')}')" class="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-[10px] font-bold">🎨 画像</button>
+                              </div>
+                              <div id="group-gen-result-${card.id || ci}" class="mt-1"></div>
+                            </div>
+                          </details>
+                        </div>
                       `).join('')}
                     </div>
                   </div>
@@ -12954,7 +12967,7 @@ async function teacherGenerateSong(cardId, index) {
   const { card, prompt } = getTeacherCardData(cardId, index)
   const area = document.getElementById('teacher-gen-result-' + cardId)
   if (!area) return
-  area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-purple-500 text-xl"></i><p class="text-xs text-purple-600 mt-1 font-bold">NB2が学習ソングを作曲中...</p></div>'
+  area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-purple-500 text-xl"></i><p class="text-xs text-purple-600 mt-1 font-bold">NB2が30秒おぼえうたを作曲中...</p></div>'
   try {
     const res = await axios.post('/api/ai/generate-nb2-music', {
       card_id: cardId, card_title: card.card_title || '',
@@ -12966,12 +12979,12 @@ async function teacherGenerateSong(cardId, index) {
     if (d.success) {
       const sd = d.song_data || {}
       let html = '<div class="bg-white rounded-lg p-3 border border-purple-200 mt-2">'
-      html += '<p class="font-bold text-purple-700 text-sm">🎵 ' + (sd.song_title || '学習ソング') + '</p>'
+      html += '<p class="font-bold text-purple-700 text-sm">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>'
       if (sd.genre) html += '<p class="text-[10px] text-gray-500">' + sd.genre + (sd.tempo_bpm ? ' / ' + sd.tempo_bpm + 'BPM' : '') + '</p>'
       if (sd.lyrics) html += '<pre class="text-xs text-gray-700 mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">' + sd.lyrics + '</pre>'
       if (d.cover_image_url) html += '<img src="' + d.cover_image_url + '" class="max-h-24 rounded mt-1 mx-auto">'
       html += '<p class="text-[10px] text-gray-400 mt-1">' + d.model + ' / ' + Math.round(d.generation_time_ms / 1000) + '秒</p>'
-      html += '<button onclick="teacherGenerateSong(' + cardId + ',' + index + ')" class="text-xs text-purple-500 underline mt-1">🔄 再生成</button>'
+      html += '<button onclick="teacherGenerateSong(' + cardId + ',' + index + ')" class="text-xs text-purple-500 underline mt-1">🔄 再生成（30秒おぼえうた）</button>'
       html += '</div>'
       area.innerHTML = html
     } else {
@@ -13030,7 +13043,53 @@ async function teacherGenerateImage(cardId, index) {
   }
 }
 
+// Sunoフル曲提案を生成（歌詞・スタイル・曲名をAIで自動生成）
+async function teacherPrepareSuno(cardId, index) {
+  const { card, prompt } = getTeacherCardData(cardId, index)
+  const area = document.getElementById('teacher-gen-result-' + cardId)
+  if (!area) return
+  area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-pink-500 text-xl"></i><p class="text-xs text-pink-600 mt-1 font-bold">AIがSunoフル曲の歌詞・スタイルを提案中...</p></div>'
+  try {
+    const res = await axios.post('/api/ai/generate-suno-lyrics', {
+      grade: card.grade || '', subject: card.subject || '',
+      unit_name: card.unit_name || '', topic: prompt || card.card_title || '',
+      song_type: '学習内容の暗記・理解補助ソング'
+    })
+    const d = res.data
+    if (d.success && d.lyrics_data) {
+      const sd = d.lyrics_data
+      let html = '<div class="bg-white rounded-lg p-3 border-2 border-pink-200 mt-2">'
+      html += '<div class="flex items-center gap-2 mb-2"><span class="text-lg">🎤</span><p class="font-bold text-pink-700 text-sm">Sunoフル曲提案</p><span class="text-[9px] bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full font-bold">外部サービス・無料（1日5曲）</span></div>'
+      if (sd.song_title) html += '<p class="text-xs text-gray-700 mb-1"><strong>曲名:</strong> ' + sd.song_title + '</p>'
+      if (sd.memory_technique) html += '<p class="text-[10px] text-indigo-600 mb-1"><i class="fas fa-brain mr-1"></i>' + sd.memory_technique + '</p>'
+      html += '<label class="text-[9px] text-gray-500 font-bold">スタイル（Sunoのスタイル欄にコピー）</label>'
+      html += '<input type="text" id="suno-style-res-' + cardId + '" value="' + (sd.suno_style_prompt || '').replace(/"/g, '&quot;') + '" class="w-full border border-pink-200 rounded px-2 py-1 text-[11px] mb-1">'
+      html += '<label class="text-[9px] text-gray-500 font-bold">歌詞（Sunoの歌詞欄にコピー・4分フル）</label>'
+      html += '<textarea id="suno-lyrics-res-' + cardId + '" rows="8" class="w-full border border-pink-200 rounded px-2 py-1 text-[10px] font-mono resize-y">' + (sd.suno_lyrics || '') + '</textarea>'
+      if (sd.usage_tips) html += '<p class="text-[10px] text-gray-500 mt-1"><i class="fas fa-lightbulb text-yellow-500 mr-1"></i>' + sd.usage_tips + '</p>'
+      html += '<div class="flex gap-2 mt-2 flex-wrap">'
+      html += '<button onclick="navigator.clipboard.writeText(document.getElementById(\'suno-lyrics-res-' + cardId + '\').value);this.textContent=\'✅ コピー済\';setTimeout(()=>{this.innerHTML=\'<i class=\\\'fas fa-copy mr-0.5\\\'></i>歌詞コピー\'},1500)" class="bg-pink-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold"><i class="fas fa-copy mr-0.5"></i>歌詞コピー</button>'
+      html += '<button onclick="navigator.clipboard.writeText(document.getElementById(\'suno-style-res-' + cardId + '\').value);this.textContent=\'✅ コピー済\';setTimeout(()=>{this.innerHTML=\'<i class=\\\'fas fa-copy mr-0.5\\\'></i>スタイルコピー\'},1500)" class="bg-pink-200 text-pink-700 px-3 py-1.5 rounded-lg text-[10px] font-bold"><i class="fas fa-copy mr-0.5"></i>スタイルコピー</button>'
+      html += '<a href="https://suno.com" target="_blank" class="ml-auto bg-gray-800 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold"><i class="fas fa-external-link-alt mr-0.5"></i>Sunoを開く</a>'
+      html += '</div>'
+      if (d.suno_info) {
+        html += '<details class="mt-2"><summary class="text-[10px] text-pink-600 cursor-pointer font-bold">📋 Sunoの使い方</summary><ol class="text-[10px] text-gray-600 mt-1 space-y-0.5 list-decimal list-inside">'
+        ;(d.suno_info.how_to_steps || []).forEach(function(s) { html += '<li>' + s + '</li>' })
+        html += '</ol></details>'
+      }
+      html += '<button onclick="teacherPrepareSuno(' + cardId + ',' + index + ')" class="text-xs text-pink-500 underline mt-2">🔄 再提案</button>'
+      html += '</div>'
+      area.innerHTML = html
+    } else {
+      area.innerHTML = '<p class="text-xs text-red-500">Suno提案生成失敗: ' + (d.error || '') + '</p>'
+    }
+  } catch (e) {
+    area.innerHTML = '<p class="text-xs text-red-500">通信エラー: ' + e.message + '</p>'
+  }
+}
+
 window.teacherGenerateSong = teacherGenerateSong
+window.teacherPrepareSuno = teacherPrepareSuno
 window.teacherGenerateVideo = teacherGenerateVideo
 window.teacherGenerateImage = teacherGenerateImage
 
@@ -13086,6 +13145,85 @@ async function teacherGenDiagram(cardId, index) {
 
 window.teacherGenShortMusic = teacherGenShortMusic
 window.teacherGenDiagram = teacherGenDiagram
+
+// ★ 全体配信カード用：音楽・動画・画像生成
+async function groupCardGenerate(type, cardId, cardIndex, courseName, cardTitle) {
+  const area = document.getElementById('group-gen-result-' + (cardId || cardIndex))
+  if (!area) return
+  const promptEl = document.getElementById('group-gen-prompt-' + (cardId || cardIndex))
+  const customPrompt = promptEl?.value?.trim() || ''
+  
+  if (type === 'song') {
+    area.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin text-purple-500"></i> <span class="text-xs text-purple-600 font-bold">NB2が30秒おぼえうたを作曲中...</span></div>'
+    try {
+      const res = await axios.post('/api/ai/generate-nb2-music', {
+        card_id: cardId, card_title: cardTitle, subject: '', grade: '',
+        unit_name: courseName, custom_prompt: customPrompt
+      })
+      const d = res.data
+      if (d.success && d.song_data) {
+        const sd = d.song_data
+        let h = '<div class="bg-purple-50 rounded p-2 mt-1 border border-purple-200">'
+        h += '<p class="font-bold text-purple-700 text-xs">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>'
+        if (sd.genre) h += '<p class="text-[9px] text-gray-500">' + sd.genre + (sd.tempo_bpm ? ' / ' + sd.tempo_bpm + 'BPM' : '') + '</p>'
+        if (sd.lyrics) h += '<pre class="text-[10px] whitespace-pre-wrap bg-white p-2 rounded border mt-1 max-h-20 overflow-y-auto">' + sd.lyrics + '</pre>'
+        if (d.cover_image_url) h += '<img src="' + d.cover_image_url + '" class="max-h-16 rounded mt-1">'
+        h += '<p class="text-[9px] text-gray-400 mt-1">' + (d.model||'NB2') + ' / ' + Math.round((d.generation_time_ms||0)/1000) + '秒</p>'
+        h += '<button onclick="groupCardGenerate(\'song\',' + cardId + ',' + cardIndex + ',\'' + courseName.replace(/'/g,'') + '\',\'' + cardTitle.replace(/'/g,'') + '\')" class="text-[10px] text-purple-500 underline mt-1">🔄 再生成</button></div>'
+        area.innerHTML = h
+      } else { area.innerHTML = '<p class="text-[10px] text-red-500">失敗: ' + (d.error||'') + '</p>' }
+    } catch(e) { area.innerHTML = '<p class="text-[10px] text-red-500">エラー: ' + e.message + '</p>' }
+  } else if (type === 'suno') {
+    area.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin text-pink-500"></i> <span class="text-xs text-pink-600 font-bold">Sunoフル曲提案を生成中...</span></div>'
+    try {
+      const res = await axios.post('/api/ai/generate-suno-lyrics', {
+        grade: '', subject: '', unit_name: courseName,
+        topic: customPrompt || cardTitle, song_type: '学習内容の暗記・理解補助ソング'
+      })
+      const d = res.data
+      if (d.success && d.lyrics_data) {
+        const sd = d.lyrics_data
+        let h = '<div class="bg-pink-50 rounded p-2 mt-1 border border-pink-200">'
+        h += '<div class="flex items-center gap-1 mb-1"><span>🎤</span><span class="text-xs font-bold text-pink-700">Sunoフル曲提案</span><span class="text-[8px] bg-pink-100 text-pink-600 px-1 py-0.5 rounded font-bold">外部</span></div>'
+        if (sd.song_title) h += '<p class="text-[10px] text-gray-700"><strong>曲名:</strong> ' + sd.song_title + '</p>'
+        h += '<input type="text" id="gsuno-style-' + (cardId||cardIndex) + '" value="' + (sd.suno_style_prompt||'').replace(/"/g,'&quot;') + '" class="w-full border border-pink-100 rounded px-1 py-0.5 text-[10px] mt-1">'
+        h += '<textarea id="gsuno-lyrics-' + (cardId||cardIndex) + '" rows="4" class="w-full border border-pink-100 rounded px-1 py-0.5 text-[9px] font-mono mt-1 resize-y">' + (sd.suno_lyrics||'') + '</textarea>'
+        h += '<div class="flex gap-1 mt-1 flex-wrap">'
+        h += '<button onclick="navigator.clipboard.writeText(document.getElementById(\'gsuno-lyrics-' + (cardId||cardIndex) + '\').value);this.textContent=\'✅\';setTimeout(()=>this.textContent=\'歌詞コピー\',1000)" class="bg-pink-500 text-white px-2 py-0.5 rounded text-[9px] font-bold">歌詞コピー</button>'
+        h += '<button onclick="navigator.clipboard.writeText(document.getElementById(\'gsuno-style-' + (cardId||cardIndex) + '\').value);this.textContent=\'✅\';setTimeout(()=>this.textContent=\'スタイルコピー\',1000)" class="bg-pink-200 text-pink-700 px-2 py-0.5 rounded text-[9px] font-bold">スタイルコピー</button>'
+        h += '<a href="https://suno.com" target="_blank" class="bg-gray-800 text-white px-2 py-0.5 rounded text-[9px] font-bold">Suno</a></div>'
+        h += '<button onclick="groupCardGenerate(\'suno\',' + cardId + ',' + cardIndex + ',\'' + courseName.replace(/'/g,'') + '\',\'' + cardTitle.replace(/'/g,'') + '\')" class="text-[10px] text-pink-500 underline mt-1">🔄 再提案</button></div>'
+        area.innerHTML = h
+      } else { area.innerHTML = '<p class="text-[10px] text-red-500">失敗: ' + (d.error||'') + '</p>' }
+    } catch(e) { area.innerHTML = '<p class="text-[10px] text-red-500">エラー: ' + e.message + '</p>' }
+  } else if (type === 'video') {
+    area.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin text-red-500"></i> <span class="text-xs text-red-600 font-bold">Veo 3.1が動画を生成中（30〜90秒）...</span></div>'
+    try {
+      const videoPrompt = customPrompt || ('日本の小学校 ' + courseName + '「' + cardTitle + '」。子どもにわかりやすい教育動画。')
+      const res = await axios.post('/api/ai/generate-video', {
+        prompt: videoPrompt, card_id: cardId, card_title: cardTitle
+      })
+      const d = res.data
+      if (d.success && d.video_url) {
+        area.innerHTML = '<div class="bg-red-50 rounded p-2 mt-1 border border-red-200"><p class="font-bold text-red-700 text-xs">🎬 動画</p><video controls class="w-full rounded mt-1" style="max-height:150px;" preload="metadata"><source src="' + d.video_url + '" type="video/mp4"></video><p class="text-[9px] text-gray-400">Veo 3.1 / ' + Math.round((d.generation_time_ms||0)/1000) + '秒</p></div>'
+      } else if (d.status === 'processing') {
+        area.innerHTML = '<div class="bg-yellow-50 rounded p-2 mt-1 border border-yellow-200"><p class="text-xs font-bold text-yellow-700">⏳ 動画生成中（30〜90秒後にリロード）</p></div>'
+      } else { area.innerHTML = '<p class="text-[10px] text-red-500">生成に時間がかかっています</p>' }
+    } catch(e) { area.innerHTML = '<p class="text-[10px] text-red-500">エラー: ' + e.message + '</p>' }
+  } else if (type === 'image') {
+    area.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin text-pink-500"></i> <span class="text-xs text-pink-600 font-bold">AI画像生成中...</span></div>'
+    try {
+      const res = await axios.post('/api/ai/generate-image', {
+        prompt: customPrompt || cardTitle, card_id: cardId, card_title: cardTitle, prefer_image: true
+      })
+      const d = res.data
+      if (d.success && d.image_url) {
+        area.innerHTML = '<div class="bg-pink-50 rounded p-2 mt-1 border border-pink-200"><p class="font-bold text-pink-700 text-xs">🎨 AI画像</p><img src="' + d.image_url + '" class="w-full rounded mt-1 border" style="max-height:120px;object-fit:contain;"><p class="text-[9px] text-gray-400">' + (d.model||'NB2') + ' / ' + Math.round((d.generation_time_ms||0)/1000) + '秒</p></div>'
+      } else { area.innerHTML = '<p class="text-[10px] text-red-500">画像生成失敗</p>' }
+    } catch(e) { area.innerHTML = '<p class="text-[10px] text-red-500">エラー: ' + e.message + '</p>' }
+  }
+}
+window.groupCardGenerate = groupCardGenerate
 
 // ============================================================
 // 作図問題用：Canvas描画実技シミュレーター
@@ -22767,18 +22905,30 @@ async function showSimpleCurriculumView(curriculumId) {
                       ▼ カード一覧を表示
                     </summary>
                     <div class="mt-3 space-y-2">
-                      ${(course.cards || []).map(card => `
-                        <button onclick="showLearningCard(${JSON.stringify(card).replace(/"/g, '&quot;')}, ${curriculumId}, ${course.course_id})"
-                                class="w-full bg-white border-2 ${colors.border} hover:shadow-lg rounded-lg p-4 text-left transition">
+                      ${(course.cards || []).map((card, ci2) => `
+                        <div class="w-full bg-white border-2 ${colors.border} rounded-lg p-4 text-left transition hover:shadow-lg">
                           <div class="flex items-start justify-between">
                             <div class="flex-1">
                               <p class="text-sm ${colors.text} font-bold mb-1">カード ${card.card_number}</p>
                               <p class="font-bold text-gray-800">${card.card_title}</p>
-                              ${card.problem_description ? `<p class="text-sm text-gray-600 mt-1">${card.problem_description.substring(0, 50)}...</p>` : ''}
+                              ${card.problem_description ? `<p class="text-sm text-gray-600 mt-1">${card.problem_description.substring(0, 80)}...</p>` : ''}
                             </div>
-                            <i class="fas fa-chevron-right ${colors.text} ml-3"></i>
+                            <span class="text-xs px-2 py-0.5 rounded-full font-bold ${card.difficulty_level === 'easy' ? 'bg-green-100 text-green-700' : card.difficulty_level === 'hard' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}">${card.difficulty_level === 'easy' ? 'きほん' : card.difficulty_level === 'hard' ? 'チャレンジ' : 'しっかり'}</span>
                           </div>
-                        </button>
+                          <details class="mt-2">
+                            <summary class="text-xs text-purple-600 cursor-pointer font-bold"><i class="fas fa-magic mr-1"></i>多感覚AI生成ツール</summary>
+                            <div class="mt-2 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-2 space-y-2">
+                              <input type="text" id="group-gen-prompt-s${card.id || ci2}" class="w-full border border-purple-200 rounded px-2 py-1 text-[10px]" placeholder="生成プロンプト（任意）">
+                              <div class="flex gap-1 flex-wrap">
+                                <button onclick="groupCardGenerate('song', ${card.id || 0}, 's${ci2}', '${(course.course_name||course.course_display_name||'').replace(/'/g,'')}', '${(card.card_title||'').replace(/'/g,'')}')" class="bg-gradient-to-r from-purple-500 to-violet-600 text-white px-2 py-1 rounded text-[10px] font-bold">🎵 30秒おぼえうた</button>
+                                <button onclick="groupCardGenerate('suno', ${card.id || 0}, 's${ci2}', '${(course.course_name||course.course_display_name||'').replace(/'/g,'')}', '${(card.card_title||'').replace(/'/g,'')}')" class="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-2 py-1 rounded text-[10px] font-bold">🎤 Sunoフル曲</button>
+                                <button onclick="groupCardGenerate('video', ${card.id || 0}, 's${ci2}', '${(course.course_name||course.course_display_name||'').replace(/'/g,'')}', '${(card.card_title||'').replace(/'/g,'')}')" class="bg-gradient-to-r from-red-500 to-pink-600 text-white px-2 py-1 rounded text-[10px] font-bold">🎬 動画</button>
+                                <button onclick="groupCardGenerate('image', ${card.id || 0}, 's${ci2}', '${(course.course_name||course.course_display_name||'').replace(/'/g,'')}', '${(card.card_title||'').replace(/'/g,'')}')" class="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-[10px] font-bold">🎨 画像</button>
+                              </div>
+                              <div id="group-gen-result-s${card.id || ci2}" class="mt-1"></div>
+                            </div>
+                          </details>
+                        </div>
                       `).join('')}
                     </div>
                   </details>
@@ -51993,8 +52143,11 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                           <input type="text" id="gen-prompt-${card.card_id || card.id || i}" class="w-full border border-purple-200 rounded-lg px-2 py-1 text-xs" placeholder="例：九九の3の段を楽しく覚える歌 / 平行移動のアニメーション動画">
                         </div>
                         <div class="flex gap-2 flex-wrap">
-                          <button onclick="teacherGenerateSong(${card.card_id || card.id || 0}, ${i})" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-violet-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition">
-                            <i class="fas fa-music"></i>🎵 学習ソング生成
+                          <button onclick="teacherGenerateSong(${card.card_id || card.id || 0}, ${i})" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-violet-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition" title="NB2で30秒おぼえうたを即時生成">
+                            <i class="fas fa-music"></i>🎵 30秒おぼえうた
+                          </button>
+                          <button onclick="teacherPrepareSuno(${card.card_id || card.id || 0}, ${i})" class="inline-flex items-center gap-1 bg-gradient-to-r from-pink-500 to-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition" title="Suno用の歌詞・スタイルを自動生成">
+                            <i class="fas fa-microphone-alt"></i>🎤 Sunoフル曲提案
                           </button>
                           <button onclick="teacherGenerateVideo(${card.card_id || card.id || 0}, ${i})" class="inline-flex items-center gap-1 bg-gradient-to-r from-red-500 to-pink-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition">
                             <i class="fas fa-video"></i>🎬 学習動画生成

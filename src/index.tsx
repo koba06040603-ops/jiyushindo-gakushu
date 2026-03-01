@@ -8790,7 +8790,9 @@ app.get('/guide/:curriculumId', async (c) => {
     html += '</div>';
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">';
     html += '<button onclick="generateLearningSong(' + page + ')" style="flex:1;min-width:140px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:white;border:none;padding:10px 14px;border-radius:12px;font-weight:bold;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;box-shadow:0 2px 8px rgba(124,58,237,0.3);">';
-    html += '<span style="font-size:1.2rem;">🎵</span> 学習ソングを作る</button>';
+    html += '<span style="font-size:1.2rem;">🎵</span> 30秒おぼえうた</button>';
+    html += '<button onclick="generateSunoProposal(' + page + ')" style="flex:1;min-width:140px;background:linear-gradient(135deg,#EC4899,#BE185D);color:white;border:none;padding:10px 14px;border-radius:12px;font-weight:bold;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;box-shadow:0 2px 8px rgba(236,72,153,0.3);">';
+    html += '<span style="font-size:1.2rem;">🎤</span> Sunoフル曲提案</button>';
     html += '<button onclick="generateLearningVideo(' + page + ')" style="flex:1;min-width:140px;background:linear-gradient(135deg,#DC2626,#B91C1C);color:white;border:none;padding:10px 14px;border-radius:12px;font-weight:bold;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;gap:6px;justify-content:center;box-shadow:0 2px 8px rgba(220,38,38,0.3);">';
     html += '<span style="font-size:1.2rem;">🎬</span> 学習動画を作る</button>';
     html += '</div>';
@@ -8807,9 +8809,8 @@ app.get('/guide/:curriculumId', async (c) => {
       html += '<div style="font-size:0.78rem;color:#991B1B;"><strong>動画で見たい場面：</strong>' + videoIdea + '</div></div>';
     }
     
-    // Suno情報
-    html += '<div style="text-align:center;font-size:0.65rem;color:#9CA3AF;margin-top:4px;">';
-    html += '💡 <a href="https://suno.com" target="_blank" style="color:#7C3AED;">Suno</a>で本格的な曲も作れるよ（4分以下・1日5曲無料）！歌詞もAIが提案します。</div>';
+    // Suno結果エリア
+    html += '<div id="suno-result-' + page + '"></div>';
     
     // 結果表示エリア
     html += '<div id="song-result-' + page + '"></div>';
@@ -10166,6 +10167,57 @@ app.get('/guide/:curriculumId', async (c) => {
         showCoachBubble('スタイルをコピーしました！', 'encourage', 2000, false);
       }).catch(function() { el.select(); document.execCommand('copy'); });
     }
+  }
+
+  // --- Sunoフル曲提案（4分フル歌詞・スタイルをAIが自動生成） ---
+  function generateSunoProposal(page) {
+    var resultArea = document.getElementById('suno-result-' + page);
+    if (!resultArea) return;
+    var cards = window._allCardPages || [];
+    var c = cards[page] || {};
+    var promptEl = document.getElementById('gen-prompt-intro-' + page);
+    var customPrompt = promptEl ? promptEl.value.trim() : '';
+    
+    resultArea.innerHTML = '<div style="text-align:center;padding:14px;"><i class="fas fa-spinner fa-spin" style="color:#EC4899;font-size:1.5rem;"></i><p style="font-size:0.78rem;color:#BE185D;margin-top:6px;font-weight:bold;">AIがSunoフル曲の歌詞・スタイルを提案中...</p></div>';
+    
+    fetch('/api/ai/generate-suno-lyrics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grade: c.grade || '', subject: c.subject || '',
+        unit_name: c.unit_name || '', topic: customPrompt || c.card_title || '',
+        song_type: '学習内容の暗記・理解補助ソング'
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.lyrics_data) {
+        var sd = data.lyrics_data;
+        var html = '<div style="background:white;border:2px solid #FBCFE8;border-radius:14px;padding:14px;margin-top:10px;">';
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><span style="font-size:1.3rem;">🎤</span><strong style="color:#BE185D;font-size:0.9rem;">Sunoフル曲提案</strong><span style="font-size:0.6rem;background:#FCE7F3;color:#BE185D;padding:2px 10px;border-radius:8px;font-weight:bold;">外部サービス・無料（1日5曲）</span></div>';
+        if (sd.song_title) html += '<p style="font-size:0.8rem;color:#374151;margin-bottom:6px;"><strong>曲名:</strong> ' + sd.song_title + '</p>';
+        if (sd.memory_technique) html += '<p style="font-size:0.7rem;color:#6D28D9;margin-bottom:6px;"><i class="fas fa-brain" style="margin-right:4px;"></i>' + sd.memory_technique + '</p>';
+        html += '<label style="font-size:0.65rem;color:#6B7280;font-weight:bold;">スタイル（Sunoのスタイル欄にコピー）</label>';
+        html += '<input type="text" id="suno-style-' + page + '" value="' + (sd.suno_style_prompt || '').replace(/"/g, '&quot;') + '" style="width:100%;border:2px solid #FBCFE8;border-radius:8px;padding:6px 10px;font-size:0.78rem;margin:4px 0;box-sizing:border-box;">';
+        html += '<label style="font-size:0.65rem;color:#6B7280;font-weight:bold;">歌詞（Sunoの歌詞欄にコピー・4分フル）</label>';
+        html += '<textarea id="suno-lyrics-' + page + '" rows="8" style="width:100%;border:2px solid #FBCFE8;border-radius:8px;padding:6px 10px;font-size:0.75rem;resize:vertical;box-sizing:border-box;margin:4px 0;font-family:monospace;">' + (sd.suno_lyrics || '').replace(/</g, '&lt;') + '</textarea>';
+        if (sd.usage_tips) html += '<p style="font-size:0.65rem;color:#6B7280;margin-top:4px;"><i class="fas fa-lightbulb" style="color:#F59E0B;margin-right:4px;"></i>' + sd.usage_tips + '</p>';
+        html += '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">';
+        html += '<button onclick="(function(){var el=document.getElementById(\'suno-lyrics-' + page + '\');if(el)navigator.clipboard.writeText(el.value).then(function(){showCoachBubble(\'歌詞をコピーしました！Sunoに貼り付けてね\',\'celebrate\',2000,false)})})()" style="background:#EC4899;color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;"><i class="fas fa-copy" style="margin-right:4px;"></i>歌詞コピー</button>';
+        html += '<button onclick="(function(){var el=document.getElementById(\'suno-style-' + page + '\');if(el)navigator.clipboard.writeText(el.value).then(function(){showCoachBubble(\'スタイルをコピーしました！\',\'encourage\',2000,false)})})()" style="background:#F9A8D4;color:#BE185D;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;"><i class="fas fa-copy" style="margin-right:4px;"></i>スタイルコピー</button>';
+        html += '<a href="https://suno.com" target="_blank" style="margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:#1F2937;color:white;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;text-decoration:none;"><i class="fas fa-external-link-alt"></i>Sunoを開く</a>';
+        html += '</div>';
+        html += '<p style="font-size:0.6rem;color:#9CA3AF;margin-top:8px;">💡 Suno（suno.com）で4分以下の曲を1日5曲まで無料で生成できます</p>';
+        html += '<button onclick="generateSunoProposal(' + page + ')" style="font-size:0.75rem;color:#EC4899;background:none;border:1px solid #FBCFE8;padding:4px 12px;border-radius:8px;cursor:pointer;margin-top:6px;">🔄 再提案</button>';
+        html += '</div>';
+        resultArea.innerHTML = html;
+      } else {
+        resultArea.innerHTML = '<p style="font-size:0.78rem;color:#DC2626;">Suno提案生成失敗: ' + (data.error || '') + '</p>';
+      }
+    })
+    .catch(function(e) {
+      resultArea.innerHTML = '<p style="font-size:0.78rem;color:#DC2626;">通信エラー: ' + e.message + '</p>';
+    });
   }
 
   // --- 図解画像生成 ---
