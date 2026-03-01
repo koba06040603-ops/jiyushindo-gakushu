@@ -9447,6 +9447,18 @@ app.get('/guide/:curriculumId', async (c) => {
       html += '<div style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:12px;">';
       html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
       html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
+      // 例題の図解（AI生成済みまたはボタン表示）
+      html += '<div id="example-diagram-' + currentPage + '">';
+      if (c.example_image_url) {
+        html += '<div style="text-align:center;margin:8px 0;"><img src="' + c.example_image_url + '" alt="例題の図" style="max-width:100%;max-height:250px;border-radius:10px;border:2px solid #FDE68A;"></div>';
+      } else {
+        html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 12px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:10px;">';
+        html += '<i class="fas fa-image" style="color:#D97706;font-size:1.2rem;"></i>';
+        html += '<span style="font-size:0.78rem;color:#92400E;font-weight:bold;">この例題は図があるとわかりやすいよ！</span>';
+        html += '<button onclick="generateExampleDiagram(' + currentPage + ')" style="margin-left:auto;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(217,119,6,0.3);"><i class="fas fa-wand-magic-sparkles" style="margin-right:4px;"></i>AIに図をかいてもらう</button>';
+        html += '</div>';
+      }
+      html += '</div>';
       if (c.example_solution) html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;"><p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p><p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p></div>';
       html += '</div>';
     }
@@ -9619,6 +9631,20 @@ app.get('/guide/:curriculumId', async (c) => {
       }
 
       html += '</div></details>';
+    } else {
+      // multimedia_ai_contentがない場合のフォールバック：簡易生成パネル
+      html += '<div class="no-print" style="margin:12px 0;padding:12px 14px;background:linear-gradient(135deg,#F5F3FF,#EEF2FF);border:2px solid #DDD6FE;border-radius:14px;">';
+      html += '<div style="text-align:center;margin-bottom:8px;"><strong style="font-size:0.85rem;color:#6D28D9;">🎶 もっと楽しく学ぶツール</strong></div>';
+      html += '<label style="font-size:0.65rem;font-weight:bold;color:#6D28D9;">プロンプト（任意）</label>';
+      html += '<input type="text" id="gen-prompt-card-' + currentPage + '" style="width:100%;border:2px solid #DDD6FE;border-radius:10px;padding:6px 10px;font-size:0.78rem;outline:none;box-sizing:border-box;margin-bottom:6px;" placeholder="例：この問題を楽しく覚える歌">';
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">';
+      html += '<button onclick="generateShortMusicFallback(' + currentPage + ')" style="flex:1;min-width:110px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:white;border:none;padding:8px 10px;border-radius:10px;font-weight:bold;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;gap:4px;justify-content:center;"><span>🎵</span>30秒おぼえうた</button>';
+      html += '<button onclick="generateSunoProposal(' + currentPage + ')" style="flex:1;min-width:110px;background:linear-gradient(135deg,#EC4899,#BE185D);color:white;border:none;padding:8px 10px;border-radius:10px;font-weight:bold;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;gap:4px;justify-content:center;"><span>🎤</span>Sunoフル曲</button>';
+      html += '<button onclick="generateDiagramFallback(' + currentPage + ')" style="flex:1;min-width:110px;background:linear-gradient(135deg,#10B981,#059669);color:white;border:none;padding:8px 10px;border-radius:10px;font-weight:bold;font-size:0.75rem;cursor:pointer;display:flex;align-items:center;gap:4px;justify-content:center;"><span>🎨</span>AI図解</button>';
+      html += '</div>';
+      html += '<div id="fallback-gen-result-' + currentPage + '" style="margin-top:8px;"></div>';
+      html += '<div id="suno-result-' + currentPage + '"></div>';
+      html += '</div>';
     }
 
     // お助けボタン（F7足場レベルに応じて表示調整）
@@ -10102,6 +10128,58 @@ app.get('/guide/:curriculumId', async (c) => {
 
   // === お助け機能 ===
 
+  // --- 例題の図解をAI生成 ---
+  function generateExampleDiagram(page) {
+    var area = document.getElementById('example-diagram-' + page);
+    if (!area) return;
+    var cards = window._allCardPages || [];
+    var c = cards[page] || {};
+    var exProblem = c.example_problem || '';
+    var exSolution = c.example_solution || '';
+    var cardTitle = c.card_title || '';
+    var subject = c.subject || CURRENT_SUBJECT || '';
+    var grade = c.grade || CURRENT_GRADE || '';
+    
+    area.innerHTML = '<div style="text-align:center;padding:12px;"><i class="fas fa-spinner fa-spin" style="color:#D97706;font-size:1.5rem;"></i><p style="font-size:0.78rem;color:#D97706;margin-top:6px;font-weight:bold;">AIが例題の図を描いています...</p></div>';
+    
+    var prompt = '日本の' + grade + subject + 'の教科書に載る例題の図解を描いてください。\n';
+    prompt += '【カードタイトル】' + cardTitle + '\n';
+    prompt += '【例題】' + exProblem + '\n';
+    if (exSolution) prompt += '【解き方】' + exSolution + '\n';
+    prompt += '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。';
+    
+    fetch('/api/ai/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt,
+        card_id: c.card_id || c.id || 0,
+        card_title: cardTitle,
+        problem_text: exProblem,
+        subject: subject,
+        grade: grade,
+        prefer_image: true
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.image_url) {
+        var html = '<div style="text-align:center;margin:8px 0;">';
+        html += '<img src="' + data.image_url + '" alt="例題の図" style="max-width:100%;max-height:280px;border-radius:10px;border:2px solid #FDE68A;">';
+        html += '<div style="display:flex;justify-content:center;gap:8px;margin-top:6px;">';
+        html += '<p style="font-size:0.65rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0) / 1000) + '秒</p>';
+        html += '<button onclick="generateExampleDiagram(' + page + ')" style="font-size:0.7rem;color:#D97706;background:none;border:1px solid #FDE68A;padding:2px 10px;border-radius:6px;cursor:pointer;">🔄 もう一度</button>';
+        html += '</div></div>';
+        area.innerHTML = html;
+      } else {
+        area.innerHTML = '<p style="font-size:0.78rem;color:#DC2626;padding:4px;">図の生成に失敗しました <button onclick="generateExampleDiagram(' + page + ')" style="color:#D97706;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+      }
+    })
+    .catch(function(e) {
+      area.innerHTML = '<p style="font-size:0.78rem;color:#DC2626;padding:4px;">通信エラー <button onclick="generateExampleDiagram(' + page + ')" style="color:#D97706;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+    });
+  }
+
   // ★ 多感覚AI提案 → 編集 → 実行 関数群
   // --- 30秒覚え歌 即時生成 ---
   function generateShortMusic(page) {
@@ -10169,13 +10247,101 @@ app.get('/guide/:curriculumId', async (c) => {
     }
   }
 
+  // --- フォールバック：30秒おぼえうた（multimedia_ai_content がないカード用） ---
+  function generateShortMusicFallback(page) {
+    var resultArea = document.getElementById('fallback-gen-result-' + page);
+    if (!resultArea) return;
+    var c = ALL_CARDS[page] || {};
+    var promptEl = document.getElementById('gen-prompt-card-' + page);
+    var customPrompt = promptEl ? promptEl.value.trim() : '';
+
+    resultArea.innerHTML = '<div style="text-align:center;padding:10px;"><i class="fas fa-spinner fa-spin" style="color:#7C3AED;font-size:1.5rem;"></i><p style="font-size:0.75rem;color:#7C3AED;margin-top:4px;font-weight:bold;">NB2が30秒おぼえうたを作曲中...</p></div>';
+
+    fetch('/api/ai/generate-nb2-music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_title: c.card_title || '',
+        problem_text: (c.problem_text || '').substring(0, 400),
+        topic: customPrompt || c.card_title || '',
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || '',
+        custom_prompt: customPrompt
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.song_data) {
+        var sd = data.song_data;
+        var html = '<div style="background:#F5F3FF;border:2px solid #C4B5FD;border-radius:10px;padding:12px;margin-top:8px;">';
+        html += '<p style="font-weight:bold;color:#7C3AED;font-size:0.85rem;">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>';
+        if (sd.genre) html += '<p style="font-size:0.65rem;color:#8B5CF6;">' + sd.genre + (sd.tempo_bpm ? ' / ' + sd.tempo_bpm + 'BPM' : '') + '</p>';
+        if (sd.lyrics) html += '<pre style="font-size:0.75rem;white-space:pre-wrap;background:white;padding:8px;border-radius:8px;border:1px solid #E9D5FF;margin:6px 0;max-height:120px;overflow-y:auto;">' + sd.lyrics + '</pre>';
+        if (data.cover_image_url) html += '<img src="' + data.cover_image_url + '" style="max-height:80px;border-radius:8px;margin:4px 0;" alt="ジャケット">';
+        html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'NB2') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
+        html += '<button onclick="generateShortMusicFallback(' + page + ')" style="font-size:0.7rem;color:#7C3AED;background:none;border:1px solid #C4B5FD;padding:3px 10px;border-radius:6px;cursor:pointer;margin-top:4px;">🔄 再生成</button>';
+        html += '</div>';
+        resultArea.innerHTML = html;
+      } else {
+        resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">生成失敗: ' + (data.error || '') + ' <button onclick="generateShortMusicFallback(' + page + ')" style="color:#7C3AED;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+      }
+    })
+    .catch(function(e) {
+      resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">通信エラー: ' + e.message + '</p>';
+    });
+  }
+
+  // --- フォールバック：AI図解（multimedia_ai_content がないカード用） ---
+  function generateDiagramFallback(page) {
+    var resultArea = document.getElementById('fallback-gen-result-' + page);
+    if (!resultArea) return;
+    var c = ALL_CARDS[page] || {};
+    var promptEl = document.getElementById('gen-prompt-card-' + page);
+    var customPrompt = promptEl ? promptEl.value.trim() : '';
+
+    resultArea.innerHTML = '<div style="text-align:center;padding:8px;"><i class="fas fa-spinner fa-spin" style="color:#10B981;"></i> <span style="font-size:0.75rem;color:#10B981;">AI図解を生成中...</span></div>';
+
+    var prompt = customPrompt || ('日本の' + (CURRICULUM.grade||'') + (CURRICULUM.subject||'') + '「' + (c.card_title||'') + '」の図解。教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。白い背景。');
+
+    fetch('/api/ai/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt,
+        card_id: c.card_id || c.id || 0,
+        card_title: c.card_title || '',
+        problem_text: c.problem_text || '',
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || '',
+        prefer_image: true
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.image_url) {
+        var html = '<div style="text-align:center;margin-top:8px;">';
+        html += '<img src="' + data.image_url + '" style="max-width:100%;max-height:250px;border-radius:10px;border:2px solid #BBF7D0;" alt="AI図解">';
+        html += '<div style="display:flex;justify-content:center;gap:8px;margin-top:6px;">';
+        html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
+        html += '<button onclick="generateDiagramFallback(' + page + ')" style="font-size:0.7rem;color:#059669;background:none;border:1px solid #BBF7D0;padding:3px 10px;border-radius:6px;cursor:pointer;">🔄 再生成</button>';
+        html += '</div></div>';
+        resultArea.innerHTML = html;
+      } else {
+        resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">生成失敗 <button onclick="generateDiagramFallback(' + page + ')" style="color:#059669;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+      }
+    })
+    .catch(function(e) { resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">通信エラー</p>'; });
+  }
+
   // --- Sunoフル曲提案（4分フル歌詞・スタイルをAIが自動生成） ---
   function generateSunoProposal(page) {
     var resultArea = document.getElementById('suno-result-' + page);
     if (!resultArea) return;
     var cards = window._allCardPages || [];
     var c = cards[page] || {};
-    var promptEl = document.getElementById('gen-prompt-intro-' + page);
+    var promptEl = document.getElementById('gen-prompt-intro-' + page) || document.getElementById('gen-prompt-card-' + page);
     var customPrompt = promptEl ? promptEl.value.trim() : '';
     
     resultArea.innerHTML = '<div style="text-align:center;padding:14px;"><i class="fas fa-spinner fa-spin" style="color:#EC4899;font-size:1.5rem;"></i><p style="font-size:0.78rem;color:#BE185D;margin-top:6px;font-weight:bold;">AIがSunoフル曲の歌詞・スタイルを提案中...</p></div>';
@@ -13983,6 +14149,7 @@ app.post('/api/ai/generate-course', async (c) => {
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
       "example_problem": "例題（具体的な数字と場面）",
       "example_solution": "解き方の丁寧な説明（途中式・図解の指示を含む）",
+      "example_image_description": "例題の図解説明（AI画像生成用。図形問題なら頂点名・角度・辺の長さ等を含む正確な図の説明。文章題なら場面のイラスト説明。図が不要な単純計算問題ではnull）",
       "real_world_connection": "実生活とのつながり（※問題内容に直接関係する具体例のみ記述すること）",
       "answer": "正解（具体的に）",
       "answer_explanation": "なぜその答えになるか（考え方の道筋を含む80-150字）",
@@ -38196,6 +38363,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "teacher_help_keywords": "【必須】わからないとき先生に聞くためのキーワード（例：『わり算、等分、あまり』）",
       "example_problem": "【必須】例題の問題文。本番の問題より少し簡単な、理解の足がかりになる問題（例：『6このクッキーを2人で同じ数ずつ分けると、1人何こ？』）",
       "example_solution": "【必須】例題の解き方。図解を含む丁寧な説明（例：『6÷2=3  6このクッキーを2つのグループに分けると、1グループ3こになります。答え：3こ』）",
+      "example_image_description": "【必須】例題の図解説明（AI画像生成用プロンプト）。図形問題→頂点名・角度・辺の長さ等を含む正確な図の説明。文章題→場面のイラスト説明。合同・対称→2つの図形を並べて対応関係を示す図。計算のみで図不要→null",
       "real_world_connection": "【推奨】実生活とのつながり。※問題の数学的内容に直接関連する具体例を書くこと。（例：わり算→『お菓子を友だちと分けるとき、何個ずつになるか考えるときにわり算を使うよ！』、角度→『建物の屋根や橋は角度を計算して設計されているよ！』）。問題と無関係な例を書かないこと",
       "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
       "problem_description": "問題の背景や文脈の補足（problem_textとは異なる内容にすること）",
@@ -38285,6 +38453,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   - new_terms: 全カード必須。新出用語・概念がない場合も復習キーワードを入れること
   - example_problem: 全カード必須。本番問題より易しい例題を用意し、理解の足がかりとすること
   - example_solution: 全カード必須。例題の解き方を図解付きで丁寧に説明すること
+  - example_image_description: 図形・合同・対称・面積・グラフ等の視覚的な例題には必須。AI画像生成に使えるレベルの詳細な図解説明を記述すること（例：「四角形ABCDと四角形EFGHを横に並べた図。左の四角形は頂点A,B,C,Dが時計回りにラベル付け。右の四角形は対応する頂点E,F,G,Hがラベル付け。対応する頂点を矢印で結ぶ」）。単純計算で図が不要な場合はnull
   - real_world_connection: 推奨。実生活との関連を記述して学習意欲を高めること。※必ず「その問題の数学的内容」に直接関連する実例を書くこと。例：「角度の性質」→「建築や橋の設計で角度の計算が使われる」。無関係な例（線路のレールなど）は絶対に書かないこと
   - hints: 全カード必須。3段階のヒントをhint_level, hint_text, thinking_tool_suggestionの構造で記述すること
 ※ multimediaフィールドでは、教育動画を可能な限り提案すること。youtube_urlにはYouTube動画の実在URLのみを入力し、NHK for Schoolの場合はyoutube_titleに「NHK for School」と明記した上でyoutube_urlには https://www.youtube.com/results?search_query=NHK+for+School+{検索キーワード} 形式のYouTube検索URLを使用すること（NHKの直接URLは使用不可）

@@ -5908,6 +5908,16 @@ async function loadCardPage(cardId) {
                 </h3>
                 <div class="bg-yellow-50 rounded-lg p-4 mb-4">
                   <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${formatText(card.example_problem)}</pre>
+                  <div id="example-diagram-card-${card.card_id || card.id || 0}" class="mt-2">
+                    ${card.example_image_url ? `<div class="text-center mt-2"><img src="${card.example_image_url}" alt="例題の図" class="max-h-48 rounded border mx-auto"></div>` : `
+                    <div class="flex items-center gap-2 mt-2 p-2 bg-yellow-100 rounded-lg">
+                      <i class="fas fa-image text-yellow-600"></i>
+                      <span class="text-xs text-yellow-800 font-bold">この例題は図があるとわかりやすい</span>
+                      <button onclick="generateExampleDiagramApp('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/'/g,'')}', '${(card.example_problem||'').replace(/'/g,'').substring(0,100)}', '${(card.example_solution||'').replace(/'/g,'').substring(0,100)}')" class="ml-auto bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-3 py-1 rounded-lg text-xs font-bold shadow hover:shadow-md transition">
+                        <i class="fas fa-wand-magic-sparkles mr-1"></i>AIに図をかいてもらう
+                      </button>
+                    </div>`}
+                  </div>
                 </div>
                 ${card.example_solution ? `
                   <div class="bg-green-50 rounded-lg p-4">
@@ -13224,6 +13234,34 @@ async function groupCardGenerate(type, cardId, cardIndex, courseName, cardTitle)
   }
 }
 window.groupCardGenerate = groupCardGenerate
+
+// ★ 例題の図解をAI生成（app.js側）
+async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exampleSolution) {
+  const area = document.getElementById('example-diagram-card-' + cardId)
+  if (!area) return
+  area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-yellow-500 text-xl"></i><p class="text-xs text-yellow-600 mt-1 font-bold">AIが例題の図を描いています...</p></div>'
+  try {
+    const prompt = '日本の小学校の教科書に載る例題の図解を描いてください。\n' +
+      '【カード】' + cardTitle + '\n' +
+      '【例題】' + exampleProblem + '\n' +
+      (exampleSolution ? '【解き方】' + exampleSolution + '\n' : '') +
+      '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。'
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: prompt,
+      card_id: cardId, card_title: cardTitle,
+      problem_text: exampleProblem, prefer_image: true
+    })
+    const d = res.data
+    if (d.success && d.image_url) {
+      area.innerHTML = '<div class="text-center mt-2"><img src="' + d.image_url + '" alt="例題の図" class="max-h-48 rounded border mx-auto"><div class="flex justify-center gap-2 mt-1"><span class="text-[10px] text-gray-400">' + (d.model || 'AI') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</span><button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-[10px] text-yellow-600 underline">🔄 再生成</button></div></div>'
+    } else {
+      area.innerHTML = '<p class="text-xs text-red-500 mt-1">図の生成に失敗 <button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-yellow-600 underline">再試行</button></p>'
+    }
+  } catch (e) {
+    area.innerHTML = '<p class="text-xs text-red-500 mt-1">通信エラー: ' + e.message + '</p>'
+  }
+}
+window.generateExampleDiagramApp = generateExampleDiagramApp
 
 // ============================================================
 // 作図問題用：Canvas描画実技シミュレーター
