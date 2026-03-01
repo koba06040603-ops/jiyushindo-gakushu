@@ -24150,6 +24150,127 @@ ${editNote}
 })
 
 // ========================================
+// ★ Nano Banana 2: コース全カードの図解一括自動生成API
+// 学習カード生成後にフロントエンドから呼び出し、
+// 各カードの problem_image_url に図解画像を自動保存
+// ========================================
+app.post('/api/ai/generate-visuals-for-course', async (c) => {
+  const startTime = Date.now()
+  const { course_id } = await c.req.json()
+  const env = c.env as any
+  const apiKey = env.GEMINI_API_KEY
+  
+  if (!apiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' })
+  if (!course_id) return c.json({ success: false, error: 'course_id is required' })
+  
+  try {
+    // コースのカードを取得
+    const cardsResult = await env.DB.prepare(
+      'SELECT id, card_title, problem_text, problem_description, problem_content, subject, grade_level, unit_name, problem_image_url FROM learning_cards WHERE course_id = ? ORDER BY card_number'
+    ).bind(course_id).all()
+    
+    const cards = (cardsResult.results || []) as any[]
+    if (cards.length === 0) return c.json({ success: false, error: 'カードが見つかりません' })
+    
+    console.log(`🎨 コース${course_id}の図解一括生成開始: ${cards.length}枚`)
+    
+    const results: any[] = []
+    
+    for (let i = 0; i < Math.min(cards.length, 5); i++) {
+      const card = cards[i]
+      
+      // 既に画像がある場合はスキップ
+      if (card.problem_image_url && card.problem_image_url.length > 100) {
+        results.push({ card_id: card.id, status: 'skipped', reason: '既に画像あり' })
+        continue
+      }
+      
+      const pText = card.problem_text || card.problem_description || ''
+      const context = [
+        card.card_title && `タイトル: ${card.card_title}`,
+        pText && `問題: ${pText.substring(0, 500)}`,
+        card.subject && `教科: ${card.subject}`,
+        card.grade_level && `学年: ${card.grade_level}年`,
+        card.unit_name && `単元: ${card.unit_name}`,
+      ].filter(Boolean).join('\n')
+
+      const prompt = `あなたは教科書の図解イラストを描く教育デザイナーです。
+以下の学習カードの問題内容を理解し、児童が問題を解くために必要な正確な図解・ダイアグラムを描いてください。
+
+【重要ルール】
+1. 問題で使われている数値・図形・関係性を正確に反映
+2. 日本の教科書スタイル（カラフル、わかりやすい、白背景）
+3. 日本語ラベル・注釈つき
+4. 児童が見るだけで問題を理解できるレベルの詳細さ
+
+【学習カード】
+${context}
+
+この問題に必要な図解イラストを1枚生成してください。`
+
+      try {
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 }
+            })
+          }
+        )
+        
+        if (resp.ok) {
+          const data = await resp.json() as any
+          const parts = data.candidates?.[0]?.content?.parts || []
+          
+          let imageUrl = ''
+          for (const part of parts) {
+            if (part.inlineData?.data) {
+              imageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`
+              break
+            }
+          }
+          
+          if (imageUrl) {
+            await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
+              .bind(imageUrl.substring(0, 2000000), card.id).run()
+            results.push({ card_id: card.id, status: 'success', image_length: imageUrl.length })
+            console.log(`✅ カード${card.id}の図解生成完了`)
+          } else {
+            results.push({ card_id: card.id, status: 'no_image' })
+          }
+        } else {
+          results.push({ card_id: card.id, status: 'api_error', code: resp.status })
+        }
+      } catch (err: any) {
+        results.push({ card_id: card.id, status: 'error', message: err.message })
+      }
+      
+      // レート制限対策
+      if (i < cards.length - 1) await new Promise(r => setTimeout(r, 2000))
+    }
+    
+    const genTime = Date.now() - startTime
+    console.log(`✅ コース${course_id}の図解一括生成完了: ${genTime}ms, ${results.filter(r => r.status === 'success').length}/${cards.length}枚`)
+    
+    return c.json({
+      success: true,
+      course_id,
+      total_cards: cards.length,
+      generated: results.filter(r => r.status === 'success').length,
+      skipped: results.filter(r => r.status === 'skipped').length,
+      results,
+      generation_time_ms: genTime
+    })
+  } catch (e: any) {
+    console.error('図解一括生成エラー:', e.message)
+    return c.json({ success: false, error: e.message })
+  }
+})
+
+// ========================================
 // ★ Nano Banana 2: 学習ソング生成API
 // gemini-3.1-flash-image-preview で歌詞+楽譜イメージ画像+
 // 曲の雰囲気画像をまとめて生成
@@ -38063,6 +38184,105 @@ ${cardSummary}
     
     // レスポンス返却後にバックグラウンドで実行
     c.executionCtx.waitUntil(bgGenerate())
+
+    // ★★★ バックグラウンドで「みてわかる」動的図解を各カードに自動生成 ★★★
+    const bgGenerateVisuals = async () => {
+      try {
+        const apiKey = env.GEMINI_API_KEY
+        if (!apiKey) { console.warn('⚠️ GEMINI_API_KEY未設定: 図解自動生成スキップ'); return }
+        
+        console.log(`🎨 バックグラウンド図解生成開始: ${savedCardIds.length}枚のカード`)
+        
+        for (let i = 0; i < Math.min(savedCardIds.length, 5); i++) {
+          const card = (cards || [])[i]
+          if (!card) continue
+          const cardId = savedCardIds[i]
+          
+          const pText = card.problem_text || card.problem_description || ''
+          const mm = card.multimedia || {}
+          const imgDesc = mm.image_description || ''
+          
+          // 図解生成プロンプト
+          const context = [
+            card.card_title && `タイトル: ${card.card_title}`,
+            pText && `問題: ${pText.substring(0, 500)}`,
+            imgDesc && `必要な図: ${imgDesc.substring(0, 300)}`,
+            curriculum.subject && `教科: ${curriculum.subject}`,
+            gradeNum && `学年: ${gradeNum}年`,
+            curriculum.unit_name && `単元: ${curriculum.unit_name}`,
+          ].filter(Boolean).join('\n')
+
+          const prompt = `あなたは教科書の図解イラストを描く教育デザイナーです。
+以下の学習カードの問題内容を理解し、児童が問題を解くために必要な図解・ダイアグラムを正確に描いてください。
+
+【重要ルール】
+1. 問題で使われている数値・図形・関係性を正確に反映すること
+2. 日本の教科書スタイル（カラフル、わかりやすい、白背景）
+3. 日本語ラベル・注釈つき
+4. 児童が見るだけで問題を理解できるレベルの詳細さ
+5. 余計な装飾は不要。教育的な正確さを最優先
+
+【学習カード】
+${context}
+
+この問題に必要な図解イラストを1枚生成してください。`
+
+          try {
+            const resp = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+              {
+                method: 'POST',
+                headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                  generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 }
+                })
+              }
+            )
+            
+            if (resp.ok) {
+              const data = await resp.json() as any
+              const parts = data.candidates?.[0]?.content?.parts || []
+              
+              let imageUrl = ''
+              for (const part of parts) {
+                if (part.inlineData?.data) {
+                  imageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`
+                  break
+                }
+              }
+              
+              if (imageUrl && cardId) {
+                // DBに画像URLを保存
+                try {
+                  await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
+                    .bind(imageUrl.substring(0, 2000000), cardId).run()
+                  console.log(`✅ カード${cardId}の図解自動生成完了（${imageUrl.length}文字）`)
+                } catch (dbErr) {
+                  console.warn(`⚠️ カード${cardId}の図解DB保存エラー:`, dbErr)
+                }
+              } else {
+                console.warn(`⚠️ カード${cardId}の図解画像なし`)
+              }
+            } else {
+              console.warn(`⚠️ カード${cardId}の図解API失敗:`, resp.status)
+            }
+          } catch (imgErr) {
+            console.warn(`⚠️ カード${cardId}の図解生成エラー:`, imgErr)
+          }
+          
+          // レート制限対策: 各カード間に2秒の間隔
+          if (i < savedCardIds.length - 1) {
+            await new Promise(r => setTimeout(r, 2000))
+          }
+        }
+        
+        console.log(`✅ バックグラウンド図解生成完了: ${savedCardIds.length}枚`)
+      } catch (bgVisualErr) {
+        console.warn('⚠️ バックグラウンド図解生成エラー:', bgVisualErr)
+      }
+    }
+    c.executionCtx.waitUntil(bgGenerateVisuals())
 
     return c.json({
       success: true,

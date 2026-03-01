@@ -5924,7 +5924,10 @@ async function loadCardPage(cardId) {
               
               <!-- もんだい：大きく目立つ問題文 -->
               <div class="bg-gradient-to-br from-yellow-50 via-orange-50 to-pink-50 border-4 border-orange-400 rounded-2xl p-6 mb-4 shadow-inner relative">
-                <div class="absolute top-2 right-2 bg-orange-400 text-white text-xs font-bold px-2 py-1 rounded-full"><i class="fas fa-question-circle mr-1"></i>よく読もう</div>
+                <div class="absolute top-2 right-2 flex gap-1">
+                  <button onclick="readCardAloud()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-2 py-1 rounded-full cursor-pointer transition shadow-sm" title="問題を読み上げる"><i class="fas fa-volume-up mr-1" id="tts-icon-main"></i>🔊 読み上げ</button>
+                  <span class="bg-orange-400 text-white text-xs font-bold px-2 py-1 rounded-full"><i class="fas fa-question-circle mr-1"></i>よく読もう</span>
+                </div>
                 <pre class="card-content text-gray-900 whitespace-pre-wrap font-sans leading-loose font-bold" style="font-size: 1.4em;">${formatText(card.problem_text || card.problem_content || card.problem_description || '')}</pre>
               </div>
               
@@ -5946,17 +5949,16 @@ async function loadCardPage(cardId) {
                 return ''
               })()}
               
-              <!-- きいてみよう（音声読み上げ） -->
-              ${card._audio_instruction ? `
-                <div class="bg-green-50 border-l-3 border-green-400 p-3 rounded mb-4 flex items-center gap-3 cursor-pointer hover:bg-green-100 transition"
-                     onclick="readCardAloud()">
-                  <i class="fas fa-volume-up text-green-600 text-lg"></i>
-                  <div>
-                    <span class="font-bold text-green-800 text-sm">🔊 きいてみよう：</span>
-                    <span class="text-green-700 text-sm">${card._audio_instruction}</span>
-                  </div>
+              <!-- きいてみよう（音声読み上げ） - 全カードで常に表示 -->
+              <div class="bg-green-50 border-l-3 border-green-400 p-3 rounded mb-4 flex items-center gap-3 cursor-pointer hover:bg-green-100 transition"
+                   onclick="readCardAloud()">
+                <i class="fas fa-volume-up text-green-600 text-lg" id="tts-icon-listen"></i>
+                <div>
+                  <span class="font-bold text-green-800 text-sm">🔊 きいてみよう：</span>
+                  <span class="text-green-700 text-sm">${card._audio_instruction || '問題文をタップして読み上げます'}</span>
                 </div>
-              ` : ''}
+                <span class="ml-auto bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full flex-shrink-0">▶ タップ</span>
+              </div>
               
               <!-- 図の説明 -->
               ${card._image_description ? `
@@ -6995,86 +6997,190 @@ function updateAIMessage(messageId, newMessage) {
 }
 
 // 問題文をゆっくり読み上げる
+// === Gemini TTS 音声再生エンジン（PCM 24kHz 16bit mono 対応） ===
+let _ttsAudioCtxCard = null
+let _ttsPlayingCard = false
+let _ttsCurrentSourceCard = null
+
+function playPcmAudioCard(base64Data, sampleRate, onEnd) {
+  try {
+    if (!_ttsAudioCtxCard) _ttsAudioCtxCard = new (window.AudioContext || window.webkitAudioContext)()
+    const raw = atob(base64Data)
+    const bytes = new Uint8Array(raw.length)
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
+    const samples = bytes.length / 2
+    const float32 = new Float32Array(samples)
+    const dv = new DataView(bytes.buffer)
+    for (let j = 0; j < samples; j++) {
+      float32[j] = dv.getInt16(j * 2, true) / 32768.0
+    }
+    const buffer = _ttsAudioCtxCard.createBuffer(1, float32.length, sampleRate)
+    buffer.getChannelData(0).set(float32)
+    const source = _ttsAudioCtxCard.createBufferSource()
+    source.buffer = buffer
+    source.connect(_ttsAudioCtxCard.destination)
+    source.onended = onEnd
+    _ttsCurrentSourceCard = source
+    source.start(0)
+  } catch (e) {
+    console.warn('PCM再生エラー:', e)
+    if (onEnd) onEnd()
+  }
+}
+
+function stopTtsCard() {
+  if (_ttsCurrentSourceCard) { try { _ttsCurrentSourceCard.stop() } catch(e){} }
+  if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel()
+  _ttsPlayingCard = false
+  _ttsCurrentSourceCard = null
+  // アイコンを復元
+  const icon = document.getElementById('tts-icon-main')
+  if (icon) { icon.className = 'fas fa-volume-up'; icon.closest('button')?.classList.remove('animate-pulse') }
+  document.querySelectorAll('[onclick="readCardAloud()"] i').forEach(i => {
+    i.className = i.className.replace('fa-spinner fa-spin', 'fa-volume-up').replace('fa-stop', 'fa-volume-up')
+    i.classList.remove('animate-pulse')
+  })
+}
+
 function readCardAloud() {
   console.log('🔊 readCardAloud 呼び出し')
   
-  // 読み上げ中のアニメーション
-  const allSpeakers = document.querySelectorAll('[onclick="readCardAloud()"] i')
-  allSpeakers.forEach(icon => icon.classList.add('animate-pulse'))
+  // 再生中ならストップ
+  if (_ttsPlayingCard) {
+    stopTtsCard()
+    return
+  }
   
-  // カードデータ取得（複数ソースから試行）
+  // UIを読み上げ中に
+  _ttsPlayingCard = true
+  const mainIcon = document.getElementById('tts-icon-main')
+  if (mainIcon) { mainIcon.className = 'fas fa-spinner fa-spin'; mainIcon.closest('button')?.classList.add('animate-pulse') }
+  document.querySelectorAll('[onclick="readCardAloud()"] i.fa-volume-up').forEach(i => i.className = 'fas fa-spinner fa-spin')
+  
+  // カードデータ取得
   let text = ''
   const cardData = window.currentCardData
   const card = cardData?.card || cardData
   
   if (card && typeof card === 'object') {
-    text = card.problem_text || card._audio_instruction || card.problem_content || card.problem_description || card.card_title || ''
+    // audio_instruction を優先（問題の解き方ガイド付き）
+    text = card._audio_instruction || card.problem_text || card.problem_content || card.problem_description || card.card_title || ''
     console.log('🔊 カードデータから取得:', text.substring(0, 50))
   }
   
-  // フォールバック1: ページ上の問題文テキスト
   if (!text) {
-    const problemEl = document.querySelector('.bg-pink-50 .card-content') || document.querySelector('.card-content')
-    if (problemEl) {
-      text = problemEl.textContent.trim()
-      console.log('🔊 DOM問題文から取得:', text.substring(0, 50))
-    }
+    const problemEl = document.querySelector('.card-content')
+    if (problemEl) text = problemEl.textContent.trim()
   }
-  
-  // フォールバック2: きいてみよう欄のテキスト
   if (!text) {
     const audioEl = document.querySelector('[onclick="readCardAloud()"] .text-green-700')
-    if (audioEl) {
-      text = audioEl.textContent.trim()
-      console.log('🔊 audio_instructionから取得:', text.substring(0, 50))
-    }
+    if (audioEl) text = audioEl.textContent.trim()
   }
   
   if (!text) {
     console.warn('readCardAloud: 読み上げるテキストがありません')
-    allSpeakers.forEach(icon => icon.classList.remove('animate-pulse'))
+    stopTtsCard()
     return
   }
   
-  // 直接Web Speech APIを使用（Google Cloud TTSよりも確実）
-  console.log('🔊 Web Speech API で読み上げ開始（速度0.8）')
-  speakTextDirect(text, 0.8)
-  
-  // アニメーション解除（5秒後、または読み上げ完了時）
-  setTimeout(() => allSpeakers.forEach(icon => icon.classList.remove('animate-pulse')), 8000)
+  // ★ Gemini TTS API を使用（高品質音声）→ フォールバック: Web Speech API
+  console.log('🔊 Gemini TTS API 呼び出し中...')
+  fetch('/api/ai/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: text.substring(0, 2000), voiceType: 'female-friendly', mood: window._currentMood || '' })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success && data.audioContent && data.audioFormat === 'pcm') {
+      console.log(`✅ Gemini TTS 成功 (${data.generation_time_ms}ms, ${data.method})`)
+      // アイコンを停止ボタンに変更
+      const mi = document.getElementById('tts-icon-main')
+      if (mi) mi.className = 'fas fa-stop'
+      playPcmAudioCard(data.audioContent, data.sampleRate || 24000, () => {
+        stopTtsCard()
+        try { TactileSounds.play('correct') } catch(e) {}
+      })
+    } else if (data.success && data.audioContent) {
+      // MP3フォールバック
+      const audio = new Audio('data:audio/mp3;base64,' + data.audioContent)
+      audio.onended = () => { stopTtsCard(); try { TactileSounds.play('correct') } catch(e) {} }
+      audio.onerror = () => fallbackWebSpeechCard(text)
+      audio.play().catch(() => fallbackWebSpeechCard(text))
+    } else {
+      fallbackWebSpeechCard(text)
+    }
+  })
+  .catch(err => {
+    console.warn('Gemini TTS エラー、Web Speech APIへフォールバック:', err.message)
+    fallbackWebSpeechCard(text)
+  })
 }
 window.readCardAloud = readCardAloud
 
-// 直接Web Speech APIで読み上げ（TTS APIを経由しない確実な方法）
+function fallbackWebSpeechCard(text) {
+  if (!('speechSynthesis' in window)) {
+    console.warn('⚠️ Web Speech API 非対応')
+    stopTtsCard()
+    return
+  }
+  speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'ja-JP'
+  utterance.rate = 0.85
+  utterance.pitch = 1.2
+  utterance.volume = 1.0
+  
+  const voices = speechSynthesis.getVoices()
+  let voice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
+    || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Kyoko'))
+    || voices.find(v => v.lang === 'ja-JP')
+    || voices.find(v => v.lang.startsWith('ja'))
+  if (voice) utterance.voice = voice
+  
+  const mi = document.getElementById('tts-icon-main')
+  if (mi) mi.className = 'fas fa-stop'
+  
+  utterance.onend = () => { stopTtsCard(); try { TactileSounds.play('correct') } catch(e) {} }
+  utterance.onerror = () => stopTtsCard()
+  
+  if (voices.length === 0) {
+    speechSynthesis.onvoiceschanged = () => {
+      const v2 = speechSynthesis.getVoices()
+      const jaV = v2.find(v => v.lang === 'ja-JP') || v2.find(v => v.lang.startsWith('ja'))
+      if (jaV) utterance.voice = jaV
+      speechSynthesis.speak(utterance)
+    }
+    setTimeout(() => { if (!speechSynthesis.speaking) speechSynthesis.speak(utterance) }, 500)
+    return
+  }
+  speechSynthesis.speak(utterance)
+}
+
+// 直接Web Speech APIで読み上げ（互換性維持）
 function speakTextDirect(text, speed = 0.85) {
   if (!('speechSynthesis' in window)) {
     console.warn('⚠️ Web Speech API 非対応')
     alert('このブラウザは音声読み上げに対応していません')
     return
   }
-  
-  // 既存の読み上げを停止
   speechSynthesis.cancel()
-  
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'ja-JP'
   utterance.rate = speed
-  utterance.pitch = 1.2  // やや高め（子ども向け）
+  utterance.pitch = 1.2
   utterance.volume = 1.0
   
-  // 日本語音声を選択
   const voices = speechSynthesis.getVoices()
   let voice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
     || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Kyoko'))
     || voices.find(v => v.lang === 'ja-JP')
     || voices.find(v => v.lang.startsWith('ja'))
-  
   if (voice) {
     utterance.voice = voice
     console.log('🎙️ 音声選択:', voice.name)
   }
   
-  // 音声がまだロードされていない場合の対策
   if (voices.length === 0) {
     speechSynthesis.onvoiceschanged = () => {
       const v2 = speechSynthesis.getVoices()
@@ -7082,10 +7188,7 @@ function speakTextDirect(text, speed = 0.85) {
       if (jaVoice) utterance.voice = jaVoice
       speechSynthesis.speak(utterance)
     }
-    // すぐ試行もする
-    setTimeout(() => {
-      if (!speechSynthesis.speaking) speechSynthesis.speak(utterance)
-    }, 500)
+    setTimeout(() => { if (!speechSynthesis.speaking) speechSynthesis.speak(utterance) }, 500)
     return
   }
   
@@ -7096,7 +7199,6 @@ function speakTextDirect(text, speed = 0.85) {
     TactileSounds.play('correct')
   }
   utterance.onerror = (e) => console.error('❌ 読み上げエラー:', e.error)
-  
   speechSynthesis.speak(utterance)
 }
 window.speakTextDirect = speakTextDirect
@@ -7798,6 +7900,25 @@ async function generateImageForCard(cardId, description) {
   }
 }
 window.generateImageForCard = generateImageForCard
+
+// ★★★ コースの全カードに対して「みてわかる」図解を自動生成する関数 ★★★
+async function autoGenerateVisualsForCourse(courseId) {
+  console.log(`🎨 コース${courseId}の「みてわかる」図解を自動生成中...`)
+  try {
+    const response = await axios.post('/api/ai/generate-visuals-for-course', {
+      course_id: courseId
+    }, { timeout: 120000 })
+    
+    if (response.data.success) {
+      console.log(`✅ みてわかる図解自動生成完了: ${response.data.generated}/${response.data.total_cards}枚 (${response.data.generation_time_ms}ms)`)
+    } else {
+      console.warn('⚠️ みてわかる図解自動生成失敗:', response.data.error)
+    }
+  } catch (err) {
+    console.warn('⚠️ みてわかる図解自動生成エラー:', err.message)
+  }
+}
+window.autoGenerateVisualsForCourse = autoGenerateVisualsForCourse
 
 // 画像読み込みエラー時のフォールバックUI（onerrorから呼ばれる）
 function handleImageLoadError(imgEl, cardId) {
@@ -22178,6 +22299,24 @@ async function saveGeneratedUnit(unitData) {
             await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, {timeout: 60000})
             console.log('✅ 学習環境デザイン 完了')
           } catch (e) { console.warn('⚠️ 学習環境デザイン 失敗:', e.message) }
+          
+          // 5. ★「みてわかる」図解をNano Banana 2で自動生成
+          saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>みてわかる図解を自動生成中...'
+          try {
+            // コースIDを取得して図解を一括生成
+            const coursesResp = await axios.get(`/api/curriculum/${curriculumId}/courses`, {timeout: 30000})
+            const courses = coursesResp.data?.courses || coursesResp.data || []
+            for (const course of courses) {
+              const cId = course.id || course.course_id
+              if (cId) {
+                try {
+                  await axios.post('/api/ai/generate-visuals-for-course', { course_id: cId }, { timeout: 120000 })
+                  console.log(`✅ コース${cId}の図解自動生成完了`)
+                } catch (ve) { console.warn(`⚠️ コース${cId}の図解生成失敗:`, ve.message) }
+              }
+            }
+            console.log('✅ みてわかる図解 自動生成完了')
+          } catch (e) { console.warn('⚠️ みてわかる図解 失敗:', e.message) }
           
           console.log('🎉 追加問題生成完了 → 学習のてびきへ遷移')
         } catch (e) {
@@ -50953,7 +51092,12 @@ async function publishPersonalizedCourse(studentId, curriculumId) {
     
     if (response.data.success) {
       document.getElementById('personalizedModal')?.remove()
-      alert(`✅ ${response.data.card_count}枚の個別最適化カードを配信しました！\n児童の「学習のてびき」に表示されます。`)
+      alert(`✅ ${response.data.card_count}枚の個別最適化カードを配信しました！\n児童の「学習のてびき」に表示されます。\n\n📊 みてわかる図解を自動生成中...`)
+      
+      // ★★★ バックグラウンドで「みてわかる」図解を自動生成 ★★★
+      if (response.data.course_id) {
+        autoGenerateVisualsForCourse(response.data.course_id)
+      }
     } else {
       throw new Error(response.data.error)
     }
