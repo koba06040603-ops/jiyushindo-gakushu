@@ -12992,6 +12992,11 @@ async function teacherGenerateSong(cardId, index) {
       html += '<p class="font-bold text-purple-700 text-sm">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>'
       if (sd.genre) html += '<p class="text-[10px] text-gray-500">' + sd.genre + (sd.tempo_bpm ? ' / ' + sd.tempo_bpm + 'BPM' : '') + '</p>'
       if (sd.lyrics) html += '<pre class="text-xs text-gray-700 mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-32 overflow-y-auto">' + sd.lyrics + '</pre>'
+      // 🔊 音声再生（AIオーディオ or TTS）
+      if (d.audio_url) {
+        html += '<div class="mt-1"><audio controls class="w-full" style="height:36px;" src="' + d.audio_url + '"></audio></div>'
+      }
+      if (sd.lyrics) html += '<div class="flex gap-2 mt-1"><button onclick="teacherSpeakSongLyrics(this, \'' + encodeURIComponent(sd.lyrics.substring(0, 500)) + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-play"></i> 歌を聴く</button></div>'
       if (d.cover_image_url) html += '<img src="' + d.cover_image_url + '" class="max-h-24 rounded mt-1 mx-auto">'
       html += '<p class="text-[10px] text-gray-400 mt-1">' + d.model + ' / ' + Math.round(d.generation_time_ms / 1000) + '秒</p>'
       html += '<button onclick="teacherGenerateSong(' + cardId + ',' + index + ')" class="text-xs text-purple-500 underline mt-1">🔄 再生成（30秒おぼえうた）</button>'
@@ -13020,7 +13025,10 @@ async function teacherGenerateVideo(cardId, index) {
     if (d.success && d.video_url) {
       area.innerHTML = '<div class="bg-white rounded-lg p-3 border border-red-200 mt-2"><p class="font-bold text-red-700 text-sm">🎬 学習動画</p><video controls class="w-full rounded mt-1" style="max-height:200px;" preload="metadata"><source src="' + d.video_url + '" type="video/mp4"></video><p class="text-[10px] text-gray-400 mt-1">Veo 3.1 / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</p><button onclick="teacherGenerateVideo(' + cardId + ',' + index + ')" class="text-xs text-red-500 underline mt-1">🔄 再生成</button></div>'
     } else if (d.status === 'processing') {
-      area.innerHTML = '<div class="bg-yellow-50 rounded-lg p-3 border border-yellow-200 mt-2"><p class="text-sm font-bold text-yellow-700">⏳ 動画生成中...</p><p class="text-xs text-gray-500">30〜90秒後にこのページをリロードしてください</p><p class="text-[10px] text-gray-400 mt-1">Operation: ' + (d.operationName || '') + '</p></div>'
+      // ポーリングで完了を待つ（リロード不要）
+      const opName = d.operationName || ''
+      area.innerHTML = '<div class="bg-yellow-50 rounded-lg p-3 border border-yellow-200 mt-2"><p class="text-sm font-bold text-yellow-700"><i class="fas fa-spinner fa-spin mr-1"></i>動画生成中...</p><p class="text-xs text-gray-500">自動で完了を確認します（30〜90秒）</p><div class="w-full bg-yellow-200 rounded-full h-1.5 mt-2"><div id="video-progress-' + cardId + '" class="bg-yellow-500 h-1.5 rounded-full transition-all" style="width:5%"></div></div><p class="text-[10px] text-gray-400 mt-1">Operation: ' + opName + '</p></div>'
+      teacherPollVideo(cardId, index, opName)
     } else {
       const yt = d.fallback_youtube_url || ''
       area.innerHTML = '<div class="bg-white rounded-lg p-3 border mt-2"><p class="text-sm text-gray-700">動画生成に時間がかかっています。</p>' + (yt ? '<a href="' + yt + '" target="_blank" class="text-xs text-blue-500 underline">YouTube検索で代替動画を探す</a>' : '') + '</div>'
@@ -13103,6 +13111,73 @@ window.teacherPrepareSuno = teacherPrepareSuno
 window.teacherGenerateVideo = teacherGenerateVideo
 window.teacherGenerateImage = teacherGenerateImage
 
+// ★ 30秒おぼえうた歌詞のTTS読み上げ
+async function teacherSpeakSongLyrics(btn, encodedLyrics) {
+  const lyrics = decodeURIComponent(encodedLyrics)
+  // 歌詞からセクションタグを除去してテキストだけにする
+  const cleanText = lyrics.replace(/\[.*?\]/g, '').replace(/\n+/g, '。').substring(0, 600)
+  const origHTML = btn.innerHTML
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 再生中...'
+  btn.disabled = true
+  try {
+    const res = await axios.post('/api/ai/tts', { text: cleanText, voice: 'Achird', speed: 1.1 })
+    if (res.data && res.data.audio_url) {
+      const audio = new Audio(res.data.audio_url)
+      audio.play()
+      audio.onended = () => { btn.innerHTML = '<i class="fas fa-play"></i> もう一度聴く'; btn.disabled = false }
+      btn.innerHTML = '<i class="fas fa-pause"></i> 再生中...'
+      btn.onclick = () => { audio.paused ? audio.play() : audio.pause() }
+    } else {
+      // フォールバック: Web Speech API
+      const u = new SpeechSynthesisUtterance(cleanText)
+      u.lang = 'ja-JP'; u.rate = 1.2
+      u.onend = () => { btn.innerHTML = origHTML; btn.disabled = false }
+      speechSynthesis.speak(u)
+    }
+  } catch (e) {
+    // フォールバック: Web Speech API
+    const u = new SpeechSynthesisUtterance(cleanText)
+    u.lang = 'ja-JP'; u.rate = 1.2
+    u.onend = () => { btn.innerHTML = origHTML; btn.disabled = false }
+    speechSynthesis.speak(u)
+  }
+}
+window.teacherSpeakSongLyrics = teacherSpeakSongLyrics
+
+// ★ 動画生成ポーリング（リロード不要）
+async function teacherPollVideo(cardId, index, operationName) {
+  let attempts = 0
+  const maxAttempts = 20 // 最大20回 × 5秒 = 100秒
+  const interval = setInterval(async () => {
+    attempts++
+    const progress = Math.min(5 + attempts * 5, 95)
+    const bar = document.getElementById('video-progress-' + cardId)
+    if (bar) bar.style.width = progress + '%'
+    try {
+      const res = await axios.get('/api/ai/video-status?operation=' + encodeURIComponent(operationName))
+      const d = res.data
+      if (d.done && (d.videoUrl || d.video_url)) {
+        clearInterval(interval)
+        const vurl = d.videoUrl || d.video_url
+        const area = document.getElementById('teacher-gen-result-' + cardId)
+        if (area) {
+          area.innerHTML = '<div class="bg-white rounded-lg p-3 border border-red-200 mt-2"><p class="font-bold text-red-700 text-sm">🎬 学習動画</p><video controls class="w-full rounded mt-1" style="max-height:200px;" preload="metadata"><source src="' + vurl + '" type="video/mp4"></video><p class="text-[10px] text-gray-400 mt-1">Veo 3.1</p><button onclick="teacherGenerateVideo(' + cardId + ',' + index + ')" class="text-xs text-red-500 underline mt-1">🔄 再生成</button></div>'
+        }
+      } else if (d.done && d.error) {
+        clearInterval(interval)
+        const area = document.getElementById('teacher-gen-result-' + cardId)
+        if (area) area.innerHTML = '<p class="text-xs text-red-500 mt-2">動画生成失敗: ' + d.error + ' <button onclick="teacherGenerateVideo(' + cardId + ',' + index + ')" class="text-red-500 underline">再試行</button></p>'
+      }
+    } catch (e) { /* ポーリング続行 */ }
+    if (attempts >= maxAttempts) {
+      clearInterval(interval)
+      const area = document.getElementById('teacher-gen-result-' + cardId)
+      if (area) area.innerHTML = '<p class="text-xs text-yellow-700 mt-2">⏳ 動画生成に時間がかかっています。<button onclick="teacherGenerateVideo(' + cardId + ',' + index + ')" class="text-yellow-700 underline">再試行</button></p>'
+    }
+  }, 5000) // 5秒ごと
+}
+window.teacherPollVideo = teacherPollVideo
+
 // ★ 教師用：AI多感覚提案からの生成
 async function teacherGenShortMusic(cardId, index) {
   const { card } = getTeacherCardData(cardId, index)
@@ -13125,6 +13200,11 @@ async function teacherGenShortMusic(cardId, index) {
       let h = '<div class="bg-purple-50 rounded p-2 mt-1 border border-purple-200">'
       h += '<p class="font-bold text-purple-700 text-xs">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>'
       if (sd.lyrics) h += '<pre class="text-[10px] whitespace-pre-wrap bg-white p-2 rounded border mt-1 max-h-24 overflow-y-auto">' + sd.lyrics + '</pre>'
+      // 🔊 音声再生
+      if (d.audio_url) {
+        h += '<div class="mt-1"><audio controls class="w-full" style="height:32px;" src="' + d.audio_url + '"></audio></div>'
+      }
+      if (sd.lyrics) h += '<button onclick="teacherSpeakSongLyrics(this, \'' + encodeURIComponent((sd.lyrics||'').substring(0, 500)) + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-1 rounded text-[10px] font-bold mt-1"><i class="fas fa-play"></i> 歌を聴く</button>'
       if (d.cover_image_url) h += '<img src="' + d.cover_image_url + '" class="max-h-16 rounded mt-1">'
       h += '<p class="text-[9px] text-gray-400 mt-1">' + (d.model || 'NB2') + ' / ' + Math.round((d.generation_time_ms || 0)/1000) + '秒</p>'
       h += '<button onclick="teacherGenShortMusic(' + cardId + ',' + index + ')" class="text-[10px] text-purple-500 underline mt-1">🔄 再生成</button></div>'
@@ -13177,6 +13257,13 @@ async function groupCardGenerate(type, cardId, cardIndex, courseName, cardTitle)
         h += '<p class="font-bold text-purple-700 text-xs">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>'
         if (sd.genre) h += '<p class="text-[9px] text-gray-500">' + sd.genre + (sd.tempo_bpm ? ' / ' + sd.tempo_bpm + 'BPM' : '') + '</p>'
         if (sd.lyrics) h += '<pre class="text-[10px] whitespace-pre-wrap bg-white p-2 rounded border mt-1 max-h-20 overflow-y-auto">' + sd.lyrics + '</pre>'
+        // 🔊 音声再生ボタン
+        if (d.audio_url) {
+          h += '<div class="mt-1"><audio controls class="w-full" style="height:32px;" src="' + d.audio_url + '"></audio></div>'
+        }
+        h += '<div class="flex gap-1 mt-1 flex-wrap">'
+        if (sd.lyrics) h += '<button onclick="groupPlaySong(this,\'' + encodeURIComponent((sd.lyrics||'').substring(0,500)) + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-play"></i>🎵 歌を聴く</button>'
+        h += '</div>'
         if (d.cover_image_url) h += '<img src="' + d.cover_image_url + '" class="max-h-16 rounded mt-1">'
         h += '<p class="text-[9px] text-gray-400 mt-1">' + (d.model||'NB2') + ' / ' + Math.round((d.generation_time_ms||0)/1000) + '秒</p>'
         h += '<button onclick="groupCardGenerate(\'song\',' + cardId + ',' + cardIndex + ',\'' + courseName.replace(/'/g,'') + '\',\'' + cardTitle.replace(/'/g,'') + '\')" class="text-[10px] text-purple-500 underline mt-1">🔄 再生成</button></div>'
@@ -13216,9 +13303,11 @@ async function groupCardGenerate(type, cardId, cardIndex, courseName, cardTitle)
       const d = res.data
       if (d.success && d.video_url) {
         area.innerHTML = '<div class="bg-red-50 rounded p-2 mt-1 border border-red-200"><p class="font-bold text-red-700 text-xs">🎬 動画</p><video controls class="w-full rounded mt-1" style="max-height:150px;" preload="metadata"><source src="' + d.video_url + '" type="video/mp4"></video><p class="text-[9px] text-gray-400">Veo 3.1 / ' + Math.round((d.generation_time_ms||0)/1000) + '秒</p></div>'
-      } else if (d.status === 'processing') {
-        area.innerHTML = '<div class="bg-yellow-50 rounded p-2 mt-1 border border-yellow-200"><p class="text-xs font-bold text-yellow-700">⏳ 動画生成中（30〜90秒後にリロード）</p></div>'
-      } else { area.innerHTML = '<p class="text-[10px] text-red-500">生成に時間がかかっています</p>' }
+      } else if ((d.success || d.status === 'processing') && d.operationName) {
+        // ポーリング方式でリロード不要
+        area.innerHTML = '<div class="bg-yellow-50 rounded p-2 mt-1 border border-yellow-200"><p class="text-xs font-bold text-yellow-700"><i class="fas fa-spinner fa-spin mr-1"></i>動画生成中...</p><p class="text-[10px] text-gray-500">自動で完了を確認します（30〜90秒）</p><div class="w-full bg-yellow-200 rounded-full h-1.5 mt-2"><div id="group-video-progress-' + (cardId || cardIndex) + '" class="bg-yellow-500 h-1.5 rounded-full transition-all" style="width:5%"></div></div></div>'
+        pollGroupVideo(cardId, cardIndex, courseName, cardTitle, d.operationName)
+      } else { area.innerHTML = '<p class="text-[10px] text-red-500">生成に時間がかかっています <button onclick="groupCardGenerate(\'video\',' + cardId + ',' + cardIndex + ',\'' + courseName.replace(/'/g,'') + '\',\'' + cardTitle.replace(/'/g,'') + '\')" class="text-red-500 underline">再試行</button></p>' }
     } catch(e) { area.innerHTML = '<p class="text-[10px] text-red-500">エラー: ' + e.message + '</p>' }
   } else if (type === 'image') {
     area.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin text-pink-500"></i> <span class="text-xs text-pink-600 font-bold">AI画像生成中...</span></div>'
@@ -13234,6 +13323,72 @@ async function groupCardGenerate(type, cardId, cardIndex, courseName, cardTitle)
   }
 }
 window.groupCardGenerate = groupCardGenerate
+
+// ★ 全体配信カード用：動画ポーリング（リロード不要）
+async function pollGroupVideo(cardId, cardIndex, courseName, cardTitle, operationName) {
+  let attempts = 0
+  const maxAttempts = 20
+  const interval = setInterval(async () => {
+    attempts++
+    const progress = Math.min(5 + attempts * 5, 95)
+    const bar = document.getElementById('group-video-progress-' + (cardId || cardIndex))
+    if (bar) bar.style.width = progress + '%'
+    try {
+      const res = await axios.get('/api/ai/video-status?operation=' + encodeURIComponent(operationName))
+      const d = res.data
+      if (d.done && (d.videoUrl || d.video_url)) {
+        clearInterval(interval)
+        const vurl = d.videoUrl || d.video_url
+        const area = document.getElementById('group-gen-result-' + (cardId || cardIndex))
+        if (area) {
+          area.innerHTML = '<div class="bg-red-50 rounded p-2 mt-1 border border-red-200"><p class="font-bold text-red-700 text-xs">🎬 動画</p><video controls class="w-full rounded mt-1" style="max-height:150px;" preload="metadata"><source src="/api/ai/video-download?uri=' + encodeURIComponent(vurl) + '" type="video/mp4"></video><p class="text-[9px] text-gray-400">Veo 3.1</p><button onclick="groupCardGenerate(\'video\',' + cardId + ',' + cardIndex + ',\'' + courseName.replace(/'/g,'') + '\',\'' + cardTitle.replace(/'/g,'') + '\')" class="text-[10px] text-red-500 underline mt-1">🔄 再生成</button></div>'
+        }
+      } else if (d.done && d.error) {
+        clearInterval(interval)
+        const area = document.getElementById('group-gen-result-' + (cardId || cardIndex))
+        if (area) area.innerHTML = '<p class="text-[10px] text-red-500">動画生成失敗 <button onclick="groupCardGenerate(\'video\',' + cardId + ',' + cardIndex + ',\'' + courseName.replace(/'/g,'') + '\',\'' + cardTitle.replace(/'/g,'') + '\')" class="text-red-500 underline">再試行</button></p>'
+      }
+    } catch(e) { /* continue polling */ }
+    if (attempts >= maxAttempts) {
+      clearInterval(interval)
+      const area = document.getElementById('group-gen-result-' + (cardId || cardIndex))
+      if (area) area.innerHTML = '<p class="text-[10px] text-red-500">タイムアウト <button onclick="groupCardGenerate(\'video\',' + cardId + ',' + cardIndex + ',\'' + courseName.replace(/'/g,'') + '\',\'' + cardTitle.replace(/'/g,'') + '\')" class="text-red-500 underline">再試行</button></p>'
+    }
+  }, 5000)
+}
+window.pollGroupVideo = pollGroupVideo
+
+// ★ 全体配信カード用：歌詞を音声で再生
+async function groupPlaySong(btn, encodedLyrics) {
+  const lyrics = decodeURIComponent(encodedLyrics)
+  const cleanText = lyrics.replace(/\[.*?\]/g, '').replace(/\n+/g, '。').substring(0, 600)
+  const origHTML = btn.innerHTML
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 読込中...'
+  btn.disabled = true
+  try {
+    const res = await axios.post('/api/ai/tts', { text: cleanText, voice: 'Achird', speed: 1.1 })
+    if (res.data && res.data.audio_url) {
+      const audio = new Audio(res.data.audio_url)
+      audio.play()
+      btn.innerHTML = '<i class="fas fa-pause"></i> 再生中...'
+      btn.onclick = () => { audio.paused ? audio.play() : audio.pause(); btn.innerHTML = audio.paused ? '<i class="fas fa-play"></i> 歌を聴く' : '<i class="fas fa-pause"></i> 再生中...' }
+      audio.onended = () => { btn.innerHTML = '<i class="fas fa-play"></i> もう一度聴く'; btn.disabled = false; btn.onclick = () => groupPlaySong(btn, encodedLyrics) }
+    } else {
+      const u = new SpeechSynthesisUtterance(cleanText)
+      u.lang = 'ja-JP'; u.rate = 1.2
+      u.onend = () => { btn.innerHTML = origHTML; btn.disabled = false }
+      speechSynthesis.speak(u)
+      btn.innerHTML = '<i class="fas fa-volume-up"></i> 読み上げ中...'
+    }
+  } catch(e) {
+    const u = new SpeechSynthesisUtterance(cleanText)
+    u.lang = 'ja-JP'; u.rate = 1.2
+    u.onend = () => { btn.innerHTML = origHTML; btn.disabled = false }
+    speechSynthesis.speak(u)
+    btn.innerHTML = '<i class="fas fa-volume-up"></i> 読み上げ中...'
+  }
+}
+window.groupPlaySong = groupPlaySong
 
 // ★ 例題の図解をAI生成（app.js側）
 async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exampleSolution) {
@@ -52157,7 +52312,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
                     </div>
                     ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://edu.web.nhk/school/?q=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
-                    ${tactile ? '<div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3 mb-2"><div class="flex items-center gap-2 mb-2"><span class="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span><span class="text-xs text-gray-700">' + tactile + '</span></div><div id="guide-tactile-' + (card.card_id || card.id || i) + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[120px]"></div></div>' : ''}
+                    ${tactile ? '<div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3 mb-2"><div class="flex items-center gap-2 mb-2"><span class="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span><span class="text-xs text-gray-700">' + tactile + '</span></div><button onclick="teacherGenerateImage(' + (card.card_id || card.id || 0) + ', ' + i + ')" class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2"><i class="fas fa-image"></i>AIに図を描いてもらう</button><div id="guide-tactile-' + (card.card_id || card.id || i) + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[120px]"></div></div>' : ''}
                     ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2 cursor-pointer hover:bg-green-100" onclick="speakText(\'' + (card.problem_text || card.problem_content || '').replace(/'/g, '').substring(0, 200) + '\', \'female-friendly\', 0.8); TactileSounds.play(\'tap\')"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
                     <div class="grid grid-cols-2 gap-2 text-xs">
                       <details class="bg-white rounded p-2 border">

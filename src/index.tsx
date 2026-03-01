@@ -9117,6 +9117,17 @@ app.get('/guide/:curriculumId', async (c) => {
         html += '<pre style="font-size:0.8rem;color:#4C1D95;white-space:pre-wrap;line-height:1.6;font-family:inherit;margin:0;max-height:300px;overflow-y:auto;cursor:pointer;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline=\\x272px solid #22C55E\\x27;setTimeout(function(){this.style.outline=\\x27none\\x27;}.bind(this),1000);">' + (sd.short_lyrics || sd.lyrics || '').substring(0, 800) + '<span style="display:block;font-size:0.6rem;color:#9CA3AF;margin-top:4px;">📋 タップでコピー</span></pre>';
         html += '</div>';
 
+        // 🔊 音声再生（実際にオーディオで聴ける）
+        if (data.audio_url) {
+          html += '<div style="background:linear-gradient(135deg,#F5F3FF,#FCE7F3);border-radius:10px;padding:10px;margin-bottom:10px;border:1px solid #DDD6FE;">';
+          html += '<p style="font-size:0.75rem;font-weight:bold;color:#7C3AED;margin-bottom:6px;">🔊 おぼえうたを聴く</p>';
+          html += '<audio controls style="width:100%;border-radius:8px;" src="' + data.audio_url + '"></audio>';
+          html += '</div>';
+        }
+        html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">';
+        html += '<button onclick="playSongAudio(this, ' + page + ')" style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.8rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-play"></i>🎵 歌を聴く（AI読み上げ）</button>';
+        html += '</div>';
+
         // メロディ説明
         if (sd.melody_description) {
           html += '<div style="background:#FFFBEB;border-left:4px solid #F59E0B;padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:10px;">';
@@ -9514,8 +9525,17 @@ app.get('/guide/:curriculumId', async (c) => {
       } else {
         html += '<div style="text-align:center;margin:10px 0;"><img src="' + imgUrl + '" alt="問題の図" style="max-width:100%;max-height:350px;border-radius:10px;border:2px solid #e5e7eb;"></div>';
       }
+      // 画像があっても追加のAI図解を生成できるボタン
+      html += '<div id="extra-diagram-' + currentPage + '" style="text-align:center;margin:4px 0;">';
+      html += '<button onclick="generateExampleDiagram(' + currentPage + ')" style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#8B5CF6,#6366F1);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;opacity:0.8;"><i class="fas fa-wand-magic-sparkles"></i>AIで別の図を描く</button>';
+      html += '</div>';
     } else if (imageDesc) {
       html += '<div style="background:#F5F3FF;border-left:4px solid #8B5CF6;padding:8px 12px;border-radius:0 8px 8px 0;margin:8px 0;font-size:0.85rem;"><strong>🖼️ 図：</strong>' + imageDesc + '</div>';
+      // 画像の説明はあるが画像がない → AI図解生成ボタンを追加
+      html += '<div id="desc-diagram-' + currentPage + '" style="text-align:center;margin:6px 0;">';
+      html += '<button onclick="generateImageFromDesc(' + currentPage + ')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(139,92,246,0.3);"><i class="fas fa-wand-magic-sparkles"></i>AIに図を描いてもらう</button>';
+      html += '<div id="desc-diagram-result-' + currentPage + '" style="margin-top:6px;"></div>';
+      html += '</div>';
     }
 
     // もんだい（大きく表示）
@@ -9569,6 +9589,11 @@ app.get('/guide/:curriculumId', async (c) => {
       html += '<div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:12px;margin:10px 0;">';
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="background:#F59E0B;color:white;font-size:0.75rem;font-weight:bold;padding:3px 10px;border-radius:20px;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>さわってまなぼう</span></div>';
       html += '<p style="font-size:0.85rem;color:#374151;margin-bottom:8px;">' + tactile + '</p>';
+      // 図解生成ボタン
+      html += '<div id="tactile-diagram-' + currentPage + '" style="margin-bottom:8px;">';
+      html += '<button onclick="generateTactileDiagram(' + currentPage + ')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(245,158,11,0.3);">';
+      html += '<i class="fas fa-image"></i>AIにやり方の図を描いてもらう</button>';
+      html += '</div>';
       html += '<div id="tactile-guide-' + currentPage + '" style="background:white;border-radius:10px;border:1px solid #E5E7EB;min-height:100px;padding:8px;"></div>';
       html += '</div>';
     }
@@ -10221,6 +10246,57 @@ app.get('/guide/:curriculumId', async (c) => {
     });
   }
 
+  // --- さわってまなぼう の図解をAI生成 ---
+  function generateTactileDiagram(page) {
+    var area = document.getElementById('tactile-diagram-' + page);
+    if (!area) return;
+    var cards = window._allCardPages || [];
+    var c = cards[page] || {};
+    var mm = c.multimedia || {};
+    var tactile = mm.tactile_activity || '';
+    var cardTitle = c.card_title || '';
+    var subject = c.subject || CURRENT_SUBJECT || '';
+    var grade = c.grade || CURRENT_GRADE || '';
+    
+    area.innerHTML = '<div style="text-align:center;padding:10px;"><i class="fas fa-spinner fa-spin" style="color:#D97706;font-size:1.3rem;"></i><p style="font-size:0.75rem;color:#D97706;margin-top:4px;font-weight:bold;">AIがやり方の図を描いています...</p></div>';
+    
+    var prompt = '日本の' + grade + subject + 'の児童向け体験活動の図解イラスト。\n';
+    prompt += '【カード】' + cardTitle + '\n';
+    prompt += '【やる活動】' + tactile + '\n';
+    prompt += '【問題】' + (c.problem_text || '').substring(0, 200) + '\n';
+    prompt += '条件：手順がわかるステップバイステップのイラスト。明るく楽しい色使い。日本語で手順番号(①②③)を大きく表示。子どもの手が作業している様子。白い背景。教科書の挿絵風。';
+    
+    fetch('/api/ai/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt,
+        card_id: c.card_id || c.id || 0,
+        card_title: cardTitle,
+        problem_text: tactile,
+        subject: subject, grade: grade,
+        prefer_image: true
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.image_url) {
+        var html = '<div style="text-align:center;margin:8px 0;">';
+        html += '<img src="' + data.image_url + '" alt="やり方の図" style="max-width:100%;max-height:250px;border-radius:10px;border:2px solid #FDE68A;">';
+        html += '<div style="display:flex;justify-content:center;gap:8px;margin-top:6px;">';
+        html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
+        html += '<button onclick="generateTactileDiagram(' + page + ')" style="font-size:0.7rem;color:#D97706;background:none;border:1px solid #FDE68A;padding:2px 10px;border-radius:6px;cursor:pointer;">🔄 もう一度</button>';
+        html += '</div></div>';
+        area.innerHTML = html;
+      } else {
+        area.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">図の生成に失敗 <button onclick="generateTactileDiagram(' + page + ')" style="color:#D97706;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+      }
+    })
+    .catch(function(e) {
+      area.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">通信エラー <button onclick="generateTactileDiagram(' + page + ')" style="color:#D97706;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+    });
+  }
+
   // ★ 多感覚AI提案 → 編集 → 実行 関数群
   // --- 30秒覚え歌 即時生成 ---
   function generateShortMusic(page) {
@@ -10256,6 +10332,13 @@ app.get('/guide/:curriculumId', async (c) => {
         html += '<p style="font-weight:bold;color:#7C3AED;font-size:0.85rem;">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>';
         if (sd.genre) html += '<p style="font-size:0.65rem;color:#8B5CF6;">' + sd.genre + (sd.tempo_bpm ? ' / ' + sd.tempo_bpm + 'BPM' : '') + '</p>';
         if (sd.lyrics) html += '<pre style="font-size:0.75rem;white-space:pre-wrap;background:white;padding:8px;border-radius:8px;border:1px solid #E9D5FF;margin:6px 0;max-height:120px;overflow-y:auto;">' + sd.lyrics + '</pre>';
+        // 🔊 音声再生ボタン（実際にオーディオで聴ける）
+        if (data.audio_url) {
+          html += '<div style="margin:8px 0;"><audio controls style="width:100%;border-radius:8px;" src="' + data.audio_url + '"></audio></div>';
+        }
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0;">';
+        if (sd.lyrics) html += '<button onclick="playSongAudio(this, ' + page + ')" class="play-song-btn" style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-play"></i>🎵 歌を聴く</button>';
+        html += '</div>';
         if (data.cover_image_url) html += '<img src="' + data.cover_image_url + '" style="max-height:80px;border-radius:8px;margin:4px 0;" alt="ジャケット">';
         html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'NB2') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
         html += '<button onclick="generateShortMusic(' + page + ')" style="font-size:0.7rem;color:#7C3AED;background:none;border:1px solid #C4B5FD;padding:3px 10px;border-radius:6px;cursor:pointer;margin-top:4px;">🔄 再生成</button>';
@@ -10286,6 +10369,87 @@ app.get('/guide/:curriculumId', async (c) => {
         showCoachBubble('スタイルをコピーしました！', 'encourage', 2000, false);
       }).catch(function() { el.select(); document.execCommand('copy'); });
     }
+  }
+
+  // --- 画像説明からAI図解を生成 ---
+  function generateImageFromDesc(page) {
+    var resultArea = document.getElementById('desc-diagram-result-' + page);
+    if (!resultArea) return;
+    var c = ALL_CARDS[page] || {};
+    var mm = c.multimedia || c.multimedia_content || {};
+    var imageDesc = mm.image_description || c.image_description || c.card_title || '';
+    
+    resultArea.innerHTML = '<div style="text-align:center;padding:12px;"><i class="fas fa-spinner fa-spin" style="color:#8B5CF6;font-size:1.5rem;"></i><p style="font-size:0.78rem;color:#8B5CF6;margin-top:6px;font-weight:bold;">AIが図を描いています...</p></div>';
+    
+    var prompt = '日本の' + (CURRICULUM.grade||'') + (CURRICULUM.subject||'') + 'の教科書に載る図解を描いてください。\n';
+    prompt += '【カード】' + (c.card_title || '') + '\n';
+    prompt += '【図の説明】' + imageDesc + '\n';
+    if (c.problem_text) prompt += '【もんだい】' + (c.problem_text || '').substring(0, 200) + '\n';
+    prompt += '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベルを明確に。白い背景。';
+    
+    fetch('/api/ai/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt, card_id: 'desc-' + page,
+        card_title: c.card_title || '', problem_text: c.problem_text || '',
+        subject: CURRICULUM.subject || '', grade: CURRICULUM.grade || '',
+        prefer_image: true
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.image_url) {
+        resultArea.innerHTML = '<div style="text-align:center;margin-top:4px;"><img src="' + data.image_url + '" alt="AI図解" style="max-width:100%;max-height:280px;border-radius:10px;border:2px solid #DDD6FE;"><div style="margin-top:4px;"><span style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</span> <button onclick="generateImageFromDesc(' + page + ')" style="font-size:0.65rem;color:#8B5CF6;background:none;border:1px solid #DDD6FE;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:4px;">🔄 再生成</button></div></div>';
+      } else {
+        resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">図の生成に失敗 <button onclick="generateImageFromDesc(' + page + ')" style="color:#8B5CF6;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+      }
+    })
+    .catch(function() {
+      resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">通信エラー <button onclick="generateImageFromDesc(' + page + ')" style="color:#8B5CF6;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+    });
+  }
+
+  // --- 🔊 歌詞の音声再生関数（Gemini TTS で歌う） ---
+  function playSongAudio(btn, page) {
+    var c = ALL_CARDS[page] || {};
+    var lyricsEl = btn.closest('div').parentElement.querySelector('pre');
+    var lyrics = lyricsEl ? lyricsEl.textContent.trim() : '';
+    if (!lyrics) { lyrics = c.card_title || '学習ソング'; }
+    // セクションタグ除去
+    var cleanText = lyrics.replace(/\[.*?\]/g, '').replace(/\n+/g, '。').substring(0, 600);
+    var origHTML = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 読み込み中...';
+    btn.disabled = true;
+    fetch('/api/ai/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: cleanText, voice: 'Achird', speed: 1.1 })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data && data.audio_url) {
+        var audio = new Audio(data.audio_url);
+        audio.play();
+        btn.innerHTML = '<i class="fas fa-pause"></i> 再生中...';
+        btn.onclick = function() { if (audio.paused) { audio.play(); btn.innerHTML = '<i class="fas fa-pause"></i> 再生中...'; } else { audio.pause(); btn.innerHTML = '<i class="fas fa-play"></i> 🎵 歌を聴く'; } };
+        audio.onended = function() { btn.innerHTML = '<i class="fas fa-play"></i> 🎵 もう一度聴く'; btn.disabled = false; btn.onclick = function() { playSongAudio(btn, page); }; };
+      } else {
+        // フォールバック: Web Speech API
+        var u = new SpeechSynthesisUtterance(cleanText);
+        u.lang = 'ja-JP'; u.rate = 1.2;
+        u.onend = function() { btn.innerHTML = origHTML; btn.disabled = false; };
+        speechSynthesis.speak(u);
+        btn.innerHTML = '<i class="fas fa-volume-up"></i> 読み上げ中...';
+      }
+    })
+    .catch(function() {
+      var u = new SpeechSynthesisUtterance(cleanText);
+      u.lang = 'ja-JP'; u.rate = 1.2;
+      u.onend = function() { btn.innerHTML = origHTML; btn.disabled = false; };
+      speechSynthesis.speak(u);
+      btn.innerHTML = '<i class="fas fa-volume-up"></i> 読み上げ中...';
+    });
   }
 
   // --- フォールバック：30秒おぼえうた（multimedia_ai_content がないカード用） ---
@@ -10319,6 +10483,13 @@ app.get('/guide/:curriculumId', async (c) => {
         html += '<p style="font-weight:bold;color:#7C3AED;font-size:0.85rem;">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>';
         if (sd.genre) html += '<p style="font-size:0.65rem;color:#8B5CF6;">' + sd.genre + (sd.tempo_bpm ? ' / ' + sd.tempo_bpm + 'BPM' : '') + '</p>';
         if (sd.lyrics) html += '<pre style="font-size:0.75rem;white-space:pre-wrap;background:white;padding:8px;border-radius:8px;border:1px solid #E9D5FF;margin:6px 0;max-height:120px;overflow-y:auto;">' + sd.lyrics + '</pre>';
+        // 🔊 音声再生ボタン
+        if (data.audio_url) {
+          html += '<div style="margin:8px 0;"><audio controls style="width:100%;border-radius:8px;" src="' + data.audio_url + '"></audio></div>';
+        }
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0;">';
+        if (sd.lyrics) html += '<button onclick="playSongAudio(this, ' + page + ')" style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-play"></i>🎵 歌を聴く</button>';
+        html += '</div>';
         if (data.cover_image_url) html += '<img src="' + data.cover_image_url + '" style="max-height:80px;border-radius:8px;margin:4px 0;" alt="ジャケット">';
         html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'NB2') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
         html += '<button onclick="generateShortMusicFallback(' + page + ')" style="font-size:0.7rem;color:#7C3AED;background:none;border:1px solid #C4B5FD;padding:3px 10px;border-radius:6px;cursor:pointer;margin-top:4px;">🔄 再生成</button>';
@@ -10496,13 +10667,53 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(data) {
       if (data.success && data.video_url) {
         resultArea.innerHTML = '<video controls style="width:100%;border-radius:10px;margin-top:4px;" preload="metadata"><source src="' + data.video_url + '" type="video/mp4"></video><button onclick="generateVideoFromSuggestion(' + page + ')" style="font-size:0.7rem;color:#DC2626;background:none;border:1px solid #FECACA;padding:3px 10px;border-radius:6px;cursor:pointer;margin-top:4px;">🔄 再生成</button>';
-      } else if (data.status === 'processing') {
-        resultArea.innerHTML = '<div style="background:#FEF3C7;padding:8px;border-radius:8px;"><p style="font-size:0.75rem;font-weight:bold;color:#92400E;">⏳ 動画生成中...</p><p style="font-size:0.65rem;color:#B45309;">30〜90秒後にリロードしてください</p></div>';
+      } else if (data.success && data.operationName) {
+        // ポーリング方式: リロード不要
+        resultArea.innerHTML = '<div style="background:#FEF3C7;padding:10px;border-radius:8px;text-align:center;"><i class="fas fa-spinner fa-spin" style="color:#F59E0B;"></i><p style="font-size:0.75rem;font-weight:bold;color:#92400E;margin-top:4px;">⏳ 動画生成中...</p><p style="font-size:0.65rem;color:#B45309;">自動で完了を確認します（30〜90秒）</p><div style="margin-top:6px;height:4px;background:#FDE68A;border-radius:2px;overflow:hidden;"><div id="mac-video-progress-' + page + '" style="height:100%;background:#F59E0B;width:5%;border-radius:2px;transition:width 0.5s;"></div></div></div>';
+        pollMacVideoStatus(data.operationName, page);
+      } else if (data.status === 'processing' && data.operationName) {
+        resultArea.innerHTML = '<div style="background:#FEF3C7;padding:10px;border-radius:8px;text-align:center;"><i class="fas fa-spinner fa-spin" style="color:#F59E0B;"></i><p style="font-size:0.75rem;font-weight:bold;color:#92400E;margin-top:4px;">⏳ 動画生成中...</p><p style="font-size:0.65rem;color:#B45309;">自動で完了を確認します（30〜90秒）</p><div style="margin-top:6px;height:4px;background:#FDE68A;border-radius:2px;overflow:hidden;"><div id="mac-video-progress-' + page + '" style="height:100%;background:#F59E0B;width:5%;border-radius:2px;transition:width 0.5s;"></div></div></div>';
+        pollMacVideoStatus(data.operationName, page);
       } else {
         resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">生成に時間がかかっています <button onclick="generateVideoFromSuggestion(' + page + ')" style="color:#DC2626;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
       }
     })
     .catch(function(e) { resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">通信エラー</p>'; });
+  }
+
+  // --- 動画ステータスポーリング（mac用・リロード不要） ---
+  function pollMacVideoStatus(operationName, page) {
+    var pollCount = 0;
+    var maxPolls = 20;
+    function poll() {
+      pollCount++;
+      if (pollCount > maxPolls) {
+        var resultArea = document.getElementById('mac-video-result-' + page);
+        if (resultArea) resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">タイムアウト <button onclick="generateVideoFromSuggestion(' + page + ')" style="color:#DC2626;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+        return;
+      }
+      var bar = document.getElementById('mac-video-progress-' + page);
+      if (bar) bar.style.width = Math.min(5 + pollCount * 5, 95) + '%';
+      
+      fetch('/api/ai/video-status?operation=' + encodeURIComponent(operationName))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.done && (data.videoUrl || data.video_url)) {
+          var vurl = data.videoUrl || data.video_url;
+          var resultArea = document.getElementById('mac-video-result-' + page);
+          if (resultArea) {
+            resultArea.innerHTML = '<div style="margin-top:4px;border-radius:10px;overflow:hidden;border:2px solid #E5E7EB;"><video controls playsinline style="width:100%;max-height:200px;" preload="metadata"><source src="/api/ai/video-download?uri=' + encodeURIComponent(vurl) + '" type="video/mp4"></video></div><p style="font-size:0.6rem;color:#9CA3AF;margin-top:4px;">🎬 Veo 3.1</p><button onclick="generateVideoFromSuggestion(' + page + ')" style="font-size:0.7rem;color:#DC2626;background:none;border:1px solid #FECACA;padding:3px 10px;border-radius:6px;cursor:pointer;margin-top:4px;">🔄 再生成</button>';
+          }
+        } else if (data.done && !data.videoUrl) {
+          var resultArea = document.getElementById('mac-video-result-' + page);
+          if (resultArea) resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">動画生成失敗 <button onclick="generateVideoFromSuggestion(' + page + ')" style="color:#DC2626;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+        } else {
+          setTimeout(poll, 5000);
+        }
+      })
+      .catch(function() { setTimeout(poll, 5000); });
+    }
+    setTimeout(poll, 8000);
   }
 
   // --- 触覚ウィジェット生成 ---
@@ -25085,11 +25296,52 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
     const genTime = Date.now() - startTime
     console.log(`✅ NB2 music生成: ${genTime}ms, title=${songData.song_title}, 画像=${coverImageUrl ? 'あり' : 'なし'}`)
 
+    // ★ 音声生成（Gemini TTS で歌詞を読み上げ・歌う）
+    let audioUrl = ''
+    try {
+      const shortLyrics = (songData.short_lyrics || songData.lyrics || '').substring(0, 500)
+      if (shortLyrics) {
+        const audioPrompt = `以下の歌詞を子ども向けの明るいメロディで楽しく歌ってください。リズミカルに、はっきりした日本語で歌ってください。\n\n歌詞:\n${shortLyrics}`
+        const audioResp = await fetch(
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent',
+          {
+            method: 'POST',
+            headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: audioPrompt }] }],
+              generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                  voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Achird' } }
+                }
+              }
+            })
+          }
+        )
+        if (audioResp.ok) {
+          const audioData = await audioResp.json() as any
+          const audioParts = audioData?.candidates?.[0]?.content?.parts || []
+          for (const part of audioParts) {
+            if (part.inlineData?.mimeType?.startsWith('audio/')) {
+              audioUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+              console.log('✅ NB2 覚え歌の音声生成成功')
+              break
+            }
+          }
+        }
+      }
+    } catch (audioErr: any) {
+      console.log('⚠️ 音声生成スキップ:', audioErr.message)
+    }
+
+    const totalTime = Date.now() - startTime
+
     return c.json({
       success: true,
       song_data: songData,
       cover_image_url: coverImageUrl,
-      generation_time_ms: genTime,
+      audio_url: audioUrl,
+      generation_time_ms: totalTime,
       model: 'Nano Banana 2 (gemini-3.1-flash-image)',
       suno_info: {
         url: 'https://suno.com',
