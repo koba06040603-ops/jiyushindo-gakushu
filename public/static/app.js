@@ -13034,6 +13034,59 @@ window.teacherGenerateSong = teacherGenerateSong
 window.teacherGenerateVideo = teacherGenerateVideo
 window.teacherGenerateImage = teacherGenerateImage
 
+// ★ 教師用：AI多感覚提案からの生成
+async function teacherGenShortMusic(cardId, index) {
+  const { card } = getTeacherCardData(cardId, index)
+  const promptEl = document.getElementById('tmac-music-' + cardId)
+  const lyricsEl = document.getElementById('tmac-lyrics-' + cardId)
+  const area = document.getElementById('tmac-music-res-' + cardId)
+  if (!area) return
+  area.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin text-purple-500"></i> <span class="text-xs text-purple-600 font-bold">NB2が30秒おぼえうたを作曲中...</span></div>'
+  try {
+    const res = await axios.post('/api/ai/generate-nb2-music', {
+      card_id: cardId, card_title: card.card_title || '',
+      problem_text: card.problem_text || '', subject: card.subject || '',
+      grade: card.grade || '', unit_name: card.unit_name || '',
+      custom_prompt: promptEl?.value?.trim() || '',
+      custom_lyrics: lyricsEl?.value?.trim() || ''
+    })
+    const d = res.data
+    if (d.success && d.song_data) {
+      const sd = d.song_data
+      let h = '<div class="bg-purple-50 rounded p-2 mt-1 border border-purple-200">'
+      h += '<p class="font-bold text-purple-700 text-xs">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>'
+      if (sd.lyrics) h += '<pre class="text-[10px] whitespace-pre-wrap bg-white p-2 rounded border mt-1 max-h-24 overflow-y-auto">' + sd.lyrics + '</pre>'
+      if (d.cover_image_url) h += '<img src="' + d.cover_image_url + '" class="max-h-16 rounded mt-1">'
+      h += '<p class="text-[9px] text-gray-400 mt-1">' + (d.model || 'NB2') + ' / ' + Math.round((d.generation_time_ms || 0)/1000) + '秒</p>'
+      h += '<button onclick="teacherGenShortMusic(' + cardId + ',' + index + ')" class="text-[10px] text-purple-500 underline mt-1">🔄 再生成</button></div>'
+      area.innerHTML = h
+    } else { area.innerHTML = '<p class="text-[10px] text-red-500">失敗: ' + (d.error||'') + '</p>' }
+  } catch(e) { area.innerHTML = '<p class="text-[10px] text-red-500">エラー: ' + e.message + '</p>' }
+}
+
+async function teacherGenDiagram(cardId, index) {
+  const { card } = getTeacherCardData(cardId, index)
+  const promptEl = document.getElementById('tmac-diagram-' + cardId)
+  const area = document.getElementById('tmac-diagram-res-' + cardId)
+  if (!area) return
+  area.innerHTML = '<div class="text-center py-2"><i class="fas fa-spinner fa-spin text-green-500"></i> <span class="text-xs text-green-600">図解生成中...</span></div>'
+  try {
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: promptEl?.value?.trim() || card.card_title || '',
+      card_id: cardId, card_title: card.card_title || '',
+      problem_text: card.problem_text || '', prefer_image: true,
+      subject: card.subject || '', grade: card.grade || ''
+    })
+    const d = res.data
+    if (d.success && d.image_url) {
+      area.innerHTML = '<img src="' + d.image_url + '" class="w-full rounded border mt-1" style="max-height:150px;object-fit:contain;"><button onclick="teacherGenDiagram(' + cardId + ',' + index + ')" class="text-[10px] text-green-500 underline mt-1">🔄 再生成</button>'
+    } else { area.innerHTML = '<p class="text-[10px] text-red-500">失敗</p>' }
+  } catch(e) { area.innerHTML = '<p class="text-[10px] text-red-500">エラー</p>' }
+}
+
+window.teacherGenShortMusic = teacherGenShortMusic
+window.teacherGenDiagram = teacherGenDiagram
+
 // ============================================================
 // 作図問題用：Canvas描画実技シミュレーター
 // コンパス（円弧描画）+ 定規（直線描画）で実際に手を動かして作図
@@ -51953,6 +52006,58 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                         <div id="teacher-gen-result-${card.card_id || card.id || i}" class="mt-1"></div>
                       </div>
                     </div>
+                    ${(() => {
+                      const mac = card.multimedia_ai_content
+                      if (!mac) return ''
+                      let h = '<details class="mt-2 border-2 border-indigo-200 rounded-xl overflow-hidden bg-gradient-to-r from-indigo-50 to-purple-50">'
+                      h += '<summary class="px-3 py-2 cursor-pointer text-xs font-bold text-indigo-700"><i class="fas fa-brain mr-1"></i>AI多感覚提案（編集可能） ▼</summary>'
+                      h += '<div class="p-3 space-y-2">'
+                      // 30秒音楽
+                      if (mac.short_music) {
+                        const sm = mac.short_music
+                        h += '<div class="bg-white border border-purple-200 rounded-lg p-2">'
+                        h += '<div class="flex items-center gap-1 mb-1"><span>🎵</span><span class="text-xs font-bold text-purple-700">30秒おぼえうた</span>'
+                        if (sm.learning_theory) h += '<span class="ml-auto text-[9px] text-gray-400">📚 ' + sm.learning_theory.substring(0,30) + '</span>'
+                        h += '</div>'
+                        h += '<label class="text-[9px] text-gray-500 font-bold">プロンプト</label>'
+                        h += '<textarea id="tmac-music-' + (card.card_id||card.id||i) + '" rows="2" class="w-full border border-purple-100 rounded px-2 py-1 text-[11px] resize-y">' + (sm.prompt_30sec||'') + '</textarea>'
+                        h += '<label class="text-[9px] text-gray-500 font-bold">歌詞</label>'
+                        h += '<textarea id="tmac-lyrics-' + (card.card_id||card.id||i) + '" rows="2" class="w-full border border-purple-100 rounded px-2 py-1 text-[11px] resize-y font-mono">' + (sm.lyrics_30sec||'') + '</textarea>'
+                        h += '<div class="flex gap-1 mt-1"><span class="text-[10px] text-purple-500">' + (sm.genre||'') + '</span>'
+                        h += '<button onclick="teacherGenShortMusic(' + (card.card_id||card.id||0) + ',' + i + ')" class="ml-auto bg-purple-600 text-white px-2 py-1 rounded text-[10px] font-bold">🎵 30秒生成</button></div>'
+                        h += '<div id="tmac-music-res-' + (card.card_id||card.id||i) + '"></div></div>'
+                      }
+                      // Suno
+                      if (mac.suno_full_song) {
+                        const sf = mac.suno_full_song
+                        h += '<div class="bg-white border border-pink-200 rounded-lg p-2">'
+                        h += '<div class="flex items-center gap-1 mb-1"><span>🎤</span><span class="text-xs font-bold text-pink-700">Sunoフル曲提案</span></div>'
+                        h += '<label class="text-[9px] text-gray-500 font-bold">曲名</label>'
+                        h += '<input type="text" value="' + (sf.title||'').replace(/"/g,'&quot;') + '" class="w-full border border-pink-100 rounded px-2 py-1 text-[11px] mb-1">'
+                        h += '<label class="text-[9px] text-gray-500 font-bold">スタイル</label>'
+                        h += '<input type="text" id="tmac-suno-style-' + (card.card_id||card.id||i) + '" value="' + (sf.style_prompt||'').replace(/"/g,'&quot;') + '" class="w-full border border-pink-100 rounded px-2 py-1 text-[11px] mb-1">'
+                        h += '<label class="text-[9px] text-gray-500 font-bold">歌詞</label>'
+                        h += '<textarea id="tmac-suno-lyrics-' + (card.card_id||card.id||i) + '" rows="3" class="w-full border border-pink-100 rounded px-2 py-1 text-[10px] resize-y font-mono">' + (sf.lyrics_full||'') + '</textarea>'
+                        h += '<div class="flex gap-1 mt-1">'
+                        h += '<button onclick="navigator.clipboard.writeText(document.getElementById(\'tmac-suno-lyrics-' + (card.card_id||card.id||i) + '\').value)" class="bg-pink-500 text-white px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-copy mr-0.5"></i>歌詞コピー</button>'
+                        h += '<button onclick="navigator.clipboard.writeText(document.getElementById(\'tmac-suno-style-' + (card.card_id||card.id||i) + '\').value)" class="bg-pink-200 text-pink-700 px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-copy mr-0.5"></i>スタイルコピー</button>'
+                        h += '<a href="https://suno.com" target="_blank" class="ml-auto bg-gray-800 text-white px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-external-link-alt mr-0.5"></i>Suno</a></div></div>'
+                      }
+                      // 図解
+                      if (mac.diagram_image) {
+                        const di = mac.diagram_image
+                        h += '<div class="bg-white border border-green-200 rounded-lg p-2">'
+                        h += '<div class="flex items-center gap-1 mb-1"><span>🎨</span><span class="text-xs font-bold text-green-700">図解画像</span>'
+                        if (di.learning_theory) h += '<span class="ml-auto text-[9px] text-gray-400">📚 ' + di.learning_theory.substring(0,25) + '</span>'
+                        h += '</div>'
+                        h += '<textarea id="tmac-diagram-' + (card.card_id||card.id||i) + '" rows="2" class="w-full border border-green-100 rounded px-2 py-1 text-[11px] resize-y">' + (di.prompt||'') + '</textarea>'
+                        h += '<div class="flex gap-1 mt-1"><span class="text-[10px] text-green-500">' + (di.image_type||'') + '</span>'
+                        h += '<button onclick="teacherGenDiagram(' + (card.card_id||card.id||0) + ',' + i + ')" class="ml-auto bg-green-600 text-white px-2 py-1 rounded text-[10px] font-bold">🎨 図解生成</button></div>'
+                        h += '<div id="tmac-diagram-res-' + (card.card_id||card.id||i) + '"></div></div>'
+                      }
+                      h += '</div></details>'
+                      return h
+                    })()}
                     <!-- 編集パネル（非表示） -->
                     <div id="card-edit-panel-${card.card_id || card.id || i}" class="hidden mt-3 bg-white border-2 border-yellow-300 rounded-xl p-4">
                       <h5 class="font-bold text-yellow-700 mb-2"><i class="fas fa-edit mr-1"></i>カード編集</h5>

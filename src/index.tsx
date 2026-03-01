@@ -9526,6 +9526,100 @@ app.get('/guide/:curriculumId', async (c) => {
       html += '<span style="display:inline-block;margin-left:8px;background:#10B981;color:white;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:bold;">▶ タップ</span></div>';
     }
 
+    // ★ 多感覚AI提案パネル（multimedia_ai_content が存在する場合に自動表示）
+    var mac = c.multimedia_ai_content;
+    if (mac) {
+      html += '<details id="multi-sense-panel-' + currentPage + '" class="no-print" style="margin:12px 0;border:2px solid #C4B5FD;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#F5F3FF,#EEF2FF);">';
+      html += '<summary style="padding:12px 16px;cursor:pointer;font-weight:bold;font-size:0.9rem;color:#6D28D9;display:flex;align-items:center;gap:8px;user-select:none;list-style:none;"><i class="fas fa-brain" style="color:#8B5CF6;"></i>🎨 多感覚コンテンツ（AI提案・編集可能）<span style="margin-left:auto;font-size:0.7rem;font-weight:normal;color:#9CA3AF;">▼ 開く</span></summary>';
+      html += '<div style="padding:12px 16px;">';
+
+      // --- 30秒覚え歌（ここで即時生成できる） ---
+      if (mac.short_music) {
+        var sm = mac.short_music;
+        html += '<div style="background:white;border:2px solid #DDD6FE;border-radius:12px;padding:12px;margin-bottom:10px;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;"><span style="font-size:1.2rem;">🎵</span><strong style="color:#7C3AED;font-size:0.85rem;">30秒おぼえうた</strong><span style="font-size:0.6rem;background:#EDE9FE;color:#6D28D9;padding:2px 8px;border-radius:8px;font-weight:bold;">ここで生成</span>';
+        if (sm.learning_theory) html += '<span style="font-size:0.55rem;color:#9CA3AF;margin-left:auto;" title="' + sm.learning_theory + '">📚 ' + sm.learning_theory.substring(0, 20) + '</span>';
+        html += '</div>';
+        html += '<label style="font-size:0.65rem;color:#6B7280;font-weight:bold;">生成プロンプト（編集して「生成」）</label>';
+        html += '<textarea id="mac-music-prompt-' + currentPage + '" rows="2" style="width:100%;border:1px solid #DDD6FE;border-radius:8px;padding:6px 8px;font-size:0.78rem;resize:vertical;box-sizing:border-box;margin:4px 0;">' + (sm.prompt_30sec || '').replace(/</g, '&lt;') + '</textarea>';
+        html += '<label style="font-size:0.65rem;color:#6B7280;font-weight:bold;">歌詞プレビュー（編集可能）</label>';
+        html += '<textarea id="mac-music-lyrics-' + currentPage + '" rows="3" style="width:100%;border:1px solid #DDD6FE;border-radius:8px;padding:6px 8px;font-size:0.78rem;resize:vertical;box-sizing:border-box;margin:4px 0;font-family:monospace;">' + (sm.lyrics_30sec || '').replace(/</g, '&lt;') + '</textarea>';
+        html += '<div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap;">';
+        html += '<span style="font-size:0.7rem;color:#7C3AED;font-weight:bold;">' + (sm.genre || 'Kids Pop') + '</span>';
+        html += '<button onclick="generateShortMusic(' + currentPage + ')" style="margin-left:auto;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:white;border:none;padding:8px 18px;border-radius:10px;font-size:0.8rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(124,58,237,0.3);"><i class="fas fa-music"></i>30秒生成</button>';
+        html += '</div>';
+        html += '<div id="mac-music-result-' + currentPage + '"></div>';
+        html += '</div>';
+      }
+
+      // --- Suno用フル曲提案（別枠） ---
+      if (mac.suno_full_song && mac.suno_full_song.recommended) {
+        var sf = mac.suno_full_song;
+        html += '<div style="background:white;border:2px solid #FBCFE8;border-radius:12px;padding:12px;margin-bottom:10px;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;"><span style="font-size:1.2rem;">🎤</span><strong style="color:#BE185D;font-size:0.85rem;">Sunoフル曲（4分）提案</strong><span style="font-size:0.6rem;background:#FCE7F3;color:#BE185D;padding:2px 8px;border-radius:8px;font-weight:bold;">外部サービス</span></div>';
+        html += '<label style="font-size:0.65rem;color:#6B7280;font-weight:bold;">曲名</label>';
+        html += '<input type="text" id="mac-suno-title-' + currentPage + '" value="' + (sf.title || '').replace(/"/g, '&quot;') + '" style="width:100%;border:1px solid #FBCFE8;border-radius:8px;padding:6px 8px;font-size:0.78rem;margin:4px 0;box-sizing:border-box;">';
+        html += '<label style="font-size:0.65rem;color:#6B7280;font-weight:bold;">スタイル（Sunoのスタイル欄にコピー）</label>';
+        html += '<input type="text" id="mac-suno-style-' + currentPage + '" value="' + (sf.style_prompt || '').replace(/"/g, '&quot;') + '" style="width:100%;border:1px solid #FBCFE8;border-radius:8px;padding:6px 8px;font-size:0.78rem;margin:4px 0;box-sizing:border-box;">';
+        html += '<label style="font-size:0.65rem;color:#6B7280;font-weight:bold;">歌詞（編集してSunoにコピー）</label>';
+        html += '<textarea id="mac-suno-lyrics-' + currentPage + '" rows="5" style="width:100%;border:1px solid #FBCFE8;border-radius:8px;padding:6px 8px;font-size:0.75rem;resize:vertical;box-sizing:border-box;margin:4px 0;font-family:monospace;">' + (sf.lyrics_full || '').replace(/</g, '&lt;') + '</textarea>';
+        html += '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">';
+        html += '<button onclick="copySunoData(' + currentPage + ')" style="background:#EC4899;color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-copy" style="margin-right:4px;"></i>歌詞をコピー</button>';
+        html += '<button onclick="copySunoStyle(' + currentPage + ')" style="background:#F9A8D4;color:#BE185D;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-copy" style="margin-right:4px;"></i>スタイルをコピー</button>';
+        html += '<a href="https://suno.com" target="_blank" style="margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:#1F2937;color:white;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;text-decoration:none;"><i class="fas fa-external-link-alt"></i>Sunoを開く</a>';
+        html += '</div>';
+        html += '<p style="font-size:0.6rem;color:#9CA3AF;margin-top:6px;">💡 Suno（suno.com）で4分以下の曲を1日5曲まで無料で生成できます</p>';
+        html += '</div>';
+      }
+
+      // --- 図解画像 ---
+      if (mac.diagram_image && mac.diagram_image.recommended) {
+        var di = mac.diagram_image;
+        html += '<div style="background:white;border:2px solid #BBF7D0;border-radius:12px;padding:12px;margin-bottom:10px;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;"><span style="font-size:1.2rem;">🎨</span><strong style="color:#166534;font-size:0.85rem;">AI図解画像</strong>';
+        if (di.learning_theory) html += '<span style="font-size:0.55rem;color:#9CA3AF;margin-left:auto;">📚 ' + di.learning_theory.substring(0, 25) + '</span>';
+        html += '</div>';
+        html += '<textarea id="mac-diagram-prompt-' + currentPage + '" rows="2" style="width:100%;border:1px solid #BBF7D0;border-radius:8px;padding:6px 8px;font-size:0.78rem;resize:vertical;box-sizing:border-box;margin:4px 0;">' + (di.prompt || '').replace(/</g, '&lt;') + '</textarea>';
+        html += '<div style="display:flex;gap:6px;margin-top:4px;">';
+        html += '<span style="font-size:0.7rem;color:#059669;">' + (di.image_type || 'イラスト') + '</span>';
+        html += '<button onclick="generateDiagramFromSuggestion(' + currentPage + ')" style="margin-left:auto;background:linear-gradient(135deg,#10B981,#059669);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-palette" style="margin-right:4px;"></i>図解生成</button>';
+        html += '</div>';
+        html += '<div id="mac-diagram-result-' + currentPage + '" style="margin-top:6px;"></div>';
+        html += '</div>';
+      }
+
+      // --- 動画 ---
+      if (mac.video && mac.video.recommended) {
+        var vi = mac.video;
+        html += '<div style="background:white;border:2px solid #FECACA;border-radius:12px;padding:12px;margin-bottom:10px;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;"><span style="font-size:1.2rem;">🎬</span><strong style="color:#DC2626;font-size:0.85rem;">AI学習動画</strong>';
+        if (vi.learning_theory) html += '<span style="font-size:0.55rem;color:#9CA3AF;margin-left:auto;">📚 ' + vi.learning_theory.substring(0, 25) + '</span>';
+        html += '</div>';
+        html += '<textarea id="mac-video-prompt-' + currentPage + '" rows="2" style="width:100%;border:1px solid #FECACA;border-radius:8px;padding:6px 8px;font-size:0.78rem;resize:vertical;box-sizing:border-box;margin:4px 0;">' + (vi.prompt || '').replace(/</g, '&lt;') + '</textarea>';
+        html += '<button onclick="generateVideoFromSuggestion(' + currentPage + ')" style="margin-top:4px;background:linear-gradient(135deg,#DC2626,#B91C1C);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-video" style="margin-right:4px;"></i>動画生成</button>';
+        html += '<div id="mac-video-result-' + currentPage + '" style="margin-top:6px;"></div>';
+        html += '</div>';
+      }
+
+      // --- 触覚ウィジェット ---
+      if (mac.tactile_widget && mac.tactile_widget.recommended) {
+        var tw = mac.tactile_widget;
+        html += '<div style="background:white;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:10px;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;"><span style="font-size:1.2rem;">👆</span><strong style="color:#92400E;font-size:0.85rem;">さわってまなぼう</strong>';
+        if (tw.learning_theory) html += '<span style="font-size:0.55rem;color:#9CA3AF;margin-left:auto;">📚 ' + tw.learning_theory.substring(0, 25) + '</span>';
+        html += '</div>';
+        html += '<textarea id="mac-tactile-prompt-' + currentPage + '" rows="2" style="width:100%;border:1px solid #FDE68A;border-radius:8px;padding:6px 8px;font-size:0.78rem;resize:vertical;box-sizing:border-box;margin:4px 0;">' + (tw.description || '').replace(/</g, '&lt;') + '</textarea>';
+        html += '<div style="display:flex;gap:6px;margin-top:4px;">';
+        html += '<span style="font-size:0.7rem;color:#B45309;">' + (tw.activity_type || 'drag') + '</span>';
+        html += '<button onclick="generateTactileFromSuggestion(' + currentPage + ')" style="margin-left:auto;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>ウィジェット生成</button>';
+        html += '</div>';
+        html += '<div id="mac-tactile-result-' + currentPage + '" style="margin-top:6px;"></div>';
+        html += '</div>';
+      }
+
+      html += '</div></details>';
+    }
+
     // お助けボタン（F7足場レベルに応じて表示調整）
     html += '<div class="help-bar no-print">';
     html += '<button class="help-btn" style="background:#DBEAFE;color:#1E40AF;" onclick="toggleAITeacher(' + currentPage + ')"><i class="fas fa-robot"></i>AI先生</button>';
@@ -10006,6 +10100,186 @@ app.get('/guide/:curriculumId', async (c) => {
   }
 
   // === お助け機能 ===
+
+  // ★ 多感覚AI提案 → 編集 → 実行 関数群
+  // --- 30秒覚え歌 即時生成 ---
+  function generateShortMusic(page) {
+    var promptEl = document.getElementById('mac-music-prompt-' + page);
+    var lyricsEl = document.getElementById('mac-music-lyrics-' + page);
+    var resultArea = document.getElementById('mac-music-result-' + page);
+    if (!resultArea) return;
+    var c = ALL_CARDS[page] || {};
+    var prompt = promptEl ? promptEl.value.trim() : '';
+    var lyrics = lyricsEl ? lyricsEl.value.trim() : '';
+
+    resultArea.innerHTML = '<div style="text-align:center;padding:10px;"><i class="fas fa-spinner fa-spin" style="color:#7C3AED;font-size:1.5rem;"></i><p style="font-size:0.75rem;color:#7C3AED;margin-top:4px;font-weight:bold;">NB2が30秒おぼえうたを作曲中...</p></div>';
+
+    fetch('/api/ai/generate-nb2-music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_title: c.card_title || '',
+        problem_text: (c.problem_text || '').substring(0, 400),
+        topic: prompt || c.card_title || '',
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || '',
+        custom_prompt: prompt,
+        custom_lyrics: lyrics
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.song_data) {
+        var sd = data.song_data;
+        var html = '<div style="background:#F5F3FF;border:2px solid #C4B5FD;border-radius:10px;padding:12px;margin-top:8px;">';
+        html += '<p style="font-weight:bold;color:#7C3AED;font-size:0.85rem;">🎵 ' + (sd.song_title || '30秒おぼえうた') + '</p>';
+        if (sd.genre) html += '<p style="font-size:0.65rem;color:#8B5CF6;">' + sd.genre + (sd.tempo_bpm ? ' / ' + sd.tempo_bpm + 'BPM' : '') + '</p>';
+        if (sd.lyrics) html += '<pre style="font-size:0.75rem;white-space:pre-wrap;background:white;padding:8px;border-radius:8px;border:1px solid #E9D5FF;margin:6px 0;max-height:120px;overflow-y:auto;">' + sd.lyrics + '</pre>';
+        if (data.cover_image_url) html += '<img src="' + data.cover_image_url + '" style="max-height:80px;border-radius:8px;margin:4px 0;" alt="ジャケット">';
+        html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'NB2') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
+        html += '<button onclick="generateShortMusic(' + page + ')" style="font-size:0.7rem;color:#7C3AED;background:none;border:1px solid #C4B5FD;padding:3px 10px;border-radius:6px;cursor:pointer;margin-top:4px;">🔄 再生成</button>';
+        html += '</div>';
+        resultArea.innerHTML = html;
+      } else {
+        resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">生成失敗: ' + (data.error || '不明なエラー') + ' <button onclick="generateShortMusic(' + page + ')" style="color:#7C3AED;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+      }
+    })
+    .catch(function(e) {
+      resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">通信エラー: ' + e.message + '</p>';
+    });
+  }
+
+  // --- Sunoデータコピー ---
+  function copySunoData(page) {
+    var el = document.getElementById('mac-suno-lyrics-' + page);
+    if (el) {
+      navigator.clipboard.writeText(el.value).then(function() {
+        showCoachBubble('歌詞をコピーしました！Sunoに貼り付けてね', 'celebrate', 2000, false);
+      }).catch(function() { el.select(); document.execCommand('copy'); });
+    }
+  }
+  function copySunoStyle(page) {
+    var el = document.getElementById('mac-suno-style-' + page);
+    if (el) {
+      navigator.clipboard.writeText(el.value).then(function() {
+        showCoachBubble('スタイルをコピーしました！', 'encourage', 2000, false);
+      }).catch(function() { el.select(); document.execCommand('copy'); });
+    }
+  }
+
+  // --- 図解画像生成 ---
+  function generateDiagramFromSuggestion(page) {
+    var promptEl = document.getElementById('mac-diagram-prompt-' + page);
+    var resultArea = document.getElementById('mac-diagram-result-' + page);
+    if (!resultArea) return;
+    var c = ALL_CARDS[page] || {};
+    var prompt = promptEl ? promptEl.value.trim() : '';
+
+    resultArea.innerHTML = '<div style="text-align:center;padding:8px;"><i class="fas fa-spinner fa-spin" style="color:#10B981;"></i> <span style="font-size:0.75rem;color:#10B981;">図解を生成中...</span></div>';
+
+    fetch('/api/ai/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt || (c.card_title || ''),
+        card_id: 'mac-' + page,
+        card_title: c.card_title || '',
+        problem_text: c.problem_text || '',
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || '',
+        prefer_image: true
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && (data.image_url || data.jsxgraph_code)) {
+        var html = '';
+        if (data.jsxgraph_code) {
+          html = '<div style="border-radius:10px;overflow:hidden;border:1px solid #BBF7D0;margin-top:4px;"><div id="mac-jsx-' + page + '" style="width:100%;height:250px;"></div></div>';
+          resultArea.innerHTML = html;
+          try { eval(data.jsxgraph_code.replace(/jxg_board/g, 'mac-jsx-' + page)); } catch(e) { console.error('JSXGraph error', e); }
+        } else {
+          html = '<img src="' + data.image_url + '" style="width:100%;border-radius:10px;border:1px solid #BBF7D0;margin-top:4px;" alt="AI図解">';
+          html += '<button onclick="generateDiagramFromSuggestion(' + page + ')" style="font-size:0.7rem;color:#059669;background:none;border:1px solid #BBF7D0;padding:3px 10px;border-radius:6px;cursor:pointer;margin-top:4px;">🔄 再生成</button>';
+          resultArea.innerHTML = html;
+        }
+      } else {
+        resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">生成失敗 <button onclick="generateDiagramFromSuggestion(' + page + ')" style="color:#059669;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+      }
+    })
+    .catch(function(e) { resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">通信エラー</p>'; });
+  }
+
+  // --- 動画生成 ---
+  function generateVideoFromSuggestion(page) {
+    var promptEl = document.getElementById('mac-video-prompt-' + page);
+    var resultArea = document.getElementById('mac-video-result-' + page);
+    if (!resultArea) return;
+    var c = ALL_CARDS[page] || {};
+    var prompt = promptEl ? promptEl.value.trim() : '';
+
+    resultArea.innerHTML = '<div style="text-align:center;padding:8px;"><i class="fas fa-spinner fa-spin" style="color:#DC2626;"></i> <span style="font-size:0.75rem;color:#DC2626;">Veo 3.1で動画生成中（30〜90秒）...</span></div>';
+
+    fetch('/api/ai/generate-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt || ('日本の' + (CURRICULUM.grade||'') + (CURRICULUM.subject||'') + ' ' + (c.card_title||'')),
+        card_id: 'mac-' + page,
+        card_title: c.card_title || '',
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || ''
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.video_url) {
+        resultArea.innerHTML = '<video controls style="width:100%;border-radius:10px;margin-top:4px;" preload="metadata"><source src="' + data.video_url + '" type="video/mp4"></video><button onclick="generateVideoFromSuggestion(' + page + ')" style="font-size:0.7rem;color:#DC2626;background:none;border:1px solid #FECACA;padding:3px 10px;border-radius:6px;cursor:pointer;margin-top:4px;">🔄 再生成</button>';
+      } else if (data.status === 'processing') {
+        resultArea.innerHTML = '<div style="background:#FEF3C7;padding:8px;border-radius:8px;"><p style="font-size:0.75rem;font-weight:bold;color:#92400E;">⏳ 動画生成中...</p><p style="font-size:0.65rem;color:#B45309;">30〜90秒後にリロードしてください</p></div>';
+      } else {
+        resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">生成に時間がかかっています <button onclick="generateVideoFromSuggestion(' + page + ')" style="color:#DC2626;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+      }
+    })
+    .catch(function(e) { resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">通信エラー</p>'; });
+  }
+
+  // --- 触覚ウィジェット生成 ---
+  function generateTactileFromSuggestion(page) {
+    var promptEl = document.getElementById('mac-tactile-prompt-' + page);
+    var resultArea = document.getElementById('mac-tactile-result-' + page);
+    if (!resultArea) return;
+    var c = ALL_CARDS[page] || {};
+    var description = promptEl ? promptEl.value.trim() : '';
+
+    resultArea.innerHTML = '<div style="text-align:center;padding:8px;"><i class="fas fa-spinner fa-spin" style="color:#F59E0B;"></i> <span style="font-size:0.75rem;color:#B45309;">ウィジェット生成中...</span></div>';
+
+    fetch('/api/ai/generate-tactile-widget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_id: 'mac-' + page,
+        card_title: c.card_title || '',
+        problem_text: c.problem_text || '',
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        tactile_description: description,
+        custom_prompt: description
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.widget_html) {
+        resultArea.innerHTML = '<div style="border:2px solid #FDE68A;border-radius:10px;overflow:hidden;margin-top:4px;background:white;padding:8px;">' + data.widget_html + '</div><button onclick="generateTactileFromSuggestion(' + page + ')" style="font-size:0.7rem;color:#B45309;background:none;border:1px solid #FDE68A;padding:3px 10px;border-radius:6px;cursor:pointer;margin-top:4px;">🔄 再生成</button>';
+      } else {
+        resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">生成失敗 <button onclick="generateTactileFromSuggestion(' + page + ')" style="color:#B45309;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
+      }
+    })
+    .catch(function(e) { resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">通信エラー</p>'; });
+  }
+
   // AI図解生成（Gemini 3.1 画像でヒントを視覚化）
   function generateHintImage(page) {
     var btn = document.getElementById('hint-img-btn-' + page);
@@ -13667,7 +13941,39 @@ app.post('/api/ai/generate-course', async (c) => {
         {"hint_level": 1, "hint_text": "ヒント1: まず何を考える？（考える方向性を示す）", "thinking_tool_suggestion": "使える思考ツール"},
         {"hint_level": 2, "hint_text": "ヒント2: 具体的な手がかり（図や式の書き方を示す）", "thinking_tool_suggestion": "使える思考ツール"},
         {"hint_level": 3, "hint_text": "ヒント3: 答えに近づくための最後のヒント", "thinking_tool_suggestion": "使える思考ツール"}
-      ]
+      ],
+      "multimedia_ai_content": {
+        "short_music": {
+          "recommended": true,
+          "prompt_30sec": "この問題の核心概念を30秒の覚え歌にするプロンプト（日本語・児童向け・リズミカル）",
+          "lyrics_30sec": "30秒で歌える短い歌詞（4〜8行）",
+          "genre": "Kids Pop / Educational Rap / 童謡アレンジなど",
+          "learning_theory": "Paivio二重符号化理論（聴覚+言語）、Mayer多感覚学習理論に基づく"
+        },
+        "suno_full_song": {
+          "recommended": false,
+          "lyrics_full": "Suno用4分フル歌詞（(Verse)(Chorus)(Bridge)タグ付き）",
+          "style_prompt": "Sunoのスタイル欄に入力するテキスト（例：upbeat J-pop, kids friendly, 120bpm）",
+          "title": "曲名"
+        },
+        "diagram_image": {
+          "recommended": true,
+          "prompt": "この問題を理解するための図解画像のAI生成プロンプト（日本語）",
+          "image_type": "JSXGraph / SVG / イラスト",
+          "learning_theory": "Gardner多元的知能MI-空間的知能、Mayer視覚学習原理"
+        },
+        "video": {
+          "recommended": false,
+          "prompt": "この問題を動画で解説するAI動画生成プロンプト（5〜8秒・教育アニメーション）",
+          "learning_theory": "Mayer時間近接原理、Sweller認知負荷理論に基づく"
+        },
+        "tactile_widget": {
+          "recommended": true,
+          "description": "触覚学習ウィジェットの説明（ドラッグ・タップ・並べ替え等）",
+          "activity_type": "drag / sort / tap / draw / match",
+          "learning_theory": "Gardner身体運動的知能、Montessori具体操作法"
+        }
+      }
     },
     { /* カード2〜${numCards}: 上記と同じ構造で繰り返し */ }
   ]
@@ -13681,7 +13987,14 @@ app.post('/api/ai/generate-course', async (c) => {
 5. すべてのフィールドに具体的な内容を記入すること
 6. 完全なJSON（{で始まり}で終わる）を出力すること
 7. 問題の難易度は教科書の目標水準（学習指導要領）に合わせること
-8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること`
+8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること
+9. 【★多感覚AI提案必須★】multimedia_ai_content を全カードに含めること
+   - short_music: 30秒覚え歌のプロンプトと歌詞（全カード recommended:true）
+   - suno_full_song: Suno用4分フル歌詞とスタイル（導入・まとめカードのみ recommended:true）
+   - diagram_image: 図解画像AI生成プロンプト（全カード recommended:true）
+   - video: 動画プロンプト（図形・空間・実験問題のみ recommended:true）
+   - tactile_widget: 触覚活動の説明（操作系問題のみ recommended:true）
+   - 理論根拠（learning_theory）を必ず記入すること`
 
     // gemini-2.5-flash をプライマリ（Gemini 3.1 Flash・最高推論能力）
     // フォールバック: gemini-3-flash-preview（高速）, gemini-2.5-flash, gemini-2.0-flash（安定）
@@ -37858,6 +38171,38 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
         "illustration_description": "図解の説明",
         "needs_manipulative": ${template.media_type === 'manipulative'},
         "manipulative_description": "操作活動の説明"
+      },
+      "multimedia_ai_content": {
+        "short_music": {
+          "recommended": true,
+          "prompt_30sec": "30秒覚え歌プロンプト（児童向けリズミカル）",
+          "lyrics_30sec": "30秒歌詞（4〜8行）",
+          "genre": "Kids Pop / Educational Rap / 童謡",
+          "learning_theory": "Paivio二重符号化理論"
+        },
+        "suno_full_song": {
+          "recommended": false,
+          "lyrics_full": "Suno用歌詞（(Verse)(Chorus)(Bridge)タグ付き）",
+          "style_prompt": "Sunoスタイル指示",
+          "title": "曲名"
+        },
+        "diagram_image": {
+          "recommended": true,
+          "prompt": "図解画像AI生成プロンプト",
+          "image_type": "JSXGraph / SVG / イラスト",
+          "learning_theory": "Gardner空間的知能"
+        },
+        "video": {
+          "recommended": false,
+          "prompt": "動画生成プロンプト（5〜8秒）",
+          "learning_theory": "Mayer時間近接原理"
+        },
+        "tactile_widget": {
+          "recommended": true,
+          "description": "触覚ウィジェット説明",
+          "activity_type": "drag / sort / tap / draw",
+          "learning_theory": "Gardner身体運動的知能"
+        }
       }${template.elaboration ? `,
       "elaboration_prompt": "${template.elaboration.prompt_text}"` : ''}${template.reflection_element.type !== 'none' ? `,
       "reflection_prompt": "${template.reflection_element.prompt_text}"` : ''}
@@ -37894,6 +38239,13 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 ※ 【★最重要★】image_description は全カード必須。教科書を使わず学習カードだけで児童が個別学習できるレベルの詳細な図解説明を書くこと
 ※ tactile_activity は全カード必須。具体物操作（おはじき、ブロック、折り紙、カード等）の活動を最低1つ提案すること
 ※ audio_instruction は全カード必須。問題文の読み上げと取り組み方のガイダンスを優しい言葉で記述すること
+※ 【★★★ 多感覚AI提案必須 ★★★】multimedia_ai_content を全カードに含めること
+  - short_music: 30秒覚え歌のプロンプトと歌詞（全カード recommended:true。概念を覚え歌にする）
+  - suno_full_song: Suno用4分フル歌詞・スタイル・曲名（導入/まとめカードのみ recommended:true）
+  - diagram_image: 図解画像AI生成プロンプト（全カード recommended:true）
+  - video: 動画プロンプト（図形・空間・実験問題のみ recommended:true）
+  - tactile_widget: 触覚ウィジェット説明+activity_type（操作系問題は recommended:true）
+  - 全フィールドにlearning_theory（理論根拠）を必ず記入すること
 `
 
     // 10. Gemini API呼び出し（フォールバック付き、タイムアウト対策）
