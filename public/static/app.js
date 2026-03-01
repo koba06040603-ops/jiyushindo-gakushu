@@ -11227,6 +11227,19 @@ function initVisualWidgets() {
           <div style="padding:14px;" id="nb2-visual-content-${cardId}">${data.widget_html}</div>
         </div>
       `
+      // ★ innerHTML で挿入された <script> を実行
+      try {
+        const bodyEl = document.getElementById('nb2-visual-content-' + cardId)
+        if (bodyEl) {
+          const scripts = bodyEl.querySelectorAll('script')
+          scripts.forEach(oldScript => {
+            const newScript = document.createElement('script')
+            if (oldScript.src) newScript.src = oldScript.src
+            else newScript.textContent = oldScript.textContent
+            oldScript.parentNode.replaceChild(newScript, oldScript)
+          })
+        }
+      } catch (e) { console.warn('NB2 script実行:', e) }
       if (data.illustration_url) {
         area.innerHTML += `<div style="margin-top:10px;text-align:center;">
           <img src="${data.illustration_url}" alt="NB2図解" style="max-width:100%;max-height:300px;border-radius:14px;border:2px solid #DDD6FE;box-shadow:0 4px 16px rgba(124,58,237,0.15);" />

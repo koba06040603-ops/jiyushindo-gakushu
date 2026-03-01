@@ -11295,8 +11295,24 @@ app.get('/guide/:curriculumId', async (c) => {
           '<span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-robot" style="margin-right:4px;"></i>Nano Banana 2 が設計</span>' +
           '<span style="color:rgba(255,255,255,0.8);font-size:0.65rem;">' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒</span>' +
           '</div>' +
-          '<div style="padding:12px;">' + data.widget_html + '</div>' +
+          '<div style="padding:12px;" id="nb2-widget-body-' + page + '">' + data.widget_html + '</div>' +
           '</div>';
+        
+        // ★ innerHTML で挿入された <script> は実行されないため、
+        // script要素を取り出して再挿入することで実行させる
+        try {
+          var bodyEl = document.getElementById('nb2-widget-body-' + page);
+          if (bodyEl) {
+            var scripts = bodyEl.querySelectorAll('script');
+            for (var si = 0; si < scripts.length; si++) {
+              var oldScript = scripts[si];
+              var newScript = document.createElement('script');
+              if (oldScript.src) { newScript.src = oldScript.src; }
+              else { newScript.textContent = oldScript.textContent; }
+              oldScript.parentNode.replaceChild(newScript, oldScript);
+            }
+          }
+        } catch (scriptErr) { console.warn('NB2 script実行エラー:', scriptErr); }
         
         // イラスト画像がある場合
         if (data.illustration_url) {
@@ -13113,10 +13129,11 @@ app.post('/api/ai/tts', async (c) => {
     // ボイスタイプに応じたGemini TTS ボイス選択
     // Kore=Firm, Puck=Upbeat, Aoede=Breezy, Leda=Youthful, 
     // Sulafat=Warm, Achird=Friendly, Achernar=Soft, Fenrir=Excitable
-    let voiceName = 'Aoede'  // デフォルト: やさしい雰囲気
+    // Vindemiatrix=Gentle, Sadachbia=Lively
+    let voiceName = 'Achird'  // デフォルト: 親しみやすい声（Friendly）
     switch(voiceType) {
       case 'female-friendly':
-        voiceName = 'Aoede'    // Breezy — やさしい女性的ボイス
+        voiceName = 'Achird'    // Friendly — 親しみやすい声
         break
       case 'female-energetic':
         voiceName = 'Leda'     // Youthful — 元気な若い声
@@ -13128,28 +13145,31 @@ app.post('/api/ai/tts', async (c) => {
         voiceName = 'Puck'     // Upbeat — 元気な男性的ボイス
         break
       case 'calm':
-        voiceName = 'Achernar' // Soft — おだやかな声
+        voiceName = 'Vindemiatrix' // Gentle — やさしい穏やかな声
         break
       case 'excited':
-        voiceName = 'Fenrir'   // Excitable — ワクワクした声
+        voiceName = 'Sadachbia'   // Lively — いきいきとした声
+        break
+      case 'teacher':
+        voiceName = 'Aoede'    // Breezy — やさしい先生風
         break
       default:
-        voiceName = 'Aoede'
+        voiceName = 'Achird'   // Friendly
     }
     
     // 気分に応じたスタイル指示を構築
     let stylePrompt = ''
     if (mood === 'tired' || mood === 'sad') {
       stylePrompt = 'ゆっくり、やさしく、落ち着いた声で読んでください。'
-      voiceName = 'Achernar' // Soft
+      voiceName = 'Vindemiatrix' // Gentle
     } else if (mood === 'anxious' || mood === 'frustrated') {
       stylePrompt = 'やさしく、ていねいに、安心できるように読んでください。'
       voiceName = 'Sulafat' // Warm
     } else if (mood === 'excited') {
       stylePrompt = '明るく、楽しそうに、テンポよく読んでください。'
-      voiceName = 'Fenrir' // Excitable
+      voiceName = 'Sadachbia' // Lively
     } else {
-      stylePrompt = 'やさしい先生のように、わかりやすく読んでください。'
+      stylePrompt = 'やさしい先生のように、わかりやすく、自然な日本語のイントネーションで読んでください。'
     }
     
     // カスタムスタイル指示がある場合は上書き
@@ -13166,51 +13186,33 @@ app.post('/api/ai/tts', async (c) => {
       style: stylePrompt.substring(0, 50)
     })
     
-    // === ステップ1: Gemini 3.1 Flash Native Audio を試行 ===
-    // Gemini 3.1はネイティブ音声出力に対応（より自然な発話）
+    // === Gemini 2.5 Flash Preview TTS（専用TTSモデル・最高品質日本語） ===
+    // 専用TTSモデルは自然なイントネーション・プロソディを持つ
+    // Gemini 3.1/3 FlashにはTTS機能がないため、2.5 Flash TTS を使用
     let audioGenerated = false
     let audioBase64 = ''
     let audioMime = ''
     let usedModel = ''
     
-    try {
-      const nativeAudioResp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `以下のテキストを日本語で自然に音読してください。${stylePrompt}\n\n${text.substring(0, 3000)}` }] }],
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-              temperature: 0.4,
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: voiceName }
-                }
-              }
-            }
-          })
-        }
-      )
-      
-      if (nativeAudioResp.ok) {
-        const nativeData = await nativeAudioResp.json() as any
-        const audioPart = nativeData.candidates?.[0]?.content?.parts?.[0]
-        if (audioPart?.inlineData?.data) {
-          audioBase64 = audioPart.inlineData.data
-          audioMime = audioPart.inlineData.mimeType || 'audio/L16;rate=24000'
-          usedModel = 'gemini-2.5-flash (Native Audio)'
-          audioGenerated = true
-          console.log('✅ Gemini 3.1 Native Audio 生成成功')
-        }
-      }
-    } catch (e: any) {
-      console.log('⚠️ Gemini 3.1 Native Audio 失敗、TTS専用モデルにフォールバック:', e.message)
-    }
+    // 日本語自然イントネーション用の詳細なスタイル指示
+    const japaneseTtsPrompt = `# AUDIO PROFILE: 教育AI先生
+## "やさしい教え方の先生"
+
+### DIRECTOR'S NOTES
+Style: ${stylePrompt}
+- 日本語ネイティブの自然なイントネーション
+- 句読点で適切な間（ま）を取る
+- 重要な数値や単語はやや強調して読む
+- 子どもに語りかけるように、あたたかく親しみやすい口調
+- 「です・ます」調は丁寧に、「だ・である」調は自然に
+
+Pacing: ゆっくりめ（速度${speed || 0.85}）、数式や計算部分はさらにゆっくり
+Accent: 標準語（NHKアナウンサー風の明瞭な発音）
+
+### TRANSCRIPT
+${text.substring(0, 5000)}`
     
-    // === ステップ2: Gemini 2.5 Flash TTS にフォールバック ===
-    if (!audioGenerated) {
+    try {
       const ttsResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`,
         {
@@ -13221,7 +13223,7 @@ app.post('/api/ai/tts', async (c) => {
           },
           body: JSON.stringify({
             contents: [{
-              parts: [{ text: ttsPrompt }]
+              parts: [{ text: japaneseTtsPrompt }]
             }],
             generationConfig: {
               responseModalities: ['AUDIO'],
@@ -13237,20 +13239,61 @@ app.post('/api/ai/tts', async (c) => {
         }
       )
       
-      if (!ttsResponse.ok) {
+      if (ttsResponse.ok) {
+        const ttsData = await ttsResponse.json() as any
+        const audioPart = ttsData.candidates?.[0]?.content?.parts?.[0]
+        
+        if (audioPart?.inlineData?.data) {
+          audioBase64 = audioPart.inlineData.data
+          audioMime = audioPart.inlineData.mimeType || 'audio/L16;rate=24000'
+          usedModel = 'gemini-2.5-flash-preview-tts'
+          audioGenerated = true
+          console.log('✅ Gemini TTS 専用モデル生成成功（自然な日本語イントネーション）')
+        }
+      } else {
         const errorText = await ttsResponse.text()
-        console.error('❌ Gemini TTS API エラー:', ttsResponse.status, errorText.substring(0, 200))
-        throw new Error(`Gemini TTS API エラー: ${ttsResponse.status}`)
+        console.warn('⚠️ TTS専用モデル失敗:', ttsResponse.status, errorText.substring(0, 100))
       }
-      
-      const ttsData = await ttsResponse.json() as any
-      const audioPart = ttsData.candidates?.[0]?.content?.parts?.[0]
-      
-      if (audioPart?.inlineData?.data) {
-        audioBase64 = audioPart.inlineData.data
-        audioMime = audioPart.inlineData.mimeType || 'audio/L16;rate=24000'
-        usedModel = 'gemini-2.5-flash-preview-tts'
-        audioGenerated = true
+    } catch (e: any) {
+      console.warn('⚠️ TTS専用モデルエラー:', e.message)
+    }
+    
+    // === フォールバック: Gemini 2.5 Flash Native Audio ===
+    if (!audioGenerated) {
+      try {
+        const nativeAudioResp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `以下のテキストを日本語で自然に音読してください。${stylePrompt}\n\n${text.substring(0, 3000)}` }] }],
+              generationConfig: {
+                responseModalities: ['AUDIO'],
+                temperature: 0.4,
+                speechConfig: {
+                  voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: voiceName }
+                  }
+                }
+              }
+            })
+          }
+        )
+        
+        if (nativeAudioResp.ok) {
+          const nativeData = await nativeAudioResp.json() as any
+          const audioPart = nativeData.candidates?.[0]?.content?.parts?.[0]
+          if (audioPart?.inlineData?.data) {
+            audioBase64 = audioPart.inlineData.data
+            audioMime = audioPart.inlineData.mimeType || 'audio/L16;rate=24000'
+            usedModel = 'gemini-2.5-flash (Native Audio Fallback)'
+            audioGenerated = true
+            console.log('✅ Gemini Native Audio フォールバック成功')
+          }
+        }
+      } catch (e: any) {
+        console.warn('⚠️ Native Audio フォールバックも失敗:', e.message)
       }
     }
     
@@ -24056,10 +24099,16 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
     const prompt = `あなたはNano Banana 2（日本の教育AIアシスタント）です。
 子どもが画面上で「さわって学べる」インタラクティブなHTML/SVGウィジェットを1つ生成してください。
 
-【生成ルール】
+【生成ルール ★必ず守ること★】
 1. HTMLコード1つだけ出力。<div>で始まり</div>で終わる
 2. すべてのCSSはインラインstyle属性（<style>タグ不使用）
-3. JavaScriptはonclick等のイベント属性内に記述
+3. ★★★ 最重要 ★★★ JavaScriptは必ず以下のどちらかの方法で記述：
+   方法A（推奨）: onclick="(function(){ ... })()" のようにイベント属性内に即時実行関数で記述
+   方法B: <script>タグを<div>の内部に配置（外部に置かない）
+   ★ドラッグ操作の場合は必ず以下のパターンを使用：
+   onpointerdown="(function(e){e.preventDefault(); var el=e.target; var svg=el.closest('svg')||el.parentElement; var move=function(ev){var r=svg.getBoundingClientRect(); var x=ev.clientX-r.left; el.setAttribute('cx',Math.max(0,Math.min(x,r.width)));}.bind(this); var up=function(){document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);})(event)"
+   ★ window.xxx = function() {} のようなグローバル関数定義は禁止
+   ★ すべてのロジックをイベント属性内のインライン関数として完結させること
 4. 外部ライブラリ不使用（純粋HTML/SVG/CSS/JSのみ）
 5. 問題の数値・データを正確に反映
 6. タップ・ドラッグ・スライダーなど触って操作できる要素を必ず含む
@@ -24067,6 +24116,12 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
 8. 日本語ラベル、カラフルで楽しいデザイン、角丸、影つき
 9. 最大幅100%、レスポンシブ対応
 10. 子どもが直感的に操作を理解できるUI
+11. touch-action:noneをドラッグ要素に設定してスクロールを防止
+12. cursor:grab をドラッグ可能な要素に設定
+
+【ドラッグ操作の正しい実装例（SVG円をドラッグ）】
+<circle cx="100" cy="100" r="20" fill="#FF6B6B" style="cursor:grab;touch-action:none;"
+  onpointerdown="(function(e){e.preventDefault();e.stopPropagation();var c=e.target;c.style.cursor='grabbing';var svg=c.closest('svg');var move=function(ev){ev.preventDefault();var r=svg.getBoundingClientRect();c.setAttribute('cx',Math.max(20,Math.min(ev.clientX-r.left,r.width-20)));c.setAttribute('cy',Math.max(20,Math.min(ev.clientY-r.top,r.height-20)));};var up=function(){c.style.cursor='grab';document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);};document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);})(event)" />
 
 【ウィジェットの例】
 - 数直線: ドラッグで数値を移動できるSVG
@@ -24077,7 +24132,7 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
 - 色分け: タップで色を塗り分けるマス目
 - 天秤: 左右にアイテムをドラッグして釣り合いを確認
 - 分数: ピザやケーキを等分するタッチ操作
-- 数の分解: 数を2つに分ける操作パネル
+- コンパス: ドラッグで弧を描く操作（onpointermove使用）
 
 【学習カード情報】
 ${context}
@@ -24121,14 +24176,27 @@ ${editNote}
       }
     }
 
-    // HTMLをテキストから抽出
+    // HTMLをテキストから抽出（NB2の信頼されたAI出力なのでscriptも保持）
     let rawText = explanationText
     rawText = rawText.replace(/```html\s*/gi, '').replace(/```\s*/g, '')
-    const divMatch = rawText.match(/<div[\s\S]*<\/div>/i)
+    // <div>...</div>の後に<script>タグが続く場合もキャプチャ
+    const divMatch = rawText.match(/<div[\s\S]*<\/div>(?:\s*<script[\s\S]*?<\/script>)*/i)
     if (divMatch && divMatch[0].length > 30) {
       widgetHtml = divMatch[0]
-        .replace(/<script[\s\S]*?<\/script>/gi, '') // scriptタグ除去（セキュリティ）
-        .replace(/javascript:\s*void/gi, '') // javascript:void除去
+        // 危険なパターンのみ除去
+        .replace(/javascript:\s*void/gi, '')
+      
+      // <script>タグがdivの外にある場合、div内に移動させる
+      const scriptTags = widgetHtml.match(/<\/div>\s*(<script[\s\S]*?<\/script>)/gi)
+      if (scriptTags) {
+        // 外部scriptをdiv内部の最後に移動
+        let cleanedScripts = ''
+        for (const st of scriptTags) {
+          const scriptOnly = st.replace(/^<\/div>\s*/, '')
+          cleanedScripts += scriptOnly
+        }
+        widgetHtml = widgetHtml.replace(/<\/div>\s*<script[\s\S]*$/i, cleanedScripts + '</div>')
+      }
     }
 
     const genTime = Date.now() - startTime
