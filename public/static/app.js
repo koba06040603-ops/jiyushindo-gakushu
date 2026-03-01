@@ -1749,7 +1749,7 @@ async function renderTopPage() {
                   <i class="fas fa-magic mr-1 text-purple-500"></i>
                   教科書にない単元も、AIで新しく作れます
                 </p>
-                <p class="text-sm text-gray-500 mt-1">学年・教科・単元名を入力 → 約1分で単元全体をカバーする学習カードを自動生成</p>
+                <p class="text-sm text-gray-500 mt-1">学年・教科・単元名を入力 → 約2分〜4分で単元全体をカバーする学習カードを自動生成</p>
               </div>
               <button 
                 onclick="showUnitGeneratorModal()"
@@ -2429,7 +2429,7 @@ async function renderTopPage() {
                   <li>• 🎵 <span class="font-semibold">音楽生成</span>: ElevenLabs で九九の歌、集中BGM</li>
                   <li>• 🎨 <span class="font-semibold">画像生成</span>: Flux で図解、イラスト（例: 立体図形）</li>
                   <li>• 🎤 <span class="font-semibold">音声生成</span>: Minimax TTS で学年別読み上げ</li>
-                  <li>• 📝 <span class="font-semibold">学習カード自動生成</span>: 3コース×10枚+ヒント90個を約1分で作成</li>
+                  <li>• 📝 <span class="font-semibold">学習カード自動生成</span>: 3コース×10枚+ヒント90個を約2分〜4分で作成</li>
                 </ul>
                 <div class="bg-indigo-100 p-2 rounded mt-2">
                   <p class="text-indigo-800 font-semibold">
@@ -3600,7 +3600,7 @@ async function loadGuidePage(curriculumId) {
           // バナーに「生成中...」を表示
           const autoGenBanners = document.querySelectorAll('.auto-gen-status-banner')
           autoGenBanners.forEach(banner => {
-            banner.innerHTML = '<div class="bg-blue-100 border border-blue-300 rounded-lg p-3 text-center mt-2"><i class="fas fa-spinner fa-spin text-blue-600 mr-1"></i><span class="text-sm font-bold text-blue-700">AIが問題を生成中です...（約30秒〜2分）</span></div>'
+            banner.innerHTML = '<div class="bg-blue-100 border border-blue-300 rounded-lg p-3 text-center mt-2"><i class="fas fa-spinner fa-spin text-blue-600 mr-1"></i><span class="text-sm font-bold text-blue-700">AIが問題を生成中です...（約2分〜4分）</span></div>'
           })
           
           let generated = 0
@@ -4135,7 +4135,7 @@ async function loadGuidePage(curriculumId) {
                   </h3>
                   <p class="text-gray-600">
                     AIが3コース（じっくり・しっかり・ぐんぐん）×各8〜10枚の学習カードを自動生成します。<br>
-                    約1〜2分で完成します。
+                    約2〜4分で完成します。
                   </p>
                 </div>
                 <button id="autoGenBtn"
@@ -5579,7 +5579,7 @@ async function regenerateCards(courseId, curriculumId) {
   if (!confirm('学習カードを再生成します。\nAIが8〜10枚の新しいカードを作成します。\nよろしいですか？')) return
   
   try {
-    loadingManager.show('AIが学習カードを生成中...（約30秒〜2分）')
+    loadingManager.show('AIが学習カードを生成中...（約2分〜4分）')
     
     const response = await axios.post(`/api/courses/${courseId}/regenerate-cards`, {
       curriculum_id: curriculumId,
@@ -6492,27 +6492,31 @@ async function loadCardPage(cardId) {
                 </p>
               </div>
               
-              <div class="flex gap-2">
+              <div class="flex gap-2 items-stretch" style="align-items:stretch;">
                 <button onclick="startVoiceInput()" 
                         id="voiceButton"
-                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg font-bold transition"
+                        class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold transition flex-shrink-0 flex items-center justify-center"
+                        style="width:42px;min-height:42px;"
                         title="音声で質問">
                   <i class="fas fa-microphone"></i>
                 </button>
                 <button onclick="toggleHandwriting()" 
                         id="handwritingButton"
-                        class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-lg font-bold transition"
+                        class="bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold transition flex-shrink-0 flex items-center justify-center"
+                        style="width:42px;min-height:42px;"
                         title="手書きで入力">
                   <i class="fas fa-pen"></i>
                 </button>
                 <input type="text" 
                        id="aiQuestionInput" 
                        placeholder="質問を入力..." 
-                       class="flex-1 p-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                       class="flex-1 min-w-0 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
+                       style="padding:8px 12px;height:42px;"
                        onkeypress="if(event.key==='Enter') { event.preventDefault(); askAI(); }">
                 <button onclick="askAI()" 
                         id="aiSendBtn"
-                        class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition">
+                        class="bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition flex-shrink-0 flex items-center justify-center"
+                        style="width:42px;min-height:42px;">
                   <i class="fas fa-paper-plane"></i>
                 </button>
               </div>
@@ -20338,7 +20342,7 @@ function showUnitGeneratorModal() {
           </button>
         </div>
         <p class="text-sm mt-2 opacity-90">
-          AIが学習コンテンツを自動生成します（約30秒〜1分）
+          AIが学習コンテンツを自動生成します（約2分〜4分）
         </p>
       </div>
 
@@ -20516,7 +20520,7 @@ function showUnitGeneratorModal() {
                     <div class="font-bold text-blue-800">⚡ 標準モード（推奨）</div>
                     <div class="text-sm text-gray-700">Gemini 3 Flash - バランス重視</div>
                     <div class="text-xs text-blue-600 mt-1">
-                      生成時間：約1分〜2分 | 3コース×10枚＝30枚のカード確実生成
+                      生成時間：約2分〜4分 | 3コース×10枚＝30枚のカード確実生成
                     </div>
                   </div>
                 </label>
@@ -20526,7 +20530,7 @@ function showUnitGeneratorModal() {
                     <div class="font-bold text-purple-800">🌟 確実モード（高品質）</div>
                     <div class="text-sm text-gray-700">Gemini 3 Pro - 最高品質・詳細説明</div>
                     <div class="text-xs text-purple-600 mt-1">
-                      生成時間：約2分〜3分 | 複雑な単元・不登校支援・特別支援に最適
+                      生成時間：約3分〜5分 | 複雑な単元・不登校支援・特別支援に最適
                     </div>
                   </div>
                 </label>
@@ -21670,8 +21674,8 @@ function saveFontSize() {
 // 生成プロセス表示
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
-  const estimatedTime = qualityMode === 'high' ? '約2〜3分' : '約1分〜2分'
-  const totalTime = qualityMode === 'high' ? 180 : 100 // 秒単位
+  const estimatedTime = qualityMode === 'high' ? '約3〜5分' : '約2分〜4分'
+  const totalTime = qualityMode === 'high' ? 300 : 200 // 秒単位
   
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -21895,7 +21899,7 @@ function animateRealtimeProgress(totalTime, qualityMode) {
       endPercent: 75,
       icon: 'fa-cards',
       task: '30枚の学習カードを生成中...',
-      comment: '📚 各コース6枚ずつ、合計30枚のカードを作っています',
+      comment: '📚 各コース10枚ずつ、合計30枚のカードを作っています',
       emoji: '📚'
     },
     {
@@ -21935,7 +21939,8 @@ function animateRealtimeProgress(totalTime, qualityMode) {
         progressBar.style.width = progress + '%'
         progressPercent.textContent = Math.floor(progress) + '%'
       }
-      elapsedTime.textContent = Math.floor(elapsed) + '秒経過'
+      const elapsedSec = Math.floor(elapsed)
+      elapsedTime.textContent = elapsedSec >= 60 ? Math.floor(elapsedSec / 60) + '分' + (elapsedSec % 60) + '秒経過' : elapsedSec + '秒経過'
     }
     
     // 現在のステップを判定
@@ -36910,7 +36915,7 @@ async function selectMusicStyle(style) {
               <ul class="text-xs text-gray-600 space-y-1 ml-4">
                 <li>✅ 歌詞からメロディーとボーカルを自動生成</li>
                 <li>✅ 選んだ曲調で音楽を生成</li>
-                <li>✅ 約30秒〜2分の学習ソング</li>
+                <li>✅ 約30秒〜1分の学習ソング</li>
                 <li>✅ 覚えやすいリズムとフレーズ</li>
                 <li>💰 料金: 約$0.015-0.02 per call</li>
               </ul>
@@ -51306,9 +51311,7 @@ async function generatePersonalizedCourse(studentId, curriculumId) {
     const response = await axios.post('/api/teacher/generate-personalized-course', {
       student_id: studentId,
       curriculum_id: curriculumId
-    }, { timeout: 120000 })
-    
-    hideLoading()
+    }, { timeout: 180000 })  // 180秒（サーバー側150秒に対応）
     
     if (!response.data.success) {
       throw new Error(response.data.error || '生成に失敗しました')
@@ -52028,13 +52031,13 @@ async function startBulkGeneration(curriculumId) {
   console.log('🚀 一括生成開始:', { curriculumId, studentIds, studentCount: studentIds.length })
   
   for (const studentId of studentIds) {
-    addLog(`⏳ 児童ID:${studentId} の個別コース生成中...（約15秒かかります）`)
+    addLog(`⏳ 児童ID:${studentId} の個別コース生成中...（約1〜3分かかります）`)
     try {
       console.log(`📤 generate API呼び出し: student=${studentId}, curriculum=${curriculumId}`)
       const res = await axios.post('/api/teacher/generate-personalized-course', {
         student_id: studentId,
         curriculum_id: curriculumId
-      }, { timeout: 120000 })
+      }, { timeout: 180000 })  // 180秒（サーバー側150秒に対応）
       
       console.log(`📥 generate APIレスポンス:`, { status: res.status, success: res.data.success, error: res.data.error, keys: Object.keys(res.data) })
       
@@ -53778,7 +53781,7 @@ async function showTeacherSupportDashboard(curriculumId) {
             '<div class="bg-blue-50 rounded-xl p-3 border border-blue-200">' +
               '<div class="text-center mb-2"><i class="fas fa-robot text-blue-600 text-2xl"></i></div>' +
               '<h5 class="text-xs font-bold text-blue-800 text-center mb-1">1. AI一括生成</h5>' +
-              '<p class="text-xs text-gray-600">12理論統合分析とv4エンジンにより、児童ごとに最適な学習カードを<strong>自動生成</strong>（1人あたり約1分）</p>' +
+              '<p class="text-xs text-gray-600">12理論統合分析とv4エンジンにより、児童ごとに最適な学習カードを<strong>自動生成</strong>（1人あたり約2分）</p>' +
               '<div class="mt-2 text-center"><span class="text-lg font-bold text-blue-600">30人 = 約30分</span></div>' +
             '</div>' +
             '<div class="bg-purple-50 rounded-xl p-3 border border-purple-200">' +

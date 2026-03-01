@@ -25242,22 +25242,48 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
 また、この学習ソングの雰囲気を表すカラフルで楽しいイラスト画像も1枚生成してください。
 子どもたちが楽しそうに歌っている場面、楽器、音符が飛び交うようなイメージです。`
 
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.8 }
-        })
+    // モデルフォールバック: gemini-3.1-flash-image-preview → gemini-2.5-flash
+    const musicModels = ['gemini-3.1-flash-image-preview', 'gemini-2.5-flash']
+    let resp: Response | null = null
+    let usedModel = ''
+    
+    for (const model of musicModels) {
+      try {
+        const isImageModel = model.includes('image-preview')
+        const genConfig: any = { temperature: 0.8 }
+        if (isImageModel) {
+          genConfig.responseModalities = ['TEXT', 'IMAGE']
+        }
+        
+        resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: isImageModel ? prompt : prompt.replace(/また、この学習ソングの雰囲気.*$/s, 'JSON形式のみ出力してください。') }] }],
+              generationConfig: genConfig
+            })
+          }
+        )
+        
+        if (resp.ok) {
+          usedModel = model
+          console.log(`✅ NB2 music: ${model} で成功`)
+          break
+        } else {
+          const errText = await resp.text()
+          console.warn(`⚠️ NB2 music: ${model} 失敗 (${resp.status}): ${errText.substring(0, 100)}`)
+          resp = null
+        }
+      } catch (modelErr: any) {
+        console.warn(`⚠️ NB2 music: ${model} エラー: ${modelErr.message}`)
+        resp = null
       }
-    )
-
-    if (!resp.ok) {
-      const errText = await resp.text()
-      console.error('NB2 music API error:', resp.status, errText.substring(0, 200))
-      return c.json({ success: false, error: `Nano Banana 2 API error: ${resp.status}` })
+    }
+    
+    if (!resp) {
+      return c.json({ success: false, error: 'すべてのモデルで生成に失敗しました。しばらく待ってから再試行してください。' })
     }
 
     const data = await resp.json() as any
@@ -25342,7 +25368,7 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
       cover_image_url: coverImageUrl,
       audio_url: audioUrl,
       generation_time_ms: totalTime,
-      model: 'Nano Banana 2 (gemini-3.1-flash-image)',
+      model: `Nano Banana 2 (${usedModel || 'gemini-3.1-flash-image'})`,
       suno_info: {
         url: 'https://suno.com',
         free_tier: '1日5曲無料（4分以下/曲）',
@@ -38771,7 +38797,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       try {
         console.log(`🎓 個別コース生成: ${model} で試行中...`)
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 90000) // 90秒タイムアウト（大量トークン生成対応）
+        const timeoutId = setTimeout(() => controller.abort(), 150000) // 150秒タイムアウト（大量トークン生成対応）
         
         geminiResponse = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -38796,7 +38822,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
           geminiResponse = null
         }
       } catch (err: any) {
-        lastError = `${model}: ${err.name === 'AbortError' ? 'タイムアウト(55s)' : err.message}`
+        lastError = `${model}: ${err.name === 'AbortError' ? 'タイムアウト(150s)' : err.message}`
         console.warn(`⚠️ ${lastError}`)
         geminiResponse = null
       }
