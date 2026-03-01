@@ -2454,7 +2454,7 @@ app.post('/api/chat/messages', authMiddleware, async (c) => {
       INSERT INTO chat_messages (
         conversation_id, sender_type, message_text, subject, 
         ai_model, response_time_ms
-      ) VALUES (?, 'ai', ?, ?, 'gemini-3.1-flash-preview', ?)
+      ) VALUES (?, 'ai', ?, ?, 'gemini-2.5-flash', ?)
     `).bind(conversation_id, aiResponse, subject || null, responseTime).run();
 
     return c.json({
@@ -5371,7 +5371,7 @@ app.post('/api/ai/ask', async (c) => {
 
     // Gemini APIにリクエスト
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -5591,7 +5591,7 @@ app.post('/api/ai/generate-problem', async (c) => {
     
     // Gemini APIにリクエスト
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -5862,7 +5862,7 @@ app.post('/api/ai/reflect', async (c) => {
   
   try {
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -7146,7 +7146,7 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -7359,7 +7359,7 @@ ${cardContext.hints ? `\n💡 ヒント:\n${cardContext.hints}` : ''}
     console.log('📤 Request contents length:', contents.length)
     console.log('📤 First content:', JSON.stringify(contents[0]).substring(0, 200))
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -11146,6 +11146,14 @@ app.get('/guide/:curriculumId', async (c) => {
     
     if (/割合|パーセント|%|百分率/.test(t)) {
       renderPercentWidget(container, card);
+    } else if (/得点カード|スコアカード|カードを用意|重ね|符号/.test(t)) {
+      if (typeof renderScoreCard === 'function') {
+        renderScoreCard(container, card);
+      } else if (typeof window.renderScoreCard === 'function') {
+        window.renderScoreCard(container, card);
+      } else {
+        container.innerHTML = '<div style="padding:12px;text-align:center;color:#6B7280;font-size:0.85rem;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>' + tactileText + '</div>';
+      }
     } else if (/ブロック|おはじき|色分け|タイル/.test(t)) {
       renderBlockWidget(container, card);
     } else if (/数直線|すうちょくせん/.test(t)) {
@@ -11159,6 +11167,82 @@ app.get('/guide/:curriculumId', async (c) => {
         '<div id="ai-video-area-' + page + '" style="margin-top:12px;"></div>' +
         '</div>';
     }
+  }
+
+  // ========== スコアカードウィジェット（guide用） ==========
+  function renderScoreCard(container, cardData) {
+    var values = [-5,-3,-2,-1,1,2,3,5];
+    var html = '<div style="padding:12px;">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">';
+    html += '<span style="font-size:0.85rem;font-weight:bold;color:#C2410C;"><i class="fas fa-star" style="margin-right:4px;"></i>得点カードで計算</span>';
+    html += '<button onclick="guideResetScoreCards(this)" style="font-size:0.75rem;background:#E5E7EB;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;">リセット</button>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:12px;">';
+    for (var i = 0; i < values.length; i++) {
+      var v = values[i];
+      var isPos = v > 0;
+      var bg = isPos ? '#FEF2F2' : '#EFF6FF';
+      var border = isPos ? '#FCA5A5' : '#93C5FD';
+      var color = isPos ? '#DC2626' : '#2563EB';
+      html += '<button onclick="guideToggleScore(this,' + v + ')" data-val="' + v + '" data-selected="false" style="width:56px;height:56px;border-radius:12px;border:2px solid ' + border + ';background:' + bg + ';color:' + color + ';font-weight:bold;font-size:1.1rem;cursor:pointer;transition:all 0.2s;">' + (isPos ? '+' : '') + v + '</button>';
+    }
+    html += '</div>';
+    html += '<div style="background:#F9FAFB;border-radius:10px;padding:10px;text-align:center;">';
+    html += '<span style="font-size:0.85rem;color:#6B7280;">合計得点：</span>';
+    html += '<span class="guide-score-total" style="font-size:1.5rem;font-weight:bold;color:#16A34A;">0</span>';
+    html += '<span class="guide-score-detail" style="font-size:0.8rem;color:#9CA3AF;margin-left:8px;"></span>';
+    html += '</div></div>';
+    container.innerHTML = html;
+  }
+
+  window.guideToggleScore = function(btn, val) {
+    var isSelected = btn.getAttribute('data-selected') === 'true';
+    btn.setAttribute('data-selected', isSelected ? 'false' : 'true');
+    if (!isSelected) {
+      btn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.15)';
+      btn.style.transform = 'scale(1.1)';
+      btn.style.borderWidth = '3px';
+    } else {
+      btn.style.boxShadow = 'none';
+      btn.style.transform = 'scale(1)';
+      btn.style.borderWidth = '2px';
+    }
+    guideUpdateScoreTotal(btn);
+  };
+
+  window.guideResetScoreCards = function(btn) {
+    var container = btn.closest('div[style*="padding"]') || btn.parentElement.parentElement;
+    var buttons = container.querySelectorAll('button[data-val]');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute('data-selected', 'false');
+      buttons[i].style.boxShadow = 'none';
+      buttons[i].style.transform = 'scale(1)';
+      buttons[i].style.borderWidth = '2px';
+    }
+    var total = container.querySelector('.guide-score-total');
+    var detail = container.querySelector('.guide-score-detail');
+    if (total) { total.textContent = '0'; total.style.color = '#16A34A'; }
+    if (detail) detail.textContent = '';
+  };
+
+  function guideUpdateScoreTotal(btn) {
+    var wrapper = btn.closest('div[style*="padding:12px"]');
+    if (!wrapper) wrapper = btn.parentElement.parentElement;
+    var buttons = wrapper.querySelectorAll('button[data-val][data-selected="true"]');
+    var total = 0;
+    var parts = [];
+    for (var i = 0; i < buttons.length; i++) {
+      var v = parseInt(buttons[i].getAttribute('data-val'));
+      total += v;
+      parts.push((v > 0 ? '+' : '') + v);
+    }
+    var totalEl = wrapper.querySelector('.guide-score-total');
+    var detailEl = wrapper.querySelector('.guide-score-detail');
+    if (totalEl) {
+      totalEl.textContent = (total > 0 ? '+' : '') + total;
+      totalEl.style.color = total > 0 ? '#DC2626' : total < 0 ? '#2563EB' : '#16A34A';
+    }
+    if (detailEl) detailEl.textContent = parts.length > 0 ? '(' + parts.join(' ') + ')' : '';
   }
 
   function renderPercentWidget(container, card) {
@@ -11873,7 +11957,7 @@ ${progress.results.slice(0, 5).map((p: any) =>
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -11987,7 +12071,7 @@ app.post('/api/ai/generate-problem', async (c) => {
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -12084,7 +12168,7 @@ app.post('/api/ai/suggest-plan', async (c) => {
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -12196,7 +12280,7 @@ ${helpCards.results.map((h: any) =>
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -12385,7 +12469,7 @@ ${specificInstructions}
     // 新しいヘルパー関数を使用（自動リトライ付き）
     // 正しいGemini 3.1/3.0/2.5/2.0モデル名を使用（2026年2月時点）
     const models = [
-      'gemini-3.1-flash-preview',  // プライマリ（Gemini 3.1 Flash・最高推論能力）
+      'gemini-2.5-flash',  // プライマリ（Gemini 3.1 Flash・最高推論能力）
       'gemini-3-flash-preview',    // フォールバック1（Gemini 3 Flash・高速）
       'gemini-2.5-flash',          // フォールバック2（安定）
       'gemini-2.0-flash'           // 最終フォールバック
@@ -12504,7 +12588,7 @@ app.get('/api/ai/test-gemini', async (c) => {
     }
     
     const testPrompt = '日本語で「こんにちは」と返答してください。'
-    const model = 'gemini-3.1-flash-preview'
+    const model = 'gemini-2.5-flash'
     
     console.log('📤 テストリクエスト送信:', model)
     
@@ -12637,7 +12721,7 @@ app.post('/api/ai/ocr', async (c) => {
       try {
         console.log('📤 [第2段階] Gemini Vision API を使用します（フォールバック）')
         
-        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${geminiApiKey}`
+        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`
         
         const requestBody = {
           contents: [
@@ -12808,7 +12892,7 @@ app.post('/api/ai/tts', async (c) => {
     
     try {
       const nativeAudioResp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${geminiApiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -12833,7 +12917,7 @@ app.post('/api/ai/tts', async (c) => {
         if (audioPart?.inlineData?.data) {
           audioBase64 = audioPart.inlineData.data
           audioMime = audioPart.inlineData.mimeType || 'audio/L16;rate=24000'
-          usedModel = 'gemini-3.1-flash-preview (Native Audio)'
+          usedModel = 'gemini-2.5-flash (Native Audio)'
           audioGenerated = true
           console.log('✅ Gemini 3.1 Native Audio 生成成功')
         }
@@ -13038,7 +13122,7 @@ app.post('/api/units/analyze', async (c) => {
 JSONのみ。`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -13210,9 +13294,9 @@ app.post('/api/ai/generate-course', async (c) => {
 7. 問題の難易度は教科書の目標水準（学習指導要領）に合わせること
 8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること`
 
-    // gemini-3.1-flash-preview をプライマリ（Gemini 3.1 Flash・最高推論能力）
+    // gemini-2.5-flash をプライマリ（Gemini 3.1 Flash・最高推論能力）
     // フォールバック: gemini-3-flash-preview（高速）, gemini-2.5-flash, gemini-2.0-flash（安定）
-    const models = ['gemini-3.1-flash-preview', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    const models = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
     
     console.log(`📋 コース情報:`, {
       コース名: courseInfo.name,
@@ -13559,7 +13643,7 @@ ${customInfo}
     if (useHighQuality) {
       // 確実モード: Gemini 2.5 Pro のみを使用、より厳密な設定
       models = [
-        { name: 'gemini-3.1-flash-preview', maxTokens: 16384 }  // 最高推論能力
+        { name: 'gemini-2.5-flash', maxTokens: 16384 }  // 最高推論能力
       ]
       generationConfig = {
         temperature: 0.5,   // より確実で一貫性のある出力
@@ -13635,7 +13719,7 @@ ${customInfo}
     } else {
       // 標準モード: Flash優先、フォールバックあり
       models = [
-        { name: 'gemini-3.1-flash-preview', maxTokens: 16384 },     // プライマリ（Gemini 3.1 Flash）
+        { name: 'gemini-2.5-flash', maxTokens: 16384 },     // プライマリ（Gemini 3.1 Flash）
         { name: 'gemini-3-flash-preview', maxTokens: 16384 },       // フォールバック1
         { name: 'gemini-2.5-flash', maxTokens: 16384 },             // フォールバック2
         { name: 'gemini-2.0-flash', maxTokens: 16384 }              // 最終フォールバック
@@ -14256,7 +14340,7 @@ app.post('/api/curriculum/:curriculumId/generate-course-problems', async (c) => 
 }`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-3.1-flash-preview', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    const models = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
     let response
     let lastError
     
@@ -15206,7 +15290,7 @@ ${weakAreas.length > 0 ? weakAreas.join('、') : 'なし'}
     // 6. Gemini API呼び出し
     console.log('🤖 Gemini APIを呼び出し中...')
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -15525,7 +15609,7 @@ app.post('/api/ai/generate-study-plan/:studentId', async (c) => {
     
     // Gemini API呼び出し
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -15644,7 +15728,7 @@ app.post('/api/curriculum/:curriculumId/generate-assessment-problems', async (c)
 4問目：友達と取り組めるゲーム型問題 / 5問目：本物の仕事場面を題材にした問題 / 6問目：知的好奇心を刺激する探究型問題`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-3.1-flash-preview', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    const models = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
     let response
     let lastError
     
@@ -15854,7 +15938,7 @@ ${courses.results.map((_: any, i: number) =>
 - learning_video_ideaは、動画で見せると理解が飛躍的に深まる場面。自然現象（火山噴火、天体運動）、実験映像、歴史的場面の再現など。PCの強みを活かしたリッチコンテンツ。動画不要なら空文字`
 
     // フォールバック機能付きAPI呼び出し
-    const models = ['gemini-3.1-flash-preview', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    const models = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
     let response
     let lastError
     
@@ -16234,7 +16318,7 @@ ${courses.results.map((c: any, i: number) => `${i + 1}. ${c.course_name}: ${c.de
 必ず完全なJSONのみを出力してください。説明文は不要です。`
 
     const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=' + apiKey,
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -17574,7 +17658,7 @@ app.post('/api/card/:cardId/suggest-learning-styles', async (c) => {
 }`
 
     const result = await callGeminiAPI({
-      model: 'gemini-3.1-flash-preview',
+      model: 'gemini-2.5-flash',
       prompt,
       apiKey,
       maxOutputTokens: 4096,
@@ -17631,7 +17715,7 @@ app.post('/api/curriculum/:id/regenerate-check-test', async (c) => {
 {"sample_problems":[{"problem_number":1,"problem_text":"問題文","answer":"答え"}]}`
 
     const result = await callGeminiAPI({
-      model: 'gemini-3.1-flash-preview',
+      model: 'gemini-2.5-flash',
       prompt,
       apiKey,
       maxOutputTokens: 4096,
@@ -18287,7 +18371,7 @@ ${body.specificRequirements ? `追加要件: ${body.specificRequirements}` : ''}
 
     // Gemini APIにリクエスト
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -18950,7 +19034,7 @@ ID: ${studentId}
 `
     
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -23456,7 +23540,7 @@ ${problem_text ? `【学習内容】${problem_text}` : ''}
 
     // テキストモデルで歌詞生成
     const lyricsResp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -23690,7 +23774,7 @@ Sunoは4分以下の曲を生成できます。1日5曲まで無料で作れま�
 }`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -23703,8 +23787,23 @@ Sunoは4分以下の曲を生成できます。1日5曲まで無料で作れま�
 
     if (resp.ok) {
       const data = await resp.json() as any
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-      const result = JSON.parse(text)
+      // gemini-2.5-flashはthinkingパーツを含む場合があるので、textパーツを探す
+      const parts = data.candidates?.[0]?.content?.parts || []
+      let text = ''
+      for (const p of parts) {
+        if (p.text && !p.thought) text += p.text
+      }
+      if (!text) text = parts[0]?.text || '{}'
+      let result: any = {}
+      try { result = JSON.parse(text.trim()) } catch (parseErr) {
+        console.error('歌詞JSONパースエラー:', text.substring(0, 300))
+        // markdownコードブロックを除去して再試行
+        const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+        try { result = JSON.parse(cleaned) } catch {
+          const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+          if (jsonMatch) { try { result = JSON.parse(jsonMatch[0]) } catch {} }
+        }
+      }
       return c.json({
         success: true,
         lyrics_data: result,
@@ -23724,8 +23823,13 @@ Sunoは4分以下の曲を生成できます。1日5曲まで無料で作れま�
       })
     }
 
-    return c.json({ success: false, error: '歌詞生成に失敗しました' })
+    const respText = !resp.ok ? await resp.text().catch(() => '') : ''
+    if (!resp.ok) {
+      console.error('Gemini歌詞生成APIエラー:', resp.status, respText.substring(0, 300))
+    }
+    return c.json({ success: false, error: '歌詞生成に失敗しました（' + resp.status + '）' })
   } catch (e: any) {
+    console.error('歌詞生成例外:', e.message)
     return c.json({ success: false, error: e.message })
   }
 })
@@ -23748,7 +23852,7 @@ ${shortLyrics}
 スタイル: 子ども向けJ-POP風、明るくキャッチー、テンポ120BPM、はっきりした歌声`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -23822,7 +23926,7 @@ app.post('/api/ai/think-aloud', async (c) => {
 - 代替アプローチがなければ空配列[]`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -23919,7 +24023,7 @@ ${student_answer ? `【児童の入力した答え】${student_answer}` : ''}
 - 図やメモがあれば、考え方の意図を読み取って褒める${analysisExtra}`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -24016,7 +24120,7 @@ ${hint_text ? `【ヒント情報】${hint_text}` : ''}${preferenceNote}
 - connection_note は「どの方法でも同じ答えになるよ。でも考え方が違うんだ」のような児童に伝わる表現で`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -26022,7 +26126,7 @@ ${styleRequirements}
 }`
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -27096,7 +27200,7 @@ ${studentAnswer}
       
       try {
         const geminiResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -27728,7 +27832,7 @@ JSON形式で以下を返してください：
 `
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -27805,7 +27909,7 @@ JSON形式で以下を返してください：
 `
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -27877,7 +27981,7 @@ JSON形式で以下を返してください：
 `
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -27985,7 +28089,7 @@ JSON形式で以下を返してください：
 `
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -28057,7 +28161,7 @@ JSON形式で以下を返してください：
 `
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29865,7 +29969,7 @@ app.post('/api/ai/auto-tag-image', async (c) => {
 JSONのみを返してください。他の説明は不要です。`
 
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -35792,7 +35896,7 @@ ${targetScore ? `
     
     // Gemini API呼び出し
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -36283,7 +36387,7 @@ JSON形式で出力してください:
 JSON のみ出力。`
 
         const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -36413,7 +36517,7 @@ app.post('/api/test-preparation/feedback', async (c) => {
 3つの具体的な改善提案をJSON配列で出力してください: ["提案1", "提案2", "提案3"]
 JSON配列のみ。`
         const resp = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${env.GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -36954,7 +37058,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 `
 
     // 10. Gemini API呼び出し（フォールバック付き、タイムアウト対策）
-    const courseModels = ['gemini-3.1-flash-preview', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
+    const courseModels = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.0-flash']
     let geminiResponse: Response | null = null
     let lastError = ''
     
@@ -37937,7 +38041,7 @@ app.post('/api/self-regulated/strategy-suggest', async (c) => {
 JSONのみ出力。`
 
       const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -38043,7 +38147,7 @@ Try（次にやること）: ${try_next || 'なし'}
 JSONのみ。`
 
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

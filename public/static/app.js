@@ -6413,7 +6413,7 @@ async function loadCardPage(cardId) {
             `}
 
             <!-- AI先生エリア（デフォルト表示） -->
-            <div id="aiTeacherArea" class="bg-gradient-to-b from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6 shadow-md">
+            <div id="aiTeacherArea" class="bg-gradient-to-b from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-xl p-6 shadow-md" style="display:flex;flex-direction:column;max-height:80vh;overflow:hidden;">
               <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-black text-blue-800">
                   <i class="fas fa-robot mr-2 text-2xl"></i>AI先生にきいてみよう！
@@ -6426,7 +6426,7 @@ async function loadCardPage(cardId) {
                   <span id="autoVoiceStatus">読み上げOFF</span>
                 </button>
               </div>
-              <div id="aiChat" class="space-y-3 mb-4 max-h-[32rem] md:max-h-[40rem] overflow-y-auto">
+              <div id="aiChat" class="space-y-3 mb-4 overflow-y-auto" style="flex:1;min-height:0;">
                 <!-- チャットメッセージがここに表示されます -->
               </div>
               
@@ -7105,7 +7105,8 @@ window.speakTextDirect = speakTextDirect
 async function generateImageForCardAsImage(cardId, description) {
   if (!cardId) return
   const placeholder = document.getElementById('image-placeholder-' + cardId) || 
-                       document.getElementById('card-image-container-' + cardId)
+                       document.getElementById('card-image-container-' + cardId) ||
+                       document.getElementById('guide-img-' + cardId)
   if (placeholder) {
     placeholder.innerHTML = `
       <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-300 rounded-2xl p-6 text-center">
@@ -7519,7 +7520,8 @@ async function generateImageForCard(cardId, description) {
   }
   
   const placeholder = document.getElementById('image-placeholder-' + cardId) || 
-                       document.getElementById('card-image-container-' + cardId)
+                       document.getElementById('card-image-container-' + cardId) ||
+                       document.getElementById('guide-img-' + cardId)
   
   // 生成中の表示（プログレスバー修正：滑らかな左→右アニメーション）
   if (placeholder) {
@@ -8342,7 +8344,7 @@ function toggleScoreCard(btn, val) {
   } else {
     btn.classList.remove('ring-2', 'ring-red-500', 'ring-blue-500', 'scale-110', 'shadow-lg')
   }
-  const container = btn.closest('[id^="tactile-widget"]')
+  const container = btn.closest('[id^="tactile-widget"]') || btn.closest('[id^="tactile-guide"]') || btn.closest('.p-4')
   if (!container) return
   let total = 0
   const parts = []
@@ -8363,7 +8365,7 @@ function toggleScoreCard(btn, val) {
 window.toggleScoreCard = toggleScoreCard
 
 function resetScoreCards(btn) {
-  const container = btn.closest('[id^="tactile-widget"]') || btn.closest('[id$="-wrapper"]')?.querySelector('[id^="tactile-widget"]')
+  const container = btn.closest('[id^="tactile-widget"]') || btn.closest('[id^="tactile-guide"]') || btn.closest('.p-4')
   if (!container) return
   container.querySelectorAll('.score-btn').forEach(b => {
     b.dataset.selected = 'false'
