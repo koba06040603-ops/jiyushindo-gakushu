@@ -8997,53 +8997,73 @@ app.get('/guide/:curriculumId', async (c) => {
     var introData = c._introData || {};
     var songIdea = introData.learning_song_idea || c.card_title || '';
 
-    // 生成中UI
+    // NB2 生成中UI
     resultArea.innerHTML = 
-      '<div style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE);border:2px solid #C4B5FD;border-radius:14px;padding:18px;text-align:center;margin-top:10px;">' +
+      '<div style="background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border:2px solid #C4B5FD;border-radius:14px;padding:18px;text-align:center;margin-top:10px;">' +
       '<div style="font-size:2rem;margin-bottom:8px;animation:float 2s ease-in-out infinite;">🎵</div>' +
-      '<p style="font-size:0.9rem;font-weight:bold;color:#6D28D9;">学習ソングを作成中...</p>' +
-      '<p style="font-size:0.75rem;color:#8B5CF6;margin-top:4px;">Gemini AIが歌詞とSunoスタイルを考えています（5〜10秒）</p>' +
+      '<p style="font-size:0.9rem;font-weight:bold;color:#7C3AED;">🧠 Nano Banana 2 が学習ソングを作曲中...</p>' +
+      '<p style="font-size:0.75rem;color:#8B5CF6;margin-top:4px;">歌詞・メロディ構成・ジャケット画像をAIが生成しています（10〜20秒）</p>' +
       '<div style="margin-top:10px;height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden;">' +
       '<div style="height:100%;background:linear-gradient(90deg,#7C3AED,#EC4899,#F59E0B);width:40%;animation:progressBar 2s ease-in-out infinite;border-radius:2px;"></div></div>' +
       '</div>';
 
-    // Suno歌詞生成API呼び出し
-    fetch('/api/ai/generate-suno-lyrics', {
+    // Nano Banana 2 音楽生成API呼び出し
+    fetch('/api/ai/generate-nb2-music', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        grade: CURRICULUM.grade || '',
-        subject: CURRICULUM.subject || '',
-        unit_name: CURRICULUM.unit_name || '',
+        card_title: c.card_title || '',
+        problem_text: (c.problem_text || '').substring(0, 400),
         topic: songIdea,
-        song_type: songIdea ? '「' + songIdea + '」をテーマにした学習ソング' : '暗記補助ソング'
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || ''
       })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data.success && data.lyrics_data) {
-        var ld = data.lyrics_data;
+      if (data.success && data.song_data) {
+        var sd = data.song_data;
         var si = data.suno_info || {};
-        var html = '<div style="background:white;border:2px solid #C4B5FD;border-radius:14px;padding:16px;margin-top:10px;">';
+        var html = '<div style="background:white;border:2px solid #C4B5FD;border-radius:14px;padding:16px;margin-top:10px;overflow:hidden;">';
         
-        // タイトル
-        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">';
-        html += '<span style="font-size:1.5rem;">🎵</span>';
-        html += '<div><strong style="color:#6D28D9;font-size:1rem;">' + (ld.song_title || '学習ソング') + '</strong>';
-        html += '<p style="font-size:0.7rem;color:#8B5CF6;margin-top:2px;">' + (ld.memory_technique || 'リズム記憶法') + '</p></div></div>';
+        // ヘッダー（NB2ブランド）
+        html += '<div style="background:linear-gradient(135deg,#7C3AED,#EC4899);margin:-16px -16px 14px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">';
+        html += '<div style="display:flex;align-items:center;gap:8px;"><span style="font-size:1.5rem;">🎵</span>';
+        html += '<div><strong style="color:white;font-size:1rem;">' + (sd.song_title || '学習ソング') + '</strong>';
+        html += '<p style="font-size:0.7rem;color:rgba(255,255,255,0.85);margin-top:1px;">' + (sd.genre || 'ポップ') + ' • ' + (sd.tempo_bpm || 120) + 'BPM' + (sd.key ? ' • ' + sd.key : '') + '</p></div></div>';
+        html += '<span style="color:rgba(255,255,255,0.7);font-size:0.65rem;">Nano Banana 2<br>' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒</span></div>';
 
-        // 短い歌詞プレビュー
+        // ジャケット画像（NB2が同時生成）
+        if (data.cover_image_url) {
+          html += '<div style="text-align:center;margin-bottom:12px;"><img src="' + data.cover_image_url + '" alt="ジャケット画像" style="max-width:100%;max-height:280px;border-radius:12px;border:2px solid #DDD6FE;box-shadow:0 4px 16px rgba(124,58,237,0.2);" /></div>';
+        }
+
+        // 歌詞プレビュー
         html += '<div style="background:#F5F3FF;border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid #DDD6FE;">';
-        html += '<p style="font-size:0.75rem;font-weight:bold;color:#7C3AED;margin-bottom:6px;">🎤 ショートバージョン（30秒）</p>';
-        html += '<pre style="font-size:0.8rem;color:#4C1D95;white-space:pre-wrap;line-height:1.6;font-family:inherit;margin:0;">' + (ld.short_version_lyrics || ld.suno_lyrics || '').substring(0, 400) + '</pre>';
+        html += '<p style="font-size:0.75rem;font-weight:bold;color:#7C3AED;margin-bottom:6px;">🎤 歌詞</p>';
+        html += '<pre style="font-size:0.8rem;color:#4C1D95;white-space:pre-wrap;line-height:1.6;font-family:inherit;margin:0;max-height:300px;overflow-y:auto;cursor:pointer;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline=\\x272px solid #22C55E\\x27;setTimeout(function(){this.style.outline=\\x27none\\x27;}.bind(this),1000);">' + (sd.short_lyrics || sd.lyrics || '').substring(0, 800) + '<span style="display:block;font-size:0.6rem;color:#9CA3AF;margin-top:4px;">📋 タップでコピー</span></pre>';
         html += '</div>';
 
-        // 覚えられる内容
-        if (ld.learning_content) {
+        // メロディ説明
+        if (sd.melody_description) {
+          html += '<div style="background:#FFFBEB;border-left:4px solid #F59E0B;padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:10px;">';
+          html += '<strong style="font-size:0.75rem;color:#92400E;">🎼 メロディの特徴：</strong>';
+          html += '<p style="font-size:0.78rem;color:#374151;margin-top:2px;">' + sd.melody_description + '</p></div>';
+        }
+
+        // 覚えられるポイント
+        if (sd.learning_points && sd.learning_points.length) {
           html += '<div style="background:#F0FDF4;border-left:4px solid #22C55E;padding:8px 12px;border-radius:0 8px 8px 0;margin-bottom:10px;">';
           html += '<strong style="font-size:0.75rem;color:#166534;">📚 この歌で覚えられること：</strong>';
-          html += '<p style="font-size:0.8rem;color:#374151;margin-top:2px;">' + (Array.isArray(ld.learning_content) ? ld.learning_content.join('、') : ld.learning_content) + '</p>';
-          html += '</div>';
+          html += '<p style="font-size:0.78rem;color:#374151;margin-top:2px;">' + (Array.isArray(sd.learning_points) ? sd.learning_points.join('、') : sd.learning_points) + '</p></div>';
+        }
+
+        // 歌い方のコツ
+        if (sd.sing_along_tips) {
+          html += '<div style="display:flex;align-items:flex-start;gap:6px;background:#EEF2FF;border-radius:8px;padding:8px 10px;border:1px solid #C7D2FE;margin-bottom:10px;">';
+          html += '<span style="flex-shrink:0;">💡</span>';
+          html += '<p style="font-size:0.75rem;color:#4338CA;">' + sd.sing_along_tips + '</p></div>';
         }
 
         // Sunoで本格曲を作るセクション
@@ -9051,48 +9071,138 @@ app.get('/guide/:curriculumId', async (c) => {
         html += '<summary style="padding:10px 14px;cursor:pointer;font-weight:bold;color:#92400E;font-size:0.85rem;user-select:none;">🎹 Sunoで本格的な曲を作る（4分以下・1日5曲無料！）</summary>';
         html += '<div style="padding:6px 14px 14px;">';
         
-        // Sunoスタイルプロンプト（コピー用）
+        // Sunoスタイルプロンプト
         html += '<div style="margin-bottom:8px;">';
         html += '<p style="font-size:0.75rem;font-weight:bold;color:#92400E;margin-bottom:4px;">🎨 スタイル欄にコピペ：</p>';
-        html += '<div style="background:white;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.8rem;font-family:monospace;position:relative;cursor:pointer;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline=\\x272px solid #22C55E\\x27;setTimeout(function(){this.style.outline=\\x27none\\x27;}.bind(this),1000);">' + (ld.suno_style_prompt || 'upbeat J-pop, children educational song, catchy melody, clear Japanese vocals') + '<span style="position:absolute;top:4px;right:6px;font-size:0.65rem;color:#9CA3AF;">📋タップでコピー</span></div>';
+        html += '<div style="background:white;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.8rem;font-family:monospace;position:relative;cursor:pointer;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline=\\x272px solid #22C55E\\x27;setTimeout(function(){this.style.outline=\\x27none\\x27;}.bind(this),1000);">' + (sd.suno_style_prompt || 'upbeat J-pop, children educational song, catchy melody, clear Japanese vocals') + '<span style="position:absolute;top:4px;right:6px;font-size:0.65rem;color:#9CA3AF;">📋タップでコピー</span></div>';
         html += '</div>';
 
-        // Suno歌詞（コピー用）
+        // Suno歌詞（フル）
         html += '<div style="margin-bottom:8px;">';
         html += '<p style="font-size:0.75rem;font-weight:bold;color:#92400E;margin-bottom:4px;">📝 歌詞欄にコピペ：</p>';
-        html += '<div style="background:white;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.75rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;cursor:pointer;position:relative;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline=\\x272px solid #22C55E\\x27;setTimeout(function(){this.style.outline=\\x27none\\x27;}.bind(this),1000);">' + (ld.suno_lyrics || '') + '<span style="position:absolute;top:4px;right:6px;font-size:0.65rem;color:#9CA3AF;">📋タップでコピー</span></div>';
+        html += '<div style="background:white;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.75rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;cursor:pointer;position:relative;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline=\\x272px solid #22C55E\\x27;setTimeout(function(){this.style.outline=\\x27none\\x27;}.bind(this),1000);">' + (sd.lyrics || sd.short_lyrics || '') + '<span style="position:absolute;top:4px;right:6px;font-size:0.65rem;color:#9CA3AF;">📋タップでコピー</span></div>';
         html += '</div>';
 
-        // Suno使い方ステップ
-        if (si.how_to_steps) {
+        // Suno使い方
+        if (si.how_to) {
           html += '<div style="background:#EFF6FF;border-radius:8px;padding:8px 12px;">';
           html += '<p style="font-size:0.75rem;font-weight:bold;color:#1E40AF;margin-bottom:4px;">📖 Sunoの使い方：</p>';
-          si.how_to_steps.forEach(function(step) {
+          (si.how_to || []).forEach(function(step) {
             html += '<p style="font-size:0.7rem;color:#374151;margin-top:2px;">' + step + '</p>';
           });
           html += '</div>';
         }
         html += '</div></details>';
 
-        // 使い方のヒント
-        if (ld.usage_tips) {
-          html += '<div style="display:flex;align-items:flex-start;gap:6px;background:#EEF2FF;border-radius:8px;padding:8px 10px;border:1px solid #C7D2FE;">';
-          html += '<span style="flex-shrink:0;">💡</span>';
-          html += '<p style="font-size:0.75rem;color:#4338CA;">' + ld.usage_tips + '</p></div>';
-        }
+        // ツールバー: 再生成・修正・画像再生成
+        html += '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px;">';
+        html += '<button onclick="generateLearningSong(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.78rem;cursor:pointer;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🧠 NB2で再生成</button>';
+        html += '<button onclick="editLearningSong(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.78rem;cursor:pointer;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>';
+        html += '<button onclick="generateSongImage(' + page + ')" id="song-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.78rem;cursor:pointer;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-palette" style="margin-right:4px;"></i>🎨 別の画像</button>';
+        html += '</div>';
+        html += '<div id="song-img-area-' + page + '" style="margin-top:8px;"></div>';
 
         html += '</div>';
         resultArea.innerHTML = html;
       } else {
         resultArea.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px;text-align:center;margin-top:10px;">' +
-          '<p style="font-size:0.85rem;color:#DC2626;">😅 歌の作成に失敗しました</p>' +
-          '<button onclick="generateLearningSong(' + page + ')" style="margin-top:8px;background:#7C3AED;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 もう一回</button></div>';
+          '<p style="font-size:0.85rem;color:#DC2626;">😅 ソング作成に失敗しました: ' + (data.error || '') + '</p>' +
+          '<button onclick="generateLearningSong(' + page + ')" style="margin-top:8px;background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 NB2で再試行</button></div>';
       }
     })
     .catch(function(err) {
       resultArea.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px;text-align:center;margin-top:10px;">' +
         '<p style="font-size:0.85rem;color:#DC2626;">😅 通信エラー: ' + err.message + '</p>' +
-        '<button onclick="generateLearningSong(' + page + ')" style="margin-top:8px;background:#7C3AED;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 再試行</button></div>';
+        '<button onclick="generateLearningSong(' + page + ')" style="margin-top:8px;background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 再試行</button></div>';
+    });
+  }
+
+  // === 学習ソング修正指示（NB2） ===
+  function editLearningSong(page) {
+    var c = ALL_CARDS[page];
+    if (!c) return;
+    var instruction = prompt('曲の修正指示を入力してください\\n例: 「もっとラップ風にして」「テンポを早くして」「サビを繰り返し多くして」');
+    if (!instruction) return;
+    var resultArea = document.getElementById('song-result-' + page);
+    if (!resultArea) return;
+    
+    resultArea.innerHTML = '<div style="padding:16px;text-align:center;background:linear-gradient(135deg,#FDF2F8,#FFFBEB);border-radius:14px;border:2px dashed #F59E0B;">' +
+      '<div style="display:inline-block;width:32px;height:32px;border:3px solid #F59E0B;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:8px;"></div>' +
+      '<p style="font-size:0.9rem;font-weight:bold;color:#D97706;">✏️ NB2で修正中: ' + instruction.substring(0, 30) + '...</p></div>';
+    
+    var introData = c._introData || {};
+    fetch('/api/ai/generate-nb2-music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_title: c.card_title || '',
+        problem_text: (c.problem_text || '').substring(0, 400),
+        topic: introData.learning_song_idea || c.card_title || '',
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || '',
+        edit_instruction: instruction
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        // 成功時は通常のgenerateLearningSongの結果表示を再利用
+        generateLearningSong(page);
+      } else {
+        resultArea.innerHTML = '<div style="padding:12px;text-align:center;color:#DC2626;">修正失敗: ' + (data.error || '') + ' <button onclick="generateLearningSong(' + page + ')" style="color:#3B82F6;text-decoration:underline;border:none;background:none;cursor:pointer;">再試行</button></div>';
+      }
+    })
+    .catch(function(err) {
+      resultArea.innerHTML = '<div style="padding:12px;text-align:center;color:#DC2626;">通信エラー <button onclick="generateLearningSong(' + page + ')" style="color:#3B82F6;text-decoration:underline;border:none;background:none;cursor:pointer;">再試行</button></div>';
+    });
+  }
+
+  // ========================================
+  // ★ 学習ソング イメージ画像生成（Nano Banana 2）
+  // ========================================
+  function generateSongImage(page) {
+    var card = ALL_CARDS[page];
+    if (!card) return;
+    var btn = document.getElementById('song-img-btn-' + page);
+    var area = document.getElementById('song-img-area-' + page);
+    if (!area) return;
+    
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>画像生成中...'; }
+    area.innerHTML = '<div style="padding:12px;text-align:center;background:#FDF2F8;border-radius:10px;"><i class="fas fa-palette" style="font-size:1.5rem;color:#EC4899;margin-bottom:6px;display:block;animation:float 2s ease-in-out infinite;"></i><p style="font-size:0.8rem;color:#BE185D;">Nano Banana 2で画像を描いています...(10〜30秒)</p></div>';
+    
+    var introData = card._introData || {};
+    var songTitle = introData.learning_song_idea || card.card_title || '';
+    var prompt = '「' + songTitle + '」の学習ソングのイメージイラスト。' + (CURRICULUM.subject || '') + 'の' + (CURRICULUM.unit_name || '') + '。';
+    
+    fetch('/api/ai/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt,
+        card_title: songTitle,
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || '',
+        prefer_image: true,
+        style: 'colorful children illustration, music themed, cheerful'
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.image_url) {
+        area.innerHTML = '<div style="text-align:center;">' +
+          '<img src="' + data.image_url + '" alt="ソングイメージ" style="max-width:100%;max-height:300px;border-radius:12px;border:2px solid #DDD6FE;box-shadow:0 4px 12px rgba(124,58,237,0.2);" />' +
+          '<p style="font-size:0.7rem;color:#8B5CF6;margin-top:4px;">' + (data.model || 'Nano Banana 2') + '（' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒）</p>' +
+          '<button onclick="generateSongImage(' + page + ')" style="margin-top:4px;background:#EC4899;color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;">🔄 別のイメージ</button></div>';
+      } else {
+        area.innerHTML = '<p style="font-size:0.75rem;color:#EF4444;text-align:center;">画像生成失敗 <button onclick="generateSongImage(' + page + ')" style="color:#3B82F6;text-decoration:underline;border:none;background:none;cursor:pointer;">再試行</button></p>';
+      }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-palette" style="margin-right:6px;"></i>🎨 イメージ画像を生成'; }
+    })
+    .catch(function(err) {
+      area.innerHTML = '<p style="font-size:0.75rem;color:#EF4444;text-align:center;">エラー: ' + (err.message||'') + '</p>';
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-palette" style="margin-right:6px;"></i>🎨 イメージ画像を生成'; }
     });
   }
 
@@ -11142,31 +11252,152 @@ app.get('/guide/:curriculumId', async (c) => {
     var containerId = 'tactile-guide-' + page;
     var container = document.getElementById(containerId);
     if (!container) return;
-    var t = (tactileText + ' ' + (card.card_title||'') + ' ' + (card.problem_text||'')).toLowerCase();
     
-    if (/割合|パーセント|%|百分率/.test(t)) {
-      renderPercentWidget(container, card);
-    } else if (/得点カード|スコアカード|カードを用意|重ね|符号/.test(t)) {
-      if (typeof renderScoreCard === 'function') {
-        renderScoreCard(container, card);
-      } else if (typeof window.renderScoreCard === 'function') {
-        window.renderScoreCard(container, card);
+    // === Nano Banana 2 動的ウィジェット生成 ===
+    // 問題内容に応じてNB2がインタラクティブHTML/SVGを動的に設計
+    var mm = card._mm || {};
+    var tactile = tactileText || mm.tactile_activity || '';
+    
+    // ローディング表示 + 即時フォールバック用の簡易テキスト
+    container.innerHTML = '<div id="nb2-widget-' + page + '">' +
+      '<div style="padding:16px;text-align:center;background:linear-gradient(135deg,#FDF2F8,#EEF2FF);border-radius:14px;border:2px dashed #DDD6FE;">' +
+      '<div style="display:inline-block;width:36px;height:36px;border:3px solid #EC4899;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:8px;"></div>' +
+      '<p style="font-size:0.9rem;font-weight:bold;color:#7C3AED;">🧠 Nano Banana 2 がウィジェットを設計中...</p>' +
+      '<p style="font-size:0.75rem;color:#9CA3AF;margin-top:4px;">問題に最適なインタラクティブ教材を生成しています（10〜20秒）</p>' +
+      '</div></div>' +
+      '<div id="nb2-toolbar-' + page + '" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;margin-top:10px;padding:8px;">' +
+      '</div>';
+    
+    // NB2 API呼び出し
+    fetch('/api/ai/generate-tactile-widget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_id: card.card_id || card.id,
+        card_title: card.card_title || '',
+        problem_text: (card.problem_text || '').substring(0, 600),
+        tactile_activity: tactile,
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || ''
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var widgetArea = document.getElementById('nb2-widget-' + page);
+      var toolbar = document.getElementById('nb2-toolbar-' + page);
+      if (!widgetArea) return;
+      
+      if (data.success && data.widget_html) {
+        // NB2生成ウィジェットHTMLを挿入
+        widgetArea.innerHTML = '<div id="nb2-content-' + page + '" style="background:white;border-radius:14px;border:2px solid #E5E7EB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">' +
+          '<div style="background:linear-gradient(135deg,#7C3AED,#EC4899);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">' +
+          '<span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-robot" style="margin-right:4px;"></i>Nano Banana 2 が設計</span>' +
+          '<span style="color:rgba(255,255,255,0.8);font-size:0.65rem;">' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒</span>' +
+          '</div>' +
+          '<div style="padding:12px;">' + data.widget_html + '</div>' +
+          '</div>';
+        
+        // イラスト画像がある場合
+        if (data.illustration_url) {
+          widgetArea.innerHTML += '<div style="margin-top:10px;text-align:center;">' +
+            '<img src="' + data.illustration_url + '" alt="NB2イラスト" style="max-width:100%;max-height:250px;border-radius:12px;border:2px solid #DDD6FE;box-shadow:0 4px 12px rgba(124,58,237,0.15);" />' +
+            '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">🎨 Nano Banana 2 生成イラスト</p></div>';
+        }
+      } else if (data.success && data.illustration_url) {
+        // HTMLなし、画像のみ
+        widgetArea.innerHTML = '<div style="text-align:center;padding:12px;">' +
+          '<p style="font-size:0.85rem;color:#6B7280;margin-bottom:8px;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>' + (tactile || 'やってみよう') + '</p>' +
+          '<img src="' + data.illustration_url + '" alt="NB2教材" style="max-width:100%;max-height:300px;border-radius:12px;border:2px solid #DDD6FE;" />' +
+          '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">Nano Banana 2（' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒）</p></div>';
       } else {
-        container.innerHTML = '<div style="padding:12px;text-align:center;color:#6B7280;font-size:0.85rem;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>' + tactileText + '</div>';
+        // フォールバック: テキスト表示
+        widgetArea.innerHTML = '<div style="padding:14px;text-align:center;background:#FEF3C7;border-radius:12px;border:1px solid #FDE68A;">' +
+          '<p style="font-size:0.85rem;color:#92400E;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>' + (tactile || 'やってみよう') + '</p>' +
+          '<p style="font-size:0.7rem;color:#B45309;margin-top:4px;">⚠️ ウィジェット自動生成に失敗しました</p></div>';
       }
-    } else if (/ブロック|おはじき|色分け|タイル/.test(t)) {
-      renderBlockWidget(container, card);
-    } else if (/数直線|すうちょくせん/.test(t)) {
-      renderNumberLineWidget(container, card);
-    } else if (/時計|なんじ|とけい/.test(t)) {
-      renderClockWidget(container);
-    } else {
-      container.innerHTML = '<div style="padding:12px;text-align:center;">' +
-        '<button onclick="this.classList.toggle(\\x27active\\x27);this.style.background=this.classList.contains(\\x27active\\x27)?\\x27#10B981\\x27:\\x27#E5E7EB\\x27;this.style.color=this.classList.contains(\\x27active\\x27)?\\x27white\\x27:\\x27#374151\\x27;" style="background:#E5E7EB;color:#374151;border:none;padding:10px 20px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:0.9rem;transition:all 0.2s;margin-right:8px;"><i class="fas fa-check" style="margin-right:6px;"></i>やってみた！</button>' +
-        '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:#7C3AED;color:white;border:none;padding:10px 20px;border-radius:12px;font-weight:bold;cursor:pointer;font-size:0.9rem;transition:all 0.2s;"><i class="fas fa-video" style="margin-right:6px;"></i>AI動画をつくる</button>' +
-        '<div id="ai-video-area-' + page + '" style="margin-top:12px;"></div>' +
+      
+      // ツールバー: 再生成・編集・AI画像・AI動画ボタン
+      if (toolbar) {
+        toolbar.innerHTML = 
+          '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🧠 NB2で再生成</button>' +
+          '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>' +
+          '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>🎨 画像生成</button>' +
+          '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:4px;"></i>🎬 AI動画</button>' +
+          '<div id="ai-img-area-' + page + '" style="width:100%;margin-top:6px;"></div>' +
+          '<div id="ai-video-area-' + page + '" style="width:100%;margin-top:6px;"></div>';
+      }
+    })
+    .catch(function(err) {
+      var widgetArea = document.getElementById('nb2-widget-' + page);
+      if (widgetArea) {
+        widgetArea.innerHTML = '<div style="padding:14px;text-align:center;background:#FEF2F2;border-radius:12px;border:1px solid #FECACA;">' +
+          '<p style="font-size:0.85rem;color:#DC2626;">ウィジェット生成エラー: ' + (err.message||'通信エラー') + '</p>' +
+          '<p style="font-size:0.8rem;color:#6B7280;margin-top:6px;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>' + (tactile || 'やってみよう') + '</p>' +
+          '<button onclick="regenerateTactileWidget(' + page + ')" style="margin-top:8px;background:#7C3AED;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 再試行</button></div>';
+      }
+    });
+  }
+  
+  // === NB2 ウィジェット再生成 ===
+  function regenerateTactileWidget(page) {
+    var card = ALL_CARDS[page];
+    if (!card) return;
+    var mm = card._mm || {};
+    var tactile = mm.tactile_activity || '';
+    initGuideWidget(page, tactile, card);
+  }
+  
+  // === NB2 ウィジェット修正指示 ===
+  function editTactileWidget(page) {
+    var card = ALL_CARDS[page];
+    if (!card) return;
+    var instruction = prompt('修正内容を入力してください\\n例: 「もっと大きくして」「数を5個にして」「色を変えて」「ドラッグ操作を追加して」');
+    if (!instruction) return;
+    
+    var widgetArea = document.getElementById('nb2-widget-' + page);
+    if (widgetArea) {
+      widgetArea.innerHTML = '<div style="padding:16px;text-align:center;background:linear-gradient(135deg,#FDF2F8,#EEF2FF);border-radius:14px;border:2px dashed #DDD6FE;">' +
+        '<div style="display:inline-block;width:36px;height:36px;border:3px solid #F59E0B;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:8px;"></div>' +
+        '<p style="font-size:0.9rem;font-weight:bold;color:#D97706;">✏️ 修正中: ' + instruction.substring(0, 30) + '...</p>' +
         '</div>';
     }
+    
+    var mm = card._mm || {};
+    fetch('/api/ai/generate-tactile-widget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_id: card.card_id || card.id,
+        card_title: card.card_title || '',
+        problem_text: (card.problem_text || '').substring(0, 600),
+        tactile_activity: mm.tactile_activity || '',
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || '',
+        edit_instruction: instruction
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!widgetArea) return;
+      if (data.success && data.widget_html) {
+        widgetArea.innerHTML = '<div style="background:white;border-radius:14px;border:2px solid #F59E0B;overflow:hidden;box-shadow:0 2px 8px rgba(245,158,11,0.15);">' +
+          '<div style="background:linear-gradient(135deg,#F59E0B,#D97706);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">' +
+          '<span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-edit" style="margin-right:4px;"></i>修正版 by Nano Banana 2</span>' +
+          '<span style="color:rgba(255,255,255,0.8);font-size:0.65rem;">' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒</span>' +
+          '</div>' +
+          '<div style="padding:12px;">' + data.widget_html + '</div></div>';
+        if (data.illustration_url) {
+          widgetArea.innerHTML += '<div style="margin-top:8px;text-align:center;"><img src="' + data.illustration_url + '" style="max-width:100%;max-height:200px;border-radius:10px;" /></div>';
+        }
+      } else {
+        widgetArea.innerHTML = '<div style="padding:12px;text-align:center;color:#DC2626;font-size:0.85rem;">修正失敗: ' + (data.error || '再度お試しください') + '</div>';
+      }
+    })
+    .catch(function(err) {
+      if (widgetArea) widgetArea.innerHTML = '<div style="padding:12px;text-align:center;color:#DC2626;font-size:0.85rem;">通信エラー: ' + err.message + '</div>';
+    });
   }
 
   // ========== スコアカードウィジェット（guide用） ==========
@@ -11292,6 +11523,58 @@ app.get('/guide/:curriculumId', async (c) => {
       }
       dots.innerHTML = dotsHtml;
     }
+  }
+
+  // === AI画像生成（Nano Banana 2）===
+  function requestAIImage(page) {
+    var card = ALL_CARDS[page];
+    if (!card) return;
+    var btn = document.getElementById('ai-img-btn-' + page);
+    var area = document.getElementById('ai-img-area-' + page);
+    if (!area) return;
+    
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>画像生成中...'; }
+    area.innerHTML = '<div style="padding:16px;text-align:center;background:#FDF2F8;border-radius:12px;"><i class="fas fa-palette" style="font-size:2rem;color:#EC4899;margin-bottom:8px;display:block;"></i><p style="font-size:0.85rem;color:#BE185D;font-weight:bold;">Nano Banana 2でAI画像を生成中...<br><span style="font-weight:normal;font-size:0.75rem;">10〜30秒ほどかかります</span></p></div>';
+    
+    var mm = card._mm || {};
+    var tactileText = mm.tactile_activity || '';
+    var prompt = (tactileText || card.card_title || '') + '。' + (card.problem_text || '').substring(0, 200);
+    
+    fetch('/api/ai/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt,
+        card_id: card.card_id || card.id,
+        card_title: card.card_title,
+        problem_text: card.problem_text || '',
+        subject: CURRICULUM.subject || '',
+        grade: CURRICULUM.grade || '',
+        unit_name: CURRICULUM.unit_name || '',
+        prefer_image: true
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.image_url) {
+        area.innerHTML = '<div style="text-align:center;margin-top:8px;">' +
+          '<img src="' + data.image_url + '" alt="AI生成画像" style="max-width:100%;border-radius:12px;border:2px solid #E5E7EB;box-shadow:0 2px 8px rgba(0,0,0,0.1);" />' +
+          '<p style="font-size:0.75rem;color:#6B7280;margin-top:6px;"><i class="fas fa-robot" style="margin-right:4px;"></i>' + (data.model || 'Nano Banana 2') + '（' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒）</p>' +
+          '<button onclick="requestAIImage(' + page + ')" style="margin-top:6px;background:#EC4899;color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.8rem;font-weight:bold;cursor:pointer;">🔄 再生成</button>' +
+          '</div>';
+      } else if (data.success && data.type === 'suggestion') {
+        area.innerHTML = '<div style="background:#EFF6FF;border:1px solid #93C5FD;border-radius:10px;padding:10px;margin-top:8px;">' +
+          '<p style="font-size:0.8rem;color:#1E40AF;font-weight:bold;">💡 ' + (data.suggestion?.diagram_type || 'ビジュアル教材') + '</p>' +
+          '<p style="font-size:0.75rem;color:#374151;">' + (data.suggestion?.description || '') + '</p></div>';
+      } else {
+        area.innerHTML = '<p style="font-size:0.8rem;color:#EF4444;text-align:center;margin-top:8px;">画像生成に失敗しました。<button onclick="requestAIImage(' + page + ')" style="color:#3B82F6;text-decoration:underline;border:none;background:none;cursor:pointer;">再試行</button></p>';
+      }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-image" style="margin-right:6px;"></i>AI画像'; }
+    })
+    .catch(function(err) {
+      area.innerHTML = '<p style="font-size:0.8rem;color:#EF4444;text-align:center;margin-top:8px;">エラー: ' + (err.message||'') + '</p>';
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-image" style="margin-right:6px;"></i>AI画像'; }
+    });
   }
 
   // === AI動画生成（Veo 3.1）===
@@ -23746,6 +24029,261 @@ Requirements:
   }
 })
 
+// ========================================
+// ★ Nano Banana 2: さわってまなぼうウィジェット動的生成API
+// gemini-3.1-flash-image-preview で問題内容に応じた
+// インタラクティブHTML/SVGウィジェットのコード+説明画像を生成
+// ========================================
+app.post('/api/ai/generate-tactile-widget', async (c) => {
+  const startTime = Date.now()
+  const { card_id, card_title, problem_text, tactile_activity, subject, grade, unit_name, edit_instruction } = await c.req.json()
+  const env = c.env as any
+  const geminiApiKey = env.GEMINI_API_KEY
+  if (!geminiApiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' })
+
+  try {
+    const context = [
+      card_title && `タイトル: ${card_title}`,
+      problem_text && `問題: ${problem_text.substring(0, 500)}`,
+      tactile_activity && `想定アクティビティ: ${tactile_activity}`,
+      subject && `教科: ${subject}`,
+      grade && `学年: ${grade}`,
+      unit_name && `単元: ${unit_name}`,
+    ].filter(Boolean).join('\n')
+
+    const editNote = edit_instruction ? `\n\n【修正指示】${edit_instruction}` : ''
+
+    const prompt = `あなたはNano Banana 2（日本の教育AIアシスタント）です。
+子どもが画面上で「さわって学べる」インタラクティブなHTML/SVGウィジェットを1つ生成してください。
+
+【生成ルール】
+1. HTMLコード1つだけ出力。<div>で始まり</div>で終わる
+2. すべてのCSSはインラインstyle属性（<style>タグ不使用）
+3. JavaScriptはonclick等のイベント属性内に記述
+4. 外部ライブラリ不使用（純粋HTML/SVG/CSS/JSのみ）
+5. 問題の数値・データを正確に反映
+6. タップ・ドラッグ・スライダーなど触って操作できる要素を必ず含む
+7. フィードバック（色変化、数値更新、○×表示等）を即時表示
+8. 日本語ラベル、カラフルで楽しいデザイン、角丸、影つき
+9. 最大幅100%、レスポンシブ対応
+10. 子どもが直感的に操作を理解できるUI
+
+【ウィジェットの例】
+- 数直線: ドラッグで数値を移動できるSVG
+- ブロック操作: タップで色が変わるブロック群
+- 得点カード: +/- のカードをタップして合計を計算
+- 割合: スライダーで円グラフ/棒グラフが変化
+- 時計: 針をドラッグして時刻を設定
+- 色分け: タップで色を塗り分けるマス目
+- 天秤: 左右にアイテムをドラッグして釣り合いを確認
+- 分数: ピザやケーキを等分するタッチ操作
+- 数の分解: 数を2つに分ける操作パネル
+
+【学習カード情報】
+${context}
+${editNote}
+
+この学習内容に最適なインタラクティブウィジェットをHTMLコードだけで出力してください。
+コードブロック(\`\`\`)で囲まないこと。説明文不要。HTMLのみ。`
+
+    // Nano Banana 2 でウィジェットHTML + 説明画像を生成
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.7 }
+        })
+      }
+    )
+
+    if (!resp.ok) {
+      const errText = await resp.text()
+      console.error('NB2 tactile API error:', resp.status, errText.substring(0, 200))
+      return c.json({ success: false, error: `Nano Banana 2 API error: ${resp.status}` })
+    }
+
+    const data = await resp.json() as any
+    const parts = data.candidates?.[0]?.content?.parts || []
+    
+    let widgetHtml = ''
+    let explanationText = ''
+    let illustrationUrl = ''
+    
+    for (const part of parts) {
+      if (part.inlineData) {
+        illustrationUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`
+      }
+      if (part.text && !part.thought) {
+        explanationText += part.text
+      }
+    }
+
+    // HTMLをテキストから抽出
+    let rawText = explanationText
+    rawText = rawText.replace(/```html\s*/gi, '').replace(/```\s*/g, '')
+    const divMatch = rawText.match(/<div[\s\S]*<\/div>/i)
+    if (divMatch && divMatch[0].length > 30) {
+      widgetHtml = divMatch[0]
+        .replace(/<script[\s\S]*?<\/script>/gi, '') // scriptタグ除去（セキュリティ）
+        .replace(/javascript:\s*void/gi, '') // javascript:void除去
+    }
+
+    const genTime = Date.now() - startTime
+    console.log(`✅ NB2 tactile widget生成: ${genTime}ms, HTML=${widgetHtml.length}文字, 画像=${illustrationUrl ? 'あり' : 'なし'}`)
+
+    return c.json({
+      success: true,
+      widget_html: widgetHtml,
+      illustration_url: illustrationUrl,
+      explanation: explanationText.replace(/<[^>]*>/g, '').substring(0, 300),
+      generation_time_ms: genTime,
+      model: 'Nano Banana 2 (gemini-3.1-flash-image)',
+      message: widgetHtml ? 'ウィジェットを生成しました' : '画像のみ生成しました'
+    })
+  } catch (e: any) {
+    console.error('NB2 tactile error:', e.message)
+    return c.json({ success: false, error: e.message })
+  }
+})
+
+// ========================================
+// ★ Nano Banana 2: 学習ソング生成API
+// gemini-3.1-flash-image-preview で歌詞+楽譜イメージ画像+
+// 曲の雰囲気画像をまとめて生成
+// ========================================
+app.post('/api/ai/generate-nb2-music', async (c) => {
+  const startTime = Date.now()
+  const { card_title, problem_text, topic, subject, grade, unit_name, song_style, edit_instruction } = await c.req.json()
+  const env = c.env as any
+  const geminiApiKey = env.GEMINI_API_KEY
+  if (!geminiApiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' })
+
+  try {
+    const context = [
+      card_title && `タイトル: ${card_title}`,
+      topic && `テーマ: ${topic}`,
+      problem_text && `学習内容: ${problem_text.substring(0, 400)}`,
+      subject && `教科: ${subject}`,
+      grade && `学年: ${grade}`,
+      unit_name && `単元: ${unit_name}`,
+      song_style && `曲調リクエスト: ${song_style}`,
+    ].filter(Boolean).join('\n')
+
+    const editNote = edit_instruction ? `\n\n【修正指示】${edit_instruction}` : ''
+
+    const prompt = `あなたはNano Banana 2（日本の教育AI音楽プロデューサー）です。
+子どもが楽しく覚えられる学習ソングを作ってください。
+
+【出力形式】以下のJSON形式で出力：
+{
+  "song_title": "曲名（キャッチーで覚えやすい日本語タイトル）",
+  "genre": "曲のジャンル（例: ポップ、ラップ、童謡風、ロック、ボサノバ等）",
+  "tempo_bpm": 数値（テンポ、子ども向けは100-140推奨）,
+  "key": "キー（例: C major, A minor）",
+  "lyrics": "歌詞全文（Verse1, Chorus, Verse2, Chorus, Bridge, Chorus の構成）",
+  "melody_description": "メロディの特徴（音の上下、リズムパターンの説明）",
+  "learning_points": ["覚えられるポイント1", "ポイント2", "ポイント3"],
+  "sing_along_tips": "歌い方のコツ（手拍子、振り付け等）",
+  "suno_style_prompt": "Sunoで使えるスタイルプロンプト（英語、30語以内）",
+  "short_lyrics": "ショートバージョン歌詞（30秒分、サビ中心）"
+}
+
+【ルール】
+1. 学習内容のキーワード・公式・概念を歌詞に自然に織り込む
+2. 繰り返しとリズムで記憶に残りやすくする
+3. 子どもが口ずさめるシンプルなメロディライン
+4. 楽しくポジティブな雰囲気
+5. 歌詞は日本語、Sunoプロンプトは英語
+
+【学習情報】
+${context}
+${editNote}
+
+JSON形式のみ出力してください。コードブロック(\`\`\`)で囲まないこと。
+また、この学習ソングの雰囲気を表すカラフルで楽しいイラスト画像も1枚生成してください。
+子どもたちが楽しそうに歌っている場面、楽器、音符が飛び交うようなイメージです。`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.8 }
+        })
+      }
+    )
+
+    if (!resp.ok) {
+      const errText = await resp.text()
+      console.error('NB2 music API error:', resp.status, errText.substring(0, 200))
+      return c.json({ success: false, error: `Nano Banana 2 API error: ${resp.status}` })
+    }
+
+    const data = await resp.json() as any
+    const parts = data.candidates?.[0]?.content?.parts || []
+    
+    let songText = ''
+    let coverImageUrl = ''
+    
+    for (const part of parts) {
+      if (part.inlineData) {
+        coverImageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`
+      }
+      if (part.text && !part.thought) {
+        songText += part.text
+      }
+    }
+
+    // JSONパース
+    let songData: any = {}
+    try {
+      const cleaned = songText.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/)?.[0]
+      if (jsonMatch) songData = JSON.parse(jsonMatch)
+    } catch {
+      // フォールバック: テキストから部分抽出
+      const titleMatch = songText.match(/"song_title"\s*:\s*"([^"]+)"/)
+      const lyricsMatch = songText.match(/"lyrics"\s*:\s*"([\s\S]*?)"(?=\s*[,}])/)
+      songData = {
+        song_title: titleMatch?.[1] || `${unit_name || topic || '学習'}の歌`,
+        lyrics: lyricsMatch?.[1]?.replace(/\\n/g, '\n') || songText.substring(0, 1000),
+        genre: 'ポップ',
+        tempo_bpm: 120
+      }
+    }
+
+    const genTime = Date.now() - startTime
+    console.log(`✅ NB2 music生成: ${genTime}ms, title=${songData.song_title}, 画像=${coverImageUrl ? 'あり' : 'なし'}`)
+
+    return c.json({
+      success: true,
+      song_data: songData,
+      cover_image_url: coverImageUrl,
+      generation_time_ms: genTime,
+      model: 'Nano Banana 2 (gemini-3.1-flash-image)',
+      suno_info: {
+        url: 'https://suno.com',
+        free_tier: '1日5曲無料（4分以下/曲）',
+        how_to: [
+          '1. https://suno.com にアクセス',
+          '2. 「Create」→「Custom」モードを選択',
+          '3. Style Promptに上のスタイルをコピペ',
+          '4. Lyricsに歌詞をコピペ',
+          '5. 「Create」で生成開始（1〜2分）'
+        ]
+      }
+    })
+  } catch (e: any) {
+    console.error('NB2 music error:', e.message)
+    return c.json({ success: false, error: e.message })
+  }
+})
+
 // ========== Suno歌詞自動提案API ==========
 // Suno用に最適化された歌詞とスタイルプロンプトを生成
 // Sunoは1日5曲無料（4分以下/曲）で作れる
@@ -28859,11 +29397,57 @@ HTMLコードだけを出力（コードブロック不要）:`
       }
     }
     
-    // ========== 第3候補: AI提案コメント方式 ==========
-    // 上記で対応できなかった場合（地図・写真・その他）
+    // ========== 第3候補: Nano Banana 2 画像生成（デフォルト） ==========
+    // JSXGraph/HTML表で対応できなかった場合 → AI画像生成を優先
+    // 以前は「提案モード」が先だったが、Nano Banana 2で直接画像を生成する方が有用
     if (!prefer_image && prefer_model !== 'nano_banana_pro') {
-      console.log('💡 AI図解提案モード:', prompt.substring(0, 80))
+      console.log('🎨 Nano Banana 2 デフォルト画像生成モード:', prompt.substring(0, 80))
       
+      // まずNano Banana 2で画像を直接生成
+      try {
+        const nb2SysPrompt = `あなたは日本の小学校・中学校の教科書に載るような、正確で分かりやすい教育用の図やイラストを生成する専門家です。
+数値やデータは問題文から正確に読み取り図に反映。ラベル・単位・目盛りは日本語で大きく読みやすく。
+色使いはカラフルで見やすく、小学生でも理解しやすいこと。教科書品質の正確さと見やすさを両立。`
+        
+        const nb2Resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: `${nb2SysPrompt}\n\n${userContext}\n\nこの内容に合った正確な教育用の図を1つ生成してください。` }] }],
+              generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 }
+            })
+          }
+        )
+        
+        if (nb2Resp.ok) {
+          const nb2Data = await nb2Resp.json() as any
+          const nb2Parts = nb2Data.candidates?.[0]?.content?.parts || []
+          let nb2ImageUrl = ''
+          let nb2Text = ''
+          for (const part of nb2Parts) {
+            if (part.inlineData) {
+              nb2ImageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`
+            }
+            if (part.text && !part.thought) nb2Text += part.text
+          }
+          
+          if (nb2ImageUrl) {
+            if (card_id) {
+              try { await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?').bind(nb2ImageUrl, Number(card_id)).run() } catch {}
+            }
+            const genTime = Date.now() - startTime
+            console.log(`✅ Nano Banana 2 デフォルト画像生成成功 (${genTime}ms)`)
+            return c.json({ success: true, image_url: nb2ImageUrl, type: 'image', ai_description: nb2Text.substring(0, 200), generation_time_ms: genTime, model: 'Nano Banana 2', message: '教育用図解を生成しました' })
+          }
+        }
+        console.warn('⚠️ Nano Banana 2: 画像なし、提案フォールバックへ')
+      } catch (nb2Err: any) {
+        console.warn('⚠️ Nano Banana 2 エラー:', nb2Err.message)
+      }
+      
+      // フォールバック: AI提案コメント方式（画像生成失敗時のみ）
       try {
         const suggestionPrompt = `あなたは日本の小学校の教育コンテンツ専門家です。
 以下の学習カードに最適な「視覚教材」を提案してください。
