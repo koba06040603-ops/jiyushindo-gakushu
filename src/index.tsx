@@ -11144,6 +11144,8 @@ app.get('/guide/:curriculumId', async (c) => {
   var _ttsAudioCtx = null;
   var _ttsPlaying = false;
   var _ttsCurrentSource = null;
+  // グローバル変数としてindex.tsx側のソースも公開（app.jsのstopGlobalTtsから連携停止）
+  window._ttsCurrentSource = null;
 
   function speakGuideText(el, moodOverride) {
     var text = '';
@@ -11152,21 +11154,27 @@ app.get('/guide/:curriculumId', async (c) => {
     if (!text) { var card = ALL_CARDS[currentPage]; text = card ? (card.problem_text || card.card_title || '') : ''; }
     if (!text) return;
 
-    // 再生中ならストップ
+    // 再生中ならストップ（app.js側のglobal TTSも停止）
     if (_ttsPlaying) {
       if (_ttsCurrentSource) { try { _ttsCurrentSource.stop(); } catch(e){} }
       if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel();
       _ttsPlaying = false;
+      window._ttsCurrentSource = null;
+      restoreVolumeIcon(el);
+      // app.js側のTTSも停止
+      if (typeof window.stopGlobalTts === 'function') window.stopGlobalTts();
       return;
     }
 
     _ttsPlaying = true;
 
-    // ボタンUIを変更
+    // ボタンUIを変更（スピナー→停止アイコンに変更）
     if (el && el.querySelector) {
       var icon = el.querySelector('i.fa-volume-up');
       if (icon) { icon.className = 'fas fa-spinner fa-spin'; }
     }
+    // フローティングボタンも更新
+    if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(true);
 
     // Gemini TTS APIを呼び出す
     var currentMood = moodOverride || (window._currentMood || '');
@@ -11182,12 +11190,13 @@ app.get('/guide/:curriculumId', async (c) => {
         playPcmAudio(data.audioContent, data.sampleRate || 24000, function() {
           _ttsPlaying = false;
           restoreVolumeIcon(el);
+          if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false);
         });
       } else if (data.success && data.audioContent) {
         // MP3形式のフォールバック
         var audioSrc = 'data:audio/mp3;base64,' + data.audioContent;
         var audio = new Audio(audioSrc);
-        audio.onended = function() { _ttsPlaying = false; restoreVolumeIcon(el); };
+        audio.onended = function() { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); };
         audio.onerror = function() { fallbackWebSpeech(text, el); };
         audio.play().catch(function() { fallbackWebSpeech(text, el); });
       } else {
@@ -11219,6 +11228,7 @@ app.get('/guide/:curriculumId', async (c) => {
       source.connect(_ttsAudioCtx.destination);
       source.onended = onEnd;
       _ttsCurrentSource = source;
+      window._ttsCurrentSource = source;
       source.start(0);
     } catch (e) {
       console.warn('PCM再生エラー:', e);
@@ -11227,13 +11237,13 @@ app.get('/guide/:curriculumId', async (c) => {
   }
 
   function fallbackWebSpeech(text, el) {
-    if (!('speechSynthesis' in window)) { _ttsPlaying = false; restoreVolumeIcon(el); return; }
+    if (!('speechSynthesis' in window)) { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); return; }
     var u = new SpeechSynthesisUtterance(text);
     u.lang = 'ja-JP'; u.rate = 0.85; u.pitch = 1.1;
     var voices = speechSynthesis.getVoices();
     var jpV = voices.find(function(v){return v.lang.startsWith('ja');});
     if (jpV) u.voice = jpV;
-    u.onend = function() { _ttsPlaying = false; restoreVolumeIcon(el); };
+    u.onend = function() { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); };
     speechSynthesis.speak(u);
   }
 

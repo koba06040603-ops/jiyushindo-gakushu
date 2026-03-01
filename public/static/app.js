@@ -6961,10 +6961,11 @@ function addAIMessage(message, sender, loadingId = null) {
   
   messageDiv.innerHTML = `
     <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border-2 border-gray-200'} rounded-lg p-4 ${sender === 'user' ? 'max-w-[80%]' : 'max-w-[95%]'} shadow">
-      ${sender === 'ai' ? '<div class="flex items-center mb-2"><i class="fas fa-robot text-blue-500 mr-2"></i><span class="font-bold text-sm">AI先生</span></div>' : ''}
+      ${sender === 'ai' ? '<div class="flex items-center mb-2"><i class="fas fa-robot text-blue-500 mr-2"></i><span class="font-bold text-sm">AI先生</span><button onclick="speakText(this.closest(\'[data-ai-msg]\').getAttribute(\'data-ai-msg\'))" style="margin-left:auto;background:none;border:1px solid #C7D2FE;border-radius:8px;padding:2px 8px;cursor:pointer;font-size:0.7rem;color:#6366F1;" title="この回答を読み上げ"><i class="fas fa-volume-up"></i></button></div>' : ''}
       <p class="text-sm whitespace-pre-wrap leading-relaxed">${cleanMessage}</p>
     </div>
   `
+  if (sender === 'ai') messageDiv.setAttribute('data-ai-msg', cleanMessage.replace(/<[^>]*>/g, '').substring(0, 3000))
   
   aiChat.appendChild(messageDiv)
   aiChat.scrollTop = aiChat.scrollHeight
@@ -6998,61 +6999,19 @@ function updateAIMessage(messageId, newMessage) {
 
 // 問題文をゆっくり読み上げる
 // === Gemini TTS 音声再生エンジン（PCM 24kHz 16bit mono 対応） ===
-let _ttsAudioCtxCard = null
-let _ttsPlayingCard = false
-let _ttsCurrentSourceCard = null
-
-function playPcmAudioCard(base64Data, sampleRate, onEnd) {
-  try {
-    if (!_ttsAudioCtxCard) _ttsAudioCtxCard = new (window.AudioContext || window.webkitAudioContext)()
-    const raw = atob(base64Data)
-    const bytes = new Uint8Array(raw.length)
-    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
-    const samples = bytes.length / 2
-    const float32 = new Float32Array(samples)
-    const dv = new DataView(bytes.buffer)
-    for (let j = 0; j < samples; j++) {
-      float32[j] = dv.getInt16(j * 2, true) / 32768.0
-    }
-    const buffer = _ttsAudioCtxCard.createBuffer(1, float32.length, sampleRate)
-    buffer.getChannelData(0).set(float32)
-    const source = _ttsAudioCtxCard.createBufferSource()
-    source.buffer = buffer
-    source.connect(_ttsAudioCtxCard.destination)
-    source.onended = onEnd
-    _ttsCurrentSourceCard = source
-    source.start(0)
-  } catch (e) {
-    console.warn('PCM再生エラー:', e)
-    if (onEnd) onEnd()
-  }
-}
-
-function stopTtsCard() {
-  if (_ttsCurrentSourceCard) { try { _ttsCurrentSourceCard.stop() } catch(e){} }
-  if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel()
-  _ttsPlayingCard = false
-  _ttsCurrentSourceCard = null
-  // アイコンを復元
-  const icon = document.getElementById('tts-icon-main')
-  if (icon) { icon.className = 'fas fa-volume-up'; icon.closest('button')?.classList.remove('animate-pulse') }
-  document.querySelectorAll('[onclick="readCardAloud()"] i').forEach(i => {
-    i.className = i.className.replace('fa-spinner fa-spin', 'fa-volume-up').replace('fa-stop', 'fa-volume-up')
-    i.classList.remove('animate-pulse')
-  })
-}
+// readCardAloudも共通のglobal TTS を使用
 
 function readCardAloud() {
   console.log('🔊 readCardAloud 呼び出し')
   
   // 再生中ならストップ
-  if (_ttsPlayingCard) {
+  if (_globalTtsPlaying) {
+    stopGlobalTts()
     stopTtsCard()
     return
   }
   
   // UIを読み上げ中に
-  _ttsPlayingCard = true
   const mainIcon = document.getElementById('tts-icon-main')
   if (mainIcon) { mainIcon.className = 'fas fa-spinner fa-spin'; mainIcon.closest('button')?.classList.add('animate-pulse') }
   document.querySelectorAll('[onclick="readCardAloud()"] i.fa-volume-up').forEach(i => i.className = 'fas fa-spinner fa-spin')
@@ -7063,9 +7022,7 @@ function readCardAloud() {
   const card = cardData?.card || cardData
   
   if (card && typeof card === 'object') {
-    // audio_instruction を優先（問題の解き方ガイド付き）
     text = card._audio_instruction || card.problem_text || card.problem_content || card.problem_description || card.card_title || ''
-    console.log('🔊 カードデータから取得:', text.substring(0, 50))
   }
   
   if (!text) {
@@ -7083,8 +7040,10 @@ function readCardAloud() {
     return
   }
   
-  // ★ Gemini TTS API を使用（高品質音声）→ フォールバック: Web Speech API
-  console.log('🔊 Gemini TTS API 呼び出し中...')
+  // Gemini TTS APIで読み上げ（speakTextと同じエンジン）
+  _globalTtsPlaying = true
+  updateFloatingTtsButton(true)
+  
   fetch('/api/ai/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -7093,18 +7052,16 @@ function readCardAloud() {
   .then(r => r.json())
   .then(data => {
     if (data.success && data.audioContent && data.audioFormat === 'pcm') {
-      console.log(`✅ Gemini TTS 成功 (${data.generation_time_ms}ms, ${data.method})`)
-      // アイコンを停止ボタンに変更
       const mi = document.getElementById('tts-icon-main')
       if (mi) mi.className = 'fas fa-stop'
-      playPcmAudioCard(data.audioContent, data.sampleRate || 24000, () => {
+      playPcmGlobal(data.audioContent, data.sampleRate || 24000, () => {
         stopTtsCard()
+        stopGlobalTts()
         try { TactileSounds.play('correct') } catch(e) {}
       })
     } else if (data.success && data.audioContent) {
-      // MP3フォールバック
       const audio = new Audio('data:audio/mp3;base64,' + data.audioContent)
-      audio.onended = () => { stopTtsCard(); try { TactileSounds.play('correct') } catch(e) {} }
+      audio.onended = () => { stopTtsCard(); stopGlobalTts() }
       audio.onerror = () => fallbackWebSpeechCard(text)
       audio.play().catch(() => fallbackWebSpeechCard(text))
     } else {
@@ -7112,7 +7069,7 @@ function readCardAloud() {
     }
   })
   .catch(err => {
-    console.warn('Gemini TTS エラー、Web Speech APIへフォールバック:', err.message)
+    console.warn('Gemini TTS エラー:', err.message)
     fallbackWebSpeechCard(text)
   })
 }
@@ -11491,56 +11448,208 @@ window.shufflePoetryWords = shufflePoetryWords
 // /自動視覚支援ウィジェットエンジン END
 // ====================================================================
 
-// 音声合成（テキスト読み上げ）
-async function speakText(text, voiceType = 'female-friendly', speed = 0.95) {
-  console.log('🎤 speakText 呼び出し:', { text: text.substring(0, 50) + '...', voiceType, speed })
+// ====================================================================
+// 統一音声読み上げエンジン - Gemini 2.5 Flash Preview TTS (Achird=Friendly)
+// すべての画面で同じ高品質音声を使用
+// ====================================================================
+let _globalTtsPlaying = false
+let _globalTtsSource = null
+let _globalTtsAudioCtx = null
+let _globalTtsAudio = null  // Audio要素（MP3フォールバック用）
+
+// === カード読み上げ用の停止関数（readCardAloudから呼ばれる） ===
+function stopTtsCard() {
+  _globalTtsPlaying = false
+  if (_globalTtsSource) { try { _globalTtsSource.stop() } catch(e){} }
+  _globalTtsSource = null
+  if (_globalTtsAudio) { try { _globalTtsAudio.pause(); _globalTtsAudio = null } catch(e){} }
+  if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel()
+  // UIアイコンを復元
+  const mi = document.getElementById('tts-icon-main')
+  if (mi) { mi.className = 'fas fa-volume-up'; const btn = mi.closest('button'); if (btn) btn.classList.remove('animate-pulse') }
+  document.querySelectorAll('[onclick="readCardAloud()"] i.fa-spinner, [onclick="readCardAloud()"] i.fa-stop').forEach(i => i.className = 'fas fa-volume-up')
+  updateFloatingTtsButton(false)
+}
+window.stopTtsCard = stopTtsCard
+
+// === 全TTS停止（マスター停止） ===
+function stopGlobalTts() {
+  if (_globalTtsSource) { try { _globalTtsSource.stop() } catch(e){} }
+  if (_globalTtsAudio) { try { _globalTtsAudio.pause(); _globalTtsAudio = null } catch(e){} }
+  if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel()
+  _globalTtsPlaying = false
+  _globalTtsSource = null
+  // index.tsx側のTTSも停止（グローバル変数連携）
+  if (window._ttsCurrentSource) { try { window._ttsCurrentSource.stop() } catch(e){} window._ttsCurrentSource = null }
+  // フローティングボタンを復元
+  updateFloatingTtsButton(false)
+}
+
+// === フローティング読み上げボタンの更新 ===
+function updateFloatingTtsButton(isPlaying) {
+  const btn = document.getElementById('floating-tts-btn')
+  if (!btn) return
+  if (isPlaying) {
+    btn.innerHTML = '<i class="fas fa-stop"></i>'
+    btn.title = '読み上げ停止'
+    btn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600')
+    btn.classList.add('bg-red-500', 'hover:bg-red-600', 'animate-pulse')
+  } else {
+    btn.innerHTML = '<i class="fas fa-headphones"></i>'
+    btn.title = '選択テキストを読み上げ'
+    btn.classList.remove('bg-red-500', 'hover:bg-red-600', 'animate-pulse')
+    btn.classList.add('bg-emerald-500', 'hover:bg-emerald-600')
+  }
+}
+
+// === フローティング読み上げボタンの作成 ===
+function createFloatingTtsButton() {
+  if (document.getElementById('floating-tts-btn')) return
+  
+  const btn = document.createElement('button')
+  btn.id = 'floating-tts-btn'
+  btn.innerHTML = '<i class="fas fa-headphones"></i>'
+  btn.title = '選択テキストを読み上げ'
+  btn.style.cssText = 'position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;border:none;color:white;font-size:1.4rem;cursor:pointer;z-index:9999;box-shadow:0 4px 15px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;'
+  btn.className = 'bg-emerald-500 hover:bg-emerald-600'
+  
+  btn.onclick = function() {
+    // 再生中なら停止
+    if (_globalTtsPlaying) {
+      stopGlobalTts()
+      stopTtsCard()
+      return
+    }
+    
+    // テキスト選択があればそれを読み上げ
+    const selectedText = window.getSelection().toString().trim()
+    if (selectedText && selectedText.length > 0) {
+      speakText(selectedText, 'female-friendly', 0.85)
+      return
+    }
+    
+    // 選択なしの場合は現在の問題文を読み上げ
+    readCardAloud()
+  }
+  
+  document.body.appendChild(btn)
+  
+  // 選択テキストがあるときに視覚的にフィードバック
+  document.addEventListener('selectionchange', function() {
+    const btn = document.getElementById('floating-tts-btn')
+    if (!btn || _globalTtsPlaying) return
+    const sel = window.getSelection().toString().trim()
+    if (sel && sel.length > 1) {
+      btn.innerHTML = '<i class="fas fa-play"></i>'
+      btn.title = '「' + sel.substring(0, 20) + (sel.length > 20 ? '...' : '') + '」を読み上げ'
+      btn.style.transform = 'scale(1.1)'
+    } else {
+      btn.innerHTML = '<i class="fas fa-headphones"></i>'
+      btn.title = '選択テキストを読み上げ'
+      btn.style.transform = 'scale(1)'
+    }
+  })
+}
+
+// ページ読み込み時にフローティングボタンを作成
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', createFloatingTtsButton)
+} else {
+  setTimeout(createFloatingTtsButton, 500)
+}
+
+function playPcmGlobal(base64Data, sampleRate, onEnd) {
+  try {
+    if (!_globalTtsAudioCtx) _globalTtsAudioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    const raw = atob(base64Data)
+    const bytes = new Uint8Array(raw.length)
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
+    const samples = bytes.length / 2
+    const float32 = new Float32Array(samples)
+    const dv = new DataView(bytes.buffer)
+    for (let j = 0; j < samples; j++) {
+      float32[j] = dv.getInt16(j * 2, true) / 32768.0
+    }
+    const buffer = _globalTtsAudioCtx.createBuffer(1, float32.length, sampleRate)
+    buffer.getChannelData(0).set(float32)
+    const source = _globalTtsAudioCtx.createBufferSource()
+    source.buffer = buffer
+    source.connect(_globalTtsAudioCtx.destination)
+    source.onended = onEnd
+    _globalTtsSource = source
+    source.start(0)
+  } catch (e) {
+    console.warn('PCM再生エラー:', e)
+    if (onEnd) onEnd()
+  }
+}
+
+async function speakText(text, voiceType = 'female-friendly', speed = 0.85) {
+  if (!text || text.trim().length < 1) return
+  
+  // 再生中なら停止
+  if (_globalTtsPlaying) {
+    stopGlobalTts()
+    return
+  }
+  
+  _globalTtsPlaying = true
+  updateFloatingTtsButton(true)
+  
+  console.log('🎤 speakText(Gemini TTS):', text.substring(0, 50) + '...')
   
   try {
-    // まず Google Cloud TTS を試行
-    console.log('📡 Google Cloud TTS API を呼び出します...')
     const response = await axios.post('/api/ai/tts', {
-      text,
+      text: text.substring(0, 3000),
       voiceType,
       speed,
-      pitch: 0  // デフォルトのピッチ
-    })
-    
-    console.log('📦 TTS API レスポンス:', { 
-      success: response.data.success, 
-      hasAudioContent: !!response.data.audioContent,
-      fallback: response.data.fallbackToWebSpeech 
+      mood: window._currentMood || ''
     })
     
     if (response.data.success && response.data.audioContent) {
-      // Google Cloud TTS で音声を再生
-      console.log('✅ Google Cloud TTS を使用して音声を再生します')
-      const audio = new Audio('data:audio/mp3;base64,' + response.data.audioContent)
-      
-      // 音声アイコンを表示
-      const voiceButton = document.getElementById('voiceButton')
-      if (voiceButton) {
-        voiceButton.innerHTML = '<i class="fas fa-volume-up"></i>'
+      if (response.data.audioFormat === 'pcm') {
+        // PCM再生（Gemini TTS標準出力）
+        playPcmGlobal(response.data.audioContent, response.data.sampleRate || 24000, () => {
+          _globalTtsPlaying = false
+          updateFloatingTtsButton(false)
+          try { TactileSounds.play('correct') } catch(e) {}
+        })
+      } else {
+        // MP3フォールバック
+        const audio = new Audio('data:audio/mp3;base64,' + response.data.audioContent)
+        audio.onended = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false) }
+        audio.onerror = () => speakTextWebSpeechFallback(text, speed)
+        await audio.play()
       }
-      
-      audio.onended = () => {
-        console.log('🔇 Google Cloud TTS 再生終了')
-        if (voiceButton) {
-          voiceButton.innerHTML = '<i class="fas fa-microphone"></i>'
-        }
-      }
-      
-      await audio.play()
       return
-    } else {
-      console.log('⚠️ Google Cloud TTS が利用できません → Web Speech API へフォールバック')
     }
   } catch (error) {
-    console.warn('⚠️ Google Cloud TTS エラー → Web Speech API へフォールバック:', error.message, error)
+    console.warn('Gemini TTS エラー:', error.message)
   }
   
-  // Google Cloud TTS が失敗した場合、Web Speech API を使用（最適化版）
-  console.log('🔊 Web Speech API を使用します')
-  speakTextWithWebSpeech(text, speed, voiceType)
+  // フォールバック: Web Speech API
+  speakTextWebSpeechFallback(text, speed)
+}
+
+function speakTextWebSpeechFallback(text, speed = 0.85) {
+  if (!('speechSynthesis' in window)) {
+    _globalTtsPlaying = false
+    updateFloatingTtsButton(false)
+    return
+  }
+  speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = 'ja-JP'
+  u.rate = speed
+  u.pitch = 1.1
+  const voices = speechSynthesis.getVoices()
+  const jaVoice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
+    || voices.find(v => v.lang === 'ja-JP')
+    || voices.find(v => v.lang.startsWith('ja'))
+  if (jaVoice) u.voice = jaVoice
+  u.onend = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false) }
+  u.onerror = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false) }
+  speechSynthesis.speak(u)
 }
 
 // Web Speech API を使用した音声読み上げ（最適化版）
@@ -12334,6 +12443,9 @@ window.toggleHandwriting = toggleHandwriting
 window.closeHandwriting = closeHandwriting
 window.clearHandwriting = clearHandwriting
 window.sendHandwriting = sendHandwriting
+window.stopGlobalTts = stopGlobalTts
+window.stopTtsCard = stopTtsCard
+window.updateFloatingTtsButton = updateFloatingTtsButton
 
 // 音声自動読み上げON/OFF切り替え
 function toggleAutoVoice() {
@@ -12357,8 +12469,10 @@ function toggleAutoVoice() {
     toggle.classList.add('bg-gray-200', 'hover:bg-gray-300', 'text-gray-700')
     toggle.innerHTML = '<i class="fas fa-volume-mute mr-1"></i><span id="autoVoiceStatus">読み上げOFF</span>'
     
-    // 読み上げを停止
-    speechSynthesis.cancel()
+    // すべての読み上げを停止
+    stopGlobalTts()
+    stopTtsCard()
+    if ('speechSynthesis' in window) speechSynthesis.cancel()
   }
 }
 
