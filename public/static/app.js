@@ -11063,20 +11063,89 @@ function initVisualWidgets() {
   
   if (!container) return
   
-  // detectVisualWidget は必ず型を返す（universal含む）ので、全カードに視覚支援表示
-  setTimeout(() => {
-    const rendered = renderVisualWidget(containerId, card)
-    if (!rendered) {
-      // 万一 renderVisualWidget が false を返した場合のみフォールバック
-      renderFallbackVisual(container, card)
+  // ★ Nano Banana 2 で問題連動型の図解を動的生成
+  // 固定テンプレートではなく、NB2が問題内容を理解して最適な図解を設計
+  container.innerHTML = `
+    <div id="nb2-visual-${cardId}" style="background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border:2px dashed #DDD6FE;border-radius:16px;padding:20px;text-align:center;">
+      <div style="display:inline-block;width:40px;height:40px;border:3px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px;"></div>
+      <p style="font-size:1rem;font-weight:bold;color:#7C3AED;">🧠 Nano Banana 2 が図解を設計中...</p>
+      <p style="font-size:0.8rem;color:#9CA3AF;margin-top:4px;">問題に合った視覚教材を生成しています（10〜20秒）</p>
+    </div>
+    <div id="nb2-visual-toolbar-${cardId}" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px;"></div>
+  `
+  
+  const problemText = card.problem_text || card.problem_content || ''
+  const cardTitle = card.card_title || ''
+  
+  fetch('/api/ai/generate-tactile-widget', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      card_id: cardId,
+      card_title: cardTitle,
+      problem_text: problemText.substring(0, 800),
+      tactile_activity: '問題内容を理解しやすくする正確な図解・ダイアグラムを生成してください。問題の数値・図形・関係性を正確に反映した視覚教材が必要です。',
+      subject: card.subject || '',
+      grade: card.grade_level || '',
+      unit_name: card.unit_name || ''
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    const area = document.getElementById('nb2-visual-' + cardId)
+    const toolbar = document.getElementById('nb2-visual-toolbar-' + cardId)
+    if (!area) return
+    
+    if (data.success && data.widget_html) {
+      area.innerHTML = `
+        <div style="background:white;border-radius:16px;border:2px solid #E5E7EB;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+          <div style="background:linear-gradient(135deg,#7C3AED,#EC4899);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;">
+            <span style="color:white;font-size:0.8rem;font-weight:bold;"><i class="fas fa-robot" style="margin-right:5px;"></i>Nano Banana 2 図解</span>
+            <span style="color:rgba(255,255,255,0.8);font-size:0.7rem;">${((data.generation_time_ms||0)/1000).toFixed(1)}秒</span>
+          </div>
+          <div style="padding:14px;" id="nb2-visual-content-${cardId}">${data.widget_html}</div>
+        </div>
+      `
+      if (data.illustration_url) {
+        area.innerHTML += `<div style="margin-top:10px;text-align:center;">
+          <img src="${data.illustration_url}" alt="NB2図解" style="max-width:100%;max-height:300px;border-radius:14px;border:2px solid #DDD6FE;box-shadow:0 4px 16px rgba(124,58,237,0.15);" />
+        </div>`
+      }
+    } else if (data.success && data.illustration_url) {
+      area.innerHTML = `<div style="text-align:center;padding:14px;">
+        <img src="${data.illustration_url}" alt="NB2図解" style="max-width:100%;max-height:300px;border-radius:14px;border:2px solid #DDD6FE;" />
+        <p style="font-size:0.7rem;color:#9CA3AF;margin-top:6px;">Nano Banana 2（${((data.generation_time_ms||0)/1000).toFixed(1)}秒）</p>
+      </div>`
+    } else {
+      area.innerHTML = `<div style="padding:14px;text-align:center;background:#FEF3C7;border-radius:14px;border:1px solid #FDE68A;">
+        <p style="font-size:0.85rem;color:#92400E;">⚠️ 図解生成に失敗しました</p>
+      </div>`
     }
-    // ★ 作図問題なら回答ウィジェットを差し替え
-    // 前の作図状態をクリア
-    window._constructionStates = {}
-    if (typeof initConstructionAnswerWidget === 'function') {
-      try { initConstructionAnswerWidget(card) } catch (e) { console.warn('作図ウィジェット初期化エラー:', e) }
+    
+    // ツールバー: 再生成・修正・画像生成
+    if (toolbar) {
+      toolbar.innerHTML = `
+        <button onclick="regenerateVisualWidget('${cardId}')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🧠 NB2で再生成</button>
+        <button onclick="editVisualWidget('${cardId}')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>
+        <button onclick="window.generateImageForCard && generateImageForCard(${cardId})" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>🎨 別の画像</button>
+      `
     }
-  }, 150)
+  })
+  .catch(err => {
+    const area = document.getElementById('nb2-visual-' + cardId)
+    if (area) {
+      area.innerHTML = `<div style="padding:14px;text-align:center;background:#FEF2F2;border-radius:14px;border:1px solid #FECACA;">
+        <p style="font-size:0.85rem;color:#DC2626;">通信エラー: ${err.message || ''}</p>
+        <button onclick="regenerateVisualWidget('${cardId}')" style="margin-top:8px;background:#7C3AED;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 再試行</button>
+      </div>`
+    }
+  })
+  
+  // ★ 作図問題なら回答ウィジェットも差し替え
+  window._constructionStates = {}
+  if (typeof initConstructionAnswerWidget === 'function') {
+    try { initConstructionAnswerWidget(card) } catch (e) { console.warn('作図ウィジェット初期化エラー:', e) }
+  }
 }
 
 // 視覚支援が一切ないカードへのフォールバックビジュアル
@@ -11160,6 +11229,67 @@ function renderFallbackVisual(container, card) {
 
 window.initVisualWidgets = initVisualWidgets
 window.renderVisualWidget = renderVisualWidget
+
+// === NB2 図解ウィジェット: 再生成 ===
+window.regenerateVisualWidget = function(cardId) {
+  const cardData = window.currentCardData
+  const card = cardData?.card || cardData
+  if (!card) return
+  initVisualWidgets() // 再度呼び出して再生成
+}
+
+// === NB2 図解ウィジェット: 修正指示 ===
+window.editVisualWidget = function(cardId) {
+  const cardData = window.currentCardData
+  const card = cardData?.card || cardData
+  if (!card) return
+  const instruction = prompt('図解の修正指示を入力してください\n例:「平行移動の図を描いて」「三角形を追加して」「矢印で移動方向を示して」')
+  if (!instruction) return
+  
+  const area = document.getElementById('nb2-visual-' + cardId)
+  if (area) {
+    area.innerHTML = `<div style="padding:16px;text-align:center;background:linear-gradient(135deg,#FFFBEB,#FDF2F8);border-radius:14px;border:2px dashed #F59E0B;">
+      <div style="display:inline-block;width:36px;height:36px;border:3px solid #F59E0B;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:8px;"></div>
+      <p style="font-size:0.9rem;font-weight:bold;color:#D97706;">✏️ NB2で修正中: ${instruction.substring(0,30)}...</p>
+    </div>`
+  }
+  
+  fetch('/api/ai/generate-tactile-widget', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      card_id: cardId,
+      card_title: card.card_title || '',
+      problem_text: (card.problem_text || card.problem_content || '').substring(0, 800),
+      tactile_activity: '問題内容を理解しやすくする正確な図解・ダイアグラムを生成してください。',
+      subject: card.subject || '',
+      grade: card.grade_level || '',
+      unit_name: card.unit_name || '',
+      edit_instruction: instruction
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!area) return
+    if (data.success && data.widget_html) {
+      area.innerHTML = `<div style="background:white;border-radius:14px;border:2px solid #F59E0B;overflow:hidden;box-shadow:0 2px 8px rgba(245,158,11,0.15);">
+        <div style="background:linear-gradient(135deg,#F59E0B,#D97706);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">
+          <span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-edit" style="margin-right:4px;"></i>修正版 by Nano Banana 2</span>
+          <span style="color:rgba(255,255,255,0.8);font-size:0.65rem;">${((data.generation_time_ms||0)/1000).toFixed(1)}秒</span>
+        </div>
+        <div style="padding:14px;">${data.widget_html}</div>
+      </div>`
+      if (data.illustration_url) {
+        area.innerHTML += `<div style="margin-top:8px;text-align:center;"><img src="${data.illustration_url}" style="max-width:100%;max-height:250px;border-radius:12px;" /></div>`
+      }
+    } else {
+      area.innerHTML = `<div style="padding:12px;text-align:center;color:#DC2626;font-size:0.85rem;">修正失敗: ${data.error || ''}</div>`
+    }
+  })
+  .catch(err => {
+    if (area) area.innerHTML = `<div style="padding:12px;text-align:center;color:#DC2626;">通信エラー: ${err.message}</div>`
+  })
+}
 
 // ========== 動的ウィジェット: 詩の音読ハイライト ==========
 function highlightPoetryLine(el) {
@@ -36234,6 +36364,7 @@ window.generateVisualDemo = generateVisualDemo
 window.generateVideoDemo = generateVideoDemo
 window.generateAudioDemo = generateAudioDemo
 window.generateMusicDemo = generateMusicDemo
+window.editMusicDemo = editMusicDemo
 window.generateKinestheticDemo = generateKinestheticDemo
 
 // Suno相当のAI音楽を生成（AIML API経由）
@@ -42091,86 +42222,182 @@ async function demoCase2Music() {
 // 音楽生成デモ実行
 async function generateMusicDemo() {
   const resultDiv = document.getElementById('musicResult')
+  if (!resultDiv) return
+  
+  // 現在のカード情報を取得
+  const cardData = window.currentCardData
+  const card = cardData?.card || cardData || {}
+  const state = window.state || {}
+  const curriculum = state.curriculum || {}
+  const cardTitle = card.card_title || curriculum.unit_name || '学習内容'
+  const subject = card.subject || curriculum.subject || ''
+  const grade = card.grade_level || curriculum.grade || ''
+  const unitName = card.unit_name || curriculum.unit_name || ''
+  const problemText = card.problem_text || card.problem_content || ''
   
   resultDiv.innerHTML = `
-    <div class="text-center py-8">
-      <div class="animate-spin mb-4 mx-auto">
-        <i class="fas fa-spinner text-6xl text-blue-600"></i>
+    <div class="text-center py-8" style="background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border-radius:14px;padding:24px;">
+      <div style="display:inline-block;width:48px;height:48px;border:4px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:12px;"></div>
+      <p style="font-size:1.1rem;font-weight:bold;color:#7C3AED;">🧠 Nano Banana 2 が学習ソングを作曲中...</p>
+      <p style="font-size:0.8rem;color:#8B5CF6;margin-top:6px;">歌詞・メロディ構成・ジャケット画像を生成中（15〜30秒）</p>
+      <div style="margin-top:12px;height:4px;background:#E5E7EB;border-radius:2px;overflow:hidden;max-width:300px;margin-left:auto;margin-right:auto;">
+        <div style="height:100%;background:linear-gradient(90deg,#7C3AED,#EC4899,#F59E0B);width:40%;animation:progressBar 2s ease-in-out infinite;border-radius:2px;"></div>
       </div>
-      <p class="text-blue-700 font-semibold">歌詞生成中...</p>
     </div>
   `
   
   try {
-    const response = await fetch('/api/media/generate-music', {
+    const response = await fetch('/api/ai/generate-nb2-music', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        lyrics: '九九の歌（3の段）',
-        style: 'educational'
+        card_title: cardTitle,
+        problem_text: problemText.substring(0, 400),
+        topic: cardTitle,
+        subject: subject,
+        grade: grade,
+        unit_name: unitName
       })
     })
     
-    if (!response.ok) throw new Error('音楽生成に失敗しました')
+    if (!response.ok) throw new Error('音楽生成に失敗しました (HTTP ' + response.status + ')')
     
     const data = await response.json()
     
-    // YouTubeリンクHTML生成
-    let youtubeLinksHtml = ''
-    if (data.youtubeLinks && data.youtubeLinks.length > 0) {
-      youtubeLinksHtml = `
-        <div class="bg-red-50 p-4 rounded border border-red-200 max-w-md mx-auto mb-4">
-          <h4 class="font-bold text-sm text-red-800 mb-3 flex items-center">
-            <i class="fab fa-youtube text-red-600 mr-2"></i>
-            実際の歌を聴く（YouTube）
-          </h4>
-          <div class="space-y-2">
-            ${data.youtubeLinks.map(link => `
-              <a href="${link.url}" target="_blank" 
-                class="block p-3 bg-white rounded border hover:border-red-400 transition">
-                <p class="text-sm font-semibold text-gray-800 mb-1">
-                  <i class="fas fa-play-circle text-red-600 mr-1"></i>
-                  ${link.title}
-                </p>
-                <p class="text-xs text-gray-600">${link.description}</p>
-              </a>
-            `).join('')}
+    if (data.success && data.song_data) {
+      const sd = data.song_data
+      const si = data.suno_info || {}
+      
+      let html = `<div style="background:white;border:2px solid #C4B5FD;border-radius:16px;overflow:hidden;">`
+      
+      // ヘッダー
+      html += `<div style="background:linear-gradient(135deg,#7C3AED,#EC4899);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:2rem;">🎵</span>
+          <div><strong style="color:white;font-size:1.1rem;">${sd.song_title || '学習ソング'}</strong>
+          <p style="font-size:0.75rem;color:rgba(255,255,255,0.85);margin-top:2px;">${sd.genre || 'ポップ'} • ${sd.tempo_bpm || 120}BPM${sd.key ? ' • ' + sd.key : ''}</p></div>
+        </div>
+        <span style="color:rgba(255,255,255,0.7);font-size:0.7rem;text-align:right;">Nano Banana 2<br>${((data.generation_time_ms||0)/1000).toFixed(1)}秒</span>
+      </div>`
+      
+      html += `<div style="padding:16px;">`
+      
+      // ジャケット画像
+      if (data.cover_image_url) {
+        html += `<div style="text-align:center;margin-bottom:14px;">
+          <img src="${data.cover_image_url}" alt="ジャケット" style="max-width:100%;max-height:300px;border-radius:14px;border:2px solid #DDD6FE;box-shadow:0 4px 16px rgba(124,58,237,0.2);" />
+        </div>`
+      }
+      
+      // 歌詞
+      html += `<div style="background:#F5F3FF;border-radius:12px;padding:14px;margin-bottom:12px;border:1px solid #DDD6FE;">
+        <p style="font-size:0.8rem;font-weight:bold;color:#7C3AED;margin-bottom:8px;">🎤 歌詞</p>
+        <pre style="font-size:0.85rem;color:#4C1D95;white-space:pre-wrap;line-height:1.7;font-family:inherit;margin:0;max-height:300px;overflow-y:auto;cursor:pointer;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline='2px solid #22C55E';setTimeout(()=>this.style.outline='none',1000);">${(sd.short_lyrics || sd.lyrics || '').substring(0, 800)}<span style="display:block;font-size:0.65rem;color:#9CA3AF;margin-top:6px;">📋 タップでコピー</span></pre>
+      </div>`
+      
+      // メロディ説明
+      if (sd.melody_description) {
+        html += `<div style="background:#FFFBEB;border-left:4px solid #F59E0B;padding:10px 14px;border-radius:0 10px 10px 0;margin-bottom:12px;">
+          <strong style="font-size:0.8rem;color:#92400E;">🎼 メロディの特徴：</strong>
+          <p style="font-size:0.82rem;color:#374151;margin-top:3px;">${sd.melody_description}</p>
+        </div>`
+      }
+      
+      // 覚えられるポイント
+      if (sd.learning_points && sd.learning_points.length) {
+        html += `<div style="background:#F0FDF4;border-left:4px solid #22C55E;padding:10px 14px;border-radius:0 10px 10px 0;margin-bottom:12px;">
+          <strong style="font-size:0.8rem;color:#166534;">📚 この歌で覚えられること：</strong>
+          <p style="font-size:0.82rem;color:#374151;margin-top:3px;">${Array.isArray(sd.learning_points) ? sd.learning_points.join('、') : sd.learning_points}</p>
+        </div>`
+      }
+      
+      // 歌い方のコツ
+      if (sd.sing_along_tips) {
+        html += `<div style="display:flex;align-items:flex-start;gap:8px;background:#EEF2FF;border-radius:10px;padding:10px 14px;border:1px solid #C7D2FE;margin-bottom:12px;">
+          <span style="flex-shrink:0;font-size:1.2rem;">💡</span>
+          <p style="font-size:0.8rem;color:#4338CA;">${sd.sing_along_tips}</p>
+        </div>`
+      }
+      
+      // Sunoセクション
+      html += `<details style="margin-bottom:12px;background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;">
+        <summary style="padding:10px 14px;cursor:pointer;font-weight:bold;color:#92400E;font-size:0.85rem;">🎹 Sunoで本格曲を作る（1日5曲無料！）</summary>
+        <div style="padding:8px 14px 14px;">
+          <div style="margin-bottom:8px;">
+            <p style="font-size:0.75rem;font-weight:bold;color:#92400E;margin-bottom:4px;">🎨 Style Prompt：</p>
+            <div style="background:white;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.82rem;font-family:monospace;cursor:pointer;position:relative;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline='2px solid #22C55E';setTimeout(()=>this.style.outline='none',1000);">${sd.suno_style_prompt || 'upbeat J-pop, educational, catchy'}<span style="position:absolute;top:4px;right:6px;font-size:0.6rem;color:#9CA3AF;">📋コピー</span></div>
+          </div>
+          <div style="margin-bottom:8px;">
+            <p style="font-size:0.75rem;font-weight:bold;color:#92400E;margin-bottom:4px;">📝 Lyrics：</p>
+            <div style="background:white;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.75rem;white-space:pre-wrap;max-height:200px;overflow-y:auto;cursor:pointer;position:relative;" onclick="navigator.clipboard.writeText(this.innerText.trim());this.style.outline='2px solid #22C55E';setTimeout(()=>this.style.outline='none',1000);">${sd.lyrics || sd.short_lyrics || ''}<span style="position:absolute;top:4px;right:6px;font-size:0.6rem;color:#9CA3AF;">📋コピー</span></div>
+          </div>
+          <div style="background:#EFF6FF;border-radius:8px;padding:8px 12px;">
+            <p style="font-size:0.75rem;font-weight:bold;color:#1E40AF;margin-bottom:4px;">📖 使い方：</p>
+            ${(si.how_to || []).map(s => '<p style="font-size:0.72rem;color:#374151;margin-top:2px;">' + s + '</p>').join('')}
           </div>
         </div>
-      `
+      </details>`
+      
+      // ツールバー
+      html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+        <button onclick="generateMusicDemo()" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🧠 NB2で再生成</button>
+        <button onclick="editMusicDemo()" style="background:#F59E0B;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>
+      </div>`
+      
+      html += `</div></div>`
+      resultDiv.innerHTML = html
+    } else {
+      throw new Error(data.error || '生成に失敗しました')
     }
-    
-    resultDiv.innerHTML = `
-      <div class="py-4">
-        <div class="text-center mb-4">
-          <div class="animate-pulse">
-            <i class="fas fa-music text-6xl text-blue-600"></i>
-          </div>
-          <p class="text-blue-700 font-semibold mt-4 mb-4">🎵 九九の歌（3の段）</p>
-        </div>
-        <div class="bg-white p-4 rounded border max-w-md mx-auto mb-4">
-          <pre class="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">${data.lyrics}</pre>
-        </div>
-        ${youtubeLinksHtml}
-        <div class="bg-white p-3 rounded border max-w-md mx-auto">
-          <p class="text-xs text-gray-500 mb-2">
-            <i class="fas fa-check-circle text-green-500 mr-1"></i>
-            ${data.note}
-          </p>
-          <p class="text-xs text-gray-500">
-            <i class="fas fa-heart text-red-500 mr-1"></i>
-            明るく楽しいメロディで暗記を支援
-          </p>
-        </div>
-      </div>
-    `
   } catch (error) {
     resultDiv.innerHTML = `
-      <div class="text-center py-8 text-red-600">
-        <i class="fas fa-exclamation-circle text-4xl mb-2"></i>
-        <p>エラー: ${error.message}</p>
+      <div style="text-align:center;padding:20px;background:#FEF2F2;border-radius:14px;border:1px solid #FECACA;">
+        <p style="font-size:0.95rem;color:#DC2626;font-weight:bold;">😅 ${error.message}</p>
+        <button onclick="generateMusicDemo()" style="margin-top:10px;background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:8px 18px;border-radius:10px;font-weight:bold;font-size:0.85rem;cursor:pointer;">🔄 NB2で再試行</button>
       </div>
     `
+  }
+}
+
+// NB2音楽 修正指示（landing用）
+async function editMusicDemo() {
+  const instruction = prompt('曲の修正指示を入力してください\n例:「もっとラップ風にして」「テンポを速くして」「歌詞に公式を入れて」')
+  if (!instruction) return
+  const resultDiv = document.getElementById('musicResult')
+  if (!resultDiv) return
+  
+  const cardData = window.currentCardData
+  const card = cardData?.card || cardData || {}
+  const state = window.state || {}
+  const curriculum = state.curriculum || {}
+  
+  resultDiv.innerHTML = `<div style="padding:20px;text-align:center;background:linear-gradient(135deg,#FFFBEB,#FDF2F8);border-radius:14px;border:2px dashed #F59E0B;">
+    <div style="display:inline-block;width:36px;height:36px;border:3px solid #F59E0B;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:8px;"></div>
+    <p style="font-size:0.95rem;font-weight:bold;color:#D97706;">✏️ NB2で修正中: ${instruction.substring(0,30)}...</p>
+  </div>`
+  
+  try {
+    const resp = await fetch('/api/ai/generate-nb2-music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_title: card.card_title || curriculum.unit_name || '学習内容',
+        problem_text: (card.problem_text || '').substring(0, 400),
+        topic: card.card_title || curriculum.unit_name || '',
+        subject: card.subject || curriculum.subject || '',
+        grade: card.grade_level || curriculum.grade || '',
+        unit_name: card.unit_name || curriculum.unit_name || '',
+        edit_instruction: instruction
+      })
+    })
+    const data = await resp.json()
+    if (data.success) {
+      generateMusicDemo() // 再生成
+    } else {
+      resultDiv.innerHTML = `<div style="padding:14px;text-align:center;color:#DC2626;">修正失敗 <button onclick="generateMusicDemo()" style="color:#3B82F6;text-decoration:underline;border:none;background:none;cursor:pointer;">再試行</button></div>`
+    }
+  } catch (err) {
+    resultDiv.innerHTML = `<div style="padding:14px;text-align:center;color:#DC2626;">通信エラー <button onclick="generateMusicDemo()" style="color:#3B82F6;text-decoration:underline;border:none;background:none;cursor:pointer;">再試行</button></div>`
   }
 }
 
