@@ -8792,7 +8792,7 @@ app.get('/guide/:curriculumId', async (c) => {
 
     html += '</div>';
     container.innerHTML = html;
-    updateNavigation();
+    updateNavButtons();
     
     // 手書きキャンバスの初期化用にグローバル関数を確認
     if (typeof initDrawCanvas === 'function') {
@@ -8957,7 +8957,7 @@ app.get('/guide/:curriculumId', async (c) => {
           // 回答欄に挿入ボタン
           if (a.recognized_text) {
             rhtml += '<div style="text-align:center;margin-top:10px;">';
-            rhtml += '<button onclick="insertNoteText(' + page + ',\\x27' + (a.recognized_text||'').replace(/'/g,"\\'").replace(/\n/g,'\\n').substring(0,200) + '\\x27)" style="background:#4F46E5;color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.8rem;font-weight:bold;cursor:pointer;">📋 回答欄にコピー</button>';
+            rhtml += '<button onclick="insertNoteText(' + page + ',\\x27' + (a.recognized_text||'').replace(/'/g,"\\'").replace(/[\\r\\n]+/g,' ').substring(0,200) + '\\x27)" style="background:#4F46E5;color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.8rem;font-weight:bold;cursor:pointer;">📋 回答欄にコピー</button>';
             rhtml += '</div>';
           }
           
