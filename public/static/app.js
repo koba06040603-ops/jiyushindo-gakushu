@@ -3600,7 +3600,7 @@ async function loadGuidePage(curriculumId) {
           // バナーに「生成中...」を表示
           const autoGenBanners = document.querySelectorAll('.auto-gen-status-banner')
           autoGenBanners.forEach(banner => {
-            banner.innerHTML = '<div class="bg-blue-100 border border-blue-300 rounded-lg p-3 text-center mt-2"><i class="fas fa-spinner fa-spin text-blue-600 mr-1"></i><span class="text-sm font-bold text-blue-700">AIが問題を生成中です...（約30秒〜1分）</span></div>'
+            banner.innerHTML = '<div class="bg-blue-100 border border-blue-300 rounded-lg p-3 text-center mt-2"><i class="fas fa-spinner fa-spin text-blue-600 mr-1"></i><span class="text-sm font-bold text-blue-700">AIが問題を生成中です...（約30秒〜2分）</span></div>'
           })
           
           let generated = 0
@@ -5579,12 +5579,12 @@ async function regenerateCards(courseId, curriculumId) {
   if (!confirm('学習カードを再生成します。\nAIが8〜10枚の新しいカードを作成します。\nよろしいですか？')) return
   
   try {
-    loadingManager.show('AIが学習カードを生成中...（約30秒〜1分）')
+    loadingManager.show('AIが学習カードを生成中...（約30秒〜2分）')
     
     const response = await axios.post(`/api/courses/${courseId}/regenerate-cards`, {
       curriculum_id: curriculumId,
       target_count: 10
-    }, { timeout: 120000 })
+    }, { timeout: 180000 })
     
     loadingManager.hide()
     
@@ -21165,7 +21165,7 @@ async function executeUnitGeneration(params) {
       unitName,
       customization,
       qualityMode
-    }, { timeout: 120000 })  // 120秒タイムアウト
+    }, { timeout: 180000 })  // 180秒タイムアウト
 
     if (unitInfoResponse.data.error) {
       throw new Error(unitInfoResponse.data.error)
@@ -21223,7 +21223,7 @@ async function executeUnitGeneration(params) {
       }
       
       console.log(`📝 ステップ${i+2}/4: ${courseDef.info.name}を生成中...`)
-      updateGenerationProgress(`${courseDef.info.name}の学習カードを生成しています...（約30〜60秒）`, progressPercent)
+      updateGenerationProgress(`${courseDef.info.name}の学習カードを生成しています...（約30〜120秒）`, progressPercent)
       
       // 最大2回リトライ（フロントエンド側）
       let courseResponse = null
@@ -21246,7 +21246,7 @@ async function executeUnitGeneration(params) {
             courseLevel: courseDef.level,
             courseInfo: courseDef.info,
             customization
-          }, { timeout: 120000 })  // 120秒タイムアウト
+          }, { timeout: 180000 })  // 180秒タイムアウト（サーバー側150秒に対応）
           
           if (courseResponse.data.error) {
             console.error(`❌ ${courseDef.info.name}の生成エラー:`, courseResponse.data.error)

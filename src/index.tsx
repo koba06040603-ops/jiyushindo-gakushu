@@ -14480,7 +14480,7 @@ app.post('/api/ai/generate-course', async (c) => {
     })
     
     let courseData = null
-    const MAX_RETRIES = 2
+    const MAX_RETRIES = 3
     
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
@@ -14488,9 +14488,9 @@ app.post('/api/ai/generate-course', async (c) => {
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
         console.log(`🔄 コース生成試行 ${attempt}/${MAX_RETRIES} (${modelName})...`)
         
-      // AbortControllerでタイムアウト制御（75秒 — ベンチマーク結果28-30秒に十分な余裕）
+      // AbortControllerでタイムアウト制御（150秒 — 10枚カード+multimedia_ai_content生成に対応）
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 75000)
+      const timeoutId = setTimeout(() => controller.abort(), 150000)
       
       let response: Response
       try {
@@ -14512,8 +14512,8 @@ app.post('/api/ai/generate-course', async (c) => {
       } catch (fetchError: any) {
         clearTimeout(timeoutId)
         if (fetchError.name === 'AbortError') {
-          console.error(`❌ Gemini API タイムアウト（75秒）: 試行 ${attempt}/${MAX_RETRIES} (${modelName})`)
-          throw new Error(`Gemini API接続がタイムアウトしました（75秒）。モデル: ${modelName}`)
+          console.error(`❌ Gemini API タイムアウト（150秒）: 試行 ${attempt}/${MAX_RETRIES} (${modelName})`)
+          throw new Error(`Gemini API接続がタイムアウトしました（150秒）。モデル: ${modelName}`)
         }
         throw fetchError
       }
