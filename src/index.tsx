@@ -448,6 +448,47 @@ function extractJSON(aiResponse: string): any {
   try {
     return JSON.parse(jsonText)
   } catch (error) {
+    // ★ Bad control character エラーの場合、文字列内の全制御文字を強制エスケープして再試行
+    if (error instanceof SyntaxError && error.message.includes('Bad control character')) {
+      console.warn('⚠️ Bad control character検出、強制サニタイズで再試行...')
+      let sanitizedJson = ''
+      let isInStr = false
+      let isEscaped = false
+      for (let i = 0; i < jsonText.length; i++) {
+        const ch = jsonText[i]
+        const cc = jsonText.charCodeAt(i)
+        if (isEscaped) {
+          sanitizedJson += ch
+          isEscaped = false
+          continue
+        }
+        if (ch === '\\' && isInStr) {
+          sanitizedJson += ch
+          isEscaped = true
+          continue
+        }
+        if (ch === '"' && !isEscaped) {
+          isInStr = !isInStr
+          sanitizedJson += ch
+          continue
+        }
+        if (isInStr && cc < 32) {
+          if (cc === 10) sanitizedJson += '\\n'
+          else if (cc === 13) sanitizedJson += '\\r'
+          else if (cc === 9) sanitizedJson += '\\t'
+          else sanitizedJson += '\\u' + ('0000' + cc.toString(16)).slice(-4)
+          continue
+        }
+        sanitizedJson += ch
+      }
+      try {
+        const result = JSON.parse(sanitizedJson)
+        console.log('✅ 強制サニタイズ後のJSON解析成功')
+        return result
+      } catch (e2) {
+        console.error('❌ 強制サニタイズ後もパース失敗:', e2)
+      }
+    }
     console.error('❌ JSON parse error:', error)
     console.error('📄 JSON text length:', jsonText.length)
     console.error('📄 JSON text (first 1000 chars):', jsonText.substring(0, 1000))
@@ -38478,7 +38519,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       try {
         console.log(`🎓 個別コース生成: ${model} で試行中...`)
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 55000) // 55秒タイムアウト
+        const timeoutId = setTimeout(() => controller.abort(), 90000) // 90秒タイムアウト（大量トークン生成対応）
         
         geminiResponse = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -38488,7 +38529,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
             signal: controller.signal,
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 8192, responseMimeType: 'application/json' }
+              generationConfig: { temperature: 0.7, maxOutputTokens: 65536, responseMimeType: 'application/json' }
             })
           }
         )
