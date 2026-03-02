@@ -6198,11 +6198,13 @@ async function loadCardPage(cardId) {
                 return '<div class="mt-4 bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-4 shadow-sm relative" id="' + widgetContainerId + '-wrapper">' +
                   '<div class="flex items-center gap-2 mb-3">' +
                     '<span class="bg-orange-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span>' +
+                    '<span class="text-lg" id="tactile-illust-' + cardIdVal + '"></span>' +
                     '<span class="text-sm font-bold text-gray-700">' + tactile + '</span>' +
                     '<button onclick="this.closest(\'[id$=-wrapper]\').style.display=\'none\'" class="ml-auto text-gray-400 hover:text-red-500 text-xs px-2 py-1 rounded hover:bg-red-50 transition" title="このウィジェットを非表示"><i class="fas fa-times"></i> 非表示</button>' +
                   '</div>' +
                   '<div id="' + widgetContainerId + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[200px] relative"></div>' +
                   '<p class="text-xs text-gray-500 mt-2 text-center"><i class="fas fa-hand-pointer mr-1"></i>画面をタッチ・ドラッグして操作してみよう</p>' +
+                  '<script>try{var _ti=document.getElementById("tactile-illust-' + cardIdVal + '");if(_ti&&typeof getTactileIllustration==="function"){_ti.textContent=getTactileIllustration("' + (tactile||'').replace(/"/g,'\\"').replace(/\n/g,' ').substring(0,100) + '",window.currentCardData?.card).icons}}catch(e){}</script>' +
                 '</div>'
               })()}
               
@@ -8731,17 +8733,93 @@ function updateDiceResult(container) {
 }
 
 // ========== 汎用触覚ウィジェット ==========
+// 活動内容に応じた具体的なイラストを自動選択
+function getTactileIllustration(text, cardData) {
+  const t = (text || '').toLowerCase()
+  const subject = (cardData?.subject || window.currentCardData?.card?.subject || '').toLowerCase()
+  // キーワード → イラストマッピング（具体的な活動場面）
+  const patterns = [
+    // 算数・数学
+    { keys: ['折り紙','おりがみ','折って','おって'], icons: '🧒📄✂️', desc: '折り紙で形を作ってみよう' },
+    { keys: ['定規','ものさし','はかる','測る','長さ','cm','mm'], icons: '📏✏️📐', desc: '定規で測ってみよう' },
+    { keys: ['コンパス','円','まる','えん'], icons: '⭕📐✏️', desc: 'コンパスで円を描こう' },
+    { keys: ['図形','三角','四角','長方形','正方形','台形'], icons: '📐📏🔺', desc: '図形を描いて確かめよう' },
+    { keys: ['立体','箱','はこ','直方体','立方体','展開図'], icons: '📦✂️📐', desc: '箱を組み立ててみよう' },
+    { keys: ['分度器','角度','角','かく'], icons: '📐✏️🔄', desc: '角度を測ってみよう' },
+    { keys: ['グラフ','表','ひょう','棒グラフ','折れ線'], icons: '📊✏️📋', desc: 'グラフを描いてみよう' },
+    { keys: ['計算','たし算','ひき算','かけ算','わり算','九九'], icons: '🧮✏️📝', desc: '実際に計算してみよう' },
+    { keys: ['おはじき','ブロック','数え','かぞえ','並べ'], icons: '🔴🟡🟢', desc: 'おはじきを並べてみよう' },
+    { keys: ['時計','時間','とけい','じかん'], icons: '⏰🕐✏️', desc: '時計を動かしてみよう' },
+    // 国語
+    { keys: ['書く','かく','なぞる','書き順','漢字','ひらがな','カタカナ'], icons: '✏️📝🖊️', desc: '文字を書いてみよう' },
+    { keys: ['音読','読む','よむ','朗読','声'], icons: '📖🗣️👂', desc: '声に出して読んでみよう' },
+    { keys: ['作文','文章','手紙','てがみ','日記'], icons: '📝✏️💌', desc: '文章を書いてみよう' },
+    { keys: ['しりとり','言葉あそび','ことばあそび'], icons: '💬🔤🎯', desc: '言葉で遊んでみよう' },
+    // 理科
+    { keys: ['実験','じっけん','観察','かんさつ'], icons: '🔬🧪👀', desc: '実験・観察してみよう' },
+    { keys: ['虫眼鏡','ルーペ','拡大'], icons: '🔍🌱👀', desc: '虫めがねで見てみよう' },
+    { keys: ['植物','花','種','たね','芽','め','育て'], icons: '🌱🌻🪴', desc: '植物を育ててみよう' },
+    { keys: ['磁石','じしゃく','くっつ'], icons: '🧲🔩📎', desc: '磁石で試してみよう' },
+    { keys: ['電池','でんち','豆電球','回路','かいろ'], icons: '🔋💡🔌', desc: '回路を作ってみよう' },
+    { keys: ['星','ほし','月','太陽','天体'], icons: '🌟🔭🌙', desc: '空を観察してみよう' },
+    { keys: ['水','みず','こおり','氷','温度','おんど'], icons: '💧🌡️🧊', desc: '水の変化を観察しよう' },
+    // 社会
+    { keys: ['地図','ちず','方角','方位','コンパス'], icons: '🗺️🧭📍', desc: '地図で調べてみよう' },
+    { keys: ['インタビュー','聞き取り','調査'], icons: '🎤📋👥', desc: 'インタビューしてみよう' },
+    // 音楽
+    { keys: ['歌','うた','歌う','うたう'], icons: '🎤🎵🎶', desc: '歌ってみよう' },
+    { keys: ['リコーダー','笛','ふえ','鍵盤','けんばん','ピアノ'], icons: '🎹🎵🎼', desc: '楽器を演奏してみよう' },
+    { keys: ['リズム','手拍子','てびょうし','たたく','打つ','太鼓','たいこ'], icons: '🥁👏🎵', desc: 'リズムを打ってみよう' },
+    { keys: ['音楽','おんがく','きく','聴く'], icons: '🎧🎵👂', desc: '音楽を聴いてみよう' },
+    // 体育
+    { keys: ['走る','はしる','かけっこ','マラソン'], icons: '🏃‍♂️👟💨', desc: '走ってみよう' },
+    { keys: ['ボール','投げる','なげる','キャッチ','蹴る','ける'], icons: '⚽🏀🤾', desc: 'ボールを使ってみよう' },
+    { keys: ['ストレッチ','柔軟','じゅうなん','体操','たいそう'], icons: '🤸‍♀️🧘‍♂️💪', desc: '体を動かしてみよう' },
+    { keys: ['なわとび','縄跳び','ジャンプ','とぶ','跳ぶ'], icons: '🏃‍♀️⭐🪢', desc: 'なわとびをしてみよう' },
+    { keys: ['泳ぐ','およぐ','水泳','プール'], icons: '🏊‍♂️💦🌊', desc: '泳いでみよう' },
+    // 図工・美術
+    { keys: ['絵','え','描く','えがく','色','いろ','塗る','ぬる'], icons: '🎨🖌️🖼️', desc: '絵を描いてみよう' },
+    { keys: ['粘土','ねんど','こねる','形','かたち'], icons: '🏺👐🎨', desc: '粘土で形を作ろう' },
+    { keys: ['切る','きる','はさみ','のり','貼る','はる'], icons: '✂️📄🧶', desc: '切って貼ってみよう' },
+    // 家庭科
+    { keys: ['料理','りょうり','作る','調理','ちょうり','炒め','煮る','焼く'], icons: '🍳👨‍🍳🥘', desc: '料理してみよう' },
+    { keys: ['縫う','ぬう','裁縫','さいほう','糸','いと','針','はり','ミシン'], icons: '🧵🪡👕', desc: '縫ってみよう' },
+    { keys: ['洗濯','せんたく','掃除','そうじ','片付','かたづ'], icons: '🧹🧺✨', desc: 'きれいにしてみよう' },
+    // 道徳・総合
+    { keys: ['話し合','はなしあ','グループ','友だち','ともだち'], icons: '👫💬🤝', desc: '話し合ってみよう' },
+    { keys: ['調べ','しらべ','パソコン','タブレット','検索'], icons: '💻📱🔍', desc: '調べてみよう' },
+    { keys: ['発表','はっぴょう','プレゼン','伝える','つたえる'], icons: '🎤📊👥', desc: '発表してみよう' },
+    // 英語
+    { keys: ['発音','はつおん','スピーキング','会話','speak','talk'], icons: '🗣️🇬🇧👂', desc: '英語で話してみよう' },
+    { keys: ['アルファベット','ABC','abc','letter'], icons: '🔤✏️📝', desc: 'アルファベットを書こう' },
+  ]
+  for (const p of patterns) {
+    if (p.keys.some(k => t.includes(k))) return p
+  }
+  // デフォルト: 教科に応じたアイコン
+  if (subject.includes('算数') || subject.includes('数学')) return { icons: '✏️📐🧮', desc: '計算や図形を確かめよう' }
+  if (subject.includes('国語')) return { icons: '📖✏️📝', desc: '書いて読んでみよう' }
+  if (subject.includes('理科')) return { icons: '🔬🌱👀', desc: '実験・観察してみよう' }
+  if (subject.includes('社会')) return { icons: '🗺️📋🔍', desc: '調べてみよう' }
+  if (subject.includes('音楽')) return { icons: '🎵🎤🎹', desc: '音楽を体験しよう' }
+  if (subject.includes('体育')) return { icons: '🏃💪⚽', desc: '体を動かそう' }
+  if (subject.includes('図工') || subject.includes('美術')) return { icons: '🎨🖌️✂️', desc: '作ってみよう' }
+  if (subject.includes('家庭')) return { icons: '🍳🧵🧹', desc: '生活で試してみよう' }
+  if (subject.includes('英語')) return { icons: '🗣️🇬🇧📝', desc: '英語で挑戦しよう' }
+  if (subject.includes('道徳')) return { icons: '💬🤝💭', desc: '考えて話し合おう' }
+  if (subject.includes('総合')) return { icons: '🔍💡📊', desc: '調べて発表しよう' }
+  return { icons: '👐✨🎯', desc: 'じっさいにやってみよう' }
+}
+
 function renderGenericTactile(container, tactileText, cardData) {
+  const illust = getTactileIllustration(tactileText, cardData)
   container.innerHTML = `
     <div class="p-4 text-center">
       <div class="bg-orange-50 rounded-lg p-4 mb-3">
-        <div class="flex items-center justify-center gap-3 mb-2">
-          <div class="text-4xl">👧✋</div>
-          <div class="text-4xl">📐✏️</div>
-        </div>
+        <div class="text-5xl mb-2">${illust.icons}</div>
         <p class="text-sm text-orange-800 font-bold mb-1">やってみよう！</p>
         <p class="text-sm text-gray-700">${tactileText}</p>
-        <p class="text-xs text-orange-500 mt-1"><i class="fas fa-lightbulb mr-1"></i>じっさいに手をうごかして体けんしてみよう！</p>
+        <p class="text-xs text-orange-500 mt-1"><i class="fas fa-lightbulb mr-1"></i>${illust.desc}</p>
       </div>
       <div class="flex gap-2 justify-center flex-wrap">
         <button onclick="this.classList.toggle('bg-green-500'); this.classList.toggle('bg-gray-300'); this.classList.toggle('text-white'); TactileSounds.play('correct')" 
@@ -52413,7 +52491,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
                     </div>
                     ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://edu.web.nhk/school/?q=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
-                    ${tactile ? '<div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3 mb-2"><div class="flex items-center gap-2 mb-2"><span class="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span><span class="text-xs text-gray-700">' + tactile + '</span></div><button onclick="teacherGenerateImage(' + (card.card_id || card.id || 0) + ', ' + i + ')" class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2"><i class="fas fa-image"></i>AIに図を描いてもらう</button><div id="guide-tactile-' + (card.card_id || card.id || i) + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[120px]"></div></div>' : ''}
+                    ${tactile ? (() => { const _tIllust = getTactileIllustration(tactile, card); return '<div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3 mb-2"><div class="flex items-center gap-2 mb-2"><span class="text-xl">' + _tIllust.icons + '</span><span class="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span><span class="text-xs text-gray-700">' + tactile + '</span></div><p class="text-[10px] text-orange-500 mb-2"><i class="fas fa-lightbulb mr-1"></i>' + _tIllust.desc + '</p><button onclick="teacherGenerateImage(' + (card.card_id || card.id || 0) + ', ' + i + ')" class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2"><i class="fas fa-image"></i>AIに図を描いてもらう</button><div id="guide-tactile-' + (card.card_id || card.id || i) + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[120px]"></div></div>' })() : ''}
                     ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2 cursor-pointer hover:bg-green-100" onclick="speakText(\'' + (card.problem_text || card.problem_content || '').replace(/'/g, '').substring(0, 200) + '\', \'female-friendly\', 0.8); TactileSounds.play(\'tap\')"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
                     <div class="grid grid-cols-2 gap-2 text-xs">
                       <details class="bg-white rounded p-2 border">
