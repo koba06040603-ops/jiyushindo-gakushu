@@ -1728,7 +1728,7 @@ async function renderTopPage() {
             <label class="block text-sm font-bold text-gray-700 mb-3">
               <i class="fas fa-list-ol mr-1 text-pink-500"></i> 単元を選択してください
             </label>
-            <div id="unitSelect" class="space-y-2 max-h-80 overflow-y-auto border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
+            <div id="unitSelect" class="space-y-2 max-h-[600px] overflow-y-auto border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
               <p class="text-gray-400 text-center py-8">学年・教科・教科書会社を選ぶと単元が表示されます</p>
             </div>
           </div>
@@ -3066,6 +3066,33 @@ async function loadTopPageData() {
   }
 }
 
+// 単元カード要素を作成するヘルパー
+function createUnitCard(item, idx) {
+  const card = document.createElement('div')
+  card.className = 'bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-400 hover:shadow-md transition cursor-pointer flex items-center justify-between group'
+  card.innerHTML = `
+    <div class="flex-1" onclick="selectUnit(${item.id})">
+      <p class="font-bold text-gray-800 group-hover:text-purple-700 transition"><i class="fas fa-book-open mr-2 text-purple-400"></i>${idx + 1}. ${item.unit_name}</p>
+      <p class="text-sm text-gray-500 ml-7">${item.grade} ${item.subject} - ${item.textbook_company}</p>
+    </div>
+    <div class="flex gap-2">
+      <button 
+        onclick="event.stopPropagation(); duplicateCurriculum(${item.id})" 
+        class="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
+        title="複製">
+        <i class="fas fa-copy"></i>
+      </button>
+      <button 
+        onclick="event.stopPropagation(); deleteCurriculum(${item.id}, '${item.unit_name.replace(/'/g, "\\'")}')" 
+        class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
+        title="削除">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+  `
+  return card
+}
+
 async function updateUnitList() {
   const grade = document.getElementById('gradeSelect').value
   const subject = document.getElementById('subjectSelect').value
@@ -3080,7 +3107,7 @@ async function updateUnitList() {
   startButton.classList.add('hidden')
 
   // 教科書が不要な教科（体育、音楽、家庭科、図工、道徳、総合、特別活動、保健体育、外国語活動、プログラミング）
-  const noTextbookSubjects = ['体育','保健体育','音楽','図工','家庭科','技術','道徳','総合','特別活動','プログラミング','外国語活動']
+  const noTextbookSubjects = ['体育','保健体育','音楽','図工','図工・美術','家庭科','技術','道徳','総合','総合的な学習','特別活動','プログラミング','外国語活動']
   const needsTextbook = !noTextbookSubjects.includes(subject)
   // 教科書不要の教科は学年と教科だけで進める
   const canProceed = grade && subject && (textbook || !needsTextbook)
@@ -3113,31 +3140,51 @@ async function updateUnitList() {
         // カード形式で表示
         unitSelect.innerHTML = ''
         
-        curricula.forEach((item, idx) => {
-          const card = document.createElement('div')
-          card.className = 'bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-400 hover:shadow-md transition cursor-pointer flex items-center justify-between group'
-          card.innerHTML = `
-            <div class="flex-1" onclick="selectUnit(${item.id})">
-              <p class="font-bold text-gray-800 group-hover:text-purple-700 transition"><i class="fas fa-book-open mr-2 text-purple-400"></i>${idx + 1}. ${item.unit_name}</p>
-              <p class="text-sm text-gray-500 ml-7">${item.grade} ${item.subject} - ${item.textbook_company}</p>
-            </div>
-            <div class="flex gap-2">
-              <button 
-                onclick="event.stopPropagation(); duplicateCurriculum(${item.id})" 
-                class="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
-                title="複製">
-                <i class="fas fa-copy"></i>
-              </button>
-              <button 
-                onclick="event.stopPropagation(); deleteCurriculum(${item.id}, '${item.unit_name}')" 
-                class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
-                title="削除">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          `
-          unitSelect.appendChild(card)
-        })
+        // 6年社会の場合、歴史と公民の分野ヘッダーを追加
+        const civicsKeywords = ['憲法','政治','選挙','国会','内閣','裁判','三権','人権','国民主権','天皇の地位','平和主義','税金','地方自治','国際','世界','持続可能','グローバル','まちづくり']
+        const isSocialStudies = subject === '社会'
+        let civicsSectionAdded = false
+        
+        // 社会の場合、歴史と公民に分類
+        if (isSocialStudies && curricula.length > 10) {
+          const historyUnits = []
+          const civicsUnits = []
+          curricula.forEach(item => {
+            const isCivics = civicsKeywords.some(kw => item.unit_name.includes(kw))
+            if (isCivics) civicsUnits.push(item)
+            else historyUnits.push(item)
+          })
+          
+          if (historyUnits.length > 0 && civicsUnits.length > 0) {
+            // 歴史分野ヘッダー
+            const histHeader = document.createElement('div')
+            histHeader.className = 'bg-amber-50 border-2 border-amber-300 rounded-lg px-4 py-2 mb-1'
+            histHeader.innerHTML = '<p class="text-sm font-bold text-amber-800"><i class="fas fa-landmark mr-2"></i>📜 歴史分野（' + historyUnits.length + '単元）</p>'
+            unitSelect.appendChild(histHeader)
+            
+            historyUnits.forEach((item, idx) => {
+              unitSelect.appendChild(createUnitCard(item, idx))
+            })
+            
+            // 公民分野ヘッダー
+            const civicsHeader = document.createElement('div')
+            civicsHeader.className = 'bg-blue-50 border-2 border-blue-300 rounded-lg px-4 py-2 mb-1 mt-3'
+            civicsHeader.innerHTML = '<p class="text-sm font-bold text-blue-800"><i class="fas fa-balance-scale mr-2"></i>🏛️ 政治・公民分野（' + civicsUnits.length + '単元）</p>'
+            unitSelect.appendChild(civicsHeader)
+            
+            civicsUnits.forEach((item, idx) => {
+              unitSelect.appendChild(createUnitCard(item, historyUnits.length + idx))
+            })
+            civicsSectionAdded = true
+          }
+        }
+        
+        // 通常の表示（社会以外、または分類不要の場合）
+        if (!civicsSectionAdded) {
+          curricula.forEach((item, idx) => {
+            unitSelect.appendChild(createUnitCard(item, idx))
+          })
+        }
         
         startButton.disabled = false
       } else {
@@ -20796,7 +20843,7 @@ function showUnitGeneratorModal() {
               <datalist id="unitDatalist"></datalist>
               <!-- 単元候補表示エリア -->
               <div id="unitSuggestions" class="mt-2 hidden">
-                <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 max-h-64 overflow-y-auto">
+                <div class="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 max-h-[480px] overflow-y-auto">
                   <div class="flex items-center justify-between mb-2">
                     <p class="text-sm font-bold text-blue-800">
                       <i class="fas fa-book mr-1"></i>
@@ -20937,7 +20984,7 @@ function showUnitGeneratorModal() {
     const subject = document.getElementById('genSubject').value
     const textbook = document.getElementById('genTextbook').value
     const loadBtn = document.getElementById('loadUnitsBtn')
-    const noTxtSubjects = ['体育','保健体育','音楽','図工','家庭科','技術','道徳','総合','特別活動','プログラミング','外国語活動']
+    const noTxtSubjects = ['体育','保健体育','音楽','図工','図工・美術','家庭科','技術','道徳','総合','総合的な学習','特別活動','プログラミング','外国語活動']
     const needsTextbook = !noTxtSubjects.includes(subject)
     
     if (grade && subject && (textbook || !needsTextbook)) {
@@ -20951,7 +20998,7 @@ function showUnitGeneratorModal() {
   document.getElementById('genSubject').addEventListener('change', function() {
     updateSuggestButton()
     // 教科書不要の教科は教科書選択を無効化
-    const noTxtSubjects = ['体育','保健体育','音楽','図工','家庭科','技術','道徳','総合','特別活動','プログラミング','外国語活動']
+    const noTxtSubjects = ['体育','保健体育','音楽','図工','図工・美術','家庭科','技術','道徳','総合','総合的な学習','特別活動','プログラミング','外国語活動']
     const genTextbookContainer = document.getElementById('genTextbookContainer')
     const genTextbookRequired = document.getElementById('genTextbookRequired')
     const genTextbook = document.getElementById('genTextbook')
@@ -21006,8 +21053,12 @@ async function suggestUnitNames() {
   
   console.log('📝 選択された値:', { grade, subject, textbook })
   
-  if (!grade || !subject || !textbook) {
-    alert('学年・教科・教科書会社を選択してください')
+  // 教科書不要の教科も対応
+  const noTextbookSubjects = ['体育','保健体育','音楽','図工','図工・美術','家庭科','技術','道徳','総合','総合的な学習','特別活動','プログラミング','外国語活動']
+  const needsTextbook = !noTextbookSubjects.includes(subject)
+  
+  if (!grade || !subject || (needsTextbook && !textbook)) {
+    alert(needsTextbook ? '学年・教科・教科書会社を選択してください' : '学年・教科を選択してください')
     return
   }
   
@@ -21026,13 +21077,11 @@ async function suggestUnitNames() {
   try {
     console.log('📡 APIリクエスト送信中...')
     
-    // データベースから実際のカリキュラムデータを取得
+    // データベースから実際のカリキュラムデータを取得（教科書不要の教科はtextbookを送らない）
+    const suggestParams = { grade, subject }
+    if (needsTextbook && textbook) suggestParams.textbook = textbook
     const response = await axios.get('/api/curriculum/unit-suggestions', {
-      params: {
-        grade,
-        subject,
-        textbook
-      }
+      params: suggestParams
     })
     
     console.log('📥 APIレスポンス:', response.data)
@@ -21167,8 +21216,12 @@ async function loadCurriculumUnits() {
   
   console.log('📝 選択された値:', { grade, subject, textbook })
   
-  if (!grade || !subject || !textbook) {
-    alert('学年・教科・教科書会社を選択してください')
+  // 教科書不要の教科も対応
+  const noTextbookSubjects = ['体育','保健体育','音楽','図工','図工・美術','家庭科','技術','道徳','総合','総合的な学習','特別活動','プログラミング','外国語活動']
+  const needsTextbook = !noTextbookSubjects.includes(subject)
+  
+  if (!grade || !subject || (needsTextbook && !textbook)) {
+    alert(needsTextbook ? '学年・教科・教科書会社を選択してください' : '学年・教科を選択してください')
     return
   }
   
@@ -21186,13 +21239,11 @@ async function loadCurriculumUnits() {
   try {
     console.log('📡 APIリクエスト送信中...')
     
-    // カリキュラムデータベースから単元を取得
+    // カリキュラムデータベースから単元を取得（教科書不要の場合はtextbook_companyを送らない）
+    const apiParams = { grade, subject }
+    if (needsTextbook && textbook) apiParams.textbook_company = textbook
     const response = await axios.get('/api/curriculum/units', {
-      params: {
-        grade,
-        subject,
-        textbook_company: textbook
-      }
+      params: apiParams
     })
     
     console.log('📥 APIレスポンス:', response.data)
