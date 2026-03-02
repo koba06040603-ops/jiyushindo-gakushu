@@ -3610,8 +3610,17 @@ app.get('/api/courses/:courseId/cards', async (c) => {
   const courseId = c.req.param('courseId')
   
   try {
+    // problem_image_url はbase64で巨大（各1-2MB）なので一覧取得時は除外
     const cards = await env.DB.prepare(`
-      SELECT * FROM learning_cards 
+      SELECT card_id, card_title, card_type, card_number, card_order,
+             difficulty_level, learning_track, problem_text, problem_description,
+             problem_content, correct_answer, answer, explanation, answer_explanation,
+             answer_keywords, hint_text, solution_video_url, image_url,
+             estimated_time_minutes, curriculum_code, textbook_page, new_terms,
+             example_problem, example_solution, real_world_connection,
+             ai_teacher_message, ai_teacher_advice, teacher_help_keywords,
+             subject, grade_level, unit_name, is_active, course_id
+      FROM learning_cards 
       WHERE course_id = ?
       ORDER BY card_number
     `).bind(courseId).all()
