@@ -10950,9 +10950,6 @@ app.get('/guide/:curriculumId', async (c) => {
     var cNums = extractNums(nc);
     var sNums = extractNums(ns);
     var numMatch = cNums.length > 0 && cNums.every(function(n) { return sNums.indexOf(n) >= 0; });
-    // キーワード判定（割合問題用）
-    var keywords = nc.split(/[,:、。\\n]/).filter(function(s){return s.length>1;});
-    var kwMatch = keywords.length > 0 && keywords.filter(function(kw){return ns.includes(kw);}).length >= Math.ceil(keywords.length * 0.5);
     // 分数判定
     var fracMatch = false;
     var cFracs = nc.match(/\\d+\\/\\d+|\\d+分の\\d+/g) || [];
@@ -10979,29 +10976,56 @@ app.get('/guide/:curriculumId', async (c) => {
       });
     }
     
-    // 【新規】意味的類似度判定（記述式・体育・道徳等の長文回答用）
-    var semanticMatch = false;
-    if (!exact && nc.length >= 8) {
-      // 正解のキーフレーズを抽出（2文字以上の単語をすべて取得）
-      var keyPhrases = nc.replace(/[、。！？\\s,\\.]/g, '|').split('|').filter(function(s){ return s.length >= 2; });
-      if (keyPhrases.length > 0) {
-        var matchCount = keyPhrases.filter(function(kp){ return ns.includes(kp); }).length;
-        // 正解キーフレーズの40%以上が含まれていれば意味的にマッチ
-        semanticMatch = matchCount >= Math.max(1, Math.ceil(keyPhrases.length * 0.4));
-      }
-      // 学生の回答にも同じチェック（逆方向: 学生→正解）
-      if (!semanticMatch) {
-        var studentPhrases = ns.replace(/[、。！？\\s,\\.]/g, '|').split('|').filter(function(s){ return s.length >= 2; });
-        if (studentPhrases.length > 0) {
-          var revMatchCount = studentPhrases.filter(function(sp){ return nc.includes(sp); }).length;
-          semanticMatch = revMatchCount >= Math.max(1, Math.ceil(studentPhrases.length * 0.5));
+    // 【キーワード判定】answer_keywordsが設定されている場合、3つ中2つ以上でOK
+    var kwResult = { match: false, matched: [], missed: [], total: 0, required: 0 };
+    var rawKw = card.answer_keywords || '';
+    var answerKeywords = [];
+    try {
+      if (typeof rawKw === 'string' && rawKw.startsWith('[')) answerKeywords = JSON.parse(rawKw);
+      else if (Array.isArray(rawKw)) answerKeywords = rawKw;
+    } catch(e) {}
+    if (answerKeywords.length >= 2) {
+      kwResult.total = answerKeywords.length;
+      kwResult.required = Math.max(2, Math.ceil(answerKeywords.length * 0.67));
+      for (var ki = 0; ki < answerKeywords.length; ki++) {
+        var kw = norm(answerKeywords[ki]);
+        if (kw && ns.includes(kw)) {
+          kwResult.matched.push(answerKeywords[ki]);
+        } else {
+          kwResult.missed.push(answerKeywords[ki]);
         }
       }
+      kwResult.match = kwResult.matched.length >= kwResult.required;
     }
     
-    var isCorrect = exact || numMatch || kwMatch || fracMatch || decMatch || openEndedMatch || semanticMatch;
+    var isCorrect = exact || numMatch || kwResult.match || fracMatch || decMatch || openEndedMatch;
     
     resultDiv.style.display = 'block';
+    
+    // キーワード判定のフィードバック生成
+    var kwFeedback = '';
+    if (answerKeywords.length >= 2) {
+      if (kwResult.match) {
+        kwFeedback = '<div style="margin-top:8px;padding:8px 12px;background:#ECFDF5;border-radius:8px;font-size:0.85rem;">' +
+          '<div style="font-weight:bold;color:#059669;margin-bottom:4px;">📝 観点チェック（' + kwResult.matched.length + '/' + kwResult.total + ' クリア！）</div>' +
+          answerKeywords.map(function(kw) {
+            var hit = kwResult.matched.indexOf(kw) >= 0;
+            return '<span style="display:inline-block;margin:2px 4px;padding:2px 8px;border-radius:12px;font-size:0.8rem;' +
+              (hit ? 'background:#D1FAE5;color:#065F46;' : 'background:#FEF3C7;color:#92400E;') + '">' +
+              (hit ? '✅ ' : '△ ') + kw + '</span>';
+          }).join('') + '</div>';
+      } else {
+        kwFeedback = '<div style="margin-top:8px;padding:8px 12px;background:#FEF3C7;border-radius:8px;font-size:0.85rem;">' +
+          '<div style="font-weight:bold;color:#92400E;margin-bottom:4px;">📝 大切な観点（' + kwResult.matched.length + '/' + kwResult.total + '）</div>' +
+          answerKeywords.map(function(kw) {
+            var hit = kwResult.matched.indexOf(kw) >= 0;
+            return '<span style="display:inline-block;margin:2px 4px;padding:2px 8px;border-radius:12px;font-size:0.8rem;' +
+              (hit ? 'background:#D1FAE5;color:#065F46;' : 'background:#FEE2E2;color:#991B1B;') + '">' +
+              (hit ? '✅ ' : '❌ ') + kw + '</span>';
+          }).join('') +
+          '<div style="margin-top:6px;color:#92400E;font-size:0.8rem;">💡 ' + kwResult.missed.join('・') + ' の観点を入れてみよう！</div></div>';
+      }
+    }
     
     if (isCorrect) {
       completedCards[page] = true;
@@ -11115,16 +11139,30 @@ app.get('/guide/:curriculumId', async (c) => {
           '</div></div>';
       }
 
-      resultDiv.innerHTML = '<div style="background:#F0FDF4;border:3px solid #10B981;border-radius:16px;padding:20px;text-align:center;animation:correctPop 0.6s ease-out;">' +
-        '<div style="font-size:4rem;animation:starBurst 0.8s ease-out;">🎉</div>' +
-        '<p style="font-size:1.5rem;font-weight:900;color:#059669;margin:8px 0;">正解！すごい！</p>' +
+      resultDiv.innerHTML = '<div style="background:#F0FDF4;border:3px solid #10B981;border-radius:16px;padding:20px;text-align:center;position:relative;overflow:visible;">' +
+        '<!-- 太い赤丸（◯）で答えを囲む -->' +
+        '<div class="correct-maru-overlay" style="position:absolute;top:-30px;left:50%;transform:translateX(-50%);width:200px;height:200px;pointer-events:none;z-index:10;animation:drawMaru 0.8s ease-out 0.1s both;">' +
+        '<svg viewBox="0 0 200 200" width="200" height="200">' +
+        '<circle cx="100" cy="100" r="80" fill="none" stroke="#DC2626" stroke-width="12" stroke-linecap="round" stroke-dasharray="502" stroke-dashoffset="502" style="animation:drawCircle 0.7s ease-out 0.3s forwards;" />' +
+        '</svg></div>' +
+        '<style>@keyframes drawCircle{0%{stroke-dashoffset:502}100%{stroke-dashoffset:0}}@keyframes drawMaru{0%{opacity:0;transform:translateX(-50%) scale(0.3)}50%{opacity:1;transform:translateX(-50%) scale(1.15)}100%{opacity:1;transform:translateX(-50%) scale(1)}}@keyframes correctPop{0%{transform:scale(0.8);opacity:0}50%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}@keyframes starBurst{0%{transform:scale(0.5) rotate(-10deg);opacity:0}60%{transform:scale(1.3) rotate(5deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:1}}</style>' +
+        '<div style="font-size:4rem;animation:starBurst 0.8s ease-out;margin-top:20px;">🎉</div>' +
+        '<p style="font-size:1.5rem;font-weight:900;color:#059669;margin:8px 0;animation:correctPop 0.6s ease-out;">正解！すごい！</p>' +
         (mindsetPraise ? '<p style="font-size:0.85rem;color:#7C3AED;font-weight:bold;margin:4px 0;background:#F5F3FF;display:inline-block;padding:4px 12px;border-radius:20px;">' + mindsetPraise + '</p>' : '') +
         microHTML +
+        kwFeedback +
         growthHTML +
         '<p style="font-size:0.9rem;color:#10B981;">よくできました！</p>' +
         '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px;">' +
         (currentPage < totalPages - 1 ? '<button onclick="navigateCard(1)" style="background:#4F46E5;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:1rem;"><i class="fas fa-arrow-right" style="margin-right:6px;"></i>次のカードへ</button>' : '<button onclick="alert(\\x27🎉 すべて完了！\\x27)" style="background:#10B981;color:white;border:none;padding:10px 24px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-flag-checkered" style="margin-right:6px;"></i>全部できた！</button>') +
         '</div>' + reflectionHTML + '</div>';
+      // 赤丸アニメーション：入力エリアにも赤枠グローを適用
+      if (input) {
+        input.style.border = '3px solid #DC2626';
+        input.style.boxShadow = '0 0 15px rgba(220,38,38,0.4)';
+        input.style.transition = 'all 0.3s ease';
+        setTimeout(function() { input.style.border = ''; input.style.boxShadow = ''; }, 3000);
+      }
     } else {
       // === v4セッション制御更新（不正解） ===
       window._v4Session.totalAnswered++;
@@ -11180,6 +11218,7 @@ app.get('/guide/:curriculumId', async (c) => {
         '<div style="font-size:3rem;">' + (gentleMode ? '🌟' : '🤔') + '</div>' +
         '<p style="font-size:1.2rem;font-weight:bold;color:#92400E;margin:8px 0;">' + (gentleMode ? 'おしいね！' : 'もう少し！') + '</p>' +
         '<p style="font-size:0.85rem;color:#6b7280;margin-bottom:12px;">' + (gentleMode ? 'ヒントを見ながらやってみよう。むりしないでね。' : 'ヒントを見て、もう一度考えてみよう。') + '</p>' +
+        kwFeedback +
         growthHTML2 +
         '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
         '<button onclick="document.getElementById(\\x27grade-result-' + page + '\\x27).style.display=\\x27none\\x27;document.getElementById(\\x27answer-' + page + '\\x27).value=\\x27\\x27;document.getElementById(\\x27answer-' + page + '\\x27).focus();" style="background:#F59E0B;color:white;border:none;padding:8px 20px;border-radius:10px;font-weight:bold;cursor:pointer;"><i class="fas fa-redo" style="margin-right:6px;"></i>もう一度</button>' +
@@ -14378,23 +14417,41 @@ app.post('/api/ai/generate-course', async (c) => {
       'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
     }[courseLevel] || '標準的なペースで学ぶコース'
 
-    // 【強化】プロンプト（軽量化版: 高速生成 + 品質維持）
-    const numCards = cards_count || 6  // デフォルト6枚（高速化）
-    const prompt = `小学校教科指導のプロ教師として、以下の単元の学習カード${numCards}枚をJSON生成してください。
+    // 【強化】プロンプト（動的枚数のカード生成 + 品質向上 + AI先生 + 難易度引き上げ + キーワード採点対応）
+    const numCards = cards_count || 10  // 動的カード枚数（デフォルト10枚：単元全体を確実にカバー）
+    const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
 
 【単元情報】
-学年: ${grade} / 教科: ${subject} / 教科書: ${textbook || '未指定'}
-単元: ${unitName} / 目標: ${unitGoal || '未指定'}
-コース: ${courseInfo.name} (${difficultyDescription})
+- 学年: ${grade}
+- 教科: ${subject}
+- 教科書会社: ${textbook || '未指定'}
+- 単元名: ${unitName}
+- 単元目標: ${unitGoal || '未指定'}
+- コース: ${courseInfo.name} (${difficultyDescription})
 ${customInfo}
-【設計方針】
-- 導入→基本→応用→まとめの流れで${numCards}枚
-- 一問一答形式（1カードに1つの明確な問いのみ）
-- 問題文は具体的な数値・場面を含む
-- answer_explanationは必ず途中式・計算過程を含む（最低80字）
-- 自由記述の場合はanswerに「例：A、B、Cなど」の形式で複数の解答例を示す
+【カード設計の方針】
+- 単元の学習内容を網羅的にカバーする（導入→基本→応用→まとめ）
+- ${numCards}枚で単元全体の主要な学習項目を漏れなく扱う
+- 問題文は具体的な数値・場面を含み、教科書の目標水準に合わせる
+- じっくりコースでも「考える力」を育む問題を含める
+- ぐんぐんコースは発展的・応用的な問題を中心に、深い思考を促す
+- 各カードにAI先生からの励ましメッセージと学び方のアドバイスを含める
+- 3段階ヒントは「考える方向性」→「具体的手がかり」→「答えに近づく導き」の順に
+- 先生に質問するための「先生ヘルプ」用のキーワードを含める
 
-【JSON形式】※必ず完全な${numCards}枚を出力
+【超重要：正誤判定が明確な問題設計】
+- 各カードには必ず1つの明確な問いだけを含めること
+- 「〜は何ですか。また、〜はどうですか。」のように複数の問いを1つの問題文に入れてはいけない
+- answer（正解）は具体的で、自動採点できる形式にすること
+- 数値問題: 答えは数値のみ（例: "2:3", "24cm²", "3/5"）
+- 用語問題: 答えは1〜2語の明確な用語（例: "相似", "光合成"）
+- 思考・判断を求める問題の場合: answerは最も重要なキーワード1つとし、さらに answer_keywords に判定用キーワードを3つ設定する
+  → 児童の回答にキーワード3つ中2つ以上含まれていれば正解とする
+  → 例: answer="協力してボールを奪う", answer_keywords=["協力","ボール","奪う"]
+- 「シュートが決まってみんなで喜び合ったとき」のような曖昧な正解は絶対に禁止
+
+【重要】以下のJSON形式で、必ず完全な${numCards}枚のカードを生成してください：
+
 {
   "course_name": "${courseInfo.name}",
   "name": "${courseInfo.name}",
@@ -14404,34 +14461,71 @@ ${customInfo}
   "cards": [
     {
       "card_number": 1,
-      "card_title": "タイトル（20字以内）",
+      "card_title": "魅力的なタイトル（20字以内）",
       "card_type": "main",
       "textbook_page": "p.XX",
-      "problem_description": "具体的な問題文（100-200字）",
-      "new_terms": "新出用語（カンマ区切り）",
-      "example_problem": "例題",
-      "example_solution": "解き方の説明",
-      "example_image_description": "図解説明（図が不要ならnull）",
-      "real_world_connection": "実生活との繋がり（1文）",
-      "answer": "正解（具体的に）",
-      "answer_explanation": "解法プロセス：①数値確認→②公式→③途中式→④答え導出（最低80字）",
-      "ai_teacher_message": "励ましメッセージ（30字）",
+      "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
+      "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
+      "example_problem": "例題（具体的な数字と場面）",
+      "example_solution": "解き方の丁寧な説明（途中式・図解の指示を含む）",
+      "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）",
+      "real_world_connection": "実生活とのつながり（1文）",
+      "answer": "正解（具体的・明確に。自動採点可能な短い答え）",
+      "answer_keywords": ["キーワード1", "キーワード2", "キーワード3"],
+      "answer_explanation": "【★★★最重要★★★】解法プロセス：①数値確認→②公式→③途中式→④答え導出。最低100字。実生活の例は書かない。",
+      "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）",
+      "ai_teacher_advice": "この問題の学び方アドバイス（30字程度）",
+      "teacher_help_keywords": "先生に質問するときのキーワード（3つ程度）",
       "hints": [
-        {"hint_level": 1, "hint_text": "方向性ヒント"},
-        {"hint_level": 2, "hint_text": "具体的手がかり"},
-        {"hint_level": 3, "hint_text": "答えに近づくヒント"}
+        {"hint_level": 1, "hint_text": "ヒント1: まず何を考える？（考える方向性を示す）", "thinking_tool_suggestion": "使える思考ツール"},
+        {"hint_level": 2, "hint_text": "ヒント2: 具体的な手がかり（図や式の書き方を示す）", "thinking_tool_suggestion": "使える思考ツール"},
+        {"hint_level": 3, "hint_text": "ヒント3: 答えに近づくための最後のヒント", "thinking_tool_suggestion": "使える思考ツール"}
       ],
       "multimedia_ai_content": {
+        "short_music": {
+          "recommended": true,
+          "prompt_30sec": "この問題の核心概念を30秒の覚え歌にするプロンプト",
+          "lyrics_30sec": "30秒で歌える短い歌詞（4〜8行）",
+          "genre": "Kids Pop / Educational Rap / 童謡アレンジなど"
+        },
+        "suno_full_song": {
+          "recommended": false,
+          "lyrics_full": "Suno用4分フル歌詞（(Verse)(Chorus)(Bridge)タグ付き）",
+          "style_prompt": "Sunoのスタイル欄に入力するテキスト",
+          "title": "曲名"
+        },
         "diagram_image": {
           "recommended": true,
-          "prompt": "この問題の図解AI生成プロンプト（日本語）"
+          "prompt": "この問題を理解するための図解画像のAI生成プロンプト（日本語）",
+          "image_type": "JSXGraph / SVG / イラスト"
+        },
+        "video": {
+          "recommended": false,
+          "prompt": "この問題を動画で解説するAI動画生成プロンプト（5〜8秒）"
+        },
+        "tactile_widget": {
+          "recommended": true,
+          "description": "触覚学習ウィジェットの説明",
+          "activity_type": "drag / sort / tap / draw / match"
         }
       }
-    }
+    },
+    { /* カード2〜${numCards}: 上記と同じ構造で繰り返し */ }
   ]
 }
 
-【厳守】${numCards}枚すべて出力。各カード3ヒント必須。JSONのみ出力。`
+【厳守事項】
+1. 必ず${numCards}枚のカードを生成し、単元の主要な学習項目を網羅すること
+2. 各カードに必ず3つのヒント（段階的に具体性が増す）を含めること
+3. ai_teacher_message, ai_teacher_advice, teacher_help_keywords を必ず含めること
+4. JSONのみを出力し、説明文は含めないこと
+5. すべてのフィールドに具体的な内容を記入すること
+6. 完全なJSON（{で始まり}で終わる）を出力すること
+7. 問題の難易度は教科書の目標水準（学習指導要領）に合わせること
+8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること
+9. 【★★★解説品質★★★】answer_explanation には必ず途中式・計算過程を含む（最低100字）
+10. 【★★★正解の明確性★★★】answerは自動採点できる明確な答えにし、answer_keywordsに判定用キーワード3つを設定すること
+11. multimedia_ai_content を全カードに含めること`
 
     // gemini-2.5-flash をプライマリ（Gemini 3.1 Flash・最高推論能力）
     // フォールバック: gemini-3-flash-preview（高速）, gemini-2.5-flash, gemini-2.0-flash（安定）
@@ -14460,7 +14554,8 @@ ${customInfo}
       
       let response: Response
       try {
-        // thinking無効化（プロンプト軽量化済み、高速生成優先）
+        // thinking有効（ベンチマーク:thinking有効28秒 vs 無効51秒 — 有効の方が速い）
+        // responseMimeType: 'application/json' でJSONパース安定化
         response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -14469,9 +14564,8 @@ ${customInfo}
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 8192,
-            responseMimeType: 'application/json',
-            thinkingConfig: { thinkingBudget: 0 }
+            maxOutputTokens: 16384,
+            responseMimeType: 'application/json'
           }
       })
     })
@@ -15229,7 +15323,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
       // AIティーチャー・3段階ヒント・先生ヘルプ対応のため拡張カラムを確保
       // ============================================================
       // 拡張カラムを安全に追加（存在しない場合のみ）
-      const extraCols = ['ai_teacher_message', 'ai_teacher_advice', 'teacher_help_keywords']
+      const extraCols = ['ai_teacher_message', 'ai_teacher_advice', 'teacher_help_keywords', 'answer_keywords']
       for (const col of extraCols) {
         try {
           await env.DB.prepare(`ALTER TABLE learning_cards ADD COLUMN ${col} TEXT DEFAULT ''`).run()
@@ -15284,6 +15378,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
           { name: 'problem_content', type: 'TEXT DEFAULT \'\''},
           { name: 'answer', type: 'TEXT DEFAULT \'\''},
           { name: 'answer_explanation', type: 'TEXT DEFAULT \'\''},
+          { name: 'answer_keywords', type: 'TEXT DEFAULT \'\''},
           { name: 'card_number', type: 'INTEGER DEFAULT 0'},
           { name: 'textbook_page', type: 'TEXT DEFAULT \'\''},
           { name: 'new_terms', type: 'TEXT DEFAULT \'\''},
@@ -15300,14 +15395,14 @@ app.post('/api/curriculum/save-generated', async (c) => {
             subject, grade_level, unit_name, card_title, card_type,
             difficulty_level, learning_track,
             problem_text, problem_description, problem_content,
-            correct_answer, answer, explanation, answer_explanation,
+            correct_answer, answer, explanation, answer_explanation, answer_keywords,
             hint_text, solution_video_url, image_url,
             card_order, card_number, estimated_time_minutes, curriculum_code,
             textbook_page, new_terms, example_problem, example_solution,
             real_world_connection,
             ai_teacher_message, ai_teacher_advice, teacher_help_keywords,
             is_active, course_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         `).bind(
           s(curriculum.subject),
           gradeNum,
@@ -15323,6 +15418,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
           answerText, // answer = same as correct_answer
           explanationText,
           explanationText, // answer_explanation = same as explanation
+          s(Array.isArray(card.answer_keywords) ? JSON.stringify(card.answer_keywords) : (card.answer_keywords || '')),
           s(card.hint_text),
           s(card.solution_video_url || card.video_url),
           s(card.image_url),

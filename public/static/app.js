@@ -22005,7 +22005,7 @@ function saveFontSize() {
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
   const estimatedTime = qualityMode === 'high' ? '約4〜7分' : '約3〜5分'
-  const totalTime = qualityMode === 'high' ? 180 : 90 // 秒単位（並列生成で大幅短縮）
+  const totalTime = qualityMode === 'high' ? 300 : 180 // 秒単位（並列生成で短縮、品質は維持）
   
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -22228,8 +22228,8 @@ function animateRealtimeProgress(totalTime, qualityMode) {
       startPercent: 30,
       endPercent: 75,
       icon: 'fa-cards',
-      task: '18枚の学習カードを並列生成中...',
-      comment: '🚀 3コース同時生成で高速に作っています',
+      task: '30枚の学習カードを並列生成中...',
+      comment: '🚀 3コース同時生成で効率よく作っています',
       emoji: '📚'
     },
     {
