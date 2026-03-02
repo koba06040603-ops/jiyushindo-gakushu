@@ -4371,7 +4371,7 @@ async function loadGuidePage(curriculumId) {
                       </div>
                       <h4 class="text-base font-bold text-gray-800 flex-1">${problem.problem_title}</h4>
                     </div>
-                    <p class="text-sm text-gray-700 mb-2 leading-relaxed">${problem.problem_description}</p>
+                    <p class="text-sm text-gray-700 mb-2 leading-relaxed">${problem.problem_content || problem.problem_description || problem.content || ''}</p>
                     
                     ${problem.learning_meaning ? `
                       <div class="bg-yellow-100 border-l-4 border-yellow-500 rounded-r-lg p-2 mb-2">
@@ -5706,15 +5706,34 @@ window.startCourseStudy = startCourseStudy
 
 // 個別最適コースかどうかに応じて適切なてびきに戻るヘルパー
 function goBackToGuide() {
+  const cId = state.selectedCurriculum?.id || window._personalizedCurriculumId || 0
   if (window._isPersonalizedCourse && window._personalizedCourseId && window._personalizedCurriculumId) {
+    // 個別コースの場合→個別てびきに戻る
     console.log('🔙 個別最適コースのてびきに戻る:', { courseId: window._personalizedCourseId, curriculumId: window._personalizedCurriculumId })
     showPersonalizedCourseGuide(window._personalizedCourseId, window._personalizedCurriculumId)
   } else {
-    console.log('🔙 通常のてびきに戻る:', state.selectedCurriculum?.id)
-    loadGuidePage(state.selectedCurriculum?.id || 0)
+    console.log('🔙 通常のてびきに戻る:', cId)
+    loadGuidePage(cId)
+  }
+}
+// 全体配信のてびきに直接戻る
+function goBackToMainGuide() {
+  const cId = state.selectedCurriculum?.id || window._personalizedCurriculumId || 0
+  console.log('🔙 全体配信てびきに戻る:', cId)
+  loadGuidePage(cId)
+}
+// 個別のてびきに戻る
+function goBackToPersonalizedGuide() {
+  if (window._personalizedCourseId && window._personalizedCurriculumId) {
+    console.log('🔙 個別てびきに戻る:', { courseId: window._personalizedCourseId, curriculumId: window._personalizedCurriculumId })
+    showPersonalizedCourseGuide(window._personalizedCourseId, window._personalizedCurriculumId)
+  } else {
+    goBackToGuide()
   }
 }
 window.goBackToGuide = goBackToGuide
+window.goBackToMainGuide = goBackToMainGuide
+window.goBackToPersonalizedGuide = goBackToPersonalizedGuide
 
 window.loadTeacherOverview = loadTeacherOverview
 window.loadLearningPlanPage = loadLearningPlanPage
@@ -5800,11 +5819,32 @@ async function loadCardPage(cardId) {
           return `
           <div class="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl shadow-lg p-4 mb-4 text-white">
             <div class="flex items-center justify-between">
-              <button onclick="${prevId ? 'loadCardPage(' + prevId + ')' : 'goBackToGuide()'}" 
+              ${prevId ? `
+              <button onclick="loadCardPage(${prevId})" 
                       class="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition font-bold text-sm">
                 <i class="fas fa-chevron-left"></i>
-                ${prevId ? '前のカード' : 'てびきに戻る'}
+                前のカード
               </button>
+              ` : (window._isPersonalizedCourse ? `
+              <div class="flex flex-col gap-1">
+                <button onclick="goBackToPersonalizedGuide()" 
+                        class="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1.5 rounded-lg transition font-bold text-xs">
+                  <i class="fas fa-chevron-left"></i>
+                  <i class="fas fa-user-graduate mr-1"></i>個別のてびき
+                </button>
+                <button onclick="goBackToMainGuide()" 
+                        class="flex items-center gap-2 bg-white bg-opacity-10 hover:bg-opacity-20 px-3 py-1.5 rounded-lg transition font-bold text-xs">
+                  <i class="fas fa-chevron-left"></i>
+                  <i class="fas fa-book mr-1"></i>全体のてびき
+                </button>
+              </div>
+              ` : `
+              <button onclick="goBackToGuide()" 
+                      class="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition font-bold text-sm">
+                <i class="fas fa-chevron-left"></i>
+                てびきに戻る
+              </button>
+              `)}
               <div class="text-center">
                 <div class="flex items-center gap-2 justify-center">
                   ${cardsList.map((_, i) => '<div class="w-3 h-3 rounded-full ' + (i === currentIdx ? 'bg-white shadow-lg scale-125' : 'bg-white bg-opacity-40') + ' transition-all"></div>').join('')}
@@ -6596,11 +6636,30 @@ async function loadCardPage(cardId) {
           return `
         <div class="mt-6 bg-white rounded-xl shadow-xl p-4 border-2 border-indigo-200 sticky bottom-4 z-40">
           <div class="flex items-center justify-between">
-            <button onclick="${prevId2 ? 'loadCardPage(' + prevId2 + '); window.scrollTo(0,0);' : 'goBackToGuide()'}" 
-                    class="flex items-center gap-2 ${prevId2 ? 'bg-indigo-500 hover:bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'} px-5 py-3 rounded-xl transition font-bold text-sm">
+            ${prevId2 ? `
+            <button onclick="loadCardPage(${prevId2}); window.scrollTo(0,0);" 
+                    class="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-3 rounded-xl transition font-bold text-sm">
               <i class="fas fa-chevron-left"></i>
-              ${prevId2 ? '前' : '戻る'}
+              前
             </button>
+            ` : (window._isPersonalizedCourse ? `
+            <div class="flex flex-col gap-1">
+              <button onclick="goBackToPersonalizedGuide()" 
+                      class="flex items-center gap-1 bg-pink-500 hover:bg-pink-600 text-white px-3 py-1.5 rounded-lg transition font-bold text-xs">
+                <i class="fas fa-chevron-left"></i><i class="fas fa-user-graduate"></i>個別
+              </button>
+              <button onclick="goBackToMainGuide()" 
+                      class="flex items-center gap-1 bg-gray-200 text-gray-600 hover:bg-gray-300 px-3 py-1.5 rounded-lg transition font-bold text-xs">
+                <i class="fas fa-chevron-left"></i><i class="fas fa-book"></i>全体
+              </button>
+            </div>
+            ` : `
+            <button onclick="goBackToGuide()" 
+                    class="flex items-center gap-2 bg-gray-200 text-gray-600 hover:bg-gray-300 px-5 py-3 rounded-xl transition font-bold text-sm">
+              <i class="fas fa-chevron-left"></i>
+              戻る
+            </button>
+            `)}
             <div class="flex items-center gap-1">
               ${cardsList2.map((id, i) => '<button onclick="loadCardPage(' + id + '); window.scrollTo(0,0);" class="w-8 h-8 rounded-full text-xs font-bold ' + (i === currentIdx2 ? 'bg-indigo-600 text-white shadow-lg scale-110' : 'bg-gray-100 text-gray-600 hover:bg-indigo-100') + ' transition-all">' + (i + 1) + '</button>').join('')}
             </div>
@@ -8676,9 +8735,13 @@ function renderGenericTactile(container, tactileText, cardData) {
   container.innerHTML = `
     <div class="p-4 text-center">
       <div class="bg-orange-50 rounded-lg p-4 mb-3">
-        <i class="fas fa-hand-paper text-4xl text-orange-400 mb-2 block"></i>
+        <div class="flex items-center justify-center gap-3 mb-2">
+          <div class="text-4xl">👧✋</div>
+          <div class="text-4xl">📐✏️</div>
+        </div>
         <p class="text-sm text-orange-800 font-bold mb-1">やってみよう！</p>
         <p class="text-sm text-gray-700">${tactileText}</p>
+        <p class="text-xs text-orange-500 mt-1"><i class="fas fa-lightbulb mr-1"></i>じっさいに手をうごかして体けんしてみよう！</p>
       </div>
       <div class="flex gap-2 justify-center flex-wrap">
         <button onclick="this.classList.toggle('bg-green-500'); this.classList.toggle('bg-gray-300'); this.classList.toggle('text-white'); TactileSounds.play('correct')" 
@@ -52316,6 +52379,9 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                         <button onclick="toggleCardEdit(${card.card_id || card.id || 0}, ${i})" class="text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-700 px-2 py-1 rounded-lg transition" title="編集">
                           <i class="fas fa-pen"></i> 編集
                         </button>
+                        <button onclick="deletePersonalizedCard(${card.card_id || card.id || 0}, ${courseId}, ${curriculumId})" class="text-xs bg-red-100 hover:bg-red-200 text-red-600 px-2 py-1 rounded-lg transition" title="削除">
+                          <i class="fas fa-trash"></i> 削除
+                        </button>
                       </div>
                     </div>
                     <div class="bg-white rounded-lg p-3 mb-2 border">
@@ -52390,14 +52456,26 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                     ${(() => {
                       const mac = card.multimedia_ai_content
                       if (!mac) return ''
-                      let h = '<details class="mt-2 border-2 border-indigo-200 rounded-xl overflow-hidden bg-gradient-to-r from-indigo-50 to-purple-50">'
-                      h += '<summary class="px-3 py-2 cursor-pointer text-xs font-bold text-indigo-700"><i class="fas fa-brain mr-1"></i>AI多感覚提案（編集可能） ▼</summary>'
+                      // おすすめ判定
+                      const hasRecommendedMusic = mac.short_music && mac.short_music.recommended
+                      const hasRecommendedDiagram = mac.diagram_image && mac.diagram_image.recommended
+                      const hasRecommendedVideo = mac.video && mac.video.recommended
+                      const hasRecommendedTactile = mac.tactile_widget && mac.tactile_widget.recommended
+                      const hasAnyRecommended = hasRecommendedMusic || hasRecommendedDiagram || hasRecommendedVideo || hasRecommendedTactile
+                      const recTags = []
+                      if (hasRecommendedMusic) recTags.push('🎵音楽')
+                      if (hasRecommendedDiagram) recTags.push('🎨図解')
+                      if (hasRecommendedVideo) recTags.push('🎬動画')
+                      if (hasRecommendedTactile) recTags.push('✋体験')
+                      let h = '<details ' + (hasAnyRecommended ? 'open' : '') + ' class="mt-2 border-2 ' + (hasAnyRecommended ? 'border-purple-400 shadow-md' : 'border-indigo-200') + ' rounded-xl overflow-hidden bg-gradient-to-r from-indigo-50 to-purple-50">'
+                      h += '<summary class="px-3 py-2 cursor-pointer text-xs font-bold text-indigo-700"><i class="fas fa-brain mr-1"></i>AI多感覚提案' + (hasAnyRecommended ? ' <span class="bg-purple-600 text-white px-2 py-0.5 rounded-full text-[10px] ml-1">★おすすめ: ' + recTags.join(' ') + '</span>' : '') + ' ▼</summary>'
                       h += '<div class="p-3 space-y-2">'
                       // 30秒音楽
                       if (mac.short_music) {
                         const sm = mac.short_music
-                        h += '<div class="bg-white border border-purple-200 rounded-lg p-2">'
+                        h += '<div class="bg-white border ' + (sm.recommended ? 'border-purple-400 ring-2 ring-purple-200' : 'border-purple-200') + ' rounded-lg p-2">'
                         h += '<div class="flex items-center gap-1 mb-1"><span>🎵</span><span class="text-xs font-bold text-purple-700">30秒おぼえうた</span>'
+                        if (sm.recommended) h += '<span class="bg-purple-500 text-white px-1.5 py-0.5 rounded text-[9px] font-bold">★おすすめ</span>'
                         if (sm.learning_theory) h += '<span class="ml-auto text-[9px] text-gray-400">📚 ' + sm.learning_theory.substring(0,30) + '</span>'
                         h += '</div>'
                         h += '<label class="text-[9px] text-gray-500 font-bold">プロンプト</label>'
@@ -52427,8 +52505,9 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       // 図解
                       if (mac.diagram_image) {
                         const di = mac.diagram_image
-                        h += '<div class="bg-white border border-green-200 rounded-lg p-2">'
+                        h += '<div class="bg-white border ' + (di.recommended ? 'border-green-400 ring-2 ring-green-200' : 'border-green-200') + ' rounded-lg p-2">'
                         h += '<div class="flex items-center gap-1 mb-1"><span>🎨</span><span class="text-xs font-bold text-green-700">図解画像</span>'
+                        if (di.recommended) h += '<span class="bg-green-500 text-white px-1.5 py-0.5 rounded text-[9px] font-bold">★おすすめ</span>'
                         if (di.learning_theory) h += '<span class="ml-auto text-[9px] text-gray-400">📚 ' + di.learning_theory.substring(0,25) + '</span>'
                         h += '</div>'
                         h += '<textarea id="tmac-diagram-' + (card.card_id||card.id||i) + '" rows="2" class="w-full border border-green-100 rounded px-2 py-1 text-[11px] resize-y">' + (di.prompt||'') + '</textarea>'
@@ -52563,14 +52642,17 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
             </div>
             
             <!-- アクションボタン -->
-            <div class="flex gap-3">
-              <button onclick="document.getElementById('personalizedGuideModal').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-bold transition">
+            <div class="flex gap-3 flex-wrap">
+              <button onclick="document.getElementById('personalizedGuideModal').remove(); loadGuidePage(${curriculumId})" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-bold transition min-w-[120px]">
+                <i class="fas fa-book mr-2"></i>全体のてびきへ
+              </button>
+              <button onclick="document.getElementById('personalizedGuideModal').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-bold transition min-w-[80px]">
                 <i class="fas fa-times mr-2"></i>閉じる
               </button>
-              <button onclick="window.open('/guide/${curriculumId}?course=${courseId}', '_blank')" class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-lg font-bold transition">
-                <i class="fas fa-external-link-alt mr-2"></i>配信ページ
+              <button onclick="window.open('/guide/${curriculumId}?course=${courseId}', '_blank')" class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-lg font-bold transition min-w-[100px]">
+                <i class="fas fa-external-link-alt mr-2"></i>配信
               </button>
-              <button onclick="window.print()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-bold transition">
+              <button onclick="window.print()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg font-bold transition min-w-[80px]">
                 <i class="fas fa-print mr-2"></i>印刷
               </button>
             </div>
@@ -52881,6 +52963,23 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
   }, 300)
 }
 window.showPersonalizedCourseGuide = showPersonalizedCourseGuide
+
+// 個別コースのカードを削除
+async function deletePersonalizedCard(cardId, courseId, curriculumId) {
+  if (!confirm('このカードを削除しますか？\n削除すると元に戻せません。')) return
+  try {
+    await axios.delete(`/api/cards/${cardId}`)
+    alert('✅ カードを削除しました')
+    // モーダルを閉じて再表示
+    const modal = document.getElementById('personalizedGuideModal')
+    if (modal) modal.remove()
+    showPersonalizedCourseGuide(courseId, curriculumId)
+  } catch (error) {
+    console.error('❌ カード削除エラー:', error)
+    alert('カードの削除に失敗しました: ' + (error.response?.data?.error || error.message))
+  }
+}
+window.deletePersonalizedCard = deletePersonalizedCard
 
 // 個別評価問題の再生成
 async function retryGenerateAssessment(courseId, curriculumId) {
