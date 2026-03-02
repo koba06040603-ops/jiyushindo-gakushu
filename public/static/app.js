@@ -15216,43 +15216,98 @@ async function gradeAnswer(correctAnswer) {
       })
     } catch (e) { /* 音声再生失敗時は無視 */ }
     
+    // ★★★ 入力欄に直接、大きく太い赤丸○を描画する ★★★
+    const answerArea = document.getElementById('answerInput') || document.querySelector('[id^="handwriting-"]')
+    if (answerArea) {
+      // 入力欄の親要素をposition:relativeにしてSVGオーバーレイを配置
+      const answerParent = answerArea.parentElement
+      if (answerParent) answerParent.style.position = 'relative'
+      
+      // 入力欄のサイズを取得
+      const rect = answerArea.getBoundingClientRect()
+      const parentRect = (answerParent || answerArea).getBoundingClientRect()
+      const offsetTop = rect.top - parentRect.top
+      const offsetLeft = rect.left - parentRect.left
+      const w = rect.width
+      const h = rect.height
+      
+      // 既存の赤丸オーバーレイがあれば削除
+      const existingMaru = document.getElementById('correct-maru-svg-overlay')
+      if (existingMaru) existingMaru.remove()
+      
+      // SVGオーバーレイを入力欄に重ねて表示
+      const svgSize = Math.max(w, h) * 1.3 // 入力欄より30%大きい
+      const svgOverlay = document.createElement('div')
+      svgOverlay.id = 'correct-maru-svg-overlay'
+      svgOverlay.style.cssText = `
+        position: absolute;
+        top: ${offsetTop + h/2 - svgSize/2}px;
+        left: ${offsetLeft + w/2 - svgSize/2}px;
+        width: ${svgSize}px;
+        height: ${svgSize}px;
+        pointer-events: none;
+        z-index: 9999;
+      `
+      // 円周 = 2πr。r = 45% of viewBox (90)。C = 2*π*90 ≈ 565
+      svgOverlay.innerHTML = `
+        <svg viewBox="0 0 200 200" width="${svgSize}" height="${svgSize}" 
+             style="filter: drop-shadow(0 4px 20px rgba(220,38,38,0.5)) drop-shadow(0 0 40px rgba(220,38,38,0.3));">
+          <circle cx="100" cy="100" r="88" fill="none" stroke="#DC2626" stroke-width="20" stroke-linecap="round"
+            stroke-dasharray="553" stroke-dashoffset="553"
+            style="animation: maruDrawStroke 0.6s cubic-bezier(0.4,0,0.2,1) 0.15s forwards;" />
+          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,100,100,0.25)" stroke-width="36" stroke-linecap="round"
+            opacity="0" style="animation: maruGlowPulse 1.5s ease-in-out 0.6s forwards;" />
+        </svg>
+      `
+      ;(answerParent || answerArea.parentElement || document.body).appendChild(svgOverlay)
+      
+      // オーバーレイ全体のポップアニメーション
+      svgOverlay.style.animation = 'maruPopIn 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both'
+      
+      // 入力欄自体にもゴールドの輝きボーダー
+      answerArea.style.border = '4px solid #DC2626'
+      answerArea.style.borderRadius = '16px'
+      answerArea.style.boxShadow = '0 0 20px 8px rgba(220,38,38,0.25), 0 0 60px 16px rgba(220,38,38,0.1)'
+      answerArea.style.transition = 'box-shadow 0.5s ease-out, border-color 0.5s ease-out'
+      
+      // 5秒後にゆっくりフェードアウト
+      setTimeout(() => {
+        if (svgOverlay) {
+          svgOverlay.style.transition = 'opacity 1.5s ease-out'
+          svgOverlay.style.opacity = '0'
+          setTimeout(() => svgOverlay.remove(), 1600)
+        }
+        answerArea.style.boxShadow = '0 0 8px 2px rgba(220,38,38,0.1)'
+      }, 5000)
+    }
+    
+    // グローバルスタイル注入（1回のみ）
+    if (!document.getElementById('maru-animation-styles')) {
+      const styleEl = document.createElement('style')
+      styleEl.id = 'maru-animation-styles'
+      styleEl.textContent = `
+        @keyframes maruDrawStroke { 0% { stroke-dashoffset: 553; } 100% { stroke-dashoffset: 0; } }
+        @keyframes maruPopIn { 0% { transform: scale(0.2); opacity: 0; } 60% { transform: scale(1.18); opacity: 1; } 80% { transform: scale(0.95); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes maruGlowPulse { 0% { opacity: 0; } 30% { opacity: 0.6; } 60% { opacity: 0.2; } 100% { opacity: 0; } }
+        @keyframes correctPopResult { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes starBurstResult { 0% { transform: scale(0) rotate(-30deg); } 50% { transform: scale(1.4) rotate(10deg); } 100% { transform: scale(1) rotate(0deg); } }
+        @keyframes fadeInUpResult { 0% { transform: translateY(15px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+      `
+      document.head.appendChild(styleEl)
+    }
+    
     resultDiv.innerHTML = `
-      <div class="bg-green-50 border-2 border-green-400 rounded-xl p-5 text-center relative overflow-visible" style="animation: correctPop 0.6s ease-out">
-        <!-- 太い赤丸（◯）で答えを囲む -->
-        <div class="correct-maru-overlay" style="animation: drawMaru 0.8s ease-out 0.1s both">
-          <svg viewBox="0 0 200 200" width="160" height="160" class="mx-auto" style="filter: drop-shadow(0 0 8px rgba(239,68,68,0.4));">
-            <circle cx="100" cy="100" r="80" fill="none" stroke="#ef4444" stroke-width="10" stroke-linecap="round"
-              stroke-dasharray="502" stroke-dashoffset="502"
-              style="animation: drawCircle 0.7s ease-out 0.3s forwards;" />
-          </svg>
-        </div>
-        <div class="text-5xl mb-3" style="animation: starBurst 0.8s ease-out">🎉</div>
-        <p class="text-2xl font-bold text-green-700 mb-2" style="animation: fadeInUp 0.5s ease-out 0.2s both">正解！すごい！</p>
-        <p class="text-sm text-green-600" style="animation: fadeInUp 0.5s ease-out 0.4s both">よくできました。${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? '次の問題に進みましょう！' : '次のカードに進みましょう！'}</p>
+      <div class="bg-green-50 border-2 border-green-400 rounded-xl p-5 text-center relative overflow-visible" style="animation: correctPopResult 0.6s ease-out">
+        <div class="text-5xl mb-3" style="animation: starBurstResult 0.8s ease-out">🎉</div>
+        <p class="text-2xl font-bold text-green-700 mb-2" style="animation: fadeInUpResult 0.5s ease-out 0.2s both">正解！すごい！</p>
+        <p class="text-sm text-green-600" style="animation: fadeInUpResult 0.5s ease-out 0.4s both">よくできました。${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? '次の問題に進みましょう！' : '次のカードに進みましょう！'}</p>
         ${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? `
         <button onclick="window.qaStepState.results.push({correct:true, studentAnswer:'', correctAnswer:''}); goToNextQAStep()" 
-                class="mt-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-lg transition shadow-lg" style="animation: fadeInUp 0.5s ease-out 0.6s both">
+                class="mt-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-lg transition shadow-lg" style="animation: fadeInUpResult 0.5s ease-out 0.6s both">
           <i class="fas fa-arrow-right mr-2"></i>次の問題へ（${window.qaStepState.currentStep + 2}/${window.qaStepState.totalSteps}）
         </button>` : ''}
       </div>
-      <style>
-        @keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes starBurst { 0% { transform: scale(0) rotate(-30deg); } 50% { transform: scale(1.4) rotate(10deg); } 100% { transform: scale(1) rotate(0deg); } }
-        @keyframes fadeInUp { 0% { transform: translateY(15px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
-        @keyframes drawCircle { 0% { stroke-dashoffset: 502; } 100% { stroke-dashoffset: 0; } }
-        @keyframes drawMaru { 0% { opacity: 0; transform: scale(0.3); } 50% { opacity: 1; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }
-        @keyframes answerGlow { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.6); } 50% { box-shadow: 0 0 20px 8px rgba(239,68,68,0.3); } 100% { box-shadow: 0 0 10px 4px rgba(239,68,68,0.15); } }
-        .correct-maru-overlay { position: relative; margin: -20px auto 0; pointer-events: none; }
-      </style>
     `
-    // 答え入力エリアにも赤丸アニメーションを適用
-    const answerArea = document.getElementById('answerInput') || document.querySelector('[id^="handwriting-"]')
-    if (answerArea) {
-      answerArea.style.border = '4px solid #ef4444'
-      answerArea.style.borderRadius = '16px'
-      answerArea.style.animation = 'answerGlow 1.5s ease-in-out 0.3s'
-      answerArea.style.boxShadow = '0 0 10px 4px rgba(239,68,68,0.15)'
-    }
     // 一問一答モードの結果を記録
     if (window.qaStepState?.active) {
       // 最後の問題の場合は結果を記録して全問結果を表示
@@ -51654,26 +51709,42 @@ console.log('✅ Phase 10 家庭学習・テスト対策モード初期化完了
 async function generatePersonalizedCourse(studentId, curriculumId) {
   console.log('🎯 個別最適化コース生成開始:', { studentId, curriculumId })
   
-  try {
-    showLoading('学習データを分析して個別コースを生成中...')
-    
-    const response = await axios.post('/api/teacher/generate-personalized-course', {
-      student_id: studentId,
-      curriculum_id: curriculumId
-    }, { timeout: 180000 })  // 180秒（サーバー側150秒に対応）
-    
-    if (!response.data.success) {
-      throw new Error(response.data.error || '生成に失敗しました')
+  const maxRetries = 2
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      showLoading(attempt > 0 ? `再試行中... (${attempt + 1}回目) 学習データを分析して個別コースを生成中...` : '学習データを分析して個別コースを生成中...')
+      
+      const response = await axios.post('/api/teacher/generate-personalized-course', {
+        student_id: studentId,
+        curriculum_id: curriculumId
+      }, { timeout: 200000 })  // 200秒（サーバー側150秒に対応 + 余裕）
+      
+      if (!response.data.success) {
+        throw new Error(response.data.error || '生成に失敗しました')
+      }
+      
+      // 教師チェック画面を表示
+      showPersonalizedCourseReview(response.data)
+      return  // 成功時はリトライループを抜ける
+      
+    } catch (error) {
+      console.error(`❌ 個別最適化コース生成エラー (試行${attempt + 1}):`, error)
+      const is503 = error.response?.status === 503
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout')
+      const isNetwork = !error.response && error.message?.includes('Network')
+      
+      if ((is503 || isTimeout || isNetwork) && attempt < maxRetries) {
+        console.log(`🔄 リトライ: ${is503 ? '503' : isTimeout ? 'タイムアウト' : 'ネットワーク'}エラー、5秒後に再試行...`)
+        await new Promise(r => setTimeout(r, 5000))
+        continue
+      }
+      
+      hideLoading()
+      alert('個別最適化コースの生成に失敗しました。\n' + (error.response?.data?.error || error.message) + '\n\nもう一度お試しください。')
+      return
     }
-    
-    // 教師チェック画面を表示
-    showPersonalizedCourseReview(response.data)
-    
-  } catch (error) {
-    hideLoading()
-    console.error('❌ 個別最適化コース生成エラー:', error)
-    alert('個別最適化コースの生成に失敗しました。\n' + (error.response?.data?.error || error.message))
   }
+  hideLoading()
 }
 
 // 教師チェック画面
@@ -52381,12 +52452,35 @@ async function startBulkGeneration(curriculumId) {
   
   for (const studentId of studentIds) {
     addLog(`⏳ 児童ID:${studentId} の個別コース生成中...（約1〜3分かかります）`)
+    
+    let genRes = null
+    let genError = null
+    for (let retryCount = 0; retryCount < 3; retryCount++) {
+      try {
+        if (retryCount > 0) addLog(`  🔄 再試行 ${retryCount + 1}回目...`)
+        console.log(`📤 generate API呼び出し: student=${studentId}, curriculum=${curriculumId}, attempt=${retryCount + 1}`)
+        genRes = await axios.post('/api/teacher/generate-personalized-course', {
+          student_id: studentId,
+          curriculum_id: curriculumId
+        }, { timeout: 300000 })
+        genError = null
+        break // 成功
+      } catch (e) {
+        genError = e
+        const is503 = e.response?.status === 503
+        const isTimeout = e.code === 'ECONNABORTED' || e.message?.includes('timeout')
+        if ((is503 || isTimeout) && retryCount < 2) {
+          addLog(`  ⚠️ ${is503 ? 'サーバー再起動中' : 'タイムアウト'}、5秒後に再試行...`)
+          await new Promise(r => setTimeout(r, 5000))
+          continue
+        }
+        break // リトライ不可
+      }
+    }
+    
     try {
-      console.log(`📤 generate API呼び出し: student=${studentId}, curriculum=${curriculumId}`)
-      const res = await axios.post('/api/teacher/generate-personalized-course', {
-        student_id: studentId,
-        curriculum_id: curriculumId
-      }, { timeout: 300000 })  // 300秒（サーバー側150秒+バックグラウンド処理に対応）
+      if (genError) throw genError
+      const res = genRes
       
       console.log(`📥 generate APIレスポンス:`, { status: res.status, success: res.data.success, error: res.data.error, keys: Object.keys(res.data) })
       

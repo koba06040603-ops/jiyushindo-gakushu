@@ -38858,6 +38858,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
       "problem_description": "問題の背景や文脈の補足（problem_textとは異なる内容にすること）",
       "correct_answer": "正解（具体的な数値・回答）",
+      "answer_keywords": ["判定キーワード1", "判定キーワード2", "判定キーワード3"],
       "explanation": "【★★★最重要フィールド★★★】解法のプロセスを児童が理解できるように詳しく書くこと。必ず以下を全て含める：①問題で与えられた数値の確認 ②使う公式や考え方 ③途中の式・計算過程 ④最終的な答えの導出。最低100字以上。実生活の例は絶対に書かない（それはreal_world_connectionに書く）。悪い例：『図形の拡大縮小は日常でよく見られます』←これは解説ではない。良い例：『対応する辺AB=4cmとEF=6cmから比を求めます。AB:EF=4:6。最大公約数2で割ると4÷2:6÷2=2:3。よって相似比は2:3です。』（80-200字）",
       "hint_text": "段階的ヒント（最初は抽象的→徐々に具体的に）",
       "hints": [
@@ -38963,6 +38964,9 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
    悪い例（不合格）: 日常生活の例、答えだけ、抽象的な説明
    良い例: 「対応する辺AB=4cm, EF=6cmの比を求めます。AB:EF=4:6。最大公約数2で割ると4÷2:6÷2=2:3。よって相似比は2:3。」
    explanation に日常生活の例を書いた場合、そのカードは不合格とする。日常生活の例は real_world_connection に書くこと。
+※ 【★正誤判定キーワード★】answer_keywords は全カード必須。correct_answerから自動判定に使える3つの重要キーワードを抽出すること。
+   例: correct_answer="12÷3=4 答え：4こ" → answer_keywords=["12÷3", "4", "こ"]
+   例: correct_answer="協力してボールを奪う" → answer_keywords=["協力", "ボール", "奪う"]
 `
 
     // 10. Gemini API呼び出し（フォールバック付き、タイムアウト対策）
@@ -39253,24 +39257,29 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
       }
       const imageUrl = card.image_url || ''
 
+      // answer_keywordsカラムが存在しない場合は追加
+      try { await env.DB.prepare(`ALTER TABLE learning_cards ADD COLUMN answer_keywords TEXT DEFAULT ''`).run() } catch (e) {}
+      
       const cardResult = await env.DB.prepare(`
         INSERT INTO learning_cards (
           subject, grade_level, unit_name, card_title, card_type,
           difficulty_level, learning_track,
           problem_text, problem_description, problem_content,
           correct_answer, answer, explanation, answer_explanation,
+          answer_keywords,
           hint_text, solution_video_url, image_url,
           card_order, card_number, estimated_time_minutes,
           textbook_page, new_terms, example_problem, example_solution,
           real_world_connection,
           ai_teacher_message, ai_teacher_advice, teacher_help_keywords,
           is_active, course_id
-        ) VALUES (?, ?, ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `).bind(
         curriculum.subject, gradeNum, curriculum.unit_name,
         card.card_title || `カード${i + 1}`, cardType, diffLevel,
         pText, pDesc, JSON.stringify({ content: pDesc, multimedia: mm, personalization_note: card.personalization_note || '', question_format: card.question_format || '' }),
         aText, aText, eText, eText,
+        Array.isArray(card.answer_keywords) ? JSON.stringify(card.answer_keywords) : (card.answer_keywords || ''),
         card.hint_text || '',
         videoUrl, imageUrl,
         i + 1, card.card_number || (i + 1), card.estimated_time_minutes || 10,
