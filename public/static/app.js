@@ -2943,32 +2943,92 @@ async function loadTopPageData() {
     const response = await axios.get('/api/curriculum/options')
     const { grades, subjects, textbooks } = response.data
 
-    // 学年選択肢を設定
+    // 学年選択肢を設定（全学年を静的に表示）
     const gradeSelect = document.getElementById('gradeSelect')
     if (!gradeSelect) return
-    grades.forEach(item => {
+    const allGrades = [
+      '小学1年', '小学2年', '小学3年', '小学4年', '小学5年', '小学6年',
+      '中学1年', '中学2年', '中学3年'
+    ]
+    const dbGrades = new Set(grades.map(g => g.grade))
+    allGrades.forEach(g => {
       const option = document.createElement('option')
-      option.value = item.grade
-      option.textContent = item.grade
+      option.value = g
+      option.textContent = dbGrades.has(g) ? g : g + '（AI新規生成）'
       gradeSelect.appendChild(option)
     })
-
-    // 教科選択肢を設定
-    const subjectSelect = document.getElementById('subjectSelect')
-    subjects.forEach(item => {
-      const option = document.createElement('option')
-      option.value = item.subject
-      option.textContent = item.subject
-      subjectSelect.appendChild(option)
+    // DBにあってallGradesにない学年も追加
+    grades.forEach(item => {
+      if (!allGrades.includes(item.grade)) {
+        const option = document.createElement('option')
+        option.value = item.grade
+        option.textContent = item.grade
+        gradeSelect.appendChild(option)
+      }
     })
 
-    // 教科書会社選択肢を設定
-    const textbookSelect = document.getElementById('textbookSelect')
-    textbooks.forEach(item => {
+    // 教科選択肢を設定（全教科を静的に表示 + DB既存をマーク）
+    const subjectSelect = document.getElementById('subjectSelect')
+    const allSubjects = [
+      { value: '算数', label: '算数' },
+      { value: '数学', label: '数学' },
+      { value: '国語', label: '国語' },
+      { value: '理科', label: '理科' },
+      { value: '社会', label: '社会' },
+      { value: '英語', label: '英語' },
+      { value: '外国語活動', label: '外国語活動' },
+      { value: '生活', label: '生活' },
+      { value: '音楽', label: '音楽' },
+      { value: '図工', label: '図工・美術' },
+      { value: '体育', label: '体育' },
+      { value: '保健体育', label: '保健体育' },
+      { value: '家庭科', label: '家庭科' },
+      { value: '技術', label: '技術' },
+      { value: '総合', label: '総合的な学習' },
+      { value: '道徳', label: '道徳' },
+      { value: '特別活動', label: '特別活動' },
+      { value: 'プログラミング', label: 'プログラミング' },
+    ]
+    const dbSubjects = new Set(subjects.map(s => s.subject))
+    allSubjects.forEach(s => {
       const option = document.createElement('option')
-      option.value = item.textbook_company
-      option.textContent = item.textbook_company
+      option.value = s.value
+      option.textContent = dbSubjects.has(s.value) ? s.label : s.label + '（AI新規生成）'
+      subjectSelect.appendChild(option)
+    })
+    // DBにあってallSubjectsにない教科も追加
+    subjects.forEach(item => {
+      if (!allSubjects.some(s => s.value === item.subject)) {
+        const option = document.createElement('option')
+        option.value = item.subject
+        option.textContent = item.subject
+        subjectSelect.appendChild(option)
+      }
+    })
+
+    // 教科書会社選択肢を設定（全出版社を静的表示 + DB既存をマーク）
+    const textbookSelect = document.getElementById('textbookSelect')
+    const allTextbooks = [
+      '東京書籍', '啓林館', '大日本図書', '学校図書', '教育出版',
+      '光村図書', '日本文教出版', '三省堂', '帝国書院', '開隆堂',
+      '信教出版', '数研出版', '実教出版', '第一学習社',
+      'その他（指定なし）'
+    ]
+    const dbTextbooks = new Set(textbooks.map(t => t.textbook_company))
+    allTextbooks.forEach(t => {
+      const option = document.createElement('option')
+      option.value = t
+      option.textContent = dbTextbooks.has(t) ? t : t
       textbookSelect.appendChild(option)
+    })
+    // DBにあってallTextbooksにない出版社も追加
+    textbooks.forEach(item => {
+      if (!allTextbooks.includes(item.textbook_company)) {
+        const option = document.createElement('option')
+        option.value = item.textbook_company
+        option.textContent = item.textbook_company
+        textbookSelect.appendChild(option)
+      }
     })
 
     // ステップインジケーター更新
@@ -3060,7 +3120,15 @@ async function updateUnitList() {
         
         startButton.disabled = false
       } else {
-        unitSelect.innerHTML = '<p class="text-gray-400 text-center py-8"><i class="fas fa-info-circle mr-2"></i>該当する単元がありません。「AIで新規作成」ボタンから作成できます。</p>'
+        unitSelect.innerHTML = `
+          <div class="text-center py-6">
+            <i class="fas fa-info-circle text-purple-400 text-3xl mb-3 block"></i>
+            <p class="text-gray-600 font-bold mb-2">「${subject}」の単元はまだ登録されていません</p>
+            <p class="text-sm text-gray-400 mb-4">AIで新しい単元を自動生成できます（約2〜4分）</p>
+            <button onclick="showUnitGeneratorModal()" class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-8 rounded-xl transition shadow-lg">
+              <i class="fas fa-wand-magic-sparkles mr-2"></i>AIで「${subject}」の単元を作成する
+            </button>
+          </div>`
         startButton.disabled = true
       }
     } catch (error) {
