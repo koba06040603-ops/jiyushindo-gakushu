@@ -38863,6 +38863,42 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       .replace(/\r\n/g, '\n')  // CRLF→LF
       .replace(/\r/g, '\n')    // CR→LF
     
+    // ★ JSON文字列リテラル内の生改行を \\n にエスケープ（ステートマシン方式）
+    // Geminiが responseMimeType:'application/json' でも歌詞等に生改行を含むことがあるため
+    const fixJsonStringNewlines = (text: string): string => {
+      let result = ''
+      let inString = false
+      let escaped = false
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i]
+        if (escaped) {
+          result += ch
+          escaped = false
+          continue
+        }
+        if (ch === '\\' && inString) {
+          result += ch
+          escaped = true
+          continue
+        }
+        if (ch === '"') {
+          inString = !inString
+          result += ch
+          continue
+        }
+        if (inString && ch === '\n') {
+          result += '\\n'
+          continue
+        }
+        if (inString && ch === '\t') {
+          result += '\\t'
+          continue
+        }
+        result += ch
+      }
+      return result
+    }
+    
     console.log('📊 Geminiレスポンス情報:', { textLength: geminiText.length, preview: geminiText.substring(0, 500) })
     
     let personalizedPlan: any = {}
@@ -38871,30 +38907,40 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       personalizedPlan = JSON.parse(sanitizedGeminiText)
       console.log('📊 JSON.parse成功:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
     } catch (directParseError: any) {
-      console.warn('⚠️ 直接JSON.parse失敗、extractJSONで再試行:', directParseError.message)
+      console.warn('⚠️ 直接JSON.parse失敗、文字列内改行修正で再試行:', directParseError.message)
       try {
-        personalizedPlan = extractJSON(sanitizedGeminiText) || {}
-        console.log('📊 extractJSON結果:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
-      } catch (parseError: any) {
-        console.warn('⚠️ extractJSON失敗、最終再試行中:', parseError.message)
-        // より強力な制御文字除去で再試行
-        const cleanedText = sanitizedGeminiText.replace(/[\x00-\x1F\x7F]/g, (ch: string) => {
-          if (ch === '\n' || ch === '\t') return ch
-          return ''
-        })
+        // ★ JSON文字列内の生改行をエスケープしてから再パース
+        const fixedText = fixJsonStringNewlines(sanitizedGeminiText)
+        personalizedPlan = JSON.parse(fixedText)
+        console.log('📊 改行修正後JSON.parse成功:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
+      } catch (fixedParseError: any) {
+        console.warn('⚠️ 改行修正後も失敗、extractJSONで再試行:', fixedParseError.message)
         try {
-          personalizedPlan = extractJSON(cleanedText) || {}
-          console.log('📊 クリーン再試行結果:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards })
-        } catch (e2: any) {
-          console.error('❌ JSON解析完全失敗:', e2.message)
-          // 最終手段: 正規表現でcardsフィールドだけ抽出を試みる
-          const cardsMatch = sanitizedGeminiText.match(/"cards"\s*:\s*\[([\s\S]*)\]/)
-          if (cardsMatch) {
+          personalizedPlan = extractJSON(sanitizedGeminiText) || {}
+          console.log('📊 extractJSON結果:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
+        } catch (parseError: any) {
+          console.warn('⚠️ extractJSON失敗、最終再試行中:', parseError.message)
+          // より強力な制御文字除去で再試行
+          const cleanedText = sanitizedGeminiText.replace(/[\x00-\x1F\x7F]/g, (ch: string) => {
+            if (ch === '\n' || ch === '\t') return ch
+            return ''
+          })
+          try {
+            const fixedClean = fixJsonStringNewlines(cleanedText)
+            personalizedPlan = JSON.parse(fixedClean)
+            console.log('📊 クリーン+改行修正結果:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards })
+          } catch (e2: any) {
+            console.error('❌ JSON解析完全失敗:', e2.message)
+            // 最終手段: 正規表現でcardsフィールドだけ抽出を試みる
             try {
-              const cardsText = '[' + cardsMatch[1] + ']'
-              const cleanedCards = cardsText.replace(/[\x00-\x1F\x7F]/g, '')
-              personalizedPlan = { cards: JSON.parse(cleanedCards) }
-              console.log('✅ cards部分のみ抽出成功')
+              const cardsMatch = sanitizedGeminiText.match(/"cards"\s*:\s*\[([\s\S]*)\]/)
+              if (cardsMatch) {
+                const cardsText = '[' + cardsMatch[1] + ']'
+                const cleanedCards = cardsText.replace(/[\x00-\x1F\x7F]/g, '')
+                const fixedCards = fixJsonStringNewlines(cleanedCards)
+                personalizedPlan = { cards: JSON.parse(fixedCards) }
+                console.log('✅ cards部分のみ抽出成功')
+              }
             } catch { /* 完全失敗 */ }
           }
         }
@@ -39317,7 +39363,7 @@ ${context}
               if (imageUrl && cardId) {
                 // DBに画像URLを保存
                 try {
-                  await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE id = ?')
+                  await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
                     .bind(imageUrl.substring(0, 2000000), cardId).run()
                   console.log(`✅ カード${cardId}の図解自動生成完了（${imageUrl.length}文字）`)
                 } catch (dbErr) {
@@ -39345,6 +39391,144 @@ ${context}
       }
     }
     c.executionCtx.waitUntil(bgGenerateVisuals())
+
+    // ★★★ バックグラウンドで個別最適マルチメディアコンテンツルーター ★★★
+    // v4分析結果に基づき、この児童に最適なメディアを判定してプロンプトを生成・保存
+    const bgGenerateMultimedia = async () => {
+      try {
+        const apiKey = env.GEMINI_API_KEY
+        if (!apiKey) return
+        
+        const v4 = v4_analysis || {}
+        const axes = v4.axes || {}
+        const template = v4.template || {}
+        const primarySensory = v4.primary_sensory || template.media_type || ''
+        
+        // この児童にとって有効なメディアタイプを判定
+        const mediaRecommendations = {
+          music: false,
+          diagram: true, // 図解は全員に有効（bgGenerateVisualsで処理済み）
+          video: false,
+          tactile: false
+        }
+        
+        // 聴覚優位 or 動機的エネルギーが低い → 音楽が有効
+        if (primarySensory === 'auditory_processing_efficiency' || 
+            (axes.motivational_energy && axes.motivational_energy < 50) ||
+            (axes.emotional_stability && axes.emotional_stability < 50)) {
+          mediaRecommendations.music = true
+        }
+        
+        // 視覚優位＋空間把握 → 動画が有効（ジオメトリ系）
+        const isGeometry = (curriculum.unit_name || '').match(/図形|空間|立体|相似|合同|三角|四角|円|角度|体積|面積/)
+        if (isGeometry && primarySensory === 'visual_processing_efficiency') {
+          mediaRecommendations.video = true
+        }
+        
+        // 触覚優位 or 運動感覚優位 → 触覚アクティビティが有効
+        if (primarySensory === 'kinesthetic_processing_efficiency' || 
+            (axes.strategic_maturity && axes.strategic_maturity < 40)) {
+          mediaRecommendations.tactile = true
+        }
+        
+        console.log(`🎵 マルチメディアルーター判定: `, mediaRecommendations, `(sensory=${primarySensory})`)
+        
+        // 各カードのmultimedia_ai_content情報も考慮
+        const multimediaData = (cards || []).map((card, i) => {
+          const mm = card.multimedia_ai_content || {}
+          return {
+            card_index: i,
+            card_id: savedCardIds[i],
+            card_title: card.card_title || '',
+            short_music: mm.short_music || null,
+            diagram_image: mm.diagram_image || null,
+            video: mm.video || null,
+            tactile_widget: mm.tactile_widget || null,
+          }
+        })
+        
+        // 音楽プロンプトの生成・保存（推奨される場合）
+        if (mediaRecommendations.music) {
+          const musicPrompts = multimediaData
+            .filter(m => m.short_music && m.short_music.recommended !== false)
+            .map(m => ({
+              card_id: m.card_id,
+              card_title: m.card_title,
+              music_prompt: m.short_music.prompt || '',
+              lyrics: m.short_music.lyrics || '',
+              genre: m.short_music.genre || 'children_educational',
+              learning_theory: m.short_music.learning_theory || ''
+            }))
+          
+          if (musicPrompts.length > 0) {
+            await env.DB.prepare(`
+              INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+              ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
+            `).bind(
+              curriculum_id,
+              `personalized_music_prompts_${courseId}`,
+              JSON.stringify({ 
+                recommendations: mediaRecommendations,
+                music_prompts: musicPrompts,
+                generated_at: new Date().toISOString()
+              })
+            ).run()
+            console.log(`🎵 音楽プロンプト保存完了: ${musicPrompts.length}件 (course_id=${courseId})`)
+          }
+        }
+        
+        // 触覚アクティビティの保存（推奨される場合）
+        if (mediaRecommendations.tactile) {
+          const tactileData = multimediaData
+            .filter(m => m.tactile_widget && m.tactile_widget.recommended !== false)
+            .map(m => ({
+              card_id: m.card_id,
+              card_title: m.card_title,
+              description: m.tactile_widget.description || '',
+              activity_type: m.tactile_widget.activity_type || '',
+              learning_theory: m.tactile_widget.learning_theory || ''
+            }))
+          
+          if (tactileData.length > 0) {
+            await env.DB.prepare(`
+              INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+              ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
+            `).bind(
+              curriculum_id,
+              `personalized_tactile_${courseId}`,
+              JSON.stringify(tactileData)
+            ).run()
+            console.log(`🤲 触覚アクティビティ保存完了: ${tactileData.length}件`)
+          }
+        }
+        
+        // メディア推奨情報をコースメタに保存
+        await env.DB.prepare(`
+          INSERT INTO curriculum_metadata (curriculum_id, meta_key, meta_value) VALUES (?, ?, ?)
+          ON CONFLICT(curriculum_id, meta_key) DO UPDATE SET meta_value = excluded.meta_value
+        `).bind(
+          curriculum_id,
+          `personalized_media_routing_${courseId}`,
+          JSON.stringify({
+            recommendations: mediaRecommendations,
+            primary_sensory: primarySensory,
+            axes_summary: {
+              cognitive: axes.cognitive_autonomy || 50,
+              emotional: axes.emotional_stability || 50,
+              strategic: axes.strategic_maturity || 50,
+              motivational: axes.motivational_energy || 50
+            },
+            cards_with_multimedia: multimediaData.length,
+            generated_at: new Date().toISOString()
+          })
+        ).run()
+        
+        console.log(`✅ マルチメディアルーティング完了 (course_id=${courseId})`)
+      } catch (mmErr) {
+        console.warn('⚠️ マルチメディアルーター処理エラー:', mmErr)
+      }
+    }
+    c.executionCtx.waitUntil(bgGenerateMultimedia())
 
     return c.json({
       success: true,

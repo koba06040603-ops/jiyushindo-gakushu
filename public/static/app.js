@@ -3608,24 +3608,24 @@ async function loadGuidePage(curriculumId) {
           
           if (missingIntroProblems.length > 0) {
             console.log('  → 導入問題を生成中...')
-            await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ 導入問題生成失敗:', e.message))
+            await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`, {}, {timeout: 120000}).catch(e => console.warn('  ⚠️ 導入問題生成失敗:', e.message))
             generated++
             autoGenBanners.forEach(b => { const s = b.querySelector('span'); if(s) s.textContent = `AIが問題を生成中です... (${generated}/${totalTasks} 完了)` })
           }
           if (needsAssessment) {
             console.log('  → チェックテスト・選択問題を生成中...')
-            await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ 評価問題生成失敗:', e.message))
+            await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`, {}, {timeout: 120000}).catch(e => console.warn('  ⚠️ 評価問題生成失敗:', e.message))
             generated++
             autoGenBanners.forEach(b => { const s = b.querySelector('span'); if(s) s.textContent = `AIが問題を生成中です... (${generated}/${totalTasks} 完了)` })
           }
           if (needsCourseProblems) {
             console.log('  → コース選択問題を生成中...')
-            await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 60000}).catch(e => console.warn('  ⚠️ コース問題生成失敗:', e.message))
+            await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 120000}).catch(e => console.warn('  ⚠️ コース問題生成失敗:', e.message))
             generated++
           }
           // 学習環境デザインも自動生成（まだ存在しなければ）
           try {
-            await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, {timeout: 60000})
+            await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, {timeout: 120000})
             console.log('  ✅ 学習環境デザイン自動生成完了')
           } catch (e) { console.warn('  ⚠️ 学習環境デザイン生成失敗:', e.message) }
           console.log('✅ バックグラウンド自動生成完了')
@@ -6341,7 +6341,7 @@ async function loadCardPage(cardId) {
                   <h4 class="font-bold text-blue-800 mb-2">
                     <i class="fas fa-info-circle mr-2"></i>解説
                   </h4>
-                  <div class="text-gray-700 whitespace-pre-wrap font-sans" style="line-height: 1.8;">${(answer?.explanation || answer?.answer_explanation || '解説は準備中です').replace(/\n/g, '<br>')}</div>
+                  <div class="text-gray-700 whitespace-pre-wrap font-sans" style="line-height: 1.8;">${(answer?.explanation || answer?.answer_explanation || card.answer_explanation || card.explanation || card.example_solution || card.real_world_connection || 'この問題の解説は、先生が編集できます。').replace(/\n/g, '<br>')}</div>
                   ${card.real_world_connection ? `<div class="mt-2 bg-orange-50 rounded-lg p-3"><strong class="text-orange-700">🌍 せいかつとのつながり：</strong><span class="text-gray-700">${card.real_world_connection}</span></div>` : ''}
                 </div>
               </div>
@@ -6493,18 +6493,18 @@ async function loadCardPage(cardId) {
                 </p>
               </div>
               
-              <div class="flex gap-2 items-stretch" style="align-items:stretch;">
+              <div class="flex gap-2 items-center" style="align-items:center;">
                 <button onclick="startVoiceInput()" 
                         id="voiceButton"
                         class="bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold transition flex-shrink-0 flex items-center justify-center"
-                        style="width:42px;min-height:42px;"
+                        style="width:42px;height:42px;min-width:42px;"
                         title="音声で質問">
                   <i class="fas fa-microphone"></i>
                 </button>
                 <button onclick="toggleHandwriting()" 
                         id="handwritingButton"
                         class="bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold transition flex-shrink-0 flex items-center justify-center"
-                        style="width:42px;min-height:42px;"
+                        style="width:42px;height:42px;min-width:42px;"
                         title="手書きで入力">
                   <i class="fas fa-pen"></i>
                 </button>
@@ -6517,7 +6517,7 @@ async function loadCardPage(cardId) {
                 <button onclick="askAI()" 
                         id="aiSendBtn"
                         class="bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition flex-shrink-0 flex items-center justify-center"
-                        style="width:42px;min-height:42px;">
+                        style="width:42px;height:42px;min-width:42px;">
                   <i class="fas fa-paper-plane"></i>
                 </button>
               </div>
@@ -21290,9 +21290,21 @@ async function executeUnitGeneration(params) {
     
     updateGenerationProgress('生成完了！保存しています...', 95)
 
-    // プレビュー画面を表示
+    // 100%にして完了アニメーション
+    setTimeout(() => {
+      updateGenerationProgress('✨ 生成完了！プレビューを表示します...', 100)
+      const progressBar = document.getElementById('progressBar')
+      if (progressBar) {
+        progressBar.style.width = '100%'
+        progressBar.style.background = 'linear-gradient(90deg, #10b981, #34d399)'
+      }
+      const progressPercent = document.getElementById('progressPercent')
+      if (progressPercent) progressPercent.textContent = '100%'
+    }, 300)
+
+    // プレビュー画面を表示（少し遅延して完了感を出す）
     const modelUsed = unitInfoResponse.data.model_used
-    showUnitPreview(unitData, modelUsed)
+    setTimeout(() => showUnitPreview(unitData, modelUsed), 1500)
 
   } catch (error) {
     console.error('❌❌❌ 単元生成エラー:', error)
@@ -21675,8 +21687,8 @@ function saveFontSize() {
 // 生成プロセス表示
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
-  const estimatedTime = qualityMode === 'high' ? '約3〜5分' : '約2分〜4分'
-  const totalTime = qualityMode === 'high' ? 300 : 200 // 秒単位
+  const estimatedTime = qualityMode === 'high' ? '約4〜7分' : '約3〜5分'
+  const totalTime = qualityMode === 'high' ? 420 : 300 // 秒単位（3コース生成の実際の所要時間に合わせた）
   
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -21926,7 +21938,17 @@ function animateRealtimeProgress(totalTime, qualityMode) {
   
   _realtimeProgressInterval = setInterval(() => {
     const elapsed = (Date.now() - startTime) / 1000 // 秒
-    const progress = Math.min((elapsed / totalTime) * 100, 99) // 99%まで
+    // 95%までは線形、その後はゴールに近づくほど遅く（対数カーブ）→ API完了まで止まらない
+    let progress
+    const linearProgress = (elapsed / totalTime) * 100
+    if (linearProgress < 95) {
+      progress = linearProgress
+    } else {
+      // 95%以降: 95 + (99.5-95) * (1 - e^(-超過/60)) → 漸近的に99.5%に近づく
+      const overTime = elapsed - (totalTime * 0.95)
+      progress = 95 + 4.5 * (1 - Math.exp(-overTime / 60))
+    }
+    progress = Math.min(progress, 99.5) // 99.5%まで（100%はAPI完了時に設定）
     
     // プログレスバー更新
     const progressBar = document.getElementById('progressBar')
@@ -21983,10 +22005,18 @@ function animateRealtimeProgress(totalTime, qualityMode) {
       }
     }
     
-    // 100%到達したらクリア
-    if (progress >= 99) {
-      clearInterval(_realtimeProgressInterval)
-      _realtimeProgressInterval = null
+    // 99.5%到達後もクリアせず、励ましメッセージを更新し続ける
+    if (progress >= 99 && elapsed > totalTime) {
+      // タイムアウト超過時は励ましメッセージを更新
+      const overMsg = [
+        'AIが丁寧に問題を作っています。もう少しお待ちください！',
+        '素晴らしい学習カードができあがります。あと少し！',
+        '子どもたちが楽しく学べるカードを作成中です...',
+        '品質の高い問題を生成するために時間がかかっています'
+      ]
+      const overIdx = Math.floor((elapsed - totalTime) / 15) % overMsg.length
+      const encourageEl = document.getElementById('encourageMessage')
+      if (encourageEl) encourageEl.textContent = overMsg[overIdx]
     }
   }, 100) // 100msごとに更新
 }
@@ -22907,7 +22937,7 @@ async function saveGeneratedUnit(unitData) {
           // 4. 学習環境デザインAI自動生成（6観点）
           saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>学習環境デザインを生成中...'
           try {
-            await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, {timeout: 60000})
+            await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, {timeout: 120000})
             console.log('✅ 学習環境デザイン 完了')
           } catch (e) { console.warn('⚠️ 学習環境デザイン 失敗:', e.message) }
           
@@ -23457,10 +23487,10 @@ function showCardDetail(card) {
               </div>
             ` : ''}
             
-            ${!card.example_solution && !card.real_world_connection ? `
+            ${!card.example_solution && !card.real_world_connection && !card.answer_explanation && !card.explanation ? `
               <div class="text-center py-12 text-gray-500">
                 <i class="fas fa-book-open text-6xl mb-4 opacity-30"></i>
-                <p class="text-lg">解説は準備中です</p>
+                <p class="text-lg">この問題の解説は、先生が編集できます</p>
               </div>
             ` : ''}
           </div>
@@ -25079,7 +25109,7 @@ function showTeacherOverview(unitData) {
                       <i class="fas fa-edit mr-1"></i>編集
                     </button>
                   </div>
-                  <div id="display-explanation-${courseIndex}-${cardIndex}" class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer_explanation || card.explanation || '解説は準備中です').replace(/\n/g, '<br>')}</div>
+                  <div id="display-explanation-${courseIndex}-${cardIndex}" class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer_explanation || card.explanation || card.example_solution || card.real_world_connection || 'この問題の解説は、先生が編集できます。').replace(/\n/g, '<br>')}</div>
                   ${card.real_world_connection ? `<div class="mt-2 bg-orange-50 rounded-lg p-3 text-sm"><strong class="text-orange-700">🌍 せいかつとのつながり：</strong><span class="text-gray-700">${card.real_world_connection}</span></div>` : ''}
                   <div id="edit-explanation-${courseIndex}-${cardIndex}" class="hidden">
                     <textarea 
@@ -52039,7 +52069,7 @@ async function startBulkGeneration(curriculumId) {
       const res = await axios.post('/api/teacher/generate-personalized-course', {
         student_id: studentId,
         curriculum_id: curriculumId
-      }, { timeout: 180000 })  // 180秒（サーバー側150秒に対応）
+      }, { timeout: 300000 })  // 300秒（サーバー側150秒+バックグラウンド処理に対応）
       
       console.log(`📥 generate APIレスポンス:`, { status: res.status, success: res.data.success, error: res.data.error, keys: Object.keys(res.data) })
       
@@ -52550,106 +52580,137 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
     `
     document.body.insertAdjacentHTML('beforeend', html)
     
-    // チェックテスト・選択課題を非同期で取得して表示
-    try {
-      const metaRes = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
-      const meta = metaRes.data || {}
-      
-      // 個別用チェックテスト（コースID別）
-      const pCheckTest = meta[`personalized_check_test_${cid}`]
+    // チェックテスト・選択課題を非同期で取得して表示（強化版ポーリング付き）
+    const renderCheckTest = (pCheckTest) => {
+      return `
+        <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+          <i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>
+          個別チェックテスト（${pCheckTest.sample_problems.length}問）
+        </h3>
+        <div class="space-y-3">
+          ${pCheckTest.sample_problems.map((p, i) => `
+            <div class="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-3">
+              <div class="flex items-center gap-2 mb-1">
+                <div class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-xs">${i+1}</div>
+                <p class="text-sm font-bold text-gray-800">${p.problem_text || ''}</p>
+                ${p.difficulty === 'advanced' ? '<span class="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">★発展</span>' : ''}
+              </div>
+              ${p.choices && p.choices.length > 0 ? `
+              <div class="grid grid-cols-2 gap-2 mt-2">
+                ${p.choices.map(ch => `<div class="bg-white border border-yellow-200 rounded-lg px-3 py-1.5 text-xs">${ch}</div>`).join('')}
+              </div>
+              ${p.correct_choice ? `<details class="mt-1"><summary class="text-xs text-yellow-600 cursor-pointer font-bold">正解を見る</summary><p class="text-xs text-gray-600 mt-1">正解: ${p.correct_choice} ${p.explanation ? '— ' + p.explanation : ''}</p></details>` : ''}
+              ` : ''}
+              ${p.personalization_reason ? '<div class="mt-1 text-xs text-indigo-500"><i class="fas fa-brain mr-1"></i>' + p.personalization_reason + '</div>' : ''}
+            </div>
+          `).join('')}
+        </div>`
+    }
+    const renderOptional = (opts) => {
+      return `
+        <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+          <i class="fas fa-star text-pink-600 mr-2"></i>
+          えらべるもんだい（${opts.length}問）
+        </h3>
+        <div class="space-y-3">
+          ${opts.map((p, i) => `
+            <div class="bg-pink-50 border-2 border-pink-200 rounded-xl p-3">
+              <div class="flex items-center gap-2 mb-1">
+                <div class="w-6 h-6 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-xs">${i+1}</div>
+                <span class="text-sm font-bold text-pink-800">${p.problem_title || ''}</span>
+              </div>
+              <p class="text-sm text-gray-700 ml-8">${p.problem_content || ''}</p>
+              ${p.personalization_reason ? '<div class="mt-1 ml-8 text-xs text-indigo-500"><i class="fas fa-brain mr-1"></i>' + p.personalization_reason + '</div>' : ''}
+            </div>
+          `).join('')}
+        </div>`
+    }
+    const loadAssessmentData = async (retryCount) => {
       const checkSection = document.getElementById('personalized-check-test-section')
-      if (checkSection) {
-        if (pCheckTest && pCheckTest.sample_problems && pCheckTest.sample_problems.length > 0) {
-          checkSection.innerHTML = `
-            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-              <i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>
-              個別チェックテスト（${pCheckTest.sample_problems.length}問）
-            </h3>
-            <div class="space-y-3">
-              ${pCheckTest.sample_problems.map((p, i) => `
-                <div class="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-3">
-                  <div class="flex items-center gap-2 mb-1">
-                    <div class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-xs">${i+1}</div>
-                    <p class="text-sm font-bold text-gray-800">${p.problem_text || ''}</p>
-                    ${p.difficulty === 'advanced' ? '<span class="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">★発展</span>' : ''}
-                  </div>
-                  ${p.choices && p.choices.length > 0 ? `
-                  <div class="grid grid-cols-2 gap-2 mt-2">
-                    ${p.choices.map(ch => `<div class="bg-white border border-yellow-200 rounded-lg px-3 py-1.5 text-xs">${ch}</div>`).join('')}
-                  </div>
-                  ${p.correct_choice ? `<details class="mt-1"><summary class="text-xs text-yellow-600 cursor-pointer font-bold">正解を見る</summary><p class="text-xs text-gray-600 mt-1">正解: ${p.correct_choice} ${p.explanation ? '— ' + p.explanation : ''}</p></details>` : ''}
-                  ` : ''}
-                  ${p.personalization_reason ? '<div class="mt-1 text-xs text-indigo-500"><i class="fas fa-brain mr-1"></i>' + p.personalization_reason + '</div>' : ''}
-                </div>
-              `).join('')}
-            </div>`
-        } else {
-          // チェックテストがない場合、自動生成を実行
-          checkSection.innerHTML = `
+      const optSection = document.getElementById('personalized-optional-section')
+      try {
+        const metaRes = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
+        const meta = metaRes.data || {}
+      
+        // 個別用チェックテスト（コースID別）
+        const pCheckTest = meta[`personalized_check_test_${cid}`]
+        if (checkSection && pCheckTest && pCheckTest.sample_problems && pCheckTest.sample_problems.length > 0) {
+          checkSection.innerHTML = renderCheckTest(pCheckTest)
+          // 選択課題もチェック
+          const pOpt = meta[`personalized_optional_${cid}`]
+          if (optSection && pOpt && pOpt.length > 0) {
+            optSection.innerHTML = renderOptional(pOpt)
+          }
+          return // 成功 → リトライ不要
+        }
+      
+        // まだ生成されていない場合
+        if (retryCount < 5) {
+          // バックグラウンド生成待ち → ポーリング（最大5回、各6秒 = 30秒待つ）
+          const waitMsg = retryCount === 0 ? 'AIがチェックテスト・選択課題を生成中です...（約30秒）' : `生成中です...（あと約${(5 - retryCount) * 6}秒）`
+          if (checkSection) checkSection.innerHTML = `
             <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
               <i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>
               チェックテスト
             </h3>
             <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center">
               <i class="fas fa-spinner fa-spin text-yellow-500 mr-1"></i>
-              <p class="text-sm text-gray-700">AIがチェックテスト・選択課題を生成中です...（約30秒）</p>
+              <p class="text-sm text-gray-700">${waitMsg}</p>
             </div>`
-          // 自動生成API呼び出し
+          setTimeout(() => loadAssessmentData(retryCount + 1), 6000)
+        } else {
+          // 5回ポーリング失敗 → 直接API呼び出しで生成
+          console.log('🔄 バックグラウンド生成未完了 → 直接APIで生成開始 courseId=', cid)
+          if (checkSection) checkSection.innerHTML = `
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+              <i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>
+              チェックテスト
+            </h3>
+            <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center">
+              <i class="fas fa-spinner fa-spin text-yellow-500 mr-1"></i>
+              <p class="text-sm text-gray-700">AIが直接生成しています...（約30秒）</p>
+            </div>`
           try {
-            const genRes = await axios.post('/api/teacher/generate-personalized-assessment/' + cid, {}, { timeout: 90000 })
+            const genRes = await axios.post('/api/teacher/generate-personalized-assessment/' + cid, {}, { timeout: 120000 })
             if (genRes.data.success && genRes.data.check_test) {
-              const pct = genRes.data.check_test
-              checkSection.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>個別チェックテスト（' + (pct.sample_problems?.length || 0) + '問）</h3><div class="space-y-3">' + (pct.sample_problems || []).map(function(p, pi) { return '<div class="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-1"><div class="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-xs">' + (pi+1) + '</div><p class="text-sm font-bold text-gray-800">' + (p.problem_text||'') + '</p></div>' + (p.choices && p.choices.length > 0 ? '<div class="grid grid-cols-2 gap-2 mt-2">' + p.choices.map(function(ch) { return '<div class="bg-white border border-yellow-200 rounded-lg px-3 py-1.5 text-xs">' + ch + '</div>' }).join('') + '</div>' + (p.correct_choice ? '<details class="mt-1"><summary class="text-xs text-yellow-600 cursor-pointer font-bold">正解を見る</summary><p class="text-xs text-gray-600 mt-1">正解: ' + p.correct_choice + (p.explanation ? ' — ' + p.explanation : '') + '</p></details>' : '') : '') + '</div>' }).join('') + '</div>'
-            }
-            // 選択課題も更新
-            const optS = document.getElementById('personalized-optional-section')
-            if (optS && genRes.data.optional_problems && genRes.data.optional_problems.length > 0) {
-              const opts = genRes.data.optional_problems
-              optS.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-star text-pink-600 mr-2"></i>えらべるもんだい（' + opts.length + '問）</h3><div class="space-y-3">' + opts.map(function(p, pi) { return '<div class="bg-pink-50 border-2 border-pink-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-1"><div class="w-6 h-6 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-xs">' + (pi+1) + '</div><span class="text-sm font-bold text-pink-800">' + (p.problem_title||'') + '</span></div><p class="text-sm text-gray-700 ml-8">' + (p.problem_content||'') + '</p></div>' }).join('') + '</div>'
+              if (checkSection) checkSection.innerHTML = renderCheckTest(genRes.data.check_test)
+              if (optSection && genRes.data.optional_problems && genRes.data.optional_problems.length > 0) {
+                optSection.innerHTML = renderOptional(genRes.data.optional_problems)
+              }
+            } else {
+              throw new Error(genRes.data.error || '生成結果が空です')
             }
           } catch (genErr) {
             console.warn('個別評価問題自動生成エラー:', genErr)
-            checkSection.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>チェックテスト</h3><div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center"><p class="text-sm text-gray-700">チェックテストの生成に失敗しました。配信ページを開くと自動生成されます。</p><button onclick="retryGenerateAssessment(' + cid + ', ' + curriculumId + ')" class="mt-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-redo mr-1"></i>再生成</button></div>'
+            if (checkSection) checkSection.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-clipboard-check text-yellow-600 mr-2"></i>チェックテスト</h3><div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center"><p class="text-sm text-gray-700">チェックテストの生成に失敗しました。</p><button onclick="retryGenerateAssessment(' + cid + ', ' + curriculumId + ')" class="mt-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-redo mr-1"></i>再生成</button></div>'
+            if (optSection) optSection.innerHTML = '<h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center"><i class="fas fa-star text-pink-600 mr-2"></i>えらべるもんだい</h3><div class="bg-pink-50 border-2 border-pink-300 rounded-xl p-4 text-center"><p class="text-sm text-gray-700">選択課題の生成に失敗しました。</p><button onclick="retryGenerateAssessment(' + cid + ', ' + curriculumId + ')" class="mt-2 bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-redo mr-1"></i>再生成</button></div>'
           }
         }
-      }
-      
-      // 個別用選択課題（コースID別）
-      const pOptional = meta[`personalized_optional_${cid}`]
-      const optSection = document.getElementById('personalized-optional-section')
-      if (optSection) {
-        if (pOptional && pOptional.length > 0) {
-          optSection.innerHTML = `
-            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-              <i class="fas fa-star text-pink-600 mr-2"></i>
-              えらべるもんだい（${pOptional.length}問）
-            </h3>
-            <div class="space-y-3">
-              ${pOptional.map((p, i) => `
-                <div class="bg-pink-50 border-2 border-pink-200 rounded-xl p-3">
-                  <div class="flex items-center gap-2 mb-1">
-                    <div class="w-6 h-6 rounded-full bg-pink-500 text-white flex items-center justify-center font-bold text-xs">${i+1}</div>
-                    <span class="text-sm font-bold text-pink-800">${p.problem_title || ''}</span>
-                  </div>
-                  <p class="text-sm text-gray-700 ml-8">${p.problem_content || ''}</p>
-                </div>
-              `).join('')}
-            </div>`
-        } else {
+        
+        // 選択課題を別途チェック（チェックテストが成功した場合もここに来る可能性）
+        const pOptional = meta[`personalized_optional_${cid}`]
+        if (optSection && pOptional && pOptional.length > 0) {
+          optSection.innerHTML = renderOptional(pOptional)
+        } else if (retryCount >= 5) {
           optSection.innerHTML = `
             <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
               <i class="fas fa-star text-pink-600 mr-2"></i>
               えらべるもんだい
             </h3>
             <div class="bg-pink-50 border-2 border-pink-300 rounded-xl p-4 text-center">
-              <i class="fas fa-spinner fa-spin text-pink-500 mr-1"></i>
               <p class="text-sm text-gray-700">チェックテストと一緒に生成中です...</p>
             </div>`
         }
-      }
     } catch (metaErr) {
       console.warn('メタデータ取得エラー:', metaErr)
+      // リトライ: バックグラウンド生成がまだ完了していない可能性
+      if (retryCount < 5) {
+        console.log(`🔄 メタデータ再取得中... (${retryCount + 1}/5)`)
+        setTimeout(() => loadAssessmentData(retryCount + 1), 6000)
+      }
     }
+    }
+    loadAssessmentData(0)
     
     // ★ v4分析データを非同期で取得して表示
     try {
