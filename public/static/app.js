@@ -3051,7 +3051,9 @@ async function loadTopPageData() {
       s1.className = s1.className.replace(inactiveClass, activeClass)
       s2.className = g ? s2.className.replace(inactiveClass, activeClass) : s2.className.replace(activeClass, inactiveClass)
       s3.className = g && s ? s3.className.replace(inactiveClass, activeClass) : s3.className.replace(activeClass, inactiveClass)
-      s4.className = g && s && t ? s4.className.replace(inactiveClass, activeClass) : s4.className.replace(activeClass, inactiveClass)
+      const noTxtSubjects = ['体育','保健体育','音楽','図工','家庭科','技術','道徳','総合','特別活動','プログラミング','外国語活動']
+      const skipTextbook = s && noTxtSubjects.includes(s)
+      s4.className = (g && s && (t || skipTextbook)) ? s4.className.replace(inactiveClass, activeClass) : s4.className.replace(activeClass, inactiveClass)
     }
 
     // 選択が変更されたら単元リストを更新
@@ -3077,16 +3079,35 @@ async function updateUnitList() {
   startButton.disabled = true
   startButton.classList.add('hidden')
 
-  // 3つすべて選択されている場合のみ単元を読み込み
-  if (grade && subject && textbook) {
+  // 教科書が不要な教科（体育、音楽、家庭科、図工、道徳、総合、特別活動、保健体育、外国語活動、プログラミング）
+  const noTextbookSubjects = ['体育','保健体育','音楽','図工','家庭科','技術','道徳','総合','特別活動','プログラミング','外国語活動']
+  const needsTextbook = !noTextbookSubjects.includes(subject)
+  // 教科書不要の教科は学年と教科だけで進める
+  const canProceed = grade && subject && (textbook || !needsTextbook)
+  // 教科書選択の表示/非表示
+  const textbookContainer = textbookSelect?.closest('div')?.parentElement ? textbookSelect.closest('div') : null
+  if (textbookContainer) {
+    if (!needsTextbook && subject) {
+      textbookContainer.style.opacity = '0.4'
+      textbookContainer.style.pointerEvents = 'none'
+      textbookContainer.title = 'この教科は教科書会社の選択は不要です'
+    } else {
+      textbookContainer.style.opacity = '1'
+      textbookContainer.style.pointerEvents = ''
+      textbookContainer.title = ''
+    }
+  }
+  if (canProceed) {
     unitArea.style.display = ''
     try {
       const response = await axios.get('/api/curriculum')
-      const curricula = response.data.filter(c => 
-        c.grade == grade && 
-        c.subject === subject && 
-        c.textbook_company === textbook
-      )
+      const curricula = response.data.filter(c => {
+        const gradeMatch = c.grade == grade
+        const subjectMatch = c.subject === subject
+        // 教科書不要の教科はtextbookフィルタなし
+        const textbookMatch = !needsTextbook || c.textbook_company === textbook
+        return gradeMatch && subjectMatch && textbookMatch
+      })
 
       if (curricula.length > 0) {
         // カード形式で表示
@@ -3143,6 +3164,13 @@ async function updateUnitList() {
     }
   } else {
     unitArea.style.display = 'none'
+    // 教科書不要教科の表示状態をリセット
+    const textbookContainer2 = textbookSelect?.closest('div')
+    if (textbookContainer2) {
+      textbookContainer2.style.opacity = '1'
+      textbookContainer2.style.pointerEvents = ''
+      textbookContainer2.title = ''
+    }
   }
 }
 
@@ -6265,11 +6293,12 @@ async function loadCardPage(cardId) {
                 const widgetContainerId = 'tactile-widget-' + cardIdVal
                 return '<div class="mt-4 bg-gradient-to-br from-orange-50 to-yellow-50 border-2 border-orange-300 rounded-xl p-4 shadow-sm relative" id="' + widgetContainerId + '-wrapper">' +
                   '<div class="flex items-center gap-2 mb-3">' +
-                    '<span class="bg-orange-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span>' +
-                    '<span class="text-lg" id="tactile-illust-' + cardIdVal + '"></span>' +
+                    '<span class="bg-orange-500 text-white text-sm font-bold px-3 py-1 rounded-full"><i class="fas fa-hand-sparkles mr-1"></i>やってみよう</span>' +
                     '<span class="text-sm font-bold text-gray-700">' + tactile + '</span>' +
                     '<button onclick="this.closest(\'[id$=-wrapper]\').style.display=\'none\'" class="ml-auto text-gray-400 hover:text-red-500 text-xs px-2 py-1 rounded hover:bg-red-50 transition" title="このウィジェットを非表示"><i class="fas fa-times"></i> 非表示</button>' +
                   '</div>' +
+                  '<div id="tactile-ai-illust-card-' + cardIdVal + '" class="flex items-center justify-center mb-2 min-h-[80px]"><span class="text-4xl" id="tactile-illust-' + cardIdVal + '"></span></div>' +
+                  '<button onclick="generateTactileIllustration(\'tactile-ai-illust-card-' + cardIdVal + '\', \'' + (tactile||'').replace(/'/g, "\\'").substring(0,120) + '\', \'' + (card.subject||'').replace(/'/g, "\\'") + '\', \'' + (card.grade||'').replace(/'/g, "\\'") + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2"><i class="fas fa-image"></i>AIにイラストを描いてもらう</button>' +
                   '<div id="' + widgetContainerId + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[200px] relative"></div>' +
                   '<p class="text-xs text-gray-500 mt-2 text-center"><i class="fas fa-hand-pointer mr-1"></i>画面をタッチ・ドラッグして操作してみよう</p>' +
                   '<script>try{var _ti=document.getElementById("tactile-illust-' + cardIdVal + '");if(_ti&&typeof getTactileIllustration==="function"){_ti.textContent=getTactileIllustration("' + (tactile||'').replace(/"/g,'\\"').replace(/\n/g,' ').substring(0,100) + '",window.currentCardData?.card).icons}}catch(e){}</script>' +
@@ -8881,11 +8910,20 @@ function getTactileIllustration(text, cardData) {
 
 function renderGenericTactile(container, tactileText, cardData) {
   const illust = getTactileIllustration(tactileText, cardData)
+  const cardId = cardData?.card_id || cardData?.id || window.currentCardData?.card?.card_id || 0
+  const illustContainerId = 'tactile-ai-illust-' + cardId
   container.innerHTML = `
     <div class="p-4 text-center">
       <div class="bg-orange-50 rounded-lg p-4 mb-3">
-        <div class="text-5xl mb-2">${illust.icons}</div>
-        <p class="text-sm text-orange-800 font-bold mb-1">やってみよう！</p>
+        <p class="text-sm text-orange-800 font-bold mb-2"><i class="fas fa-hand-sparkles mr-1"></i>やってみよう！</p>
+        <!-- AI生成イラスト表示エリア -->
+        <div id="${illustContainerId}" class="mb-2 min-h-[100px] flex items-center justify-center">
+          <div class="text-4xl">${illust.icons}</div>
+        </div>
+        <button onclick="generateTactileIllustration('${illustContainerId}', '${tactileText.replace(/'/g, "\\'")}', '${(cardData?.subject || '').replace(/'/g, "\\'")}', '${(cardData?.grade || '').replace(/'/g, "\\'")}')" 
+                class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2">
+          <i class="fas fa-image"></i>AIにイラストを描いてもらう
+        </button>
         <p class="text-sm text-gray-700">${tactileText}</p>
         <p class="text-xs text-orange-500 mt-1"><i class="fas fa-lightbulb mr-1"></i>${illust.desc}</p>
       </div>
@@ -8900,7 +8938,44 @@ function renderGenericTactile(container, tactileText, cardData) {
         </button>
       </div>
     </div>`
+  // カードにproblem_image_urlがあればそれをイラストとして使う
+  if (cardData?.problem_image_url) {
+    const el = document.getElementById(illustContainerId)
+    if (el) {
+      el.innerHTML = '<img src="' + cardData.problem_image_url + '" class="max-h-[180px] mx-auto rounded-lg border-2 border-orange-200 shadow" alt="やってみよう イラスト">'
+    }
+  }
 }
+
+// 「やってみよう」のAIイラスト生成
+async function generateTactileIllustration(containerId, tactileText, subject, grade) {
+  const el = document.getElementById(containerId)
+  if (!el) return
+  el.innerHTML = '<div class="py-4"><i class="fas fa-spinner fa-spin text-orange-500 text-2xl"></i><p class="text-xs text-orange-600 mt-2 font-bold">AIがイラストを描いています...</p><p class="text-[10px] text-gray-400">約10〜20秒</p></div>'
+  try {
+    // 子ども向けイラストプロンプトを生成
+    const illustPrompt = 'Cute, warm, child-friendly educational illustration showing: ' + tactileText + '. Subject: ' + (subject || '') + ', Grade: ' + (grade || '') + '. Style: soft watercolor, kawaii, gentle colors (orange, yellow, warm tones), simple clean lines, no text, safe for children, encouraging and fun atmosphere. Show a child happily doing the activity.'
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: illustPrompt,
+      card_title: 'やってみよう: ' + tactileText,
+      problem_text: tactileText,
+      subject: subject || '',
+      grade: grade || '',
+      prefer_image: true,
+      style: 'tactile_illustration'
+    }, { timeout: 60000 })
+    const d = res.data
+    if (d.success && d.image_url) {
+      el.innerHTML = '<img src="' + d.image_url + '" class="max-h-[180px] mx-auto rounded-lg border-2 border-orange-200 shadow animate-fadeIn" alt="やってみよう イラスト"><p class="text-[10px] text-gray-400 mt-1">' + (d.model || 'AI') + '</p><button onclick="generateTactileIllustration(\'' + containerId + '\', \'' + tactileText.replace(/'/g, "\\\\'") + '\', \'' + (subject || '').replace(/'/g, "\\\\'") + '\', \'' + (grade || '').replace(/'/g, "\\\\'") + '\')" class="text-[10px] text-orange-500 underline mt-1 block">🔄 別のイラストにする</button>'
+    } else {
+      el.innerHTML = '<p class="text-xs text-red-500 py-2">イラスト生成に失敗しました</p><div class="text-4xl">' + getTactileIllustration(tactileText).icons + '</div>'
+    }
+  } catch (e) {
+    console.error('Tactile illustration error:', e)
+    el.innerHTML = '<p class="text-xs text-red-500 py-2">通信エラー: ' + (e.message || '') + '</p><div class="text-4xl">' + getTactileIllustration(tactileText).icons + '</div>'
+  }
+}
+window.generateTactileIllustration = generateTactileIllustration
 
 // --- ウィジェット初期化（カードロード後に呼ばれる） ---
 function initTactileWidgets() {
@@ -20594,20 +20669,24 @@ function showUnitGeneratorModal() {
                 <option value="理科">理科</option>
                 <option value="社会">社会</option>
                 <option value="英語">英語</option>
+                <option value="外国語活動">外国語活動</option>
                 <option value="生活">生活</option>
                 <option value="音楽">音楽</option>
                 <option value="図工">図工・美術</option>
                 <option value="体育">体育</option>
+                <option value="保健体育">保健体育</option>
                 <option value="家庭科">家庭科</option>
                 <option value="技術">技術</option>
                 <option value="総合">総合的な学習</option>
                 <option value="道徳">道徳</option>
+                <option value="特別活動">特別活動</option>
+                <option value="プログラミング">プログラミング</option>
               </select>
             </div>
 
             <!-- 教科書会社 -->
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2">教科書会社 *</label>
+            <div id="genTextbookContainer">
+              <label class="block text-sm font-bold text-gray-700 mb-2">教科書会社 <span id="genTextbookRequired">*</span></label>
               <select id="genTextbook" class="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none">
                 <option value="">選択してください</option>
                 <option value="東京書籍">東京書籍</option>
@@ -20783,8 +20862,10 @@ function showUnitGeneratorModal() {
     const subject = document.getElementById('genSubject').value
     const textbook = document.getElementById('genTextbook').value
     const loadBtn = document.getElementById('loadUnitsBtn')
+    const noTxtSubjects = ['体育','保健体育','音楽','図工','家庭科','技術','道徳','総合','特別活動','プログラミング','外国語活動']
+    const needsTextbook = !noTxtSubjects.includes(subject)
     
-    if (grade && subject && textbook) {
+    if (grade && subject && (textbook || !needsTextbook)) {
       loadBtn.disabled = false
     } else {
       loadBtn.disabled = true
@@ -20792,7 +20873,22 @@ function showUnitGeneratorModal() {
   }
   
   document.getElementById('genGrade').addEventListener('change', updateSuggestButton)
-  document.getElementById('genSubject').addEventListener('change', updateSuggestButton)
+  document.getElementById('genSubject').addEventListener('change', function() {
+    updateSuggestButton()
+    // 教科書不要の教科は教科書選択を無効化
+    const noTxtSubjects = ['体育','保健体育','音楽','図工','家庭科','技術','道徳','総合','特別活動','プログラミング','外国語活動']
+    const genTextbookContainer = document.getElementById('genTextbookContainer')
+    const genTextbookRequired = document.getElementById('genTextbookRequired')
+    const genTextbook = document.getElementById('genTextbook')
+    if (noTxtSubjects.includes(this.value)) {
+      if (genTextbookContainer) { genTextbookContainer.style.opacity = '0.4'; genTextbookContainer.style.pointerEvents = 'none' }
+      if (genTextbookRequired) genTextbookRequired.textContent = '（不要）'
+      if (genTextbook) genTextbook.value = 'その他'
+    } else {
+      if (genTextbookContainer) { genTextbookContainer.style.opacity = '1'; genTextbookContainer.style.pointerEvents = '' }
+      if (genTextbookRequired) genTextbookRequired.textContent = '*'
+    }
+  })
   document.getElementById('genTextbook').addEventListener('change', updateSuggestButton)
 }
 
@@ -52559,7 +52655,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                       <p class="text-sm text-gray-800"><strong>もんだい：</strong>${card.problem_text || card.problem_content || card.problem_description || ''}</p>
                     </div>
                     ${ytId ? '<div class="mb-2 rounded-lg overflow-hidden border border-gray-200"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div><p class="text-xs text-gray-500 mt-1 p-1">🎬 ' + (mm.youtube_title || '関連動画') + '</p></div>' : ytUrl ? (ytUrl.includes('nhk.or.jp') ? '<div class="mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><span class="bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded">NHK for School</span><span class="text-sm font-bold text-gray-800">' + (mm.youtube_title || 'NHK学習動画') + '</span></div><div class="bg-white rounded-lg p-4 text-center border border-blue-200"><i class="fas fa-search text-4xl text-blue-500 mb-2 block"></i><a href="https://edu.web.nhk/school/?q=' + encodeURIComponent((card.card_title || '').substring(0, 20)) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow"><i class="fas fa-external-link-alt"></i>NHK for School で探す</a></div></div>' : '<div class="mb-2 bg-red-50 border border-red-200 rounded-xl p-3"><div class="flex items-center gap-2 mb-2"><i class="fas fa-video text-red-500"></i><span class="text-sm font-bold text-gray-700">' + (mm.youtube_title || '学習動画') + '</span></div><a href="' + ytUrl + '" target="_blank" class="inline-flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition"><i class="fas fa-play-circle"></i>動画を再生する<i class="fas fa-external-link-alt text-xs"></i></a></div>') : ''}
-                    ${tactile ? (() => { const _tIllust = getTactileIllustration(tactile, card); return '<div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3 mb-2"><div class="flex items-center gap-2 mb-2"><span class="text-xl">' + _tIllust.icons + '</span><span class="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"><i class="fas fa-hand-pointer mr-1"></i>さわってまなぼう</span><span class="text-xs text-gray-700">' + tactile + '</span></div><p class="text-[10px] text-orange-500 mb-2"><i class="fas fa-lightbulb mr-1"></i>' + _tIllust.desc + '</p><button onclick="teacherGenerateImage(' + (card.card_id || card.id || 0) + ', ' + i + ')" class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2"><i class="fas fa-image"></i>AIに図を描いてもらう</button><div id="guide-tactile-' + (card.card_id || card.id || i) + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[120px]"></div></div>' })() : ''}
+                    ${tactile ? (() => { const _tIllust = getTactileIllustration(tactile, card); const _tcId = 'guide-tactile-illust-' + (card.card_id || card.id || i); const _safeTactile = tactile.replace(/'/g, "\\'").replace(/"/g, '&quot;'); const _safeSub = (card.subject || '').replace(/'/g, "\\'"); const _safeGrade = (card.grade || '').replace(/'/g, "\\'"); return '<div class="bg-orange-50 border-2 border-orange-300 rounded-xl p-3 mb-2"><div class="flex items-center gap-2 mb-2"><span class="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"><i class="fas fa-hand-sparkles mr-1"></i>やってみよう</span></div><div id="' + _tcId + '" class="flex items-center justify-center mb-2 min-h-[80px]"><span class="text-3xl">' + _tIllust.icons + '</span></div><button onclick="generateTactileIllustration(\'' + _tcId + '\', \'' + _safeTactile + '\', \'' + _safeSub + '\', \'' + _safeGrade + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2"><i class="fas fa-image"></i>AIにイラストを描いてもらう</button><p class="text-xs text-gray-700">' + tactile + '</p><p class="text-[10px] text-orange-500 mt-1"><i class="fas fa-lightbulb mr-1"></i>' + _tIllust.desc + '</p></div>' })() : ''}
                     ${audio ? '<div class="bg-green-50 border-l-3 border-green-400 p-2 rounded text-xs mb-2 cursor-pointer hover:bg-green-100" onclick="speakText(\'' + (card.problem_text || card.problem_content || '').replace(/'/g, '').substring(0, 200) + '\', \'female-friendly\', 0.8); TactileSounds.play(\'tap\')"><strong>🔊 きいてみよう:</strong> ' + audio + '</div>' : ''}
                     <div class="grid grid-cols-2 gap-2 text-xs">
                       <details class="bg-white rounded p-2 border">
