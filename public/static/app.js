@@ -15217,7 +15217,15 @@ async function gradeAnswer(correctAnswer) {
     } catch (e) { /* 音声再生失敗時は無視 */ }
     
     resultDiv.innerHTML = `
-      <div class="bg-green-50 border-2 border-green-400 rounded-xl p-5 text-center" style="animation: correctPop 0.6s ease-out">
+      <div class="bg-green-50 border-2 border-green-400 rounded-xl p-5 text-center relative overflow-visible" style="animation: correctPop 0.6s ease-out">
+        <!-- 太い赤丸（◯）で答えを囲む -->
+        <div class="correct-maru-overlay" style="animation: drawMaru 0.8s ease-out 0.1s both">
+          <svg viewBox="0 0 200 200" width="160" height="160" class="mx-auto" style="filter: drop-shadow(0 0 8px rgba(239,68,68,0.4));">
+            <circle cx="100" cy="100" r="80" fill="none" stroke="#ef4444" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="502" stroke-dashoffset="502"
+              style="animation: drawCircle 0.7s ease-out 0.3s forwards;" />
+          </svg>
+        </div>
         <div class="text-5xl mb-3" style="animation: starBurst 0.8s ease-out">🎉</div>
         <p class="text-2xl font-bold text-green-700 mb-2" style="animation: fadeInUp 0.5s ease-out 0.2s both">正解！すごい！</p>
         <p class="text-sm text-green-600" style="animation: fadeInUp 0.5s ease-out 0.4s both">よくできました。${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? '次の問題に進みましょう！' : '次のカードに進みましょう！'}</p>
@@ -15231,8 +15239,20 @@ async function gradeAnswer(correctAnswer) {
         @keyframes correctPop { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
         @keyframes starBurst { 0% { transform: scale(0) rotate(-30deg); } 50% { transform: scale(1.4) rotate(10deg); } 100% { transform: scale(1) rotate(0deg); } }
         @keyframes fadeInUp { 0% { transform: translateY(15px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+        @keyframes drawCircle { 0% { stroke-dashoffset: 502; } 100% { stroke-dashoffset: 0; } }
+        @keyframes drawMaru { 0% { opacity: 0; transform: scale(0.3); } 50% { opacity: 1; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes answerGlow { 0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.6); } 50% { box-shadow: 0 0 20px 8px rgba(239,68,68,0.3); } 100% { box-shadow: 0 0 10px 4px rgba(239,68,68,0.15); } }
+        .correct-maru-overlay { position: relative; margin: -20px auto 0; pointer-events: none; }
       </style>
     `
+    // 答え入力エリアにも赤丸アニメーションを適用
+    const answerArea = document.getElementById('answerInput') || document.querySelector('[id^="handwriting-"]')
+    if (answerArea) {
+      answerArea.style.border = '4px solid #ef4444'
+      answerArea.style.borderRadius = '16px'
+      answerArea.style.animation = 'answerGlow 1.5s ease-in-out 0.3s'
+      answerArea.style.boxShadow = '0 0 10px 4px rgba(239,68,68,0.15)'
+    }
     // 一問一答モードの結果を記録
     if (window.qaStepState?.active) {
       // 最後の問題の場合は結果を記録して全問結果を表示

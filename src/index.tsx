@@ -13779,7 +13779,7 @@ app.post('/api/ai/ocr', async (c) => {
               },
               features: [
                 {
-                  type: 'TEXT_DETECTION',
+                  type: 'DOCUMENT_TEXT_DETECTION',
                   maxResults: 1
                 }
               ],
@@ -14569,9 +14569,47 @@ app.post('/api/ai/generate-course', async (c) => {
     })
     
     if (finishReason && finishReason !== 'STOP') {
-      console.error('❌ 異常終了:', finishReason)
-      console.error('📊 候補データ:', candidate)
-      throw new Error(`Gemini API が異常終了しました: ${finishReason}`)
+      if (finishReason === 'MAX_TOKENS') {
+        // MAX_TOKENS: 出力が途中で切れた場合 → 部分JSONの修復を試みる
+        console.warn('⚠️ MAX_TOKENS: 出力が途中で切れました。部分データの修復を試みます...')
+        let partialText = candidate.content?.parts?.[0]?.text || ''
+        if (partialText) {
+          // 部分JSONを修復: 不完全な末尾を補完
+          partialText = partialText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+          // 末尾のカンマ・コロン等を除去
+          partialText = partialText.replace(/,\s*$/, '')
+          // 開きブレースの数を数えて閉じる
+          let braceCount = 0, bracketCount = 0
+          for (const ch of partialText) {
+            if (ch === '{') braceCount++
+            if (ch === '}') braceCount--
+            if (ch === '[') bracketCount++
+            if (ch === ']') bracketCount--
+          }
+          // 不完全なJSON文字列値を閉じる
+          const lastQuoteIdx = partialText.lastIndexOf('"')
+          const afterLastQuote = partialText.substring(lastQuoteIdx + 1)
+          if (lastQuoteIdx > 0 && !afterLastQuote.match(/["\]},:]/)) {
+            partialText += '"'
+          }
+          // 閉じ括弧を追加
+          for (let i = 0; i < bracketCount; i++) partialText += ']'
+          for (let i = 0; i < braceCount; i++) partialText += '}'
+          console.log('🔧 修復後のJSON末尾:', partialText.slice(-200))
+          // 修復したレスポンスでaiResponseに代入（次のパース処理へ）
+          candidate.content.parts[0].text = partialText
+        } else {
+          console.error('❌ MAX_TOKENS: テキストが空です')
+          throw new Error(`Gemini API が異常終了しました: ${finishReason}`)
+        }
+      } else if (finishReason === 'SAFETY') {
+        console.error('❌ 安全性フィルタによりブロック:', finishReason)
+        throw new Error(`Gemini API が安全性フィルタによりブロックされました`)
+      } else {
+        console.error('❌ 異常終了:', finishReason)
+        console.error('📊 候補データ:', candidate)
+        throw new Error(`Gemini API が異常終了しました: ${finishReason}`)
+      }
     }
     
     let aiResponse = candidate.content.parts[0].text
@@ -14636,9 +14674,10 @@ app.post('/api/ai/generate-course', async (c) => {
       }
     }
     
-    // 【強化】バリデーション: 動的枚数チェック
+    // 【強化】バリデーション: 動的枚数チェック（MAX_TOKENS修復時は緩和）
     const expectedCards = numCards
-    if (!courseData.cards || courseData.cards.length < Math.max(expectedCards - 2, 3)) {
+    const minRequired = finishReason === 'MAX_TOKENS' ? 2 : Math.max(expectedCards - 2, 3)
+    if (!courseData.cards || courseData.cards.length < minRequired) {
       console.error('❌ バリデーションエラー:', {
         cards存在: !!courseData.cards,
         cards長さ: courseData.cards?.length || 0,
@@ -38849,7 +38888,29 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
     if (!geminiResponse || !geminiResponse.ok) throw new Error(`全モデル失敗: ${lastError}`)
 
     const geminiData = await geminiResponse.json() as any
-    const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const geminiFinishReason = geminiData.candidates?.[0]?.finishReason
+    let geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // MAX_TOKENS: 出力が途中で切れた場合 → 部分JSONの修復
+    if (geminiFinishReason === 'MAX_TOKENS' && geminiText) {
+      console.warn('⚠️ MAX_TOKENS: 個別コース生成の出力が途中で切れました。修復を試みます...')
+      // 不完全な末尾を修復
+      geminiText = geminiText.replace(/,\s*$/, '')
+      let braceCount = 0, bracketCount = 0
+      for (const ch of geminiText) {
+        if (ch === '{') braceCount++
+        if (ch === '}') braceCount--
+        if (ch === '[') bracketCount++
+        if (ch === ']') bracketCount--
+      }
+      // 不完全な文字列値を閉じる
+      const lastQI = geminiText.lastIndexOf('"')
+      const afterQ = geminiText.substring(lastQI + 1)
+      if (lastQI > 0 && !afterQ.match(/["\]},:]/)) geminiText += '"'
+      for (let i = 0; i < bracketCount; i++) geminiText += ']'
+      for (let i = 0; i < braceCount; i++) geminiText += '}'
+      console.log('🔧 修復後の個別コースJSON末尾:', geminiText.slice(-200))
+    }
     
     // ★ responseMimeType: 'application/json' ではGeminiが正しいJSONを返すため
     // 制御文字除去のみ行い、構造的な改行はそのまま保持する
@@ -39301,7 +39362,7 @@ ${cardSummary}
         
         console.log(`🎨 バックグラウンド図解生成開始: ${savedCardIds.length}枚のカード`)
         
-        for (let i = 0; i < Math.min(savedCardIds.length, 5); i++) {
+        for (let i = 0; i < Math.min(savedCardIds.length, 10); i++) {
           const card = (cards || [])[i]
           if (!card) continue
           const cardId = savedCardIds[i]
