@@ -8096,9 +8096,13 @@ app.get('/guide/:curriculumId', async (c) => {
                   <div style="background:white; border-radius:6px; padding:8px 10px; border:1px solid #BBF7D0; font-size:0.9rem;">
                     <strong style="color:#166534;">こたえ：</strong>${card.correct_answer || card.answer || '解答は準備中です'}
                   </div>
-                  ${card.answer_explanation || card.explanation || card.real_world_connection ? `
+                  ${card.answer_explanation || card.explanation ? `
                   <div style="background:white; border-radius:6px; padding:8px 10px; margin-top:6px; border:1px solid #BBF7D0; font-size:0.85rem;">
-                    <strong style="color:#1E40AF;">📖 かいせつ：</strong>${card.answer_explanation || card.explanation || card.real_world_connection || ''}
+                    <strong style="color:#1E40AF;">📖 かいせつ：</strong>${card.answer_explanation || card.explanation || ''}
+                  </div>` : ''}
+                  ${card.real_world_connection ? `
+                  <div style="background:#FFF7ED; border-radius:6px; padding:8px 10px; margin-top:6px; border:1px solid #FED7AA; font-size:0.85rem;">
+                    <strong style="color:#C2410C;">🌍 せいかつとのつながり：</strong>${card.real_world_connection}
                   </div>` : ''}
                 </div>
               </details>
@@ -14404,7 +14408,7 @@ app.post('/api/ai/generate-course', async (c) => {
       "example_image_description": "例題の図解説明（AI画像生成用。図形問題なら頂点名・角度・辺の長さ等を含む正確な図の説明。文章題なら場面のイラスト説明。図が不要な単純計算問題ではnull）",
       "real_world_connection": "実生活とのつながり（※answer_explanationとは別の内容にすること。日常生活での応用例を1文で記述）",
       "answer": "正解（具体的に）",
-      "answer_explanation": "【重要】解法のプロセスを具体的に書くこと。途中の式・計算手順・数値の変換過程を必ず含める。例:「AB:EF=4:6=2:3なので、相似比は2:3」のように、なぜその答えになるか論理的に説明する（80-200字）。実生活の例はreal_world_connectionに書き、ここには書かない。",
+      "answer_explanation": "【★★★最重要フィールド★★★】この問題の解法プロセスを児童が理解できるように詳しく書くこと。必ず以下を全て含める：①問題で与えられた数値の確認 ②使う公式や考え方 ③途中の式・計算過程（例：4÷2=2、6÷2=3）④最終的な答えの導出。最低100字以上。実生活の例は絶対に書かない（それはreal_world_connectionに書く）。悪い例：『スマートフォンのピンチアウトは拡大の例です』←これは解説ではない。良い例：『四角形ABCDと四角形EFGHで、対応する辺AB=4cmとEF=6cmの比を求めます。AB:EF=4:6です。4と6の最大公約数は2なので、両方を2で割ると4÷2:6÷2=2:3となります。よって相似比は2:3です。』",
       "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）",
       "ai_teacher_advice": "この問題の学び方アドバイス（30字程度）",
       "teacher_help_keywords": "先生に質問するときのキーワード（3つ程度）",
@@ -14459,10 +14463,14 @@ app.post('/api/ai/generate-course', async (c) => {
 6. 完全なJSON（{で始まり}で終わる）を出力すること
 7. 問題の難易度は教科書の目標水準（学習指導要領）に合わせること
 8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること
-9. 【★解説品質必須★】answer_explanation には必ず「解法の手順・途中の式・計算過程」を含めること
-   - 悪い例: 「スマートフォンのピンチアウトは相似の例です」（←これは real_world_connection であり解説ではない）
-   - 良い例: 「AB:EF = 4:6 です。これを最も簡単な整数の比にすると 4÷2:6÷2 = 2:3 となります。よって相似比は 2:3 です。」
-   - answer_explanation と real_world_connection は必ず異なる内容にすること
+9. 【★★★解説品質 - 最重要ルール★★★】answer_explanation には必ず「数学的な解法の手順・途中の式・計算過程」を含めること（最低100字）
+   - このフィールドは児童が「なぜその答えになるのか」を理解するための最も重要な部分である
+   - 必ず含める内容: ①与えられた数値の確認 ②使う公式・定理・考え方の名前 ③途中の計算式 ④答えの導出
+   - 悪い例（絶対禁止）: 「スマートフォンのピンチアウトは相似の例です」（←これは実生活の例であり解説ではない）
+   - 悪い例（絶対禁止）: 「相似比は2:3です」（←答えだけで途中式がない）
+   - 良い例: 「四角形ABCDと四角形EFGHで、対応する辺はAB=4cmとEF=6cmです。相似比=AB:EF=4:6 です。4と6の最大公約数は2なので、4÷2:6÷2=2:3。よって相似比は2:3です。」
+   - answer_explanation と real_world_connection は絶対に異なる内容にすること
+   - answer_explanation に日常生活の例を書いたら不合格
 10. 【★多感覚AI提案必須★】multimedia_ai_content を全カードに含めること
    - short_music: 30秒覚え歌のプロンプトと歌詞（全カード recommended:true）
    - suno_full_song: Suno用4分フル歌詞とスタイル（導入・まとめカードのみ recommended:true）
@@ -38691,7 +38699,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
       "problem_description": "問題の背景や文脈の補足（problem_textとは異なる内容にすること）",
       "correct_answer": "正解（具体的な数値・回答）",
-      "explanation": "【重要】解法のプロセスを具体的に書くこと。途中の式・計算手順・考え方の道筋を必ず含める。例:「4:6を最も簡単な比にすると4÷2:6÷2=2:3」のように論理的に説明する。実生活の例はreal_world_connectionに書き、ここには書かない。（80-200字）",
+      "explanation": "【★★★最重要フィールド★★★】解法のプロセスを児童が理解できるように詳しく書くこと。必ず以下を全て含める：①問題で与えられた数値の確認 ②使う公式や考え方 ③途中の式・計算過程 ④最終的な答えの導出。最低100字以上。実生活の例は絶対に書かない（それはreal_world_connectionに書く）。悪い例：『図形の拡大縮小は日常でよく見られます』←これは解説ではない。良い例：『対応する辺AB=4cmとEF=6cmから比を求めます。AB:EF=4:6。最大公約数2で割ると4÷2:6÷2=2:3。よって相似比は2:3です。』（80-200字）",
       "hint_text": "段階的ヒント（最初は抽象的→徐々に具体的に）",
       "hints": [
         {"hint_level": 1, "hint_text": "ヒント1: まずは問題をよく読もう。大事な数字に線を引いてみよう", "thinking_tool_suggestion": "線引きリーディング"},
@@ -38791,7 +38799,11 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   - tactile_widget: 触覚ウィジェット説明+activity_type（操作系問題は recommended:true）
   - 全フィールドにlearning_theory（理論根拠）を必ず記入すること
 ※ 【★JSON出力ルール★】すべてのJSON文字列値には生の改行を含めないこと。改行が必要な場合は \\n を使うこと。
-※ 【★解説品質必須★】explanation には解法のプロセス（途中の式・計算手順）を必ず含めること。実生活の例は real_world_connection に書くこと。
+※ 【★★★解説品質 - 最重要ルール★★★】explanation には必ず数学的な解法プロセスを100字以上で書くこと。
+   必ず含める: ①与えられた数値 ②使う公式 ③途中の計算式 ④答えの導出
+   悪い例（不合格）: 日常生活の例、答えだけ、抽象的な説明
+   良い例: 「対応する辺AB=4cm, EF=6cmの比を求めます。AB:EF=4:6。最大公約数2で割ると4÷2:6÷2=2:3。よって相似比は2:3。」
+   explanation に日常生活の例を書いた場合、そのカードは不合格とする。日常生活の例は real_world_connection に書くこと。
 `
 
     // 10. Gemini API呼び出し（フォールバック付き、タイムアウト対策）
@@ -38839,49 +38851,52 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
     const geminiData = await geminiResponse.json() as any
     const geminiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || ''
     
-    // ★ 制御文字を徹底除去してからextractJSONを実行
+    // ★ responseMimeType: 'application/json' ではGeminiが正しいJSONを返すため
+    // 制御文字除去のみ行い、構造的な改行はそのまま保持する
+    // 注意: JSON文字列内の改行はGeminiが既に \n にエスケープ済み
     let sanitizedGeminiText = geminiText
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // 制御文字除去（タブ・改行・CR以外）
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, (ch: string) => {
+        const code = ch.charCodeAt(0)
+        if (code === 9 || code === 10 || code === 13) return ch // タブ・LF・CRは保持
+        return '' // その他の制御文字は除去
+      })
       .replace(/\r\n/g, '\n')  // CRLF→LF
       .replace(/\r/g, '\n')    // CR→LF
     
-    // ★ JSON文字列内の生改行を\\nに変換（歌詞フィールド対策）
-    // responseMimeType: 'application/json' の場合、Geminiが歌詞に生改行を入れることがある
-    sanitizedGeminiText = sanitizedGeminiText.replace(/"([^"]*)\n([^"]*?)"/g, (match: string) => {
-      return match.replace(/\n/g, '\\n')
-    })
-    // 複数行にまたがる文字列リテラル内の改行を全て置換（再帰的に）
-    let prevText = ''
-    while (prevText !== sanitizedGeminiText) {
-      prevText = sanitizedGeminiText
-      sanitizedGeminiText = sanitizedGeminiText.replace(/"([^"]*)\n([^"]*?)"/g, (match: string) => {
-        return match.replace(/\n/g, '\\n')
-      })
-    }
+    console.log('📊 Geminiレスポンス情報:', { textLength: geminiText.length, preview: geminiText.substring(0, 500) })
     
     let personalizedPlan: any = {}
     try {
-      personalizedPlan = extractJSON(sanitizedGeminiText) || {}
-    } catch (parseError: any) {
-      console.warn('⚠️ extractJSON失敗、再試行中:', parseError.message)
-      // より強力な制御文字除去で再試行
-      sanitizedGeminiText = sanitizedGeminiText.replace(/[\x00-\x1F\x7F]/g, (ch: string) => {
-        if (ch === '\n' || ch === '\t') return ch
-        return ''
-      })
+      // responseMimeType: 'application/json' なのでまず直接パースを試みる
+      personalizedPlan = JSON.parse(sanitizedGeminiText)
+      console.log('📊 JSON.parse成功:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
+    } catch (directParseError: any) {
+      console.warn('⚠️ 直接JSON.parse失敗、extractJSONで再試行:', directParseError.message)
       try {
         personalizedPlan = extractJSON(sanitizedGeminiText) || {}
-      } catch (e2: any) {
-        console.error('❌ JSON解析完全失敗:', e2.message)
-        // 最終手段: 正規表現でcardsフィールドだけ抽出を試みる
-        const cardsMatch = sanitizedGeminiText.match(/"cards"\s*:\s*\[([\s\S]*)\]/)
-        if (cardsMatch) {
-          try {
-            const cardsText = '[' + cardsMatch[1] + ']'
-            const cleanedCards = cardsText.replace(/[\x00-\x1F\x7F]/g, '')
-            personalizedPlan = { cards: JSON.parse(cleanedCards) }
-            console.log('✅ cards部分のみ抽出成功')
-          } catch { /* 完全失敗 */ }
+        console.log('📊 extractJSON結果:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
+      } catch (parseError: any) {
+        console.warn('⚠️ extractJSON失敗、最終再試行中:', parseError.message)
+        // より強力な制御文字除去で再試行
+        const cleanedText = sanitizedGeminiText.replace(/[\x00-\x1F\x7F]/g, (ch: string) => {
+          if (ch === '\n' || ch === '\t') return ch
+          return ''
+        })
+        try {
+          personalizedPlan = extractJSON(cleanedText) || {}
+          console.log('📊 クリーン再試行結果:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards })
+        } catch (e2: any) {
+          console.error('❌ JSON解析完全失敗:', e2.message)
+          // 最終手段: 正規表現でcardsフィールドだけ抽出を試みる
+          const cardsMatch = sanitizedGeminiText.match(/"cards"\s*:\s*\[([\s\S]*)\]/)
+          if (cardsMatch) {
+            try {
+              const cardsText = '[' + cardsMatch[1] + ']'
+              const cleanedCards = cardsText.replace(/[\x00-\x1F\x7F]/g, '')
+              personalizedPlan = { cards: JSON.parse(cleanedCards) }
+              console.log('✅ cards部分のみ抽出成功')
+            } catch { /* 完全失敗 */ }
+          }
         }
       }
     }
@@ -38892,7 +38907,8 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       console.warn('⚠️ Geminiレスポンスからcardsが抽出できませんでした:', { 
         textLength: geminiText.length, 
         planKeys: Object.keys(personalizedPlan),
-        geminiTextPreview: geminiText.substring(0, 300)
+        geminiTextPreview: geminiText.substring(0, 500),
+        sanitizedPreview: sanitizedGeminiText.substring(0, 500)
       })
     } else {
       console.log(`✅ Geminiから${extractedCards.length}枚のカードを抽出`)

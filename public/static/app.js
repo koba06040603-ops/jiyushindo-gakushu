@@ -6341,7 +6341,8 @@ async function loadCardPage(cardId) {
                   <h4 class="font-bold text-blue-800 mb-2">
                     <i class="fas fa-info-circle mr-2"></i>解説
                   </h4>
-                  <div class="text-gray-700 whitespace-pre-wrap font-sans" style="line-height: 1.8;">${(answer?.explanation || card.real_world_connection || '解説は準備中です').replace(/\n/g, '<br>')}</div>
+                  <div class="text-gray-700 whitespace-pre-wrap font-sans" style="line-height: 1.8;">${(answer?.explanation || answer?.answer_explanation || '解説は準備中です').replace(/\n/g, '<br>')}</div>
+                  ${card.real_world_connection ? `<div class="mt-2 bg-orange-50 rounded-lg p-3"><strong class="text-orange-700">🌍 せいかつとのつながり：</strong><span class="text-gray-700">${card.real_world_connection}</span></div>` : ''}
                 </div>
               </div>
             ` : `
@@ -25078,14 +25079,15 @@ function showTeacherOverview(unitData) {
                       <i class="fas fa-edit mr-1"></i>編集
                     </button>
                   </div>
-                  <div id="display-explanation-${courseIndex}-${cardIndex}" class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer_explanation || card.real_world_connection || '解説は準備中です').replace(/\n/g, '<br>')}</div>
+                  <div id="display-explanation-${courseIndex}-${cardIndex}" class="text-gray-700" style="line-height: 1.8; white-space: pre-wrap;">${(card.answer_explanation || card.explanation || '解説は準備中です').replace(/\n/g, '<br>')}</div>
+                  ${card.real_world_connection ? `<div class="mt-2 bg-orange-50 rounded-lg p-3 text-sm"><strong class="text-orange-700">🌍 せいかつとのつながり：</strong><span class="text-gray-700">${card.real_world_connection}</span></div>` : ''}
                   <div id="edit-explanation-${courseIndex}-${cardIndex}" class="hidden">
                     <textarea 
                       id="input-explanation-${courseIndex}-${cardIndex}"
                       class="w-full p-3 border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:outline-none"
                       rows="4"
                       style="line-height: 1.8;"
-                    >${card.answer_explanation || card.real_world_connection || ''}</textarea>
+                    >${card.answer_explanation || card.explanation || ''}</textarea>
                     <div class="flex gap-2 mt-2">
                       <button onclick="saveFieldEdit(${courseIndex}, ${cardIndex}, 'answer_explanation', ${card.id})"
                               class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
