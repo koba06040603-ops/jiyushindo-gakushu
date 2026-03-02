@@ -21540,68 +21540,60 @@ async function executeUnitGeneration(params) {
     
     const generatedCourses = []
     
-    // 各コースを順番に生成（API レート制限対策: コース間にディレイを挿入）
-    for (let i = 0; i < courseDefinitions.length; i++) {
-      const courseDef = courseDefinitions[i]
-      const progressPercent = 25 + (i * 25)  // 25%, 50%, 75%
-      
-      // 2番目以降のコース生成前に3秒間のディレイを挿入（Gemini APIレート制限対策）
-      if (i > 0) {
-        console.log(`⏳ APIレート制限対策: 3秒間待機中...`)
-        updateGenerationProgress(`次のコース生成まで少しお待ちください...`, progressPercent - 5)
-        await new Promise(resolve => setTimeout(resolve, 3000))
-      }
-      
-      console.log(`📝 ステップ${i+2}/4: ${courseDef.info.name}を生成中...`)
-      updateGenerationProgress(`${courseDef.info.name}の学習カードを生成しています...（約30〜120秒）`, progressPercent)
-      
-      // 最大2回リトライ（フロントエンド側）
-      let courseResponse = null
-      let lastError = null
-      for (let retry = 0; retry < 3; retry++) {
-        try {
-          if (retry > 0) {
-            console.log(`🔄 ${courseDef.info.name} リトライ ${retry}/2...`)
-            updateGenerationProgress(`${courseDef.info.name}を再生成しています... (リトライ ${retry}/2)`, progressPercent)
-            // リトライ前に5秒待機（レート制限回避）
-            await new Promise(resolve => setTimeout(resolve, 5000))
+    // 【高速化】3つのコースを並列生成（Promise.allSettled）
+    console.log('🚀 3コースを並列生成開始...')
+    updateGenerationProgress('3つのコースを同時に生成しています...（約60〜90秒）', 30)
+    
+    const coursePromises = courseDefinitions.map((courseDef, i) => {
+      // 少しずらして送信（レート制限対策: 0秒、1秒、2秒）
+      return new Promise(async (resolve, reject) => {
+        if (i > 0) await new Promise(r => setTimeout(r, i * 1500))
+        
+        let lastError = null
+        for (let retry = 0; retry < 2; retry++) {
+          try {
+            if (retry > 0) {
+              console.log(`🔄 ${courseDef.info.name} リトライ ${retry}...`)
+              await new Promise(r => setTimeout(r, 3000))
+            }
+            
+            const resp = await axios.post('/api/ai/generate-course', {
+              grade,
+              subject,
+              textbook,
+              unitName,
+              unitGoal,
+              courseLevel: courseDef.level,
+              courseInfo: courseDef.info,
+              customization
+            }, { timeout: 180000 })
+            
+            if (resp.data.error) {
+              lastError = new Error(resp.data.error)
+              continue
+            }
+            resolve(resp.data.course)
+            return
+          } catch (e) {
+            lastError = e
           }
-          
-          courseResponse = await axios.post('/api/ai/generate-course', {
-            grade,
-            subject,
-            textbook,
-            unitName,
-            unitGoal,
-            courseLevel: courseDef.level,
-            courseInfo: courseDef.info,
-            customization
-          }, { timeout: 180000 })  // 180秒タイムアウト（サーバー側150秒に対応）
-          
-          if (courseResponse.data.error) {
-            console.error(`❌ ${courseDef.info.name}の生成エラー:`, courseResponse.data.error)
-            lastError = new Error(`${courseDef.info.name}の生成に失敗しました: ${courseResponse.data.error}`)
-            courseResponse = null
-            continue
-          }
-          
-          // 成功
-          break
-          
-        } catch (retryError) {
-          console.error(`❌ ${courseDef.info.name} 試行${retry+1}失敗:`, retryError.message)
-          lastError = retryError
-          courseResponse = null
         }
+        reject(lastError)
+      })
+    })
+    
+    const results = await Promise.allSettled(coursePromises)
+    
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+      if (result.status === 'fulfilled') {
+        generatedCourses.push(result.value)
+        console.log(`✅ ${courseDefinitions[i].info.name}の生成完了（${result.value.cards.length}枚）`)
+        updateGenerationProgress(`${courseDefinitions[i].info.name} 完了！`, 30 + ((i + 1) * 20))
+      } else {
+        console.error(`❌ ${courseDefinitions[i].info.name}の生成失敗:`, result.reason)
+        throw new Error(`${courseDefinitions[i].info.name}の生成に失敗: ${result.reason?.message || 'Unknown'}`)
       }
-      
-      if (!courseResponse) {
-        console.error(`❌ ${courseDef.info.name}の生成に全リトライ失敗:`, lastError)
-        throw new Error(`${courseDef.info.name}の生成に失敗しました: ${lastError?.message || 'Unknown error'}`)
-      }
-      
-      generatedCourses.push(courseResponse.data.course)
-      console.log(`✅ ${courseDef.info.name}の生成完了（${courseResponse.data.course.cards.length}枚）`)
     }
     
     // 生成されたコースをunitDataに統合（配列として直接設定）
@@ -22013,7 +22005,7 @@ function saveFontSize() {
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
   const estimatedTime = qualityMode === 'high' ? '約4〜7分' : '約3〜5分'
-  const totalTime = qualityMode === 'high' ? 420 : 300 // 秒単位（3コース生成の実際の所要時間に合わせた）
+  const totalTime = qualityMode === 'high' ? 180 : 90 // 秒単位（並列生成で大幅短縮）
   
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -22236,8 +22228,8 @@ function animateRealtimeProgress(totalTime, qualityMode) {
       startPercent: 30,
       endPercent: 75,
       icon: 'fa-cards',
-      task: '30枚の学習カードを生成中...',
-      comment: '📚 各コース10枚ずつ、合計30枚のカードを作っています',
+      task: '18枚の学習カードを並列生成中...',
+      comment: '🚀 3コース同時生成で高速に作っています',
       emoji: '📚'
     },
     {
@@ -22245,7 +22237,7 @@ function animateRealtimeProgress(totalTime, qualityMode) {
       startPercent: 75,
       endPercent: 100,
       icon: 'fa-comment-dots',
-      task: '54個のヒントカードを作成中...',
+      task: 'ヒントカードを作成中...',
       comment: '💡 各カードに3段階のヒントを用意しています',
       emoji: '💡'
     }

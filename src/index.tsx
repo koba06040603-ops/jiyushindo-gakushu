@@ -10979,7 +10979,27 @@ app.get('/guide/:curriculumId', async (c) => {
       });
     }
     
-    var isCorrect = exact || numMatch || kwMatch || fracMatch || decMatch || openEndedMatch;
+    // 【新規】意味的類似度判定（記述式・体育・道徳等の長文回答用）
+    var semanticMatch = false;
+    if (!exact && nc.length >= 8) {
+      // 正解のキーフレーズを抽出（2文字以上の単語をすべて取得）
+      var keyPhrases = nc.replace(/[、。！？\\s,\\.]/g, '|').split('|').filter(function(s){ return s.length >= 2; });
+      if (keyPhrases.length > 0) {
+        var matchCount = keyPhrases.filter(function(kp){ return ns.includes(kp); }).length;
+        // 正解キーフレーズの40%以上が含まれていれば意味的にマッチ
+        semanticMatch = matchCount >= Math.max(1, Math.ceil(keyPhrases.length * 0.4));
+      }
+      // 学生の回答にも同じチェック（逆方向: 学生→正解）
+      if (!semanticMatch) {
+        var studentPhrases = ns.replace(/[、。！？\\s,\\.]/g, '|').split('|').filter(function(s){ return s.length >= 2; });
+        if (studentPhrases.length > 0) {
+          var revMatchCount = studentPhrases.filter(function(sp){ return nc.includes(sp); }).length;
+          semanticMatch = revMatchCount >= Math.max(1, Math.ceil(studentPhrases.length * 0.5));
+        }
+      }
+    }
+    
+    var isCorrect = exact || numMatch || kwMatch || fracMatch || decMatch || openEndedMatch || semanticMatch;
     
     resultDiv.style.display = 'block';
     
@@ -14358,37 +14378,23 @@ app.post('/api/ai/generate-course', async (c) => {
       'fast': 'どんどん進むコース。発展的な内容や応用問題も含める。'
     }[courseLevel] || '標準的なペースで学ぶコース'
 
-    // 【強化】プロンプト（動的枚数のカード生成 + 品質向上 + AI先生 + 難易度引き上げ）
-    const numCards = cards_count || 10  // 動的カード枚数（デフォルト10枚：単元全体を確実にカバー）
-    const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
+    // 【強化】プロンプト（軽量化版: 高速生成 + 品質維持）
+    const numCards = cards_count || 6  // デフォルト6枚（高速化）
+    const prompt = `小学校教科指導のプロ教師として、以下の単元の学習カード${numCards}枚をJSON生成してください。
 
 【単元情報】
-- 学年: ${grade}
-- 教科: ${subject}
-- 教科書会社: ${textbook || '未指定'}
-- 単元名: ${unitName}
-- 単元目標: ${unitGoal || '未指定'}
-- コース: ${courseInfo.name} (${difficultyDescription})
+学年: ${grade} / 教科: ${subject} / 教科書: ${textbook || '未指定'}
+単元: ${unitName} / 目標: ${unitGoal || '未指定'}
+コース: ${courseInfo.name} (${difficultyDescription})
+${customInfo}
+【設計方針】
+- 導入→基本→応用→まとめの流れで${numCards}枚
+- 一問一答形式（1カードに1つの明確な問いのみ）
+- 問題文は具体的な数値・場面を含む
+- answer_explanationは必ず途中式・計算過程を含む（最低80字）
+- 自由記述の場合はanswerに「例：A、B、Cなど」の形式で複数の解答例を示す
 
-【カード設計の方針】
-- 単元の学習内容を網羅的にカバーする（導入→基本→応用→まとめ）
-- ${numCards}枚で単元全体の主要な学習項目を漏れなく扱う
-- 問題文は具体的な数値・場面を含み、教科書の目標水準に合わせる
-- じっくりコースでも「考える力」を育む問題を含める
-- ぐんぐんコースは発展的・応用的な問題を中心に、深い思考を促す
-- 各カードにAI先生からの励ましメッセージと学び方のアドバイスを含める
-- 3段階ヒントは「考える方向性」→「具体的手がかり」→「答えに近づく導き」の順に
-- 先生に質問するための「先生ヘルプ」用のキーワードを含める
-
-【超重要：一問一答形式】
-- 各カードには必ず1つの明確な問いだけを含めること
-- 「〜は何ですか。また、〜はどうですか。」のように複数の問いを1つの問題文に入れてはいけない
-- 複数の観点を問いたい場合は、別々のカードに分ける
-- answer（正解）は問題文に対して1つの明確な答えにする
-- 自由記述の場合は「例：A、B、Cなど」の形式で複数の解答例を示す
-
-【重要】以下のJSON形式で、必ず完全な${numCards}枚のカードを生成してください：
-
+【JSON形式】※必ず完全な${numCards}枚を出力
 {
   "course_name": "${courseInfo.name}",
   "name": "${courseInfo.name}",
@@ -14398,86 +14404,34 @@ app.post('/api/ai/generate-course', async (c) => {
   "cards": [
     {
       "card_number": 1,
-      "card_title": "魅力的なタイトル（20字以内）",
+      "card_title": "タイトル（20字以内）",
       "card_type": "main",
       "textbook_page": "p.XX",
-      "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
-      "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
-      "example_problem": "例題（具体的な数字と場面）",
-      "example_solution": "解き方の丁寧な説明（途中式・図解の指示を含む）",
-      "example_image_description": "例題の図解説明（AI画像生成用。図形問題なら頂点名・角度・辺の長さ等を含む正確な図の説明。文章題なら場面のイラスト説明。図が不要な単純計算問題ではnull）",
-      "real_world_connection": "実生活とのつながり（※answer_explanationとは別の内容にすること。日常生活での応用例を1文で記述）",
+      "problem_description": "具体的な問題文（100-200字）",
+      "new_terms": "新出用語（カンマ区切り）",
+      "example_problem": "例題",
+      "example_solution": "解き方の説明",
+      "example_image_description": "図解説明（図が不要ならnull）",
+      "real_world_connection": "実生活との繋がり（1文）",
       "answer": "正解（具体的に）",
-      "answer_explanation": "【★★★最重要フィールド★★★】この問題の解法プロセスを児童が理解できるように詳しく書くこと。必ず以下を全て含める：①問題で与えられた数値の確認 ②使う公式や考え方 ③途中の式・計算過程（例：4÷2=2、6÷2=3）④最終的な答えの導出。最低100字以上。実生活の例は絶対に書かない（それはreal_world_connectionに書く）。悪い例：『スマートフォンのピンチアウトは拡大の例です』←これは解説ではない。良い例：『四角形ABCDと四角形EFGHで、対応する辺AB=4cmとEF=6cmの比を求めます。AB:EF=4:6です。4と6の最大公約数は2なので、両方を2で割ると4÷2:6÷2=2:3となります。よって相似比は2:3です。』",
-      "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）",
-      "ai_teacher_advice": "この問題の学び方アドバイス（30字程度）",
-      "teacher_help_keywords": "先生に質問するときのキーワード（3つ程度）",
+      "answer_explanation": "解法プロセス：①数値確認→②公式→③途中式→④答え導出（最低80字）",
+      "ai_teacher_message": "励ましメッセージ（30字）",
       "hints": [
-        {"hint_level": 1, "hint_text": "ヒント1: まず何を考える？（考える方向性を示す）", "thinking_tool_suggestion": "使える思考ツール"},
-        {"hint_level": 2, "hint_text": "ヒント2: 具体的な手がかり（図や式の書き方を示す）", "thinking_tool_suggestion": "使える思考ツール"},
-        {"hint_level": 3, "hint_text": "ヒント3: 答えに近づくための最後のヒント", "thinking_tool_suggestion": "使える思考ツール"}
+        {"hint_level": 1, "hint_text": "方向性ヒント"},
+        {"hint_level": 2, "hint_text": "具体的手がかり"},
+        {"hint_level": 3, "hint_text": "答えに近づくヒント"}
       ],
       "multimedia_ai_content": {
-        "short_music": {
-          "recommended": true,
-          "prompt_30sec": "この問題の核心概念を30秒の覚え歌にするプロンプト（日本語・児童向け・リズミカル）",
-          "lyrics_30sec": "30秒で歌える短い歌詞（4〜8行）",
-          "genre": "Kids Pop / Educational Rap / 童謡アレンジなど",
-          "learning_theory": "Paivio二重符号化理論（聴覚+言語）、Mayer多感覚学習理論に基づく"
-        },
-        "suno_full_song": {
-          "recommended": false,
-          "lyrics_full": "Suno用4分フル歌詞（(Verse)(Chorus)(Bridge)タグ付き）",
-          "style_prompt": "Sunoのスタイル欄に入力するテキスト（例：upbeat J-pop, kids friendly, 120bpm）",
-          "title": "曲名"
-        },
         "diagram_image": {
           "recommended": true,
-          "prompt": "この問題を理解するための図解画像のAI生成プロンプト（日本語）",
-          "image_type": "JSXGraph / SVG / イラスト",
-          "learning_theory": "Gardner多元的知能MI-空間的知能、Mayer視覚学習原理"
-        },
-        "video": {
-          "recommended": false,
-          "prompt": "この問題を動画で解説するAI動画生成プロンプト（5〜8秒・教育アニメーション）",
-          "learning_theory": "Mayer時間近接原理、Sweller認知負荷理論に基づく"
-        },
-        "tactile_widget": {
-          "recommended": true,
-          "description": "触覚学習ウィジェットの説明（ドラッグ・タップ・並べ替え等）",
-          "activity_type": "drag / sort / tap / draw / match",
-          "learning_theory": "Gardner身体運動的知能、Montessori具体操作法"
+          "prompt": "この問題の図解AI生成プロンプト（日本語）"
         }
       }
-    },
-    { /* カード2〜${numCards}: 上記と同じ構造で繰り返し */ }
+    }
   ]
 }
 
-【厳守事項】
-1. 必ず${numCards}枚のカードを生成し、単元の主要な学習項目を網羅すること
-2. 各カードに必ず3つのヒント（段階的に具体性が増す）を含めること
-3. ai_teacher_message, ai_teacher_advice, teacher_help_keywords を必ず含めること
-4. JSONのみを出力し、説明文は含めないこと
-5. すべてのフィールドに具体的な内容を記入すること
-6. 完全なJSON（{で始まり}で終わる）を出力すること
-7. 問題の難易度は教科書の目標水準（学習指導要領）に合わせること
-8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること
-9. 【★★★解説品質 - 最重要ルール★★★】answer_explanation には必ず「数学的な解法の手順・途中の式・計算過程」を含めること（最低100字）
-   - このフィールドは児童が「なぜその答えになるのか」を理解するための最も重要な部分である
-   - 必ず含める内容: ①与えられた数値の確認 ②使う公式・定理・考え方の名前 ③途中の計算式 ④答えの導出
-   - 悪い例（絶対禁止）: 「スマートフォンのピンチアウトは相似の例です」（←これは実生活の例であり解説ではない）
-   - 悪い例（絶対禁止）: 「相似比は2:3です」（←答えだけで途中式がない）
-   - 良い例: 「四角形ABCDと四角形EFGHで、対応する辺はAB=4cmとEF=6cmです。相似比=AB:EF=4:6 です。4と6の最大公約数は2なので、4÷2:6÷2=2:3。よって相似比は2:3です。」
-   - answer_explanation と real_world_connection は絶対に異なる内容にすること
-   - answer_explanation に日常生活の例を書いたら不合格
-10. 【★多感覚AI提案必須★】multimedia_ai_content を全カードに含めること
-   - short_music: 30秒覚え歌のプロンプトと歌詞（全カード recommended:true）
-   - suno_full_song: Suno用4分フル歌詞とスタイル（導入・まとめカードのみ recommended:true）
-   - diagram_image: 図解画像AI生成プロンプト（全カード recommended:true）
-   - video: 動画プロンプト（図形・空間・実験問題のみ recommended:true）
-   - tactile_widget: 触覚活動の説明（操作系問題のみ recommended:true）
-   - 理論根拠（learning_theory）を必ず記入すること`
+【厳守】${numCards}枚すべて出力。各カード3ヒント必須。JSONのみ出力。`
 
     // gemini-2.5-flash をプライマリ（Gemini 3.1 Flash・最高推論能力）
     // フォールバック: gemini-3-flash-preview（高速）, gemini-2.5-flash, gemini-2.0-flash（安定）
@@ -14506,7 +14460,7 @@ app.post('/api/ai/generate-course', async (c) => {
       
       let response: Response
       try {
-        // thinking有効のまま（ベンチマーク:thinking有効28秒 vs 無効51秒 — 有効の方が速い）
+        // thinking無効化（プロンプト軽量化済み、高速生成優先）
         response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -14515,9 +14469,9 @@ app.post('/api/ai/generate-course', async (c) => {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 16384,
-            topP: 0.9,
-            topK: 20
+            maxOutputTokens: 8192,
+            responseMimeType: 'application/json',
+            thinkingConfig: { thinkingBudget: 0 }
           }
       })
     })
@@ -15470,6 +15424,67 @@ app.post('/api/curriculum/save-generated', async (c) => {
       total_cards: totalCards,
       optional_problems: optionalProblems?.length || 0
     })
+    
+    // ★★★ バックグラウンドで図解画像を自動生成 ★★★
+    const bgGenerateUnitVisuals = async () => {
+      try {
+        const apiKey = env.GEMINI_API_KEY
+        if (!apiKey) return
+        
+        // 保存したカードをDBから取得
+        const savedCourses = await env.DB.prepare('SELECT id FROM courses WHERE curriculum_id = ?').bind(curriculumId).all()
+        const allCards: any[] = []
+        for (const sc of (savedCourses.results || []) as any[]) {
+          const cards = await env.DB.prepare('SELECT card_id, card_title, problem_text, problem_description FROM learning_cards WHERE course_id = ? AND (problem_image_url IS NULL OR problem_image_url = \'\') LIMIT 6').bind(sc.id).all()
+          allCards.push(...(cards.results || []))
+        }
+        
+        console.log(`🎨 バックグラウンド図解生成開始（単元保存後）: ${allCards.length}枚`)
+        
+        for (let i = 0; i < Math.min(allCards.length, 12); i++) {
+          const card = allCards[i] as any
+          const pText = card.problem_text || card.problem_description || ''
+          if (!pText) continue
+          
+          const imgPrompt = `教科書の図解イラストを描いてください。
+問題: ${pText.substring(0, 400)}
+タイトル: ${card.card_title || ''}
+教科: ${curriculum.subject} / 学年: ${curriculum.grade}
+日本の教科書スタイル（カラフル、白背景、日本語ラベル付き）で1枚描いてください。`
+          
+          try {
+            const resp = await fetch(
+              'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent',
+              {
+                method: 'POST',
+                headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ role: 'user', parts: [{ text: imgPrompt }] }],
+                  generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.4 }
+                })
+              }
+            )
+            if (resp.ok) {
+              const data = await resp.json() as any
+              const parts = data.candidates?.[0]?.content?.parts || []
+              for (const part of parts) {
+                if (part.inlineData?.data) {
+                  const imageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`
+                  await env.DB.prepare('UPDATE learning_cards SET problem_image_url = ? WHERE card_id = ?')
+                    .bind(imageUrl.substring(0, 2000000), card.card_id).run()
+                  console.log(`✅ 図解生成完了: カード${card.card_id}`)
+                  break
+                }
+              }
+            }
+          } catch (e) { console.warn(`⚠️ 図解生成エラー: カード${card.card_id}`, e) }
+          
+          if (i < allCards.length - 1) await new Promise(r => setTimeout(r, 2000))
+        }
+        console.log('✅ バックグラウンド図解生成完了')
+      } catch (e) { console.warn('⚠️ バックグラウンド図解生成エラー:', e) }
+    }
+    c.executionCtx.waitUntil(bgGenerateUnitVisuals())
     
     return c.json({
       success: true,
