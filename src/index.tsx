@@ -14402,9 +14402,9 @@ app.post('/api/ai/generate-course', async (c) => {
       "example_problem": "例題（具体的な数字と場面）",
       "example_solution": "解き方の丁寧な説明（途中式・図解の指示を含む）",
       "example_image_description": "例題の図解説明（AI画像生成用。図形問題なら頂点名・角度・辺の長さ等を含む正確な図の説明。文章題なら場面のイラスト説明。図が不要な単純計算問題ではnull）",
-      "real_world_connection": "実生活とのつながり（※問題内容に直接関係する具体例のみ記述すること）",
+      "real_world_connection": "実生活とのつながり（※answer_explanationとは別の内容にすること。日常生活での応用例を1文で記述）",
       "answer": "正解（具体的に）",
-      "answer_explanation": "なぜその答えになるか（考え方の道筋を含む80-150字）",
+      "answer_explanation": "【重要】解法のプロセスを具体的に書くこと。途中の式・計算手順・数値の変換過程を必ず含める。例:「AB:EF=4:6=2:3なので、相似比は2:3」のように、なぜその答えになるか論理的に説明する（80-200字）。実生活の例はreal_world_connectionに書き、ここには書かない。",
       "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）",
       "ai_teacher_advice": "この問題の学び方アドバイス（30字程度）",
       "teacher_help_keywords": "先生に質問するときのキーワード（3つ程度）",
@@ -14459,7 +14459,11 @@ app.post('/api/ai/generate-course', async (c) => {
 6. 完全なJSON（{で始まり}で終わる）を出力すること
 7. 問題の難易度は教科書の目標水準（学習指導要領）に合わせること
 8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること
-9. 【★多感覚AI提案必須★】multimedia_ai_content を全カードに含めること
+9. 【★解説品質必須★】answer_explanation には必ず「解法の手順・途中の式・計算過程」を含めること
+   - 悪い例: 「スマートフォンのピンチアウトは相似の例です」（←これは real_world_connection であり解説ではない）
+   - 良い例: 「AB:EF = 4:6 です。これを最も簡単な整数の比にすると 4÷2:6÷2 = 2:3 となります。よって相似比は 2:3 です。」
+   - answer_explanation と real_world_connection は必ず異なる内容にすること
+10. 【★多感覚AI提案必須★】multimedia_ai_content を全カードに含めること
    - short_music: 30秒覚え歌のプロンプトと歌詞（全カード recommended:true）
    - suno_full_song: Suno用4分フル歌詞とスタイル（導入・まとめカードのみ recommended:true）
    - diagram_image: 図解画像AI生成プロンプト（全カード recommended:true）
@@ -38687,7 +38691,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
       "problem_description": "問題の背景や文脈の補足（problem_textとは異なる内容にすること）",
       "correct_answer": "正解（具体的な数値・回答）",
-      "explanation": "解説（つまずきポイントと解法のコツを含む、児童にわかりやすい言葉で）",
+      "explanation": "【重要】解法のプロセスを具体的に書くこと。途中の式・計算手順・考え方の道筋を必ず含める。例:「4:6を最も簡単な比にすると4÷2:6÷2=2:3」のように論理的に説明する。実生活の例はreal_world_connectionに書き、ここには書かない。（80-200字）",
       "hint_text": "段階的ヒント（最初は抽象的→徐々に具体的に）",
       "hints": [
         {"hint_level": 1, "hint_text": "ヒント1: まずは問題をよく読もう。大事な数字に線を引いてみよう", "thinking_tool_suggestion": "線引きリーディング"},
@@ -38780,12 +38784,14 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
 ※ tactile_activity は全カード必須。具体物操作（おはじき、ブロック、折り紙、カード等）の活動を最低1つ提案すること
 ※ audio_instruction は全カード必須。問題文の読み上げと取り組み方のガイダンスを優しい言葉で記述すること
 ※ 【★★★ 多感覚AI提案必須 ★★★】multimedia_ai_content を全カードに含めること
-  - short_music: 30秒覚え歌のプロンプトと歌詞（全カード recommended:true。概念を覚え歌にする）
-  - suno_full_song: Suno用4分フル歌詞・スタイル・曲名（導入/まとめカードのみ recommended:true）
+  - short_music: 30秒覚え歌のプロンプトと歌詞（全カード recommended:true。概念を覚え歌にする）※歌詞内の改行は \\n で表現すること（生の改行文字は使わない）
+  - suno_full_song: Suno用4分フル歌詞・スタイル・曲名（導入/まとめカードのみ recommended:true）※歌詞内の改行は \\n で表現すること
   - diagram_image: 図解画像AI生成プロンプト（全カード recommended:true）
   - video: 動画プロンプト（図形・空間・実験問題のみ recommended:true）
   - tactile_widget: 触覚ウィジェット説明+activity_type（操作系問題は recommended:true）
   - 全フィールドにlearning_theory（理論根拠）を必ず記入すること
+※ 【★JSON出力ルール★】すべてのJSON文字列値には生の改行を含めないこと。改行が必要な場合は \\n を使うこと。
+※ 【★解説品質必須★】explanation には解法のプロセス（途中の式・計算手順）を必ず含めること。実生活の例は real_world_connection に書くこと。
 `
 
     // 10. Gemini API呼び出し（フォールバック付き、タイムアウト対策）
@@ -38838,6 +38844,20 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // 制御文字除去（タブ・改行・CR以外）
       .replace(/\r\n/g, '\n')  // CRLF→LF
       .replace(/\r/g, '\n')    // CR→LF
+    
+    // ★ JSON文字列内の生改行を\\nに変換（歌詞フィールド対策）
+    // responseMimeType: 'application/json' の場合、Geminiが歌詞に生改行を入れることがある
+    sanitizedGeminiText = sanitizedGeminiText.replace(/"([^"]*)\n([^"]*?)"/g, (match: string) => {
+      return match.replace(/\n/g, '\\n')
+    })
+    // 複数行にまたがる文字列リテラル内の改行を全て置換（再帰的に）
+    let prevText = ''
+    while (prevText !== sanitizedGeminiText) {
+      prevText = sanitizedGeminiText
+      sanitizedGeminiText = sanitizedGeminiText.replace(/"([^"]*)\n([^"]*?)"/g, (match: string) => {
+        return match.replace(/\n/g, '\\n')
+      })
+    }
     
     let personalizedPlan: any = {}
     try {
