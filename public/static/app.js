@@ -55,6 +55,33 @@
       animation: fade-in 0.3s ease-out;
     }
     
+    /* ★ ボタン押下フィードバック（全ボタンに適用） */
+    button, [role="button"], [onclick] {
+      transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease !important;
+    }
+    button:active, [role="button"]:active, [onclick]:active {
+      transform: scale(0.95) !important;
+      filter: brightness(0.92) !important;
+    }
+    /* グラデーションボタンの押下フィードバック強化 */
+    .bg-gradient-to-r:active, .bg-gradient-to-br:active {
+      transform: scale(0.93) !important;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2) !important;
+    }
+    
+    /* ★ 正解アニメーション */
+    @keyframes bounceIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    
+    /* ★ ボタンリップルエフェクト */
+    @keyframes ripple {
+      0% { transform: scale(0); opacity: 0.5; }
+      100% { transform: scale(3); opacity: 0; }
+    }
+    
     /* ============================================
      * Phase 5-2: レスポンシブデザイン
      * スマホ/タブレット対応
@@ -21863,7 +21890,8 @@ async function executeUnitGeneration(params) {
     
     // 【高速化】3つのコースを並列生成（Promise.allSettled）
     console.log('🚀 3コースを並列生成開始...')
-    updateGenerationProgress('3つのコースを同時に生成しています...（約60〜90秒）', 30)
+    // ★ 15%で中間表示（10→15のスムーズ遷移）、コース完了時に個別更新
+    updateGenerationProgress('3つのコースを同時に生成しています...（約60〜90秒）', 15)
     
     const coursePromises = courseDefinitions.map((courseDef, i) => {
       // 少しずらして送信（レート制限対策: 0秒、1秒、2秒）
@@ -21910,7 +21938,8 @@ async function executeUnitGeneration(params) {
       if (result.status === 'fulfilled') {
         generatedCourses.push(result.value)
         console.log(`✅ ${courseDefinitions[i].info.name}の生成完了（${result.value.cards.length}枚）`)
-        updateGenerationProgress(`${courseDefinitions[i].info.name} 完了！`, 30 + ((i + 1) * 20))
+        // ★ 各コース完了ごとに均等に進行: 20→40→60
+        updateGenerationProgress(`${courseDefinitions[i].info.name} 完了！`, 20 + ((i + 1) * 13))
       } else {
         console.error(`❌ ${courseDefinitions[i].info.name}の生成失敗:`, result.reason)
         throw new Error(`${courseDefinitions[i].info.name}の生成に失敗: ${result.reason?.message || 'Unknown'}`)
@@ -21926,23 +21955,26 @@ async function executeUnitGeneration(params) {
       コース3: generatedCourses[2].name + ' ' + generatedCourses[2].cards.length + '枚'
     })
     
-    updateGenerationProgress('生成完了！保存しています...', 95)
+    // ★ 保存中は70%→90%へスムーズに
+    updateGenerationProgress('生成完了！保存しています...', 70)
 
-    // 100%にして完了アニメーション
+    // 保存処理完了後に90%→100%へスムーズに
+    setTimeout(() => {
+      updateGenerationProgress('保存中...', 90)
+    }, 500)
+    
+    // 100%にして完了アニメーション（保存が完了してから）
     setTimeout(() => {
       updateGenerationProgress('✨ 生成完了！プレビューを表示します...', 100)
       const progressBar = document.getElementById('progressBar')
       if (progressBar) {
-        progressBar.style.width = '100%'
         progressBar.style.background = 'linear-gradient(90deg, #10b981, #34d399)'
       }
-      const progressPercent = document.getElementById('progressPercent')
-      if (progressPercent) progressPercent.textContent = '100%'
-    }, 300)
+    }, 1200)
 
-    // プレビュー画面を表示（少し遅延して完了感を出す）
+    // プレビュー画面を表示（スムーズなアニメーション完了後に表示）
     const modelUsed = unitInfoResponse.data.model_used
-    setTimeout(() => showUnitPreview(unitData, modelUsed), 1500)
+    setTimeout(() => showUnitPreview(unitData, modelUsed), 2500)
 
   } catch (error) {
     console.error('❌❌❌ 単元生成エラー:', error)
@@ -22462,6 +22494,10 @@ function showGenerationProgress(grade, subject, unitName, qualityMode = 'standar
 }
 
 // 段階的生成の進捗更新関数
+// ★ 進捗バーはアニメーションでスムーズに移動する（ジャンプしない）
+let _progressTargetPercent = 0
+let _progressAnimFrame = null
+
 function updateGenerationProgress(message, percent) {
   const currentTask = document.getElementById('currentTask')
   const progressBar = document.getElementById('progressBar')
@@ -22469,27 +22505,22 @@ function updateGenerationProgress(message, percent) {
   
   if (currentTask) currentTask.textContent = message
   
-  // ★ プログレスバーは常に前進のみ（後退しない）
-  if (progressBar) {
-    const currentWidth = parseFloat(progressBar.style.width) || 0
-    if (percent > currentWidth) {
-      progressBar.style.width = `${percent}%`
-      if (progressPercent) {
-        progressPercent.textContent = `${Math.round(percent)}%`
-      }
-    }
+  // ★ ターゲットを設定し、アニメーションでスムーズに追従
+  if (percent > _progressTargetPercent) {
+    _progressTargetPercent = percent
+    _smoothProgressTo(progressBar, progressPercent, percent)
   }
   
-  // ステップカードの更新
-  if (percent >= 10 && percent < 25) {
+  // ステップカードの更新（API進捗の段階に合わせた閾値）
+  if (percent >= 5 && percent < 15) {
     updateStepCard('step1', 'active', 'ステップ1: 実行中')
-  } else if (percent >= 25 && percent < 50) {
+  } else if (percent >= 15 && percent < 33) {
     updateStepCard('step1', 'completed', 'ステップ1: 完了')
     updateStepCard('step2', 'active', 'ステップ2: 実行中')
-  } else if (percent >= 50 && percent < 75) {
+  } else if (percent >= 33 && percent < 60) {
     updateStepCard('step2', 'completed', 'ステップ2: 完了')
     updateStepCard('step3', 'active', 'ステップ3: 実行中')
-  } else if (percent >= 75) {
+  } else if (percent >= 60) {
     updateStepCard('step3', 'completed', 'ステップ3: 完了')
     updateStepCard('step4', 'active', 'ステップ4: 実行中')
   }
@@ -22502,6 +22533,40 @@ function updateGenerationProgress(message, percent) {
     }
     updateStepCard('step4', 'completed', 'ステップ4: 完了')
   }
+}
+
+// ★ スムーズに目標%まで進むアニメーション（ゆっくり均一に進行）
+let _smoothProgressStartTime = null
+let _smoothProgressStartValue = 0
+function _smoothProgressTo(progressBar, progressPercent, targetPercent) {
+  if (_progressAnimFrame) cancelAnimationFrame(_progressAnimFrame)
+  
+  // 開始時点の値を記録
+  _smoothProgressStartValue = parseFloat(progressBar?.style.width) || 0
+  _smoothProgressStartTime = performance.now()
+  
+  // 差に応じたアニメーション時間: 差が大きいほど長く（最低800ms、差1%あたり80ms）
+  const diff = targetPercent - _smoothProgressStartValue
+  const duration = Math.max(800, Math.min(diff * 80, 4000))  // 800ms〜4000ms
+  
+  const animate = (now) => {
+    if (!progressBar) return
+    const elapsed = now - _smoothProgressStartTime
+    const progress = Math.min(elapsed / duration, 1)
+    
+    // easeOutCubic: ゆっくり減速して自然に止まる
+    const eased = 1 - Math.pow(1 - progress, 3)
+    const current = _smoothProgressStartValue + diff * eased
+    const next = Math.min(current, targetPercent)
+    
+    progressBar.style.width = `${next}%`
+    if (progressPercent) progressPercent.textContent = `${Math.round(next)}%`
+    
+    if (progress < 1) {
+      _progressAnimFrame = requestAnimationFrame(animate)
+    }
+  }
+  _progressAnimFrame = requestAnimationFrame(animate)
 }
 
 // ステップカードの状態更新
@@ -22527,12 +22592,12 @@ function animateRealtimeProgress(totalTime, qualityMode) {
   if (_realtimeProgressInterval) clearInterval(_realtimeProgressInterval)
   const startTime = Date.now()
   
-  // ステップ定義（実時間配分）
+  // ステップ定義（実時間配分）- API進捗と同期
   const steps = [
     {
       id: 1,
       startPercent: 0,
-      endPercent: 15,
+      endPercent: 10,
       icon: 'fa-lightbulb',
       task: '単元の目標を設計中...',
       comment: '💡 子どもたちがワクワクする単元目標を考えています',
@@ -22540,8 +22605,8 @@ function animateRealtimeProgress(totalTime, qualityMode) {
     },
     {
       id: 2,
-      startPercent: 15,
-      endPercent: 30,
+      startPercent: 10,
+      endPercent: 20,
       icon: 'fa-route',
       task: '3つのコースを作成中...',
       comment: '🎨 ゆっくり・しっかり・ぐんぐんコースを設計しています',
@@ -22549,8 +22614,8 @@ function animateRealtimeProgress(totalTime, qualityMode) {
     },
     {
       id: 3,
-      startPercent: 30,
-      endPercent: 75,
+      startPercent: 20,
+      endPercent: 60,
       icon: 'fa-cards',
       task: '30枚の学習カードを並列生成中...',
       comment: '🚀 3コース同時生成で効率よく作っています',
@@ -22558,7 +22623,7 @@ function animateRealtimeProgress(totalTime, qualityMode) {
     },
     {
       id: 4,
-      startPercent: 75,
+      startPercent: 60,
       endPercent: 100,
       icon: 'fa-comment-dots',
       task: 'ヒントカードを作成中...',
@@ -30956,18 +31021,86 @@ function checkTestAnswer(curriculumId, problemNumber, correctAnswer) {
     return
   }
   
-  // 簡易的な正誤判定（部分一致）
-  const normalizedUser = userAnswer.replace(/[\s　]/g, '').toLowerCase()
-  const normalizedCorrect = correctAnswer.replace(/[\s　]/g, '').toLowerCase()
+  // ★ 全角→半角正規化関数（改良版）
+  const normalize = (s) => {
+    return s
+      .replace(/[\s　\t\n\r]/g, '')  // 全空白除去
+      .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/[ａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/％/g, '%').replace(/＋/g, '+').replace(/－/g, '-').replace(/×/g, '*').replace(/÷/g, '/')
+      .replace(/．/g, '.').replace(/，/g, ',').replace(/：/g, ':').replace(/；/g, ';')
+      .replace(/（/g, '(').replace(/）/g, ')').replace(/「/g, '').replace(/」/g, '')
+      .replace(/『/g, '').replace(/』/g, '').replace(/〜/g, '~').replace(/ー/g, '-')
+      .replace(/約|およそ|だいたい|ほぼ|くらい|ぐらい/g, '')  // 近似表現を除去
+      .toLowerCase()
+  }
   
-  // 正解に含まれるキーワードで判定
-  const correctKeywords = normalizedCorrect.split(/[（）()、,。.／/]/).filter(k => k.length > 1)
-  const isCorrect = correctKeywords.some(kw => normalizedUser.includes(kw)) || normalizedCorrect.includes(normalizedUser) || normalizedUser.includes(normalizedCorrect)
+  const normalizedUser = normalize(userAnswer)
+  const normalizedCorrect = normalize(correctAnswer)
+  
+  // ★ 数値抽出関数（小数・分数・%を含む数値をすべて抽出）
+  const extractNumbers = (s) => {
+    const nums = []
+    // 小数・整数・%付き
+    const numMatches = s.match(/[\d]+\.?[\d]*%?/g)
+    if (numMatches) nums.push(...numMatches)
+    // 分数パターン（例: 6分の1, 1/3）
+    const fracMatch = s.match(/(\d+)分の(\d+)/g)
+    if (fracMatch) nums.push(...fracMatch)
+    return nums
+  }
+  
+  // 判定ロジック（複数の方法で照合）
+  let isCorrect = false
+  
+  // 方法1: 完全一致（正規化後）
+  if (normalizedUser === normalizedCorrect) isCorrect = true
+  
+  // 方法2: 相互包含
+  if (!isCorrect && normalizedUser.length >= 2) {
+    if (normalizedCorrect.includes(normalizedUser) || normalizedUser.includes(normalizedCorrect)) isCorrect = true
+  }
+  
+  // 方法3: 数値一致（数値が含まれる場合、全ての数値が一致すればOK）
+  if (!isCorrect) {
+    const userNums = extractNumbers(normalizedUser)
+    const correctNums = extractNumbers(normalizedCorrect)
+    if (userNums.length > 0 && correctNums.length > 0) {
+      // ユーザーの数値がすべて正解に含まれているか
+      const allMatch = userNums.every(un => correctNums.some(cn => cn === un || cn.includes(un) || un.includes(cn)))
+      if (allMatch) isCorrect = true
+    }
+  }
+  
+  // 方法4: キーワード分割（句読点・括弧で分割、★小数点は保持する）
+  if (!isCorrect) {
+    // ★ 小数点を一時的にプレースホルダーに置換してから分割
+    const protectDecimals = (s) => s.replace(/(\d)\.(\d)/g, '$1__DECIMAL__$2')
+    const restoreDecimals = (s) => s.replace(/__DECIMAL__/g, '.')
+    const protectedCorrect = protectDecimals(normalizedCorrect)
+    const correctKeywords = protectedCorrect.split(/[()、,。／/\s]/).map(restoreDecimals).filter(k => k.length >= 2)
+    if (correctKeywords.some(kw => normalizedUser.includes(kw))) isCorrect = true
+  }
+  
+  // 方法5: 数値のみ抽出して比較（「31.3%」と「約31.3%」のようなケース）
+  if (!isCorrect) {
+    const userNumOnly = normalizedUser.replace(/[^0-9.%/分の]/g, '')
+    const correctNumOnly = normalizedCorrect.replace(/[^0-9.%/分の]/g, '')
+    if (userNumOnly.length >= 2 && correctNumOnly.length >= 2) {
+      if (userNumOnly === correctNumOnly) isCorrect = true
+    }
+  }
   
   if (isCorrect) {
-    resultSpan.innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>せいかい！🎉</span>'
+    resultSpan.innerHTML = '<span class="text-green-600 text-lg"><i class="fas fa-check-circle mr-1"></i>せいかい！🎉</span>'
     input.style.borderColor = '#22c55e'
     input.style.backgroundColor = '#f0fdf4'
+    // ★ 正解時のアニメーション
+    input.style.transition = 'all 0.3s ease'
+    resultSpan.style.animation = 'none'
+    resultSpan.offsetHeight  // reflow
+    resultSpan.style.animation = 'bounceIn 0.5s ease'
   } else {
     resultSpan.innerHTML = '<span class="text-orange-500"><i class="fas fa-times-circle mr-1"></i>もういちど考えてみよう！</span>'
     input.style.borderColor = '#f97316'
@@ -32100,34 +32233,8 @@ const websocket = {
   }
 }
 
-// トースト通知表示
-function showToast(message, type = 'info', duration = 3000) {
-  const toast = document.createElement('div')
-  toast.className = `fixed top-4 right-4 z-50 max-w-sm p-4 rounded-lg shadow-lg transform transition-all duration-300 ${
-    type === 'success' ? 'bg-green-500 text-white' :
-    type === 'warning' ? 'bg-orange-500 text-white' :
-    type === 'error' ? 'bg-red-500 text-white' :
-    'bg-blue-500 text-white'
-  }`
-  
-  toast.innerHTML = `
-    <div class="flex items-start">
-      <div class="flex-1 whitespace-pre-line">${message}</div>
-      <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-  `
-  
-  document.body.appendChild(toast)
-  
-  // アニメーション
-  setTimeout(() => {
-    toast.style.opacity = '0'
-    toast.style.transform = 'translateX(100%)'
-    setTimeout(() => toast.remove(), 300)
-  }, duration)
-}
+// トースト通知表示（コラボレーション用 - 既存showToastと互換）
+// NOTE: showToast は既に定義済みのため、ここでは上書きしない
 
 // 通知音を再生
 function playNotificationSound() {
@@ -35658,7 +35765,8 @@ function openImageEditor(cardId) {
 }
 window.openImageEditor = openImageEditor
 
-function getCanvasPos(e, canvas) {
+// 画像エディタ用のキャンバス座標取得（名前衝突回避）
+const _editorGetCanvasPos = function(e, canvas) {
   const rect = canvas.getBoundingClientRect()
   const scaleX = canvas.width / rect.width
   const scaleY = canvas.height / rect.height
@@ -35669,7 +35777,7 @@ function getCanvasPos(e, canvas) {
 }
 
 function editorStartDraw(e, canvas, ctx, state) {
-  const pos = getCanvasPos(e, canvas)
+  const pos = _editorGetCanvasPos(e, canvas)
   
   // トリミングモード
   if (state.cropMode) {
@@ -35731,7 +35839,7 @@ function editorStartDraw(e, canvas, ctx, state) {
 
 function editorMoveDraw(e, canvas, ctx, state) {
   if (!state.isDrawing) return
-  const pos = getCanvasPos(e, canvas)
+  const pos = _editorGetCanvasPos(e, canvas)
   
   // トリミングモード: 矩形を描画
   if (state.cropMode && state.cropStart) {
@@ -39864,7 +39972,7 @@ function renderExistingImages() {
             ${image.alt_text ? `<p class="text-sm text-gray-700"><strong>説明:</strong> ${image.alt_text}</p>` : ''}
             ${image.caption ? `<p class="text-xs text-gray-600">${image.caption}</p>` : ''}
             <button 
-              onclick="deleteCardImage(${image.image_id})"
+              onclick="deleteCardImageById(${image.image_id})"
               class="w-full bg-red-500 text-white py-2 px-4 rounded-lg text-sm font-bold hover:bg-red-600 transition-all"
             >
               <i class="fas fa-trash mr-1"></i>
@@ -40113,8 +40221,8 @@ async function useGeneratedImage(imageUrl, prompt) {
   }
 }
 
-// 画像削除
-async function deleteCardImage(imageId) {
+// 画像削除（メディアエディタ用）
+async function deleteCardImageById(imageId) {
   if (!confirm('この画像を削除しますか？')) return
   
   try {
@@ -40179,7 +40287,7 @@ window.addImageToCard = addImageToCard
 window.addVideoToCard = addVideoToCard
 window.generateAIImage = generateAIImage
 window.useGeneratedImage = useGeneratedImage
-window.deleteCardImage = deleteCardImage
+window.deleteCardImageById = deleteCardImageById
 window.deleteCardVideo = deleteCardVideo
 
 console.log('✅ Phase 13: 学習カードメディア管理UI 読み込み完了')
@@ -52550,6 +52658,24 @@ window.showTestPrepDashboard = showTestPrepDashboard
 async function showPersonalizedCourseSelector(curriculumId) {
   console.log('🎯 個別最適化コース生成 - 児童選択:', curriculumId)
   
+  // ★ 即座にローディング表示（ボタンの反応がない感じを解消）
+  const loadingModal = document.createElement('div')
+  loadingModal.id = 'personalizedSelectorLoading'
+  loadingModal.className = 'fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50'
+  loadingModal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl p-8 text-center transform scale-95 opacity-0 transition-all duration-200" id="loading-inner">
+      <div class="text-4xl mb-3 animate-bounce">🎯</div>
+      <div class="text-lg font-bold text-gray-800 mb-1">児童データを読み込み中...</div>
+      <div class="text-sm text-gray-500">少々お待ちください</div>
+    </div>
+  `
+  document.body.appendChild(loadingModal)
+  // アニメーション表示
+  requestAnimationFrame(() => {
+    const inner = document.getElementById('loading-inner')
+    if (inner) { inner.style.transform = 'scale(1)'; inner.style.opacity = '1' }
+  })
+  
   try {
     // 児童一覧を取得
     let students = []
@@ -52567,6 +52693,10 @@ async function showPersonalizedCourseSelector(curriculumId) {
       const currRes = await axios.get(`/api/curriculum/${curriculumId}`)
       existingPersonalized = (currRes.data.courses || []).filter(c => c.course_level === 'personalized')
     } catch {}
+    
+    // ★ ローディングモーダルを除去
+    const loadingEl = document.getElementById('personalizedSelectorLoading')
+    if (loadingEl) loadingEl.remove()
     const existingStudentIds = existingPersonalized.map(c => {
       const match = c.course_name?.match(/ID:(\d+)/)
       return match ? parseInt(match[1]) : null
@@ -52641,6 +52771,9 @@ async function showPersonalizedCourseSelector(curriculumId) {
     `
     document.body.insertAdjacentHTML('beforeend', html)
   } catch (error) {
+    // ★ エラー時もローディングを除去
+    const loadingEl = document.getElementById('personalizedSelectorLoading')
+    if (loadingEl) loadingEl.remove()
     console.error('❌ 児童選択モーダルエラー:', error)
     alert('児童一覧の取得に失敗しました')
   }
