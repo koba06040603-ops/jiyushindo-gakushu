@@ -33103,7 +33103,16 @@ async function ensureCollaborationTables(db: D1Database) {
 app.post('/api/collaboration/presence', authMiddleware, async (c) => {
   const { env } = c
   const user = c.get('user')
-  const { status, current_page } = await c.req.json()
+  
+  let status = 'online'
+  let current_page = null
+  try {
+    const body = await c.req.json()
+    status = body.status || 'online'
+    current_page = body.current_page || null
+  } catch (e) {
+    // ボディが空の場合はデフォルト値を使用
+  }
   
   try {
     await ensureCollaborationTables(env.DB)

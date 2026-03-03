@@ -570,9 +570,9 @@ window.addEventListener('unhandledrejection', (event) => {
 console.log('✅ app.js loaded successfully')
 console.log('📦 Available functions:', typeof renderTopPage, typeof showTopPage)
 
-// axios グローバルタイムアウト設定（30秒）
+// axios グローバルタイムアウト設定（AI生成は長時間かかるため十分な余裕を設定）
 if (typeof axios !== 'undefined') {
-  axios.defaults.timeout = 60000
+  axios.defaults.timeout = 300000 // 5分（AI生成の並列処理に対応）
 }
 
 // グローバル状態管理
@@ -1372,8 +1372,8 @@ function initializeApp() {
   const savedSession = localStorage.getItem('session_token')
   const savedUser = localStorage.getItem('user')
   
-  // axios グローバル設定: デフォルトタイムアウト30秒（個別設定で上書き可能）
-  axios.defaults.timeout = 30000
+  // axios グローバル設定: AI生成は数分かかるため十分な余裕を設定（個別設定で上書き可能）
+  axios.defaults.timeout = 300000 // 5分
   
   // axios リクエストインターセプター: 認証トークンを自動付与
   axios.interceptors.request.use(function(config) {
