@@ -7546,7 +7546,7 @@ app.get('/test-buttons.html', async (c) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ボタンテスト</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
 </head>
@@ -12944,10 +12944,8 @@ app.get('/landing', (c) => {
         <link rel="preload" href="/static/app.js?v=${Date.now()}" as="script">
         
         <!-- Stylesheets -->
-        <link href="/static/tailwind-minimal.css" rel="stylesheet">
+        <link href="/static/tailwind-full.css" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <!-- Tailwind CDN: 同期ロード（非同期だと後からスタイル再計算で画面がゆれる） -->
-        <script src="https://cdn.tailwindcss.com"></script>
         
         <!-- Deferred Libraries (non-critical) -->
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -22552,7 +22550,7 @@ app.get('/proposal', (c) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI駆動型個別最適化学習システム導入提案書</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
@@ -23040,7 +23038,7 @@ app.get('/theory-demo', (c) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>教育理論と具体的実装の対応 — AI学習システム</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         .theory-card { transition: all 0.3s; border-left: 6px solid; }
