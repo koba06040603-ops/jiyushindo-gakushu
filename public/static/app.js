@@ -6606,7 +6606,15 @@ async function loadCardPage(cardId) {
                   <i class="fas fa-check-circle mr-2"></i>解答
                 </h3>
                 <div class="bg-white rounded-lg p-4 mb-4">
-                  <div class="text-gray-800 whitespace-pre-wrap font-sans" style="line-height: 1.8;">${(answer?.answer_content || card.answer || card.example_solution || '解答は準備中です').replace(/\n/g, '<br>')}</div>
+                  <div class="text-gray-800 whitespace-pre-wrap font-sans" style="line-height: 1.8;">${(() => {
+                    const mainAnswer = answer?.answer_content || card.answer || card.example_solution || '解答は準備中です'
+                    let keywords = card.answer_keywords || []
+                    if (typeof keywords === 'string') { try { keywords = JSON.parse(keywords) } catch(e) { keywords = [] } }
+                    // answer_keywordsに含まれるがmainAnswerに含まれないキーワードを補足表示
+                    const missingKw = keywords.filter(kw => kw && !mainAnswer.includes(kw))
+                    const extra = missingKw.length > 0 ? '<div class="mt-2 text-sm text-green-700 bg-green-100 rounded px-3 py-2"><i class="fas fa-plus-circle mr-1"></i>キーワード: ' + missingKw.join('、') + '</div>' : ''
+                    return mainAnswer.replace(/\n/g, '<br>') + extra
+                  })()}</div>
                 </div>
                 <div class="bg-blue-50 rounded-lg p-4">
                   <h4 class="font-bold text-blue-800 mb-2">
@@ -52624,7 +52632,7 @@ async function startBulkGeneration(curriculumId) {
     
     let genRes = null
     let genError = null
-    for (let retryCount = 0; retryCount < 3; retryCount++) {
+    for (let retryCount = 0; retryCount < 5; retryCount++) {
       try {
         if (retryCount > 0) addLog(`  🔄 再試行 ${retryCount + 1}回目...`)
         console.log(`📤 generate API呼び出し: student=${studentId}, curriculum=${curriculumId}, attempt=${retryCount + 1}`)
@@ -52638,9 +52646,10 @@ async function startBulkGeneration(curriculumId) {
         genError = e
         const is503 = e.response?.status === 503
         const isTimeout = e.code === 'ECONNABORTED' || e.message?.includes('timeout')
-        if ((is503 || isTimeout) && retryCount < 2) {
-          addLog(`  ⚠️ ${is503 ? 'サーバー再起動中' : 'タイムアウト'}、5秒後に再試行...`)
-          await new Promise(r => setTimeout(r, 5000))
+        if ((is503 || isTimeout) && retryCount < 4) {
+          const waitSec = is503 ? 15 : 10
+          addLog(`  ⚠️ ${is503 ? 'サーバーが他の処理中' : 'タイムアウト'}、${waitSec}秒後に再試行...`)
+          await new Promise(r => setTimeout(r, waitSec * 1000))
           continue
         }
         break // リトライ不可
