@@ -3666,14 +3666,30 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
   loadingManager.show('学習のてびきを読み込み中...')
   
   try {
-    // メインデータ取得（必須）+ 補助データを並列取得
-    const [response, metaResult, optionalResult, statsResult, envDesignResult] = await Promise.all([
-      axios.get(`/api/curriculum/${curriculumId}`, { timeout: 30000 }),
-      axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 15000 }).catch(() => ({ data: {} })),
-      axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 15000 }).catch(() => ({ data: {} })),
-      axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 15000 }).catch(() => ({ data: null })),
-      axios.get(`/api/environment/design/${curriculumId}`, { timeout: 15000 }).catch(() => ({ data: null }))
-    ])
+    // キャッシュ判定: 同じcurriculumIdのデータがstateにあればメインAPIをスキップ
+    const hasCachedData = state.selectedCurriculum?.id == curriculumId && state.courses && state.courses.length > 0
+    
+    let response, metaResult, optionalResult, statsResult, envDesignResult
+    if (hasCachedData) {
+      console.log('📦 キャッシュデータを使用（メインAPIスキップ）:', curriculumId)
+      response = { data: { curriculum: state.selectedCurriculum, courses: state.courses } }
+      // 補助データのみ取得（失敗してもOK）
+      ;[metaResult, optionalResult, statsResult, envDesignResult] = await Promise.all([
+        axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 10000 }).catch(() => ({ data: {} })),
+        axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 10000 }).catch(() => ({ data: {} })),
+        axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 10000 }).catch(() => ({ data: null })),
+        axios.get(`/api/environment/design/${curriculumId}`, { timeout: 10000 }).catch(() => ({ data: null }))
+      ])
+    } else {
+      // メインデータ取得（必須）+ 補助データを並列取得
+      ;[response, metaResult, optionalResult, statsResult, envDesignResult] = await Promise.all([
+        axios.get(`/api/curriculum/${curriculumId}`, { timeout: 30000 }),
+        axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 15000 }).catch(() => ({ data: {} })),
+        axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 15000 }).catch(() => ({ data: {} })),
+        axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 15000 }).catch(() => ({ data: null })),
+        axios.get(`/api/environment/design/${curriculumId}`, { timeout: 15000 }).catch(() => ({ data: null }))
+      ])
+    }
     
     const { curriculum, courses: rawCourses } = response.data
     const courses = rawCourses || []
