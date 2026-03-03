@@ -1235,6 +1235,7 @@ const learningTimer = {
 
 // グローバルローディング管理
 const loadingManager = {
+  _timer: null,
   show: (message = '読み込み中...') => {
     const existing = document.getElementById('global-loading')
     if (existing) return
@@ -1250,9 +1251,20 @@ const loadingManager = {
       </div>
     `
     document.body.appendChild(loadingDiv)
+    
+    // 安全網：30秒後にローディングを自動解除（ぐるぐる永久防止）
+    if (loadingManager._timer) clearTimeout(loadingManager._timer)
+    loadingManager._timer = setTimeout(() => {
+      const el = document.getElementById('global-loading')
+      if (el) {
+        console.warn('⚠️ ローディング30秒タイムアウト、自動解除')
+        el.remove()
+      }
+    }, 30000)
   },
   
   hide: () => {
+    if (loadingManager._timer) { clearTimeout(loadingManager._timer); loadingManager._timer = null }
     const loading = document.getElementById('global-loading')
     if (loading) {
       loading.remove()
@@ -3141,7 +3153,9 @@ async function updateUnitList() {
         unitSelect.innerHTML = ''
         
         // 6年社会の場合、歴史と公民の分野ヘッダーを追加
-        const civicsKeywords = ['憲法','政治','選挙','国会','内閣','裁判','三権','人権','国民主権','天皇の地位','平和主義','税金','地方自治','国際','世界','持続可能','グローバル','まちづくり']
+        // 歴史時代名キーワード（これを含む場合は歴史として優先判定）
+        const historyEraKeywords = ['縄文','弥生','古墳','大和','飛鳥','奈良時代','平安','鎌倉','室町','戦国','安土桃山','江戸','明治維新','明治時代','大正','昭和','日清','日露','近代国家']
+        const civicsKeywords = ['憲法','選挙','国会','内閣','裁判','三権','人権','国民主権','天皇の地位','平和主義','税金','地方自治','国際協力','持続可能','グローバル','まちづくり','子育て支援','震災復興','願いを実現']
         const isSocialStudies = subject === '社会'
         let civicsSectionAdded = false
         
@@ -3150,7 +3164,9 @@ async function updateUnitList() {
           const historyUnits = []
           const civicsUnits = []
           curricula.forEach(item => {
-            const isCivics = civicsKeywords.some(kw => item.unit_name.includes(kw))
+            // 歴史時代名を含む場合は歴史として優先判定（「奈良時代の政治と文化」等の誤分類防止）
+            const isHistory = historyEraKeywords.some(kw => item.unit_name.includes(kw))
+            const isCivics = !isHistory && civicsKeywords.some(kw => item.unit_name.includes(kw))
             if (isCivics) civicsUnits.push(item)
             else historyUnits.push(item)
           })
@@ -3652,7 +3668,7 @@ async function loadGuidePage(curriculumId) {
   try {
     // メインデータ取得（必須）+ 補助データを並列取得
     const [response, metaResult, optionalResult, statsResult, envDesignResult] = await Promise.all([
-      axios.get(`/api/curriculum/${curriculumId}`, { timeout: 30000 }),
+      axios.get(`/api/curriculum/${curriculumId}`, { timeout: 20000 }),
       axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 15000 }).catch(() => ({ data: {} })),
       axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 15000 }).catch(() => ({ data: {} })),
       axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 15000 }).catch(() => ({ data: null })),
@@ -4659,7 +4675,7 @@ async function loadGuidePage(curriculumId) {
     
     // エラーが発生しても、基本情報だけで表示を試みる
     try {
-      const response = await axios.get(`/api/curriculum/${curriculumId}`)
+      const response = await axios.get(`/api/curriculum/${curriculumId}`, { timeout: 15000 })
       const { curriculum, courses } = response.data
       
       if (!curriculum || !courses) {
@@ -4761,9 +4777,28 @@ async function loadGuidePage(curriculumId) {
       
     } catch (fallbackError) {
       console.error('簡易版の表示も失敗しました:', fallbackError)
-      console.warn('⚠️ 一部のデータの読み込みに失敗しましたが、基本情報は表示されています')
       loadingManager.hide()
-      // エラーは出すが、トップページには戻らない
+      // トップページに戻るオプションを表示
+      const app = document.getElementById('app')
+      app.innerHTML = `
+        <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
+          <div class="container mx-auto px-4 max-w-2xl">
+            <div class="bg-white rounded-2xl shadow-xl p-8 text-center">
+              <div class="text-6xl mb-4">⚠️</div>
+              <h2 class="text-2xl font-bold text-gray-800 mb-3">読み込みに時間がかかっています</h2>
+              <p class="text-gray-600 mb-6">サーバーが他の処理中のため、少し時間をおいて再度お試しください。</p>
+              <div class="space-y-3">
+                <button onclick="loadGuidePage(${curriculumId})" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-xl font-bold text-lg hover:from-blue-600 hover:to-indigo-700 transition">
+                  <i class="fas fa-redo mr-2"></i>もう一度読み込む
+                </button>
+                <button onclick="renderTopPage()" class="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-bold text-lg hover:bg-gray-300 transition">
+                  <i class="fas fa-home mr-2"></i>トップページにもどる
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
     }
   }
 }
@@ -15220,6 +15255,35 @@ async function gradeAnswer(correctAnswer) {
       const matchCount = coreKeywords.filter(kw => normalizedStudent.includes(kw)).length
       if (matchCount >= Math.ceil(coreKeywords.length * 0.4)) return true
     }
+    // 日本語意味キーワード判定（助詞・接続詞で分割して核となる語句を抽出）
+    const jaKeywords = normalizedCorrect
+      .replace(/[。、,.\s]/g, '')
+      .split(/[がのをにへとでやかもはばれるたいなくてしまうする]/)
+      .filter(w => w.length >= 2)
+    // 正解と生徒の回答から共通する核となる語句を探す
+    const studentJaKeywords = normalizedStudent
+      .replace(/[。、,.\s]/g, '')
+      .split(/[がのをにへとでやかもはばれるたいなくてしまうする]/)
+      .filter(w => w.length >= 2)
+    if (jaKeywords.length > 0 && studentJaKeywords.length > 0) {
+      const jaMatchCount = jaKeywords.filter(kw => normalizedStudent.includes(kw)).length
+      if (jaMatchCount >= Math.ceil(jaKeywords.length * 0.5)) return true
+    }
+    // 短い部分文字列マッチ（正解から2-6文字の重要語を抽出して比較）
+    const substrKeywords = []
+    const cleanCorrect = normalizedCorrect.replace(/[。、,.]/g, '')
+    for (let len = 3; len <= Math.min(6, cleanCorrect.length); len++) {
+      for (let i = 0; i <= cleanCorrect.length - len; i++) {
+        const sub = cleanCorrect.substring(i, i + len)
+        if (!/^[はがのをにへとでもや]+$/.test(sub)) substrKeywords.push(sub)
+      }
+    }
+    // 重要な部分文字列が生徒の回答に多く含まれていれば正解
+    if (substrKeywords.length > 0) {
+      const uniqueSubs = [...new Set(substrKeywords)]
+      const subMatchCount = uniqueSubs.filter(s => normalizedStudent.includes(s)).length
+      if (subMatchCount >= Math.ceil(uniqueSubs.length * 0.3)) return true
+    }
     return false
   })()
   
@@ -15265,7 +15329,7 @@ async function gradeAnswer(correctAnswer) {
       if (existingMaru) existingMaru.remove()
       
       // SVGオーバーレイを入力欄に重ねて表示
-      const svgSize = Math.max(w, h) * 1.3 // 入力欄より30%大きい
+      const svgSize = Math.max(w, h) * 0.9 // 入力欄より少し小さく
       const svgOverlay = document.createElement('div')
       svgOverlay.id = 'correct-maru-svg-overlay'
       svgOverlay.style.cssText = `
@@ -15280,11 +15344,11 @@ async function gradeAnswer(correctAnswer) {
       // 円周 = 2πr。r = 45% of viewBox (90)。C = 2*π*90 ≈ 565
       svgOverlay.innerHTML = `
         <svg viewBox="0 0 200 200" width="${svgSize}" height="${svgSize}" 
-             style="filter: drop-shadow(0 4px 20px rgba(220,38,38,0.5)) drop-shadow(0 0 40px rgba(220,38,38,0.3));">
-          <circle cx="100" cy="100" r="88" fill="none" stroke="#DC2626" stroke-width="20" stroke-linecap="round"
+             style="filter: drop-shadow(0 2px 10px rgba(220,38,38,0.4)) drop-shadow(0 0 20px rgba(220,38,38,0.2));">
+          <circle cx="100" cy="100" r="88" fill="none" stroke="#DC2626" stroke-width="12" stroke-linecap="round"
             stroke-dasharray="553" stroke-dashoffset="553"
             style="animation: maruDrawStroke 0.6s cubic-bezier(0.4,0,0.2,1) 0.15s forwards;" />
-          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,100,100,0.25)" stroke-width="36" stroke-linecap="round"
+          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,100,100,0.2)" stroke-width="22" stroke-linecap="round"
             opacity="0" style="animation: maruGlowPulse 1.5s ease-in-out 0.6s forwards;" />
         </svg>
       `
@@ -15294,9 +15358,9 @@ async function gradeAnswer(correctAnswer) {
       svgOverlay.style.animation = 'maruPopIn 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.1s both'
       
       // 入力欄自体にもゴールドの輝きボーダー
-      answerArea.style.border = '4px solid #DC2626'
+      answerArea.style.border = '3px solid #DC2626'
       answerArea.style.borderRadius = '16px'
-      answerArea.style.boxShadow = '0 0 20px 8px rgba(220,38,38,0.25), 0 0 60px 16px rgba(220,38,38,0.1)'
+      answerArea.style.boxShadow = '0 0 12px 4px rgba(220,38,38,0.2), 0 0 30px 8px rgba(220,38,38,0.08)'
       answerArea.style.transition = 'box-shadow 0.5s ease-out, border-color 0.5s ease-out'
       
       // 5秒後にゆっくりフェードアウト
