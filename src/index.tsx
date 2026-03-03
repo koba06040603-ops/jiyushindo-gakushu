@@ -13034,6 +13034,8 @@ app.get('/landing', (c) => {
             ]
             
             let loadedCount = 0
+            let errorCount = 0
+            const criticalScripts = ['/static/app.js']
             
             scripts.forEach((src, index) => {
               const script = document.createElement('script')
@@ -13043,29 +13045,69 @@ app.get('/landing', (c) => {
                 console.log('✅ 読み込み完了:', src)
                 loadedCount++
                 
-                // 全スクリプト読み込み完了後
-                if (loadedCount === scripts.length) {
+                // 全スクリプト読み込み完了後（エラーのものも含めてカウント）
+                if (loadedCount + errorCount >= scripts.length) {
                   clearTimeout(loadTimeout)
                   window._appInitialized = true
-                  console.log('🚀 全スクリプト読み込み完了')
+                  console.log('🚀 全スクリプト読み込み完了 (成功:' + loadedCount + ', エラー:' + errorCount + ')')
                   setTimeout(() => {
                     if (typeof window.renderTopPage === 'function') {
                       console.log('🎯 renderTopPageを実行')
                       window.renderTopPage()
-                    } else {
-                      console.error('❌ renderTopPage not found')
-                      document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">システムエラー</h2><p class="text-gray-600 mb-6">スクリプトの読み込みに失敗しました。ページをリフレッシュしてください。</p><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"><i class="fas fa-redo mr-2"></i>リフレッシュ</button></div></div>'
+                    } else if (errorCount > 0) {
+                      // app.jsが読み込めなかった場合 - 自動リロード
+                      console.warn('⚠️ 重要なスクリプトが読み込めませんでした。自動リロードします。')
+                      autoReloadOnError()
                     }
                   }, 200)
                 }
               }
               script.onerror = (error) => {
                 console.error('❌ 読み込みエラー:', src, error)
-                clearTimeout(loadTimeout)
-                document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">読み込みエラー</h2><p class="text-gray-600 mb-6">ファイル: ' + src + '</p><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"><i class="fas fa-redo mr-2"></i>リフレッシュ</button></div></div>'
+                errorCount++
+                
+                // 重要なスクリプト(app.js)が失敗した場合は自動リロード
+                if (criticalScripts.some(cs => src.includes(cs))) {
+                  clearTimeout(loadTimeout)
+                  autoReloadOnError()
+                  return
+                }
+                
+                // 非重要スクリプトはスキップして続行
+                console.warn('⚠️ 非重要スクリプトをスキップ:', src)
+                if (loadedCount + errorCount >= scripts.length) {
+                  clearTimeout(loadTimeout)
+                  window._appInitialized = true
+                  if (typeof window.renderTopPage === 'function') {
+                    window.renderTopPage()
+                  }
+                }
               }
               document.head.appendChild(script)
             })
+            
+            // スクリプト読み込みエラー時の自動リロード関数
+            function autoReloadOnError() {
+              if (window._autoReloading) return
+              window._autoReloading = true
+              var app = document.getElementById('app')
+              if (app) {
+                app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem;">' +
+                  '<div style="text-align:center;background:white;border-radius:1.5rem;box-shadow:0 10px 40px rgba(0,0,0,0.08);max-width:400px;width:100%;padding:2rem;">' +
+                  '<div style="display:inline-block;width:48px;height:48px;border:4px solid #e0e7ff;border-top:4px solid #6366f1;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:1rem;"></div>' +
+                  '<style>@keyframes spin{to{transform:rotate(360deg);}}</style>' +
+                  '<p style="color:#374151;font-weight:700;margin-bottom:0.5rem;">サーバーに再接続中...</p>' +
+                  '<p style="color:#9CA3AF;font-size:0.8rem;" id="reload-countdown">8秒後に自動リロード</p>' +
+                  '</div></div>'
+              }
+              var sec = 8
+              var iv = setInterval(function() {
+                sec--
+                var el = document.getElementById('reload-countdown')
+                if (el) el.textContent = sec + '秒後に自動リロード'
+                if (sec <= 0) { clearInterval(iv); location.reload() }
+              }, 1000)
+            }
           })
         </script>
     </body>
