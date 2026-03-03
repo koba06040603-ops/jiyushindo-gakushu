@@ -3762,13 +3762,13 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
       envDesignResult = { data: null }
     } else {
       // メインデータ取得（必須）+ 補助データを並列取得
-      ;[response, metaResult, optionalResult, statsResult, envDesignResult] = await Promise.all([
-        axios.get(`/api/curriculum/${curriculumId}`, { timeout: 30000 }),
-        axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 15000 }).catch(() => ({ data: {} })),
-        axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 15000 }).catch(() => ({ data: {} })),
-        axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 15000 }).catch(() => ({ data: null })),
-        axios.get(`/api/environment/design/${curriculumId}`, { timeout: 15000 }).catch(() => ({ data: null }))
-      ])
+      // メインデータを先に取得（必須）
+      response = await axios.get(`/api/curriculum/${curriculumId}`, { timeout: 60000 })
+      // 補助データは順次取得（Wranglerシングルスレッド対策で直列実行）
+      metaResult = await axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 60000 }).catch(() => ({ data: {} }))
+      optionalResult = await axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 60000 }).catch(() => ({ data: {} }))
+      statsResult = await axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 30000 }).catch(() => ({ data: null }))
+      envDesignResult = await axios.get(`/api/environment/design/${curriculumId}`, { timeout: 30000 }).catch(() => ({ data: null }))
     }
     
     const { curriculum, courses: rawCourses } = response.data
@@ -3877,17 +3877,9 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
           } catch (e) { console.warn('  ⚠️ 学習環境デザイン生成失敗:', e.message) }
           console.log('✅ バックグラウンド自動生成完了')
           
-          if (!alreadyAutoReloaded) {
-            // 初回のみ自動リロード
-            sessionStorage.setItem(autoReloadKey, 'done')
-            console.log('🔄 自動リロード実行')
-            loadGuidePage(curriculumId)
-          } else {
-            // 2回目以降はバナーで通知のみ
-            autoGenBanners.forEach(banner => {
-              banner.innerHTML = '<div class="bg-green-100 border border-green-300 rounded-lg p-3 text-center mt-2"><i class="fas fa-check-circle text-green-600 mr-1"></i><span class="text-sm font-bold text-green-700">生成完了！再読み込みで表示されます</span></div>'
-            })
-          }
+          // 生成完了後に常に自動リロード
+          console.log('🔄 自動リロード実行')
+          loadGuidePage(curriculumId)
         } catch (e) {
           console.warn('⚠️ 自動生成エラー:', e)
           const autoGenBanners = document.querySelectorAll('.auto-gen-status-banner')
@@ -23561,7 +23553,7 @@ async function saveGeneratedUnit(unitData) {
           
           // 1. 導入問題（最も軽い）
           try {
-            await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`, {}, {timeout: 60000})
+            await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`, {}, {timeout: 180000})
             console.log('✅ 導入問題 完了')
           } catch (e) { console.warn('⚠️ 導入問題 失敗:', e.message) }
           
@@ -23569,7 +23561,7 @@ async function saveGeneratedUnit(unitData) {
           
           // 2. 評価問題
           try {
-            await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`, {}, {timeout: 60000})
+            await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`, {}, {timeout: 180000})
             console.log('✅ 評価問題 完了')
           } catch (e) { console.warn('⚠️ 評価問題 失敗:', e.message) }
           
@@ -23577,7 +23569,7 @@ async function saveGeneratedUnit(unitData) {
           
           // 3. コース選択問題（最も重い）
           try {
-            await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 60000})
+            await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 180000})
             console.log('✅ コース選択問題 完了')
           } catch (e) { console.warn('⚠️ コース選択問題 失敗:', e.message) }
           
