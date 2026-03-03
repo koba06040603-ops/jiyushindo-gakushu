@@ -3650,7 +3650,15 @@ async function loadGuidePage(curriculumId) {
   loadingManager.show('学習のてびきを読み込み中...')
   
   try {
-    const response = await axios.get(`/api/curriculum/${curriculumId}`)
+    // メインデータ取得（必須）+ 補助データを並列取得
+    const [response, metaResult, optionalResult, statsResult, envDesignResult] = await Promise.all([
+      axios.get(`/api/curriculum/${curriculumId}`, { timeout: 30000 }),
+      axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 15000 }).catch(() => ({ data: {} })),
+      axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 15000 }).catch(() => ({ data: {} })),
+      axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 15000 }).catch(() => ({ data: null })),
+      axios.get(`/api/environment/design/${curriculumId}`, { timeout: 15000 }).catch(() => ({ data: null }))
+    ])
+    
     const { curriculum, courses: rawCourses } = response.data
     const courses = rawCourses || []
     
@@ -3661,38 +3669,20 @@ async function loadGuidePage(curriculumId) {
     console.log('📋 カリキュラム取得:', { id: curriculumId, coursesCount: courses.length, courseLevels: courses.map(c => c.course_level), rawResponse: response.data.error ? response.data : 'OK' })
     
     //コース選択問題と共通チェックテストをメタデータから取得
-    let courseSelectionProblems = []
-    let commonCheckTest = null
-    let deliveryMode = 'group'  // デフォルト: 全体配信
-    let approvedCourseIds = []
-    let excludedStudents = []
-    try {
-      const metaResponse = await axios.get(`/api/curriculum/${curriculumId}/metadata`)
-      courseSelectionProblems = metaResponse.data.course_selection_problems || []
-      commonCheckTest = metaResponse.data.common_check_test || null
-      deliveryMode = metaResponse.data.delivery_mode || 'group'
-      approvedCourseIds = metaResponse.data.approved_courses || []
-      excludedStudents = metaResponse.data.excluded_students || []
-      console.log('✅ メタデータ取得:', {
-        courseSelectionCount: courseSelectionProblems.length,
-        hasCheckTest: !!commonCheckTest,
-        deliveryMode: deliveryMode,
-        approvedCourseIds: approvedCourseIds,
-        excludedStudents: excludedStudents
-      })
-    } catch (metaError) {
-      console.log('⚠️ メタデータなし、デフォルト表示')
-    }
+    let courseSelectionProblems = metaResult.data.course_selection_problems || []
+    let commonCheckTest = metaResult.data.common_check_test || null
+    let deliveryMode = metaResult.data.delivery_mode || 'group'
+    let approvedCourseIds = metaResult.data.approved_courses || []
+    let excludedStudents = metaResult.data.excluded_students || []
+    console.log('✅ メタデータ取得:', {
+      courseSelectionCount: courseSelectionProblems.length,
+      hasCheckTest: !!commonCheckTest,
+      deliveryMode: deliveryMode
+    })
     
-    // 選択問題を取得
-    let optionalProblems = []
-    try {
-      const optionalResponse = await axios.get(`/api/curriculum/${curriculumId}/optional-problems`)
-      optionalProblems = optionalResponse.data.optional_problems || []
-      console.log('✅ 選択問題取得:', optionalProblems.length, '件')
-    } catch (optionalError) {
-      console.log('⚠️ 選択問題なし')
-    }
+    // 選択問題
+    let optionalProblems = optionalResult.data.optional_problems || []
+    console.log('✅ 選択問題取得:', optionalProblems.length, '件')
     
     // 個別最適化コースと学習統計を取得（教師フロー表示用）
     const standardCourses = courses.filter(c => c.course_level !== 'personalized')
@@ -3707,22 +3697,14 @@ async function loadGuidePage(curriculumId) {
     const pendingCourses = personalizedCourses.filter(pc => !approvedCourseIds.includes(pc.course_id))
     const approvedCourses = personalizedCourses.filter(pc => approvedCourseIds.includes(pc.course_id))
     let learningStats = { totalStudents: 0, activeStudents: 0, avgCorrectRate: 0, totalAnswers: 0 }
-    try {
-      const statsResponse = await axios.get(`/api/curriculum/${curriculumId}/learning-stats`)
-      if (statsResponse.data) learningStats = statsResponse.data
-    } catch (e) { console.log('⚠️ 学習統計なし') }
+    if (statsResult.data) learningStats = statsResult.data
     
-    // 学習環境デザインを取得
+    // 学習環境デザイン（並列取得済み）
     let environmentDesign = null
-    try {
-      const envDesignRes = await axios.get(`/api/environment/design/${curriculumId}`)
-      environmentDesign = envDesignRes.data
-      if (environmentDesign && environmentDesign.id) {
-        console.log('✅ 学習環境デザイン取得済み:', environmentDesign.id)
-      } else {
-        environmentDesign = null
-      }
-    } catch (e) { console.log('⚠️ 学習環境デザインなし') }
+    if (envDesignResult.data && envDesignResult.data.id) {
+      environmentDesign = envDesignResult.data
+      console.log('✅ 学習環境デザイン取得済み:', environmentDesign.id)
+    }
 
     // 欠落データのバックグラウンド自動生成（順次実行）
     const missingIntroProblems = courses.filter(c => !c.introduction_problem)

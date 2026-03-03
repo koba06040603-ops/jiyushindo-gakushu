@@ -7754,7 +7754,9 @@ app.get('/diagnostic/:curriculumId', async (c) => {
 })
 
 // カリキュラム基本情報API（認証不要 - 診断ページ用）
-app.get('/api/curriculum/:id', async (c) => {
+// 注意: /api/curriculum/:id は line 3310 で定義済み（courses+cardsを含む完全版）
+// 重複定義するとHonoで最初のルートが優先されるため、ここでは /api/curriculum/:id/basic として分離
+app.get('/api/curriculum/:id/basic', async (c) => {
   const { env } = c
   try {
     const id = c.req.param('id')
