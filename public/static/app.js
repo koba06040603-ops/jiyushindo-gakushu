@@ -3716,6 +3716,16 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
     
     // 選択問題
     let optionalProblems = optionalResult.data.optional_problems || []
+    // contentフィールドがJSON文字列の場合パースして展開
+    optionalProblems = optionalProblems.map(p => {
+      if (p.content && typeof p.content === 'string') {
+        try {
+          const parsed = JSON.parse(p.content)
+          return { ...p, ...parsed }
+        } catch (e) { /* パース失敗時はそのまま */ }
+      }
+      return p
+    })
     console.log('✅ 選択問題取得:', optionalProblems.length, '件')
     
     // 個別最適化コースと学習統計を取得（教師フロー表示用）
@@ -5831,7 +5841,12 @@ async function loadTeacherOverview(curriculumId) {
     
     // 選択問題を取得
     const optionalProblemsResponse = await axios.get(`/api/curriculum/${curriculumId}/optional-problems`)
-    const optionalProblems = optionalProblemsResponse.data.optional_problems || []
+    const optionalProblems = (optionalProblemsResponse.data.optional_problems || []).map(p => {
+      if (p.content && typeof p.content === 'string') {
+        try { return { ...p, ...JSON.parse(p.content) } } catch (e) { /* */ }
+      }
+      return p
+    })
     
     // 教師用全体確認画面を表示
     showTeacherOverview({ 
@@ -5852,9 +5867,17 @@ async function startCourseStudy(curriculumId, courseId) {
   try {
     loadingManager.show('学習カードを準備中...')
     
-    // カリキュラムデータを取得
-    const response = await axios.get(`/api/curriculum/${curriculumId}`)
-    const { curriculum, courses } = response.data
+    // キャッシュ判定: stateに同じcurriculumのデータがあればAPIスキップ
+    let curriculum, courses
+    if (state.selectedCurriculum?.id == curriculumId && state.courses && state.courses.length > 0) {
+      console.log('📦 startCourseStudy: キャッシュデータを使用')
+      curriculum = state.selectedCurriculum
+      courses = state.courses
+    } else {
+      const response = await axios.get(`/api/curriculum/${curriculumId}`, { timeout: 30000 })
+      curriculum = response.data.curriculum
+      courses = response.data.courses
+    }
     
     // 指定されたコースを探す
     const selectedCourse = courses.find(c => (c.course_id || c.id) === courseId)
