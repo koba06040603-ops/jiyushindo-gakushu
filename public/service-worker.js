@@ -1,5 +1,5 @@
 // Service Worker for PWA - 自由進度学習支援システム
-const CACHE_VERSION = 'v1.2.0';
+const CACHE_VERSION = 'v1.3.0';
 const CACHE_NAME = `jiyushindo-gakushu-${CACHE_VERSION}`;
 
 // キャッシュするリソース
@@ -18,6 +18,20 @@ const STATIC_CACHE_URLS = [
 // APIキャッシュの有効期限（ミリ秒）
 const API_CACHE_DURATION = 5 * 60 * 1000; // 5分
 
+// タイムアウト付きfetch
+function fetchWithTimeout(request, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(new Error('fetch timeout'));
+    }, timeoutMs);
+    fetch(request, { signal: controller.signal })
+      .then(response => { clearTimeout(timeoutId); resolve(response); })
+      .catch(err => { clearTimeout(timeoutId); reject(err); });
+  });
+}
+
 // インストールイベント
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] インストール中...');
@@ -28,7 +42,6 @@ self.addEventListener('install', (event) => {
       return cache.addAll(STATIC_CACHE_URLS.map(url => new Request(url, { cache: 'no-cache' })))
         .catch(err => {
           console.warn('[Service Worker] 一部のリソースのキャッシュに失敗:', err);
-          // 失敗しても続行
           return Promise.resolve();
         });
     }).then(() => {
@@ -59,7 +72,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// フェッチイベント - ネットワーク優先、フォールバックでキャッシュ
+// フェッチイベント
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -70,18 +83,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 静的リソースの場合 - キャッシュ優先
+  // 静的リソースの場合
   if (request.method === 'GET' && isStaticResource(url)) {
     event.respondWith(handleStaticRequest(request));
     return;
   }
 
-  // ナビゲーションリクエスト（ページ遷移） - 常にネットワークから取得（キャッシュ使わない）
+  // ナビゲーションリクエスト（ページ遷移） - 8秒タイムアウト付き
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => {
-        // ネットワーク完全不通時のみフォールバック
-        return new Response(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>接続中...</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f3f4f6;}.box{text-align:center;padding:2rem;background:white;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,0.1);max-width:400px;}h1{color:#4F46E5;margin-bottom:0.5rem;}p{color:#6B7280;margin-bottom:1.5rem;}button{background:#4F46E5;color:white;border:none;padding:0.75rem 2rem;border-radius:0.5rem;font-size:1rem;cursor:pointer;}button:hover{background:#4338CA;}</style></head><body><div class="box"><h1>接続できません</h1><p>サーバーに接続できません。<br>インターネット接続を確認してください。</p><button onclick="location.reload()">再読み込み</button></div></body></html>`, {
+      fetchWithTimeout(request, 8000).catch(() => {
+        // タイムアウトまたはネットワーク不通時のフォールバック
+        return new Response(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>接続中...</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:linear-gradient(135deg,#eef2ff,#fdf2f8);}.box{text-align:center;padding:2.5rem;background:white;border-radius:1.5rem;box-shadow:0 10px 40px rgba(0,0,0,0.1);max-width:420px;width:90%;}h1{color:#4F46E5;margin-bottom:0.5rem;font-size:1.3rem;}p{color:#6B7280;margin-bottom:1.5rem;font-size:0.9rem;line-height:1.6;}button{background:linear-gradient(135deg,#4F46E5,#7C3AED);color:white;border:none;padding:0.9rem 2rem;border-radius:0.75rem;font-size:1rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:0.75rem;transition:all 0.2s;}button:hover{filter:brightness(1.1);}button:active{transform:scale(0.97);}.secondary{background:#f3f4f6;color:#374151;}.secondary:hover{background:#e5e7eb;}.spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#fff;animation:spin 1s linear infinite;}@keyframes spin{to{transform:rotate(360deg);}}</style></head><body><div class="box"><div style="font-size:3rem;margin-bottom:1rem;">⏳</div><h1>サーバーが混み合っています</h1><p>AIが他の処理を行っているため、しばらくお待ちください。<br>通常30秒〜2分で完了します。</p><button onclick="this.innerHTML='<span class=spinner></span> 接続中...';this.disabled=true;setTimeout(()=>location.reload(),1000)">もう一度読み込む</button><button class="secondary" onclick="location.href='/landing'">トップページにもどる</button></div></body></html>`, {
           status: 503,
           statusText: 'Service Unavailable',
           headers: new Headers({ 'Content-Type': 'text/html; charset=utf-8' })
@@ -91,7 +104,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // その他のリクエスト - ネットワーク優先
+  // その他のリクエスト
   event.respondWith(
     fetch(request).catch(() => {
       return caches.match(request).then(response => {

@@ -1324,6 +1324,21 @@ function showToast(message, type = 'info', duration = 2500) {
 
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
+  // bfcache対策: ページが戻る/進むボタンで復元された場合にリロード
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      console.log('🔄 bfcacheから復元 - リロードします')
+      location.reload()
+      return
+    }
+  })
+  
+  // /landingページの場合はapp.jsの初期化をスキップ（landingは独自HTMLを持つ）
+  if (window.location.pathname === '/landing') {
+    console.log('📄 ランディングページ - app.js初期化をスキップ')
+    return
+  }
+  
   // 音声合成の初期化（ボイスリストを読み込む）
   if ('speechSynthesis' in window) {
     // ボイスリストの読み込みを待つ
@@ -1358,6 +1373,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ローカルストレージから認証情報を復元
   const savedSession = localStorage.getItem('session_token')
   const savedUser = localStorage.getItem('user')
+  
+  // axios グローバル設定: デフォルトタイムアウト30秒（個別設定で上書き可能）
+  axios.defaults.timeout = 30000
   
   // axios リクエストインターセプター: 認証トークンを自動付与
   axios.interceptors.request.use(function(config) {
@@ -4887,20 +4905,19 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
       // トップページに戻るオプションを表示
       const app = document.getElementById('app')
       app.innerHTML = `
-        <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
-          <div class="container mx-auto px-4 max-w-2xl">
-            <div class="bg-white rounded-2xl shadow-xl p-8 text-center">
-              <div class="text-6xl mb-4">⚠️</div>
-              <h2 class="text-2xl font-bold text-gray-800 mb-3">読み込みに時間がかかっています</h2>
-              <p class="text-gray-600 mb-6">サーバーが他の処理中のため、少し時間をおいて再度お試しください。</p>
-              <div class="space-y-3">
-                <button onclick="loadGuidePage(${curriculumId})" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-xl font-bold text-lg hover:from-blue-600 hover:to-indigo-700 transition">
-                  <i class="fas fa-redo mr-2"></i>もう一度読み込む
-                </button>
-                <button onclick="renderTopPage()" class="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-bold text-lg hover:bg-gray-300 transition">
-                  <i class="fas fa-home mr-2"></i>トップページにもどる
-                </button>
-              </div>
+        <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+          <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+            <div style="font-size:3rem;margin-bottom:1rem;">⏳</div>
+            <h2 class="text-xl font-bold text-gray-800 mb-3">サーバーが混み合っています</h2>
+            <p class="text-gray-600 mb-2 text-sm">AIが他の処理を行っているため、しばらくお待ちください。</p>
+            <p class="text-gray-400 mb-6 text-xs">通常30秒〜2分で完了します。</p>
+            <div class="space-y-3">
+              <button onclick="location.reload()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-xl font-bold text-lg hover:from-blue-600 hover:to-indigo-700 transition active:scale-95">
+                <i class="fas fa-redo mr-2"></i>もう一度読み込む
+              </button>
+              <button onclick="renderTopPage()" class="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-bold text-lg hover:bg-gray-300 transition active:scale-95">
+                <i class="fas fa-home mr-2"></i>トップページにもどる
+              </button>
             </div>
           </div>
         </div>
@@ -31364,13 +31381,25 @@ async function authFetch(url, options = {}) {
 // セッション検証
 async function verifySession() {
   try {
-    const response = await authFetch('/api/auth/me')
+    // 10秒タイムアウトを設定（Wranglerビジー時にハングしないように）
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    const response = await authFetch('/api/auth/me', { signal: controller.signal })
+    clearTimeout(timeoutId)
     if (!response.ok) {
       logout()
+      return false
     }
+    return true
   } catch (error) {
     console.error('セッション検証エラー:', error)
+    // タイムアウトの場合はログアウトせず、保存済みセッションで続行
+    if (error.name === 'AbortError') {
+      console.warn('⚠️ セッション検証タイムアウト - オフラインモードで続行')
+      return true // タイムアウト時はセッション有効として扱う
+    }
     logout()
+    return false
   }
 }
 

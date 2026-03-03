@@ -12988,9 +12988,22 @@ app.get('/landing', (c) => {
         
         <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
         <script>
+          // bfcache対策
+          window.addEventListener('pageshow', function(e) {
+            if (e.persisted) { location.reload(); return; }
+          });
+          
           // DOMContentLoaded後にスクリプトを動的読み込み
           document.addEventListener('DOMContentLoaded', () => {
             console.log('📦 DOMContentLoaded: スクリプト読み込み開始')
+            
+            // 15秒タイムアウト: スクリプト読み込みが遅い場合にメッセージ表示
+            const loadTimeout = setTimeout(() => {
+              const app = document.getElementById('app')
+              if (app && !window._appInitialized) {
+                app.innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center"><div style="font-size:3rem;margin-bottom:1rem;">⏳</div><h2 class="text-xl font-bold text-gray-800 mb-3">サーバーが混み合っています</h2><p class="text-gray-600 mb-6 text-sm">AIが他の処理を行っています。<br>30秒〜2分で完了します。</p><button onclick="location.reload()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition mb-3"><i class="fas fa-redo mr-2"></i>もう一度読み込む</button><button onclick="location.href=\\'/landing\\'" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-xl transition"><i class="fas fa-home mr-2"></i>トップへ</button></div></div>'
+              }
+            }, 15000)
             
             const scripts = [
               '/static/ocr-simple.js',
@@ -13025,6 +13038,8 @@ app.get('/landing', (c) => {
                 
                 // 全スクリプト読み込み完了後
                 if (loadedCount === scripts.length) {
+                  clearTimeout(loadTimeout)
+                  window._appInitialized = true
                   console.log('🚀 全スクリプト読み込み完了')
                   setTimeout(() => {
                     if (typeof window.renderTopPage === 'function') {
@@ -13039,6 +13054,7 @@ app.get('/landing', (c) => {
               }
               script.onerror = (error) => {
                 console.error('❌ 読み込みエラー:', src, error)
+                clearTimeout(loadTimeout)
                 document.getElementById('app').innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center"><div class="text-red-600 mb-4"><i class="fas fa-exclamation-triangle text-6xl"></i></div><h2 class="text-2xl font-bold text-gray-800 mb-4">読み込みエラー</h2><p class="text-gray-600 mb-6">ファイル: ' + src + '</p><button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"><i class="fas fa-redo mr-2"></i>リフレッシュ</button></div></div>'
               }
               document.head.appendChild(script)
