@@ -82,6 +82,18 @@
       100% { transform: scale(3); opacity: 0; }
     }
     
+    /* ★ ページ遷移ガクつき防止 */
+    html {
+      overflow-y: scroll !important; /* スクロールバーを常に表示してガクつき防止 */
+    }
+    #app {
+      overflow-anchor: none !important; /* ブラウザの自動スクロール調整を無効化 */
+    }
+    /* select変更でフォーカスリングによるレイアウトシフト防止 */
+    select:focus {
+      outline-offset: 0 !important;
+    }
+    
     /* ============================================
      * Phase 5-2: レスポンシブデザイン
      * スマホ/タブレット対応
@@ -1261,6 +1273,23 @@ const learningTimer = {
 // =============================================================================
 
 // グローバルローディング管理
+// ★ ページ遷移安定化ユーティリティ
+// app.innerHTMLを書き換える際にガクつきを防止する
+function stablePageTransition(newContent) {
+  const app = document.getElementById('app')
+  if (!app) return
+  window.scrollTo(0, 0)
+  // bodyのスクロールを一時的にロック
+  const scrollY = window.scrollY
+  document.body.style.overflow = 'hidden'
+  app.innerHTML = newContent
+  // 次フレームでスクロールロック解除
+  requestAnimationFrame(() => {
+    document.body.style.overflow = ''
+    window.scrollTo(0, 0)
+  })
+}
+
 const loadingManager = {
   _timer: null,
   show: (message = '読み込み中...') => {
@@ -1459,6 +1488,7 @@ if (document.readyState === 'loading') {
 // ============================================
 async function renderTopPage() {
   state.currentView = 'top'
+  window.scrollTo(0, 0) // ★ 先にスクロールリセット
   
   const app = document.getElementById('app')
   if (!app) {
@@ -1466,7 +1496,10 @@ async function renderTopPage() {
     return
   }
   
-  app.innerHTML = `
+  // ★ body背景を統一（ログイン画面のグラデーションが残らないよう）
+  document.body.className = 'bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen'
+  
+  stablePageTransition(`
     <div class="container mx-auto px-4 py-8">
       <!-- ヘッダー -->
       <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-xl p-8 mb-8 text-center">
@@ -3047,7 +3080,7 @@ async function renderTopPage() {
       </div>
 
     </div>
-  `
+  `)
 
   // DB連動の選択フォームを初期化
   loadTopPageData()
@@ -3840,6 +3873,7 @@ async function saveEditedCurriculum(curriculumId) {
 // ============================================
 async function loadGuidePage(curriculumId, _retryCount = 0) {
   state.currentView = 'guide'
+  window.scrollTo(0, 0) // ★ 先にスクロールリセット
   
   // キャッシュ判定: 同じcurriculumIdのデータがstateにあればメインAPIをスキップ
   const hasCachedData = state.selectedCurriculum?.id == curriculumId && state.courses && state.courses.length > 0
@@ -22431,6 +22465,7 @@ function saveFontSize() {
 
 // 生成プロセス表示
 function showGenerationProgress(grade, subject, unitName, qualityMode = 'standard') {
+  window.scrollTo(0, 0) // ★ 先にスクロールリセット
   const modeLabel = qualityMode === 'high' ? '確実モード（Gemini 3 Pro）' : '標準モード（Gemini 3 Flash）'
   const estimatedTime = qualityMode === 'high' ? '約4〜7分' : '約3〜5分'
   const totalTime = qualityMode === 'high' ? 300 : 180 // 秒単位（並列生成で短縮、品質は維持）
@@ -31659,9 +31694,9 @@ async function refreshSession() {
 // ログイン画面表示
 function renderLoginPage() {
   state.currentView = 'login'
+  window.scrollTo(0, 0) // ★ 先にスクロールリセット
   
-  const app = document.getElementById('app')
-  app.innerHTML = `
+  stablePageTransition(`
     <style>
       /* テキスト入力カーソルを黒に設定 */
       input[type="text"],
@@ -31761,7 +31796,7 @@ function renderLoginPage() {
         </div>
       </div>
     </div>
-  `
+  `)
   
   // ログインフォームの送信処理
   document.getElementById('loginForm').addEventListener('submit', handleLogin)
