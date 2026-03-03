@@ -55,18 +55,17 @@
       animation: fade-in 0.3s ease-out;
     }
     
-    /* ★ ボタン押下フィードバック（全ボタンに適用） */
-    button, [role="button"], [onclick] {
-      transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease !important;
+    /* ★ ボタン押下フィードバック（button要素のみ。select/div等には適用しない） */
+    button, [role="button"] {
+      transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
     }
-    button:active, [role="button"]:active, [onclick]:active {
-      transform: scale(0.95) !important;
-      filter: brightness(0.92) !important;
+    button:active, [role="button"]:active {
+      transform: scale(0.97);
+      filter: brightness(0.95);
     }
-    /* グラデーションボタンの押下フィードバック強化 */
-    .bg-gradient-to-r:active, .bg-gradient-to-br:active {
-      transform: scale(0.93) !important;
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2) !important;
+    /* グラデーションボタンの押下フィードバック */
+    button.bg-gradient-to-r:active, button.bg-gradient-to-br:active {
+      transform: scale(0.97);
     }
     
     /* ★ 正解アニメーション */
@@ -1283,20 +1282,16 @@ const learningTimer = {
 function stablePageTransition(newContent) {
   const app = document.getElementById('app')
   if (!app) return
-  // 1. スクロールをトップに固定
+  // 1. 初期ローダーを除去（最初の遷移時のみ）
+  const loader = document.getElementById('initial-loader')
+  if (loader) loader.remove()
+  // 2. #appのクラスをリセット（初期スピナーのflex centerなどを除去）
+  app.className = ''
+  app.removeAttribute('style')
+  // 3. 画面更新を1フレームに集約
   window.scrollTo(0, 0)
-  // 2. appを不可視にして書き換え（レイアウト計算はされるが描画されない）
-  app.style.visibility = 'hidden'
-  app.style.opacity = '0'
   app.innerHTML = newContent
-  // 3. レイアウトが確定してから表示（2フレーム待つ）
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      window.scrollTo(0, 0)
-      app.style.visibility = ''
-      app.style.opacity = '1'
-    })
-  })
+  window.scrollTo(0, 0)
 }
 
 const loadingManager = {
