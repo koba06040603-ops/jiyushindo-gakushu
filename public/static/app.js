@@ -1841,7 +1841,7 @@ async function renderTopPage() {
           </div>
 
           <!-- 単元一覧 -->
-          <div id="unitSelectArea" class="mb-6" style="display:none;">
+          <div id="unitSelectArea" class="mb-6" style="max-height:0;overflow:hidden;opacity:0;transition:max-height 0.3s ease,opacity 0.3s ease;">
             <label class="block text-sm font-bold text-gray-700 mb-3">
               <i class="fas fa-list-ol mr-1 text-pink-500"></i> 単元を選択してください
             </label>
@@ -3217,27 +3217,34 @@ async function loadTopPageData() {
 // 単元カード要素を作成するヘルパー
 function createUnitCard(item, idx) {
   const card = document.createElement('div')
-  card.className = 'bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-400 hover:shadow-md transition cursor-pointer flex items-center justify-between group'
+  card.className = 'bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-purple-400 hover:shadow-md transition-all duration-200 cursor-pointer flex items-center justify-between group'
+  card.setAttribute('data-curriculum-id', item.id)
   card.innerHTML = `
-    <div class="flex-1" onclick="selectUnit(${item.id})">
+    <div class="flex-1 pointer-events-none">
       <p class="font-bold text-gray-800 group-hover:text-purple-700 transition"><i class="fas fa-book-open mr-2 text-purple-400"></i>${idx + 1}. ${item.unit_name}</p>
       <p class="text-sm text-gray-500 ml-7">${item.grade} ${item.subject} - ${item.textbook_company}</p>
     </div>
     <div class="flex gap-2">
       <button 
         onclick="event.stopPropagation(); duplicateCurriculum(${item.id})" 
-        class="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
+        class="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100 pointer-events-auto"
         title="複製">
         <i class="fas fa-copy"></i>
       </button>
       <button 
         onclick="event.stopPropagation(); deleteCurriculum(${item.id}, '${item.unit_name.replace(/'/g, "\\'")}')" 
-        class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100"
+        class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded transition opacity-0 group-hover:opacity-100 pointer-events-auto"
         title="削除">
         <i class="fas fa-trash"></i>
       </button>
     </div>
   `
+  // ★ カード全体にクリックハンドラ（ボタンのstopPropagationで複製/削除は上書きされない）
+  card.addEventListener('click', function(e) {
+    // ボタン内のクリックは除外（stopPropagationで処理済み）
+    console.log('📌 単元カードクリック:', item.id, item.unit_name)
+    selectUnit(item.id)
+  })
   return card
 }
 
@@ -3249,11 +3256,7 @@ async function updateUnitList() {
   const startButton = document.getElementById('startButton')
   const unitArea = document.getElementById('unitSelectArea')
 
-  // リセット（★ 高さを固定してガクン防止）
-  const currentHeight = unitSelect.offsetHeight
-  if (currentHeight > 0) {
-    unitSelect.style.minHeight = currentHeight + 'px'
-  }
+  // リセット（★ 高さ変動を最小化：スピナーに切り替えるだけで高さは維持）
   unitSelect.innerHTML = '<p class="text-gray-400 text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>読み込み中...</p>'
   startButton.disabled = true
   startButton.classList.add('hidden')
@@ -3277,9 +3280,9 @@ async function updateUnitList() {
     }
   }
   if (canProceed) {
-    unitArea.style.display = ''
+    // ★ max-heightアニメーションで滑らかに表示（display:noneは使わない）
+    unitArea.style.maxHeight = '800px'
     unitArea.style.opacity = '1'
-    unitArea.style.transition = 'opacity 0.2s ease'
     try {
       const response = await axios.get('/api/curriculum')
       const curricula = response.data.filter(c => {
@@ -3291,8 +3294,7 @@ async function updateUnitList() {
       })
 
       if (curricula.length > 0) {
-        // カード形式で表示（★ 高さ固定を解除）
-        unitSelect.style.minHeight = ''
+        // カード形式で表示
         unitSelect.innerHTML = ''
         
         // 6年社会の場合、歴史と公民の分野ヘッダーを追加
@@ -3347,8 +3349,6 @@ async function updateUnitList() {
         
         startButton.disabled = false
       } else {
-        // ★ 高さ固定を解除
-        unitSelect.style.minHeight = ''
         unitSelect.innerHTML = `
           <div class="text-center py-6">
             <i class="fas fa-info-circle text-purple-400 text-3xl mb-3 block"></i>
@@ -3371,10 +3371,9 @@ async function updateUnitList() {
         </div>`
     }
   } else {
-    // ★ スムーズにフェードアウト
-    unitArea.style.transition = 'opacity 0.2s ease'
+    // ★ スムーズにフェードアウト（max-height + opacity）
     unitArea.style.opacity = '0'
-    setTimeout(() => { if (!unitArea.style.opacity || unitArea.style.opacity === '0') unitArea.style.display = 'none' }, 200)
+    unitArea.style.maxHeight = '0'
     // 教科書不要教科の表示状態をリセット
     const textbookContainer2 = textbookSelect?.closest('div')
     if (textbookContainer2) {
@@ -3390,17 +3389,19 @@ async function selectUnit(curriculumId) {
   state.selectedCurriculumId = curriculumId
   
   // ★ 即座に選択した感を出す（ローディング表示）
-  const allCards = document.querySelectorAll('#unitSelect > div')
+  const allCards = document.querySelectorAll('#unitSelect > div[data-curriculum-id]')
   allCards.forEach(card => {
-    const innerDiv = card.querySelector('[onclick*="selectUnit"]')
-    if (innerDiv && innerDiv.getAttribute('onclick').includes(curriculumId)) {
+    const cardId = card.getAttribute('data-curriculum-id')
+    if (String(cardId) === String(curriculumId)) {
       card.classList.add('border-purple-500', 'bg-purple-50', 'shadow-lg')
       card.style.transform = 'scale(0.98)'
+      card.style.transition = 'all 0.2s ease'
       const nameEl = card.querySelector('p.font-bold')
       if (nameEl) nameEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-2 text-purple-500"></i>' + nameEl.textContent
     } else {
       card.style.opacity = '0.4'
       card.style.pointerEvents = 'none'
+      card.style.transition = 'all 0.2s ease'
     }
   })
   
