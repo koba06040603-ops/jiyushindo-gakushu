@@ -23364,23 +23364,23 @@ async function saveGeneratedUnit(unitData) {
             console.log('✅ 学習環境デザイン 完了')
           } catch (e) { console.warn('⚠️ 学習環境デザイン 失敗:', e.message) }
           
-          // 5. ★「みてわかる」図解をNano Banana 2で自動生成
-          saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>みてわかる図解を自動生成中...'
+          // 5. ★「みてわかる」図解をバックグラウンドで自動生成（画面遷移をブロックしない）
+          saveButton.innerHTML = '<i class="fas fa-check-circle mr-2"></i>保存完了！学習のてびきへ移動します...'
+          // 図解はバックグラウンドで生成（ユーザーを待たせない）
           try {
-            // コースIDを取得して図解を一括生成
             const coursesResp = await axios.get(`/api/curriculum/${curriculumId}/courses`, {timeout: 30000})
             const courses = coursesResp.data?.courses || coursesResp.data || []
+            // 非同期でバックグラウンド生成（awaitしない）
             for (const course of courses) {
               const cId = course.id || course.course_id
               if (cId) {
-                try {
-                  await axios.post('/api/ai/generate-visuals-for-course', { course_id: cId }, { timeout: 120000 })
-                  console.log(`✅ コース${cId}の図解自動生成完了`)
-                } catch (ve) { console.warn(`⚠️ コース${cId}の図解生成失敗:`, ve.message) }
+                axios.post('/api/ai/generate-visuals-for-course', { course_id: cId }, { timeout: 180000 })
+                  .then(() => console.log(`✅ コース${cId}の図解自動生成完了（バックグラウンド）`))
+                  .catch(ve => console.warn(`⚠️ コース${cId}の図解生成失敗（バックグラウンド）:`, ve.message))
               }
             }
-            console.log('✅ みてわかる図解 自動生成完了')
-          } catch (e) { console.warn('⚠️ みてわかる図解 失敗:', e.message) }
+            console.log('🎨 みてわかる図解をバックグラウンドで生成開始')
+          } catch (e) { console.warn('⚠️ みてわかる図解開始失敗:', e.message) }
           
           console.log('🎉 追加問題生成完了 → 学習のてびきへ遷移')
         } catch (e) {
@@ -52183,7 +52183,7 @@ async function publishPersonalizedCourse(studentId, curriculumId) {
     
     if (response.data.success) {
       document.getElementById('personalizedModal')?.remove()
-      alert(`✅ ${response.data.card_count}枚の個別最適化カードを配信しました！\n児童の「学習のてびき」に表示されます。\n\n📊 みてわかる図解を自動生成中...`)
+      alert(`✅ ${response.data.card_count}枚の個別最適化カードを配信しました！\n児童の「学習のてびき」に表示されます。\n\n📊 みてわかる図解はバックグラウンドで自動生成されます。`)
       
       // ★★★ バックグラウンドで「みてわかる」図解を自動生成 ★★★
       if (response.data.course_id) {
