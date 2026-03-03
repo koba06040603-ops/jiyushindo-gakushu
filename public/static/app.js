@@ -3661,14 +3661,14 @@ async function saveEditedCurriculum(curriculumId) {
 // ============================================
 // 学習のてびきページ
 // ============================================
-async function loadGuidePage(curriculumId) {
+async function loadGuidePage(curriculumId, _retryCount = 0) {
   state.currentView = 'guide'
   loadingManager.show('学習のてびきを読み込み中...')
   
   try {
     // メインデータ取得（必須）+ 補助データを並列取得
     const [response, metaResult, optionalResult, statsResult, envDesignResult] = await Promise.all([
-      axios.get(`/api/curriculum/${curriculumId}`, { timeout: 20000 }),
+      axios.get(`/api/curriculum/${curriculumId}`, { timeout: 30000 }),
       axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 15000 }).catch(() => ({ data: {} })),
       axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 15000 }).catch(() => ({ data: {} })),
       axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 15000 }).catch(() => ({ data: null })),
@@ -4671,9 +4671,21 @@ async function loadGuidePage(curriculumId) {
   } catch (error) {
     console.error('❌❌❌ 学習のてびき読み込みエラー:', error?.message || error, error?.stack || '')
     console.error('❌ エラー詳細: curriculumId=', curriculumId, 'error=', error)
+    
+    // リトライ: サーバーが一時的にbusy（図解生成中等）の場合、再試行で成功することが多い
+    if (_retryCount < 1) {
+      try {
+        console.log('🔄 てびき読み込みリトライ中... (attempt', _retryCount + 1, ')')
+        loadingManager.hide()
+        return loadGuidePage(curriculumId, _retryCount + 1)
+      } catch (retryErr) {
+        console.warn('⚠️ リトライも失敗:', retryErr.message)
+      }
+    }
+    
     loadingManager.hide()
     
-    // エラーが発生しても、基本情報だけで表示を試みる
+    // リトライも失敗した場合、フォールバック表示を試みる
     try {
       const response = await axios.get(`/api/curriculum/${curriculumId}`, { timeout: 15000 })
       const { curriculum, courses } = response.data
@@ -4697,11 +4709,14 @@ async function loadGuidePage(curriculumId) {
               </button>
             </div>
 
-            <div class="bg-yellow-100 border-l-4 border-yellow-600 p-4 mb-6 rounded">
+            <div class="bg-yellow-100 border-l-4 border-yellow-600 p-4 mb-6 rounded flex items-center justify-between">
               <p class="text-yellow-800 font-semibold">
                 <i class="fas fa-info-circle mr-2"></i>
                 一部のデータの読み込みに失敗しましたが、学習カードは正常に表示されます。
               </p>
+              <button onclick="loadGuidePage(${curriculumId})" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-bold ml-4 whitespace-nowrap transition">
+                <i class="fas fa-redo mr-1"></i>完全版を読み込む
+              </button>
             </div>
 
             <div class="bg-white rounded-2xl shadow-2xl p-8">
