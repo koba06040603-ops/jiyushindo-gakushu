@@ -3755,11 +3755,11 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
     if (hasCachedData) {
       console.log('📦 キャッシュデータを使用（メインAPIスキップ）:', curriculumId)
       response = { data: { curriculum: state.selectedCurriculum, courses: state.courses } }
-      // 補助データはページ描画後にバックグラウンドで取得（ブロックしない）
-      metaResult = { data: {} }
-      optionalResult = { data: {} }
-      statsResult = { data: null }
-      envDesignResult = { data: null }
+      // ★ メタデータ・選択問題は必ずフェッチ（チェックテスト等がバックグラウンド生成後に表示されない問題を修正）
+      metaResult = await axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 60000 }).catch(() => ({ data: {} }))
+      optionalResult = await axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 60000 }).catch(() => ({ data: {} }))
+      statsResult = await axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 30000 }).catch(() => ({ data: null }))
+      envDesignResult = await axios.get(`/api/environment/design/${curriculumId}`, { timeout: 30000 }).catch(() => ({ data: null }))
     } else {
       // メインデータ取得（必須）+ 補助データを並列取得
       // メインデータを先に取得（必須）
@@ -3855,30 +3855,32 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
           
           if (missingIntroProblems.length > 0) {
             console.log('  → 導入問題を生成中...')
-            await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`, {}, {timeout: 120000}).catch(e => console.warn('  ⚠️ 導入問題生成失敗:', e.message))
+            await axios.post(`/api/curriculum/${curriculumId}/generate-intro-problems`, {}, {timeout: 180000}).catch(e => console.warn('  ⚠️ 導入問題生成失敗:', e.message))
             generated++
             autoGenBanners.forEach(b => { const s = b.querySelector('span'); if(s) s.textContent = `AIが問題を生成中です... (${generated}/${totalTasks} 完了)` })
           }
           if (needsAssessment) {
             console.log('  → チェックテスト・選択問題を生成中...')
-            await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`, {}, {timeout: 120000}).catch(e => console.warn('  ⚠️ 評価問題生成失敗:', e.message))
+            await axios.post(`/api/curriculum/${curriculumId}/generate-assessment-problems`, {}, {timeout: 180000}).catch(e => console.warn('  ⚠️ 評価問題生成失敗:', e.message))
             generated++
             autoGenBanners.forEach(b => { const s = b.querySelector('span'); if(s) s.textContent = `AIが問題を生成中です... (${generated}/${totalTasks} 完了)` })
           }
           if (needsCourseProblems) {
             console.log('  → コース選択問題を生成中...')
-            await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 120000}).catch(e => console.warn('  ⚠️ コース問題生成失敗:', e.message))
+            await axios.post(`/api/curriculum/${curriculumId}/generate-course-problems`, {}, {timeout: 180000}).catch(e => console.warn('  ⚠️ コース問題生成失敗:', e.message))
             generated++
           }
           // 学習環境デザインも自動生成（まだ存在しなければ）
           try {
-            await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, {timeout: 120000})
+            await axios.post(`/api/environment/design/generate/${curriculumId}`, {}, {timeout: 180000})
             console.log('  ✅ 学習環境デザイン自動生成完了')
           } catch (e) { console.warn('  ⚠️ 学習環境デザイン生成失敗:', e.message) }
           console.log('✅ バックグラウンド自動生成完了')
           
-          // 生成完了後に常に自動リロード
-          console.log('🔄 自動リロード実行')
+          // 生成完了後に常に自動リロード（キャッシュをクリアして最新データを取得）
+          console.log('🔄 自動リロード実行（キャッシュクリア）')
+          state.selectedCurriculum = null
+          state.courses = null
           loadGuidePage(curriculumId)
         } catch (e) {
           console.warn('⚠️ 自動生成エラー:', e)
