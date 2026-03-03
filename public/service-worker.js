@@ -1,5 +1,5 @@
 // Service Worker for PWA - 自由進度学習支援システム
-const CACHE_VERSION = 'v1.1.0';
+const CACHE_VERSION = 'v1.2.0';
 const CACHE_NAME = `jiyushindo-gakushu-${CACHE_VERSION}`;
 
 // キャッシュするリソース
@@ -76,21 +76,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ナビゲーションリクエスト（ページ遷移） - ネットワーク優先、タイムアウト付き
+  // ナビゲーションリクエスト（ページ遷移） - 常にネットワークから取得（キャッシュ使わない）
   if (request.mode === 'navigate') {
     event.respondWith(
-      Promise.race([
-        fetch(request),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
-      ]).catch(() => {
-        return caches.match(request).then(response => {
-          if (response) return response;
-          // オフラインフォールバック - ちゃんとしたHTMLを返す
-          return new Response(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>接続中...</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f3f4f6;}.box{text-align:center;padding:2rem;background:white;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,0.1);max-width:400px;}h1{color:#4F46E5;margin-bottom:0.5rem;}p{color:#6B7280;margin-bottom:1.5rem;}button{background:#4F46E5;color:white;border:none;padding:0.75rem 2rem;border-radius:0.5rem;font-size:1rem;cursor:pointer;}button:hover{background:#4338CA;}</style></head><body><div class="box"><h1>📡 接続できません</h1><p>サーバーに接続できません。<br>インターネット接続を確認してください。</p><button onclick="location.reload()">🔄 再読み込み</button></div></body></html>`, {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: new Headers({ 'Content-Type': 'text/html; charset=utf-8' })
-          });
+      fetch(request).catch(() => {
+        // ネットワーク完全不通時のみフォールバック
+        return new Response(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>接続中...</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f3f4f6;}.box{text-align:center;padding:2rem;background:white;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,0.1);max-width:400px;}h1{color:#4F46E5;margin-bottom:0.5rem;}p{color:#6B7280;margin-bottom:1.5rem;}button{background:#4F46E5;color:white;border:none;padding:0.75rem 2rem;border-radius:0.5rem;font-size:1rem;cursor:pointer;}button:hover{background:#4338CA;}</style></head><body><div class="box"><h1>接続できません</h1><p>サーバーに接続できません。<br>インターネット接続を確認してください。</p><button onclick="location.reload()">再読み込み</button></div></body></html>`, {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: new Headers({ 'Content-Type': 'text/html; charset=utf-8' })
         });
       })
     );
@@ -115,29 +109,24 @@ function isStaticResource(url) {
          url.hostname.includes('cdn.jsdelivr.net');
 }
 
-// 静的リソースのハンドリング（キャッシュ優先）
+// 静的リソースのハンドリング（ネットワーク優先、フォールバックでキャッシュ）
 async function handleStaticRequest(request) {
   const cache = await caches.open(CACHE_NAME);
-  const cachedResponse = await cache.match(request);
-
-  if (cachedResponse) {
-    console.log('[Service Worker] キャッシュから取得:', request.url);
-    // バックグラウンドで更新
-    fetch(request).then(response => {
-      if (response && response.status === 200) {
-        cache.put(request, response.clone());
-      }
-    }).catch(() => {});
-    return cachedResponse;
-  }
 
   try {
+    // まずネットワークから取得を試みる
     const networkResponse = await fetch(request);
     if (networkResponse && networkResponse.status === 200) {
       cache.put(request, networkResponse.clone());
     }
     return networkResponse;
   } catch (error) {
+    // ネットワーク失敗時のみキャッシュを使用
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
+      console.log('[Service Worker] オフライン - キャッシュから取得:', request.url);
+      return cachedResponse;
+    }
     console.error('[Service Worker] ネットワークエラー:', error);
     return new Response('リソースの取得に失敗しました', {
       status: 503,
