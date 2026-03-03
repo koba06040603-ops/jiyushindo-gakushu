@@ -85,9 +85,14 @@
     /* ★ ページ遷移ガクつき防止 */
     html {
       overflow-y: scroll !important; /* スクロールバーを常に表示してガクつき防止 */
+      scroll-behavior: auto !important; /* smooth scrollをOFFにしてジャンプ感を消す */
+    }
+    body {
+      overflow-anchor: none !important; /* ブラウザの自動スクロール調整を完全無効化 */
     }
     #app {
-      overflow-anchor: none !important; /* ブラウザの自動スクロール調整を無効化 */
+      overflow-anchor: none !important;
+      min-height: 100vh; /* 高さを常に確保して縮みを防ぐ */
     }
     /* select変更でフォーカスリングによるレイアウトシフト防止 */
     select:focus {
@@ -1278,15 +1283,19 @@ const learningTimer = {
 function stablePageTransition(newContent) {
   const app = document.getElementById('app')
   if (!app) return
+  // 1. スクロールをトップに固定
   window.scrollTo(0, 0)
-  // bodyのスクロールを一時的にロック
-  const scrollY = window.scrollY
-  document.body.style.overflow = 'hidden'
+  // 2. appを不可視にして書き換え（レイアウト計算はされるが描画されない）
+  app.style.visibility = 'hidden'
+  app.style.opacity = '0'
   app.innerHTML = newContent
-  // 次フレームでスクロールロック解除
+  // 3. レイアウトが確定してから表示（2フレーム待つ）
   requestAnimationFrame(() => {
-    document.body.style.overflow = ''
-    window.scrollTo(0, 0)
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 0)
+      app.style.visibility = ''
+      app.style.opacity = '1'
+    })
   })
 }
 
@@ -4049,8 +4058,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
     state.selectedCurriculum = curriculum
     state.courses = courses
 
-    const app = document.getElementById('app')
-    app.innerHTML = `
+    stablePageTransition(`
       <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-8">
         <div class="container mx-auto px-4 max-w-5xl">
           
@@ -4896,7 +4904,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
           </div>
         </div>
       </div>
-    `
+    `)
     
     // 個別最適化コース管理セクションをDOM描画後に挿入（テンプレートリテラルネスト回避）
     renderPersonalizedSection(curriculumId, personalizedCourses, approvedCourseIds)
@@ -22470,8 +22478,7 @@ function showGenerationProgress(grade, subject, unitName, qualityMode = 'standar
   const estimatedTime = qualityMode === 'high' ? '約4〜7分' : '約3〜5分'
   const totalTime = qualityMode === 'high' ? 300 : 180 // 秒単位（並列生成で短縮、品質は維持）
   
-  const app = document.getElementById('app')
-  app.innerHTML = `
+  stablePageTransition(`
     <div class="container mx-auto px-4 py-8">
       <div class="bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 rounded-2xl shadow-2xl p-8">
         
@@ -22594,7 +22601,7 @@ function showGenerationProgress(grade, subject, unitName, qualityMode = 'standar
         background: linear-gradient(to bottom, #d1fae5, #ffffff);
       }
     </style>
-  `
+  `)
 
   // 実時間ベースのプログレスアニメーション
   animateRealtimeProgress(totalTime, qualityMode)
