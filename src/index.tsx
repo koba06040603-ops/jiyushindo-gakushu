@@ -12946,8 +12946,8 @@ app.get('/landing', (c) => {
         <!-- Stylesheets -->
         <link href="/static/tailwind-minimal.css" rel="stylesheet">
         <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-        <!-- Tailwind CDN: 非同期で後から読み込み（完全なスタイル適用用） -->
-        <script>var _tw=document.createElement('script');_tw.src='https://cdn.tailwindcss.com';_tw.async=true;document.head.appendChild(_tw);</script>
+        <!-- Tailwind CDN: 同期ロード（非同期だと後からスタイル再計算で画面がゆれる） -->
+        <script src="https://cdn.tailwindcss.com"></script>
         
         <!-- Deferred Libraries (non-critical) -->
         <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -12965,6 +12965,10 @@ app.get('/landing', (c) => {
           .fa-spin {
             animation: fa-spin 1s infinite linear;
           }
+          @keyframes _spin { to { transform: rotate(360deg) } }
+          /* ★ ページ遷移ゆれ防止 */
+          html { overflow-y: scroll; }
+          #app { overflow-anchor: none; }
           
           @media print {
             body { background: white !important; }
@@ -12976,13 +12980,11 @@ app.get('/landing', (c) => {
           }
         </style>
     </head>
-    <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
-        <div id="app">
-          <div class="flex items-center justify-center min-h-screen">
-            <div class="text-center">
-              <div class="inline-block animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"></div>
-              <p class="text-xl text-gray-700">システムを読み込んでいます...</p>
-            </div>
+    <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen" style="overflow-y:scroll;">
+        <div id="app" class="flex items-center justify-center min-h-screen">
+          <div class="text-center">
+            <div style="display:inline-block;width:64px;height:64px;border:4px solid #dbeafe;border-top-color:#2563eb;border-bottom-color:#2563eb;border-radius:50%;animation:_spin 1s linear infinite;margin-bottom:16px;"></div>
+            <p class="text-xl text-gray-700">システムを読み込んでいます...</p>
           </div>
         </div>
         
