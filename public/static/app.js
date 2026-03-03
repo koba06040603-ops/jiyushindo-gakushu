@@ -1322,8 +1322,12 @@ function showToast(message, type = 'info', duration = 2500) {
   return toast
 }
 
-// 初期化
-document.addEventListener('DOMContentLoaded', () => {
+// 初期化関数（DOMContentLoaded or 外部から呼び出し可能）
+function initializeApp() {
+  if (window._appBootstrapped) return // 二重実行防止
+  window._appBootstrapped = true
+  console.log('🚀 app.js 初期化開始')
+  
   // bfcache対策: ページが戻る/進むボタンで復元された場合にリロード
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
@@ -1333,18 +1337,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })
   
-  // /landingページの場合はapp.jsの初期化をスキップ（landingは独自HTMLを持つ）
-  if (window.location.pathname === '/landing') {
-    console.log('📄 ランディングページ - app.js初期化をスキップ')
-    return
-  }
-  
   // 音声合成の初期化（ボイスリストを読み込む）
   if ('speechSynthesis' in window) {
     // ボイスリストの読み込みを待つ
     let voicesLoaded = false
     const loadVoices = () => {
-      const voices = speechSynthesis.getVoices()
+      const voices = window.speechSynthesis.getVoices()
       if (voices.length > 0 && !voicesLoaded) {
         voicesLoaded = true
         console.log('音声合成が利用可能:', voices.length, '種類の音声')
@@ -1356,8 +1354,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Chrome/Edge用
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-      speechSynthesis.onvoiceschanged = loadVoices
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoices
     }
     
     // Safari用（すぐに読み込まれる場合）
@@ -1415,7 +1413,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // セッションがない場合はログイン画面
     renderLoginPage()
   }
-})
+}
+// グローバルに公開
+window.initializeApp = initializeApp
+
+// 通常のページ読み込み時はDOMContentLoadedで初期化
+// 動的スクリプトロード時（/landing）はDOMContentLoadedが既に発火済みなので
+// document.readyStateをチェック
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeApp)
+} else {
+  // DOMContentLoadedは既に発火済み - 即座に初期化
+  initializeApp()
+}
 
 // ============================================
 // トップページ（学年・教科・単元選択）
@@ -4942,7 +4952,6 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
           .catch(() => { setTimeout(retryGuide, 8000) })
       }
       setTimeout(retryGuide, 5000)
-      `
     }
   }
 }
@@ -7496,14 +7505,14 @@ function fallbackWebSpeechCard(text) {
     stopTtsCard()
     return
   }
-  speechSynthesis.cancel()
+  window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'ja-JP'
   utterance.rate = 0.85
   utterance.pitch = 1.2
   utterance.volume = 1.0
   
-  const voices = speechSynthesis.getVoices()
+  const voices = window.speechSynthesis.getVoices()
   let voice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
     || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Kyoko'))
     || voices.find(v => v.lang === 'ja-JP')
@@ -7517,16 +7526,16 @@ function fallbackWebSpeechCard(text) {
   utterance.onerror = () => stopTtsCard()
   
   if (voices.length === 0) {
-    speechSynthesis.onvoiceschanged = () => {
-      const v2 = speechSynthesis.getVoices()
+    window.speechSynthesis.onvoiceschanged = () => {
+      const v2 = window.speechSynthesis.getVoices()
       const jaV = v2.find(v => v.lang === 'ja-JP') || v2.find(v => v.lang.startsWith('ja'))
       if (jaV) utterance.voice = jaV
-      speechSynthesis.speak(utterance)
+      window.speechSynthesis.speak(utterance)
     }
-    setTimeout(() => { if (!speechSynthesis.speaking) speechSynthesis.speak(utterance) }, 500)
+    setTimeout(() => { if (!window.speechSynthesis.speaking) window.speechSynthesis.speak(utterance) }, 500)
     return
   }
-  speechSynthesis.speak(utterance)
+  window.speechSynthesis.speak(utterance)
 }
 
 // 直接Web Speech APIで読み上げ（互換性維持）
@@ -7536,14 +7545,14 @@ function speakTextDirect(text, speed = 0.85) {
     alert('このブラウザは音声読み上げに対応していません')
     return
   }
-  speechSynthesis.cancel()
+  window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'ja-JP'
   utterance.rate = speed
   utterance.pitch = 1.2
   utterance.volume = 1.0
   
-  const voices = speechSynthesis.getVoices()
+  const voices = window.speechSynthesis.getVoices()
   let voice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
     || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Kyoko'))
     || voices.find(v => v.lang === 'ja-JP')
@@ -7554,13 +7563,13 @@ function speakTextDirect(text, speed = 0.85) {
   }
   
   if (voices.length === 0) {
-    speechSynthesis.onvoiceschanged = () => {
-      const v2 = speechSynthesis.getVoices()
+    window.speechSynthesis.onvoiceschanged = () => {
+      const v2 = window.speechSynthesis.getVoices()
       const jaVoice = v2.find(v => v.lang === 'ja-JP') || v2.find(v => v.lang.startsWith('ja'))
       if (jaVoice) utterance.voice = jaVoice
-      speechSynthesis.speak(utterance)
+      window.speechSynthesis.speak(utterance)
     }
-    setTimeout(() => { if (!speechSynthesis.speaking) speechSynthesis.speak(utterance) }, 500)
+    setTimeout(() => { if (!window.speechSynthesis.speaking) window.speechSynthesis.speak(utterance) }, 500)
     return
   }
   
@@ -7571,7 +7580,7 @@ function speakTextDirect(text, speed = 0.85) {
     TactileSounds.play('correct')
   }
   utterance.onerror = (e) => console.error('❌ 読み上げエラー:', e.error)
-  speechSynthesis.speak(utterance)
+  window.speechSynthesis.speak(utterance)
 }
 window.speakTextDirect = speakTextDirect
 
@@ -11957,9 +11966,9 @@ function readPoetryAloud(containerId) {
     utter.lang = 'ja-JP'
     utter.rate = 0.85
     utter.onend = () => { idx++; setTimeout(speakNext, 300) }
-    speechSynthesis.speak(utter)
+    window.speechSynthesis.speak(utter)
   }
-  speechSynthesis.cancel()
+  window.speechSynthesis.cancel()
   speakNext()
 }
 window.readPoetryAloud = readPoetryAloud
@@ -12004,7 +12013,7 @@ function stopTtsCard() {
   if (_globalTtsSource) { try { _globalTtsSource.stop() } catch(e){} }
   _globalTtsSource = null
   if (_globalTtsAudio) { try { _globalTtsAudio.pause(); _globalTtsAudio = null } catch(e){} }
-  if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel()
+  if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.cancel()
   // UIアイコンを復元
   const mi = document.getElementById('tts-icon-main')
   if (mi) { mi.className = 'fas fa-volume-up'; const btn = mi.closest('button'); if (btn) btn.classList.remove('animate-pulse') }
@@ -12017,7 +12026,7 @@ window.stopTtsCard = stopTtsCard
 function stopGlobalTts() {
   if (_globalTtsSource) { try { _globalTtsSource.stop() } catch(e){} }
   if (_globalTtsAudio) { try { _globalTtsAudio.pause(); _globalTtsAudio = null } catch(e){} }
-  if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel()
+  if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.cancel()
   _globalTtsPlaying = false
   _globalTtsSource = null
   // index.tsx側のTTSも停止（グローバル変数連携）
@@ -12178,19 +12187,19 @@ function speakTextWebSpeechFallback(text, speed = 0.85) {
     updateFloatingTtsButton(false)
     return
   }
-  speechSynthesis.cancel()
+  window.speechSynthesis.cancel()
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'ja-JP'
   u.rate = speed
   u.pitch = 1.1
-  const voices = speechSynthesis.getVoices()
+  const voices = window.speechSynthesis.getVoices()
   const jaVoice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
     || voices.find(v => v.lang === 'ja-JP')
     || voices.find(v => v.lang.startsWith('ja'))
   if (jaVoice) u.voice = jaVoice
   u.onend = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false) }
   u.onerror = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false) }
-  speechSynthesis.speak(u)
+  window.speechSynthesis.speak(u)
 }
 
 // Web Speech API を使用した音声読み上げ（最適化版）
@@ -12204,7 +12213,7 @@ function speakTextWithWebSpeech(text, speed = 0.95, voiceType = 'female-friendly
   }
   
   // 既存の読み上げを停止
-  speechSynthesis.cancel()
+  window.speechSynthesis.cancel()
   
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'ja-JP'
@@ -12237,7 +12246,7 @@ function speakTextWithWebSpeech(text, speed = 0.95, voiceType = 'female-friendly
   }
   
   // 日本語音声を選択（詳細な優先順位付き）
-  const voices = speechSynthesis.getVoices()
+  const voices = window.speechSynthesis.getVoices()
   
   // 音声タイプに応じた選択
   let targetVoice = null
@@ -12324,13 +12333,13 @@ function speakTextWithWebSpeech(text, speed = 0.95, voiceType = 'female-friendly
         sentenceUtterance.volume = utterance.volume
         sentenceUtterance.voice = targetVoice
         
-        speechSynthesis.speak(sentenceUtterance)
+        window.speechSynthesis.speak(sentenceUtterance)
         currentText = ''
       }
     })
   } else {
     // 通常の読み上げ
-    speechSynthesis.speak(utterance)
+    window.speechSynthesis.speak(utterance)
   }
 }
 
@@ -13013,7 +13022,7 @@ function toggleAutoVoice() {
     // すべての読み上げを停止
     stopGlobalTts()
     stopTtsCard()
-    if ('speechSynthesis' in window) speechSynthesis.cancel()
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
   }
 }
 
@@ -13650,14 +13659,14 @@ async function teacherSpeakSongLyrics(btn, encodedLyrics) {
       const u = new SpeechSynthesisUtterance(cleanText)
       u.lang = 'ja-JP'; u.rate = 1.2
       u.onend = () => { btn.innerHTML = origHTML; btn.disabled = false }
-      speechSynthesis.speak(u)
+      window.speechSynthesis.speak(u)
     }
   } catch (e) {
     // フォールバック: Web Speech API
     const u = new SpeechSynthesisUtterance(cleanText)
     u.lang = 'ja-JP'; u.rate = 1.2
     u.onend = () => { btn.innerHTML = origHTML; btn.disabled = false }
-    speechSynthesis.speak(u)
+    window.speechSynthesis.speak(u)
   }
 }
 window.teacherSpeakSongLyrics = teacherSpeakSongLyrics
@@ -13895,14 +13904,14 @@ async function groupPlaySong(btn, encodedLyrics) {
       const u = new SpeechSynthesisUtterance(cleanText)
       u.lang = 'ja-JP'; u.rate = 1.2
       u.onend = () => { btn.innerHTML = origHTML; btn.disabled = false }
-      speechSynthesis.speak(u)
+      window.speechSynthesis.speak(u)
       btn.innerHTML = '<i class="fas fa-volume-up"></i> 読み上げ中...'
     }
   } catch(e) {
     const u = new SpeechSynthesisUtterance(cleanText)
     u.lang = 'ja-JP'; u.rate = 1.2
     u.onend = () => { btn.innerHTML = origHTML; btn.disabled = false }
-    speechSynthesis.speak(u)
+    window.speechSynthesis.speak(u)
     btn.innerHTML = '<i class="fas fa-volume-up"></i> 読み上げ中...'
   }
 }
@@ -37383,7 +37392,6 @@ async function generateAudioDemo() {
 }
 
 // 音声読み上げ機能
-let speechSynthesis = window.speechSynthesis
 let currentUtterance = null
 let currentLineIndex = 0
 let japaneseVoice = null
@@ -37392,15 +37400,15 @@ let japaneseVoice = null
 function getJapaneseVoice() {
   if (japaneseVoice) return japaneseVoice
   
-  const voices = speechSynthesis.getVoices()
+  const voices = window.speechSynthesis.getVoices()
   // 日本語音声を優先的に選択
   japaneseVoice = voices.find(voice => voice.lang === 'ja-JP') || voices[0]
   return japaneseVoice
 }
 
 // ページ読み込み時に音声リストを取得
-if (speechSynthesis.onvoiceschanged !== undefined) {
-  speechSynthesis.onvoiceschanged = getJapaneseVoice
+if (window.speechSynthesis.onvoiceschanged !== undefined) {
+  window.speechSynthesis.onvoiceschanged = getJapaneseVoice
 }
 
 function speakAudioScript() {
@@ -37457,11 +37465,11 @@ function speakNextLine() {
     setTimeout(() => speakNextLine(), 800)  // より長い間隔
   }
   
-  speechSynthesis.speak(currentUtterance)
+  window.speechSynthesis.speak(currentUtterance)
 }
 
 function stopAudioScript() {
-  speechSynthesis.cancel()
+  window.speechSynthesis.cancel()
   
   // ボタンを元に戻す
   if (document.getElementById('speak-button')) {

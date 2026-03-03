@@ -13050,16 +13050,27 @@ app.get('/landing', (c) => {
                   clearTimeout(loadTimeout)
                   window._appInitialized = true
                   console.log('🚀 全スクリプト読み込み完了 (成功:' + loadedCount + ', エラー:' + errorCount + ')')
+                  // app.jsのinitializeApp()が自動実行されるので追加呼び出し不要
+                  // 1秒後にフォールバックチェック（初期化されなかった場合）
                   setTimeout(() => {
-                    if (typeof window.renderTopPage === 'function') {
-                      console.log('🎯 renderTopPageを実行')
-                      window.renderTopPage()
-                    } else if (errorCount > 0) {
-                      // app.jsが読み込めなかった場合 - 自動リロード
-                      console.warn('⚠️ 重要なスクリプトが読み込めませんでした。自動リロードします。')
-                      autoReloadOnError()
+                    if (!window._appBootstrapped) {
+                      if (typeof window.initializeApp === 'function') {
+                        console.log('⚠️ フォールバック: initializeAppを手動実行')
+                        try { window.initializeApp() } catch(e) { console.error('initializeApp error:', e) }
+                      }
+                      // initializeApp自体がなくてもrenderTopPage/renderLoginPageがあれば呼ぶ
+                      if (!window._appBootstrapped) {
+                        if (typeof window.renderTopPage === 'function') {
+                          console.log('⚠️ フォールバック: renderTopPageを直接実行')
+                          window.renderTopPage()
+                        } else if (typeof window.renderLoginPage === 'function') {
+                          window.renderLoginPage()
+                        } else if (errorCount > 0) {
+                          autoReloadOnError()
+                        }
+                      }
                     }
-                  }, 200)
+                  }, 500)
                 }
               }
               script.onerror = (error) => {
