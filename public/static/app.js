@@ -3173,8 +3173,39 @@ async function loadTopPageData() {
       s4.className = (g && s && (t || skipTextbook)) ? s4.className.replace(inactiveClass, activeClass) : s4.className.replace(activeClass, inactiveClass)
     }
 
+    // ★ 学年に応じて教科リストをフィルタリング（小学→算数、中学→数学）
+    function updateSubjectListForGrade() {
+      const grade = gradeSelect.value
+      const isElementary = grade.startsWith('小学')
+      const isMiddle = grade.startsWith('中学')
+      const currentSubject = subjectSelect.value
+      
+      Array.from(subjectSelect.options).forEach(opt => {
+        if (opt.value === '') return // 「選択してください」は常に表示
+        if (opt.value === '算数') {
+          opt.style.display = isMiddle ? 'none' : ''
+          opt.disabled = isMiddle
+        } else if (opt.value === '数学') {
+          opt.style.display = isElementary ? 'none' : ''
+          opt.disabled = isElementary
+        } else if (opt.value === '生活') {
+          // 生活は小1・小2のみ
+          const isLow = ['小学1年','小学2年'].includes(grade)
+          opt.style.display = (!grade || isLow) ? '' : 'none'
+          opt.disabled = grade && !isLow
+        }
+      })
+      
+      // 現在選択中の教科が非表示になった場合、自動切替
+      if (isElementary && currentSubject === '数学') {
+        subjectSelect.value = '算数'
+      } else if (isMiddle && currentSubject === '算数') {
+        subjectSelect.value = '数学'
+      }
+    }
+    
     // 選択が変更されたら単元リストを更新
-    gradeSelect.addEventListener('change', () => { updateStepIndicators(); updateUnitList() })
+    gradeSelect.addEventListener('change', () => { updateSubjectListForGrade(); updateStepIndicators(); updateUnitList() })
     subjectSelect.addEventListener('change', () => { updateStepIndicators(); updateUnitList() })
     textbookSelect.addEventListener('change', () => { updateStepIndicators(); updateUnitList() })
 
@@ -3218,8 +3249,12 @@ async function updateUnitList() {
   const startButton = document.getElementById('startButton')
   const unitArea = document.getElementById('unitSelectArea')
 
-  // リセット
-  unitSelect.innerHTML = '<p class="text-gray-400 text-center py-8">読み込み中...</p>'
+  // リセット（★ 高さを固定してガクン防止）
+  const currentHeight = unitSelect.offsetHeight
+  if (currentHeight > 0) {
+    unitSelect.style.minHeight = currentHeight + 'px'
+  }
+  unitSelect.innerHTML = '<p class="text-gray-400 text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>読み込み中...</p>'
   startButton.disabled = true
   startButton.classList.add('hidden')
 
@@ -3243,6 +3278,8 @@ async function updateUnitList() {
   }
   if (canProceed) {
     unitArea.style.display = ''
+    unitArea.style.opacity = '1'
+    unitArea.style.transition = 'opacity 0.2s ease'
     try {
       const response = await axios.get('/api/curriculum')
       const curricula = response.data.filter(c => {
@@ -3254,7 +3291,8 @@ async function updateUnitList() {
       })
 
       if (curricula.length > 0) {
-        // カード形式で表示
+        // カード形式で表示（★ 高さ固定を解除）
+        unitSelect.style.minHeight = ''
         unitSelect.innerHTML = ''
         
         // 6年社会の場合、歴史と公民の分野ヘッダーを追加
@@ -3309,6 +3347,8 @@ async function updateUnitList() {
         
         startButton.disabled = false
       } else {
+        // ★ 高さ固定を解除
+        unitSelect.style.minHeight = ''
         unitSelect.innerHTML = `
           <div class="text-center py-6">
             <i class="fas fa-info-circle text-purple-400 text-3xl mb-3 block"></i>
@@ -3331,7 +3371,10 @@ async function updateUnitList() {
         </div>`
     }
   } else {
-    unitArea.style.display = 'none'
+    // ★ スムーズにフェードアウト
+    unitArea.style.transition = 'opacity 0.2s ease'
+    unitArea.style.opacity = '0'
+    setTimeout(() => { if (!unitArea.style.opacity || unitArea.style.opacity === '0') unitArea.style.display = 'none' }, 200)
     // 教科書不要教科の表示状態をリセット
     const textbookContainer2 = textbookSelect?.closest('div')
     if (textbookContainer2) {
