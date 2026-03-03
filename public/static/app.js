@@ -1840,13 +1840,12 @@ async function renderTopPage() {
             </div>
           </div>
 
-          <!-- 単元一覧 -->
-          <div id="unitSelectArea" class="mb-6" style="max-height:0;overflow:hidden;opacity:0;transition:max-height 0.3s ease,opacity 0.3s ease;">
-            <label class="block text-sm font-bold text-gray-700 mb-3">
+          <!-- 単元一覧（常にDOMに存在、中身だけ差し替え） -->
+          <div id="unitSelectArea" class="mb-6">
+            <label id="unitSelectLabel" class="block text-sm font-bold text-gray-700 mb-3" style="display:none;">
               <i class="fas fa-list-ol mr-1 text-pink-500"></i> 単元を選択してください
             </label>
-            <div id="unitSelect" class="space-y-2 max-h-[600px] overflow-y-auto border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
-              <p class="text-gray-400 text-center py-8">学年・教科・教科書会社を選ぶと単元が表示されます</p>
+            <div id="unitSelect" class="space-y-2 max-h-[600px] overflow-y-auto rounded-xl p-4" style="min-height:0;transition:none;">
             </div>
           </div>
 
@@ -3204,10 +3203,10 @@ async function loadTopPageData() {
       }
     }
     
-    // 選択が変更されたら単元リストを更新
-    gradeSelect.addEventListener('change', () => { updateSubjectListForGrade(); updateStepIndicators(); updateUnitList() })
-    subjectSelect.addEventListener('change', () => { updateStepIndicators(); updateUnitList() })
-    textbookSelect.addEventListener('change', () => { updateStepIndicators(); updateUnitList() })
+    // 選択が変更されたら単元リストを更新（★ スクロール位置を保持）
+    gradeSelect.addEventListener('change', () => { const sy = window.scrollY; updateSubjectListForGrade(); updateStepIndicators(); updateUnitList().then(() => window.scrollTo(0, sy)) })
+    subjectSelect.addEventListener('change', () => { const sy = window.scrollY; updateStepIndicators(); updateUnitList().then(() => window.scrollTo(0, sy)) })
+    textbookSelect.addEventListener('change', () => { const sy = window.scrollY; updateStepIndicators(); updateUnitList().then(() => window.scrollTo(0, sy)) })
 
   } catch (error) {
     console.error('データ読み込みエラー:', error)
@@ -3256,8 +3255,6 @@ async function updateUnitList() {
   const startButton = document.getElementById('startButton')
   const unitArea = document.getElementById('unitSelectArea')
 
-  // リセット（★ 高さ変動を最小化：スピナーに切り替えるだけで高さは維持）
-  unitSelect.innerHTML = '<p class="text-gray-400 text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>読み込み中...</p>'
   startButton.disabled = true
   startButton.classList.add('hidden')
 
@@ -3280,9 +3277,12 @@ async function updateUnitList() {
     }
   }
   if (canProceed) {
-    // ★ max-heightアニメーションで滑らかに表示（display:noneは使わない）
-    unitArea.style.maxHeight = '800px'
-    unitArea.style.opacity = '1'
+    // ラベル表示 + スピナー（現在のスクロール位置を保持）
+    const scrollY = window.scrollY
+    document.getElementById('unitSelectLabel').style.display = ''
+    unitSelect.className = 'space-y-2 max-h-[600px] overflow-y-auto border-2 border-gray-200 rounded-xl p-4 bg-gray-50'
+    unitSelect.innerHTML = '<p class="text-gray-400 text-center py-8"><i class="fas fa-spinner fa-spin mr-2"></i>読み込み中...</p>'
+    window.scrollTo(0, scrollY)
     try {
       const response = await axios.get('/api/curriculum')
       const curricula = response.data.filter(c => {
@@ -3294,7 +3294,8 @@ async function updateUnitList() {
       })
 
       if (curricula.length > 0) {
-        // カード形式で表示
+        // カード形式で表示（スクロール位置を保持）
+        const sy = window.scrollY
         unitSelect.innerHTML = ''
         
         // 6年社会の場合、歴史と公民の分野ヘッダーを追加
@@ -3348,6 +3349,7 @@ async function updateUnitList() {
         }
         
         startButton.disabled = false
+        window.scrollTo(0, sy)
       } else {
         unitSelect.innerHTML = `
           <div class="text-center py-6">
@@ -3371,9 +3373,12 @@ async function updateUnitList() {
         </div>`
     }
   } else {
-    // ★ スムーズにフェードアウト（max-height + opacity）
-    unitArea.style.opacity = '0'
-    unitArea.style.maxHeight = '0'
+    // 単元リストを非表示（スクロール位置を保持）
+    const scrollY2 = window.scrollY
+    document.getElementById('unitSelectLabel').style.display = 'none'
+    unitSelect.className = 'space-y-2 max-h-[600px] overflow-y-auto rounded-xl p-4'
+    unitSelect.innerHTML = ''
+    window.scrollTo(0, scrollY2)
     // 教科書不要教科の表示状態をリセット
     const textbookContainer2 = textbookSelect?.closest('div')
     if (textbookContainer2) {
@@ -3387,6 +3392,9 @@ async function updateUnitList() {
 // 単元を選択
 async function selectUnit(curriculumId) {
   state.selectedCurriculumId = curriculumId
+  
+  // ★ スクロール位置を保持
+  const savedScrollY = window.scrollY
   
   // ★ 即座に選択した感を出す（ローディング表示）
   const allCards = document.querySelectorAll('#unitSelect > div[data-curriculum-id]')
@@ -3404,6 +3412,9 @@ async function selectUnit(curriculumId) {
       card.style.transition = 'all 0.2s ease'
     }
   })
+  
+  // スクロール位置を復元
+  window.scrollTo(0, savedScrollY)
   
   // まずカリキュラムのカード数を確認
   try {
