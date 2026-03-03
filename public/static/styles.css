@@ -1,1 +1,258 @@
 h1 { font-family: Arial, Helvetica, sans-serif; }
+
+/* ==========================================
+   ボタン共通フィードバック強化
+   ========================================== */
+
+/* 全ボタン共通のトランジション */
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+/* 押下時のフィードバック（全ボタン） */
+button:not(:disabled):active {
+  transform: scale(0.93) !important;
+  filter: brightness(0.85);
+}
+
+/* ホバー時のフィードバック */
+button:not(:disabled):hover {
+  filter: brightness(1.05);
+}
+
+/* 無効化ボタン */
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: grayscale(30%);
+}
+
+/* ==========================================
+   ローディング中のボタンパルスアニメーション
+   ========================================== */
+@keyframes btn-loading-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 20px 4px rgba(99, 102, 241, 0.3);
+  }
+}
+
+.btn-loading-state {
+  animation: btn-loading-pulse 1.5s ease-in-out infinite !important;
+  pointer-events: none !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ローディングプログレスバー */
+.btn-loading-state::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+  animation: btn-loading-bar 1.5s ease-in-out infinite;
+  width: 40%;
+}
+
+@keyframes btn-loading-bar {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
+/* ==========================================
+   リップルエフェクト
+   ========================================== */
+.ripple-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s ease, height 0.6s ease, opacity 0.6s ease;
+  opacity: 0;
+  z-index: 1;
+}
+
+.ripple-effect:active::before {
+  width: 300px;
+  height: 300px;
+  opacity: 1;
+  transition: width 0s, height 0s, opacity 0s;
+}
+
+/* ==========================================
+   コース学習ボタン特別スタイル
+   ========================================== */
+.course-study-btn {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 16px !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.course-study-btn:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+.course-study-btn:not(:disabled):active {
+  transform: translateY(1px) scale(0.97) !important;
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* ==========================================
+   チェックボックス＆ラベル操作性改善
+   ========================================== */
+
+/* チェックボックスラベル共通 */
+.student-select-label {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px !important;
+  border-width: 2px !important;
+  border-radius: 12px !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.student-select-label:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.student-select-label:active {
+  transform: scale(0.96);
+}
+
+/* チェックボックス選択時のラベルハイライト */
+.student-select-label:has(input:checked) {
+  background: linear-gradient(135deg, #fce7f3, #fdf2f8) !important;
+  border-color: #ec4899 !important;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15), 0 4px 12px rgba(236, 72, 153, 0.1);
+}
+
+/* チェックボックス自体を大きく */
+.student-checkbox {
+  width: 22px !important;
+  height: 22px !important;
+  accent-color: #ec4899;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* 生成済みラベル */
+.student-select-label.generated {
+  background: linear-gradient(135deg, #d1fae5, #ecfdf5) !important;
+  border-color: #34d399 !important;
+}
+
+/* ==========================================
+   一括生成ボタン強化
+   ========================================== */
+.bulk-generate-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.bulk-generate-btn:not(:disabled) {
+  animation: bulk-btn-ready 2s ease-in-out infinite;
+}
+
+@keyframes bulk-btn-ready {
+  0%, 100% {
+    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 25px rgba(168, 85, 247, 0.5), 0 0 40px rgba(168, 85, 247, 0.15);
+  }
+}
+
+.bulk-generate-btn:disabled {
+  animation: none !important;
+  opacity: 0.4 !important;
+  filter: grayscale(50%) !important;
+  box-shadow: none !important;
+}
+
+/* ==========================================
+   一括操作ボタン（全員選択・全解除等）
+   ========================================== */
+.bulk-action-btn {
+  min-height: 36px;
+  font-weight: 700 !important;
+  transition: all 0.15s ease !important;
+}
+
+.bulk-action-btn:active {
+  transform: scale(0.9) !important;
+}
+
+/* ==========================================
+   トーストフィードバック
+   ========================================== */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+
+.toast-notification {
+  animation: toast-in 0.3s ease forwards;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+.toast-notification.fade-out {
+  animation: toast-out 0.3s ease forwards;
+}

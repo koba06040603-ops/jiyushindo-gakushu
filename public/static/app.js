@@ -1272,6 +1272,56 @@ const loadingManager = {
   }
 }
 
+// ボタン押下フィードバック: 押した直後にローディング状態にし、処理完了後に復元
+function btnLoading(btn, loadingText = '読み込み中...') {
+  if (!btn || btn.dataset.loading === 'true') return null
+  const original = { html: btn.innerHTML, disabled: btn.disabled, classes: btn.className }
+  btn.dataset.loading = 'true'
+  btn.disabled = true
+  btn.classList.add('btn-loading-state')
+  btn.innerHTML = `
+    <span class="inline-flex items-center gap-2">
+      <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <span>${loadingText}</span>
+    </span>`
+  // トースト通知を表示
+  showToast(loadingText, 'info')
+  return {
+    restore: () => {
+      btn.innerHTML = original.html
+      btn.disabled = original.disabled
+      btn.classList.remove('btn-loading-state')
+      delete btn.dataset.loading
+    }
+  }
+}
+
+// トースト通知
+function showToast(message, type = 'info', duration = 2500) {
+  // 既存のトーストを削除
+  document.querySelectorAll('.toast-notification').forEach(t => t.remove())
+  const colors = {
+    info: 'background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;',
+    success: 'background: linear-gradient(135deg, #10b981, #34d399); color: white;',
+    error: 'background: linear-gradient(135deg, #ef4444, #f87171); color: white;',
+    warning: 'background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #1f2937;'
+  }
+  const icons = { info: 'fas fa-spinner fa-spin', success: 'fas fa-check-circle', error: 'fas fa-exclamation-circle', warning: 'fas fa-exclamation-triangle' }
+  const toast = document.createElement('div')
+  toast.className = 'toast-notification'
+  toast.style.cssText = colors[type] || colors.info
+  toast.innerHTML = `<i class="${icons[type] || icons.info} mr-2"></i>${message}`
+  document.body.appendChild(toast)
+  setTimeout(() => {
+    toast.classList.add('fade-out')
+    setTimeout(() => toast.remove(), 300)
+  }, duration)
+  return toast
+}
+
 // 初期化
 document.addEventListener('DOMContentLoaded', () => {
   // 音声合成の初期化（ボイスリストを読み込む）
@@ -4410,8 +4460,9 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                         </div>
                       `}
                       
-                      <button onclick="startCourseStudy(${curriculumId}, ${course.course_id || course.id})" class="w-full mt-2 py-2 ${badgeClasses} text-white rounded-lg font-bold text-sm hover:opacity-90 shadow-md">
-                        このコースで学しゅうする
+                      <button onclick="const b=this;const r=btnLoading(b,'カードを読み込み中...');startCourseStudy(${curriculumId}, ${course.course_id || course.id}).finally(()=>r&&r.restore())" class="course-study-btn ripple-effect w-full mt-3 py-3 ${badgeClasses} text-white rounded-xl font-extrabold text-base hover:opacity-90 shadow-lg active:scale-95 transition-all">
+                        <i class="fas fa-play-circle mr-2 text-lg"></i>このコースで学しゅうする
+                        <i class="fas fa-chevron-right ml-2 text-sm opacity-70"></i>
                       </button>
                     </div>
                   `
@@ -51315,9 +51366,9 @@ function displayStudyPlan(data) {
               class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">
         <i class="fas fa-print mr-2"></i>印刷する
       </button>
-      <button onclick="loadGuidePage(${state.selectedCurriculum.id})" 
-              class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition">
-        <i class="fas fa-book mr-2"></i>学習を始める
+      <button onclick="const b=this;const r=btnLoading(b,'読み込み中...');loadGuidePage(${state.selectedCurriculum.id}).finally(()=>r&&r.restore())" 
+              class="course-study-btn ripple-effect bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all active:scale-95">
+        <i class="fas fa-book mr-2 text-lg"></i>学習を始める <i class="fas fa-chevron-right ml-2 text-sm opacity-70"></i>
       </button>
     </div>
   `
@@ -51837,8 +51888,8 @@ function displayTestPrepPlan(planData) {
         
         <!-- アクションボタン -->
         <div class="flex gap-4 justify-center">
-          <button onclick="loadGuidePage(${state.selectedCurriculum?.id || 1})" class="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white px-6 py-3 rounded-lg font-bold transition shadow-lg">
-            <i class="fas fa-book mr-2"></i>学習を始める
+          <button onclick="const b=this;const r=btnLoading(b,'読み込み中...');loadGuidePage(${state.selectedCurriculum?.id || 1}).finally(()=>r&&r.restore())" class="course-study-btn ripple-effect bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-lg active:scale-95">
+            <i class="fas fa-book mr-2 text-lg"></i>学習を始める <i class="fas fa-chevron-right ml-2 text-sm opacity-70"></i>
           </button>
           <button onclick="window.print()" class="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-6 py-3 rounded-lg font-bold transition shadow-lg">
             <i class="fas fa-print mr-2"></i>印刷する
@@ -52482,16 +52533,16 @@ async function showPersonalizedCourseSelector(curriculumId) {
           
           <!-- 一括操作 -->
           <div class="flex gap-2 mb-3">
-            <button onclick="document.querySelectorAll('.student-checkbox').forEach(cb=>{if(!cb.disabled)cb.checked=true}); updateBulkCount()" 
-                    class="text-xs bg-pink-500 hover:bg-pink-600 text-white px-3 py-1.5 rounded-lg font-bold transition">
+            <button onclick="document.querySelectorAll('.student-checkbox').forEach(cb=>{if(!cb.disabled)cb.checked=true}); updateBulkCount(); this.classList.add('ring-2','ring-pink-300');setTimeout(()=>this.classList.remove('ring-2','ring-pink-300'),300)" 
+                    class="bulk-action-btn text-xs bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg font-bold transition-all active:scale-95">
               <i class="fas fa-check-double mr-1"></i>全員選択
             </button>
-            <button onclick="document.querySelectorAll('.student-checkbox').forEach(cb=>cb.checked=false); updateBulkCount()" 
-                    class="text-xs bg-gray-400 hover:bg-gray-500 text-white px-3 py-1.5 rounded-lg font-bold transition">
+            <button onclick="document.querySelectorAll('.student-checkbox').forEach(cb=>cb.checked=false); updateBulkCount(); this.classList.add('ring-2','ring-gray-300');setTimeout(()=>this.classList.remove('ring-2','ring-gray-300'),300)" 
+                    class="bulk-action-btn text-xs bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg font-bold transition-all active:scale-95">
               <i class="fas fa-times mr-1"></i>全解除
             </button>
-            <button onclick="document.querySelectorAll('.student-checkbox').forEach(cb=>{if(!cb.disabled && !cb.dataset.existing)cb.checked=true}); updateBulkCount()" 
-                    class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold transition">
+            <button onclick="document.querySelectorAll('.student-checkbox').forEach(cb=>{if(!cb.disabled && !cb.dataset.existing)cb.checked=true}); updateBulkCount(); this.classList.add('ring-2','ring-blue-300');setTimeout(()=>this.classList.remove('ring-2','ring-blue-300'),300)" 
+                    class="bulk-action-btn text-xs bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold transition-all active:scale-95">
               <i class="fas fa-user-plus mr-1"></i>未生成のみ選択
             </button>
             <div class="flex-1"></div>
@@ -52503,9 +52554,9 @@ async function showPersonalizedCourseSelector(curriculumId) {
             ${students.map(s => {
               const hasExisting = existingStudentIds.includes(s.id)
               return `
-              <label class="flex items-center gap-2 p-2 rounded-lg border ${hasExisting ? 'bg-green-50 border-green-200' : 'bg-gray-50 hover:bg-pink-50 border-gray-200 hover:border-pink-300'} transition cursor-pointer">
-                <input type="checkbox" class="student-checkbox w-4 h-4 accent-pink-500" value="${s.id}" ${hasExisting ? 'data-existing="true"' : ''} onchange="updateBulkCount()">
-                <span class="text-sm ${hasExisting ? 'text-green-700' : 'text-gray-800'} truncate">
+              <label class="student-select-label ${hasExisting ? 'generated bg-green-50 border-green-200' : 'bg-gray-50 hover:bg-pink-50 border-gray-200 hover:border-pink-300'}">
+                <input type="checkbox" class="student-checkbox" value="${s.id}" ${hasExisting ? 'data-existing="true"' : ''} onchange="updateBulkCount(); this.closest('label').classList.toggle('bg-pink-100',this.checked); this.closest('label').classList.toggle('border-pink-400',this.checked); this.closest('label').classList.toggle('bg-gray-50',!this.checked)">
+                <span class="text-sm font-semibold ${hasExisting ? 'text-green-700' : 'text-gray-800'} truncate">
                   ${hasExisting ? '<i class="fas fa-check-circle text-green-500 mr-1"></i>' : '<i class="fas fa-user text-gray-400 mr-1"></i>'}
                   ${s.name || '児童' + s.id}
                 </span>
@@ -52526,7 +52577,7 @@ async function showPersonalizedCourseSelector(curriculumId) {
               閉じる
             </button>
             <button id="bulk-generate-btn" onclick="startBulkGeneration(${curriculumId})" 
-                    class="flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4 py-3 rounded-lg font-bold transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    class="bulk-generate-btn ripple-effect flex-1 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white px-4 py-4 rounded-xl font-extrabold text-base transition-all shadow-lg active:scale-95" disabled>
               <i class="fas fa-magic mr-2"></i>一括生成開始
             </button>
           </div>
@@ -52548,8 +52599,18 @@ function updateBulkCount() {
   const checked = document.querySelectorAll('.student-checkbox:checked')
   const countEl = document.getElementById('bulk-count')
   const btn = document.getElementById('bulk-generate-btn')
-  if (countEl) countEl.textContent = `${checked.length}名選択中`
-  if (btn) btn.disabled = checked.length === 0
+  if (countEl) {
+    countEl.textContent = checked.length > 0 ? `✨ ${checked.length}名選択中` : '0名選択中'
+    countEl.className = checked.length > 0 ? 'text-sm text-pink-600 font-extrabold self-center animate-pulse' : 'text-xs text-gray-500 self-center'
+  }
+  if (btn) {
+    btn.disabled = checked.length === 0
+    if (checked.length > 0) {
+      btn.innerHTML = `<i class="fas fa-magic mr-2 text-lg"></i>${checked.length}名の一括生成開始 <i class="fas fa-arrow-right ml-2"></i>`
+    } else {
+      btn.innerHTML = '<i class="fas fa-magic mr-2"></i>児童を選択してください'
+    }
+  }
 }
 window.updateBulkCount = updateBulkCount
 
@@ -52588,7 +52649,9 @@ async function startBulkGeneration(curriculumId) {
   
   const btn = document.getElementById('bulk-generate-btn')
   btn.disabled = true
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>生成中...'
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>AIが生成中... お待ちください'
+  btn.style.opacity = '0.7'
+  btn.className = btn.className.replace('from-pink-500 to-purple-600', 'from-gray-500 to-gray-600')
   
   const progressEl = document.getElementById('bulk-progress')
   progressEl.classList.remove('hidden')
@@ -53135,9 +53198,10 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
               </div>
               <!-- 生徒体験ボタン -->
               <div class="mt-4 text-center">
-                <button onclick="startPersonalizedCourseLearning(${courseId}, ${curriculumId})" 
-                        class="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white py-3 px-8 rounded-xl font-bold transition shadow-lg text-sm">
-                  <i class="fas fa-play-circle mr-2"></i>このコースで学習を始める（AI先生・採点・ヒント付き）
+                <button onclick="const b=this;const r=btnLoading(b,'カードを読み込み中...');startPersonalizedCourseLearning(${courseId}, ${curriculumId}).catch(()=>{}).finally(()=>r&&r.restore())" 
+                        class="course-study-btn ripple-effect bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white py-4 px-10 rounded-xl font-extrabold transition-all shadow-lg text-base active:scale-95">
+                  <i class="fas fa-play-circle mr-2 text-lg"></i>このコースで学習を始める
+                  <span class="block text-xs font-normal opacity-80 mt-1">AI先生・採点・ヒント付き</span>
                 </button>
                 <p class="text-xs text-gray-400 mt-2">生徒が学習するときと同じ画面（AI先生・ヒント・採点機能付き）で体験できます</p>
               </div>
