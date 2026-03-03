@@ -12997,11 +12997,18 @@ app.get('/landing', (c) => {
           document.addEventListener('DOMContentLoaded', () => {
             console.log('📦 DOMContentLoaded: スクリプト読み込み開始')
             
-            // 15秒タイムアウト: スクリプト読み込みが遅い場合にメッセージ表示
+            // 15秒タイムアウト: スクリプト読み込みが遅い場合に自動リトライ
             const loadTimeout = setTimeout(() => {
               const app = document.getElementById('app')
               if (app && !window._appInitialized) {
-                app.innerHTML = '<div class="flex items-center justify-center min-h-screen p-4"><div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center"><div style="font-size:3rem;margin-bottom:1rem;">⏳</div><h2 class="text-xl font-bold text-gray-800 mb-3">サーバーが混み合っています</h2><p class="text-gray-600 mb-6 text-sm">AIが他の処理を行っています。<br>30秒〜2分で完了します。</p><button onclick="location.reload()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition mb-3"><i class="fas fa-redo mr-2"></i>もう一度読み込む</button><button onclick="location.href=\\'/landing\\'" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-xl transition"><i class="fas fa-home mr-2"></i>トップへ</button></div></div>'
+                app.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem;"><div style="text-align:center;background:white;border-radius:1.5rem;box-shadow:0 10px 40px rgba(0,0,0,0.08);max-width:420px;width:100%;padding:2.5rem;"><div style="display:inline-block;width:48px;height:48px;border:4px solid #e0e7ff;border-top:4px solid #6366f1;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:1.5rem;"></div><style>@keyframes spin{to{transform:rotate(360deg);}}</style><h2 style="color:#374151;font-size:1.1rem;margin-bottom:0.5rem;">スクリプトを読み込んでいます</h2><p style="color:#6B7280;font-size:0.85rem;margin-bottom:1rem;">サーバーがAI処理中のため遅延しています。<br>自動的にリロードします。</p><div id="retry-msg" style="color:#6366f1;font-weight:700;font-size:0.85rem;">10秒後にリロード...</div></div></div>'
+                var countdown = 10
+                var interval = setInterval(function() {
+                  countdown--
+                  var el = document.getElementById('retry-msg')
+                  if (el) el.textContent = countdown + '秒後にリロード...'
+                  if (countdown <= 0) { clearInterval(interval); location.reload(); }
+                }, 1000)
               }
             }, 15000)
             

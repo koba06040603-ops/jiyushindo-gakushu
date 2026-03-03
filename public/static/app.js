@@ -4902,25 +4902,46 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
     } catch (fallbackError) {
       console.error('簡易版の表示も失敗しました:', fallbackError)
       loadingManager.hide()
-      // トップページに戻るオプションを表示
+      // 自動リトライ付きのローディング画面を表示
       const app = document.getElementById('app')
       app.innerHTML = `
         <div class="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
           <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-            <div style="font-size:3rem;margin-bottom:1rem;">⏳</div>
-            <h2 class="text-xl font-bold text-gray-800 mb-3">サーバーが混み合っています</h2>
-            <p class="text-gray-600 mb-2 text-sm">AIが他の処理を行っているため、しばらくお待ちください。</p>
-            <p class="text-gray-400 mb-6 text-xs">通常30秒〜2分で完了します。</p>
-            <div class="space-y-3">
-              <button onclick="location.reload()" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-xl font-bold text-lg hover:from-blue-600 hover:to-indigo-700 transition active:scale-95">
-                <i class="fas fa-redo mr-2"></i>もう一度読み込む
-              </button>
-              <button onclick="renderTopPage()" class="w-full bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-bold text-lg hover:bg-gray-300 transition active:scale-95">
-                <i class="fas fa-home mr-2"></i>トップページにもどる
-              </button>
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-500 mb-4"></div>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">ページを読み込んでいます</h2>
+            <p class="text-gray-500 text-sm mb-3">サーバーがAI処理中のため、自動的に再接続しています。</p>
+            <div class="bg-gray-100 rounded-full h-2 mb-3 overflow-hidden">
+              <div id="guide-retry-bar" class="bg-indigo-500 h-full rounded-full transition-all duration-500" style="width:0%"></div>
             </div>
+            <p id="guide-retry-msg" class="text-indigo-600 font-bold text-sm">再接続中...</p>
+            <p class="text-gray-400 text-xs mt-2 mb-4">AI処理完了後に自動で表示されます</p>
+            <button onclick="renderTopPage()" class="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-xl font-bold text-sm hover:bg-gray-300 transition active:scale-95">
+              <i class="fas fa-home mr-2"></i>トップページにもどる
+            </button>
           </div>
         </div>
+      `
+      // 自動リトライ
+      let retryCount = 0
+      const maxRetries = 12
+      const retryGuide = () => {
+        retryCount++
+        const bar = document.getElementById('guide-retry-bar')
+        const msg = document.getElementById('guide-retry-msg')
+        if (bar) bar.style.width = Math.min(retryCount / maxRetries * 100, 95) + '%'
+        if (msg) msg.textContent = '再接続中... (' + retryCount + '/' + maxRetries + ')'
+        if (retryCount >= maxRetries) {
+          if (msg) msg.textContent = 'トップページから再度お試しください'
+          return
+        }
+        fetch('/api/curriculum/' + curriculumId, { method: 'HEAD', cache: 'no-store' })
+          .then(r => {
+            if (r.ok) { if (msg) msg.textContent = '接続成功！'; loadGuidePage(curriculumId) }
+            else { setTimeout(retryGuide, 8000) }
+          })
+          .catch(() => { setTimeout(retryGuide, 8000) })
+      }
+      setTimeout(retryGuide, 5000)
       `
     }
   }

@@ -1,5 +1,5 @@
 // Service Worker for PWA - 自由進度学習支援システム
-const CACHE_VERSION = 'v1.3.0';
+const CACHE_VERSION = 'v1.4.0';
 const CACHE_NAME = `jiyushindo-gakushu-${CACHE_VERSION}`;
 
 // キャッシュするリソース
@@ -89,12 +89,59 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // ナビゲーションリクエスト（ページ遷移） - 8秒タイムアウト付き
+  // ナビゲーションリクエスト（ページ遷移） - サーバービジー時は自動リトライ画面
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetchWithTimeout(request, 8000).catch(() => {
-        // タイムアウトまたはネットワーク不通時のフォールバック
-        return new Response(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>接続中...</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:linear-gradient(135deg,#eef2ff,#fdf2f8);}.box{text-align:center;padding:2.5rem;background:white;border-radius:1.5rem;box-shadow:0 10px 40px rgba(0,0,0,0.1);max-width:420px;width:90%;}h1{color:#4F46E5;margin-bottom:0.5rem;font-size:1.3rem;}p{color:#6B7280;margin-bottom:1.5rem;font-size:0.9rem;line-height:1.6;}button{background:linear-gradient(135deg,#4F46E5,#7C3AED);color:white;border:none;padding:0.9rem 2rem;border-radius:0.75rem;font-size:1rem;font-weight:700;cursor:pointer;width:100%;margin-bottom:0.75rem;transition:all 0.2s;}button:hover{filter:brightness(1.1);}button:active{transform:scale(0.97);}.secondary{background:#f3f4f6;color:#374151;}.secondary:hover{background:#e5e7eb;}.spinner{display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,0.3);border-radius:50%;border-top-color:#fff;animation:spin 1s linear infinite;}@keyframes spin{to{transform:rotate(360deg);}}</style></head><body><div class="box"><div style="font-size:3rem;margin-bottom:1rem;">⏳</div><h1>サーバーが混み合っています</h1><p>AIが他の処理を行っているため、しばらくお待ちください。<br>通常30秒〜2分で完了します。</p><button onclick="this.innerHTML='<span class=spinner></span> 接続中...';this.disabled=true;setTimeout(()=>location.reload(),1000)">もう一度読み込む</button><button class="secondary" onclick="location.href='/landing'">トップページにもどる</button></div></body></html>`, {
+      fetchWithTimeout(request, 10000).catch(() => {
+        // タイムアウト時: 自動リトライ付きのローディング画面を返す
+        return new Response(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>読み込み中...</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#eef2ff,#fdf2f8);}
+.box{text-align:center;padding:2.5rem;background:white;border-radius:1.5rem;box-shadow:0 10px 40px rgba(0,0,0,0.08);max-width:420px;width:90%;}
+.spinner-ring{display:inline-block;width:56px;height:56px;border:4px solid #e0e7ff;border-top:4px solid #6366f1;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:1.5rem;}
+@keyframes spin{to{transform:rotate(360deg);}}
+h1{color:#374151;font-size:1.1rem;margin-bottom:0.5rem;}
+p{color:#6B7280;font-size:0.85rem;line-height:1.6;margin-bottom:0.5rem;}
+.count{color:#6366f1;font-weight:700;font-size:0.9rem;margin:1rem 0;}
+.bar-bg{background:#e5e7eb;height:4px;border-radius:2px;overflow:hidden;margin:1rem 0;}
+.bar{background:linear-gradient(90deg,#6366f1,#a78bfa);height:100%;border-radius:2px;transition:width 0.5s ease;width:0%;}
+button{background:linear-gradient(135deg,#6366f1,#7c3aed);color:white;border:none;padding:0.8rem 1.5rem;border-radius:0.75rem;font-size:0.9rem;font-weight:600;cursor:pointer;width:100%;margin-top:1rem;transition:all 0.2s;display:none;}
+button:hover{filter:brightness(1.1);}
+button:active{transform:scale(0.97);}
+.status{font-size:0.75rem;color:#9ca3af;margin-top:0.5rem;}
+</style></head><body>
+<div class="box">
+  <div class="spinner-ring"></div>
+  <h1>ページを読み込んでいます</h1>
+  <p>サーバーがAI処理中のため、少しお待ちください。<br>自動的に再接続します。</p>
+  <div class="bar-bg"><div class="bar" id="bar"></div></div>
+  <div class="count" id="msg">接続を試みています...</div>
+  <div class="status" id="status"></div>
+  <button id="btn" onclick="location.reload()">手動で再読み込み</button>
+</div>
+<script>
+(function(){
+  var attempt=0, maxAttempt=20, barEl=document.getElementById('bar'), msgEl=document.getElementById('msg'), statusEl=document.getElementById('status'), btnEl=document.getElementById('btn');
+  function tryReload(){
+    attempt++;
+    var pct=Math.min(attempt/maxAttempt*100,95);
+    barEl.style.width=pct+'%';
+    msgEl.textContent='再接続中... ('+attempt+'回目)';
+    statusEl.textContent='次の試行まで '+(attempt<5?'5秒':attempt<10?'8秒':'10秒');
+    fetch(location.href,{method:'HEAD',cache:'no-store'}).then(function(r){
+      if(r.ok){msgEl.textContent='接続成功！読み込み中...';barEl.style.width='100%';setTimeout(function(){location.reload();},500);}
+      else{schedule();}
+    }).catch(function(){schedule();});
+  }
+  function schedule(){
+    if(attempt>=maxAttempt){msgEl.textContent='サーバーが応答しません';statusEl.textContent='';btnEl.style.display='block';return;}
+    var delay=attempt<5?5000:attempt<10?8000:10000;
+    setTimeout(tryReload,delay);
+  }
+  setTimeout(tryReload,3000);
+})();
+</script></body></html>`, {
           status: 503,
           statusText: 'Service Unavailable',
           headers: new Headers({ 'Content-Type': 'text/html; charset=utf-8' })
