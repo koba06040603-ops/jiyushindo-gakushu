@@ -3663,23 +3663,25 @@ async function saveEditedCurriculum(curriculumId) {
 // ============================================
 async function loadGuidePage(curriculumId, _retryCount = 0) {
   state.currentView = 'guide'
-  loadingManager.show('学習のてびきを読み込み中...')
+  
+  // キャッシュ判定: 同じcurriculumIdのデータがstateにあればメインAPIをスキップ
+  const hasCachedData = state.selectedCurriculum?.id == curriculumId && state.courses && state.courses.length > 0
+  
+  // キャッシュがない場合のみローディング表示（キャッシュ有りなら即座に表示）
+  if (!hasCachedData) {
+    loadingManager.show('学習のてびきを読み込み中...')
+  }
   
   try {
-    // キャッシュ判定: 同じcurriculumIdのデータがstateにあればメインAPIをスキップ
-    const hasCachedData = state.selectedCurriculum?.id == curriculumId && state.courses && state.courses.length > 0
-    
     let response, metaResult, optionalResult, statsResult, envDesignResult
     if (hasCachedData) {
       console.log('📦 キャッシュデータを使用（メインAPIスキップ）:', curriculumId)
       response = { data: { curriculum: state.selectedCurriculum, courses: state.courses } }
-      // 補助データのみ取得（失敗してもOK）
-      ;[metaResult, optionalResult, statsResult, envDesignResult] = await Promise.all([
-        axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 10000 }).catch(() => ({ data: {} })),
-        axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 10000 }).catch(() => ({ data: {} })),
-        axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 10000 }).catch(() => ({ data: null })),
-        axios.get(`/api/environment/design/${curriculumId}`, { timeout: 10000 }).catch(() => ({ data: null }))
-      ])
+      // 補助データはページ描画後にバックグラウンドで取得（ブロックしない）
+      metaResult = { data: {} }
+      optionalResult = { data: {} }
+      statsResult = { data: null }
+      envDesignResult = { data: null }
     } else {
       // メインデータ取得（必須）+ 補助データを並列取得
       ;[response, metaResult, optionalResult, statsResult, envDesignResult] = await Promise.all([
@@ -4684,6 +4686,18 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
     renderPersonalizedSection(curriculumId, personalizedCourses, approvedCourseIds)
     
     loadingManager.hide()
+    
+    // キャッシュモードの場合、描画後にバックグラウンドで補助データを取得
+    if (hasCachedData) {
+      Promise.all([
+        axios.get(`/api/curriculum/${curriculumId}/metadata`, { timeout: 10000 }).catch(() => null),
+        axios.get(`/api/curriculum/${curriculumId}/optional-problems`, { timeout: 10000 }).catch(() => null),
+        axios.get(`/api/curriculum/${curriculumId}/learning-stats`, { timeout: 10000 }).catch(() => null),
+        axios.get(`/api/environment/design/${curriculumId}`, { timeout: 10000 }).catch(() => null)
+      ]).then(([meta, optional, stats, env]) => {
+        console.log('📦 バックグラウンド補助データ取得完了')
+      }).catch(() => {})
+    }
   } catch (error) {
     console.error('❌❌❌ 学習のてびき読み込みエラー:', error?.message || error, error?.stack || '')
     console.error('❌ エラー詳細: curriculumId=', curriculumId, 'error=', error)
@@ -5836,7 +5850,7 @@ async function loadTeacherOverview(curriculumId) {
 // コース学習開始関数
 async function startCourseStudy(curriculumId, courseId) {
   try {
-    loadingManager.show('学習のてびきを読み込み中...')
+    loadingManager.show('学習カードを準備中...')
     
     // カリキュラムデータを取得
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
@@ -21641,6 +21655,7 @@ async function startUnitGeneration() {
     console.error('💥💥💥 startUnitGeneration でエラーが発生:', error)
     console.error('エラーメッセージ:', error.message)
     console.error('エラースタック:', error.stack)
+    loadingManager.hide()
     alert('エラーが発生しました: ' + error.message)
   }
 }
@@ -21733,11 +21748,11 @@ async function executeUnitGeneration(params) {
         if (i > 0) await new Promise(r => setTimeout(r, i * 1500))
         
         let lastError = null
-        for (let retry = 0; retry < 2; retry++) {
+        for (let retry = 0; retry < 3; retry++) {
           try {
             if (retry > 0) {
               console.log(`🔄 ${courseDef.info.name} リトライ ${retry}...`)
-              await new Promise(r => setTimeout(r, 3000))
+              await new Promise(r => setTimeout(r, 5000))
             }
             
             const resp = await axios.post('/api/ai/generate-course', {
@@ -21811,6 +21826,9 @@ async function executeUnitGeneration(params) {
     console.error('エラータイプ:', typeof error)
     console.error('エラー詳細:', error.response?.data)
     console.error('エラースタック:', error.stack)
+    
+    // ローディングオーバーレイを確実に解除
+    loadingManager.hide()
     
     // エラー詳細を取得
     const errorDetails = error.response?.data?.details || error.message || '不明なエラー'
