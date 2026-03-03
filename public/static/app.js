@@ -3346,6 +3346,21 @@ async function updateUnitList() {
 async function selectUnit(curriculumId) {
   state.selectedCurriculumId = curriculumId
   
+  // ★ 即座に選択した感を出す（ローディング表示）
+  const allCards = document.querySelectorAll('#unitSelect > div')
+  allCards.forEach(card => {
+    const innerDiv = card.querySelector('[onclick*="selectUnit"]')
+    if (innerDiv && innerDiv.getAttribute('onclick').includes(curriculumId)) {
+      card.classList.add('border-purple-500', 'bg-purple-50', 'shadow-lg')
+      card.style.transform = 'scale(0.98)'
+      const nameEl = card.querySelector('p.font-bold')
+      if (nameEl) nameEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-2 text-purple-500"></i>' + nameEl.textContent
+    } else {
+      card.style.opacity = '0.4'
+      card.style.pointerEvents = 'none'
+    }
+  })
+  
   // まずカリキュラムのカード数を確認
   try {
     const response = await axios.get(`/api/curriculum/${curriculumId}`)
@@ -3369,6 +3384,7 @@ async function selectUnit(curriculumId) {
   // カードがある場合は通常通りてびきページへ
   loadGuidePage(curriculumId)
 }
+window.selectUnit = selectUnit
 
 // 単元を削除
 // 単元を複製
@@ -3506,6 +3522,7 @@ async function deleteCurriculum(curriculumId, unitName) {
     alert(`❌ 削除に失敗しました: ${error.response?.data?.error || error.message}`)
   }
 }
+window.deleteCurriculum = deleteCurriculum
 
 // 単元を編集
 async function editCurriculum(curriculumId) {
