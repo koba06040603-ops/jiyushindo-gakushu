@@ -39195,39 +39195,69 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       personalizedPlan = JSON.parse(sanitizedGeminiText)
       console.log('📊 JSON.parse成功:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
     } catch (directParseError: any) {
-      console.warn('⚠️ 直接JSON.parse失敗、文字列内改行修正で再試行:', directParseError.message)
+      console.warn('⚠️ 直接JSON.parse失敗:', directParseError.message)
       try {
-        // ★ JSON文字列内の生改行をエスケープしてから再パース
+        // ★ Step 2: JSON文字列内の生改行をエスケープしてから再パース
         const fixedText = fixJsonStringNewlines(sanitizedGeminiText)
         personalizedPlan = JSON.parse(fixedText)
-        console.log('📊 改行修正後JSON.parse成功:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
+        console.log('📊 改行修正後JSON.parse成功')
       } catch (fixedParseError: any) {
-        console.warn('⚠️ 改行修正後も失敗、extractJSONで再試行:', fixedParseError.message)
+        console.warn('⚠️ 改行修正後も失敗:', fixedParseError.message)
         try {
-          personalizedPlan = extractJSON(sanitizedGeminiText) || {}
-          console.log('📊 extractJSON結果:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
-        } catch (parseError: any) {
-          console.warn('⚠️ extractJSON失敗、最終再試行中:', parseError.message)
-          // より強力な制御文字除去で再試行
-          const cleanedText = sanitizedGeminiText.replace(/[\x00-\x1F\x7F]/g, (ch: string) => {
-            if (ch === '\n' || ch === '\t') return ch
-            return ''
-          })
+          // ★ Step 3: 安全なJSON修復（extractJSONの積極的replaceは避ける）
+          // cardsフィールドを部分的に抽出する安全な方法
+          let safeText = fixJsonStringNewlines(sanitizedGeminiText)
+          // 最小限のクリーニング：末尾カンマ削除のみ
+          for (let i = 0; i < 5; i++) {
+            safeText = safeText.replace(/,(\s*[}\]])/g, '$1')
+          }
+          // 重複カンマ修正
+          safeText = safeText.replace(/,\s*,/g, ',')
+          personalizedPlan = JSON.parse(safeText)
+          console.log('📊 安全修復JSON.parse成功')
+        } catch (safeParseError: any) {
+          console.warn('⚠️ 安全修復失敗、extractJSONで再試行:', safeParseError.message)
           try {
-            const fixedClean = fixJsonStringNewlines(cleanedText)
-            personalizedPlan = JSON.parse(fixedClean)
-            console.log('📊 クリーン+改行修正結果:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards })
-          } catch (e2: any) {
-            console.error('❌ JSON解析完全失敗:', e2.message)
-            // 最終手段: 正規表現でcardsフィールドだけ抽出を試みる
+            personalizedPlan = extractJSON(sanitizedGeminiText) || {}
+            console.log('📊 extractJSON結果:', { keys: Object.keys(personalizedPlan), hasCards: !!personalizedPlan.cards, cardsLength: personalizedPlan.cards?.length })
+          } catch (parseError: any) {
+            console.warn('⚠️ extractJSON失敗、最終手段:', parseError.message)
+            // 最終手段: cardsフィールドのみ正規表現で抽出
             try {
-              const cardsMatch = sanitizedGeminiText.match(/"cards"\s*:\s*\[([\s\S]*)\]/)
-              if (cardsMatch) {
-                const cardsText = '[' + cardsMatch[1] + ']'
-                const cleanedCards = cardsText.replace(/[\x00-\x1F\x7F]/g, '')
-                const fixedCards = fixJsonStringNewlines(cleanedCards)
-                personalizedPlan = { cards: JSON.parse(fixedCards) }
-                console.log('✅ cards部分のみ抽出成功')
+              // cards配列の各オブジェクトを個別に抽出
+              const cardPattern = /"card_title"\s*:\s*"[^"]*"/g
+              const cardMatches = sanitizedGeminiText.match(cardPattern)
+              if (cardMatches && cardMatches.length > 0) {
+                // 各カードオブジェクトの開始位置を特定
+                const cards: any[] = []
+                let searchFrom = 0
+                for (let ci = 0; ci < cardMatches.length; ci++) {
+                  const cardTitlePos = sanitizedGeminiText.indexOf(cardMatches[ci], searchFrom)
+                  if (cardTitlePos < 0) continue
+                  // card_titleの前の{を探す
+                  let braceStart = sanitizedGeminiText.lastIndexOf('{', cardTitlePos)
+                  if (braceStart < 0) continue
+                  // 対応する}を探す
+                  let depth = 0
+                  let braceEnd = -1
+                  for (let j = braceStart; j < sanitizedGeminiText.length; j++) {
+                    if (sanitizedGeminiText[j] === '{') depth++
+                    if (sanitizedGeminiText[j] === '}') depth--
+                    if (depth === 0) { braceEnd = j; break }
+                  }
+                  if (braceEnd > braceStart) {
+                    try {
+                      const cardJson = sanitizedGeminiText.substring(braceStart, braceEnd + 1)
+                      const fixedCard = fixJsonStringNewlines(cardJson)
+                      cards.push(JSON.parse(fixedCard))
+                    } catch { /* skip broken card */ }
+                  }
+                  searchFrom = cardTitlePos + cardMatches[ci].length
+                }
+                if (cards.length > 0) {
+                  personalizedPlan = { cards }
+                  console.log(`✅ 個別カード抽出で${cards.length}枚のカードを救出`)
+                }
               }
             } catch { /* 完全失敗 */ }
           }
