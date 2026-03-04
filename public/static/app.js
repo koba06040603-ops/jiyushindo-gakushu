@@ -4536,7 +4536,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                 それぞれのコースの とくちょうが わかる もんだいを しょうかいするよ！
               </p>
               <div class="grid grid-cols-3 gap-4">
-                ${courses.map((course, index) => {
+                ${standardCourses.map((course, index) => {
                   const problem = courseSelectionProblems[index] || {
                     problem_title: `${course.course_name}の問題`,
                     problem_content: course.description
@@ -4618,7 +4618,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                         </div>
                       `}
                       
-                      <button onclick="const b=this;const r=btnLoading(b,'カードを読み込み中...');startCourseStudy(${curriculumId}, ${course.course_id || course.id}).finally(()=>r&&r.restore())" class="course-study-btn ripple-effect w-full mt-3 py-3 ${badgeClasses} text-white rounded-xl font-extrabold text-base hover:opacity-90 shadow-lg active:scale-95 transition-all">
+                      <button onclick="event.stopPropagation();const b=this;const r=btnLoading(b,'カードを読み込み中...');startCourseStudy(${curriculumId}, ${course.course_id || course.id}).finally(()=>r&&r.restore())" class="course-study-btn ripple-effect w-full mt-3 py-3 ${badgeClasses} text-white rounded-xl font-extrabold text-base hover:opacity-90 shadow-lg transition-all">
                         <i class="fas fa-play-circle mr-2 text-lg"></i>このコースで学しゅうする
                         <i class="fas fa-chevron-right ml-2 text-sm opacity-70"></i>
                       </button>
@@ -5737,7 +5737,7 @@ async function showIntegratedPrintPreview(curriculumId) {
             <h3 class="font-bold text-base mb-2 text-indigo-700 bg-indigo-100 px-2 py-1 rounded">🎯 コースの選び方</h3>
             
             <div class="grid grid-cols-3 gap-2">
-              ${courses.map((course, index) => {
+              ${standardCourses.map((course, index) => {
                 const colorClass = index === 0 ? 'green' : index === 1 ? 'blue' : 'purple';
                 const problem = courseSelectionProblems[index];
                 return `
@@ -6092,27 +6092,38 @@ async function loadTeacherOverview(curriculumId) {
 
 // コース学習開始関数
 async function startCourseStudy(curriculumId, courseId) {
+  console.log('🚀 startCourseStudy開始:', { curriculumId, courseId, typeOfCurrId: typeof curriculumId, typeOfCourseId: typeof courseId })
   try {
     loadingManager.show('学習カードを準備中...')
+    
+    // 型を統一（テンプレートリテラルから来る場合は数値のはず）
+    curriculumId = Number(curriculumId)
+    courseId = Number(courseId)
     
     // キャッシュ判定: stateに同じcurriculumのデータがあればAPIスキップ
     let curriculum, courses
     if (state.selectedCurriculum?.id == curriculumId && state.courses && state.courses.length > 0) {
-      console.log('📦 startCourseStudy: キャッシュデータを使用')
+      console.log('📦 startCourseStudy: キャッシュデータを使用', { cachedCourseCount: state.courses.length })
       curriculum = state.selectedCurriculum
       courses = state.courses
     } else {
+      console.log('🌐 startCourseStudy: APIからデータ取得')
       const response = await axios.get(`/api/curriculum/${curriculumId}`, { timeout: 30000 })
       curriculum = response.data.curriculum
       courses = response.data.courses
     }
     
-    // 指定されたコースを探す
-    const selectedCourse = courses.find(c => (c.course_id || c.id) === courseId)
+    console.log('📋 startCourseStudy: コース一覧:', courses.map(c => ({ id: c.course_id || c.id, level: c.course_level, cards: c.cards?.length })))
+    
+    // 指定されたコースを探す（型の不一致を防ぐためNumber変換）
+    const selectedCourse = courses.find(c => Number(c.course_id || c.id) === courseId)
     
     if (!selectedCourse) {
-      throw new Error('コースが見つかりません')
+      console.error('❌ コースが見つかりません:', { courseId, availableIds: courses.map(c => ({ course_id: c.course_id, id: c.id })) })
+      throw new Error(`コースが見つかりません（ID: ${courseId}）`)
     }
+    
+    console.log('✅ コース選択:', { courseName: selectedCourse.course_name, cardsCount: selectedCourse.cards?.length })
     
     if (!selectedCourse.cards || selectedCourse.cards.length === 0) {
       throw new Error('このコースにはまだ学習カードがありません')
@@ -53096,41 +53107,40 @@ async function startBulkGeneration(curriculumId) {
   
   addLog(`🎉 一括生成完了: ${completed}名成功, ${failed}名失敗`)
   
+  // DB確認: フロントの成功/失敗カウントに関わらず、実際にDBに保存されたコースを確認
+  let dbPersonalizedCount = 0
+  try {
+    const verifyRes = await axios.get(`/api/curriculum/${curriculumId}`, { timeout: 30000 })
+    const pCourses = (verifyRes.data.courses || []).filter(c => c.course_level === 'personalized')
+    dbPersonalizedCount = pCourses.length
+    addLog(`✅ DB確認: ${pCourses.length}件の個別コースがカリキュラムID:${curriculumId}に保存されています`)
+    console.log('📊 生成後DB確認:', { curriculumId, personalizedCount: pCourses.length, courses: pCourses.map(c => ({ id: c.id, name: c.course_name })) })
+  } catch(ve) { console.warn('DB確認エラー:', ve) }
+  
   // 結果を明確に表示
   if (completed === 0 && failed > 0) {
-    addLog(`❌ 全員の生成に失敗しました。上記のエラーメッセージをご確認ください。`)
-    addLog(`💡 カリキュラムID: ${curriculumId} - この情報を開発者にお伝えください。`)
-    alert(`⚠️ 個別最適化コースの生成に全員失敗しました（${failed}名）。\n\nカリキュラムID: ${curriculumId}\n\nブラウザのコンソール(F12)でエラーの詳細をご確認ください。\nスクリーンショットをお送りいただければ原因を特定できます。`)
+    if (dbPersonalizedCount > 0) {
+      addLog(`⚠️ フロントではエラーと判定されましたが、サーバー側で${dbPersonalizedCount}件のコースが正常に保存されています。`)
+      addLog(`🔄 3秒後にページを自動更新して個別コースを表示します。`)
+    } else {
+      addLog(`❌ 全員の生成に失敗しました。上記のエラーメッセージをご確認ください。`)
+      addLog(`💡 カリキュラムID: ${curriculumId} - この情報を開発者にお伝えください。`)
+      alert(`⚠️ 個別最適化コースの生成に失敗しました（${failed}名）。\n\nカリキュラムID: ${curriculumId}\n\nブラウザのコンソール(F12)でエラーの詳細をご確認ください。`)
+    }
   } else if (completed > 0 && failed > 0) {
     addLog(`⚠️ 一部の生成に失敗しました。成功した${completed}名分のコースは保存されました。`)
-    // 生成後に確認
-    try {
-      const verifyRes = await axios.get(`/api/curriculum/${curriculumId}`)
-      const pCourses = (verifyRes.data.courses || []).filter(c => c.course_level === 'personalized')
-      addLog(`✅ DB確認: ${pCourses.length}件の個別コースがカリキュラムID:${curriculumId}に保存されています`)
-      console.log('📊 生成後DB確認:', { curriculumId, personalizedCount: pCourses.length, courses: pCourses.map(c => ({ id: c.id, name: c.course_name })) })
-    } catch(ve) { console.warn('DB確認エラー:', ve) }
   } else if (completed > 0) {
     addLog(`✅ ${completed}名全員の個別最適化コースが正常に保存されました！`)
-    // 生成後に確認
-    try {
-      const verifyRes = await axios.get(`/api/curriculum/${curriculumId}`)
-      const pCourses = (verifyRes.data.courses || []).filter(c => c.course_level === 'personalized')
-      addLog(`✅ DB確認: ${pCourses.length}件の個別コースがカリキュラムID:${curriculumId}に保存されています`)
-      console.log('📊 生成後DB確認:', { curriculumId, personalizedCount: pCourses.length, courses: pCourses.map(c => ({ id: c.id, name: c.course_name })) })
-    } catch(ve) { console.warn('DB確認エラー:', ve) }
   }
   
-  // 成功時のみ3秒後に自動でモーダルを閉じてページを更新（失敗時は手動で閉じる）
-  if (completed > 0) {
+  // 成功 OR DBにコースが存在すれば3秒後に自動でモーダルを閉じてページを更新
+  if (completed > 0 || dbPersonalizedCount > 0) {
     addLog(`🔄 3秒後にページを自動更新します...個別最適化コースが表示されます。`)
     setTimeout(() => {
       const m = document.getElementById('personalizedSelectorModal')
-      if (m) {
-        m.remove()
-        console.log('🔄 生成完了後にガイドページをリロード: curriculumId=', curriculumId, '成功:', completed, '件')
-        loadGuidePage(curriculumId)
-      }
+      if (m) m.remove()
+      console.log('🔄 生成完了後にガイドページをリロード: curriculumId=', curriculumId, '成功:', completed, '件, DB保存:', dbPersonalizedCount, '件')
+      loadGuidePage(curriculumId)
     }, 3000)
   }
 }
@@ -53888,15 +53898,20 @@ window.retryGenerateAssessment = retryGenerateAssessment
 
 // 個別最適化コースの学習を開始（state設定→selectCourse）
 async function startPersonalizedCourseLearning(courseId, curriculumId) {
+  console.log('🚀 startPersonalizedCourseLearning開始:', { courseId, curriculumId })
   try {
     // モーダルを閉じる
     const modal = document.getElementById('personalizedGuideModal')
     if (modal) modal.remove()
     
+    courseId = Number(courseId)
+    curriculumId = Number(curriculumId)
+    
     // state.selectedCurriculum を設定（selectCourseで必要）
     if (!state.selectedCurriculum || state.selectedCurriculum.id !== curriculumId) {
       try {
-        const currRes = await axios.get('/api/curriculum/' + curriculumId)
+        console.log('🌐 カリキュラム情報をAPI取得:', curriculumId)
+        const currRes = await axios.get('/api/curriculum/' + curriculumId, { timeout: 30000 })
         state.selectedCurriculum = currRes.data.curriculum
       } catch (e) {
         console.warn('カリキュラム情報取得失敗:', e)
@@ -53906,11 +53921,12 @@ async function startPersonalizedCourseLearning(courseId, curriculumId) {
     
     // カード一覧を取得してグローバルに保存（ページネーション用）
     try {
-      const cardsRes = await axios.get('/api/courses/' + courseId + '/cards')
+      console.log('🌐 カード一覧をAPI取得:', courseId)
+      const cardsRes = await axios.get('/api/courses/' + courseId + '/cards', { timeout: 30000 })
       const cards = cardsRes.data || []
       window._courseCardsList = cards.map(c => c.card_id || c.id).filter(Boolean)
       window._courseCardsData = cards
-      console.log('📚 個別コースカード保存:', window._courseCardsList.length, '枚')
+      console.log('📚 個別コースカード保存:', window._courseCardsList.length, '枚', window._courseCardsList)
     } catch (e) {
       console.warn('カード一覧取得失敗:', e)
       window._courseCardsList = []
