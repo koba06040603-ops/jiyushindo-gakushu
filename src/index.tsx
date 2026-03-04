@@ -15636,11 +15636,11 @@ ${customInfo}
     if (useHighQuality) {
       // 確実モード: Gemini 2.5 Pro のみを使用、より厳密な設定
       models = [
-        { name: 'gemini-2.5-flash', maxTokens: 16384 }  // 最高推論能力
+        { name: 'gemini-2.5-flash', maxTokens: 4096 }  // 基本情報のみなので少トークンで十分
       ]
       generationConfig = {
         temperature: 0.5,   // より確実で一貫性のある出力
-        maxOutputTokens: 16384,
+        maxOutputTokens: 4096,
         topP: 0.9,          // より保守的な選択
         topK: 20,           // トークン候補を制限
         responseMimeType: 'application/json',  // JSON出力を強制
@@ -15659,70 +15659,23 @@ ${customInfo}
                 non_cognitive_goal: { type: 'string' }
               },
               required: ['grade', 'subject', 'unit_name', 'unit_goal']
-            },
-            courses: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string' },
-                  course_name: { type: 'string' },
-                  label: { type: 'string' },
-                  description: { type: 'string' },
-                  color_code: { type: 'string' },
-                  cards: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        card_number: { type: 'number' },
-                        card_title: { type: 'string' },
-                        card_type: { type: 'string' },
-                        textbook_page: { type: 'string' },
-                        problem_description: { type: 'string' },
-                        new_terms: { type: 'string' },
-                        example_problem: { type: 'string' },
-                        example_solution: { type: 'string' },
-                        real_world_connection: { type: 'string' },
-                        answer: { type: 'string' },
-                        answer_explanation: { type: 'string' },
-                        hints: {
-                          type: 'array',
-                          items: {
-                            type: 'object',
-                            properties: {
-                              hint_level: { type: 'number' },
-                              hint_text: { type: 'string' }
-                            },
-                            required: ['hint_level', 'hint_text']
-                          }
-                        }
-                      },
-                      required: ['card_number', 'card_title', 'problem_description', 'real_world_connection', 'answer', 'hints']
-                    }
-                  }
-                },
-                required: ['name', 'course_name', 'cards']
-              }
             }
           },
-          required: ['curriculum', 'courses']
+          required: ['curriculum']
         }
       }
     } else {
       // 標準モード: Flash優先、フォールバックあり
       models = [
-        { name: 'gemini-2.5-flash', maxTokens: 16384 },     // プライマリ（Gemini 3.1 Flash）
-        { name: 'gemini-3-flash-preview', maxTokens: 16384 },       // フォールバック1
-        { name: 'gemini-2.5-flash', maxTokens: 16384 },             // フォールバック2
-        { name: 'gemini-2.0-flash', maxTokens: 16384 }              // 最終フォールバック
+        { name: 'gemini-2.5-flash', maxTokens: 4096 },     // プライマリ
+        { name: 'gemini-2.0-flash', maxTokens: 4096 }      // フォールバック
       ]
       generationConfig = {
         temperature: 0.7,
-        maxOutputTokens: 16384,
+        maxOutputTokens: 4096,
         topP: 0.95,
         topK: 40,
-        responseMimeType: 'application/json',  // JSON出力を強制（標準モードでも）
+        responseMimeType: 'application/json',  // JSON出力を強制
         responseSchema: {
           type: 'object',
           properties: {
@@ -15738,54 +15691,9 @@ ${customInfo}
                 non_cognitive_goal: { type: 'string' }
               },
               required: ['grade', 'subject', 'unit_name', 'unit_goal']
-            },
-            courses: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  name: { type: 'string' },
-                  course_name: { type: 'string' },
-                  label: { type: 'string' },
-                  description: { type: 'string' },
-                  color_code: { type: 'string' },
-                  cards: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        card_number: { type: 'number' },
-                        card_title: { type: 'string' },
-                        card_type: { type: 'string' },
-                        textbook_page: { type: 'string' },
-                        problem_description: { type: 'string' },
-                        new_terms: { type: 'string' },
-                        example_problem: { type: 'string' },
-                        example_solution: { type: 'string' },
-                        real_world_connection: { type: 'string' },
-                        answer: { type: 'string' },
-                        answer_explanation: { type: 'string' },
-                        hints: {
-                          type: 'array',
-                          items: {
-                            type: 'object',
-                            properties: {
-                              hint_level: { type: 'number' },
-                              hint_text: { type: 'string' }
-                            },
-                            required: ['hint_level', 'hint_text']
-                          }
-                        }
-                      },
-                      required: ['card_number', 'card_title', 'problem_description', 'real_world_connection', 'answer', 'hints']
-                    }
-                  }
-                },
-                required: ['name', 'course_name', 'cards']
-              }
             }
           },
-          required: ['curriculum', 'courses']
+          required: ['curriculum']
         }
       }
     }
