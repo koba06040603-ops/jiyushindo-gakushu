@@ -55401,7 +55401,7 @@ async function renderAdminDashboard() {
             </h1>
             <p class="text-indigo-300 text-sm mt-1">論文データ集計・システム管理・研究エクスポート</p>
           </div>
-          <button onclick="renderTopPage()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition border border-white/20">
+          <button onclick="renderTopPage()" class="bg-white hover:bg-gray-100 text-indigo-900 px-6 py-3 rounded-lg transition border-2 border-indigo-400 font-bold shadow-lg text-base">
             <i class="fas fa-arrow-left mr-2"></i>トップへ戻る
           </button>
         </div>
@@ -55444,6 +55444,13 @@ async function renderAdminDashboard() {
           <i class="fas fa-spinner fa-spin text-indigo-400 text-3xl"></i>
           <p class="text-white/60 mt-3">データを読み込み中...</p>
         </div>
+      </div>
+
+      <!-- ページ下部ナビゲーション -->
+      <div class="mt-8 mb-4 text-center">
+        <button onclick="renderTopPage()" class="bg-white hover:bg-gray-100 text-indigo-900 px-8 py-3 rounded-xl font-bold shadow-lg transition border-2 border-indigo-400 text-lg">
+          <i class="fas fa-home mr-2"></i>トップページに戻る
+        </button>
       </div>
     </div>
   `)
