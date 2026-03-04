@@ -1502,40 +1502,19 @@ async function renderTopPage() {
   
   // ★ body背景を統一（ログイン画面のグラデーションが残らないよう）
   document.body.className = 'bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen'
-  
-  stablePageTransition(`
-    <div class="container mx-auto px-4 py-8">
-      <!-- ヘッダー -->
-      <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-xl p-8 mb-8 text-center">
-        <h1 class="text-5xl font-bold text-white mb-3">
-          <i class="fas fa-graduation-cap mr-3"></i>
-          自由進度学習支援システム
-        </h1>
-        <p class="text-white text-xl opacity-90">AIで学習カードを自動生成</p>
-        <p class="text-white text-sm opacity-75 mt-2">学年・教科・教科書会社・単元を選んで学習スタート</p>
-      </div>
 
-      <!-- ユーザー情報 -->
-      <div class="bg-white rounded-lg shadow p-4 mb-8">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center">
-            <i class="fas fa-user-circle text-3xl text-indigo-500 mr-3"></i>
-            <div>
-              <p class="text-sm text-gray-500">ログイン中</p>
-              <p class="font-bold text-lg">\${state.student?.name || state.auth?.user?.email || 'ゲスト'}</p>
-              \${state.auth?.user ? \`<p class="text-xs text-gray-400">\${state.auth.user.role === 'teacher' ? '教師' : state.auth.user.role === 'admin' ? '管理者' : '児童・生徒'} | クラス: \${state.student?.classCode || '未設定'}</p>\` : ''}
-            </div>
-          </div>
-          <button
-            onclick="logout()"
-            class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-          >
-            <i class="fas fa-sign-out-alt mr-2"></i>ログアウト
-          </button>
-        </div>
-      </div>
+  // ★ 条件分岐HTMLを事前構築（テンプレートリテラルのエスケープ問題回避）
+  const user = state.auth?.user
+  const userName = state.student?.name || user?.email || 'ゲスト'
+  const isTeacher = user && user.role === 'teacher'
+  const isAdmin = user && user.role === 'admin'
+  const isTeacherOrAdmin = isTeacher || isAdmin
 
-      \${state.auth.user && (state.auth.user.role === 'teacher' || state.auth.user.role === 'admin') ? \`
+  const userRoleLabel = isTeacher ? '教師' : isAdmin ? '管理者' : '児童・生徒'
+  const classCode = state.student?.classCode || '未設定'
+  const userInfoLine = user ? '<p class="text-xs text-gray-400">' + userRoleLabel + ' | クラス: ' + classCode + '</p>' : ''
+
+  const teacherMenuHtml = isTeacherOrAdmin ? `
       <!-- 教師用メニュー -->
       <div class="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-xl p-6 mb-8">
         <h2 class="text-2xl font-bold text-white mb-4 text-center">
@@ -1572,9 +1551,9 @@ async function renderTopPage() {
           </button>
         </div>
       </div>
-      \` : ''}
+  ` : ''
 
-      \${state.auth.user && state.auth.user.role === 'admin' ? \`
+  const adminMenuHtml = isAdmin ? `
       <!-- 管理者専用メニュー -->
       <div class="bg-gradient-to-r from-gray-800 to-indigo-900 rounded-lg shadow-2xl p-6 mb-8 border border-indigo-500/30">
         <h2 class="text-2xl font-bold text-white mb-4 text-center">
@@ -1611,9 +1590,10 @@ async function renderTopPage() {
           </button>
         </div>
       </div>
-      \` : ''}
+  ` : ''
 
-      <!-- 12理論統合システム インフォグラフィック（全ユーザー表示） -->
+  const teacherOnlySectionsHtml = isTeacherOrAdmin ? `
+      <!-- 12理論統合システム インフォグラフィック -->
       <div class="bg-white rounded-2xl shadow-xl mb-8 overflow-hidden border-2 border-indigo-200">
         <div class="bg-gradient-to-r from-indigo-700 to-purple-800 p-5">
           <h2 class="text-xl font-bold text-white flex items-center">
@@ -1649,7 +1629,6 @@ async function renderTopPage() {
         </div>
       </div>
 
-      \${state.auth.user && (state.auth.user.role === 'teacher' || state.auth.user.role === 'admin') ? \`
       <!-- 個別最適化ロジック可視化 -->
       <div class="bg-white rounded-2xl shadow-xl mb-8 overflow-hidden border-2 border-indigo-200">
         <div class="bg-gradient-to-r from-indigo-600 to-purple-700 p-5">
@@ -1851,7 +1830,37 @@ async function renderTopPage() {
           </details>
         </div>
       </div>
-      \` : ''}
+  ` : ''
+
+  // ★ メインページHTML構築
+  stablePageTransition(`
+    <div class="max-w-6xl mx-auto p-4 md:p-8">
+
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl shadow-2xl p-6 mb-8">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>
+            <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center">
+              <i class="fas fa-graduation-cap mr-3"></i>自由進度学習システム
+            </h1>
+            <p class="text-blue-100 text-sm mt-1">AI × 12の教育理論で、一人ひとりに最適化された学びを</p>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-right">
+              <p class="font-bold text-lg text-white">${userName}</p>
+              ${userInfoLine}
+            </div>
+            <button onclick="logout()" class="bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+              <i class="fas fa-sign-out-alt mr-1"></i>ログアウト
+            </button>
+          </div>
+        </div>
+      </div>
+
+      ${teacherMenuHtml}
+      ${adminMenuHtml}
+      ${teacherOnlySectionsHtml}
+
       <div class="bg-white rounded-2xl shadow-2xl mb-8 overflow-hidden">
         <!-- ステップバー -->
         <div class="bg-gradient-to-r from-purple-600 to-pink-500 p-6">
