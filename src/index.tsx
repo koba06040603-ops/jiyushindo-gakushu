@@ -1603,6 +1603,624 @@ app.get('/api/admin/dashboard', authMiddleware, requireRole('admin', 'teacher'),
   })
 })
 
+// =============================================================================
+// 管理者専用ダッシュボード API群（論文・データ集計・システム管理）
+// =============================================================================
+
+// A-1. システム概要統計（論文の「システム規模」記述用）
+app.get('/api/admin/research/overview', async (c) => {
+  const { env } = c
+  try {
+    const queries = [
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM auth_users").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM auth_users WHERE user_role='teacher'").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM auth_users WHERE user_role='student'").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM auth_users WHERE user_role='admin'").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM courses").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM courses WHERE course_level='personalized'").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM learning_cards").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM answers").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM auth_sessions").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM curriculum").first(),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM ai_tutor_conversations").first().catch(() => ({ cnt: 0 })),
+      env.DB.prepare("SELECT COUNT(*) as cnt FROM card_edit_history").first().catch(() => ({ cnt: 0 })),
+      env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%' AND name NOT LIKE 'sqlite_%'").all(),
+    ]
+    const results = await Promise.all(queries)
+    
+    return c.json({
+      success: true,
+      overview: {
+        users: {
+          total: (results[0] as any)?.cnt || 0,
+          teachers: (results[1] as any)?.cnt || 0,
+          students: (results[2] as any)?.cnt || 0,
+          admins: (results[3] as any)?.cnt || 0,
+        },
+        content: {
+          curricula: (results[9] as any)?.cnt || 0,
+          courses: (results[4] as any)?.cnt || 0,
+          personalized_courses: (results[5] as any)?.cnt || 0,
+          learning_cards: (results[6] as any)?.cnt || 0,
+        },
+        activity: {
+          total_answers: (results[7] as any)?.cnt || 0,
+          active_sessions: (results[8] as any)?.cnt || 0,
+          ai_conversations: (results[10] as any)?.cnt || 0,
+          card_edits: (results[11] as any)?.cnt || 0,
+        },
+        system: {
+          total_tables: (results[12] as any)?.results?.length || 0,
+          db_engine: 'Cloudflare D1 (SQLite)',
+          ai_engine: 'Gemini 2.5 Flash / 3 Flash',
+          framework: 'Hono + Cloudflare Pages',
+        },
+        generated_at: new Date().toISOString()
+      }
+    })
+  } catch (error: any) {
+    console.error('管理者概要取得エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-2. カリキュラム別分析（論文の「分析結果」セクション用）
+app.get('/api/admin/research/curricula-analysis', async (c) => {
+  const { env } = c
+  try {
+    const curricula = await env.DB.prepare(`
+      SELECT c.id as curriculum_id, c.subject, c.grade, c.unit_name, c.textbook_company,
+             c.created_at,
+             COUNT(DISTINCT co.id) as course_count,
+             SUM(CASE WHEN co.course_level = 'personalized' THEN 1 ELSE 0 END) as personalized_count
+      FROM curriculum c
+      LEFT JOIN courses co ON c.id = co.curriculum_id
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+    `).all()
+
+    // 各カリキュラムのカード数を取得
+    const cardCounts = await env.DB.prepare(`
+      SELECT co.curriculum_id, COUNT(lc.card_id) as card_count
+      FROM courses co
+      JOIN learning_cards lc ON co.id = lc.course_id
+      GROUP BY co.curriculum_id
+    `).all()
+    
+    const cardMap = new Map((cardCounts.results || []).map((r: any) => [r.curriculum_id, r.card_count]))
+    
+    const enriched = (curricula.results || []).map((c: any) => ({
+      ...c,
+      card_count: cardMap.get(c.curriculum_id) || 0
+    }))
+
+    return c.json({ success: true, curricula: enriched })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-3. AI生成品質レポート（論文の「技術的知見」用）
+app.get('/api/admin/research/ai-quality', async (c) => {
+  const { env } = c
+  try {
+    // コースレベル別のカード数
+    const levelDist = await env.DB.prepare(`
+      SELECT co.course_level, COUNT(lc.card_id) as card_count,
+             AVG(lc.estimated_time_minutes) as avg_time
+      FROM courses co
+      JOIN learning_cards lc ON co.id = lc.course_id
+      GROUP BY co.course_level
+    `).all()
+
+    // 難易度分布
+    const difficultyDist = await env.DB.prepare(`
+      SELECT difficulty_level, COUNT(*) as cnt
+      FROM learning_cards
+      GROUP BY difficulty_level
+    `).all()
+
+    // カードタイプ分布
+    const typeDist = await env.DB.prepare(`
+      SELECT card_type, COUNT(*) as cnt
+      FROM learning_cards
+      GROUP BY card_type
+    `).all()
+
+    // 教科別カード数
+    const subjectDist = await env.DB.prepare(`
+      SELECT subject, COUNT(*) as cnt
+      FROM learning_cards
+      GROUP BY subject
+    `).all()
+    
+    // メディア付きカード率
+    const mediaStats = await env.DB.prepare(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN problem_image_url IS NOT NULL AND problem_image_url != '' THEN 1 ELSE 0 END) as with_image,
+        SUM(CASE WHEN solution_video_url IS NOT NULL AND solution_video_url != '' THEN 1 ELSE 0 END) as with_video
+      FROM learning_cards
+    `).first()
+
+    return c.json({
+      success: true,
+      ai_quality: {
+        course_level_distribution: levelDist.results || [],
+        difficulty_distribution: difficultyDist.results || [],
+        card_type_distribution: typeDist.results || [],
+        subject_distribution: subjectDist.results || [],
+        media_statistics: {
+          total_cards: (mediaStats as any)?.total || 0,
+          with_image: (mediaStats as any)?.with_image || 0,
+          with_video: (mediaStats as any)?.with_video || 0,
+          image_rate: (mediaStats as any)?.total > 0 ? (((mediaStats as any)?.with_image || 0) / (mediaStats as any).total * 100).toFixed(1) + '%' : '0%',
+          video_rate: (mediaStats as any)?.total > 0 ? (((mediaStats as any)?.with_video || 0) / (mediaStats as any).total * 100).toFixed(1) + '%' : '0%',
+        },
+        generated_at: new Date().toISOString()
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-4. ユーザー一覧管理
+app.get('/api/admin/users', async (c) => {
+  const { env } = c
+  try {
+    const users = await env.DB.prepare(`
+      SELECT user_id, username, full_name, user_role, school_id, is_active, created_at
+      FROM auth_users
+      ORDER BY user_role, user_id
+    `).all()
+    return c.json({ success: true, users: users.results || [] })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-5. ユーザー追加
+app.post('/api/admin/users', async (c) => {
+  const { env } = c
+  try {
+    const { username, password, full_name, user_role, school_id } = await c.req.json()
+    if (!username || !password || !full_name || !user_role) {
+      return c.json({ success: false, error: '必須項目が不足しています' }, 400)
+    }
+    const existing = await env.DB.prepare("SELECT user_id FROM auth_users WHERE username = ?").bind(username).first()
+    if (existing) {
+      return c.json({ success: false, error: 'そのユーザー名は既に使われています' }, 409)
+    }
+    const password_hash = await bcrypt.hash(password, 10)
+    const result = await env.DB.prepare(`
+      INSERT INTO auth_users (username, password_hash, full_name, user_role, school_id, is_active)
+      VALUES (?, ?, ?, ?, ?, 1)
+    `).bind(username, password_hash, full_name, user_role, school_id || 1).run()
+    return c.json({ success: true, user_id: result.meta?.last_row_id })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-6. ユーザー有効/無効切替
+app.put('/api/admin/users/:userId/toggle', async (c) => {
+  const { env } = c
+  const userId = c.req.param('userId')
+  try {
+    const user = await env.DB.prepare("SELECT is_active FROM auth_users WHERE user_id = ?").bind(userId).first()
+    if (!user) return c.json({ success: false, error: 'ユーザーが見つかりません' }, 404)
+    const newStatus = (user as any).is_active ? 0 : 1
+    await env.DB.prepare("UPDATE auth_users SET is_active = ? WHERE user_id = ?").bind(newStatus, userId).run()
+    return c.json({ success: true, is_active: newStatus })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-7. データエクスポート（CSV）
+app.get('/api/admin/export/:type', async (c) => {
+  const { env } = c
+  const type = c.req.param('type')
+  try {
+    let data: any[] = []
+    let filename = ''
+    
+    switch (type) {
+      case 'users':
+        const users = await env.DB.prepare("SELECT user_id, username, full_name, user_role, school_id, is_active, created_at FROM auth_users ORDER BY user_id").all()
+        data = users.results || []
+        filename = 'users_export.csv'
+        break
+      case 'curricula':
+        const cur = await env.DB.prepare("SELECT id as curriculum_id, subject, grade, unit_name, textbook_company, unit_goal, created_at FROM curriculum ORDER BY id").all()
+        data = cur.results || []
+        filename = 'curricula_export.csv'
+        break
+      case 'courses':
+        const courses = await env.DB.prepare("SELECT id as course_id, curriculum_id, course_name, course_level, description, created_at FROM courses ORDER BY id").all()
+        data = courses.results || []
+        filename = 'courses_export.csv'
+        break
+      case 'cards':
+        const cards = await env.DB.prepare(`
+          SELECT lc.card_id, lc.course_id, lc.card_title, lc.card_type, lc.difficulty_level, 
+                 lc.subject, lc.grade_level, lc.unit_name, lc.estimated_time_minutes, lc.created_at
+          FROM learning_cards lc ORDER BY lc.card_id
+        `).all()
+        data = cards.results || []
+        filename = 'learning_cards_export.csv'
+        break
+      case 'answers':
+        const ans = await env.DB.prepare(`
+          SELECT answer_id, student_id, card_id, answer_text, is_correct, time_spent_seconds, answered_at as created_at
+          FROM answers ORDER BY answer_id
+        `).all()
+        data = ans.results || []
+        filename = 'answers_export.csv'
+        break
+      default:
+        return c.json({ success: false, error: '不明なエクスポートタイプ: ' + type }, 400)
+    }
+    
+    if (data.length === 0) {
+      return c.json({ success: true, data: [], csv: '', filename, message: 'データがありません' })
+    }
+    
+    // CSV生成
+    const headers = Object.keys(data[0])
+    const csvRows = [headers.join(',')]
+    for (const row of data) {
+      csvRows.push(headers.map(h => {
+        const val = (row as any)[h]
+        if (val === null || val === undefined) return ''
+        const str = String(val).replace(/"/g, '""')
+        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str}"` : str
+      }).join(','))
+    }
+    const csv = csvRows.join('\n')
+    
+    // JSON形式でも返す（フロントで選択可能）
+    return c.json({ success: true, data, csv, filename, count: data.length })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-8. システムヘルスチェック（DB状態・テーブル一覧）
+app.get('/api/admin/system-health', async (c) => {
+  const { env } = c
+  try {
+    const startTime = Date.now()
+    
+    // テーブル一覧と行数を取得
+    const tables = await env.DB.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    ).all()
+    
+    const tableNames = (tables.results || []).map((t: any) => t.name)
+    
+    // 主要テーブルの行数を取得（高速化のため主要なもののみ）
+    const importantTables = ['auth_users', 'curricula', 'courses', 'learning_cards', 'answers', 'auth_sessions', 'students', 'ai_tutor_conversations', 'card_edit_history', 'achievements', 'badges']
+    const tableSizes: Record<string, number> = {}
+    
+    for (const tbl of importantTables) {
+      if (tableNames.includes(tbl)) {
+        try {
+          const cnt = await env.DB.prepare(`SELECT COUNT(*) as cnt FROM ${tbl}`).first()
+          tableSizes[tbl] = (cnt as any)?.cnt || 0
+        } catch { tableSizes[tbl] = -1 }
+      }
+    }
+    
+    const dbResponseTime = Date.now() - startTime
+    
+    return c.json({
+      success: true,
+      health: {
+        status: 'healthy',
+        db_response_ms: dbResponseTime,
+        total_tables: tableNames.length,
+        table_list: tableNames,
+        table_sizes: tableSizes,
+        uptime: process.uptime ? process.uptime() : 'N/A',
+        memory: process.memoryUsage ? process.memoryUsage() : 'N/A',
+        timestamp: new Date().toISOString()
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message, health: { status: 'error' } }, 500)
+  }
+})
+
+// A-9. 学習効果分析（論文の「個別最適化の効果」セクション用）
+app.get('/api/admin/research/learning-effectiveness', async (c) => {
+  const { env } = c
+  try {
+    // 個別最適化コースと通常コースの比較
+    const courseComparison = await env.DB.prepare(`
+      SELECT 
+        co.course_level,
+        COUNT(DISTINCT a.student_id) as student_count,
+        COUNT(a.answer_id) as total_answers,
+        ROUND(AVG(CASE WHEN a.is_correct = 1 THEN 100.0 ELSE 0 END), 1) as avg_correct_rate,
+        ROUND(AVG(a.time_spent_seconds), 1) as avg_time_seconds
+      FROM courses co
+      JOIN learning_cards lc ON co.id = lc.course_id
+      LEFT JOIN answers a ON lc.card_id = a.card_id
+      GROUP BY co.course_level
+    `).all()
+
+    // 日別の学習アクティビティ推移
+    const dailyActivity = await env.DB.prepare(`
+      SELECT 
+        DATE(a.answered_at) as date,
+        COUNT(*) as answer_count,
+        COUNT(DISTINCT a.student_id) as active_students,
+        ROUND(AVG(CASE WHEN a.is_correct = 1 THEN 100.0 ELSE 0 END), 1) as daily_correct_rate
+      FROM answers a
+      GROUP BY DATE(a.answered_at)
+      ORDER BY date DESC
+      LIMIT 30
+    `).all()
+
+    // 児童別の学習進捗サマリー
+    const studentProgress = await env.DB.prepare(`
+      SELECT 
+        a.student_id,
+        COUNT(*) as total_answers,
+        SUM(CASE WHEN a.is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        ROUND(AVG(CASE WHEN a.is_correct = 1 THEN 100.0 ELSE 0 END), 1) as correct_rate,
+        ROUND(AVG(a.time_spent_seconds), 1) as avg_time,
+        COUNT(DISTINCT lc.course_id) as courses_attempted
+      FROM answers a
+      JOIN learning_cards lc ON a.card_id = lc.card_id
+      GROUP BY a.student_id
+      ORDER BY total_answers DESC
+    `).all()
+
+    // カード難易度別の正答率
+    const difficultyAnalysis = await env.DB.prepare(`
+      SELECT 
+        lc.difficulty_level,
+        COUNT(a.answer_id) as total_attempts,
+        ROUND(AVG(CASE WHEN a.is_correct = 1 THEN 100.0 ELSE 0 END), 1) as correct_rate,
+        ROUND(AVG(a.time_spent_seconds), 1) as avg_time
+      FROM learning_cards lc
+      LEFT JOIN answers a ON lc.card_id = a.card_id
+      WHERE a.answer_id IS NOT NULL
+      GROUP BY lc.difficulty_level
+    `).all()
+
+    // 論文記述用テキスト自動生成
+    const comparison = (courseComparison.results || []) as any[]
+    const personalized = comparison.find(c => c.course_level === 'personalized')
+    const standard = comparison.find(c => c.course_level === 'standard')
+    
+    let researchText = '学習効果の分析結果: '
+    if (personalized && standard) {
+      const diffRate = ((personalized.avg_correct_rate || 0) - (standard.avg_correct_rate || 0)).toFixed(1)
+      researchText += `個別最適化コースの平均正答率は${personalized.avg_correct_rate || 0}%であり、標準コースの${standard.avg_correct_rate || 0}%と比較して${Number(diffRate) >= 0 ? '+' : ''}${diffRate}ポイントの差異が観測された。`
+      researchText += `個別最適化コースでは${personalized.student_count || 0}名の児童が計${personalized.total_answers || 0}問に取り組み、標準コースでは${standard.student_count || 0}名が計${standard.total_answers || 0}問に取り組んだ。`
+    } else {
+      researchText += `現時点でのデータでは、コースレベル別に${comparison.length}カテゴリの比較が可能である。`
+    }
+
+    return c.json({
+      success: true,
+      effectiveness: {
+        course_comparison: courseComparison.results || [],
+        daily_activity: (dailyActivity.results || []).reverse(),
+        student_progress: studentProgress.results || [],
+        difficulty_analysis: difficultyAnalysis.results || [],
+        research_text: researchText,
+        generated_at: new Date().toISOString()
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-10. 12理論統合分析（論文の「理論的枠組み」評価用）
+app.get('/api/admin/research/theory-analysis', async (c) => {
+  const { env } = c
+  try {
+    // 統合プロファイルデータを取得
+    const profiles = await env.DB.prepare(`
+      SELECT 
+        student_id,
+        knowledge_skill_level, thinking_expression_level, learning_attitude_level,
+        metacognition_level, learning_strategy_level, goal_setting_level,
+        dialogue_level, collaboration_level, social_perspective_level,
+        linguistic_intelligence, logical_mathematical_intelligence, spatial_intelligence,
+        bodily_kinesthetic_intelligence, musical_intelligence, interpersonal_intelligence,
+        intrapersonal_intelligence, naturalistic_intelligence,
+        dominant_intelligences, overall_profile_summary, confidence_score,
+        created_at
+      FROM student_profile_integrated
+      ORDER BY created_at DESC
+    `).all().catch(() => ({ results: [] }))
+
+    // 学習スタイル検出結果
+    const learningStyles = await env.DB.prepare(`
+      SELECT learning_style, COUNT(*) as cnt
+      FROM detected_learning_styles
+      GROUP BY learning_style
+    `).all().catch(() => ({ results: [] }))
+
+    // 総プロファイル数
+    const totalProfiles = (profiles.results || []).length
+
+    // 能力項目の平均値（12理論にマッピング）
+    const factorLabels = {
+      knowledge_skill: '知識・技能',
+      thinking_expression: '思考・判断・表現',
+      learning_attitude: '主体的学習態度',
+      metacognition: 'メタ認知',
+      learning_strategy: '学習方略',
+      goal_setting: '目標設定',
+      dialogue: '対話力',
+      collaboration: '協働力',
+      social_perspective: '社会的視座'
+    }
+
+    const factorAverages = totalProfiles > 0 ? Object.entries(factorLabels).map(([key, label]) => {
+      const vals = (profiles.results || []).map((p: any) => p[key + '_level']).filter((v: any) => v != null && v > 0)
+      const avg = vals.length > 0 ? vals.reduce((s: number, v: any) => s + Number(v), 0) / vals.length : 0
+      return { factor: key.toUpperCase().slice(0, 6), label, average: Number(avg.toFixed(2)) }
+    }) : []
+
+    // 多重知能の分布
+    const intelligenceLabels = ['linguistic', 'logical_mathematical', 'spatial', 'bodily_kinesthetic', 'musical', 'interpersonal', 'intrapersonal', 'naturalistic']
+    const intelligenceAvg = totalProfiles > 0 ? intelligenceLabels.map(key => {
+      const vals = (profiles.results || []).map((p: any) => p[key + '_intelligence']).filter((v: any) => v != null && v > 0)
+      const avg = vals.length > 0 ? vals.reduce((s: number, v: any) => s + Number(v), 0) / vals.length : 0
+      const labelMap: Record<string, string> = {
+        linguistic: '言語的', logical_mathematical: '論理数学的', spatial: '空間的',
+        bodily_kinesthetic: '身体運動的', musical: '音楽的', interpersonal: '対人的',
+        intrapersonal: '内省的', naturalistic: '博物的'
+      }
+      return { factor: key, label: labelMap[key] || key, average: Number(avg.toFixed(2)) }
+    }) : []
+
+    // 論文記述用テキスト
+    let researchText = `12理論統合プロファイル分析: 計${totalProfiles}件のプロファイルを分析した。`
+    if ((learningStyles.results || []).length > 0) {
+      researchText += `学習スタイル分布は${(learningStyles.results as any[]).map(s => `「${s.learning_style}」${s.cnt}名`).join('、')}であった。`
+    }
+    const highFactors = factorAverages.filter(f => f.average >= 3.5).map(f => f.label)
+    const lowFactors = factorAverages.filter(f => f.average > 0 && f.average < 2.0).map(f => f.label)
+    if (highFactors.length > 0) researchText += `特に${highFactors.join('・')}の評価が高い傾向を示した。`
+    if (lowFactors.length > 0) researchText += `一方、${lowFactors.join('・')}は相対的に低い値を示した。`
+
+    return c.json({
+      success: true,
+      theory_analysis: {
+        profiles: profiles.results || [],
+        archetype_distribution: learningStyles.results || [],
+        factor_averages: factorAverages,
+        intelligence_averages: intelligenceAvg,
+        total_profiles: totalProfiles,
+        research_text: researchText,
+        generated_at: new Date().toISOString()
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-11. 時系列トレンド分析（論文の「経時的変化」グラフ用）
+app.get('/api/admin/research/timeline', async (c) => {
+  const { env } = c
+  try {
+    // 週別の利用状況
+    const weeklyUsage = await env.DB.prepare(`
+      SELECT 
+        strftime('%Y-W%W', answered_at) as week,
+        COUNT(*) as answer_count,
+        COUNT(DISTINCT student_id) as unique_students,
+        ROUND(AVG(CASE WHEN is_correct = 1 THEN 100.0 ELSE 0 END), 1) as correct_rate
+      FROM answers
+      GROUP BY strftime('%Y-W%W', answered_at)
+      ORDER BY week
+    `).all()
+
+    // コンテンツ作成の推移
+    const contentTimeline = await env.DB.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as cards_created
+      FROM learning_cards
+      GROUP BY DATE(created_at)
+      ORDER BY date
+    `).all()
+
+    // カリキュラム作成推移
+    const curriculaTimeline = await env.DB.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as curricula_created
+      FROM curriculum
+      GROUP BY DATE(created_at)
+      ORDER BY date
+    `).all()
+
+    // セッション数の推移
+    const sessionTimeline = await env.DB.prepare(`
+      SELECT 
+        DATE(created_at) as date,
+        COUNT(*) as sessions_created
+      FROM auth_sessions
+      GROUP BY DATE(created_at)
+      ORDER BY date DESC
+      LIMIT 30
+    `).all()
+
+    return c.json({
+      success: true,
+      timeline: {
+        weekly_usage: weeklyUsage.results || [],
+        content_creation: contentTimeline.results || [],
+        curricula_creation: curriculaTimeline.results || [],
+        session_activity: (sessionTimeline.results || []).reverse(),
+        generated_at: new Date().toISOString()
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// A-12. リアルタイム統計ダッシュボード
+app.get('/api/admin/realtime-stats', async (c) => {
+  const { env } = c
+  try {
+    const today = new Date().toISOString().split('T')[0]
+    
+    const [todayAnswers, todaySessions, recentCards, activeCurricula] = await Promise.all([
+      env.DB.prepare(`
+        SELECT COUNT(*) as cnt, 
+               COUNT(DISTINCT student_id) as unique_students,
+               ROUND(AVG(CASE WHEN is_correct = 1 THEN 100.0 ELSE 0 END), 1) as correct_rate
+        FROM answers WHERE DATE(answered_at) = ?
+      `).bind(today).first().catch(() => ({ cnt: 0, unique_students: 0, correct_rate: 0 })),
+      env.DB.prepare(`
+        SELECT COUNT(*) as cnt FROM auth_sessions 
+        WHERE DATE(created_at) = ?
+      `).bind(today).first().catch(() => ({ cnt: 0 })),
+      env.DB.prepare(`
+        SELECT COUNT(*) as cnt FROM learning_cards 
+        WHERE DATE(created_at) = ?
+      `).bind(today).first().catch(() => ({ cnt: 0 })),
+      env.DB.prepare(`
+        SELECT COUNT(DISTINCT curriculum_id) as cnt FROM courses 
+        WHERE DATE(created_at) >= date('now', '-7 days')
+      `).first().catch(() => ({ cnt: 0 }))
+    ])
+
+    return c.json({
+      success: true,
+      realtime: {
+        today: {
+          answers: (todayAnswers as any)?.cnt || 0,
+          active_students: (todayAnswers as any)?.unique_students || 0,
+          correct_rate: (todayAnswers as any)?.correct_rate || 0,
+          sessions: (todaySessions as any)?.cnt || 0,
+          cards_created: (recentCards as any)?.cnt || 0,
+        },
+        week: {
+          active_curricula: (activeCurricula as any)?.cnt || 0,
+        },
+        timestamp: new Date().toISOString()
+      }
+    })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
 // ユーザータイプベースアクセス制御のデモ
 app.get('/api/student/progress', authMiddleware, requireUserType('student'), async (c) => {
   const user = c.get('user') as any;

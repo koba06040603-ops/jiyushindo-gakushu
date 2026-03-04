@@ -1574,6 +1574,45 @@ async function renderTopPage() {
       </div>
       \` : ''}
 
+      \${state.auth.user && state.auth.user.role === 'admin' ? \`
+      <!-- 管理者専用メニュー -->
+      <div class="bg-gradient-to-r from-gray-800 to-indigo-900 rounded-lg shadow-2xl p-6 mb-8 border border-indigo-500/30">
+        <h2 class="text-2xl font-bold text-white mb-4 text-center">
+          <i class="fas fa-shield-alt mr-2 text-indigo-400"></i>管理者専用メニュー
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <button 
+            onclick="renderAdminDashboard()"
+            class="bg-gradient-to-br from-indigo-600 to-indigo-800 hover:from-indigo-500 hover:to-indigo-700 text-white py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group border border-indigo-400/30">
+            <i class="fas fa-chart-pie mr-2 text-xl"></i>
+            論文データ集計
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+          <button 
+            onclick="renderAdminDashboard(); setTimeout(() => adminSwitchTab('research'), 300)"
+            class="bg-gradient-to-br from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group border border-green-400/30">
+            <i class="fas fa-flask mr-2 text-xl"></i>
+            AI品質レポート
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+          <button 
+            onclick="renderAdminDashboard(); setTimeout(() => adminSwitchTab('export'), 300)"
+            class="bg-gradient-to-br from-yellow-600 to-orange-700 hover:from-yellow-500 hover:to-orange-600 text-white py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group border border-yellow-400/30">
+            <i class="fas fa-file-export mr-2 text-xl"></i>
+            データエクスポート
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+          <button 
+            onclick="renderAdminDashboard(); setTimeout(() => adminSwitchTab('health'), 300)"
+            class="bg-gradient-to-br from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white py-4 px-6 rounded-lg font-bold text-lg transition shadow-lg flex items-center justify-center group border border-red-400/30">
+            <i class="fas fa-heartbeat mr-2 text-xl"></i>
+            システム状態
+            <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
+          </button>
+        </div>
+      </div>
+      \` : ''}
+
       <!-- 12理論統合システム インフォグラフィック（全ユーザー表示） -->
       <div class="bg-white rounded-2xl shadow-xl mb-8 overflow-hidden border-2 border-indigo-200">
         <div class="bg-gradient-to-r from-indigo-700 to-purple-800 p-5">
@@ -55337,3 +55376,926 @@ window.loadStudyPlanFromStorage = loadStudyPlanFromStorage
 console.log('✅ Phase 11 編集可能な学習計画表初期化完了')
 
 console.log('✅ Phase 9-2 PWA機能初期化完了')
+
+// =============================================================================
+// 管理者専用ダッシュボード（論文・データ集計・システム管理）
+// =============================================================================
+
+async function renderAdminDashboard() {
+  state.currentView = 'admin'
+  window.scrollTo(0, 0)
+  const app = document.getElementById('app')
+  if (!app) return
+  
+  document.body.className = 'bg-gradient-to-br from-gray-900 to-indigo-900 min-h-screen'
+  
+  stablePageTransition(`
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
+      <!-- ヘッダー -->
+      <div class="bg-gradient-to-r from-gray-800 to-indigo-900 rounded-2xl shadow-2xl p-6 mb-6 border border-indigo-500/30">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-3xl font-bold text-white flex items-center">
+              <i class="fas fa-shield-alt mr-3 text-indigo-400"></i>
+              管理者ダッシュボード
+            </h1>
+            <p class="text-indigo-300 text-sm mt-1">論文データ集計・システム管理・研究エクスポート</p>
+          </div>
+          <button onclick="renderTopPage()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition border border-white/20">
+            <i class="fas fa-arrow-left mr-2"></i>トップへ戻る
+          </button>
+        </div>
+      </div>
+
+      <!-- タブナビゲーション -->
+      <div class="flex gap-2 mb-6 flex-wrap">
+        <button onclick="adminSwitchTab('overview')" id="admin-tab-overview" class="admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-indigo-600 text-white">
+          <i class="fas fa-chart-pie mr-1"></i>概要統計
+        </button>
+        <button onclick="adminSwitchTab('research')" id="admin-tab-research" class="admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white/10 text-white/70 hover:bg-white/20">
+          <i class="fas fa-flask mr-1"></i>論文データ
+        </button>
+        <button onclick="adminSwitchTab('curricula')" id="admin-tab-curricula" class="admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white/10 text-white/70 hover:bg-white/20">
+          <i class="fas fa-book mr-1"></i>カリキュラム分析
+        </button>
+        <button onclick="adminSwitchTab('users')" id="admin-tab-users" class="admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white/10 text-white/70 hover:bg-white/20">
+          <i class="fas fa-users-cog mr-1"></i>ユーザー管理
+        </button>
+        <button onclick="adminSwitchTab('export')" id="admin-tab-export" class="admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white/10 text-white/70 hover:bg-white/20">
+          <i class="fas fa-file-export mr-1"></i>データエクスポート
+        </button>
+        <button onclick="adminSwitchTab('effectiveness')" id="admin-tab-effectiveness" class="admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white/10 text-white/70 hover:bg-white/20">
+          <i class="fas fa-chart-line mr-1"></i>学習効果
+        </button>
+        <button onclick="adminSwitchTab('theory')" id="admin-tab-theory" class="admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white/10 text-white/70 hover:bg-white/20">
+          <i class="fas fa-brain mr-1"></i>12理論分析
+        </button>
+        <button onclick="adminSwitchTab('timeline')" id="admin-tab-timeline" class="admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white/10 text-white/70 hover:bg-white/20">
+          <i class="fas fa-clock mr-1"></i>時系列
+        </button>
+        <button onclick="adminSwitchTab('health')" id="admin-tab-health" class="admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white/10 text-white/70 hover:bg-white/20">
+          <i class="fas fa-heartbeat mr-1"></i>システム状態
+        </button>
+      </div>
+
+      <!-- タブコンテンツ -->
+      <div id="admin-tab-content">
+        <div class="bg-white/5 rounded-xl p-8 text-center border border-white/10">
+          <i class="fas fa-spinner fa-spin text-indigo-400 text-3xl"></i>
+          <p class="text-white/60 mt-3">データを読み込み中...</p>
+        </div>
+      </div>
+    </div>
+  `)
+  
+  // デフォルトタブをロード
+  adminSwitchTab('overview')
+}
+
+function adminSwitchTab(tab) {
+  // タブボタンのスタイル切替
+  document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+    btn.className = 'admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-white/10 text-white/70 hover:bg-white/20'
+  })
+  const activeBtn = document.getElementById('admin-tab-' + tab)
+  if (activeBtn) activeBtn.className = 'admin-tab-btn px-5 py-2.5 rounded-lg font-bold text-sm transition bg-indigo-600 text-white shadow-lg'
+  
+  const content = document.getElementById('admin-tab-content')
+  if (!content) return
+  content.innerHTML = '<div class="bg-white/5 rounded-xl p-8 text-center border border-white/10"><i class="fas fa-spinner fa-spin text-indigo-400 text-3xl"></i><p class="text-white/60 mt-3">読み込み中...</p></div>'
+  
+  switch (tab) {
+    case 'overview': loadAdminOverview(); break
+    case 'research': loadAdminResearch(); break
+    case 'curricula': loadAdminCurricula(); break
+    case 'users': loadAdminUsers(); break
+    case 'export': loadAdminExport(); break
+    case 'health': loadAdminHealth(); break
+    case 'effectiveness': loadAdminEffectiveness(); break
+    case 'theory': loadAdminTheory(); break
+    case 'timeline': loadAdminTimeline(); break
+  }
+}
+
+// === 概要統計タブ ===
+async function loadAdminOverview() {
+  const content = document.getElementById('admin-tab-content')
+  try {
+    const res = await axios.get('/api/admin/research/overview', { timeout: 15000 })
+    const d = res.data.overview
+    content.innerHTML = `
+      <div class="space-y-6">
+        <!-- KPIカード -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl p-5 text-white shadow-xl">
+            <div class="text-3xl font-black">${d.users.total}</div>
+            <div class="text-blue-200 text-sm font-bold mt-1"><i class="fas fa-users mr-1"></i>総ユーザー数</div>
+            <div class="text-xs text-blue-300 mt-2">教師:${d.users.teachers} / 児童:${d.users.students} / 管理:${d.users.admins}</div>
+          </div>
+          <div class="bg-gradient-to-br from-green-600 to-green-800 rounded-xl p-5 text-white shadow-xl">
+            <div class="text-3xl font-black">${d.content.curricula}</div>
+            <div class="text-green-200 text-sm font-bold mt-1"><i class="fas fa-book mr-1"></i>カリキュラム数</div>
+            <div class="text-xs text-green-300 mt-2">コース:${d.content.courses} / 個別:${d.content.personalized_courses}</div>
+          </div>
+          <div class="bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl p-5 text-white shadow-xl">
+            <div class="text-3xl font-black">${d.content.learning_cards}</div>
+            <div class="text-purple-200 text-sm font-bold mt-1"><i class="fas fa-layer-group mr-1"></i>学習カード総数</div>
+            <div class="text-xs text-purple-300 mt-2">AI生成カード</div>
+          </div>
+          <div class="bg-gradient-to-br from-orange-600 to-orange-800 rounded-xl p-5 text-white shadow-xl">
+            <div class="text-3xl font-black">${d.activity.total_answers}</div>
+            <div class="text-orange-200 text-sm font-bold mt-1"><i class="fas fa-pencil-alt mr-1"></i>総回答数</div>
+            <div class="text-xs text-orange-300 mt-2">AI会話:${d.activity.ai_conversations} / 編集:${d.activity.card_edits}</div>
+          </div>
+        </div>
+        
+        <!-- システム情報 -->
+        <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+          <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-server mr-2 text-indigo-400"></i>システム構成</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white/5 rounded-lg p-3">
+              <div class="text-indigo-400 text-xs font-bold">DB Engine</div>
+              <div class="text-white font-bold">${d.system.db_engine}</div>
+            </div>
+            <div class="bg-white/5 rounded-lg p-3">
+              <div class="text-indigo-400 text-xs font-bold">AI Engine</div>
+              <div class="text-white font-bold">${d.system.ai_engine}</div>
+            </div>
+            <div class="bg-white/5 rounded-lg p-3">
+              <div class="text-indigo-400 text-xs font-bold">Framework</div>
+              <div class="text-white font-bold">${d.system.framework}</div>
+            </div>
+            <div class="bg-white/5 rounded-lg p-3">
+              <div class="text-indigo-400 text-xs font-bold">テーブル数</div>
+              <div class="text-white font-bold">${d.system.total_tables}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 論文記述用テキスト -->
+        <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+          <h3 class="text-lg font-bold text-white mb-3"><i class="fas fa-file-alt mr-2 text-yellow-400"></i>論文記述用サマリー（コピペ可）</h3>
+          <div class="bg-gray-900 rounded-lg p-4 text-sm text-green-300 font-mono whitespace-pre-wrap select-all" onclick="navigator.clipboard.writeText(this.textContent);showToast('コピーしました','success')">本システムは${d.system.framework}で構築され、${d.system.db_engine}をデータベースとして採用した。${d.system.ai_engine}を用いたAI生成エンジンにより、${d.content.curricula}のカリキュラムに対して${d.content.courses}コース（うち個別最適化${d.content.personalized_courses}コース）、計${d.content.learning_cards}枚の学習カードを自動生成した。システムには${d.users.total}名のユーザー（教師${d.users.teachers}名、児童${d.users.students}名）が登録され、${d.activity.total_answers}件の回答データが蓄積されている。データベースは${d.system.total_tables}テーブルで構成される。</div>
+          <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>クリックでクリップボードにコピーされます</p>
+        </div>
+        
+        <p class="text-xs text-gray-500 text-right">生成日時: ${d.generated_at}</p>
+      </div>
+    `
+  } catch (e) {
+    content.innerHTML = '<div class="bg-red-900/30 rounded-xl p-6 text-red-300"><i class="fas fa-exclamation-triangle mr-2"></i>データ取得エラー: ' + e.message + '</div>'
+  }
+}
+
+// === 論文データタブ（AI生成品質レポート） ===
+async function loadAdminResearch() {
+  const content = document.getElementById('admin-tab-content')
+  try {
+    const res = await axios.get('/api/admin/research/ai-quality', { timeout: 15000 })
+    const q = res.data.ai_quality
+    
+    const levelRows = (q.course_level_distribution || []).map(r => 
+      `<tr class="border-b border-white/10"><td class="py-2 px-3 text-white">${r.course_level || 'unknown'}</td><td class="py-2 px-3 text-white text-right">${r.card_count}</td><td class="py-2 px-3 text-white text-right">${r.avg_time ? Number(r.avg_time).toFixed(1) : '-'}分</td></tr>`
+    ).join('')
+    
+    const diffRows = (q.difficulty_distribution || []).map(r => {
+      const label = r.difficulty_level === 'easy' ? '🟢 きほん' : r.difficulty_level === 'hard' ? '🔴 チャレンジ' : '🔵 しっかり'
+      return `<tr class="border-b border-white/10"><td class="py-2 px-3 text-white">${label}</td><td class="py-2 px-3 text-white text-right">${r.cnt}</td></tr>`
+    }).join('')
+    
+    const subjectRows = (q.subject_distribution || []).map(r =>
+      `<tr class="border-b border-white/10"><td class="py-2 px-3 text-white">${r.subject || '未設定'}</td><td class="py-2 px-3 text-white text-right">${r.cnt}</td></tr>`
+    ).join('')
+    
+    content.innerHTML = `
+      <div class="space-y-6">
+        <h2 class="text-xl font-bold text-white"><i class="fas fa-flask mr-2 text-green-400"></i>AI生成品質レポート（論文用）</h2>
+        
+        <!-- メディア統計 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <div class="text-2xl font-black text-white">${q.media_statistics.total_cards}</div>
+            <div class="text-indigo-300 text-sm">総カード数</div>
+          </div>
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <div class="text-2xl font-black text-cyan-400">${q.media_statistics.with_image} <span class="text-sm text-gray-400">(${q.media_statistics.image_rate})</span></div>
+            <div class="text-indigo-300 text-sm">画像付きカード</div>
+          </div>
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <div class="text-2xl font-black text-pink-400">${q.media_statistics.with_video} <span class="text-sm text-gray-400">(${q.media_statistics.video_rate})</span></div>
+            <div class="text-indigo-300 text-sm">動画付きカード</div>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- コースレベル別 -->
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-layer-group mr-1"></i>コースレベル別</h3>
+            <table class="w-full text-sm"><thead><tr class="text-indigo-400 text-xs"><th class="text-left py-1 px-3">レベル</th><th class="text-right py-1 px-3">カード数</th><th class="text-right py-1 px-3">平均時間</th></tr></thead><tbody>${levelRows || '<tr><td colspan="3" class="text-gray-500 text-center py-3">データなし</td></tr>'}</tbody></table>
+          </div>
+          <!-- 難易度分布 -->
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-signal mr-1"></i>難易度分布</h3>
+            <table class="w-full text-sm"><thead><tr class="text-indigo-400 text-xs"><th class="text-left py-1 px-3">難易度</th><th class="text-right py-1 px-3">カード数</th></tr></thead><tbody>${diffRows || '<tr><td colspan="2" class="text-gray-500 text-center py-3">データなし</td></tr>'}</tbody></table>
+          </div>
+          <!-- 教科分布 -->
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-book-open mr-1"></i>教科別</h3>
+            <table class="w-full text-sm"><thead><tr class="text-indigo-400 text-xs"><th class="text-left py-1 px-3">教科</th><th class="text-right py-1 px-3">カード数</th></tr></thead><tbody>${subjectRows || '<tr><td colspan="2" class="text-gray-500 text-center py-3">データなし</td></tr>'}</tbody></table>
+          </div>
+        </div>
+        
+        <!-- 論文用テキスト -->
+        <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+          <h3 class="text-lg font-bold text-white mb-3"><i class="fas fa-file-alt mr-2 text-yellow-400"></i>論文記述用（AI生成品質セクション）</h3>
+          <div class="bg-gray-900 rounded-lg p-4 text-sm text-green-300 font-mono whitespace-pre-wrap select-all" onclick="navigator.clipboard.writeText(this.textContent);showToast('コピーしました','success')">AI生成エンジンにより計${q.media_statistics.total_cards}枚の学習カードが生成された。うち${q.media_statistics.with_image}枚（${q.media_statistics.image_rate}）に図解画像が、${q.media_statistics.with_video}枚（${q.media_statistics.video_rate}）に学習動画が付与された。難易度分布は${(q.difficulty_distribution || []).map(r => (r.difficulty_level === 'easy' ? '基本' : r.difficulty_level === 'hard' ? '発展' : '標準') + r.cnt + '枚').join('、')}であった。</div>
+        </div>
+      </div>
+    `
+  } catch (e) {
+    content.innerHTML = '<div class="bg-red-900/30 rounded-xl p-6 text-red-300"><i class="fas fa-exclamation-triangle mr-2"></i>' + e.message + '</div>'
+  }
+}
+
+// === カリキュラム分析タブ ===
+async function loadAdminCurricula() {
+  const content = document.getElementById('admin-tab-content')
+  try {
+    const res = await axios.get('/api/admin/research/curricula-analysis', { timeout: 15000 })
+    const curricula = res.data.curricula || []
+    
+    const rows = curricula.map(c => `
+      <tr class="border-b border-white/10 hover:bg-white/5">
+        <td class="py-2 px-3 text-white text-xs">${c.curriculum_id}</td>
+        <td class="py-2 px-3 text-white font-bold">${c.unit_name || '-'}</td>
+        <td class="py-2 px-3 text-white">${c.subject || '-'}</td>
+        <td class="py-2 px-3 text-white">${c.grade || '-'}</td>
+        <td class="py-2 px-3 text-white">${c.textbook_company || '-'}</td>
+        <td class="py-2 px-3 text-white text-right">${c.course_count}</td>
+        <td class="py-2 px-3 text-pink-400 text-right">${c.personalized_count}</td>
+        <td class="py-2 px-3 text-white text-right">${c.card_count}</td>
+        <td class="py-2 px-3 text-gray-400 text-xs">${c.created_at ? new Date(c.created_at).toLocaleDateString('ja-JP') : '-'}</td>
+      </tr>
+    `).join('')
+    
+    content.innerHTML = `
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-bold text-white"><i class="fas fa-book mr-2 text-blue-400"></i>カリキュラム別分析（${curricula.length}件）</h2>
+        </div>
+        <div class="bg-white/5 rounded-xl border border-white/10 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-indigo-400 text-xs border-b border-white/20">
+                <th class="text-left py-3 px-3">ID</th>
+                <th class="text-left py-3 px-3">単元名</th>
+                <th class="text-left py-3 px-3">教科</th>
+                <th class="text-left py-3 px-3">学年</th>
+                <th class="text-left py-3 px-3">教科書</th>
+                <th class="text-right py-3 px-3">コース</th>
+                <th class="text-right py-3 px-3">個別化</th>
+                <th class="text-right py-3 px-3">カード</th>
+                <th class="text-left py-3 px-3">作成日</th>
+              </tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="9" class="text-center text-gray-500 py-6">データなし</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+    `
+  } catch (e) {
+    content.innerHTML = '<div class="bg-red-900/30 rounded-xl p-6 text-red-300">' + e.message + '</div>'
+  }
+}
+
+// === ユーザー管理タブ ===
+async function loadAdminUsers() {
+  const content = document.getElementById('admin-tab-content')
+  try {
+    const res = await axios.get('/api/admin/users', { timeout: 15000 })
+    const users = res.data.users || []
+    
+    const roleLabel = r => r === 'admin' ? '<span class="bg-red-600 text-white px-2 py-0.5 rounded text-xs font-bold">管理者</span>' : r === 'teacher' ? '<span class="bg-blue-600 text-white px-2 py-0.5 rounded text-xs font-bold">教師</span>' : '<span class="bg-green-600 text-white px-2 py-0.5 rounded text-xs font-bold">児童</span>'
+    
+    const rows = users.map(u => `
+      <tr class="border-b border-white/10 hover:bg-white/5">
+        <td class="py-2 px-3 text-white">${u.user_id}</td>
+        <td class="py-2 px-3 text-white font-bold">${u.username}</td>
+        <td class="py-2 px-3 text-white">${u.full_name}</td>
+        <td class="py-2 px-3">${roleLabel(u.user_role)}</td>
+        <td class="py-2 px-3">${u.is_active ? '<span class="text-green-400 font-bold">有効</span>' : '<span class="text-red-400">無効</span>'}</td>
+        <td class="py-2 px-3 text-gray-400 text-xs">${u.created_at ? new Date(u.created_at).toLocaleDateString('ja-JP') : '-'}</td>
+        <td class="py-2 px-3">
+          <button onclick="adminToggleUser(${u.user_id})" class="text-xs ${u.is_active ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white px-2 py-1 rounded transition">
+            ${u.is_active ? '無効化' : '有効化'}
+          </button>
+        </td>
+      </tr>
+    `).join('')
+    
+    content.innerHTML = `
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-bold text-white"><i class="fas fa-users-cog mr-2 text-purple-400"></i>ユーザー管理（${users.length}名）</h2>
+          <button onclick="adminShowAddUser()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+            <i class="fas fa-user-plus mr-1"></i>ユーザー追加
+          </button>
+        </div>
+        
+        <!-- 追加フォーム（非表示） -->
+        <div id="admin-add-user-form" class="hidden bg-white/5 rounded-xl p-5 border border-indigo-500/30">
+          <h3 class="text-white font-bold mb-3"><i class="fas fa-user-plus mr-1"></i>新規ユーザー追加</h3>
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <input id="new-user-name" type="text" placeholder="ユーザー名" class="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-2 text-sm">
+            <input id="new-user-pass" type="text" placeholder="パスワード" class="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-2 text-sm" value="password123">
+            <input id="new-user-full" type="text" placeholder="表示名" class="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-2 text-sm">
+            <select id="new-user-role" class="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-2 text-sm">
+              <option value="student">児童</option><option value="teacher">教師</option><option value="admin">管理者</option>
+            </select>
+            <button onclick="adminAddUser()" class="bg-green-600 hover:bg-green-700 text-white rounded-lg px-3 py-2 text-sm font-bold transition">
+              <i class="fas fa-check mr-1"></i>追加
+            </button>
+          </div>
+        </div>
+        
+        <div class="bg-white/5 rounded-xl border border-white/10 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="text-indigo-400 text-xs border-b border-white/20">
+              <th class="text-left py-3 px-3">ID</th><th class="text-left py-3 px-3">ユーザー名</th><th class="text-left py-3 px-3">表示名</th><th class="text-left py-3 px-3">役割</th><th class="text-left py-3 px-3">状態</th><th class="text-left py-3 px-3">登録日</th><th class="text-left py-3 px-3">操作</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+    `
+  } catch (e) {
+    content.innerHTML = '<div class="bg-red-900/30 rounded-xl p-6 text-red-300">' + e.message + '</div>'
+  }
+}
+
+function adminShowAddUser() {
+  const form = document.getElementById('admin-add-user-form')
+  if (form) form.classList.toggle('hidden')
+}
+
+async function adminAddUser() {
+  const username = document.getElementById('new-user-name')?.value
+  const password = document.getElementById('new-user-pass')?.value
+  const full_name = document.getElementById('new-user-full')?.value
+  const user_role = document.getElementById('new-user-role')?.value
+  if (!username || !password || !full_name) { alert('全項目を入力してください'); return }
+  try {
+    const res = await axios.post('/api/admin/users', { username, password, full_name, user_role })
+    if (res.data.success) {
+      showToast('ユーザーを追加しました', 'success')
+      loadAdminUsers()
+    } else {
+      alert(res.data.error)
+    }
+  } catch (e) { alert('追加失敗: ' + (e.response?.data?.error || e.message)) }
+}
+
+async function adminToggleUser(userId) {
+  if (!confirm('このユーザーの有効/無効を切り替えますか？')) return
+  try {
+    await axios.put('/api/admin/users/' + userId + '/toggle')
+    showToast('ユーザー状態を変更しました', 'success')
+    loadAdminUsers()
+  } catch (e) { alert('変更失敗: ' + e.message) }
+}
+
+// === データエクスポートタブ ===
+function loadAdminExport() {
+  const content = document.getElementById('admin-tab-content')
+  const types = [
+    { key: 'users', label: 'ユーザー一覧', icon: 'fa-users', desc: 'auth_usersテーブルの全レコード（パスワードハッシュ除外）', color: 'blue' },
+    { key: 'curricula', label: 'カリキュラム一覧', icon: 'fa-book', desc: '教科・学年・単元・教科書情報', color: 'green' },
+    { key: 'courses', label: 'コース一覧', icon: 'fa-layer-group', desc: 'コースID・レベル・説明・紐付けカリキュラム', color: 'purple' },
+    { key: 'cards', label: '学習カード一覧', icon: 'fa-id-card', desc: 'カードタイトル・タイプ・難易度・教科・推定時間', color: 'pink' },
+    { key: 'answers', label: '回答データ', icon: 'fa-pencil-alt', desc: '児童の回答・正誤・スコア・所要時間（匿名化推奨）', color: 'orange' },
+  ]
+  
+  content.innerHTML = `
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white"><i class="fas fa-file-export mr-2 text-yellow-400"></i>データエクスポート（論文添付用）</h2>
+      <p class="text-sm text-gray-400">CSV形式またはJSON形式でダウンロードできます。論文の再現性担保やデータ分析用にご利用ください。</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        ${types.map(t => `
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10 hover:border-${t.color}-500/50 transition">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-lg bg-${t.color}-600/30 flex items-center justify-center">
+                <i class="fas ${t.icon} text-${t.color}-400"></i>
+              </div>
+              <div>
+                <h3 class="text-white font-bold">${t.label}</h3>
+                <p class="text-xs text-gray-400">${t.desc}</p>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="adminExportData('${t.key}','csv')" class="flex-1 bg-${t.color}-600 hover:bg-${t.color}-700 text-white py-2 rounded-lg text-xs font-bold transition">
+                <i class="fas fa-file-csv mr-1"></i>CSV
+              </button>
+              <button onclick="adminExportData('${t.key}','json')" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg text-xs font-bold transition">
+                <i class="fas fa-file-code mr-1"></i>JSON
+              </button>
+            </div>
+            <div id="export-status-${t.key}" class="mt-2 text-xs text-gray-500"></div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `
+}
+
+async function adminExportData(type, format) {
+  const statusEl = document.getElementById('export-status-' + type)
+  if (statusEl) statusEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>取得中...'
+  try {
+    const res = await axios.get('/api/admin/export/' + type, { timeout: 30000 })
+    const d = res.data
+    if (!d.success) throw new Error(d.error)
+    if (d.count === 0) {
+      if (statusEl) statusEl.innerHTML = '<span class="text-yellow-400">データがありません</span>'
+      return
+    }
+    
+    let blob, fname
+    if (format === 'csv') {
+      // BOM付きCSV
+      blob = new Blob(['\uFEFF' + d.csv], { type: 'text/csv;charset=utf-8' })
+      fname = d.filename || (type + '_export.csv')
+    } else {
+      blob = new Blob([JSON.stringify(d.data, null, 2)], { type: 'application/json' })
+      fname = type + '_export.json'
+    }
+    
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
+    
+    if (statusEl) statusEl.innerHTML = '<span class="text-green-400"><i class="fas fa-check mr-1"></i>' + d.count + '件をダウンロード</span>'
+    showToast(d.count + '件のデータをエクスポートしました', 'success')
+  } catch (e) {
+    if (statusEl) statusEl.innerHTML = '<span class="text-red-400">エラー: ' + e.message + '</span>'
+  }
+}
+
+// === システム状態タブ ===
+async function loadAdminHealth() {
+  const content = document.getElementById('admin-tab-content')
+  try {
+    const res = await axios.get('/api/admin/system-health', { timeout: 15000 })
+    const h = res.data.health
+    
+    const tableRows = Object.entries(h.table_sizes || {}).map(([name, cnt]) => 
+      `<tr class="border-b border-white/10"><td class="py-1.5 px-3 text-white font-mono text-xs">${name}</td><td class="py-1.5 px-3 text-white text-right">${cnt}</td></tr>`
+    ).join('')
+    
+    const statusColor = h.status === 'healthy' ? 'green' : 'red'
+    
+    content.innerHTML = `
+      <div class="space-y-6">
+        <div class="flex items-center gap-4">
+          <h2 class="text-xl font-bold text-white"><i class="fas fa-heartbeat mr-2 text-${statusColor}-400"></i>システムヘルスチェック</h2>
+          <span class="bg-${statusColor}-600 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">${h.status.toUpperCase()}</span>
+        </div>
+        
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-white/5 rounded-xl p-4 border border-white/10">
+            <div class="text-2xl font-black text-green-400">${h.db_response_ms}ms</div>
+            <div class="text-gray-400 text-xs">DB応答時間</div>
+          </div>
+          <div class="bg-white/5 rounded-xl p-4 border border-white/10">
+            <div class="text-2xl font-black text-blue-400">${h.total_tables}</div>
+            <div class="text-gray-400 text-xs">テーブル数</div>
+          </div>
+          <div class="bg-white/5 rounded-xl p-4 border border-white/10">
+            <div class="text-2xl font-black text-white">${new Date(h.timestamp).toLocaleTimeString('ja-JP')}</div>
+            <div class="text-gray-400 text-xs">チェック時刻</div>
+          </div>
+          <div class="bg-white/5 rounded-xl p-4 border border-white/10">
+            <button onclick="loadAdminHealth()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold transition">
+              <i class="fas fa-redo mr-1"></i>再チェック
+            </button>
+          </div>
+        </div>
+        
+        <!-- 主要テーブル行数 -->
+        <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+          <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-database mr-1"></i>主要テーブルの行数</h3>
+          <table class="w-full text-sm">
+            <thead><tr class="text-indigo-400 text-xs border-b border-white/20"><th class="text-left py-2 px-3">テーブル名</th><th class="text-right py-2 px-3">行数</th></tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+        
+        <!-- 全テーブル一覧 -->
+        <details class="bg-white/5 rounded-xl border border-white/10">
+          <summary class="p-4 cursor-pointer text-white font-bold text-sm"><i class="fas fa-list mr-1"></i>全テーブル一覧（${h.total_tables}件）</summary>
+          <div class="p-4 pt-0 grid grid-cols-2 md:grid-cols-4 gap-1 text-xs">
+            ${(h.table_list || []).map(t => '<span class="bg-white/5 rounded px-2 py-1 text-gray-300 font-mono">' + t + '</span>').join('')}
+          </div>
+        </details>
+      </div>
+    `
+  } catch (e) {
+    content.innerHTML = '<div class="bg-red-900/30 rounded-xl p-6 text-red-300"><i class="fas fa-exclamation-triangle mr-2"></i>' + e.message + '</div>'
+  }
+}
+
+// === 学習効果分析タブ（論文の「効果検証」用） ===
+async function loadAdminEffectiveness() {
+  const content = document.getElementById('admin-tab-content')
+  try {
+    const [effRes, rtRes] = await Promise.all([
+      axios.get('/api/admin/research/learning-effectiveness', { timeout: 20000 }),
+      axios.get('/api/admin/realtime-stats', { timeout: 10000 }).catch(() => ({ data: { realtime: { today: {} } } }))
+    ])
+    const eff = effRes.data.effectiveness
+    const rt = rtRes.data.realtime?.today || {}
+
+    // コースレベル比較表
+    const compRows = (eff.course_comparison || []).map(c => {
+      const levelLabel = c.course_level === 'personalized' ? '🎯 個別最適化' : c.course_level === 'basic' ? '📘 じっくり' : c.course_level === 'standard' ? '📗 しっかり' : c.course_level === 'advanced' ? '📕 ぐんぐん' : c.course_level || '不明'
+      const rateColor = (c.avg_correct_rate || 0) >= 80 ? 'text-green-400' : (c.avg_correct_rate || 0) >= 60 ? 'text-yellow-400' : 'text-red-400'
+      return `<tr class="border-b border-white/10 hover:bg-white/5">
+        <td class="py-3 px-4 text-white font-bold">${levelLabel}</td>
+        <td class="py-3 px-4 text-white text-right">${c.student_count || 0}名</td>
+        <td class="py-3 px-4 text-white text-right">${c.total_answers || 0}問</td>
+        <td class="py-3 px-4 text-right font-black ${rateColor}">${c.avg_correct_rate || 0}%</td>
+        <td class="py-3 px-4 text-white text-right">${c.avg_time_seconds ? Number(c.avg_time_seconds).toFixed(0) + '秒' : '-'}</td>
+      </tr>`
+    }).join('')
+
+    // 日別アクティビティグラフ
+    const maxAnswers = Math.max(...(eff.daily_activity || []).map(d => d.answer_count || 0), 1)
+    const dailyRows = (eff.daily_activity || []).slice(-14).map(d => {
+      const barWidth = Math.round((d.answer_count / maxAnswers) * 100)
+      const rateColor = (d.daily_correct_rate || 0) >= 80 ? 'bg-green-500' : (d.daily_correct_rate || 0) >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+      return `<div class="flex items-center gap-2 py-1">
+        <span class="text-xs text-gray-400 w-20 shrink-0">${d.date ? d.date.slice(5) : ''}</span>
+        <div class="flex-1 bg-white/5 rounded-full h-4 overflow-hidden">
+          <div class="${rateColor} h-full rounded-full transition-all" style="width:${barWidth}%"></div>
+        </div>
+        <span class="text-xs text-white w-12 text-right">${d.answer_count}</span>
+        <span class="text-xs text-gray-400 w-14 text-right">${d.daily_correct_rate || 0}%</span>
+      </div>`
+    }).join('')
+
+    // 難易度別分析
+    const diffRows = (eff.difficulty_analysis || []).map(d => {
+      const label = d.difficulty_level === 'easy' ? '🟢 基本' : d.difficulty_level === 'hard' ? '🔴 発展' : '🔵 標準'
+      return `<tr class="border-b border-white/10">
+        <td class="py-2 px-3 text-white">${label}</td>
+        <td class="py-2 px-3 text-white text-right">${d.total_attempts || 0}</td>
+        <td class="py-2 px-3 text-right font-bold ${(d.correct_rate||0) >= 70 ? 'text-green-400' : 'text-yellow-400'}">${d.correct_rate || 0}%</td>
+        <td class="py-2 px-3 text-white text-right">${d.avg_time ? Number(d.avg_time).toFixed(0) + '秒' : '-'}</td>
+      </tr>`
+    }).join('')
+
+    // 児童別上位10名
+    const topStudents = (eff.student_progress || []).slice(0, 10).map((s, i) => `
+      <tr class="border-b border-white/10 hover:bg-white/5">
+        <td class="py-2 px-3 text-gray-400">${i+1}</td>
+        <td class="py-2 px-3 text-white">児童ID:${s.student_id}</td>
+        <td class="py-2 px-3 text-white text-right">${s.total_answers}</td>
+        <td class="py-2 px-3 text-right font-bold ${(s.correct_rate||0)>=80?'text-green-400':'text-yellow-400'}">${s.correct_rate}%</td>
+        <td class="py-2 px-3 text-white text-right">${s.courses_attempted}</td>
+      </tr>`
+    ).join('')
+
+    content.innerHTML = `
+      <div class="space-y-6">
+        <h2 class="text-xl font-bold text-white"><i class="fas fa-chart-line mr-2 text-cyan-400"></i>学習効果分析（論文データ用）</h2>
+        
+        <!-- リアルタイム指標 -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div class="bg-gradient-to-br from-cyan-600/30 to-cyan-800/30 rounded-xl p-4 border border-cyan-500/30">
+            <div class="text-2xl font-black text-cyan-400">${rt.answers || 0}</div>
+            <div class="text-xs text-gray-400">本日の回答数</div>
+          </div>
+          <div class="bg-gradient-to-br from-green-600/30 to-green-800/30 rounded-xl p-4 border border-green-500/30">
+            <div class="text-2xl font-black text-green-400">${rt.active_students || 0}</div>
+            <div class="text-xs text-gray-400">本日のアクティブ児童</div>
+          </div>
+          <div class="bg-gradient-to-br from-yellow-600/30 to-yellow-800/30 rounded-xl p-4 border border-yellow-500/30">
+            <div class="text-2xl font-black text-yellow-400">${rt.correct_rate || 0}%</div>
+            <div class="text-xs text-gray-400">本日の正答率</div>
+          </div>
+          <div class="bg-gradient-to-br from-purple-600/30 to-purple-800/30 rounded-xl p-4 border border-purple-500/30">
+            <div class="text-2xl font-black text-purple-400">${rt.sessions || 0}</div>
+            <div class="text-xs text-gray-400">本日のセッション</div>
+          </div>
+          <div class="bg-gradient-to-br from-pink-600/30 to-pink-800/30 rounded-xl p-4 border border-pink-500/30">
+            <div class="text-2xl font-black text-pink-400">${rt.cards_created || 0}</div>
+            <div class="text-xs text-gray-400">本日の生成カード</div>
+          </div>
+        </div>
+
+        <!-- コースレベル別比較 -->
+        <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+          <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-balance-scale mr-2 text-yellow-400"></i>コースレベル別学習効果比較</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-indigo-400 text-xs border-b border-white/20">
+                <th class="text-left py-3 px-4">コースレベル</th>
+                <th class="text-right py-3 px-4">児童数</th>
+                <th class="text-right py-3 px-4">回答数</th>
+                <th class="text-right py-3 px-4">正答率</th>
+                <th class="text-right py-3 px-4">平均所要時間</th>
+              </tr></thead>
+              <tbody>${compRows || '<tr><td colspan="5" class="text-center text-gray-500 py-6">データなし</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- 日別アクティビティ -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-chart-bar mr-1"></i>直近14日間の学習アクティビティ</h3>
+            <div class="text-right text-xs text-gray-500 mb-2">回答数 | 正答率</div>
+            ${dailyRows || '<p class="text-gray-500 text-center py-4">データなし</p>'}
+          </div>
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-signal mr-1"></i>難易度別正答率</h3>
+            <table class="w-full text-sm">
+              <thead><tr class="text-indigo-400 text-xs border-b border-white/20">
+                <th class="text-left py-2 px-3">難易度</th><th class="text-right py-2 px-3">回答数</th><th class="text-right py-2 px-3">正答率</th><th class="text-right py-2 px-3">平均時間</th>
+              </tr></thead>
+              <tbody>${diffRows || '<tr><td colspan="4" class="text-center text-gray-500 py-4">データなし</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 児童別トップ10 -->
+        <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+          <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-trophy mr-1 text-yellow-400"></i>学習量トップ10</h3>
+          <table class="w-full text-sm">
+            <thead><tr class="text-indigo-400 text-xs border-b border-white/20">
+              <th class="text-left py-2 px-3">#</th><th class="text-left py-2 px-3">児童</th><th class="text-right py-2 px-3">回答数</th><th class="text-right py-2 px-3">正答率</th><th class="text-right py-2 px-3">コース数</th>
+            </tr></thead>
+            <tbody>${topStudents || '<tr><td colspan="5" class="text-center text-gray-500 py-4">データなし</td></tr>'}</tbody>
+          </table>
+        </div>
+
+        <!-- 論文記述用 -->
+        <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+          <h3 class="text-lg font-bold text-white mb-3"><i class="fas fa-file-alt mr-2 text-yellow-400"></i>論文記述用（学習効果セクション）</h3>
+          <div class="bg-gray-900 rounded-lg p-4 text-sm text-green-300 font-mono whitespace-pre-wrap select-all cursor-pointer" onclick="navigator.clipboard.writeText(this.textContent);showToast('コピーしました','success')">${eff.research_text || ''}</div>
+          <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>クリックでコピー</p>
+        </div>
+        
+        <p class="text-xs text-gray-500 text-right">生成日時: ${eff.generated_at}</p>
+      </div>
+    `
+  } catch (e) {
+    content.innerHTML = '<div class="bg-red-900/30 rounded-xl p-6 text-red-300"><i class="fas fa-exclamation-triangle mr-2"></i>データ取得エラー: ' + e.message + '</div>'
+  }
+}
+
+// === 12理論統合分析タブ ===
+async function loadAdminTheory() {
+  const content = document.getElementById('admin-tab-content')
+  try {
+    const res = await axios.get('/api/admin/research/theory-analysis', { timeout: 20000 })
+    const ta = res.data.theory_analysis
+
+    // アーキタイプ分布（学習スタイル）
+    const totalProfiles = ta.total_profiles || 0
+    const archetypeCards = (ta.archetype_distribution || []).map(a => {
+      const colors = {
+        'visual': 'from-blue-600 to-blue-800', 'auditory': 'from-green-600 to-green-800',
+        'kinesthetic': 'from-purple-600 to-purple-800', 'reading': 'from-orange-600 to-orange-800',
+        '視覚型': 'from-blue-600 to-blue-800', '聴覚型': 'from-green-600 to-green-800',
+        '体感型': 'from-purple-600 to-purple-800', '読書型': 'from-orange-600 to-orange-800'
+      }
+      const bgClass = colors[a.learning_style || a.archetype] || 'from-gray-600 to-gray-800'
+      const pct = totalProfiles > 0 ? ((a.cnt || 0) / totalProfiles * 100).toFixed(1) : 0
+      return `<div class="bg-gradient-to-br ${bgClass} rounded-xl p-4 text-white shadow-lg">
+        <div class="text-2xl font-black">${a.cnt || 0}</div>
+        <div class="text-sm font-bold opacity-90">${a.learning_style || a.archetype || '未分類'}</div>
+        <div class="text-xs opacity-70">${pct}%</div>
+      </div>`
+    }).join('')
+
+    // 能力因子の平均値
+    const factorBars = (ta.factor_averages || []).map(f => {
+      const maxVal = 5 // 5段階評価想定
+      const pct = Math.round(((f.average || 0) / maxVal) * 100)
+      const color = pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-yellow-500' : pct > 0 ? 'bg-red-500' : 'bg-gray-600'
+      return `<div class="flex items-center gap-2 py-1">
+        <span class="text-xs text-white w-36 truncate">${f.label}</span>
+        <div class="flex-1 bg-white/10 rounded-full h-3 overflow-hidden">
+          <div class="${color} h-full rounded-full" style="width:${pct}%"></div>
+        </div>
+        <span class="text-xs text-white w-10 text-right">${f.average || '-'}</span>
+      </div>`
+    }).join('')
+
+    // 多重知能の平均値
+    const intelligenceBars = (ta.intelligence_averages || []).map(f => {
+      const maxVal = 5
+      const pct = Math.round(((f.average || 0) / maxVal) * 100)
+      const color = pct >= 70 ? 'bg-cyan-500' : pct >= 40 ? 'bg-blue-500' : pct > 0 ? 'bg-indigo-500' : 'bg-gray-600'
+      return `<div class="flex items-center gap-2 py-1">
+        <span class="text-xs text-white w-28 truncate">${f.label}知能</span>
+        <div class="flex-1 bg-white/10 rounded-full h-3 overflow-hidden">
+          <div class="${color} h-full rounded-full" style="width:${pct}%"></div>
+        </div>
+        <span class="text-xs text-white w-10 text-right">${f.average || '-'}</span>
+      </div>`
+    }).join('')
+
+    // プロファイル一覧（最新10件）
+    const profileRows = (ta.profiles || []).slice(0, 10).map(p => `
+      <tr class="border-b border-white/10 hover:bg-white/5 text-xs">
+        <td class="py-1.5 px-2 text-white">ID:${p.student_id}</td>
+        <td class="py-1.5 px-2 text-white">${(p.knowledge_skill_level||0)}</td>
+        <td class="py-1.5 px-2 text-white">${(p.thinking_expression_level||0)}</td>
+        <td class="py-1.5 px-2 text-white">${(p.metacognition_level||0)}</td>
+        <td class="py-1.5 px-2 text-white">${(p.collaboration_level||0)}</td>
+        <td class="py-1.5 px-2 text-indigo-300 text-xs truncate max-w-[120px]">${p.dominant_intelligences || '-'}</td>
+        <td class="py-1.5 px-2 text-cyan-300">${(p.confidence_score||0)}</td>
+        <td class="py-1.5 px-2 text-gray-400">${p.created_at ? new Date(p.created_at).toLocaleDateString('ja-JP') : '-'}</td>
+      </tr>`
+    ).join('')
+
+    content.innerHTML = `
+      <div class="space-y-6">
+        <h2 class="text-xl font-bold text-white"><i class="fas fa-brain mr-2 text-purple-400"></i>12理論統合分析（${totalProfiles}プロファイル）</h2>
+        
+        ${totalProfiles === 0 ? `
+          <div class="bg-yellow-900/30 rounded-xl p-6 border border-yellow-500/30 text-center">
+            <i class="fas fa-info-circle text-yellow-400 text-3xl mb-3"></i>
+            <h3 class="text-white font-bold text-lg mb-2">理論プロファイルデータなし</h3>
+            <p class="text-yellow-200 text-sm">児童が学習を進めると、12理論プロファイルが自動生成されます。<br>個別最適化コースを生成するためには、まず児童の学習データが必要です。</p>
+          </div>
+        ` : `
+          <!-- アーキタイプ分布（学習スタイル） -->
+          <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+            <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-puzzle-piece mr-2 text-pink-400"></i>学習スタイル分布</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              ${archetypeCards || '<div class="col-span-4 text-center text-gray-500">データなし</div>'}
+            </div>
+          </div>
+
+          <!-- 能力因子平均 -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+              <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-sliders-h mr-2 text-cyan-400"></i>学力・資質能力の平均値</h3>
+              <div class="max-w-xl">${factorBars || '<p class="text-gray-500">データなし</p>'}</div>
+            </div>
+            <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+              <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-lightbulb mr-2 text-yellow-400"></i>多重知能の平均値</h3>
+              <div class="max-w-xl">${intelligenceBars || '<p class="text-gray-500">データなし</p>'}</div>
+            </div>
+          </div>
+
+          <!-- プロファイル一覧 -->
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-table mr-1"></i>直近プロファイル（最新10件）</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead><tr class="text-indigo-400 text-xs border-b border-white/20">
+                  <th class="text-left py-2 px-2">児童</th><th class="text-right py-2 px-2">知識技能</th><th class="text-right py-2 px-2">思考表現</th><th class="text-right py-2 px-2">メタ認知</th><th class="text-right py-2 px-2">協働力</th><th class="text-left py-2 px-2">優位知能</th><th class="text-right py-2 px-2">信頼度</th><th class="text-left py-2 px-2">日付</th>
+                </tr></thead>
+                <tbody>${profileRows || '<tr><td colspan="8" class="text-center text-gray-500 py-4">データなし</td></tr>'}</tbody>
+              </table>
+            </div>
+          </div>
+        `}
+
+        <!-- 論文記述用 -->
+        <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+          <h3 class="text-lg font-bold text-white mb-3"><i class="fas fa-file-alt mr-2 text-yellow-400"></i>論文記述用（12理論分析セクション）</h3>
+          <div class="bg-gray-900 rounded-lg p-4 text-sm text-green-300 font-mono whitespace-pre-wrap select-all cursor-pointer" onclick="navigator.clipboard.writeText(this.textContent);showToast('コピーしました','success')">${ta.research_text || ''}</div>
+          <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>クリックでコピー</p>
+        </div>
+        
+        <p class="text-xs text-gray-500 text-right">生成日時: ${ta.generated_at}</p>
+      </div>
+    `
+  } catch (e) {
+    content.innerHTML = '<div class="bg-red-900/30 rounded-xl p-6 text-red-300"><i class="fas fa-exclamation-triangle mr-2"></i>' + e.message + '</div>'
+  }
+}
+
+// === 時系列トレンド分析タブ ===
+async function loadAdminTimeline() {
+  const content = document.getElementById('admin-tab-content')
+  try {
+    const res = await axios.get('/api/admin/research/timeline', { timeout: 20000 })
+    const tl = res.data.timeline
+
+    // 週別利用状況
+    const maxWeekly = Math.max(...(tl.weekly_usage || []).map(w => w.answer_count || 0), 1)
+    const weeklyRows = (tl.weekly_usage || []).map(w => {
+      const barW = Math.round((w.answer_count / maxWeekly) * 100)
+      return `<div class="flex items-center gap-2 py-1.5">
+        <span class="text-xs text-gray-400 w-20 shrink-0 font-mono">${w.week || ''}</span>
+        <div class="flex-1 bg-white/5 rounded-full h-5 overflow-hidden relative">
+          <div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full rounded-full" style="width:${barW}%"></div>
+          <span class="absolute right-2 top-0.5 text-xs text-white/80">${w.answer_count}回答 / ${w.unique_students}名</span>
+        </div>
+        <span class="text-xs w-14 text-right ${(w.correct_rate||0)>=70?'text-green-400':'text-yellow-400'} font-bold">${w.correct_rate || 0}%</span>
+      </div>`
+    }).join('')
+
+    // コンテンツ作成推移
+    const maxCards = Math.max(...(tl.content_creation || []).map(c => c.cards_created || 0), 1)
+    const contentRows = (tl.content_creation || []).slice(-20).map(c => {
+      const barW = Math.round((c.cards_created / maxCards) * 100)
+      return `<div class="flex items-center gap-2 py-0.5">
+        <span class="text-xs text-gray-400 w-16 shrink-0">${c.date ? c.date.slice(5) : ''}</span>
+        <div class="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
+          <div class="bg-gradient-to-r from-green-500 to-emerald-500 h-full rounded-full" style="width:${barW}%"></div>
+        </div>
+        <span class="text-xs text-white w-8 text-right">${c.cards_created}</span>
+      </div>`
+    }).join('')
+
+    // カリキュラム作成推移
+    const curRows = (tl.curricula_creation || []).map(c => 
+      `<tr class="border-b border-white/10">
+        <td class="py-1.5 px-3 text-gray-400 text-xs">${c.date || ''}</td>
+        <td class="py-1.5 px-3 text-white text-right">${c.curricula_created}</td>
+      </tr>`
+    ).join('')
+
+    // セッション推移
+    const sessionRows = (tl.session_activity || []).slice(-14).map(s => {
+      const maxS = Math.max(...(tl.session_activity || []).map(x => x.sessions_created || 0), 1)
+      const barW = Math.round((s.sessions_created / maxS) * 100)
+      return `<div class="flex items-center gap-2 py-0.5">
+        <span class="text-xs text-gray-400 w-16 shrink-0">${s.date ? s.date.slice(5) : ''}</span>
+        <div class="flex-1 bg-white/5 rounded-full h-3 overflow-hidden">
+          <div class="bg-gradient-to-r from-orange-500 to-red-500 h-full rounded-full" style="width:${barW}%"></div>
+        </div>
+        <span class="text-xs text-white w-8 text-right">${s.sessions_created}</span>
+      </div>`
+    }).join('')
+
+    // 論文用サマリーテキスト
+    const totalWeeks = (tl.weekly_usage || []).length
+    const totalContent = (tl.content_creation || []).reduce((s,c) => s + (c.cards_created||0), 0)
+    const totalCur = (tl.curricula_creation || []).reduce((s,c) => s + (c.curricula_created||0), 0)
+    const researchText = `時系列分析: システム運用期間は計${totalWeeks}週間にわたり、${totalCur}件のカリキュラムが作成され、計${totalContent}枚の学習カードが生成された。${(tl.weekly_usage||[]).length > 0 ? `週あたり平均${Math.round((tl.weekly_usage||[]).reduce((s,w)=>s+(w.answer_count||0),0)/Math.max(totalWeeks,1))}回答が記録された。` : ''}`
+
+    content.innerHTML = `
+      <div class="space-y-6">
+        <h2 class="text-xl font-bold text-white"><i class="fas fa-clock mr-2 text-orange-400"></i>時系列トレンド分析</h2>
+        
+        <!-- 週別利用状況 -->
+        <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+          <h3 class="text-lg font-bold text-white mb-4"><i class="fas fa-calendar-week mr-2 text-indigo-400"></i>週別学習アクティビティ</h3>
+          ${weeklyRows || '<p class="text-gray-500 text-center py-4">データなし</p>'}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- カード生成推移 -->
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-layer-group mr-1 text-green-400"></i>カード生成推移（直近20日）</h3>
+            ${contentRows || '<p class="text-gray-500 text-center py-4">データなし</p>'}
+          </div>
+          
+          <!-- セッション推移 -->
+          <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+            <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-sign-in-alt mr-1 text-orange-400"></i>セッション推移（直近14日）</h3>
+            ${sessionRows || '<p class="text-gray-500 text-center py-4">データなし</p>'}
+          </div>
+        </div>
+
+        <!-- カリキュラム作成履歴 -->
+        <div class="bg-white/5 rounded-xl p-5 border border-white/10">
+          <h3 class="text-sm font-bold text-indigo-300 mb-3"><i class="fas fa-book mr-1 text-blue-400"></i>カリキュラム作成履歴</h3>
+          <table class="w-full text-sm">
+            <thead><tr class="text-indigo-400 text-xs border-b border-white/20"><th class="text-left py-2 px-3">日付</th><th class="text-right py-2 px-3">作成数</th></tr></thead>
+            <tbody>${curRows || '<tr><td colspan="2" class="text-center text-gray-500 py-4">データなし</td></tr>'}</tbody>
+          </table>
+        </div>
+
+        <!-- 論文記述用 -->
+        <div class="bg-white/5 rounded-xl p-6 border border-white/10">
+          <h3 class="text-lg font-bold text-white mb-3"><i class="fas fa-file-alt mr-2 text-yellow-400"></i>論文記述用（時系列分析セクション）</h3>
+          <div class="bg-gray-900 rounded-lg p-4 text-sm text-green-300 font-mono whitespace-pre-wrap select-all cursor-pointer" onclick="navigator.clipboard.writeText(this.textContent);showToast('コピーしました','success')">${researchText}</div>
+          <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>クリックでコピー</p>
+        </div>
+        
+        <p class="text-xs text-gray-500 text-right">生成日時: ${tl.generated_at}</p>
+      </div>
+    `
+  } catch (e) {
+    content.innerHTML = '<div class="bg-red-900/30 rounded-xl p-6 text-red-300"><i class="fas fa-exclamation-triangle mr-2"></i>' + e.message + '</div>'
+  }
+}
+
+// グローバル登録
+window.renderAdminDashboard = renderAdminDashboard
+window.adminSwitchTab = adminSwitchTab
+window.adminToggleUser = adminToggleUser
+window.adminAddUser = adminAddUser
+window.adminShowAddUser = adminShowAddUser
+window.adminExportData = adminExportData
+
+console.log('✅ 管理者ダッシュボード初期化完了')
