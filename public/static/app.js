@@ -7574,7 +7574,7 @@ function addAIMessage(message, sender, loadingId = null) {
   
   messageDiv.innerHTML = `
     <div class="${sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-800 border-2 border-gray-200'} rounded-lg p-4 ${sender === 'user' ? 'max-w-[80%]' : 'max-w-[95%]'} shadow">
-      ${sender === 'ai' ? '<div class="flex items-center mb-2"><i class="fas fa-robot text-blue-500 mr-2"></i><span class="font-bold text-sm">AI先生</span><button onclick="speakText(this.closest(\'[data-ai-msg]\').getAttribute(\'data-ai-msg\'))" style="margin-left:auto;background:none;border:1px solid #C7D2FE;border-radius:8px;padding:2px 8px;cursor:pointer;font-size:0.7rem;color:#6366F1;" title="この回答を読み上げ"><i class="fas fa-volume-up"></i></button></div>' : ''}
+      ${sender === 'ai' ? '<div class="flex items-center mb-2"><i class="fas fa-robot text-blue-500 mr-2"></i><span class="font-bold text-sm">AI先生</span><button onclick="toggleMessageTts(this)" data-msg-tts-btn style="margin-left:auto;background:none;border:1px solid #C7D2FE;border-radius:8px;padding:2px 8px;cursor:pointer;font-size:0.7rem;color:#6366F1;" title="この回答を読み上げ/停止"><i class="fas fa-volume-up"></i></button></div>' : ''}
       <p class="text-sm whitespace-pre-wrap leading-relaxed">${cleanMessage}</p>
     </div>
   `
@@ -7585,6 +7585,14 @@ function addAIMessage(message, sender, loadingId = null) {
   
   // AI先生の回答を音声で読み上げ（オプション）
   if (sender === 'ai' && window.autoPlayAIVoice) {
+    // 再生開始時にそのメッセージのボタンをアクティブ状態にする
+    const ttsBtn = messageDiv.querySelector('[data-msg-tts-btn]')
+    if (ttsBtn) {
+      ttsBtn.setAttribute('data-tts-active', 'true')
+      ttsBtn.innerHTML = '<i class="fas fa-stop"></i>'
+      ttsBtn.style.color = '#EF4444'
+      ttsBtn.style.borderColor = '#FCA5A5'
+    }
     speakText(message)
   }
   
@@ -12218,6 +12226,9 @@ function stopGlobalTts() {
   if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.cancel()
   _globalTtsPlaying = false
   _globalTtsSource = null
+  // AI先生のUIもリセット
+  resetAllTtsButtons()
+  showAiTeacherStopBar(false)
   // index.tsx側のTTSも停止（グローバル変数連携）
   if (window._ttsCurrentSource) { try { window._ttsCurrentSource.stop() } catch(e){} window._ttsCurrentSource = null }
   // フローティングボタンを復元
@@ -12334,6 +12345,7 @@ async function speakText(text, voiceType = 'female-friendly', speed = 0.85) {
   
   _globalTtsPlaying = true
   updateFloatingTtsButton(true)
+  showAiTeacherStopBar(true)
   
   console.log('🎤 speakText(Gemini TTS):', text.substring(0, 50) + '...')
   
@@ -12351,12 +12363,14 @@ async function speakText(text, voiceType = 'female-friendly', speed = 0.85) {
         playPcmGlobal(response.data.audioContent, response.data.sampleRate || 24000, () => {
           _globalTtsPlaying = false
           updateFloatingTtsButton(false)
+          resetAllTtsButtons()
+          showAiTeacherStopBar(false)
           try { TactileSounds.play('correct') } catch(e) {}
         })
       } else {
         // MP3フォールバック
         const audio = new Audio('data:audio/mp3;base64,' + response.data.audioContent)
-        audio.onended = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false) }
+        audio.onended = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false); resetAllTtsButtons(); showAiTeacherStopBar(false) }
         audio.onerror = () => speakTextWebSpeechFallback(text, speed)
         await audio.play()
       }
@@ -12374,6 +12388,8 @@ function speakTextWebSpeechFallback(text, speed = 0.85) {
   if (!('speechSynthesis' in window)) {
     _globalTtsPlaying = false
     updateFloatingTtsButton(false)
+    resetAllTtsButtons()
+    showAiTeacherStopBar(false)
     return
   }
   window.speechSynthesis.cancel()
@@ -12386,8 +12402,8 @@ function speakTextWebSpeechFallback(text, speed = 0.85) {
     || voices.find(v => v.lang === 'ja-JP')
     || voices.find(v => v.lang.startsWith('ja'))
   if (jaVoice) u.voice = jaVoice
-  u.onend = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false) }
-  u.onerror = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false) }
+  u.onend = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false); resetAllTtsButtons(); showAiTeacherStopBar(false) }
+  u.onerror = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false); resetAllTtsButtons(); showAiTeacherStopBar(false) }
   window.speechSynthesis.speak(u)
 }
 
@@ -13185,6 +13201,75 @@ window.sendHandwriting = sendHandwriting
 window.stopGlobalTts = stopGlobalTts
 window.stopTtsCard = stopTtsCard
 window.updateFloatingTtsButton = updateFloatingTtsButton
+
+// === メッセージ内の再生/停止トグルボタン ===
+function toggleMessageTts(btn) {
+  if (_globalTtsPlaying) {
+    // 再生中なら停止
+    stopAllTtsAndResetButtons()
+  } else {
+    // 停止中なら再生
+    const msgDiv = btn.closest('[data-ai-msg]')
+    if (!msgDiv) return
+    const text = msgDiv.getAttribute('data-ai-msg')
+    if (!text) return
+    
+    // 全ボタンをリセットしてからこのボタンをアクティブに
+    resetAllTtsButtons()
+    btn.setAttribute('data-tts-active', 'true')
+    btn.innerHTML = '<i class="fas fa-stop"></i>'
+    btn.style.color = '#EF4444'
+    btn.style.borderColor = '#FCA5A5'
+    showAiTeacherStopBar(true)
+    
+    speakText(text)
+  }
+}
+window.toggleMessageTts = toggleMessageTts
+
+// === 全TTS停止＆全ボタンリセット ===
+function stopAllTtsAndResetButtons() {
+  stopGlobalTts()
+  stopTtsCard()
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+  resetAllTtsButtons()
+  showAiTeacherStopBar(false)
+}
+window.stopAllTtsAndResetButtons = stopAllTtsAndResetButtons
+
+// === 全メッセージのTTSボタンをリセット ===
+function resetAllTtsButtons() {
+  document.querySelectorAll('[data-msg-tts-btn]').forEach(b => {
+    b.removeAttribute('data-tts-active')
+    b.innerHTML = '<i class="fas fa-volume-up"></i>'
+    b.style.color = '#6366F1'
+    b.style.borderColor = '#C7D2FE'
+  })
+}
+
+// === AI先生エリア上部の停止バー表示/非表示 ===
+function showAiTeacherStopBar(show) {
+  let bar = document.getElementById('aiTeacherStopBar')
+  if (show) {
+    if (!bar) {
+      bar = document.createElement('div')
+      bar.id = 'aiTeacherStopBar'
+      bar.className = 'bg-red-50 border-2 border-red-300 rounded-lg px-4 py-2 mb-3 flex items-center justify-between animate-pulse'
+      bar.innerHTML = `
+        <span class="text-sm font-bold text-red-700"><i class="fas fa-volume-up mr-2"></i>音声再生中...</span>
+        <button onclick="stopAllTtsAndResetButtons()" class="bg-red-500 hover:bg-red-600 text-white font-bold px-4 py-1.5 rounded-lg text-sm transition flex items-center gap-1">
+          <i class="fas fa-stop"></i> 停止
+        </button>
+      `
+      const aiChat = document.getElementById('aiChat')
+      if (aiChat && aiChat.parentElement) {
+        aiChat.parentElement.insertBefore(bar, aiChat)
+      }
+    }
+  } else {
+    if (bar) bar.remove()
+  }
+}
 
 // 音声自動読み上げON/OFF切り替え
 function toggleAutoVoice() {
