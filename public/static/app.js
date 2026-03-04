@@ -1668,7 +1668,7 @@ async function renderTopPage() {
               <i class="fas fa-arrow-right text-gray-300 text-sm"></i>
               <div class="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-2 md:p-3 text-center min-w-[100px]">
                 <i class="fas fa-robot text-yellow-600 text-lg block mb-0.5"></i>
-                <span class="text-xs font-bold text-yellow-800 block">Gemini AI生成</span>
+                <span class="text-xs font-bold text-yellow-800 block">AI自動生成</span>
                 <p class="text-[10px] text-gray-500">問題・解説・ヒント</p>
               </div>
               <i class="fas fa-arrow-right text-gray-300 text-sm"></i>
@@ -1689,62 +1689,62 @@ async function renderTopPage() {
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
               <div class="bg-blue-50 rounded-xl p-3 border border-blue-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-blue-200 text-blue-800 px-2 py-0.5 rounded">F1</span><span class="text-sm font-bold text-gray-800">マルチモーダル感覚処理効率理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">VARK学習スタイル理論を発展（Fleming, 1987）</p>
+                <p class="text-xs text-gray-500 italic mb-1">学習スタイル理論を発展</p>
                 <p class="text-xs text-gray-600">視覚(V)・聴覚(A)・読み書き(R)・運動感覚(K)の処理効率を多面的に測定し、最適なメディアタイプ（図解・動画・テキスト・体験活動）を選択する。</p>
               </div>
               <div class="bg-green-50 rounded-xl p-3 border border-green-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-green-200 text-green-800 px-2 py-0.5 rounded">F2</span><span class="text-sm font-bold text-gray-800">多元的知能プロファイリング理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">多重知能理論（MI理論）を発展（Gardner, 1983）</p>
+                <p class="text-xs text-gray-500 italic mb-1">多重知能理論を発展</p>
                 <p class="text-xs text-gray-600">言語・論理数学・空間・身体運動・音楽・対人・内省・博物的の8知能の強弱パターンから、問題形式と提示方法を個別に決定する。</p>
               </div>
               <div class="bg-yellow-50 rounded-xl p-3 border border-yellow-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded">F3</span><span class="text-sm font-bold text-gray-800">適応型経験学習サイクル理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">経験学習サイクル理論を発展（Kolb, 1984）</p>
+                <p class="text-xs text-gray-500 italic mb-1">経験学習サイクル理論を発展</p>
                 <p class="text-xs text-gray-600">具体的経験→省察的観察→抽象的概念化→能動的実験の4段階を適応的に検出し、段階に合わせた課題を設計する。</p>
               </div>
               <div class="bg-red-50 rounded-xl p-3 border border-red-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-red-200 text-red-800 px-2 py-0.5 rounded">F4</span><span class="text-sm font-bold text-gray-800">動的適性処遇交互作用理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">適性処遇交互作用理論（ATI）を発展（Cronbach & Snow, 1977）</p>
+                <p class="text-xs text-gray-500 italic mb-1">適性処遇交互作用理論を発展</p>
                 <p class="text-xs text-gray-600">事前知識・不安レベル・独立性などの適性をリアルタイムに測定し、スキャフォールド（足場かけ）の量と種類を動的に調整する。</p>
               </div>
               <div class="bg-indigo-50 rounded-xl p-3 border border-indigo-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded">F5</span><span class="text-sm font-bold text-gray-800">AI支援型自己調整学習理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">自己調整学習理論（SRL）を発展（Zimmerman, 2000）</p>
+                <p class="text-xs text-gray-500 italic mb-1">自己調整学習理論を発展</p>
                 <p class="text-xs text-gray-600">予見→遂行→自己省察の3フェーズをAIが検出し、段階に応じた振り返りプロンプトやチェックリストを自動生成する。</p>
               </div>
               <div class="bg-purple-50 rounded-xl p-3 border border-purple-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded">F6</span><span class="text-sm font-bold text-gray-800">適応的検索練習・望ましい困難統合理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">検索練習効果（Roediger, 2006）＋ 望ましい困難理論（Bjork, 1994）を統合・発展</p>
+                <p class="text-xs text-gray-500 italic mb-1">検索練習効果＋望ましい困難理論を統合・発展</p>
                 <p class="text-xs text-gray-600">検索練習・間隔反復・交互配置（インターリーブ）の準備度を自動判定し、出題間隔と問題配列を個別に設計する。</p>
               </div>
               <div class="bg-pink-50 rounded-xl p-3 border border-pink-200">
-                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-pink-200 text-pink-800 px-2 py-0.5 rounded">F7</span><span class="text-sm font-bold text-gray-800">動的ZPDスキャフォールディング理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">発達の最近接領域（ZPD）理論を発展（Vygotsky, 1978）</p>
+                <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-pink-200 text-pink-800 px-2 py-0.5 rounded">F7</span><span class="text-sm font-bold text-gray-800">動的足場かけ理論</span></div>
+                <p class="text-xs text-gray-500 italic mb-1">最近接発達領域理論を発展</p>
                 <p class="text-xs text-gray-600">「支援があればできる」領域の幅と位置をリアルタイム推定し、ヒント段階数・解法例の有無を動的に決定する。</p>
               </div>
               <div class="bg-orange-50 rounded-xl p-3 border border-orange-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-orange-200 text-orange-800 px-2 py-0.5 rounded">F8</span><span class="text-sm font-bold text-gray-800">学習文脈型自己決定理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">自己決定理論（SDT）を発展（Deci & Ryan, 1985）</p>
+                <p class="text-xs text-gray-500 italic mb-1">自己決定理論を発展</p>
                 <p class="text-xs text-gray-600">自律性・有能感・関係性の3基本的心理欲求の充足度を学習場面で測定し、内発的動機づけを高める支援を個別設計する。</p>
               </div>
               <div class="bg-teal-50 rounded-xl p-3 border border-teal-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-teal-200 text-teal-800 px-2 py-0.5 rounded">F9</span><span class="text-sm font-bold text-gray-800">段階的メタ認知発達支援理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">メタ認知理論を発展（Flavell, 1979 ＋ Brown, 1987）</p>
+                <p class="text-xs text-gray-500 italic mb-1">メタ認知理論を発展</p>
                 <p class="text-xs text-gray-600">メタ認知的知識・制御・批判的思考の発達段階を自動判定し、段階に応じた自己モニタリング課題や振り返り問いを付加する。</p>
               </div>
               <div class="bg-cyan-50 rounded-xl p-3 border border-cyan-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-cyan-200 text-cyan-800 px-2 py-0.5 rounded">F10</span><span class="text-sm font-bold text-gray-800">適応型領域学習進行モデル</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">領域学習モデル（MDL）を発展（Alexander, 2003）</p>
+                <p class="text-xs text-gray-500 italic mb-1">領域学習モデルを発展</p>
                 <p class="text-xs text-gray-600">順応期→能力期→熟達期の3段階を診断データから推定し、課題難易度と先行概念（誤概念）への対応を自動で組み込む。</p>
               </div>
               <div class="bg-lime-50 rounded-xl p-3 border border-lime-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-lime-200 text-lime-800 px-2 py-0.5 rounded">F11</span><span class="text-sm font-bold text-gray-800">個別文脈化された真正の学び理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">真正の学び理論を発展（Herrington & Oliver, 2000）</p>
+                <p class="text-xs text-gray-500 italic mb-1">真正の学びの理論を発展</p>
                 <p class="text-xs text-gray-600">個人的関連性・実世界との接続・コミュニティへの参加の3要素を児童の生活文脈に合わせて問題文に埋め込む。</p>
               </div>
               <div class="bg-rose-50 rounded-xl p-3 border border-rose-200">
                 <div class="flex items-center gap-1 mb-1"><span class="text-xs font-bold bg-rose-200 text-rose-800 px-2 py-0.5 rounded">F12</span><span class="text-sm font-bold text-gray-800">リアルタイム学業感情調整理論</span></div>
-                <p class="text-xs text-gray-500 italic mb-1">学業感情の統制価値理論を発展（Pekrun, 2006）</p>
+                <p class="text-xs text-gray-500 italic mb-1">学業感情の統制価値理論を発展</p>
                 <p class="text-xs text-gray-600">学業的享受・不安・退屈の状態をリアルタイム検出し、統制感と価値づけを高める感情支援と難易度調整を行う。</p>
               </div>
             </div>
@@ -2265,7 +2265,7 @@ async function renderTopPage() {
                 <div class="bg-purple-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F1</div>
                 <h4 class="font-bold text-purple-800">マルチモーダル感覚処理効率理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">VARK学習スタイル理論を発展（Fleming, 1987）</p>
+              <p class="text-sm text-gray-700 mb-2">学習スタイル理論を発展</p>
               <p class="text-xs text-gray-600">視覚・聴覚・読み書き・運動感覚の処理効率を多面的に測定し、最適なメディアタイプを選択</p>
             </div>
 
@@ -2274,7 +2274,7 @@ async function renderTopPage() {
                 <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F2</div>
                 <h4 class="font-bold text-blue-800">多元的知能プロファイリング理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">多重知能理論（MI理論）を発展（Gardner, 1983）</p>
+              <p class="text-sm text-gray-700 mb-2">多重知能理論を発展</p>
               <p class="text-xs text-gray-600">8知能の強弱パターンから、問題形式と提示方法を個別に決定</p>
             </div>
 
@@ -2283,7 +2283,7 @@ async function renderTopPage() {
                 <div class="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F3</div>
                 <h4 class="font-bold text-green-800">適応型経験学習サイクル理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">経験学習サイクル理論を発展（Kolb, 1984）</p>
+              <p class="text-sm text-gray-700 mb-2">経験学習サイクル理論を発展</p>
               <p class="text-xs text-gray-600">具体的経験→省察→概念化→実験の4段階を適応的に検出し課題設計</p>
             </div>
 
@@ -2292,7 +2292,7 @@ async function renderTopPage() {
                 <div class="bg-orange-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F4</div>
                 <h4 class="font-bold text-orange-800">動的適性処遇交互作用理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">ATI理論を発展（Cronbach & Snow, 1977）</p>
+              <p class="text-sm text-gray-700 mb-2">適性処遇交互作用理論を発展</p>
               <p class="text-xs text-gray-600">適性をリアルタイム測定し、足場かけの量と種類を動的に調整</p>
             </div>
 
@@ -2301,7 +2301,7 @@ async function renderTopPage() {
                 <div class="bg-pink-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F5</div>
                 <h4 class="font-bold text-pink-800">AI支援型自己調整学習理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">自己調整学習理論（SRL）を発展（Zimmerman, 2000）</p>
+              <p class="text-sm text-gray-700 mb-2">自己調整学習理論を発展</p>
               <p class="text-xs text-gray-600">予見→遂行→自己省察の3フェーズをAIが検出し支援を自動生成</p>
             </div>
 
@@ -2310,16 +2310,16 @@ async function renderTopPage() {
                 <div class="bg-teal-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F6</div>
                 <h4 class="font-bold text-teal-800">適応的検索練習・望ましい困難統合理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">検索練習効果（Roediger, 2006）＋ 望ましい困難理論（Bjork, 1994）を統合</p>
+              <p class="text-sm text-gray-700 mb-2">検索練習効果＋望ましい困難理論を統合</p>
               <p class="text-xs text-gray-600">間隔反復・交互配置の準備度を自動判定し出題間隔を個別設計</p>
             </div>
 
             <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border-2 border-red-300">
               <div class="flex items-center mb-2">
                 <div class="bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F7</div>
-                <h4 class="font-bold text-red-800">動的ZPDスキャフォールディング理論</h4>
+                <h4 class="font-bold text-red-800">動的足場かけ理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">最近接発達領域（ZPD）理論を発展（Vygotsky, 1978）</p>
+              <p class="text-sm text-gray-700 mb-2">最近接発達領域理論を発展</p>
               <p class="text-xs text-gray-600">「支援があればできる」領域をリアルタイム推定しヒント段階を動的決定</p>
             </div>
 
@@ -2328,7 +2328,7 @@ async function renderTopPage() {
                 <div class="bg-indigo-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F8</div>
                 <h4 class="font-bold text-indigo-800">学習文脈型自己決定理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">自己決定理論（SDT）を発展（Deci & Ryan, 1985）</p>
+              <p class="text-sm text-gray-700 mb-2">自己決定理論を発展</p>
               <p class="text-xs text-gray-600">自律性・有能感・関係性の充足度を測定し内発的動機づけを支援</p>
             </div>
 
@@ -2337,7 +2337,7 @@ async function renderTopPage() {
                 <div class="bg-cyan-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F9</div>
                 <h4 class="font-bold text-cyan-800">段階的メタ認知発達支援理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">メタ認知理論を発展（Flavell, 1979 ＋ Brown, 1987）</p>
+              <p class="text-sm text-gray-700 mb-2">メタ認知理論を発展</p>
               <p class="text-xs text-gray-600">メタ認知的知識と制御の発達段階を検出し振り返り課題を自動配置</p>
             </div>
 
@@ -2346,7 +2346,7 @@ async function renderTopPage() {
                 <div class="bg-amber-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F10</div>
                 <h4 class="font-bold text-amber-800">適応型領域学習発達モデル</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">領域学習モデル（MDL）を発展（Alexander, 2004）</p>
+              <p class="text-sm text-gray-700 mb-2">領域学習モデルを発展</p>
               <p class="text-xs text-gray-600">順応期→能力期→熟達期の発達段階に応じて難易度を適応調整</p>
             </div>
 
@@ -2355,7 +2355,7 @@ async function renderTopPage() {
                 <div class="bg-lime-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F11</div>
                 <h4 class="font-bold text-lime-800">デジタル真正学習デザイン理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">真正の学び理論を発展（Herrington & Oliver, 2000）</p>
+              <p class="text-sm text-gray-700 mb-2">真正の学びの理論を発展</p>
               <p class="text-xs text-gray-600">個人的意味・実世界接続・コミュニティ参加を問題文に埋め込む</p>
             </div>
 
@@ -2364,7 +2364,7 @@ async function renderTopPage() {
                 <div class="bg-rose-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold mr-2">F12</div>
                 <h4 class="font-bold text-rose-800">学習感情ダイナミクス制御理論</h4>
               </div>
-              <p class="text-sm text-gray-700 mb-2">統制−価値理論を発展（Pekrun, 2006）</p>
+              <p class="text-sm text-gray-700 mb-2">統制−価値理論を発展</p>
               <p class="text-xs text-gray-600">学業享受・不安・退屈の動態を検出し感情支援と難易度を調整</p>
             </div>
           </div>
@@ -2492,12 +2492,12 @@ async function renderTopPage() {
                 <p><strong>学習コース:</strong> <span class="bg-purple-600 text-white px-2 py-1 rounded">ぐんぐんコース</span></p>
                 <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 📹 <strong>AI生成動画</strong>: 「九九の計算手順」解説動画（Gemini Veo, 5秒）
+                  <li>• 📹 <strong>AI生成動画</strong>: 「九九の計算手順」解説動画（AI動画生成, 5秒）
                     <button onclick="demoCase1Video()" class="ml-2 bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded">
                       <i class="fas fa-play mr-1"></i>試す
                     </button>
                   </li>
-                  <li>• 🎨 <strong>AI生成画像</strong>: 「3×4の図解」（Flux Pro）
+                  <li>• 🎨 <strong>AI生成画像</strong>: 「3×4の図解」（AI画像生成）
                     <button onclick="demoCase1Image()" class="ml-2 bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-1 rounded">
                       <i class="fas fa-image mr-1"></i>試す
                     </button>
@@ -2525,12 +2525,12 @@ async function renderTopPage() {
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">じっくりコース</span></p>
                 <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 🎵 <strong>AI生成音楽</strong>: 「九九の歌（3の段）」で暗記支援（ElevenLabs）
+                  <li>• 🎵 <strong>AI生成音楽</strong>: 「九九の歌（3の段）」で暗記支援（AI音楽生成）
                     <button onclick="demoCase2Music()" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded">
                       <i class="fas fa-music mr-1"></i>試す
                     </button>
                   </li>
-                  <li>• 🎤 <strong>AI音声読み上げ</strong>: やさしい言葉で説明（Minimax TTS）
+                  <li>• 🎤 <strong>AI音声読み上げ</strong>: やさしい言葉で説明（AI音声合成）
                     <button onclick="demoCase2Voice()" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded">
                       <i class="fas fa-volume-up mr-1"></i>試す
                     </button>
@@ -2562,7 +2562,7 @@ async function renderTopPage() {
                 <p><strong>学習コース:</strong> <span class="bg-blue-600 text-white px-2 py-1 rounded">しっかりコース</span></p>
                 <p><strong>🎯 活用している実装機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 📹 <strong>AI解説動画</strong>: 授業の代わりに5秒の要点動画（Gemini Veo）
+                  <li>• 📹 <strong>AI解説動画</strong>: 授業の代わりに5秒の要点動画（AI動画生成）
                     <button onclick="demoCase3Video()" class="ml-2 bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-2 py-1 rounded">
                       <i class="fas fa-play mr-1"></i>試す
                     </button>
@@ -2626,10 +2626,10 @@ async function renderTopPage() {
                 <p><strong>特徴:</strong> 教師がAIで教材を瞬時に作成</p>
                 <p><strong>🎯 実装されている生成機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• 📹 <span class="font-semibold">動画生成</span>: Gemini Veo で5〜8秒の解説動画（例: 分数の計算手順）</li>
-                  <li>• 🎵 <span class="font-semibold">音楽生成</span>: ElevenLabs で九九の歌、集中BGM</li>
-                  <li>• 🎨 <span class="font-semibold">画像生成</span>: Flux で図解、イラスト（例: 立体図形）</li>
-                  <li>• 🎤 <span class="font-semibold">音声生成</span>: Minimax TTS で学年別読み上げ</li>
+                  <li>• 📹 <span class="font-semibold">動画生成</span>: AIで５〜８秒の解説動画（例: 分数の計算手順）</li>
+                  <li>• 🎵 <span class="font-semibold">音楽生成</span>: AIで九九の歌、集中用音楽</li>
+                  <li>• 🎨 <span class="font-semibold">画像生成</span>: AIで図解、イラスト（例: 立体図形）</li>
+                  <li>• 🎤 <span class="font-semibold">音声生成</span>: AIで学年別読み上げ</li>
                   <li>• 📝 <span class="font-semibold">学習カード自動生成</span>: 3コース×10枚+ヒント90個を約2分〜4分で作成</li>
                 </ul>
                 <div class="bg-indigo-100 p-2 rounded mt-2">
@@ -2673,12 +2673,12 @@ async function renderTopPage() {
                 ケース7: 発達障害のある児童Fさん
               </h4>
               <div class="space-y-2 text-sm text-gray-700">
-                <p><strong>特徴:</strong> ADHD、集中が続きにくい</p>
+                <p><strong>特徴: 注意欠如・多動性、集中が続きにくい</p>
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">じっくりコース</span></p>
                 <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
                   <li>• <span class="font-semibold">短時間動画</span>（AI生成5〜8秒）で飽きずに学習</li>
-                  <li>• <span class="font-semibold">音楽BGM</span>（AI生成）で集中力を持続</li>
+                  <li>• <span class="font-semibold">音楽</span>（AI生成）で集中力を持続</li>
                   <li>• <span class="font-semibold">学習時間データ分析</span>: 集中できる時間帯を AI が自動検出</li>
                   <li>• <span class="font-semibold">小ステップ設計</span>: 10枚×10分＝100分で達成感</li>
                 </ul>
@@ -2752,9 +2752,9 @@ async function renderTopPage() {
                 <p><strong>学習コース:</strong> <span class="bg-blue-600 text-white px-2 py-1 rounded">しっかりコース</span></p>
                 <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• <span class="font-semibold">AI生成音楽</span>: ElevenLabs で「九九の歌」を自動作成</li>
-                  <li>• <span class="font-semibold">聴覚優位版</span>: Minimax TTS で音声解説（歌うように読み上げ）</li>
-                  <li>• <span class="font-semibold">集中BGM生成</span>: 学習内容に合わせた最適な音楽</li>
+                  <li>• <span class="font-semibold">AI生成音楽</span>: AIで「九九の歌」を自動作成</li>
+                  <li>• <span class="font-semibold">聴覚優位版</span>: AIで音声解説（歌うように読み上げ）</li>
+                  <li>• <span class="font-semibold">集中用音楽生成</span>: 学習内容に合わせた最適な音楽</li>
                   <li>• <span class="font-semibold">リズムパターン分析</span>: 効果的な記憶リズムを AI が提案</li>
                 </ul>
                 <div class="bg-rose-100 p-2 rounded mt-2">
@@ -2778,7 +2778,7 @@ async function renderTopPage() {
                 <p><strong>🎯 活用している機能:</strong></p>
                 <ul class="ml-4 space-y-1">
                   <li>• <span class="font-semibold">体験優位版</span>: 具体物（積み木、お金）を使った実演提案</li>
-                  <li>• <span class="font-semibold">AI生成動画</span>: Gemini Veo で手を動かす様子を撮影・生成</li>
+                  <li>• <span class="font-semibold">AI生成動画</span>: AIで手を動かす様子を撮影・生成</li>
                   <li>• <span class="font-semibold">実験動画</span>: 実際にやってみる様子を5〜8秒で確認</li>
                   <li>• <span class="font-semibold">ペットボトル・紙コップ</span>などの準備物リストも自動提示</li>
                 </ul>
@@ -2802,7 +2802,7 @@ async function renderTopPage() {
                 <p><strong>学習コース:</strong> <span class="bg-green-600 text-white px-2 py-1 rounded">じっくりコース</span></p>
                 <p><strong>🎯 活用している全機能:</strong></p>
                 <ul class="ml-4 space-y-1">
-                  <li>• <span class="font-semibold">3スタイル統合</span>: 視覚・聴覚・体験を組み合わせた UDL 設計</li>
+                  <li>• <span class="font-semibold">3スタイル統合</span>: 視覚・聴覚・体験を組み合わせた ユニバーサルデザイン 設計</li>
                   <li>• <span class="font-semibold">AI 先生＋教師</span>: 二重の見守りで取りこぼしゼロ</li>
                   <li>• <span class="font-semibold">つまずき自動検出</span>: データ分析で早期発見→即座に介入</li>
                   <li>• <span class="font-semibold">週次レポート</span>を保護者と共有、家庭連携を強化</li>
@@ -43637,7 +43637,7 @@ async function demoCase1Video() {
     <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-purple-700">
-          <i class="fas fa-rocket mr-2"></i>ケース1: AI生成動画（Gemini Veo）
+          <i class="fas fa-rocket mr-2"></i>ケース1: AI生成動画（AI動画生成）
         </h3>
         <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
           <i class="fas fa-times text-2xl"></i>
@@ -43774,7 +43774,7 @@ async function demoCase1Image() {
     <div class="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-purple-700">
-          <i class="fas fa-rocket mr-2"></i>ケース1: AI生成画像（Flux Pro）
+          <i class="fas fa-rocket mr-2"></i>ケース1: AI生成画像（AI画像生成）
         </h3>
         <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
           <i class="fas fa-times text-2xl"></i>
@@ -43905,7 +43905,7 @@ async function demoCase2Music() {
     <div class="bg-white rounded-lg p-6 max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-blue-700">
-          <i class="fas fa-seedling mr-2"></i>ケース2: AI生成音楽（ElevenLabs）
+          <i class="fas fa-seedling mr-2"></i>ケース2: AI生成音楽（AI音楽生成）
         </h3>
         <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
           <i class="fas fa-times text-2xl"></i>
@@ -44130,7 +44130,7 @@ async function demoCase2Voice() {
     <div class="bg-white rounded-lg p-6 max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-blue-700">
-          <i class="fas fa-seedling mr-2"></i>ケース2: AI音声読み上げ（Minimax TTS）
+          <i class="fas fa-seedling mr-2"></i>ケース2: AI音声読み上げ（AI音声合成）
         </h3>
         <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
           <i class="fas fa-times text-2xl"></i>
@@ -44203,7 +44203,7 @@ async function generateVoiceDemo() {
         <div class="bg-white p-3 rounded border max-w-md mx-auto">
           <p class="text-xs text-gray-500 mb-2">
             <i class="fas fa-check-circle text-green-500 mr-1"></i>
-            Minimax TTS（小学2年生モード）で生成
+            AI音声合成（小学2年生モード）で生成
           </p>
           <p class="text-xs text-gray-500">
             <i class="fas fa-heart text-red-500 mr-1"></i>
@@ -47405,14 +47405,14 @@ function demoCase1Advanced() {
               <li class="flex items-start">
                 <i class="fas fa-video text-purple-600 mr-3 mt-1 text-xl"></i>
                 <div>
-                  <strong>AI生成動画:</strong> 「九九の計算手順」解説動画（Gemini Veo）<br>
+                  <strong>AI生成動画:</strong> 「九九の計算手順」解説動画（AI動画生成）<br>
                   <span class="text-sm text-gray-600">発展的な内容をビジュアルで理解</span>
                 </div>
               </li>
               <li class="flex items-start">
                 <i class="fas fa-image text-purple-600 mr-3 mt-1 text-xl"></i>
                 <div>
-                  <strong>AI生成画像:</strong> 「3×4の図解」（Flux Pro）<br>
+                  <strong>AI生成画像:</strong> 「3×4の図解」（AI画像生成）<br>
                   <span class="text-sm text-gray-600">複雑な概念を視覚化</span>
                 </div>
               </li>
@@ -47479,7 +47479,7 @@ function demoCase1Advanced() {
                 <h5 class="font-bold text-lg mb-3 text-purple-800">
                   <i class="fas fa-video mr-2"></i>AI解説動画
                 </h5>
-                <p class="text-gray-700 mb-4">九九の計算手順を視覚的に解説します（Gemini Veo）</p>
+                <p class="text-gray-700 mb-4">九九の計算手順を視覚的に解説します（AI動画生成）</p>
                 <button onclick="demoCase1Video()" 
                   class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-md">
                   <i class="fas fa-play-circle mr-2"></i>動画を生成する
@@ -47490,7 +47490,7 @@ function demoCase1Advanced() {
                 <h5 class="font-bold text-lg mb-3 text-pink-800">
                   <i class="fas fa-image mr-2"></i>AI生成画像
                 </h5>
-                <p class="text-gray-700 mb-4">3×4の図解をAIで生成します（Flux Pro）</p>
+                <p class="text-gray-700 mb-4">3×4の図解をAIで生成します（AI画像生成）</p>
                 <button onclick="demoCase1Image()" 
                   class="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-md">
                   <i class="fas fa-image mr-2"></i>画像を生成する
@@ -47608,7 +47608,7 @@ function demoCase2Struggling() {
               <li class="flex items-start">
                 <i class="fas fa-volume-up text-blue-600 mr-3 mt-1 text-xl"></i>
                 <div>
-                  <strong>AI音声読み上げ:</strong> やさしい言葉で説明（Minimax TTS）<br>
+                  <strong>AI音声読み上げ:</strong> やさしい言葉で説明（AI音声合成）<br>
                   <span class="text-sm text-gray-600">聴覚優位の学習スタイルに対応</span>
                 </div>
               </li>
@@ -47941,7 +47941,7 @@ function demoCase3Absent() {
                 <i class="fas fa-video mr-2"></i>授業の要点動画
               </h5>
               <p class="text-gray-700 mb-4">
-                3×4のかけ算の意味を5秒で解説します（Gemini Veo）<br>
+                3×4のかけ算の意味を5秒で解説します（AI動画生成）<br>
                 <span class="text-sm text-gray-600">授業に参加できなくても、自宅で学習できます</span>
               </p>
               <button onclick="demoCase3Video()" 
@@ -54845,18 +54845,18 @@ async function showTeacherSupportDashboard(curriculumId) {
         '<div class="bg-white rounded-xl border-2 border-indigo-200 p-4">' +
           '<h4 class="font-bold text-indigo-800 mb-3"><i class="fas fa-book-open mr-2"></i>統合されている12の教育理論</h4>' +
           '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">' +
-            buildTheoryCard('F1', 'マルチモーダル感覚処理効率理論', 'VARK学習スタイル理論を発展（Fleming, 1987）', '視覚・聴覚・読み書き・運動感覚の処理効率を多面的に測定し、最適なメディアタイプを選択') +
+            buildTheoryCard('F1', 'マルチモーダル感覚処理効率理論', '学習スタイル理論を発展', '視覚・聴覚・読み書き・運動感覚の処理効率を多面的に測定し、最適なメディアタイプを選択') +
             buildTheoryCard('F2', '多元的知能プロファイリング理論', '多重知能理論（MI）を発展（Gardner, 1983）', '8知能の強弱パターンから、問題形式と提示方法を個別に決定') +
-            buildTheoryCard('F3', '適応型経験学習サイクル理論', '経験学習サイクル理論を発展（Kolb, 1984）', '具体的経験→省察→概念化→実験の段階を適応的に検出し課題を設計') +
-            buildTheoryCard('F4', '動的適性処遇交互作用理論', '適性処遇交互作用理論（ATI）を発展（Cronbach & Snow, 1977）', '適性をリアルタイム測定しスキャフォールド量を動的に調整') +
-            buildTheoryCard('F5', 'AI支援型自己調整学習理論', '自己調整学習理論（SRL）を発展（Zimmerman, 2000）', 'AIが予見→遂行→自己省察の3段階を検出し振り返りプロンプトを自動生成') +
-            buildTheoryCard('F6', '適応的検索練習・望ましい困難統合理論', '検索練習効果（Roediger, 2006）＋ 望ましい困難理論（Bjork, 1994）を統合・発展', '検索練習・間隔反復・インターリーブの準備度を自動判定し出題間隔を個別設計') +
-            buildTheoryCard('F7', '動的ZPDスキャフォールディング理論', '発達の最近接領域（ZPD）理論を発展（Vygotsky, 1978）', 'ZPDをリアルタイム推定しヒント段階数・解法例を動的に決定') +
-            buildTheoryCard('F8', '学習文脈型自己決定理論', '自己決定理論（SDT）を発展（Deci & Ryan, 1985）', '自律性・有能感・関係性の充足度を学習場面で測定し動機づけ支援を個別設計') +
-            buildTheoryCard('F9', '段階的メタ認知発達支援理論', 'メタ認知理論を発展（Flavell, 1979 ＋ Brown, 1987）', 'メタ認知の発達段階を自動判定し自己モニタリング課題を段階的に付加') +
-            buildTheoryCard('F10', '適応型領域学習進行モデル', '領域学習モデル（MDL）を発展（Alexander, 2003）', '順応期→能力期→熟達期を診断データから推定し難易度と誤概念対応を自動組み込み') +
-            buildTheoryCard('F11', '個別文脈化された真正の学び理論', '真正の学び理論を発展（Herrington & Oliver, 2000）', '個人的関連性・実世界接続・コミュニティ参加を児童の生活文脈に合わせ埋め込み') +
-            buildTheoryCard('F12', 'リアルタイム学業感情調整理論', '学業感情の統制価値理論を発展（Pekrun, 2006）', '享受・不安・退屈をリアルタイム検出し感情支援と難易度調整を自動実行') +
+            buildTheoryCard('F3', '適応型経験学習サイクル理論', '経験学習サイクル理論を発展', '具体的経験→省察→概念化→実験の段階を適応的に検出し課題を設計') +
+            buildTheoryCard('F4', '動的適性処遇交互作用理論', '適性処遇交互作用理論を発展', '適性をリアルタイム測定しスキャフォールド量を動的に調整') +
+            buildTheoryCard('F5', 'AI支援型自己調整学習理論', '自己調整学習理論を発展', 'AIが予見→遂行→自己省察の3段階を検出し振り返りプロンプトを自動生成') +
+            buildTheoryCard('F6', '適応的検索練習・望ましい困難統合理論', '検索練習効果＋望ましい困難理論を統合・発展', '検索練習・間隔反復・インターリーブの準備度を自動判定し出題間隔を個別設計') +
+            buildTheoryCard('F7', '動的足場かけ理論', '最近接発達領域理論を発展', 'ZPDをリアルタイム推定しヒント段階数・解法例を動的に決定') +
+            buildTheoryCard('F8', '学習文脈型自己決定理論', '自己決定理論を発展', '自律性・有能感・関係性の充足度を学習場面で測定し動機づけ支援を個別設計') +
+            buildTheoryCard('F9', '段階的メタ認知発達支援理論', 'メタ認知理論を発展', 'メタ認知の発達段階を自動判定し自己モニタリング課題を段階的に付加') +
+            buildTheoryCard('F10', '適応型領域学習進行モデル', '領域学習モデルを発展', '順応期→能力期→熟達期を診断データから推定し難易度と誤概念対応を自動組み込み') +
+            buildTheoryCard('F11', '個別文脈化された真正の学び理論', '真正の学びの理論を発展', '個人的関連性・実世界接続・コミュニティ参加を児童の生活文脈に合わせ埋め込み') +
+            buildTheoryCard('F12', 'リアルタイム学業感情調整理論', '学業感情の統制価値理論を発展', '享受・不安・退屈をリアルタイム検出し感情支援と難易度調整を自動実行') +
           '</div>' +
         '</div>' +
         
