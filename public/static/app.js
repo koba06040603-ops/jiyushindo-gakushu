@@ -1505,7 +1505,7 @@ async function renderTopPage() {
 
   // ★ 条件分岐HTMLを事前構築（テンプレートリテラルのエスケープ問題回避）
   const user = state.auth?.user
-  const userName = state.student?.name || user?.email || 'ゲスト'
+  const userName = state.student?.name || state.currentStudent?.name || user?.full_name || user?.name || 'ゲスト'
   const isTeacher = user && user.role === 'teacher'
   const isAdmin = user && user.role === 'admin'
   const isTeacherOrAdmin = isTeacher || isAdmin
@@ -1981,7 +1981,7 @@ async function renderTopPage() {
         </div>
       </div>
 
-      <!-- 学習スタイル別サンプル（プレゼン用） -->
+      ${isAdmin ? `<!-- 学習スタイル別サンプル（プレゼン用・管理者のみ） -->
       <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-xl p-8 mb-8">
         <div class="text-center">
           <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
@@ -2002,7 +2002,7 @@ async function renderTopPage() {
             <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
           </button>
         </div>
-      </div>
+      </div>` : ''}
 
       <!-- テスト対策プランへのリンク -->
       <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-2xl p-8 mb-8">
@@ -2030,7 +2030,7 @@ async function renderTopPage() {
         </div>
       </div>
 
-      <!-- ケース4-12: 個別最適化学習デモ -->
+      ${isAdmin ? `<!-- ケース4-12: 個別最適化学習デモ（管理者のみ） -->
       <div class="bg-gradient-to-r from-pink-500 to-rose-500 rounded-lg shadow-xl p-8 mb-8">
         <div class="text-center mb-8">
           <div class="inline-block bg-white bg-opacity-20 px-6 py-3 rounded-full text-white text-sm font-bold mb-4">
@@ -2200,14 +2200,14 @@ async function renderTopPage() {
             </button>
           </div>
         </div>
-      </div>
+      </div>` : ''}
 
-      <!-- Phase 19: 次世代学習支援機能 -->
+      <!-- 次世代学習支援機能 -->
       ${state.student && state.student.id ? `
       <div class="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg shadow-xl p-8 mb-8">
         <div class="text-center mb-6">
           <div class="inline-block bg-white bg-opacity-20 px-4 py-2 rounded-full text-white text-sm font-bold mb-4">
-            🚀 Phase 19: 次世代機能
+            🚀 次世代機能
           </div>
           <h2 class="text-2xl font-bold text-white mb-3">
             <i class="fas fa-rocket mr-2"></i>
@@ -2238,7 +2238,7 @@ async function renderTopPage() {
       </div>
       ` : ''}
 
-      <!-- 村長・教育長向けデモセクション -->
+      ${isAdmin ? `<!-- 村長・教育長向けデモセクション（管理者のみ表示） -->
       <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg shadow-2xl p-8 mb-8">
         <div class="text-center mb-8">
           <div class="inline-block bg-white bg-opacity-20 px-6 py-3 rounded-full text-white text-sm font-bold mb-4">
@@ -3059,7 +3059,7 @@ async function renderTopPage() {
             </p>
           </div>
         </div>
-      </div>
+      </div>` : ''}
 
       <!-- お問い合わせ・感想フォーム -->
       <div class="bg-gradient-to-r from-green-500 to-teal-500 rounded-lg shadow-xl p-8">
@@ -19839,7 +19839,7 @@ async function analyzeStudent(studentId, studentName) {
         </button>
         <button onclick="exportPhase3Data(${studentId}, '${studentName}')" class="bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 transition font-semibold shadow-md flex-1">
           <i class="fas fa-file-alt mr-2"></i>
-          Phase3データCSV
+          データCSV
         </button>
         <button onclick="showStatisticsDashboard(${studentId}, '${studentName}')" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition font-semibold shadow-md flex-1">
           <i class="fas fa-brain mr-2"></i>
