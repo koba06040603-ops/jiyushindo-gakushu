@@ -4199,10 +4199,10 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     ${personalizedCourses.map(pc => {
                       const isApproved = approvedCourseIds.includes(pc.course_id)
                       return `
-                      <div class="bg-white rounded-lg p-2 border ${isApproved ? 'border-green-300' : 'border-orange-300'} flex items-center gap-1 text-xs">
+                      <div class="bg-white rounded-lg p-2 border ${isApproved ? 'border-green-300' : 'border-orange-300'} flex items-start gap-1 text-xs">
                         <i class="fas ${isApproved ? 'fa-check-circle text-green-500' : 'fa-clock text-orange-500'}"></i>
-                        <span class="font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
-                        <span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs">${pc.cards?.length || 0}枚</span>
+                        <span class="font-bold text-gray-700 flex-1" style="word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">${pc.course_name}</span>
+                        <span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs flex-shrink-0">${pc.cards?.length || 0}枚</span>
                         <button onclick="showPersonalizedCourseGuide(${pc.course_id}, '${(pc.course_name || '').replace(/'/g, "\\'")}', ${curriculumId})" 
                           class="text-blue-600 hover:text-blue-800 px-1" title="内容を確認">
                           <i class="fas fa-eye"></i>
@@ -4253,7 +4253,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     ${approvedCourses.map(pc => `
                       <div class="bg-white rounded-lg p-1.5 border border-green-200 flex items-center gap-1 text-xs">
                         <i class="fas fa-check-circle text-green-500"></i>
-                        <span class="font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
+                        <span class="font-bold text-gray-700 flex-1" style="word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">${pc.course_name}</span>
                         <a href="/guide/${curriculumId}?course=${pc.course_id}" target="_blank" 
                           class="text-blue-600 hover:text-blue-800 px-1" title="配信ページを開く">
                           <i class="fas fa-external-link-alt"></i>
@@ -4521,7 +4521,7 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                       <div class="bg-pink-50 rounded-lg p-3 border border-pink-100">
                         <div class="flex items-center gap-2 mb-2">
                           <i class="fas fa-user-graduate text-pink-500"></i>
-                          <span class="text-sm font-bold text-gray-700 flex-1 truncate">${pc.course_name}</span>
+                          <span class="text-sm font-bold text-gray-700 flex-1" style="word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">${pc.course_name}</span>
                           <span class="text-xs bg-pink-200 text-pink-700 px-2 py-0.5 rounded-full">${pc.cards?.length || 0}枚</span>
                         </div>
                         <button onclick="showPersonalizedCourseGuide(${pc.id}, ${curriculumId})" 
@@ -5042,13 +5042,13 @@ async function loadGuidePage(curriculumId, _retryCount = 0) {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                       ${(course.cards || []).map((card, ci) => `
                         <div class="bg-white border-2 border-${course.color_code || 'blue'}-200 rounded-lg p-4 text-left transition shadow hover:shadow-lg">
-                          <div class="flex items-start justify-between mb-2">
-                            <div class="flex-1">
+                          <div class="flex items-start justify-between mb-2 gap-2">
+                            <div class="flex-1 min-w-0">
                               <p class="text-sm text-${course.color_code || 'blue'}-600 font-bold mb-1">カード ${card.card_number}</p>
-                              <p class="font-bold text-gray-800">${card.card_title}</p>
-                              ${card.problem_text || card.problem_description ? '<p class="text-xs text-gray-600 mt-1">' + (card.problem_text || card.problem_description || '').substring(0, 80) + '...</p>' : ''}
+                              <p class="font-bold text-gray-800" style="word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">${card.card_title}</p>
+                              ${card.problem_text || card.problem_description ? '<p class="text-xs text-gray-600 mt-1" style="word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">' + (card.problem_text || card.problem_description || '').substring(0, 120) + (((card.problem_text || card.problem_description || '').length > 120) ? '...' : '') + '</p>' : ''}
                             </div>
-                            <span class="text-xs px-2 py-0.5 rounded-full font-bold ${card.difficulty_level === 'easy' ? 'bg-green-100 text-green-700' : card.difficulty_level === 'hard' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}">${card.difficulty_level === 'easy' ? 'きほん' : card.difficulty_level === 'hard' ? 'チャレンジ' : 'しっかり'}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${card.difficulty_level === 'easy' ? 'bg-green-100 text-green-700' : card.difficulty_level === 'hard' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}">${card.difficulty_level === 'easy' ? 'きほん' : card.difficulty_level === 'hard' ? 'チャレンジ' : 'しっかり'}</span>
                           </div>
                           <details class="mt-2">
                             <summary class="text-xs text-purple-600 cursor-pointer font-bold"><i class="fas fa-magic mr-1"></i>多感覚AI生成ツール</summary>
@@ -23471,10 +23471,10 @@ function renderPersonalizedSection(curriculumId, personalizedCourses, approvedCo
           '<i class="fas fa-undo"></i></button>'
       }
       
-      return '<div class="bg-white rounded-lg p-3 border ' + (isApproved ? 'border-green-300 shadow-sm' : 'border-orange-300') + ' flex items-center gap-2">' +
+      return '<div class="bg-white rounded-lg p-3 border ' + (isApproved ? 'border-green-300 shadow-sm' : 'border-orange-300') + ' flex items-start gap-2">' +
         '<i class="fas ' + (isApproved ? 'fa-check-circle text-green-500 text-lg' : 'fa-clock text-orange-500 text-lg') + '"></i>' +
         '<div class="flex-1 min-w-0">' +
-          '<div class="font-bold text-gray-800 text-sm truncate">' + pc.course_name + '</div>' +
+          '<div class="font-bold text-gray-800 text-sm" style="word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">' + pc.course_name + '</div>' +
           '<div class="text-xs text-gray-500">学習カード ' + cardCount + '枚 ' + (isApproved ? '・<span class="text-green-600 font-bold">承認済み</span>' : '・<span class="text-orange-600 font-bold">未確認</span>') + '</div>' +
         '</div>' +
         '<div class="flex items-center gap-1.5 flex-shrink-0">' +
@@ -52574,7 +52574,7 @@ function showPersonalizedCourseReview(data) {
               <div class="space-y-1">
                 ${student_analysis.test_prep.low_confidence_topics.map(t => `
                   <div class="flex items-center gap-2 text-xs">
-                    <span class="font-bold text-gray-700 w-32 truncate">${t.topic}</span>
+                    <span class="font-bold text-gray-700" style="min-width:8rem;word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">${t.topic}</span>
                     <div class="flex-1 bg-gray-200 rounded-full h-2">
                       <div class="h-2 rounded-full ${t.avg_confidence < 2 ? 'bg-red-500' : t.avg_confidence < 3 ? 'bg-orange-500' : 'bg-green-500'}" style="width:${(t.avg_confidence/5*100)}%"></div>
                     </div>
@@ -52991,7 +52991,7 @@ async function showPersonalizedCourseSelector(curriculumId) {
               return `
               <label class="student-select-label ${hasExisting ? 'generated bg-green-50 border-green-200' : 'bg-gray-50 hover:bg-pink-50 border-gray-200 hover:border-pink-300'}">
                 <input type="checkbox" class="student-checkbox" value="${s.id}" ${hasExisting ? 'data-existing="true"' : ''} onchange="updateBulkCount(); this.closest('label').classList.toggle('bg-pink-100',this.checked); this.closest('label').classList.toggle('border-pink-400',this.checked); this.closest('label').classList.toggle('bg-gray-50',!this.checked)">
-                <span class="text-sm font-semibold ${hasExisting ? 'text-green-700' : 'text-gray-800'} truncate">
+                <span class="text-sm font-semibold ${hasExisting ? 'text-green-700' : 'text-gray-800'}" style="word-wrap:break-word;overflow-wrap:break-word;white-space:normal;">
                   ${hasExisting ? '<i class="fas fa-check-circle text-green-500 mr-1"></i>' : '<i class="fas fa-user text-gray-400 mr-1"></i>'}
                   ${s.name || '児童' + s.id}
                 </span>

@@ -10,6 +10,71 @@ button {
   touch-action: manipulation;
 }
 
+/* ==========================================
+   フォーカスリング制御
+   マウスクリック時はフォーカスリングを非表示
+   キーボード操作時のみ表示（アクセシビリティ確保）
+   ========================================== */
+button:focus {
+  outline: none !important;
+  box-shadow: none;
+}
+
+button:focus-visible {
+  outline: 2px solid #6366f1 !important;
+  outline-offset: 2px !important;
+}
+
+/* 音声・TTS関連ボタンのフォーカスリング完全除去 */
+[onclick*="readCardAloud"]:focus,
+[onclick*="speakText"]:focus,
+[onclick*="toggleMessageTts"]:focus,
+[data-msg-tts-btn]:focus,
+[onclick*="readCardAloud"]:focus-visible,
+[onclick*="speakText"]:focus-visible,
+[onclick*="toggleMessageTts"]:focus-visible,
+[data-msg-tts-btn]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* ==========================================
+   テキスト見切れ防止 — カード内テキスト
+   ========================================== */
+
+/* カード内のテキストは常に折り返し＋高さ自動 */
+.card-content,
+.card-title,
+.card-heading {
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  -webkit-line-clamp: unset !important;
+  display: block !important;
+}
+
+/* カード内の truncate を上書き（カードコンテナ内のみ） */
+[class*="border-"][class*="rounded-lg"] .truncate,
+[class*="rounded-xl"] .truncate,
+.bg-white.rounded-lg .truncate {
+  overflow: visible !important;
+  text-overflow: unset !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* コース名・カードタイトルの見切れ防止 */
+.font-bold.text-gray-800,
+.font-bold.text-gray-700 {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
 /* 押下時のフィードバック（控えめ。ガクつかないよう scale は使わない） */
 button:not(:disabled):active {
   filter: brightness(0.92);
