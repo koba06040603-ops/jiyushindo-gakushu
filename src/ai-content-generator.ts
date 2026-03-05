@@ -194,7 +194,7 @@ ${styleConfig.elements.map((e, i) => `${i + 1}. ${e}`).join('\n')}
    */
   private async callGeminiAPI(prompt: string): Promise<string> {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${this.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${this.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,7 +230,7 @@ ${styleConfig.elements.map((e, i) => `${i + 1}. ${e}`).join('\n')}
       content: generatedText,
       metadata: {
         generated_at: new Date().toISOString(),
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3.1-flash-lite-preview',
         token_count: generatedText.length
       }
     };
