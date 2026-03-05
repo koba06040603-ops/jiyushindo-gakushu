@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>先生向け運用ガイド — はじめての使い方</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; }
+    .step-card { transition: all 0.3s ease; }
+    .step-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+    .step-number { width: 56px; height: 56px; min-width: 56px; }
+    @media print {
+      .no-print { display: none !important; }
+      .step-card { break-inside: avoid; page-break-inside: avoid; }
+      body { font-size: 11pt; }
+    }
+    .timeline-line { position: absolute; left: 27px; top: 56px; bottom: 0; width: 3px; background: linear-gradient(to bottom, #6366f1, #ec4899); }
+    .highlight-box { background: linear-gradient(135deg, #fef3c7, #fde68a); border-left: 4px solid #f59e0b; }
+    .warning-box { background: linear-gradient(135deg, #fee2e2, #fecaca); border-left: 4px solid #ef4444; }
+    .success-box { background: linear-gradient(135deg, #d1fae5, #a7f3d0); border-left: 4px solid #10b981; }
+    .info-box { background: linear-gradient(135deg, #dbeafe, #bfdbfe); border-left: 4px solid #3b82f6; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+  <!-- ヘッダー -->
+  <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-8 px-6">
+    <div class="max-w-4xl mx-auto">
+      <div class="flex items-center gap-4 mb-4">
+        <div class="bg-white/20 rounded-full p-3">
+          <i class="fas fa-chalkboard-teacher text-3xl"></i>
+        </div>
+        <div>
+          <h1 class="text-3xl font-black">先生向け運用ガイド</h1>
+          <p class="text-lg opacity-90 mt-1">はじめての先生が児童にIDを配り、学習データを活用・回収するまでの流れ</p>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-4 no-print">
+        <button onclick="window.print()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-bold transition">
+          <i class="fas fa-print mr-2"></i>印刷する
+        </button>
+        <a href="/" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-bold transition">
+          <i class="fas fa-home mr-2"></i>トップへ
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="max-w-4xl mx-auto px-4 py-8">
+
+    <!-- 全体の流れ（概要） -->
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-8">
+      <h2 class="text-xl font-black text-gray-800 mb-4">
+        <i class="fas fa-map-signs mr-2 text-indigo-600"></i>全体の流れ（5ステップ）
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-2 text-center">
+        <div class="bg-indigo-50 rounded-xl p-3 border-2 border-indigo-200">
+          <div class="text-2xl mb-1">👨‍🏫</div>
+          <p class="text-xs font-bold text-indigo-800">STEP 1</p>
+          <p class="text-sm font-bold text-gray-700">先生がログイン</p>
+        </div>
+        <div class="flex items-center justify-center text-gray-400 text-xl font-bold">→</div>
+        <div class="bg-pink-50 rounded-xl p-3 border-2 border-pink-200">
+          <div class="text-2xl mb-1">👦👧</div>
+          <p class="text-xs font-bold text-pink-800">STEP 2</p>
+          <p class="text-sm font-bold text-gray-700">児童のIDを作成</p>
+        </div>
+        <div class="flex items-center justify-center text-gray-400 text-xl font-bold">→</div>
+        <div class="bg-green-50 rounded-xl p-3 border-2 border-green-200">
+          <div class="text-2xl mb-1">📚</div>
+          <p class="text-xs font-bold text-green-800">STEP 3</p>
+          <p class="text-sm font-bold text-gray-700">単元を作成</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-2 text-center mt-2">
+        <div class="bg-orange-50 rounded-xl p-3 border-2 border-orange-200">
+          <div class="text-2xl mb-1">📤</div>
+          <p class="text-xs font-bold text-orange-800">STEP 4</p>
+          <p class="text-sm font-bold text-gray-700">児童にURLを配布</p>
+        </div>
+        <div class="flex items-center justify-center text-gray-400 text-xl font-bold">→</div>
+        <div class="bg-purple-50 rounded-xl p-3 border-2 border-purple-200">
+          <div class="text-2xl mb-1">📊</div>
+          <p class="text-xs font-bold text-purple-800">STEP 5</p>
+          <p class="text-sm font-bold text-gray-700">学習データ回収</p>
+        </div>
+        <div class="md:col-span-2"></div>
+      </div>
+    </div>
+
+    <!-- ===== STEP 1: 先生がログイン ===== -->
+    <div class="step-card bg-white rounded-2xl shadow-lg p-6 mb-6 border-l-4 border-indigo-500">
+      <div class="flex items-start gap-4">
+        <div class="step-number bg-indigo-600 text-white rounded-full flex items-center justify-center text-xl font-black flex-shrink-0">1</div>
+        <div class="flex-1">
+          <h3 class="text-xl font-black text-indigo-800 mb-3">先生がログインする</h3>
+          <p class="text-gray-600 mb-4">まず、先生自身のアカウントでシステムにログインします。</p>
+
+          <div class="bg-gray-50 rounded-xl p-4 mb-4">
+            <h4 class="font-bold text-gray-700 mb-2"><i class="fas fa-mouse-pointer mr-2 text-indigo-500"></i>操作手順</h4>
+            <ol class="space-y-2 text-sm text-gray-700">
+              <li class="flex items-start gap-2">
+                <span class="bg-indigo-100 text-indigo-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>ブラウザでシステムのURLにアクセスします</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-indigo-100 text-indigo-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <span>ログイン画面が表示されます</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-indigo-100 text-indigo-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <span><strong>ユーザー名</strong>と<strong>パスワード</strong>を入力して「ログイン」を押します</span>
+              </li>
+            </ol>
+          </div>
+
+          <div class="info-box rounded-lg p-4 mb-3">
+            <p class="text-sm font-bold text-blue-800 mb-1"><i class="fas fa-info-circle mr-1"></i>教師アカウントについて</p>
+            <p class="text-sm text-blue-700">教師アカウントは管理者（admin）が事前に作成します。もし自分のアカウントがない場合は、管理者に「教師アカウントの作成」を依頼してください。</p>
+          </div>
+
+          <div class="highlight-box rounded-lg p-4">
+            <p class="text-sm font-bold text-amber-800 mb-1"><i class="fas fa-lightbulb mr-1"></i>ポイント</p>
+            <p class="text-sm text-amber-700">教師としてログインすると、画面上部に「管理ダッシュボード」「学習データ分析」のメニューが表示されます。児童アカウントではこれらは表示されません。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== STEP 2: 児童のIDを作成 ===== -->
+    <div class="step-card bg-white rounded-2xl shadow-lg p-6 mb-6 border-l-4 border-pink-500">
+      <div class="flex items-start gap-4">
+        <div class="step-number bg-pink-600 text-white rounded-full flex items-center justify-center text-xl font-black flex-shrink-0">2</div>
+        <div class="flex-1">
+          <h3 class="text-xl font-black text-pink-800 mb-3">児童のID（アカウント）を作成する</h3>
+          <p class="text-gray-600 mb-4">クラスの児童一人ひとりのアカウントを作成し、ユーザー名とパスワードを配布します。</p>
+
+          <div class="bg-gray-50 rounded-xl p-4 mb-4">
+            <h4 class="font-bold text-gray-700 mb-2"><i class="fas fa-mouse-pointer mr-2 text-pink-500"></i>操作手順</h4>
+            <ol class="space-y-3 text-sm text-gray-700">
+              <li class="flex items-start gap-2">
+                <span class="bg-pink-100 text-pink-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>画面上部メニューの「<strong>管理ダッシュボード</strong>」をクリック</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-pink-100 text-pink-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <span>「<strong>ユーザー管理</strong>」タブを開く</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-pink-100 text-pink-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <span>「<strong>ユーザー追加</strong>」ボタンを押す</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-pink-100 text-pink-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
+                <div>
+                  以下の情報を入力します：
+                  <div class="mt-2 bg-white rounded-lg p-3 border border-pink-200">
+                    <table class="w-full text-xs">
+                      <tr class="border-b"><td class="py-1.5 font-bold text-pink-700 w-28">ユーザー名</td><td>例：<code class="bg-gray-100 px-1 rounded">student01</code>（出席番号にすると管理しやすい）</td></tr>
+                      <tr class="border-b"><td class="py-1.5 font-bold text-pink-700">パスワード</td><td>例：<code class="bg-gray-100 px-1 rounded">pass1234</code>（初期パスワード。あとで児童が変更可能）</td></tr>
+                      <tr class="border-b"><td class="py-1.5 font-bold text-pink-700">表示名</td><td>例：<code class="bg-gray-100 px-1 rounded">田中太郎</code>（児童の名前）</td></tr>
+                      <tr><td class="py-1.5 font-bold text-pink-700">役割</td><td>「<strong>児童</strong>」を選択</td></tr>
+                    </table>
+                  </div>
+                </div>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-pink-100 text-pink-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">5</span>
+                <span>「<strong>追加</strong>」ボタンを押す → 完了</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-pink-100 text-pink-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">6</span>
+                <span>クラス全員分（30人なら30回）繰り返します</span>
+              </li>
+            </ol>
+          </div>
+
+          <!-- IDの配布方法 -->
+          <div class="bg-pink-50 rounded-xl p-4 mb-4 border border-pink-200">
+            <h4 class="font-bold text-pink-800 mb-3"><i class="fas fa-id-card mr-2"></i>児童へのID配布方法（おすすめ）</h4>
+            <div class="space-y-3">
+              <div class="bg-white rounded-lg p-3 border border-pink-100">
+                <p class="font-bold text-gray-700 text-sm mb-1">📝 方法① 紙で配布（低学年におすすめ）</p>
+                <p class="text-xs text-gray-600">一人ひとりに「ユーザー名」と「パスワード」を書いた紙を配ります。小さなカードにして筆箱に入れておくと便利です。</p>
+              </div>
+              <div class="bg-white rounded-lg p-3 border border-pink-100">
+                <p class="font-bold text-gray-700 text-sm mb-1">📋 方法② クラス名簿に記載</p>
+                <p class="text-xs text-gray-600">出席番号順に「ユーザー名 = student01〜student30」「パスワード = 全員共通 pass1234」と一覧表にして配布します。</p>
+              </div>
+              <div class="bg-white rounded-lg p-3 border border-pink-100">
+                <p class="font-bold text-gray-700 text-sm mb-1">💻 方法③ タブレットに設定済み</p>
+                <p class="text-xs text-gray-600">学校のタブレットにあらかじめブックマーク＋ログイン情報を保存しておくと、児童はタップするだけで使えます。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="highlight-box rounded-lg p-4">
+            <p class="text-sm font-bold text-amber-800 mb-1"><i class="fas fa-lightbulb mr-1"></i>命名のコツ</p>
+            <p class="text-sm text-amber-700">
+              <strong>ユーザー名のルール例：</strong><br>
+              <code class="bg-white/50 px-1 rounded">5a01</code>（5年A組 出席番号1番）、<code class="bg-white/50 px-1 rounded">5a02</code>、...、<code class="bg-white/50 px-1 rounded">5a30</code><br>
+              このように学年・組・出席番号を組み合わせると、誰のデータか一目でわかります。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== STEP 3: 単元を作成 ===== -->
+    <div class="step-card bg-white rounded-2xl shadow-lg p-6 mb-6 border-l-4 border-green-500">
+      <div class="flex items-start gap-4">
+        <div class="step-number bg-green-600 text-white rounded-full flex items-center justify-center text-xl font-black flex-shrink-0">3</div>
+        <div class="flex-1">
+          <h3 class="text-xl font-black text-green-800 mb-3">学習する単元（カリキュラム）を作成する</h3>
+          <p class="text-gray-600 mb-4">AIが自動で学習カード（3コース分）を生成します。教科書・学年・単元名を入力するだけです。</p>
+
+          <div class="bg-gray-50 rounded-xl p-4 mb-4">
+            <h4 class="font-bold text-gray-700 mb-2"><i class="fas fa-mouse-pointer mr-2 text-green-500"></i>操作手順</h4>
+            <ol class="space-y-3 text-sm text-gray-700">
+              <li class="flex items-start gap-2">
+                <span class="bg-green-100 text-green-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>トップページで「<strong>新しい単元を作成する</strong>」をクリック</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-green-100 text-green-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <div>
+                  以下を入力します：
+                  <div class="mt-2 bg-white rounded-lg p-3 border border-green-200">
+                    <table class="w-full text-xs">
+                      <tr class="border-b"><td class="py-1.5 font-bold text-green-700 w-28">学年</td><td>例：小学3年</td></tr>
+                      <tr class="border-b"><td class="py-1.5 font-bold text-green-700">教科</td><td>例：算数</td></tr>
+                      <tr class="border-b"><td class="py-1.5 font-bold text-green-700">教科書会社</td><td>例：東京書籍</td></tr>
+                      <tr><td class="py-1.5 font-bold text-green-700">単元名</td><td>例：かけ算のきまり</td></tr>
+                    </table>
+                  </div>
+                </div>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-green-100 text-green-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <span>「<strong>AIで自動生成</strong>」ボタンを押す</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-green-100 text-green-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
+                <span>AIが<strong>3コース×10枚</strong>の学習カードを自動生成します（約1〜3分）</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-green-100 text-green-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">5</span>
+                <span>生成された「<strong>学習のてびき</strong>」を確認し、必要に応じて編集します</span>
+              </li>
+            </ol>
+          </div>
+
+          <div class="info-box rounded-lg p-4 mb-3">
+            <p class="text-sm font-bold text-blue-800 mb-1"><i class="fas fa-layer-group mr-1"></i>3コースとは？</p>
+            <div class="text-sm text-blue-700 space-y-1">
+              <p>🟢 <strong>じっくりコース</strong>（基礎）— つまずきやすい児童向け</p>
+              <p>🔵 <strong>ぐんぐんコース</strong>（標準）— 多くの児童向け</p>
+              <p>🟣 <strong>チャレンジコース</strong>（発展）— 先に進みたい児童向け</p>
+              <p class="mt-2">児童が自分でコースを選べるので、自由進度学習が実現します。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== STEP 4: 児童にURLを配布 ===== -->
+    <div class="step-card bg-white rounded-2xl shadow-lg p-6 mb-6 border-l-4 border-orange-500">
+      <div class="flex items-start gap-4">
+        <div class="step-number bg-orange-600 text-white rounded-full flex items-center justify-center text-xl font-black flex-shrink-0">4</div>
+        <div class="flex-1">
+          <h3 class="text-xl font-black text-orange-800 mb-3">児童に「学習のてびき」URLを配布する</h3>
+          <p class="text-gray-600 mb-4">作成した単元の「学習のてびき」ページのURLを児童に配布します。2つの方法があります。</p>
+
+          <!-- 方法A: オンライン -->
+          <div class="bg-orange-50 rounded-xl p-4 mb-4 border border-orange-200">
+            <h4 class="font-bold text-orange-800 mb-3"><i class="fas fa-globe mr-2"></i>方法A: オンライン配布（タブレット利用）</h4>
+            <ol class="space-y-2 text-sm text-gray-700">
+              <li class="flex items-start gap-2">
+                <span class="bg-orange-100 text-orange-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>学習のてびきページで「<strong>配信</strong>」タブをクリック</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-orange-100 text-orange-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <span>「<strong>オンライン配信</strong>」タブを選択</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-orange-100 text-orange-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <div>
+                  配布方法を選びます：
+                  <ul class="mt-1 space-y-1 text-xs">
+                    <li>📋 <strong>URLコピー</strong> — URLをコピーしてチャットやメールで送信</li>
+                    <li>📱 <strong>QRコード</strong> — QRコードを印刷してタブレットで読み取り</li>
+                    <li>👤 <strong>児童ごとのリンク</strong> — 各児童の名前入りURLを一括生成</li>
+                  </ul>
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          <!-- 方法B: 印刷 -->
+          <div class="bg-orange-50 rounded-xl p-4 mb-4 border border-orange-200">
+            <h4 class="font-bold text-orange-800 mb-3"><i class="fas fa-print mr-2"></i>方法B: 紙で配布（印刷）</h4>
+            <ol class="space-y-2 text-sm text-gray-700">
+              <li class="flex items-start gap-2">
+                <span class="bg-orange-100 text-orange-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>学習のてびきページで「<strong>配信</strong>」タブ → 「<strong>印刷</strong>」タブを選択</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-orange-100 text-orange-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <span>ブラウザの印刷機能（Ctrl+P / ⌘+P）で印刷</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-orange-100 text-orange-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <span>児童一人ひとりに配布します</span>
+              </li>
+            </ol>
+          </div>
+
+          <div class="success-box rounded-lg p-4">
+            <p class="text-sm font-bold text-green-800 mb-1"><i class="fas fa-check-circle mr-1"></i>児童がやること</p>
+            <div class="text-sm text-green-700 space-y-1">
+              <p>① ログイン画面で<strong>自分のユーザー名とパスワード</strong>を入力</p>
+              <p>② 配布されたURLの「学習のてびき」を開く</p>
+              <p>③ <strong>自分でコースを選んで</strong>学習カードに取り組む</p>
+              <p>④ 回答を入力し、「こたえあわせ」を押す</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== STEP 5: 学習データの回収・活用 ===== -->
+    <div class="step-card bg-white rounded-2xl shadow-lg p-6 mb-6 border-l-4 border-purple-500">
+      <div class="flex items-start gap-4">
+        <div class="step-number bg-purple-600 text-white rounded-full flex items-center justify-center text-xl font-black flex-shrink-0">5</div>
+        <div class="flex-1">
+          <h3 class="text-xl font-black text-purple-800 mb-3">学習データを回収・活用する</h3>
+          <p class="text-gray-600 mb-4">児童が学習すると、回答データ・進捗・理解度が自動で記録されます。先生はリアルタイムで確認できます。</p>
+
+          <!-- 5-A: リアルタイム確認 -->
+          <div class="bg-purple-50 rounded-xl p-4 mb-4 border border-purple-200">
+            <h4 class="font-bold text-purple-800 mb-3"><i class="fas fa-chart-line mr-2"></i>A. リアルタイムで進捗を確認する</h4>
+            <ol class="space-y-2 text-sm text-gray-700">
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>学習のてびきページを開く</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <div>
+                  以下のデータが確認できます：
+                  <ul class="mt-1 space-y-1 text-xs">
+                    <li>📊 <strong>進捗ボード</strong> — 各児童がどこまで進んでいるか一覧表示</li>
+                    <li>🔥 <strong>ヒートマップ</strong> — クラス全体の理解度を色で可視化</li>
+                    <li>⚠️ <strong>要注意の児童</strong> — つまずいている児童を自動検出</li>
+                    <li>📈 <strong>学習時間分析</strong> — 各児童の取り組み時間</li>
+                  </ul>
+                </div>
+              </li>
+            </ol>
+          </div>
+
+          <!-- 5-B: 個別最適化 -->
+          <div class="bg-purple-50 rounded-xl p-4 mb-4 border border-purple-200">
+            <h4 class="font-bold text-purple-800 mb-3"><i class="fas fa-magic mr-2"></i>B. 個別最適化カードを生成する</h4>
+            <ol class="space-y-2 text-sm text-gray-700">
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>学習のてびきページの「<strong>個別最適化コース</strong>」セクションを開く</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <span>「<strong>新規生成</strong>」ボタンを押す</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <span>対象児童を選択して「生成」</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
+                <span>AIが各児童の学習データを分析し、その子専用の学習カードを自動生成</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">5</span>
+                <span>内容を確認して「<strong>承認</strong>」→ 児童に配信されます</span>
+              </li>
+            </ol>
+          </div>
+
+          <!-- 5-C: CSVエクスポート -->
+          <div class="bg-purple-50 rounded-xl p-4 mb-4 border border-purple-200">
+            <h4 class="font-bold text-purple-800 mb-3"><i class="fas fa-file-csv mr-2"></i>C. 学習データをCSVでダウンロードする</h4>
+            <ol class="space-y-2 text-sm text-gray-700">
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                <span>「<strong>管理ダッシュボード</strong>」→「<strong>データエクスポート</strong>」タブ</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                <div>
+                  ダウンロードできるデータ：
+                  <ul class="mt-1 space-y-1 text-xs">
+                    <li>📋 <strong>ユーザー一覧</strong> — 全アカウント情報</li>
+                    <li>📚 <strong>カリキュラム一覧</strong> — 教科・学年・単元情報</li>
+                    <li>🃏 <strong>学習カード一覧</strong> — カードの内容と設定</li>
+                    <li>✏️ <strong>回答データ</strong> — 児童の全回答・正誤・所要時間</li>
+                    <li>📊 <strong>コース一覧</strong> — コースID・レベル・説明</li>
+                  </ul>
+                </div>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="bg-purple-100 text-purple-700 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                <span>「<strong>CSVダウンロード</strong>」ボタンを押す → Excel等で開けます</span>
+              </li>
+            </ol>
+          </div>
+
+          <div class="info-box rounded-lg p-4">
+            <p class="text-sm font-bold text-blue-800 mb-1"><i class="fas fa-sync mr-1"></i>データの自動収集について</p>
+            <p class="text-sm text-blue-700">児童がカードに回答すると、以下のデータが<strong>自動で記録</strong>されます。先生は何もしなくてもデータが蓄積されます。</p>
+            <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-white/60 rounded p-2">✅ 回答内容（正誤）</div>
+              <div class="bg-white/60 rounded p-2">⏱️ 回答にかかった時間</div>
+              <div class="bg-white/60 rounded p-2">📊 理解度スコア</div>
+              <div class="bg-white/60 rounded p-2">🆘 ヘルプの利用回数</div>
+              <div class="bg-white/60 rounded p-2">🔄 チャレンジ回数</div>
+              <div class="bg-white/60 rounded p-2">📅 学習日時</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== よくある質問 ===== -->
+    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+      <h2 class="text-xl font-black text-gray-800 mb-4">
+        <i class="fas fa-question-circle mr-2 text-amber-500"></i>よくある質問
+      </h2>
+      <div class="space-y-3">
+        <details class="bg-gray-50 rounded-lg border border-gray-200">
+          <summary class="cursor-pointer p-4 font-bold text-gray-700 text-sm hover:bg-gray-100 transition">
+            <i class="fas fa-chevron-right mr-2 text-gray-400"></i>児童がパスワードを忘れたら？
+          </summary>
+          <div class="px-4 pb-4 text-sm text-gray-600">
+            管理ダッシュボードの「ユーザー管理」から該当の児童アカウントを確認し、パスワードをリセットしてください。または、新しいアカウントを作成することもできます。
+          </div>
+        </details>
+
+        <details class="bg-gray-50 rounded-lg border border-gray-200">
+          <summary class="cursor-pointer p-4 font-bold text-gray-700 text-sm hover:bg-gray-100 transition">
+            <i class="fas fa-chevron-right mr-2 text-gray-400"></i>学習データはどこに保存されますか？
+          </summary>
+          <div class="px-4 pb-4 text-sm text-gray-600">
+            データはクラウド上のデータベース（Cloudflare D1）に安全に保存されます。端末には保存されないので、別のタブレットからログインしても続きから学習できます。
+          </div>
+        </details>
+
+        <details class="bg-gray-50 rounded-lg border border-gray-200">
+          <summary class="cursor-pointer p-4 font-bold text-gray-700 text-sm hover:bg-gray-100 transition">
+            <i class="fas fa-chevron-right mr-2 text-gray-400"></i>途中でカードの内容を修正できますか？
+          </summary>
+          <div class="px-4 pb-4 text-sm text-gray-600">
+            はい。教師としてログイン後、学習のてびきページでカードの内容を編集できます。AIが生成した内容を先生の判断で自由に変更できます。
+          </div>
+        </details>
+
+        <details class="bg-gray-50 rounded-lg border border-gray-200">
+          <summary class="cursor-pointer p-4 font-bold text-gray-700 text-sm hover:bg-gray-100 transition">
+            <i class="fas fa-chevron-right mr-2 text-gray-400"></i>オフラインでも使えますか？
+          </summary>
+          <div class="px-4 pb-4 text-sm text-gray-600">
+            インターネット接続が必要です。ただし、紙で印刷した「学習のてびき」はオフラインでも使えます。その場合は児童が紙に記入し、先生が後からデータを入力する方法もあります。
+          </div>
+        </details>
+
+        <details class="bg-gray-50 rounded-lg border border-gray-200">
+          <summary class="cursor-pointer p-4 font-bold text-gray-700 text-sm hover:bg-gray-100 transition">
+            <i class="fas fa-chevron-right mr-2 text-gray-400"></i>1つの単元にかかる準備時間は？
+          </summary>
+          <div class="px-4 pb-4 text-sm text-gray-600">
+            <strong>約5〜10分</strong>です。STEP 3の入力（学年・教科・単元名）に約1分、AIの自動生成に約1〜3分、確認に約3〜5分です。従来の手作業（1人30分×30人 = 15時間）と比べて大幅に短縮されます。
+          </div>
+        </details>
+
+        <details class="bg-gray-50 rounded-lg border border-gray-200">
+          <summary class="cursor-pointer p-4 font-bold text-gray-700 text-sm hover:bg-gray-100 transition">
+            <i class="fas fa-chevron-right mr-2 text-gray-400"></i>保護者にも見せられますか？
+          </summary>
+          <div class="px-4 pb-4 text-sm text-gray-600">
+            はい。「児童ごとのリンク」機能で、各児童の名前入りURLを生成できます。これを保護者に送れば、家庭でも学習に取り組めます。
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <!-- ===== クイックリファレンス ===== -->
+    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 mb-6 border-2 border-indigo-200">
+      <h2 class="text-xl font-black text-indigo-800 mb-4">
+        <i class="fas fa-bookmark mr-2"></i>クイックリファレンス（壁に貼ってお使いください）
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div class="bg-white rounded-lg p-4 shadow-sm">
+          <h4 class="font-bold text-indigo-700 mb-2">🔑 ログイン情報</h4>
+          <table class="w-full text-xs">
+            <tr class="border-b"><td class="py-1 text-gray-500">URL</td><td class="font-mono font-bold">（配布されたURL）</td></tr>
+            <tr class="border-b"><td class="py-1 text-gray-500">教師ユーザー名</td><td class="font-bold">teacher1</td></tr>
+            <tr><td class="py-1 text-gray-500">初期パスワード</td><td class="font-bold">password123</td></tr>
+          </table>
+        </div>
+        <div class="bg-white rounded-lg p-4 shadow-sm">
+          <h4 class="font-bold text-indigo-700 mb-2">🛠️ 主な画面</h4>
+          <div class="text-xs space-y-1.5">
+            <p>📍 <strong>トップページ</strong> — 単元一覧・新規作成</p>
+            <p>📍 <strong>学習のてびき</strong> — コース・カード・配信</p>
+            <p>📍 <strong>管理ダッシュボード</strong> — ユーザー管理・エクスポート</p>
+            <p>📍 <strong>進捗ボード</strong> — クラス全体の進捗確認</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <div class="text-center text-gray-400 text-xs py-4">
+      <p>自由進度学習支援システム — 先生向け運用ガイド</p>
+    </div>
+
+  </div>
+
+</body>
+</html>
