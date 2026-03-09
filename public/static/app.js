@@ -1610,19 +1610,19 @@ async function renderTopPage() {
             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="text-center">
                 <p class="text-xs font-bold text-gray-700 mb-2">12理論統合因果モデル全体図</p>
-                <img src="https://www.genspark.ai/api/files/s/ER2whxud?cache_control=3600" alt="v4統合制御エンジン — 12理論統合因果モデル" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+                <img src="https://www.genspark.ai/api/files/s/XcOSlsWV" alt="v4統合制御エンジン — 12理論統合因果モデル" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
               </div>
               <div class="text-center">
                 <p class="text-xs font-bold text-gray-700 mb-2">8つの学びの姿（アーキタイプマップ）</p>
-                <img src="https://www.genspark.ai/api/files/s/4I6FyxIC?cache_control=3600" alt="8つの学びの姿 — アーキタイプマップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+                <img src="https://www.genspark.ai/api/files/s/iHKbCTfk" alt="8つの学びの姿 — アーキタイプマップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
               </div>
               <div class="text-center">
                 <p class="text-xs font-bold text-gray-700 mb-2">12理論の因果関係マップ</p>
-                <img src="https://www.genspark.ai/api/files/s/fmmMoCJy?cache_control=3600" alt="12理論の因果関係マップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+                <img src="https://www.genspark.ai/api/files/s/XVo5I3MO" alt="12理論の因果関係マップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
               </div>
               <div class="text-center">
                 <p class="text-xs font-bold text-gray-700 mb-2">統合制御パラメータ算出フロー</p>
-                <img src="https://www.genspark.ai/api/files/s/0cgnOO0R?cache_control=3600" alt="統合制御パラメータ算出フロー" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+                <img src="https://www.genspark.ai/api/files/s/7hKyI6ir" alt="統合制御パラメータ算出フロー" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
               </div>
             </div>
           </details>
