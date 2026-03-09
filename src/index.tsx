@@ -23202,10 +23202,10 @@ app.get('/proposal', (c) => {
 
     <script>
     const slides = [
-        { num: 1, title: 'v4統合制御エンジン — 12理論統合因果モデル', url: 'https://www.genspark.ai/api/files/s/XcOSlsWV' },
-        { num: 2, title: '統合制御パラメータ算出フロー', url: 'https://www.genspark.ai/api/files/s/7hKyI6ir' },
-        { num: 3, title: '8つの学びの姿 — アーキタイプマップ', url: 'https://www.genspark.ai/api/files/s/iHKbCTfk' },
-        { num: 4, title: '12理論の因果関係マップ — 正と負のスパイラル', url: 'https://www.genspark.ai/api/files/s/XVo5I3MO' }
+        { num: 1, title: 'v4統合制御エンジン — 12理論統合因果モデル', url: '/static/images/v4-engine-model.png' },
+        { num: 2, title: '統合制御パラメータ算出フロー', url: '/static/images/parameter-flow.png' },
+        { num: 3, title: '8つの学びの姿 — アーキタイプマップ', url: '/static/images/archetype-map.png' },
+        { num: 4, title: '12理論の因果関係マップ — 正と負のスパイラル', url: '/static/images/causal-map.png' }
     ];
 
     let current = 0;
