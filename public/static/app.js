@@ -15684,7 +15684,32 @@ async function gradeAnswer(correctAnswer) {
   const correctKeyValues = extractKeyValues(normalizedCorrect)
   const keyValuesMatch = correctKeyValues.length > 0 && correctKeyValues.every(v => normalizedStudent.includes(v))
   
-  const isCorrect = openEndedMatch || multiTraitMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
+  // 英語判定: 正解がアルファベット主体（英語の文）かどうか
+  const isEnglishAnswer = /^[a-z0-9\s.,!?'";\-:()]+$/i.test(correctAnswer.trim())
+  
+  const isCorrect = (() => {
+    // 英語の場合は厳密判定（単語の意味が違うと不正解にする）
+    if (isEnglishAnswer) {
+      // 完全一致
+      if (normalizedStudent === normalizedCorrect) return true
+      // スペース・句読点を統一して比較
+      const normalizeEng = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim()
+      const normS = normalizeEng(studentAnswer)
+      const normC = normalizeEng(correctAnswer)
+      if (normS === normC) return true
+      // 単語配列で比較（全単語一致のみ正解）
+      const wordsS = normS.split(' ').filter(w => w.length > 0)
+      const wordsC = normC.split(' ').filter(w => w.length > 0)
+      if (wordsS.length === wordsC.length && wordsS.every((w, i) => w === wordsC[i])) return true
+      // 冠詞・大文字の差異を許容する緩い判定（語順と内容語は一致必須）
+      const contentWordsC = wordsC.filter(w => !['a', 'an', 'the', 'is', 'am', 'are'].includes(w))
+      const contentWordsS = wordsS.filter(w => !['a', 'an', 'the', 'is', 'am', 'are'].includes(w))
+      if (contentWordsC.length > 0 && contentWordsS.length === contentWordsC.length && 
+          contentWordsS.every((w, i) => w === contentWordsC[i])) return true
+      return false
+    }
+    // 日本語・その他の場合は従来の判定
+    return openEndedMatch || multiTraitMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
     // 追加判定: 人名・選択肢判定（「Aさん」「Bさん」など比較問題）
     const personMatch = normalizedCorrect.match(/([abcABC][さくんちゃん]*|[ア-ン]+さん)/) 
     if (personMatch && normalizedStudent.includes(personMatch[0])) return true
@@ -15734,8 +15759,9 @@ async function gradeAnswer(correctAnswer) {
     }
     return false
   })()
+  })()
   
-  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
+  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, isEnglishAnswer, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
   
   if (isCorrect) {
     // 正解音を再生
