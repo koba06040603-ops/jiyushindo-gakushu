@@ -1610,19 +1610,19 @@ async function renderTopPage() {
             <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="text-center">
                 <p class="text-xs font-bold text-gray-700 mb-2">12理論統合因果モデル全体図</p>
-                <img src="/static/images/v4-engine-model.png" alt="v4統合制御エンジン — 12理論統合因果モデル" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+                <a href="/static/images/v4-engine-model.png" target="_blank"><img src="/static/images/v4-engine-model.png" alt="v4統合制御エンジン — 12理論統合因果モデル" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition" /></a>
               </div>
               <div class="text-center">
                 <p class="text-xs font-bold text-gray-700 mb-2">8つの学びの姿（アーキタイプマップ）</p>
-                <img src="/static/images/archetype-map.png" alt="8つの学びの姿 — アーキタイプマップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+                <a href="/static/images/archetype-map.png" target="_blank"><img src="/static/images/archetype-map.png" alt="8つの学びの姿 — アーキタイプマップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition" /></a>
               </div>
-              <div class="text-center">
-                <p class="text-xs font-bold text-gray-700 mb-2">12理論の因果関係マップ</p>
-                <img src="/static/images/causal-map.png" alt="12理論の因果関係マップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+              <div class="text-center md:col-span-2">
+                <p class="text-xs font-bold text-gray-700 mb-2">12理論の因果関係マップ（クリックで拡大）</p>
+                <a href="/static/images/causal-map.png" target="_blank"><img src="/static/images/causal-map.png" alt="12理論の因果関係マップ" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl hover:scale-[1.01] transition" /></a>
               </div>
-              <div class="text-center">
-                <p class="text-xs font-bold text-gray-700 mb-2">統合制御パラメータ算出フロー</p>
-                <img src="/static/images/parameter-flow.png" alt="統合制御パラメータ算出フロー" class="rounded-xl shadow-lg w-full cursor-pointer hover:shadow-2xl transition" onclick="this.classList.toggle('md:col-span-2');this.classList.toggle('max-w-2xl');this.classList.toggle('mx-auto')" />
+              <div class="text-center md:col-span-2">
+                <p class="text-xs font-bold text-gray-700 mb-2">統合制御パラメータ算出フロー（クリックで拡大）</p>
+                <a href="/static/images/parameter-flow.png" target="_blank"><img src="/static/images/parameter-flow.png" alt="統合制御パラメータ算出フロー" class="rounded-xl shadow-lg w-full max-w-3xl mx-auto cursor-pointer hover:shadow-2xl hover:scale-[1.02] transition" /></a>
               </div>
             </div>
           </details>
