@@ -84,14 +84,14 @@ export { ProgressWebSocket } from './websocket'
 // 本番DB:     learning_card_id, hint_number, hint_content, thinking_tool_suggestion
 // ============================================================
 // Gemini モデル定数
-// カード生成・問題生成など品質重要タスク用（Gemini 3 Flash - 最高性能）
-const GEMINI_MODEL_QUALITY = 'gemini-3-flash-preview'
+// カード生成・問題生成など品質重要タスク用（Gemini 3.1 Pro - 最高性能）
+const GEMINI_MODEL_QUALITY = 'gemini-3.1-pro-preview'
 // チャット・フィードバック・分析など軽量タスク用（Gemini 3.1 Flash Lite - 高速・低コスト）
 const GEMINI_MODEL_LITE = 'gemini-3.1-flash-lite-preview'
-// フォールバック用（Gemini 2.5 Flash - 安定）
-const GEMINI_MODEL_FALLBACK = 'gemini-2.5-flash'
-// 旧フォールバック
-const GEMINI_MODEL_LEGACY = 'gemini-2.0-flash'
+// フォールバック用（Gemini 3 Flash - 高性能）
+const GEMINI_MODEL_FALLBACK = 'gemini-3-flash-preview'
+// 旧フォールバック（Gemini 2.5 Flash - 安定）
+const GEMINI_MODEL_LEGACY = 'gemini-2.5-flash'
 // ============================================================
 
 // ============================================================
