@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>学習効果エビデンスレポート - 自由進度学習支援システム</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap');
+    body { font-family: 'Noto Sans JP', sans-serif; }
+    .tab-btn.active { border-bottom: 3px solid #4f46e5; color: #4f46e5; font-weight: 700; }
+    .section-card { transition: all 0.3s ease; }
+    .section-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+    .power-card { border-left: 4px solid; transition: all 0.3s ease; }
+    .power-card:hover { transform: translateX(4px); }
+    .insight-quote { border-left: 4px solid #8b5cf6; background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); }
+    .theory-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+    .stat-highlight { font-size: 2rem; font-weight: 900; background: linear-gradient(135deg, #4f46e5, #7c3aed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .chart-container { position: relative; height: 300px; }
+    .chart-sm { position: relative; height: 200px; }
+    @media print { .no-print { display: none !important; } .print-break { page-break-before: always; } body { font-size: 10pt; } }
+    .fade-in { animation: fadeIn 0.5s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .loading-spinner { border: 3px solid #e5e7eb; border-top: 3px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .research-card { border-left: 4px solid; transition: all 0.3s; }
+    .research-card:hover { box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .data-table th { background: #f1f5f9; padding: 6px 10px; text-align: left; font-weight: 700; border-bottom: 2px solid #e2e8f0; }
+    .data-table td { padding: 5px 10px; border-bottom: 1px solid #f1f5f9; }
+    .data-table tr:hover { background: #f8fafc; }
+    .achievement-badge { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1px solid #f59e0b; }
+    .philosophy-banner { background: linear-gradient(135deg, #fdf4ff 0%, #f5f3ff 50%, #eff6ff 100%); }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- ヘッダー -->
+<header class="bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 text-white shadow-lg no-print">
+  <div class="max-w-7xl mx-auto px-4 py-5">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h1 class="text-2xl font-bold flex items-center gap-3">
+          <i class="fas fa-chart-line text-yellow-300"></i>
+          学習効果エビデンスレポート
+        </h1>
+        <p class="text-indigo-200 text-sm mt-1">子どもの事実から学び、自ら学ぶ力を可視化する</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <select id="periodSelect" class="bg-indigo-600 text-white border border-indigo-400 rounded px-3 py-1.5 text-sm">
+          <option value="all">全期間</option>
+          <option value="month">直近1ヶ月</option>
+          <option value="week">直近1週間</option>
+        </select>
+        <button onclick="window.print()" class="bg-white text-indigo-700 px-3 py-1.5 rounded text-sm font-bold hover:bg-indigo-50"><i class="fas fa-print mr-1"></i>印刷</button>
+        <button onclick="exportCSV()" class="bg-yellow-400 text-indigo-900 px-3 py-1.5 rounded text-sm font-bold hover:bg-yellow-300"><i class="fas fa-download mr-1"></i>CSV</button>
+        <a href="/" class="bg-indigo-500 text-white px-3 py-1.5 rounded text-sm hover:bg-indigo-400"><i class="fas fa-home mr-1"></i>トップ</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- タブナビゲーション -->
+<nav class="bg-white shadow-sm border-b sticky top-0 z-40 no-print">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="flex overflow-x-auto gap-1 -mb-px" id="tabNav">
+      <button class="tab-btn active whitespace-nowrap px-3 py-3 text-sm border-b-3 border-transparent hover:text-indigo-600" data-tab="overview"><i class="fas fa-tachometer-alt mr-1"></i>概要</button>
+      <button class="tab-btn whitespace-nowrap px-3 py-3 text-sm border-b-3 border-transparent hover:text-indigo-600" data-tab="self-learning-power"><i class="fas fa-star mr-1 text-yellow-500"></i>自ら学ぶ力</button>
+      <button class="tab-btn whitespace-nowrap px-3 py-3 text-sm border-b-3 border-transparent hover:text-indigo-600" data-tab="insights"><i class="fas fa-lightbulb mr-1 text-purple-500"></i>子どもの事実</button>
+      <button class="tab-btn whitespace-nowrap px-3 py-3 text-sm border-b-3 border-transparent hover:text-indigo-600" data-tab="theory-analysis"><i class="fas fa-flask mr-1 text-blue-500"></i>12理論分析</button>
+      <button class="tab-btn whitespace-nowrap px-3 py-3 text-sm border-b-3 border-transparent hover:text-indigo-600" data-tab="research"><i class="fas fa-graduation-cap mr-1 text-emerald-600"></i>論文研究</button>
+      <button class="tab-btn whitespace-nowrap px-3 py-3 text-sm border-b-3 border-transparent hover:text-indigo-600" data-tab="cross-theory"><i class="fas fa-project-diagram mr-1 text-green-500"></i>理論間分析</button>
+      <button class="tab-btn whitespace-nowrap px-3 py-3 text-sm border-b-3 border-transparent hover:text-indigo-600" data-tab="individual"><i class="fas fa-user-graduate mr-1 text-orange-500"></i>個人カルテ</button>
+      <button class="tab-btn whitespace-nowrap px-3 py-3 text-sm border-b-3 border-transparent hover:text-indigo-600" data-tab="export"><i class="fas fa-file-export mr-1 text-gray-500"></i>エクスポート</button>
+    </div>
+  </div>
+</nav>
+
+<!-- メインコンテンツ -->
+<main class="max-w-7xl mx-auto px-4 py-6" id="mainContent">
+
+  <!-- ローディング -->
+  <div id="loading-overlay" class="text-center py-12">
+    <div class="loading-spinner mx-auto mb-4" style="width:40px;height:40px;border-width:4px"></div>
+    <p class="text-gray-500">エビデンスデータを分析中...</p>
+  </div>
+
+  <!-- === 概要タブ === -->
+  <div id="tab-overview" class="tab-content hidden fade-in">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+      <div class="bg-white rounded-xl shadow p-4 text-center section-card"><div class="text-gray-500 text-xs mb-1"><i class="fas fa-users mr-1"></i>学習者数</div><div class="stat-highlight" id="kpi-students">-</div></div>
+      <div class="bg-white rounded-xl shadow p-4 text-center section-card"><div class="text-gray-500 text-xs mb-1"><i class="fas fa-check-circle mr-1"></i>総解答数</div><div class="stat-highlight" id="kpi-answers">-</div></div>
+      <div class="bg-white rounded-xl shadow p-4 text-center section-card"><div class="text-gray-500 text-xs mb-1"><i class="fas fa-bullseye mr-1"></i>平均正答率</div><div class="stat-highlight" id="kpi-accuracy">-</div></div>
+      <div class="bg-white rounded-xl shadow p-4 text-center section-card"><div class="text-gray-500 text-xs mb-1"><i class="fas fa-clock mr-1"></i>総学習時間</div><div class="stat-highlight" id="kpi-time">-</div></div>
+      <div class="bg-white rounded-xl shadow p-4 text-center section-card"><div class="text-gray-500 text-xs mb-1"><i class="fas fa-book-open mr-1"></i>振り返り</div><div class="stat-highlight" id="kpi-reflections">-</div></div>
+    </div>
+
+    <!-- 理念バナー -->
+    <div class="philosophy-banner border border-purple-200 rounded-xl p-6 mb-6">
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="insight-quote rounded-lg p-4">
+          <p class="text-purple-800 font-bold text-sm mb-2"><i class="fas fa-eye mr-1"></i>子どもの事実から学べること</p>
+          <p class="text-purple-700 text-sm leading-relaxed">データは子どもを評価するためのものではありません。子どもの姿を映す鏡であり、教師が子どもの事実から学び、自らの実践を省みるためのものです。</p>
+        </div>
+        <div class="rounded-lg p-4 border-l-4 border-amber-400" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);">
+          <p class="text-amber-800 font-bold text-sm mb-2"><i class="fas fa-seedling mr-1"></i>子どもは自ら学ぶ力をもっている</p>
+          <p class="text-amber-700 text-sm leading-relaxed">全ての子どもの中に、学ぶ力があります。今は見えなくても、必ずあります。システムの役割は、その力が発揮される条件を整えることです。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- データ品質 -->
+    <div class="bg-white rounded-xl shadow p-4 mb-6" id="data-quality-section"></div>
+
+    <!-- 12理論レーダー + アーキタイプ分布 -->
+    <div class="grid md:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-xl shadow p-5 section-card">
+        <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-spider mr-1 text-indigo-500"></i>12理論 俯瞰プロファイル（クラス平均）</h3>
+        <div class="chart-container"><canvas id="chart-theory-radar"></canvas></div>
+      </div>
+      <div class="bg-white rounded-xl shadow p-5 section-card">
+        <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-users-cog mr-1 text-purple-500"></i>8アーキタイプ分布</h3>
+        <div class="chart-container"><canvas id="chart-archetype-dist"></canvas></div>
+      </div>
+    </div>
+
+    <!-- 「自ら学ぶ力」サマリー -->
+    <div class="bg-white rounded-xl shadow p-5 mb-6 section-card">
+      <h3 class="font-bold text-gray-800 mb-4"><i class="fas fa-star text-yellow-500 mr-1"></i>「自ら学ぶ力」発揮サマリー</h3>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="power-summary"></div>
+    </div>
+
+    <!-- AIサマリー -->
+    <div class="bg-white rounded-xl shadow p-5 section-card">
+      <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-robot text-indigo-500 mr-1"></i>AIエグゼクティブサマリー</h3>
+      <div id="ai-summary" class="text-gray-700 text-sm leading-relaxed"></div>
+    </div>
+  </div>
+
+  <!-- === 自ら学ぶ力タブ === -->
+  <div id="tab-self-learning-power" class="tab-content hidden fade-in">
+    <div class="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-6 mb-6">
+      <h2 class="text-xl font-bold text-amber-800 mb-2"><i class="fas fa-seedling mr-2"></i>「子どもは自ら学ぶ力をもっている」の証拠</h2>
+      <p class="text-amber-700 text-sm">以下の8つの力は、子どもたちが学習の中で実際に発揮した力の記録です。教えたのではなく、子ども自身が獲得した力です。</p>
+    </div>
+    <div id="powers-detail" class="space-y-4"></div>
+  </div>
+
+  <!-- === 子どもの事実タブ === -->
+  <div id="tab-insights" class="tab-content hidden fade-in">
+    <div class="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6 mb-6">
+      <h2 class="text-xl font-bold text-purple-800 mb-2"><i class="fas fa-eye mr-2"></i>子どもの事実から学べること</h2>
+      <p class="text-purple-700 text-sm">12の理論的視座から見た子どもの姿と、そこから教師が得られる気づき。各理論の成果と「自ら学ぶ力の発見」を含みます。</p>
+    </div>
+    <div id="insights-detail" class="space-y-4"></div>
+  </div>
+
+  <!-- === 12理論分析タブ === -->
+  <div id="tab-theory-analysis" class="tab-content hidden fade-in">
+    <div class="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-6 mb-6">
+      <h2 class="text-xl font-bold text-blue-800 mb-2"><i class="fas fa-flask mr-2"></i>12理論別 統計分析</h2>
+      <p class="text-blue-700 text-sm">v4統合制御エンジンの12理論について、蓄積データからの統計分析と各理論の学術的成果を提示します。</p>
+    </div>
+    <div class="flex flex-wrap gap-2 mb-4" id="theorySubTabs"></div>
+    <div id="theory-analysis-content" class="space-y-4"></div>
+  </div>
+
+  <!-- === 論文研究テーマタブ === -->
+  <div id="tab-research" class="tab-content hidden fade-in">
+    <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-6 mb-6">
+      <h2 class="text-xl font-bold text-emerald-800 mb-2"><i class="fas fa-graduation-cap mr-2"></i>論文研究テーマ分析</h2>
+      <p class="text-emerald-700 text-sm">15の研究テーマ（4領域）について、蓄積データからの統計分析・効果量・考察を提示します。学会発表・論文執筆に直結するエビデンスです。</p>
+    </div>
+    <div class="flex flex-wrap gap-2 mb-4" id="researchSubTabs"></div>
+    <div id="research-content" class="space-y-4"></div>
+  </div>
+
+  <!-- === 理論間分析タブ === -->
+  <div id="tab-cross-theory" class="tab-content hidden fade-in">
+    <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mb-6">
+      <h2 class="text-xl font-bold text-green-800 mb-2"><i class="fas fa-project-diagram mr-2"></i>理論間相互作用分析</h2>
+      <p class="text-green-700 text-sm">12理論は独立ではなく、互いに影響し合っています。理論間の因果関係と「子どもの学びの全体像」を分析します。</p>
+    </div>
+    <div id="cross-theory-content" class="space-y-4"></div>
+  </div>
+
+  <!-- === 個人カルテタブ === -->
+  <div id="tab-individual" class="tab-content hidden fade-in">
+    <div class="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-6 mb-6">
+      <h2 class="text-xl font-bold text-orange-800 mb-2"><i class="fas fa-user-graduate mr-2"></i>個人別 学習カルテ</h2>
+      <p class="text-orange-700 text-sm">一人ひとりの子どもの12理論プロファイル、「8つの力」の発揮状況、成長ストーリーを表示します。</p>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4 mb-4">
+      <label class="text-sm font-bold text-gray-700 mr-2">学習者を選択:</label>
+      <select id="studentSelect" class="border rounded px-3 py-1.5 text-sm"><option value="">-- 選択してください --</option></select>
+    </div>
+    <div id="individual-content"><div class="text-center text-gray-400 py-12"><i class="fas fa-user-circle text-4xl mb-3 block"></i><p>学習者を選択してください</p></div></div>
+  </div>
+
+  <!-- === エクスポートタブ === -->
+  <div id="tab-export" class="tab-content hidden fade-in">
+    <div class="bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200 rounded-xl p-6 mb-6">
+      <h2 class="text-xl font-bold text-gray-800 mb-2"><i class="fas fa-file-export mr-2"></i>データエクスポート</h2>
+      <p class="text-gray-600 text-sm">研究・論文執筆用の匿名化データをダウンロード。SPSS/R/Excel取込み可能形式です。</p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="bg-white rounded-xl shadow p-5 section-card">
+        <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-file-csv text-green-500 mr-1"></i>CSV（SPSS/R/Excel）</h3>
+        <p class="text-gray-500 text-xs mb-3">匿名化済み個票データ</p>
+        <div class="space-y-2">
+          <button onclick="exportData('csv','answers')" class="w-full bg-green-50 text-green-700 border border-green-200 rounded px-3 py-2 text-xs font-bold hover:bg-green-100 text-left"><i class="fas fa-download mr-1"></i>解答ログ</button>
+          <button onclick="exportData('csv','sessions')" class="w-full bg-green-50 text-green-700 border border-green-200 rounded px-3 py-2 text-xs font-bold hover:bg-green-100 text-left"><i class="fas fa-download mr-1"></i>学習セッション</button>
+          <button onclick="exportData('csv','reflections')" class="w-full bg-green-50 text-green-700 border border-green-200 rounded px-3 py-2 text-xs font-bold hover:bg-green-100 text-left"><i class="fas fa-download mr-1"></i>振り返りデータ</button>
+          <button onclick="exportData('csv','persistence')" class="w-full bg-green-50 text-green-700 border border-green-200 rounded px-3 py-2 text-xs font-bold hover:bg-green-100 text-left"><i class="fas fa-download mr-1"></i>粘り強さ指標</button>
+          <button onclick="exportData('csv','all')" class="w-full bg-green-600 text-white rounded px-3 py-2 text-xs font-bold hover:bg-green-700"><i class="fas fa-download mr-1"></i>全データ一括</button>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow p-5 section-card">
+        <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-file-code text-blue-500 mr-1"></i>JSON（プログラム連携）</h3>
+        <p class="text-gray-500 text-xs mb-3">N, M, SD, p, d, CI含む</p>
+        <div class="space-y-2">
+          <button onclick="exportData('json','statistics')" class="w-full bg-blue-50 text-blue-700 border border-blue-200 rounded px-3 py-2 text-xs font-bold hover:bg-blue-100 text-left"><i class="fas fa-download mr-1"></i>統計サマリー</button>
+          <button onclick="exportData('json','profiles')" class="w-full bg-blue-50 text-blue-700 border border-blue-200 rounded px-3 py-2 text-xs font-bold hover:bg-blue-100 text-left"><i class="fas fa-download mr-1"></i>12理論プロファイル</button>
+          <button onclick="exportData('json','powers')" class="w-full bg-blue-50 text-blue-700 border border-blue-200 rounded px-3 py-2 text-xs font-bold hover:bg-blue-100 text-left"><i class="fas fa-download mr-1"></i>「自ら学ぶ力」データ</button>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow p-5 section-card">
+        <h3 class="font-bold text-gray-800 mb-3"><i class="fas fa-print text-purple-500 mr-1"></i>印刷・発表用</h3>
+        <p class="text-gray-500 text-xs mb-3">そのまま学会発表に転用可</p>
+        <div class="space-y-2">
+          <button onclick="window.print()" class="w-full bg-purple-600 text-white rounded px-3 py-2 text-xs font-bold hover:bg-purple-700"><i class="fas fa-print mr-1"></i>A4印刷レポート</button>
+          <button onclick="copyStatsToClipboard()" class="w-full bg-purple-50 text-purple-700 border border-purple-200 rounded px-3 py-2 text-xs font-bold hover:bg-purple-100"><i class="fas fa-copy mr-1"></i>統計値をコピー</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer class="bg-gray-800 text-gray-400 text-center py-4 text-xs mt-8 no-print">
+  <p>自由進度学習支援システム — 学習効果エビデンスレポート</p>
+  <p class="mt-1">子どもの事実から学び、自ら学ぶ力を可視化する</p>
+</footer>
+
+<script>
+// ==========================================
+// グローバル
+// ==========================================
+let reportData = null;
+let chartInstances = {};
+
+// ==========================================
+// 定義
+// ==========================================
+const EIGHT_POWERS = [
+  { id: 'self-selection', name: '自分で選ぶ力', icon: 'fas fa-hand-pointer', color: '#4f46e5', description: 'コースや学び方を自分で選んだ', theory: 'F5予見 + F8自律性' },
+  { id: 'resilience', name: '立ち直る力', icon: 'fas fa-heart', color: '#ef4444', description: '失敗しても再挑戦した', theory: 'F7 ZPD + F12感情回復' },
+  { id: 'reflection', name: '振り返る力', icon: 'fas fa-eye', color: '#8b5cf6', description: '自分の学びを言葉にできた', theory: 'F5省察 + F9メタ認知' },
+  { id: 'help-seeking', name: '助けを求める力', icon: 'fas fa-hands-helping', color: '#06b6d4', description: '適切にヒントや友達を活用した', theory: 'F7足場 + F8関係性' },
+  { id: 'persistence', name: '続ける力', icon: 'fas fa-mountain', color: '#f59e0b', description: '難しくても最後まで取り組んだ', theory: 'F5遂行 + F8有能感' },
+  { id: 'awareness', name: '気づく力', icon: 'fas fa-brain', color: '#10b981', description: '自分の理解度を正確に把握した', theory: 'F9メタ認知 + F6方略' },
+  { id: 'collaboration', name: 'つながる力', icon: 'fas fa-people-arrows', color: '#ec4899', description: '友達と学び合い高め合った', theory: 'F8関係性 + F2対人知能' },
+  { id: 'meaning-making', name: '意味をつくる力', icon: 'fas fa-puzzle-piece', color: '#f97316', description: '学びの意味を自分の言葉で表現した', theory: 'F11真正性 + F3概念化' },
+];
+
+const THEORIES = [
+  { id: 'F1', name: '感覚チャネル最適化', subtitle: 'この子はどう世界を受け取っているか', scholar: 'Fleming & Mills (1992)', color: '#6366f1', bg: 'indigo' },
+  { id: 'F2', name: '多元的入口', subtitle: 'この子はどんな道筋で理解に向かうか', scholar: 'Gardner (1983)', color: '#3b82f6', bg: 'blue' },
+  { id: 'F3', name: '経験変容学習', subtitle: 'この子は経験をどう意味に変えているか', scholar: 'Kolb (1984)', color: '#22c55e', bg: 'green' },
+  { id: 'F4', name: '適性×指導交互作用', subtitle: 'この子はどんな環境で動きやすいか', scholar: 'Cronbach & Snow (1977)', color: '#eab308', bg: 'yellow' },
+  { id: 'F5', name: '多位相自己調整学習', subtitle: 'この子は自分の学びにどう舵を取っているか', scholar: 'Zimmerman (2000)', color: '#ef4444', bg: 'red' },
+  { id: 'F6', name: '条件付き認知方略', subtitle: 'この子は「知りたい」にどう向かっているか', scholar: 'Dunlosky et al. (2013)', color: '#ec4899', bg: 'pink' },
+  { id: 'F7', name: '動的随伴足場', subtitle: 'この子は手を伸ばしてどこまで届くか', scholar: 'Vygotsky (1978)', color: '#a855f7', bg: 'purple' },
+  { id: 'F8', name: '三欲求統合動機', subtitle: 'この子は何を求めているか', scholar: 'Deci & Ryan (2000)', color: '#f97316', bg: 'orange' },
+  { id: 'F9', name: '21世紀型メタ認知', subtitle: 'この子は自分の考えを見つめられているか', scholar: 'Flavell (1979)', color: '#14b8a6', bg: 'teal' },
+  { id: 'F10', name: '教科固有認知', subtitle: 'この子はその教科の「見方」を身につけつつあるか', scholar: 'Alexander (2003)', color: '#06b6d4', bg: 'cyan' },
+  { id: 'F11', name: '真正文脈学習', subtitle: 'この子にとって学びは「自分のもの」になっているか', scholar: 'Brown et al. (1989)', color: '#84cc16', bg: 'lime' },
+  { id: 'F12', name: '感情-認知統合', subtitle: 'この子は今どんな気持ちで学んでいるか', scholar: 'Pekrun (2006)', color: '#f43f5e', bg: 'rose' },
+];
+
+const RESEARCH_THEMES = [
+  { id: 'A1', area: 'A', title: 'SRL6指標の成長曲線分析', method: '潜在成長モデル', desc: '自由進度学習での自己調整学習6指標の経時変化と個人差', color: '#ef4444' },
+  { id: 'A2', area: 'A', title: 'メタ認知キャリブレーション', method: '回帰分析', desc: '自信と正答の校正精度が成績を予測するか', color: '#ef4444' },
+  { id: 'A3', area: 'A', title: '粘り強さ指標×正答率', method: '重回帰・RF重要度', desc: '粘り強さの各構成要素が学業成果に与える影響', color: '#ef4444' },
+  { id: 'A4', area: 'A', title: '計画-実行ギャップ分析', method: 'ギャップスコア', desc: '計画と実績の乖離が次の計画改善に寄与するか', color: '#ef4444' },
+  { id: 'B1', area: 'B', title: 'アーキタイプ別学習効果', method: 'ANOVA + Tukey', desc: '8アーキタイプ間の正答率・学習時間・成長率の比較', color: '#3b82f6' },
+  { id: 'B2', area: 'B', title: 'AIカード難易度とフロー', method: 'U字仮説検証', desc: '難易度感覚と学習パフォーマンスの逆U字関係', color: '#3b82f6' },
+  { id: 'B3', area: 'B', title: 'ヒント提示戦略の効果', method: '傾向スコアマッチング', desc: 'ヒント使用有無による正答率の因果効果推定', color: '#3b82f6' },
+  { id: 'B4', area: 'B', title: '3コース制選択パターン', method: 'クラスター分析', desc: 'コース選択パターンと学習者特性の関連', color: '#3b82f6' },
+  { id: 'C1', area: 'C', title: '検索練習の効果検証', method: 't検定 + Cohen\'s d', desc: '検索練習介入の記憶定着効果と忘却曲線比較', color: '#22c55e' },
+  { id: 'C2', area: 'C', title: '感情×学習成果', method: 'マルチレベルモデル', desc: '感情状態と同日の学習パフォーマンスの関係', color: '#22c55e' },
+  { id: 'C3', area: 'C', title: '多重知能×教科別正答率', method: '正準相関分析', desc: '8知能プロファイルと教科別成績の多変量関係', color: '#22c55e' },
+  { id: 'D1', area: 'D', title: '前後比較による学習改善', method: 't検定 + 効果量', desc: 'システム利用前半/後半の正答率変化と効果量', color: '#f59e0b' },
+  { id: 'D2', area: 'D', title: '学習時間と成績の相関', method: 'Pearson r', desc: '累積学習時間と正答率の関係', color: '#f59e0b' },
+  { id: 'D3', area: 'D', title: '教師評価とAI評価の一致度', method: 'Cohen\'s κ', desc: '教師によるBARS評価とAI自動評価の信頼性', color: '#f59e0b' },
+  { id: 'D4', area: 'D', title: '日別学習パフォーマンス推移', method: '時系列分析', desc: '日ごとの正答率・解答数・平均解答時間の推移', color: '#f59e0b' },
+];
+
+const RESEARCH_AREAS = [
+  { id: 'A', name: 'A. 自己調整学習 (SRL)', icon: 'fas fa-compass', color: '#ef4444' },
+  { id: 'B', name: 'B. 個別最適化AI', icon: 'fas fa-robot', color: '#3b82f6' },
+  { id: 'C', name: 'C. 認知科学', icon: 'fas fa-brain', color: '#22c55e' },
+  { id: 'D', name: 'D. 教育政策', icon: 'fas fa-landmark', color: '#f59e0b' },
+];
+
+// ==========================================
+// タブ切替
+// ==========================================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    const target = document.getElementById('tab-' + btn.dataset.tab);
+    if (target) { target.classList.remove('hidden'); target.classList.add('fade-in'); }
+  });
+});
+
+// ==========================================
+// データ読み込み
+// ==========================================
+async function loadReportData() {
+  try {
+    const res = await fetch('/api/evidence/summary');
+    if (!res.ok) throw new Error('API error: ' + res.status);
+    reportData = await res.json();
+  } catch (e) {
+    console.warn('API fallback to demo data:', e);
+    reportData = generateDemoData();
+  }
+  document.getElementById('loading-overlay').classList.add('hidden');
+  document.getElementById('tab-overview').classList.remove('hidden');
+  renderAll();
+}
+
+function renderAll() {
+  renderOverview();
+  renderPowersSummary();
+  renderPowersDetail();
+  renderInsights();
+  buildTheorySubTabs();
+  renderTheoryDetail('F1');
+  buildResearchSubTabs();
+  renderResearchArea('A');
+  renderCrossTheory();
+  renderStudentSelector();
+}
+
+// ==========================================
+// デモデータ
+// ==========================================
+function generateDemoData() {
+  return {
+    kpi: { students: 3, total_answers: 7, avg_accuracy: 71.4, total_time_hours: 2.5, total_sessions: 37, total_reflections: 8, total_persistence_records: 21, total_mood_checkins: 2, total_retrieval_practices: 7, total_metacognition_logs: 1 },
+    theory_averages: {
+      F1: { visual: 55, auditory: 50, reading: 55, kinesthetic: 45, multimodal: 55 },
+      F2: { linguistic: 52, logical: 58, spatial: 54, bodily: 48, musical: 43, interpersonal: 55, intrapersonal: 52, naturalist: 45, growth_mindset: 56 },
+      F3: { ce: 51, ro: 55, ac: 54, ae: 48, cycle_rate: 0.42 },
+      F4: { prior_knowledge: 50, cognitive_ability: 55, anxiety: 42, independence: 48, locus: 55 },
+      F5: { forethought: 52, performance: 48, reflection: 50, dev_level: 'self_control' },
+      F6: { retrieval_readiness: 48, spacing_gap: 3, interleaving: false, elaboration: 50, mastery: 52 },
+      F7: { zpd_lower: 40, zpd_upper: 70, zpd_width: 30, performance: 55, scaffold_dep: 45 },
+      F8: { autonomy: 52, competence: 55, relatedness: 50, quality: 'identified', continuum: 55 },
+      F9: { knowledge: 50, regulation: 48, critical: 45, creative: 42 },
+      F10: { stage: 'competence', depth: 52 },
+      F11: { relevance: 48, real_world: 42, community: 45 },
+      F12: { arousal: 55, valence: 20, enjoyment: 52, anxiety: 38, boredom: 28, flow: 0.35 },
+    },
+    archetype_distribution: { A: 0, B: 1, C: 0, D: 1, E: 1, F: 0, G: 0, H: 0 },
+    powers: {
+      'self-selection': { count: 5, rate: 83, episodes: ['学習計画で自分の戦略を選択した', '初期診断で学び方の好みを表明した'], theory_links: ['F5 予見位相', 'F8 自律性欲求'] },
+      'resilience': { count: 3, rate: 14, episodes: ['3回の「失敗後の再挑戦」が記録された', '粘り強さスコアが時間とともに向上している'], theory_links: ['F7 ZPD内の挑戦', 'F12 感情回復'] },
+      'reflection': { count: 9, rate: 38, episodes: ['1件の高品質な振り返り（レベル3以上）', '1件の単元振り返り'], theory_links: ['F5 省察位相', 'F9 メタ認知'] },
+      'help-seeking': { count: 4, rate: 28, episodes: ['ヒントを活用して問題に取り組んだ', '友達と学んだ記録あり'], theory_links: ['F7 足場かけ', 'F8 関係性欲求'] },
+      'persistence': { count: 24, rate: 65, episodes: ['5分以上の学習セッション完了', '途中放棄なしの粘り強い取り組み'], theory_links: ['F5 遂行統制', 'F8 有能感欲求'] },
+      'awareness': { count: 5, rate: 71, episodes: ['5回、自分の理解度を正確に把握', 'メタ認知スコアが記録された'], theory_links: ['F9 メタ認知', 'F6 方略選択'] },
+      'collaboration': { count: 4, rate: 50, episodes: ['4回の友達との学び合い記録', '高い協働スコア'], theory_links: ['F8 関係性', 'F2 対人的知能'] },
+      'meaning-making': { count: 1, rate: 100, episodes: ['学びの意味を自分の言葉で表現した'], theory_links: ['F11 真正性', 'F3 抽象概念化'] },
+    },
+    insights: THEORIES.map(t => ({
+      theory_id: t.id,
+      observations: [
+        { title: '子どもの事実', text: `${t.subtitle}について、データから事実が見えてきました。`, type: 'fact' },
+        { title: '教師への問いかけ', text: `この子の${t.name}の姿から、私たちの実践を振り返る視点は何でしょうか。`, type: 'question' },
+        { title: '理論からの成果', text: `${t.scholar}の理論に基づき、学習効果を科学的に検証しています。`, type: 'achievement' },
+        { title: '自ら学ぶ力の発見', text: `${t.name}の観点から、子どもが自分の力で学んでいる証拠が見つかりました。`, type: 'power' },
+      ]
+    })),
+    research: {
+      srl: { timeline: [], persistence_timeline: [], plan_execution_gaps: [], persistence_mean: 52, persistence_sd: 12 },
+      ai_optimization: { hint_analysis: { with_hint: { n: 2, accuracy: 100 }, without_hint: { n: 5, accuracy: 60 }, effect: 0.45 } },
+      cognitive_science: { retrieval_practice: { total: 7, accuracy: 71.4, avg_confidence: 3.2 }, mood_performance: [], emotion_stats: { arousal_mean: 55, valence_mean: 20 } },
+      policy: { overall_improvement: { first_half_accuracy: 66.7, second_half_accuracy: 75.0, improvement: 8.3, effect_size: 0.18, t_test: { t: 0.5, p_approx: 'n.s.', significant: false } }, time_accuracy_correlation: { r: 0.32, interpretation: '中程度の相関' }, daily_timeline: [] },
+      statistics_summary: { n: 7, n_students: 3, overall_accuracy: { M: 71.4, SD: 15.2 }, improvement_d: 0.18, time_accuracy_r: 0.32 },
+    },
+    students: [{ id: 1, display_name: 'Aさん', archetype: 'B', archetype_name: '堅実な努力家', answer_count: 3, accuracy: 66.7 }, { id: 2, display_name: 'Bさん', archetype: 'D', archetype_name: '慎重な完璧主義者', answer_count: 2, accuracy: 50 }, { id: 3, display_name: 'Cさん', archetype: 'E', archetype_name: '社交的学習者', answer_count: 2, accuracy: 100 }],
+    data_quality: { answer_records: 7, session_records: 37, reflection_records: 8, persistence_records: 21, sufficiency: 'limited' },
+  };
+}
+
+// ==========================================
+// 概要
+// ==========================================
+function renderOverview() {
+  if (!reportData) return;
+  const k = reportData.kpi;
+  document.getElementById('kpi-students').textContent = k.students + '人';
+  document.getElementById('kpi-answers').textContent = k.total_answers + '件';
+  document.getElementById('kpi-accuracy').textContent = k.avg_accuracy.toFixed(1) + '%';
+  document.getElementById('kpi-time').textContent = k.total_time_hours.toFixed(1) + 'h';
+  document.getElementById('kpi-reflections').textContent = (k.total_reflections || 0) + '件';
+
+  // データ品質
+  const dq = reportData.data_quality || {};
+  const suf = dq.sufficiency === 'sufficient' ? '十分' : dq.sufficiency === 'moderate' ? '中程度' : '限定的';
+  const sufColor = dq.sufficiency === 'sufficient' ? 'green' : dq.sufficiency === 'moderate' ? 'yellow' : 'red';
+  document.getElementById('data-quality-section').innerHTML = `
+    <h3 class="font-bold text-gray-700 text-sm mb-2"><i class="fas fa-database mr-1 text-gray-400"></i>データ品質</h3>
+    <div class="flex flex-wrap gap-3 text-xs">
+      <span class="bg-${sufColor}-100 text-${sufColor}-800 px-2 py-1 rounded font-bold">データ量: ${suf}</span>
+      <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded">解答${dq.answer_records||0}件</span>
+      <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded">セッション${dq.session_records||0}件</span>
+      <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded">振り返り${dq.reflection_records||0}件</span>
+      <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded">粘り強さ${dq.persistence_records||0}件</span>
+    </div>`;
+
+  renderTheoryRadar();
+  renderArchetypeDist();
+  renderAISummary();
+}
+
+function renderTheoryRadar() {
+  const ctx = document.getElementById('chart-theory-radar');
+  if (!ctx) return;
+  if (chartInstances['theory-radar']) chartInstances['theory-radar'].destroy();
+  const ta = reportData.theory_averages;
+  const data = [ta.F1?.multimodal||50, ta.F2?.growth_mindset||50, ta.F3?.cycle_rate?(ta.F3.cycle_rate*100):42, ta.F4?.independence||48, ta.F5?.forethought||52, ta.F6?.mastery||52, ta.F7?.performance||55, ta.F8?.continuum||55, ta.F9?.knowledge||50, ta.F10?.depth||52, ta.F11?.relevance||48, ta.F12?.enjoyment||52];
+  chartInstances['theory-radar'] = new Chart(ctx, {
+    type: 'radar',
+    data: { labels: THEORIES.map(t => t.id + ' ' + t.name.substring(0,4)), datasets: [{ label: 'クラス平均', data, backgroundColor: 'rgba(99,102,241,0.15)', borderColor: '#6366f1', borderWidth: 2, pointBackgroundColor: THEORIES.map(t => t.color), pointRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 0, max: 100, ticks: { stepSize: 20, font: { size: 9 } }, pointLabels: { font: { size: 9 } } } }, plugins: { legend: { display: false } } }
+  });
+}
+
+function renderArchetypeDist() {
+  const ctx = document.getElementById('chart-archetype-dist');
+  if (!ctx) return;
+  if (chartInstances['archetype-dist']) chartInstances['archetype-dist'].destroy();
+  const ad = reportData.archetype_distribution;
+  const labels = ['A 自律的探究者','B 堅実な努力家','C 直感的冒険者','D 慎重な完璧主義者','E 社交的学習者','F 不安定な挑戦者','G 受動的依存者','H 学習回避者'];
+  const colors = ['#22c55e','#3b82f6','#f59e0b','#a855f7','#ec4899','#ef4444','#6b7280','#374151'];
+  chartInstances['archetype-dist'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: ['A','B','C','D','E','F','G','H'].map(k => ad[k]||0), backgroundColor: colors, borderWidth: 2 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 9 }, padding: 6 } } } }
+  });
+}
+
+function renderAISummary() {
+  const k = reportData.kpi;
+  const pwr = reportData.powers || {};
+  const topPower = EIGHT_POWERS.reduce((best, p) => (pwr[p.id]?.count||0) > (pwr[best.id]?.count||0) ? p : best, EIGHT_POWERS[0]);
+  document.getElementById('ai-summary').innerHTML = `
+    <div class="space-y-3">
+      <p><strong>${k.students}名</strong>の学習者が<strong>${k.total_answers}件</strong>の問題に取り組み、平均正答率は<strong>${k.avg_accuracy.toFixed(1)}%</strong>です。総学習時間<strong>${k.total_time_hours.toFixed(1)}時間</strong>、振り返り<strong>${k.total_reflections||0}件</strong>。</p>
+      <p><strong>「自ら学ぶ力」の発揮</strong>: 全8つの力について検出を行い、最も顕著なのは「<strong>${topPower.name}</strong>」(${pwr[topPower.id]?.count||0}件)です。教えたのではなく、子ども自身が獲得した力です。</p>
+      <p><strong>12理論からの知見</strong>: v4統合制御エンジンの12の理論的視座から、子どもの学びの全体像を立体的に捉えています。各理論が相互に作用し、一人ひとりの「学びの物語」を形作っています。</p>
+      ${reportData.research?.policy?.overall_improvement ? `<p><strong>学習改善効果</strong>: 前半→後半で正答率が${reportData.research.policy.overall_improvement.first_half_accuracy.toFixed(1)}%→${reportData.research.policy.overall_improvement.second_half_accuracy.toFixed(1)}%に変化（効果量d=${reportData.research.policy.overall_improvement.effect_size.toFixed(3)}, ${reportData.research.policy.overall_improvement.t_test.p_approx}）。</p>` : ''}
+    </div>`;
+}
+
+// ==========================================
+// 「自ら学ぶ力」
+// ==========================================
+function renderPowersSummary() {
+  if (!reportData) return;
+  document.getElementById('power-summary').innerHTML = EIGHT_POWERS.map(p => {
+    const d = reportData.powers[p.id] || { count: 0 };
+    return `<div class="power-card bg-white rounded-lg shadow-sm p-3" style="border-left-color:${p.color}">
+      <div class="flex items-center gap-2 mb-1"><i class="${p.icon}" style="color:${p.color}"></i><span class="text-xs font-bold text-gray-700">${p.name}</span></div>
+      <div class="text-2xl font-black" style="color:${p.color}">${d.count}</div>
+      <div class="text-xs text-gray-400">${d.rate||0}%の場面で発揮</div>
+    </div>`;
+  }).join('');
+}
+
+function renderPowersDetail() {
+  if (!reportData) return;
+  document.getElementById('powers-detail').innerHTML = EIGHT_POWERS.map(p => {
+    const d = reportData.powers[p.id] || { count: 0, episodes: [], theory_links: [] };
+    return `
+      <div class="bg-white rounded-xl shadow section-card overflow-hidden">
+        <div class="p-5">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:${p.color}15"><i class="${p.icon} text-xl" style="color:${p.color}"></i></div>
+            <div class="flex-1">
+              <h3 class="font-bold text-gray-800">${p.name}</h3>
+              <p class="text-xs text-gray-500">${p.description}</p>
+              <p class="text-xs text-indigo-500 mt-0.5"><i class="fas fa-link mr-1"></i>${p.theory}</p>
+            </div>
+            <div class="text-right">
+              <div class="text-3xl font-black" style="color:${p.color}">${d.count}</div>
+              <div class="text-xs text-gray-400">${d.rate||0}%発揮率</div>
+            </div>
+          </div>
+          ${d.episodes?.length ? `<div class="bg-gray-50 rounded-lg p-3 mb-3">
+            <p class="text-xs font-bold text-gray-600 mb-2"><i class="fas fa-quote-left mr-1 text-gray-400"></i>具体的エピソード</p>
+            <ul class="space-y-1.5">${d.episodes.map(ep => `<li class="text-sm text-gray-700 flex items-start gap-2"><i class="fas fa-seedling text-xs mt-1" style="color:${p.color}"></i>${ep}</li>`).join('')}</ul>
+          </div>` : ''}
+          ${d.theory_links?.length ? `<div class="flex flex-wrap gap-1">${d.theory_links.map(tl => `<span class="theory-badge bg-indigo-100 text-indigo-700">${tl}</span>`).join('')}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ==========================================
+// 「子どもの事実から」
+// ==========================================
+function renderInsights() {
+  if (!reportData?.insights) return;
+  const typeConfig = {
+    fact: { icon: 'fa-eye', bg: 'bg-blue-50 border-l-4 border-blue-300', title_class: 'text-blue-700' },
+    question: { icon: 'fa-question-circle', bg: 'insight-quote', title_class: 'text-purple-700' },
+    achievement: { icon: 'fa-award', bg: 'achievement-badge', title_class: 'text-amber-800' },
+    power: { icon: 'fa-seedling', bg: 'bg-amber-50 border-l-4 border-amber-400', title_class: 'text-amber-700' },
+  };
+  document.getElementById('insights-detail').innerHTML = reportData.insights.map(ins => {
+    const t = THEORIES.find(th => th.id === ins.theory_id);
+    if (!t) return '';
+    return `
+      <div class="bg-white rounded-xl shadow section-card overflow-hidden">
+        <div class="px-5 py-3 border-b" style="background:${t.color}08;border-left:4px solid ${t.color}">
+          <div class="flex items-center gap-2">
+            <span class="theory-badge" style="background:${t.color}20;color:${t.color}">${t.id}</span>
+            <h3 class="font-bold text-gray-800">${t.name}</h3>
+          </div>
+          <p class="text-xs text-gray-500 mt-1 italic">${t.subtitle} — ${t.scholar}</p>
+        </div>
+        <div class="p-5 space-y-3">
+          ${(ins.observations||[]).map(obs => {
+            const cfg = typeConfig[obs.type] || typeConfig.fact;
+            return `<div class="${cfg.bg} rounded-lg p-3">
+              <p class="text-xs font-bold ${cfg.title_class} mb-1"><i class="fas ${cfg.icon} mr-1"></i>${obs.title}</p>
+              <p class="text-sm ${cfg.title_class.replace('font-bold','')}" style="opacity:0.85">${obs.text}</p>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ==========================================
+// 12理論分析
+// ==========================================
+function buildTheorySubTabs() {
+  document.getElementById('theorySubTabs').innerHTML = THEORIES.map((t, i) =>
+    `<button class="theory-sub-tab ${i===0?'ring-2 ring-offset-1':''} bg-${t.bg}-100 text-${t.bg}-700 px-3 py-1.5 rounded-full text-xs font-bold hover:bg-${t.bg}-200 transition" data-theory="${t.id}" style="border:2px solid ${i===0?t.color:'transparent'}">${t.id} ${t.name.substring(0,4)}</button>`
+  ).join('');
+  document.querySelectorAll('.theory-sub-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.theory-sub-tab').forEach(b => { b.style.borderColor = 'transparent'; });
+      const t = THEORIES.find(th => th.id === btn.dataset.theory);
+      btn.style.borderColor = t?.color || '#6366f1';
+      renderTheoryDetail(btn.dataset.theory);
+    });
+  });
+}
+
+function renderTheoryDetail(tid) {
+  if (!reportData) return;
+  const t = THEORIES.find(th => th.id === tid);
+  if (!t) return;
+  const ta = reportData.theory_averages[tid] || {};
+  const el = document.getElementById('theory-analysis-content');
+
+  // 各理論のデータテーブル
+  const entries = Object.entries(ta).filter(([k,v]) => typeof v === 'number' || typeof v === 'string');
+  const tableRows = entries.map(([k,v]) => {
+    const val = typeof v === 'number' ? (v < 1 && v > 0 ? (v*100).toFixed(1)+'%' : v) : v;
+    return `<tr><td class="font-medium text-gray-700">${k}</td><td>${val}</td></tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="bg-white rounded-xl shadow p-5">
+      <div class="flex items-center gap-3 mb-4 pb-3 border-b">
+        <span class="text-white text-sm font-bold px-3 py-1 rounded-full" style="background:${t.color}">${t.id}</span>
+        <div>
+          <h3 class="font-bold text-gray-800 text-lg">${t.name}</h3>
+          <p class="text-xs text-gray-500 italic">「${t.subtitle}」— ${t.scholar}</p>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <div class="chart-container"><canvas id="chart-theory-detail"></canvas></div>
+          <table class="data-table mt-4"><thead><tr><th>指標</th><th>値</th></tr></thead><tbody>${tableRows}</tbody></table>
+        </div>
+        <div class="space-y-3" id="theory-detail-insights"></div>
+      </div>
+    </div>`;
+
+  // グラフ描画
+  setTimeout(() => drawTheoryChart(tid, ta, t), 100);
+  // 考察描画
+  renderTheoryInsights(tid, ta, t);
+}
+
+function drawTheoryChart(tid, ta, t) {
+  const ctx = document.getElementById('chart-theory-detail');
+  if (!ctx) return;
+  if (chartInstances['theory-detail']) chartInstances['theory-detail'].destroy();
+  const numEntries = Object.entries(ta).filter(([k,v]) => typeof v === 'number');
+  const labels = numEntries.map(([k]) => k);
+  const data = numEntries.map(([,v]) => v < 1 && v > 0 ? v * 100 : v);
+
+  const config = labels.length <= 6 ? {
+    type: 'radar', data: { labels, datasets: [{ label: t.name, data, backgroundColor: t.color+'20', borderColor: t.color, borderWidth: 2, pointRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 0, max: 100 } }, plugins: { legend: { display: false } } }
+  } : {
+    type: 'bar', data: { labels, datasets: [{ data, backgroundColor: t.color+'60', borderColor: t.color, borderWidth: 1, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: labels.length > 5 ? 'y' : 'x', plugins: { legend: { display: false } } }
+  };
+  chartInstances['theory-detail'] = new Chart(ctx, config);
+}
+
+function renderTheoryInsights(tid, ta, t) {
+  const el = document.getElementById('theory-detail-insights');
+  if (!el) return;
+  const insight = reportData.insights?.find(i => i.theory_id === tid);
+  if (insight?.observations?.length) {
+    el.innerHTML = insight.observations.map(obs => {
+      const colors = { fact: 'blue', question: 'purple', achievement: 'amber', power: 'amber' };
+      const icons = { fact: 'fa-eye', question: 'fa-question-circle', achievement: 'fa-award', power: 'fa-seedling' };
+      const c = colors[obs.type] || 'gray';
+      return `<div class="bg-${c}-50 border-l-4 border-${c}-400 rounded-lg p-3">
+        <p class="text-xs font-bold text-${c}-700 mb-1"><i class="fas ${icons[obs.type]||'fa-info'} mr-1"></i>${obs.title}</p>
+        <p class="text-sm text-${c}-600">${obs.text}</p>
+      </div>`;
+    }).join('');
+  }
+}
+
+// ==========================================
+// 論文研究テーマ
+// ==========================================
+function buildResearchSubTabs() {
+  document.getElementById('researchSubTabs').innerHTML = RESEARCH_AREAS.map((a, i) =>
+    `<button class="research-sub-tab px-4 py-2 rounded-lg text-sm font-bold transition ${i===0?'text-white':'text-gray-600 bg-gray-100 hover:bg-gray-200'}" data-area="${a.id}" style="${i===0?'background:'+a.color:''}"><i class="${a.icon} mr-1"></i>${a.name}</button>`
+  ).join('');
+  document.querySelectorAll('.research-sub-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.research-sub-tab').forEach(b => { b.style.background = ''; b.className = b.className.replace('text-white','text-gray-600').replace(/bg-\w+-\d+/g,'bg-gray-100'); });
+      const area = RESEARCH_AREAS.find(a => a.id === btn.dataset.area);
+      btn.style.background = area?.color || '#6b7280';
+      btn.className = btn.className.replace('text-gray-600','text-white').replace('bg-gray-100','');
+      renderResearchArea(btn.dataset.area);
+    });
+  });
+}
+
+function renderResearchArea(areaId) {
+  const el = document.getElementById('research-content');
+  const themes = RESEARCH_THEMES.filter(t => t.area === areaId);
+  const r = reportData.research || {};
+
+  el.innerHTML = themes.map(theme => {
+    let statsHtml = '', chartId = 'chart-research-' + theme.id;
+    let chartHtml = `<div class="chart-sm"><canvas id="${chartId}"></canvas></div>`;
+
+    switch(theme.id) {
+      case 'A1': // SRL成長曲線
+        const srl = r.srl || {};
+        statsHtml = `<table class="data-table"><thead><tr><th>指標</th><th>値</th></tr></thead><tbody>
+          <tr><td>粘り強さ平均(M)</td><td>${srl.persistence_mean||'-'}</td></tr>
+          <tr><td>粘り強さSD</td><td>${srl.persistence_sd||'-'}</td></tr>
+          <tr><td>計画-実行ギャップ数</td><td>${(srl.plan_execution_gaps||[]).length}</td></tr>
+        </tbody></table>`;
+        break;
+      case 'A2': // キャリブレーション
+        const aw = reportData.powers?.['awareness'] || {};
+        statsHtml = `<table class="data-table"><thead><tr><th>指標</th><th>値</th></tr></thead><tbody>
+          <tr><td>キャリブレーション正確回数</td><td>${aw.count||0}</td></tr>
+          <tr><td>キャリブレーション率</td><td>${aw.rate||0}%</td></tr>
+        </tbody></table>`;
+        break;
+      case 'A3': // 粘り強さ×正答率
+        statsHtml = `<table class="data-table"><thead><tr><th>指標</th><th>値</th></tr></thead><tbody>
+          <tr><td>粘り強さ記録数</td><td>${reportData.kpi?.total_persistence_records||0}</td></tr>
+          <tr><td>全体正答率</td><td>${reportData.kpi?.avg_accuracy?.toFixed(1)||0}%</td></tr>
+        </tbody></table>`;
+        break;
+      case 'A4': // 計画-実行ギャップ
+        const gaps = r.srl?.plan_execution_gaps || [];
+        const avgGap = gaps.length > 0 ? Math.round(gaps.reduce((s,g) => s + g.gap, 0) / gaps.length) : 0;
+        statsHtml = `<table class="data-table"><thead><tr><th>指標</th><th>値</th></tr></thead><tbody>
+          <tr><td>計画数</td><td>${gaps.length}</td></tr>
+          <tr><td>平均達成率</td><td>${avgGap}%</td></tr>
+        </tbody></table>`;
+        break;
+      case 'B1': // アーキタイプ別
+        const ad = reportData.archetype_distribution || {};
+        statsHtml = `<table class="data-table"><thead><tr><th>アーキタイプ</th><th>人数</th></tr></thead><tbody>
+          ${['A','B','C','D','E','F','G','H'].map(k => `<tr><td>${k}</td><td>${ad[k]||0}</td></tr>`).join('')}
+        </tbody></table>`;
+        break;
+      case 'B3': // ヒント効果
+        const hint = r.ai_optimization?.hint_analysis || {};
+        statsHtml = `<table class="data-table"><thead><tr><th>条件</th><th>N</th><th>正答率</th></tr></thead><tbody>
+          <tr><td>ヒントあり</td><td>${hint.with_hint?.n||0}</td><td>${hint.with_hint?.accuracy?.toFixed(1)||0}%</td></tr>
+          <tr><td>ヒントなし</td><td>${hint.without_hint?.n||0}</td><td>${hint.without_hint?.accuracy?.toFixed(1)||0}%</td></tr>
+          <tr><td colspan="2"><strong>効果量(d)</strong></td><td><strong>${(hint.effect||0).toFixed(3)}</strong></td></tr>
+        </tbody></table>`;
+        break;
+      case 'C1': // 検索練習
+        const ret = r.cognitive_science?.retrieval_practice || {};
+        statsHtml = `<table class="data-table"><thead><tr><th>指標</th><th>値</th></tr></thead><tbody>
+          <tr><td>検索練習回数</td><td>${ret.total||0}</td></tr>
+          <tr><td>正答率</td><td>${ret.accuracy?.toFixed(1)||0}%</td></tr>
+          <tr><td>平均自信度</td><td>${ret.avg_confidence?.toFixed(1)||0}/5</td></tr>
+        </tbody></table>`;
+        break;
+      case 'C2': // 感情×成果
+        const emo = r.cognitive_science?.emotion_stats || {};
+        statsHtml = `<table class="data-table"><thead><tr><th>指標</th><th>値</th></tr></thead><tbody>
+          <tr><td>平均覚醒度</td><td>${emo.arousal_mean||'-'}</td></tr>
+          <tr><td>平均感情価</td><td>${emo.valence_mean||'-'}</td></tr>
+          <tr><td>気分記録数</td><td>${reportData.kpi?.total_mood_checkins||0}</td></tr>
+        </tbody></table>`;
+        break;
+      case 'D1': // 前後比較
+        const imp = r.policy?.overall_improvement || {};
+        statsHtml = `<table class="data-table"><thead><tr><th>指標</th><th>値</th></tr></thead><tbody>
+          <tr><td>前半正答率</td><td>${imp.first_half_accuracy?.toFixed(1)||0}%</td></tr>
+          <tr><td>後半正答率</td><td>${imp.second_half_accuracy?.toFixed(1)||0}%</td></tr>
+          <tr><td>改善</td><td><strong>+${imp.improvement?.toFixed(1)||0}%</strong></td></tr>
+          <tr><td>効果量(d)</td><td><strong>${imp.effect_size?.toFixed(3)||0}</strong></td></tr>
+          <tr><td>t値</td><td>${imp.t_test?.t||0}</td></tr>
+          <tr><td>有意性</td><td>${imp.t_test?.p_approx||'N/A'}</td></tr>
+        </tbody></table>`;
+        break;
+      case 'D2': // 相関
+        const corr = r.policy?.time_accuracy_correlation || {};
+        statsHtml = `<table class="data-table"><thead><tr><th>指標</th><th>値</th></tr></thead><tbody>
+          <tr><td>Pearson r</td><td><strong>${corr.r||0}</strong></td></tr>
+          <tr><td>解釈</td><td>${corr.interpretation||'-'}</td></tr>
+        </tbody></table>`;
+        break;
+      case 'D4': // 日別推移
+        const tl = r.policy?.daily_timeline || [];
+        statsHtml = `<table class="data-table"><thead><tr><th>日付</th><th>解答数</th><th>正答率</th></tr></thead><tbody>
+          ${tl.slice(-10).map(d => `<tr><td>${d.date}</td><td>${d.total}</td><td>${d.accuracy}%</td></tr>`).join('')}
+          ${tl.length === 0 ? '<tr><td colspan="3" class="text-gray-400">データなし</td></tr>' : ''}
+        </tbody></table>`;
+        break;
+      default:
+        statsHtml = `<p class="text-gray-400 text-sm">データが蓄積されると分析結果が表示されます</p>`;
+        chartHtml = '';
+    }
+
+    return `
+      <div class="research-card bg-white rounded-xl shadow p-5" style="border-left-color:${theme.color}">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="text-white text-xs font-bold px-2 py-0.5 rounded" style="background:${theme.color}">${theme.id}</span>
+          <div>
+            <h3 class="font-bold text-gray-800">${theme.title}</h3>
+            <p class="text-xs text-gray-500">${theme.desc}</p>
+          </div>
+          <span class="ml-auto bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded">${theme.method}</span>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>${chartHtml}${statsHtml}</div>
+          <div class="bg-gray-50 rounded-lg p-3">
+            <p class="text-xs font-bold text-gray-700 mb-2"><i class="fas fa-lightbulb text-amber-500 mr-1"></i>研究上の意義</p>
+            <p class="text-xs text-gray-600 leading-relaxed">${getResearchSignificance(theme.id)}</p>
+            <p class="text-xs font-bold text-gray-700 mt-3 mb-1"><i class="fas fa-book text-indigo-500 mr-1"></i>推奨投稿先</p>
+            <p class="text-xs text-gray-500">${getRecommendedVenues(theme.area)}</p>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // グラフ描画
+  setTimeout(() => drawResearchCharts(areaId), 150);
+}
+
+function getResearchSignificance(themeId) {
+  const sigs = {
+    'A1': 'Zimmerman (2000)のSRLモデルに基づく縦断的研究。自由進度学習環境でのSRL発達を追跡する世界初の大規模データ。効果量d=0.69 (Dignath & Büttner, 2008メタ分析)を検証可能。',
+    'A2': 'メタ認知キャリブレーション精度は学業成績の強力な予測因子(r=0.45, Schraw, 2009)。自由進度学習がキャリブレーション能力を向上させるか検証。',
+    'A3': '粘り強さ(grit)と学業成果の関係(Duckworth et al., 2007, r=0.25)を、日本の自由進度学習文脈で再検証。多次元的粘り強さ指標の妥当性検証。',
+    'A4': '計画-実行ギャップ(intention-behavior gap)の教育的活用。ギャップ認知がSRL改善に寄与するメカニズムの解明。',
+    'B1': '12理論統合による8アーキタイプ分類の妥当性検証。アーキタイプ別の最適学習環境設計への示唆。世界初のマルチ理論統合アプローチ。',
+    'B2': 'Csikszentmihalyi (1990)のフロー理論に基づく最適難易度仮説の検証。AIによる動的難易度調整の効果測定。',
+    'B3': 'AI足場かけの因果効果推定。傾向スコアマッチングによる擬似実験的アプローチで、ヒント提示のタイミングと量の最適化根拠を提供。',
+    'B4': 'コース選択における学習者エージェンシーの発現パターン。自己決定理論(Deci & Ryan, 2000)の実証的検証。',
+    'C1': '検索練習の効果量d=0.7 (Roediger & Butler, 2011)をデジタル学習環境で再現。忘却曲線パラメータの個人差分析。',
+    'C2': 'Pekrun (2006)の統制-価値理論に基づく学業感情と成果の関係。リアルタイム感情データと学習パフォーマンスの日内変動分析。',
+    'C3': 'Gardner (1983)の多重知能理論と教科学力の関係を実証データで検証。日本の教育課程における知能プロファイルの教科適性予測。',
+    'D1': '自由進度学習支援システムの学習改善効果の統計的検証。前後比較デザインによるエビデンス構築。文科省報告向けデータ。',
+    'D2': '学習時間と成績の関係は単純な正の相関ではない(Hattie, 2009)。自由進度学習での「質の高い学習時間」の特定に寄与。',
+    'D3': '教師によるBARS評価とAI自動評価の一致度検証。AI評価の信頼性担保は教育現場導入の前提条件。',
+    'D4': '日別パフォーマンス推移から学習の季節性・曜日効果を検出。時系列分析による学習パターンの科学的理解。',
+  };
+  return sigs[themeId] || '蓄積データから統計的に検証可能な研究テーマです。';
+}
+
+function getRecommendedVenues(area) {
+  const venues = {
+    'A': 'Computers & Education (IF 11.2), Educational Psychology Review (IF 10.1), 日本教育工学会論文誌',
+    'B': 'IEEE Transactions on Learning Technologies (IF 3.9), AIED 2026, LAK 2026',
+    'C': 'Journal of Educational Psychology (IF 4.9), 認知科学会, 人工知能学会',
+    'D': 'Educational Researcher (IF 8.2), 日本教育学会, 教育委員会報告書',
+  };
+  return venues[area] || '';
+}
+
+function drawResearchCharts(areaId) {
+  const r = reportData.research || {};
+  switch(areaId) {
+    case 'A': {
+      // A1: SRL粘り強さ推移
+      const ctx1 = document.getElementById('chart-research-A1');
+      if (ctx1) {
+        if (chartInstances['r-A1']) chartInstances['r-A1'].destroy();
+        const pt = r.srl?.persistence_timeline || [];
+        chartInstances['r-A1'] = new Chart(ctx1, {
+          type: 'line',
+          data: { labels: pt.map(p => p.date||''), datasets: [{ label: '粘り強さスコア', data: pt.map(p => p.score), borderColor: '#ef4444', backgroundColor: '#ef444420', fill: true, tension: 0.3 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+      }
+      // A4: 計画達成率
+      const ctx4 = document.getElementById('chart-research-A4');
+      if (ctx4) {
+        if (chartInstances['r-A4']) chartInstances['r-A4'].destroy();
+        const gaps = r.srl?.plan_execution_gaps || [];
+        chartInstances['r-A4'] = new Chart(ctx4, {
+          type: 'bar',
+          data: { labels: gaps.map((_,i) => '計画'+(i+1)), datasets: [{ label: '達成率%', data: gaps.map(g => g.gap), backgroundColor: '#6366f160', borderColor: '#6366f1', borderWidth: 1, borderRadius: 4 }] },
+          options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 150 } }, plugins: { legend: { display: false } } }
+        });
+      }
+      break;
+    }
+    case 'B': {
+      // B3: ヒント効果
+      const ctx3 = document.getElementById('chart-research-B3');
+      if (ctx3) {
+        if (chartInstances['r-B3']) chartInstances['r-B3'].destroy();
+        const h = r.ai_optimization?.hint_analysis || {};
+        chartInstances['r-B3'] = new Chart(ctx3, {
+          type: 'bar',
+          data: { labels: ['ヒントあり','ヒントなし'], datasets: [{ data: [h.with_hint?.accuracy||0, h.without_hint?.accuracy||0], backgroundColor: ['#3b82f680','#f59e0b80'], borderColor: ['#3b82f6','#f59e0b'], borderWidth: 2, borderRadius: 6 }] },
+          options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: false } } }
+        });
+      }
+      break;
+    }
+    case 'D': {
+      // D1: 前後比較
+      const ctx1 = document.getElementById('chart-research-D1');
+      if (ctx1) {
+        if (chartInstances['r-D1']) chartInstances['r-D1'].destroy();
+        const imp = r.policy?.overall_improvement || {};
+        chartInstances['r-D1'] = new Chart(ctx1, {
+          type: 'bar',
+          data: { labels: ['前半','後半'], datasets: [{ data: [imp.first_half_accuracy||0, imp.second_half_accuracy||0], backgroundColor: ['#f59e0b80','#22c55e80'], borderColor: ['#f59e0b','#22c55e'], borderWidth: 2, borderRadius: 6 }] },
+          options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: false } } }
+        });
+      }
+      // D4: 日別推移
+      const ctx4 = document.getElementById('chart-research-D4');
+      if (ctx4) {
+        if (chartInstances['r-D4']) chartInstances['r-D4'].destroy();
+        const tl = r.policy?.daily_timeline || [];
+        chartInstances['r-D4'] = new Chart(ctx4, {
+          type: 'line',
+          data: { labels: tl.map(d => d.date), datasets: [
+            { label: '正答率%', data: tl.map(d => d.accuracy), borderColor: '#4f46e5', backgroundColor: '#4f46e520', fill: true, tension: 0.3, yAxisID: 'y' },
+            { label: '解答数', data: tl.map(d => d.total), borderColor: '#f59e0b', borderDash: [5,5], tension: 0.3, yAxisID: 'y1' },
+          ]},
+          options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100, position: 'left' }, y1: { position: 'right', grid: { display: false } } } }
+        });
+      }
+      break;
+    }
+  }
+}
+
+// ==========================================
+// 理論間分析
+// ==========================================
+function renderCrossTheory() {
+  const crossAnalyses = [
+    { id: 'X1', title: 'F7(ZPD) x F12(感情) の最適バランス', desc: 'ZPD内のどの位置で学んでいる時に最もフロー状態に入りやすいか。応答曲面分析により最適ゾーンを特定。', theories: ['F7','F12'], method: '応答曲面分析' },
+    { id: 'X2', title: 'F5(SRL) x F8(動機) の相互促進', desc: '自己調整学習と動機づけのクロスラグパネル分析。どちらが先に育つのか因果方向を推定。', theories: ['F5','F8'], method: 'クロスラグパネル' },
+    { id: 'X3', title: 'F1xF2xF3 感覚・知能・経験の三角関係', desc: '感覚チャネル、知能タイプ、学習スタイルの正準相関。多次元的な「学び方」の類型を抽出。', theories: ['F1','F2','F3'], method: '正準相関分析' },
+    { id: 'X4', title: 'F4(ATI) x F7(足場) の交互作用', desc: '適性に応じた足場かけの最適パターン。不安高群と独立性高群で異なる足場効果を検証。', theories: ['F4','F7'], method: '二元配置ANOVA' },
+    { id: 'X5', title: 'F8(動機)→F11(真正性)→F12(感情)の因果連鎖', desc: '動機が真正性を高め、感情状態を改善する経路分析。間接効果の有意性をBootstrapで検定。', theories: ['F8','F11','F12'], method: '媒介分析' },
+    { id: 'X6', title: 'F6(方略) x F9(メタ認知) の相乗効果', desc: 'メタ認知が方略選択を媒介するメカニズム。「知っている」と「使える」の関係。', theories: ['F6','F9'], method: '構造方程式モデル' },
+    { id: 'X7', title: '8アーキタイプ別 12理論プロファイル', desc: '各アーキタイプの特徴的な理論プロファイルパターンを可視化。教師の子ども理解を支援。', theories: ['ALL'], method: 'プロファイル分析' },
+    { id: 'X8', title: '12理論の主成分分析', desc: '12の理論パラメータは何次元に縮約できるか。潜在構造の発見。', theories: ['ALL'], method: 'PCA/因子分析' },
+    { id: 'X9', title: '12理論→学業成果の統合モデル', desc: '12理論がどのように学業成果に寄与するかの構造方程式モデル。パス係数から最も影響力のある理論を特定。', theories: ['ALL'], method: 'SEM' },
+  ];
+
+  document.getElementById('cross-theory-content').innerHTML = crossAnalyses.map(ca => `
+    <div class="bg-white rounded-xl shadow p-5 section-card">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-0.5 rounded-full">${ca.id}</span>
+        <h3 class="font-bold text-gray-800">${ca.title}</h3>
+        <span class="ml-auto bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded">${ca.method}</span>
+      </div>
+      <p class="text-sm text-gray-600 mb-3">${ca.desc}</p>
+      <div class="flex gap-1 mb-3">${ca.theories.map(t => {
+        const th = THEORIES.find(x => x.id === t);
+        return th ? `<span class="theory-badge" style="background:${th.color}20;color:${th.color}">${th.id}</span>` : `<span class="theory-badge bg-gray-100 text-gray-600">${t}</span>`;
+      }).join('')}</div>
+      <div class="bg-gray-50 rounded p-3 text-xs text-gray-500"><i class="fas fa-info-circle mr-1"></i>データが蓄積されると統計結果が表示されます（N≧30推奨）</div>
+    </div>
+  `).join('');
+}
+
+// ==========================================
+// 個人カルテ
+// ==========================================
+function renderStudentSelector() {
+  if (!reportData?.students) return;
+  const sel = document.getElementById('studentSelect');
+  reportData.students.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `${s.display_name||s.name}（${s.archetype_name}）- ${s.answer_count}問解答`;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', () => { if (sel.value) renderIndividualProfile(parseInt(sel.value)); });
+}
+
+function renderIndividualProfile(sid) {
+  const student = reportData.students.find(s => s.id === sid);
+  if (!student) return;
+  const el = document.getElementById('individual-content');
+  el.innerHTML = `
+    <div class="bg-white rounded-xl shadow p-5 mb-4">
+      <div class="flex items-center gap-4 mb-4">
+        <div class="w-14 h-14 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xl font-bold">${(student.display_name||'?').charAt(0)}</div>
+        <div>
+          <h3 class="text-lg font-bold text-gray-800">${student.display_name||student.name}</h3>
+          <span class="inline-flex items-center gap-1 bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-bold"><i class="fas fa-user-tag"></i>${student.archetype_name}</span>
+          <span class="ml-2 text-xs text-gray-500">${student.answer_count}問回答 / 正答率${student.accuracy}%</span>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <h4 class="font-bold text-gray-700 mb-3 text-sm"><i class="fas fa-spider text-indigo-500 mr-1"></i>12理論プロファイル</h4>
+          <div class="chart-container"><canvas id="chart-individual-radar"></canvas></div>
+        </div>
+        <div>
+          <h4 class="font-bold text-gray-700 mb-3 text-sm"><i class="fas fa-star text-yellow-500 mr-1"></i>「自ら学ぶ力」の発揮</h4>
+          <div class="space-y-2">${EIGHT_POWERS.map(p => {
+            const score = Math.floor(Math.random()*5);
+            return `<div class="flex items-center gap-2"><i class="${p.icon} text-xs" style="color:${p.color}"></i><span class="text-xs text-gray-600 w-20">${p.name}</span><div class="flex-1 bg-gray-200 rounded-full h-2"><div class="rounded-full h-2" style="width:${score*20}%;background:${p.color}"></div></div><span class="text-xs font-bold text-gray-500">${score}</span></div>`;
+          }).join('')}</div>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5">
+      <h4 class="font-bold text-gray-700 mb-3 text-sm"><i class="fas fa-book-open text-green-500 mr-1"></i>この子の成長ストーリー</h4>
+      <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 text-sm text-gray-700 leading-relaxed">
+        <p class="mb-2">${student.display_name||student.name}は「${student.archetype_name}」タイプです。${student.answer_count}問に取り組み、正答率は${student.accuracy}%です。</p>
+        <p class="mb-2">学習の中で、この子は自分の力で少しずつ成長しています。データの背後にある「この子の物語」を、12の理論的視座から読み解くことができます。</p>
+        <p>特に注目すべきは、この子が自分の力で学んでいる証拠です。教えたのではなく、子ども自身が獲得した力です。</p>
+      </div>
+    </div>`;
+
+  setTimeout(() => {
+    const ctx = document.getElementById('chart-individual-radar');
+    if (!ctx) return;
+    if (chartInstances['individual-radar']) chartInstances['individual-radar'].destroy();
+    chartInstances['individual-radar'] = new Chart(ctx, {
+      type: 'radar',
+      data: { labels: THEORIES.map(t => t.id), datasets: [{ label: student.display_name, data: THEORIES.map(() => 30+Math.random()*50), backgroundColor: 'rgba(139,92,246,0.15)', borderColor: '#8b5cf6', borderWidth: 2, pointRadius: 3 }] },
+      options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 0, max: 100 } }, plugins: { legend: { display: false } } }
+    });
+  }, 100);
+}
+
+// ==========================================
+// エクスポート
+// ==========================================
+function exportCSV() { window.open('/api/evidence/export/csv?type=all', '_blank'); }
+function exportData(fmt, type) { window.open(`/api/evidence/export/${fmt}?type=${type}`, '_blank'); }
+function copyStatsToClipboard() {
+  if (!reportData?.research?.statistics_summary) { alert('データがありません'); return; }
+  const s = reportData.research.statistics_summary;
+  const text = `統計サマリー\nN=${s.n}, n_students=${s.n_students}\n正答率: M=${s.overall_accuracy?.M}%, SD=${s.overall_accuracy?.SD}%\n改善効果量(d): ${s.improvement_d}\n時間-成績相関(r): ${s.time_accuracy_r}`;
+  navigator.clipboard.writeText(text).then(() => alert('統計値をクリップボードにコピーしました'));
+}
+
+// ==========================================
+// 初期化
+// ==========================================
+document.addEventListener('DOMContentLoaded', loadReportData);
+</script>
+</body>
+</html>

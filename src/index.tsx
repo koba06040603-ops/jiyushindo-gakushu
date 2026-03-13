@@ -61,6 +61,7 @@ import {
 import { v4Api } from './v4-api'
 import { v4CardApi, fetchStudentRawData, buildProfilesFromD1, buildBehaviorFromD1, computeAdaptiveNext, buildV4PromptSection, determineCardTemplate } from './v4-card-integration'
 import { computeIntegratedControls, computeFundamentalAxes, understandCurrentPresence, ARCHETYPES } from './lib/v4-engine'
+import { evidenceApi } from './evidence-api'
 
 type Bindings = {
   DB: D1Database
@@ -43974,6 +43975,12 @@ app.route('/api/v4', v4Api)
 // D1データ→プロファイル→v4制御→AIカード生成→リアルタイム適応
 // =============================================================================
 app.route('/api/v4/card', v4CardApi)
+
+// =============================================================================
+// Phase H: 学習効果エビデンスレポート API
+// 12理論×統計分析 + 子どもの事実から学べる考察 + 自ら学ぶ力の証拠 + 論文研究テーマ
+// =============================================================================
+app.route('/api/evidence', evidenceApi)
 
 // ============================================================
 // 静的HTML配信フォールバック（wrangler pages devローカル環境用）
