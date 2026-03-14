@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>松川村教育委員会 提案書 — 自由進度学習システム TOCO-TON</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700;900&family=Noto+Serif+JP:wght@400;500;600;700&display=swap');
+
+        :root {
+            --color-primary: #1a365d;
+            --color-accent: #2563eb;
+            --color-accent-light: #3b82f6;
+            --color-warm: #92400e;
+            --color-warm-light: #d97706;
+            --color-success: #065f46;
+            --color-bg: #fafbfc;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: var(--color-bg);
+            color: #1e293b;
+            line-height: 1.8;
+        }
+
+        .serif { font-family: 'Noto Serif JP', serif; }
+
+        /* ===== Print Styles ===== */
+        @media print {
+            @page {
+                size: A4;
+                margin: 15mm 18mm;
+            }
+            body {
+                background: white !important;
+                font-size: 10.5pt;
+                line-height: 1.7;
+                color: #000;
+            }
+            .no-print { display: none !important; }
+            .page-break { page-break-before: always; }
+            .avoid-break { page-break-inside: avoid; }
+            .proposal-container {
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+            }
+            .section-card {
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+                margin-bottom: 12pt !important;
+            }
+            .cover-page {
+                min-height: auto !important;
+                padding: 40pt 0 !important;
+            }
+            table { font-size: 9.5pt; }
+            h1 { font-size: 18pt !important; }
+            h2 { font-size: 14pt !important; }
+            h3 { font-size: 12pt !important; }
+            .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+
+        /* ===== Cover Page ===== */
+        .cover-page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 30%, #1a365d 70%, #0f2444 100%);
+            color: white;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .cover-page::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 40%, rgba(59,130,246,0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 60%, rgba(217,119,6,0.08) 0%, transparent 50%);
+        }
+        .cover-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== Section Cards ===== */
+        .section-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+            padding: 2rem 2.5rem;
+            margin-bottom: 2rem;
+        }
+        .section-card h2 {
+            color: var(--color-primary);
+            border-bottom: 3px solid var(--color-accent);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .section-card h3 {
+            color: var(--color-primary);
+        }
+
+        /* ===== Tables ===== */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th {
+            background: #1e3a5f;
+            color: white;
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+        .data-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.875rem;
+        }
+        .data-table tr:nth-child(even) td {
+            background: #f8fafc;
+        }
+        .data-table .amount {
+            text-align: right;
+            font-family: 'Noto Sans JP', monospace;
+            font-weight: 600;
+        }
+        .data-table tfoot td {
+            font-weight: 700;
+            border-top: 2px solid #1e3a5f;
+            background: #f1f5f9 !important;
+        }
+
+        /* ===== KPI Cards ===== */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+        .kpi-card {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #bae6fd;
+            border-radius: 10px;
+            padding: 1.2rem;
+            text-align: center;
+        }
+        .kpi-card .kpi-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--color-accent);
+        }
+        .kpi-card .kpi-label {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+
+        /* ===== Highlight Box ===== */
+        .highlight-box {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border-left: 4px solid #d97706;
+            padding: 1.25rem 1.5rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+        .alert-box {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border-left: 4px solid #dc2626;
+            padding: 1.25rem 1.5rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+        .success-box {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border-left: 4px solid #16a34a;
+            padding: 1.25rem 1.5rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+
+        /* ===== Timeline ===== */
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.5rem;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(to bottom, #2563eb, #7c3aed, #16a34a);
+            border-radius: 2px;
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+            padding-left: 1.5rem;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.65rem;
+            top: 0.5rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #2563eb;
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px #2563eb;
+        }
+
+        /* ===== Feature Grid ===== */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+        .feature-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 1.25rem;
+            transition: all 0.2s;
+        }
+        .feature-card:hover {
+            border-color: var(--color-accent);
+            box-shadow: 0 4px 12px rgba(37,99,235,0.1);
+        }
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+        }
+
+        /* ===== Comparison ===== */
+        .compare-table th:first-child { width: 25%; }
+        .compare-good { color: #16a34a; }
+        .compare-better { color: #2563eb; font-weight: 600; }
+
+        /* ===== Navigation ===== */
+        .nav-floating {
+            position: fixed;
+            top: 50%;
+            right: 1rem;
+            transform: translateY(-50%);
+            z-index: 100;
+            background: rgba(255,255,255,0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 0.75rem;
+            backdrop-filter: blur(10px);
+        }
+        .nav-floating a {
+            display: block;
+            padding: 0.4rem 0.6rem;
+            font-size: 0.7rem;
+            color: #64748b;
+            text-decoration: none;
+            border-radius: 6px;
+            margin-bottom: 2px;
+            transition: all 0.2s;
+        }
+        .nav-floating a:hover, .nav-floating a.active {
+            background: #2563eb;
+            color: white;
+        }
+
+        /* ===== Stamp / Seal ===== */
+        .official-stamp {
+            width: 100px;
+            height: 100px;
+            border: 3px solid #dc2626;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #dc2626;
+            font-weight: 700;
+            font-size: 0.75rem;
+            text-align: center;
+            line-height: 1.3;
+            opacity: 0.8;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .feature-grid { grid-template-columns: 1fr; }
+            .nav-floating { display: none; }
+            .section-card { padding: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ========== Floating Navigation ========== -->
+<nav class="nav-floating no-print" id="floatingNav">
+    <a href="#cover">表紙</a>
+    <a href="#summary">要旨</a>
+    <a href="#system">システム概要</a>
+    <a href="#effectiveness">学習効果</a>
+    <a href="#security">セキュリティ</a>
+    <a href="#cost">費用分析</a>
+    <a href="#plan">ビジネスプラン</a>
+    <a href="#schedule">スケジュール</a>
+    <a href="#request">お願い事項</a>
+</nav>
+
+<!-- ========== Print / PDF Controls ========== -->
+<div class="fixed top-4 left-4 z-50 flex gap-2 no-print">
+    <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition text-sm">
+        <i class="fas fa-print mr-1"></i> 印刷 / PDF
+    </button>
+    <a href="/admin-dashboard.html" class="bg-gray-600 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-700 transition text-sm inline-flex items-center">
+        <i class="fas fa-arrow-left mr-1"></i> ダッシュボードに戻る
+    </a>
+</div>
+
+<!-- ============================================================ -->
+<!-- COVER PAGE -->
+<!-- ============================================================ -->
+<section class="cover-page" id="cover">
+    <div class="cover-content px-6">
+        <div class="mb-6 opacity-80">
+            <span class="text-sm tracking-widest uppercase">Proposal Document</span>
+        </div>
+        <h1 class="serif text-4xl md:text-5xl font-bold mb-4 leading-tight">
+            自由進度学習支援システム<br>
+            <span class="text-blue-300">TOCO-TON</span> 試行運用提案書
+        </h1>
+        <div class="w-24 h-1 bg-blue-400 mx-auto my-6 rounded"></div>
+        <p class="text-xl text-blue-200 mb-2">
+            松川村教育委員会 御中
+        </p>
+        <p class="text-lg text-blue-300 mb-8">
+            ウェルビーイング実践校 松川小・中学校
+        </p>
+
+        <div class="grid grid-cols-2 gap-8 max-w-lg mx-auto text-left mt-12 text-sm">
+            <div>
+                <p class="text-blue-400 text-xs mb-1">提出日</p>
+                <p class="text-white font-medium">令和8年（2026年）3月14日</p>
+            </div>
+            <div>
+                <p class="text-blue-400 text-xs mb-1">提出者</p>
+                <p class="text-white font-medium">小林 寿英</p>
+                <p class="text-blue-300 text-xs">TOCO-TON 指導主事</p>
+            </div>
+            <div>
+                <p class="text-blue-400 text-xs mb-1">対象校</p>
+                <p class="text-white font-medium">松川小・中学校</p>
+            </div>
+            <div>
+                <p class="text-blue-400 text-xs mb-1">文書番号</p>
+                <p class="text-white font-medium">TOCO-TON-2026-001</p>
+            </div>
+        </div>
+
+        <div class="mt-16 text-blue-400 text-xs opacity-70">
+            本提案書は機密文書です。教育委員会関係者以外への配布はご遠慮ください。
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- EXECUTIVE SUMMARY -->
+<!-- ============================================================ -->
+<div class="proposal-container max-w-4xl mx-auto px-4 py-8">
+
+<section id="summary" class="section-card page-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-file-alt text-blue-600"></i> 提案要旨（エグゼクティブサマリー）
+    </h2>
+
+    <div class="highlight-box">
+        <p class="font-semibold text-amber-800 mb-2">
+            <i class="fas fa-lightbulb mr-1"></i> 本提案の核心
+        </p>
+        <p class="text-sm text-amber-900">
+            小林寿英が令和7年10月より1,080時間以上を投じて開発した「自由進度学習支援システム TOCO-TON」を、
+            令和8年4月より松川中学校にて試行運用し、教育委員会がジェンスパーク（GenSpark）ビジネスプランを
+            公式採用することで、<strong>持続可能な運用体制</strong>と<strong>開発者の費用負担解消</strong>を
+            同時に実現する提案です。
+        </p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-4 mt-6">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 avoid-break">
+            <div class="text-blue-600 font-bold text-sm mb-2"><i class="fas fa-check-circle mr-1"></i> 提案1</div>
+            <p class="text-sm font-medium">松川中学校での試行運用許可</p>
+            <p class="text-xs text-gray-600 mt-1">令和8年4月〜 まず1〜2クラス・1〜2教科で開始</p>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 avoid-break">
+            <div class="text-amber-600 font-bold text-sm mb-2"><i class="fas fa-yen-sign mr-1"></i> 提案2</div>
+            <p class="text-sm font-medium">開発費用の補填と運用費負担</p>
+            <p class="text-xs text-gray-600 mt-1">個人負担月額10万円超の解消</p>
+        </div>
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 avoid-break">
+            <div class="text-green-600 font-bold text-sm mb-2"><i class="fas fa-handshake mr-1"></i> 提案3</div>
+            <p class="text-sm font-medium">GenSparkビジネスプラン公式採用</p>
+            <p class="text-xs text-gray-600 mt-1">教育委員会が契約主体・小林をパートナーとして招聘</p>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SYSTEM OVERVIEW -->
+<!-- ============================================================ -->
+<section id="system" class="section-card page-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-laptop-code text-blue-600"></i> 1. システム概要
+    </h2>
+
+    <h3 class="text-lg font-semibold mt-4 mb-3">1.1 TOCO-TONとは</h3>
+    <p class="mb-4">
+        TOCO-TON（トコトン）は、<strong>12の学習理論</strong>に基づき児童生徒の学びを個別最適化する
+        自由進度学習支援システムです。AI技術を活用し、一人ひとりの学習スタイル・理解度・感情状態を
+        リアルタイムに分析し、教師の指導と児童生徒の自律的な学びの両方を強力に支援します。
+    </p>
+
+    <h3 class="text-lg font-semibold mt-6 mb-3">1.2 基盤となる12の学習理論</h3>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F1</span> VARK感覚モデル<br>
+            <span class="text-gray-500">Fleming — 感覚別学習スタイル</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F2</span> 多重知能理論<br>
+            <span class="text-gray-500">Gardner — 8つの知能</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F3</span> 経験学習サイクル<br>
+            <span class="text-gray-500">Kolb — 体験→省察→概念化→実践</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F4</span> 適性処遇交互作用<br>
+            <span class="text-gray-500">ATI — 個人差に応じた教授法</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F5</span> 自己調整学習<br>
+            <span class="text-gray-500">Zimmerman — SRL 3段階モデル</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F6</span> 学習方略<br>
+            <span class="text-gray-500">Oxford — 認知・メタ認知方略</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F7</span> 足場かけ理論<br>
+            <span class="text-gray-500">Vygotsky — ZPD・段階的支援</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F8</span> 動機づけ理論<br>
+            <span class="text-gray-500">Deci & Ryan — 自己決定理論</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F9</span> メタ認知<br>
+            <span class="text-gray-500">Flavell — 自己モニタリング</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F10</span> 領域固有性<br>
+            <span class="text-gray-500">Chi — 教科特性に応じた学び</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F11</span> 真正な学び<br>
+            <span class="text-gray-500">Authentic Learning — 実社会との接続</span>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
+            <span class="font-bold text-blue-700">F12</span> 感情と学習<br>
+            <span class="text-gray-500">Pekrun — 達成感情理論</span>
+        </div>
+    </div>
+
+    <h3 class="text-lg font-semibold mt-6 mb-3">1.3 主要機能一覧</h3>
+    <div class="feature-grid">
+        <div class="feature-card avoid-break">
+            <div class="feature-icon bg-blue-100 text-blue-600"><i class="fas fa-brain"></i></div>
+            <h4 class="font-semibold text-sm mb-1">適応学習エンジン</h4>
+            <p class="text-xs text-gray-600">12理論統合の個別最適化アルゴリズムが、一人ひとりに最適な学習パスを自動生成</p>
+        </div>
+        <div class="feature-card avoid-break">
+            <div class="feature-icon bg-purple-100 text-purple-600"><i class="fas fa-robot"></i></div>
+            <h4 class="font-semibold text-sm mb-1">AIチュータリング</h4>
+            <p class="text-xs text-gray-600">Gemini AI搭載の対話型個別指導。質問への回答、ヒント提示、思考支援</p>
+        </div>
+        <div class="feature-card avoid-break">
+            <div class="feature-icon bg-green-100 text-green-600"><i class="fas fa-chalkboard-teacher"></i></div>
+            <h4 class="font-semibold text-sm mb-1">教師ダッシュボード</h4>
+            <p class="text-xs text-gray-600">リアルタイムのクラス状況把握、BARS評価ルーブリック、通知表所見自動生成</p>
+        </div>
+        <div class="feature-card avoid-break">
+            <div class="feature-icon bg-amber-100 text-amber-600"><i class="fas fa-chart-line"></i></div>
+            <h4 class="font-semibold text-sm mb-1">学習エビデンスレポート</h4>
+            <p class="text-xs text-gray-600">APA形式の統計分析、効果量(Cohen's d)、SPSS/R互換データエクスポート</p>
+        </div>
+        <div class="feature-card avoid-break">
+            <div class="feature-icon bg-rose-100 text-rose-600"><i class="fas fa-home"></i></div>
+            <h4 class="font-semibold text-sm mb-1">保護者ダッシュボード</h4>
+            <p class="text-xs text-gray-600">お子様の学習状況を見える化。12理論プロファイル、成長レポートを共有</p>
+        </div>
+        <div class="feature-card avoid-break">
+            <div class="feature-icon bg-teal-100 text-teal-600"><i class="fas fa-hands-helping"></i></div>
+            <h4 class="font-semibold text-sm mb-1">不登校支援モジュール</h4>
+            <p class="text-xs text-gray-600">登校困難な児童生徒の自宅学習を支援。柔軟な学習ペース設定</p>
+        </div>
+        <div class="feature-card avoid-break">
+            <div class="feature-icon bg-indigo-100 text-indigo-600"><i class="fas fa-book-open"></i></div>
+            <h4 class="font-semibold text-sm mb-1">間違いノート・復習</h4>
+            <p class="text-xs text-gray-600">誤答を自動記録し、間隔反復アルゴリズムで最適なタイミングで復習を促進</p>
+        </div>
+        <div class="feature-card avoid-break">
+            <div class="feature-icon bg-orange-100 text-orange-600"><i class="fas fa-pen-fancy"></i></div>
+            <h4 class="font-semibold text-sm mb-1">作文・記述式採点</h4>
+            <p class="text-xs text-gray-600">AI搭載の記述式問題自動採点。ルーブリックベースの精密評価</p>
+        </div>
+        <div class="feature-card avoid-break">
+            <div class="feature-icon bg-cyan-100 text-cyan-600"><i class="fas fa-file-export"></i></div>
+            <h4 class="font-semibold text-sm mb-1">研究用データエクスポート</h4>
+            <p class="text-xs text-gray-600">匿名化済みCSV/JSON/SPSS形式。学術研究に即座に利用可能</p>
+        </div>
+    </div>
+
+    <h3 class="text-lg font-semibold mt-8 mb-3">1.4 技術構成</h3>
+    <table class="data-table avoid-break">
+        <thead>
+            <tr>
+                <th style="width:30%">項目</th>
+                <th>技術・サービス</th>
+                <th style="width:25%">特徴</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-medium">フレームワーク</td>
+                <td>Hono（TypeScript）</td>
+                <td>軽量・高速・エッジ最適</td>
+            </tr>
+            <tr>
+                <td class="font-medium">ホスティング</td>
+                <td>Cloudflare Pages / Workers</td>
+                <td>全世界300+拠点 CDN</td>
+            </tr>
+            <tr>
+                <td class="font-medium">データベース</td>
+                <td>Cloudflare D1（SQLite）</td>
+                <td>エッジ分散DB・低遅延</td>
+            </tr>
+            <tr>
+                <td class="font-medium">ストレージ</td>
+                <td>Cloudflare R2 / KV</td>
+                <td>メディア保存・キャッシュ</td>
+            </tr>
+            <tr>
+                <td class="font-medium">AI機能</td>
+                <td>Google Gemini API</td>
+                <td>対話・採点・コンテンツ生成</td>
+            </tr>
+            <tr>
+                <td class="font-medium">開発プラットフォーム</td>
+                <td>GenSpark（ジェンスパーク）</td>
+                <td>AI支援開発・統合環境</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- EFFECTIVENESS -->
+<!-- ============================================================ -->
+<section id="effectiveness" class="section-card page-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-chart-bar text-blue-600"></i> 2. システム有効性と学習効果
+    </h2>
+
+    <h3 class="text-lg font-semibold mt-4 mb-3">2.1 開発段階での実証データ</h3>
+    <p class="text-sm text-gray-700 mb-4">
+        開発過程での動作テストにおいて、以下の初期データが得られています。
+        本格的な実証データは令和8年4月以降の試行運用で蓄積されます。
+    </p>
+
+    <div class="kpi-grid mb-6">
+        <div class="kpi-card avoid-break">
+            <div class="kpi-value">85.7%</div>
+            <div class="kpi-label">テスト平均正答率</div>
+        </div>
+        <div class="kpi-card avoid-break">
+            <div class="kpi-value">12</div>
+            <div class="kpi-label">統合学習理論数</div>
+        </div>
+        <div class="kpi-card avoid-break">
+            <div class="kpi-value">9+</div>
+            <div class="kpi-label">機能モジュール数</div>
+        </div>
+        <div class="kpi-card avoid-break">
+            <div class="kpi-value">APA</div>
+            <div class="kpi-label">準拠統計分析</div>
+        </div>
+    </div>
+
+    <h3 class="text-lg font-semibold mt-6 mb-3">2.2 「自ら学ぶ力」の8つの力</h3>
+    <p class="text-sm text-gray-700 mb-4">
+        本システムは、児童生徒の「自ら学ぶ力」を8つの観点で可視化・育成します。
+    </p>
+    <table class="data-table avoid-break">
+        <thead>
+            <tr>
+                <th style="width:5%">No</th>
+                <th style="width:18%">力</th>
+                <th>内容</th>
+                <th style="width:25%">関連理論</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-bold text-blue-600">1</td>
+                <td class="font-medium">自己選択力</td>
+                <td class="text-sm">自分で学ぶ内容・方法・順序を選択する力</td>
+                <td class="text-xs text-gray-500">F5自己調整学習、F8動機づけ</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-blue-600">2</td>
+                <td class="font-medium">回復力</td>
+                <td class="text-sm">失敗や困難から立ち直り、再挑戦する力</td>
+                <td class="text-xs text-gray-500">F12感情と学習、F8動機づけ</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-blue-600">3</td>
+                <td class="font-medium">振り返り力</td>
+                <td class="text-sm">自分の学びを客観的に振り返る力</td>
+                <td class="text-xs text-gray-500">F9メタ認知、F3経験学習</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-blue-600">4</td>
+                <td class="font-medium">援助要請力</td>
+                <td class="text-sm">必要なときに適切に助けを求める力</td>
+                <td class="text-xs text-gray-500">F7足場かけ、F2対人的知能</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-blue-600">5</td>
+                <td class="font-medium">粘り強さ</td>
+                <td class="text-sm">困難な課題にも諦めず取り組み続ける力</td>
+                <td class="text-xs text-gray-500">F8動機づけ、F12感情</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-blue-600">6</td>
+                <td class="font-medium">学びの自覚</td>
+                <td class="text-sm">自分の成長や変化に気づく力</td>
+                <td class="text-xs text-gray-500">F9メタ認知、F5自己調整</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-blue-600">7</td>
+                <td class="font-medium">協働力</td>
+                <td class="text-sm">他者と協力して学びを深める力</td>
+                <td class="text-xs text-gray-500">F2対人的知能、F11真正な学び</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-blue-600">8</td>
+                <td class="font-medium">意味づけ力</td>
+                <td class="text-sm">学びと実生活・将来を結びつける力</td>
+                <td class="text-xs text-gray-500">F11真正な学び、F8内発的動機</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="text-lg font-semibold mt-8 mb-3">2.3 期待される学習効果</h3>
+    <div class="grid md:grid-cols-2 gap-4">
+        <div class="success-box avoid-break">
+            <p class="font-semibold text-green-800 text-sm mb-2"><i class="fas fa-graduation-cap mr-1"></i> 児童生徒への効果</p>
+            <ul class="text-xs text-green-900 space-y-1">
+                <li>• 個人の学習スタイルに合った最適な学び方を発見</li>
+                <li>• 自己調整学習能力（SRL）の段階的な獲得</li>
+                <li>• 失敗を恐れない学習環境による主体的な学び</li>
+                <li>• 間隔反復による長期記憶への定着強化</li>
+                <li>• 不登校児童生徒の学びの継続支援</li>
+            </ul>
+        </div>
+        <div class="success-box avoid-break">
+            <p class="font-semibold text-green-800 text-sm mb-2"><i class="fas fa-chalkboard-teacher mr-1"></i> 教師への効果</p>
+            <ul class="text-xs text-green-900 space-y-1">
+                <li>• リアルタイムのクラス全体・個別学習状況把握</li>
+                <li>• BARS評価による客観的な学習評価</li>
+                <li>• 通知表所見の自動生成による業務効率化</li>
+                <li>• データに基づく授業改善の根拠提供</li>
+                <li>• 研究用エビデンスの自動蓄積</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="highlight-box mt-4 avoid-break">
+        <p class="font-semibold text-amber-800 text-sm mb-2"><i class="fas fa-microscope mr-1"></i> 研究的価値</p>
+        <p class="text-xs text-amber-900">
+            本システムのエビデンスレポート機能は、APA形式の統計分析（N, M, SD, Cohen's d, t検定, 相関係数r, 95%CI）を
+            自動生成し、SPSS/R互換のCSVデータをエクスポートできます。これは文部科学省が推進する
+            「エビデンスに基づく教育（EBPM）」に直接貢献し、松川村の教育実践を<strong>学術論文レベルの研究成果</strong>
+            として全国に発信できる可能性を持っています。
+        </p>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SECURITY -->
+<!-- ============================================================ -->
+<section id="security" class="section-card page-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-shield-alt text-blue-600"></i> 3. セキュリティと個人情報保護
+    </h2>
+
+    <h3 class="text-lg font-semibold mt-4 mb-3">3.1 現在のセキュリティ実装状況</h3>
+    <table class="data-table avoid-break">
+        <thead>
+            <tr>
+                <th style="width:25%">対策項目</th>
+                <th>現在の実装</th>
+                <th style="width:15%">状態</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-medium">認証方式</td>
+                <td>JWT（JSON Web Token）によるトークンベース認証。ログイン時にトークンを発行し、全APIリクエストで検証</td>
+                <td><span class="text-green-600 font-bold">✅ 実装済</span></td>
+            </tr>
+            <tr>
+                <td class="font-medium">パスワード保護</td>
+                <td>SHA-256ハッシュ化により平文パスワードは一切保存しない</td>
+                <td><span class="text-green-600 font-bold">✅ 実装済</span></td>
+            </tr>
+            <tr>
+                <td class="font-medium">ロールベースアクセス制御</td>
+                <td>student / teacher / parent / admin の4ロールで機能アクセスを制限</td>
+                <td><span class="text-green-600 font-bold">✅ 実装済</span></td>
+            </tr>
+            <tr>
+                <td class="font-medium">Cookie設定</td>
+                <td>HttpOnly, Secure, SameSite=Strict の3重保護</td>
+                <td><span class="text-green-600 font-bold">✅ 実装済</span></td>
+            </tr>
+            <tr>
+                <td class="font-medium">通信暗号化</td>
+                <td>Cloudflare Pages はデフォルトでHTTPS通信（TLS 1.3）</td>
+                <td><span class="text-green-600 font-bold">✅ 自動適用</span></td>
+            </tr>
+            <tr>
+                <td class="font-medium">データ匿名化</td>
+                <td>エビデンスレポート・エクスポート時の学習者ID自動匿名化</td>
+                <td><span class="text-green-600 font-bold">✅ 実装済</span></td>
+            </tr>
+            <tr>
+                <td class="font-medium">インフラセキュリティ</td>
+                <td>Cloudflare のDDoS防御・WAF・Bot管理が自動適用</td>
+                <td><span class="text-green-600 font-bold">✅ 自動適用</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="text-lg font-semibold mt-8 mb-3">3.2 今後強化すべきセキュリティ項目</h3>
+    <div class="alert-box avoid-break">
+        <p class="font-semibold text-red-800 text-sm mb-2"><i class="fas fa-exclamation-triangle mr-1"></i> 改善推奨事項</p>
+        <p class="text-xs text-red-900 mb-3">
+            現在のセキュリティは基本的な保護は実装されていますが、教育機関としての運用には以下の強化が推奨されます。
+            これらは<strong>ビジネスプラン採用後の開発ロードマップ</strong>に含めます。
+        </p>
+    </div>
+
+    <table class="data-table avoid-break">
+        <thead>
+            <tr>
+                <th style="width:25%">改善項目</th>
+                <th>内容</th>
+                <th style="width:12%">優先度</th>
+                <th style="width:12%">工数</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-medium">JWT秘密鍵の外部化</td>
+                <td>現在ハードコードされている秘密鍵を Cloudflare Secrets（環境変数）に移行</td>
+                <td><span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">高</span></td>
+                <td class="text-xs">1日</td>
+            </tr>
+            <tr>
+                <td class="font-medium">パスワードハッシュ強化</td>
+                <td>SHA-256 → bcrypt/scrypt へ変更（ブルートフォース攻撃への耐性向上）</td>
+                <td><span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">高</span></td>
+                <td class="text-xs">1日</td>
+            </tr>
+            <tr>
+                <td class="font-medium">レート制限</td>
+                <td>ログイン試行回数制限（ブルートフォース攻撃防止）</td>
+                <td><span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-xs font-bold">中</span></td>
+                <td class="text-xs">2日</td>
+            </tr>
+            <tr>
+                <td class="font-medium">CORS設定の厳密化</td>
+                <td>許可ドメインの明示的指定（現在は全ドメイン許可）</td>
+                <td><span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-xs font-bold">中</span></td>
+                <td class="text-xs">半日</td>
+            </tr>
+            <tr>
+                <td class="font-medium">入力値サニタイズ</td>
+                <td>XSS・SQLインジェクション対策の網羅的な適用</td>
+                <td><span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-xs font-bold">中</span></td>
+                <td class="text-xs">3日</td>
+            </tr>
+            <tr>
+                <td class="font-medium">監査ログ</td>
+                <td>管理者操作・データアクセスの記録（いつ・誰が・何をしたか）</td>
+                <td><span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs font-bold">低</span></td>
+                <td class="text-xs">3日</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="text-lg font-semibold mt-8 mb-3">3.3 実名運用について — 提案</h3>
+    <div class="grid md:grid-cols-2 gap-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 avoid-break">
+            <h4 class="font-bold text-blue-700 text-sm mb-2"><i class="fas fa-user-check mr-1"></i> 推奨：「表示名」方式</h4>
+            <p class="text-xs text-gray-700 mb-2">
+                教師用ダッシュボードでは<strong>実名を表示</strong>し、授業中の利便性を確保しつつ、
+                データベース上では生徒ID（数字）で管理する「二層方式」を推奨します。
+            </p>
+            <ul class="text-xs text-gray-600 space-y-1">
+                <li>✅ 授業中は教師画面に実名表示</li>
+                <li>✅ エクスポートデータは自動的に匿名化</li>
+                <li>✅ 保護者画面は自分の子どものみ閲覧可</li>
+                <li>✅ 研究データからは実名を完全除去</li>
+            </ul>
+        </div>
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 avoid-break">
+            <h4 class="font-bold text-gray-700 text-sm mb-2"><i class="fas fa-user-secret mr-1"></i> 代替案：匿名方式</h4>
+            <p class="text-xs text-gray-700 mb-2">
+                教育委員会のポリシーが厳格な場合、全場面で匿名ID（A, B, C…）を使用する方式も選択可能です。
+            </p>
+            <ul class="text-xs text-gray-600 space-y-1">
+                <li>⚠️ 授業中に生徒を特定しにくい</li>
+                <li>⚠️ 教師の負担が若干増加</li>
+                <li>✅ 個人情報リスクは最小</li>
+                <li>✅ 既に匿名化機能は実装済み</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="success-box mt-4 avoid-break">
+        <p class="font-semibold text-green-800 text-sm mb-2"><i class="fas fa-check-double mr-1"></i> セキュリティ上の結論</p>
+        <p class="text-xs text-green-900">
+            現在のシステムは<strong>基本的なセキュリティ（認証・暗号化・アクセス制御・通信保護）は確保</strong>されており、
+            限定的な試行運用（1〜2クラス規模）を開始するには十分な水準です。
+            ビジネスプラン採用後に上記の強化項目を計画的に実装することで、
+            全校展開に耐えうるセキュリティレベルに引き上げることができます。
+        </p>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COST ANALYSIS -->
+<!-- ============================================================ -->
+<section id="cost" class="section-card page-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-calculator text-blue-600"></i> 4. 費用分析
+    </h2>
+
+    <h3 class="text-lg font-semibold mt-4 mb-3">4.1 開発投資の実態（令和7年10月〜令和8年3月）</h3>
+    <table class="data-table avoid-break">
+        <thead>
+            <tr>
+                <th>項目</th>
+                <th>内容</th>
+                <th style="width:20%">金額（税込）</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-medium">GenSpark利用料</td>
+                <td>AIアシスト開発プラットフォーム月額利用料（6ヶ月間）</td>
+                <td class="amount">¥600,000 以上</td>
+            </tr>
+            <tr>
+                <td class="font-medium">開発時間</td>
+                <td>1日平均6時間 × 180日 = 1,080時間以上<br>
+                    <span class="text-xs text-gray-500">※教育活動の傍ら、勤務時間外に開発</span></td>
+                <td class="amount">（無償労働）</td>
+            </tr>
+            <tr>
+                <td class="font-medium">Cloudflare運用費</td>
+                <td>Pages・D1・KV・R2の利用料（無料枠内で運用中）</td>
+                <td class="amount">¥0 <span class="text-xs text-gray-500">※現在</span></td>
+            </tr>
+            <tr>
+                <td class="font-medium">Gemini API</td>
+                <td>Google AI API利用料（無料枠内で運用中）</td>
+                <td class="amount">¥0 <span class="text-xs text-gray-500">※現在</span></td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2" class="font-bold">個人負担 合計（6ヶ月間）</td>
+                <td class="amount text-red-600">¥600,000 以上</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div class="alert-box mt-4 avoid-break">
+        <p class="font-semibold text-red-800 text-sm mb-2"><i class="fas fa-exclamation-circle mr-1"></i> 現状の課題</p>
+        <p class="text-xs text-red-900">
+            小林は松川村の教職員として、公務外の時間と私費を投じて本システムを開発してきました。
+            月額10万円以上の継続的な個人負担は持続不可能であり、令和8年4月以降の開発・運用の継続には
+            教育委員会による費用支援が不可欠です。
+        </p>
+    </div>
+
+    <h3 class="text-lg font-semibold mt-8 mb-3">4.2 今後の運用費用見込み</h3>
+    <table class="data-table avoid-break">
+        <thead>
+            <tr>
+                <th>費用項目</th>
+                <th>内容</th>
+                <th style="width:15%">月額</th>
+                <th style="width:15%">年額</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-medium">GenSpark ビジネスプラン</td>
+                <td>10ユーザー分契約（開発・保守・教師利用）<br>
+                    <span class="text-xs text-gray-500">※教育委員会が契約主体</span></td>
+                <td class="amount">約¥100,000</td>
+                <td class="amount">約¥1,200,000</td>
+            </tr>
+            <tr>
+                <td class="font-medium">Cloudflare Pro</td>
+                <td>本格運用時のホスティング・WAF・分析<br>
+                    <span class="text-xs text-gray-500">※生徒数が増加した場合の想定</span></td>
+                <td class="amount">約¥3,000</td>
+                <td class="amount">約¥36,000</td>
+            </tr>
+            <tr>
+                <td class="font-medium">Gemini API（有料枠）</td>
+                <td>AI機能の利用量増加に伴う従量課金<br>
+                    <span class="text-xs text-gray-500">※生徒数・利用頻度に依存</span></td>
+                <td class="amount">約¥5,000</td>
+                <td class="amount">約¥60,000</td>
+            </tr>
+            <tr>
+                <td class="font-medium">保守・開発</td>
+                <td>機能追加、バグ修正、セキュリティ更新<br>
+                    <span class="text-xs text-gray-500">※小林が担当（パートナー契約）</span></td>
+                <td class="amount">（パートナー契約に含む）</td>
+                <td class="amount">—</td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2" class="font-bold">月額運用コスト見込み</td>
+                <td class="amount font-bold">約¥108,000</td>
+                <td class="amount font-bold">約¥1,296,000</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <h3 class="text-lg font-semibold mt-8 mb-3">4.3 費用対効果の比較</h3>
+    <table class="data-table compare-table avoid-break">
+        <thead>
+            <tr>
+                <th>比較項目</th>
+                <th>一般的な学習支援システム</th>
+                <th>TOCO-TON</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-medium">導入費用</td>
+                <td>300〜500万円（初期構築）</td>
+                <td class="compare-better">¥0（開発済み）</td>
+            </tr>
+            <tr>
+                <td class="font-medium">年間ライセンス</td>
+                <td>1人あたり年2〜5万円<br><span class="text-xs text-gray-500">100名で200〜500万円/年</span></td>
+                <td class="compare-better">年間約130万円（全校一律）</td>
+            </tr>
+            <tr>
+                <td class="font-medium">カスタマイズ</td>
+                <td>追加費用（数十〜数百万円）</td>
+                <td class="compare-better">小林が松川村の教育方針に合わせて随時対応</td>
+            </tr>
+            <tr>
+                <td class="font-medium">学習理論の統合</td>
+                <td>1〜3理論程度</td>
+                <td class="compare-better">12理論を統合した独自アルゴリズム</td>
+            </tr>
+            <tr>
+                <td class="font-medium">教師との連携</td>
+                <td>営業担当を通じた要望伝達</td>
+                <td class="compare-better">開発者が現場教員として直接対応</td>
+            </tr>
+            <tr>
+                <td class="font-medium">研究的価値</td>
+                <td>限定的（データ取得が困難）</td>
+                <td class="compare-better">APA形式統計・SPSS/R互換エクスポート標準搭載</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- BUSINESS PLAN -->
+<!-- ============================================================ -->
+<section id="plan" class="section-card page-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-handshake text-blue-600"></i> 5. ビジネスプラン提案
+    </h2>
+
+    <h3 class="text-lg font-semibold mt-4 mb-3">5.1 提案するスキーム</h3>
+    <div class="bg-blue-50 border-2 border-blue-300 rounded-xl p-6 mb-6 avoid-break">
+        <div class="text-center mb-4">
+            <span class="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-bold">推奨スキーム</span>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4 text-center">
+            <div>
+                <div class="text-3xl mb-2">🏛️</div>
+                <p class="font-bold text-sm">松川村教育委員会</p>
+                <p class="text-xs text-gray-500">契約主体・費用負担</p>
+            </div>
+            <div class="flex items-center justify-center">
+                <div class="text-center">
+                    <div class="flex items-center gap-2 text-blue-600">
+                        <i class="fas fa-arrow-left text-xl"></i>
+                        <span class="text-xs font-bold">契約締結</span>
+                        <i class="fas fa-arrow-right text-xl"></i>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">GenSpark ビジネスプラン<br>10ユーザー契約</p>
+                </div>
+            </div>
+            <div>
+                <div class="text-3xl mb-2">🤖</div>
+                <p class="font-bold text-sm">GenSpark</p>
+                <p class="text-xs text-gray-500">AI開発プラットフォーム提供</p>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <i class="fas fa-arrow-down text-blue-400 text-xl"></i>
+        </div>
+        <div class="text-center mt-2">
+            <div class="inline-block bg-white rounded-lg p-4 shadow-sm">
+                <div class="text-3xl mb-2">👨‍💻</div>
+                <p class="font-bold text-sm">小林 寿英</p>
+                <p class="text-xs text-gray-500">パートナー（開発・運用・保守）</p>
+                <p class="text-xs text-blue-600 mt-1">TOCO-TON指導主事として松川村教育に貢献</p>
+            </div>
+        </div>
+    </div>
+
+    <h3 class="text-lg font-semibold mt-6 mb-3">5.2 現行方式との比較 — なぜビジネスプランが優れているか</h3>
+    <table class="data-table compare-table avoid-break">
+        <thead>
+            <tr>
+                <th style="width:22%">観点</th>
+                <th>現行（個人負担）</th>
+                <th>提案（ビジネスプラン）</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-medium">費用の透明性</td>
+                <td class="text-sm">個人のクレジットカード払い。経理処理不可</td>
+                <td class="compare-better text-sm">教育委員会の公式契約。予算・決算に明記可能</td>
+            </tr>
+            <tr>
+                <td class="font-medium">持続可能性</td>
+                <td class="text-sm">個人の経済状況に依存。継続性が不透明</td>
+                <td class="compare-better text-sm">公的予算による安定的な運用継続が保証</td>
+            </tr>
+            <tr>
+                <td class="font-medium">開発の継続</td>
+                <td class="text-sm">個人の善意に依存。燃え尽きリスクあり</td>
+                <td class="compare-better text-sm">パートナー契約により開発者の貢献が正当に評価</td>
+            </tr>
+            <tr>
+                <td class="font-medium">責任の所在</td>
+                <td class="text-sm">個人が全責任を負う（法的リスク）</td>
+                <td class="compare-better text-sm">教育委員会が運用主体。責任と権限が明確</td>
+            </tr>
+            <tr>
+                <td class="font-medium">拡張性</td>
+                <td class="text-sm">1名分の利用枠で開発のみ</td>
+                <td class="compare-better text-sm">10名分で教師も管理画面からシステムを活用可能</td>
+            </tr>
+            <tr>
+                <td class="font-medium">セキュリティ</td>
+                <td class="text-sm">個人管理。外部監査なし</td>
+                <td class="compare-better text-sm">組織管理。必要に応じて外部監査を実施可能</td>
+            </tr>
+            <tr>
+                <td class="font-medium">データ管理</td>
+                <td class="text-sm">個人アカウント上にデータが存在</td>
+                <td class="compare-better text-sm">教育委員会名義のアカウントでデータを管理</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="text-lg font-semibold mt-8 mb-3">5.3 10ユーザー枠の想定配分</h3>
+    <table class="data-table avoid-break">
+        <thead>
+            <tr>
+                <th style="width:8%">No</th>
+                <th style="width:25%">ユーザー</th>
+                <th>利用目的</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-bold">1</td>
+                <td class="font-medium">小林 寿英</td>
+                <td>システム開発・保守・機能追加（主開発者）</td>
+            </tr>
+            <tr>
+                <td class="font-bold">2</td>
+                <td class="font-medium">教育委員会 管理者</td>
+                <td>システム全体の管理・監視・データ確認</td>
+            </tr>
+            <tr>
+                <td class="font-bold">3-4</td>
+                <td class="font-medium">試行担当教師（2名）</td>
+                <td>授業での活用・教師ダッシュボード利用・フィードバック提供</td>
+            </tr>
+            <tr>
+                <td class="font-bold">5</td>
+                <td class="font-medium">校長 or 教頭</td>
+                <td>管理者ダッシュボードでの全体把握・評価</td>
+            </tr>
+            <tr>
+                <td class="font-bold">6-10</td>
+                <td class="font-medium">予備枠（5名）</td>
+                <td>試行拡大時の教師追加、研究協力者、教育委員会委員等</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCHEDULE -->
+<!-- ============================================================ -->
+<section id="schedule" class="section-card page-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-calendar-alt text-blue-600"></i> 6. 実施スケジュール
+    </h2>
+
+    <div class="timeline mt-6">
+        <div class="timeline-item avoid-break">
+            <h4 class="font-bold text-sm text-blue-700">Phase 0：準備期間（令和8年3月）</h4>
+            <ul class="text-xs text-gray-600 mt-1 space-y-0.5">
+                <li>• 教育委員会への本提案書提出・協議</li>
+                <li>• GenSpark ビジネスプラン契約の検討・決定</li>
+                <li>• 試行担当教師の選定（1〜2名）</li>
+                <li>• セキュリティ強化（JWT秘密鍵外部化、パスワードハッシュ強化）</li>
+            </ul>
+        </div>
+
+        <div class="timeline-item avoid-break">
+            <h4 class="font-bold text-sm text-purple-700">Phase 1：試行開始（令和8年4月〜6月）</h4>
+            <ul class="text-xs text-gray-600 mt-1 space-y-0.5">
+                <li>• 松川中学校 1〜2クラス、1〜2教科で試行運用開始</li>
+                <li>• 担当教師への操作研修（2時間程度）</li>
+                <li>• 生徒アカウント作成・初期設定</li>
+                <li>• 週次フィードバック収集と即時改善</li>
+                <li>• 学習データの蓄積開始</li>
+            </ul>
+        </div>
+
+        <div class="timeline-item avoid-break">
+            <h4 class="font-bold text-sm text-indigo-700">Phase 2：評価と改善（令和8年7月〜9月）</h4>
+            <ul class="text-xs text-gray-600 mt-1 space-y-0.5">
+                <li>• 1学期の試行結果をエビデンスレポートで分析</li>
+                <li>• 教師・生徒アンケートの実施</li>
+                <li>• セキュリティ強化（レート制限、CORS厳密化、監査ログ）</li>
+                <li>• 教育委員会への中間報告</li>
+                <li>• 2学期に向けた機能改善</li>
+            </ul>
+        </div>
+
+        <div class="timeline-item avoid-break">
+            <h4 class="font-bold text-sm text-green-700">Phase 3：拡大運用（令和8年10月〜令和9年3月）</h4>
+            <ul class="text-xs text-gray-600 mt-1 space-y-0.5">
+                <li>• 試行結果に基づき対象クラス・教科を段階的に拡大</li>
+                <li>• 松川小学校への展開検討</li>
+                <li>• 年間学習効果の統計分析・研究成果のまとめ</li>
+                <li>• 次年度予算への本格計上に向けた資料作成</li>
+                <li>• 学会発表・論文投稿の準備（任意）</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- REQUEST -->
+<!-- ============================================================ -->
+<section id="request" class="section-card page-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-clipboard-list text-blue-600"></i> 7. お願い事項
+    </h2>
+
+    <h3 class="text-lg font-semibold mt-4 mb-3">7.1 教育委員会へのお願い</h3>
+    <div class="space-y-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 avoid-break">
+            <div class="flex items-start gap-3">
+                <div class="bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">1</div>
+                <div>
+                    <h4 class="font-bold text-sm mb-1">松川中学校での試行運用の許可</h4>
+                    <p class="text-xs text-gray-600">
+                        令和8年4月より、松川中学校の1〜2クラス・1〜2教科にて、TOCO-TONの試行運用を
+                        許可いただきたくお願い申し上げます。試行は段階的に実施し、問題が発生した場合は
+                        即座に中断・対処いたします。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 avoid-break">
+            <div class="flex items-start gap-3">
+                <div class="bg-amber-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">2</div>
+                <div>
+                    <h4 class="font-bold text-sm mb-1">GenSpark ビジネスプランの公式契約</h4>
+                    <p class="text-xs text-gray-600">
+                        教育委員会がGenSparkと10ユーザー分のビジネスプラン契約を締結し、
+                        システムの運用主体を教育委員会としていただきたくお願い申し上げます。
+                        月額約10万円の費用負担をお願いいたします。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 avoid-break">
+            <div class="flex items-start gap-3">
+                <div class="bg-green-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">3</div>
+                <div>
+                    <h4 class="font-bold text-sm mb-1">開発費用の補填</h4>
+                    <p class="text-xs text-gray-600">
+                        令和7年10月から令和8年3月までの6ヶ月間に個人負担した開発費用（GenSpark利用料：
+                        ¥600,000以上）について、教育委員会より補填いただきたくお願い申し上げます。
+                        本システムは松川村の教育振興を目的として開発されたものであり、
+                        その成果は松川村の教育資産として活用されます。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4 avoid-break">
+            <div class="flex items-start gap-3">
+                <div class="bg-purple-600 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">4</div>
+                <div>
+                    <h4 class="font-bold text-sm mb-1">パートナーとしての招聘</h4>
+                    <p class="text-xs text-gray-600">
+                        小林寿英をTOCO-TONシステムの開発・運用パートナーとして位置づけ、
+                        継続的なシステム改善と松川村の教育ICT推進にあたらせていただきたく
+                        お願い申し上げます。TOCO-TON指導主事として、現場と開発の両面から
+                        教育の質向上に貢献いたします。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h3 class="text-lg font-semibold mt-8 mb-3">7.2 校長・教頭・教師の皆様へのお願い</h3>
+    <div class="bg-gray-50 rounded-lg p-5 avoid-break">
+        <p class="text-sm text-gray-700 mb-3">
+            本システムの試行運用にあたり、以下のご協力をお願い申し上げます。
+        </p>
+        <div class="grid md:grid-cols-2 gap-3">
+            <div class="text-xs text-gray-600">
+                <p class="font-bold text-gray-800 mb-1">校長・教頭</p>
+                <ul class="space-y-0.5">
+                    <li>• 試行運用の校内承認と環境整備</li>
+                    <li>• 管理者ダッシュボードによる定期的な状況確認</li>
+                    <li>• 教育委員会との連絡・報告の窓口</li>
+                </ul>
+            </div>
+            <div class="text-xs text-gray-600">
+                <p class="font-bold text-gray-800 mb-1">試行担当教師</p>
+                <ul class="space-y-0.5">
+                    <li>• 授業でのTOCO-TON活用と生徒への案内</li>
+                    <li>• 教師ダッシュボードの日常的な活用</li>
+                    <li>• 週次フィードバック（操作性・効果・改善点）の提供</li>
+                    <li>• 操作研修への参加（約2時間）</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- CLOSING -->
+<!-- ============================================================ -->
+<section class="section-card avoid-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-heart text-blue-600"></i> 結びに
+    </h2>
+
+    <p class="text-sm text-gray-700 mt-4 mb-4 leading-relaxed">
+        TOCO-TONは、「すべての子どもが自分のペースで、自分に合った方法で学べる」環境を
+        実現するために生まれたシステムです。12の学習理論に基づく科学的なアプローチと、
+        AI技術による個別最適化により、松川村の児童生徒一人ひとりの学びを支援します。
+    </p>
+    <p class="text-sm text-gray-700 mb-4 leading-relaxed">
+        1,080時間以上の開発は、松川村の子どもたちの学びをより良くしたいという思いから生まれました。
+        教育委員会のご支援により、この取り組みを持続可能な形で発展させ、
+        松川村をウェルビーイング教育のモデル地域として全国に発信できることを確信しております。
+    </p>
+    <p class="text-sm text-gray-700 mb-6 leading-relaxed">
+        ご検討のほど、何卒よろしくお願い申し上げます。
+    </p>
+
+    <div class="flex justify-between items-end mt-8 pt-6 border-t border-gray-200">
+        <div class="text-sm">
+            <p class="text-gray-500 text-xs mb-1">提出者</p>
+            <p class="font-bold text-lg">小林 寿英</p>
+            <p class="text-gray-600 text-xs">ウェルビーイング実践校 松川小・中学校</p>
+            <p class="text-gray-600 text-xs">TOCO-TON 指導主事</p>
+            <p class="text-gray-400 text-xs mt-2">令和8年3月14日</p>
+        </div>
+        <div class="official-stamp">
+            松川小中<br>TOCO-TON<br>指導主事
+        </div>
+    </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- APPENDIX -->
+<!-- ============================================================ -->
+<section class="section-card page-break avoid-break">
+    <h2 class="text-2xl font-bold flex items-center gap-2">
+        <i class="fas fa-paperclip text-blue-600"></i> 別紙：デモンストレーション・リンク集
+    </h2>
+    <p class="text-sm text-gray-600 mb-4">
+        本システムの動作確認は、以下のリンクからオンラインでご覧いただけます。
+    </p>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width:30%">ページ</th>
+                <th>内容</th>
+                <th style="width:20%">対象者</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-medium"><i class="fas fa-tachometer-alt mr-1 text-blue-500"></i> 管理者ダッシュボード</td>
+                <td>全体統計、データエクスポート、システム管理</td>
+                <td class="text-xs">管理者・校長</td>
+            </tr>
+            <tr>
+                <td class="font-medium"><i class="fas fa-chart-line mr-1 text-green-500"></i> エビデンスレポート</td>
+                <td>12理論分析、APA形式統計、研究用データ</td>
+                <td class="text-xs">管理者・研究者</td>
+            </tr>
+            <tr>
+                <td class="font-medium"><i class="fas fa-chalkboard-teacher mr-1 text-purple-500"></i> 教師ダッシュボード</td>
+                <td>クラス状況把握、BARS評価、所見生成</td>
+                <td class="text-xs">教師</td>
+            </tr>
+            <tr>
+                <td class="font-medium"><i class="fas fa-home mr-1 text-amber-500"></i> 保護者ダッシュボード</td>
+                <td>お子様の学習状況、成長レポート</td>
+                <td class="text-xs">保護者</td>
+            </tr>
+            <tr>
+                <td class="font-medium"><i class="fas fa-graduation-cap mr-1 text-rose-500"></i> 学習者ホーム</td>
+                <td>個別学習画面、AIチューター、復習</td>
+                <td class="text-xs">児童生徒</td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="text-xs text-gray-500 mt-3">
+        ※ デモアカウントの発行は個別にご相談ください。実際のシステム画面をご覧いただきながら詳細をご説明いたします。
+    </p>
+</section>
+
+</div><!-- /proposal-container -->
+
+<!-- ========== Scroll to Top ========== -->
+<button onclick="window.scrollTo({top:0,behavior:'smooth'})" 
+        class="fixed bottom-6 right-6 bg-blue-600 text-white w-12 h-12 rounded-full shadow-lg hover:bg-blue-700 transition no-print flex items-center justify-center">
+    <i class="fas fa-arrow-up"></i>
+</button>
+
+<!-- ========== Navigation Highlight Script ========== -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const nav = document.getElementById('floatingNav');
+    const links = nav ? nav.querySelectorAll('a') : [];
+    const sections = [];
+
+    links.forEach(link => {
+        const id = link.getAttribute('href')?.substring(1);
+        if (id) {
+            const section = document.getElementById(id);
+            if (section) sections.push({ link, section });
+        }
+    });
+
+    function updateNav() {
+        const scrollPos = window.scrollY + 200;
+        let current = sections[0];
+        sections.forEach(s => {
+            if (s.section.offsetTop <= scrollPos) current = s;
+        });
+        links.forEach(l => l.classList.remove('active'));
+        if (current) current.link.classList.add('active');
+    }
+
+    window.addEventListener('scroll', updateNav);
+    updateNav();
+});
+</script>
+
+</body>
+</html>
