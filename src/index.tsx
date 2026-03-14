@@ -71,6 +71,7 @@ type Bindings = {
   GEMINI_API_KEY?: string
   SUNO_API_KEY?: string
   HUGGINGFACE_API_KEY?: string // HuggingFace Inference API (optional)
+  JWT_SECRET?: string // JWT署名用秘密鍵（Cloudflare Secretsで設定）
   PROGRESS_WEBSOCKET?: DurableObjectNamespace
 }
 
@@ -19900,13 +19901,75 @@ app.get('/api/system/stats', async (c) => {
 // 認証API
 // ==============================================
 
-// ユーティリティ: パスワードハッシュ生成（Web Crypto API使用）
+// ユーティリティ: パスワードハッシュ生成（PBKDF2-SHA-256）
+// セキュリティ強化: SHA-256 → PBKDF2（10万回反復）
+const PBKDF2_ITERATIONS = 100_000
+const PBKDF2_KEY_LENGTH = 32
+const SALT_LENGTH = 16
+
 async function hashPassword(password: string): Promise<string> {
+  const salt = new Uint8Array(SALT_LENGTH)
+  crypto.getRandomValues(salt)
+  
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
+  )
+  const derivedBits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    keyMaterial, PBKDF2_KEY_LENGTH * 8
+  )
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('')
+  const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('')
+  return `pbkdf2:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`
+}
+
+// レガシーSHA-256ハッシュ（後方互換用、新規には使用しない）
+async function hashPasswordLegacySHA256(password: string): Promise<string> {
   const encoder = new TextEncoder()
   const data = encoder.encode(password)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// PBKDF2ハッシュ検証
+async function verifyPBKDF2Hash(password: string, storedHash: string): Promise<boolean> {
+  const parts = storedHash.split(':')
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false
+  const iterations = parseInt(parts[1], 10)
+  const saltHex = parts[2]
+  const expectedHashHex = parts[3]
+  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(byte => parseInt(byte, 16)))
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
+  )
+  const derivedBits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    keyMaterial, PBKDF2_KEY_LENGTH * 8
+  )
+  const actualHashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('')
+  if (actualHashHex.length !== expectedHashHex.length) return false
+  let result = 0
+  for (let i = 0; i < actualHashHex.length; i++) result |= actualHashHex.charCodeAt(i) ^ expectedHashHex.charCodeAt(i)
+  return result === 0
+}
+
+// パスワード検証（PBKDF2 / bcrypt / レガシーSHA-256 自動判別）
+async function verifyPasswordMulti(password: string, storedHash: string): Promise<boolean> {
+  // 1. PBKDF2形式
+  if (storedHash.startsWith('pbkdf2:')) {
+    return verifyPBKDF2Hash(password, storedHash)
+  }
+  // 2. bcrypt形式（$2a$ / $2b$ で始まる）
+  if (storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$')) {
+    return bcrypt.compare(password, storedHash)
+  }
+  // 3. レガシーSHA-256（64文字hex）
+  const legacyHash = await hashPasswordLegacySHA256(password)
+  if (legacyHash.length !== storedHash.length) return false
+  let result = 0
+  for (let i = 0; i < legacyHash.length; i++) result |= legacyHash.charCodeAt(i) ^ storedHash.charCodeAt(i)
+  return result === 0
 }
 
 // ユーティリティ: トークン生成
@@ -20063,9 +20126,9 @@ app.post('/api/auth/login', async (c) => {
       }, 403)
     }
     
-    // パスワード検証
-    const passwordHash = await hashPassword(password)
-    if (passwordHash !== user.password_hash) {
+    // パスワード検証（PBKDF2 / bcrypt / SHA-256 自動判別）
+    const passwordValid = await verifyPasswordMulti(password, user.password_hash as string)
+    if (!passwordValid) {
       // ログイン失敗回数を増加
       const attempts = (user.failed_login_attempts as number || 0) + 1
       const lockUntil = attempts >= 5 
@@ -20082,6 +20145,15 @@ app.post('/api/auth/login', async (c) => {
         error: 'メールアドレスまたはパスワードが正しくありません',
         attempts_remaining: 5 - attempts
       }, 401)
+    }
+    
+    // レガシーハッシュの場合、PBKDF2に自動移行
+    if (!(user.password_hash as string).startsWith('pbkdf2:') && !(user.password_hash as string).startsWith('$2')) {
+      try {
+        const newHash = await hashPassword(password)
+        await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(newHash, user.id).run()
+        console.log(`🔐 usersテーブル: パスワードハッシュをPBKDF2に自動移行 user#${user.id}`)
+      } catch (e) { console.error('ハッシュ移行エラー:', e) }
     }
     
     // セッショントークン生成

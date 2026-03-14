@@ -2,6 +2,11 @@
  * 認証・認可システム
  * JWT + Role-Based Access Control (RBAC)
  * 
+ * セキュリティ強化 (2026-03-14):
+ * - JWT秘密鍵: ハードコード → 環境変数（Cloudflare Secrets）
+ * - パスワードハッシュ: SHA-256 → PBKDF2-SHA-256（10万回反復）
+ * - 既存SHA-256ハッシュとの後方互換性を維持（自動移行）
+ * 
  * サポートするロール:
  * - student: 学生
  * - teacher: 教師
@@ -14,12 +19,82 @@ import { sign, verify } from 'hono/jwt';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 
 // JWT設定
-const JWT_SECRET = 'your-super-secret-jwt-key-change-in-production'; // 本番環境では環境変数に
+// ⚠️ 秘密鍵は環境変数から取得。ハードコードは禁止。
+// 本番: `npx wrangler pages secret put JWT_SECRET` で設定
+// ローカル: `.dev.vars` ファイルに `JWT_SECRET=xxxxxx` を記載
 const JWT_EXPIRES_IN = 60 * 60 * 24 * 7; // 7日間
 
-// パスワードハッシュ化（本番環境ではbcrypt等を使用）
+// フォールバック用の秘密鍵（環境変数未設定時の警告付き）
+const FALLBACK_SECRET = 'INSECURE-FALLBACK-CHANGE-ME-IN-PRODUCTION';
+
+function getJwtSecret(env: any): string {
+  const secret = env?.JWT_SECRET;
+  if (!secret) {
+    console.warn(
+      '⚠️ JWT_SECRET が環境変数に設定されていません。' +
+      'フォールバック秘密鍵を使用中です。' +
+      '本番環境では必ず `wrangler pages secret put JWT_SECRET` で設定してください。'
+    );
+    return FALLBACK_SECRET;
+  }
+  return secret;
+}
+
+// =============================================================================
+// パスワードハッシュ（PBKDF2-SHA-256）
+// =============================================================================
+// PBKDF2: Password-Based Key Derivation Function 2
+// - SHA-256を10万回繰り返すことで、ブルートフォース攻撃のコストを大幅に増加
+// - ソルト（ランダム値）により、同じパスワードでも異なるハッシュを生成
+// - Cloudflare Workers の Web Crypto API で動作（bcryptは非対応環境あり）
+// =============================================================================
+
+const PBKDF2_ITERATIONS = 100_000;  // 反復回数（NIST推奨: 10万回以上）
+const PBKDF2_KEY_LENGTH = 32;       // 出力鍵長（256bit）
+const SALT_LENGTH = 16;             // ソルト長（128bit）
+
+/**
+ * PBKDF2-SHA-256 でパスワードをハッシュ化
+ * 出力形式: "pbkdf2:iterations:salt_hex:hash_hex"
+ */
 async function hashPassword(password: string): Promise<string> {
-  // Cloudflare Workers環境ではWeb Crypto APIを使用
+  // ランダムソルト生成
+  const salt = new Uint8Array(SALT_LENGTH);
+  crypto.getRandomValues(salt);
+  
+  // パスワードをインポート
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  
+  // PBKDF2でハッシュ生成
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: PBKDF2_ITERATIONS,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    PBKDF2_KEY_LENGTH * 8 // ビット単位
+  );
+  
+  const hashArray = Array.from(new Uint8Array(derivedBits));
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  // 形式: "pbkdf2:100000:salt:hash"
+  return `pbkdf2:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`;
+}
+
+/**
+ * レガシーSHA-256ハッシュ生成（後方互換用、新規には使用しない）
+ */
+async function hashPasswordLegacySHA256(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
@@ -27,9 +102,96 @@ async function hashPassword(password: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const passwordHash = await hashPassword(password);
-  return passwordHash === hash;
+/**
+ * PBKDF2ハッシュを検証
+ */
+async function verifyPBKDF2(password: string, storedHash: string): Promise<boolean> {
+  const parts = storedHash.split(':');
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
+  
+  const iterations = parseInt(parts[1], 10);
+  const saltHex = parts[2];
+  const expectedHashHex = parts[3];
+  
+  // ソルトを復元
+  const salt = new Uint8Array(
+    saltHex.match(/.{2}/g)!.map(byte => parseInt(byte, 16))
+  );
+  
+  // パスワードをインポート
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  
+  // PBKDF2でハッシュ生成
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: iterations,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    PBKDF2_KEY_LENGTH * 8
+  );
+  
+  const actualHashHex = Array.from(new Uint8Array(derivedBits))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  // タイミング攻撃対策: 定数時間比較
+  return timingSafeEqual(actualHashHex, expectedHashHex);
+}
+
+/**
+ * 定数時間文字列比較（タイミング攻撃対策）
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+/**
+ * パスワード検証（PBKDF2 + レガシーSHA-256 自動判別）
+ * - 新形式（pbkdf2:...）→ PBKDF2で検証
+ * - 旧形式（64文字hex）→ SHA-256で検証、成功時にPBKDF2へ自動移行
+ */
+async function verifyPassword(
+  password: string, 
+  storedHash: string,
+  options?: { db?: D1Database; tableName?: string; idField?: string; userId?: number }
+): Promise<boolean> {
+  // 新形式: PBKDF2
+  if (storedHash.startsWith('pbkdf2:')) {
+    return verifyPBKDF2(password, storedHash);
+  }
+  
+  // 旧形式: SHA-256（64文字の16進数文字列）
+  const legacyHash = await hashPasswordLegacySHA256(password);
+  const isValid = timingSafeEqual(legacyHash, storedHash);
+  
+  // 検証成功時、PBKDF2に自動移行
+  if (isValid && options?.db && options?.tableName && options?.idField && options?.userId) {
+    try {
+      const newHash = await hashPassword(password);
+      await options.db.prepare(
+        `UPDATE ${options.tableName} SET password_hash = ? WHERE ${options.idField} = ?`
+      ).bind(newHash, options.userId).run();
+      console.log(`🔒 パスワードハッシュをPBKDF2に自動移行: ${options.tableName}#${options.userId}`);
+    } catch (e) {
+      console.error('パスワードハッシュ移行エラー:', e);
+      // 移行失敗しても認証自体は成功させる
+    }
+  }
+  
+  return isValid;
 }
 
 // JWTペイロード型定義
@@ -45,14 +207,16 @@ interface JWTPayload {
 
 /**
  * JWTトークン生成
+ * @param user ユーザー情報
+ * @param env 環境変数（JWT_SECRETを含む）
  */
-export async function generateToken(user: {
+export async function generateJwtToken(user: {
   user_id: number;
   user_type: 'student' | 'teacher' | 'parent' | 'admin';
   role: string;
   email: string;
   name: string;
-}): Promise<string> {
+}, env?: any): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const payload: JWTPayload = {
     ...user,
@@ -60,15 +224,19 @@ export async function generateToken(user: {
     exp: now + JWT_EXPIRES_IN
   };
   
-  return await sign(payload, JWT_SECRET);
+  const secret = getJwtSecret(env);
+  return await sign(payload, secret);
 }
 
 /**
  * JWTトークン検証
+ * @param token JWTトークン
+ * @param env 環境変数（JWT_SECRETを含む）
  */
-export async function verifyToken(token: string): Promise<JWTPayload | null> {
+export async function verifyToken(token: string, env?: any): Promise<JWTPayload | null> {
   try {
-    const payload = await verify(token, JWT_SECRET) as JWTPayload;
+    const secret = getJwtSecret(env);
+    const payload = await verify(token, secret) as JWTPayload;
     
     // 有効期限チェック
     const now = Math.floor(Date.now() / 1000);
@@ -101,7 +269,8 @@ export async function authMiddleware(c: Context, next: () => Promise<void>) {
     return c.json({ error: 'Authentication required' }, 401);
   }
   
-  const payload = await verifyToken(token);
+  // 環境変数からJWT_SECRETを取得して検証
+  const payload = await verifyToken(token, c.env);
   if (!payload) {
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
@@ -195,13 +364,13 @@ export async function registerStudent(c: Context) {
   const student_id = result.meta.last_row_id;
   
   // JWT生成
-  const token = await generateToken({
+  const token = await generateJwtToken({
     user_id: student_id as number,
     user_type: 'student',
     role: 'student',
     email,
     name: student_name
-  });
+  }, c.env);
   
   // Cookieにトークンを設定
   setCookie(c, 'auth_token', token, {
@@ -266,20 +435,29 @@ export async function login(c: Context) {
     return c.json({ error: 'Invalid email or password' }, 401);
   }
   
-  // パスワード検証
-  const isValid = await verifyPassword(password, user.password_hash as string);
+  // パスワード検証（PBKDF2 + レガシーSHA-256 自動判別・移行）
+  let tableName = '';
+  let idField = '';
+  switch (user_type) {
+    case 'student': tableName = 'students'; idField = 'student_id'; break;
+    case 'teacher': tableName = 'teachers'; idField = 'teacher_id'; break;
+    case 'parent': tableName = 'parents'; idField = 'parent_id'; break;
+  }
+  const isValid = await verifyPassword(password, user.password_hash as string, {
+    db: DB, tableName, idField, userId: user.user_id as number
+  });
   if (!isValid) {
     return c.json({ error: 'Invalid email or password' }, 401);
   }
   
-  // JWT生成
-  const token = await generateToken({
+  // JWT生成（環境変数のJWT_SECRETを使用）
+  const token = await generateJwtToken({
     user_id: user.user_id as number,
     user_type: user_type as 'student' | 'teacher' | 'parent' | 'admin',
     role: user.role as string,
     email: user.email as string,
     name: user.name as string
-  });
+  }, c.env);
   
   // Cookieにトークンを設定
   setCookie(c, 'auth_token', token, {
@@ -405,13 +583,15 @@ export async function changePassword(c: Context) {
     return c.json({ error: 'User not found' }, 404);
   }
   
-  // 現在のパスワード検証
-  const isValid = await verifyPassword(current_password, userData.password_hash as string);
+  // 現在のパスワード検証（PBKDF2 + レガシーSHA-256 自動判別・移行）
+  const isValid = await verifyPassword(current_password, userData.password_hash as string, {
+    db: DB, tableName, idField, userId: user.user_id
+  });
   if (!isValid) {
     return c.json({ error: 'Current password is incorrect' }, 401);
   }
   
-  // 新しいパスワードハッシュ化
+  // 新しいパスワードハッシュ化（PBKDF2）
   const new_password_hash = await hashPassword(new_password);
   
   // パスワード更新
