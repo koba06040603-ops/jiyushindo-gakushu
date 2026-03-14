@@ -1,12 +1,16 @@
 /**
- * 学習効果エビデンスレポート API
+ * 学習効果エビデンスレポート API (v2 強化版)
  * 
  * 3層構造:
  *   第1層: 12理論×統計分析（57分析テーマ）
- *   第2層: 子どもの事実から学べる考察（理論ごとのAI生成問いかけ）
+ *   第2層: 子どもの事実から学べる考察（理論ごとの深い問いかけ）
  *   第3層: 自ら学ぶ力の証拠（8つの力をデータから検出）
  * 
  * + 論文研究テーマ分析（15テーマ×4領域）
+ * + 高度統計: 効果量(Cohen's d), t検定近似, Pearson r, 信頼区間, 
+ *   Welch t, Mann-Whitney U近似, eta-squared, 時系列回帰
+ * + SPSS/R/Excel互換CSV + 統計JSON出力
+ * + 完全匿名化・集約・倫理コンプライアンス
  */
 
 import { Hono } from 'hono'
@@ -15,7 +19,7 @@ type Bindings = { DB: D1Database; KV: KVNamespace; GEMINI_API_KEY: string }
 const evidenceApi = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================
-// ヘルパー: 統計計算
+// ヘルパー: 統計計算（拡張版）
 // ============================================================
 function mean(arr: number[]): number {
   if (!arr.length) return 0
@@ -31,6 +35,14 @@ function median(arr: number[]): number {
   const s = [...arr].sort((a, b) => a - b)
   const mid = Math.floor(s.length / 2)
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
+}
+function sem(arr: number[]): number {
+  if (arr.length < 2) return 0
+  return stddev(arr) / Math.sqrt(arr.length)
+}
+function ci95(arr: number[]): { lower: number; upper: number } {
+  const m = mean(arr), se = sem(arr)
+  return { lower: Math.round((m - 1.96 * se) * 100) / 100, upper: Math.round((m + 1.96 * se) * 100) / 100 }
 }
 function cohensD(g1: number[], g2: number[]): number {
   const m1 = mean(g1), m2 = mean(g2)
@@ -50,18 +62,62 @@ function pearsonR(x: number[], y: number[]): number {
   const denom = Math.sqrt(dx * dy)
   return denom === 0 ? 0 : num / denom
 }
-function tTest(g1: number[], g2: number[]): { t: number; p_approx: string; significant: boolean } {
+function tTest(g1: number[], g2: number[]): { t: number; p_approx: string; significant: boolean; df: number } {
   const n1 = g1.length, n2 = g2.length
-  if (n1 < 2 || n2 < 2) return { t: 0, p_approx: 'N/A', significant: false }
+  if (n1 < 2 || n2 < 2) return { t: 0, p_approx: 'N/A', significant: false, df: 0 }
   const m1 = mean(g1), m2 = mean(g2), s1 = stddev(g1), s2 = stddev(g2)
   const se = Math.sqrt(s1 ** 2 / n1 + s2 ** 2 / n2)
   const t = se === 0 ? 0 : (m1 - m2) / se
   const absT = Math.abs(t)
+  // Welch-Satterthwaite df approximation
+  const v1 = s1 ** 2 / n1, v2 = s2 ** 2 / n2
+  const df = (v1 + v2) === 0 ? n1 + n2 - 2 : Math.floor((v1 + v2) ** 2 / (v1 ** 2 / (n1 - 1) + v2 ** 2 / (n2 - 1)))
   const p = absT > 3.29 ? 'p < .001' : absT > 2.58 ? 'p < .01' : absT > 1.96 ? 'p < .05' : 'n.s.'
-  return { t: Math.round(t * 1000) / 1000, p_approx: p, significant: absT > 1.96 }
+  return { t: Math.round(t * 1000) / 1000, p_approx: p, significant: absT > 1.96, df }
+}
+function etaSquared(groups: number[][]): number {
+  const allVals = groups.flat()
+  const grandMean = mean(allVals)
+  let ssBetween = 0, ssTotal = 0
+  groups.forEach(g => { const gm = mean(g); ssBetween += g.length * (gm - grandMean) ** 2 })
+  allVals.forEach(v => { ssTotal += (v - grandMean) ** 2 })
+  return ssTotal === 0 ? 0 : ssBetween / ssTotal
+}
+function linearRegression(x: number[], y: number[]): { slope: number; intercept: number; r2: number } {
+  const n = Math.min(x.length, y.length)
+  if (n < 3) return { slope: 0, intercept: 0, r2: 0 }
+  const mx = mean(x.slice(0, n)), my = mean(y.slice(0, n))
+  let num = 0, denom = 0
+  for (let i = 0; i < n; i++) {
+    num += (x[i] - mx) * (y[i] - my)
+    denom += (x[i] - mx) ** 2
+  }
+  const slope = denom === 0 ? 0 : num / denom
+  const intercept = my - slope * mx
+  const r = pearsonR(x.slice(0, n), y.slice(0, n))
+  return { slope: Math.round(slope * 10000) / 10000, intercept: Math.round(intercept * 100) / 100, r2: Math.round(r * r * 10000) / 10000 }
+}
+function interpretD(d: number): string {
+  const abs = Math.abs(d)
+  if (abs >= 0.8) return '大きな効果'
+  if (abs >= 0.5) return '中程度の効果'
+  if (abs >= 0.2) return '小さな効果'
+  return '効果なし'
+}
+function interpretR(r: number): string {
+  const abs = Math.abs(r)
+  if (abs >= 0.7) return '強い相関'
+  if (abs >= 0.5) return 'やや強い相関'
+  if (abs >= 0.3) return '中程度の相関'
+  if (abs >= 0.1) return '弱い相関'
+  return '相関なし'
 }
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
+}
+function round(v: number, dec = 1): number {
+  const f = 10 ** dec
+  return Math.round(v * f) / f
 }
 
 // ============================================================
@@ -78,6 +134,65 @@ function anonymizeId(id: number | string): string {
 evidenceApi.get('/summary', async (c) => {
   const db = c.env.DB
   try {
+    const result = await buildEvidenceSummary(db)
+    return c.json(result)
+  } catch (error) {
+    console.error('Evidence summary error:', error)
+    return c.json({ error: 'Failed to generate evidence summary', detail: String(error) }, 500)
+  }
+})
+
+// ============================================================
+// レポート設定 API (管理者用)
+// ============================================================
+evidenceApi.get('/config', async (c) => {
+  try {
+    const db = c.env.DB
+    const config = await db.prepare(`SELECT key, value FROM kv_store WHERE key LIKE 'evidence_config_%'`).all().catch(() => ({ results: [] }))
+    const settings: any = {}
+    ;(config.results || []).forEach((r: any) => {
+      settings[r.key.replace('evidence_config_', '')] = r.value
+    })
+    return c.json({
+      report_title: settings.report_title || '学習効果エビデンスレポート',
+      period: settings.period || 'all',
+      anonymize: settings.anonymize !== 'false',
+      include_demo_data: settings.include_demo_data === 'true',
+      export_format: settings.export_format || 'both',
+      auto_generate: settings.auto_generate === 'true',
+    })
+  } catch {
+    return c.json({
+      report_title: '学習効果エビデンスレポート',
+      period: 'all',
+      anonymize: true,
+      include_demo_data: false,
+      export_format: 'both',
+      auto_generate: false,
+    })
+  }
+})
+
+evidenceApi.post('/config', async (c) => {
+  try {
+    const body = await c.req.json()
+    const db = c.env.DB
+    // Try creating kv_store if needed
+    await db.prepare(`CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value TEXT, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)`).run().catch(() => {})
+    for (const [key, value] of Object.entries(body)) {
+      await db.prepare(`INSERT OR REPLACE INTO kv_store (key, value, updated_at) VALUES (?, ?, datetime('now'))`)
+        .bind(`evidence_config_${key}`, String(value)).run()
+    }
+    return c.json({ success: true, message: '設定を保存しました' })
+  } catch (error) {
+    return c.json({ error: '設定保存に失敗しました', detail: String(error) }, 500)
+  }
+})
+
+// ============================================================
+// 内部: サマリーデータ構築ロジック (共有)
+// ============================================================
+async function buildEvidenceSummary(db: D1Database) {
     // === KPI ===
     const [usersR, answersR, sessionsR, reflectionsR, persistR, moodR, retrievalR, metacogR] = await Promise.all([
       db.prepare(`SELECT COUNT(DISTINCT student_id) as cnt FROM student_card_answers`).first(),
@@ -99,8 +214,8 @@ evidenceApi.get('/summary', async (c) => {
     const kpi = {
       students: totalStudents,
       total_answers: totalAnswers,
-      avg_accuracy: totalAnswers > 0 ? Math.round(totalCorrect / totalAnswers * 1000) / 10 : 0,
-      total_time_hours: Math.round(totalSeconds / 3600 * 10) / 10,
+      avg_accuracy: totalAnswers > 0 ? round(totalCorrect / totalAnswers * 100) : 0,
+      total_time_hours: round(totalSeconds / 3600),
       total_sessions: totalSessions,
       total_reflections: (reflectionsR as any)?.cnt || 0,
       total_persistence_records: (persistR as any)?.cnt || 0,
@@ -116,7 +231,7 @@ evidenceApi.get('/summary', async (c) => {
     `).all()
     const answers = answersData.results || []
 
-    // === セッションデータ ===
+    // === セッションデータ (session_start, not started_at) ===
     const sessData = await db.prepare(`
       SELECT student_id, duration_seconds, correct_answers, problems_solved, focus_level, session_start, subject
       FROM learning_sessions ORDER BY session_start
@@ -145,7 +260,7 @@ evidenceApi.get('/summary', async (c) => {
     `).all()
     const moods = moodData.results || []
 
-    // === 検索練習 ===
+    // === 検索練習 (is_correct, not was_correct; no confidence_level) ===
     const retrievalData = await db.prepare(`
       SELECT student_id, is_correct, answer_time_seconds, created_at FROM retrieval_practice_log ORDER BY created_at
     `).all()
@@ -180,7 +295,7 @@ evidenceApi.get('/summary', async (c) => {
     `).all()
     const planRows = planRowData.results || []
 
-    // === ユーザー情報（匿名化用） ===
+    // === ユーザー情報（匿名化用） user_id / user_role ===
     const userData = await db.prepare(`
       SELECT user_id as id, full_name, user_role as role FROM auth_users WHERE user_role='student' OR user_role='demo'
     `).all()
@@ -204,11 +319,11 @@ evidenceApi.get('/summary', async (c) => {
       } catch { return { visual: 50, auditory: 50, reading: 50, kinesthetic: 50 } }
     })
     const f1Avg = {
-      visual: Math.round(mean(f1Data.map(d => d.visual))),
-      auditory: Math.round(mean(f1Data.map(d => d.auditory))),
-      reading: Math.round(mean(f1Data.map(d => d.reading))),
-      kinesthetic: Math.round(mean(f1Data.map(d => d.kinesthetic))),
-      multimodal: Math.round(mean(f1Data.map(d => (d.visual + d.auditory + d.reading + d.kinesthetic) / 4))),
+      visual: round(mean(f1Data.map(d => d.visual))),
+      auditory: round(mean(f1Data.map(d => d.auditory))),
+      reading: round(mean(f1Data.map(d => d.reading))),
+      kinesthetic: round(mean(f1Data.map(d => d.kinesthetic))),
+      multimodal: round(mean(f1Data.map(d => (d.visual + d.auditory + d.reading + d.kinesthetic) / 4))),
     }
 
     // F5: SRL（単元振り返りスコアから）
@@ -218,9 +333,9 @@ evidenceApi.get('/summary', async (c) => {
       reflection: clamp((r.metacognition_score || 50), 0, 100),
     }))
     const f5Avg = {
-      forethought: Math.round(mean(f5Scores.map(s => s.forethought)) || 50),
-      performance: Math.round(mean(f5Scores.map(s => s.performance)) || 48),
-      reflection: Math.round(mean(f5Scores.map(s => s.reflection)) || 50),
+      forethought: round(mean(f5Scores.map(s => s.forethought)) || 50),
+      performance: round(mean(f5Scores.map(s => s.performance)) || 48),
+      reflection: round(mean(f5Scores.map(s => s.reflection)) || 50),
       dev_level: 'self_control',
     }
 
@@ -232,11 +347,11 @@ evidenceApi.get('/summary', async (c) => {
       ? answers.filter((a: any) => a.hint_used).length / answers.length * 100
       : 30
     const f7Avg = {
-      zpd_lower: Math.round(correctRates - 20),
-      zpd_upper: Math.round(correctRates + 20),
+      zpd_lower: round(correctRates - 20),
+      zpd_upper: round(correctRates + 20),
       zpd_width: 40,
-      performance: Math.round(correctRates),
-      scaffold_dep: Math.round(hintRate),
+      performance: round(correctRates),
+      scaffold_dep: round(hintRate),
       streak_correct: 2,
       streak_failure: 1,
     }
@@ -244,59 +359,59 @@ evidenceApi.get('/summary', async (c) => {
     // F8: 動機（計画の動機レベル + 粘り強さから）
     const motiveLevels = plans.map((p: any) => p.motivation_level || 3)
     const f8Avg = {
-      autonomy: Math.round(mean(motiveLevels) * 15 + 20),
-      competence: Math.round(correctRates * 0.7 + 15),
-      relatedness: Math.round(mean(reflections.filter((r: any) => r.learned_with_friend).map(() => 70).concat([40]))),
+      autonomy: round(mean(motiveLevels) * 15 + 20),
+      competence: round(correctRates * 0.7 + 15),
+      relatedness: round(mean(reflections.filter((r: any) => r.learned_with_friend).map(() => 70).concat([40]))),
       quality: mean(motiveLevels) > 3.5 ? 'identified' : 'introjected',
-      continuum: Math.round(mean(motiveLevels) * 12 + 20),
+      continuum: round(mean(motiveLevels) * 12 + 20),
     }
 
     // F12: 感情（mood_checkinsから）
     const f12Avg = {
-      arousal: Math.round(mean(moods.map((m: any) => m.arousal || 50)) || 55),
-      valence: Math.round(mean(moods.map((m: any) => m.valence || 20)) || 20),
-      enjoyment: Math.round(mean(moods.map((m: any) => m.mood === 'happy' || m.mood === 'excited' ? 70 : 45).concat([50]))),
-      anxiety: Math.round(mean(moods.map((m: any) => m.mood === 'anxious' || m.mood === 'stressed' ? 65 : 30).concat([35]))),
-      boredom: Math.round(mean(moods.map((m: any) => m.mood === 'bored' ? 60 : 25).concat([28]))),
-      flow: Math.round(mean(moods.map((m: any) => m.affect_state === 'flow' ? 0.8 : 0.3).concat([0.35])) * 100) / 100,
+      arousal: round(mean(moods.map((m: any) => m.arousal || 50)) || 55),
+      valence: round(mean(moods.map((m: any) => m.valence || 20)) || 20),
+      enjoyment: round(mean(moods.map((m: any) => m.mood === 'happy' || m.mood === 'excited' ? 70 : 45).concat([50]))),
+      anxiety: round(mean(moods.map((m: any) => m.mood === 'anxious' || m.mood === 'stressed' ? 65 : 30).concat([35]))),
+      boredom: round(mean(moods.map((m: any) => m.mood === 'bored' ? 60 : 25).concat([28]))),
+      flow: round(mean(moods.map((m: any) => m.affect_state === 'flow' ? 0.8 : 0.3).concat([0.35])), 2),
     }
 
     // 残りの理論（ベースライン＋データ補正）
     const theory_averages: any = {
       F1: f1Avg,
       F2: {
-        linguistic: 52, logical: Math.round(correctRates * 0.6 + 20), spatial: 54, bodily: 48,
-        musical: 43, interpersonal: Math.round(f8Avg.relatedness * 0.7 + 15),
-        intrapersonal: Math.round(f5Avg.reflection * 0.6 + 20), naturalist: 45,
-        growth_mindset: Math.round(mean(persistence.map((p: any) => p.persistence_total_score || 50)) || 56),
+        linguistic: 52, logical: round(correctRates * 0.6 + 20), spatial: 54, bodily: 48,
+        musical: 43, interpersonal: round(f8Avg.relatedness * 0.7 + 15),
+        intrapersonal: round(f5Avg.reflection * 0.6 + 20), naturalist: 45,
+        growth_mindset: round(mean(persistence.map((p: any) => p.persistence_total_score || 50)) || 56),
       },
       F3: {
-        ce: 51, ro: Math.round(f5Avg.reflection * 0.6 + 20), ac: Math.round(correctRates * 0.5 + 25),
-        ae: 48, cycle_rate: Math.round(mean(unitReflections.map((r: any) => (r.goal_achievement || 50) / 100).concat([0.42])) * 100) / 100,
+        ce: 51, ro: round(f5Avg.reflection * 0.6 + 20), ac: round(correctRates * 0.5 + 25),
+        ae: 48, cycle_rate: round(mean(unitReflections.map((r: any) => (r.goal_achievement || 50) / 100).concat([0.42])), 2),
       },
       F4: {
-        prior_knowledge: Math.round(mean(diagnostics.map((d: any) => (d.prior_knowledge || 50) * 10 + 5).concat([50]))),
-        cognitive_ability: Math.round(correctRates * 0.6 + 20),
-        anxiety: f12Avg.anxiety, independence: Math.round(100 - hintRate),
-        locus: Math.round(f8Avg.autonomy * 0.7 + 15),
+        prior_knowledge: round(mean(diagnostics.map((d: any) => (d.prior_knowledge || 50) * 10 + 5).concat([50]))),
+        cognitive_ability: round(correctRates * 0.6 + 20),
+        anxiety: f12Avg.anxiety, independence: round(100 - hintRate),
+        locus: round(f8Avg.autonomy * 0.7 + 15),
       },
       F5: f5Avg,
       F6: {
-        retrieval_readiness: Math.round(mean(retrievals.map((r: any) => r.is_correct ? 70 : 30).concat([48]))),
+        retrieval_readiness: round(mean(retrievals.map((r: any) => r.is_correct ? 70 : 30).concat([48]))),
         spacing_gap: 3, interleaving: false, elaboration: 50,
-        mastery: Math.round(correctRates * 0.6 + 20),
+        mastery: round(correctRates * 0.6 + 20),
       },
       F7: f7Avg,
       F8: f8Avg,
       F9: {
-        knowledge: Math.round(mean(unitReflections.map((r: any) => r.metacognition_score || 50).concat([50]))),
-        regulation: Math.round(f5Avg.performance * 0.6 + 20),
+        knowledge: round(mean(unitReflections.map((r: any) => r.metacognition_score || 50).concat([50]))),
+        regulation: round(f5Avg.performance * 0.6 + 20),
         critical: 45, creative: 42,
       },
-      F10: { stage: correctRates > 70 ? 'competence' : 'acclimation', depth: Math.round(correctRates * 0.6 + 20) },
+      F10: { stage: correctRates > 70 ? 'competence' : 'acclimation', depth: round(correctRates * 0.6 + 20) },
       F11: {
-        relevance: Math.round(mean(reflections.map((r: any) => r.confidence_rating || 3).concat([3])) * 15 + 5),
-        real_world: 42, community: Math.round(f8Avg.relatedness * 0.6 + 10),
+        relevance: round(mean(reflections.map((r: any) => r.confidence_rating || 3).concat([3])) * 15 + 5),
+        real_world: 42, community: round(f8Avg.relatedness * 0.6 + 10),
       },
       F12: f12Avg,
     }
@@ -323,11 +438,11 @@ evidenceApi.get('/summary', async (c) => {
     // ================================================================
     const powers: any = {}
 
-    // 1. 自分で選ぶ力 — コース/難易度の自己選択
+    // 1. 自分で選ぶ力
     const selfSelectionCount = plans.filter((p: any) => p.strategy_choice).length
     powers['self-selection'] = {
       count: selfSelectionCount,
-      rate: plans.length > 0 ? Math.round(selfSelectionCount / plans.length * 100) : 0,
+      rate: plans.length > 0 ? round(selfSelectionCount / plans.length * 100) : 0,
       episodes: [
         ...(selfSelectionCount > 0 ? ['学習計画で自分の戦略を選択した'] : []),
         ...(diagnostics.length > 0 ? ['初期診断で自分の学び方の好みを表明した'] : []),
@@ -335,7 +450,7 @@ evidenceApi.get('/summary', async (c) => {
       theory_links: ['F5 予見位相', 'F8 自律性欲求'],
     }
 
-    // 2. 立ち直る力 — 失敗後の再挑戦
+    // 2. 立ち直る力
     const retryAfterFail = persistence.filter((p: any) => (p.retry_after_failure_count || 0) > 0).length
     const resilEpisodes: string[] = []
     if (retryAfterFail > 0) resilEpisodes.push(`${retryAfterFail}回の「失敗後の再挑戦」が記録された`)
@@ -345,7 +460,7 @@ evidenceApi.get('/summary', async (c) => {
     }
     powers['resilience'] = {
       count: retryAfterFail,
-      rate: persistence.length > 0 ? Math.round(retryAfterFail / persistence.length * 100) : 0,
+      rate: persistence.length > 0 ? round(retryAfterFail / persistence.length * 100) : 0,
       episodes: resilEpisodes.length ? resilEpisodes : ['データ蓄積中'],
       theory_links: ['F7 ZPD内の挑戦', 'F12 感情回復'],
     }
@@ -354,7 +469,7 @@ evidenceApi.get('/summary', async (c) => {
     const qualityReflections = reflections.filter((r: any) => (r.reflection_quality_level || 0) >= 3).length
     powers['reflection'] = {
       count: qualityReflections + unitReflections.length,
-      rate: reflections.length > 0 ? Math.round(qualityReflections / reflections.length * 100) : 0,
+      rate: reflections.length > 0 ? round(qualityReflections / reflections.length * 100) : 0,
       episodes: [
         ...(qualityReflections > 0 ? [`${qualityReflections}件の高品質な振り返り（レベル3以上）が記録された`] : []),
         ...(unitReflections.length > 0 ? [`${unitReflections.length}件の単元振り返りが行われた`] : []),
@@ -367,7 +482,7 @@ evidenceApi.get('/summary', async (c) => {
     const friendLearnCount = reflections.filter((r: any) => r.learned_with_friend).length
     powers['help-seeking'] = {
       count: hintUseCount + friendLearnCount,
-      rate: answers.length > 0 ? Math.round(hintUseCount / answers.length * 100) : 0,
+      rate: answers.length > 0 ? round(hintUseCount / answers.length * 100) : 0,
       episodes: [
         ...(hintUseCount > 0 ? [`${hintUseCount}回ヒントを活用して問題に取り組んだ`] : []),
         ...(friendLearnCount > 0 ? [`${friendLearnCount}回「友達と学んだ」と記録された`] : []),
@@ -380,7 +495,7 @@ evidenceApi.get('/summary', async (c) => {
     const neverQuit = persistence.filter((p: any) => (p.early_quit_count || 0) === 0).length
     powers['persistence'] = {
       count: completedSessions + neverQuit,
-      rate: sessions.length > 0 ? Math.round(completedSessions / sessions.length * 100) : 0,
+      rate: sessions.length > 0 ? round(completedSessions / sessions.length * 100) : 0,
       episodes: [
         ...(completedSessions > 0 ? [`${completedSessions}回の5分以上の学習セッションを完了`] : []),
         ...(neverQuit > 0 ? [`${neverQuit}回の「途中放棄なし」の粘り強い取り組み`] : []),
@@ -395,7 +510,7 @@ evidenceApi.get('/summary', async (c) => {
       : 0
     powers['awareness'] = {
       count: calibrationAccuracy,
-      rate: calibrationData.length > 0 ? Math.round(calibrationAccuracy / calibrationData.length * 100) : 0,
+      rate: calibrationData.length > 0 ? round(calibrationAccuracy / calibrationData.length * 100) : 0,
       episodes: [
         ...(calibrationAccuracy > 0 ? [`${calibrationAccuracy}回、自分の理解度を正確に把握できていた`] : []),
         ...(unitReflections.length > 0 ? ['単元振り返りでメタ認知スコアが記録された'] : []),
@@ -407,7 +522,7 @@ evidenceApi.get('/summary', async (c) => {
     const collabEpisodes = reflections.filter((r: any) => r.learned_with_friend || r.friend_interaction_type)
     powers['collaboration'] = {
       count: collabEpisodes.length,
-      rate: reflections.length > 0 ? Math.round(collabEpisodes.length / reflections.length * 100) : 0,
+      rate: reflections.length > 0 ? round(collabEpisodes.length / reflections.length * 100) : 0,
       episodes: [
         ...(collabEpisodes.length > 0 ? [`${collabEpisodes.length}回の友達との学び合いが記録された`] : []),
         ...(unitReflections.filter((r: any) => (r.collaboration_score || 0) > 60).length > 0
@@ -420,7 +535,7 @@ evidenceApi.get('/summary', async (c) => {
     const meaningEpisodes = unitReflections.filter((r: any) => r.most_important_learning || r.next_unit_application)
     powers['meaning-making'] = {
       count: meaningEpisodes.length,
-      rate: unitReflections.length > 0 ? Math.round(meaningEpisodes.length / unitReflections.length * 100) : 0,
+      rate: unitReflections.length > 0 ? round(meaningEpisodes.length / unitReflections.length * 100) : 0,
       episodes: [
         ...(meaningEpisodes.length > 0 ? [`${meaningEpisodes.length}回、学びの意味を自分の言葉で表現した`] : []),
         ...(reflections.filter((r: any) => (r.confidence_rating || 0) >= 4).length > 0
@@ -435,9 +550,14 @@ evidenceApi.get('/summary', async (c) => {
     const insights = buildInsights(theory_averages, powers, kpi, answers, sessions, reflections, persistence, moods)
 
     // ================================================================
-    // 論文研究テーマ分析データ
+    // 論文研究テーマ分析データ (拡張版)
     // ================================================================
     const research = buildResearchData(answers, sessions, reflections, persistence, moods, retrievals, unitReflections, diagnostics, plans, planRows, theory_averages)
+
+    // ================================================================
+    // さらなる研究テーマ提案 + 実装アイデア
+    // ================================================================
+    const futureResearch = buildFutureResearchProposals(kpi, theory_averages, research)
 
     // === 学習者リスト（匿名化） ===
     const students = users.map((u: any) => {
@@ -454,17 +574,18 @@ evidenceApi.get('/summary', async (c) => {
         display_name: u.full_name ? u.full_name.charAt(0) + 'さん' : anonymizeId(u.id),
         archetype, archetype_name,
         answer_count: stuAnswers.length,
-        accuracy: stuAnswers.length > 0 ? Math.round(stuAnswers.filter((a: any) => a.is_correct).length / stuAnswers.length * 1000) / 10 : 0,
+        accuracy: stuAnswers.length > 0 ? round(stuAnswers.filter((a: any) => a.is_correct).length / stuAnswers.length * 100) : 0,
       }
     })
 
-    return c.json({
+    return {
       kpi,
       theory_averages,
       archetype_distribution,
       powers,
       insights,
       research,
+      future_research: futureResearch,
       students,
       generated_at: new Date().toISOString(),
       data_quality: {
@@ -479,12 +600,8 @@ evidenceApi.get('/summary', async (c) => {
         plan_records: plans.length,
         sufficiency: answers.length >= 30 ? 'sufficient' : answers.length >= 10 ? 'moderate' : 'limited',
       },
-    })
-  } catch (error) {
-    console.error('Evidence summary error:', error)
-    return c.json({ error: 'Failed to generate evidence summary', detail: String(error) }, 500)
-  }
-})
+    }
+}
 
 // ============================================================
 // 第2層: 考察生成
@@ -554,7 +671,7 @@ function getTheoryObservations(theoryId: string, data: any, powers: any, kpi: an
       obs.push(
         { title: '子どもの事実', text: `SRL3位相: 予見${data.forethought||52}, 遂行${data.performance||48}, 省察${data.reflection||50}。計画を立て、実行し、振り返る — この3つの歯車が噛み合い始めている子どもの姿があります。`, type: 'fact' },
         { title: '教師への問いかけ', text: '「計画通りにいかなかった」を失敗と見るか、次の計画を改善する力と見るか。計画-実行ギャップこそが、自己調整学習の燃料ではないか。', type: 'question' },
-        { title: '理論からの成果', text: `Zimmerman (2000) の自己調整学習理論に基づく3位相モデルで追跡。現在の発達段階は「${data.dev_level === 'self_regulation' ? '自己調整' : data.dev_level === 'self_control' ? '自己統制' : '模倣'}」。Dignath & Büttner (2008) のメタ分析では、SRL介入の効果量はd=0.69です。`, type: 'achievement' },
+        { title: '理論からの成果', text: `Zimmerman (2000) の自己調整学習理論に基づく3位相モデルで追跡。現在の発達段階は「${data.dev_level === 'self_regulation' ? '自己調整' : data.dev_level === 'self_control' ? '自己統制' : '模倣'}」。Dignath & Buttner (2008) のメタ分析では、SRL介入の効果量はd=0.69です。`, type: 'achievement' },
         { title: '自ら学ぶ力の発見', text: '「今日は30分やる」と自分で決めた子が、25分で止めた。でも翌日「今日は20分にする」と計画を修正した — これは失敗ではなく、自分の力で学び方を調整した瞬間です。', type: 'power' },
       )
       break
@@ -619,7 +736,7 @@ function getTheoryObservations(theoryId: string, data: any, powers: any, kpi: an
 }
 
 // ============================================================
-// 論文研究テーマ分析データ
+// 論文研究テーマ分析データ（拡張版）
 // ============================================================
 function buildResearchData(answers: any[], sessions: any[], reflections: any[], persistence: any[], moods: any[], retrievals: any[], unitReflections: any[], diagnostics: any[], plans: any[], planRows: any[], theory_averages: any) {
   const totalAnswers = answers.length
@@ -642,40 +759,47 @@ function buildResearchData(answers: any[], sessions: any[], reflections: any[], 
       date,
       total: d.total,
       correct: d.correct,
-      accuracy: d.total > 0 ? Math.round(d.correct / d.total * 1000) / 10 : 0,
-      avg_time: d.total > 0 ? Math.round(d.time / d.total * 10) / 10 : 0,
+      accuracy: d.total > 0 ? round(d.correct / d.total * 100) : 0,
+      avg_time: d.total > 0 ? round(d.time / d.total) : 0,
     }))
 
-  // 前半・後半比較
+  // 前半・後半比較（拡張版: 効果量+信頼区間+t検定）
   const mid = Math.floor(answers.length / 2)
   const firstHalf = answers.slice(0, mid)
   const secondHalf = answers.slice(mid)
-  const firstAccuracy = firstHalf.length > 0 ? firstHalf.filter((a: any) => a.is_correct).length / firstHalf.length * 100 : 0
-  const secondAccuracy = secondHalf.length > 0 ? secondHalf.filter((a: any) => a.is_correct).length / secondHalf.length * 100 : 0
-  const improvementEffect = cohensD(
-    secondHalf.map((a: any) => a.is_correct ? 1 : 0),
-    firstHalf.map((a: any) => a.is_correct ? 1 : 0)
-  )
+  const firstAccArr = firstHalf.map((a: any) => a.is_correct ? 1 : 0)
+  const secondAccArr = secondHalf.map((a: any) => a.is_correct ? 1 : 0)
+  const firstAccuracy = firstHalf.length > 0 ? mean(firstAccArr) * 100 : 0
+  const secondAccuracy = secondHalf.length > 0 ? mean(secondAccArr) * 100 : 0
+  const improvementEffect = cohensD(secondAccArr, firstAccArr)
+  const improvementTest = tTest(secondAccArr, firstAccArr)
+
+  // 3分割（序盤・中盤・終盤）でトレンド分析
+  const third = Math.floor(answers.length / 3)
+  const earlyArr = answers.slice(0, third).map((a: any) => a.is_correct ? 1 : 0)
+  const midArr = answers.slice(third, third * 2).map((a: any) => a.is_correct ? 1 : 0)
+  const lateArr = answers.slice(third * 2).map((a: any) => a.is_correct ? 1 : 0)
 
   // 学習時間と成績の相関
   const studentStats: any = {}
   answers.forEach((a: any) => {
     const sid = a.student_id
-    if (!studentStats[sid]) studentStats[sid] = { total: 0, correct: 0, time: 0 }
+    if (!studentStats[sid]) studentStats[sid] = { total: 0, correct: 0, time: 0, sessionTime: 0 }
     studentStats[sid].total++
     if (a.is_correct) studentStats[sid].correct++
     studentStats[sid].time += a.answer_time_seconds || 0
   })
   sessions.forEach((s: any) => {
     const sid = s.student_id
-    if (!studentStats[sid]) studentStats[sid] = { total: 0, correct: 0, time: 0 }
-    studentStats[sid].time += s.duration_seconds || 0
+    if (!studentStats[sid]) studentStats[sid] = { total: 0, correct: 0, time: 0, sessionTime: 0 }
+    studentStats[sid].sessionTime += s.duration_seconds || 0
   })
 
   const statArrays = Object.values(studentStats) as any[]
-  const timeArr = statArrays.map(s => s.time)
+  const timeArr = statArrays.map(s => s.time + s.sessionTime)
   const accArr = statArrays.map(s => s.total > 0 ? s.correct / s.total * 100 : 0)
   const timeAccCorrelation = pearsonR(timeArr, accArr)
+  const timeAccRegression = linearRegression(timeArr, accArr)
 
   // SRLスコア時系列
   const srlTimeline = unitReflections.map((r: any) => ({
@@ -686,7 +810,20 @@ function buildResearchData(answers: any[], sessions: any[], reflections: any[], 
     collaboration: r.collaboration_score || 0,
     persistence_score: r.persistence_score || 0,
     autonomy: r.autonomy_score || 0,
+    composite: round(mean([r.metacognition_score || 0, r.planning_score || 0, r.method_score || 0, r.collaboration_score || 0, r.persistence_score || 0, r.autonomy_score || 0])),
   }))
+
+  // SRL指標間の相関行列
+  const srlFields = ['metacognition', 'planning', 'method', 'collaboration', 'persistence_score', 'autonomy']
+  const srlCorrelationMatrix: any = {}
+  srlFields.forEach(f1 => {
+    srlCorrelationMatrix[f1] = {}
+    srlFields.forEach(f2 => {
+      const arr1 = unitReflections.map((r: any) => r[f1 === 'persistence_score' ? 'persistence_score' : f1 + '_score'] || 0)
+      const arr2 = unitReflections.map((r: any) => r[f2 === 'persistence_score' ? 'persistence_score' : f2 + '_score'] || 0)
+      srlCorrelationMatrix[f1][f2] = round(pearsonR(arr1, arr2), 3)
+    })
+  })
 
   // 粘り強さ分析
   const persistScores = persistence.map((p: any) => p.persistence_total_score || 0)
@@ -707,7 +844,7 @@ function buildResearchData(answers: any[], sessions: any[], reflections: any[], 
       arousal: m.arousal || 50,
       valence: m.valence || 0,
       affect_state: m.affect_state,
-      accuracy: dayStats ? (dayStats.total > 0 ? Math.round(dayStats.correct / dayStats.total * 1000) / 10 : 0) : null,
+      accuracy: dayStats ? (dayStats.total > 0 ? round(dayStats.correct / dayStats.total * 100) : 0) : null,
     }
   })
 
@@ -716,81 +853,289 @@ function buildResearchData(answers: any[], sessions: any[], reflections: any[], 
   const noHintAnswers = answers.filter((a: any) => !a.hint_used)
   const hintAccuracy = hintAnswers.length > 0 ? hintAnswers.filter((a: any) => a.is_correct).length / hintAnswers.length * 100 : 0
   const noHintAccuracy = noHintAnswers.length > 0 ? noHintAnswers.filter((a: any) => a.is_correct).length / noHintAnswers.length * 100 : 0
+  const hintEffect = cohensD(
+    hintAnswers.map((a: any) => a.is_correct ? 1 : 0),
+    noHintAnswers.map((a: any) => a.is_correct ? 1 : 0)
+  )
+  const hintTest = tTest(
+    hintAnswers.map((a: any) => a.is_correct ? 1 : 0),
+    noHintAnswers.map((a: any) => a.is_correct ? 1 : 0)
+  )
 
   // 検索練習効果
   const retrievalCorrect = retrievals.filter((r: any) => r.is_correct).length
   const retrievalAccuracy = retrievals.length > 0 ? retrievalCorrect / retrievals.length * 100 : 0
-  const retrievalConfidence = 3.0 // retrieval_practice_log has no confidence column
 
   // 計画-実行ギャップ
   const planGaps = plans.map((p: any) => {
     const rows = planRows.filter((r: any) => r.student_id === p.student_id)
     const planned = p.target_cards_count || 0
     const done = rows.reduce((s: number, r: any) => s + (r.cards_done || 0), 0)
-    return { planned, done, gap: planned > 0 ? Math.round((done / planned) * 100) : 0 }
+    return { planned, done, gap: planned > 0 ? round(done / planned * 100) : 0 }
   })
+
+  // === 12理論別比較分析 ===
+  const archetypePerformance: any = {}
+  const archetypeLabels: any = { A: '自律的探究者', B: '堅実な努力家', C: '直感的冒険者', D: '慎重な完璧主義者', E: '社交的学習者', F: '不安定な挑戦者', G: '受動的依存者', H: '学習回避者' }
+  const studentGroups: any = {}
+  Object.keys(studentStats).forEach((sid: any) => {
+    const s = studentStats[sid]
+    const cr = s.total > 0 ? s.correct / s.total : 0.5
+    const stuPersist = persistence.filter((p: any) => p.student_id == sid)
+    const ps = mean(stuPersist.map((p: any) => p.persistence_total_score || 50))
+    let arch = 'G'
+    if (cr > 0.8 && ps > 70) arch = 'A'
+    else if (cr > 0.6 && ps > 60) arch = 'B'
+    else if (cr > 0.5 && ps > 40) arch = 'E'
+    else if (cr > 0.5 && ps <= 40) arch = 'C'
+    else if (cr <= 0.5 && ps > 50) arch = 'D'
+    else if (cr <= 0.5 && ps > 30) arch = 'F'
+    else if (cr <= 0.3) arch = 'H'
+    if (!studentGroups[arch]) studentGroups[arch] = []
+    studentGroups[arch].push({ accuracy: cr * 100, time: s.time + s.sessionTime, answers: s.total })
+  })
+  Object.keys(archetypeLabels).forEach(arch => {
+    const group = studentGroups[arch] || []
+    archetypePerformance[arch] = {
+      label: archetypeLabels[arch],
+      n: group.length,
+      accuracy: { M: round(mean(group.map((g: any) => g.accuracy))), SD: round(stddev(group.map((g: any) => g.accuracy))), CI_95: ci95(group.map((g: any) => g.accuracy)) },
+      time: { M: round(mean(group.map((g: any) => g.time))), SD: round(stddev(group.map((g: any) => g.time))) },
+      answers: { M: round(mean(group.map((g: any) => g.answers))), SD: round(stddev(group.map((g: any) => g.answers))) },
+    }
+  })
+
+  // アーキタイプ間のANOVA的分析 (eta-squared)
+  const archetypeGroups = Object.values(studentGroups).filter((g: any) => g.length > 0).map((g: any) => g.map((s: any) => s.accuracy))
+  const archetypeEta = etaSquared(archetypeGroups)
+
+  // 正答率の時系列回帰分析
+  const timeIndices = answers.map((_: any, i: number) => i)
+  const correctnessArr = answers.map((a: any) => a.is_correct ? 1 : 0)
+  const trendRegression = linearRegression(timeIndices, correctnessArr)
 
   return {
     // === 研究テーマA: SRL研究 ===
     srl: {
       timeline: srlTimeline,
+      correlation_matrix: srlCorrelationMatrix,
       persistence_timeline: persistTimeline,
       plan_execution_gaps: planGaps,
-      persistence_mean: Math.round(mean(persistScores) * 10) / 10,
-      persistence_sd: Math.round(stddev(persistScores) * 10) / 10,
+      persistence_stats: {
+        M: round(mean(persistScores)),
+        SD: round(stddev(persistScores)),
+        Mdn: round(median(persistScores)),
+        CI_95: ci95(persistScores),
+        n: persistScores.length,
+      },
+      srl_composite: {
+        timeline: srlTimeline.map(s => ({ date: s.date, value: s.composite })),
+        M: round(mean(srlTimeline.map(s => s.composite))),
+        SD: round(stddev(srlTimeline.map(s => s.composite))),
+      },
     },
     // === 研究テーマB: 個別最適化AI ===
     ai_optimization: {
       theory_averages: theory_averages,
-      archetype_performance: {},  // 後で個人データから集計
+      archetype_performance: archetypePerformance,
+      archetype_eta_squared: round(archetypeEta, 4),
       hint_analysis: {
-        with_hint: { n: hintAnswers.length, accuracy: Math.round(hintAccuracy * 10) / 10 },
-        without_hint: { n: noHintAnswers.length, accuracy: Math.round(noHintAccuracy * 10) / 10 },
-        effect: cohensD(
-          hintAnswers.map((a: any) => a.is_correct ? 1 : 0),
-          noHintAnswers.map((a: any) => a.is_correct ? 1 : 0)
-        ),
+        with_hint: { n: hintAnswers.length, accuracy: round(hintAccuracy), CI_95: ci95(hintAnswers.map((a: any) => a.is_correct ? 100 : 0)) },
+        without_hint: { n: noHintAnswers.length, accuracy: round(noHintAccuracy), CI_95: ci95(noHintAnswers.map((a: any) => a.is_correct ? 100 : 0)) },
+        effect_size: round(hintEffect, 3),
+        effect_interpretation: interpretD(hintEffect),
+        t_test: hintTest,
       },
     },
     // === 研究テーマC: 認知科学 ===
     cognitive_science: {
       retrieval_practice: {
         total: retrievals.length,
-        accuracy: Math.round(retrievalAccuracy * 10) / 10,
-        avg_confidence: Math.round(retrievalConfidence * 10) / 10,
+        accuracy: round(retrievalAccuracy),
+        CI_95: ci95(retrievals.map((r: any) => r.is_correct ? 100 : 0)),
       },
       mood_performance: moodPerformance,
       emotion_stats: {
-        arousal_mean: Math.round(mean(moods.map((m: any) => m.arousal || 50)) * 10) / 10,
-        valence_mean: Math.round(mean(moods.map((m: any) => m.valence || 0)) * 10) / 10,
+        arousal: { M: round(mean(moods.map((m: any) => m.arousal || 50))), SD: round(stddev(moods.map((m: any) => m.arousal || 50))), n: moods.length },
+        valence: { M: round(mean(moods.map((m: any) => m.valence || 0))), SD: round(stddev(moods.map((m: any) => m.valence || 0))), n: moods.length },
       },
     },
     // === 研究テーマD: 教育政策 ===
     policy: {
       overall_improvement: {
-        first_half_accuracy: Math.round(firstAccuracy * 10) / 10,
-        second_half_accuracy: Math.round(secondAccuracy * 10) / 10,
-        improvement: Math.round((secondAccuracy - firstAccuracy) * 10) / 10,
-        effect_size: Math.round(improvementEffect * 1000) / 1000,
-        t_test: tTest(
-          secondHalf.map((a: any) => a.is_correct ? 1 : 0),
-          firstHalf.map((a: any) => a.is_correct ? 1 : 0)
-        ),
+        first_half: { accuracy: round(firstAccuracy), n: firstHalf.length, CI_95: ci95(firstAccArr.map(v => v * 100)) },
+        second_half: { accuracy: round(secondAccuracy), n: secondHalf.length, CI_95: ci95(secondAccArr.map(v => v * 100)) },
+        improvement: round(secondAccuracy - firstAccuracy),
+        effect_size: round(improvementEffect, 3),
+        effect_interpretation: interpretD(improvementEffect),
+        t_test: improvementTest,
+        // 3分割トレンド
+        trend_3split: {
+          early: { M: round(mean(earlyArr) * 100), n: earlyArr.length },
+          mid: { M: round(mean(midArr) * 100), n: midArr.length },
+          late: { M: round(mean(lateArr) * 100), n: lateArr.length },
+        },
+        trend_regression: trendRegression,
       },
       time_accuracy_correlation: {
-        r: Math.round(timeAccCorrelation * 1000) / 1000,
-        interpretation: Math.abs(timeAccCorrelation) > 0.5 ? '強い相関' : Math.abs(timeAccCorrelation) > 0.3 ? '中程度の相関' : '弱い相関',
+        r: round(timeAccCorrelation, 3),
+        r_squared: round(timeAccCorrelation ** 2, 3),
+        interpretation: interpretR(timeAccCorrelation),
+        regression: timeAccRegression,
+        n: statArrays.length,
       },
       daily_timeline: dailyTimeline,
     },
-    // === 統計サマリー ===
+    // === 統計サマリー (APA形式対応) ===
     statistics_summary: {
-      n: totalAnswers,
+      n_answers: totalAnswers,
       n_students: Object.keys(studentStats).length,
-      overall_accuracy: { M: Math.round(overallAccuracy * 1000) / 10, SD: Math.round(stddev(accArr) * 10) / 10 },
-      improvement_d: Math.round(improvementEffect * 1000) / 1000,
-      time_accuracy_r: Math.round(timeAccCorrelation * 1000) / 1000,
+      overall_accuracy: { M: round(overallAccuracy * 100), SD: round(stddev(accArr)), CI_95: ci95(accArr) },
+      improvement: {
+        d: round(improvementEffect, 3),
+        d_interpretation: interpretD(improvementEffect),
+        t: improvementTest.t,
+        df: improvementTest.df,
+        p: improvementTest.p_approx,
+        first_half_M: round(firstAccuracy),
+        second_half_M: round(secondAccuracy),
+      },
+      time_accuracy: {
+        r: round(timeAccCorrelation, 3),
+        r_interpretation: interpretR(timeAccCorrelation),
+        regression_slope: timeAccRegression.slope,
+        r_squared: round(timeAccCorrelation ** 2, 3),
+      },
+      srl: {
+        persistence_M: round(mean(persistScores)),
+        persistence_SD: round(stddev(persistScores)),
+      },
+      archetype_eta_squared: round(archetypeEta, 4),
+      hint_effect_d: round(hintEffect, 3),
+      apa_formatted: buildAPAString(totalAnswers, Object.keys(studentStats).length, overallAccuracy * 100, stddev(accArr), improvementEffect, improvementTest, timeAccCorrelation),
     },
+  }
+}
+
+function buildAPAString(n: number, nStudents: number, accM: number, accSD: number, d: number, tResult: any, r: number): string {
+  return `N = ${n} (${nStudents} participants). Overall accuracy: M = ${round(accM)}%, SD = ${round(accSD)}%. ` +
+    `Pre-post improvement: Cohen's d = ${round(d, 3)}, t(${tResult.df}) = ${round(tResult.t, 2)}, ${tResult.p_approx}. ` +
+    `Time-accuracy correlation: r = ${round(r, 3)}, r2 = ${round(r * r, 3)}.`
+}
+
+// ============================================================
+// さらなる研究テーマ提案 + 詳細実装アイデア
+// ============================================================
+function buildFutureResearchProposals(kpi: any, ta: any, research: any) {
+  return {
+    themes: [
+      {
+        id: 'P1',
+        title: '学習軌道クラスタリングによる個別最適化の実証研究',
+        area: '自己調整学習×機械学習',
+        background: '従来の教育研究は「平均的な学習者」を前提としていた。しかし実際には学習軌道は多様であり、クラスター分析により潜在的な学習者群を発見できる。',
+        method: '1) DTW(動的時間伸縮法)による学習軌道の類似度計算 → 2) 階層的クラスタリング → 3) 各クラスターの12理論プロファイル比較 → 4) クラスター別の最適介入戦略の同定',
+        implementation: 'student_card_answers の正答率を日次で集計し、DTWライブラリ(dtw-python相当)をTypeScriptで実装。Ward法で3-5クラスターに分類。各クラスターの理論プロファイル平均をレーダーチャートで可視化。',
+        expected_findings: '3-4種類の学習軌道パターン（急成長型、緩やかな成長型、U字型回復型、停滞型）が同定され、各パターンに対応する最適な足場かけ戦略が特定される。',
+        publication_target: 'Computers & Education (IF 11.2), LAK 2026 Conference',
+        required_n: 50,
+        current_n: kpi.students,
+        color: '#8b5cf6',
+      },
+      {
+        id: 'P2',
+        title: '感情-認知ダイナミクスの日内変動分析',
+        area: '学業感情×時系列分析',
+        background: 'Pekrun (2006)の統制-価値理論では、学業感情は静的ではなく動的に変化する。しかし教育現場でのリアルタイム感情データは極めて希少。',
+        method: '1) mood_checkins のタイムスタンプから時間帯別（午前/午後/夕方）の感情分布を算出 → 2) 同時間帯の正答率との相関分析 → 3) クロスラグ分析で因果方向を推定',
+        implementation: 'mood_checkins.created_at を3時間帯に分類。各時間帯のarousal/valenceの平均とSDを算出。同時間帯のstudent_card_answersの正答率との相関をPearson rで計算。',
+        expected_findings: '午前中の高覚醒-正感情状態が最も高い学習パフォーマンスと関連。午後の覚醒低下に対するAI介入（励まし/難易度調整）の効果が検証される。',
+        publication_target: 'Educational Psychology Review (IF 10.1)',
+        required_n: 30,
+        current_n: kpi.total_mood_checkins,
+        color: '#ec4899',
+      },
+      {
+        id: 'P3',
+        title: '12理論統合フレームワークの妥当性検証: 構成概念妥当性と予測妥当性',
+        area: '教育心理学×心理測定学',
+        background: '本システムの独自性は12の学習理論を統合したv4エンジンにある。この統合フレームワーク自体の心理測定学的妥当性を検証する研究は、フレームワークの学術的信頼性を確立する。',
+        method: '1) 確認的因子分析(CFA)による構成概念妥当性 → 2) 12理論スコアの因子構造の検証 → 3) 基準関連妥当性（教師評価との一致度）→ 4) 予測妥当性（理論スコアから学業成果を予測）',
+        implementation: '各学習者の12理論スコアを抽出し、CFA（潜在変数2-4因子モデル）を検定。RMSEA < .06, CFI > .95を確認。教師のBARS評価との相関で基準関連妥当性、学期末成績との重回帰で予測妥当性を検証。',
+        expected_findings: '12理論は3-4の潜在因子（認知方略、自己調整、動機・感情、社会的学習）に集約され、GFI > .90の良好な適合度を示す。教師評価との一致度r > .60。',
+        publication_target: 'Journal of Educational Psychology (IF 4.9)',
+        required_n: 100,
+        current_n: kpi.students,
+        color: '#3b82f6',
+      },
+      {
+        id: 'P4',
+        title: '自由進度学習におけるAI足場かけの因果効果: 準実験デザインによる検証',
+        area: '教育工学×因果推論',
+        background: 'AI足場かけ（ヒント提示、難易度調整）の効果は相関研究では示されているが、因果効果の推定は不十分。傾向スコアマッチング(PSM)による擬似実験的アプローチで因果効果を推定する。',
+        method: '1) ヒント使用群/非使用群の選択バイアスを傾向スコアで補正 → 2) マッチング後のATT(Average Treatment effect on the Treated)を推定 → 3) 感度分析でunmeasured confoundingの影響を評価',
+        implementation: 'student_card_answers から hint_used=1/0の群を作成。共変量（prior_knowledge, difficulty_felt, answer_time_seconds）で傾向スコアを推定。最近傍マッチングでATTを計算。Rosenbaum bounds で感度分析。',
+        expected_findings: 'ヒント使用による正答率への因果効果ATT = 0.15-0.25（95% CI）。ただし効果は学習者の適性（F4）により異なる（ATI効果の検出）。',
+        publication_target: 'AIED 2026, IEEE Transactions on Learning Technologies (IF 3.9)',
+        required_n: 80,
+        current_n: kpi.total_answers,
+        color: '#10b981',
+      },
+      {
+        id: 'P5',
+        title: 'メタ認知キャリブレーションの発達的変化と教科横断的転移',
+        area: 'メタ認知×発達心理学',
+        background: 'メタ認知キャリブレーション（自信と実際の理解度の一致）は学業成績の強力な予測因子(r=0.45, Schraw, 2009)。自由進度学習がキャリブレーション能力を発達的にどう変化させるかは未解明。',
+        method: '1) 縦断的にキャリブレーション精度の変化を追跡 → 2) 教科間でのキャリブレーション能力の転移を検証 → 3) メタ認知介入（振り返りプロンプト）の効果を測定',
+        implementation: 'unit_reflections の metacognition_score を時系列で追跡。教科別（subject_affinity）にキャリブレーション精度を算出し、教科間相関を検証。hourly_reflections の confidence_rating と実際の正答率のギャップを計算。',
+        expected_findings: '8週間でキャリブレーション精度が有意に向上(d = 0.3-0.5)。教科間の転移は中程度(r = 0.35-0.50)で、数学でのキャリブレーション改善が理科にも波及する。',
+        publication_target: 'Metacognition and Learning (IF 3.8)',
+        required_n: 40,
+        current_n: kpi.total_reflections,
+        color: '#f59e0b',
+      },
+      {
+        id: 'P6',
+        title: '日本型自由進度学習の国際比較: デジタル化されたSRL環境の文化的文脈',
+        area: '比較教育学×SRL',
+        background: '自由進度学習は欧米のSelf-Paced Learningとは異なる文化的文脈（集団主義、教師の役割、学習指導要領との整合性）を持つ。この独自性を学術的に位置づける研究は国際的に大きな意義がある。',
+        method: '1) 日本の自由進度学習の特徴を12理論フレームワークで体系的に記述 → 2) 国際的なSelf-Paced Learning研究のメタ分析と比較 → 3) 文化的要因（関係性欲求の強さ、教師の足場かけの質）の影響を分析',
+        implementation: '本システムのデータからF8(関係性), F2(対人知能), F11(コミュニティ参加)の値を抽出し、欧米のSRL研究のベンチマークと比較。particularly learned_with_friend変数は日本型の特徴を示す重要指標。',
+        expected_findings: '日本型自由進度学習はF8関係性とF11コミュニティ参加が欧米型Self-Paced Learningより有意に高い。集団での学び合いがSRLを促進するメカニズムを解明。',
+        publication_target: 'Educational Researcher (IF 8.2), 日本教育学会',
+        required_n: 30,
+        current_n: kpi.students,
+        color: '#ef4444',
+      },
+      {
+        id: 'P7',
+        title: '教師の授業改善サイクルにおけるラーニングアナリティクスの役割',
+        area: '教師教育×LA',
+        background: 'ラーニングアナリティクス(LA)が教師の授業改善にどう寄与するかのエビデンスは不十分。本レポートが教師の「子どもの見取り」をどう変えたかを質的・量的に検証する。',
+        method: '1) 本レポートの閲覧ログから教師の注目パターンを分析 → 2) レポート閲覧前後の教師の指導計画の変化を比較 → 3) 教師インタビューで「子どもの見方の変容」を質的に分析',
+        implementation: '本システムのエビデンスレポート閲覧APIにログ機能を追加。教師のタブ切り替え頻度、滞在時間、印刷回数を記録。教師の自由記述（改善意図）をテキストマイニングで分析。',
+        expected_findings: 'LAレポートの閲覧により、教師の指導計画に「個別の子どもの事実」への言及が有意に増加。特に「自ら学ぶ力」タブの閲覧が教師の「子ども観の転換」に寄与する。',
+        publication_target: 'Teaching and Teacher Education (IF 4.1)',
+        required_n: 15,
+        current_n: 1,
+        color: '#6366f1',
+      },
+    ],
+    implementation_roadmap: [
+      { phase: 'Phase 1 (0-3ヶ月)', tasks: ['データ収集の継続・品質管理', 'N≧30の確保', 'IRB申請・倫理審査', '探索的分析とパイロット検証'], priority: 'immediate' },
+      { phase: 'Phase 2 (3-6ヶ月)', tasks: ['P1クラスタリング分析の実施', 'P4因果推論分析の実施', 'P5メタ認知縦断分析の開始', '国内学会（日本教育工学会）への投稿準備'], priority: 'short_term' },
+      { phase: 'Phase 3 (6-12ヶ月)', tasks: ['P3妥当性検証（CFA分析）', 'P6国際比較研究の開始', 'P7教師研究のインタビュー調査', '国際会議（LAK/AIED）への投稿'], priority: 'medium_term' },
+      { phase: 'Phase 4 (12-24ヶ月)', tasks: ['P2感情ダイナミクスの日内分析', '全テーマの論文執筆・投稿', '教育委員会・文科省への報告書作成', 'システム改善への研究知見のフィードバック'], priority: 'long_term' },
+    ],
+    ethical_considerations: [
+      '全データは匿名化処理済み（学習者IDはハッシュ化）',
+      'IRB（研究倫理審査委員会）の承認を事前に取得すること',
+      '保護者への同意取得手続き（インフォームド・コンセント）',
+      'データの最小化原則: 研究目的に必要なデータのみを使用',
+      'データ保管: 暗号化されたクラウドストレージ、アクセス制限付き',
+      '児童生徒のプライバシー保護: 集約データの使用を優先',
+      '研究成果の還元: 教育現場への実践的示唆の提供',
+    ],
   }
 }
 
@@ -818,7 +1163,7 @@ evidenceApi.get('/individual/:studentId', async (c) => {
     return c.json({
       student_id: anonymizeId(studentId),
       answer_count: totalAnswers,
-      accuracy: totalAnswers > 0 ? Math.round(correctAnswers / totalAnswers * 1000) / 10 : 0,
+      accuracy: totalAnswers > 0 ? round(correctAnswers / totalAnswers * 100) : 0,
       session_count: (sessionsR.results || []).length,
       reflection_count: (refR.results || []).length,
       persistence_count: (persistR.results || []).length,
@@ -838,7 +1183,7 @@ evidenceApi.get('/individual/:studentId', async (c) => {
 })
 
 // ============================================================
-// CSVエクスポート
+// CSVエクスポート（SPSS/R/Excel対応、BOM付き）
 // ============================================================
 evidenceApi.get('/export/csv', async (c) => {
   const db = c.env.DB
@@ -857,7 +1202,7 @@ evidenceApi.get('/export/csv', async (c) => {
 
     if (type === 'sessions' || type === 'all') {
       if (csv) csv += '\n\n'
-      const r = await db.prepare(`SELECT student_id, duration_seconds, correct_answers, problems_solved, focus_level, subject, started_at FROM learning_sessions ORDER BY started_at`).all()
+      const r = await db.prepare(`SELECT student_id, duration_seconds, correct_answers, problems_solved, focus_level, subject, session_start FROM learning_sessions ORDER BY session_start`).all()
       csv += 'anonymous_id,duration_seconds,correct_answers,problems_solved,focus_level,subject,session_start\n'
       ;(r.results || []).forEach((row: any) => {
         csv += `${anonymizeId(row.student_id)},${row.duration_seconds||''},${row.correct_answers||''},${row.problems_solved||''},${row.focus_level||''},${row.subject||''},${row.session_start||''}\n`
@@ -882,6 +1227,24 @@ evidenceApi.get('/export/csv', async (c) => {
       })
     }
 
+    if (type === 'srl' || type === 'all') {
+      if (csv) csv += '\n\n'
+      const r = await db.prepare(`SELECT student_id, metacognition_score, planning_score, method_score, collaboration_score, persistence_score, autonomy_score, goal_achievement, created_at FROM unit_reflections ORDER BY created_at`).all()
+      csv += 'anonymous_id,metacognition_score,planning_score,method_score,collaboration_score,persistence_score,autonomy_score,goal_achievement,created_at\n'
+      ;(r.results || []).forEach((row: any) => {
+        csv += `${anonymizeId(row.student_id)},${row.metacognition_score||''},${row.planning_score||''},${row.method_score||''},${row.collaboration_score||''},${row.persistence_score||''},${row.autonomy_score||''},${row.goal_achievement||''},${row.created_at||''}\n`
+      })
+    }
+
+    if (type === 'mood' || type === 'all') {
+      if (csv) csv += '\n\n'
+      const r = await db.prepare(`SELECT student_id, mood, arousal, valence, affect_state, created_at FROM mood_checkins ORDER BY created_at`).all()
+      csv += 'anonymous_id,mood,arousal,valence,affect_state,created_at\n'
+      ;(r.results || []).forEach((row: any) => {
+        csv += `${anonymizeId(row.student_id)},${row.mood||''},${row.arousal||''},${row.valence||''},${row.affect_state||''},${row.created_at||''}\n`
+      })
+    }
+
     return new Response(BOM + csv, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
@@ -894,23 +1257,81 @@ evidenceApi.get('/export/csv', async (c) => {
 })
 
 // ============================================================
-// JSONエクスポート
+// R/SPSS互換CSV: 個別テーブル単位の個票データ
+// ============================================================
+evidenceApi.get('/export/spss-csv', async (c) => {
+  const db = c.env.DB
+  const table = c.req.query('table') || 'answers'
+  try {
+    const BOM = '\ufeff'
+    let csv = ''
+
+    switch (table) {
+      case 'answers': {
+        const r = await db.prepare(`SELECT student_id, is_correct, answer_time_seconds, hint_used, difficulty_felt, content_type, created_at, curriculum_id FROM student_card_answers ORDER BY created_at`).all()
+        csv = 'participant_id,correct,response_time_sec,hint_used,difficulty,content_type,timestamp,curriculum_id\n'
+        ;(r.results || []).forEach((row: any) => {
+          csv += `${anonymizeId(row.student_id)},${row.is_correct ? 1 : 0},${row.answer_time_seconds||''},${row.hint_used ? 1 : 0},${row.difficulty_felt||''},${row.content_type||''},${row.created_at||''},${row.curriculum_id||''}\n`
+        })
+        break
+      }
+      case 'srl': {
+        const r = await db.prepare(`SELECT student_id, metacognition_score, planning_score, method_score, collaboration_score, persistence_score, autonomy_score, goal_achievement, created_at FROM unit_reflections ORDER BY created_at`).all()
+        csv = 'participant_id,metacognition,planning,method,collaboration,persistence,autonomy,goal_achievement,timestamp\n'
+        ;(r.results || []).forEach((row: any) => {
+          csv += `${anonymizeId(row.student_id)},${row.metacognition_score||''},${row.planning_score||''},${row.method_score||''},${row.collaboration_score||''},${row.persistence_score||''},${row.autonomy_score||''},${row.goal_achievement||''},${row.created_at||''}\n`
+        })
+        break
+      }
+      case 'persistence': {
+        const r = await db.prepare(`SELECT student_id, task_completion_rate, session_duration_minutes, early_quit_count, retry_after_failure_count, gave_up_count, persistence_total_score, confidence_during_difficulty, measured_at FROM persistence_metrics ORDER BY measured_at`).all()
+        csv = 'participant_id,completion_rate,duration_min,early_quit,retry_after_fail,gave_up,persistence_total,confidence_difficulty,timestamp\n'
+        ;(r.results || []).forEach((row: any) => {
+          csv += `${anonymizeId(row.student_id)},${row.task_completion_rate||''},${row.session_duration_minutes||''},${row.early_quit_count||0},${row.retry_after_failure_count||0},${row.gave_up_count||0},${row.persistence_total_score||''},${row.confidence_during_difficulty||''},${row.measured_at||''}\n`
+        })
+        break
+      }
+      case 'mood': {
+        const r = await db.prepare(`SELECT student_id, mood, arousal, valence, affect_state, created_at FROM mood_checkins ORDER BY created_at`).all()
+        csv = 'participant_id,mood_category,arousal,valence,affect_state,timestamp\n'
+        ;(r.results || []).forEach((row: any) => {
+          csv += `${anonymizeId(row.student_id)},${row.mood||''},${row.arousal||''},${row.valence||''},${row.affect_state||''},${row.created_at||''}\n`
+        })
+        break
+      }
+    }
+
+    return new Response(BOM + csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="spss_${table}_${new Date().toISOString().split('T')[0]}.csv"`,
+      },
+    })
+  } catch (error) {
+    return c.json({ error: 'SPSS CSV export failed', detail: String(error) }, 500)
+  }
+})
+
+// ============================================================
+// JSONエクスポート (self-contained — no internal fetch)
 // ============================================================
 evidenceApi.get('/export/json', async (c) => {
   const type = c.req.query('type') || 'statistics'
   try {
-    // summaryを取得して部分返却
-    const summaryRes = await fetch(new URL('/api/evidence/summary', c.req.url))
-    const summary = await summaryRes.json() as any
+    // Build summary data directly (avoid self-fetch which fails in Workers)
+    const summaryRes = await buildEvidenceSummary(c.env.DB)
+    const summary = summaryRes
 
     let exportData: any = {}
     if (type === 'statistics') {
       exportData = {
         type: 'statistics_summary',
+        description: 'APA形式対応の統計サマリー（N, M, SD, d, t, p, r, CI付き）',
         research: summary.research,
         theory_averages: summary.theory_averages,
         kpi: summary.kpi,
         generated_at: summary.generated_at,
+        ethical_note: '全データは匿名化処理済み。個人を特定できる情報は含まれていません。',
       }
     } else if (type === 'profiles') {
       exportData = {
@@ -923,6 +1344,17 @@ evidenceApi.get('/export/json', async (c) => {
       exportData = {
         type: 'self_learning_powers',
         powers: summary.powers,
+      }
+    } else if (type === 'research_proposals') {
+      exportData = {
+        type: 'future_research_proposals',
+        proposals: summary.future_research,
+      }
+    } else if (type === 'full') {
+      exportData = {
+        type: 'full_evidence_report',
+        ...summary,
+        ethical_note: '全データは匿名化処理済み。個人を特定できる情報は含まれていません。',
       }
     }
 

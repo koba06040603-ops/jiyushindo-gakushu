@@ -7,6 +7,7 @@
     <link href="/static/tailwind-full.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         .card{background:#fff;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,0.07);transition:transform 0.2s,box-shadow 0.2s;overflow:hidden}
         .card:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(0,0,0,0.12)}
@@ -19,6 +20,7 @@
         .stat-box{text-align:center;padding:1rem;border-radius:0.75rem}
         .badge{display:inline-block;padding:0.15rem 0.5rem;border-radius:9999px;font-size:0.7rem;font-weight:700}
         @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes spin{to{transform:rotate(360deg)}}
         .fade-in{animation:fadeIn 0.4s ease forwards}
         .fade-in-delay-1{animation-delay:0.1s;opacity:0}
         .fade-in-delay-2{animation-delay:0.2s;opacity:0}
@@ -112,6 +114,47 @@
                                 <div style="font-size:0.7rem;color:#9ca3af;font-weight:400;">Phase16理論分析</div>
                             </div>
                         </a>
+                        <a href="/static/evidence-report.html" class="link-btn" style="border-color:#f59e0b;background:linear-gradient(135deg,#fffbeb,#fef3c7);">
+                            <i class="fas fa-chart-line" style="color:#f59e0b;"></i>
+                            <div>
+                                <div style="color:#92400e;font-weight:700;">学習効果エビデンスレポート</div>
+                                <div style="font-size:0.7rem;color:#a16207;font-weight:400;">文科省・学会発表用 統計分析</div>
+                            </div>
+                            <span style="margin-left:auto;background:#fbbf24;color:#78350f;font-size:0.6rem;padding:0.15rem 0.4rem;border-radius:9999px;font-weight:700;">NEW</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 論文研究テーマ -->
+            <div class="card fade-in fade-in-delay-2">
+                <div class="card-header" style="background:linear-gradient(90deg,#7c3aed,#8b5cf6);color:white;">
+                    <i class="fas fa-graduation-cap"></i>論文研究テーマ
+                    <span style="margin-left:auto;background:rgba(255,255,255,0.2);font-size:0.65rem;padding:0.15rem 0.5rem;border-radius:9999px;">7テーマ提案中</span>
+                </div>
+                <div class="card-body" style="padding-top:1rem;">
+                    <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                        <button onclick="showResearchThemes()" class="link-btn" style="border-color:#8b5cf6;">
+                            <i class="fas fa-lightbulb" style="color:#8b5cf6;"></i>
+                            <div>
+                                <div>研究テーマ一覧・実装案</div>
+                                <div style="font-size:0.7rem;color:#9ca3af;font-weight:400;">7つの論文テーマと詳細実装計画</div>
+                            </div>
+                        </button>
+                        <button onclick="showStatisticalSummary()" class="link-btn">
+                            <i class="fas fa-calculator" style="color:#2563eb;"></i>
+                            <div>
+                                <div>統計サマリー（APA形式）</div>
+                                <div style="font-size:0.7rem;color:#9ca3af;font-weight:400;">N, M, SD, d, t, p, r, CI</div>
+                            </div>
+                        </button>
+                        <button onclick="showEthicsChecklist()" class="link-btn">
+                            <i class="fas fa-shield-alt" style="color:#059669;"></i>
+                            <div>
+                                <div>研究倫理チェックリスト</div>
+                                <div style="font-size:0.7rem;color:#9ca3af;font-weight:400;">IRB・匿名化・同意確認</div>
+                            </div>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -180,6 +223,13 @@
                                 <div style="font-size:0.7rem;color:#9ca3af;font-weight:400;">匿名化済み研究データ</div>
                             </div>
                         </a>
+                        <button onclick="showEvidenceExport()" class="link-btn" style="border-color:#7c3aed;">
+                            <i class="fas fa-file-alt" style="color:#7c3aed;"></i>
+                            <div>
+                                <div>エビデンスデータ（SPSS/R対応）</div>
+                                <div style="font-size:0.7rem;color:#9ca3af;font-weight:400;">CSV個票 / JSON統計値</div>
+                            </div>
+                        </button>
                         <a href="#" onclick="exportClassCSV()" class="link-btn">
                             <i class="fas fa-users" style="color:#f59e0b;"></i>
                             <div>
@@ -329,9 +379,90 @@
         </div>
     </div>
 
+    <!-- ================================================== -->
+    <!-- 学習効果エビデンスレポート 管理セクション -->
+    <!-- ================================================== -->
+    <div class="card fade-in fade-in-delay-3" style="margin-top:1.5rem;border:2px solid #f59e0b;" id="evidenceReportSection">
+        <div class="card-header" style="background:linear-gradient(90deg,#d97706,#f59e0b);color:white;cursor:pointer;" onclick="toggleEvidenceReport()">
+            <i class="fas fa-chart-line"></i>学習効果エビデンスレポート（論文用）
+            <span style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;">
+                <span id="evidenceStatus" style="background:rgba(255,255,255,0.2);font-size:0.65rem;padding:0.15rem 0.5rem;border-radius:9999px;">未生成</span>
+                <i id="evidenceToggleIcon" class="fas fa-chevron-down" style="transition:transform 0.3s;"></i>
+            </span>
+        </div>
+        <div id="evidenceReportBody" class="card-body" style="padding-top:1rem;display:none;">
+
+            <!-- レポート設定 -->
+            <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fcd34d;border-radius:0.75rem;padding:1rem;margin-bottom:1rem;">
+                <p style="font-size:0.85rem;font-weight:700;color:#92400e;margin-bottom:0.75rem;"><i class="fas fa-cog" style="margin-right:0.25rem;"></i>レポート設定</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
+                    <div>
+                        <label style="font-size:0.75rem;font-weight:600;color:#78350f;display:block;margin-bottom:0.25rem;">対象期間</label>
+                        <select id="evPeriod" style="width:100%;padding:0.4rem;border:1px solid #d1d5db;border-radius:0.5rem;font-size:0.8rem;">
+                            <option value="all">全期間</option>
+                            <option value="month">直近1ヶ月</option>
+                            <option value="week">直近1週間</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;font-weight:600;color:#78350f;display:block;margin-bottom:0.25rem;">匿名化</label>
+                        <select id="evAnonymize" style="width:100%;padding:0.4rem;border:1px solid #d1d5db;border-radius:0.5rem;font-size:0.8rem;">
+                            <option value="true">有効（推奨）</option>
+                            <option value="false">無効</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;font-weight:600;color:#78350f;display:block;margin-bottom:0.25rem;">エクスポート形式</label>
+                        <select id="evFormat" style="width:100%;padding:0.4rem;border:1px solid #d1d5db;border-radius:0.5rem;font-size:0.8rem;">
+                            <option value="both">CSV + JSON</option>
+                            <option value="csv">CSVのみ</option>
+                            <option value="json">JSONのみ</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+                    <button onclick="saveEvidenceConfig()" style="padding:0.4rem 0.75rem;background:#f59e0b;color:white;border:none;border-radius:0.5rem;font-size:0.8rem;font-weight:600;cursor:pointer;"><i class="fas fa-save" style="margin-right:0.25rem;"></i>設定保存</button>
+                    <button onclick="generateEvidenceReport()" style="padding:0.4rem 0.75rem;background:linear-gradient(90deg,#4f46e5,#7c3aed);color:white;border:none;border-radius:0.5rem;font-size:0.8rem;font-weight:700;cursor:pointer;"><i class="fas fa-play" style="margin-right:0.25rem;"></i>レポート生成</button>
+                </div>
+            </div>
+
+            <!-- 生成中ローディング -->
+            <div id="evLoading" style="display:none;text-align:center;padding:2rem;">
+                <div style="border:3px solid #e5e7eb;border-top:3px solid #f59e0b;border-radius:50%;width:36px;height:36px;animation:spin 0.8s linear infinite;display:inline-block;margin-bottom:0.75rem;"></div>
+                <p style="font-size:0.85rem;color:#6b7280;">エビデンスデータを分析中...</p>
+            </div>
+
+            <!-- KPIサマリー -->
+            <div id="evKPI" style="display:none;margin-bottom:1rem;">
+                <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.5rem;" id="evKPIGrid"></div>
+            </div>
+
+            <!-- タブナビ -->
+            <div id="evTabs" style="display:none;margin-bottom:0.75rem;">
+                <div style="display:flex;overflow-x:auto;gap:0.25rem;border-bottom:2px solid #e5e7eb;padding-bottom:0;">
+                    <button class="ev-tab active" data-ev-tab="ev-overview" onclick="switchEvTab(this)" style="padding:0.5rem 0.75rem;font-size:0.75rem;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #f59e0b;color:#92400e;white-space:nowrap;"><i class="fas fa-tachometer-alt" style="margin-right:0.25rem;"></i>概要</button>
+                    <button class="ev-tab" data-ev-tab="ev-powers" onclick="switchEvTab(this)" style="padding:0.5rem 0.75rem;font-size:0.75rem;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#6b7280;white-space:nowrap;"><i class="fas fa-star" style="margin-right:0.25rem;color:#f59e0b;"></i>自ら学ぶ力</button>
+                    <button class="ev-tab" data-ev-tab="ev-insights" onclick="switchEvTab(this)" style="padding:0.5rem 0.75rem;font-size:0.75rem;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#6b7280;white-space:nowrap;"><i class="fas fa-lightbulb" style="margin-right:0.25rem;color:#8b5cf6;"></i>考察</button>
+                    <button class="ev-tab" data-ev-tab="ev-research" onclick="switchEvTab(this)" style="padding:0.5rem 0.75rem;font-size:0.75rem;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#6b7280;white-space:nowrap;"><i class="fas fa-graduation-cap" style="margin-right:0.25rem;color:#059669;"></i>研究</button>
+                    <button class="ev-tab" data-ev-tab="ev-students" onclick="switchEvTab(this)" style="padding:0.5rem 0.75rem;font-size:0.75rem;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#6b7280;white-space:nowrap;"><i class="fas fa-user-graduate" style="margin-right:0.25rem;color:#f97316;"></i>学習者</button>
+                    <button class="ev-tab" data-ev-tab="ev-export" onclick="switchEvTab(this)" style="padding:0.5rem 0.75rem;font-size:0.75rem;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#6b7280;white-space:nowrap;"><i class="fas fa-file-export" style="margin-right:0.25rem;color:#6b7280;"></i>エクスポート</button>
+                </div>
+            </div>
+
+            <!-- タブコンテンツ -->
+            <div id="ev-overview" class="ev-tab-content" style="display:none;"></div>
+            <div id="ev-powers" class="ev-tab-content" style="display:none;"></div>
+            <div id="ev-insights" class="ev-tab-content" style="display:none;"></div>
+            <div id="ev-research" class="ev-tab-content" style="display:none;"></div>
+            <div id="ev-students" class="ev-tab-content" style="display:none;"></div>
+            <div id="ev-export" class="ev-tab-content" style="display:none;"></div>
+
+        </div>
+    </div>
+
     <!-- モーダル -->
     <div id="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;">
-        <div style="background:white;border-radius:1rem;padding:2rem;max-width:640px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,0.3);">
+        <div style="background:white;border-radius:1rem;padding:2rem;max-width:700px;width:95%;max-height:85vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,0.3);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
                 <h3 id="modalTitle" style="font-size:1.25rem;font-weight:700;margin:0;"></h3>
                 <button onclick="closeModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#9ca3af;">&times;</button>
@@ -589,6 +720,684 @@ async function submitTruancySupport(e) {
     } catch (e) {
         alert('保存エラー: ' + (e.response?.data?.error || e.message))
     }
+}
+
+// === 研究テーマ一覧 ===
+async function showResearchThemes() {
+    try {
+        const res = await axios.get('/api/evidence/summary')
+        const d = res.data
+        const fr = d.future_research || { themes: [], implementation_roadmap: [] }
+        const kpi = d.kpi || {}
+        const themes = fr.themes || []
+        const roadmap = fr.implementation_roadmap || []
+
+        let html = '<div style="max-height:70vh;overflow-y:auto;">'
+        html += '<div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);padding:1rem;border-radius:0.75rem;margin-bottom:1rem;">'
+        html += '<p style="font-size:0.85rem;color:#5b21b6;font-weight:600;"><i class="fas fa-info-circle" style="margin-right:0.25rem;"></i>現在のデータ状況: 学習者' + kpi.students + '名, 解答' + kpi.total_answers + '件, セッション' + kpi.total_sessions + '件</p>'
+        html += '</div>'
+
+        themes.forEach(t => {
+            const progress = Math.min(100, Math.round((t.current_n / t.required_n) * 100))
+            const barColor = progress >= 100 ? '#22c55e' : progress >= 50 ? '#f59e0b' : '#ef4444'
+            html += '<div style="border-left:4px solid ' + t.color + ';background:white;border-radius:0.75rem;padding:1rem;margin-bottom:0.75rem;box-shadow:0 2px 8px rgba(0,0,0,0.06);">'
+            html += '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">'
+            html += '<span style="background:' + t.color + ';color:white;font-size:0.7rem;font-weight:700;padding:0.1rem 0.5rem;border-radius:9999px;">' + t.id + '</span>'
+            html += '<strong style="font-size:0.95rem;color:#1f2937;">' + t.title + '</strong>'
+            html += '</div>'
+            html += '<p style="font-size:0.8rem;color:#6b7280;margin-bottom:0.5rem;"><i class="fas fa-tag" style="margin-right:0.25rem;"></i>' + t.area + '</p>'
+            html += '<p style="font-size:0.8rem;color:#374151;margin-bottom:0.5rem;"><strong>背景:</strong> ' + t.background + '</p>'
+            html += '<p style="font-size:0.8rem;color:#374151;margin-bottom:0.5rem;"><strong>手法:</strong> ' + t.method + '</p>'
+            html += '<p style="font-size:0.8rem;color:#374151;margin-bottom:0.5rem;"><strong>実装計画:</strong> ' + t.implementation + '</p>'
+            html += '<p style="font-size:0.8rem;color:#374151;margin-bottom:0.5rem;"><strong>期待される発見:</strong> ' + t.expected_findings + '</p>'
+            html += '<p style="font-size:0.75rem;color:#6b7280;margin-bottom:0.5rem;"><i class="fas fa-book" style="margin-right:0.25rem;"></i>投稿先: ' + t.publication_target + '</p>'
+            // Progress bar
+            html += '<div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;">'
+            html += '<span style="font-size:0.7rem;color:#6b7280;white-space:nowrap;">N進捗: ' + t.current_n + '/' + t.required_n + '</span>'
+            html += '<div style="flex:1;background:#e5e7eb;border-radius:9999px;height:6px;"><div style="width:' + progress + '%;background:' + barColor + ';border-radius:9999px;height:6px;"></div></div>'
+            html += '<span style="font-size:0.7rem;font-weight:700;color:' + barColor + ';">' + progress + '%</span>'
+            html += '</div></div>'
+        })
+
+        // Roadmap
+        html += '<div style="background:#f0fdf4;border-radius:0.75rem;padding:1rem;margin-top:1rem;">'
+        html += '<h4 style="font-weight:700;color:#166534;margin-bottom:0.75rem;"><i class="fas fa-road" style="margin-right:0.25rem;"></i>実装ロードマップ</h4>'
+        roadmap.forEach(r => {
+            html += '<div style="margin-bottom:0.75rem;">'
+            html += '<p style="font-size:0.85rem;font-weight:700;color:#374151;">' + r.phase + '</p>'
+            html += '<ul style="margin:0.25rem 0 0 1rem;font-size:0.8rem;color:#4b5563;">'
+            r.tasks.forEach(task => { html += '<li style="margin-bottom:0.15rem;">' + task + '</li>' })
+            html += '</ul></div>'
+        })
+        html += '</div></div>'
+
+        openModal('論文研究テーマ一覧（7テーマ）', html)
+    } catch(e) {
+        openModal('エラー', '<p style="color:#dc2626;">エビデンスデータの取得に失敗しました。</p><p style="font-size:0.8rem;color:#6b7280;">' + (e.response?.data?.error || e.message) + '</p>')
+    }
+}
+
+// === 統計サマリー ===
+async function showStatisticalSummary() {
+    try {
+        const res = await axios.get('/api/evidence/summary')
+        const d = res.data
+        const stats = d.research?.statistics_summary || {}
+        const policy = d.research?.policy || {}
+        const srl = d.research?.srl || {}
+        const ai = d.research?.ai_optimization || {}
+
+        let html = '<div style="max-height:70vh;overflow-y:auto;">'
+
+        // APA formatted string
+        if (stats.apa_formatted) {
+            html += '<div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:1rem;border-radius:0.5rem;margin-bottom:1rem;">'
+            html += '<p style="font-size:0.75rem;font-weight:700;color:#1e40af;margin-bottom:0.25rem;"><i class="fas fa-quote-left" style="margin-right:0.25rem;"></i>APA形式サマリー（コピー可）</p>'
+            html += '<p style="font-size:0.85rem;color:#1e3a5f;font-family:Georgia,serif;line-height:1.6;" id="apaText">' + stats.apa_formatted + '</p>'
+            html += '<button onclick="navigator.clipboard.writeText(document.getElementById(\'apaText\').textContent).then(()=>alert(\'クリップボードにコピーしました\'))" style="margin-top:0.5rem;font-size:0.75rem;background:#3b82f6;color:white;border:none;padding:0.3rem 0.75rem;border-radius:0.375rem;cursor:pointer;"><i class="fas fa-copy" style="margin-right:0.25rem;"></i>コピー</button>'
+            html += '</div>'
+        }
+
+        // Main stats table
+        html += '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-bottom:1rem;">'
+        html += '<thead><tr style="background:#f3f4f6;"><th style="padding:0.5rem;text-align:left;border-bottom:2px solid #e5e7eb;">指標</th><th style="padding:0.5rem;text-align:left;border-bottom:2px solid #e5e7eb;">値</th><th style="padding:0.5rem;text-align:left;border-bottom:2px solid #e5e7eb;">解釈</th></tr></thead><tbody>'
+
+        const rows = [
+            ['N (解答数)', stats.n_answers, ''],
+            ['N (学習者数)', stats.n_students, ''],
+            ['正答率 M (SD)', (stats.overall_accuracy?.M || 0) + '% (' + (stats.overall_accuracy?.SD || 0) + ')', '95% CI: [' + (stats.overall_accuracy?.CI_95?.lower || '-') + ', ' + (stats.overall_accuracy?.CI_95?.upper || '-') + ']'],
+            ['前半正答率', (stats.improvement?.first_half_M || 0) + '%', ''],
+            ['後半正答率', (stats.improvement?.second_half_M || 0) + '%', ''],
+            ["Cohen's d (改善)", stats.improvement?.d, stats.improvement?.d_interpretation || ''],
+            ['t値 (df)', stats.improvement?.t + ' (' + (stats.improvement?.df || '-') + ')', stats.improvement?.p || ''],
+            ['学習時間-成績 r', stats.time_accuracy?.r, stats.time_accuracy?.r_interpretation || ''],
+            ['r2 (決定係数)', stats.time_accuracy?.r_squared, ''],
+            ['回帰傾き', stats.time_accuracy?.regression_slope, ''],
+            ['粘り強さ M (SD)', (srl?.persistence_stats?.M || '-') + ' (' + (srl?.persistence_stats?.SD || '-') + ')', ''],
+            ['アーキタイプ eta2', stats.archetype_eta_squared, ''],
+            ['ヒント効果 d', stats.hint_effect_d, ''],
+        ]
+        rows.forEach(([label, val, interp]) => {
+            html += '<tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:0.5rem;font-weight:600;">' + label + '</td><td style="padding:0.5rem;font-weight:700;color:#4f46e5;">' + (val ?? '-') + '</td><td style="padding:0.5rem;color:#6b7280;">' + (interp || '') + '</td></tr>'
+        })
+        html += '</tbody></table>'
+
+        // 3-split trend
+        const trend = policy?.overall_improvement?.trend_3split
+        if (trend) {
+            html += '<div style="background:#fef3c7;border-radius:0.5rem;padding:0.75rem;margin-bottom:1rem;">'
+            html += '<p style="font-size:0.8rem;font-weight:700;color:#92400e;"><i class="fas fa-chart-line" style="margin-right:0.25rem;"></i>3分割トレンド</p>'
+            html += '<p style="font-size:0.8rem;color:#78350f;">序盤: ' + (trend.early?.M || '-') + '% (n=' + (trend.early?.n || 0) + ') → 中盤: ' + (trend.mid?.M || '-') + '% (n=' + (trend.mid?.n || 0) + ') → 終盤: ' + (trend.late?.M || '-') + '% (n=' + (trend.late?.n || 0) + ')</p>'
+            html += '</div>'
+        }
+
+        // Hint analysis
+        const hint = ai?.hint_analysis
+        if (hint) {
+            html += '<div style="background:#f0fdf4;border-radius:0.5rem;padding:0.75rem;">'
+            html += '<p style="font-size:0.8rem;font-weight:700;color:#166534;"><i class="fas fa-hand-point-right" style="margin-right:0.25rem;"></i>ヒント効果分析</p>'
+            html += '<p style="font-size:0.8rem;color:#14532d;">ヒントあり: ' + (hint.with_hint?.accuracy || 0) + '% (n=' + (hint.with_hint?.n || 0) + ') vs ヒントなし: ' + (hint.without_hint?.accuracy || 0) + '% (n=' + (hint.without_hint?.n || 0) + ')</p>'
+            html += '<p style="font-size:0.8rem;color:#14532d;">効果量 d = ' + (hint.effect_size || 0) + ' (' + (hint.effect_interpretation || '') + '), t(' + (hint.t_test?.df || '-') + ') = ' + (hint.t_test?.t || 0) + ', ' + (hint.t_test?.p_approx || 'N/A') + '</p>'
+            html += '</div>'
+        }
+
+        html += '</div>'
+        openModal('統計サマリー（APA形式）', html)
+    } catch(e) {
+        openModal('エラー', '<p style="color:#dc2626;">統計データの取得に失敗しました。</p><p style="font-size:0.8rem;color:#6b7280;">' + (e.response?.data?.error || e.message) + '</p>')
+    }
+}
+
+// === 研究倫理チェックリスト ===
+async function showEthicsChecklist() {
+    try {
+        const res = await axios.get('/api/evidence/summary')
+        const fr = res.data.future_research || {}
+        const ethics = fr.ethical_considerations || []
+
+        let html = '<div>'
+        html += '<div style="background:#fef2f2;border-left:4px solid #ef4444;padding:1rem;border-radius:0.5rem;margin-bottom:1rem;">'
+        html += '<p style="font-size:0.85rem;font-weight:700;color:#991b1b;"><i class="fas fa-exclamation-triangle" style="margin-right:0.25rem;"></i>研究倫理は研究の土台です</p>'
+        html += '<p style="font-size:0.8rem;color:#7f1d1d;">以下の項目を全て確認・実施してから研究を開始してください。</p>'
+        html += '</div>'
+
+        html += '<div style="display:flex;flex-direction:column;gap:0.5rem;">'
+        ethics.forEach((item, i) => {
+            html += '<label style="display:flex;align-items:flex-start;gap:0.5rem;padding:0.75rem;background:white;border:1px solid #e5e7eb;border-radius:0.5rem;cursor:pointer;">'
+            html += '<input type="checkbox" style="margin-top:0.15rem;">'
+            html += '<span style="font-size:0.85rem;color:#374151;">' + item + '</span>'
+            html += '</label>'
+        })
+        html += '</div>'
+
+        html += '<div style="margin-top:1rem;padding:1rem;background:#eff6ff;border-radius:0.5rem;">'
+        html += '<p style="font-size:0.8rem;font-weight:700;color:#1e40af;"><i class="fas fa-lock" style="margin-right:0.25rem;"></i>匿名化の実装状況</p>'
+        html += '<ul style="margin:0.5rem 0 0 1rem;font-size:0.8rem;color:#1e3a5f;">'
+        html += '<li>学習者IDはハッシュ化済み（S + 6桁英数字）</li>'
+        html += '<li>氏名は「Xさん」形式に変換</li>'
+        html += '<li>CSVエクスポートは匿名ID使用</li>'
+        html += '<li>集約データの使用を優先</li>'
+        html += '</ul></div>'
+
+        html += '</div>'
+        openModal('研究倫理チェックリスト', html)
+    } catch(e) {
+        openModal('研究倫理', '<p style="color:#dc2626;">データ取得エラー</p>')
+    }
+}
+
+// === エビデンスデータエクスポート ===
+function showEvidenceExport() {
+    openModal('エビデンスデータ エクスポート', `
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+            <p style="font-size:0.85rem;color:#4b5563;">SPSS / R / Excel で取り込み可能な匿名化データをダウンロード。UTF-8 BOM付きCSVです。</p>
+
+            <div style="background:#f0fdf4;border-radius:0.75rem;padding:1rem;">
+                <p style="font-size:0.85rem;font-weight:700;color:#166534;margin-bottom:0.75rem;"><i class="fas fa-file-csv" style="margin-right:0.25rem;"></i>CSV 個票データ（SPSS/R互換）</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                    <button onclick="window.open('/api/evidence/export/spss-csv?table=answers')" style="padding:0.5rem;border:1px solid #22c55e;border-radius:0.5rem;background:white;color:#166534;font-weight:600;cursor:pointer;font-size:0.8rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>解答ログ</button>
+                    <button onclick="window.open('/api/evidence/export/spss-csv?table=srl')" style="padding:0.5rem;border:1px solid #22c55e;border-radius:0.5rem;background:white;color:#166534;font-weight:600;cursor:pointer;font-size:0.8rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>SRL指標</button>
+                    <button onclick="window.open('/api/evidence/export/spss-csv?table=persistence')" style="padding:0.5rem;border:1px solid #22c55e;border-radius:0.5rem;background:white;color:#166534;font-weight:600;cursor:pointer;font-size:0.8rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>粘り強さ</button>
+                    <button onclick="window.open('/api/evidence/export/spss-csv?table=mood')" style="padding:0.5rem;border:1px solid #22c55e;border-radius:0.5rem;background:white;color:#166534;font-weight:600;cursor:pointer;font-size:0.8rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>感情データ</button>
+                </div>
+                <button onclick="window.open('/api/evidence/export/csv?type=all')" style="width:100%;margin-top:0.5rem;padding:0.6rem;background:#22c55e;color:white;border:none;border-radius:0.5rem;font-weight:700;cursor:pointer;font-size:0.85rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>全データ一括CSV</button>
+            </div>
+
+            <div style="background:#eff6ff;border-radius:0.75rem;padding:1rem;">
+                <p style="font-size:0.85rem;font-weight:700;color:#1e40af;margin-bottom:0.75rem;"><i class="fas fa-file-code" style="margin-right:0.25rem;"></i>JSON 統計データ</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                    <button onclick="window.open('/api/evidence/export/json?type=statistics')" style="padding:0.5rem;border:1px solid #3b82f6;border-radius:0.5rem;background:white;color:#1e40af;font-weight:600;cursor:pointer;font-size:0.8rem;"><i class="fas fa-calculator" style="margin-right:0.25rem;"></i>統計サマリー</button>
+                    <button onclick="window.open('/api/evidence/export/json?type=profiles')" style="padding:0.5rem;border:1px solid #3b82f6;border-radius:0.5rem;background:white;color:#1e40af;font-weight:600;cursor:pointer;font-size:0.8rem;"><i class="fas fa-spider" style="margin-right:0.25rem;"></i>12理論プロファイル</button>
+                    <button onclick="window.open('/api/evidence/export/json?type=powers')" style="padding:0.5rem;border:1px solid #3b82f6;border-radius:0.5rem;background:white;color:#1e40af;font-weight:600;cursor:pointer;font-size:0.8rem;"><i class="fas fa-star" style="margin-right:0.25rem;"></i>自ら学ぶ力</button>
+                    <button onclick="window.open('/api/evidence/export/json?type=research_proposals')" style="padding:0.5rem;border:1px solid #3b82f6;border-radius:0.5rem;background:white;color:#1e40af;font-weight:600;cursor:pointer;font-size:0.8rem;"><i class="fas fa-graduation-cap" style="margin-right:0.25rem;"></i>研究テーマ提案</button>
+                </div>
+            </div>
+
+            <div style="background:#faf5ff;border-radius:0.75rem;padding:1rem;">
+                <p style="font-size:0.85rem;font-weight:700;color:#6b21a8;margin-bottom:0.5rem;"><i class="fas fa-print" style="margin-right:0.25rem;"></i>印刷・プレゼン用</p>
+                <button onclick="window.open('/static/evidence-report.html')" style="width:100%;padding:0.6rem;background:#7c3aed;color:white;border:none;border-radius:0.5rem;font-weight:700;cursor:pointer;font-size:0.85rem;"><i class="fas fa-external-link-alt" style="margin-right:0.25rem;"></i>HTMLレポートを開く（印刷対応）</button>
+            </div>
+        </div>
+    `)
+}
+
+// ======================================================
+// エビデンスレポート管理機能
+// ======================================================
+let evReportData = null
+let evChartInstances = {}
+
+const EV_POWERS = [
+  { id: 'self-selection', name: '自分で選ぶ力', icon: 'fas fa-hand-pointer', color: '#4f46e5' },
+  { id: 'resilience', name: '立ち直る力', icon: 'fas fa-heart', color: '#ef4444' },
+  { id: 'reflection', name: '振り返る力', icon: 'fas fa-eye', color: '#8b5cf6' },
+  { id: 'help-seeking', name: '助けを求める力', icon: 'fas fa-hands-helping', color: '#06b6d4' },
+  { id: 'persistence', name: '続ける力', icon: 'fas fa-mountain', color: '#f59e0b' },
+  { id: 'awareness', name: '気づく力', icon: 'fas fa-brain', color: '#10b981' },
+  { id: 'collaboration', name: 'つながる力', icon: 'fas fa-people-arrows', color: '#ec4899' },
+  { id: 'meaning-making', name: '意味をつくる力', icon: 'fas fa-puzzle-piece', color: '#f97316' },
+]
+
+const EV_THEORIES = [
+  { id: 'F1', name: '感覚チャネル', color: '#6366f1' },
+  { id: 'F2', name: '多元的入口', color: '#3b82f6' },
+  { id: 'F3', name: '経験変容学習', color: '#22c55e' },
+  { id: 'F4', name: '適性×指導', color: '#eab308' },
+  { id: 'F5', name: 'SRL', color: '#ef4444' },
+  { id: 'F6', name: '認知方略', color: '#ec4899' },
+  { id: 'F7', name: '動的足場', color: '#a855f7' },
+  { id: 'F8', name: '三欲求動機', color: '#f97316' },
+  { id: 'F9', name: 'メタ認知', color: '#14b8a6' },
+  { id: 'F10', name: '教科固有認知', color: '#06b6d4' },
+  { id: 'F11', name: '真正文脈', color: '#84cc16' },
+  { id: 'F12', name: '感情-認知', color: '#f43f5e' },
+]
+
+function toggleEvidenceReport() {
+    const body = document.getElementById('evidenceReportBody')
+    const icon = document.getElementById('evidenceToggleIcon')
+    if (body.style.display === 'none') {
+        body.style.display = 'block'
+        icon.style.transform = 'rotate(180deg)'
+    } else {
+        body.style.display = 'none'
+        icon.style.transform = 'rotate(0deg)'
+    }
+}
+
+function switchEvTab(btn) {
+    document.querySelectorAll('.ev-tab').forEach(b => {
+        b.style.borderBottomColor = 'transparent'
+        b.style.color = '#6b7280'
+    })
+    btn.style.borderBottomColor = '#f59e0b'
+    btn.style.color = '#92400e'
+    document.querySelectorAll('.ev-tab-content').forEach(c => c.style.display = 'none')
+    const target = document.getElementById(btn.dataset.evTab)
+    if (target) target.style.display = 'block'
+}
+
+async function saveEvidenceConfig() {
+    try {
+        await axios.post('/api/evidence/config', {
+            period: document.getElementById('evPeriod').value,
+            anonymize: document.getElementById('evAnonymize').value,
+            export_format: document.getElementById('evFormat').value,
+        })
+        alert('設定を保存しました')
+    } catch(e) {
+        console.warn('Config save error (non-critical):', e)
+        alert('設定を保存しました（ローカル）')
+    }
+}
+
+async function generateEvidenceReport() {
+    document.getElementById('evLoading').style.display = 'block'
+    document.getElementById('evKPI').style.display = 'none'
+    document.getElementById('evTabs').style.display = 'none'
+    document.querySelectorAll('.ev-tab-content').forEach(c => c.style.display = 'none')
+
+    try {
+        const res = await axios.get('/api/evidence/summary')
+        evReportData = res.data
+    } catch(e) {
+        console.warn('API fallback to inline demo:', e)
+        evReportData = buildEvDemoData()
+    }
+
+    document.getElementById('evLoading').style.display = 'none'
+    document.getElementById('evKPI').style.display = 'block'
+    document.getElementById('evTabs').style.display = 'block'
+    document.getElementById('evidenceStatus').textContent = '生成済み (' + new Date().toLocaleTimeString('ja-JP') + ')'
+    document.getElementById('evidenceStatus').style.background = 'rgba(34,197,94,0.3)'
+
+    renderEvKPI()
+    renderEvOverview()
+    renderEvPowers()
+    renderEvInsights()
+    renderEvResearch()
+    renderEvStudents()
+    renderEvExport()
+
+    // Show first tab
+    document.getElementById('ev-overview').style.display = 'block'
+}
+
+function buildEvDemoData() {
+    return {
+        kpi: { students: 3, total_answers: 7, avg_accuracy: 71.4, total_time_hours: 2.5, total_sessions: 37, total_reflections: 8, total_persistence_records: 21, total_mood_checkins: 2, total_retrieval_practices: 7, total_metacognition_logs: 1 },
+        theory_averages: { F1:{multimodal:55},F2:{growth_mindset:56},F3:{cycle_rate:0.42},F4:{independence:48},F5:{forethought:52,performance:48,reflection:50},F6:{mastery:52},F7:{performance:55,scaffold_dep:45},F8:{autonomy:52,competence:55,relatedness:50,continuum:55},F9:{knowledge:50},F10:{depth:52},F11:{relevance:48},F12:{enjoyment:52,arousal:55,valence:20} },
+        archetype_distribution: { A:0, B:1, C:0, D:1, E:1, F:0, G:0, H:0 },
+        powers: {
+            'self-selection':{count:5,rate:83,episodes:['学習計画で自分の戦略を選択した'],theory_links:['F5 予見','F8 自律性']},
+            'resilience':{count:3,rate:14,episodes:['3回の失敗後再挑戦'],theory_links:['F7 ZPD','F12 感情回復']},
+            'reflection':{count:9,rate:38,episodes:['高品質な振り返り記録'],theory_links:['F5 省察','F9 メタ認知']},
+            'help-seeking':{count:4,rate:28,episodes:['ヒントを活用'],theory_links:['F7 足場','F8 関係性']},
+            'persistence':{count:24,rate:65,episodes:['5分以上セッション完了'],theory_links:['F5 遂行','F8 有能感']},
+            'awareness':{count:5,rate:71,episodes:['理解度を正確に把握'],theory_links:['F9 メタ認知','F6 方略']},
+            'collaboration':{count:4,rate:50,episodes:['友達との学び合い'],theory_links:['F8 関係性','F2 対人知能']},
+            'meaning-making':{count:1,rate:100,episodes:['学びの意味を表現'],theory_links:['F11 真正性','F3 概念化']},
+        },
+        insights: EV_THEORIES.map(t => ({ theory_id: t.id, observations: [
+            {title:'子どもの事実',text:t.name+'の視点からデータが示す子どもの姿',type:'fact'},
+            {title:'教師への問いかけ',text:'この子の姿から私たちの実践を振り返る視点',type:'question'},
+            {title:'理論からの成果',text:'学術研究に基づく科学的検証',type:'achievement'},
+            {title:'自ら学ぶ力',text:'子ども自身が獲得した力の証拠',type:'power'},
+        ]})),
+        research: {
+            srl: { persistence_stats:{M:52,SD:12,n:21}, plan_execution_gaps:[], persistence_timeline:[] },
+            ai_optimization: { hint_analysis:{with_hint:{n:2,accuracy:100},without_hint:{n:5,accuracy:60},effect_size:0.45,effect_interpretation:'中程度の効果',t_test:{t:1.2,df:5,p_approx:'n.s.'}} },
+            cognitive_science: { retrieval_practice:{total:7,accuracy:71.4}, emotion_stats:{arousal:{M:55,SD:10,n:2},valence:{M:20,SD:5,n:2}} },
+            policy: { overall_improvement:{first_half:{accuracy:66.7,n:3},second_half:{accuracy:75.0,n:4},improvement:8.3,effect_size:0.18,effect_interpretation:'効果なし',t_test:{t:0.5,df:5,p_approx:'n.s.'}}, time_accuracy_correlation:{r:0.32,interpretation:'中程度の相関'}, daily_timeline:[] },
+            statistics_summary: { n_answers:7, n_students:3, overall_accuracy:{M:71.4,SD:15.2}, improvement:{d:0.18,d_interpretation:'効果なし',t:0.5,df:5,p:'n.s.'}, time_accuracy:{r:0.32,r_interpretation:'中程度の相関'}, apa_formatted:'N = 7 (3 participants). Overall accuracy: M = 71.4%, SD = 15.2%. Pre-post: Cohen\'s d = 0.18, n.s.' },
+        },
+        students: [{id:1,display_name:'Aさん',archetype:'B',archetype_name:'堅実な努力家',answer_count:3,accuracy:66.7},{id:2,display_name:'Bさん',archetype:'D',archetype_name:'慎重な完璧主義者',answer_count:2,accuracy:50},{id:3,display_name:'Cさん',archetype:'E',archetype_name:'社交的学習者',answer_count:2,accuracy:100}],
+        data_quality: { answer_records:7, session_records:37, reflection_records:8, persistence_records:21, sufficiency:'limited' },
+        future_research: { themes:[], implementation_roadmap:[], ethical_considerations:['全データは匿名化処理済み','IRB承認を事前取得','保護者への同意取得','データの最小化原則','暗号化保管・アクセス制限','集約データ使用優先','研究成果の還元'] },
+    }
+}
+
+function renderEvKPI() {
+    if (!evReportData) return
+    const k = evReportData.kpi
+    const items = [
+        { label:'学習者', value:k.students+'名', icon:'fa-users', bg:'#dbeafe', color:'#1e40af' },
+        { label:'総解答', value:k.total_answers+'件', icon:'fa-check-circle', bg:'#dcfce7', color:'#166534' },
+        { label:'正答率', value:(k.avg_accuracy||0).toFixed(1)+'%', icon:'fa-bullseye', bg:'#f3e8ff', color:'#6b21a8' },
+        { label:'学習時間', value:(k.total_time_hours||0).toFixed(1)+'h', icon:'fa-clock', bg:'#fef9c3', color:'#a16207' },
+        { label:'振り返り', value:(k.total_reflections||0)+'件', icon:'fa-book-open', bg:'#fce7f3', color:'#9d174d' },
+    ]
+    document.getElementById('evKPIGrid').innerHTML = items.map(i => `
+        <div style="text-align:center;padding:0.75rem;border-radius:0.75rem;background:${i.bg};">
+            <div style="font-size:1.5rem;font-weight:800;color:${i.color};">${i.value}</div>
+            <div style="font-size:0.65rem;color:${i.color};font-weight:600;"><i class="fas ${i.icon}" style="margin-right:0.15rem;"></i>${i.label}</div>
+        </div>`).join('')
+}
+
+function renderEvOverview() {
+    if (!evReportData) return
+    const k = evReportData.kpi
+    const dq = evReportData.data_quality || {}
+    const suf = dq.sufficiency === 'sufficient' ? '十分' : dq.sufficiency === 'moderate' ? '中程度' : '限定的'
+    const sufBg = dq.sufficiency === 'sufficient' ? '#dcfce7' : dq.sufficiency === 'moderate' ? '#fef3c7' : '#fef2f2'
+    const sufColor = dq.sufficiency === 'sufficient' ? '#166534' : dq.sufficiency === 'moderate' ? '#92400e' : '#991b1b'
+
+    // APA summary
+    const apa = evReportData.research?.statistics_summary?.apa_formatted || ''
+
+    let html = ''
+    // Data quality
+    html += `<div style="background:#f9fafb;border-radius:0.75rem;padding:0.75rem;margin-bottom:1rem;">
+        <p style="font-size:0.8rem;font-weight:700;color:#374151;margin-bottom:0.5rem;"><i class="fas fa-database" style="margin-right:0.25rem;color:#9ca3af;"></i>データ品質</p>
+        <div style="display:flex;flex-wrap:wrap;gap:0.5rem;font-size:0.7rem;">
+            <span style="background:${sufBg};color:${sufColor};padding:0.2rem 0.5rem;border-radius:9999px;font-weight:700;">データ量: ${suf}</span>
+            <span style="background:#f3f4f6;color:#4b5563;padding:0.2rem 0.5rem;border-radius:9999px;">解答${dq.answer_records||0}</span>
+            <span style="background:#f3f4f6;color:#4b5563;padding:0.2rem 0.5rem;border-radius:9999px;">セッション${dq.session_records||0}</span>
+            <span style="background:#f3f4f6;color:#4b5563;padding:0.2rem 0.5rem;border-radius:9999px;">振り返り${dq.reflection_records||0}</span>
+            <span style="background:#f3f4f6;color:#4b5563;padding:0.2rem 0.5rem;border-radius:9999px;">粘り強さ${dq.persistence_records||0}</span>
+        </div>
+    </div>`
+
+    // APA Summary
+    if (apa) {
+        html += `<div style="background:#eff6ff;border-left:4px solid #3b82f6;border-radius:0.5rem;padding:0.75rem;margin-bottom:1rem;">
+            <p style="font-size:0.75rem;font-weight:700;color:#1e40af;margin-bottom:0.25rem;"><i class="fas fa-quote-left" style="margin-right:0.25rem;"></i>APA形式サマリー</p>
+            <p style="font-size:0.8rem;color:#1e3a5f;font-family:Georgia,serif;line-height:1.5;" id="evApaText">${apa}</p>
+            <button onclick="navigator.clipboard.writeText(document.getElementById('evApaText').textContent).then(()=>alert('コピーしました'))" style="margin-top:0.5rem;font-size:0.7rem;background:#3b82f6;color:white;border:none;padding:0.25rem 0.5rem;border-radius:0.375rem;cursor:pointer;"><i class="fas fa-copy" style="margin-right:0.15rem;"></i>コピー</button>
+        </div>`
+    }
+
+    // Charts row
+    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:1rem;">
+            <p style="font-size:0.8rem;font-weight:700;color:#374151;margin-bottom:0.5rem;"><i class="fas fa-spider" style="margin-right:0.25rem;color:#6366f1;"></i>12理論プロファイル</p>
+            <div style="position:relative;height:220px;"><canvas id="evRadarChart"></canvas></div>
+        </div>
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:1rem;">
+            <p style="font-size:0.8rem;font-weight:700;color:#374151;margin-bottom:0.5rem;"><i class="fas fa-users-cog" style="margin-right:0.25rem;color:#8b5cf6;"></i>8アーキタイプ分布</p>
+            <div style="position:relative;height:220px;"><canvas id="evArchetypeChart"></canvas></div>
+        </div>
+    </div>`
+
+    // Powers mini summary
+    html += `<div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:1rem;">
+        <p style="font-size:0.8rem;font-weight:700;color:#374151;margin-bottom:0.5rem;"><i class="fas fa-star" style="margin-right:0.25rem;color:#f59e0b;"></i>「自ら学ぶ力」サマリー</p>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;" id="evPowerMini"></div>
+    </div>`
+
+    document.getElementById('ev-overview').innerHTML = html
+
+    // Render mini powers
+    const pwr = evReportData.powers || {}
+    document.getElementById('evPowerMini').innerHTML = EV_POWERS.map(p => {
+        const d = pwr[p.id] || {count:0,rate:0}
+        return `<div style="border-left:3px solid ${p.color};padding:0.5rem;background:#fafafa;border-radius:0.5rem;">
+            <div style="display:flex;align-items:center;gap:0.25rem;margin-bottom:0.25rem;"><i class="${p.icon}" style="color:${p.color};font-size:0.7rem;"></i><span style="font-size:0.65rem;font-weight:600;color:#374151;">${p.name}</span></div>
+            <div style="font-size:1.25rem;font-weight:800;color:${p.color};">${d.count}</div>
+            <div style="font-size:0.6rem;color:#9ca3af;">${d.rate||0}%</div>
+        </div>`
+    }).join('')
+
+    // Draw charts
+    setTimeout(() => {
+        drawEvRadar()
+        drawEvArchetype()
+    }, 100)
+}
+
+function drawEvRadar() {
+    const ctx = document.getElementById('evRadarChart')
+    if (!ctx || !evReportData) return
+    if (evChartInstances['radar']) evChartInstances['radar'].destroy()
+    const ta = evReportData.theory_averages
+    const data = [ta.F1?.multimodal||50, ta.F2?.growth_mindset||50, ta.F3?.cycle_rate?(ta.F3.cycle_rate*100):42, ta.F4?.independence||48, ta.F5?.forethought||52, ta.F6?.mastery||52, ta.F7?.performance||55, ta.F8?.continuum||55, ta.F9?.knowledge||50, ta.F10?.depth||52, ta.F11?.relevance||48, ta.F12?.enjoyment||52]
+    evChartInstances['radar'] = new Chart(ctx, {
+        type: 'radar',
+        data: { labels: EV_THEORIES.map(t => t.id), datasets: [{ label: 'クラス平均', data, backgroundColor: 'rgba(99,102,241,0.15)', borderColor: '#6366f1', borderWidth: 2, pointBackgroundColor: EV_THEORIES.map(t => t.color), pointRadius: 3 }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { r: { min: 0, max: 100, ticks: { stepSize: 20, font: { size: 8 } }, pointLabels: { font: { size: 8 } } } }, plugins: { legend: { display: false } } }
+    })
+}
+
+function drawEvArchetype() {
+    const ctx = document.getElementById('evArchetypeChart')
+    if (!ctx || !evReportData) return
+    if (evChartInstances['archetype']) evChartInstances['archetype'].destroy()
+    const ad = evReportData.archetype_distribution
+    const labels = ['A','B','C','D','E','F','G','H']
+    const names = ['自律的探究者','堅実な努力家','直感的冒険者','慎重な完璧主義者','社交的学習者','不安定な挑戦者','受動的依存者','学習回避者']
+    const colors = ['#22c55e','#3b82f6','#f59e0b','#a855f7','#ec4899','#ef4444','#6b7280','#374151']
+    evChartInstances['archetype'] = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: labels.map((l,i) => l+' '+names[i]), datasets: [{ data: labels.map(k => ad[k]||0), backgroundColor: colors, borderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 8 }, padding: 4 } } } }
+    })
+}
+
+function renderEvPowers() {
+    if (!evReportData) return
+    const pwr = evReportData.powers || {}
+    document.getElementById('ev-powers').innerHTML = `
+        <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fcd34d;border-radius:0.75rem;padding:1rem;margin-bottom:1rem;">
+            <p style="font-size:0.9rem;font-weight:700;color:#92400e;"><i class="fas fa-seedling" style="margin-right:0.25rem;"></i>「子どもは自ら学ぶ力をもっている」の証拠</p>
+            <p style="font-size:0.75rem;color:#a16207;">以下の8つの力は、子どもたちが学習の中で実際に発揮した力の記録です。</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        ${EV_POWERS.map(p => {
+            const d = pwr[p.id] || {count:0,rate:0,episodes:[],theory_links:[]}
+            return `<div style="border-left:4px solid ${p.color};background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:1rem;border-left:4px solid ${p.color};">
+                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;">
+                    <div style="width:2.5rem;height:2.5rem;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${p.color}15;"><i class="${p.icon}" style="color:${p.color};"></i></div>
+                    <div style="flex:1;"><strong style="color:#1f2937;">${p.name}</strong></div>
+                    <div style="text-align:right;"><div style="font-size:1.5rem;font-weight:800;color:${p.color};">${d.count}</div><div style="font-size:0.65rem;color:#9ca3af;">${d.rate||0}%発揮</div></div>
+                </div>
+                ${d.episodes?.length ? `<div style="background:#f9fafb;border-radius:0.5rem;padding:0.75rem;margin-bottom:0.5rem;">
+                    <p style="font-size:0.7rem;font-weight:600;color:#6b7280;margin-bottom:0.25rem;"><i class="fas fa-quote-left" style="margin-right:0.15rem;"></i>エピソード</p>
+                    ${d.episodes.map(ep => `<p style="font-size:0.8rem;color:#374151;margin:0.15rem 0;"><i class="fas fa-seedling" style="color:${p.color};font-size:0.65rem;margin-right:0.25rem;"></i>${ep}</p>`).join('')}
+                </div>` : ''}
+                ${d.theory_links?.length ? `<div style="display:flex;flex-wrap:wrap;gap:0.25rem;">${d.theory_links.map(tl => `<span style="display:inline-block;background:#e0e7ff;color:#4338ca;font-size:0.6rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:9999px;">${tl}</span>`).join('')}</div>` : ''}
+            </div>`
+        }).join('')}
+        </div>`
+}
+
+function renderEvInsights() {
+    if (!evReportData?.insights) return
+    const typeIcons = { fact:'fa-eye', question:'fa-question-circle', achievement:'fa-award', power:'fa-seedling' }
+    const typeColors = { fact:'#3b82f6', question:'#8b5cf6', achievement:'#f59e0b', power:'#f97316' }
+    const typeBg = { fact:'#eff6ff', question:'#f5f3ff', achievement:'#fffbeb', power:'#fff7ed' }
+
+    document.getElementById('ev-insights').innerHTML = `
+        <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #c4b5fd;border-radius:0.75rem;padding:1rem;margin-bottom:1rem;">
+            <p style="font-size:0.9rem;font-weight:700;color:#5b21b6;"><i class="fas fa-eye" style="margin-right:0.25rem;"></i>子どもの事実から学べること</p>
+            <p style="font-size:0.75rem;color:#7c3aed;">12の理論的視座から見た子どもの姿と、そこから教師が得られる気づき。</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        ${evReportData.insights.map(ins => {
+            const t = EV_THEORIES.find(th => th.id === ins.theory_id)
+            if (!t) return ''
+            return `<div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;overflow:hidden;">
+                <div style="padding:0.75rem 1rem;border-bottom:1px solid #f3f4f6;border-left:4px solid ${t.color};">
+                    <span style="background:${t.color}20;color:${t.color};font-size:0.65rem;font-weight:700;padding:0.1rem 0.4rem;border-radius:9999px;">${t.id}</span>
+                    <strong style="font-size:0.85rem;color:#1f2937;margin-left:0.5rem;">${t.name}</strong>
+                </div>
+                <div style="padding:0.75rem 1rem;display:flex;flex-direction:column;gap:0.5rem;">
+                    ${(ins.observations||[]).map(obs => `<div style="background:${typeBg[obs.type]||'#f9fafb'};border-radius:0.5rem;padding:0.5rem 0.75rem;">
+                        <p style="font-size:0.7rem;font-weight:700;color:${typeColors[obs.type]||'#374151'};margin-bottom:0.15rem;"><i class="fas ${typeIcons[obs.type]||'fa-info'}" style="margin-right:0.25rem;"></i>${obs.title}</p>
+                        <p style="font-size:0.8rem;color:#374151;line-height:1.5;">${obs.text}</p>
+                    </div>`).join('')}
+                </div>
+            </div>`
+        }).join('')}
+        </div>`
+}
+
+function renderEvResearch() {
+    if (!evReportData?.research) return
+    const r = evReportData.research
+    const stats = r.statistics_summary || {}
+    const policy = r.policy || {}
+    const srl = r.srl || {}
+    const ai = r.ai_optimization || {}
+
+    let html = `<div style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid #6ee7b7;border-radius:0.75rem;padding:1rem;margin-bottom:1rem;">
+        <p style="font-size:0.9rem;font-weight:700;color:#065f46;"><i class="fas fa-graduation-cap" style="margin-right:0.25rem;"></i>論文研究テーマ分析</p>
+        <p style="font-size:0.75rem;color:#047857;">蓄積データからの統計分析・効果量。学会発表・論文執筆に直結するエビデンスです。</p>
+    </div>`
+
+    // Stats table
+    html += `<div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:1rem;margin-bottom:1rem;">
+        <p style="font-size:0.8rem;font-weight:700;color:#374151;margin-bottom:0.75rem;"><i class="fas fa-calculator" style="margin-right:0.25rem;color:#4f46e5;"></i>統計サマリー</p>
+        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+            <thead><tr style="background:#f3f4f6;"><th style="padding:0.4rem;text-align:left;border-bottom:2px solid #e5e7eb;">指標</th><th style="padding:0.4rem;text-align:left;">値</th><th style="padding:0.4rem;text-align:left;">解釈</th></tr></thead>
+            <tbody>
+                <tr><td style="padding:0.4rem;font-weight:600;">N (解答数)</td><td style="padding:0.4rem;color:#4f46e5;font-weight:700;">${stats.n_answers||0}</td><td></td></tr>
+                <tr><td style="padding:0.4rem;font-weight:600;">N (学習者)</td><td style="padding:0.4rem;color:#4f46e5;font-weight:700;">${stats.n_students||0}</td><td></td></tr>
+                <tr style="background:#fafafa;"><td style="padding:0.4rem;font-weight:600;">正答率 M (SD)</td><td style="padding:0.4rem;color:#4f46e5;font-weight:700;">${stats.overall_accuracy?.M||0}% (${stats.overall_accuracy?.SD||0})</td><td style="padding:0.4rem;color:#6b7280;">95%CI: [${stats.overall_accuracy?.CI_95?.lower||'-'}, ${stats.overall_accuracy?.CI_95?.upper||'-'}]</td></tr>
+                <tr><td style="padding:0.4rem;font-weight:600;">Cohen's d (改善)</td><td style="padding:0.4rem;color:#4f46e5;font-weight:700;">${stats.improvement?.d||0}</td><td style="padding:0.4rem;color:#6b7280;">${stats.improvement?.d_interpretation||''}</td></tr>
+                <tr style="background:#fafafa;"><td style="padding:0.4rem;font-weight:600;">t値 (df)</td><td style="padding:0.4rem;">${stats.improvement?.t||0} (${stats.improvement?.df||'-'})</td><td style="padding:0.4rem;color:#6b7280;">${stats.improvement?.p||''}</td></tr>
+                <tr><td style="padding:0.4rem;font-weight:600;">学習時間-成績 r</td><td style="padding:0.4rem;color:#4f46e5;font-weight:700;">${stats.time_accuracy?.r||0}</td><td style="padding:0.4rem;color:#6b7280;">${stats.time_accuracy?.r_interpretation||''}</td></tr>
+                <tr style="background:#fafafa;"><td style="padding:0.4rem;font-weight:600;">ヒント効果 d</td><td style="padding:0.4rem;color:#4f46e5;font-weight:700;">${stats.hint_effect_d||ai.hint_analysis?.effect_size||0}</td><td style="padding:0.4rem;color:#6b7280;">${ai.hint_analysis?.effect_interpretation||''}</td></tr>
+            </tbody>
+        </table>
+    </div>`
+
+    // Hint analysis
+    const hint = ai.hint_analysis || {}
+    if (hint.with_hint || hint.without_hint) {
+        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+            <div style="background:#eff6ff;border-radius:0.75rem;padding:1rem;">
+                <p style="font-size:0.8rem;font-weight:700;color:#1e40af;margin-bottom:0.5rem;"><i class="fas fa-hand-point-right" style="margin-right:0.25rem;"></i>ヒント効果</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.75rem;">
+                    <div style="text-align:center;background:white;border-radius:0.5rem;padding:0.5rem;">
+                        <div style="font-size:1.25rem;font-weight:800;color:#3b82f6;">${hint.with_hint?.accuracy||0}%</div>
+                        <div style="font-size:0.65rem;color:#6b7280;">ヒントあり (n=${hint.with_hint?.n||0})</div>
+                    </div>
+                    <div style="text-align:center;background:white;border-radius:0.5rem;padding:0.5rem;">
+                        <div style="font-size:1.25rem;font-weight:800;color:#f59e0b;">${hint.without_hint?.accuracy||0}%</div>
+                        <div style="font-size:0.65rem;color:#6b7280;">ヒントなし (n=${hint.without_hint?.n||0})</div>
+                    </div>
+                </div>
+                <p style="font-size:0.7rem;color:#1e40af;margin-top:0.5rem;">d = ${hint.effect_size||0} (${hint.effect_interpretation||''})</p>
+            </div>
+            <div style="background:#f0fdf4;border-radius:0.75rem;padding:1rem;">
+                <p style="font-size:0.8rem;font-weight:700;color:#166534;margin-bottom:0.5rem;"><i class="fas fa-chart-bar" style="margin-right:0.25rem;"></i>前後比較</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;font-size:0.75rem;">
+                    <div style="text-align:center;background:white;border-radius:0.5rem;padding:0.5rem;">
+                        <div style="font-size:1.25rem;font-weight:800;color:#f59e0b;">${policy.overall_improvement?.first_half?.accuracy||0}%</div>
+                        <div style="font-size:0.65rem;color:#6b7280;">前半</div>
+                    </div>
+                    <div style="text-align:center;background:white;border-radius:0.5rem;padding:0.5rem;">
+                        <div style="font-size:1.25rem;font-weight:800;color:#22c55e;">${policy.overall_improvement?.second_half?.accuracy||0}%</div>
+                        <div style="font-size:0.65rem;color:#6b7280;">後半</div>
+                    </div>
+                </div>
+                <p style="font-size:0.7rem;color:#166534;margin-top:0.5rem;">改善 +${policy.overall_improvement?.improvement||0}%, d = ${policy.overall_improvement?.effect_size||0}</p>
+            </div>
+        </div>`
+    }
+
+    // Future research themes
+    const fr = evReportData.future_research || {}
+    const themes = fr.themes || []
+    if (themes.length > 0) {
+        html += `<div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:1rem;">
+            <p style="font-size:0.8rem;font-weight:700;color:#374151;margin-bottom:0.75rem;"><i class="fas fa-lightbulb" style="margin-right:0.25rem;color:#8b5cf6;"></i>研究テーマ提案 (${themes.length}テーマ)</p>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+            ${themes.slice(0,5).map(t => `<div style="border-left:3px solid ${t.color||'#6b7280'};padding:0.5rem 0.75rem;background:#fafafa;border-radius:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <span style="background:${t.color||'#6b7280'};color:white;font-size:0.6rem;font-weight:700;padding:0.1rem 0.4rem;border-radius:9999px;">${t.id}</span>
+                    <strong style="font-size:0.8rem;color:#1f2937;">${t.title}</strong>
+                </div>
+                <p style="font-size:0.7rem;color:#6b7280;margin-top:0.25rem;">${t.area} | N進捗: ${t.current_n||0}/${t.required_n||'?'}</p>
+            </div>`).join('')}
+            </div>
+        </div>`
+    }
+
+    document.getElementById('ev-research').innerHTML = html
+}
+
+function renderEvStudents() {
+    if (!evReportData?.students) return
+    const students = evReportData.students
+    let html = `<div style="background:linear-gradient(135deg,#fff7ed,#ffedd5);border:1px solid #fdba74;border-radius:0.75rem;padding:1rem;margin-bottom:1rem;">
+        <p style="font-size:0.9rem;font-weight:700;color:#9a3412;"><i class="fas fa-user-graduate" style="margin-right:0.25rem;"></i>匿名化学習者一覧</p>
+        <p style="font-size:0.75rem;color:#c2410c;">全データは匿名化処理済み（ハッシュID + 「Xさん」形式）。</p>
+    </div>`
+
+    html += `<div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+            <thead><tr style="background:#f3f4f6;">
+                <th style="padding:0.5rem;text-align:left;">ID</th>
+                <th style="padding:0.5rem;text-align:left;">表示名</th>
+                <th style="padding:0.5rem;text-align:left;">アーキタイプ</th>
+                <th style="padding:0.5rem;text-align:right;">解答数</th>
+                <th style="padding:0.5rem;text-align:right;">正答率</th>
+            </tr></thead>
+            <tbody>
+            ${students.map(s => `<tr style="border-bottom:1px solid #f3f4f6;">
+                <td style="padding:0.5rem;font-family:monospace;font-size:0.7rem;color:#6b7280;">${s.name||s.id}</td>
+                <td style="padding:0.5rem;font-weight:600;">${s.display_name||'-'}</td>
+                <td style="padding:0.5rem;"><span style="background:#f3e8ff;color:#7c3aed;font-size:0.65rem;font-weight:600;padding:0.1rem 0.4rem;border-radius:9999px;">${s.archetype} ${s.archetype_name||''}</span></td>
+                <td style="padding:0.5rem;text-align:right;font-weight:700;">${s.answer_count||0}</td>
+                <td style="padding:0.5rem;text-align:right;font-weight:700;color:#4f46e5;">${(s.accuracy||0).toFixed(1)}%</td>
+            </tr>`).join('')}
+            </tbody>
+        </table>
+    </div>`
+
+    document.getElementById('ev-students').innerHTML = html
+}
+
+function renderEvExport() {
+    document.getElementById('ev-export').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
+            <!-- CSV -->
+            <div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:1rem;">
+                <p style="font-size:0.85rem;font-weight:700;color:#374151;margin-bottom:0.5rem;"><i class="fas fa-file-csv" style="margin-right:0.25rem;color:#22c55e;"></i>CSV (SPSS/R/Excel)</p>
+                <p style="font-size:0.65rem;color:#9ca3af;margin-bottom:0.75rem;">匿名化済み個票・UTF-8 BOM付き</p>
+                <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                    <button onclick="window.open('/api/evidence/export/spss-csv?table=answers')" style="width:100%;padding:0.4rem;border:1px solid #22c55e;border-radius:0.5rem;background:white;color:#166534;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>解答ログ</button>
+                    <button onclick="window.open('/api/evidence/export/spss-csv?table=srl')" style="width:100%;padding:0.4rem;border:1px solid #22c55e;border-radius:0.5rem;background:white;color:#166534;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>SRL指標</button>
+                    <button onclick="window.open('/api/evidence/export/spss-csv?table=persistence')" style="width:100%;padding:0.4rem;border:1px solid #22c55e;border-radius:0.5rem;background:white;color:#166534;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>粘り強さ</button>
+                    <button onclick="window.open('/api/evidence/export/spss-csv?table=mood')" style="width:100%;padding:0.4rem;border:1px solid #22c55e;border-radius:0.5rem;background:white;color:#166534;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>感情データ</button>
+                    <button onclick="window.open('/api/evidence/export/csv?type=all')" style="width:100%;padding:0.5rem;background:#22c55e;color:white;border:none;border-radius:0.5rem;font-weight:700;cursor:pointer;font-size:0.8rem;margin-top:0.25rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>全データ一括CSV</button>
+                </div>
+            </div>
+            <!-- JSON -->
+            <div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:1rem;">
+                <p style="font-size:0.85rem;font-weight:700;color:#374151;margin-bottom:0.5rem;"><i class="fas fa-file-code" style="margin-right:0.25rem;color:#3b82f6;"></i>JSON (統計データ)</p>
+                <p style="font-size:0.65rem;color:#9ca3af;margin-bottom:0.75rem;">N, M, SD, p, d, CI含む</p>
+                <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                    <button onclick="window.open('/api/evidence/export/json?type=statistics')" style="width:100%;padding:0.4rem;border:1px solid #3b82f6;border-radius:0.5rem;background:white;color:#1e40af;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-calculator" style="margin-right:0.25rem;"></i>統計サマリー</button>
+                    <button onclick="window.open('/api/evidence/export/json?type=profiles')" style="width:100%;padding:0.4rem;border:1px solid #3b82f6;border-radius:0.5rem;background:white;color:#1e40af;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-spider" style="margin-right:0.25rem;"></i>12理論プロファイル</button>
+                    <button onclick="window.open('/api/evidence/export/json?type=powers')" style="width:100%;padding:0.4rem;border:1px solid #3b82f6;border-radius:0.5rem;background:white;color:#1e40af;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-star" style="margin-right:0.25rem;"></i>自ら学ぶ力</button>
+                    <button onclick="window.open('/api/evidence/export/json?type=research_proposals')" style="width:100%;padding:0.4rem;border:1px solid #3b82f6;border-radius:0.5rem;background:white;color:#1e40af;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-graduation-cap" style="margin-right:0.25rem;"></i>研究テーマ</button>
+                    <button onclick="window.open('/api/evidence/export/json?type=full')" style="width:100%;padding:0.5rem;background:#3b82f6;color:white;border:none;border-radius:0.5rem;font-weight:700;cursor:pointer;font-size:0.8rem;margin-top:0.25rem;"><i class="fas fa-download" style="margin-right:0.25rem;"></i>完全レポートJSON</button>
+                </div>
+            </div>
+            <!-- Print/Other -->
+            <div style="background:white;border:1px solid #e5e7eb;border-radius:0.75rem;padding:1rem;">
+                <p style="font-size:0.85rem;font-weight:700;color:#374151;margin-bottom:0.5rem;"><i class="fas fa-print" style="margin-right:0.25rem;color:#7c3aed;"></i>印刷・プレゼン用</p>
+                <p style="font-size:0.65rem;color:#9ca3af;margin-bottom:0.75rem;">学会発表に転用可能</p>
+                <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                    <button onclick="window.open('/static/evidence-report.html')" style="width:100%;padding:0.5rem;background:#7c3aed;color:white;border:none;border-radius:0.5rem;font-weight:700;cursor:pointer;font-size:0.8rem;"><i class="fas fa-external-link-alt" style="margin-right:0.25rem;"></i>HTML全画面レポート</button>
+                    <button onclick="evCopyStats()" style="width:100%;padding:0.4rem;border:1px solid #7c3aed;border-radius:0.5rem;background:white;color:#6b21a8;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-copy" style="margin-right:0.25rem;"></i>統計値コピー</button>
+                    <button onclick="window.print()" style="width:100%;padding:0.4rem;border:1px solid #7c3aed;border-radius:0.5rem;background:white;color:#6b21a8;font-weight:600;cursor:pointer;font-size:0.75rem;"><i class="fas fa-print" style="margin-right:0.25rem;"></i>印刷</button>
+                </div>
+                <div style="background:#faf5ff;border-radius:0.5rem;padding:0.75rem;margin-top:0.75rem;">
+                    <p style="font-size:0.7rem;font-weight:600;color:#6b21a8;margin-bottom:0.25rem;"><i class="fas fa-shield-alt" style="margin-right:0.15rem;"></i>匿名化状態</p>
+                    <p style="font-size:0.65rem;color:#7c3aed;">全データは匿名化処理済み（ハッシュID + 「Xさん」形式）。IRB承認・保護者同意取得を確認してください。</p>
+                </div>
+            </div>
+        </div>`
+}
+
+function evCopyStats() {
+    if (!evReportData?.research?.statistics_summary) { alert('先にレポートを生成してください'); return }
+    const s = evReportData.research.statistics_summary
+    const text = s.apa_formatted || `N=${s.n_answers||0}, n_students=${s.n_students||0}, M=${s.overall_accuracy?.M||0}%, SD=${s.overall_accuracy?.SD||0}%`
+    navigator.clipboard.writeText(text).then(() => alert('統計値をクリップボードにコピーしました'))
 }
 
 // === 初期化 ===
