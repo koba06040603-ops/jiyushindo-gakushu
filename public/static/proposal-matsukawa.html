@@ -1591,7 +1591,11 @@
 <script>
 // ===== State =====
 let isEditMode = false;
-const STORAGE_KEY = 'proposal-matsukawa-edits-v2';
+// バージョン: HTMLソースを更新したら必ずインクリメントすること
+// v3: 専門用語を教育委員会向けにわかりやすく言い換え (2026-03-15)
+const STORAGE_VERSION = 3;
+const STORAGE_KEY = 'proposal-matsukawa-edits-v3';
+const STORAGE_HASH_KEY = 'proposal-matsukawa-source-hash';
 let originalHTML = {};
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1623,6 +1627,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- Prepare editable sections ---
     prepareSections();
+
+    // --- 古いバージョンのストレージデータを削除 ---
+    cleanupOldStorage();
 
     // --- Notify if saved edits exist ---
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -1823,6 +1830,22 @@ function toggleAllSections(expand) {
         } else {
             card.classList.add('collapsed');
             if (toggle) toggle.className = 'fas fa-chevron-down';
+        }
+    });
+}
+
+// ===== 古いバージョンのストレージをクリーンアップ =====
+function cleanupOldStorage() {
+    // 古いキーのリスト（バージョンアップ時にここに追加）
+    const oldKeys = [
+        'proposal-matsukawa-edits',
+        'proposal-matsukawa-edits-v1',
+        'proposal-matsukawa-edits-v2'
+    ];
+    oldKeys.forEach(key => {
+        if (localStorage.getItem(key)) {
+            localStorage.removeItem(key);
+            console.log('旧バージョンの保存データを削除しました:', key);
         }
     });
 }
