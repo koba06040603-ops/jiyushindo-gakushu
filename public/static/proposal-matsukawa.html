@@ -1590,19 +1590,8 @@
 <script>
 // ===== State =====
 let isEditMode = false;
-const STORAGE_VERSION = '2026-03-15-v2'; // Change this whenever source HTML changes
-const STORAGE_KEY = 'proposal-matsukawa-edits';
-const VERSION_KEY = 'proposal-matsukawa-version';
+const STORAGE_KEY = 'proposal-matsukawa-edits-v2';
 let originalHTML = {};
-
-// Clear outdated saved edits on version mismatch
-(function() {
-    const savedVersion = localStorage.getItem(VERSION_KEY);
-    if (savedVersion !== STORAGE_VERSION) {
-        localStorage.removeItem(STORAGE_KEY);
-        localStorage.setItem(VERSION_KEY, STORAGE_VERSION);
-    }
-})();
 
 document.addEventListener('DOMContentLoaded', function() {
     // --- Navigation highlight ---
@@ -1634,13 +1623,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Prepare editable sections ---
     prepareSections();
 
-    // --- Restore saved edits if any ---
+    // --- Notify if saved edits exist ---
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
         try {
             const edits = JSON.parse(saved);
             if (Object.keys(edits).length > 0) {
-                showToast('保存された編集内容があります。「編集する」を押して確認できます。', 4000);
+                showToast('保存済みの編集が反映されています', 3000);
             }
         } catch(e) {}
     }
@@ -1783,23 +1772,19 @@ function saveEdits() {
     const edits = {};
     document.querySelectorAll('[data-edit-id]').forEach(el => {
         const id = el.getAttribute('data-edit-id');
-        const currentHTML = el.innerHTML;
-        // Only save if changed from original
-        if (originalHTML[id] && currentHTML !== originalHTML[id]) {
-            edits[id] = currentHTML;
-        }
+        // Save current content for all sections unconditionally
+        edits[id] = el.innerHTML;
     });
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(edits));
 
-    const count = Object.keys(edits).length;
     const status = document.getElementById('editStatus');
     status.innerHTML = '<span class="status-dot saved"></span> 保存済み';
     setTimeout(() => {
         if (isEditMode) status.innerHTML = '<span class="status-dot editing"></span> 編集中';
     }, 2000);
 
-    showToast(count > 0 ? `${count}セクションの変更を保存しました` : '変更はありません', 2500);
+    showToast('すべてのセクションを保存しました', 2500);
 }
 
 // ===== Restore from Storage =====
@@ -1821,20 +1806,9 @@ function restoreFromStorage() {
 
 // ===== Reset Edits =====
 function resetEdits() {
-    if (!confirm('すべての編集内容を元に戻します。よろしいですか？\n（ブラウザに保存された編集データも削除されます）')) return;
+    if (!confirm('すべての編集内容をソースコードの初期状態に戻します。よろしいですか？\n（ブラウザに保存された編集データも削除されます）')) return;
 
     localStorage.removeItem(STORAGE_KEY);
-
-    // Restore original content
-    document.querySelectorAll('[data-edit-id]').forEach(el => {
-        const id = el.getAttribute('data-edit-id');
-        if (originalHTML[id]) {
-            el.innerHTML = originalHTML[id];
-        }
-    });
-
-    // Re-prepare sections (re-add toggle/hint/wrapper)
-    // Simple approach: reload the page
     location.reload();
 }
 
