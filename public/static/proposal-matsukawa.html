@@ -67,7 +67,7 @@
 
         /* ===== Cover Page ===== */
         .cover-page {
-            min-height: 100vh;
+            min-height: 60vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -77,6 +77,7 @@
             text-align: center;
             position: relative;
             overflow: hidden;
+            padding: 3rem 1rem;
         }
         .cover-page::before {
             content: '';
@@ -518,42 +519,46 @@
 <!-- ============================================================ -->
 <section class="cover-page" id="cover">
     <div class="cover-content px-6">
-        <div class="mb-6 opacity-80">
+        <div class="mb-4 opacity-80">
             <span class="text-sm tracking-widest uppercase">Proposal Document</span>
         </div>
-        <h1 class="serif text-4xl md:text-5xl font-bold mb-4 leading-tight">
+        <h1 class="serif text-3xl md:text-4xl font-bold mb-3 leading-tight">
             自由進度学習支援システム<br>
             <span class="text-blue-300">TOCO-TON</span> 試行運用提案書
         </h1>
-        <div class="w-24 h-1 bg-blue-400 mx-auto my-6 rounded"></div>
-        <p class="text-xl text-blue-200 mb-2">
-            松川村教育委員会 御中
+        <div class="w-20 h-1 bg-blue-400 mx-auto my-4 rounded"></div>
+        <p class="text-lg text-blue-200 mb-1">
+            松川村教育委員会・校長・教頭 各位
         </p>
-        <p class="text-lg text-blue-300 mb-8">
+        <p class="text-base text-blue-300 mb-6">
             ウェルビーイング実践校 松川小・中学校
         </p>
 
-        <div class="grid grid-cols-2 gap-8 max-w-lg mx-auto text-left mt-12 text-sm">
-            <div>
-                <p class="text-blue-400 text-xs mb-1">提出日</p>
-                <p class="text-white font-medium">令和8年（2026年）3月14日</p>
+        <div class="max-w-lg mx-auto mt-6 text-sm">
+            <div class="flex justify-between items-start">
+                <div class="text-left">
+                    <p class="text-blue-400 text-xs mb-1">提出日</p>
+                    <p class="text-white font-medium">令和8年（2026年）3月14日</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-blue-400 text-xs mb-1">提出者</p>
+                    <p class="text-white font-medium">小林 寿英</p>
+                    <p class="text-blue-300 text-xs">TOCO-TON 指導主事</p>
+                </div>
             </div>
-            <div>
-                <p class="text-blue-400 text-xs mb-1">提出者</p>
-                <p class="text-white font-medium">小林 寿英</p>
-                <p class="text-blue-300 text-xs">TOCO-TON 指導主事</p>
-            </div>
-            <div>
-                <p class="text-blue-400 text-xs mb-1">対象校</p>
-                <p class="text-white font-medium">松川小・中学校</p>
-            </div>
-            <div>
-                <p class="text-blue-400 text-xs mb-1">文書番号</p>
-                <p class="text-white font-medium">TOCO-TON-2026-001</p>
+            <div class="flex justify-between items-start mt-4">
+                <div class="text-left">
+                    <p class="text-blue-400 text-xs mb-1">対象校</p>
+                    <p class="text-white font-medium">松川小・中学校</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-blue-400 text-xs mb-1">文書番号</p>
+                    <p class="text-white font-medium">TOCO-TON-2026-001</p>
+                </div>
             </div>
         </div>
 
-        <div class="mt-16 text-blue-400 text-xs opacity-70">
+        <div class="mt-8 text-blue-400 text-xs opacity-70">
             本提案書は機密文書です。教育委員会関係者以外への配布はご遠慮ください。
         </div>
     </div>
