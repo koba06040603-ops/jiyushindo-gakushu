@@ -1590,8 +1590,19 @@
 <script>
 // ===== State =====
 let isEditMode = false;
+const STORAGE_VERSION = '2026-03-15-v2'; // Change this whenever source HTML changes
 const STORAGE_KEY = 'proposal-matsukawa-edits';
+const VERSION_KEY = 'proposal-matsukawa-version';
 let originalHTML = {};
+
+// Clear outdated saved edits on version mismatch
+(function() {
+    const savedVersion = localStorage.getItem(VERSION_KEY);
+    if (savedVersion !== STORAGE_VERSION) {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(VERSION_KEY, STORAGE_VERSION);
+    }
+})();
 
 document.addEventListener('DOMContentLoaded', function() {
     // --- Navigation highlight ---
