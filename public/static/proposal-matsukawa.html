@@ -810,6 +810,7 @@
     <h3 class="text-lg font-semibold mt-6 mb-3">2.2 「自ら学ぶ力」の8つの力</h3>
     <p class="text-sm text-gray-700 mb-4">
         本システムは、児童生徒の「自ら学ぶ力」を8つの観点で可視化・育成します。
+        これらの力がどの程度育っているかは、次項（2.3）の振り返り記述の質的5段階評価で測定します。
     </p>
     <table class="data-table avoid-break">
         <thead>
@@ -872,7 +873,185 @@
         </tbody>
     </table>
 
-    <h3 class="text-lg font-semibold mt-8 mb-3">2.3 期待される学習効果</h3>
+    <!-- ===== 2.3 振り返り記述の質的5段階評価（SOLO Taxonomy × メタ認知 × 自己調整学習） ===== -->
+    <h3 class="text-lg font-semibold mt-8 mb-3">2.3 振り返り記述の質的5段階評価フレーム</h3>
+    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 text-sm rounded-r avoid-break">
+        <p class="font-semibold text-blue-800 mb-1"><i class="fas fa-microscope mr-1"></i> 理論的基盤</p>
+        <p class="text-blue-900">
+            ビッグス（Biggs）の <strong>SOLO Taxonomy</strong>（学習成果の構造的観察分類法）、
+            フラベルの<strong>メタ認知理論</strong>（F9）、
+            ジマーマンの<strong>自己調整学習3段階モデル</strong>（F5）を統合し、
+            児童生徒の「振り返り記述」の質を5段階で可視化するオリジナル評価フレームです。<br>
+            前田康裕教授（熊本大学）の振り返り研究、英国教育基金（EEF）のメタ認知ガイダンス、
+            ハッティ（Hattie）の効果量研究を参照しています。
+        </p>
+    </div>
+
+    <!-- L1-L5 定義テーブル -->
+    <p class="text-sm font-semibold text-gray-800 mb-2">■ L1〜L5 振り返りレベル定義</p>
+    <table class="data-table text-xs avoid-break">
+        <thead>
+            <tr>
+                <th style="width:6%">Lv</th>
+                <th style="width:14%">レベル名</th>
+                <th style="width:26%">定義</th>
+                <th style="width:26%">判定キーワード例</th>
+                <th style="width:28%">対応するTOCO-TONの力</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="bg-gray-50">
+                <td class="font-bold text-gray-500 text-center">L1</td>
+                <td class="font-medium">感想レベル<br><span class="text-gray-400">📝</span></td>
+                <td>活動の記述のみ。「やった」「楽しかった」等の表面的な感想にとどまる。<br>
+                    <span class="text-gray-400 text-xxs">SOLO: 前構造的 / 効果量≈0</span></td>
+                <td>「〇〇をやった」「楽しかった」「むずかしかった」「ふつうだった」</td>
+                <td>（成長の起点段階）</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-blue-500 text-center">L2</td>
+                <td class="font-medium">事実記述レベル<br><span class="text-blue-400">📋 学びの自覚</span></td>
+                <td>具体的な学習内容を記述できる。何を学んだか事実として記録。<br>
+                    <span class="text-gray-400 text-xxs">SOLO: 単一構造的 / 効果量≈0.15</span></td>
+                <td>「〇〇がわかった」「△△を覚えた」「□□は難しかった」</td>
+                <td><span class="text-blue-600 font-semibold">学びの自覚</span></td>
+            </tr>
+            <tr class="bg-gray-50">
+                <td class="font-bold text-green-500 text-center">L3</td>
+                <td class="font-medium">関連づけレベル<br><span class="text-green-400">🔗 意味づけ力・協働力</span></td>
+                <td>複数の事実を関連づけ、因果関係や他者の視点を含む。友だちとの学びへの言及。<br>
+                    <span class="text-gray-400 text-xxs">SOLO: 多構造的 / 効果量≈0.40</span></td>
+                <td>「〇〇だから△△になる」「友だちの説明で気づいた」「前に習った〜と似ている」</td>
+                <td><span class="text-green-600 font-semibold">意味づけ力・協働力</span></td>
+            </tr>
+            <tr>
+                <td class="font-bold text-purple-500 text-center">L4</td>
+                <td class="font-medium">メタ認知レベル<br><span class="text-purple-400">🧠 自己選択力・振り返り力・援助要請力</span></td>
+                <td>自分の学び方を客観的に分析し、方略の有効性を評価できる。「なぜその方法がうまくいったか」を省察。<br>
+                    <span class="text-gray-400 text-xxs">SOLO: 関連構造的 / 効果量≈0.69</span></td>
+                <td>「図を描いたらわかりやすかった」「友だちに聞いたことで〇〇に気づけた」「このやり方は自分に合っている」</td>
+                <td><span class="text-purple-600 font-semibold">自己選択力・振り返り力・援助要請力</span></td>
+            </tr>
+            <tr class="bg-yellow-50">
+                <td class="font-bold text-amber-600 text-center">L5</td>
+                <td class="font-medium">転移・価値化レベル<br><span class="text-amber-500">🌟 意味づけ力・粘り強さ・回復力</span></td>
+                <td>学びを他教科・生活・将来と接続し、自己成長を認識。学びの価値を自分の言葉で語れる。<br>
+                    <span class="text-gray-400 text-xxs">SOLO: 拡張抽象的 / 効果量≈0.75+</span></td>
+                <td>「この考え方は社会科でも使える」「将来〇〇に役立つ」「前の自分と比べて成長した」「失敗したけどやり直せた」</td>
+                <td><span class="text-amber-600 font-semibold">意味づけ力・粘り強さ・回復力</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- 7観点採点ルーブリック -->
+    <p class="text-sm font-semibold text-gray-800 mt-6 mb-2">■ AI自動判定: 7つの観点 × 0〜3点（合計0〜21点）</p>
+    <table class="data-table text-xs avoid-break">
+        <thead>
+            <tr>
+                <th style="width:4%">No</th>
+                <th style="width:14%">観点</th>
+                <th style="width:16%">0点</th>
+                <th style="width:18%">1点</th>
+                <th style="width:22%">2点</th>
+                <th style="width:26%">3点</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="font-bold text-center">1</td>
+                <td class="font-medium">記述の具体性</td>
+                <td class="text-gray-400">白紙・1語</td>
+                <td>抽象的な感想</td>
+                <td>具体的事実あり</td>
+                <td>エピソード＋数値等</td>
+            </tr>
+            <tr class="bg-gray-50">
+                <td class="font-bold text-center">2</td>
+                <td class="font-medium">因果関係・論理構造</td>
+                <td class="text-gray-400">なし</td>
+                <td>弱い接続語</td>
+                <td>「なぜなら」等の明確な論理</td>
+                <td>複数の因果を構造的に記述</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-center">3</td>
+                <td class="font-medium">他者への言及</td>
+                <td class="text-gray-400">なし</td>
+                <td>名前のみ</td>
+                <td>他者の行動・発言の引用</td>
+                <td>相互作用から得た気づき</td>
+            </tr>
+            <tr class="bg-gray-50">
+                <td class="font-bold text-center">4</td>
+                <td class="font-medium">自己の学び方への言及</td>
+                <td class="text-gray-400">なし</td>
+                <td>「難しかった」程度</td>
+                <td>学習方略の具体的記述</td>
+                <td>方略の有効性を客観分析</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-center">5</td>
+                <td class="font-medium">次の行動への言及</td>
+                <td class="text-gray-400">なし</td>
+                <td>漠然とした意欲</td>
+                <td>具体的な行動計画</td>
+                <td>根拠＋計画＋振り返り接続</td>
+            </tr>
+            <tr class="bg-gray-50">
+                <td class="font-bold text-center">6</td>
+                <td class="font-medium">教科横断・過去学習</td>
+                <td class="text-gray-400">なし</td>
+                <td>曖昧な関連</td>
+                <td>他教科・過去学習と明確に関連</td>
+                <td>複数の関連＋構造的比較</td>
+            </tr>
+            <tr>
+                <td class="font-bold text-center">7</td>
+                <td class="font-medium">社会・生活・自己成長</td>
+                <td class="text-gray-400">なし</td>
+                <td>漠然とした接続</td>
+                <td>生活・社会と具体的接続</td>
+                <td>学びの価値化＋成長認識</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- スコア→レベル変換 -->
+    <div class="grid md:grid-cols-2 gap-4 mt-4">
+        <div class="bg-gray-50 rounded-lg p-4 avoid-break">
+            <p class="text-sm font-semibold mb-2">■ 合計スコア → レベル変換</p>
+            <table class="text-xs w-full">
+                <tbody>
+                    <tr><td class="py-1 font-bold text-gray-500">L1</td><td class="py-1">0〜3点</td><td class="py-1 text-gray-500">感想</td></tr>
+                    <tr><td class="py-1 font-bold text-blue-500">L2</td><td class="py-1">4〜7点</td><td class="py-1 text-gray-500">事実記述</td></tr>
+                    <tr><td class="py-1 font-bold text-green-500">L3</td><td class="py-1">8〜11点</td><td class="py-1 text-gray-500">関連づけ</td></tr>
+                    <tr><td class="py-1 font-bold text-purple-500">L4</td><td class="py-1">12〜16点</td><td class="py-1 text-gray-500">メタ認知</td></tr>
+                    <tr><td class="py-1 font-bold text-amber-600">L5</td><td class="py-1">17〜21点</td><td class="py-1 text-gray-500">転移・価値化</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="bg-purple-50 rounded-lg p-4 avoid-break">
+            <p class="text-sm font-semibold mb-2">■ AI判定の仕組み</p>
+            <ul class="text-xs text-gray-700 space-y-1">
+                <li>① Gemini AIが振り返り記述を受け取り、7観点を0-3点で採点</li>
+                <li>② 合計点（0-21）からL1-L5に自動変換</li>
+                <li>③ レベルに応じた褒めフィードバック＋レベルアップのヒントを生成</li>
+                <li>④ 時系列の成長履歴を記録し、例えば L2→L3→L4 の成長を可視化</li>
+                <li>⑤ Gemini不使用時はルールベース（キーワードマッチ）で判定</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="bg-green-50 border border-green-200 rounded-lg p-3 mt-4 mb-6 text-xs avoid-break">
+        <p class="font-semibold text-green-800 mb-1"><i class="fas fa-check-circle mr-1"></i> 実装状況: TOCO-TON に組み込み済み</p>
+        <p class="text-green-900">
+            本評価フレームは既にシステムに実装されています。毎時間の振り返り提出時に自動で7観点採点・レベル判定・成長履歴記録が行われ、
+            教師は学級一覧画面で各児童生徒のレベル推移を確認できます。
+            なお、従来のハッティ効果量ベースの5段階評価（⭐1〜5）も後方互換として維持しています。
+        </p>
+    </div>
+
+    <h3 class="text-lg font-semibold mt-8 mb-3">2.4 期待される学習効果</h3>
     <div class="grid md:grid-cols-2 gap-4">
         <div class="success-box avoid-break">
             <p class="font-semibold text-green-800 text-sm mb-2"><i class="fas fa-graduation-cap mr-1"></i> 児童生徒への効果</p>

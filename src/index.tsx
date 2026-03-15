@@ -41044,20 +41044,206 @@ app.post('/api/student-learning/save-reflection', async (c) => {
 
 // --- 振り返りAI分析（毎時間）: 理論ベース深化版 ---
 // 教育理論:
+//   ★ Biggs SOLO Taxonomy: 前構造的→単一構造的→多構造的→関連構造的→拡張抽象的
 //   F5 Zimmerman自己調整学習 (d=0.52): 予見→遂行→省察の循環
 //   F6 Flavellメタ認知 (d=0.69): メタ認知的知識(人間・課題・方略) + メタ認知的活動(モニタリング・コントロール)
 //   F8 Deci & Ryan自己決定理論 (d=0.61): 自律性・有能感・関係性の3欲求
 //   F11 Vygotsky社会的構成主義 (d=0.40): 他者との相互作用による知識構成
 //   F2 Dweck成長マインドセット (d=0.19): 能力は努力で伸びる信念
 //   Duckworthグリット (d=0.20): 長期的目標への情熱と粘り強さ
-//   Hattie振り返り効果量: Lv1活動記述(~0), Lv2感想(0.15), Lv3内容気づき(0.40), Lv4方法気づき(0.69), Lv5転用(0.75+)
+//   前田康裕教授（熊本大学）振り返り研究、EEF（英国教育基金）メタ認知ガイダンス
+//   Hattie振り返り効果量: L1活動記述(~0), L2感想(0.15), L3内容気づき(0.40), L4方法気づき(0.69), L5転用(0.75+)
+//   → TOCO-TON「自ら学ぶ力の8つの力」対応:
+//     L2→学びの自覚, L3→意味づけ力・協働力, L4→自己選択力・振り返り力・援助要請力, L5→意味づけ力・粘り強さ・回復力
 // 学習指導要領「主体的に学習に取り組む態度」: 粘り強さ ＋ 自己調整
 app.post('/api/student-learning/analyze-reflection', async (c) => {
   const { env } = c
   try {
     const { reflection_id, plan_id, student_id, hour_number, content_learned, method_reflection, next_application, friend_interaction, confidence_rating, unit_name, subject, grade, cards_done, check_test_score, selection_tasks_done } = await c.req.json()
 
-    // ===== 振り返りの質レベル判定（Hattie効果量ベース） =====
+    // ===== SOLO Taxonomy × メタ認知 × 自己調整学習: 7観点スコア =====
+    // 前田康裕教授（熊本大学）の研究、EEF（英国教育基金）メタ認知ガイダンス、
+    // SOLO Taxonomy、TOCO-TON「自ら学ぶ力の8つの力」を統合
+    // 各観点 0-3点、合計0-21 → L1-L5変換
+
+    const allText = [content_learned, method_reflection, next_application, friend_interaction].filter(Boolean).join(' ')
+    const allTextLen = allText.length
+
+    // --- ルールベース7観点スコア（Gemini不使用時のフォールバック） ---
+    let scores7 = {
+      specificity: 0,    // 記述の具体性
+      causality: 0,      // 因果関係・論理構造
+      others: 0,         // 他者への言及
+      metacognition: 0,  // 自己の学び方への言及
+      planning: 0,       // 次の行動への言及
+      crossSubject: 0,   // 教科横断・過去学習との接続
+      transfer: 0        // 社会・生活・自己成長への接続
+    }
+
+    // (1) 記述の具体性
+    if (allTextLen > 100) scores7.specificity = 3
+    else if (allTextLen > 50) scores7.specificity = 2
+    else if (allTextLen > 15) scores7.specificity = 1
+
+    // (2) 因果関係・論理構造
+    const causalPatterns = /なぜなら|だから|ので|のため|理由は|原因は|結果|つまり|したがって|ということは/
+    if (causalPatterns.test(allText)) {
+      scores7.causality = allText.match(new RegExp(causalPatterns.source, 'g'))?.length >= 2 ? 3 : 2
+    } else if (/から|ため|ので/.test(allText)) {
+      scores7.causality = 1
+    }
+
+    // (3) 他者への言及
+    const othersPatterns = /友だち|友達|ともだち|〇〇さん|〇〇くん|みんな|グループ|ペア|班|先生|教えてもらった|聞いた|一緒に|いっしょに|話し合い|と言って/
+    if (othersPatterns.test(allText)) {
+      const othersMatches = allText.match(new RegExp(othersPatterns.source, 'g'))?.length || 0
+      scores7.others = Math.min(3, othersMatches)
+    }
+
+    // (4) 自己の学び方への言及
+    const metacogPatterns = /やり方|方法|学び方|工夫|うまくいった|うまくいかなかった|コツ|ポイント|気づいた|発見|分かった|わかった|できた|できなかった|苦手|得意|間違えた|ミス/
+    if (metacogPatterns.test(allText)) {
+      const mcMatches = allText.match(new RegExp(metacogPatterns.source, 'g'))?.length || 0
+      scores7.metacognition = Math.min(3, mcMatches >= 3 ? 3 : mcMatches >= 2 ? 2 : 1)
+    }
+    if ((method_reflection || '').length > 20) scores7.metacognition = Math.max(scores7.metacognition, 2)
+
+    // (5) 次の行動への言及
+    const planPatterns = /次は|次回は|今度は|これからは|もっと|〜しよう|〜したい|〜してみる|改善|目標|挑戦|チャレンジ|がんばる|がんばりたい|ためしてみ/
+    if (planPatterns.test(allText)) {
+      const planMatches = allText.match(new RegExp(planPatterns.source, 'g'))?.length || 0
+      scores7.planning = Math.min(3, planMatches >= 2 ? 3 : planMatches >= 1 ? 2 : 1)
+    }
+    if ((next_application || '').length > 20) scores7.planning = Math.max(scores7.planning, 2)
+
+    // (6) 教科横断・過去学習との接続
+    const crossPatterns = /前に習った|前の単元|他の教科|算数で|国語で|理科で|社会で|英語で|〜と似て|関連|つながり|比べる|比較|以前/
+    if (crossPatterns.test(allText)) {
+      scores7.crossSubject = 2
+      if (allText.match(new RegExp(crossPatterns.source, 'g'))?.length >= 2) scores7.crossSubject = 3
+    }
+
+    // (7) 社会・生活・自己成長への接続
+    const transferPatterns = /社会|生活|日常|将来|大人になったら|世の中|実際に|役に立つ|使える|成長|変わった|前の自分|自分が|意味がある|価値/
+    if (transferPatterns.test(allText)) {
+      scores7.transfer = 2
+      if (allText.match(new RegExp(transferPatterns.source, 'g'))?.length >= 2) scores7.transfer = 3
+    }
+
+    // --- Gemini AIによる7観点精密スコアリング ---
+    let aiScored = false
+    let aiLevelFeedback = ''
+    let aiUpgradeSuggestion = ''
+    const apiKey = env.GEMINI_API_KEY
+
+    if (apiKey && allTextLen > 10) {
+      try {
+        const soloPrompt = `あなたは振り返り記述の質を評価する教育AI専門家です。
+SOLO Taxonomy × メタ認知 × 自己調整学習の理論に基づき、以下の7つの観点で児童・生徒の振り返りを0-3点で採点してください。
+
+【振り返り記述】
+学年: ${grade || '不明'} / 教科: ${subject || '不明'} / 単元: ${unit_name || '不明'} / 第${hour_number || '?'}時
+② わかったこと: ${content_learned || '（未記入）'}
+③ どうやって学んだか: ${method_reflection || '（未記入）'}
+④ 次にいかすこと: ${next_application || '（未記入）'}
+⑤ 友だちとの学び: ${friend_interaction || '（未記入）'}
+⑥ 手ごたえ: ${confidence_rating || 3}/5
+
+【採点基準（各0-3点）】
+1. specificity（記述の具体性）: 0=白紙/1語のみ, 1=抽象的感想, 2=具体的事実あり, 3=具体的エピソード+数値等
+2. causality（因果関係・論理構造）: 0=なし, 1=弱い接続, 2=「なぜなら」「だから」等の明確な論理, 3=複数の因果を構造的に記述
+3. others（他者への言及）: 0=なし, 1=名前のみ, 2=他者の行動・発言を引用, 3=他者との相互作用から得た気づきを記述
+4. metacognition（自己の学び方への言及）: 0=なし, 1=「難しかった」程度, 2=学習方略・つまずきを具体的に記述, 3=方略の有効性を客観的に分析
+5. planning（次の行動への言及）: 0=なし, 1=漠然とした意欲, 2=具体的な行動計画, 3=根拠に基づく具体的計画+振り返りとの接続
+6. crossSubject（教科横断・過去学習との接続）: 0=なし, 1=曖昧な関連, 2=他教科・過去学習との明確な関連, 3=複数の関連+構造的な比較
+7. transfer（社会・生活・自己成長への接続）: 0=なし, 1=漠然とした接続, 2=生活・社会との具体的接続, 3=学びの価値化+自己成長の認識
+
+【レベル判定】合計0-3→L1(感想), 4-7→L2(事実記述), 8-11→L3(関連づけ), 12-16→L4(メタ認知), 17-21→L5(転移・価値化)
+
+【追加指示】
+- level_feedback: このレベルの振り返りの良い点を${(grade || '').includes('中') ? '中学生向けに' : '小学生向けにやさしく'}具体的にほめる（100字以内）
+- upgrade_suggestion: 次のレベルに上がるための具体的アドバイスを1つ（100字以内、否定表現禁止）
+
+以下のJSON形式のみで回答:
+{
+  "specificity": 0, "causality": 0, "others": 0, "metacognition": 0,
+  "planning": 0, "crossSubject": 0, "transfer": 0,
+  "level_feedback": "...",
+  "upgrade_suggestion": "..."
+}
+JSONのみ回答。`
+
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_LITE}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: soloPrompt }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
+            })
+          }
+        )
+        const data = await resp.json() as any
+        const text = data.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || ''
+        const match = text.match(/\{[\s\S]*\}/)
+        if (match) {
+          const aiScores = JSON.parse(match[0])
+          // 各スコアを0-3にクランプ
+          scores7.specificity = Math.max(0, Math.min(3, aiScores.specificity || 0))
+          scores7.causality = Math.max(0, Math.min(3, aiScores.causality || 0))
+          scores7.others = Math.max(0, Math.min(3, aiScores.others || 0))
+          scores7.metacognition = Math.max(0, Math.min(3, aiScores.metacognition || 0))
+          scores7.planning = Math.max(0, Math.min(3, aiScores.planning || 0))
+          scores7.crossSubject = Math.max(0, Math.min(3, aiScores.crossSubject || 0))
+          scores7.transfer = Math.max(0, Math.min(3, aiScores.transfer || 0))
+          aiLevelFeedback = aiScores.level_feedback || ''
+          aiUpgradeSuggestion = aiScores.upgrade_suggestion || ''
+          aiScored = true
+        }
+      } catch (e) {
+        console.error('SOLO scoring Gemini error, using rule-based:', e)
+      }
+    }
+
+    // --- 合計スコア → L1-L5変換 ---
+    const soloTotalScore = scores7.specificity + scores7.causality + scores7.others + 
+                           scores7.metacognition + scores7.planning + scores7.crossSubject + scores7.transfer
+    let soloLevel = 1
+    if (soloTotalScore >= 17) soloLevel = 5       // L5: 転移・価値化
+    else if (soloTotalScore >= 12) soloLevel = 4   // L4: メタ認知
+    else if (soloTotalScore >= 8) soloLevel = 3    // L3: 関連づけ
+    else if (soloTotalScore >= 4) soloLevel = 2    // L2: 事実記述
+    // else L1: 感想
+
+    const soloLevelNames = ['', 'L1 感想レベル', 'L2 事実記述レベル', 'L3 関連づけレベル', 'L4 メタ認知レベル', 'L5 転移・価値化レベル']
+    const soloLevelEmoji = ['', '📝', '📋', '🔗', '🧠', '🌟']
+    // TOCO-TON「自ら学ぶ力の8つの力」との対応
+    const soloLevelSkills = ['', '（成長の起点段階）', '学びの自覚', '意味づけ力・協働力', '自己選択力・振り返り力・援助要請力', '意味づけ力・粘り強さ・回復力']
+
+    // レベルアップのためのフォールバックアドバイス
+    if (!aiUpgradeSuggestion) {
+      const upgradeSuggestions: Record<number, string> = {
+        1: '次は「わかったこと」を具体的に書いてみよう！何が・どんなふうにわかったか、くわしく書くと振り返りが深まるよ。',
+        2: '「なぜそうなったのかな？」「前に習った〜と似ているかな？」と、つながりを考えて書いてみよう！',
+        3: '「自分はどうやって学んだか」「この方法がうまくいった理由」を書いてみよう。学び方を振り返ると、もっと賢い学び方が見つかるよ！',
+        4: '「この学びは生活のどこで使えるかな？」「将来どんなことに役立つかな？」と、学びの意味を考えてみよう！',
+        5: '最高レベルだよ！この調子で、友だちにも「学びの振り返り方」を教えてあげよう。教えることでさらに深まるよ！'
+      }
+      aiUpgradeSuggestion = upgradeSuggestions[soloLevel] || ''
+    }
+    if (!aiLevelFeedback) {
+      const levelFeedbacks: Record<number, string> = {
+        1: '振り返りを書けたこと自体がすばらしい一歩だよ！',
+        2: '学んだことを自分の言葉で書けているね。事実を記録する力がついてきている！',
+        3: 'すごい！いろんなことを関連づけて考えられているね。深い学びができている証拠だよ！',
+        4: '自分の学び方を客観的に見られているね。これは「メタ認知」という、学ぶ力の中でもいちばん高い力だよ！',
+        5: '最高レベル！学びを社会や自分の成長につなげられている。研究者のような振り返りだね！'
+      }
+      aiLevelFeedback = levelFeedbacks[soloLevel] || ''
+    }
+
+    // ===== 既存の質レベル判定（Hattie効果量ベース・後方互換） =====
     let qualityLevel = 1
     const hasContent = (content_learned || '').length > 5
     const hasMethod = (method_reflection || '').length > 5
@@ -41082,7 +41268,7 @@ app.post('/api/student-learning/analyze-reflection', async (c) => {
     // ===== 理論ベースフィードバック =====
     const theories: string[] = []
     let feedback = ''
-    const apiKey = env.GEMINI_API_KEY
+    // apiKey is already declared above for SOLO scoring
 
     // Gemini AIによる深い分析を試行
     if (apiKey && (hasContent || hasMethod || hasNext)) {
@@ -41213,19 +41399,154 @@ JSONのみ回答。`
       }
     }
 
-    // DB更新
+    // DB更新（SOLO Taxonomyスコアも含む）
     if (reflection_id) {
       await env.DB.prepare(`
-        UPDATE hourly_reflections SET reflection_quality_level = ?, ai_feedback = ?, ai_theory_references = ? WHERE id = ?
-      `).bind(qualityLevel, feedback, JSON.stringify(theories), reflection_id).run()
+        UPDATE hourly_reflections SET reflection_quality_level = ?, ai_feedback = ?, ai_theory_references = ?,
+        solo_level = ?, solo_total_score = ?,
+        score_specificity = ?, score_causality = ?, score_others = ?, score_metacognition = ?,
+        score_planning = ?, score_cross_subject = ?, score_transfer = ?
+        WHERE id = ?
+      `).bind(qualityLevel, feedback, JSON.stringify(theories),
+        soloLevel, soloTotalScore,
+        scores7.specificity, scores7.causality, scores7.others, scores7.metacognition,
+        scores7.planning, scores7.crossSubject, scores7.transfer,
+        reflection_id).run()
+    }
+
+    // SOLO レベル成長履歴に記録
+    if (student_id) {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS reflection_level_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          student_id INTEGER NOT NULL,
+          plan_id INTEGER,
+          hour_number INTEGER,
+          reflection_id INTEGER,
+          solo_level INTEGER NOT NULL DEFAULT 1,
+          solo_total_score INTEGER NOT NULL DEFAULT 0,
+          score_specificity INTEGER DEFAULT 0,
+          score_causality INTEGER DEFAULT 0,
+          score_others INTEGER DEFAULT 0,
+          score_metacognition INTEGER DEFAULT 0,
+          score_planning INTEGER DEFAULT 0,
+          score_cross_subject INTEGER DEFAULT 0,
+          score_transfer INTEGER DEFAULT 0,
+          ai_level_feedback TEXT,
+          ai_upgrade_suggestion TEXT,
+          subject TEXT,
+          unit_name TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run().catch(() => {})
+
+      await env.DB.prepare(`
+        INSERT INTO reflection_level_history (student_id, plan_id, hour_number, reflection_id, 
+          solo_level, solo_total_score, score_specificity, score_causality, score_others, 
+          score_metacognition, score_planning, score_cross_subject, score_transfer,
+          ai_level_feedback, ai_upgrade_suggestion, subject, unit_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(student_id, plan_id || null, hour_number || null, reflection_id || null,
+        soloLevel, soloTotalScore,
+        scores7.specificity, scores7.causality, scores7.others, scores7.metacognition,
+        scores7.planning, scores7.crossSubject, scores7.transfer,
+        aiLevelFeedback, aiUpgradeSuggestion, subject || null, unit_name || null).run().catch((e: any) => {
+        console.error('reflection_level_history insert error:', e)
+      })
+    }
+
+    // SOLOレベルに応じたフィードバック追記
+    feedback += `\n\n${soloLevelEmoji[soloLevel]} 振り返りレベル: ${soloLevelNames[soloLevel]}（${soloTotalScore}/21点）`
+    feedback += `\n${aiLevelFeedback}`
+    if (soloLevel < 5) {
+      feedback += `\n💡 レベルアップのヒント: ${aiUpgradeSuggestion}`
     }
 
     return c.json({
       success: true,
       quality_level: qualityLevel,
       quality_label: ['', '⭐ やったことを書けたよ', '⭐⭐ 気持ちも書けたね', '⭐⭐⭐ 気づきがあるね！', '⭐⭐⭐⭐ 学び方も考えてる！', '⭐⭐⭐⭐⭐ 次にいかせるね！'][qualityLevel],
+      // SOLO Taxonomy 質的評価
+      solo_level: soloLevel,
+      solo_level_name: soloLevelNames[soloLevel],
+      solo_level_skills: soloLevelSkills[soloLevel],
+      solo_total_score: soloTotalScore,
+      solo_scores: scores7,
+      solo_scores_labels: {
+        specificity: '記述の具体性',
+        causality: '因果関係・論理構造',
+        others: '他者への言及',
+        metacognition: '自己の学び方への言及',
+        planning: '次の行動への言及',
+        crossSubject: '教科横断・過去学習との接続',
+        transfer: '社会・生活・自己成長への接続'
+      },
+      solo_level_feedback: aiLevelFeedback,
+      solo_upgrade_suggestion: aiUpgradeSuggestion,
+      solo_ai_scored: aiScored,
       feedback,
       theories
+    })
+  } catch (error) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
+  }
+})
+
+// --- 振り返りレベル成長履歴取得API ---
+app.get('/api/student-learning/reflection-level-history/:studentId', async (c) => {
+  const { env } = c
+  try {
+    const studentId = c.req.param('studentId')
+    const limit = Number(c.req.query('limit') || 50)
+    
+    const history = await env.DB.prepare(`
+      SELECT * FROM reflection_level_history 
+      WHERE student_id = ? 
+      ORDER BY created_at ASC 
+      LIMIT ?
+    `).bind(studentId, limit).all().catch(() => ({ results: [] }))
+
+    const rows = (history.results || []) as any[]
+
+    // 成長サマリー
+    let growthSummary: any = null
+    if (rows.length >= 2) {
+      const first = rows[0]
+      const last = rows[rows.length - 1]
+      const firstLevel = first.solo_level || 1
+      const lastLevel = last.solo_level || 1
+      const avgFirst5 = rows.slice(0, Math.min(5, rows.length)).reduce((s: number, r: any) => s + (r.solo_total_score || 0), 0) / Math.min(5, rows.length)
+      const avgLast5 = rows.slice(-Math.min(5, rows.length)).reduce((s: number, r: any) => s + (r.solo_total_score || 0), 0) / Math.min(5, rows.length)
+      
+      growthSummary = {
+        total_reflections: rows.length,
+        first_level: firstLevel,
+        current_level: lastLevel,
+        level_change: lastLevel - firstLevel,
+        avg_score_first5: Math.round(avgFirst5 * 10) / 10,
+        avg_score_last5: Math.round(avgLast5 * 10) / 10,
+        score_growth: Math.round((avgLast5 - avgFirst5) * 10) / 10,
+        level_progression: rows.map((r: any) => ({
+          date: r.created_at,
+          level: r.solo_level,
+          score: r.solo_total_score,
+          subject: r.subject,
+          unit: r.unit_name
+        }))
+      }
+    }
+
+    return c.json({
+      success: true,
+      history: rows,
+      growth_summary: growthSummary,
+      level_names: {
+        1: 'L1 感想レベル',
+        2: 'L2 事実記述レベル',
+        3: 'L3 関連づけレベル',
+        4: 'L4 メタ認知レベル',
+        5: 'L5 転移・価値化レベル'
+      }
     })
   } catch (error) {
     return c.json({ success: false, error: error instanceof Error ? error.message : 'Unknown' }, 500)
