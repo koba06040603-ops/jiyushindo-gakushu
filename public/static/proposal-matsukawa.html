@@ -619,51 +619,51 @@
     <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F1</span> VARK感覚モデル<br>
-            <span class="text-gray-500">Fleming — 感覚別学習スタイル</span>
+            <span class="text-gray-500">フレミング — 感覚別学習スタイル</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F2</span> 多重知能理論<br>
-            <span class="text-gray-500">Gardner — 8つの知能</span>
+            <span class="text-gray-500">ガードナー — 8つの知能</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F3</span> 経験学習サイクル<br>
-            <span class="text-gray-500">Kolb — 体験→省察→概念化→実践</span>
+            <span class="text-gray-500">コルブ — 体験→省察→概念化→実践</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F4</span> 適性処遇交互作用<br>
-            <span class="text-gray-500">ATI — 個人差に応じた教授法</span>
+            <span class="text-gray-500">クロンバック — 個人差に応じた教授法</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F5</span> 自己調整学習<br>
-            <span class="text-gray-500">Zimmerman — SRL 3段階モデル</span>
+            <span class="text-gray-500">ジマーマン — 自己調整学習 3段階モデル</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F6</span> 学習方略<br>
-            <span class="text-gray-500">Oxford — 認知・メタ認知方略</span>
+            <span class="text-gray-500">オックスフォード — 認知・メタ認知方略</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F7</span> 足場かけ理論<br>
-            <span class="text-gray-500">Vygotsky — ZPD・段階的支援</span>
+            <span class="text-gray-500">ヴィゴツキー — 発達の最近接領域・段階的支援</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F8</span> 動機づけ理論<br>
-            <span class="text-gray-500">Deci & Ryan — 自己決定理論</span>
+            <span class="text-gray-500">デシ＆ライアン — 自己決定理論</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F9</span> メタ認知<br>
-            <span class="text-gray-500">Flavell — 自己モニタリング</span>
+            <span class="text-gray-500">フラベル — 自己モニタリング</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F10</span> 領域固有性<br>
-            <span class="text-gray-500">Chi — 教科特性に応じた学び</span>
+            <span class="text-gray-500">チー — 教科特性に応じた学び</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F11</span> 真正な学び<br>
-            <span class="text-gray-500">Authentic Learning — 実社会との接続</span>
+            <span class="text-gray-500">真正な学び — 実社会との接続</span>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 text-xs avoid-break">
             <span class="font-bold text-blue-700">F12</span> 感情と学習<br>
-            <span class="text-gray-500">Pekrun — 達成感情理論</span>
+            <span class="text-gray-500">ペクラン — 達成感情理論</span>
         </div>
     </div>
 
@@ -960,11 +960,17 @@
     </table>
 
     <h3 class="text-lg font-semibold mt-8 mb-3">3.2 今後強化すべきセキュリティ項目</h3>
+    <div class="bg-green-50 border border-green-300 rounded-lg p-4 mb-4 avoid-break">
+        <p class="font-semibold text-green-800 text-sm mb-2"><i class="fas fa-check-circle mr-1"></i> 実装完了済み（2026年3月）</p>
+        <ul class="text-xs text-green-900 space-y-1">
+            <li>✅ <strong>認証の鍵の安全化</strong> — 認証の鍵を外部の安全な保管場所（環境変数）に移動完了</li>
+            <li>✅ <strong>パスワードハッシュ強化</strong> — 暗号化方式をPBKDF2（10万回計算・ランダムソルト付き）に強化完了</li>
+        </ul>
+    </div>
     <div class="alert-box avoid-break">
         <p class="font-semibold text-red-800 text-sm mb-2"><i class="fas fa-exclamation-triangle mr-1"></i> 改善推奨事項</p>
         <p class="text-xs text-red-900 mb-3">
-            現在のセキュリティは基本的な保護は実装されていますが、教育機関としての運用には以下の強化が推奨されます。
-            これらは<strong>ビジネスプラン採用後の開発計画</strong>に含めます。
+            上記2項目は実装済みです。残る以下の強化項目は<strong>ビジネスプラン採用後の開発計画</strong>に含めます。
         </p>
     </div>
 
@@ -978,18 +984,6 @@
             </tr>
         </thead>
         <tbody>
-            <tr>
-                <td class="font-medium">認証の鍵の安全化</td>
-                <td>プログラム内に直接書かれている認証の鍵を、外部の安全な保管場所に移動</td>
-                <td><span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">高</span></td>
-                <td class="text-xs">1日</td>
-            </tr>
-            <tr>
-                <td class="font-medium">パスワードハッシュ強化</td>
-                <td>パスワードの暗号化方式をさらに強固なものに変更（総当たり攻撃への耐性向上）</td>
-                <td><span class="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">高</span></td>
-                <td class="text-xs">1日</td>
-            </tr>
             <tr>
                 <td class="font-medium">ログイン試行回数の制限</td>
                 <td>パスワードを繰り返し試す不正アクセスを自動的にブロック</td>
@@ -1357,7 +1351,7 @@
                 <li>• 教育委員会への本提案書提出・協議</li>
                 <li>• GenSpark ビジネスプラン契約の検討・決定</li>
                 <li>• 試行担当教師の選定（1〜2名）</li>
-                <li>• セキュリティ強化（認証の鍵の安全化、パスワード暗号化強化）</li>
+                <li>• セキュリティ強化（認証の鍵の安全化、パスワード暗号化強化）→ <strong>実装完了</strong></li>
             </ul>
         </div>
 
