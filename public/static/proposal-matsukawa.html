@@ -308,9 +308,184 @@
             .nav-floating { display: none; }
             .section-card { padding: 1.25rem; }
         }
+
+        /* ===== Edit Mode Styles ===== */
+        .edit-toolbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 200;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: white;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            font-size: 0.85rem;
+            transition: transform 0.3s ease;
+        }
+        .edit-toolbar.hidden {
+            transform: translateY(-100%);
+        }
+        .edit-toolbar button {
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .edit-toolbar .btn-primary { background: #3b82f6; color: white; }
+        .edit-toolbar .btn-primary:hover { background: #2563eb; }
+        .edit-toolbar .btn-success { background: #16a34a; color: white; }
+        .edit-toolbar .btn-success:hover { background: #15803d; }
+        .edit-toolbar .btn-danger { background: #dc2626; color: white; }
+        .edit-toolbar .btn-danger:hover { background: #b91c1c; }
+        .edit-toolbar .btn-warning { background: #d97706; color: white; }
+        .edit-toolbar .btn-warning:hover { background: #b45309; }
+        .edit-toolbar .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid #475569; }
+        .edit-toolbar .btn-ghost:hover { background: #475569; color: white; }
+        .edit-toolbar .separator { width: 1px; height: 24px; background: #475569; }
+        .edit-toolbar .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            display: inline-block; margin-right: 4px;
+        }
+        .edit-toolbar .status-dot.editing { background: #f59e0b; animation: pulse-dot 1.5s infinite; }
+        .edit-toolbar .status-dot.saved { background: #22c55e; }
+        .edit-toolbar .status-dot.view { background: #94a3b8; }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        body.edit-mode {
+            padding-top: 52px;
+        }
+        body.edit-mode .section-card {
+            position: relative;
+            border: 2px dashed transparent;
+            transition: border-color 0.2s;
+        }
+        body.edit-mode .section-card:hover {
+            border-color: #3b82f6;
+        }
+        body.edit-mode .section-card:focus-within {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+        }
+        body.edit-mode .editable-highlight {
+            outline: none;
+        }
+        body.edit-mode .editable-highlight:focus {
+            background: rgba(254, 243, 199, 0.3);
+        }
+
+        /* Section collapse controls */
+        .section-toggle {
+            display: none;
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #e2e8f0;
+            border: none;
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: #64748b;
+            transition: all 0.2s;
+            z-index: 5;
+        }
+        .section-toggle:hover { background: #cbd5e1; color: #334155; }
+        body.edit-mode .section-toggle { display: flex; align-items: center; justify-content: center; }
+        .section-card.collapsed .section-body { display: none; }
+        .section-card.collapsed { padding-bottom: 1rem; }
+        .section-card.collapsed h2 { margin-bottom: 0; border-bottom: none; padding-bottom: 0; }
+
+        /* Edit hint overlay */
+        .edit-hint {
+            display: none;
+            position: absolute;
+            top: -10px;
+            left: 16px;
+            background: #3b82f6;
+            color: white;
+            font-size: 0.65rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            z-index: 5;
+            pointer-events: none;
+        }
+        body.edit-mode .section-card:hover .edit-hint { display: block; }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #1e293b;
+            color: white;
+            padding: 10px 24px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            z-index: 300;
+            opacity: 0;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        }
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        @media print {
+            .edit-toolbar { display: none !important; }
+            .section-toggle { display: none !important; }
+            .edit-hint { display: none !important; }
+            .toast { display: none !important; }
+            body.edit-mode { padding-top: 0; }
+            body.edit-mode .section-card { border: 1px solid #ccc !important; }
+        }
     </style>
 </head>
 <body>
+
+<!-- ========== Edit Toolbar ========== -->
+<div class="edit-toolbar hidden no-print" id="editToolbar">
+    <i class="fas fa-pen-to-square" style="font-size:1rem;color:#60a5fa"></i>
+    <span style="font-weight:600">提案書エディター</span>
+    <div class="separator"></div>
+    <button class="btn-primary" id="btnToggleEdit" onclick="toggleEditMode()">
+        <i class="fas fa-edit mr-1"></i> 編集モードON
+    </button>
+    <button class="btn-success" id="btnSave" onclick="saveEdits()" style="display:none">
+        <i class="fas fa-save mr-1"></i> 保存
+    </button>
+    <button class="btn-warning" id="btnExpandAll" onclick="toggleAllSections(true)" style="display:none">
+        <i class="fas fa-expand-alt mr-1"></i> 全展開
+    </button>
+    <button class="btn-ghost" id="btnCollapseAll" onclick="toggleAllSections(false)" style="display:none">
+        <i class="fas fa-compress-alt mr-1"></i> 全折畳
+    </button>
+    <div class="separator" id="sepReset" style="display:none"></div>
+    <button class="btn-danger" id="btnReset" onclick="resetEdits()" style="display:none">
+        <i class="fas fa-undo mr-1"></i> 元に戻す
+    </button>
+    <div style="flex:1"></div>
+    <span id="editStatus">
+        <span class="status-dot view"></span> 表示モード
+    </span>
+    <button class="btn-ghost" id="btnClose" onclick="hideToolbar()">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
 
 <!-- ========== Floating Navigation ========== -->
 <nav class="nav-floating no-print" id="floatingNav">
@@ -329,6 +504,9 @@
 <div class="fixed top-4 left-4 z-50 flex gap-2 no-print">
     <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition text-sm">
         <i class="fas fa-print mr-1"></i> 印刷 / PDF
+    </button>
+    <button onclick="showToolbar()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg shadow hover:bg-emerald-700 transition text-sm" id="btnOpenEditor">
+        <i class="fas fa-pen mr-1"></i> 編集する
     </button>
     <a href="/admin-dashboard.html" class="bg-gray-600 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-700 transition text-sm inline-flex items-center">
         <i class="fas fa-arrow-left mr-1"></i> ダッシュボードに戻る
@@ -1399,9 +1577,15 @@
     <i class="fas fa-arrow-up"></i>
 </button>
 
-<!-- ========== Navigation Highlight Script ========== -->
+<!-- ========== Navigation Highlight + Edit System Script ========== -->
 <script>
+// ===== State =====
+let isEditMode = false;
+const STORAGE_KEY = 'proposal-matsukawa-edits';
+let originalHTML = {};
+
 document.addEventListener('DOMContentLoaded', function() {
+    // --- Navigation highlight ---
     const nav = document.getElementById('floatingNav');
     const links = nav ? nav.querySelectorAll('a') : [];
     const sections = [];
@@ -1426,7 +1610,257 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.addEventListener('scroll', updateNav);
     updateNav();
+
+    // --- Prepare editable sections ---
+    prepareSections();
+
+    // --- Restore saved edits if any ---
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+        try {
+            const edits = JSON.parse(saved);
+            if (Object.keys(edits).length > 0) {
+                showToast('保存された編集内容があります。「編集する」を押して確認できます。', 4000);
+            }
+        } catch(e) {}
+    }
 });
+
+// ===== Prepare editable sections =====
+function prepareSections() {
+    const sectionCards = document.querySelectorAll('.section-card');
+    sectionCards.forEach((card, i) => {
+        const sectionId = 'edit-section-' + i;
+        card.setAttribute('data-edit-id', sectionId);
+
+        // Store original HTML
+        originalHTML[sectionId] = card.innerHTML;
+
+        // Add toggle button
+        const toggle = document.createElement('button');
+        toggle.className = 'section-toggle';
+        toggle.innerHTML = '<i class="fas fa-chevron-up"></i>';
+        toggle.title = '折畳み / 展開';
+        toggle.onclick = function(e) {
+            e.stopPropagation();
+            card.classList.toggle('collapsed');
+            const icon = toggle.querySelector('i');
+            if (card.classList.contains('collapsed')) {
+                icon.className = 'fas fa-chevron-down';
+            } else {
+                icon.className = 'fas fa-chevron-up';
+            }
+        };
+        card.style.position = 'relative';
+        card.appendChild(toggle);
+
+        // Add edit hint
+        const hint = document.createElement('div');
+        hint.className = 'edit-hint';
+        hint.textContent = 'クリックして編集';
+        card.appendChild(hint);
+
+        // Wrap body content (everything except h2, toggle, hint) in a div
+        const h2 = card.querySelector('h2');
+        if (h2) {
+            const bodyWrapper = document.createElement('div');
+            bodyWrapper.className = 'section-body';
+            const children = Array.from(card.childNodes);
+            let afterH2 = false;
+            children.forEach(child => {
+                if (child === h2) {
+                    afterH2 = true;
+                    return;
+                }
+                if (afterH2 && child !== toggle && child !== hint) {
+                    bodyWrapper.appendChild(child);
+                }
+            });
+            h2.after(bodyWrapper);
+        }
+    });
+
+    // Also make cover page editable
+    const coverContent = document.querySelector('.cover-content');
+    if (coverContent) {
+        originalHTML['cover'] = coverContent.innerHTML;
+        coverContent.setAttribute('data-edit-id', 'cover');
+    }
+
+    // Apply any saved edits
+    restoreFromStorage();
+}
+
+// ===== Toggle Edit Mode =====
+function toggleEditMode() {
+    isEditMode = !isEditMode;
+    const body = document.body;
+    const btn = document.getElementById('btnToggleEdit');
+    const btnSave = document.getElementById('btnSave');
+    const btnExpandAll = document.getElementById('btnExpandAll');
+    const btnCollapseAll = document.getElementById('btnCollapseAll');
+    const btnReset = document.getElementById('btnReset');
+    const sepReset = document.getElementById('sepReset');
+    const status = document.getElementById('editStatus');
+
+    if (isEditMode) {
+        body.classList.add('edit-mode');
+        btn.innerHTML = '<i class="fas fa-eye mr-1"></i> 表示モードに切替';
+        btn.className = 'btn-ghost';
+        btnSave.style.display = '';
+        btnExpandAll.style.display = '';
+        btnCollapseAll.style.display = '';
+        btnReset.style.display = '';
+        sepReset.style.display = '';
+        status.innerHTML = '<span class="status-dot editing"></span> 編集中';
+
+        // Make content editable
+        enableEditing(true);
+    } else {
+        body.classList.remove('edit-mode');
+        btn.innerHTML = '<i class="fas fa-edit mr-1"></i> 編集モードON';
+        btn.className = 'btn-primary';
+        btnSave.style.display = 'none';
+        btnExpandAll.style.display = 'none';
+        btnCollapseAll.style.display = 'none';
+        btnReset.style.display = 'none';
+        sepReset.style.display = 'none';
+        status.innerHTML = '<span class="status-dot view"></span> 表示モード';
+
+        // Disable editing
+        enableEditing(false);
+    }
+}
+
+function enableEditing(enable) {
+    // Section cards
+    document.querySelectorAll('.section-card').forEach(card => {
+        const body = card.querySelector('.section-body');
+        const h2 = card.querySelector('h2');
+        if (h2) {
+            h2.contentEditable = enable;
+            if (enable) h2.classList.add('editable-highlight');
+            else h2.classList.remove('editable-highlight');
+        }
+        if (body) {
+            body.contentEditable = enable;
+            if (enable) body.classList.add('editable-highlight');
+            else body.classList.remove('editable-highlight');
+        }
+    });
+
+    // Cover page
+    const coverContent = document.querySelector('.cover-content');
+    if (coverContent) {
+        coverContent.contentEditable = enable;
+        if (enable) coverContent.classList.add('editable-highlight');
+        else coverContent.classList.remove('editable-highlight');
+    }
+}
+
+// ===== Save Edits =====
+function saveEdits() {
+    const edits = {};
+    document.querySelectorAll('[data-edit-id]').forEach(el => {
+        const id = el.getAttribute('data-edit-id');
+        const currentHTML = el.innerHTML;
+        // Only save if changed from original
+        if (originalHTML[id] && currentHTML !== originalHTML[id]) {
+            edits[id] = currentHTML;
+        }
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(edits));
+
+    const count = Object.keys(edits).length;
+    const status = document.getElementById('editStatus');
+    status.innerHTML = '<span class="status-dot saved"></span> 保存済み';
+    setTimeout(() => {
+        if (isEditMode) status.innerHTML = '<span class="status-dot editing"></span> 編集中';
+    }, 2000);
+
+    showToast(count > 0 ? `${count}セクションの変更を保存しました` : '変更はありません', 2500);
+}
+
+// ===== Restore from Storage =====
+function restoreFromStorage() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    try {
+        const edits = JSON.parse(saved);
+        Object.entries(edits).forEach(([id, html]) => {
+            const el = document.querySelector(`[data-edit-id="${id}"]`);
+            if (el) {
+                el.innerHTML = html;
+            }
+        });
+    } catch(e) {
+        console.warn('Failed to restore edits:', e);
+    }
+}
+
+// ===== Reset Edits =====
+function resetEdits() {
+    if (!confirm('すべての編集内容を元に戻します。よろしいですか？\n（ブラウザに保存された編集データも削除されます）')) return;
+
+    localStorage.removeItem(STORAGE_KEY);
+
+    // Restore original content
+    document.querySelectorAll('[data-edit-id]').forEach(el => {
+        const id = el.getAttribute('data-edit-id');
+        if (originalHTML[id]) {
+            el.innerHTML = originalHTML[id];
+        }
+    });
+
+    // Re-prepare sections (re-add toggle/hint/wrapper)
+    // Simple approach: reload the page
+    location.reload();
+}
+
+// ===== Collapse / Expand All =====
+function toggleAllSections(expand) {
+    document.querySelectorAll('.section-card').forEach(card => {
+        const toggle = card.querySelector('.section-toggle i');
+        if (expand) {
+            card.classList.remove('collapsed');
+            if (toggle) toggle.className = 'fas fa-chevron-up';
+        } else {
+            card.classList.add('collapsed');
+            if (toggle) toggle.className = 'fas fa-chevron-down';
+        }
+    });
+}
+
+// ===== Toolbar Show/Hide =====
+function showToolbar() {
+    const toolbar = document.getElementById('editToolbar');
+    toolbar.classList.remove('hidden');
+    document.getElementById('btnOpenEditor').style.display = 'none';
+}
+function hideToolbar() {
+    if (isEditMode) {
+        if (!confirm('編集モードを終了してツールバーを閉じます。\n保存されていない変更は失われます。')) return;
+        toggleEditMode();
+    }
+    const toolbar = document.getElementById('editToolbar');
+    toolbar.classList.add('hidden');
+    document.getElementById('btnOpenEditor').style.display = '';
+}
+
+// ===== Toast =====
+function showToast(msg, duration = 2500) {
+    let toast = document.getElementById('globalToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'globalToast';
+        toast.className = 'toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), duration);
+}
 </script>
 
 </body>
