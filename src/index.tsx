@@ -97,6 +97,53 @@ const GEMINI_MODEL_LEGACY = 'gemini-2.0-flash'
 // ============================================================
 
 // ============================================================
+// 各教科等の「見方・考え方」（学習指導要領次期改訂 素案ベース）
+// 学習カード生成時に教科固有の思考の視点を組み込むために使用
+// ============================================================
+const MIKATA_KANGAEKATA: Record<string, string> = {
+  // 小学校
+  '国語': '自分や他者の言葉を、その意味や使い方、表現の意図等に着目して多面的・多角的に吟味し、多様な立場や考えを理解しながら、丁寧に言葉を紡ぎ、よりよく伝え合うこと',
+  '算数': '事象や言説を数理の視点から捉え、論理的、統合的・発展的、批判的に考察すること',
+  '数学': '事象や言説を数理の視点から捉え、論理的、統合的・発展的、批判的に考察すること',
+  '理科': '自然や社会の事象・言説を、自然科学的な視点から捉え、観察・実験の結果や科学的知見などに基づいて、客観的、論理的、批判的に考察すること',
+  '社会': '社会的事象やその言説を、地域の空間的な広がり、時期や時間の経過、事象や人々の相互関係などに着目して捉え、よりよい社会の形成に向けて課題を多角的に考え、根拠に基づき公正に判断すること',
+  '地理': '社会的事象やその言説を、地域の空間的な広がり、地域の環境、地域間の関係などに着目して捉え、よりよい社会の形成に向けて課題を多面的・多角的に考え、根拠に基づき公正に判断すること',
+  '歴史': '社会的事象やその言説を、時系列、推移、類似や差異、因果関係や現在とのつながりなどに着目して捉え、よりよい社会の形成に向けて課題を多面的・多角的に考え、根拠に基づき公正に判断すること',
+  '公民': '社会的事象やその言説を、政治、法、経済などに関わる概念や理論などに着目して捉え、よりよい社会の形成に向けて課題を多面的・多角的に考え、根拠に基づき公正に判断すること',
+  '外国語': '外国語及び外国語によるコミュニケーションを文化の違いや社会及び相手との関わりに着目して捉え、他者の考えを受け止めるとともに、表現等を工夫して自分の考え等を発信し、多様な他者との相互理解を図ること',
+  '外国語活動': '外国語及び外国語によるコミュニケーションを文化の違いや社会及び相手との関わりに着目して捉え、他者の考えを受け止めるとともに、表現等を工夫して自分の考え等を発信し、多様な他者との相互理解を図ること',
+  '英語': '外国語及び外国語によるコミュニケーションを文化の違いや社会及び相手との関わりに着目して捉え、他者の考えを受け止めるとともに、表現等を工夫して自分の考え等を発信し、多様な他者との相互理解を図ること',
+  '体育': '運動やスポーツを、心身の充実に果たす役割や多様な楽しみ方の視点から捉え、自他の豊かな生活及び活力あふれる社会づくりにつなげること',
+  '保健体育': '運動やスポーツを、心身の充実に果たす役割や多様な楽しみ方の視点から捉え、自他の豊かな生活及び活力あふれる社会づくりにつなげること',
+  '保健': '保健に関する課題や情報を、健康や安全に関する概念やそれに関わる原則に着目して捉え、リスクの軽減や生活の質の向上、及び健康・安全を支える環境づくりにつなげること',
+  '音楽': '感性や想像力を働かせ、対象や事象を、音や音楽、文化などの視点で捉え、意味や価値を見いだすこと',
+  '図画工作': '感性や想像力を働かせ、対象や事象を、造形的、文化的な視点で捉え、意味や価値をつくりだすこと',
+  '美術': '感性や想像力を働かせ、対象や事象を、造形的、文化的な視点で捉え、意味や価値をつくりだすこと',
+  '家庭': '自分や家族の生活の営みを、地域や社会との関わりの中で持続的なものとする視点から総合的・多角的に捉え、主体的によりよい生活を創り出すこと',
+  '家庭科': '自分や家族の生活の営みを、地域や社会との関わりの中で持続的なものとする視点から総合的・多角的に捉え、主体的によりよい生活を創り出すこと',
+  '技術・家庭': '自分や家族の生活の営みを、地域や社会との関わりの中で持続的なものとする視点から総合的・多角的に捉え、主体的によりよい生活を創り出すこと',
+  '生活': '身近な人々、社会及び自然を自分との関わりや、自分と他者との関係の中で捉え、よりよい生活に向けて思いや願いを実現しようとすること',
+  '技術': '生活や社会における問題を、技術的視点から正負の両面を含め多角的に捉え、包摂的で豊かな生活や社会の実現に向けて、情報技術及び生産技術を適切に活用したり、創造したりすること',
+  '情報': '生活や社会における問題を、技術的視点から正負の両面を含め多角的に捉え、包摂的で豊かな生活や社会の実現に向けて、情報技術及び生産技術を適切に活用したり、創造したりすること',
+  '総合的な学習の時間': '実社会・実生活との関わりの中で見いだす興味・関心や問題意識に基づく課題を、横断的・総合的な視点から捉え、新たな価値を創造し、自分らしい生き方を問い続けること',
+  '総合': '実社会・実生活との関わりの中で見いだす興味・関心や問題意識に基づく課題を、横断的・総合的な視点から捉え、新たな価値を創造し、自分らしい生き方を問い続けること',
+  '特別活動': '自己の生活や身近な社会における課題を社会創造、自己実現及びそれらの基盤としての人間関係形成の視点から捉え、社会を形成する当事者として多様な他者と協働し、自他のよりよい人生や社会生活につなげること',
+  '道徳': '自己の生き方や人間としての在り方を、多様な価値観や他者との関わりの視点から捉え、よりよく生きるために道徳的な判断力、心情、実践意欲と態度を育てること',
+}
+
+// 教科名から「見方・考え方」を取得するヘルパー関数
+function getMikataKangaekata(subject: string): string {
+  if (!subject) return ''
+  // 完全一致を優先
+  if (MIKATA_KANGAEKATA[subject]) return MIKATA_KANGAEKATA[subject]
+  // 部分一致で検索（例: "小学3年 算数" → "算数"）
+  for (const [key, value] of Object.entries(MIKATA_KANGAEKATA)) {
+    if (subject.includes(key)) return value
+  }
+  return ''
+}
+
+// ============================================================
 type HintSchema = {
   cardIdCol: string       // card_id or learning_card_id
   levelCol: string        // hint_level or hint_number
@@ -4462,7 +4509,7 @@ app.post('/api/courses/:courseId/regenerate-cards', async (c) => {
     
     const prompt = `あなたは${grade}の${subject}の教師です。
 単元「${unitName}」の学習カードを${additionalCount}枚追加で作成してください。
-
+${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(subject)}\n→ 問題文・解説にこの視点を反映させてください。\n` : ''}
 既存のカードタイトル: ${existingTitles}
 ※上記と重複しない内容を作成すること。
 
@@ -6290,7 +6337,7 @@ app.post('/api/ai/generate-problem', async (c) => {
 単元: ${curriculum?.unit_name || ''}
 単元目標: ${curriculum?.unit_goal || ''}
 難易度: ${body.difficultyLevel || 'しっかり'}
-
+${getMikataKangaekata(curriculum?.subject || '') ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(curriculum?.subject || '')}\n→ この教科の思考の視点を反映した問いかけにしてください。\n` : ''}
 ${examplesText ? `【参考問題】\n${examplesText}\n` : ''}
 
 【生成条件】
@@ -7175,7 +7222,7 @@ app.post('/api/environment/design/generate/:curriculumId', async (c) => {
 - 学年: ${curriculum.grade}
 - 単元名: ${curriculum.unit_name}
 - 単元目標: ${curriculum.unit_goal || ''}
-
+${getMikataKangaekata(curriculum.subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(curriculum.subject)}\n→ 各活動提案にこの教科固有の「見方・考え方」を反映させてください。\n` : ''}
 【6つの観点】各観点について、この単元に合った具体的な活動を1〜2文で提案してください。
 
 以下のJSON形式で回答してください:
@@ -7810,7 +7857,7 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
 - カードタイトル: ${card.card_title}
 - 元の問題: ${card.problem_description || card.problem_content || card.card_content || '問題情報なし'}
 - 解答例: ${card.answer || card.example_solution || ''}
-
+${getMikataKangaekata(card.subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(card.subject)}\n→ 類似問題でもこの教科の思考の視点を活かした問いかけにしてください。\n` : ''}
 【類似問題の条件】
 1. 元の問題と**同じ学習内容**を練習できる問題にする
 2. **数字や状況を変えた**バリエーションを作成
@@ -7954,6 +8001,7 @@ ${cardContext.problem_description}
 ${cardContext.answer ? `\n📝 正解・模範解答:\n${cardContext.answer}` : ''}
 ${cardContext.hints ? `\n💡 ヒント:\n${cardContext.hints}` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${cardContext.subject ? (() => { const mk = getMikataKangaekata(cardContext.subject); return mk ? `\n【この教科の「見方・考え方」】\n${mk}\n→ 解説や説明の際、この教科固有の思考の視点を意識し、児童生徒が自然と「見方・考え方」を働かせられるように問いかけてください。\n` : '' })() : ''}
 
 💡 あなたは上記の問題について質問されています。
    「問題が見えない」「わからない」とは絶対に言わないでください。
@@ -15151,6 +15199,9 @@ app.post('/api/ai/generate-course', async (c) => {
 
     // 【強化】プロンプト（動的枚数のカード生成 + 品質向上 + AI先生 + 難易度引き上げ + キーワード採点対応）
     const numCards = cards_count || 10  // 動的カード枚数（デフォルト10枚：単元全体を確実にカバー）
+    // 教科の「見方・考え方」を取得
+    const mikataKangaekata = getMikataKangaekata(subject)
+    const mikataSection = mikataKangaekata ? `\n【この教科の「見方・考え方」（学習指導要領）】\n${mikataKangaekata}\n→ この「見方・考え方」を問題文・ヒント・解説・AI先生メッセージに自然に織り込んでください。児童生徒が教科固有の思考の視点を無意識に身につけられるよう、問いかけ方や解説の切り口に反映させてください。\n` : ''
     const prompt = `あなたは小学校の教科指導に精通した優秀な教師です。以下の単元の学習カード${numCards}枚を生成してください。
 
 【単元情報】
@@ -15160,7 +15211,7 @@ app.post('/api/ai/generate-course', async (c) => {
 - 単元名: ${unitName}
 - 単元目標: ${unitGoal || '未指定'}
 - コース: ${courseInfo.name} (${difficultyDescription})
-${customInfo}
+${customInfo}${mikataSection}
 【カード設計の方針】
 - 単元の学習内容を網羅的にカバーする（導入→基本→応用→まとめ）
 - ${numCards}枚で単元全体の主要な学習項目を漏れなく扱う
@@ -17867,7 +17918,7 @@ app.post('/api/curriculum/:curriculumId/generate-intro-problems', async (c) => {
     
     const prompt = `あなたは${curriculum.grade}の${curriculum.subject}の、子どもの心をつかむのが得意な先生です。
 「${curriculum.unit_name}」の${numCourses}つのコースの**導入問題**を作ってください。
-
+${getMikataKangaekata(curriculum.subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(curriculum.subject)}\n→ 導入問題の切り口にこの教科ならではの「見方・考え方」を反映させ、児童生徒が自然と教科の思考の視点を使えるようにしてください。\n` : ''}
 ★★★ 最も大切なこと ★★★
 導入問題は「テスト」ではありません。「学びへの招待状」です。
 以下の3つの感情を引き出すことが目的です：
@@ -39857,7 +39908,7 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
 単元名: ${curriculum.unit_name}
 学年: ${curriculum.grade}
 教科: ${curriculum.subject}
-${v4Section}
+${getMikataKangaekata(curriculum.subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(curriculum.subject)}\n→ チェックテスト・選択課題の問題文に、この教科固有の「見方・考え方」を意識した問いかけを含めてください。\n` : ''}${v4Section}
 【個別学習カードの内容】
 ${cardSummary}
 
@@ -40259,7 +40310,7 @@ app.post('/api/teacher/generate-personalized-assessment/:courseId', async (c) =>
 以下の個別学習カードの内容に基づいて、この児童専用のチェックテスト（6問）と選択課題（6問）を作成してください。
 
 単元名: ${curriculum.unit_name}
-${v4Section}
+${getMikataKangaekata(curriculum.subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(curriculum.subject)}\n→ 問題の切り口にこの教科固有の思考の視点を反映させてください。\n` : ''}${v4Section}
 
 学習カード内容:
 ${cardSummary}
