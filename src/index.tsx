@@ -1347,6 +1347,17 @@ app.use('/api/*', async (c, next) => {
         }
       }
       
+      // 例題分離用カラムの自動追加
+      for (const col of ['example_answer', 'example_problem', 'example_solution', 'example_image_url', 'new_terms', 'real_world_connection', 'textbook_page', 'card_number', 'answer_keywords']) {
+        try {
+          const colType = col === 'card_number' ? 'INTEGER DEFAULT 0' : "TEXT DEFAULT ''"
+          await env.DB.prepare(`ALTER TABLE learning_cards ADD COLUMN ${col} ${colType}`).run()
+          console.log(`✅ learning_cards に ${col} カラム追加`)
+        } catch (alterErr: any) {
+          // カラム既存の場合は無視
+        }
+      }
+      
       dbInitialized = true
       console.log('✅ DB初期化完了')
     } catch (e: any) {
@@ -1360,6 +1371,234 @@ app.use('/api/*', async (c, next) => {
 // =============================================================================
 // Phase 7: ヘルスチェック・監視エンドポイント
 // =============================================================================
+
+// === 教員向け「自由進度学習システム」導入提案書 ===
+app.get('/proposal', async (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自由進度学習システム導入提案書</title>
+<style>
+  @page { size: A4; margin: 12mm 14mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; font-size: 9pt; color: #1a1a2e; line-height: 1.55; background: #f0f0f0; }
+  .page { width: 210mm; min-height: 297mm; max-height: 297mm; overflow: hidden; background: white; margin: 0 auto; padding: 10mm 13mm 8mm 13mm; position: relative; }
+  @media print { body { background: white; } .page { margin: 0; padding: 10mm 13mm 8mm 13mm; box-shadow: none; } .no-print { display: none !important; } }
+  @media screen { .page { box-shadow: 0 4px 20px rgba(0,0,0,0.15); margin: 10px auto; } }
+  
+  /* ヘッダー */
+  .header { text-align: center; border-bottom: 3px solid #1e3a5f; padding-bottom: 6px; margin-bottom: 8px; }
+  .header h1 { font-size: 16pt; color: #1e3a5f; letter-spacing: 3px; font-weight: 900; }
+  .header .subtitle { font-size: 9pt; color: #4a6fa5; margin-top: 2px; font-weight: 600; }
+  .header .meta { font-size: 7pt; color: #888; margin-top: 3px; }
+  
+  /* セクション */
+  .section { margin-bottom: 7px; }
+  .section-title { font-size: 10pt; font-weight: 800; color: white; background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 4px 10px; border-radius: 4px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+  .section-title .icon { font-size: 11pt; }
+  
+  /* グリッド */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+  
+  /* カード */
+  .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 6px 8px; }
+  .card-title { font-size: 8.5pt; font-weight: 800; color: #1e3a5f; margin-bottom: 2px; display: flex; align-items: center; gap: 4px; }
+  .card p, .card li { font-size: 8pt; color: #374151; line-height: 1.45; }
+  .card ul { padding-left: 14px; margin: 0; }
+  .card ul li { margin-bottom: 1px; }
+  
+  /* ハイライト */
+  .highlight { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1.5px solid #f59e0b; border-radius: 5px; padding: 6px 10px; margin-bottom: 7px; }
+  .highlight-title { font-size: 9pt; font-weight: 800; color: #92400e; margin-bottom: 3px; }
+  .highlight p { font-size: 8.5pt; color: #78350f; }
+  
+  /* ステップ */
+  .step { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
+  .step-num { background: #1e3a5f; color: white; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8pt; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+  .step-content { font-size: 8pt; }
+  .step-content strong { color: #1e3a5f; }
+  
+  /* 比較表 */
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+  .compare-table th { background: #1e3a5f; color: white; padding: 3px 6px; text-align: center; font-weight: 700; }
+  .compare-table td { padding: 3px 6px; border: 1px solid #e2e8f0; text-align: center; }
+  .compare-table tr:nth-child(even) td { background: #f8fafc; }
+  
+  /* 効果 */
+  .effect-badge { display: inline-block; background: #10b981; color: white; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; margin: 0 2px; }
+  
+  /* フッター */
+  .footer { position: absolute; bottom: 8mm; left: 13mm; right: 13mm; border-top: 2px solid #1e3a5f; padding-top: 4px; text-align: center; font-size: 7pt; color: #6b7280; }
+  
+  /* 印刷ボタン */
+  .print-btn { position: fixed; bottom: 20px; right: 20px; background: #1e3a5f; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999; }
+  .print-btn:hover { background: #2d5a8e; }
+</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">🖨️ PDF印刷</button>
+<div class="page">
+  <!-- ヘッダー -->
+  <div class="header">
+    <h1>📚 AI活用 自由進度学習支援システム 導入提案書</h1>
+    <div class="subtitle">〜 児童一人ひとりに最適化された学びを、先生の負担軽減とともに実現 〜</div>
+    <div class="meta">令和7年度 ｜ TOCO-TON 自由進度学習支援システム</div>
+  </div>
+
+  <!-- 導入背景 -->
+  <div class="highlight">
+    <div class="highlight-title">🎯 なぜ今、自由進度学習が必要なのか</div>
+    <p>令和の日本型学校教育（中教審答申2021）では<strong>「個別最適な学び」</strong>と<strong>「協働的な学び」</strong>の一体的充実が求められています。本システムは、AIが児童の理解度・学習特性を分析し、一人ひとりに最適な学習カードを自動生成。<strong>先生の教材準備時間を大幅削減</strong>しながら、全児童が自分のペースで学べる環境を実現します。</p>
+  </div>
+
+  <!-- システム概要 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">⚙️</span>システム概要と主要機能</div>
+    <div class="grid3">
+      <div class="card">
+        <div class="card-title">🤖 AI学習カード自動生成</div>
+        <ul>
+          <li>教科書の単元を入力するだけ</li>
+          <li>3段階コース自動作成（じっくり・しっかり・どんどん）</li>
+          <li>例題→問題→ヒントの段階的構成</li>
+          <li>児童の学習特性に応じた個別化</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">🎙️ AI先生の音声ガイド</div>
+        <ul>
+          <li>問題文の読み上げ機能</li>
+          <li>男女の先生の声を選択可能</li>
+          <li>つまずき時の励ましメッセージ</li>
+          <li>段階的なヒント音声提示</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 リアルタイム学習分析</div>
+        <ul>
+          <li>児童の回答を自動採点（AI）</li>
+          <li>理解度・進捗の可視化</li>
+          <li>つまずきポイントの自動検出</li>
+          <li>教員ダッシュボードで一覧確認</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 導入手順 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🚀</span>かんたん3ステップ導入</div>
+    <div style="display: flex; gap: 8px;">
+      <div style="flex:1;">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content"><strong>単元情報を入力</strong>（2分）<br>学年・教科・単元名を入力するだけ。教科書対応表から自動補完も可能。</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content"><strong>AIが学習カードを生成</strong>（3分）<br>3段階コースの学習カードが自動作成。例題・ヒント・採点基準を含む。</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content"><strong>QRコードを配布</strong>（1分）<br>生成されたQRコードを黒板に表示。児童がタブレットで読み取り開始。</div>
+        </div>
+      </div>
+      <div style="flex:0.85;">
+        <table class="compare-table">
+          <tr><th>項目</th><th>従来</th><th>本システム</th></tr>
+          <tr><td style="text-align:left;font-weight:700;">教材準備</td><td>2〜3時間</td><td style="color:#10b981;font-weight:800;">約6分</td></tr>
+          <tr><td style="text-align:left;font-weight:700;">コース分け</td><td>手作業</td><td style="color:#10b981;font-weight:800;">AI自動生成</td></tr>
+          <tr><td style="text-align:left;font-weight:700;">採点・評価</td><td>手作業</td><td style="color:#10b981;font-weight:800;">AI自動</td></tr>
+          <tr><td style="text-align:left;font-weight:700;">進捗把握</td><td>個別確認</td><td style="color:#10b981;font-weight:800;">リアルタイム</td></tr>
+          <tr><td style="text-align:left;font-weight:700;">つまずき対応</td><td>巡回指導</td><td style="color:#10b981;font-weight:800;">AI + 教員</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 教育効果 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📈</span>期待される教育効果</div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">👦 児童にとって</div>
+        <ul>
+          <li><span class="effect-badge">主体性</span> 自分のペースで学習でき、学ぶ楽しさを実感</li>
+          <li><span class="effect-badge">個別最適</span> 理解度に応じたコース・ヒントで確実に定着</li>
+          <li><span class="effect-badge">自己調整力</span> 自分で振り返り・目標設定する力が育つ</li>
+          <li><span class="effect-badge">UDL対応</span> 音声・画像・動画など多感覚で学べる</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">👩‍🏫 先生にとって</div>
+        <ul>
+          <li><span class="effect-badge">時間創出</span> 教材準備の大幅削減→個別指導に注力</li>
+          <li><span class="effect-badge">見える化</span> 全員の進捗・理解度をリアルタイム把握</li>
+          <li><span class="effect-badge">専門性向上</span> AIの分析データを活用した指導改善</li>
+          <li><span class="effect-badge">働き方改革</span> 業務効率化で持続可能な教育現場へ</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 安全性・対応教科 -->
+  <div class="section">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">🔒 安全性・信頼性</div>
+        <ul>
+          <li><strong>個人情報保護：</strong>ニックネーム利用、ログイン不要設計</li>
+          <li><strong>コンテンツ管理：</strong>教員が全カードを確認・編集可能</li>
+          <li><strong>学習指導要領準拠：</strong>教科書対応の出題内容</li>
+          <li><strong>端末：</strong>GIGAスクールのタブレット・PCに対応</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">📘 対応教科と今後の展望</div>
+        <ul>
+          <li><strong>現在対応：</strong>算数・数学・国語・社会・理科・英語</li>
+          <li><strong>特別支援：</strong>読み上げ・ルビ・拡大表示機能搭載</li>
+          <li><strong>今後：</strong>学校間データ連携、保護者への進捗共有、校務支援システム連携を予定</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 導入実績・費用 -->
+  <div class="section">
+    <div class="section-title"><span class="icon">💰</span>導入プランと費用</div>
+    <div class="grid3">
+      <div class="card" style="border-color: #10b981; border-width: 2px;">
+        <div class="card-title" style="color:#10b981;">🆓 無料トライアル</div>
+        <p><strong>0円</strong> / 30日間<br>全機能利用可能<br>最大3単元まで<br>※導入判断材料として</p>
+      </div>
+      <div class="card" style="border-color: #3b82f6; border-width: 2px;">
+        <div class="card-title" style="color:#3b82f6;">🏫 学校プラン</div>
+        <p><strong>要相談</strong> / 年間<br>無制限利用<br>全教科対応<br>教員研修サポート付き</p>
+      </div>
+      <div class="card" style="border-color: #8b5cf6; border-width: 2px;">
+        <div class="card-title" style="color:#8b5cf6;">🏛️ 自治体プラン</div>
+        <p><strong>要相談</strong> / 年間<br>複数校一括導入<br>カスタマイズ対応<br>データ分析レポート付き</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); color: white; border-radius: 6px; padding: 8px 14px; text-align: center; margin-top: 4px;">
+    <div style="font-size: 10pt; font-weight: 800; margin-bottom: 3px;">✨ まずは無料トライアルで、自由進度学習を体験してみませんか？</div>
+    <div style="font-size: 8pt; opacity: 0.9;">お問い合わせ・デモのご依頼は管理者まで ｜ 初期設定は30分で完了 ｜ 研修サポート有り</div>
+  </div>
+
+  <div class="footer">
+    TOCO-TON 自由進度学習支援システム ｜ 令和7年度 ｜ AI × 個別最適な学び × 協働的な学び
+  </div>
+</div>
+</body>
+</html>`)
+})
 
 // ヘルスチェック（認証不要）
 app.get('/health', async (c) => {
@@ -8920,13 +9159,24 @@ app.get('/guide/:curriculumId', async (c) => {
         try { if (card.problem_content && card.problem_content.startsWith('{')) mm = JSON.parse(card.problem_content)?.multimedia || {} } catch {}
         let hints: any[] = card._hints || []
         if (hints.length === 0) { try { hints = JSON.parse(card.hints || '[]') } catch { hints = [] } }
+        
+        // サーバー側で例題の答え重複を事前チェック
+        const mainAns = (card.correct_answer || card.answer || '').toString().trim()
+        const exAns = (card.example_answer || '').toString().trim()
+        const exSol = (card.example_solution || '').toString().trim()
+        const needsExampleFix = card.example_problem && mainAns && (
+          (exAns && exAns === mainAns) ||
+          (!exAns && exSol && exSol.includes(mainAns))
+        )
+        
         allCardsFlat.push({
           ...card,
           _mm: mm,
           _hints: hints,
           _courseInfo: info,
           _courseName: course.course_name || info.name,
-          _cardIndex: idx
+          _cardIndex: idx,
+          _needsExampleFix: needsExampleFix ? true : false
         })
       })
     }
@@ -9200,6 +9450,68 @@ app.get('/guide/:curriculumId', async (c) => {
     tactile: true,       // さわってまなぼう
     audio: true          // きいてみよう
   };
+
+  // === 例題自動修正（ページ読み込み後にバックグラウンドで実行） ===
+  (function autoFixExamplesOnLoad() {
+    setTimeout(function() {
+      var cardsToFix = [];
+      ALL_CARDS.forEach(function(c, idx) {
+        if (!c.card_id || !c.example_problem) return;
+        var mainAns = (c.correct_answer || c.answer || '').trim();
+        var exAns = (c.example_answer || '').trim();
+        var exSol = (c.example_solution || '').trim();
+        if (c._needsExampleFix || (mainAns && (
+          (exAns && exAns === mainAns) ||
+          (!exAns && exSol && exSol.indexOf(mainAns) >= 0)
+        ))) {
+          cardsToFix.push({ idx: idx, cardId: c.card_id });
+        }
+      });
+      if (cardsToFix.length === 0) {
+        console.log('✅ 全例題チェック完了：修正不要');
+        return;
+      }
+      console.log('🔧 例題自動修正: ' + cardsToFix.length + '件のカードを修正中...');
+      
+      function fixNext(i) {
+        if (i >= cardsToFix.length) {
+          console.log('✅ 例題自動修正完了');
+          return;
+        }
+        var item = cardsToFix[i];
+        console.log('🔧 修正中: card_id=' + item.cardId + ' (' + (i+1) + '/' + cardsToFix.length + ')');
+        fetch('/api/fix-example', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ card_id: item.cardId })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success && data.fixed) {
+            var c = ALL_CARDS[item.idx];
+            if (c) {
+              c.example_problem = data.example_problem;
+              c.example_solution = data.example_solution;
+              c.example_answer = data.example_answer;
+              c._needsExampleFix = false;
+            }
+            // 現在表示中のカードなら即座にUIを更新
+            if (item.idx === currentPage) {
+              renderCard(currentPage);
+            }
+            console.log('✅ card_id=' + item.cardId + ' 修正完了: ' + data.example_answer);
+          }
+          // 次のカードを修正（レート制限回避のため少し待機）
+          setTimeout(function() { fixNext(i + 1); }, 800);
+        })
+        .catch(function(err) {
+          console.warn('⚠️ card_id=' + item.cardId + ' 修正失敗:', err);
+          setTimeout(function() { fixNext(i + 1); }, 800);
+        });
+      }
+      fixNext(0);
+    }, 2000); // ページ読み込み2秒後に開始
+  })();
   // localStorageから復元
   try {
     var saved = localStorage.getItem('sectionVisibility_' + CURRICULUM_ID_PARAM);
@@ -10299,15 +10611,15 @@ app.get('/guide/:curriculumId', async (c) => {
 
     // 例題
     if (c.example_problem && SECTION_VISIBILITY.example) {
-      // 例題と問題の答えが同じかチェック
+      // サーバー側フラグまたはクライアント側チェックで例題修正が必要か判定
       var mainAns = (c.correct_answer || c.answer || '').trim();
       var exAns = (c.example_answer || '').trim();
       var exSol = (c.example_solution || '').trim();
-      var isSameAnswer = mainAns && (
+      var isSameAnswer = c._needsExampleFix || (mainAns && (
         (exAns && exAns === mainAns) || 
         (!exAns && exSol && exSol.indexOf(mainAns) >= 0) ||
         (c.example_problem && c.example_problem.indexOf(mainAns) >= 0 && exSol && exSol.indexOf(mainAns) >= 0)
-      );
+      ));
 
       html += '<div id="example-section-' + currentPage + '" style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:12px;">';
       
@@ -15193,6 +15505,99 @@ ${card.unit_name || ''}
     })
   } catch (e: any) {
     console.error('例題修正エラー:', e.message)
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// === 例題一括修正API ===
+// 全カードの例題をチェックし、答えが同じものを一括修正
+app.post('/api/fix-all-examples', async (c) => {
+  const { env } = c
+  try {
+    const geminiApiKey = env.GEMINI_API_KEY
+    if (!geminiApiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not set' }, 500)
+
+    // example_answerカラムを確認（なければ追加）
+    try { await env.DB.prepare("ALTER TABLE learning_cards ADD COLUMN example_answer TEXT DEFAULT ''").run() } catch(e) {}
+
+    // 例題があるが、example_answerが空のカードを取得
+    const cards = await env.DB.prepare(`
+      SELECT card_id, correct_answer, answer, example_problem, example_solution, example_answer, 
+             subject, grade_level, unit_name, problem_text, problem_description
+      FROM learning_cards 
+      WHERE example_problem != '' AND example_problem IS NOT NULL
+      AND (example_answer IS NULL OR example_answer = '')
+      LIMIT 50
+    `).all()
+
+    const results: any[] = []
+    let fixedCount = 0
+    
+    for (const card of (cards.results || []) as any[]) {
+      const mainAns = (card.correct_answer || card.answer || '').trim()
+      const exSol = (card.example_solution || '').trim()
+      
+      // 例題の解き方に本問題の答えが含まれているかチェック
+      const needsFix = mainAns && exSol && exSol.includes(mainAns)
+      
+      if (!needsFix) {
+        // 答えが含まれていない場合、example_answerを解き方から推測して設定
+        // 「答えは○○です」パターンから抽出
+        const ansMatch = exSol.match(/答え[はが]「([^」]+)」|答え[はが](\S+?)(?:です|。|$)/u)
+        if (ansMatch) {
+          const extractedAns = ansMatch[1] || ansMatch[2]
+          if (extractedAns && extractedAns !== mainAns) {
+            await env.DB.prepare('UPDATE learning_cards SET example_answer = ? WHERE card_id = ?').bind(extractedAns, card.card_id).run()
+            results.push({ card_id: card.card_id, action: 'extracted', example_answer: extractedAns })
+          }
+        }
+        continue
+      }
+      
+      // AIで例題を再生成
+      try {
+        const prompt = `あなたは${card.grade_level || '小学5'}年生の${card.subject || '社会'}の先生です。
+以下の本問題と同じ単元で、必ず異なる答えになる例題を作成してください。
+【本問題】${card.problem_text || card.problem_description || ''}
+【本問題の答え】${mainAns}
+【単元名】${card.unit_name || ''}
+【重要ルール】
+- 例題の答えは「${mainAns}」以外にすること
+- 同じ単元内の別の概念・用語を問う問題にする
+- ${card.grade_level || '小学5'}年生にわかる日本語で書く
+以下のJSON形式で回答：
+{"example_problem":"例題の問題文","example_solution":"解き方の説明","example_answer":"例題の答え"}`
+
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 20000)
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.8, maxOutputTokens: 500 } }) }
+        )
+        clearTimeout(timeout)
+        const data = await response.json() as any
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const result = JSON.parse(jsonMatch[0])
+          if ((result.example_answer || '').trim() !== mainAns) {
+            await env.DB.prepare('UPDATE learning_cards SET example_problem = ?, example_solution = ?, example_answer = ? WHERE card_id = ?')
+              .bind(result.example_problem, result.example_solution, result.example_answer, card.card_id).run()
+            fixedCount++
+            results.push({ card_id: card.card_id, action: 'ai_fixed', example_answer: result.example_answer })
+          }
+        }
+      } catch (err: any) {
+        results.push({ card_id: card.card_id, action: 'error', error: err.message })
+      }
+      
+      // レート制限を避けるため少し待機
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+
+    return c.json({ success: true, total: cards.results?.length || 0, fixed: fixedCount, results })
+  } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500)
   }
 })
