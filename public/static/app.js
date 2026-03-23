@@ -7018,6 +7018,12 @@ async function loadCardPage(cardId) {
                   <span id="autoVoiceStatus">読み上げOFF</span>
                 </button>
               </div>
+              <!-- AI先生の声選択 -->
+              <div id="appVoiceSelector" class="flex items-center gap-2 mb-3 p-2 bg-white rounded-lg border border-blue-200">
+                <span class="text-xs font-bold text-gray-600"><i class="fas fa-microphone mr-1"></i>AI先生の声：</span>
+                <button onclick="setAppVoicePreference('male')" id="voiceMaleBtn" class="text-xs font-bold px-3 py-1 rounded-full border-2 transition cursor-pointer" style="border-color:#3B82F6;background:#EFF6FF;color:#1E40AF;">👨 男の先生 ✓</button>
+                <button onclick="setAppVoicePreference('female')" id="voiceFemaleBtn" class="text-xs font-bold px-3 py-1 rounded-full border-2 transition cursor-pointer" style="border-color:#D1D5DB;background:#F9FAFB;color:#9CA3AF;">👩 女の先生</button>
+              </div>
               <div id="aiChat" class="space-y-3 mb-4 overflow-y-auto" style="flex:1;min-height:0;">
                 <!-- チャットメッセージがここに表示されます -->
               </div>
@@ -7440,7 +7446,7 @@ async function askAI() {
       card_title: card.card_title || '',
       problem_description: card.problem_description || card.problem_text || card.problem_content || '',
       new_terms: card.new_terms || '',
-      answer: card.correct_answer || card.answer || card.example_solution || '',
+      subject: card.subject || '',
       hints: Array.isArray(card.hints) ? card.hints.map(h => typeof h === 'string' ? h : h.hint_text || '').join('、') : ''
     } : null
     
@@ -13307,6 +13313,36 @@ function toggleAutoVoice() {
     stopTtsCard()
     if ('speechSynthesis' in window) window.speechSynthesis.cancel()
   }
+}
+
+// AI先生の声 男女選択
+function setAppVoicePreference(type) {
+  try { localStorage.setItem('voicePreference', type); } catch(e) {}
+  var maleBtn = document.getElementById('voiceMaleBtn');
+  var femaleBtn = document.getElementById('voiceFemaleBtn');
+  if (type === 'male') {
+    if (maleBtn) { maleBtn.style.borderColor = '#3B82F6'; maleBtn.style.background = '#EFF6FF'; maleBtn.style.color = '#1E40AF'; maleBtn.textContent = '👨 男の先生 ✓'; }
+    if (femaleBtn) { femaleBtn.style.borderColor = '#D1D5DB'; femaleBtn.style.background = '#F9FAFB'; femaleBtn.style.color = '#9CA3AF'; femaleBtn.textContent = '👩 女の先生'; }
+  } else {
+    if (femaleBtn) { femaleBtn.style.borderColor = '#EC4899'; femaleBtn.style.background = '#FDF2F8'; femaleBtn.style.color = '#BE185D'; femaleBtn.textContent = '👩 女の先生 ✓'; }
+    if (maleBtn) { maleBtn.style.borderColor = '#D1D5DB'; maleBtn.style.background = '#F9FAFB'; maleBtn.style.color = '#9CA3AF'; maleBtn.textContent = '👨 男の先生'; }
+  }
+  // プレビュー音声
+  speakText('こんにちは！AI先生だよ。いっしょにがんばろう！', type === 'male' ? 'male-friendly' : 'female-friendly', 0.9);
+}
+window.setAppVoicePreference = setAppVoicePreference;
+
+// ページ読み込み時に保存された音声設定を復元
+function restoreVoicePreference() {
+  try {
+    var saved = localStorage.getItem('voicePreference');
+    if (saved === 'female') setAppVoicePreference('female');
+  } catch(e) {}
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(restoreVoicePreference, 500); });
+} else {
+  setTimeout(restoreVoicePreference, 500);
 }
 
 // 回答欄のモード切り替え

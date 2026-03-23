@@ -1162,7 +1162,7 @@ app.use('*', async (c, next) => {
   c.header('X-Frame-Options', 'SAMEORIGIN')
   c.header('X-XSS-Protection', '1; mode=block')
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
-  c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+  c.header('Permissions-Policy', 'geolocation=(), camera=()')
   
   // パフォーマンスヘッダー
   const path = c.req.path
@@ -15030,25 +15030,15 @@ app.post('/api/ai/tts', async (c) => {
     let audioMime = ''
     let usedModel = ''
     
-    // 日本語自然イントネーション用の詳細なスタイル指示
-    const japaneseTtsPrompt = `# AUDIO PROFILE: 教育AI先生
-## "やさしい教え方の先生"
-
-### DIRECTOR'S NOTES
-Style: ${stylePrompt}
-- 日本語ネイティブの自然なイントネーション
-- 句読点で適切な間（ま）を取る
-- 重要な数値や単語はやや強調して読む
-- 子どもに語りかけるように、あたたかく親しみやすい口調
-- 「です・ます」調は丁寧に、「だ・である」調は自然に
-
-Pacing: ゆっくりめ（速度${speed || 0.85}）、数式や計算部分はさらにゆっくり
-Accent: 標準語（NHKアナウンサー風の明瞭な発音）
-
-### TRANSCRIPT
-${text.substring(0, 5000)}`
+    // 日本語自然イントネーション用のスタイル指示（簡潔にして応答速度を向上）
+    const japaneseTtsPrompt = `${stylePrompt}
+${text.substring(0, 4000)}`
     
     try {
+      // 15秒タイムアウトで高速フォールバック
+      const ttsAbort = new AbortController()
+      const ttsTimeout = setTimeout(() => ttsAbort.abort(), 15000)
+      
       const ttsResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`,
         {
@@ -15057,6 +15047,7 @@ ${text.substring(0, 5000)}`
             'x-goog-api-key': geminiApiKey,
             'Content-Type': 'application/json',
           },
+          signal: ttsAbort.signal,
           body: JSON.stringify({
             contents: [{
               parts: [{ text: japaneseTtsPrompt }]
@@ -15074,6 +15065,8 @@ ${text.substring(0, 5000)}`
           })
         }
       )
+      
+      clearTimeout(ttsTimeout)
       
       if (ttsResponse.ok) {
         const ttsData = await ttsResponse.json() as any
@@ -34215,7 +34208,7 @@ function securityHeaders() {
     c.header('X-Frame-Options', 'DENY')
     c.header('X-XSS-Protection', '1; mode=block')
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin')
-    c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+    c.header('Permissions-Policy', 'geolocation=(), camera=()')
     
     // HSTS (HTTPSのみ)
     if (c.req.url.startsWith('https://')) {
