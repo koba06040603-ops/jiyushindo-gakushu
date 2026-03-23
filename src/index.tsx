@@ -4525,8 +4525,8 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
     "correct_answer": "正解",
     "explanation": "解説",
     "hint_text": "ヒント",
-    "example_problem": "例題（あれば）",
-    "example_solution": "例題の解き方",
+    "example_problem": "例題（あれば。答えそのものは書かないこと）",
+    "example_hint": "例題のヒント（考え方の方向性を示す。答えは直接書かない）",
     "real_world_connection": "日常とのつながり",
     "learning_meaning": "この問題を学ぶ意味",
     "difficulty_level": "standard",
@@ -4593,7 +4593,7 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
         card.card_number,
         curriculum.curriculum_code || '',
         card.example_problem || '',
-        card.example_solution || '',
+        card.example_hint || card.example_solution || '',
         card.real_world_connection || card.real_world_context || '',
         card.correct_answer || '',
         card.explanation || '',
@@ -7856,22 +7856,27 @@ app.post('/api/cards/:cardId/generate-similar', async (c) => {
 - コース: ${card.course_name}
 - カードタイトル: ${card.card_title}
 - 元の問題: ${card.problem_description || card.problem_content || card.card_content || '問題情報なし'}
-- 解答例: ${card.answer || card.example_solution || ''}
 ${getMikataKangaekata(card.subject) ? `\n【この教科の「見方・考え方」】\n${getMikataKangaekata(card.subject)}\n→ 類似問題でもこの教科の思考の視点を活かした問いかけにしてください。\n` : ''}
 【類似問題の条件】
 1. 元の問題と**同じ学習内容**を練習できる問題にする
 2. **数字や状況を変えた**バリエーションを作成
 3. 難易度は元の問題と同程度
 4. 具体的で子どもが解ける形式
-5. 必ず解答例を付ける
+5. **答えは直接表示しない** — 3段階のヒントを代わりに提供する
+
+【★★★ 超重要: 答えを直接見せないこと ★★★】
+- "answer" フィールドには答えそのものを書かず、「考え方の最終ヒント」にとどめる
+- hint_1: まず何を考えるべきか（方向性のヒント）
+- hint_2: 具体的な手がかり（図や式の書き方、注目すべきポイント）
+- hint_3: 答えに近づくための最後のガイド（途中までの計算や考え方。最終答えは書かない）
 
 以下のJSON形式で出力してください。説明文は不要です：
 {
   "problem_text": "新しい類似問題の問題文",
-  "answer": "解答例",
-  "hint_1": "ヒント1（まず考えてほしいこと）",
-  "hint_2": "ヒント2（中間ヒント）",
-  "hint_3": "ヒント3（答えに近いヒント）"
+  "thinking_guide": "考え方のガイド（答えそのものではなく、どう考えればよいかの方向性）",
+  "hint_1": "ヒント1（まず何を考えるべきか — 方向性を示す）",
+  "hint_2": "ヒント2（具体的な手がかり — 図や式の書き方を示す）",
+  "hint_3": "ヒント3（答えに近づく最後のガイド — でも答えそのものは書かない）"
 }`
 
     const response = await fetch(
@@ -8714,11 +8719,14 @@ app.get('/guide/:curriculumId', async (c) => {
               <div style="background:#FFFBEB; border:2px solid #FDE68A; border-radius:10px; padding:10px 12px; margin-bottom:10px;">
                 <p style="font-weight:bold; color:#92400E; font-size:0.85rem; margin-bottom:4px;">💡 例題</p>
                 <p style="font-size:0.9rem; margin-bottom:6px;">${card.example_problem}</p>
-                ${card.example_solution ? `
-                <div style="background:white; border-radius:6px; padding:8px 10px; border:1px solid #FDE68A;">
-                  <p style="font-weight:bold; color:#166534; font-size:0.8rem; margin-bottom:2px;">✅ 解き方</p>
-                  <p style="font-size:0.85rem; color:#374151;">${card.example_solution}</p>
-                </div>` : ''}
+                ${card.example_hint || card.example_solution ? `
+                <details>
+                  <summary style="cursor:pointer; font-weight:bold; color:#B45309; font-size:0.8rem; user-select:none; padding:4px 0;">💡 考え方のヒントを見る</summary>
+                  <div style="background:white; border-radius:6px; padding:8px 10px; border:1px solid #FDE68A; margin-top:4px;">
+                    <p style="font-weight:bold; color:#B45309; font-size:0.8rem; margin-bottom:2px;">💡 考え方のヒント</p>
+                    <p style="font-size:0.85rem; color:#374151;">${card.example_hint || card.example_solution}</p>
+                  </div>
+                </details>` : ''}
               </div>` : ''}
               
               ${card.problem_text ? `<div style="background:#FFF1F2; border-left:4px solid #FB7185; padding:10px 14px; border-radius:0 8px 8px 0; margin-bottom:8px;"><strong style="color:#BE123C; font-size:0.85rem;">もんだい：</strong><span style="font-size:0.95rem;">${card.problem_text}</span></div>` : ''}
@@ -9079,6 +9087,14 @@ app.get('/guide/:curriculumId', async (c) => {
       <button onclick="toggleEditMode()" id="editModeBtn" style="background:#F59E0B; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">✏️ 編集モード</button>
     </div>
 
+    <!-- セクション表示制御パネル -->
+    <details class="no-print" style="margin-bottom:10px;background:white;border:1px solid #E5E7EB;border-radius:12px;overflow:hidden;">
+      <summary style="padding:10px 14px;cursor:pointer;font-size:0.8rem;font-weight:bold;color:#6B7280;user-select:none;display:flex;align-items:center;gap:6px;">
+        <i class="fas fa-sliders-h"></i> カード表示設定（セクションの表示/非表示）
+      </summary>
+      <div id="section-toggles" style="padding:8px 14px 12px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+    </details>
+
     <!-- カード表示エリア -->
     <div id="cardContainer">
       ${allCardsFlat.length === 0 ? `
@@ -9122,6 +9138,44 @@ app.get('/guide/:curriculumId', async (c) => {
   var completedCards = {};
   var aiConversation = [];
   var editMode = false;
+
+  // === セクション表示制御（不要な部分を空間的にカットできる） ===
+  var SECTION_VISIBILITY = {
+    example: true,       // 例題セクション
+    multiSense: true,    // 多感覚コンテンツ（NB2図解・ウィジェット等）
+    realWorld: true,     // 実生活とのつながり
+    video: true,         // YouTube動画
+    tactile: true,       // さわってまなぼう
+    audio: true          // きいてみよう
+  };
+  // localStorageから復元
+  try {
+    var saved = localStorage.getItem('sectionVisibility_' + CURRICULUM_ID_PARAM);
+    if (saved) SECTION_VISIBILITY = JSON.parse(saved);
+  } catch(e) {}
+
+  function toggleSectionVisibility(key) {
+    SECTION_VISIBILITY[key] = !SECTION_VISIBILITY[key];
+    try { localStorage.setItem('sectionVisibility_' + CURRICULUM_ID_PARAM, JSON.stringify(SECTION_VISIBILITY)); } catch(e) {}
+    renderCurrentCard();
+    renderSectionToggles();
+  }
+  function renderSectionToggles() {
+    var panel = document.getElementById('section-toggles');
+    if (!panel) return;
+    var items = [
+      { key: 'example', label: '💡 例題', icon: 'lightbulb' },
+      { key: 'multiSense', label: '🎨 多感覚コンテンツ', icon: 'brain' },
+      { key: 'realWorld', label: '🌍 実生活つながり', icon: 'globe' },
+      { key: 'video', label: '🎬 動画', icon: 'video' },
+      { key: 'tactile', label: '✋ さわってまなぼう', icon: 'hand-pointer' },
+      { key: 'audio', label: '🔊 きいてみよう', icon: 'volume-up' }
+    ];
+    panel.innerHTML = items.map(function(it) {
+      var on = SECTION_VISIBILITY[it.key];
+      return '<button onclick="toggleSectionVisibility(\\x27' + it.key + '\\x27)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;border:2px solid ' + (on ? '#10B981' : '#D1D5DB') + ';background:' + (on ? '#ECFDF5' : '#F9FAFB') + ';color:' + (on ? '#065F46' : '#9CA3AF') + ';font-size:0.7rem;font-weight:bold;cursor:pointer;transition:all 0.2s;">' + it.label + (on ? ' ✓' : ' ✗') + '</button>';
+    }).join('');
+  }
 
   // === 今日のきもちデータ ===
   var TODAY_MOOD = ${todayMood ? `'${todayMood.mood}'` : 'null'};
@@ -9261,6 +9315,7 @@ app.get('/guide/:curriculumId', async (c) => {
     renderCurrentCard();
     renderNavDots();
     updateNavButtons();
+    renderSectionToggles();
 
     // === F6: 間隔反復リマインダー（今日復習すべきカードの表示） ===
     if (STUDENT_ID_PARAM) {
@@ -10190,7 +10245,7 @@ app.get('/guide/:curriculumId', async (c) => {
     }
 
     // 例題
-    if (c.example_problem) {
+    if (c.example_problem && SECTION_VISIBILITY.example) {
       html += '<div style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:12px;">';
       html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
       html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
@@ -10206,7 +10261,11 @@ app.get('/guide/:curriculumId', async (c) => {
         html += '</div>';
       }
       html += '</div>';
-      if (c.example_solution) html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;"><p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p><p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p></div>';
+      if (c.example_hint || c.example_solution) {
+        html += '<details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:bold;color:#B45309;font-size:0.8rem;user-select:none;padding:4px 0;">💡 考え方のヒントを見る</summary>';
+        html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:4px;"><p style="font-weight:bold;color:#B45309;font-size:0.8rem;margin-bottom:2px;">💡 考え方のヒント</p><p style="font-size:0.85rem;color:#374151;">' + (c.example_hint || c.example_solution) + '</p></div>';
+        html += '</details>';
+      }
       html += '</div>';
     }
 
@@ -10266,21 +10325,21 @@ app.get('/guide/:curriculumId', async (c) => {
     })();
 
     // 実生活とのつながり
-    if (c.real_world_context) {
+    if (c.real_world_context && SECTION_VISIBILITY.realWorld) {
       html += '<div style="background:#F0FDF4;border-left:4px solid #22C55E;padding:8px 12px;border-radius:0 8px 8px 0;margin:8px 0;font-size:0.85rem;"><strong>🌍 実生活とのつながり：</strong>' + c.real_world_context + '</div>';
     }
 
     // 動画
-    if (ytId) {
+    if (ytId && SECTION_VISIBILITY.video) {
       html += '<div class="no-print" style="margin:10px 0;border-radius:10px;overflow:hidden;background:#000;"><div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;"><iframe style="position:absolute;top:0;left:0;width:100%;height:100%;" src="https://www.youtube.com/embed/' + ytId + '?rel=0" frameborder="0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe></div></div>';
-    } else if (ytUrl && ytUrl.includes('nhk.or.jp')) {
+    } else if (ytUrl && ytUrl.includes('nhk.or.jp') && SECTION_VISIBILITY.video) {
       html += '<div class="no-print" style="margin:10px 0;background:#EFF6FF;border:2px solid #93C5FD;border-radius:12px;padding:12px;text-align:center;"><span style="background:#2563EB;color:white;font-size:0.75rem;font-weight:bold;padding:2px 10px;border-radius:6px;">NHK for School</span><br><a href="' + ytUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#2563EB;color:white;padding:10px 20px;border-radius:10px;font-weight:bold;text-decoration:none;margin-top:8px;"><i class="fas fa-external-link-alt"></i>NHK for School で見る</a></div>';
-    } else if (ytUrl) {
+    } else if (ytUrl && SECTION_VISIBILITY.video) {
       html += '<div class="no-print" style="margin:10px 0;"><a href="' + ytUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#EF4444;color:white;padding:8px 16px;border-radius:10px;font-weight:bold;text-decoration:none;"><i class="fas fa-play-circle"></i>動画を見る</a></div>';
     }
 
     // さわってまなぼう
-    if (tactile) {
+    if (tactile && SECTION_VISIBILITY.tactile) {
       html += '<div style="background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:12px;margin:10px 0;">';
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="background:#F59E0B;color:white;font-size:0.75rem;font-weight:bold;padding:3px 10px;border-radius:20px;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>さわってまなぼう</span></div>';
       html += '<p style="font-size:0.85rem;color:#374151;margin-bottom:8px;">' + tactile + '</p>';
@@ -10294,7 +10353,7 @@ app.get('/guide/:curriculumId', async (c) => {
     }
 
     // 音声
-    if (audio) {
+    if (audio && SECTION_VISIBILITY.audio) {
       html += '<div class="no-print" style="background:#F0FDF4;border-left:4px solid #10B981;padding:10px 14px;border-radius:0 10px 10px 0;margin:10px 0;cursor:pointer;" onclick="speakGuideText(this)" data-text="' + (c.problem_text||audio).replace(/"/g, '&quot;').substring(0, 300) + '">';
       html += '<strong>🔊 きいてみよう：</strong>' + audio;
       html += '<span style="display:inline-block;margin-left:8px;background:#10B981;color:white;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:bold;">▶ タップ</span></div>';
@@ -10302,7 +10361,7 @@ app.get('/guide/:curriculumId', async (c) => {
 
     // ★ 多感覚AI提案パネル（multimedia_ai_content が存在する場合に自動表示）
     var mac = c.multimedia_ai_content;
-    if (mac) {
+    if (mac && SECTION_VISIBILITY.multiSense) {
       html += '<details id="multi-sense-panel-' + currentPage + '" class="no-print" style="margin:12px 0;border:2px solid #C4B5FD;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#F5F3FF,#EEF2FF);">';
       html += '<summary style="padding:12px 16px;cursor:pointer;font-weight:bold;font-size:0.9rem;color:#6D28D9;display:flex;align-items:center;gap:8px;user-select:none;list-style:none;"><i class="fas fa-brain" style="color:#8B5CF6;"></i>🎨 多感覚コンテンツ（AI提案・編集可能）<span style="margin-left:auto;font-size:0.7rem;font-weight:normal;color:#9CA3AF;">▼ 開く</span></summary>';
       html += '<div style="padding:12px 16px;">';
@@ -10392,7 +10451,7 @@ app.get('/guide/:curriculumId', async (c) => {
       }
 
       html += '</div></details>';
-    } else {
+    } else if (SECTION_VISIBILITY.multiSense) {
       // multimedia_ai_contentがない場合のフォールバック：簡易生成パネル
       html += '<div class="no-print" style="margin:12px 0;padding:12px 14px;background:linear-gradient(135deg,#F5F3FF,#EEF2FF);border:2px solid #DDD6FE;border-radius:14px;">';
       html += '<div style="text-align:center;margin-bottom:8px;"><strong style="font-size:0.85rem;color:#6D28D9;">🎶 もっと楽しく学ぶツール</strong></div>';
@@ -10532,7 +10591,7 @@ app.get('/guide/:curriculumId', async (c) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // さわってまなぼうウィジェット初期化
-    if (tactile) {
+    if (tactile && SECTION_VISIBILITY.tactile) {
       setTimeout(function() { initGuideWidget(currentPage, tactile, c); }, 200);
     }
 
@@ -10906,7 +10965,7 @@ app.get('/guide/:curriculumId', async (c) => {
     var prompt = '日本の' + grade + subject + 'の教科書に載る例題の図解を描いてください。\n';
     prompt += '【カードタイトル】' + cardTitle + '\n';
     prompt += '【例題】' + exProblem + '\n';
-    if (exSolution) prompt += '【解き方】' + exSolution + '\n';
+    if (exSolution) prompt += '【考え方のヒント】' + exSolution + '\n';
     prompt += '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。';
     
     fetch('/api/ai/generate-image', {
@@ -14006,12 +14065,17 @@ app.post('/api/ai/generate-problem', async (c) => {
 問題: ${card.problem_description}
 例題: ${card.example_problem}
 
+【★重要★ 答えを直接見せないこと】
+- "answer" には答えそのものではなく「考え方のガイド」を書く
+- "hint" は考える方向性を示すヒントにする
+- 児童が自分で考えて答えにたどり着けるようにする
+
 以下のJSON形式で問題を出力してください：
 {
   "problem": "新しい問題文（数値や状況を変えて）",
-  "answer": "正解",
-  "hint": "ヒント（困ったときのアドバイス）",
-  "explanation": "解き方の説明"
+  "answer": "考え方のガイド（答えそのものではなく、解法の手順や方向性を示す）",
+  "hint": "ヒント（どう考え始めればよいかのアドバイス）",
+  "explanation": "解き方の考え方（途中まで示し、最後の答えは児童に考えさせる）"
 }`
 
     const response = await fetch(
@@ -15251,8 +15315,8 @@ ${customInfo}${mikataSection}
       "textbook_page": "p.XX",
       "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
-      "example_problem": "例題（具体的な数字と場面）",
-      "example_solution": "解き方の丁寧な説明（途中式・図解の指示を含む）",
+      "example_problem": "例題（具体的な数字と場面。答えそのものは書かないこと）",
+      "example_hint": "例題のヒント（解法の手順や考え方の方向性を示す。答えは直接書かず、考え方のガイドにとどめる）",
       "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）",
       "real_world_connection": "実生活とのつながり（1文）",
       "answer": "正解（具体的・明確に。自動採点可能な短い答え）",
@@ -16122,7 +16186,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
           s(card.textbook_page),
           s(card.new_terms),
           s(card.example_problem),
-          s(card.example_solution),
+          s(card.example_hint || card.example_solution),
           s(card.real_world_connection),
           s(card.ai_teacher_message),
           s(card.ai_teacher_advice),
@@ -25597,6 +25661,16 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
     const prompt = `あなたはNano Banana 2（日本の教育AIアシスタント）です。
 子どもが画面上で「さわって学べる」インタラクティブなHTML/SVGウィジェットを1つ生成してください。
 
+【★★★ 最最重要ルール: 答えを絶対に見せないこと ★★★】
+- このウィジェットは「ヒント」であり「解答」ではありません
+- 問題の正解・解答をそのまま表示してはいけません
+- 正解の文字列・数値・用語をそのまま見えるように配置してはいけません
+- 例: 答えが「今は昔」なら、その文字列をそのまま目立つように表示してはダメ
+- 代わりに、考え方のヒントや関連概念の整理を視覚的に示す
+- 児童が「自分で考えて答えにたどり着く」ための手がかりを提供する
+- ★正しいアプローチ: 時間の流れの概念図、分類の枠組み、思考の手順を示す
+- ★間違いアプローチ: 答えの選択肢を並べてタップさせる、答えをハイライトして見せる
+
 【生成ルール ★必ず守ること★】
 1. HTMLコード1つだけ出力。<div>で始まり</div>で終わる
 2. すべてのCSSはインラインstyle属性（<style>タグ不使用）
@@ -25761,10 +25835,16 @@ app.post('/api/ai/generate-visuals-for-course', async (c) => {
       ].filter(Boolean).join('\n')
 
       const prompt = `あなたは教科書の図解イラストを描く教育デザイナーです。
-以下の学習カードの問題内容を理解し、児童が問題を解くために必要な正確な図解・ダイアグラムを描いてください。
+以下の学習カードの問題内容を理解し、児童が問題を解くために必要な図解・ダイアグラムを描いてください。
 
-【重要ルール】
-1. 問題で使われている数値・図形・関係性を正確に反映
+【★★★ 最重要ルール: 答えを見せない ★★★】
+- 図解は「考えるためのヒント」であり、正解そのものを見せてはいけません
+- 答えの文字列・数値をそのまま図に描いてはいけません
+- 代わりに、問題を理解するための概念図・関係図・構造図を描いてください
+- 児童が「自分で考えて答えにたどり着く」手がかりとなる図を描く
+
+【その他のルール】
+1. 問題の場面設定・構造・関係性を視覚的に表現
 2. 日本の教科書スタイル（カラフル、わかりやすい、白背景）
 3. 日本語ラベル・注釈つき
 4. 児童が見るだけで問題を理解できるレベルの詳細さ
