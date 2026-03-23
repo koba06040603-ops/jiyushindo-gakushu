@@ -45400,6 +45400,197 @@ app.route('/api/v4/card', v4CardApi)
 // =============================================================================
 app.route('/api/evidence', evidenceApi)
 
+// ========================================
+// 振り返りAI 概要ページ（印刷用A4 1枚）
+// ========================================
+app.get('/reflection-ai', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>振り返りAI 評価基準・理論・返答方法</title>
+<style>
+  @page { size: A4; margin: 7mm 9mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Kaku Gothic ProN','Noto Sans JP','Yu Gothic',sans-serif; font-size: 8.2pt; line-height: 1.45; color: #1a1a1a; background: white; padding: 7mm 9mm; max-width: 210mm; }
+  h1 { font-size: 13pt; text-align: center; margin-bottom: 3px; color: #1e1b4b; letter-spacing: 0.05em; border-bottom: 2.5px solid #7c3aed; padding-bottom: 2px; }
+  .subtitle { text-align: center; font-size: 7pt; color: #6b7280; margin-bottom: 5px; }
+  h2 { font-size: 9.5pt; color: #fff; background: linear-gradient(135deg,#7c3aed,#6366f1); padding: 2px 8px; border-radius: 4px; margin: 5px 0 3px; }
+  h3 { font-size: 8.5pt; color: #4338ca; margin: 3px 0 1px; border-left: 3px solid #7c3aed; padding-left: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 7.5pt; margin: 2px 0 4px; }
+  th { background: #ede9fe; color: #3730a3; font-weight: 700; text-align: left; padding: 2px 4px; border: 1px solid #c4b5fd; }
+  td { padding: 1.5px 4px; border: 1px solid #ddd6fe; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f3ff; }
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  .card { background: #faf5ff; border: 1px solid #ddd6fe; border-radius: 5px; padding: 3px 5px; }
+  .card-blue { background: #eff6ff; border-color: #bfdbfe; }
+  .card-green { background: #ecfdf5; border-color: #a7f3d0; }
+  .card-amber { background: #fffbeb; border-color: #fde68a; }
+  .card-red { background: #fef2f2; border-color: #fecaca; }
+  .badge { display: inline-block; font-size: 6.5pt; font-weight: 700; color: white; padding: 0 4px; border-radius: 3px; margin-right: 2px; }
+  .badge-violet { background: #7c3aed; }
+  .badge-blue { background: #3b82f6; }
+  .badge-green { background: #059669; }
+  .badge-amber { background: #d97706; }
+  .badge-red { background: #dc2626; }
+  .badge-pink { background: #ec4899; }
+  .tag { font-size: 6.8pt; font-weight: 600; }
+  ul { margin: 1px 0 2px 12px; }
+  li { margin-bottom: 0.5px; }
+  .arrow { color: #7c3aed; font-weight: bold; }
+  .small { font-size: 6.8pt; color: #6b7280; }
+  .footer { text-align: center; font-size: 6.5pt; color: #9ca3af; margin-top: 4px; border-top: 1px solid #e5e7eb; padding-top: 2px; }
+  .em { font-weight: 700; color: #4338ca; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+
+<h1>🧠 振り返りAI ─ 評価基準・理論・返答方法</h1>
+<p class="subtitle">自由進度学習支援システム TOCO-TON │ 振り返りAIエンジン仕様概要 │ A4 1枚</p>
+
+<!-- ===== セクション1: 理論基盤 ===== -->
+<h2>1. 理論基盤（6理論 + 補助理論の統合）</h2>
+<table>
+<tr><th style="width:22%">理論</th><th style="width:10%">効果量</th><th style="width:34%">学習科学的根拠</th><th style="width:34%">システム実装</th></tr>
+<tr><td><span class="badge badge-violet">F5</span> <b>Zimmerman</b><br>自己調整学習</td><td class="em">d = 0.52</td><td>予見→遂行→省察のサイクルで<br>自律的学習者を育成</td><td>N問ごとのミニ振り返り<br>(😊🤔😰 3択 → scaffold/interval調整)</td></tr>
+<tr><td><span class="badge badge-blue">F9</span> <b>Flavell</b><br>メタ認知理論</td><td class="em">d = 0.69</td><td>自分の思考を認知・制御する<br>「考えることを考える」能力</td><td>不正解時の4択自己分析UI<br>(忘れた/読み間違い/計算ミス/わからない)</td></tr>
+<tr><td><span class="badge badge-green">API</span> <b>Hattie</b><br>振り返り5段階</td><td class="em">d ≥ 0.75</td><td>「よかった点→改善点→学んだこと」<br>の質的深化をAIが評価</td><td>POST /api/ai/reflect<br>hourly(150字) / unit(200字) フィードバック</td></tr>
+<tr><td><span class="badge badge-pink">声がけ</span> <b>Pekrun</b><br>感情ゲート理論</td><td>─</td><td>不安・退屈が学習ゲートを閉じる<br>→ AIコーチが感情を再活性化</td><td>7段階の気分適応パラメータ<br>声がけトーン・ヒント自動展開を制御</td></tr>
+<tr><td><span class="badge badge-amber">F7</span> <b>Vygotsky</b><br>足場かけ (ZPD)</td><td class="em">d = 0.40</td><td>最近接発達領域内で<br>適切な支援→漸次撤去</td><td>scaffoldLevel (1.0→0.2)<br>3連続正解で-0.2、不正解で+0.3復帰</td></tr>
+<tr><td><span class="badge badge-red">F2</span> <b>Dweck</b><br>成長マインドセット</td><td>─</td><td>能力固定観→成長観へ<br>努力・過程を評価する称賛</td><td>正答率に応じた3段階称賛<br>努力→プロセス→方略</td></tr>
+</table>
+<p class="small">補助: <b>Kolb経験学習サイクル</b>（CE→RO→AC→AE の4段階表示で学習体験を構造化）</p>
+
+<!-- ===== セクション2: 気分適応 ===== -->
+<h2>2. 評価基準 ─ 7段階の気分適応マップ <span class="small">(getMoodCoachParams)</span></h2>
+<table>
+<tr><th>気分状態</th><th>トーン</th><th>emoji</th><th>最大難度</th><th>ヒント自動</th><th>やさしい</th><th>足場深度</th></tr>
+<tr><td>🔥 <b>excited</b> 興奮</td><td>energetic</td><td>🔥</td><td>hard</td><td>×</td><td>×</td><td>浅い</td></tr>
+<tr><td>😊 <b>happy</b> 嬉しい</td><td>positive</td><td>😊</td><td>hard</td><td>×</td><td>×</td><td>浅い</td></tr>
+<tr><td>📚 <b>calm</b> 穏やか</td><td>neutral</td><td>📚</td><td>hard</td><td>×</td><td>×</td><td>標準</td></tr>
+<tr><td>🌙 <b>tired</b> 疲れ</td><td>gentle</td><td>🌙</td><td>standard</td><td class="em">○</td><td class="em">○</td><td>深い</td></tr>
+<tr><td>🤗 <b>anxious</b> 不安</td><td>calming</td><td>🤗</td><td>standard</td><td class="em">○</td><td class="em">○</td><td>深い</td></tr>
+<tr><td>💪 <b>frustrated</b> 悔しい</td><td>empathic</td><td>💪</td><td>standard</td><td class="em">○</td><td class="em">○</td><td>深い</td></tr>
+<tr><td>🌈 <b>sad</b> 悲しい</td><td>caring</td><td>🌈</td><td>easy</td><td class="em">○</td><td class="em">○</td><td>最深</td></tr>
+</table>
+
+<!-- ===== セクション3: 5トリガー ===== -->
+<h2>3. 返答方法 ─ AIコーチ 5つのトリガー</h2>
+
+<div class="cols2">
+<div class="card">
+<h3>T1: カード表示時 <span class="small">aiCoachOnCardOpen</span></h3>
+<ul>
+<li>7気分 × 各2-3フレーズ からランダム選択</li>
+<li><b>gentleMode + 難問</b> → ヒント自動展開 + info吹き出し</li>
+<li><b>3連続不正解</b> → crisis介入（ヒント強制＋先生案内）</li>
+<li><b>3連続正解 + excited</b> → チャレンジ促進</li>
+</ul>
+</div>
+<div class="card">
+<h3>T2: 考え中の励まし <span class="small">startThinkingTimer</span></h3>
+<ul>
+<li>gentle時 <b>45秒</b> / 通常 <b>60秒</b> 経過で発動</li>
+<li>トーン別メッセージ（gentle/calming/empathic/energetic/positive/neutral）</li>
+<li>2ページ目以降＆連続2エラー未満 → 50%確率で抑制</li>
+</ul>
+</div>
+<div class="card card-green">
+<h3>T3: 正解時 <span class="small">aiCoachOnCorrect</span></h3>
+<ul>
+<li>7トーン別の称賛フレーズ <span class="badge badge-green">celebrate</span> 4秒</li>
+<li><b>F2 成長マインドセット称賛:</b><br>
+  正答率70%+ & 2連続正解 → <b>方略称賛</b>「やり方がよかった」<br>
+  正答率40%+ → <b>プロセス称賛</b>「がんばり方がいい」<br>
+  正答率40%未満 → <b>努力称賛</b>「チャレンジえらい」</li>
+<li><b>F8</b> 5連続→「天才！🏆」、3連続→「その調子！🔥」</li>
+<li><b>F7</b> 3連続正解で scaffoldLevel を -0.2</li>
+</ul>
+</div>
+<div class="card card-red">
+<h3>T4: 不正解時 <span class="small">aiCoachOnIncorrect</span></h3>
+<ul>
+<li>7トーン別の共感フレーズ <span class="badge badge-red">comfort</span> 6秒</li>
+<li>2連続不正解 + autoHint → ヒント自動展開</li>
+<li>3連続不正解 → <span class="badge badge-red">crisis</span> 介入</li>
+<li><b>F7</b> scaffoldLevel < 0.8 なら +0.3 復帰</li>
+<li><b>F9</b> メタ認知プロンプト（4択の自己分析UI）</li>
+</ul>
+</div>
+</div>
+
+<div class="card card-amber" style="margin-top:3px;">
+<h3>T5: ミニ振り返り <span class="small">F5 / N問ごとに発動</span></h3>
+<div class="cols3" style="margin-top:2px;">
+<div style="text-align:center;"><b>😊 わかってきた</b><br><span class="small">scaffold -0.1 / interval +1</span></div>
+<div style="text-align:center;"><b>🤔 まあまあ</b><br><span class="small">変化なし</span></div>
+<div style="text-align:center;"><b>😰 むずかしい</b><br><span class="small">scaffold +0.2 / interval -1</span></div>
+</div>
+<p class="small" style="margin-top:1px;">reflectionInterval: デフォルト5問。好調時→7問に延長、困難時→3問に短縮。</p>
+</div>
+
+<!-- ===== セクション4: API仕様 ===== -->
+<h2>4. 振り返りAPI仕様 <span class="small">POST /api/ai/reflect</span></h2>
+<div class="cols2">
+<div class="card card-blue">
+<h3>入出力仕様</h3>
+<table>
+<tr><th>項目</th><th>hourly（1時間）</th><th>unit（単元全体）</th></tr>
+<tr><td>入力</td><td colspan="2">{ type, reflections: { grade, good, bad, learned } }</td></tr>
+<tr><td>文字数上限</td><td><b>150字</b></td><td><b>200字</b></td></tr>
+<tr><td>maxTokens</td><td>200</td><td>300</td></tr>
+<tr><td>temperature</td><td colspan="2">0.8</td></tr>
+<tr><td>モデル</td><td colspan="2">gemini-2.5-flash-lite</td></tr>
+</table>
+</div>
+<div class="card card-blue">
+<h3>AIプロンプト 5原則</h3>
+<ol style="margin-left:14px;">
+<li>必ず<b>「がんばったね」「すごいね」</b>で始める</li>
+<li>よかったことを<b>具体的</b>にほめる</li>
+<li><b>否定語禁止</b>（ダメ/できていない/不十分）</li>
+<li>学年に応じたトーン<br><span class="small">中学生→親しみ+敬意 / 小学生→あたたかく</span></li>
+<li><b>次への意欲</b>を引き出す前向きな提案</li>
+</ol>
+<p class="small" style="margin-top:2px;"><b>フォールバック:</b> API未設定時は定型メッセージを返却</p>
+</div>
+</div>
+
+<!-- ===== セクション5: 声がけUI ===== -->
+<h2>5. 声がけUI ─ 6タイプの吹き出し <span class="small">showCoachBubble(msg, type, duration, speak)</span></h2>
+<table>
+<tr><th style="width:12%">タイプ</th><th style="width:13%">用途</th><th style="width:15%">背景色</th><th style="width:7%">icon</th><th>使用場面の例</th></tr>
+<tr><td><span class="badge badge-green">encourage</span></td><td>励まし</td><td>緑系 #ecfdf5</td><td>💚</td><td>カード開始時の声がけ、基本選択時の応援</td></tr>
+<tr><td><span class="badge badge-amber">warn</span></td><td>注意喚起</td><td>黄系 #fffbeb</td><td>⚠️</td><td>時間超過時の確認、難度注意</td></tr>
+<tr><td><span class="badge badge-pink">comfort</span></td><td>慰め・共感</td><td>ピンク #fdf2f8</td><td>💗</td><td>不正解時の共感メッセージ、疲れ時の声がけ</td></tr>
+<tr><td><span class="badge badge-blue">celebrate</span></td><td>祝福・称賛</td><td>青系 #eff6ff</td><td>🎉</td><td>正解時の称賛、連続正解のマイクロ成功</td></tr>
+<tr><td><span class="badge badge-violet">info</span></td><td>情報・ヒント</td><td>紫系 #f5f3ff</td><td>💬</td><td>考え中の励まし、gentleMode時の支援</td></tr>
+<tr><td><span class="badge badge-red">crisis</span></td><td>危機介入</td><td>赤系 #fef2f2</td><td>🆘</td><td>3連続不正解、深刻な困難検知時</td></tr>
+</table>
+<p class="small">全吹き出しは画面下部固定表示 + TTS自動読み上げ対応。表示時間: encourage/celebrate 3-4秒、comfort/crisis 5-6秒、info 7秒。</p>
+
+<!-- ===== セクション6: 動的制御変数 ===== -->
+<h2>6. セッション動的制御変数 <span class="small">window._v4Session</span></h2>
+<div class="cols3">
+<div class="card"><b>scaffoldLevel</b><br>1.0 (フル) → 0.2 (自力)<br><span class="small">≤0.4でヒントボタン非表示</span></div>
+<div class="card"><b>scaffoldFadeCount</b><br>連続正解カウンタ<br><span class="small">閾値3で-0.2フェーディング</span></div>
+<div class="card"><b>reflectionInterval</b><br>ミニ振り返り間隔<br><span class="small">デフォルト5問 (3-7可変)</span></div>
+<div class="card"><b>consecutiveErrors</b><br>連続不正解数<br><span class="small">2→autoHint / 3→crisis</span></div>
+<div class="card"><b>consecutiveCorrects</b><br>連続正解数<br><span class="small">3→scaffold減 / 5→天才!</span></div>
+<div class="card"><b>kolbPhase</b><br>経験学習フェーズ<br><span class="small">CE→RO→AC→AE循環</span></div>
+</div>
+
+<div class="footer">
+  振り返りAI エンジン v4.0 │ Gemini 2.5 Flash Lite │ Pekrun感情ゲート理論に基づく適応型AI学習支援 │ © TOCO-TON 自由進度学習支援システム
+</div>
+
+</body>
+</html>`)
+})
+
 // ============================================================
 // 静的HTML配信フォールバック（wrangler pages devローカル環境用）
 // 本番ではCloudflare Pagesの_routes.json excludeリストが処理する
@@ -45416,390 +45607,6 @@ app.get('*', async (c) => {
   return c.notFound()
 })
 
-// ========================================
-// 振り返りAI 概要ページ（印刷用A4 1枚）
-// ========================================
-app.get('/reflection-ai', (c) => {
-  return c.html(`<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>振り返りAI システム概要</title>
-<style>
-  @page { size: A4; margin: 8mm 10mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif;
-    font-size: 7.5pt;
-    line-height: 1.45;
-    color: #1a1a1a;
-    background: #f5f5f5;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .page {
-    width: 210mm;
-    min-height: 297mm;
-    max-height: 297mm;
-    overflow: hidden;
-    background: white;
-    margin: 0 auto;
-    padding: 8mm 10mm;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-  }
-  @media print {
-    body { background: white; }
-    .page { box-shadow: none; margin: 0; padding: 8mm 10mm; }
-    .no-print { display: none !important; }
-  }
-
-  /* ヘッダー */
-  .header {
-    text-align: center;
-    padding: 6px 0 5px;
-    border-bottom: 2.5px solid #1e3a5f;
-    margin-bottom: 6px;
-  }
-  .header h1 {
-    font-size: 14pt;
-    color: #1e3a5f;
-    letter-spacing: 2px;
-    font-weight: 900;
-  }
-  .header .sub {
-    font-size: 7pt;
-    color: #4b5563;
-    margin-top: 2px;
-    font-weight: 600;
-  }
-
-  /* セクション */
-  .section {
-    margin-bottom: 5px;
-  }
-  .section-title {
-    font-size: 8.5pt;
-    font-weight: 800;
-    color: white;
-    background: linear-gradient(135deg, #1e3a5f, #2d5a8e);
-    padding: 3px 10px;
-    border-radius: 4px;
-    margin-bottom: 4px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .section-title .num {
-    background: white;
-    color: #1e3a5f;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 8pt;
-    font-weight: 900;
-    flex-shrink: 0;
-  }
-
-  /* テーブル */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 7pt;
-    margin-bottom: 4px;
-  }
-  th {
-    background: #eef2f7;
-    color: #1e3a5f;
-    font-weight: 800;
-    padding: 2.5px 5px;
-    border: 1px solid #cbd5e1;
-    text-align: left;
-    font-size: 6.5pt;
-  }
-  td {
-    padding: 2px 5px;
-    border: 1px solid #cbd5e1;
-    font-weight: 500;
-    vertical-align: top;
-  }
-  td strong {
-    color: #1e3a5f;
-    font-weight: 700;
-  }
-  .badge {
-    display: inline-block;
-    padding: 0px 5px;
-    border-radius: 3px;
-    font-size: 6pt;
-    font-weight: 700;
-  }
-  .badge-green { background: #dcfce7; color: #166534; }
-  .badge-blue { background: #dbeafe; color: #1e40af; }
-  .badge-amber { background: #fef3c7; color: #92400e; }
-  .badge-red { background: #fee2e2; color: #991b1b; }
-  .badge-purple { background: #f3e8ff; color: #6b21a8; }
-
-  /* 2カラム */
-  .cols2 { display: flex; gap: 6px; }
-  .cols2 > * { flex: 1; }
-
-  /* コンパクトリスト */
-  .compact-list {
-    margin: 0;
-    padding-left: 12px;
-    font-size: 7pt;
-  }
-  .compact-list li {
-    margin-bottom: 1px;
-    font-weight: 500;
-    color: #1f2937;
-  }
-  .compact-list li strong {
-    color: #1e3a5f;
-  }
-
-  /* トリガーボックス */
-  .trigger-box {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 5px;
-    padding: 4px 6px;
-    margin-bottom: 3px;
-  }
-  .trigger-label {
-    font-size: 7pt;
-    font-weight: 800;
-    color: #1e3a5f;
-    margin-bottom: 1px;
-  }
-  .trigger-content {
-    font-size: 6.5pt;
-    color: #374151;
-    font-weight: 500;
-  }
-
-  /* フロー図 */
-  .flow-row {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    justify-content: center;
-    margin: 4px 0;
-  }
-  .flow-step {
-    background: linear-gradient(135deg, #eef2f7, #dbeafe);
-    border: 1.5px solid #93c5fd;
-    border-radius: 6px;
-    padding: 3px 8px;
-    text-align: center;
-    font-size: 6.5pt;
-    font-weight: 700;
-    color: #1e40af;
-  }
-  .flow-arrow { color: #9ca3af; font-size: 9pt; }
-
-  /* フッター */
-  .footer {
-    text-align: center;
-    font-size: 6pt;
-    color: #6b7280;
-    border-top: 1px solid #d1d5db;
-    padding-top: 3px;
-    margin-top: 4px;
-    font-weight: 600;
-  }
-
-  /* 色付き行 */
-  tr.mood-low td { background: #fef9ee; }
-  tr.mood-neg td { background: #fef2f2; }
-
-  /* ボタンサンプル */
-  .bubble-sample {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-size: 6pt;
-    font-weight: 700;
-    border: 1.5px solid;
-  }
-</style>
-</head>
-<body>
-<div class="page">
-
-  <!-- ヘッダー -->
-  <div class="header">
-    <h1>振り返りAI システム概要</h1>
-    <div class="sub">TOCO-TON 自由進度学習支援システム｜適応型AIコーチ 理論・評価基準・返答仕様</div>
-  </div>
-
-  <!-- 1. 理論的基盤 -->
-  <div class="section">
-    <div class="section-title"><span class="num">1</span>理論的基盤（6理論統合 + 補助1理論）</div>
-    <table>
-      <tr><th style="width:22%">理論</th><th style="width:16%">提唱者</th><th style="width:10%">効果量</th><th>実装内容</th><th style="width:8%">機能ID</th></tr>
-      <tr><td><strong>自己調整学習</strong></td><td>Zimmerman</td><td><span class="badge badge-green">d=0.52</span></td><td>予見→遂行→省察のミニ振り返りをN問ごとに自動表示</td><td>F5</td></tr>
-      <tr><td><strong>メタ認知</strong></td><td>Flavell</td><td><span class="badge badge-blue">d=0.69</span></td><td>不正解時「なぜ間違えたか」4択の自己分析UI</td><td>F9</td></tr>
-      <tr><td><strong>振り返り5段階モデル</strong></td><td>Hattie</td><td><span class="badge badge-purple">d=0.75+</span></td><td>1時間/単元の振り返りをAIが質的に評価・フィードバック</td><td>API</td></tr>
-      <tr><td><strong>感情ゲート理論</strong></td><td>Pekrun (2006)</td><td>-</td><td>感情状態が学習効率のゲートとして機能→AIコーチが調整</td><td>Coach</td></tr>
-      <tr><td><strong>足場かけ（ZPD）</strong></td><td>Vygotsky</td><td><span class="badge badge-amber">d=0.40</span></td><td>正解連続で足場を自動フェーディング、不正解で復帰</td><td>F7</td></tr>
-      <tr><td><strong>成長マインドセット</strong></td><td>Dweck (2006)</td><td>-</td><td>努力称賛→プロセス称賛→方略称賛の3段階適応</td><td>F2</td></tr>
-      <tr style="background:#f0f9ff;"><td><strong>経験学習サイクル</strong></td><td>Kolb</td><td>-</td><td>CE(体験)→RO(観察)→AC(概念化)→AE(実験) の4段階可視化</td><td>F3</td></tr>
-    </table>
-  </div>
-
-  <!-- 2-3 並列 -->
-  <div class="cols2">
-    <!-- 2. 気分→パラメータ -->
-    <div class="section">
-      <div class="section-title"><span class="num">2</span>気分→声がけ適応パラメータ（7段階）</div>
-      <table>
-        <tr><th>気分</th><th>トーン</th><th>ヒント<br>自動</th><th>やさしい<br>モード</th><th>最大<br>難度</th></tr>
-        <tr><td>excited</td><td>energetic</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td>hard</td></tr>
-        <tr><td>happy</td><td>positive</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td>hard</td></tr>
-        <tr><td>calm</td><td>neutral</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td>hard</td></tr>
-        <tr class="mood-low"><td>tired</td><td>gentle</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td>standard</td></tr>
-        <tr class="mood-low"><td>anxious</td><td>calming</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td>standard</td></tr>
-        <tr class="mood-neg"><td>frustrated</td><td>empathic</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td>standard</td></tr>
-        <tr class="mood-neg"><td>sad</td><td>caring</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td>easy</td></tr>
-      </table>
-      <div style="font-size:6pt; color:#6b7280; font-weight:600; padding:2px 0;">
-        ※ 学習開始時に児童が選択した気分に基づき全パラメータが自動設定
-      </div>
-    </div>
-
-    <!-- 3. セッション制御 -->
-    <div class="section">
-      <div class="section-title"><span class="num">3</span>セッション制御パラメータ（リアルタイム）</div>
-      <table>
-        <tr><th style="width:38%">パラメータ</th><th>説明</th></tr>
-        <tr><td><strong>scaffoldLevel</strong></td><td>足場レベル (1.0=フル支援 → 0.2=ほぼ自力)</td></tr>
-        <tr><td><strong>scaffoldFadeCount</strong></td><td>連続正解カウンタ（3連続で-0.2段階）</td></tr>
-        <tr><td><strong>reflectionInterval</strong></td><td>ミニ振り返り間隔（困難:3問/通常:5問/好調:7問）</td></tr>
-        <tr><td><strong>totalAnswered/Correct</strong></td><td>回答数・正答数→正答率を常時計算</td></tr>
-        <tr><td><strong>metacogPromptEnabled</strong></td><td>メタ認知プロンプト表示（連続不正解時ON）</td></tr>
-        <tr><td><strong>kolbPhase</strong></td><td>経験学習サイクルの現在段階(CE/RO/AC/AE)</td></tr>
-      </table>
-      <div style="font-size:6.5pt; color:#1e3a5f; font-weight:700; margin-top:3px;">
-        足場フェーディング・フロー:
-      </div>
-      <div class="flow-row">
-        <div class="flow-step">正解3連続</div>
-        <span class="flow-arrow">→</span>
-        <div class="flow-step">足場-0.2</div>
-        <span class="flow-arrow">→</span>
-        <div class="flow-step" style="background:#dcfce7; border-color:#22c55e; color:#166534;">自力モード<br>(0.4以下)</div>
-        <span class="flow-arrow" style="font-size:7pt;">/ 不正解→</span>
-        <div class="flow-step" style="background:#fef3c7; border-color:#f59e0b; color:#92400e;">足場復帰<br>(+0.3)</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 4. 5つのトリガー -->
-  <div class="section">
-    <div class="section-title"><span class="num">4</span>AIコーチ 5つのトリガーと返答ロジック</div>
-    <div class="cols2">
-      <div>
-        <div class="trigger-box">
-          <div class="trigger-label">T1 カード表示時 <span class="badge badge-blue">aiCoachOnCardOpen</span></div>
-          <div class="trigger-content">
-            気分7パターン x 各2-3メッセージからランダム選択。gentleMode+難問→ヒント自動展開+支援声がけ。連続不正解3回→<span style="color:#dc2626;font-weight:700">危機介入</span>（ヒント強制展開+先生ヘルプ案内）。連続正解3回+excited→チャレンジ促進。
-          </div>
-        </div>
-        <div class="trigger-box">
-          <div class="trigger-label">T2 考え中の励まし <span class="badge badge-amber">startThinkingTimer</span></div>
-          <div class="trigger-content">
-            gentle時<strong>45秒</strong> / 通常<strong>60秒</strong>経過で自動声がけ。7トーン別ヒント案内メッセージ。解答済みなら非表示。
-          </div>
-        </div>
-        <div class="trigger-box">
-          <div class="trigger-label">T3 正解時 <span class="badge badge-green">aiCoachOnCorrect</span></div>
-          <div class="trigger-content">
-            <strong>F2 成長マインドセット:</strong> 正答率70%+&連続2+→方略称賛 / 40%+→プロセス称賛 / 40%未満→努力称賛。
-            <strong>F8 マイクロ成功:</strong> 5連続「天才かも!」3連続「その調子!」。
-            <strong>F7:</strong> 3連続で足場-0.2。
-          </div>
-        </div>
-      </div>
-      <div>
-        <div class="trigger-box">
-          <div class="trigger-label">T4 不正解時 <span class="badge badge-red">aiCoachOnIncorrect</span></div>
-          <div class="trigger-content">
-            7トーン別の共感メッセージ。連続2回+autoHint→ヒント自動展開。3回→<span style="color:#dc2626;font-weight:700">crisis介入</span>。
-            <strong>F7 足場復帰:</strong> level&lt;0.8なら+0.3。
-            <strong>F9 メタ認知:</strong> 4択自己分析「やり方を忘れた/問題読み違い/計算ミス/わからない」
-          </div>
-        </div>
-        <div class="trigger-box">
-          <div class="trigger-label">T5 ミニ振り返り <span class="badge badge-purple">F5: N問ごと</span></div>
-          <div class="trigger-content">
-            3択ボタン: わかってきた/まあまあ/むずかしい。回答に応じてscaffoldLevel・reflectionIntervalを動的調整（「むずかしい」→足場+0.2・間隔3問、「わかってきた」→間隔7問に拡大）。
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 5-6 並列 -->
-  <div class="cols2">
-    <!-- 5. 振り返りAPI -->
-    <div class="section">
-      <div class="section-title"><span class="num">5</span>振り返りAIフィードバック API</div>
-      <table>
-        <tr><th></th><th>1時間振り返り (hourly)</th><th>単元振り返り (unit)</th></tr>
-        <tr><td><strong>入力</strong></td><td colspan="2">grade, good(よかったこと), bad(むずかしかったこと), learned(わかったこと)</td></tr>
-        <tr><td><strong>文字数</strong></td><td>150字以内</td><td>200字以内</td></tr>
-        <tr><td><strong>maxTokens</strong></td><td>200</td><td>300</td></tr>
-        <tr><td><strong>temperature</strong></td><td colspan="2" style="text-align:center">0.8</td></tr>
-        <tr><td><strong>モデル</strong></td><td colspan="2">Gemini 2.5 Flash Lite</td></tr>
-      </table>
-      <div style="font-size:6.5pt; color:#1e3a5f; font-weight:700; margin:3px 0 1px;">AIプロンプトの5原則:</div>
-      <ol class="compact-list" style="font-size:6.5pt;">
-        <li><strong>励ましで始める</strong>（「がんばったね」「すごいね」等）</li>
-        <li><strong>よかったことを具体的にほめる</strong></li>
-        <li><strong>否定語は絶対禁止</strong>（「ダメ」「できていない」「不十分」等）</li>
-        <li><strong>学年適応トーン</strong>（中学生→敬意+親しみ / 小学生→あたたかく）</li>
-        <li><strong>次への意欲</strong>を引き出す前向きな提案で締め</li>
-      </ol>
-    </div>
-
-    <!-- 6. 声がけUI -->
-    <div class="section">
-      <div class="section-title"><span class="num">6</span>声がけUI（showCoachBubble）</div>
-      <table>
-        <tr><th>タイプ</th><th>用途</th><th>背景</th><th>発動条件</th></tr>
-        <tr><td><span class="bubble-sample" style="background:#f0fdf4;border-color:#22c55e;color:#166534;">💚 encourage</span></td><td>励まし</td><td>緑</td><td>正解時・カード開始</td></tr>
-        <tr><td><span class="bubble-sample" style="background:#fffbeb;border-color:#f59e0b;color:#92400e;">⚠️ warn</span></td><td>注意</td><td>黄</td><td>時間経過・考え中</td></tr>
-        <tr><td><span class="bubble-sample" style="background:#fff1f2;border-color:#f43f5e;color:#881337;">💗 comfort</span></td><td>慰め</td><td>桃</td><td>不正解・gentleMode</td></tr>
-        <tr><td><span class="bubble-sample" style="background:#eff6ff;border-color:#3b82f6;color:#1e40af;">🎉 celebrate</span></td><td>祝福</td><td>青</td><td>連続正解・足場フェード</td></tr>
-        <tr><td><span class="bubble-sample" style="background:#f5f3ff;border-color:#8b5cf6;color:#5b21b6;">💬 info</span></td><td>情報</td><td>紫</td><td>ヒント案内・一般声がけ</td></tr>
-        <tr><td><span class="bubble-sample" style="background:#fef2f2;border-color:#ef4444;color:#991b1b;">🆘 crisis</span></td><td>危機介入</td><td>赤</td><td>連続不正解3回</td></tr>
-      </table>
-      <div style="font-size:6.5pt; color:#374151; font-weight:600; margin-top:3px;">
-        全吹き出しにTTS自動読み上げ付き（100文字未満の場合）。固定位置表示+自動消去（4-10秒）。閉じるボタン付き。
-      </div>
-    </div>
-  </div>
-
-  <!-- フッター -->
-  <div class="footer">
-    TOCO-TON 自由進度学習支援システム｜Gemini API (2.5 Flash Lite) 使用｜Pekrun感情ゲート理論に基づく適応型AI学習支援
-    <br>
-    <span class="no-print" style="margin-top:4px; display:inline-block;">
-      <button onclick="window.print()" style="background:#1e3a5f;color:white;border:none;padding:6px 20px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:9pt;">印刷 / PDF保存</button>
-    </span>
-  </div>
-
-</div>
-</body>
-</html>`)
-})
 
 export default app
 
