@@ -10627,8 +10627,8 @@ app.get('/guide/:curriculumId', async (c) => {
         html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p>';
         html += '<div style="display:flex;gap:6px;">';
         if (c.card_id) {
-          html += '<button onclick="fixExampleCard(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:4px 10px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>再生成</button>';
-          html += '<button onclick="editExampleWithPrompt(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:4px 10px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:3px;"></i>修正指示</button>';
+          html += '<button onclick="fixExampleCard(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(217,119,6,0.3);"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>再生成</button>';
+          html += '<button onclick="editExampleWithPrompt(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(139,92,246,0.3);"><i class="fas fa-edit" style="margin-right:3px;"></i>✏️ 修正指示</button>';
         }
         html += '</div></div>';
         html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
@@ -10653,9 +10653,9 @@ app.get('/guide/:curriculumId', async (c) => {
         }
         // 例題セクション下部にもボタンバーを表示（画像が大きい場合に上のボタンが見切れるため）
         if (c.card_id) {
-          html += '<div style="display:flex;gap:6px;justify-content:center;margin-top:8px;padding-top:8px;border-top:1px dashed #FDE68A;">';
-          html += '<button onclick="fixExampleCard(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>🔄 例題を再生成</button>';
-          html += '<button onclick="editExampleWithPrompt(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:3px;"></i>✏️ 例題を修正指示</button>';
+          html += '<div style="display:flex;gap:8px;justify-content:center;margin-top:10px;padding:10px 8px;background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border-radius:10px;border:1px solid #FDE68A;">';
+          html += '<button onclick="fixExampleCard(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:7px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(217,119,6,0.35);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🔄 例題を再生成</button>';
+          html += '<button onclick="editExampleWithPrompt(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:7px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(139,92,246,0.35);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 例題を修正指示</button>';
           html += '</div>';
         }
         html += '</div>';
@@ -11432,8 +11432,8 @@ app.get('/guide/:curriculumId', async (c) => {
     html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p>';
     html += '<div style="display:flex;gap:6px;">';
     if (cid) {
-      html += '<button onclick="fixExampleCard(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:4px 10px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>再生成</button>';
-      html += '<button onclick="editExampleWithPrompt(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:4px 10px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:3px;"></i>修正指示</button>';
+      html += '<button onclick="fixExampleCard(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(217,119,6,0.3);"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>再生成</button>';
+      html += '<button onclick="editExampleWithPrompt(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(139,92,246,0.3);"><i class="fas fa-edit" style="margin-right:3px;"></i>✏️ 修正指示</button>';
     }
     html += '</div></div>';
     html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + ep + '</p>';
@@ -11454,9 +11454,9 @@ app.get('/guide/:curriculumId', async (c) => {
     }
     // 下部にもボタンバー（画像が大きい場合に上のボタンが見切れるため）
     if (cid) {
-      html += '<div style="display:flex;gap:6px;justify-content:center;margin-top:8px;padding-top:8px;border-top:1px dashed #FDE68A;">';
-      html += '<button onclick="fixExampleCard(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>🔄 例題を再生成</button>';
-      html += '<button onclick="editExampleWithPrompt(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:3px;"></i>✏️ 例題を修正指示</button>';
+      html += '<div style="display:flex;gap:8px;justify-content:center;margin-top:10px;padding:10px 8px;background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border-radius:10px;border:1px solid #FDE68A;">';
+      html += '<button onclick="fixExampleCard(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:7px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(217,119,6,0.35);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🔄 例題を再生成</button>';
+      html += '<button onclick="editExampleWithPrompt(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:7px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(139,92,246,0.35);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 例題を修正指示</button>';
       html += '</div>';
     }
     section.innerHTML = html;
@@ -13493,7 +13493,8 @@ app.get('/guide/:curriculumId', async (c) => {
     
     // ローディング表示 + ツールバーを上に固定配置（重なり防止・常時表示）
     container.innerHTML = 
-      '<div id="nb2-toolbar-' + page + '" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;padding:8px;margin-bottom:6px;background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border-radius:10px;border:1px solid #E9D5FF;position:sticky;top:0;z-index:10;">' +
+      '<div id="nb2-toolbar-' + page + '" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;padding:10px;margin-bottom:8px;background:linear-gradient(135deg,#EDE9FE,#FCE7F3);border-radius:12px;border:2px solid #C4B5FD;position:sticky;top:0;z-index:10;box-shadow:0 2px 8px rgba(124,58,237,0.15);">' +
+      '<span style="font-size:0.7rem;font-weight:bold;color:#7C3AED;margin-right:4px;">🛠️ NB2ツール:</span>' +
       '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2で再生成</button>' +
       '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>' +
       '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>🎨 画像生成</button>' +
@@ -13575,10 +13576,11 @@ app.get('/guide/:curriculumId', async (c) => {
       // ツールバー: ウィジェット上部に再生成・編集・AI画像・AI動画ボタン
       if (toolbar) {
         toolbar.innerHTML = 
+          '<span style="font-size:0.7rem;font-weight:bold;color:#7C3AED;margin-right:4px;">🛠️ NB2ツール:</span>' +
           '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2で再生成</button>' +
-          '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>修正指示</button>' +
-          '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>画像生成</button>' +
-          '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:4px;"></i>AI動画</button>';
+          '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>' +
+          '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>🎨 画像生成</button>' +
+          '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:4px;"></i>🎬 AI動画</button>';
       }
       // 画像・動画結果エリアはウィジェットの下に分離配置（重なり防止）
       var imgVideoArea = document.getElementById('nb2-img-video-area-' + page);
@@ -45412,6 +45414,391 @@ app.get('*', async (c) => {
     } catch {}
   }
   return c.notFound()
+})
+
+// ========================================
+// 振り返りAI 概要ページ（印刷用A4 1枚）
+// ========================================
+app.get('/reflection-ai', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>振り返りAI システム概要</title>
+<style>
+  @page { size: A4; margin: 8mm 10mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif;
+    font-size: 7.5pt;
+    line-height: 1.45;
+    color: #1a1a1a;
+    background: #f5f5f5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    max-height: 297mm;
+    overflow: hidden;
+    background: white;
+    margin: 0 auto;
+    padding: 8mm 10mm;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  @media print {
+    body { background: white; }
+    .page { box-shadow: none; margin: 0; padding: 8mm 10mm; }
+    .no-print { display: none !important; }
+  }
+
+  /* ヘッダー */
+  .header {
+    text-align: center;
+    padding: 6px 0 5px;
+    border-bottom: 2.5px solid #1e3a5f;
+    margin-bottom: 6px;
+  }
+  .header h1 {
+    font-size: 14pt;
+    color: #1e3a5f;
+    letter-spacing: 2px;
+    font-weight: 900;
+  }
+  .header .sub {
+    font-size: 7pt;
+    color: #4b5563;
+    margin-top: 2px;
+    font-weight: 600;
+  }
+
+  /* セクション */
+  .section {
+    margin-bottom: 5px;
+  }
+  .section-title {
+    font-size: 8.5pt;
+    font-weight: 800;
+    color: white;
+    background: linear-gradient(135deg, #1e3a5f, #2d5a8e);
+    padding: 3px 10px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .section-title .num {
+    background: white;
+    color: #1e3a5f;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8pt;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  /* テーブル */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7pt;
+    margin-bottom: 4px;
+  }
+  th {
+    background: #eef2f7;
+    color: #1e3a5f;
+    font-weight: 800;
+    padding: 2.5px 5px;
+    border: 1px solid #cbd5e1;
+    text-align: left;
+    font-size: 6.5pt;
+  }
+  td {
+    padding: 2px 5px;
+    border: 1px solid #cbd5e1;
+    font-weight: 500;
+    vertical-align: top;
+  }
+  td strong {
+    color: #1e3a5f;
+    font-weight: 700;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0px 5px;
+    border-radius: 3px;
+    font-size: 6pt;
+    font-weight: 700;
+  }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-purple { background: #f3e8ff; color: #6b21a8; }
+
+  /* 2カラム */
+  .cols2 { display: flex; gap: 6px; }
+  .cols2 > * { flex: 1; }
+
+  /* コンパクトリスト */
+  .compact-list {
+    margin: 0;
+    padding-left: 12px;
+    font-size: 7pt;
+  }
+  .compact-list li {
+    margin-bottom: 1px;
+    font-weight: 500;
+    color: #1f2937;
+  }
+  .compact-list li strong {
+    color: #1e3a5f;
+  }
+
+  /* トリガーボックス */
+  .trigger-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    padding: 4px 6px;
+    margin-bottom: 3px;
+  }
+  .trigger-label {
+    font-size: 7pt;
+    font-weight: 800;
+    color: #1e3a5f;
+    margin-bottom: 1px;
+  }
+  .trigger-content {
+    font-size: 6.5pt;
+    color: #374151;
+    font-weight: 500;
+  }
+
+  /* フロー図 */
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    justify-content: center;
+    margin: 4px 0;
+  }
+  .flow-step {
+    background: linear-gradient(135deg, #eef2f7, #dbeafe);
+    border: 1.5px solid #93c5fd;
+    border-radius: 6px;
+    padding: 3px 8px;
+    text-align: center;
+    font-size: 6.5pt;
+    font-weight: 700;
+    color: #1e40af;
+  }
+  .flow-arrow { color: #9ca3af; font-size: 9pt; }
+
+  /* フッター */
+  .footer {
+    text-align: center;
+    font-size: 6pt;
+    color: #6b7280;
+    border-top: 1px solid #d1d5db;
+    padding-top: 3px;
+    margin-top: 4px;
+    font-weight: 600;
+  }
+
+  /* 色付き行 */
+  tr.mood-low td { background: #fef9ee; }
+  tr.mood-neg td { background: #fef2f2; }
+
+  /* ボタンサンプル */
+  .bubble-sample {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 6pt;
+    font-weight: 700;
+    border: 1.5px solid;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <h1>振り返りAI システム概要</h1>
+    <div class="sub">TOCO-TON 自由進度学習支援システム｜適応型AIコーチ 理論・評価基準・返答仕様</div>
+  </div>
+
+  <!-- 1. 理論的基盤 -->
+  <div class="section">
+    <div class="section-title"><span class="num">1</span>理論的基盤（6理論統合 + 補助1理論）</div>
+    <table>
+      <tr><th style="width:22%">理論</th><th style="width:16%">提唱者</th><th style="width:10%">効果量</th><th>実装内容</th><th style="width:8%">機能ID</th></tr>
+      <tr><td><strong>自己調整学習</strong></td><td>Zimmerman</td><td><span class="badge badge-green">d=0.52</span></td><td>予見→遂行→省察のミニ振り返りをN問ごとに自動表示</td><td>F5</td></tr>
+      <tr><td><strong>メタ認知</strong></td><td>Flavell</td><td><span class="badge badge-blue">d=0.69</span></td><td>不正解時「なぜ間違えたか」4択の自己分析UI</td><td>F9</td></tr>
+      <tr><td><strong>振り返り5段階モデル</strong></td><td>Hattie</td><td><span class="badge badge-purple">d=0.75+</span></td><td>1時間/単元の振り返りをAIが質的に評価・フィードバック</td><td>API</td></tr>
+      <tr><td><strong>感情ゲート理論</strong></td><td>Pekrun (2006)</td><td>-</td><td>感情状態が学習効率のゲートとして機能→AIコーチが調整</td><td>Coach</td></tr>
+      <tr><td><strong>足場かけ（ZPD）</strong></td><td>Vygotsky</td><td><span class="badge badge-amber">d=0.40</span></td><td>正解連続で足場を自動フェーディング、不正解で復帰</td><td>F7</td></tr>
+      <tr><td><strong>成長マインドセット</strong></td><td>Dweck (2006)</td><td>-</td><td>努力称賛→プロセス称賛→方略称賛の3段階適応</td><td>F2</td></tr>
+      <tr style="background:#f0f9ff;"><td><strong>経験学習サイクル</strong></td><td>Kolb</td><td>-</td><td>CE(体験)→RO(観察)→AC(概念化)→AE(実験) の4段階可視化</td><td>F3</td></tr>
+    </table>
+  </div>
+
+  <!-- 2-3 並列 -->
+  <div class="cols2">
+    <!-- 2. 気分→パラメータ -->
+    <div class="section">
+      <div class="section-title"><span class="num">2</span>気分→声がけ適応パラメータ（7段階）</div>
+      <table>
+        <tr><th>気分</th><th>トーン</th><th>ヒント<br>自動</th><th>やさしい<br>モード</th><th>最大<br>難度</th></tr>
+        <tr><td>excited</td><td>energetic</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td>hard</td></tr>
+        <tr><td>happy</td><td>positive</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td>hard</td></tr>
+        <tr><td>calm</td><td>neutral</td><td style="text-align:center">-</td><td style="text-align:center">-</td><td>hard</td></tr>
+        <tr class="mood-low"><td>tired</td><td>gentle</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td>standard</td></tr>
+        <tr class="mood-low"><td>anxious</td><td>calming</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td>standard</td></tr>
+        <tr class="mood-neg"><td>frustrated</td><td>empathic</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td>standard</td></tr>
+        <tr class="mood-neg"><td>sad</td><td>caring</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td style="text-align:center; color:#059669; font-weight:800">ON</td><td>easy</td></tr>
+      </table>
+      <div style="font-size:6pt; color:#6b7280; font-weight:600; padding:2px 0;">
+        ※ 学習開始時に児童が選択した気分に基づき全パラメータが自動設定
+      </div>
+    </div>
+
+    <!-- 3. セッション制御 -->
+    <div class="section">
+      <div class="section-title"><span class="num">3</span>セッション制御パラメータ（リアルタイム）</div>
+      <table>
+        <tr><th style="width:38%">パラメータ</th><th>説明</th></tr>
+        <tr><td><strong>scaffoldLevel</strong></td><td>足場レベル (1.0=フル支援 → 0.2=ほぼ自力)</td></tr>
+        <tr><td><strong>scaffoldFadeCount</strong></td><td>連続正解カウンタ（3連続で-0.2段階）</td></tr>
+        <tr><td><strong>reflectionInterval</strong></td><td>ミニ振り返り間隔（困難:3問/通常:5問/好調:7問）</td></tr>
+        <tr><td><strong>totalAnswered/Correct</strong></td><td>回答数・正答数→正答率を常時計算</td></tr>
+        <tr><td><strong>metacogPromptEnabled</strong></td><td>メタ認知プロンプト表示（連続不正解時ON）</td></tr>
+        <tr><td><strong>kolbPhase</strong></td><td>経験学習サイクルの現在段階(CE/RO/AC/AE)</td></tr>
+      </table>
+      <div style="font-size:6.5pt; color:#1e3a5f; font-weight:700; margin-top:3px;">
+        足場フェーディング・フロー:
+      </div>
+      <div class="flow-row">
+        <div class="flow-step">正解3連続</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step">足場-0.2</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-step" style="background:#dcfce7; border-color:#22c55e; color:#166534;">自力モード<br>(0.4以下)</div>
+        <span class="flow-arrow" style="font-size:7pt;">/ 不正解→</span>
+        <div class="flow-step" style="background:#fef3c7; border-color:#f59e0b; color:#92400e;">足場復帰<br>(+0.3)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 5つのトリガー -->
+  <div class="section">
+    <div class="section-title"><span class="num">4</span>AIコーチ 5つのトリガーと返答ロジック</div>
+    <div class="cols2">
+      <div>
+        <div class="trigger-box">
+          <div class="trigger-label">T1 カード表示時 <span class="badge badge-blue">aiCoachOnCardOpen</span></div>
+          <div class="trigger-content">
+            気分7パターン x 各2-3メッセージからランダム選択。gentleMode+難問→ヒント自動展開+支援声がけ。連続不正解3回→<span style="color:#dc2626;font-weight:700">危機介入</span>（ヒント強制展開+先生ヘルプ案内）。連続正解3回+excited→チャレンジ促進。
+          </div>
+        </div>
+        <div class="trigger-box">
+          <div class="trigger-label">T2 考え中の励まし <span class="badge badge-amber">startThinkingTimer</span></div>
+          <div class="trigger-content">
+            gentle時<strong>45秒</strong> / 通常<strong>60秒</strong>経過で自動声がけ。7トーン別ヒント案内メッセージ。解答済みなら非表示。
+          </div>
+        </div>
+        <div class="trigger-box">
+          <div class="trigger-label">T3 正解時 <span class="badge badge-green">aiCoachOnCorrect</span></div>
+          <div class="trigger-content">
+            <strong>F2 成長マインドセット:</strong> 正答率70%+&連続2+→方略称賛 / 40%+→プロセス称賛 / 40%未満→努力称賛。
+            <strong>F8 マイクロ成功:</strong> 5連続「天才かも!」3連続「その調子!」。
+            <strong>F7:</strong> 3連続で足場-0.2。
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="trigger-box">
+          <div class="trigger-label">T4 不正解時 <span class="badge badge-red">aiCoachOnIncorrect</span></div>
+          <div class="trigger-content">
+            7トーン別の共感メッセージ。連続2回+autoHint→ヒント自動展開。3回→<span style="color:#dc2626;font-weight:700">crisis介入</span>。
+            <strong>F7 足場復帰:</strong> level&lt;0.8なら+0.3。
+            <strong>F9 メタ認知:</strong> 4択自己分析「やり方を忘れた/問題読み違い/計算ミス/わからない」
+          </div>
+        </div>
+        <div class="trigger-box">
+          <div class="trigger-label">T5 ミニ振り返り <span class="badge badge-purple">F5: N問ごと</span></div>
+          <div class="trigger-content">
+            3択ボタン: わかってきた/まあまあ/むずかしい。回答に応じてscaffoldLevel・reflectionIntervalを動的調整（「むずかしい」→足場+0.2・間隔3問、「わかってきた」→間隔7問に拡大）。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5-6 並列 -->
+  <div class="cols2">
+    <!-- 5. 振り返りAPI -->
+    <div class="section">
+      <div class="section-title"><span class="num">5</span>振り返りAIフィードバック API</div>
+      <table>
+        <tr><th></th><th>1時間振り返り (hourly)</th><th>単元振り返り (unit)</th></tr>
+        <tr><td><strong>入力</strong></td><td colspan="2">grade, good(よかったこと), bad(むずかしかったこと), learned(わかったこと)</td></tr>
+        <tr><td><strong>文字数</strong></td><td>150字以内</td><td>200字以内</td></tr>
+        <tr><td><strong>maxTokens</strong></td><td>200</td><td>300</td></tr>
+        <tr><td><strong>temperature</strong></td><td colspan="2" style="text-align:center">0.8</td></tr>
+        <tr><td><strong>モデル</strong></td><td colspan="2">Gemini 2.5 Flash Lite</td></tr>
+      </table>
+      <div style="font-size:6.5pt; color:#1e3a5f; font-weight:700; margin:3px 0 1px;">AIプロンプトの5原則:</div>
+      <ol class="compact-list" style="font-size:6.5pt;">
+        <li><strong>励ましで始める</strong>（「がんばったね」「すごいね」等）</li>
+        <li><strong>よかったことを具体的にほめる</strong></li>
+        <li><strong>否定語は絶対禁止</strong>（「ダメ」「できていない」「不十分」等）</li>
+        <li><strong>学年適応トーン</strong>（中学生→敬意+親しみ / 小学生→あたたかく）</li>
+        <li><strong>次への意欲</strong>を引き出す前向きな提案で締め</li>
+      </ol>
+    </div>
+
+    <!-- 6. 声がけUI -->
+    <div class="section">
+      <div class="section-title"><span class="num">6</span>声がけUI（showCoachBubble）</div>
+      <table>
+        <tr><th>タイプ</th><th>用途</th><th>背景</th><th>発動条件</th></tr>
+        <tr><td><span class="bubble-sample" style="background:#f0fdf4;border-color:#22c55e;color:#166534;">💚 encourage</span></td><td>励まし</td><td>緑</td><td>正解時・カード開始</td></tr>
+        <tr><td><span class="bubble-sample" style="background:#fffbeb;border-color:#f59e0b;color:#92400e;">⚠️ warn</span></td><td>注意</td><td>黄</td><td>時間経過・考え中</td></tr>
+        <tr><td><span class="bubble-sample" style="background:#fff1f2;border-color:#f43f5e;color:#881337;">💗 comfort</span></td><td>慰め</td><td>桃</td><td>不正解・gentleMode</td></tr>
+        <tr><td><span class="bubble-sample" style="background:#eff6ff;border-color:#3b82f6;color:#1e40af;">🎉 celebrate</span></td><td>祝福</td><td>青</td><td>連続正解・足場フェード</td></tr>
+        <tr><td><span class="bubble-sample" style="background:#f5f3ff;border-color:#8b5cf6;color:#5b21b6;">💬 info</span></td><td>情報</td><td>紫</td><td>ヒント案内・一般声がけ</td></tr>
+        <tr><td><span class="bubble-sample" style="background:#fef2f2;border-color:#ef4444;color:#991b1b;">🆘 crisis</span></td><td>危機介入</td><td>赤</td><td>連続不正解3回</td></tr>
+      </table>
+      <div style="font-size:6.5pt; color:#374151; font-weight:600; margin-top:3px;">
+        全吹き出しにTTS自動読み上げ付き（100文字未満の場合）。固定位置表示+自動消去（4-10秒）。閉じるボタン付き。
+      </div>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <div class="footer">
+    TOCO-TON 自由進度学習支援システム｜Gemini API (2.5 Flash Lite) 使用｜Pekrun感情ゲート理論に基づく適応型AI学習支援
+    <br>
+    <span class="no-print" style="margin-top:4px; display:inline-block;">
+      <button onclick="window.print()" style="background:#1e3a5f;color:white;border:none;padding:6px 20px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:9pt;">印刷 / PDF保存</button>
+    </span>
+  </div>
+
+</div>
+</body>
+</html>`)
 })
 
 export default app
