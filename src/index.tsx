@@ -1381,59 +1381,49 @@ app.get('/proposal', async (c) => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>自由進度学習システム導入提案書</title>
 <style>
-  @page { size: A4; margin: 12mm 14mm; }
+  @page { size: A4; margin: 10mm 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; font-size: 9pt; color: #1a1a2e; line-height: 1.55; background: #f0f0f0; }
-  .page { width: 210mm; min-height: 297mm; max-height: 297mm; overflow: hidden; background: white; margin: 0 auto; padding: 10mm 13mm 8mm 13mm; position: relative; display: flex; flex-direction: column; }
-  @media print { body { background: white; } .page { margin: 0; padding: 10mm 13mm 8mm 13mm; box-shadow: none; } .no-print { display: none !important; } }
+  body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; font-size: 8.5pt; color: #1a1a2e; line-height: 1.45; background: #f0f0f0; }
+  .page { width: 210mm; height: 297mm; overflow: hidden; background: white; margin: 0 auto; padding: 8mm 12mm 6mm 12mm; position: relative; display: flex; flex-direction: column; }
+  @media print { body { background: white; } .page { margin: 0; padding: 8mm 12mm 6mm 12mm; box-shadow: none; } .no-print { display: none !important; } }
   @media screen { .page { box-shadow: 0 4px 20px rgba(0,0,0,0.15); margin: 10px auto; } }
   
-  /* ヘッダー */
-  .header { text-align: center; border-bottom: 3px solid #1e3a5f; padding-bottom: 6px; margin-bottom: 8px; }
-  .header h1 { font-size: 16pt; color: #1e3a5f; letter-spacing: 3px; font-weight: 900; }
-  .header .subtitle { font-size: 9pt; color: #4a6fa5; margin-top: 2px; font-weight: 600; }
-  .header .meta { font-size: 7pt; color: #888; margin-top: 3px; }
+  .header { text-align: center; border-bottom: 2.5px solid #1e3a5f; padding-bottom: 4px; margin-bottom: 5px; }
+  .header h1 { font-size: 15pt; color: #1e3a5f; letter-spacing: 2px; font-weight: 900; }
+  .header .subtitle { font-size: 8.5pt; color: #4a6fa5; margin-top: 1px; font-weight: 600; }
+  .header .meta { font-size: 7pt; color: #888; margin-top: 2px; }
   
-  /* セクション */
-  .section { margin-bottom: 7px; }
-  .section-title { font-size: 10pt; font-weight: 800; color: white; background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 4px 10px; border-radius: 4px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
-  .section-title .icon { font-size: 11pt; }
+  .section { margin-bottom: 5px; }
+  .section-title { font-size: 9.5pt; font-weight: 800; color: white; background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 3px 9px; border-radius: 3px; margin-bottom: 3px; display: flex; align-items: center; gap: 5px; }
+  .section-title .icon { font-size: 10pt; }
   
-  /* グリッド */
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
   
-  /* カード */
-  .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 6px 8px; }
-  .card-title { font-size: 8.5pt; font-weight: 800; color: #1e3a5f; margin-bottom: 2px; display: flex; align-items: center; gap: 4px; }
-  .card p, .card li { font-size: 8pt; color: #374151; line-height: 1.45; }
-  .card ul { padding-left: 14px; margin: 0; }
-  .card ul li { margin-bottom: 1px; }
+  .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px; }
+  .card-title { font-size: 8pt; font-weight: 800; color: #1e3a5f; margin-bottom: 1px; display: flex; align-items: center; gap: 3px; }
+  .card p, .card li { font-size: 7.5pt; color: #374151; line-height: 1.4; }
+  .card ul { padding-left: 12px; margin: 0; }
+  .card ul li { margin-bottom: 0; }
   
-  /* ハイライト */
-  .highlight { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1.5px solid #f59e0b; border-radius: 5px; padding: 6px 10px; margin-bottom: 7px; }
-  .highlight-title { font-size: 9pt; font-weight: 800; color: #92400e; margin-bottom: 3px; }
-  .highlight p { font-size: 8.5pt; color: #78350f; }
+  .highlight { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1.5px solid #f59e0b; border-radius: 4px; padding: 4px 8px; margin-bottom: 5px; }
+  .highlight-title { font-size: 8.5pt; font-weight: 800; color: #92400e; margin-bottom: 2px; }
+  .highlight p { font-size: 8pt; color: #78350f; }
   
-  /* ステップ */
-  .step { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
-  .step-num { background: #1e3a5f; color: white; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8pt; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
-  .step-content { font-size: 8pt; }
+  .step { display: flex; align-items: flex-start; gap: 5px; margin-bottom: 3px; }
+  .step-num { background: #1e3a5f; color: white; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 7.5pt; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+  .step-content { font-size: 7.5pt; }
   .step-content strong { color: #1e3a5f; }
   
-  /* 比較表 */
-  .compare-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
-  .compare-table th { background: #1e3a5f; color: white; padding: 3px 6px; text-align: center; font-weight: 700; }
-  .compare-table td { padding: 3px 6px; border: 1px solid #e2e8f0; text-align: center; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 7pt; }
+  .compare-table th { background: #1e3a5f; color: white; padding: 2px 4px; text-align: center; font-weight: 700; }
+  .compare-table td { padding: 2px 4px; border: 1px solid #e2e8f0; text-align: center; }
   .compare-table tr:nth-child(even) td { background: #f8fafc; }
   
-  /* 効果 */
-  .effect-badge { display: inline-block; background: #10b981; color: white; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; margin: 0 2px; }
+  .effect-badge { display: inline-block; background: #10b981; color: white; padding: 0 6px; border-radius: 8px; font-size: 7pt; font-weight: 700; margin: 0 1px; }
   
-  /* フッター */
-  .footer { border-top: 2px solid #1e3a5f; padding-top: 4px; text-align: center; font-size: 7pt; color: #6b7280; margin-top: auto; }
+  .footer { border-top: 2px solid #1e3a5f; padding-top: 3px; text-align: center; font-size: 7pt; color: #6b7280; margin-top: auto; flex-shrink: 0; }
   
-  /* 印刷ボタン */
   .print-btn { position: fixed; bottom: 20px; right: 20px; background: #1e3a5f; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999; }
   .print-btn:hover { background: #2d5a8e; }
 </style>
@@ -1441,20 +1431,17 @@ app.get('/proposal', async (c) => {
 <body>
 <button class="print-btn no-print" onclick="window.print()">🖨️ PDF印刷</button>
 <div class="page">
-  <!-- ヘッダー -->
   <div class="header">
     <h1>📚 AI活用 自由進度学習支援システム 導入提案書</h1>
     <div class="subtitle">〜 児童一人ひとりに最適化された学びを、先生の負担軽減とともに実現 〜</div>
     <div class="meta">令和8年度 ｜ 自由進度学習支援システム</div>
   </div>
 
-  <!-- 導入背景 -->
   <div class="highlight">
     <div class="highlight-title">🎯 なぜ今、自由進度学習が必要なのか</div>
-    <p>令和の日本型学校教育（中教審答申2021）では<strong>「個別最適な学び」</strong>と<strong>「協働的な学び」</strong>の一体的充実が求められています。本システムは、AIが児童の理解度・学習特性を分析し、一人ひとりに最適な学習カードを自動生成。<strong>先生の教材準備時間を大幅削減</strong>しながら、全児童が自分のペースで学べる環境を実現します。</p>
+    <p>令和の日本型学校教育（中教審答申2021）では<strong>「個別最適な学び」</strong>と<strong>「協働的な学び」</strong>の一体的充実が求められています。本システムはAIが児童の理解度を分析し、一人ひとりに最適な学習カードを自動生成。<strong>先生の教材準備時間を大幅削減</strong>しながら、全児童が自分のペースで学べる環境を実現します。</p>
   </div>
 
-  <!-- システム概要 -->
   <div class="section">
     <div class="section-title"><span class="icon">⚙️</span>システム概要と主要機能</div>
     <div class="grid3">
@@ -1462,7 +1449,7 @@ app.get('/proposal', async (c) => {
         <div class="card-title">🤖 AI学習カード自動生成</div>
         <ul>
           <li>教科書の単元を入力するだけ</li>
-          <li>3段階コース自動作成（じっくり・しっかり・どんどん）</li>
+          <li>3段階コース自動作成</li>
           <li>例題→問題→ヒントの段階的構成</li>
           <li>児童の学習特性に応じた個別化</li>
         </ul>
@@ -1479,7 +1466,7 @@ app.get('/proposal', async (c) => {
       <div class="card">
         <div class="card-title">📊 リアルタイム学習分析</div>
         <ul>
-          <li>児童の回答を自動採点（AI）</li>
+          <li>児童の回答をAI自動採点</li>
           <li>理解度・進捗の可視化</li>
           <li>つまずきポイントの自動検出</li>
           <li>教員ダッシュボードで一覧確認</li>
@@ -1488,14 +1475,13 @@ app.get('/proposal', async (c) => {
     </div>
   </div>
 
-  <!-- 導入手順 -->
   <div class="section">
     <div class="section-title"><span class="icon">🚀</span>かんたん3ステップ導入</div>
-    <div style="display: flex; gap: 8px;">
+    <div style="display: flex; gap: 6px;">
       <div style="flex:1;">
         <div class="step">
           <div class="step-num">1</div>
-          <div class="step-content"><strong>単元情報を入力</strong>（2分）<br>学年・教科・単元名を入力するだけ。教科書対応表から自動補完も可能。</div>
+          <div class="step-content"><strong>単元情報を入力</strong>（2分）<br>学年・教科・単元名を入力。教科書対応表から自動補完も可能。</div>
         </div>
         <div class="step">
           <div class="step-num">2</div>
@@ -1513,23 +1499,22 @@ app.get('/proposal', async (c) => {
           <tr><td style="text-align:left;font-weight:700;">コース分け</td><td>手作業</td><td style="color:#10b981;font-weight:800;">AI自動生成</td></tr>
           <tr><td style="text-align:left;font-weight:700;">採点・評価</td><td>手作業</td><td style="color:#10b981;font-weight:800;">AI自動</td></tr>
           <tr><td style="text-align:left;font-weight:700;">進捗把握</td><td>個別確認</td><td style="color:#10b981;font-weight:800;">リアルタイム</td></tr>
-          <tr><td style="text-align:left;font-weight:700;">つまずき対応</td><td>巡回指導</td><td style="color:#10b981;font-weight:800;">AI + 教員</td></tr>
+          <tr><td style="text-align:left;font-weight:700;">つまずき対応</td><td>巡回指導</td><td style="color:#10b981;font-weight:800;">AI+教員</td></tr>
         </table>
       </div>
     </div>
   </div>
 
-  <!-- 教育効果 -->
   <div class="section">
     <div class="section-title"><span class="icon">📈</span>期待される教育効果</div>
     <div class="grid2">
       <div class="card">
         <div class="card-title">👦 児童にとって</div>
         <ul>
-          <li><span class="effect-badge">主体性</span> 自分のペースで学習でき、学ぶ楽しさを実感</li>
+          <li><span class="effect-badge">主体性</span> 自分のペースで学び、楽しさを実感</li>
           <li><span class="effect-badge">個別最適</span> 理解度に応じたコース・ヒントで確実に定着</li>
-          <li><span class="effect-badge">自己調整力</span> 自分で振り返り・目標設定する力が育つ</li>
-          <li><span class="effect-badge">多感覚学習</span> 音声・画像・動画など多感覚で学べる</li>
+          <li><span class="effect-badge">自己調整力</span> 振り返り・目標設定する力が育つ</li>
+          <li><span class="effect-badge">多感覚</span> 音声・画像・動画など多感覚で学べる</li>
         </ul>
       </div>
       <div class="card">
@@ -1537,27 +1522,25 @@ app.get('/proposal', async (c) => {
         <ul>
           <li><span class="effect-badge">時間創出</span> 教材準備の大幅削減→個別指導に注力</li>
           <li><span class="effect-badge">見える化</span> 全員の進捗・理解度をリアルタイム把握</li>
-          <li><span class="effect-badge">専門性向上</span> AIの分析データを活用した指導改善</li>
+          <li><span class="effect-badge">専門性</span> AIの分析データを活用した指導改善</li>
           <li><span class="effect-badge">働き方改革</span> 業務効率化で持続可能な教育現場へ</li>
         </ul>
       </div>
     </div>
   </div>
 
-  <!-- 安全性・対応教科（1行に統合） -->
-  <div style="display:flex;gap:6px;margin-bottom:7px;font-size:7.5pt;color:#374151;">
-    <div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:4px 8px;"><strong style="color:#166534;">🔒 安全性：</strong>ニックネーム利用・ログイン不要 ｜ 教員が全カード確認・編集可能 ｜ 学習指導要領準拠 ｜ GIGAスクール端末対応</div>
-    <div style="flex:1;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:4px 8px;"><strong style="color:#1e40af;">📘 対応：</strong>算数・数学・国語・社会・理科・英語 ｜ 読み上げ・ルビ・拡大表示（特別支援対応） ｜ 学校間連携予定</div>
+  <div style="display:flex;gap:4px;margin-bottom:5px;font-size:7pt;color:#374151;">
+    <div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:3px;padding:3px 6px;"><strong style="color:#166534;">🔒 安全性：</strong>ニックネーム利用・ログイン不要 ｜ 教員が全カード確認・編集可能 ｜ 学習指導要領準拠 ｜ GIGAスクール端末対応</div>
+    <div style="flex:1;background:#eff6ff;border:1px solid #bfdbfe;border-radius:3px;padding:3px 6px;"><strong style="color:#1e40af;">📘 対応：</strong>算数・国語・社会・理科・英語 ｜ 読み上げ・ルビ・拡大表示（特別支援対応） ｜ 学校間連携予定</div>
   </div>
 
-  <!-- 理論的基盤 -->
-  <div class="section">
+  <div class="section" style="margin-bottom:3px;">
     <div class="section-title"><span class="icon">🧠</span>理論的基盤 ― 12の教育理論を統合した設計</div>
-    <div class="grid2" style="margin-bottom:4px;">
+    <div class="grid2" style="margin-bottom:3px;">
       <div class="card">
         <div class="card-title">📐 学習の構造化</div>
         <ul>
-          <li><strong>ソロ・タキソノミー</strong>（ビッグス）：5段階で理解度を可視化しカード難易度を自動調整</li>
+          <li><strong>ソロ・タキソノミー</strong>（ビッグス）：5段階で理解度を可視化し難易度を自動調整</li>
           <li><strong>ブルーム改訂版</strong>：記憶→創造の6認知レベルに沿った出題設計</li>
           <li><strong>コルブ経験学習サイクル</strong>：体験→省察→概念化→実験の4段階をカードに内蔵</li>
         </ul>
@@ -1565,9 +1548,9 @@ app.get('/proposal', async (c) => {
       <div class="card">
         <div class="card-title">🔄 自己調整・メタ認知</div>
         <ul>
-          <li><strong>ツィマーマン自己調整学習</strong>（効果量0.52）：予見→遂行→省察のサイクルをミニ振り返りで実装</li>
-          <li><strong>フラベルメタ認知</strong>（効果量0.69）：不正解時「なぜ間違えたか」の自己分析を自動表示</li>
-          <li><strong>ハティ振り返り5段階</strong>：第1→第5段階（効果量0.75+）の質的深化をAIが評価・支援</li>
+          <li><strong>ツィマーマン自己調整学習</strong>（効果量0.52）：予見→遂行→省察のミニ振り返り</li>
+          <li><strong>フラベルメタ認知</strong>（効果量0.69）：不正解時の自己分析を自動表示</li>
+          <li><strong>ハティ振り返り5段階</strong>（効果量0.75+）：質的深化をAIが評価・支援</li>
         </ul>
       </div>
     </div>
@@ -1575,26 +1558,25 @@ app.get('/proposal', async (c) => {
       <div class="card">
         <div class="card-title">💪 動機づけ・非認知能力</div>
         <ul>
-          <li><strong>デシ＆ライアン自己決定理論</strong>（効果量0.61）：順序・難易度・解法を児童が自己選択</li>
-          <li><strong>ドゥェック成長マインドセット</strong>：AI先生が努力過程を評価する声かけを自動生成</li>
-          <li><strong>ヴィゴツキー発達の最近接領域・足場かけ</strong>（効果量0.40）：正解連続で足場を自動フェーディング</li>
+          <li><strong>デシ＆ライアン自己決定理論</strong>（効果量0.61）：順序・難易度・解法を自己選択</li>
+          <li><strong>ドゥェック成長マインドセット</strong>：努力過程を評価する声かけを自動生成</li>
+          <li><strong>ヴィゴツキー最近接領域・足場かけ</strong>（効果量0.40）：足場を自動フェーディング</li>
         </ul>
       </div>
       <div class="card">
-        <div class="card-title">🎨 学びのユニバーサルデザイン・感情適応</div>
+        <div class="card-title">🎨 ユニバーサルデザイン・感情適応</div>
         <ul>
-          <li><strong>学びのユニバーサルデザイン</strong>：音声・画像・動画・手書き等の多感覚チャネルで学習保障</li>
+          <li><strong>学びのユニバーサルデザイン</strong>：音声・画像・動画等の多感覚で学習保障</li>
           <li><strong>アレクサンダー教科別発達理論</strong>：教科固有の思考フレームを可視化</li>
-          <li><strong>感情ゲーティング理論</strong>：学習者の気分に応じAI先生のトーンを自動調整</li>
+          <li><strong>感情ゲーティング理論</strong>：学習者の気分に応じトーンを自動調整</li>
         </ul>
       </div>
     </div>
   </div>
 
-  <!-- CTA -->
-  <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); color: white; border-radius: 6px; padding: 8px 14px; text-align: center; margin-top: 4px;">
-    <div style="font-size: 10pt; font-weight: 800; margin-bottom: 3px;">✨ エビデンスに基づく自由進度学習を、教室で体験してみませんか？</div>
-    <div style="font-size: 8pt; opacity: 0.9;">お問い合わせ・デモのご依頼は管理者まで ｜ 初期設定は30分で完了 ｜ 研修サポート有り</div>
+  <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); color: white; border-radius: 5px; padding: 6px 12px; text-align: center;">
+    <div style="font-size: 9.5pt; font-weight: 800; margin-bottom: 2px;">✨ エビデンスに基づく自由進度学習を、教室で体験してみませんか？</div>
+    <div style="font-size: 7.5pt; opacity: 0.9;">お問い合わせ・デモのご依頼は管理者まで ｜ 初期設定は30分で完了 ｜ 研修サポート有り</div>
   </div>
 
   <div class="footer">
@@ -15442,14 +15424,19 @@ ${card.unit_name || ''}
 - 例題の答えは「${mainAnswer}」と異なる値にすること
 
 【良い例】
-- 本問題「フィヨルドとは何か？」→例題「ノルウェーの海岸線を削った自然の力は何？」→答え「氷河」（同じトピックの前提知識）
+- 本問題「フィヨルドとは何か？」→例題「日本の三陸海岸のように、海岸線がギザギザに入り組んだ地形を何という？」→答え「リアス海岸」（同じ海岸地形の比較）
+- 本問題「フィヨルドとは何か？」→例題「フィヨルドを作った、山の上から流れてくる大きな氷のかたまりを何という？」→答え「氷河」（フィヨルドの成因）
 - 本問題「光合成で作られるものは？→デンプン」→例題「光合成に必要な気体は？」→答え「二酸化炭素」（同じ反応の別要素）
 - 本問題「3.8×2.5＝9.5」→例題「2.4×1.5を計算しましょう」→答え「3.6」（同じ解法で数値を変更）
-- 本問題「ポーツマス条約」→例題「日露戦争で日本海海戦を指揮した人は？」→答え「東郷平八郎」（同じ出来事の関連知識）
+- 本問題「ポーツマス条約」→例題「日露戦争の講和を仲介した国はどこ？」→答え「アメリカ」（同じ出来事の関連知識）
 
 【悪い例 — 絶対にやらないこと】
 - 本問題「フィヨルド」→例題「コンビナートとは？」（全く別のトピック — 禁止！）
+- 本問題「フィヨルド」→例題「氷河地形とは？」（小学生が知らない専門用語 — 禁止！）
 - 本問題「光合成」→例題「火山の噴火について」（関連なし — 禁止！）
+
+- 例題の答えは、その学年の児童が教科書で習う用語を使うこと
+- 児童が知らない専門用語（氷河地形、堆積作用など）は答えにしないこと
 
 - ${card.grade_level || '小学5'}年生にわかる日本語で書く
 
@@ -15582,6 +15569,7 @@ app.post('/api/fix-all-examples', async (c) => {
 - 本問題の答えの「前提知識」「構成要素」「関連概念」を問う問題にすること
 - 答えは「${mainAns}」と異なる値にするが、トピックは同じ
 - 全く別のテーマの問題は絶対に禁止（例：フィヨルド→コンビナートはNG）
+- 答えは${card.grade_level || '小学5'}年生が教科書で習う用語を使うこと。習わない専門用語（氷河地形、堆積作用等）は禁止
 - ${card.grade_level || '小学5'}年生にわかる日本語で書く
 以下のJSON形式で回答：
 {"example_problem":"例題の問題文（本問題と直接関連する内容）","example_solution":"解き方の説明","example_answer":"例題の答え（同じトピックの関連語・関連値）"}`
@@ -16082,9 +16070,10 @@ ${customInfo}${mikataSection}
 - 【★超重要★】例題は本問題と「同じ具体的トピック」に直接関連する問題にすること。例題は本問題の「前提知識・構成要素・関連概念」を問う練習問題として機能する。
 - 【★超重要★】例題と本問題の答えは異なる値だが、トピックは必ず同じ。全く別のテーマの問題は絶対禁止。
   - 算数・数学：同じ解き方で数値だけ変えた簡単な問題。例：本問題「3.8×2.5」→例題「1.2×3」
-  - 用語問題：同じトピックの前提知識・構成要素を問う。例：本問題「フィヨルド」→例題「ノルウェーの海岸を削った自然の力は？」→答え「氷河」
+  - 用語問題：同じトピックの前提知識・構成要素を問う。例：本問題「フィヨルド」→例題「日本の三陸海岸のような入り組んだ海岸地形を何という？」→答え「リアス海岸」
   - 社会・理科：本問題の理解に必要な前提知識を問う。例：本問題「光合成」→例題「光合成に必要な気体は？」→答え「二酸化炭素」
   - 全く別のテーマの問題は絶対禁止。例：本問題「フィヨルド」→例題「コンビナートとは？」→これはNG！
+  - 児童がその学年で習わない専門用語を答えにしないこと（例：「氷河地形」「堆積作用」などはNG）
   - 「例題を解けば本問題も解ける」という流れになるように設計すること。
 
 【超重要：正誤判定が明確な問題設計】
@@ -16116,7 +16105,7 @@ ${customInfo}${mikataSection}
       "textbook_page": "p.XX",
       "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
-      "example_problem": "【★超重要★】例題は本問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う。答えは異なるがトピックは同じ。例：本問題『フィヨルド』→例題『ノルウェーの海岸を削った自然の力は？』答え:『氷河』。全く別のテーマの問題は絶対禁止。",
+      "example_problem": "【★超重要★】例題は本問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う。答えは異なるがトピックは同じ。例：本問題『フィヨルド』→例題『入り組んだ海岸地形を何という？』答え:『リアス海岸』。全く別のテーマ・児童が習わない専門用語は絶対禁止。",
       "example_solution": "例題の解き方の丁寧な説明（途中式・図解の指示を含む）。例題専用の答えも最後に明記する。",
       "example_answer": "例題の答え（本問題のanswerとは異なる値だが、同じトピックの関連語）",
       "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）",
@@ -40224,7 +40213,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "ai_teacher_message": "【必須】AI先生からの励ましメッセージ。児童の学習タイプに合わせた声かけ（例：『今日はわり算に挑戦だよ！前回の掛け算がバッチリだったから、きっとできるよ！』）",
       "ai_teacher_advice": "【必須】AI先生からの学習アドバイス。問題を解くための具体的なコツ（例：『まず、何を何で割るのか、問題の中のキーワードに線を引いてみよう』）",
       "teacher_help_keywords": "【必須】わからないとき先生に聞くためのキーワード（例：『わり算、等分、あまり』）",
-      "example_problem": "【必須】例題の問題文。本番の問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う練習問題。答えは異なるがトピックは同じ。全く別のテーマは禁止。例：本問題『フィヨルド』→例題『ノルウェーの海岸を削った自然の力は？』。",
+      "example_problem": "【必須】例題の問題文。本番の問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う練習問題。答えは異なるがトピックは同じ。全く別のテーマは禁止。例：本問題『フィヨルド』→例題『入り組んだ海岸地形を何という？』答え『リアス海岸』。児童が習わない専門用語は答えにしない。",
       "example_solution": "【必須】例題の解き方。図解を含む丁寧な説明（例：『6÷2=3  6このクッキーを2つのグループに分けると、1グループ3こになります。答え：3こ』）",
       "example_answer": "【必須】例題の答え（★本問題のanswerとは絶対に異なる値にする★）",
       "example_image_description": "【必須】例題の図解説明（AI画像生成用プロンプト）。図形問題→頂点名・角度・辺の長さ等を含む正確な図の説明。文章題→場面のイラスト説明。合同・対称→2つの図形を並べて対応関係を示す図。計算のみで図不要→null",
@@ -40316,7 +40305,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   - ai_teacher_advice: 全カード必須。問題を解くための具体的なアドバイス・コツを記述すること
   - teacher_help_keywords: 全カード必須。児童が先生に質問するときの2〜4個のキーワードを記述すること
   - new_terms: 全カード必須。新出用語・概念がない場合も復習キーワードを入れること
-  - example_problem: 全カード必須。本番問題と同じ具体的トピックに直接関連する問題を用意。本問題の前提知識・構成要素を問う練習問題。答えは異なるがトピックは同じ。全く別のテーマは禁止。例：本問題「フィヨルド」→例題「ノルウェーの海岸を削った自然の力は？」答え「氷河」
+  - example_problem: 全カード必須。本番問題と同じ具体的トピックに直接関連する問題を用意。本問題の前提知識・構成要素を問う練習問題。答えは異なるがトピックは同じ。全く別のテーマは禁止。例：本問題「フィヨルド」→例題「入り組んだ海岸地形を何という？」答え「リアス海岸」。児童が習わない専門用語は答えにしない
   - example_solution: 全カード必須。例題の解き方を図解付きで丁寧に説明すること
   - example_answer: 全カード必須。例題の答え。本問題のanswerとは必ず異なる値にすること。同一の答えは絶対禁止
   - example_image_description: 図形・合同・対称・面積・グラフ等の視覚的な例題には必須。AI画像生成に使えるレベルの詳細な図解説明を記述すること（例：「四角形ABCDと四角形EFGHを横に並べた図。左の四角形は頂点A,B,C,Dが時計回りにラベル付け。右の四角形は対応する頂点E,F,G,Hがラベル付け。対応する頂点を矢印で結ぶ」）。単純計算で図が不要な場合はnull
