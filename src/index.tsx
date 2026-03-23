@@ -3351,8 +3351,13 @@ async function generateAIResponse(
 【あなたの役割】
 - ${isJH ? '生徒' : '子ども'}の質問に、わかりやすくていねいに答える
 - 全教科（${isJH ? '数学' : '算数'}、国語、理科、社会、英語など）に対応する
-- 答えを直接教えるのではなく、考え方やヒントを出す
+- 答えを直接教えるのではなく、考え方やヒントを段階的に出して、自分で答えにたどり着かせる
 - 必ず励ましの言葉を入れる
+
+【最重要ルール — 答えを直接教えない】
+🚫 答えや正解を直接言わない
+✅ 「まず〜を考えてみよう」「〜に注目するといいよ」のように段階的に導く
+✅ 用語の意味や概念の説明は直接答えてOK
 
 【回答ルール】
 1. ${grade || '小学3-4年'}生にわかる言葉を使う${isJH ? '（幼すぎる表現は避ける）' : ''}
@@ -3364,7 +3369,7 @@ async function generateAIResponse(
 【現在の教科】: ${subject || '不明'}
 【学年】: ${grade || '不明'}
 
-${isJH ? '生徒' : '子ども'}の質問に、やさしくていねいに答えてください。`;
+${isJH ? '生徒' : '子ども'}の質問に、ヒントや考え方で導いてください。`;
 
   // 会話履歴をフォーマット
   const historyText = conversationHistory
@@ -6111,36 +6116,20 @@ app.post('/api/ai/ask', async (c) => {
             parts: [{
               text: `あなたは${body.grade || '小学校'}の児童・生徒の学習をサポートする優しいAI先生です。
 
-【重要なルール】
-1. **学年に応じた言葉遣い**
-   - ${getGradeLanguageRule(body.grade)}
-   - 難しい漢字は使わず、ひらがなや簡単な言葉で説明する
-   - 学年に合わせた具体例を使う
+【最重要ルール — 答えを直接教えない】
+🚫 答えや正解を直接言ってはいけません。
+✅ 考え方・ヒント・段階的な導きで、子ども自身が答えにたどり着けるようにしてください。
+✅ 用語の意味や概念の説明は直接答えてOKです。
+✅ 問題の答え自体を聞かれたときは、ヒントや考え方で段階的に導いてください。
 
-2. **質問には必ず答える**
-   - 質問されたことには、わかりやすく答える
-   - ただし、直接答えを教えるのではなく、考え方やヒントを中心に説明する
-   - 「わかりません」「答えられません」とは言わない
+【学年に応じた言葉遣い】
+- ${getGradeLanguageRule(body.grade)}
+- 難しい漢字は使わず、ひらがなや簡単な言葉で説明する
 
-3. **対話を続ける**
-   - 説明の後に、理解を確認する質問をする
-   - 一方的な説明ではなく、対話を心がける
-   - 簡潔に答える（150文字以内）
-
-【利用可能な機能】
-✅ **手書き認識機能**
-   - 生徒が手書きで答えを書いたら、「認識」ボタンで文字に変換できます
-   - 手書きのメモやメモ帳の内容も読み取れます
-   - 数式や図形も認識できます
-   - 手書きで答えを書くことを積極的に勧めてください
-
-✅ **音声読み上げ機能**
-   - 問題文や解説を音声で聞くことができます
-   - 「読み上げ」ボタンで利用できます
-
-✅ **ヒントカード**
-   - 3段階のヒントがあります
-   - 困ったときは「ヒント」ボタンを押すよう案内してください
+【対話のルール】
+- 説明の後に、理解を確認する質問をする
+- 一方的な説明ではなく、対話を心がける
+- 200文字以内で簡潔に答える
 
 【学習カード情報】
 タイトル: ${card?.card_title || ''}
@@ -6152,10 +6141,11 @@ ${historyContext ? `【これまでの対話】\n${historyContext}\n` : ''}
 ${body.question}
 
 【回答の条件】
-- 150文字以内で答える
+- 200文字以内で答える
 - ${body.grade || '小学校'}の児童・生徒がわかる言葉で説明する
 - 質問には必ず答える（「わかりません」とは言わない）
-- 考え方やヒントを中心に、答えに近づけるように導く
+- 答えそのものは教えず、考え方やヒントで導く
+- 「まず〜を考えてみよう」「〜に注目してみよう」のように段階的に
 - 手書き認識などの機能について聞かれたら、上記の「利用可能な機能」を参考に答える`
             }]
           }],
@@ -8003,7 +7993,6 @@ ${cardContext ? `
 ${cardContext.problem_description}
 
 📚 新しく習う言葉: ${cardContext.new_terms || 'なし'}
-${cardContext.answer ? `\n📝 正解・模範解答:\n${cardContext.answer}` : ''}
 ${cardContext.hints ? `\n💡 ヒント:\n${cardContext.hints}` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${cardContext.subject ? (() => { const mk = getMikataKangaekata(cardContext.subject); return mk ? `\n【この教科の「見方・考え方」】\n${mk}\n→ 解説や説明の際、この教科固有の思考の視点を意識し、児童生徒が自然と「見方・考え方」を働かせられるように問いかけてください。\n` : '' })() : ''}
@@ -8024,8 +8013,32 @@ ${learningChoices.order ? `- 学習順序の好み: ${learningChoices.order}` : 
   考え方が「視覚的」なら図や具体例を多く。「演繹的」なら公式やルールから説明。
 ` : ''}
 
-【絶対ルール】
-1. **学習内容のみに回答する（最優先ルール）**
+【絶対ルール — 最重要】
+🚫 **答えを直接教えてはいけません！（最優先ルール）**
+   - ❌ 絶対禁止: 正解や模範解答をそのまま教えること
+   - ❌ 絶対禁止: 「答えは〇〇だよ」「正解は〇〇です」のように答えを言うこと
+   - ❌ 絶対禁止: 選択肢の正解を直接示すこと
+   - ✅ 代わりに: 考え方・ヒント・段階的な導きで子ども自身が答えにたどり着けるようにする
+
+【段階的ヒント方式 — 必ず守ること】
+子どもの質問には、以下の段階で対応してください：
+
+🔰 **ステップ1（最初の質問）**: まず問題の理解を助ける
+   - 「この問題は〜を聞いているね」と問題の意味を確認する
+   - 「まず〜を考えてみよう」と最初の一歩を示す
+   - キーワードや大事なポイントに注目するよう促す
+
+🔰 **ステップ2（もう少しヒントが欲しいとき）**: 考え方の方向を示す
+   - 「ヒントだよ！〜に注目してみよう」と具体的な着眼点を示す
+   - 「図に書いてみるとわかりやすいよ」など方法を提案
+   - 類似の簡単な例を出して、考え方のパターンを示す
+
+🔰 **ステップ3（それでもわからないとき）**: より具体的に導く
+   - 解き方の手順を示す（ただし答えそのものは言わない）
+   - 「〜を〜すると…どうなるかな？」と答えの一歩手前まで導く
+   - 「あと少し！〜を計算してみよう」と最後の一歩を自分で踏ませる
+
+1. **学習内容のみに回答する**
    - ❌ 絶対禁止: 恋愛相談、人間関係の悩み、学習以外の個人的な相談には一切答えない
    - ✅ 回答対象: ${subjectsList}などの教科の学習内容のみ
    - 🚫 学習以外の質問には: 「ごめんね、ぼくは勉強を教える先生だから、学習の質問にだけ答えることができるよ。${mathSubjectName}や国語の勉強で困っていることはある？」と丁寧に断る
@@ -8037,10 +8050,10 @@ ${learningChoices.order ? `- 学習順序の好み: ${learningChoices.order}` : 
 
 3. **どんな（学習の）質問にも必ず答える（超重要！）**
    - ❌ 絶対禁止: 「答えられません」「わかりません」「説明が難しいです」「問題が見えない」と言うこと
-   - ✅ 必ず実行: どんな質問でも、子どもに分かる形で説明を提供する
-   - ✅ 方法: 難しい内容でも、具体例・たとえ話・身近な例で説明する
-   - ✅ **簡単な質問・基本的な質問には直接答えてOK**
-   - ✅ 難しい問題や考えさせたい問題の場合のみ、考え方やヒントを段階的に導く
+   - ✅ 必ず実行: どんな質問でも、子どもに分かる形で「考え方」を提供する
+   - ✅ 方法: 難しい内容でも、具体例・たとえ話・身近な例で考え方を示す
+   - ✅ **用語の意味や概念の説明は直接答えてOK**（例:「季節風って何？」→意味を教えてOK）
+   - ✅ **問題の答え自体は段階的ヒントで導く**（例:「答えは？」→ヒントを出す）
    - ✅ **問題文の内容について聞かれたら、上記【学習する問題・内容】を必ず参照して具体的に答える**
 
 4. **問題文を常に参照する**
@@ -8052,9 +8065,9 @@ ${learningChoices.order ? `- 学習順序の好み: ${learningChoices.order}` : 
    - 「まず〜を考えてみよう」のようにステップを示す
    - 「図に書いてみるといいよ」など具体的な方法を提案
    - 「いいところに気づいたね！」など励ましを必ず入れる
-   - **300〜500文字程度で、丁寧に説明し、途中で切れないように完結した回答をする**
-   - **説明は具体例を2〜3個入れて、分かりやすくする**
-   - 最後に「〜は分かったかな？」「もっと知りたいことはある？」と理解確認・追加質問を促す
+   - **200〜400文字程度で、丁寧に説明し、途中で切れないように完結した回答をする**
+   - **答えではなく「考え方」を教える。子どもが自分で答えを出せるように導く**
+   - 最後に「〜は分かったかな？」「どう思う？」と考えを促す質問をする
    - **LaTeX記号（$記号$など）は使わず、プレーンテキストで記述する**
    - **数式は日本語と算用数字で表現する（例：n+1、2×3、x=5 など）**
 
@@ -9084,13 +9097,16 @@ app.get('/guide/:curriculumId', async (c) => {
       <button onclick="toggleEditMode()" id="editModeBtn" style="background:#F59E0B; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:0.85rem;">✏️ 編集モード</button>
     </div>
 
-    <!-- セクション表示制御パネル -->
-    <details class="no-print" style="margin-bottom:10px;background:white;border:1px solid #E5E7EB;border-radius:12px;overflow:hidden;">
-      <summary style="padding:10px 14px;cursor:pointer;font-size:0.8rem;font-weight:bold;color:#6B7280;user-select:none;display:flex;align-items:center;gap:6px;">
-        <i class="fas fa-sliders-h"></i> カード表示設定（セクションの表示/非表示）
-      </summary>
-      <div id="section-toggles" style="padding:8px 14px 12px;display:flex;flex-wrap:wrap;gap:6px;"></div>
-    </details>
+    <!-- セクション表示制御パネル（常に表示・目立つUI） -->
+    <div class="no-print" style="margin-bottom:10px;background:linear-gradient(135deg,#F8FAFC,#EFF6FF);border:2px solid #93C5FD;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(59,130,246,0.1);">
+      <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+        <span style="font-size:0.8rem;font-weight:bold;color:#1E40AF;display:flex;align-items:center;gap:6px;">
+          <i class="fas fa-sliders-h" style="color:#3B82F6;"></i> カード表示設定
+        </span>
+        <button onclick="this.parentElement.nextElementSibling.style.display=this.parentElement.nextElementSibling.style.display==='none'?'flex':'none';this.innerHTML=this.parentElement.nextElementSibling.style.display==='none'?'<i class=\\'fas fa-chevron-down\\'></i>':'<i class=\\'fas fa-chevron-up\\'></i>'" style="background:none;border:1px solid #93C5FD;border-radius:8px;padding:4px 8px;cursor:pointer;color:#3B82F6;font-size:0.7rem;"><i class="fas fa-chevron-up"></i></button>
+      </div>
+      <div id="section-toggles" style="padding:6px 14px 10px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+    </div>
 
     <!-- カード表示エリア -->
     <div id="cardContainer">
@@ -9136,6 +9152,38 @@ app.get('/guide/:curriculumId', async (c) => {
   var aiConversation = [];
   var editMode = false;
 
+  // === AI先生の音声設定 ===
+  var VOICE_PREFERENCE = 'male';  // デフォルト: 男性
+  try {
+    var savedVoice = localStorage.getItem('voicePreference');
+    if (savedVoice) VOICE_PREFERENCE = savedVoice;
+  } catch(e) {}
+
+  function setVoicePreference(type) {
+    VOICE_PREFERENCE = type;
+    try { localStorage.setItem('voicePreference', type); } catch(e) {}
+    renderVoiceSelector();
+    // プレビュー音声
+    var previewText = type === 'male' ? 'こんにちは！AI先生だよ。いっしょにがんばろう！' : 'こんにちは！AI先生だよ。いっしょにがんばろう！';
+    speakGuideText({ getAttribute: function() { return previewText; } });
+  }
+
+  function getVoiceType() {
+    if (VOICE_PREFERENCE === 'male') return 'male-friendly';
+    return 'female-friendly';
+  }
+
+  function renderVoiceSelector() {
+    var el = document.getElementById('voice-selector');
+    if (!el) return;
+    var isMale = VOICE_PREFERENCE === 'male';
+    el.innerHTML = '<div style="display:flex;align-items:center;gap:6px;">' +
+      '<span style="font-size:0.75rem;color:#4B5563;font-weight:bold;"><i class="fas fa-microphone" style="margin-right:3px;"></i>AI先生の声：</span>' +
+      '<button onclick="setVoicePreference(\\x27male\\x27)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:16px;border:2px solid ' + (isMale ? '#3B82F6' : '#D1D5DB') + ';background:' + (isMale ? '#EFF6FF' : '#F9FAFB') + ';color:' + (isMale ? '#1E40AF' : '#9CA3AF') + ';font-size:0.7rem;font-weight:bold;cursor:pointer;transition:all 0.2s;">👨 男の先生' + (isMale ? ' ✓' : '') + '</button>' +
+      '<button onclick="setVoicePreference(\\x27female\\x27)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:16px;border:2px solid ' + (!isMale ? '#EC4899' : '#D1D5DB') + ';background:' + (!isMale ? '#FDF2F8' : '#F9FAFB') + ';color:' + (!isMale ? '#BE185D' : '#9CA3AF') + ';font-size:0.7rem;font-weight:bold;cursor:pointer;transition:all 0.2s;">👩 女の先生' + (!isMale ? ' ✓' : '') + '</button>' +
+      '</div>';
+  }
+
   // === セクション表示制御（不要な部分を空間的にカットできる） ===
   var SECTION_VISIBILITY = {
     example: true,       // 例題セクション
@@ -9171,7 +9219,8 @@ app.get('/guide/:curriculumId', async (c) => {
     panel.innerHTML = items.map(function(it) {
       var on = SECTION_VISIBILITY[it.key];
       return '<button onclick="toggleSectionVisibility(\\x27' + it.key + '\\x27)" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;border:2px solid ' + (on ? '#10B981' : '#D1D5DB') + ';background:' + (on ? '#ECFDF5' : '#F9FAFB') + ';color:' + (on ? '#065F46' : '#9CA3AF') + ';font-size:0.7rem;font-weight:bold;cursor:pointer;transition:all 0.2s;">' + it.label + (on ? ' ✓' : ' ✗') + '</button>';
-    }).join('');
+    }).join('') + '<div id="voice-selector" style="width:100%;margin-top:6px;padding-top:6px;border-top:1px solid #E5E7EB;"></div>';
+    renderVoiceSelector();
   }
 
   // === 今日のきもちデータ ===
@@ -11589,7 +11638,7 @@ app.get('/guide/:curriculumId', async (c) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: msg,
-        cardContext: { card_title: card.card_title || '', problem_description: card.problem_text || card.problem_content || '', new_terms: card.new_terms || '', answer: card.correct_answer || card.answer || '', hints: '' },
+        cardContext: { card_title: card.card_title || '', problem_description: card.problem_text || card.problem_content || '', new_terms: card.new_terms || '', hints: '', subject: CURRICULUM.subject || '' },
         conversationHistory: aiConversation.map(function(c) { return { role: c.role, text: c.content }; }),
         studentGrade: CURRICULUM.grade || null,
         learningChoices: window._learningChoices || {}
@@ -12786,7 +12835,7 @@ app.get('/guide/:curriculumId', async (c) => {
     fetch('/api/ai/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text.substring(0, 2000), mood: currentMood, voiceType: 'female-friendly' })
+      body: JSON.stringify({ text: text.substring(0, 2000), mood: currentMood, voiceType: getVoiceType() })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -12844,10 +12893,18 @@ app.get('/guide/:curriculumId', async (c) => {
   function fallbackWebSpeech(text, el) {
     if (!('speechSynthesis' in window)) { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); return; }
     var u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP'; u.rate = 0.85; u.pitch = 1.1;
+    u.lang = 'ja-JP'; u.rate = 0.9; u.pitch = VOICE_PREFERENCE === 'male' ? 0.95 : 1.15;
     var voices = speechSynthesis.getVoices();
-    var jpV = voices.find(function(v){return v.lang.startsWith('ja');});
-    if (jpV) u.voice = jpV;
+    // 性別に合わせた日本語音声を優先的に選択
+    var jpVoices = voices.filter(function(v){return v.lang.startsWith('ja');});
+    var preferred = null;
+    if (VOICE_PREFERENCE === 'male') {
+      preferred = jpVoices.find(function(v){ return v.name.toLowerCase().indexOf('male') >= 0 || v.name.indexOf('Otoya') >= 0 || v.name.indexOf('Hattori') >= 0; });
+    } else {
+      preferred = jpVoices.find(function(v){ return v.name.toLowerCase().indexOf('female') >= 0 || v.name.indexOf('Kyoko') >= 0 || v.name.indexOf('O-Ren') >= 0 || v.name.indexOf('Haruka') >= 0; });
+    }
+    if (preferred) u.voice = preferred;
+    else if (jpVoices.length > 0) u.voice = jpVoices[0];
     u.onend = function() { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); };
     speechSynthesis.speak(u);
   }
@@ -12861,6 +12918,79 @@ app.get('/guide/:curriculumId', async (c) => {
   if ('speechSynthesis' in window && speechSynthesis.onvoiceschanged !== undefined) {
     speechSynthesis.onvoiceschanged = function() { speechSynthesis.getVoices(); };
   }
+
+  // === 選択テキスト読み上げ フローティングボタン ===
+  (function() {
+    if (document.getElementById('guide-floating-tts-btn')) return;
+    var btn = document.createElement('button');
+    btn.id = 'guide-floating-tts-btn';
+    btn.innerHTML = '<i class="fas fa-headphones"></i>';
+    btn.title = 'テキストを選択して読み上げ';
+    btn.style.cssText = 'position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;border:none;background:linear-gradient(135deg,#10B981,#059669);color:white;font-size:1.4rem;cursor:pointer;z-index:9999;box-shadow:0 4px 15px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;';
+    
+    btn.onclick = function() {
+      // 再生中なら停止
+      if (_ttsPlaying) {
+        if (_ttsCurrentSource) { try { _ttsCurrentSource.stop(); } catch(e){} }
+        if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel();
+        _ttsPlaying = false;
+        window._ttsCurrentSource = null;
+        btn.innerHTML = '<i class="fas fa-headphones"></i>';
+        btn.style.background = 'linear-gradient(135deg,#10B981,#059669)';
+        btn.style.animation = '';
+        return;
+      }
+      
+      // テキスト選択があればそれを読み上げ
+      var selectedText = window.getSelection().toString().trim();
+      if (selectedText && selectedText.length > 0) {
+        speakGuideText({ getAttribute: function() { return selectedText; } });
+        return;
+      }
+      
+      // 選択なしの場合は現在の問題文を読み上げ
+      var card = ALL_CARDS[currentPage];
+      if (card) {
+        speakGuideText({ getAttribute: function() { return card.problem_text || card.card_title || ''; } });
+      }
+    };
+    
+    document.body.appendChild(btn);
+    
+    // 選択テキストがあるときにボタンの見た目を変更
+    document.addEventListener('selectionchange', function() {
+      var b = document.getElementById('guide-floating-tts-btn');
+      if (!b || _ttsPlaying) return;
+      var sel = window.getSelection().toString().trim();
+      if (sel && sel.length > 1) {
+        b.innerHTML = '<i class="fas fa-play"></i>';
+        b.title = sel.substring(0, 20) + (sel.length > 20 ? '...' : '') + ' を読み上げ';
+        b.style.transform = 'scale(1.15)';
+        b.style.background = 'linear-gradient(135deg,#3B82F6,#1D4ED8)';
+      } else {
+        b.innerHTML = '<i class="fas fa-headphones"></i>';
+        b.title = 'テキストを選択して読み上げ';
+        b.style.transform = 'scale(1)';
+        b.style.background = 'linear-gradient(135deg,#10B981,#059669)';
+      }
+    });
+    
+    // _ttsPlaying の変化を監視してボタンを更新
+    var origSpeak = speakGuideText;
+    window.updateFloatingTtsButton = function(isPlaying) {
+      var b = document.getElementById('guide-floating-tts-btn');
+      if (!b) return;
+      if (isPlaying) {
+        b.innerHTML = '<i class="fas fa-stop"></i>';
+        b.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)';
+        b.style.animation = 'pulse 2s infinite';
+      } else {
+        b.innerHTML = '<i class="fas fa-headphones"></i>';
+        b.style.background = 'linear-gradient(135deg,#10B981,#059669)';
+        b.style.animation = '';
+      }
+    };
+  })();
 
   // === さわってまなぼうウィジェット ===
   function initGuideWidget(page, tactileText, card) {
@@ -14839,19 +14969,19 @@ app.post('/api/ai/tts', async (c) => {
     // Kore=Firm, Puck=Upbeat, Aoede=Breezy, Leda=Youthful, 
     // Sulafat=Warm, Achird=Friendly, Achernar=Soft, Fenrir=Excitable
     // Vindemiatrix=Gentle, Sadachbia=Lively
-    let voiceName = 'Achird'  // デフォルト: 親しみやすい声（Friendly）
+    let voiceName = 'Puck'  // デフォルト: 元気な男性的ボイス（Upbeat）
     switch(voiceType) {
       case 'female-friendly':
-        voiceName = 'Achird'    // Friendly — 親しみやすい声
+        voiceName = 'Leda'     // Youthful — 元気で若々しい女性的ボイス
         break
       case 'female-energetic':
-        voiceName = 'Leda'     // Youthful — 元気な若い声
+        voiceName = 'Sadachbia' // Lively — いきいきとした声
         break
       case 'male-friendly':
-        voiceName = 'Sulafat'  // Warm — あたたかい男性的ボイス
+        voiceName = 'Puck'     // Upbeat — 元気でスムーズな男性的ボイス
         break
       case 'male-energetic':
-        voiceName = 'Puck'     // Upbeat — 元気な男性的ボイス
+        voiceName = 'Fenrir'   // Excitable — 興奮した声
         break
       case 'calm':
         voiceName = 'Vindemiatrix' // Gentle — やさしい穏やかな声
@@ -14860,23 +14990,20 @@ app.post('/api/ai/tts', async (c) => {
         voiceName = 'Sadachbia'   // Lively — いきいきとした声
         break
       case 'teacher':
-        voiceName = 'Aoede'    // Breezy — やさしい先生風
+        voiceName = 'Puck'    // Upbeat — 元気な先生風
         break
       default:
-        voiceName = 'Achird'   // Friendly
+        voiceName = 'Puck'    // Upbeat — デフォルトは男性スムーズ
     }
     
-    // 気分に応じたスタイル指示を構築
+    // 気分に応じたスタイル指示を構築（ボイス名は変更しない — ユーザーの男女選択を尊重）
     let stylePrompt = ''
     if (mood === 'tired' || mood === 'sad') {
       stylePrompt = 'ゆっくり、やさしく、落ち着いた声で読んでください。'
-      voiceName = 'Vindemiatrix' // Gentle
     } else if (mood === 'anxious' || mood === 'frustrated') {
       stylePrompt = 'やさしく、ていねいに、安心できるように読んでください。'
-      voiceName = 'Sulafat' // Warm
     } else if (mood === 'excited') {
       stylePrompt = '明るく、楽しそうに、テンポよく読んでください。'
-      voiceName = 'Sadachbia' // Lively
     } else {
       stylePrompt = 'やさしい先生のように、わかりやすく、自然な日本語のイントネーションで読んでください。'
     }

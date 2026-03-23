@@ -23,9 +23,12 @@
     "hono": "^4.11.3"
   },
   "devDependencies": {
+    "@hono/vite-build": "^1.10.1",
+    "@hono/vite-dev-server": "^0.25.1",
     "@types/bcryptjs": "^2.4.6",
     "esbuild": "^0.24.0",
     "tailwindcss": "^3.4.19",
+    "vite": "^8.0.1",
     "wrangler": "^3.99.0"
   }
 }

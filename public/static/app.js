@@ -7668,7 +7668,7 @@ function readCardAloud() {
   fetch('/api/ai/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: text.substring(0, 2000), voiceType: 'female-friendly', mood: window._currentMood || '' })
+    body: JSON.stringify({ text: text.substring(0, 2000), voiceType: (() => { try { return (localStorage.getItem('voicePreference') === 'female') ? 'female-friendly' : 'male-friendly'; } catch(e) { return 'male-friendly'; } })(), mood: window._currentMood || '' })
   })
   .then(r => r.json())
   .then(data => {
@@ -12274,7 +12274,9 @@ function createFloatingTtsButton() {
     // テキスト選択があればそれを読み上げ
     const selectedText = window.getSelection().toString().trim()
     if (selectedText && selectedText.length > 0) {
-      speakText(selectedText, 'female-friendly', 0.85)
+      var vt = 'male-friendly';
+      try { vt = (localStorage.getItem('voicePreference') === 'female') ? 'female-friendly' : 'male-friendly'; } catch(e) {}
+      speakText(selectedText, vt, 0.9)
       return
     }
     
@@ -12334,8 +12336,13 @@ function playPcmGlobal(base64Data, sampleRate, onEnd) {
   }
 }
 
-async function speakText(text, voiceType = 'female-friendly', speed = 0.85) {
+async function speakText(text, voiceType = null, speed = 0.9) {
   if (!text || text.trim().length < 1) return
+  
+  // voiceTypeが未指定の場合はlocalStorageから取得
+  if (!voiceType) {
+    try { voiceType = (localStorage.getItem('voicePreference') === 'female') ? 'female-friendly' : 'male-friendly'; } catch(e) { voiceType = 'male-friendly'; }
+  }
   
   // 再生中なら停止
   if (_globalTtsPlaying) {
@@ -12384,7 +12391,7 @@ async function speakText(text, voiceType = 'female-friendly', speed = 0.85) {
   speakTextWebSpeechFallback(text, speed)
 }
 
-function speakTextWebSpeechFallback(text, speed = 0.85) {
+function speakTextWebSpeechFallback(text, speed = 0.9) {
   if (!('speechSynthesis' in window)) {
     _globalTtsPlaying = false
     updateFloatingTtsButton(false)
@@ -12396,7 +12403,9 @@ function speakTextWebSpeechFallback(text, speed = 0.85) {
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'ja-JP'
   u.rate = speed
-  u.pitch = 1.1
+  var isMale = true;
+  try { isMale = localStorage.getItem('voicePreference') !== 'female'; } catch(e) {}
+  u.pitch = isMale ? 0.95 : 1.15
   const voices = window.speechSynthesis.getVoices()
   const jaVoice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
     || voices.find(v => v.lang === 'ja-JP')
