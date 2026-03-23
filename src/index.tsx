@@ -10651,6 +10651,13 @@ app.get('/guide/:curriculumId', async (c) => {
           }
           html += '</div>';
         }
+        // 例題セクション下部にもボタンバーを表示（画像が大きい場合に上のボタンが見切れるため）
+        if (c.card_id) {
+          html += '<div style="display:flex;gap:6px;justify-content:center;margin-top:8px;padding-top:8px;border-top:1px dashed #FDE68A;">';
+          html += '<button onclick="fixExampleCard(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>🔄 例題を再生成</button>';
+          html += '<button onclick="editExampleWithPrompt(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:3px;"></i>✏️ 例題を修正指示</button>';
+          html += '</div>';
+        }
         html += '</div>';
       }
     }
@@ -11445,6 +11452,13 @@ app.get('/guide/:curriculumId', async (c) => {
       }
       html += '</div>';
     }
+    // 下部にもボタンバー（画像が大きい場合に上のボタンが見切れるため）
+    if (cid) {
+      html += '<div style="display:flex;gap:6px;justify-content:center;margin-top:8px;padding-top:8px;border-top:1px dashed #FDE68A;">';
+      html += '<button onclick="fixExampleCard(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>🔄 例題を再生成</button>';
+      html += '<button onclick="editExampleWithPrompt(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.72rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:3px;"></i>✏️ 例題を修正指示</button>';
+      html += '</div>';
+    }
     section.innerHTML = html;
   }
 
@@ -11484,11 +11498,16 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.success && data.image_url) {
+        var cid = c.card_id || c.id || 0;
         var html = '<div style="text-align:center;margin:8px 0;">';
         html += '<img src="' + data.image_url + '" alt="例題の図" style="max-width:100%;max-height:280px;border-radius:10px;border:2px solid #FDE68A;">';
-        html += '<div style="display:flex;justify-content:center;gap:8px;margin-top:6px;">';
-        html += '<p style="font-size:0.65rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0) / 1000) + '秒</p>';
-        html += '<button onclick="generateExampleDiagram(' + page + ')" style="font-size:0.7rem;color:#D97706;background:none;border:1px solid #FDE68A;padding:2px 10px;border-radius:6px;cursor:pointer;">🔄 もう一度</button>';
+        html += '<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">';
+        html += '<p style="font-size:0.65rem;color:#9CA3AF;margin:0;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0) / 1000) + '秒</p>';
+        html += '<button onclick="generateExampleDiagram(' + page + ')" style="font-size:0.7rem;color:#D97706;background:none;border:1px solid #FDE68A;padding:2px 10px;border-radius:6px;cursor:pointer;">🖼️ 図を再生成</button>';
+        if (cid) {
+          html += '<button onclick="fixExampleCard(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:3px 10px;border-radius:6px;font-size:0.68rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:2px;"></i>🔄 例題再生成</button>';
+          html += '<button onclick="editExampleWithPrompt(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:3px 10px;border-radius:6px;font-size:0.68rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:2px;"></i>✏️ 例題修正指示</button>';
+        }
         html += '</div></div>';
         area.innerHTML = html;
       } else {
@@ -13472,9 +13491,13 @@ app.get('/guide/:curriculumId', async (c) => {
     var mm = card._mm || {};
     var tactile = tactileText || mm.tactile_activity || '';
     
-    // ローディング表示 + ツールバーを上に配置（重なり防止）
+    // ローディング表示 + ツールバーを上に固定配置（重なり防止・常時表示）
     container.innerHTML = 
-      '<div id="nb2-toolbar-' + page + '" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;padding:8px;margin-bottom:6px;background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border-radius:10px;border:1px solid #E9D5FF;">' +
+      '<div id="nb2-toolbar-' + page + '" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;padding:8px;margin-bottom:6px;background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border-radius:10px;border:1px solid #E9D5FF;position:sticky;top:0;z-index:10;">' +
+      '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2で再生成</button>' +
+      '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>' +
+      '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>🎨 画像生成</button>' +
+      '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:4px;"></i>🎬 AI動画</button>' +
       '</div>' +
       '<div id="nb2-widget-' + page + '">' +
       '<div style="padding:16px;text-align:center;background:linear-gradient(135deg,#FDF2F8,#EEF2FF);border-radius:14px;border:2px dashed #DDD6FE;">' +
@@ -13571,6 +13594,12 @@ app.get('/guide/:curriculumId', async (c) => {
           '<p style="font-size:0.85rem;color:#DC2626;">ウィジェット生成エラー: ' + (err.message||'通信エラー') + '</p>' +
           '<p style="font-size:0.8rem;color:#6B7280;margin-top:6px;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>' + (tactile || 'やってみよう') + '</p>' +
           '<button onclick="regenerateTactileWidget(' + page + ')" style="margin-top:8px;background:#7C3AED;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 再試行</button></div>';
+      }
+      // エラー時にも画像・動画結果エリアを設定
+      var imgVideoArea = document.getElementById('nb2-img-video-area-' + page);
+      if (imgVideoArea) {
+        imgVideoArea.innerHTML = '<div id="ai-img-area-' + page + '" style="margin-top:6px;"></div>' +
+          '<div id="ai-video-area-' + page + '" style="margin-top:6px;"></div>';
       }
     });
   }
