@@ -1381,48 +1381,48 @@ app.get('/proposal', async (c) => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>自由進度学習システム導入提案書</title>
 <style>
-  @page { size: A4; margin: 10mm 12mm; }
+  @page { size: A4; margin: 12mm 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; font-size: 8.5pt; color: #1a1a2e; line-height: 1.45; background: #f0f0f0; }
-  .page { width: 210mm; height: 297mm; overflow: hidden; background: white; margin: 0 auto; padding: 8mm 12mm 6mm 12mm; position: relative; display: flex; flex-direction: column; }
-  @media print { body { background: white; } .page { margin: 0; padding: 8mm 12mm 6mm 12mm; box-shadow: none; } .no-print { display: none !important; } }
+  body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; font-size: 9pt; color: #1a1a2e; line-height: 1.55; background: #f0f0f0; }
+  .page { width: 210mm; height: 297mm; overflow: hidden; background: white; margin: 0 auto; padding: 9mm 13mm 7mm 13mm; display: flex; flex-direction: column; }
+  @media print { body { background: white; } .page { margin: 0; padding: 9mm 13mm 7mm 13mm; box-shadow: none; } .no-print { display: none !important; } }
   @media screen { .page { box-shadow: 0 4px 20px rgba(0,0,0,0.15); margin: 10px auto; } }
   
-  .header { text-align: center; border-bottom: 2.5px solid #1e3a5f; padding-bottom: 4px; margin-bottom: 5px; }
-  .header h1 { font-size: 15pt; color: #1e3a5f; letter-spacing: 2px; font-weight: 900; }
-  .header .subtitle { font-size: 8.5pt; color: #4a6fa5; margin-top: 1px; font-weight: 600; }
+  .header { text-align: center; border-bottom: 3px solid #1e3a5f; padding-bottom: 5px; margin-bottom: 6px; }
+  .header h1 { font-size: 16pt; color: #1e3a5f; letter-spacing: 3px; font-weight: 900; }
+  .header .subtitle { font-size: 9pt; color: #4a6fa5; margin-top: 2px; font-weight: 600; }
   .header .meta { font-size: 7pt; color: #888; margin-top: 2px; }
   
-  .section { margin-bottom: 5px; }
-  .section-title { font-size: 9.5pt; font-weight: 800; color: white; background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 3px 9px; border-radius: 3px; margin-bottom: 3px; display: flex; align-items: center; gap: 5px; }
-  .section-title .icon { font-size: 10pt; }
+  .section { margin-bottom: 6px; }
+  .section-title { font-size: 10pt; font-weight: 800; color: white; background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 3px 10px; border-radius: 4px; margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
+  .section-title .icon { font-size: 11pt; }
   
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; }
   
-  .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 6px; }
-  .card-title { font-size: 8pt; font-weight: 800; color: #1e3a5f; margin-bottom: 1px; display: flex; align-items: center; gap: 3px; }
-  .card p, .card li { font-size: 7.5pt; color: #374151; line-height: 1.4; }
-  .card ul { padding-left: 12px; margin: 0; }
-  .card ul li { margin-bottom: 0; }
+  .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 5px 8px; }
+  .card-title { font-size: 8.5pt; font-weight: 800; color: #1e3a5f; margin-bottom: 2px; display: flex; align-items: center; gap: 4px; }
+  .card p, .card li { font-size: 8pt; color: #374151; line-height: 1.4; }
+  .card ul { padding-left: 14px; margin: 0; }
+  .card ul li { margin-bottom: 1px; }
   
-  .highlight { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1.5px solid #f59e0b; border-radius: 4px; padding: 4px 8px; margin-bottom: 5px; }
-  .highlight-title { font-size: 8.5pt; font-weight: 800; color: #92400e; margin-bottom: 2px; }
-  .highlight p { font-size: 8pt; color: #78350f; }
+  .highlight { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1.5px solid #f59e0b; border-radius: 5px; padding: 5px 10px; margin-bottom: 6px; }
+  .highlight-title { font-size: 9pt; font-weight: 800; color: #92400e; margin-bottom: 2px; }
+  .highlight p { font-size: 8.5pt; color: #78350f; }
   
-  .step { display: flex; align-items: flex-start; gap: 5px; margin-bottom: 3px; }
-  .step-num { background: #1e3a5f; color: white; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 7.5pt; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
-  .step-content { font-size: 7.5pt; }
+  .step { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 3px; }
+  .step-num { background: #1e3a5f; color: white; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8pt; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+  .step-content { font-size: 8pt; }
   .step-content strong { color: #1e3a5f; }
   
-  .compare-table { width: 100%; border-collapse: collapse; font-size: 7pt; }
-  .compare-table th { background: #1e3a5f; color: white; padding: 2px 4px; text-align: center; font-weight: 700; }
-  .compare-table td { padding: 2px 4px; border: 1px solid #e2e8f0; text-align: center; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+  .compare-table th { background: #1e3a5f; color: white; padding: 3px 6px; text-align: center; font-weight: 700; }
+  .compare-table td { padding: 3px 6px; border: 1px solid #e2e8f0; text-align: center; }
   .compare-table tr:nth-child(even) td { background: #f8fafc; }
   
-  .effect-badge { display: inline-block; background: #10b981; color: white; padding: 0 6px; border-radius: 8px; font-size: 7pt; font-weight: 700; margin: 0 1px; }
+  .effect-badge { display: inline-block; background: #10b981; color: white; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; margin: 0 2px; }
   
-  .footer { border-top: 2px solid #1e3a5f; padding-top: 3px; text-align: center; font-size: 7pt; color: #6b7280; margin-top: auto; flex-shrink: 0; }
+  .footer { border-top: 2px solid #1e3a5f; padding-top: 4px; text-align: center; font-size: 7pt; color: #6b7280; margin-top: auto; flex-shrink: 0; }
   
   .print-btn { position: fixed; bottom: 20px; right: 20px; background: #1e3a5f; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999; }
   .print-btn:hover { background: #2d5a8e; }
@@ -1439,7 +1439,7 @@ app.get('/proposal', async (c) => {
 
   <div class="highlight">
     <div class="highlight-title">🎯 なぜ今、自由進度学習が必要なのか</div>
-    <p>令和の日本型学校教育（中教審答申2021）では<strong>「個別最適な学び」</strong>と<strong>「協働的な学び」</strong>の一体的充実が求められています。本システムはAIが児童の理解度を分析し、一人ひとりに最適な学習カードを自動生成。<strong>先生の教材準備時間を大幅削減</strong>しながら、全児童が自分のペースで学べる環境を実現します。</p>
+    <p>令和の日本型学校教育（中教審答申2021）では<strong>「個別最適な学び」</strong>と<strong>「協働的な学び」</strong>の一体的充実が求められています。本システムは、AIが児童の理解度・学習特性を分析し、一人ひとりに最適な学習カードを自動生成。<strong>先生の教材準備時間を大幅削減</strong>しながら、全児童が自分のペースで学べる環境を実現します。</p>
   </div>
 
   <div class="section">
@@ -1449,7 +1449,7 @@ app.get('/proposal', async (c) => {
         <div class="card-title">🤖 AI学習カード自動生成</div>
         <ul>
           <li>教科書の単元を入力するだけ</li>
-          <li>3段階コース自動作成</li>
+          <li>3段階コース自動作成（じっくり・しっかり・どんどん）</li>
           <li>例題→問題→ヒントの段階的構成</li>
           <li>児童の学習特性に応じた個別化</li>
         </ul>
@@ -1466,7 +1466,7 @@ app.get('/proposal', async (c) => {
       <div class="card">
         <div class="card-title">📊 リアルタイム学習分析</div>
         <ul>
-          <li>児童の回答をAI自動採点</li>
+          <li>児童の回答を自動採点（AI）</li>
           <li>理解度・進捗の可視化</li>
           <li>つまずきポイントの自動検出</li>
           <li>教員ダッシュボードで一覧確認</li>
@@ -1477,11 +1477,11 @@ app.get('/proposal', async (c) => {
 
   <div class="section">
     <div class="section-title"><span class="icon">🚀</span>かんたん3ステップ導入</div>
-    <div style="display: flex; gap: 6px;">
+    <div style="display: flex; gap: 8px;">
       <div style="flex:1;">
         <div class="step">
           <div class="step-num">1</div>
-          <div class="step-content"><strong>単元情報を入力</strong>（2分）<br>学年・教科・単元名を入力。教科書対応表から自動補完も可能。</div>
+          <div class="step-content"><strong>単元情報を入力</strong>（2分）<br>学年・教科・単元名を入力するだけ。教科書対応表から自動補完も可能。</div>
         </div>
         <div class="step">
           <div class="step-num">2</div>
@@ -1499,7 +1499,7 @@ app.get('/proposal', async (c) => {
           <tr><td style="text-align:left;font-weight:700;">コース分け</td><td>手作業</td><td style="color:#10b981;font-weight:800;">AI自動生成</td></tr>
           <tr><td style="text-align:left;font-weight:700;">採点・評価</td><td>手作業</td><td style="color:#10b981;font-weight:800;">AI自動</td></tr>
           <tr><td style="text-align:left;font-weight:700;">進捗把握</td><td>個別確認</td><td style="color:#10b981;font-weight:800;">リアルタイム</td></tr>
-          <tr><td style="text-align:left;font-weight:700;">つまずき対応</td><td>巡回指導</td><td style="color:#10b981;font-weight:800;">AI+教員</td></tr>
+          <tr><td style="text-align:left;font-weight:700;">つまずき対応</td><td>巡回指導</td><td style="color:#10b981;font-weight:800;">AI + 教員</td></tr>
         </table>
       </div>
     </div>
@@ -1511,10 +1511,10 @@ app.get('/proposal', async (c) => {
       <div class="card">
         <div class="card-title">👦 児童にとって</div>
         <ul>
-          <li><span class="effect-badge">主体性</span> 自分のペースで学び、楽しさを実感</li>
+          <li><span class="effect-badge">主体性</span> 自分のペースで学習でき、学ぶ楽しさを実感</li>
           <li><span class="effect-badge">個別最適</span> 理解度に応じたコース・ヒントで確実に定着</li>
-          <li><span class="effect-badge">自己調整力</span> 振り返り・目標設定する力が育つ</li>
-          <li><span class="effect-badge">多感覚</span> 音声・画像・動画など多感覚で学べる</li>
+          <li><span class="effect-badge">自己調整力</span> 自分で振り返り・目標設定する力が育つ</li>
+          <li><span class="effect-badge">多感覚学習</span> 音声・画像・動画など多感覚で学べる</li>
         </ul>
       </div>
       <div class="card">
@@ -1522,25 +1522,25 @@ app.get('/proposal', async (c) => {
         <ul>
           <li><span class="effect-badge">時間創出</span> 教材準備の大幅削減→個別指導に注力</li>
           <li><span class="effect-badge">見える化</span> 全員の進捗・理解度をリアルタイム把握</li>
-          <li><span class="effect-badge">専門性</span> AIの分析データを活用した指導改善</li>
+          <li><span class="effect-badge">専門性向上</span> AIの分析データを活用した指導改善</li>
           <li><span class="effect-badge">働き方改革</span> 業務効率化で持続可能な教育現場へ</li>
         </ul>
       </div>
     </div>
   </div>
 
-  <div style="display:flex;gap:4px;margin-bottom:5px;font-size:7pt;color:#374151;">
-    <div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:3px;padding:3px 6px;"><strong style="color:#166534;">🔒 安全性：</strong>ニックネーム利用・ログイン不要 ｜ 教員が全カード確認・編集可能 ｜ 学習指導要領準拠 ｜ GIGAスクール端末対応</div>
-    <div style="flex:1;background:#eff6ff;border:1px solid #bfdbfe;border-radius:3px;padding:3px 6px;"><strong style="color:#1e40af;">📘 対応：</strong>算数・国語・社会・理科・英語 ｜ 読み上げ・ルビ・拡大表示（特別支援対応） ｜ 学校間連携予定</div>
+  <div style="display:flex;gap:6px;margin-bottom:6px;font-size:7.5pt;color:#374151;">
+    <div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:4px 8px;"><strong style="color:#166534;">🔒 安全性：</strong>ニックネーム利用・ログイン不要 ｜ 教員が全カード確認・編集可能 ｜ 学習指導要領準拠 ｜ GIGAスクール端末対応</div>
+    <div style="flex:1;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:4px 8px;"><strong style="color:#1e40af;">📘 対応：</strong>算数・数学・国語・社会・理科・英語 ｜ 読み上げ・ルビ・拡大表示（特別支援対応） ｜ 学校間連携予定</div>
   </div>
 
-  <div class="section" style="margin-bottom:3px;">
+  <div class="section" style="margin-bottom:4px;">
     <div class="section-title"><span class="icon">🧠</span>理論的基盤 ― 12の教育理論を統合した設計</div>
-    <div class="grid2" style="margin-bottom:3px;">
+    <div class="grid2" style="margin-bottom:4px;">
       <div class="card">
         <div class="card-title">📐 学習の構造化</div>
         <ul>
-          <li><strong>ソロ・タキソノミー</strong>（ビッグス）：5段階で理解度を可視化し難易度を自動調整</li>
+          <li><strong>ソロ・タキソノミー</strong>（ビッグス）：5段階で理解度を可視化しカード難易度を自動調整</li>
           <li><strong>ブルーム改訂版</strong>：記憶→創造の6認知レベルに沿った出題設計</li>
           <li><strong>コルブ経験学習サイクル</strong>：体験→省察→概念化→実験の4段階をカードに内蔵</li>
         </ul>
@@ -1548,8 +1548,8 @@ app.get('/proposal', async (c) => {
       <div class="card">
         <div class="card-title">🔄 自己調整・メタ認知</div>
         <ul>
-          <li><strong>ツィマーマン自己調整学習</strong>（効果量0.52）：予見→遂行→省察のミニ振り返り</li>
-          <li><strong>フラベルメタ認知</strong>（効果量0.69）：不正解時の自己分析を自動表示</li>
+          <li><strong>ツィマーマン自己調整学習</strong>（効果量0.52）：予見→遂行→省察のミニ振り返りで実装</li>
+          <li><strong>フラベルメタ認知</strong>（効果量0.69）：不正解時「なぜ間違えたか」の自己分析を自動表示</li>
           <li><strong>ハティ振り返り5段階</strong>（効果量0.75+）：質的深化をAIが評価・支援</li>
         </ul>
       </div>
@@ -1558,25 +1558,25 @@ app.get('/proposal', async (c) => {
       <div class="card">
         <div class="card-title">💪 動機づけ・非認知能力</div>
         <ul>
-          <li><strong>デシ＆ライアン自己決定理論</strong>（効果量0.61）：順序・難易度・解法を自己選択</li>
-          <li><strong>ドゥェック成長マインドセット</strong>：努力過程を評価する声かけを自動生成</li>
-          <li><strong>ヴィゴツキー最近接領域・足場かけ</strong>（効果量0.40）：足場を自動フェーディング</li>
+          <li><strong>デシ＆ライアン自己決定理論</strong>（効果量0.61）：順序・難易度・解法を児童が自己選択</li>
+          <li><strong>ドゥェック成長マインドセット</strong>：AI先生が努力過程を評価する声かけを自動生成</li>
+          <li><strong>ヴィゴツキー最近接領域・足場かけ</strong>（効果量0.40）：正解連続で足場を自動フェーディング</li>
         </ul>
       </div>
       <div class="card">
         <div class="card-title">🎨 ユニバーサルデザイン・感情適応</div>
         <ul>
-          <li><strong>学びのユニバーサルデザイン</strong>：音声・画像・動画等の多感覚で学習保障</li>
+          <li><strong>学びのユニバーサルデザイン</strong>：音声・画像・動画・手書き等の多感覚チャネルで学習保障</li>
           <li><strong>アレクサンダー教科別発達理論</strong>：教科固有の思考フレームを可視化</li>
-          <li><strong>感情ゲーティング理論</strong>：学習者の気分に応じトーンを自動調整</li>
+          <li><strong>感情ゲーティング理論</strong>：学習者の気分に応じAI先生のトーンを自動調整</li>
         </ul>
       </div>
     </div>
   </div>
 
-  <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); color: white; border-radius: 5px; padding: 6px 12px; text-align: center;">
-    <div style="font-size: 9.5pt; font-weight: 800; margin-bottom: 2px;">✨ エビデンスに基づく自由進度学習を、教室で体験してみませんか？</div>
-    <div style="font-size: 7.5pt; opacity: 0.9;">お問い合わせ・デモのご依頼は管理者まで ｜ 初期設定は30分で完了 ｜ 研修サポート有り</div>
+  <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); color: white; border-radius: 6px; padding: 7px 14px; text-align: center;">
+    <div style="font-size: 10pt; font-weight: 800; margin-bottom: 2px;">✨ エビデンスに基づく自由進度学習を、教室で体験してみませんか？</div>
+    <div style="font-size: 8pt; opacity: 0.9;">お問い合わせ・デモのご依頼は管理者まで ｜ 初期設定は30分で完了 ｜ 研修サポート有り</div>
   </div>
 
   <div class="footer">
