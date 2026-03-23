@@ -12819,15 +12819,17 @@ app.get('/guide/:curriculumId', async (c) => {
     if (!text) { var card = ALL_CARDS[currentPage]; text = card ? (card.problem_text || card.card_title || '') : ''; }
     if (!text) return;
 
-    // 再生中ならストップ（app.js側のglobal TTSも停止）
+    // まず全ての音声を完全停止
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    if (typeof window.stopGlobalTts === 'function') window.stopGlobalTts();
+
+    // 再生中ならストップして終了
     if (_ttsPlaying) {
       if (_ttsCurrentSource) { try { _ttsCurrentSource.stop(); } catch(e){} }
-      if (window.speechSynthesis && speechSynthesis.speaking) speechSynthesis.cancel();
       _ttsPlaying = false;
       window._ttsCurrentSource = null;
       restoreVolumeIcon(el);
-      // app.js側のTTSも停止
-      if (typeof window.stopGlobalTts === 'function') window.stopGlobalTts();
+      if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false);
       return;
     }
 
@@ -12850,26 +12852,37 @@ app.get('/guide/:curriculumId', async (c) => {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      // Gemini TTS成功の場合、Web Speech APIキューを必ずクリア
+      if (window.speechSynthesis) speechSynthesis.cancel();
+      
       if (data.success && data.audioContent && data.audioFormat === 'pcm') {
         // Gemini TTS: PCM 24kHz 16bit mono → Web Audio API で再生
         playPcmAudio(data.audioContent, data.sampleRate || 24000, function() {
           _ttsPlaying = false;
           restoreVolumeIcon(el);
           if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false);
+          // 完了後も念のためWeb Speech APIを停止
+          if (window.speechSynthesis) speechSynthesis.cancel();
         });
       } else if (data.success && data.audioContent) {
         // MP3形式のフォールバック
         var audioSrc = 'data:audio/mp3;base64,' + data.audioContent;
         var audio = new Audio(audioSrc);
-        audio.onended = function() { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); };
-        audio.onerror = function() { fallbackWebSpeech(text, el); };
-        audio.play().catch(function() { fallbackWebSpeech(text, el); });
+        audio.onended = function() { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); if (window.speechSynthesis) speechSynthesis.cancel(); };
+        audio.onerror = function() { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); };
+        audio.play().catch(function() { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); });
       } else {
-        fallbackWebSpeech(text, el);
+        // APIが成功しなかった場合のみフォールバック
+        _ttsPlaying = false;
+        restoreVolumeIcon(el);
+        if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false);
       }
     })
     .catch(function() {
-      fallbackWebSpeech(text, el);
+      // ネットワークエラーの場合のみフォールバック
+      _ttsPlaying = false;
+      restoreVolumeIcon(el);
+      if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false);
     });
   }
 
@@ -15412,6 +15425,7 @@ ${customInfo}${mikataSection}
 - 3段階ヒントは「考える方向性」→「具体的手がかり」→「答えに近づく導き」の順に
 - 先生に質問するための「先生ヘルプ」用のキーワードを含める
 - 【★超重要★】例題(example_problem)と本問題(problem_description)は必ず異なる数値・異なる場面で作成すること。例題は「この解き方を理解するための練習問題」として、本問題よりも易しく・別の数値を使う。例題の答え(example_answer)と本問題の答え(answer)は必ず異なる値にすること。
+- 【★超重要★】特に用語問題・社会・理科では、例題と本問題で異なる用語・概念を問うこと。例：本問題が「フィヨルド」なら、例題は「リアス海岸」や「三角州」など同じ単元内の別概念にする。同じ答えになる問題は絶対に禁止。
 
 【超重要：正誤判定が明確な問題設計】
 - 各カードには必ず1つの明確な問いだけを含めること（これが最優先ルール）
@@ -15442,9 +15456,9 @@ ${customInfo}${mikataSection}
       "textbook_page": "p.XX",
       "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
-      "example_problem": "【★超重要★】例題は本問題(problem_description)とは必ず異なる数値・場面設定にすること。同じ答えにならないよう、別の具体例で出題する。例：本問題が『3×4』なら例題は『2×5』のように変える。",
+      "example_problem": "【★超重要★】例題は本問題(problem_description)とは必ず異なる答えになる問題にすること。算数なら異なる数値、用語問題なら同じ単元内の別の用語・概念を問う。例：本問題が『フィヨルド』なら例題は『リアス海岸』にする。本問題と同じ答えの例題は絶対に禁止。",
       "example_solution": "例題の解き方の丁寧な説明（途中式・図解の指示を含む）。例題専用の答えも最後に明記する。",
-      "example_answer": "例題の答え（本問題のanswerとは必ず異なる値にする）",
+      "example_answer": "例題の答え（★本問題のanswerとは必ず異なる値★ 同じ答えは絶対に禁止）",
       "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）",
       "real_world_connection": "実生活とのつながり（1文）",
       "answer": "正解（具体的・明確に。自動採点可能な短い答え。★例題の答えとは異なる値にする★）",
@@ -39550,9 +39564,9 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "ai_teacher_message": "【必須】AI先生からの励ましメッセージ。児童の学習タイプに合わせた声かけ（例：『今日はわり算に挑戦だよ！前回の掛け算がバッチリだったから、きっとできるよ！』）",
       "ai_teacher_advice": "【必須】AI先生からの学習アドバイス。問題を解くための具体的なコツ（例：『まず、何を何で割るのか、問題の中のキーワードに線を引いてみよう』）",
       "teacher_help_keywords": "【必須】わからないとき先生に聞くためのキーワード（例：『わり算、等分、あまり』）",
-      "example_problem": "【必須】例題の問題文。本番の問題より少し簡単な、理解の足がかりになる問題（例：『6このクッキーを2人で同じ数ずつ分けると、1人何こ？』）★本問題とは必ず異なる数値・場面にすること★",
+      "example_problem": "【必須】例題の問題文。本番の問題とは必ず異なる答えになる問題にすること。用語問題なら別の用語を問う。算数なら別の数値。例：本問題が『フィヨルド』なら例題は『リアス海岸』。同じ答えは絶対に禁止。",
       "example_solution": "【必須】例題の解き方。図解を含む丁寧な説明（例：『6÷2=3  6このクッキーを2つのグループに分けると、1グループ3こになります。答え：3こ』）",
-      "example_answer": "【必須】例題の答え（本問題のanswerとは必ず異なる値にする）",
+      "example_answer": "【必須】例題の答え（★本問題のanswerとは絶対に異なる値にする★）",
       "example_image_description": "【必須】例題の図解説明（AI画像生成用プロンプト）。図形問題→頂点名・角度・辺の長さ等を含む正確な図の説明。文章題→場面のイラスト説明。合同・対称→2つの図形を並べて対応関係を示す図。計算のみで図不要→null",
       "real_world_connection": "【推奨】実生活とのつながり。※問題の数学的内容に直接関連する具体例を書くこと。（例：わり算→『お菓子を友だちと分けるとき、何個ずつになるか考えるときにわり算を使うよ！』、角度→『建物の屋根や橋は角度を計算して設計されているよ！』）。問題と無関係な例を書かないこと",
       "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
@@ -39642,9 +39656,9 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   - ai_teacher_advice: 全カード必須。問題を解くための具体的なアドバイス・コツを記述すること
   - teacher_help_keywords: 全カード必須。児童が先生に質問するときの2〜4個のキーワードを記述すること
   - new_terms: 全カード必須。新出用語・概念がない場合も復習キーワードを入れること
-  - example_problem: 全カード必須。本番問題より易しい例題を用意し、理解の足がかりとすること。★本問題とは異なる数値・場面にすること★
+  - example_problem: 全カード必須。本番問題とは必ず異なる答えになる例題を用意すること。用語問題なら同じ単元の別概念を問い、算数なら異なる数値を使う。★同じ答えは絶対に禁止★
   - example_solution: 全カード必須。例題の解き方を図解付きで丁寧に説明すること
-  - example_answer: 全カード必須。例題の答え。本問題のanswerとは必ず異なる値にすること
+  - example_answer: 全カード必須。例題の答え。本問題のanswerとは必ず異なる値にすること。同一の答えは絶対禁止
   - example_image_description: 図形・合同・対称・面積・グラフ等の視覚的な例題には必須。AI画像生成に使えるレベルの詳細な図解説明を記述すること（例：「四角形ABCDと四角形EFGHを横に並べた図。左の四角形は頂点A,B,C,Dが時計回りにラベル付け。右の四角形は対応する頂点E,F,G,Hがラベル付け。対応する頂点を矢印で結ぶ」）。単純計算で図が不要な場合はnull
   - real_world_connection: 推奨。実生活との関連を記述して学習意欲を高めること。※必ず「その問題の数学的内容」に直接関連する実例を書くこと。例：「角度の性質」→「建築や橋の設計で角度の計算が使われる」。無関係な例（線路のレールなど）は絶対に書かないこと
   - hints: 全カード必須。3段階のヒントをhint_level, hint_text, thinking_tool_suggestionの構造で記述すること

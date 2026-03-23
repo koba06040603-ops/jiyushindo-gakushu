@@ -7679,25 +7679,30 @@ function readCardAloud() {
   .then(r => r.json())
   .then(data => {
     if (data.success && data.audioContent && data.audioFormat === 'pcm') {
+      if (window.speechSynthesis) window.speechSynthesis.cancel()
       const mi = document.getElementById('tts-icon-main')
       if (mi) mi.className = 'fas fa-stop'
       playPcmGlobal(data.audioContent, data.sampleRate || 24000, () => {
         stopTtsCard()
         stopGlobalTts()
+        if (window.speechSynthesis) window.speechSynthesis.cancel()
         try { TactileSounds.play('correct') } catch(e) {}
       })
     } else if (data.success && data.audioContent) {
       const audio = new Audio('data:audio/mp3;base64,' + data.audioContent)
       audio.onended = () => { stopTtsCard(); stopGlobalTts() }
-      audio.onerror = () => fallbackWebSpeechCard(text)
-      audio.play().catch(() => fallbackWebSpeechCard(text))
+      audio.onerror = () => { stopTtsCard(); stopGlobalTts() }
+      audio.play().catch(() => { stopTtsCard(); stopGlobalTts() })
     } else {
-      fallbackWebSpeechCard(text)
+      console.warn('Gemini TTS: 音声生成失敗')
+      stopTtsCard()
+      stopGlobalTts()
     }
   })
   .catch(err => {
     console.warn('Gemini TTS エラー:', err.message)
-    fallbackWebSpeechCard(text)
+    stopTtsCard()
+    stopGlobalTts()
   })
 }
 window.readCardAloud = readCardAloud
@@ -12228,7 +12233,7 @@ function stopTtsCard() {
   if (_globalTtsSource) { try { _globalTtsSource.stop() } catch(e){} }
   _globalTtsSource = null
   if (_globalTtsAudio) { try { _globalTtsAudio.pause(); _globalTtsAudio = null } catch(e){} }
-  if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.cancel()
+  if (window.speechSynthesis) window.speechSynthesis.cancel()
   // UIアイコンを復元
   const mi = document.getElementById('tts-icon-main')
   if (mi) { mi.className = 'fas fa-volume-up'; const btn = mi.closest('button'); if (btn) btn.classList.remove('animate-pulse') }
@@ -12241,7 +12246,7 @@ window.stopTtsCard = stopTtsCard
 function stopGlobalTts() {
   if (_globalTtsSource) { try { _globalTtsSource.stop() } catch(e){} }
   if (_globalTtsAudio) { try { _globalTtsAudio.pause(); _globalTtsAudio = null } catch(e){} }
-  if (window.speechSynthesis && window.speechSynthesis.speaking) window.speechSynthesis.cancel()
+  if (window.speechSynthesis) window.speechSynthesis.cancel()
   _globalTtsPlaying = false
   _globalTtsSource = null
   // AI先生のUIもリセット
@@ -12383,20 +12388,23 @@ async function speakText(text, voiceType = null, speed = 0.9) {
     })
     
     if (response.data.success && response.data.audioContent) {
+  // Gemini TTS成功後はWeb Speech APIを確実に停止
       if (response.data.audioFormat === 'pcm') {
         // PCM再生（Gemini TTS標準出力）
+        if (window.speechSynthesis) window.speechSynthesis.cancel()
         playPcmGlobal(response.data.audioContent, response.data.sampleRate || 24000, () => {
           _globalTtsPlaying = false
           updateFloatingTtsButton(false)
           resetAllTtsButtons()
           showAiTeacherStopBar(false)
+          if (window.speechSynthesis) window.speechSynthesis.cancel()
           try { TactileSounds.play('correct') } catch(e) {}
         })
       } else {
         // MP3フォールバック
         const audio = new Audio('data:audio/mp3;base64,' + response.data.audioContent)
         audio.onended = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false); resetAllTtsButtons(); showAiTeacherStopBar(false) }
-        audio.onerror = () => speakTextWebSpeechFallback(text, speed)
+        audio.onerror = () => { _globalTtsPlaying = false; updateFloatingTtsButton(false); resetAllTtsButtons(); showAiTeacherStopBar(false) }
         await audio.play()
       }
       return
@@ -12405,8 +12413,11 @@ async function speakText(text, voiceType = null, speed = 0.9) {
     console.warn('Gemini TTS エラー:', error.message)
   }
   
-  // フォールバック: Web Speech API
-  speakTextWebSpeechFallback(text, speed)
+  // Gemini TTS失敗時: 静かに終了（Web Speech APIフォールバックは使わない）
+  _globalTtsPlaying = false
+  updateFloatingTtsButton(false)
+  resetAllTtsButtons()
+  showAiTeacherStopBar(false)
 }
 
 function speakTextWebSpeechFallback(text, speed = 0.9) {
