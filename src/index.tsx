@@ -4525,8 +4525,8 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
     "correct_answer": "正解",
     "explanation": "解説",
     "hint_text": "ヒント",
-    "example_problem": "例題（あれば。答えそのものは書かないこと）",
-    "example_hint": "例題のヒント（考え方の方向性を示す。答えは直接書かない）",
+    "example_problem": "例題（あれば）",
+    "example_solution": "例題の解き方",
     "real_world_connection": "日常とのつながり",
     "learning_meaning": "この問題を学ぶ意味",
     "difficulty_level": "standard",
@@ -4593,7 +4593,7 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
         card.card_number,
         curriculum.curriculum_code || '',
         card.example_problem || '',
-        card.example_hint || card.example_solution || '',
+        card.example_solution || '',
         card.real_world_connection || card.real_world_context || '',
         card.correct_answer || '',
         card.explanation || '',
@@ -8716,17 +8716,14 @@ app.get('/guide/:curriculumId', async (c) => {
               </div>
               
               ${card.example_problem ? `
-              <div style="background:#FFFBEB; border:2px solid #FDE68A; border-radius:10px; padding:10px 12px; margin-bottom:10px;">
+              <div id="section-example-static" style="background:#FFFBEB; border:2px solid #FDE68A; border-radius:10px; padding:10px 12px; margin-bottom:10px;">
                 <p style="font-weight:bold; color:#92400E; font-size:0.85rem; margin-bottom:4px;">💡 例題</p>
                 <p style="font-size:0.9rem; margin-bottom:6px;">${card.example_problem}</p>
-                ${card.example_hint || card.example_solution ? `
-                <details>
-                  <summary style="cursor:pointer; font-weight:bold; color:#B45309; font-size:0.8rem; user-select:none; padding:4px 0;">💡 考え方のヒントを見る</summary>
-                  <div style="background:white; border-radius:6px; padding:8px 10px; border:1px solid #FDE68A; margin-top:4px;">
-                    <p style="font-weight:bold; color:#B45309; font-size:0.8rem; margin-bottom:2px;">💡 考え方のヒント</p>
-                    <p style="font-size:0.85rem; color:#374151;">${card.example_hint || card.example_solution}</p>
-                  </div>
-                </details>` : ''}
+                ${card.example_solution ? `
+                <div style="background:white; border-radius:6px; padding:8px 10px; border:1px solid #FDE68A;">
+                  <p style="font-weight:bold; color:#166534; font-size:0.8rem; margin-bottom:2px;">✅ 解き方</p>
+                  <p style="font-size:0.85rem; color:#374151;">${card.example_solution}</p>
+                </div>` : ''}
               </div>` : ''}
               
               ${card.problem_text ? `<div style="background:#FFF1F2; border-left:4px solid #FB7185; padding:10px 14px; border-radius:0 8px 8px 0; margin-bottom:8px;"><strong style="color:#BE123C; font-size:0.85rem;">もんだい：</strong><span style="font-size:0.95rem;">${card.problem_text}</span></div>` : ''}
@@ -10261,10 +10258,8 @@ app.get('/guide/:curriculumId', async (c) => {
         html += '</div>';
       }
       html += '</div>';
-      if (c.example_hint || c.example_solution) {
-        html += '<details style="margin-top:6px;"><summary style="cursor:pointer;font-weight:bold;color:#B45309;font-size:0.8rem;user-select:none;padding:4px 0;">💡 考え方のヒントを見る</summary>';
-        html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:4px;"><p style="font-weight:bold;color:#B45309;font-size:0.8rem;margin-bottom:2px;">💡 考え方のヒント</p><p style="font-size:0.85rem;color:#374151;">' + (c.example_hint || c.example_solution) + '</p></div>';
-        html += '</details>';
+      if (c.example_solution) {
+        html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;"><p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p><p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p></div>';
       }
       html += '</div>';
     }
@@ -10965,7 +10960,7 @@ app.get('/guide/:curriculumId', async (c) => {
     var prompt = '日本の' + grade + subject + 'の教科書に載る例題の図解を描いてください。\n';
     prompt += '【カードタイトル】' + cardTitle + '\n';
     prompt += '【例題】' + exProblem + '\n';
-    if (exSolution) prompt += '【考え方のヒント】' + exSolution + '\n';
+    if (exSolution) prompt += '【解き方】' + exSolution + '\n';
     prompt += '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。';
     
     fetch('/api/ai/generate-image', {
@@ -15315,8 +15310,8 @@ ${customInfo}${mikataSection}
       "textbook_page": "p.XX",
       "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
-      "example_problem": "例題（具体的な数字と場面。答えそのものは書かないこと）",
-      "example_hint": "例題のヒント（解法の手順や考え方の方向性を示す。答えは直接書かず、考え方のガイドにとどめる）",
+      "example_problem": "例題（具体的な数字と場面）",
+      "example_solution": "解き方の丁寧な説明（途中式・図解の指示を含む）",
       "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）",
       "real_world_connection": "実生活とのつながり（1文）",
       "answer": "正解（具体的・明確に。自動採点可能な短い答え）",
@@ -16186,7 +16181,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
           s(card.textbook_page),
           s(card.new_terms),
           s(card.example_problem),
-          s(card.example_hint || card.example_solution),
+          s(card.example_solution),
           s(card.real_world_connection),
           s(card.ai_teacher_message),
           s(card.ai_teacher_advice),
