@@ -10299,29 +10299,54 @@ app.get('/guide/:curriculumId', async (c) => {
 
     // 例題
     if (c.example_problem && SECTION_VISIBILITY.example) {
-      html += '<div style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:12px;">';
-      html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
-      html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
-      // 例題の図解（AI生成済みまたはボタン表示）
-      html += '<div id="example-diagram-' + currentPage + '">';
-      if (c.example_image_url) {
-        html += '<div style="text-align:center;margin:8px 0;"><img src="' + c.example_image_url + '" alt="例題の図" style="max-width:100%;max-height:250px;border-radius:10px;border:2px solid #FDE68A;"></div>';
-      } else {
-        html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 12px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:10px;">';
-        html += '<i class="fas fa-image" style="color:#D97706;font-size:1.2rem;"></i>';
-        html += '<span style="font-size:0.78rem;color:#92400E;font-weight:bold;">この例題は図があるとわかりやすいよ！</span>';
-        html += '<button onclick="generateExampleDiagram(' + currentPage + ')" style="margin-left:auto;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(217,119,6,0.3);"><i class="fas fa-wand-magic-sparkles" style="margin-right:4px;"></i>AIに図をかいてもらう</button>';
+      // 例題と問題の答えが同じかチェック
+      var mainAns = (c.correct_answer || c.answer || '').trim();
+      var exAns = (c.example_answer || '').trim();
+      var exSol = (c.example_solution || '').trim();
+      var isSameAnswer = mainAns && (
+        (exAns && exAns === mainAns) || 
+        (!exAns && exSol && exSol.indexOf(mainAns) >= 0) ||
+        (c.example_problem && c.example_problem.indexOf(mainAns) >= 0 && exSol && exSol.indexOf(mainAns) >= 0)
+      );
+
+      html += '<div id="example-section-' + currentPage + '" style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:12px;">';
+      
+      if (isSameAnswer && c.card_id) {
+        // 答えが同じ → 修正中表示 + 自動修正トリガー
+        html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
+        html += '<div id="example-fixing-' + currentPage + '" style="text-align:center;padding:16px;">';
+        html += '<i class="fas fa-wand-magic-sparkles fa-spin" style="color:#D97706;font-size:1.5rem;"></i>';
+        html += '<p style="font-size:0.8rem;color:#92400E;margin-top:8px;font-weight:bold;">AIが例題を改善しています...</p>';
+        html += '<p style="font-size:0.7rem;color:#9CA3AF;margin-top:4px;">より良い例題に自動修正中</p>';
         html += '</div>';
-      }
-      html += '</div>';
-      if (c.example_solution) {
-        html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;"><p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p><p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p>';
-        if (c.example_answer) {
-          html += '<p style="font-size:0.85rem;color:#166534;font-weight:bold;margin-top:4px;">こたえ：' + c.example_answer + '</p>';
+        html += '</div>';
+        // 自動修正をトリガー
+        setTimeout(function() { fixExampleCard(currentPage, c.card_id); }, 500);
+      } else {
+        // 答えが異なる → 通常表示
+        html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
+        html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
+        // 例題の図解（AI生成済みまたはボタン表示）
+        html += '<div id="example-diagram-' + currentPage + '">';
+        if (c.example_image_url) {
+          html += '<div style="text-align:center;margin:8px 0;"><img src="' + c.example_image_url + '" alt="例題の図" style="max-width:100%;max-height:250px;border-radius:10px;border:2px solid #FDE68A;"></div>';
+        } else {
+          html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 12px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:10px;">';
+          html += '<i class="fas fa-image" style="color:#D97706;font-size:1.2rem;"></i>';
+          html += '<span style="font-size:0.78rem;color:#92400E;font-weight:bold;">この例題は図があるとわかりやすいよ！</span>';
+          html += '<button onclick="generateExampleDiagram(' + currentPage + ')" style="margin-left:auto;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 6px rgba(217,119,6,0.3);"><i class="fas fa-wand-magic-sparkles" style="margin-right:4px;"></i>AIに図をかいてもらう</button>';
+          html += '</div>';
+        }
+        html += '</div>';
+        if (c.example_solution) {
+          html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;"><p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p><p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p>';
+          if (c.example_answer) {
+            html += '<p style="font-size:0.85rem;color:#166534;font-weight:bold;margin-top:4px;">こたえ：' + c.example_answer + '</p>';
+          }
+          html += '</div>';
         }
         html += '</div>';
       }
-      html += '</div>';
     }
 
     // 画像
@@ -11002,6 +11027,84 @@ app.get('/guide/:curriculumId', async (c) => {
   }
 
   // === お助け機能 ===
+
+  // --- 例題自動修正（答えが問題と同じ場合） ---
+  function fixExampleCard(page, cardId) {
+    console.log('🔧 例題修正開始: page=' + page + ', cardId=' + cardId);
+    fetch('/api/fix-example', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ card_id: cardId })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.fixed) {
+        console.log('✅ 例題修正完了:', data.example_answer);
+        // ローカルのカードデータも更新
+        var c = ALL_CARDS[page];
+        if (c) {
+          c.example_problem = data.example_problem;
+          c.example_solution = data.example_solution;
+          c.example_answer = data.example_answer;
+        }
+        // UIを更新
+        var section = document.getElementById('example-section-' + page);
+        if (section) {
+          var html = '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
+          html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + data.example_problem + '</p>';
+          html += '<div id="example-diagram-' + page + '">';
+          html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 12px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:10px;">';
+          html += '<i class="fas fa-image" style="color:#D97706;font-size:1.2rem;"></i>';
+          html += '<span style="font-size:0.78rem;color:#92400E;font-weight:bold;">この例題は図があるとわかりやすいよ！</span>';
+          html += '<button onclick="generateExampleDiagram(' + page + ')" style="margin-left:auto;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-wand-magic-sparkles" style="margin-right:4px;"></i>AIに図をかいてもらう</button>';
+          html += '</div></div>';
+          if (data.example_solution) {
+            html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;">';
+            html += '<p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p>';
+            html += '<p style="font-size:0.85rem;color:#374151;">' + data.example_solution + '</p>';
+            if (data.example_answer) {
+              html += '<p style="font-size:0.85rem;color:#166534;font-weight:bold;margin-top:4px;">こたえ：' + data.example_answer + '</p>';
+            }
+            html += '</div>';
+          }
+          section.innerHTML = html;
+        }
+      } else {
+        console.warn('🔧 例題修正不要 or 失敗:', data.message || data.error);
+        // 修正不要の場合は元の例題を表示
+        var section = document.getElementById('example-section-' + page);
+        var c = ALL_CARDS[page];
+        if (section && c) {
+          var html = '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
+          html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
+          if (c.example_solution) {
+            html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;">';
+            html += '<p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p>';
+            html += '<p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p>';
+            html += '</div>';
+          }
+          section.innerHTML = html;
+        }
+      }
+    })
+    .catch(function(err) {
+      console.error('🔧 例題修正エラー:', err);
+      // エラー時は元の例題を表示
+      var section = document.getElementById('example-section-' + page);
+      var c = ALL_CARDS[page];
+      if (section && c) {
+        var html = '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
+        html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
+        if (c.example_solution) {
+          html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;">';
+          html += '<p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p>';
+          html += '<p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p>';
+          html += '</div>';
+        }
+        section.innerHTML = html;
+      }
+    });
+  }
 
   // --- 例題の図解をAI生成 ---
   function generateExampleDiagram(page) {
@@ -14962,6 +15065,135 @@ app.post('/api/ai/ocr', async (c) => {
       text: null,
       stage: 0
     }, 500)
+  }
+})
+
+// === 例題自動修正API ===
+// 例題と問題の答えが同じ場合に、AIで例題を再生成する
+app.post('/api/fix-example', async (c) => {
+  const { env } = c
+  try {
+    const { card_id } = await c.req.json()
+    if (!card_id) return c.json({ success: false, error: 'card_id required' }, 400)
+
+    const geminiApiKey = env.GEMINI_API_KEY
+    if (!geminiApiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not set' }, 500)
+
+    // カードデータ取得
+    const card = await env.DB.prepare('SELECT * FROM learning_cards WHERE card_id = ?').bind(card_id).first() as any
+    if (!card) return c.json({ success: false, error: 'card not found' }, 404)
+
+    const mainAnswer = (card.correct_answer || card.answer || '').trim()
+    const exampleAnswer = (card.example_answer || '').trim()
+    const exampleSolution = (card.example_solution || '').trim()
+
+    // 例題の解き方テキストから答えを抽出して比較
+    const solutionContainsAnswer = exampleSolution && mainAnswer && 
+      exampleSolution.includes(mainAnswer)
+
+    // example_answerが空、または問題の答えと同じ、または解き方に問題の答えが含まれる
+    const needsFix = !exampleAnswer || 
+      exampleAnswer === mainAnswer || 
+      solutionContainsAnswer ||
+      (card.example_problem && mainAnswer && card.example_problem.includes(mainAnswer) && exampleSolution.includes(mainAnswer))
+
+    if (!needsFix) {
+      return c.json({ success: true, fixed: false, message: 'No fix needed' })
+    }
+
+    console.log(`🔧 例題修正開始: card_id=${card_id}, 問題の答え="${mainAnswer}"`)
+
+    // Gemini APIで例題を再生成
+    const prompt = `あなたは${card.grade_level || '小学5'}年生の${card.subject || '社会'}の先生です。
+
+以下の本問題と同じ単元で、必ず異なる答えになる例題を作成してください。
+
+【本問題】
+${card.problem_text || card.problem_description || ''}
+
+【本問題の答え】
+${mainAnswer}
+
+【単元名】
+${card.unit_name || ''}
+
+【重要ルール】
+- 例題の答えは「${mainAnswer}」以外にすること（絶対に同じ答えにしない）
+- 同じ単元内の別の概念・用語を問う問題にする
+- 例：本問題が「フィヨルド」なら例題は「リアス海岸」「三角州」「扇状地」など別の地形
+- 例：本問題が「光合成」なら例題は「呼吸」「蒸散」など別の概念
+- 例：本問題が「12cm²」なら例題は違う数値（例：「8cm²」）の問題にする
+- ${card.grade_level || '小学5'}年生にわかる日本語で書く
+
+以下のJSON形式で回答してください：
+{
+  "example_problem": "例題の問題文（1〜2文）",
+  "example_solution": "解き方の説明と答え",
+  "example_answer": "例題の答え（${mainAnswer}とは異なる値）"
+}`
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 20000)
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.8, maxOutputTokens: 500 }
+        })
+      }
+    )
+    clearTimeout(timeout)
+
+    const data = await response.json() as any
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // JSONを抽出
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.error('🔧 例題修正: JSON解析失敗')
+      return c.json({ success: false, error: 'AI response parse error' }, 500)
+    }
+
+    const result = JSON.parse(jsonMatch[0])
+    
+    // 答えが同じでないか最終チェック
+    if ((result.example_answer || '').trim() === mainAnswer) {
+      console.warn('🔧 例題修正: AIが同じ答えを返した')
+      return c.json({ success: false, error: 'AI returned same answer' }, 500)
+    }
+
+    // DBを更新
+    await env.DB.prepare(`
+      UPDATE learning_cards SET 
+        example_problem = ?,
+        example_solution = ?,
+        example_answer = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE card_id = ?
+    `).bind(
+      result.example_problem || card.example_problem,
+      result.example_solution || card.example_solution,
+      result.example_answer || '',
+      card_id
+    ).run()
+
+    console.log(`✅ 例題修正完了: card_id=${card_id}, 新しい例題の答え="${result.example_answer}"`)
+
+    return c.json({ 
+      success: true, 
+      fixed: true,
+      example_problem: result.example_problem,
+      example_solution: result.example_solution,
+      example_answer: result.example_answer
+    })
+  } catch (e: any) {
+    console.error('例題修正エラー:', e.message)
+    return c.json({ success: false, error: e.message }, 500)
   }
 })
 
