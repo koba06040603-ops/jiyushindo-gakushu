@@ -1384,7 +1384,7 @@ app.get('/proposal', async (c) => {
   @page { size: A4; margin: 12mm 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; font-size: 9pt; color: #1a1a2e; line-height: 1.55; background: #f0f0f0; }
-  .page { width: 210mm; min-height: 297mm; max-height: 297mm; overflow: hidden; background: white; margin: 0 auto; padding: 10mm 13mm 8mm 13mm; position: relative; }
+  .page { width: 210mm; min-height: 297mm; max-height: 297mm; overflow: hidden; background: white; margin: 0 auto; padding: 10mm 13mm 8mm 13mm; position: relative; display: flex; flex-direction: column; }
   @media print { body { background: white; } .page { margin: 0; padding: 10mm 13mm 8mm 13mm; box-shadow: none; } .no-print { display: none !important; } }
   @media screen { .page { box-shadow: 0 4px 20px rgba(0,0,0,0.15); margin: 10px auto; } }
   
@@ -1431,7 +1431,7 @@ app.get('/proposal', async (c) => {
   .effect-badge { display: inline-block; background: #10b981; color: white; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; margin: 0 2px; }
   
   /* フッター */
-  .footer { position: absolute; bottom: 8mm; left: 13mm; right: 13mm; border-top: 2px solid #1e3a5f; padding-top: 4px; text-align: center; font-size: 7pt; color: #6b7280; }
+  .footer { border-top: 2px solid #1e3a5f; padding-top: 4px; text-align: center; font-size: 7pt; color: #6b7280; margin-top: auto; }
   
   /* 印刷ボタン */
   .print-btn { position: fixed; bottom: 20px; right: 20px; background: #1e3a5f; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999; }
@@ -1529,7 +1529,7 @@ app.get('/proposal', async (c) => {
           <li><span class="effect-badge">主体性</span> 自分のペースで学習でき、学ぶ楽しさを実感</li>
           <li><span class="effect-badge">個別最適</span> 理解度に応じたコース・ヒントで確実に定着</li>
           <li><span class="effect-badge">自己調整力</span> 自分で振り返り・目標設定する力が育つ</li>
-          <li><span class="effect-badge">UDL対応</span> 音声・画像・動画など多感覚で学べる</li>
+          <li><span class="effect-badge">多感覚学習</span> 音声・画像・動画など多感覚で学べる</li>
         </ul>
       </div>
       <div class="card">
@@ -1557,17 +1557,17 @@ app.get('/proposal', async (c) => {
       <div class="card">
         <div class="card-title">📐 学習の構造化</div>
         <ul>
-          <li><strong>SOLO Taxonomy</strong>（Biggs）：5段階で理解度を可視化しカード難易度を自動調整</li>
-          <li><strong>Bloom改訂版</strong>：記憶→創造の6認知レベルに沿った出題設計</li>
-          <li><strong>Kolb経験学習サイクル</strong>：体験→省察→概念化→実験の4段階をカードに内蔵</li>
+          <li><strong>ソロ・タキソノミー</strong>（ビッグス）：5段階で理解度を可視化しカード難易度を自動調整</li>
+          <li><strong>ブルーム改訂版</strong>：記憶→創造の6認知レベルに沿った出題設計</li>
+          <li><strong>コルブ経験学習サイクル</strong>：体験→省察→概念化→実験の4段階をカードに内蔵</li>
         </ul>
       </div>
       <div class="card">
         <div class="card-title">🔄 自己調整・メタ認知</div>
         <ul>
-          <li><strong>Zimmerman SRL</strong>（d=0.52）：予見→遂行→省察のサイクルをミニ振り返りで実装</li>
-          <li><strong>Flavellメタ認知</strong>（d=0.69）：不正解時「なぜ間違えたか」の自己分析を自動表示</li>
-          <li><strong>Hattie振り返り5段階</strong>：L1→L5（d=0.75+）の質的深化をAIが評価・支援</li>
+          <li><strong>ツィマーマン自己調整学習</strong>（効果量0.52）：予見→遂行→省察のサイクルをミニ振り返りで実装</li>
+          <li><strong>フラベルメタ認知</strong>（効果量0.69）：不正解時「なぜ間違えたか」の自己分析を自動表示</li>
+          <li><strong>ハティ振り返り5段階</strong>：第1→第5段階（効果量0.75+）の質的深化をAIが評価・支援</li>
         </ul>
       </div>
     </div>
@@ -1575,16 +1575,16 @@ app.get('/proposal', async (c) => {
       <div class="card">
         <div class="card-title">💪 動機づけ・非認知能力</div>
         <ul>
-          <li><strong>Deci & Ryan自己決定理論</strong>（d=0.61）：順序・難易度・解法を児童が自己選択</li>
-          <li><strong>Dweck成長マインドセット</strong>：AI先生が努力過程を評価する声かけを自動生成</li>
-          <li><strong>Vygotsky ZPD・足場かけ</strong>（d=0.40）：正解連続で足場を自動フェーディング</li>
+          <li><strong>デシ＆ライアン自己決定理論</strong>（効果量0.61）：順序・難易度・解法を児童が自己選択</li>
+          <li><strong>ドゥェック成長マインドセット</strong>：AI先生が努力過程を評価する声かけを自動生成</li>
+          <li><strong>ヴィゴツキー発達の最近接領域・足場かけ</strong>（効果量0.40）：正解連続で足場を自動フェーディング</li>
         </ul>
       </div>
       <div class="card">
-        <div class="card-title">🎨 UDL・感情適応</div>
+        <div class="card-title">🎨 学びのユニバーサルデザイン・感情適応</div>
         <ul>
-          <li><strong>UDL（学びのUD）</strong>：音声・画像・動画・手書き等の多感覚チャネルで学習保障</li>
-          <li><strong>Alexander MDL理論</strong>：教科固有の思考フレームを可視化</li>
+          <li><strong>学びのユニバーサルデザイン</strong>：音声・画像・動画・手書き等の多感覚チャネルで学習保障</li>
+          <li><strong>アレクサンダー教科別発達理論</strong>：教科固有の思考フレームを可視化</li>
           <li><strong>感情ゲーティング理論</strong>：学習者の気分に応じAI先生のトーンを自動調整</li>
         </ul>
       </div>
@@ -15423,7 +15423,8 @@ app.post('/api/fix-example', async (c) => {
     // Gemini APIで例題を再生成
     const prompt = `あなたは${card.grade_level || '小学5'}年生の${card.subject || '社会'}の先生です。
 
-以下の本問題と同じ単元で、必ず異なる答えになる例題を作成してください。
+以下の本問題と「直接的に関連する」「類似した」例題を作成してください。
+例題は本問題を解くための「練習問題・準備問題」として機能します。
 
 【本問題】
 ${card.problem_text || card.problem_description || ''}
@@ -15434,19 +15435,29 @@ ${mainAnswer}
 【単元名】
 ${card.unit_name || ''}
 
-【重要ルール】
-- 例題の答えは「${mainAnswer}」以外にすること（絶対に同じ答えにしない）
-- 同じ単元内の別の概念・用語を問う問題にする
-- 例：本問題が「フィヨルド」なら例題は「リアス海岸」「三角州」「扇状地」など別の地形
-- 例：本問題が「光合成」なら例題は「呼吸」「蒸散」など別の概念
-- 例：本問題が「12cm²」なら例題は違う数値（例：「8cm²」）の問題にする
+【★最重要ルール★】
+- 例題は本問題と「同じ具体的なトピック」に直接関連する問題にすること
+- 本問題の答えの「前提知識」「構成要素」「関連概念」を問う問題にすること
+- 例題を解けば、本問題の答えに自然とたどり着けるような流れにすること
+- 例題の答えは「${mainAnswer}」と異なる値にすること
+
+【良い例】
+- 本問題「フィヨルドとは何か？」→例題「ノルウェーの海岸線を削った自然の力は何？」→答え「氷河」（同じトピックの前提知識）
+- 本問題「光合成で作られるものは？→デンプン」→例題「光合成に必要な気体は？」→答え「二酸化炭素」（同じ反応の別要素）
+- 本問題「3.8×2.5＝9.5」→例題「2.4×1.5を計算しましょう」→答え「3.6」（同じ解法で数値を変更）
+- 本問題「ポーツマス条約」→例題「日露戦争で日本海海戦を指揮した人は？」→答え「東郷平八郎」（同じ出来事の関連知識）
+
+【悪い例 — 絶対にやらないこと】
+- 本問題「フィヨルド」→例題「コンビナートとは？」（全く別のトピック — 禁止！）
+- 本問題「光合成」→例題「火山の噴火について」（関連なし — 禁止！）
+
 - ${card.grade_level || '小学5'}年生にわかる日本語で書く
 
 以下のJSON形式で回答してください：
 {
-  "example_problem": "例題の問題文（1〜2文）",
+  "example_problem": "例題の問題文（1〜2文、本問題と直接関連する内容）",
   "example_solution": "解き方の説明と答え",
-  "example_answer": "例題の答え（${mainAnswer}とは異なる値）"
+  "example_answer": "例題の答え（${mainAnswer}とは異なるが、同じトピックの関連語・関連値）"
 }`
 
     const controller = new AbortController()
@@ -15562,16 +15573,18 @@ app.post('/api/fix-all-examples', async (c) => {
       // AIで例題を再生成
       try {
         const prompt = `あなたは${card.grade_level || '小学5'}年生の${card.subject || '社会'}の先生です。
-以下の本問題と同じ単元で、必ず異なる答えになる例題を作成してください。
+以下の本問題と「直接的に関連する」「類似した」例題を作成してください。例題は本問題を解くための練習問題・準備問題です。
 【本問題】${card.problem_text || card.problem_description || ''}
 【本問題の答え】${mainAns}
 【単元名】${card.unit_name || ''}
-【重要ルール】
-- 例題の答えは「${mainAns}」以外にすること
-- 同じ単元内の別の概念・用語を問う問題にする
+【★最重要ルール★】
+- 例題は本問題と「同じ具体的なトピック」に直接関連する問題にすること
+- 本問題の答えの「前提知識」「構成要素」「関連概念」を問う問題にすること
+- 答えは「${mainAns}」と異なる値にするが、トピックは同じ
+- 全く別のテーマの問題は絶対に禁止（例：フィヨルド→コンビナートはNG）
 - ${card.grade_level || '小学5'}年生にわかる日本語で書く
 以下のJSON形式で回答：
-{"example_problem":"例題の問題文","example_solution":"解き方の説明","example_answer":"例題の答え"}`
+{"example_problem":"例題の問題文（本問題と直接関連する内容）","example_solution":"解き方の説明","example_answer":"例題の答え（同じトピックの関連語・関連値）"}`
 
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 20000)
@@ -16066,8 +16079,13 @@ ${customInfo}${mikataSection}
 - 各カードにAI先生からの励ましメッセージと学び方のアドバイスを含める
 - 3段階ヒントは「考える方向性」→「具体的手がかり」→「答えに近づく導き」の順に
 - 先生に質問するための「先生ヘルプ」用のキーワードを含める
-- 【★超重要★】例題(example_problem)と本問題(problem_description)は必ず異なる数値・異なる場面で作成すること。例題は「この解き方を理解するための練習問題」として、本問題よりも易しく・別の数値を使う。例題の答え(example_answer)と本問題の答え(answer)は必ず異なる値にすること。
-- 【★超重要★】特に用語問題・社会・理科では、例題と本問題で異なる用語・概念を問うこと。例：本問題が「フィヨルド」なら、例題は「リアス海岸」や「三角州」など同じ単元内の別概念にする。同じ答えになる問題は絶対に禁止。
+- 【★超重要★】例題は本問題と「同じ具体的トピック」に直接関連する問題にすること。例題は本問題の「前提知識・構成要素・関連概念」を問う練習問題として機能する。
+- 【★超重要★】例題と本問題の答えは異なる値だが、トピックは必ず同じ。全く別のテーマの問題は絶対禁止。
+  - 算数・数学：同じ解き方で数値だけ変えた簡単な問題。例：本問題「3.8×2.5」→例題「1.2×3」
+  - 用語問題：同じトピックの前提知識・構成要素を問う。例：本問題「フィヨルド」→例題「ノルウェーの海岸を削った自然の力は？」→答え「氷河」
+  - 社会・理科：本問題の理解に必要な前提知識を問う。例：本問題「光合成」→例題「光合成に必要な気体は？」→答え「二酸化炭素」
+  - 全く別のテーマの問題は絶対禁止。例：本問題「フィヨルド」→例題「コンビナートとは？」→これはNG！
+  - 「例題を解けば本問題も解ける」という流れになるように設計すること。
 
 【超重要：正誤判定が明確な問題設計】
 - 各カードには必ず1つの明確な問いだけを含めること（これが最優先ルール）
@@ -16098,9 +16116,9 @@ ${customInfo}${mikataSection}
       "textbook_page": "p.XX",
       "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
-      "example_problem": "【★超重要★】例題は本問題(problem_description)とは必ず異なる答えになる問題にすること。算数なら異なる数値、用語問題なら同じ単元内の別の用語・概念を問う。例：本問題が『フィヨルド』なら例題は『リアス海岸』にする。本問題と同じ答えの例題は絶対に禁止。",
+      "example_problem": "【★超重要★】例題は本問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う。答えは異なるがトピックは同じ。例：本問題『フィヨルド』→例題『ノルウェーの海岸を削った自然の力は？』答え:『氷河』。全く別のテーマの問題は絶対禁止。",
       "example_solution": "例題の解き方の丁寧な説明（途中式・図解の指示を含む）。例題専用の答えも最後に明記する。",
-      "example_answer": "例題の答え（★本問題のanswerとは必ず異なる値★ 同じ答えは絶対に禁止）",
+      "example_answer": "例題の答え（本問題のanswerとは異なる値だが、同じトピックの関連語）",
       "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）",
       "real_world_connection": "実生活とのつながり（1文）",
       "answer": "正解（具体的・明確に。自動採点可能な短い答え。★例題の答えとは異なる値にする★）",
@@ -40206,7 +40224,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "ai_teacher_message": "【必須】AI先生からの励ましメッセージ。児童の学習タイプに合わせた声かけ（例：『今日はわり算に挑戦だよ！前回の掛け算がバッチリだったから、きっとできるよ！』）",
       "ai_teacher_advice": "【必須】AI先生からの学習アドバイス。問題を解くための具体的なコツ（例：『まず、何を何で割るのか、問題の中のキーワードに線を引いてみよう』）",
       "teacher_help_keywords": "【必須】わからないとき先生に聞くためのキーワード（例：『わり算、等分、あまり』）",
-      "example_problem": "【必須】例題の問題文。本番の問題とは必ず異なる答えになる問題にすること。用語問題なら別の用語を問う。算数なら別の数値。例：本問題が『フィヨルド』なら例題は『リアス海岸』。同じ答えは絶対に禁止。",
+      "example_problem": "【必須】例題の問題文。本番の問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う練習問題。答えは異なるがトピックは同じ。全く別のテーマは禁止。例：本問題『フィヨルド』→例題『ノルウェーの海岸を削った自然の力は？』。",
       "example_solution": "【必須】例題の解き方。図解を含む丁寧な説明（例：『6÷2=3  6このクッキーを2つのグループに分けると、1グループ3こになります。答え：3こ』）",
       "example_answer": "【必須】例題の答え（★本問題のanswerとは絶対に異なる値にする★）",
       "example_image_description": "【必須】例題の図解説明（AI画像生成用プロンプト）。図形問題→頂点名・角度・辺の長さ等を含む正確な図の説明。文章題→場面のイラスト説明。合同・対称→2つの図形を並べて対応関係を示す図。計算のみで図不要→null",
@@ -40298,7 +40316,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   - ai_teacher_advice: 全カード必須。問題を解くための具体的なアドバイス・コツを記述すること
   - teacher_help_keywords: 全カード必須。児童が先生に質問するときの2〜4個のキーワードを記述すること
   - new_terms: 全カード必須。新出用語・概念がない場合も復習キーワードを入れること
-  - example_problem: 全カード必須。本番問題とは必ず異なる答えになる例題を用意すること。用語問題なら同じ単元の別概念を問い、算数なら異なる数値を使う。★同じ答えは絶対に禁止★
+  - example_problem: 全カード必須。本番問題と同じ具体的トピックに直接関連する問題を用意。本問題の前提知識・構成要素を問う練習問題。答えは異なるがトピックは同じ。全く別のテーマは禁止。例：本問題「フィヨルド」→例題「ノルウェーの海岸を削った自然の力は？」答え「氷河」
   - example_solution: 全カード必須。例題の解き方を図解付きで丁寧に説明すること
   - example_answer: 全カード必須。例題の答え。本問題のanswerとは必ず異なる値にすること。同一の答えは絶対禁止
   - example_image_description: 図形・合同・対称・面積・グラフ等の視覚的な例題には必須。AI画像生成に使えるレベルの詳細な図解説明を記述すること（例：「四角形ABCDと四角形EFGHを横に並べた図。左の四角形は頂点A,B,C,Dが時計回りにラベル付け。右の四角形は対応する頂点E,F,G,Hがラベル付け。対応する頂点を矢印で結ぶ」）。単純計算で図が不要な場合はnull
