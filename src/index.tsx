@@ -4301,7 +4301,7 @@ app.get('/api/courses/:courseId/cards', async (c) => {
              problem_content, correct_answer, answer, explanation, answer_explanation,
              answer_keywords, hint_text, solution_video_url, image_url,
              estimated_time_minutes, curriculum_code, textbook_page, new_terms,
-             example_problem, example_solution, real_world_connection,
+             example_problem, example_solution, example_answer, real_world_connection,
              ai_teacher_message, ai_teacher_advice, teacher_help_keywords,
              subject, grade_level, unit_name, is_active, course_id
       FROM learning_cards 
@@ -4580,10 +4580,10 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
           subject, grade_level, unit_name, card_title, card_type, difficulty_level,
           learning_track, problem_text, problem_content, correct_answer, explanation,
           hint_text, card_order, card_number, estimated_time_minutes, curriculum_code,
-          example_problem, example_solution, real_world_connection, answer, answer_explanation,
+          example_problem, example_solution, example_answer, real_world_connection, answer, answer_explanation,
           ai_teacher_message, ai_teacher_advice, teacher_help_keywords, new_terms,
           learning_meaning, is_active, course_id
-        ) VALUES (?, ?, ?, ?, 'standard', ?, ?, ?, ?, ?, ?, ?, ?, ?, 10, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ) VALUES (?, ?, ?, ?, 'standard', ?, ?, ?, ?, ?, ?, ?, ?, ?, 10, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `).bind(
         subject, grade, unitName,
         card.card_title || `カード${card.card_number}`,
@@ -4599,6 +4599,7 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
         curriculum.curriculum_code || '',
         card.example_problem || '',
         card.example_solution || '',
+        card.example_answer || '',
         card.real_world_connection || card.real_world_context || '',
         card.correct_answer || '',
         card.explanation || '',
@@ -7461,6 +7462,7 @@ app.put('/api/cards/:cardId', async (c) => {
         new_terms = ?,
         example_problem = ?,
         example_solution = ?,
+        example_answer = ?,
         diagram_url = ?,
         real_world_connection = ?,
         answer = ?,
@@ -7475,6 +7477,7 @@ app.put('/api/cards/:cardId', async (c) => {
       body.new_terms || '',
       body.example_problem || '',
       body.example_solution || '',
+      body.example_answer || '',
       body.diagram_url || '',
       body.real_world_connection || '',
       body.answer || '',
@@ -7614,9 +7617,9 @@ app.post('/api/course/:courseId/add-card', async (c) => {
       INSERT INTO learning_cards (
         course_id, card_number, card_title, card_type,
         textbook_page, problem_description, new_terms, 
-        example_problem, example_solution, real_world_connection,
+        example_problem, example_solution, example_answer, real_world_connection,
         answer, answer_explanation
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       courseId,
       nextCardNumber,
@@ -7627,6 +7630,7 @@ app.post('/api/course/:courseId/add-card', async (c) => {
       body.new_terms || '',
       body.example_problem || '',
       body.example_solution || '',
+      body.example_answer || '',
       body.real_world_connection || '',
       body.answer || '',
       body.answer_explanation || ''
@@ -7672,6 +7676,7 @@ app.put('/api/cards/:cardId', async (c) => {
         new_terms = ?,
         example_problem = ?,
         example_solution = ?,
+        example_answer = ?,
         real_world_connection = ?,
         answer = ?,
         answer_explanation = ?,
@@ -7687,6 +7692,7 @@ app.put('/api/cards/:cardId', async (c) => {
       body.new_terms || '',
       body.example_problem || '',
       body.example_solution || '',
+      body.example_answer || '',
       body.real_world_connection || '',
       body.answer || '',
       body.answer_explanation || '',
@@ -8736,6 +8742,7 @@ app.get('/guide/:curriculumId', async (c) => {
                 <div style="background:white; border-radius:6px; padding:8px 10px; border:1px solid #FDE68A;">
                   <p style="font-weight:bold; color:#166534; font-size:0.8rem; margin-bottom:2px;">✅ 解き方</p>
                   <p style="font-size:0.85rem; color:#374151;">${card.example_solution}</p>
+                  ${card.example_answer ? `<p style="font-size:0.85rem; color:#166534; font-weight:bold; margin-top:4px;">こたえ：${card.example_answer}</p>` : ''}
                 </div>` : ''}
               </div>` : ''}
               
@@ -10308,7 +10315,11 @@ app.get('/guide/:curriculumId', async (c) => {
       }
       html += '</div>';
       if (c.example_solution) {
-        html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;"><p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p><p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p></div>';
+        html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;"><p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p><p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p>';
+        if (c.example_answer) {
+          html += '<p style="font-size:0.85rem;color:#166534;font-weight:bold;margin-top:4px;">こたえ：' + c.example_answer + '</p>';
+        }
+        html += '</div>';
       }
       html += '</div>';
     }
@@ -11222,7 +11233,7 @@ app.get('/guide/:curriculumId', async (c) => {
     fetch('/api/ai/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: cleanText, voice: 'Achird', speed: 1.1 })
+      body: JSON.stringify({ text: cleanText, voiceType: getVoiceType(), speed: 1.1 })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -12893,7 +12904,7 @@ app.get('/guide/:curriculumId', async (c) => {
   function fallbackWebSpeech(text, el) {
     if (!('speechSynthesis' in window)) { _ttsPlaying = false; restoreVolumeIcon(el); if (typeof window.updateFloatingTtsButton === 'function') window.updateFloatingTtsButton(false); return; }
     var u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP'; u.rate = 0.9; u.pitch = VOICE_PREFERENCE === 'male' ? 0.95 : 1.15;
+    u.lang = 'ja-JP'; u.rate = 0.92; u.pitch = VOICE_PREFERENCE === 'male' ? 0.9 : 1.1;
     var voices = speechSynthesis.getVoices();
     // 性別に合わせた日本語音声を優先的に選択
     var jpVoices = voices.filter(function(v){return v.lang.startsWith('ja');});
@@ -14945,7 +14956,7 @@ app.post('/api/ai/ocr', async (c) => {
 // 日本語対応・30種のボイス・感情コントロール可能
 app.post('/api/ai/tts', async (c) => {
   const { env } = c
-  const { text, voiceType = 'female-friendly', speed = 1.0, mood, style } = await c.req.json()
+  const { text, voiceType = 'male-friendly', speed = 1.0, mood, style } = await c.req.json()
   
   const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
   
@@ -15400,6 +15411,7 @@ ${customInfo}${mikataSection}
 - 各カードにAI先生からの励ましメッセージと学び方のアドバイスを含める
 - 3段階ヒントは「考える方向性」→「具体的手がかり」→「答えに近づく導き」の順に
 - 先生に質問するための「先生ヘルプ」用のキーワードを含める
+- 【★超重要★】例題(example_problem)と本問題(problem_description)は必ず異なる数値・異なる場面で作成すること。例題は「この解き方を理解するための練習問題」として、本問題よりも易しく・別の数値を使う。例題の答え(example_answer)と本問題の答え(answer)は必ず異なる値にすること。
 
 【超重要：正誤判定が明確な問題設計】
 - 各カードには必ず1つの明確な問いだけを含めること（これが最優先ルール）
@@ -15430,11 +15442,12 @@ ${customInfo}${mikataSection}
       "textbook_page": "p.XX",
       "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
-      "example_problem": "例題（具体的な数字と場面）",
-      "example_solution": "解き方の丁寧な説明（途中式・図解の指示を含む）",
+      "example_problem": "【★超重要★】例題は本問題(problem_description)とは必ず異なる数値・場面設定にすること。同じ答えにならないよう、別の具体例で出題する。例：本問題が『3×4』なら例題は『2×5』のように変える。",
+      "example_solution": "例題の解き方の丁寧な説明（途中式・図解の指示を含む）。例題専用の答えも最後に明記する。",
+      "example_answer": "例題の答え（本問題のanswerとは必ず異なる値にする）",
       "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）",
       "real_world_connection": "実生活とのつながり（1文）",
-      "answer": "正解（具体的・明確に。自動採点可能な短い答え）",
+      "answer": "正解（具体的・明確に。自動採点可能な短い答え。★例題の答えとは異なる値にする★）",
       "answer_keywords": ["キーワード1", "キーワード2", "キーワード3"],
       "answer_explanation": "【★★★最重要★★★】解法プロセス：①数値確認→②公式→③途中式→④答え導出。最低100字。実生活の例は書かない。",
       "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）",
@@ -16256,6 +16269,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
           { name: 'new_terms', type: 'TEXT DEFAULT \'\''},
           { name: 'example_problem', type: 'TEXT DEFAULT \'\''},
           { name: 'example_solution', type: 'TEXT DEFAULT \'\''},
+          { name: 'example_answer', type: 'TEXT DEFAULT \'\''},
           { name: 'real_world_connection', type: 'TEXT DEFAULT \'\''},
         ]
         for (const col of missingCols) {
@@ -16270,11 +16284,11 @@ app.post('/api/curriculum/save-generated', async (c) => {
             correct_answer, answer, explanation, answer_explanation, answer_keywords,
             hint_text, solution_video_url, image_url,
             card_order, card_number, estimated_time_minutes, curriculum_code,
-            textbook_page, new_terms, example_problem, example_solution,
+            textbook_page, new_terms, example_problem, example_solution, example_answer,
             real_world_connection,
             ai_teacher_message, ai_teacher_advice, teacher_help_keywords,
             is_active, course_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         `).bind(
           s(curriculum.subject),
           gradeNum,
@@ -16302,6 +16316,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
           s(card.new_terms),
           s(card.example_problem),
           s(card.example_solution),
+          s(card.example_answer),
           s(card.real_world_connection),
           s(card.ai_teacher_message),
           s(card.ai_teacher_advice),
@@ -39535,8 +39550,9 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "ai_teacher_message": "【必須】AI先生からの励ましメッセージ。児童の学習タイプに合わせた声かけ（例：『今日はわり算に挑戦だよ！前回の掛け算がバッチリだったから、きっとできるよ！』）",
       "ai_teacher_advice": "【必須】AI先生からの学習アドバイス。問題を解くための具体的なコツ（例：『まず、何を何で割るのか、問題の中のキーワードに線を引いてみよう』）",
       "teacher_help_keywords": "【必須】わからないとき先生に聞くためのキーワード（例：『わり算、等分、あまり』）",
-      "example_problem": "【必須】例題の問題文。本番の問題より少し簡単な、理解の足がかりになる問題（例：『6このクッキーを2人で同じ数ずつ分けると、1人何こ？』）",
+      "example_problem": "【必須】例題の問題文。本番の問題より少し簡単な、理解の足がかりになる問題（例：『6このクッキーを2人で同じ数ずつ分けると、1人何こ？』）★本問題とは必ず異なる数値・場面にすること★",
       "example_solution": "【必須】例題の解き方。図解を含む丁寧な説明（例：『6÷2=3  6このクッキーを2つのグループに分けると、1グループ3こになります。答え：3こ』）",
+      "example_answer": "【必須】例題の答え（本問題のanswerとは必ず異なる値にする）",
       "example_image_description": "【必須】例題の図解説明（AI画像生成用プロンプト）。図形問題→頂点名・角度・辺の長さ等を含む正確な図の説明。文章題→場面のイラスト説明。合同・対称→2つの図形を並べて対応関係を示す図。計算のみで図不要→null",
       "real_world_connection": "【推奨】実生活とのつながり。※問題の数学的内容に直接関連する具体例を書くこと。（例：わり算→『お菓子を友だちと分けるとき、何個ずつになるか考えるときにわり算を使うよ！』、角度→『建物の屋根や橋は角度を計算して設計されているよ！』）。問題と無関係な例を書かないこと",
       "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
@@ -39626,8 +39642,9 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
   - ai_teacher_advice: 全カード必須。問題を解くための具体的なアドバイス・コツを記述すること
   - teacher_help_keywords: 全カード必須。児童が先生に質問するときの2〜4個のキーワードを記述すること
   - new_terms: 全カード必須。新出用語・概念がない場合も復習キーワードを入れること
-  - example_problem: 全カード必須。本番問題より易しい例題を用意し、理解の足がかりとすること
+  - example_problem: 全カード必須。本番問題より易しい例題を用意し、理解の足がかりとすること。★本問題とは異なる数値・場面にすること★
   - example_solution: 全カード必須。例題の解き方を図解付きで丁寧に説明すること
+  - example_answer: 全カード必須。例題の答え。本問題のanswerとは必ず異なる値にすること
   - example_image_description: 図形・合同・対称・面積・グラフ等の視覚的な例題には必須。AI画像生成に使えるレベルの詳細な図解説明を記述すること（例：「四角形ABCDと四角形EFGHを横に並べた図。左の四角形は頂点A,B,C,Dが時計回りにラベル付け。右の四角形は対応する頂点E,F,G,Hがラベル付け。対応する頂点を矢印で結ぶ」）。単純計算で図が不要な場合はnull
   - real_world_connection: 推奨。実生活との関連を記述して学習意欲を高めること。※必ず「その問題の数学的内容」に直接関連する実例を書くこと。例：「角度の性質」→「建築や橋の設計で角度の計算が使われる」。無関係な例（線路のレールなど）は絶対に書かないこと
   - hints: 全カード必須。3段階のヒントをhint_level, hint_text, thinking_tool_suggestionの構造で記述すること
@@ -39983,11 +40000,11 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
           answer_keywords,
           hint_text, solution_video_url, image_url,
           card_order, card_number, estimated_time_minutes,
-          textbook_page, new_terms, example_problem, example_solution,
+          textbook_page, new_terms, example_problem, example_solution, example_answer,
           real_world_connection,
           ai_teacher_message, ai_teacher_advice, teacher_help_keywords,
           is_active, course_id
-        ) VALUES (?, ?, ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
       `).bind(
         curriculum.subject, gradeNum, curriculum.unit_name,
         card.card_title || `カード${i + 1}`, cardType, diffLevel,
@@ -39998,7 +40015,7 @@ app.post('/api/teacher/publish-personalized-course', async (c) => {
         videoUrl, imageUrl,
         i + 1, card.card_number || (i + 1), card.estimated_time_minutes || 10,
         card.textbook_page || '', card.new_terms || '',
-        card.example_problem || '', card.example_solution || '',
+        card.example_problem || '', card.example_solution || '', card.example_answer || '',
         card.real_world_connection || '',
         card.ai_teacher_message || '',
         card.ai_teacher_advice || '',
@@ -44264,9 +44281,9 @@ JSON のみ出力してください。`
           subject, grade_level, unit_name, difficulty_level, learning_track,
           problem_text, problem_description, correct_answer, answer, explanation, answer_explanation,
           hint_text, estimated_time_minutes,
-          ai_teacher_message, new_terms, real_world_connection, example_problem, example_solution,
+          ai_teacher_message, new_terms, real_world_connection, example_problem, example_solution, example_answer,
           is_active, created_at
-        ) VALUES (?, ?, ?, ?, 'standard', ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+        ) VALUES (?, ?, ?, ?, 'standard', ?, ?, ?, ?, 'shikkari', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
       `).bind(
         courseId, i + 1, i + 1,
         card.card_title || `カード${i + 1}`, 
@@ -44284,7 +44301,8 @@ JSON のみ出力してください。`
         typeof card.new_terms === 'object' ? JSON.stringify(card.new_terms) : (card.new_terms || ''),
         card.real_world_connection || '',
         card.example_problem || '',
-        card.example_solution || ''
+        card.example_solution || '',
+        card.example_answer || ''
       ).run()
     }
 

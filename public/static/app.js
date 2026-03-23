@@ -7752,14 +7752,26 @@ function speakTextDirect(text, speed = 0.85) {
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'ja-JP'
   utterance.rate = speed
-  utterance.pitch = 1.2
+  var isMale = true;
+  try { isMale = localStorage.getItem('voicePreference') !== 'female'; } catch(e) {}
+  utterance.pitch = isMale ? 0.9 : 1.1
   utterance.volume = 1.0
   
   const voices = window.speechSynthesis.getVoices()
-  let voice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
-    || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Kyoko'))
-    || voices.find(v => v.lang === 'ja-JP')
-    || voices.find(v => v.lang.startsWith('ja'))
+  let voice = null;
+  if (isMale) {
+    voice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google') && v.name.includes('Male'))
+      || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Otoya'))
+      || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
+      || voices.find(v => v.lang === 'ja-JP')
+      || voices.find(v => v.lang.startsWith('ja'))
+  } else {
+    voice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google') && v.name.includes('Female'))
+      || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Kyoko'))
+      || voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
+      || voices.find(v => v.lang === 'ja-JP')
+      || voices.find(v => v.lang.startsWith('ja'))
+  }
   if (voice) {
     utterance.voice = voice
     console.log('🎙️ 音声選択:', voice.name)
@@ -12411,7 +12423,7 @@ function speakTextWebSpeechFallback(text, speed = 0.9) {
   u.rate = speed
   var isMale = true;
   try { isMale = localStorage.getItem('voicePreference') !== 'female'; } catch(e) {}
-  u.pitch = isMale ? 0.95 : 1.15
+  u.pitch = isMale ? 0.9 : 1.1
   const voices = window.speechSynthesis.getVoices()
   const jaVoice = voices.find(v => v.lang === 'ja-JP' && v.name.includes('Google'))
     || voices.find(v => v.lang === 'ja-JP')
@@ -12444,20 +12456,20 @@ function speakTextWithWebSpeech(text, speed = 0.95, voiceType = 'female-friendly
   // 音声タイプに応じてピッチと速度を調整
   switch(voiceType) {
     case 'female-friendly':
-      utterance.pitch = 1.3  // より高め（明るい女性の声）
+      utterance.pitch = 1.1  // やや高め（自然な女性の声）
       utterance.rate = 0.95  // ややゆっくり
-      console.log('🎀 女性の優しい声を設定: pitch 1.3')
+      console.log('🎀 女性の優しい声を設定: pitch 1.1')
       break
     case 'male-friendly':
-      utterance.pitch = 0.85 // やや低め
-      utterance.rate = 0.9   // ゆっくり
+      utterance.pitch = 0.9  // やや低め
+      utterance.rate = 0.92  // ゆっくり
       break
     case 'female-energetic':
-      utterance.pitch = 1.4  // 高め（元気な女性の声）
-      utterance.rate = 1.05  // やや速め
+      utterance.pitch = 1.15 // やや高め
+      utterance.rate = 1.0   // 標準
       break
     case 'male-energetic':
-      utterance.pitch = 0.8  // 低め
+      utterance.pitch = 0.85 // 低め
       utterance.rate = 1.0   // 標準
       break
     default:
@@ -13146,7 +13158,9 @@ async function sendHandwriting() {
             
             // 自動音声再生
             if (window.autoPlayAIVoice) {
-              speakText(answer, 'female-friendly', 0.95, 0)
+              var autoVt = 'male-friendly';
+              try { autoVt = (localStorage.getItem('voicePreference') === 'female') ? 'female-friendly' : 'male-friendly'; } catch(e) {}
+              speakText(answer, autoVt, 0.95, 0)
             }
           }
         } catch (aiError) {
