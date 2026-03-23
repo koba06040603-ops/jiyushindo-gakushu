@@ -1383,15 +1383,15 @@ app.get('/proposal', async (c) => {
 <style>
   @page { size: A4; margin: 12mm 14mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; font-size: 9pt; color: #1a1a2e; line-height: 1.55; background: #f0f0f0; }
+  body { font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif; font-size: 9pt; color: #111827; line-height: 1.55; background: #f0f0f0; font-weight: 500; }
   .page { width: 210mm; height: 297mm; overflow: hidden; background: white; margin: 0 auto; padding: 9mm 13mm 7mm 13mm; display: flex; flex-direction: column; }
   @media print { body { background: white; } .page { margin: 0; padding: 9mm 13mm 7mm 13mm; box-shadow: none; } .no-print { display: none !important; } }
   @media screen { .page { box-shadow: 0 4px 20px rgba(0,0,0,0.15); margin: 10px auto; } }
   
   .header { text-align: center; border-bottom: 3px solid #1e3a5f; padding-bottom: 5px; margin-bottom: 6px; }
   .header h1 { font-size: 16pt; color: #1e3a5f; letter-spacing: 3px; font-weight: 900; }
-  .header .subtitle { font-size: 9pt; color: #4a6fa5; margin-top: 2px; font-weight: 600; }
-  .header .meta { font-size: 7pt; color: #888; margin-top: 2px; }
+  .header .subtitle { font-size: 9pt; color: #1e3a5f; margin-top: 2px; font-weight: 700; }
+  .header .meta { font-size: 7.5pt; color: #4b5563; margin-top: 2px; font-weight: 600; }
   
   .section { margin-bottom: 6px; }
   .section-title { font-size: 10pt; font-weight: 800; color: white; background: linear-gradient(135deg, #1e3a5f, #2d5a8e); padding: 3px 10px; border-radius: 4px; margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
@@ -1402,27 +1402,27 @@ app.get('/proposal', async (c) => {
   
   .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 5px 8px; }
   .card-title { font-size: 8.5pt; font-weight: 800; color: #1e3a5f; margin-bottom: 2px; display: flex; align-items: center; gap: 4px; }
-  .card p, .card li { font-size: 8pt; color: #374151; line-height: 1.4; }
+  .card p, .card li { font-size: 8pt; color: #1f2937; line-height: 1.4; font-weight: 500; }
   .card ul { padding-left: 14px; margin: 0; }
   .card ul li { margin-bottom: 1px; }
   
   .highlight { background: linear-gradient(135deg, #fef3c7, #fde68a); border: 1.5px solid #f59e0b; border-radius: 5px; padding: 5px 10px; margin-bottom: 6px; }
   .highlight-title { font-size: 9pt; font-weight: 800; color: #92400e; margin-bottom: 2px; }
-  .highlight p { font-size: 8.5pt; color: #78350f; }
+  .highlight p { font-size: 8.5pt; color: #78350f; font-weight: 500; }
   
   .step { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 3px; }
   .step-num { background: #1e3a5f; color: white; width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8pt; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
-  .step-content { font-size: 8pt; }
+  .step-content { font-size: 8pt; font-weight: 500; color: #1f2937; }
   .step-content strong { color: #1e3a5f; }
   
-  .compare-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; }
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; color: #1f2937; }
   .compare-table th { background: #1e3a5f; color: white; padding: 3px 6px; text-align: center; font-weight: 700; }
-  .compare-table td { padding: 3px 6px; border: 1px solid #e2e8f0; text-align: center; }
+  .compare-table td { padding: 3px 6px; border: 1px solid #e2e8f0; text-align: center; font-weight: 500; color: #1f2937; }
   .compare-table tr:nth-child(even) td { background: #f8fafc; }
   
   .effect-badge { display: inline-block; background: #10b981; color: white; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; margin: 0 2px; }
   
-  .footer { border-top: 2px solid #1e3a5f; padding-top: 4px; text-align: center; font-size: 7pt; color: #6b7280; margin-top: auto; flex-shrink: 0; }
+  .footer { border-top: 2px solid #1e3a5f; padding-top: 4px; text-align: center; font-size: 7.5pt; color: #374151; margin-top: auto; flex-shrink: 0; font-weight: 600; }
   
   .print-btn { position: fixed; bottom: 20px; right: 20px; background: #1e3a5f; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 999; }
   .print-btn:hover { background: #2d5a8e; }
@@ -1529,7 +1529,7 @@ app.get('/proposal', async (c) => {
     </div>
   </div>
 
-  <div style="display:flex;gap:6px;margin-bottom:6px;font-size:7.5pt;color:#374151;">
+  <div style="display:flex;gap:6px;margin-bottom:6px;font-size:7.5pt;color:#1f2937;font-weight:500;">
     <div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:4px 8px;"><strong style="color:#166534;">🔒 安全性：</strong>ニックネーム利用・ログイン不要 ｜ 教員が全カード確認・編集可能 ｜ 学習指導要領準拠 ｜ GIGAスクール端末対応</div>
     <div style="flex:1;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:4px 8px;"><strong style="color:#1e40af;">📘 対応：</strong>算数・数学・国語・社会・理科・英語 ｜ 読み上げ・ルビ・拡大表示（特別支援対応） ｜ 学校間連携予定</div>
   </div>
@@ -1576,7 +1576,7 @@ app.get('/proposal', async (c) => {
 
   <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); color: white; border-radius: 6px; padding: 7px 14px; text-align: center;">
     <div style="font-size: 10pt; font-weight: 800; margin-bottom: 2px;">✨ エビデンスに基づく自由進度学習を、教室で体験してみませんか？</div>
-    <div style="font-size: 8pt; opacity: 0.9;">お問い合わせ・デモのご依頼は管理者まで ｜ 初期設定は30分で完了 ｜ 研修サポート有り</div>
+    <div style="font-size: 8pt;">お問い合わせ・デモのご依頼は管理者まで ｜ 初期設定は30分で完了 ｜ 研修サポート有り</div>
   </div>
 
   <div class="footer">
@@ -10623,7 +10623,14 @@ app.get('/guide/:curriculumId', async (c) => {
         setTimeout(function() { fixExampleCard(currentPage, c.card_id); }, 500);
       } else {
         // 答えが異なる → 通常表示
-        html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+        html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p>';
+        html += '<div style="display:flex;gap:6px;">';
+        if (c.card_id) {
+          html += '<button onclick="fixExampleCard(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:4px 10px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>再生成</button>';
+          html += '<button onclick="editExampleWithPrompt(' + currentPage + ',' + c.card_id + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:4px 10px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:3px;"></i>修正指示</button>';
+        }
+        html += '</div></div>';
         html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
         // 例題の図解（AI生成済みまたはボタン表示）
         html += '<div id="example-diagram-' + currentPage + '">';
@@ -11330,6 +11337,13 @@ app.get('/guide/:curriculumId', async (c) => {
   // --- 例題自動修正（答えが問題と同じ場合） ---
   function fixExampleCard(page, cardId) {
     console.log('🔧 例題修正開始: page=' + page + ', cardId=' + cardId);
+    var section = document.getElementById('example-section-' + page);
+    if (section) {
+      section.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p></div>' +
+        '<div style="text-align:center;padding:16px;">' +
+        '<i class="fas fa-wand-magic-sparkles fa-spin" style="color:#D97706;font-size:1.5rem;"></i>' +
+        '<p style="font-size:0.8rem;color:#92400E;margin-top:8px;font-weight:bold;">AIが例題を改善しています...</p></div>';
+    }
     fetch('/api/fix-example', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -11337,72 +11351,101 @@ app.get('/guide/:curriculumId', async (c) => {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      var c = ALL_CARDS[page];
       if (data.success && data.fixed) {
         console.log('✅ 例題修正完了:', data.example_answer);
-        // ローカルのカードデータも更新
-        var c = ALL_CARDS[page];
         if (c) {
           c.example_problem = data.example_problem;
           c.example_solution = data.example_solution;
           c.example_answer = data.example_answer;
+          c._needsExampleFix = false;
         }
-        // UIを更新
-        var section = document.getElementById('example-section-' + page);
-        if (section) {
-          var html = '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
-          html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + data.example_problem + '</p>';
-          html += '<div id="example-diagram-' + page + '">';
-          html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 12px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:10px;">';
-          html += '<i class="fas fa-image" style="color:#D97706;font-size:1.2rem;"></i>';
-          html += '<span style="font-size:0.78rem;color:#92400E;font-weight:bold;">この例題は図があるとわかりやすいよ！</span>';
-          html += '<button onclick="generateExampleDiagram(' + page + ')" style="margin-left:auto;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-wand-magic-sparkles" style="margin-right:4px;"></i>AIに図をかいてもらう</button>';
-          html += '</div></div>';
-          if (data.example_solution) {
-            html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;">';
-            html += '<p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p>';
-            html += '<p style="font-size:0.85rem;color:#374151;">' + data.example_solution + '</p>';
-            if (data.example_answer) {
-              html += '<p style="font-size:0.85rem;color:#166534;font-weight:bold;margin-top:4px;">こたえ：' + data.example_answer + '</p>';
-            }
-            html += '</div>';
-          }
-          section.innerHTML = html;
-        }
+        renderExampleSection(page, c, data);
       } else {
         console.warn('🔧 例題修正不要 or 失敗:', data.message || data.error);
-        // 修正不要の場合は元の例題を表示
-        var section = document.getElementById('example-section-' + page);
-        var c = ALL_CARDS[page];
-        if (section && c) {
-          var html = '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
-          html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
-          if (c.example_solution) {
-            html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;">';
-            html += '<p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p>';
-            html += '<p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p>';
-            html += '</div>';
-          }
-          section.innerHTML = html;
-        }
+        renderExampleSection(page, c, null);
       }
     })
     .catch(function(err) {
       console.error('🔧 例題修正エラー:', err);
-      // エラー時は元の例題を表示
-      var section = document.getElementById('example-section-' + page);
-      var c = ALL_CARDS[page];
-      if (section && c) {
-        var html = '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin-bottom:4px;">💡 例題</p>';
-        html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + c.example_problem + '</p>';
-        if (c.example_solution) {
-          html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;">';
-          html += '<p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p>';
-          html += '<p style="font-size:0.85rem;color:#374151;">' + c.example_solution + '</p>';
-          html += '</div>';
-        }
-        section.innerHTML = html;
-      }
+      renderExampleSection(page, ALL_CARDS[page], null);
     });
+  }
+
+  // --- 例題をプロンプト指示で修正 ---
+  function editExampleWithPrompt(page, cardId) {
+    var c = ALL_CARDS[page];
+    if (!c) return;
+    var instruction = prompt('例題の修正指示を入力してください\\n例: 「リアス海岸に関する問題にして」「もっと簡単にして」「計算問題にして」「同じ単元の別の用語にして」');
+    if (!instruction) return;
+
+    var section = document.getElementById('example-section-' + page);
+    if (section) {
+      section.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p></div>' +
+        '<div style="text-align:center;padding:16px;">' +
+        '<i class="fas fa-wand-magic-sparkles fa-spin" style="color:#7C3AED;font-size:1.5rem;"></i>' +
+        '<p style="font-size:0.8rem;color:#7C3AED;margin-top:8px;font-weight:bold;">修正中: ' + instruction.substring(0, 30) + '...</p></div>';
+    }
+
+    fetch('/api/fix-example', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ card_id: cardId, edit_instruction: instruction })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success && data.fixed) {
+        if (c) {
+          c.example_problem = data.example_problem;
+          c.example_solution = data.example_solution;
+          c.example_answer = data.example_answer;
+          c._needsExampleFix = false;
+        }
+        renderExampleSection(page, c, data);
+      } else {
+        renderExampleSection(page, c, null);
+      }
+    })
+    .catch(function(err) {
+      console.error('例題修正エラー:', err);
+      renderExampleSection(page, c, null);
+    });
+  }
+
+  // --- 例題セクションの共通レンダリング ---
+  function renderExampleSection(page, c, data) {
+    var section = document.getElementById('example-section-' + page);
+    if (!section || !c) return;
+    var ep = data ? data.example_problem : c.example_problem;
+    var es = data ? data.example_solution : c.example_solution;
+    var ea = data ? data.example_answer : c.example_answer;
+    var cid = c.card_id || c.id;
+
+    var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+    html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p>';
+    html += '<div style="display:flex;gap:6px;">';
+    if (cid) {
+      html += '<button onclick="fixExampleCard(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:4px 10px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>再生成</button>';
+      html += '<button onclick="editExampleWithPrompt(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:4px 10px;border-radius:8px;font-size:0.7rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:3px;"></i>修正指示</button>';
+    }
+    html += '</div></div>';
+    html += '<p style="font-size:0.95rem;margin-bottom:8px;">' + ep + '</p>';
+    html += '<div id="example-diagram-' + page + '">';
+    html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 12px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:10px;">';
+    html += '<i class="fas fa-image" style="color:#D97706;font-size:1.2rem;"></i>';
+    html += '<span style="font-size:0.78rem;color:#92400E;font-weight:bold;">この例題は図があるとわかりやすいよ！</span>';
+    html += '<button onclick="generateExampleDiagram(' + page + ')" style="margin-left:auto;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;"><i class="fas fa-wand-magic-sparkles" style="margin-right:4px;"></i>AIに図をかいてもらう</button>';
+    html += '</div></div>';
+    if (es) {
+      html += '<div style="background:white;border-radius:8px;padding:8px 12px;border:1px solid #FDE68A;margin-top:6px;">';
+      html += '<p style="font-weight:bold;color:#166534;font-size:0.8rem;margin-bottom:2px;">✅ 解き方</p>';
+      html += '<p style="font-size:0.85rem;color:#374151;">' + es + '</p>';
+      if (ea) {
+        html += '<p style="font-size:0.85rem;color:#166534;font-weight:bold;margin-top:4px;">こたえ：' + ea + '</p>';
+      }
+      html += '</div>';
+    }
+    section.innerHTML = html;
   }
 
   // --- 例題の図解をAI生成 ---
@@ -13429,15 +13472,17 @@ app.get('/guide/:curriculumId', async (c) => {
     var mm = card._mm || {};
     var tactile = tactileText || mm.tactile_activity || '';
     
-    // ローディング表示 + 即時フォールバック用の簡易テキスト
-    container.innerHTML = '<div id="nb2-widget-' + page + '">' +
+    // ローディング表示 + ツールバーを上に配置（重なり防止）
+    container.innerHTML = 
+      '<div id="nb2-toolbar-' + page + '" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;padding:8px;margin-bottom:6px;background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border-radius:10px;border:1px solid #E9D5FF;">' +
+      '</div>' +
+      '<div id="nb2-widget-' + page + '">' +
       '<div style="padding:16px;text-align:center;background:linear-gradient(135deg,#FDF2F8,#EEF2FF);border-radius:14px;border:2px dashed #DDD6FE;">' +
       '<div style="display:inline-block;width:36px;height:36px;border:3px solid #EC4899;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:8px;"></div>' +
       '<p style="font-size:0.9rem;font-weight:bold;color:#7C3AED;">🧠 Nano Banana 2 がウィジェットを設計中...</p>' +
       '<p style="font-size:0.75rem;color:#9CA3AF;margin-top:4px;">問題に最適なインタラクティブ教材を生成しています（10〜20秒）</p>' +
       '</div></div>' +
-      '<div id="nb2-toolbar-' + page + '" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;margin-top:10px;padding:8px;">' +
-      '</div>';
+      '<div id="nb2-img-video-area-' + page + '"></div>';
     
     // NB2 API呼び出し
     fetch('/api/ai/generate-tactile-widget', {
@@ -13504,15 +13549,19 @@ app.get('/guide/:curriculumId', async (c) => {
           '<p style="font-size:0.7rem;color:#B45309;margin-top:4px;">⚠️ ウィジェット自動生成に失敗しました</p></div>';
       }
       
-      // ツールバー: 再生成・編集・AI画像・AI動画ボタン
+      // ツールバー: ウィジェット上部に再生成・編集・AI画像・AI動画ボタン
       if (toolbar) {
         toolbar.innerHTML = 
-          '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🧠 NB2で再生成</button>' +
-          '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>' +
-          '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>🎨 画像生成</button>' +
-          '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:4px;"></i>🎬 AI動画</button>' +
-          '<div id="ai-img-area-' + page + '" style="width:100%;margin-top:6px;"></div>' +
-          '<div id="ai-video-area-' + page + '" style="width:100%;margin-top:6px;"></div>';
+          '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2で再生成</button>' +
+          '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>修正指示</button>' +
+          '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>画像生成</button>' +
+          '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:4px;"></i>AI動画</button>';
+      }
+      // 画像・動画結果エリアはウィジェットの下に分離配置（重なり防止）
+      var imgVideoArea = document.getElementById('nb2-img-video-area-' + page);
+      if (imgVideoArea) {
+        imgVideoArea.innerHTML = '<div id="ai-img-area-' + page + '" style="margin-top:6px;"></div>' +
+          '<div id="ai-video-area-' + page + '" style="margin-top:6px;"></div>';
       }
     })
     .catch(function(err) {
@@ -15369,10 +15418,12 @@ app.post('/api/ai/ocr', async (c) => {
 
 // === 例題自動修正API ===
 // 例題と問題の答えが同じ場合に、AIで例題を再生成する
+// edit_instruction がある場合はプロンプト指示で修正
 app.post('/api/fix-example', async (c) => {
   const { env } = c
   try {
-    const { card_id } = await c.req.json()
+    const body = await c.req.json()
+    const { card_id, edit_instruction } = body
     if (!card_id) return c.json({ success: false, error: 'card_id required' }, 400)
 
     const geminiApiKey = env.GEMINI_API_KEY
@@ -15386,28 +15437,44 @@ app.post('/api/fix-example', async (c) => {
     const exampleAnswer = (card.example_answer || '').trim()
     const exampleSolution = (card.example_solution || '').trim()
 
-    // 例題の解き方テキストから答えを抽出して比較
-    const solutionContainsAnswer = exampleSolution && mainAnswer && 
-      exampleSolution.includes(mainAnswer)
+    // edit_instructionがある場合は常に修正実行
+    if (!edit_instruction) {
+      // 例題の解き方テキストから答えを抽出して比較
+      const solutionContainsAnswer = exampleSolution && mainAnswer && 
+        exampleSolution.includes(mainAnswer)
 
-    // example_answerが空、または問題の答えと同じ、または解き方に問題の答えが含まれる
-    const needsFix = !exampleAnswer || 
-      exampleAnswer === mainAnswer || 
-      solutionContainsAnswer ||
-      (card.example_problem && mainAnswer && card.example_problem.includes(mainAnswer) && exampleSolution.includes(mainAnswer))
+      // example_answerが空、または問題の答えと同じ、または解き方に問題の答えが含まれる
+      const needsFix = !exampleAnswer || 
+        exampleAnswer === mainAnswer || 
+        solutionContainsAnswer ||
+        (card.example_problem && mainAnswer && card.example_problem.includes(mainAnswer) && exampleSolution.includes(mainAnswer))
 
-    if (!needsFix) {
-      return c.json({ success: true, fixed: false, message: 'No fix needed' })
+      if (!needsFix) {
+        return c.json({ success: true, fixed: false, message: 'No fix needed' })
+      }
     }
 
-    console.log(`🔧 例題修正開始: card_id=${card_id}, 問題の答え="${mainAnswer}"`)
+    console.log(`🔧 例題修正開始: card_id=${card_id}, 問題の答え="${mainAnswer}"${edit_instruction ? ', 指示: ' + edit_instruction : ''}`)
+
+    // プロンプト構築（edit_instructionがある場合は追加指示を組み込む）
+    let editInstructionBlock = ''
+    if (edit_instruction) {
+      editInstructionBlock = `
+【★ユーザーからの修正指示★】
+${edit_instruction}
+この指示に従って例題を修正してください。現在の例題は以下です：
+- 現在の例題: ${card.example_problem || '(なし)'}
+- 現在の答え: ${exampleAnswer || '(なし)'}
+- 現在の解き方: ${exampleSolution || '(なし)'}
+`
+    }
 
     // Gemini APIで例題を再生成
     const prompt = `あなたは${card.grade_level || '小学5'}年生の${card.subject || '社会'}の先生です。
 
 以下の本問題と「直接的に関連する」「類似した」例題を作成してください。
 例題は本問題を解くための「練習問題・準備問題」として機能します。
-
+${editInstructionBlock}
 【本問題】
 ${card.problem_text || card.problem_description || ''}
 
