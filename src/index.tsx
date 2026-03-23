@@ -1445,7 +1445,7 @@ app.get('/proposal', async (c) => {
   <div class="header">
     <h1>📚 AI活用 自由進度学習支援システム 導入提案書</h1>
     <div class="subtitle">〜 児童一人ひとりに最適化された学びを、先生の負担軽減とともに実現 〜</div>
-    <div class="meta">令和7年度 ｜ TOCO-TON 自由進度学習支援システム</div>
+    <div class="meta">令和8年度 ｜ 自由進度学習支援システム</div>
   </div>
 
   <!-- 導入背景 -->
@@ -1544,56 +1544,61 @@ app.get('/proposal', async (c) => {
     </div>
   </div>
 
-  <!-- 安全性・対応教科 -->
+  <!-- 安全性・対応教科（1行に統合） -->
+  <div style="display:flex;gap:6px;margin-bottom:7px;font-size:7.5pt;color:#374151;">
+    <div style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:4px 8px;"><strong style="color:#166534;">🔒 安全性：</strong>ニックネーム利用・ログイン不要 ｜ 教員が全カード確認・編集可能 ｜ 学習指導要領準拠 ｜ GIGAスクール端末対応</div>
+    <div style="flex:1;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:4px 8px;"><strong style="color:#1e40af;">📘 対応：</strong>算数・数学・国語・社会・理科・英語 ｜ 読み上げ・ルビ・拡大表示（特別支援対応） ｜ 学校間連携予定</div>
+  </div>
+
+  <!-- 理論的基盤 -->
   <div class="section">
-    <div class="grid2">
+    <div class="section-title"><span class="icon">🧠</span>理論的基盤 ― 12の教育理論を統合した設計</div>
+    <div class="grid2" style="margin-bottom:4px;">
       <div class="card">
-        <div class="card-title">🔒 安全性・信頼性</div>
+        <div class="card-title">📐 学習の構造化</div>
         <ul>
-          <li><strong>個人情報保護：</strong>ニックネーム利用、ログイン不要設計</li>
-          <li><strong>コンテンツ管理：</strong>教員が全カードを確認・編集可能</li>
-          <li><strong>学習指導要領準拠：</strong>教科書対応の出題内容</li>
-          <li><strong>端末：</strong>GIGAスクールのタブレット・PCに対応</li>
+          <li><strong>SOLO Taxonomy</strong>（Biggs）：5段階で理解度を可視化しカード難易度を自動調整</li>
+          <li><strong>Bloom改訂版</strong>：記憶→創造の6認知レベルに沿った出題設計</li>
+          <li><strong>Kolb経験学習サイクル</strong>：体験→省察→概念化→実験の4段階をカードに内蔵</li>
         </ul>
       </div>
       <div class="card">
-        <div class="card-title">📘 対応教科と今後の展望</div>
+        <div class="card-title">🔄 自己調整・メタ認知</div>
         <ul>
-          <li><strong>現在対応：</strong>算数・数学・国語・社会・理科・英語</li>
-          <li><strong>特別支援：</strong>読み上げ・ルビ・拡大表示機能搭載</li>
-          <li><strong>今後：</strong>学校間データ連携、保護者への進捗共有、校務支援システム連携を予定</li>
+          <li><strong>Zimmerman SRL</strong>（d=0.52）：予見→遂行→省察のサイクルをミニ振り返りで実装</li>
+          <li><strong>Flavellメタ認知</strong>（d=0.69）：不正解時「なぜ間違えたか」の自己分析を自動表示</li>
+          <li><strong>Hattie振り返り5段階</strong>：L1→L5（d=0.75+）の質的深化をAIが評価・支援</li>
         </ul>
       </div>
     </div>
-  </div>
-
-  <!-- 導入実績・費用 -->
-  <div class="section">
-    <div class="section-title"><span class="icon">💰</span>導入プランと費用</div>
-    <div class="grid3">
-      <div class="card" style="border-color: #10b981; border-width: 2px;">
-        <div class="card-title" style="color:#10b981;">🆓 無料トライアル</div>
-        <p><strong>0円</strong> / 30日間<br>全機能利用可能<br>最大3単元まで<br>※導入判断材料として</p>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">💪 動機づけ・非認知能力</div>
+        <ul>
+          <li><strong>Deci & Ryan自己決定理論</strong>（d=0.61）：順序・難易度・解法を児童が自己選択</li>
+          <li><strong>Dweck成長マインドセット</strong>：AI先生が努力過程を評価する声かけを自動生成</li>
+          <li><strong>Vygotsky ZPD・足場かけ</strong>（d=0.40）：正解連続で足場を自動フェーディング</li>
+        </ul>
       </div>
-      <div class="card" style="border-color: #3b82f6; border-width: 2px;">
-        <div class="card-title" style="color:#3b82f6;">🏫 学校プラン</div>
-        <p><strong>要相談</strong> / 年間<br>無制限利用<br>全教科対応<br>教員研修サポート付き</p>
-      </div>
-      <div class="card" style="border-color: #8b5cf6; border-width: 2px;">
-        <div class="card-title" style="color:#8b5cf6;">🏛️ 自治体プラン</div>
-        <p><strong>要相談</strong> / 年間<br>複数校一括導入<br>カスタマイズ対応<br>データ分析レポート付き</p>
+      <div class="card">
+        <div class="card-title">🎨 UDL・感情適応</div>
+        <ul>
+          <li><strong>UDL（学びのUD）</strong>：音声・画像・動画・手書き等の多感覚チャネルで学習保障</li>
+          <li><strong>Alexander MDL理論</strong>：教科固有の思考フレームを可視化</li>
+          <li><strong>感情ゲーティング理論</strong>：学習者の気分に応じAI先生のトーンを自動調整</li>
+        </ul>
       </div>
     </div>
   </div>
 
   <!-- CTA -->
   <div style="background: linear-gradient(135deg, #1e3a5f, #2d5a8e); color: white; border-radius: 6px; padding: 8px 14px; text-align: center; margin-top: 4px;">
-    <div style="font-size: 10pt; font-weight: 800; margin-bottom: 3px;">✨ まずは無料トライアルで、自由進度学習を体験してみませんか？</div>
+    <div style="font-size: 10pt; font-weight: 800; margin-bottom: 3px;">✨ エビデンスに基づく自由進度学習を、教室で体験してみませんか？</div>
     <div style="font-size: 8pt; opacity: 0.9;">お問い合わせ・デモのご依頼は管理者まで ｜ 初期設定は30分で完了 ｜ 研修サポート有り</div>
   </div>
 
   <div class="footer">
-    TOCO-TON 自由進度学習支援システム ｜ 令和7年度 ｜ AI × 個別最適な学び × 協働的な学び
+    自由進度学習支援システム ｜ 令和8年度 ｜ AI × 個別最適な学び × 協働的な学び
   </div>
 </div>
 </body>
@@ -24057,7 +24062,7 @@ app.get('/api/ws', async (c) => {
 // ==============================================
 // 提案書ページ（46枚画像スライドショー版）
 // ==============================================
-app.get('/proposal', (c) => {
+app.get('/proposal-slides', (c) => {
   return c.html(`<!DOCTYPE html>
 <html lang="ja">
 <head>
