@@ -6464,7 +6464,15 @@ async function loadCardPage(cardId) {
                 <div class="bg-yellow-50 rounded-lg p-4 mb-4">
                   <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${formatText(card.example_problem)}</pre>
                   <div id="example-diagram-card-${card.card_id || card.id || 0}" class="mt-2">
-                    ${card.example_image_url ? `<div class="text-center mt-2"><img src="${card.example_image_url}" alt="例題の図" class="max-h-48 rounded border mx-auto"></div>` : `
+                    ${card.example_image_url ? `<div class="text-center mt-2" id="example-img-wrapper-${card.card_id || card.id || 0}">
+                      <img src="${card.example_image_url}" alt="例題の図" class="max-h-48 rounded border mx-auto">
+                      <div class="flex justify-center items-center gap-2 mt-1 flex-wrap">
+                        <span class="text-[10px] text-gray-400">例題の図</span>
+                        <button onclick="generateExampleDiagramApp('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/'/g,'')}', '${(card.example_problem||'').replace(/'/g,'').substring(0,100)}', '${(card.example_solution||'').replace(/'/g,'').substring(0,100)}')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>
+                        <button onclick="editExampleDiagramPrompt('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/'/g,'')}', '${(card.example_problem||'').replace(/'/g,'').substring(0,100)}', '${(card.example_solution||'').replace(/'/g,'').substring(0,100)}')" class="text-[10px] text-blue-600 underline">✏️ プロンプト修正</button>
+                        <button onclick="hideExampleDiagram('${card.card_id || card.id || 0}')" class="text-[10px] text-gray-400 underline">✕ 非表示</button>
+                      </div>
+                    </div>` : `
                     <div class="flex items-center gap-2 mt-2 p-2 bg-yellow-100 rounded-lg">
                       <i class="fas fa-image text-yellow-600"></i>
                       <span class="text-xs text-yellow-800 font-bold">この例題は図があるとわかりやすい</span>
@@ -11927,6 +11935,16 @@ function initVisualWidgets() {
     </div>
   `
   
+  // ★ NB2ウィジェットの下にある問題画像コンテナに境界ラベルを追加
+  const cardImageContainer = document.getElementById('card-image-container-' + cardId)
+  if (cardImageContainer && !cardImageContainer.previousElementSibling?.classList?.contains('nb2-separator')) {
+    const separator = document.createElement('div')
+    separator.className = 'nb2-separator'
+    separator.style.cssText = 'display:flex;align-items:center;gap:8px;margin:12px 0 6px 0;padding:0 4px;'
+    separator.innerHTML = '<div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,#D1D5DB,transparent);"></div><span style="font-size:0.7rem;color:#9CA3AF;white-space:nowrap;">📷 問題の画像</span><div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,#D1D5DB,transparent);"></div>'
+    cardImageContainer.parentElement.insertBefore(separator, cardImageContainer)
+  }
+  
   const problemText = card.problem_text || card.problem_content || ''
   const cardTitle = card.card_title || ''
   
@@ -14348,7 +14366,16 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
     })
     const d = res.data
     if (d.success && d.image_url) {
-      area.innerHTML = '<div class="text-center mt-2"><img src="' + d.image_url + '" alt="例題の図" class="max-h-48 rounded border mx-auto"><div class="flex justify-center gap-2 mt-1"><span class="text-[10px] text-gray-400">' + (d.model || 'AI') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</span><button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-[10px] text-yellow-600 underline">🔄 再生成</button></div></div>'
+      // 例題画像をカードに保存
+      try { await axios.put('/api/card/' + cardId, { example_image_url: d.image_url }) } catch(e) {}
+      area.innerHTML = '<div class="text-center mt-2" id="example-img-wrapper-' + cardId + '">' +
+        '<img src="' + d.image_url + '" alt="例題の図" class="max-h-48 rounded border mx-auto">' +
+        '<div class="flex justify-center items-center gap-2 mt-1 flex-wrap">' +
+        '<span class="text-[10px] text-gray-400">' + (d.model || 'AI') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</span>' +
+        '<button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>' +
+        '<button onclick="editExampleDiagramPrompt(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-[10px] text-blue-600 underline">✏️ プロンプト修正</button>' +
+        '<button onclick="hideExampleDiagram(\'' + cardId + '\')" class="text-[10px] text-gray-400 underline">✕ 非表示</button>' +
+        '</div></div>'
     } else {
       area.innerHTML = '<p class="text-xs text-red-500 mt-1">図の生成に失敗 <button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-yellow-600 underline">再試行</button></p>'
     }

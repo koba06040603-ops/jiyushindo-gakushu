@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260324e' }, 200, {
+  return c.json({ build_id: '20260324f' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260324e';
+    var MY_BUILD = '20260324f';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -13635,7 +13635,6 @@ app.get('/guide/:curriculumId', async (c) => {
       '<span style="font-size:0.7rem;font-weight:bold;color:#7C3AED;margin-right:2px;">🛠️ NB2ウィジェットのツール▼</span>' +
       '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>NB2を再生成</button>' +
       '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:3px;"></i>NB2を修正指示</button>' +
-      '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:3px;"></i>🎨 別の画像</button>' +
       '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:3px;"></i>🎬 AI動画</button>' +
       '</div>' +
       '<div id="nb2-widget-' + page + '">' +
@@ -13766,7 +13765,6 @@ app.get('/guide/:curriculumId', async (c) => {
           '<span style="font-size:0.7rem;font-weight:bold;color:#7C3AED;margin-right:2px;">🛠️ NB2ウィジェットのツール▼</span>' +
           '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>NB2を再生成</button>' +
           '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:3px;"></i>NB2を修正指示</button>' +
-          '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:3px;"></i>🎨 別の画像</button>' +
           '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:3px;"></i>🎬 AI動画</button>';
       }
       // 画像・動画結果エリアはウィジェットの下に分離配置（重なり防止）
@@ -14494,7 +14492,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260324e';
+          var MY_BUILD = '20260324f';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
