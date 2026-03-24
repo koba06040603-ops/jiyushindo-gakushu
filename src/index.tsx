@@ -1190,6 +1190,14 @@ app.use('*', async (c, next) => {
 // CORS設定
 app.use('/api/*', cors())
 
+// BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
+app.get('/api/build-id', (c) => {
+  return c.json({ build_id: '20260324d' }, 200, {
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+    'CDN-Cache-Control': 'no-store'
+  })
+})
+
 // 動的HTMLページのキャッシュ禁止（Service Workerキャッシュ問題対策）
 app.use('/guide/*', async (c, next) => {
   await next()
@@ -9251,41 +9259,36 @@ app.get('/guide/:curriculumId', async (c) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>
-  // === キャッシュ強制クリア v3（head内で実行 - ページ描画前に処理） ===
+  // === キャッシュ強制クリア v4（サーバーAPIで最新版チェック） ===
+  // SWキャッシュが古いHTMLを返す場合でも、APIで最新BUILD_IDを取得して強制リロード
   (function(){
-    var BUILD_ID = '20260324c';
-    var cacheKey = '_toco_build';
-    try {
-      var prev = localStorage.getItem(cacheKey);
-      if(prev !== BUILD_ID){
-        localStorage.setItem(cacheKey, BUILD_ID);
-        var tasks = [];
-        // 全キャッシュ削除（Promiseを待つ）
-        if('caches' in window){
-          tasks.push(caches.keys().then(function(ks){
-            return Promise.all(ks.map(function(k){ return caches.delete(k); }));
-          }));
-        }
-        // SW登録解除（Promiseを待つ）
-        if('serviceWorker' in navigator){
-          tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs){
-            return Promise.all(regs.map(function(r){ return r.unregister(); }));
-          }));
-        }
-        // 旧バージョンからの更新なら、全タスク完了後にリロード
-        if(prev && prev !== BUILD_ID){
-          if(tasks.length > 0){
-            Promise.all(tasks).then(function(){ window.location.reload(); }).catch(function(){ window.location.reload(); });
-          } else {
-            window.location.reload();
+    var MY_BUILD = '20260324d';
+    // 1. まずSWを即座にバイパスしてサーバーから最新BUILD_IDを取得
+    fetch('/api/build-id', { cache: 'no-store' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d.build_id && d.build_id !== MY_BUILD){
+          // このHTMLは古い → キャッシュ全削除 + SW登録解除 + リロード
+          var tasks = [];
+          if('caches' in window){
+            tasks.push(caches.keys().then(function(ks){
+              return Promise.all(ks.map(function(k){ return caches.delete(k); }));
+            }));
           }
+          if('serviceWorker' in navigator){
+            tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs){
+              return Promise.all(regs.map(function(r){ return r.unregister(); }));
+            }));
+          }
+          Promise.all(tasks)
+            .then(function(){ window.location.reload(); })
+            .catch(function(){ window.location.reload(); });
           // リロードまでページ描画を止める
           document.write('<html><body style="background:#f0f4ff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><p style="color:#4F46E5;font-size:1.2rem">\\u26A1 \\u6700\\u65B0\\u7248\\u3092\\u8AAD\\u307F\\u8FBC\\u307F\\u4E2D...</p></body></html>');
           document.close();
-          return; // 以降のHTML描画を完全に止める
         }
-      }
-    } catch(e){}
+      })
+      .catch(function(){});
   })();
   </script>
   <title>学習のてびき - ${curriculum.unit_name}</title>
@@ -13647,10 +13650,10 @@ app.get('/guide/:curriculumId', async (c) => {
         var safeWidgetHtml = (data.widget_html || '')
           // onclickに編集系キーワードを含むボタン・要素を除去
           .replace(/<[^>]*onclick[^>]*(問題の図|例題|編集|差し替え|削除|replace|delete|edit|remove|modify)[^>]*>[^<]*<\/[^>]*>/gi, '')
-          // href/onclickに編集系を含むリンクを除去
-          .replace(/<a[^>]*(問題の図|例題|編集|差し替え|削除|edit|replace|delete)[^>]*>[^<]*<\/a>/gi, '')
-          // ツールバー風のdiv（編集・削除等のボタンが並ぶ行）を除去
-          .replace(/<div[^>]*>\s*(<(button|a)[^>]*(編集|削除|差し替え|edit|delete|replace)[^>]*>[^<]*<\/(button|a)>\s*)+<\/div>/gi, '')
+          // 「問題の図」「編集」「差し替え」「削除」を含むリンク・ボタン・スパンを除去（アイコン付きも対応）
+          .replace(/<(a|button|span)[^>]*>[^<]*(問題の図|編集|差し替え|削除)[^<]*<\/(a|button|span)>/gi, '')
+          // ツールバー風の行（問題の図・編集・差し替え・削除が並ぶ）を丸ごと除去
+          .replace(/<(div|p|span)[^>]*>[\s\S]*?(問題の図|編集)[\s\S]*?(差し替え|削除)[\s\S]*?<\/(div|p|span)>/gi, '')
           // 隠しinputやdata属性で画像URLを保持する要素を除去
           .replace(/<input[^>]*(image_url|img_src|edit_target)[^>]*\/?>\s*/gi, '');
         
@@ -13678,22 +13681,43 @@ app.get('/guide/:curriculumId', async (c) => {
           }
         } catch (scriptErr) { console.warn('NB2 script実行エラー:', scriptErr); }
         
-        // ★ NB2スクリプト実行後のDOMクリーンアップ
+        // ★ NB2スクリプト実行後のDOMクリーンアップ（即時 + 遅延の2段階）
         // AI生成スクリプトが実行時にUI風ボタン（編集・差し替え・削除等）をDOMに追加する場合があるため除去
+        function cleanNB2Dom(pageNum) {
+          try {
+            var nb2Body = document.getElementById('nb2-widget-body-' + pageNum);
+            if (!nb2Body) return;
+            // 全てのボタン・リンク・スパンをチェック
+            var allEls = nb2Body.querySelectorAll('button, a, span, div, p');
+            for (var bi = 0; bi < allEls.length; bi++) {
+              var elText = (allEls[bi].textContent || '').trim();
+              var elOnclick = allEls[bi].getAttribute('onclick') || '';
+              // テキスト内に編集系キーワードを含む要素を除去（部分一致・アイコン付きも対応）
+              if (/(問題の図|編集|差し替え|削除)/i.test(elText) && elText.length < 50) {
+                // ただしNB2の教育コンテンツ内の説明文は除外（50文字以上は説明文とみなす）
+                allEls[bi].remove();
+              } else if (/(問題の図|example_image|problem_image|editImage|replaceImage|deleteImage)/i.test(elOnclick)) {
+                allEls[bi].remove();
+              }
+            }
+          } catch(e) { console.warn('NB2クリーンアップ:', e); }
+        }
+        // 即時クリーンアップ
+        cleanNB2Dom(page);
+        // スクリプト実行後の遅延クリーンアップ（300ms, 1s, 3s）
+        setTimeout(function() { cleanNB2Dom(page); }, 300);
+        setTimeout(function() { cleanNB2Dom(page); }, 1000);
+        setTimeout(function() { cleanNB2Dom(page); }, 3000);
+        // MutationObserverで動的追加も監視
         try {
           var nb2Body = document.getElementById('nb2-widget-body-' + page);
           if (nb2Body) {
-            var suspiciousButtons = nb2Body.querySelectorAll('button, a');
-            for (var bi = 0; bi < suspiciousButtons.length; bi++) {
-              var btnText = (suspiciousButtons[bi].textContent || '').trim();
-              var btnOnclick = suspiciousButtons[bi].getAttribute('onclick') || '';
-              if (/^(問題の図|編集|差し替え|削除|edit|replace|delete|remove)$/i.test(btnText) ||
-                  /(問題の図|example_image|problem_image|editImage|replaceImage|deleteImage)/i.test(btnOnclick)) {
-                suspiciousButtons[bi].remove();
-              }
-            }
+            var nb2Observer = new MutationObserver(function() { cleanNB2Dom(page); });
+            nb2Observer.observe(nb2Body, { childList: true, subtree: true });
+            // 10秒後にObserver停止（パフォーマンス保護）
+            setTimeout(function() { nb2Observer.disconnect(); }, 10000);
           }
-        } catch (cleanErr) { console.warn('NB2 クリーンアップエラー:', cleanErr); }
+        } catch(obsErr) {}
         
         // イラスト画像がある場合
         if (data.illustration_url) {
