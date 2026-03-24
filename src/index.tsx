@@ -10743,6 +10743,7 @@ app.get('/guide/:curriculumId', async (c) => {
       html += '<button onclick="generateTactileDiagram(' + currentPage + ')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(245,158,11,0.3);">';
       html += '<i class="fas fa-image"></i>AIにやり方の図を描いてもらう</button>';
       html += '</div>';
+      html += '<div style="margin:8px 0 4px;padding:4px 10px;background:linear-gradient(135deg,#EDE9FE,#FCE7F3);border-radius:8px;text-align:center;"><span style="font-size:0.68rem;font-weight:bold;color:#7C3AED;">⬇ ここから下は NB2（Nano Banana 2）が自動生成した教材です</span></div>';
       html += '<div id="tactile-guide-' + currentPage + '" style="background:white;border-radius:10px;border:1px solid #E5E7EB;min-height:100px;padding:8px;"></div>';
       html += '</div>';
     }
@@ -13532,10 +13533,16 @@ app.get('/guide/:curriculumId', async (c) => {
       
       if (data.success && data.widget_html) {
         // NB2生成ウィジェットHTMLを挿入
-        // NB2 AI出力からシステムUI風の不正なボタン・リンクを除去
+        // NB2 AI出力からシステムUI風の不正なボタン・リンク・ツールバーを徹底除去
         var safeWidgetHtml = (data.widget_html || '')
-          .replace(/<[^>]*onclick[^>]*(問題の図|編集|差し替え|削除|replace|delete|edit)[^>]*>[^<]*<\/[^>]*>/gi, '')
-          .replace(/<a[^>]*(問題の図|編集|差し替え|削除)[^>]*>[^<]*<\/a>/gi, '');
+          // onclickに編集系キーワードを含むボタン・要素を除去
+          .replace(/<[^>]*onclick[^>]*(問題の図|例題|編集|差し替え|削除|replace|delete|edit|remove|modify)[^>]*>[^<]*<\/[^>]*>/gi, '')
+          // href/onclickに編集系を含むリンクを除去
+          .replace(/<a[^>]*(問題の図|例題|編集|差し替え|削除|edit|replace|delete)[^>]*>[^<]*<\/a>/gi, '')
+          // ツールバー風のdiv（編集・削除等のボタンが並ぶ行）を除去
+          .replace(/<div[^>]*>\s*(<(button|a)[^>]*(編集|削除|差し替え|edit|delete|replace)[^>]*>[^<]*<\/(button|a)>\s*)+<\/div>/gi, '')
+          // 隠しinputやdata属性で画像URLを保持する要素を除去
+          .replace(/<input[^>]*(image_url|img_src|edit_target)[^>]*\/?>\s*/gi, '');
         
         widgetArea.innerHTML = '<div id="nb2-content-' + page + '" style="background:white;border-radius:14px;border:2px solid #E5E7EB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">' +
           '<div style="background:linear-gradient(135deg,#7C3AED,#EC4899);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">' +
@@ -13560,6 +13567,23 @@ app.get('/guide/:curriculumId', async (c) => {
             }
           }
         } catch (scriptErr) { console.warn('NB2 script実行エラー:', scriptErr); }
+        
+        // ★ NB2スクリプト実行後のDOMクリーンアップ
+        // AI生成スクリプトが実行時にUI風ボタン（編集・差し替え・削除等）をDOMに追加する場合があるため除去
+        try {
+          var nb2Body = document.getElementById('nb2-widget-body-' + page);
+          if (nb2Body) {
+            var suspiciousButtons = nb2Body.querySelectorAll('button, a');
+            for (var bi = 0; bi < suspiciousButtons.length; bi++) {
+              var btnText = (suspiciousButtons[bi].textContent || '').trim();
+              var btnOnclick = suspiciousButtons[bi].getAttribute('onclick') || '';
+              if (/^(問題の図|編集|差し替え|削除|edit|replace|delete|remove)$/i.test(btnText) ||
+                  /(問題の図|example_image|problem_image|editImage|replaceImage|deleteImage)/i.test(btnOnclick)) {
+                suspiciousButtons[bi].remove();
+              }
+            }
+          }
+        } catch (cleanErr) { console.warn('NB2 クリーンアップエラー:', cleanErr); }
         
         // イラスト画像がある場合
         if (data.illustration_url) {
@@ -13657,8 +13681,10 @@ app.get('/guide/:curriculumId', async (c) => {
       if (!widgetArea) return;
       if (data.success && data.widget_html) {
         var safeHtml = (data.widget_html || '')
-          .replace(/<[^>]*onclick[^>]*(問題の図|編集|差し替え|削除|replace|delete|edit)[^>]*>[^<]*<\/[^>]*>/gi, '')
-          .replace(/<a[^>]*(問題の図|編集|差し替え|削除)[^>]*>[^<]*<\/a>/gi, '');
+          .replace(/<[^>]*onclick[^>]*(問題の図|例題|編集|差し替え|削除|replace|delete|edit|remove|modify)[^>]*>[^<]*<\/[^>]*>/gi, '')
+          .replace(/<a[^>]*(問題の図|例題|編集|差し替え|削除|edit|replace|delete)[^>]*>[^<]*<\/a>/gi, '')
+          .replace(/<div[^>]*>\s*(<(button|a)[^>]*(編集|削除|差し替え|edit|delete|replace)[^>]*>[^<]*<\/(button|a)>\s*)+<\/div>/gi, '')
+          .replace(/<input[^>]*(image_url|img_src|edit_target)[^>]*\/?>\s*/gi, '');
         widgetArea.innerHTML = '<div style="background:white;border-radius:14px;border:2px solid #F59E0B;overflow:hidden;box-shadow:0 2px 8px rgba(245,158,11,0.15);">' +
           '<div style="background:linear-gradient(135deg,#F59E0B,#D97706);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">' +
           '<span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-edit" style="margin-right:4px;"></i>修正版 by Nano Banana 2</span>' +

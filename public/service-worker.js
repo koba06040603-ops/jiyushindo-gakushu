@@ -1,5 +1,5 @@
 // Service Worker for PWA - 自由進度学習支援システム
-const CACHE_VERSION = 'v1.9.0';
+const CACHE_VERSION = 'v1.10.0';
 const CACHE_NAME = `jiyushindo-gakushu-${CACHE_VERSION}`;
 
 // キャッシュするリソース
