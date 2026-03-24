@@ -8655,20 +8655,59 @@ app.get('/test-buttons.html', async (c) => {
         }
     </script>
     <script>
-    // SW強制更新（ページ内直接埋め込み - キャッシュに影響されない）
-    if('serviceWorker' in navigator){
+    // SW強制更新 v2 - 古いキャッシュを完全破棄して最新コンテンツを保証
+    (function(){
+      if(!('serviceWorker' in navigator)) return;
+      var EXPECTED_SW_VERSION = 'v2.0.0';
+      
+      // Step1: 全キャッシュを削除
+      if('caches' in window){
+        caches.keys().then(function(names){
+          names.forEach(function(name){
+            if(name.indexOf(EXPECTED_SW_VERSION) === -1){
+              caches.delete(name);
+              console.log('[SW更新] 古いキャッシュ削除:', name);
+            }
+          });
+        });
+      }
+      
+      // Step2: SWの更新を強制
       navigator.serviceWorker.getRegistration().then(function(reg){
-        if(reg){reg.update().catch(function(){});}
+        if(!reg) return;
+        // 更新チェック（service-worker.jsをno-cacheで取得させる）
+        reg.update().catch(function(){});
+        
+        // waiting中のSWがあれば即座にアクティベート
+        if(reg.waiting){
+          reg.waiting.postMessage({type:'SKIP_WAITING'});
+        }
+        reg.addEventListener('updatefound', function(){
+          var nw = reg.installing;
+          if(nw){
+            nw.addEventListener('statechange', function(){
+              if(nw.state === 'installed'){
+                nw.postMessage({type:'SKIP_WAITING'});
+              }
+            });
+          }
+        });
       });
-      var _swRefreshing=false;
-      navigator.serviceWorker.addEventListener('controllerchange',function(){
-        if(!_swRefreshing){_swRefreshing=true;window.location.reload();}
+      
+      // Step3: controllerchangeでリロード
+      var _swR = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function(){
+        if(!_swR){ _swR = true; window.location.reload(); }
       });
-    }
+    })();
     </script>
 </body>
 </html>`
   
+  // キャッシュ完全無効化（SW・ブラウザ両方）
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate')
+  c.header('Pragma', 'no-cache')
+  c.header('Expires', '0')
   return c.html(htmlContent)
 })
 
@@ -9211,6 +9250,34 @@ app.get('/guide/:curriculumId', async (c) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+  // === キャッシュ強制クリア（head内で実行 - ページ描画前に処理） ===
+  // Service Workerの古いキャッシュが原因で変更が反映されない問題の最終対策
+  (function(){
+    var BUILD_ID = '20260324b';  // ビルドIDを変えるたびに古いキャッシュをクリア
+    var cacheKey = '_toco_build';
+    try {
+      var prev = localStorage.getItem(cacheKey);
+      if(prev !== BUILD_ID){
+        localStorage.setItem(cacheKey, BUILD_ID);
+        // 全キャッシュ削除
+        if('caches' in window){
+          caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k); }); });
+        }
+        // SW登録解除→再登録はリロード後に自動で行われる
+        if('serviceWorker' in navigator){
+          navigator.serviceWorker.getRegistrations().then(function(regs){
+            regs.forEach(function(r){ r.unregister(); });
+          });
+        }
+        // 初回（旧キャッシュ）なら強制リロード
+        if(prev && prev !== BUILD_ID){
+          window.location.reload();
+        }
+      }
+    } catch(e){}
+  })();
+  </script>
   <title>学習のてびき - ${curriculum.unit_name}</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
   <style>
