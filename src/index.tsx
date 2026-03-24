@@ -9251,28 +9251,38 @@ app.get('/guide/:curriculumId', async (c) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>
-  // === キャッシュ強制クリア（head内で実行 - ページ描画前に処理） ===
-  // Service Workerの古いキャッシュが原因で変更が反映されない問題の最終対策
+  // === キャッシュ強制クリア v3（head内で実行 - ページ描画前に処理） ===
   (function(){
-    var BUILD_ID = '20260324b';  // ビルドIDを変えるたびに古いキャッシュをクリア
+    var BUILD_ID = '20260324c';
     var cacheKey = '_toco_build';
     try {
       var prev = localStorage.getItem(cacheKey);
       if(prev !== BUILD_ID){
         localStorage.setItem(cacheKey, BUILD_ID);
-        // 全キャッシュ削除
+        var tasks = [];
+        // 全キャッシュ削除（Promiseを待つ）
         if('caches' in window){
-          caches.keys().then(function(ks){ ks.forEach(function(k){ caches.delete(k); }); });
+          tasks.push(caches.keys().then(function(ks){
+            return Promise.all(ks.map(function(k){ return caches.delete(k); }));
+          }));
         }
-        // SW登録解除→再登録はリロード後に自動で行われる
+        // SW登録解除（Promiseを待つ）
         if('serviceWorker' in navigator){
-          navigator.serviceWorker.getRegistrations().then(function(regs){
-            regs.forEach(function(r){ r.unregister(); });
-          });
+          tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs){
+            return Promise.all(regs.map(function(r){ return r.unregister(); }));
+          }));
         }
-        // 初回（旧キャッシュ）なら強制リロード
+        // 旧バージョンからの更新なら、全タスク完了後にリロード
         if(prev && prev !== BUILD_ID){
-          window.location.reload();
+          if(tasks.length > 0){
+            Promise.all(tasks).then(function(){ window.location.reload(); }).catch(function(){ window.location.reload(); });
+          } else {
+            window.location.reload();
+          }
+          // リロードまでページ描画を止める
+          document.write('<html><body style="background:#f0f4ff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><p style="color:#4F46E5;font-size:1.2rem">\\u26A1 \\u6700\\u65B0\\u7248\\u3092\\u8AAD\\u307F\\u8FBC\\u307F\\u4E2D...</p></body></html>');
+          document.close();
+          return; // 以降のHTML描画を完全に止める
         }
       }
     } catch(e){}
@@ -10842,8 +10852,8 @@ app.get('/guide/:curriculumId', async (c) => {
       html += '<button onclick="generateTactileDiagram(' + currentPage + ')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(245,158,11,0.3);">';
       html += '<i class="fas fa-image"></i>AIにやり方の図を描いてもらう</button>';
       html += '</div>';
-      html += '<div style="margin:8px 0 4px;padding:4px 10px;background:linear-gradient(135deg,#EDE9FE,#FCE7F3);border-radius:8px;text-align:center;"><span style="font-size:0.68rem;font-weight:bold;color:#7C3AED;">⬇ ここから下は NB2（Nano Banana 2）が自動生成した教材です</span></div>';
-      html += '<div id="tactile-guide-' + currentPage + '" style="background:white;border-radius:10px;border:1px solid #E5E7EB;min-height:100px;padding:8px;"></div>';
+      html += '<div style="margin:12px 0 4px;padding:6px 12px;background:linear-gradient(135deg,#7C3AED,#EC4899);border-radius:10px;text-align:center;box-shadow:0 2px 6px rgba(124,58,237,0.25);"><span style="font-size:0.72rem;font-weight:bold;color:white;">🤖 ⬇ NB2（Nano Banana 2）自動生成ゾーン ⬇</span></div>';
+      html += '<div id="tactile-guide-' + currentPage + '" style="background:white;border-radius:10px;border:2px solid #C4B5FD;min-height:100px;padding:8px;"></div>';
       html += '</div>';
     }
 
@@ -11602,6 +11612,7 @@ app.get('/guide/:curriculumId', async (c) => {
       if (data.success && data.image_url) {
         var cid = c.card_id || c.id || 0;
         var html = '<div style="text-align:center;margin:8px 0;">';
+        html += '<p style="font-size:0.68rem;font-weight:bold;color:#92400E;margin-bottom:4px;">📐 例題の図解</p>';
         html += '<img src="' + data.image_url + '" alt="例題の図" style="max-width:100%;max-height:280px;border-radius:10px;border:2px solid #FDE68A;">';
         html += '<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">';
         html += '<p style="font-size:0.65rem;color:#9CA3AF;margin:0;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0) / 1000) + '秒</p>';
@@ -13593,10 +13604,10 @@ app.get('/guide/:curriculumId', async (c) => {
     var mm = card._mm || {};
     var tactile = tactileText || mm.tactile_activity || '';
     
-    // ローディング表示 + ツールバーを上に固定配置（重なり防止・常時表示）
+    // ローディング表示 + ツールバー（sticky廃止: 例題図解との混同防止）
     container.innerHTML = 
-      '<div id="nb2-toolbar-' + page + '" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;padding:8px 10px;margin-bottom:8px;background:linear-gradient(135deg,#EDE9FE,#FCE7F3);border-radius:12px;border:2px solid #C4B5FD;position:sticky;top:0;z-index:10;box-shadow:0 2px 8px rgba(124,58,237,0.15);">' +
-      '<span style="font-size:0.7rem;font-weight:bold;color:#7C3AED;margin-right:2px;">🛠️ 下の図のツール▼</span>' +
+      '<div id="nb2-toolbar-' + page + '" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;padding:8px 10px;margin-bottom:8px;background:linear-gradient(135deg,#EDE9FE,#FCE7F3);border-radius:12px;border:2px solid #C4B5FD;box-shadow:0 2px 8px rgba(124,58,237,0.15);">' +
+      '<span style="font-size:0.7rem;font-weight:bold;color:#7C3AED;margin-right:2px;">🛠️ NB2ウィジェットのツール▼</span>' +
       '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>NB2を再生成</button>' +
       '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:3px;"></i>NB2を修正指示</button>' +
       '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:3px;"></i>🎨 別の画像</button>' +
@@ -13643,9 +13654,9 @@ app.get('/guide/:curriculumId', async (c) => {
           // 隠しinputやdata属性で画像URLを保持する要素を除去
           .replace(/<input[^>]*(image_url|img_src|edit_target)[^>]*\/?>\s*/gi, '');
         
-        widgetArea.innerHTML = '<div id="nb2-content-' + page + '" style="background:white;border-radius:14px;border:2px solid #E5E7EB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">' +
+        widgetArea.innerHTML = '<div id="nb2-content-' + page + '" style="background:white;border-radius:14px;border:2px solid #C4B5FD;overflow:hidden;box-shadow:0 2px 8px rgba(124,58,237,0.1);">' +
           '<div style="background:linear-gradient(135deg,#7C3AED,#EC4899);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">' +
-          '<span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-robot" style="margin-right:4px;"></i>Nano Banana 2 が設計</span>' +
+          '<span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-robot" style="margin-right:4px;"></i>🤖 NB2 が自動設計した教材</span>' +
           '<span style="color:rgba(255,255,255,0.8);font-size:0.65rem;">' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒</span>' +
           '</div>' +
           '<div style="padding:12px;" id="nb2-widget-body-' + page + '">' + safeWidgetHtml + '</div>' +
@@ -13706,7 +13717,7 @@ app.get('/guide/:curriculumId', async (c) => {
       // ツールバー: ウィジェット上部に再生成・編集・AI画像・AI動画ボタン
       if (toolbar) {
         toolbar.innerHTML = 
-          '<span style="font-size:0.7rem;font-weight:bold;color:#7C3AED;margin-right:2px;">🛠️ 下の図のツール▼</span>' +
+          '<span style="font-size:0.7rem;font-weight:bold;color:#7C3AED;margin-right:2px;">🛠️ NB2ウィジェットのツール▼</span>' +
           '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>NB2を再生成</button>' +
           '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:3px;"></i>NB2を修正指示</button>' +
           '<button onclick="requestAIImage(' + page + ')" id="ai-img-btn-' + page + '" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:3px;"></i>🎨 別の画像</button>' +

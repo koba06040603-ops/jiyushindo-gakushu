@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>キャッシュクリア</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Kaku Gothic ProN',sans-serif;background:linear-gradient(135deg,#eef2ff,#fdf2f8);display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;}
+.card{background:white;border-radius:20px;padding:32px;box-shadow:0 10px 40px rgba(0,0,0,0.08);max-width:500px;width:100%;text-align:center;}
+h1{font-size:1.3rem;color:#374151;margin-bottom:12px;}
+p{color:#6B7280;font-size:0.9rem;line-height:1.7;margin-bottom:16px;}
+.btn{background:linear-gradient(135deg,#EF4444,#DC2626);color:white;border:none;padding:14px 28px;border-radius:14px;font-size:1rem;font-weight:bold;cursor:pointer;width:100%;margin:8px 0;transition:all 0.2s;}
+.btn:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.btn.done{background:linear-gradient(135deg,#10B981,#059669);}
+.status{margin-top:16px;padding:12px;border-radius:10px;font-size:0.85rem;font-weight:bold;display:none;}
+.status.show{display:block;}
+.status.success{background:#ECFDF5;color:#065F46;border:2px solid #A7F3D0;}
+.status.error{background:#FEF2F2;color:#991B1B;border:2px solid #FECACA;}
+.steps{text-align:left;background:#F9FAFB;border-radius:12px;padding:16px;margin:16px 0;font-size:0.85rem;color:#4B5563;}
+.steps li{margin:8px 0;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🧹 キャッシュクリア</h1>
+  <p>画面の変更が反映されない場合、このボタンを押してキャッシュをクリアしてください。</p>
+  
+  <button class="btn" id="clearBtn" onclick="clearAll()">
+    🗑️ キャッシュを全てクリアして再読み込み
+  </button>
+  
+  <div class="status" id="status"></div>
+  
+  <div class="steps">
+    <strong>このボタンで行うこと：</strong>
+    <ol>
+      <li>ブラウザのService Workerを全て登録解除</li>
+      <li>キャッシュストレージを全削除</li>
+      <li>ページを強制リロード</li>
+    </ol>
+  </div>
+  
+  <p style="font-size:0.75rem;color:#9CA3AF;margin-top:12px;">
+    ※ ログイン情報やお気に入りは消えません。キャッシュ（一時保存データ）のみ削除されます。
+  </p>
+</div>
+
+<script>
+async function clearAll() {
+  var btn = document.getElementById('clearBtn');
+  var status = document.getElementById('status');
+  btn.textContent = '⏳ クリア中...';
+  btn.disabled = true;
+  
+  try {
+    // 1. 全キャッシュ削除
+    if ('caches' in window) {
+      var names = await caches.keys();
+      for (var i = 0; i < names.length; i++) {
+        await caches.delete(names[i]);
+      }
+      console.log('キャッシュ削除完了:', names.length + '件');
+    }
+    
+    // 2. 全SW登録解除
+    if ('serviceWorker' in navigator) {
+      var regs = await navigator.serviceWorker.getRegistrations();
+      for (var j = 0; j < regs.length; j++) {
+        await regs[j].unregister();
+      }
+      console.log('SW登録解除完了:', regs.length + '件');
+    }
+    
+    // 3. BUILD_ID リセット
+    try { localStorage.removeItem('_toco_build'); } catch(e) {}
+    
+    status.className = 'status show success';
+    status.textContent = '✅ クリア完了！3秒後にリロードします...';
+    btn.className = 'btn done';
+    btn.textContent = '✅ 完了';
+    
+    // 3秒後にリロード
+    setTimeout(function() {
+      window.location.href = '/';
+    }, 3000);
+    
+  } catch(e) {
+    status.className = 'status show error';
+    status.textContent = '❌ エラー: ' + e.message;
+    btn.textContent = '🔄 再試行';
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
