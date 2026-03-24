@@ -1190,6 +1190,26 @@ app.use('*', async (c, next) => {
 // CORS設定
 app.use('/api/*', cors())
 
+// 動的HTMLページのキャッシュ禁止（Service Workerキャッシュ問題対策）
+app.use('/guide/*', async (c, next) => {
+  await next()
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate')
+  c.header('Pragma', 'no-cache')
+  c.header('Expires', '0')
+})
+app.use('/diagnostic*', async (c, next) => {
+  await next()
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate')
+  c.header('Pragma', 'no-cache')
+  c.header('Expires', '0')
+})
+app.use('/reflection-ai*', async (c, next) => {
+  await next()
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate')
+  c.header('Pragma', 'no-cache')
+  c.header('Expires', '0')
+})
+
 // =============================================================================
 // DB初期化: 必要なテーブルが存在しない場合は自動作成
 // =============================================================================
@@ -45656,6 +45676,26 @@ app.get('/reflection-ai', (c) => {
 
 </body>
 </html>`)
+})
+
+// ============================================================
+// service-worker.jsは常に最新版を返す（キャッシュ禁止）
+// ============================================================
+app.get('/service-worker.js', async (c) => {
+  const env = c.env as any
+  if (env.ASSETS) {
+    try {
+      const response = await env.ASSETS.fetch(c.req.raw)
+      if (response.status !== 404) {
+        const newResp = new Response(response.body, response)
+        newResp.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate')
+        newResp.headers.set('Pragma', 'no-cache')
+        newResp.headers.set('Expires', '0')
+        return newResp
+      }
+    } catch {}
+  }
+  return c.notFound()
 })
 
 // ============================================================
