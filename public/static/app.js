@@ -11914,12 +11914,17 @@ function initVisualWidgets() {
   // ★ Nano Banana 2 で問題連動型の図解を動的生成
   // 固定テンプレートではなく、NB2が問題内容を理解して最適な図解を設計
   container.innerHTML = `
-    <div id="nb2-visual-${cardId}" style="background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border:2px dashed #DDD6FE;border-radius:16px;padding:20px;text-align:center;">
-      <div style="display:inline-block;width:40px;height:40px;border:3px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px;"></div>
-      <p style="font-size:1rem;font-weight:bold;color:#7C3AED;">🧠 Nano Banana 2 が図解を設計中...</p>
-      <p style="font-size:0.8rem;color:#9CA3AF;margin-top:4px;">問題に合った視覚教材を生成しています（10〜20秒）</p>
+    <div style="background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border:2px solid #C4B5FD;border-radius:16px;padding:12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:4px 10px;background:linear-gradient(135deg,#7C3AED,#EC4899);border-radius:10px;">
+        <span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-robot" style="margin-right:4px;"></i>NB2 インタラクティブ教材</span>
+      </div>
+      <div id="nb2-visual-toolbar-${cardId}" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px;"></div>
+      <div id="nb2-visual-${cardId}" style="background:white;border:2px dashed #DDD6FE;border-radius:12px;padding:20px;text-align:center;">
+        <div style="display:inline-block;width:40px;height:40px;border:3px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px;"></div>
+        <p style="font-size:1rem;font-weight:bold;color:#7C3AED;">🧠 Nano Banana 2 が図解を設計中...</p>
+        <p style="font-size:0.8rem;color:#9CA3AF;margin-top:4px;">問題に合った視覚教材を生成しています（10〜20秒）</p>
+      </div>
     </div>
-    <div id="nb2-visual-toolbar-${cardId}" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px;"></div>
   `
   
   const problemText = card.problem_text || card.problem_content || ''
@@ -11973,32 +11978,51 @@ function initVisualWidgets() {
         }
       } catch (e) { console.warn('NB2 script実行:', e) }
       // ★ DOMクリーンアップ（問題の図・編集・差し替え・削除ボタンを除去）
+      // nb2-visual-content だけでなく、nb2-visual 全体を対象にする
       function cleanNB2(cid) {
         try {
+          // 1. ウィジェット内部を掃除
           const body = document.getElementById('nb2-visual-content-' + cid)
-          if (!body) return
-          body.querySelectorAll('button, a, span, div, p').forEach(el => {
-            const t = (el.textContent || '').trim()
-            if (/(問題の図|編集|差し替え|削除)/.test(t) && t.length < 50) el.remove()
-          })
+          if (body) {
+            body.querySelectorAll('button, a, span, div, p').forEach(el => {
+              const t = (el.textContent || '').trim()
+              if (/(問題の図|編集|差し替え|削除|再生成)/.test(t) && t.length < 50 && !el.closest('[id^="nb2-visual-toolbar"]')) el.remove()
+            })
+          }
+          // 2. ウィジェット全体（イラスト含む）を掃除
+          const area = document.getElementById('nb2-visual-' + cid)
+          if (area) {
+            area.querySelectorAll('button, a, span, div, p').forEach(el => {
+              const t = (el.textContent || '').trim()
+              // ツールバー内のボタンは除外
+              if (el.closest('[id^="nb2-visual-toolbar"]')) return
+              // NB2ヘッダーは除外
+              if (el.closest('[style*="linear-gradient(135deg,#7C3AED"]')) return
+              if (/(問題の図|✏\s*編集|差し替え|🗑\s*削除)/.test(t) && t.length < 30) el.remove()
+            })
+          }
         } catch(e) {}
       }
       cleanNB2(cardId)
       setTimeout(() => cleanNB2(cardId), 300)
       setTimeout(() => cleanNB2(cardId), 1000)
       setTimeout(() => cleanNB2(cardId), 3000)
+      // MutationObserver: nb2-visual 全体を監視（イラスト追加後も動的ボタンを除去）
       try {
-        const body = document.getElementById('nb2-visual-content-' + cardId)
-        if (body) {
+        const areaForObs = document.getElementById('nb2-visual-' + cardId)
+        if (areaForObs) {
           const obs = new MutationObserver(() => cleanNB2(cardId))
-          obs.observe(body, { childList: true, subtree: true })
-          setTimeout(() => obs.disconnect(), 10000)
+          obs.observe(areaForObs, { childList: true, subtree: true })
+          setTimeout(() => obs.disconnect(), 15000)
         }
       } catch(e) {}
       if (data.illustration_url) {
-        area.innerHTML += `<div style="margin-top:10px;text-align:center;">
+        // insertAdjacentHTML で既存DOMを壊さずにイラストを追加
+        area.insertAdjacentHTML('beforeend', `<div style="margin-top:10px;text-align:center;">
           <img src="${data.illustration_url}" alt="NB2図解" style="max-width:100%;max-height:300px;border-radius:14px;border:2px solid #DDD6FE;box-shadow:0 4px 16px rgba(124,58,237,0.15);" />
-        </div>`
+        </div>`)
+        // イラスト追加後にクリーンアップ
+        setTimeout(() => cleanNB2(cardId), 100)
       }
     } else if (data.success && data.illustration_url) {
       area.innerHTML = `<div style="text-align:center;padding:14px;">
@@ -12014,9 +12038,8 @@ function initVisualWidgets() {
     // ツールバー: 再生成・修正・画像生成
     if (toolbar) {
       toolbar.innerHTML = `
-        <button onclick="regenerateVisualWidget('${cardId}')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🔄🍊 NB2を再生成</button>
-        <button onclick="editVisualWidget('${cardId}')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>📝✏️ NB2を修正指示</button>
-        <button onclick="window.generateImageForCard && generateImageForCard(${cardId})" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>🖼️🎨 別の画像</button>
+        <button onclick="regenerateVisualWidget('${cardId}')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2を再生成</button>
+        <button onclick="editVisualWidget('${cardId}')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>NB2を修正指示</button>
       `
     }
   })
