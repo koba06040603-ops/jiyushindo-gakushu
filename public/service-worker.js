@@ -1,5 +1,5 @@
 // Service Worker for PWA - 自由進度学習支援システム
-const CACHE_VERSION = 'v2.2.0';
+const CACHE_VERSION = 'v3.0.0';
 const CACHE_NAME = `jiyushindo-gakushu-${CACHE_VERSION}`;
 
 // キャッシュするリソース（CDN系のみ。動的ページはキャッシュしない）
@@ -11,7 +11,7 @@ const STATIC_CACHE_URLS = [
 ];
 
 // キャッシュしないパス（動的コンテンツ）
-const NO_CACHE_PATHS = ['/guide/', '/diagnostic', '/reflection-ai', '/api/'];
+const NO_CACHE_PATHS = ['/guide/', '/diagnostic', '/reflection-ai', '/api/', '/static/'];
 
 // APIキャッシュの有効期限（ミリ秒）
 const API_CACHE_DURATION = 5 * 60 * 1000; // 5分
@@ -183,7 +183,8 @@ async function handleStaticRequest(request) {
   const cache = await caches.open(CACHE_NAME);
 
   try {
-    const networkResponse = await fetch(request);
+    // cache: 'no-cache' でブラウザのHTTPキャッシュをバイパスし、常にサーバーから取得
+    const networkResponse = await fetch(request, { cache: 'no-cache' });
     if (networkResponse && networkResponse.status === 200) {
       cache.put(request, networkResponse.clone());
     }

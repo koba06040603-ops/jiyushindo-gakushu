@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260324d' }, 200, {
+  return c.json({ build_id: '20260324e' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -1206,6 +1206,13 @@ app.use('/guide/*', async (c, next) => {
   c.header('Expires', '0')
 })
 app.use('/landing', async (c, next) => {
+  await next()
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate')
+  c.header('Pragma', 'no-cache')
+  c.header('Expires', '0')
+})
+// 静的ファイル（app.js等）のキャッシュ無効化
+app.use('/static/*', async (c, next) => {
   await next()
   c.header('Cache-Control', 'no-cache, no-store, must-revalidate')
   c.header('Pragma', 'no-cache')
@@ -9265,33 +9272,42 @@ app.get('/guide/:curriculumId', async (c) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>
-  // === キャッシュ強制クリア v4（サーバーAPIで最新版チェック） ===
-  // SWキャッシュが古いHTMLを返す場合でも、APIで最新BUILD_IDを取得して強制リロード
+  // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260324d';
-    // 1. まずSWを即座にバイパスしてサーバーから最新BUILD_IDを取得
+    var MY_BUILD = '20260324e';
+    var LAST_CLEAR_KEY = 'toco_last_cache_clear';
+    var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
+    
+    // BUILD_IDが変わっていたら、SW解除+キャッシュ全削除+リロード
+    if(lastClear !== MY_BUILD){
+      console.log('[CACHE-CLEAR] 新BUILD検出: ' + lastClear + ' → ' + MY_BUILD);
+      localStorage.setItem(LAST_CLEAR_KEY, MY_BUILD);
+      var tasks = [];
+      if('caches' in window){
+        tasks.push(caches.keys().then(function(ks){
+          return Promise.all(ks.map(function(k){ return caches.delete(k); }));
+        }));
+      }
+      if('serviceWorker' in navigator){
+        tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs){
+          return Promise.all(regs.map(function(r){ return r.unregister(); }));
+        }));
+      }
+      Promise.all(tasks)
+        .then(function(){ window.location.reload(); })
+        .catch(function(){ window.location.reload(); });
+      document.write('<html><body style="background:#f0f4ff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><p style="color:#4F46E5;font-size:1.2rem">\\u26A1 \\u6700\\u65B0\\u7248\\u3092\\u8AAD\\u307F\\u8FBC\\u307F\\u4E2D...</p></body></html>');
+      document.close();
+      return;
+    }
+    
+    // 2重チェック：サーバーAPIからも確認
     fetch('/api/build-id', { cache: 'no-store' })
       .then(function(r){ return r.json(); })
       .then(function(d){
         if(d.build_id && d.build_id !== MY_BUILD){
-          // このHTMLは古い → キャッシュ全削除 + SW登録解除 + リロード
-          var tasks = [];
-          if('caches' in window){
-            tasks.push(caches.keys().then(function(ks){
-              return Promise.all(ks.map(function(k){ return caches.delete(k); }));
-            }));
-          }
-          if('serviceWorker' in navigator){
-            tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs){
-              return Promise.all(regs.map(function(r){ return r.unregister(); }));
-            }));
-          }
-          Promise.all(tasks)
-            .then(function(){ window.location.reload(); })
-            .catch(function(){ window.location.reload(); });
-          // リロードまでページ描画を止める
-          document.write('<html><body style="background:#f0f4ff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><p style="color:#4F46E5;font-size:1.2rem">\\u26A1 \\u6700\\u65B0\\u7248\\u3092\\u8AAD\\u307F\\u8FBC\\u307F\\u4E2D...</p></body></html>');
-          document.close();
+          localStorage.removeItem(LAST_CLEAR_KEY);
+          window.location.reload();
         }
       })
       .catch(function(){});
@@ -14476,29 +14492,51 @@ app.get('/landing', (c) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <script>
-        // === キャッシュ強制クリア v4（サーバーAPIで最新版チェック） ===
+        // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260324d';
+          var MY_BUILD = '20260324e';
+          var LAST_CLEAR_KEY = 'toco_last_cache_clear';
+          var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
+          
+          // BUILD_IDが変わっていたら、SW解除+キャッシュ全削除+リロード
+          if(lastClear !== MY_BUILD){
+            console.log('[CACHE-CLEAR] 新BUILD検出: ' + lastClear + ' → ' + MY_BUILD);
+            localStorage.setItem(LAST_CLEAR_KEY, MY_BUILD);
+            var tasks = [];
+            if('caches' in window){
+              tasks.push(caches.keys().then(function(ks){
+                return Promise.all(ks.map(function(k){ 
+                  console.log('[CACHE-CLEAR] キャッシュ削除:', k);
+                  return caches.delete(k); 
+                }));
+              }));
+            }
+            if('serviceWorker' in navigator){
+              tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs){
+                return Promise.all(regs.map(function(r){ 
+                  console.log('[CACHE-CLEAR] SW解除');
+                  return r.unregister(); 
+                }));
+              }));
+            }
+            Promise.all(tasks)
+              .then(function(){ 
+                console.log('[CACHE-CLEAR] 全クリア完了 → リロード');
+                window.location.reload(); 
+              })
+              .catch(function(){ window.location.reload(); });
+            document.write('<html><body style="background:#f0f4ff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><p style="color:#4F46E5;font-size:1.2rem">\\u26A1 \\u6700\\u65B0\\u7248\\u3092\\u8AAD\\u307F\\u8FBC\\u307F\\u4E2D...</p></body></html>');
+            document.close();
+            return; // 以降のスクリプト実行を停止
+          }
+          
+          // さらに、サーバーAPIからも確認（2重チェック）
           fetch('/api/build-id', { cache: 'no-store' })
             .then(function(r){ return r.json(); })
             .then(function(d){
               if(d.build_id && d.build_id !== MY_BUILD){
-                var tasks = [];
-                if('caches' in window){
-                  tasks.push(caches.keys().then(function(ks){
-                    return Promise.all(ks.map(function(k){ return caches.delete(k); }));
-                  }));
-                }
-                if('serviceWorker' in navigator){
-                  tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs){
-                    return Promise.all(regs.map(function(r){ return r.unregister(); }));
-                  }));
-                }
-                Promise.all(tasks)
-                  .then(function(){ window.location.reload(); })
-                  .catch(function(){ window.location.reload(); });
-                document.write('<html><body style="background:#f0f4ff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><p style="color:#4F46E5;font-size:1.2rem">\\u26A1 \\u6700\\u65B0\\u7248\\u3092\\u8AAD\\u307F\\u8FBC\\u307F\\u4E2D...</p></body></html>');
-                document.close();
+                localStorage.removeItem(LAST_CLEAR_KEY); // 強制再クリア
+                window.location.reload();
               }
             })
             .catch(function(){});

@@ -12174,6 +12174,21 @@ window.editVisualWidget = function(cardId) {
       if (data.illustration_url) {
         area.innerHTML += `<div style="margin-top:8px;text-align:center;"><img src="${data.illustration_url}" style="max-width:100%;max-height:250px;border-radius:12px;" /></div>`
       }
+      // ★ DOMクリーンアップ（editVisualWidget後も不正ボタン除去）
+      function cleanNB2Edit(cid) {
+        try {
+          const body = document.getElementById('nb2-visual-' + cid)
+          if (!body) return
+          body.querySelectorAll('button, a, span, div, p').forEach(el => {
+            const t = (el.textContent || '').trim()
+            if (/(問題の図|編集|差し替え|削除)/.test(t) && t.length < 50) el.remove()
+          })
+        } catch(e) {}
+      }
+      cleanNB2Edit(cardId)
+      setTimeout(() => cleanNB2Edit(cardId), 300)
+      setTimeout(() => cleanNB2Edit(cardId), 1000)
+      setTimeout(() => cleanNB2Edit(cardId), 3000)
     } else {
       area.innerHTML = `<div style="padding:12px;text-align:center;color:#DC2626;font-size:0.85rem;">修正失敗: ${data.error || ''}</div>`
     }
@@ -44273,8 +44288,8 @@ async function generateMusicDemo() {
       
       // ツールバー
       html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
-        <button onclick="generateMusicDemo()" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🧠 NB2で再生成</button>
-        <button onclick="editMusicDemo()" style="background:#F59E0B;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>
+        <button onclick="generateMusicDemo()" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2を再生成</button>
+        <button onclick="editMusicDemo()" style="background:#F59E0B;color:white;border:none;padding:8px 16px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>NB2を修正指示</button>
       </div>`
       
       html += `</div></div>`
