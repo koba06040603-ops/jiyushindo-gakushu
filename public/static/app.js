@@ -11924,13 +11924,16 @@ function initVisualWidgets() {
   container.innerHTML = `
     <div style="background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border:2px solid #C4B5FD;border-radius:16px;padding:12px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:4px 10px;background:linear-gradient(135deg,#7C3AED,#EC4899);border-radius:10px;">
-        <span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-robot" style="margin-right:4px;"></i>NB2 インタラクティブ教材</span>
+        <span style="color:white;font-size:0.75rem;font-weight:bold;flex:1;"><i class="fas fa-robot" style="margin-right:4px;"></i>NB2 インタラクティブ教材</span>
+        <button onclick="toggleNB2Widget('${cardId}')" id="nb2-toggle-btn-${cardId}" style="color:white;background:rgba(255,255,255,0.2);border:none;padding:2px 8px;border-radius:6px;font-size:0.65rem;cursor:pointer;font-weight:bold;" title="表示/非表示"><i class="fas fa-eye-slash" style="margin-right:3px;"></i>非表示</button>
       </div>
-      <div id="nb2-visual-toolbar-${cardId}" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px;"></div>
-      <div id="nb2-visual-${cardId}" style="background:white;border:2px dashed #DDD6FE;border-radius:12px;padding:20px;text-align:center;">
-        <div style="display:inline-block;width:40px;height:40px;border:3px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px;"></div>
-        <p style="font-size:1rem;font-weight:bold;color:#7C3AED;">🧠 Nano Banana 2 が図解を設計中...</p>
-        <p style="font-size:0.8rem;color:#9CA3AF;margin-top:4px;">問題に合った視覚教材を生成しています（10〜20秒）</p>
+      <div id="nb2-widget-body-${cardId}">
+        <div id="nb2-visual-toolbar-${cardId}" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px;"></div>
+        <div id="nb2-visual-${cardId}" style="background:white;border:2px dashed #DDD6FE;border-radius:12px;padding:20px;text-align:center;">
+          <div style="display:inline-block;width:40px;height:40px;border:3px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px;"></div>
+          <p style="font-size:1rem;font-weight:bold;color:#7C3AED;">&#x1F9E0; Nano Banana 2 が図解を設計中...</p>
+          <p style="font-size:0.8rem;color:#9CA3AF;margin-top:4px;">問題に合った視覚教材を生成しています（10〜20秒）</p>
+        </div>
       </div>
     </div>
   `
@@ -12053,11 +12056,12 @@ function initVisualWidgets() {
       </div>`
     }
     
-    // ツールバー: 再生成・修正・画像生成
+    // ツールバー: 再生成・修正・聴覚（学習ソング）
     if (toolbar) {
       toolbar.innerHTML = `
         <button onclick="regenerateVisualWidget('${cardId}')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2を再生成</button>
         <button onclick="editVisualWidget('${cardId}')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>NB2を修正指示</button>
+        <button onclick="openLearningMusicPanel('${cardId}')" style="background:linear-gradient(135deg,#10B981,#3B82F6);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-music" style="margin-right:4px;"></i>🎵 学習ソング</button>
       `
     }
   })
@@ -40871,11 +40875,12 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
   if (ytId) {
     return `
       <div class="mt-4 text-center" id="card-image-container-${cardId}">
-        <div class="relative rounded-lg overflow-hidden shadow-md border-2 border-gray-200 mx-auto" style="max-width:560px;">
+        <div id="card-image-body-${cardId}" class="relative rounded-lg overflow-hidden shadow-md border-2 border-gray-200 mx-auto" style="max-width:560px;">
           <iframe src="https://www.youtube.com/embed/${ytId}" class="w-full" style="height:315px;" frameborder="0" allowfullscreen></iframe>
         </div>
         <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
           <p class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>${description || 'YouTube動画'}</p>
+          <button onclick="toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
           <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
         </div>
@@ -40885,13 +40890,16 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
   if (isVideoUrl(url)) {
     return `
       <div class="mt-4 text-center" id="card-image-container-${cardId}">
-        <video controls class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: ${maxHeight};" preload="metadata">
-          <source src="${url}" type="video/mp4">
-          <source src="${url}">
-          動画を再生できません
-        </video>
+        <div id="card-image-body-${cardId}">
+          <video controls class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: ${maxHeight};" preload="metadata">
+            <source src="${url}" type="video/mp4">
+            <source src="${url}">
+            動画を再生できません
+          </video>
+        </div>
         <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
           <p class="text-xs text-gray-500"><i class="fas fa-video mr-1"></i>${description || '動画'}</p>
+          <button onclick="toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
           <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
         </div>
@@ -40905,20 +40913,23 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
     const audioMime = audioMimeMap[audioExt.toLowerCase()] || 'audio/mpeg'
     return `
       <div class="mt-4 text-center bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5 shadow-sm" id="card-image-container-${cardId}">
-        <div class="mb-3">
-          <i class="fas fa-music text-green-500 text-4xl"></i>
+        <div id="card-image-body-${cardId}">
+          <div class="mb-3">
+            <i class="fas fa-music text-green-500 text-4xl"></i>
+          </div>
+          <p class="text-sm font-bold text-green-800 mb-2"><i class="fas fa-headphones mr-1"></i>音声を聞いてみよう</p>
+          <audio controls class="mx-auto w-full" style="max-width:400px;" preload="auto" controlslist="nodownload">
+            <source src="${url}" type="${audioMime}">
+            <source src="${url}" type="audio/mpeg">
+            <source src="${url}" type="audio/mp4">
+            <source src="${url}">
+            音声を再生できません
+          </audio>
+          <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>再生ボタンを押して音声を聞きましょう</p>
         </div>
-        <p class="text-sm font-bold text-green-800 mb-2"><i class="fas fa-headphones mr-1"></i>音声を聞いてみよう</p>
-        <audio controls class="mx-auto w-full" style="max-width:400px;" preload="auto" controlslist="nodownload">
-          <source src="${url}" type="${audioMime}">
-          <source src="${url}" type="audio/mpeg">
-          <source src="${url}" type="audio/mp4">
-          <source src="${url}">
-          音声を再生できません
-        </audio>
-        <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>再生ボタンを押して音声を聞きましょう</p>
         <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
           <p class="text-xs text-gray-500"><i class="fas fa-music mr-1"></i>${description || '音声'}</p>
+          <button onclick="toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
           <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
         </div>
@@ -40928,7 +40939,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
   // デフォルト: 画像
   return `
     <div class="mt-4 text-center" id="card-image-container-${cardId}">
-      <div class="relative group inline-block cursor-pointer" onclick="replaceCardImage(${cardId})">
+      <div id="card-image-body-${cardId}" class="relative group inline-block cursor-pointer" onclick="replaceCardImage(${cardId})">
         <img src="${url}" alt="${description || '問題の図'}" 
              class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200 transition group-hover:brightness-90" style="max-height: ${maxHeight};"
              onerror="handleImageLoadError(this, ${cardId})">
@@ -40941,13 +40952,255 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
       </div>
       <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
         <p class="text-xs text-gray-500"><i class="fas fa-image mr-1"></i>${description || '問題の図'}</p>
+        <button onclick="event.stopPropagation(); toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
         ${showEdit ? `<button onclick="event.stopPropagation(); openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-crop-alt mr-1"></i>編集</button>` : ''}
+        <button onclick="event.stopPropagation(); openPromptImageGenerate(${cardId}, 'replace')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-magic mr-1"></i>プロンプト指示</button>
         ${showReplace ? `<button onclick="event.stopPropagation(); replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
         <button onclick="event.stopPropagation(); deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
       </div>
     </div>`
 }
 window.renderMediaEmbed = renderMediaEmbed
+
+// 画像の表示/非表示トグル
+function toggleCardImage(cardId) {
+  const body = document.getElementById('card-image-body-' + cardId)
+  const btn = document.getElementById('card-image-toggle-' + cardId)
+  if (!body) return
+  if (body.style.display === 'none') {
+    body.style.display = ''
+    if (btn) btn.innerHTML = '<i class="fas fa-eye-slash mr-1"></i>非表示'
+  } else {
+    body.style.display = 'none'
+    if (btn) btn.innerHTML = '<i class="fas fa-eye mr-1"></i>表示'
+  }
+}
+window.toggleCardImage = toggleCardImage
+
+// NB2ウィジェットの表示/非表示トグル
+function toggleNB2Widget(cardId) {
+  const body = document.getElementById('nb2-widget-body-' + cardId)
+  const btn = document.getElementById('nb2-toggle-btn-' + cardId)
+  if (!body) return
+  if (body.style.display === 'none') {
+    body.style.display = ''
+    if (btn) btn.innerHTML = '<i class="fas fa-eye-slash" style="margin-right:3px;"></i>非表示'
+  } else {
+    body.style.display = 'none'
+    if (btn) btn.innerHTML = '<i class="fas fa-eye" style="margin-right:3px;"></i>表示'
+  }
+}
+window.toggleNB2Widget = toggleNB2Widget
+
+// 🎵 学習ソング生成パネルを開く（聴覚モード）
+function openLearningMusicPanel(cardId) {
+  const rawCd = window.currentCardData || {}
+  const cd = rawCd.card || rawCd || {}
+  const cardTitle = cd.card_title || cd.title || '学習内容'
+  const problemText = (cd.problem_content || cd.problem_text || '').substring(0, 300)
+  const subject = cd.subject || ''
+  const grade = cd.grade_level || cd.grade || ''
+  const unitName = cd.unit_name || ''
+  
+  const existingModal = document.getElementById('learning-music-modal')
+  if (existingModal) existingModal.remove()
+
+  const modal = document.createElement('div')
+  modal.id = 'learning-music-modal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-green-800"><i class="fas fa-music text-green-500 mr-2"></i>🎵 学習ソング生成 <span class="text-xs font-normal text-gray-500">（聴覚モード）</span></h3>
+        <button onclick="document.getElementById('learning-music-modal').remove()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+      </div>
+      
+      <div class="bg-green-50 border border-green-200 rounded-xl p-3 mb-4">
+        <p class="text-xs text-green-800 font-bold mb-1"><i class="fas fa-lightbulb mr-1"></i>聴覚学習とは</p>
+        <p class="text-xs text-green-700">学習内容を歌詞にして覚えることで、暗記・理解が深まります。NB2が問題内容に合った歌詞を自動生成します。</p>
+      </div>
+
+      <div class="mb-3">
+        <p class="text-xs font-bold text-gray-700 mb-1"><i class="fas fa-book mr-1"></i>対象: ${cardTitle}</p>
+        ${problemText ? '<p class="text-xs text-gray-500 line-clamp-2">' + problemText.substring(0, 100) + '...</p>' : ''}
+      </div>
+
+      <div class="mb-3">
+        <label class="block text-sm font-bold text-gray-700 mb-1"><i class="fas fa-palette text-purple-500 mr-1"></i>曲調を選択</label>
+        <div class="grid grid-cols-2 gap-2" id="music-style-grid">
+          <button onclick="selectMusicStyle(this, 'pop')" class="music-style-btn border-2 border-blue-300 bg-blue-50 rounded-lg p-2 text-xs text-center hover:bg-blue-100 transition" data-style="pop">
+            <i class="fas fa-star text-blue-500 block text-lg mb-1"></i>ポップ<br><span class="text-gray-400">明るく元気</span>
+          </button>
+          <button onclick="selectMusicStyle(this, 'rap')" class="music-style-btn border-2 border-orange-300 bg-orange-50 rounded-lg p-2 text-xs text-center hover:bg-orange-100 transition" data-style="rap">
+            <i class="fas fa-microphone text-orange-500 block text-lg mb-1"></i>ラップ<br><span class="text-gray-400">リズミカル</span>
+          </button>
+          <button onclick="selectMusicStyle(this, 'ballad')" class="music-style-btn border-2 border-pink-300 bg-pink-50 rounded-lg p-2 text-xs text-center hover:bg-pink-100 transition" data-style="ballad">
+            <i class="fas fa-heart text-pink-500 block text-lg mb-1"></i>バラード<br><span class="text-gray-400">ゆったり</span>
+          </button>
+          <button onclick="selectMusicStyle(this, 'march')" class="music-style-btn border-2 border-green-300 bg-green-50 rounded-lg p-2 text-xs text-center hover:bg-green-100 transition" data-style="march">
+            <i class="fas fa-drum text-green-500 block text-lg mb-1"></i>マーチ<br><span class="text-gray-400">行進曲風</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="block text-xs font-bold text-gray-700 mb-1"><i class="fas fa-pencil-alt text-indigo-500 mr-1"></i>追加リクエスト（任意）</label>
+        <textarea id="music-extra-prompt" rows="2" class="w-full p-2 border-2 border-gray-200 rounded-xl text-xs focus:border-green-400 focus:outline-none" placeholder="例: 掛け算の九九を覚える歌にして、サビで答えを繰り返して"></textarea>
+      </div>
+
+      <div id="learning-music-result"></div>
+
+      <div class="flex gap-3 mt-4">
+        <button onclick="executeLearningMusicGenerate('${cardId}')" id="music-gen-start-btn" class="flex-1 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition shadow-lg">
+          <i class="fas fa-music mr-1"></i>🎵 歌詞を生成
+        </button>
+        <button onclick="document.getElementById('learning-music-modal').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-xl font-bold text-sm transition">閉じる</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+  
+  // デフォルトでポップを選択
+  setTimeout(() => selectMusicStyle(document.querySelector('.music-style-btn[data-style="pop"]'), 'pop'), 50)
+}
+window.openLearningMusicPanel = openLearningMusicPanel
+
+// 曲調選択
+window._selectedMusicStyle = 'pop'
+function selectMusicStyle(btn, style) {
+  window._selectedMusicStyle = style
+  document.querySelectorAll('.music-style-btn').forEach(b => {
+    b.classList.remove('ring-2', 'ring-offset-1')
+    b.style.boxShadow = ''
+  })
+  if (btn) {
+    btn.classList.add('ring-2', 'ring-offset-1')
+    btn.style.boxShadow = '0 0 0 2px rgba(16,185,129,0.5)'
+  }
+}
+window.selectMusicStyle = selectMusicStyle
+
+// 学習ソング生成実行
+async function executeLearningMusicGenerate(cardId) {
+  const resultDiv = document.getElementById('learning-music-result')
+  const startBtn = document.getElementById('music-gen-start-btn')
+  if (!resultDiv) return
+  
+  const rawCd = window.currentCardData || {}
+  const cd = rawCd.card || rawCd || {}
+  const cardTitle = cd.card_title || cd.title || '学習内容'
+  const problemText = (cd.problem_content || cd.problem_text || '').substring(0, 400)
+  const subject = cd.subject || ''
+  const grade = cd.grade_level || cd.grade || ''
+  const unitName = cd.unit_name || ''
+  const extraPrompt = document.getElementById('music-extra-prompt')?.value || ''
+  const style = window._selectedMusicStyle || 'pop'
+  
+  if (startBtn) startBtn.disabled = true
+  
+  resultDiv.innerHTML = `
+    <div style="text-align:center;padding:20px;background:linear-gradient(135deg,#ECFDF5,#EFF6FF);border-radius:14px;border:2px solid #A7F3D0;">
+      <div style="display:inline-block;width:40px;height:40px;border:3px solid #10B981;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px;"></div>
+      <p style="font-size:0.9rem;font-weight:bold;color:#065F46;">🎵 Nano Banana 2 が学習ソングを作曲中...</p>
+      <p style="font-size:0.75rem;color:#6B7280;margin-top:4px;">歌詞と曲の構成を生成しています（15〜30秒）</p>
+    </div>`
+  
+  try {
+    const response = await fetch('/api/ai/generate-nb2-music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        card_title: cardTitle,
+        problem_text: problemText,
+        topic: cardTitle,
+        subject: subject,
+        grade: grade,
+        unit_name: unitName,
+        style: style,
+        extra_prompt: extraPrompt
+      })
+    })
+    
+    if (!response.ok) throw new Error('音楽生成に失敗しました (HTTP ' + response.status + ')')
+    
+    const data = await response.json()
+    
+    if (data.success && data.song_data) {
+      const sd = data.song_data
+      const styleLabels = { pop: 'ポップ', rap: 'ラップ', ballad: 'バラード', march: 'マーチ' }
+      
+      let html = '<div style="background:white;border:2px solid #A7F3D0;border-radius:16px;overflow:hidden;">'
+      
+      // ヘッダー
+      html += '<div style="background:linear-gradient(135deg,#10B981,#3B82F6);padding:12px 16px;display:flex;align-items:center;gap:10px;">'
+      html += '<span style="font-size:1.5rem;">🎵</span>'
+      html += '<div style="flex:1;">'
+      html += '<p style="color:white;font-weight:bold;font-size:0.85rem;margin:0;">' + (sd.title || cardTitle + 'の歌') + '</p>'
+      html += '<p style="color:rgba(255,255,255,0.8);font-size:0.65rem;margin:0;">聴覚学習モード / ' + (styleLabels[style] || style) + '</p>'
+      html += '</div></div>'
+      
+      // 歌詞表示
+      if (sd.lyrics) {
+        html += '<div style="padding:14px;">'
+        html += '<p style="font-weight:bold;font-size:0.8rem;color:#065F46;margin-bottom:8px;"><i class="fas fa-file-alt" style="margin-right:4px;"></i>歌詞</p>'
+        html += '<div style="background:#F0FDF4;border-radius:10px;padding:12px;font-size:0.8rem;color:#1F2937;white-space:pre-wrap;line-height:1.7;border:1px solid #BBF7D0;">' + sd.lyrics + '</div>'
+        html += '</div>'
+      }
+      
+      // メロディーガイド
+      if (sd.melody_guide) {
+        html += '<div style="padding:0 14px 14px;">'
+        html += '<p style="font-weight:bold;font-size:0.8rem;color:#1E40AF;margin-bottom:6px;"><i class="fas fa-music" style="margin-right:4px;"></i>メロディーガイド</p>'
+        html += '<div style="background:#EFF6FF;border-radius:10px;padding:10px;font-size:0.75rem;color:#374151;white-space:pre-wrap;line-height:1.6;border:1px solid #BFDBFE;">' + sd.melody_guide + '</div>'
+        html += '</div>'
+      }
+      
+      // ジャケット画像
+      if (sd.jacket_url) {
+        html += '<div style="padding:0 14px 14px;text-align:center;">'
+        html += '<img src="' + sd.jacket_url + '" style="max-width:200px;border-radius:12px;border:2px solid #D1FAE5;box-shadow:0 4px 12px rgba(0,0,0,0.1);" />'
+        html += '</div>'
+      }
+      
+      // アクション
+      html += '<div style="padding:10px 14px 14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">'
+      html += '<button onclick="executeLearningMusicGenerate(\'' + cardId + '\')" style="background:linear-gradient(135deg,#10B981,#3B82F6);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.75rem;"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>再生成</button>'
+      html += '<button onclick="copyLyricsToClipboard()" style="background:#6366F1;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.75rem;"><i class="fas fa-copy" style="margin-right:4px;"></i>歌詞コピー</button>'
+      html += '</div>'
+      
+      html += '</div>'
+      resultDiv.innerHTML = html
+    } else {
+      throw new Error(data.error || '生成に失敗しました')
+    }
+  } catch (err) {
+    resultDiv.innerHTML = '<div style="padding:14px;text-align:center;background:#FEF2F2;border-radius:14px;border:1px solid #FECACA;"><p style="font-size:0.85rem;color:#DC2626;">⚠️ ' + (err.message || '通信エラー') + '</p><button onclick="executeLearningMusicGenerate(\'' + cardId + '\')" style="margin-top:8px;background:#10B981;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;font-size:0.8rem;cursor:pointer;">🔄 再試行</button></div>'
+  } finally {
+    if (startBtn) startBtn.disabled = false
+  }
+}
+window.executeLearningMusicGenerate = executeLearningMusicGenerate
+
+// 歌詞をクリップボードにコピー
+function copyLyricsToClipboard() {
+  const lyricsDiv = document.querySelector('#learning-music-result [style*="pre-wrap"]')
+  if (lyricsDiv) {
+    navigator.clipboard.writeText(lyricsDiv.textContent).then(() => {
+      if (typeof showToast === 'function') showToast('歌詞をコピーしました', 'success')
+      else alert('コピーしました')
+    }).catch(() => {
+      // fallback
+      const range = document.createRange()
+      range.selectNodeContents(lyricsDiv)
+      const sel = window.getSelection()
+      sel.removeAllRanges()
+      sel.addRange(range)
+      document.execCommand('copy')
+      sel.removeAllRanges()
+      if (typeof showToast === 'function') showToast('歌詞をコピーしました', 'success')
+    })
+  }
+}
+window.copyLyricsToClipboard = copyLyricsToClipboard
 
 // ファイルサイズフォーマット
 function formatFileSize(bytes) {
