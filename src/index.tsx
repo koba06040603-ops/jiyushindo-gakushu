@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260324g' }, 200, {
+  return c.json({ build_id: '20260324h' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260324g';
+    var MY_BUILD = '20260324h';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14492,7 +14492,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260324g';
+          var MY_BUILD = '20260324h';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           

@@ -11924,7 +11924,7 @@ function initVisualWidgets() {
   container.innerHTML = `
     <div style="background:linear-gradient(135deg,#F5F3FF,#FDF2F8);border:2px solid #C4B5FD;border-radius:16px;padding:12px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:4px 10px;background:linear-gradient(135deg,#7C3AED,#EC4899);border-radius:10px;">
-        <span style="color:white;font-size:0.75rem;font-weight:bold;flex:1;"><i class="fas fa-robot" style="margin-right:4px;"></i>NB2 インタラクティブ教材</span>
+        <span style="color:white;font-size:0.75rem;font-weight:bold;flex:1;"><i class="fas fa-robot" style="margin-right:4px;"></i>NB2 インタラクティブ教材 <span style="font-size:0.55rem;opacity:0.8;margin-left:4px;background:rgba(255,255,255,0.2);padding:1px 5px;border-radius:4px;">F1視覚 F2空間知能 F3体験</span></span>
         <button onclick="toggleNB2Widget('${cardId}')" id="nb2-toggle-btn-${cardId}" style="color:white;background:rgba(255,255,255,0.2);border:none;padding:2px 8px;border-radius:6px;font-size:0.65rem;cursor:pointer;font-weight:bold;" title="表示/非表示"><i class="fas fa-eye-slash" style="margin-right:3px;"></i>非表示</button>
       </div>
       <div id="nb2-widget-body-${cardId}">
@@ -14389,8 +14389,101 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
 }
 window.generateExampleDiagramApp = generateExampleDiagramApp
 
-// ============================================================
-// 作図問題用：Canvas描画実技シミュレーター
+// 例題の図: プロンプト修正（モーダルでプロンプト編集→再生成）
+function editExampleDiagramPrompt(cardId, cardTitle, exampleProblem, exampleSolution) {
+  const existingModal = document.getElementById('edit-example-prompt-modal')
+  if (existingModal) existingModal.remove()
+
+  const defaultPrompt = '日本の小学校の教科書に載る例題の図解を描いてください。\n' +
+    '【カード】' + (cardTitle || '') + '\n' +
+    '【例題】' + (exampleProblem || '') + '\n' +
+    (exampleSolution ? '【解き方】' + exampleSolution + '\n' : '') +
+    '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。'
+
+  const modal = document.createElement('div')
+  modal.id = 'edit-example-prompt-modal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4'
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-gray-800"><i class="fas fa-pencil-alt text-blue-500 mr-2"></i>例題の図 プロンプト修正</h3>
+        <button onclick="document.getElementById('edit-example-prompt-modal').remove()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+      </div>
+      <div class="mb-3">
+        <label class="block text-sm font-bold text-gray-700 mb-1"><i class="fas fa-image text-yellow-500 mr-1"></i>図の内容を指定</label>
+        <textarea id="edit-example-prompt-text" rows="8" class="w-full p-3 border-2 border-blue-200 rounded-xl text-sm focus:border-blue-400 focus:outline-none">${defaultPrompt}</textarea>
+        <p class="text-xs text-gray-400 mt-1">💡 問題の内容や正解のデータを含めると、より正確な図が生成されます。</p>
+      </div>
+      <div class="flex gap-3 mt-4">
+        <button onclick="executeEditExampleDiagram('${cardId}')" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2.5 rounded-xl font-bold text-sm transition">
+          <i class="fas fa-magic mr-1"></i>この内容で再生成
+        </button>
+        <button onclick="document.getElementById('edit-example-prompt-modal').remove()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2.5 rounded-xl font-bold text-sm transition">キャンセル</button>
+      </div>
+    </div>`
+  document.body.appendChild(modal)
+}
+window.editExampleDiagramPrompt = editExampleDiagramPrompt
+
+// 例題の図: プロンプト修正→実行
+async function executeEditExampleDiagram(cardId) {
+  const promptText = document.getElementById('edit-example-prompt-text')?.value || ''
+  document.getElementById('edit-example-prompt-modal')?.remove()
+
+  const area = document.getElementById('example-diagram-card-' + cardId)
+  if (!area) return
+  area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-blue-500 text-xl"></i><p class="text-xs text-blue-600 mt-1 font-bold">プロンプト指定で図を生成中...</p></div>'
+  try {
+    const res = await axios.post('/api/ai/generate-image', {
+      prompt: promptText,
+      card_id: cardId,
+      prefer_image: true
+    })
+    const d = res.data
+    if (d.success && d.image_url) {
+      try { await axios.put('/api/card/' + cardId, { example_image_url: d.image_url }) } catch(e) {}
+      const rawCd = window.currentCardData || {}
+      const cd = rawCd.card || rawCd || {}
+      const ct = (cd.card_title || '').replace(/'/g, '')
+      const ep = (cd.example_problem || '').replace(/'/g, '').substring(0, 80)
+      const es = (cd.example_solution || '').replace(/'/g, '').substring(0, 80)
+      area.innerHTML = '<div class="text-center mt-2" id="example-img-wrapper-' + cardId + '">' +
+        '<img src="' + d.image_url + '" alt="例題の図" class="max-h-48 rounded border mx-auto">' +
+        '<div class="flex justify-center items-center gap-2 mt-1 flex-wrap">' +
+        '<span class="text-[10px] text-gray-400">' + (d.model || 'AI') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</span>' +
+        '<button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + ct + '\',\'' + ep + '\',\'' + es + '\')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>' +
+        '<button onclick="editExampleDiagramPrompt(\'' + cardId + '\',\'' + ct + '\',\'' + ep + '\',\'' + es + '\')" class="text-[10px] text-blue-600 underline">✏️ プロンプト修正</button>' +
+        '<button onclick="hideExampleDiagram(\'' + cardId + '\')" class="text-[10px] text-gray-400 underline">✕ 非表示</button>' +
+        '</div></div>'
+    } else {
+      area.innerHTML = '<p class="text-xs text-red-500 mt-1">図の生成に失敗 <button onclick="editExampleDiagramPrompt(\'' + cardId + '\')" class="text-blue-600 underline">再試行</button></p>'
+    }
+  } catch (e) {
+    area.innerHTML = '<p class="text-xs text-red-500 mt-1">通信エラー: ' + e.message + '</p>'
+  }
+}
+window.executeEditExampleDiagram = executeEditExampleDiagram
+
+// 例題の図: 非表示トグル
+function hideExampleDiagram(cardId) {
+  const wrapper = document.getElementById('example-img-wrapper-' + cardId)
+  if (!wrapper) return
+  const img = wrapper.querySelector('img')
+  if (!img) return
+  if (img.style.display === 'none') {
+    img.style.display = ''
+    // ボタンテキストを「非表示」に戻す
+    wrapper.querySelectorAll('button').forEach(btn => {
+      if (btn.textContent.includes('表示')) btn.innerHTML = '✕ 非表示'
+    })
+  } else {
+    img.style.display = 'none'
+    wrapper.querySelectorAll('button').forEach(btn => {
+      if (btn.textContent.includes('非表示')) btn.innerHTML = '👁 表示'
+    })
+  }
+}
+window.hideExampleDiagram = hideExampleDiagram
 // コンパス（円弧描画）+ 定規（直線描画）で実際に手を動かして作図
 // ============================================================
 
@@ -41011,7 +41104,7 @@ function openLearningMusicPanel(cardId) {
   modal.innerHTML = `
     <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6">
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-bold text-green-800"><i class="fas fa-music text-green-500 mr-2"></i>🎵 学習ソング生成 <span class="text-xs font-normal text-gray-500">（聴覚モード）</span></h3>
+        <h3 class="text-lg font-bold text-green-800"><i class="fas fa-music text-green-500 mr-2"></i>🎵 学習ソング生成 <span class="text-xs font-normal text-gray-500">（聴覚モード）</span> <span class="text-[9px] font-normal bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-1">F1聴覚 F2音楽知能</span></h3>
         <button onclick="document.getElementById('learning-music-modal').remove()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
       </div>
       
@@ -41094,6 +41187,7 @@ async function executeLearningMusicGenerate(cardId) {
   const unitName = cd.unit_name || ''
   const extraPrompt = document.getElementById('music-extra-prompt')?.value || ''
   const style = window._selectedMusicStyle || 'pop'
+  const styleLabels = { pop: 'ポップ', rap: 'ラップ', ballad: 'バラード', march: 'マーチ' }
   
   if (startBtn) startBtn.disabled = true
   
@@ -41101,7 +41195,7 @@ async function executeLearningMusicGenerate(cardId) {
     <div style="text-align:center;padding:20px;background:linear-gradient(135deg,#ECFDF5,#EFF6FF);border-radius:14px;border:2px solid #A7F3D0;">
       <div style="display:inline-block;width:40px;height:40px;border:3px solid #10B981;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px;"></div>
       <p style="font-size:0.9rem;font-weight:bold;color:#065F46;">🎵 Nano Banana 2 が学習ソングを作曲中...</p>
-      <p style="font-size:0.75rem;color:#6B7280;margin-top:4px;">歌詞と曲の構成を生成しています（15〜30秒）</p>
+      <p style="font-size:0.75rem;color:#6B7280;margin-top:4px;">歌詞・音声・ジャケット画像を生成しています（15〜40秒）</p>
     </div>`
   
   try {
@@ -41115,8 +41209,8 @@ async function executeLearningMusicGenerate(cardId) {
         subject: subject,
         grade: grade,
         unit_name: unitName,
-        style: style,
-        extra_prompt: extraPrompt
+        song_style: style + ' / ' + (styleLabels[style] || style),
+        edit_instruction: extraPrompt || undefined
       })
     })
     
@@ -41126,7 +41220,10 @@ async function executeLearningMusicGenerate(cardId) {
     
     if (data.success && data.song_data) {
       const sd = data.song_data
-      const styleLabels = { pop: 'ポップ', rap: 'ラップ', ballad: 'バラード', march: 'マーチ' }
+      const si = data.suno_info || {}
+      const audioUrl = data.audio_url || ''
+      const coverUrl = data.cover_image_url || sd.jacket_url || ''
+      const genTime = Math.round((data.generation_time_ms || 0) / 1000)
       
       let html = '<div style="background:white;border:2px solid #A7F3D0;border-radius:16px;overflow:hidden;">'
       
@@ -41134,37 +41231,85 @@ async function executeLearningMusicGenerate(cardId) {
       html += '<div style="background:linear-gradient(135deg,#10B981,#3B82F6);padding:12px 16px;display:flex;align-items:center;gap:10px;">'
       html += '<span style="font-size:1.5rem;">🎵</span>'
       html += '<div style="flex:1;">'
-      html += '<p style="color:white;font-weight:bold;font-size:0.85rem;margin:0;">' + (sd.title || cardTitle + 'の歌') + '</p>'
-      html += '<p style="color:rgba(255,255,255,0.8);font-size:0.65rem;margin:0;">聴覚学習モード / ' + (styleLabels[style] || style) + '</p>'
+      html += '<p style="color:white;font-weight:bold;font-size:0.85rem;margin:0;">' + (sd.song_title || sd.title || cardTitle + 'の歌') + '</p>'
+      html += '<p style="color:rgba(255,255,255,0.8);font-size:0.65rem;margin:0;">聴覚学習モード / ' + (sd.genre || styleLabels[style] || style) + ' / ' + genTime + '秒</p>'
       html += '</div></div>'
       
-      // 歌詞表示
-      if (sd.lyrics) {
-        html += '<div style="padding:14px;">'
-        html += '<p style="font-weight:bold;font-size:0.8rem;color:#065F46;margin-bottom:8px;"><i class="fas fa-file-alt" style="margin-right:4px;"></i>歌詞</p>'
-        html += '<div style="background:#F0FDF4;border-radius:10px;padding:12px;font-size:0.8rem;color:#1F2937;white-space:pre-wrap;line-height:1.7;border:1px solid #BBF7D0;">' + sd.lyrics + '</div>'
-        html += '</div>'
-      }
-      
-      // メロディーガイド
-      if (sd.melody_guide) {
-        html += '<div style="padding:0 14px 14px;">'
-        html += '<p style="font-weight:bold;font-size:0.8rem;color:#1E40AF;margin-bottom:6px;"><i class="fas fa-music" style="margin-right:4px;"></i>メロディーガイド</p>'
-        html += '<div style="background:#EFF6FF;border-radius:10px;padding:10px;font-size:0.75rem;color:#374151;white-space:pre-wrap;line-height:1.6;border:1px solid #BFDBFE;">' + sd.melody_guide + '</div>'
+      // 🔊 音声プレイヤー（30秒プレビュー）
+      if (audioUrl) {
+        html += '<div style="padding:14px 14px 8px;">'
+        html += '<p style="font-weight:bold;font-size:0.8rem;color:#065F46;margin-bottom:8px;"><i class="fas fa-headphones" style="margin-right:4px;"></i>🔊 聴いてみよう（AI読み上げプレビュー）</p>'
+        html += '<audio controls style="width:100%;max-width:400px;display:block;margin:0 auto;" preload="auto">'
+        html += '<source src="' + audioUrl + '">'
+        html += '</audio>'
+        html += '<p style="font-size:0.65rem;color:#9CA3AF;text-align:center;margin-top:4px;">Gemini TTS による歌詞読み上げ（約30秒）</p>'
         html += '</div>'
       }
       
       // ジャケット画像
-      if (sd.jacket_url) {
-        html += '<div style="padding:0 14px 14px;text-align:center;">'
-        html += '<img src="' + sd.jacket_url + '" style="max-width:200px;border-radius:12px;border:2px solid #D1FAE5;box-shadow:0 4px 12px rgba(0,0,0,0.1);" />'
+      if (coverUrl) {
+        html += '<div style="padding:8px 14px;text-align:center;">'
+        html += '<img src="' + coverUrl + '" style="max-width:180px;max-height:180px;border-radius:12px;border:2px solid #D1FAE5;box-shadow:0 4px 12px rgba(0,0,0,0.1);" />'
+        html += '</div>'
+      }
+      
+      // 歌詞表示（Suno用フルバージョン 4分以内）
+      if (sd.lyrics) {
+        html += '<div style="padding:10px 14px;">'
+        html += '<p style="font-weight:bold;font-size:0.8rem;color:#065F46;margin-bottom:6px;"><i class="fas fa-file-alt" style="margin-right:4px;"></i>歌詞（Suno用フルバージョン / 4分以内）</p>'
+        html += '<div id="lyrics-full-text" style="background:#F0FDF4;border-radius:10px;padding:12px;font-size:0.78rem;color:#1F2937;white-space:pre-wrap;line-height:1.7;border:1px solid #BBF7D0;max-height:250px;overflow-y:auto;">' + sd.lyrics + '</div>'
+        html += '</div>'
+      }
+      
+      // Suno連携セクション
+      html += '<div style="padding:8px 14px;background:#FFFBEB;border-top:1px solid #FDE68A;border-bottom:1px solid #FDE68A;">'
+      html += '<p style="font-weight:bold;font-size:0.78rem;color:#92400E;margin-bottom:6px;"><i class="fas fa-external-link-alt" style="margin-right:4px;"></i>🎤 Sunoで本格的な歌にする</p>'
+      if (sd.suno_style_prompt) {
+        html += '<div style="margin-bottom:6px;">'
+        html += '<p style="font-size:0.7rem;color:#78350F;font-weight:bold;margin-bottom:2px;">Style Prompt（Sunoにコピペ）:</p>'
+        html += '<div id="suno-style-text" onclick="copySunoStyle()" style="background:white;border:1px solid #FDE68A;border-radius:8px;padding:8px;font-size:0.72rem;color:#374151;cursor:pointer;font-family:monospace;" title="クリックでコピー">' + sd.suno_style_prompt + '</div>'
+        html += '</div>'
+      }
+      html += '<div style="font-size:0.65rem;color:#92400E;line-height:1.5;">'
+      if (si.how_to && si.how_to.length) {
+        si.how_to.forEach(function(step) { html += '<p style="margin:1px 0;">' + step + '</p>' })
+      } else {
+        html += '<p>1. <a href="https://suno.com" target="_blank" style="color:#2563EB;text-decoration:underline;">suno.com</a> にアクセス</p>'
+        html += '<p>2. 「Create」→「Custom」で歌詞とStyleをコピペ</p>'
+        html += '<p>3. 「Create」で生成（1日5曲無料）</p>'
+      }
+      html += '</div></div>'
+      
+      // メロディーガイド / 歌い方のコツ
+      if (sd.melody_description || sd.sing_along_tips) {
+        html += '<div style="padding:8px 14px;">'
+        if (sd.melody_description) {
+          html += '<p style="font-weight:bold;font-size:0.75rem;color:#1E40AF;margin-bottom:4px;"><i class="fas fa-music" style="margin-right:4px;"></i>メロディー</p>'
+          html += '<p style="font-size:0.72rem;color:#374151;margin-bottom:6px;">' + sd.melody_description + '</p>'
+        }
+        if (sd.sing_along_tips) {
+          html += '<p style="font-weight:bold;font-size:0.75rem;color:#7C3AED;margin-bottom:4px;"><i class="fas fa-hands-clapping" style="margin-right:4px;"></i>歌い方のコツ</p>'
+          html += '<p style="font-size:0.72rem;color:#374151;">' + sd.sing_along_tips + '</p>'
+        }
+        html += '</div>'
+      }
+      
+      // 学習ポイント
+      if (sd.learning_points && sd.learning_points.length) {
+        html += '<div style="padding:4px 14px 8px;">'
+        html += '<p style="font-weight:bold;font-size:0.75rem;color:#065F46;margin-bottom:4px;"><i class="fas fa-check-circle" style="margin-right:4px;"></i>この歌で覚えられること</p>'
+        sd.learning_points.forEach(function(p) { html += '<p style="font-size:0.7rem;color:#374151;margin:1px 0;">✅ ' + p + '</p>' })
         html += '</div>'
       }
       
       // アクション
-      html += '<div style="padding:10px 14px 14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">'
-      html += '<button onclick="executeLearningMusicGenerate(\'' + cardId + '\')" style="background:linear-gradient(135deg,#10B981,#3B82F6);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.75rem;"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>再生成</button>'
-      html += '<button onclick="copyLyricsToClipboard()" style="background:#6366F1;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.75rem;"><i class="fas fa-copy" style="margin-right:4px;"></i>歌詞コピー</button>'
+      html += '<div style="padding:10px 14px 14px;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
+      html += '<button onclick="executeLearningMusicGenerate(\'' + cardId + '\')" style="background:linear-gradient(135deg,#10B981,#3B82F6);color:white;border:none;padding:7px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>再生成</button>'
+      html += '<button onclick="copyLyricsToClipboard()" style="background:#6366F1;color:white;border:none;padding:7px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;"><i class="fas fa-copy" style="margin-right:3px;"></i>歌詞コピー</button>'
+      if (sd.suno_style_prompt) {
+        html += '<button onclick="copySunoStyle()" style="background:#F59E0B;color:white;border:none;padding:7px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;"><i class="fas fa-copy" style="margin-right:3px;"></i>Styleコピー</button>'
+      }
+      html += '<a href="https://suno.com" target="_blank" style="background:#EF4444;color:white;text-decoration:none;padding:7px 12px;border-radius:10px;font-weight:bold;font-size:0.72rem;display:inline-flex;align-items:center;"><i class="fas fa-external-link-alt" style="margin-right:3px;"></i>Sunoを開く</a>'
       html += '</div>'
       
       html += '</div>'
@@ -41179,6 +41324,18 @@ async function executeLearningMusicGenerate(cardId) {
   }
 }
 window.executeLearningMusicGenerate = executeLearningMusicGenerate
+
+// Sunoスタイルプロンプトをコピー
+function copySunoStyle() {
+  const el = document.getElementById('suno-style-text')
+  if (el) {
+    navigator.clipboard.writeText(el.textContent).then(() => {
+      if (typeof showToast === 'function') showToast('Sunoスタイルをコピーしました', 'success')
+      else alert('コピーしました')
+    }).catch(() => {})
+  }
+}
+window.copySunoStyle = copySunoStyle
 
 // 歌詞をクリップボードにコピー
 function copyLyricsToClipboard() {
