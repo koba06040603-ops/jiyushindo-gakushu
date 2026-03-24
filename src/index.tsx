@@ -8634,6 +8634,18 @@ app.get('/test-buttons.html', async (c) => {
             }
         }
     </script>
+    <script>
+    // SW強制更新（ページ内直接埋め込み - キャッシュに影響されない）
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.getRegistration().then(function(reg){
+        if(reg){reg.update().catch(function(){});}
+      });
+      var _swRefreshing=false;
+      navigator.serviceWorker.addEventListener('controllerchange',function(){
+        if(!_swRefreshing){_swRefreshing=true;window.location.reload();}
+      });
+    }
+    </script>
 </body>
 </html>`
   

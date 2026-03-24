@@ -51418,12 +51418,15 @@ console.log('🎉 Phase 7: すべての高度な機能を読み込みました�
 // Phase 9-2: PWA対応
 // ============================================
 
-// Service Worker登録
+// Service Worker登録（自動更新対応）
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
       .then(registration => {
         console.log('✅ Service Worker登録成功:', registration.scope)
+        
+        // 即座に更新チェックを実行
+        registration.update().catch(() => {})
         
         // 更新チェック
         registration.addEventListener('updatefound', () => {
@@ -51432,13 +51435,22 @@ if ('serviceWorker' in navigator) {
           
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // 新しいバージョンが利用可能
-              if (confirm('新しいバージョンが利用可能です。更新しますか？')) {
-                newWorker.postMessage({ type: 'SKIP_WAITING' })
-                window.location.reload()
-              }
+              // 新しいバージョンが利用可能 → 自動でskipWaiting + リロード
+              console.log('🔄 新バージョンを自動適用中...')
+              newWorker.postMessage({ type: 'SKIP_WAITING' })
+              // controllerchangeイベントでリロードされるので、ここでは直接リロードしない
             }
           })
+        })
+
+        // 新しいSWがコントロールを取得したらリロード
+        var refreshing = false
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) {
+            refreshing = true
+            console.log('🔄 新しいService Workerが有効化されました。ページをリロードします。')
+            window.location.reload()
+          }
         })
       })
       .catch(error => {
