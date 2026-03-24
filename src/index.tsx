@@ -1205,6 +1205,12 @@ app.use('/guide/*', async (c, next) => {
   c.header('Pragma', 'no-cache')
   c.header('Expires', '0')
 })
+app.use('/landing', async (c, next) => {
+  await next()
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate')
+  c.header('Pragma', 'no-cache')
+  c.header('Expires', '0')
+})
 app.use('/diagnostic*', async (c, next) => {
   await next()
   c.header('Cache-Control', 'no-cache, no-store, must-revalidate')
@@ -14469,6 +14475,35 @@ app.get('/landing', (c) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script>
+        // === キャッシュ強制クリア v4（サーバーAPIで最新版チェック） ===
+        (function(){
+          var MY_BUILD = '20260324d';
+          fetch('/api/build-id', { cache: 'no-store' })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+              if(d.build_id && d.build_id !== MY_BUILD){
+                var tasks = [];
+                if('caches' in window){
+                  tasks.push(caches.keys().then(function(ks){
+                    return Promise.all(ks.map(function(k){ return caches.delete(k); }));
+                  }));
+                }
+                if('serviceWorker' in navigator){
+                  tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs){
+                    return Promise.all(regs.map(function(r){ return r.unregister(); }));
+                  }));
+                }
+                Promise.all(tasks)
+                  .then(function(){ window.location.reload(); })
+                  .catch(function(){ window.location.reload(); });
+                document.write('<html><body style="background:#f0f4ff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif"><p style="color:#4F46E5;font-size:1.2rem">\\u26A1 \\u6700\\u65B0\\u7248\\u3092\\u8AAD\\u307F\\u8FBC\\u307F\\u4E2D...</p></body></html>');
+                document.close();
+              }
+            })
+            .catch(function(){});
+        })();
+        </script>
         <meta name="description" content="AI搭載の自由進度学習支援システム - 個別最適化された学習体験を提供">
         <title>自由進度学習支援システム</title>
         <link rel="icon" type="image/svg+xml" href="/favicon.svg">

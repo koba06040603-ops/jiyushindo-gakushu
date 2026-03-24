@@ -6477,7 +6477,7 @@ async function loadCardPage(cardId) {
                 ${card.example_solution ? `
                   <div class="bg-green-50 rounded-lg p-4">
                     <h4 class="card-heading font-bold text-green-800 mb-2">
-                      <i class="fas fa-check-circle mr-2"></i>解き方
+                      <i class="fas fa-check-circle mr-2"></i>解き方・答え
                     </h4>
                     <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans">${formatText(card.example_solution)}</pre>
                   </div>
@@ -11945,13 +11945,18 @@ function initVisualWidgets() {
     if (!area) return
     
     if (data.success && data.widget_html) {
+      // NB2 AI出力からシステムUI風の不正ボタンを除去
+      const safeHtml = (data.widget_html || '')
+        .replace(/<(a|button|span)[^>]*>[^<]*(問題の図|編集|差し替え|削除)[^<]*<\/(a|button|span)>/gi, '')
+        .replace(/<(div|p|span)[^>]*>[\s\S]*?(問題の図|編集)[\s\S]*?(差し替え|削除)[\s\S]*?<\/(div|p|span)>/gi, '')
+        .replace(/<[^>]*onclick[^>]*(問題の図|編集|差し替え|削除|replace|delete|edit|remove)[^>]*>[^<]*<\/[^>]*>/gi, '')
       area.innerHTML = `
-        <div style="background:white;border-radius:16px;border:2px solid #E5E7EB;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
+        <div style="background:white;border-radius:16px;border:2px solid #C4B5FD;overflow:hidden;box-shadow:0 2px 12px rgba(124,58,237,0.1);">
           <div style="background:linear-gradient(135deg,#7C3AED,#EC4899);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;">
-            <span style="color:white;font-size:0.8rem;font-weight:bold;"><i class="fas fa-robot" style="margin-right:5px;"></i>Nano Banana 2 図解</span>
+            <span style="color:white;font-size:0.8rem;font-weight:bold;"><i class="fas fa-robot" style="margin-right:5px;"></i>🤖 NB2 が自動設計した教材</span>
             <span style="color:rgba(255,255,255,0.8);font-size:0.7rem;">${((data.generation_time_ms||0)/1000).toFixed(1)}秒</span>
           </div>
-          <div style="padding:14px;" id="nb2-visual-content-${cardId}">${data.widget_html}</div>
+          <div style="padding:14px;" id="nb2-visual-content-${cardId}">${safeHtml}</div>
         </div>
       `
       // ★ innerHTML で挿入された <script> を実行
@@ -11967,6 +11972,29 @@ function initVisualWidgets() {
           })
         }
       } catch (e) { console.warn('NB2 script実行:', e) }
+      // ★ DOMクリーンアップ（問題の図・編集・差し替え・削除ボタンを除去）
+      function cleanNB2(cid) {
+        try {
+          const body = document.getElementById('nb2-visual-content-' + cid)
+          if (!body) return
+          body.querySelectorAll('button, a, span, div, p').forEach(el => {
+            const t = (el.textContent || '').trim()
+            if (/(問題の図|編集|差し替え|削除)/.test(t) && t.length < 50) el.remove()
+          })
+        } catch(e) {}
+      }
+      cleanNB2(cardId)
+      setTimeout(() => cleanNB2(cardId), 300)
+      setTimeout(() => cleanNB2(cardId), 1000)
+      setTimeout(() => cleanNB2(cardId), 3000)
+      try {
+        const body = document.getElementById('nb2-visual-content-' + cardId)
+        if (body) {
+          const obs = new MutationObserver(() => cleanNB2(cardId))
+          obs.observe(body, { childList: true, subtree: true })
+          setTimeout(() => obs.disconnect(), 10000)
+        }
+      } catch(e) {}
       if (data.illustration_url) {
         area.innerHTML += `<div style="margin-top:10px;text-align:center;">
           <img src="${data.illustration_url}" alt="NB2図解" style="max-width:100%;max-height:300px;border-radius:14px;border:2px solid #DDD6FE;box-shadow:0 4px 16px rgba(124,58,237,0.15);" />
@@ -11986,9 +12014,9 @@ function initVisualWidgets() {
     // ツールバー: 再生成・修正・画像生成
     if (toolbar) {
       toolbar.innerHTML = `
-        <button onclick="regenerateVisualWidget('${cardId}')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🧠 NB2で再生成</button>
-        <button onclick="editVisualWidget('${cardId}')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>
-        <button onclick="window.generateImageForCard && generateImageForCard(${cardId})" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>🎨 別の画像</button>
+        <button onclick="regenerateVisualWidget('${cardId}')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>🔄🍊 NB2を再生成</button>
+        <button onclick="editVisualWidget('${cardId}')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>📝✏️ NB2を修正指示</button>
+        <button onclick="window.generateImageForCard && generateImageForCard(${cardId})" style="background:linear-gradient(135deg,#EC4899,#F97316);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(236,72,153,0.3);"><i class="fas fa-image" style="margin-right:4px;"></i>🖼️🎨 別の画像</button>
       `
     }
   })
@@ -12133,12 +12161,15 @@ window.editVisualWidget = function(cardId) {
   .then(data => {
     if (!area) return
     if (data.success && data.widget_html) {
+      const safeHtml2 = (data.widget_html || '')
+        .replace(/<(a|button|span)[^>]*>[^<]*(問題の図|編集|差し替え|削除)[^<]*<\/(a|button|span)>/gi, '')
+        .replace(/<[^>]*onclick[^>]*(問題の図|編集|差し替え|削除|replace|delete|edit|remove)[^>]*>[^<]*<\/[^>]*>/gi, '')
       area.innerHTML = `<div style="background:white;border-radius:14px;border:2px solid #F59E0B;overflow:hidden;box-shadow:0 2px 8px rgba(245,158,11,0.15);">
         <div style="background:linear-gradient(135deg,#F59E0B,#D97706);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;">
-          <span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-edit" style="margin-right:4px;"></i>修正版 by Nano Banana 2</span>
+          <span style="color:white;font-size:0.75rem;font-weight:bold;"><i class="fas fa-edit" style="margin-right:4px;"></i>修正版 by NB2</span>
           <span style="color:rgba(255,255,255,0.8);font-size:0.65rem;">${((data.generation_time_ms||0)/1000).toFixed(1)}秒</span>
         </div>
-        <div style="padding:14px;">${data.widget_html}</div>
+        <div style="padding:14px;">${safeHtml2}</div>
       </div>`
       if (data.illustration_url) {
         area.innerHTML += `<div style="margin-top:8px;text-align:center;"><img src="${data.illustration_url}" style="max-width:100%;max-height:250px;border-radius:12px;" /></div>`
@@ -19007,7 +19038,7 @@ async function previewCard(cardId) {
           <p class="text-gray-700 mb-2">${card.example_problem}</p>
           ${card.example_solution ? `
             <div class="bg-white rounded p-3 mt-2">
-              <p class="text-sm font-bold text-blue-600 mb-1">解き方：</p>
+              <p class="text-sm font-bold text-blue-600 mb-1">解き方・答え：</p>
               <p class="text-gray-700">${card.example_solution}</p>
             </div>
           ` : ''}
@@ -19551,7 +19582,7 @@ async function generateProblem() {
           <p class="text-xl">${problem.answer}</p>
           ${problem.explanation ? `
             <div class="mt-4 border-t pt-4">
-              <p class="text-sm font-semibold text-gray-600 mb-2">解き方：</p>
+              <p class="text-sm font-semibold text-gray-600 mb-2">解き方・答え：</p>
               <p class="text-sm text-gray-700">${problem.explanation}</p>
             </div>
           ` : ''}
@@ -25155,7 +25186,7 @@ function showPrintPreview(unitData) {
                       <p class="text-gray-800 mb-2">${card.example_problem}</p>
                       ${card.example_solution ? `
                         <div class="bg-white p-2 rounded border border-purple-200 mt-2">
-                          <p class="text-sm font-semibold text-purple-600 mb-1">解き方</p>
+                          <p class="text-sm font-semibold text-purple-600 mb-1">解き方・答え</p>
                           <p class="text-gray-700">${card.example_solution}</p>
                         </div>
                       ` : ''}
