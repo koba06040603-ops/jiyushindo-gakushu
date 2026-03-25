@@ -5303,7 +5303,7 @@ async function loadLearningPlanPage(curriculumId) {
 
             <div class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl p-6 mb-6">
               <h3 class="text-xl font-bold text-purple-800 mb-4 flex items-center">
-                <i class="fas fa-comments mr-2"></i>単元ぜんたいの振り返り
+                <i class="fas fa-comments mr-2"></i>単元ぜんたいの振り返り <span class="text-[9px] font-normal bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded ml-1">F5自己調整 F9メタ認知</span>
               </h3>
               <div class="grid grid-cols-3 gap-4 mb-4">
                 <div>
@@ -6934,7 +6934,7 @@ async function loadCardPage(cardId) {
             <!-- ヒントカードエリア -->
             <div id="hintsArea" class="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6">
               <h3 class="text-lg font-bold text-yellow-800 mb-4">
-                <i class="fas fa-lightbulb mr-2"></i>3だんかいヒント
+                <i class="fas fa-lightbulb mr-2"></i>3だんかいヒント <span class="text-[9px] font-normal bg-red-100 text-red-700 px-1.5 py-0.5 rounded ml-1">F4足場かけ F7動的調整</span>
               </h3>
               <p class="text-xs text-gray-500 mb-3"><i class="fas fa-info-circle mr-1"></i>こまったときは、ヒントを使ってみよう！ヒント1から順番に見てね。</p>
               <div class="space-y-3">
@@ -19585,7 +19585,7 @@ async function loadAIProblemGenerator() {
       <div class="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 class="text-xl font-bold text-gray-800 mb-4">
           <i class="fas fa-sliders-h mr-2"></i>
-          難易度を選んでね
+          難易度を選んでね <span class="text-[9px] font-normal bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded ml-1">F6検索練習 F4適性処遇</span>
         </h2>
         <div class="flex space-x-4">
           <button onclick="setDifficulty('easy')" 

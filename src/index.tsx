@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260324h' }, 200, {
+  return c.json({ build_id: '20260325a' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260324h';
+    var MY_BUILD = '20260325a';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14492,7 +14492,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260324h';
+          var MY_BUILD = '20260325a';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -27076,26 +27076,29 @@ app.post('/api/ai/generate-nb2-music', async (c) => {
     const prompt = `あなたはNano Banana 2（日本の教育AI音楽プロデューサー）です。
 子どもが楽しく覚えられる学習ソングを作ってください。
 
-【出力形式】以下のJSON形式で出力：
+【出力形式】以下のJSON形式で出力（全フィールド必須、空文字不可）：
 {
   "song_title": "曲名（キャッチーで覚えやすい日本語タイトル）",
   "genre": "曲のジャンル（例: ポップ、ラップ、童謡風、ロック、ボサノバ等）",
   "tempo_bpm": 数値（テンポ、子ども向けは100-140推奨）,
   "key": "キー（例: C major, A minor）",
-  "lyrics": "歌詞全文（Verse1, Chorus, Verse2, Chorus, Bridge, Chorus の構成）",
+  "lyrics": "歌詞全文（[Verse1]\\n歌詞...\\n[Chorus]\\n歌詞...\\n[Verse2]\\n歌詞...\\n[Chorus]\\n歌詞...\\n[Bridge]\\n歌詞...\\n[Chorus]\\n歌詞... の構成、4分以内で歌える長さ）",
   "melody_description": "メロディの特徴（音の上下、リズムパターンの説明）",
   "learning_points": ["覚えられるポイント1", "ポイント2", "ポイント3"],
   "sing_along_tips": "歌い方のコツ（手拍子、振り付け等）",
-  "suno_style_prompt": "Sunoで使えるスタイルプロンプト（英語、30語以内）",
-  "short_lyrics": "ショートバージョン歌詞（30秒分、サビ中心）"
+  "suno_style_prompt": "English style prompt for Suno AI, max 30 words, e.g. 'upbeat children pop, catchy melody, Japanese vocals, educational, happy, 120bpm, major key'（必ず英語で書くこと、空にしないこと）",
+  "short_lyrics": "ショートバージョン歌詞（サビ中心、30秒で歌える分量、4-8行程度。空にしないこと）"
 }
 
-【ルール】
-1. 学習内容のキーワード・公式・概念を歌詞に自然に織り込む
-2. 繰り返しとリズムで記憶に残りやすくする
-3. 子どもが口ずさめるシンプルなメロディライン
-4. 楽しくポジティブな雰囲気
-5. 歌詞は日本語、Sunoプロンプトは英語
+【重要ルール】
+1. suno_style_promptは必ず英語で30語以内で書く。NONEや空文字は禁止
+2. short_lyricsは必ず歌詞のサビ部分から4-8行を抽出して書く。NONEや空文字は禁止
+3. lyricsは[Verse1][Chorus][Bridge]等のセクションマーカー付きで書く
+4. 学習内容のキーワード・公式・概念を歌詞に自然に織り込む
+5. 繰り返しとリズムで記憶に残りやすくする
+6. 子どもが口ずさめるシンプルなメロディライン
+7. 楽しくポジティブな雰囲気
+8. 歌詞は日本語、suno_style_promptのみ英語
 
 【学習情報】
 ${context}
@@ -27188,8 +27191,11 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
     // ★ 音声生成（Gemini TTS で歌詞を読み上げ・歌う）
     let audioUrl = ''
     try {
-      const shortLyrics = (songData.short_lyrics || songData.lyrics || '').substring(0, 500)
-      if (shortLyrics) {
+      // short_lyrics優先、なければlyrics先頭500文字
+      const shortLyrics = (songData.short_lyrics && songData.short_lyrics !== 'NONE' && songData.short_lyrics.length > 10)
+        ? songData.short_lyrics
+        : (songData.lyrics || '').replace(/\[.*?\]/g, '').substring(0, 500)
+      if (shortLyrics && shortLyrics.length > 10) {
         const audioPrompt = `以下の歌詞を子ども向けの明るいメロディで楽しく歌ってください。リズミカルに、はっきりした日本語で歌ってください。\n\n歌詞:\n${shortLyrics}`
         const audioResp = await fetch(
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent',
@@ -27212,7 +27218,75 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
           const audioParts = audioData?.candidates?.[0]?.content?.parts || []
           for (const part of audioParts) {
             if (part.inlineData?.mimeType?.startsWith('audio/')) {
-              audioUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
+              const rawMime = part.inlineData.mimeType || ''
+              const rawB64 = part.inlineData.data || ''
+              
+              // PCM (L16) → WAV 変換（ブラウザのaudioタグで再生可能にする）
+              if (rawMime.includes('L16') || rawMime.includes('pcm')) {
+                try {
+                  // base64デコード（Workers互換: atob → Uint8Array）
+                  const binaryStr = atob(rawB64)
+                  const pcmBytes = new Uint8Array(binaryStr.length)
+                  for (let i = 0; i < binaryStr.length; i++) pcmBytes[i] = binaryStr.charCodeAt(i)
+                  
+                  // rate抽出（デフォルト24000）
+                  const rateMatch = rawMime.match(/rate=(\d+)/)
+                  const sampleRate = rateMatch ? parseInt(rateMatch[1]) : 24000
+                  const numChannels = 1
+                  const bitsPerSample = 16
+                  const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
+                  const blockAlign = numChannels * (bitsPerSample / 8)
+                  
+                  // L16 はネットワークバイトオーダー(big-endian) → WAV は little-endian
+                  // バイトスワップが必要
+                  const leBytes = new Uint8Array(pcmBytes.length)
+                  for (let i = 0; i < pcmBytes.length - 1; i += 2) {
+                    leBytes[i] = pcmBytes[i + 1]
+                    leBytes[i + 1] = pcmBytes[i]
+                  }
+                  const dataSize = leBytes.length
+                  
+                  // WAVヘッダー (44 bytes)
+                  const wavHeader = new ArrayBuffer(44)
+                  const view = new DataView(wavHeader)
+                  const writeStr = (offset: number, str: string) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)) }
+                  writeStr(0, 'RIFF')
+                  view.setUint32(4, 36 + dataSize, true)
+                  writeStr(8, 'WAVE')
+                  writeStr(12, 'fmt ')
+                  view.setUint32(16, 16, true)
+                  view.setUint16(20, 1, true) // PCM format
+                  view.setUint16(22, numChannels, true)
+                  view.setUint32(24, sampleRate, true)
+                  view.setUint32(28, byteRate, true)
+                  view.setUint16(32, blockAlign, true)
+                  view.setUint16(34, bitsPerSample, true)
+                  writeStr(36, 'data')
+                  view.setUint32(40, dataSize, true)
+                  
+                  // WAVヘッダー + PCMデータを結合
+                  const wavBytes = new Uint8Array(44 + dataSize)
+                  wavBytes.set(new Uint8Array(wavHeader), 0)
+                  wavBytes.set(leBytes, 44)
+                  
+                  // base64エンコード（Workers安全: スタックオーバーフロー回避）
+                  const CHUNK = 1024
+                  let binStr = ''
+                  for (let i = 0; i < wavBytes.length; i += CHUNK) {
+                    const end = Math.min(i + CHUNK, wavBytes.length)
+                    let s = ''
+                    for (let j = i; j < end; j++) s += String.fromCharCode(wavBytes[j])
+                    binStr += s
+                  }
+                  audioUrl = `data:audio/wav;base64,${btoa(binStr)}`
+                  console.log(`✅ NB2 PCM→WAV変換成功 (${sampleRate}Hz, ${(dataSize/1024).toFixed(0)}KB, LE変換済)`)
+                } catch (convErr: any) {
+                  console.warn('⚠️ PCM→WAV変換失敗、元データ使用:', convErr.message)
+                  audioUrl = `data:${rawMime};base64,${rawB64}`
+                }
+              } else {
+                audioUrl = `data:${rawMime};base64,${rawB64}`
+              }
               console.log('✅ NB2 覚え歌の音声生成成功')
               break
             }
