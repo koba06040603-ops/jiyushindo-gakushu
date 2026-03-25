@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260325b' }, 200, {
+  return c.json({ build_id: '20260325c' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260325b';
+    var MY_BUILD = '20260325c';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14492,7 +14492,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260325b';
+          var MY_BUILD = '20260325c';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -27188,116 +27188,15 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
     const genTime = Date.now() - startTime
     console.log(`✅ NB2 music生成: ${genTime}ms, title=${songData.song_title}, 画像=${coverImageUrl ? 'あり' : 'なし'}`)
 
-    // ★ 音声生成（Gemini TTS で歌詞を読み上げ・歌う）
-    let audioUrl = ''
-    try {
-      // short_lyrics優先、なければlyrics先頭500文字
-      const shortLyrics = (songData.short_lyrics && songData.short_lyrics !== 'NONE' && songData.short_lyrics.length > 10)
-        ? songData.short_lyrics
-        : (songData.lyrics || '').replace(/\[.*?\]/g, '').substring(0, 500)
-      if (shortLyrics && shortLyrics.length > 10) {
-        const audioPrompt = `以下の歌詞を、子ども向けの明るく元気な声で、はっきりした日本語でリズミカルに読み上げてください。テンポよく、楽しい雰囲気で、子どもが一緒に口ずさめるようなペースでお願いします。\n\n${shortLyrics}`
-        const audioResp = await fetch(
-          'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent',
-          {
-            method: 'POST',
-            headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: audioPrompt }] }],
-              generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                  voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Leda' } }
-                }
-              }
-            })
-          }
-        )
-        if (audioResp.ok) {
-          const audioData = await audioResp.json() as any
-          const audioParts = audioData?.candidates?.[0]?.content?.parts || []
-          for (const part of audioParts) {
-            if (part.inlineData?.mimeType?.startsWith('audio/')) {
-              const rawMime = part.inlineData.mimeType || ''
-              const rawB64 = part.inlineData.data || ''
-              
-              // PCM (L16) → WAV 変換（ブラウザのaudioタグで再生可能にする）
-              // ★ Gemini TTS は little-endian 16-bit PCM を返す（Google公式ドキュメント確認済み）
-              // バイトスワップは不要！そのままWAVヘッダーを付加するだけでOK
-              if (rawMime.includes('L16') || rawMime.includes('pcm')) {
-                try {
-                  // base64デコード（Workers互換: atob → Uint8Array）
-                  const binaryStr = atob(rawB64)
-                  const pcmBytes = new Uint8Array(binaryStr.length)
-                  for (let i = 0; i < binaryStr.length; i++) pcmBytes[i] = binaryStr.charCodeAt(i)
-                  
-                  // rate抽出（デフォルト24000）
-                  const rateMatch = rawMime.match(/rate=(\d+)/)
-                  const sampleRate = rateMatch ? parseInt(rateMatch[1]) : 24000
-                  const numChannels = 1
-                  const bitsPerSample = 16
-                  const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
-                  const blockAlign = numChannels * (bitsPerSample / 8)
-                  const dataSize = pcmBytes.length
-                  
-                  // WAVヘッダー (44 bytes)
-                  const wavHeader = new ArrayBuffer(44)
-                  const view = new DataView(wavHeader)
-                  const writeStr = (offset: number, str: string) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)) }
-                  writeStr(0, 'RIFF')
-                  view.setUint32(4, 36 + dataSize, true)
-                  writeStr(8, 'WAVE')
-                  writeStr(12, 'fmt ')
-                  view.setUint32(16, 16, true)
-                  view.setUint16(20, 1, true) // PCM format
-                  view.setUint16(22, numChannels, true)
-                  view.setUint32(24, sampleRate, true)
-                  view.setUint32(28, byteRate, true)
-                  view.setUint16(32, blockAlign, true)
-                  view.setUint16(34, bitsPerSample, true)
-                  writeStr(36, 'data')
-                  view.setUint32(40, dataSize, true)
-                  
-                  // WAVヘッダー + PCMデータを結合（バイトスワップ不要 — Geminiは既にLE）
-                  const wavBytes = new Uint8Array(44 + dataSize)
-                  wavBytes.set(new Uint8Array(wavHeader), 0)
-                  wavBytes.set(pcmBytes, 44)
-                  
-                  // base64エンコード（Workers安全: スタックオーバーフロー回避）
-                  const CHUNK = 1024
-                  let binStr = ''
-                  for (let i = 0; i < wavBytes.length; i += CHUNK) {
-                    const end = Math.min(i + CHUNK, wavBytes.length)
-                    let s = ''
-                    for (let j = i; j < end; j++) s += String.fromCharCode(wavBytes[j])
-                    binStr += s
-                  }
-                  audioUrl = `data:audio/wav;base64,${btoa(binStr)}`
-                  console.log(`✅ NB2 PCM→WAV変換成功 (${sampleRate}Hz, ${(dataSize/1024).toFixed(0)}KB, LE変換済)`)
-                } catch (convErr: any) {
-                  console.warn('⚠️ PCM→WAV変換失敗、元データ使用:', convErr.message)
-                  audioUrl = `data:${rawMime};base64,${rawB64}`
-                }
-              } else {
-                audioUrl = `data:${rawMime};base64,${rawB64}`
-              }
-              console.log('✅ NB2 覚え歌の音声生成成功')
-              break
-            }
-          }
-        }
-      }
-    } catch (audioErr: any) {
-      console.log('⚠️ 音声生成スキップ:', audioErr.message)
-    }
-
+    // ★ TTS音声は別エンドポイント(/api/ai/generate-tts-preview)で生成
+    // 歌詞+画像を先に返し、フロントエンドが非同期でTTSをリクエストする
     const totalTime = Date.now() - startTime
 
     return c.json({
       success: true,
       song_data: songData,
       cover_image_url: coverImageUrl,
-      audio_url: audioUrl,
+      audio_url: '', // TTS は別リクエストで取得
       generation_time_ms: totalTime,
       model: `Nano Banana 2 (${usedModel || 'gemini-3.1-flash-image'})`,
       suno_info: {
@@ -27314,6 +27213,125 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
     })
   } catch (e: any) {
     console.error('NB2 music error:', e.message)
+    return c.json({ success: false, error: e.message })
+  }
+})
+
+// ========== TTS音声プレビュー生成API ==========
+// 歌詞テキストからGemini TTSで音声を生成（非同期・分離）
+app.post('/api/ai/generate-tts-preview', async (c) => {
+  const startTime = Date.now()
+  const { lyrics_text } = await c.req.json()
+  const env = c.env as any
+  const geminiApiKey = env.GEMINI_API_KEY
+  if (!geminiApiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' })
+  if (!lyrics_text || lyrics_text.length < 10) return c.json({ success: false, error: '歌詞テキストが短すぎます' })
+
+  try {
+    const cleanLyrics = lyrics_text.replace(/\[.*?\]/g, '').substring(0, 500)
+    const audioPrompt = `以下の歌詞を、子ども向けの明るく元気な声で、はっきりした日本語でリズミカルに読み上げてください。テンポよく、楽しい雰囲気で、子どもが一緒に口ずさめるようなペースでお願いします。\n\n${cleanLyrics}`
+
+    const audioResp = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent',
+      {
+        method: 'POST',
+        headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: audioPrompt }] }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Leda' } }
+            }
+          }
+        })
+      }
+    )
+
+    if (!audioResp.ok) {
+      const errText = await audioResp.text()
+      console.warn(`⚠️ TTS API失敗 (${audioResp.status}): ${errText.substring(0, 200)}`)
+      return c.json({ success: false, error: `TTS API エラー (${audioResp.status})` })
+    }
+
+    const audioData = await audioResp.json() as any
+    const audioParts = audioData?.candidates?.[0]?.content?.parts || []
+    let audioUrl = ''
+
+    for (const part of audioParts) {
+      if (part.inlineData?.mimeType?.startsWith('audio/')) {
+        const rawMime = part.inlineData.mimeType || ''
+        const rawB64 = part.inlineData.data || ''
+
+        // PCM (L16) → WAV 変換
+        // ★ Gemini TTS は little-endian 16-bit PCM（公式ドキュメント確認済み）
+        if (rawMime.includes('L16') || rawMime.includes('pcm')) {
+          try {
+            const binaryStr = atob(rawB64)
+            const pcmBytes = new Uint8Array(binaryStr.length)
+            for (let i = 0; i < binaryStr.length; i++) pcmBytes[i] = binaryStr.charCodeAt(i)
+
+            const rateMatch = rawMime.match(/rate=(\d+)/)
+            const sampleRate = rateMatch ? parseInt(rateMatch[1]) : 24000
+            const numChannels = 1
+            const bitsPerSample = 16
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
+            const blockAlign = numChannels * (bitsPerSample / 8)
+            const dataSize = pcmBytes.length
+
+            // WAVヘッダー (44 bytes)
+            const wavHeader = new ArrayBuffer(44)
+            const view = new DataView(wavHeader)
+            const writeStr = (offset: number, str: string) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)) }
+            writeStr(0, 'RIFF')
+            view.setUint32(4, 36 + dataSize, true)
+            writeStr(8, 'WAVE')
+            writeStr(12, 'fmt ')
+            view.setUint32(16, 16, true)
+            view.setUint16(20, 1, true)
+            view.setUint16(22, numChannels, true)
+            view.setUint32(24, sampleRate, true)
+            view.setUint32(28, byteRate, true)
+            view.setUint16(32, blockAlign, true)
+            view.setUint16(34, bitsPerSample, true)
+            writeStr(36, 'data')
+            view.setUint32(40, dataSize, true)
+
+            const wavBytes = new Uint8Array(44 + dataSize)
+            wavBytes.set(new Uint8Array(wavHeader), 0)
+            wavBytes.set(pcmBytes, 44)
+
+            // base64エンコード（Workers安全）
+            const CHUNK = 1024
+            let binStr = ''
+            for (let i = 0; i < wavBytes.length; i += CHUNK) {
+              const end = Math.min(i + CHUNK, wavBytes.length)
+              let s = ''
+              for (let j = i; j < end; j++) s += String.fromCharCode(wavBytes[j])
+              binStr += s
+            }
+            audioUrl = `data:audio/wav;base64,${btoa(binStr)}`
+            console.log(`✅ TTS PCM→WAV変換成功 (${sampleRate}Hz, ${(dataSize/1024).toFixed(0)}KB)`)
+          } catch (convErr: any) {
+            console.warn('⚠️ PCM→WAV変換失敗:', convErr.message)
+            audioUrl = `data:${rawMime};base64,${rawB64}`
+          }
+        } else {
+          audioUrl = `data:${rawMime};base64,${rawB64}`
+        }
+        break
+      }
+    }
+
+    const genTime = Date.now() - startTime
+    if (!audioUrl) {
+      return c.json({ success: false, error: 'TTS音声データが取得できませんでした' })
+    }
+
+    console.log(`✅ TTS音声プレビュー生成: ${genTime}ms`)
+    return c.json({ success: true, audio_url: audioUrl, generation_time_ms: genTime })
+  } catch (e: any) {
+    console.error('TTS preview error:', e.message)
     return c.json({ success: false, error: e.message })
   }
 })
