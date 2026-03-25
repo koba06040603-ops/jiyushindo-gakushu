@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260325a' }, 200, {
+  return c.json({ build_id: '20260325b' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260325a';
+    var MY_BUILD = '20260325b';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14492,7 +14492,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260325a';
+          var MY_BUILD = '20260325b';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -27196,7 +27196,7 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
         ? songData.short_lyrics
         : (songData.lyrics || '').replace(/\[.*?\]/g, '').substring(0, 500)
       if (shortLyrics && shortLyrics.length > 10) {
-        const audioPrompt = `以下の歌詞を子ども向けの明るいメロディで楽しく歌ってください。リズミカルに、はっきりした日本語で歌ってください。\n\n歌詞:\n${shortLyrics}`
+        const audioPrompt = `以下の歌詞を、子ども向けの明るく元気な声で、はっきりした日本語でリズミカルに読み上げてください。テンポよく、楽しい雰囲気で、子どもが一緒に口ずさめるようなペースでお願いします。\n\n${shortLyrics}`
         const audioResp = await fetch(
           'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent',
           {
@@ -27207,7 +27207,7 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
               generationConfig: {
                 responseModalities: ['AUDIO'],
                 speechConfig: {
-                  voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Achird' } }
+                  voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Leda' } }
                 }
               }
             })
@@ -27222,6 +27222,8 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
               const rawB64 = part.inlineData.data || ''
               
               // PCM (L16) → WAV 変換（ブラウザのaudioタグで再生可能にする）
+              // ★ Gemini TTS は little-endian 16-bit PCM を返す（Google公式ドキュメント確認済み）
+              // バイトスワップは不要！そのままWAVヘッダーを付加するだけでOK
               if (rawMime.includes('L16') || rawMime.includes('pcm')) {
                 try {
                   // base64デコード（Workers互換: atob → Uint8Array）
@@ -27236,15 +27238,7 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
                   const bitsPerSample = 16
                   const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
                   const blockAlign = numChannels * (bitsPerSample / 8)
-                  
-                  // L16 はネットワークバイトオーダー(big-endian) → WAV は little-endian
-                  // バイトスワップが必要
-                  const leBytes = new Uint8Array(pcmBytes.length)
-                  for (let i = 0; i < pcmBytes.length - 1; i += 2) {
-                    leBytes[i] = pcmBytes[i + 1]
-                    leBytes[i + 1] = pcmBytes[i]
-                  }
-                  const dataSize = leBytes.length
+                  const dataSize = pcmBytes.length
                   
                   // WAVヘッダー (44 bytes)
                   const wavHeader = new ArrayBuffer(44)
@@ -27264,10 +27258,10 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
                   writeStr(36, 'data')
                   view.setUint32(40, dataSize, true)
                   
-                  // WAVヘッダー + PCMデータを結合
+                  // WAVヘッダー + PCMデータを結合（バイトスワップ不要 — Geminiは既にLE）
                   const wavBytes = new Uint8Array(44 + dataSize)
                   wavBytes.set(new Uint8Array(wavHeader), 0)
-                  wavBytes.set(leBytes, 44)
+                  wavBytes.set(pcmBytes, 44)
                   
                   // base64エンコード（Workers安全: スタックオーバーフロー回避）
                   const CHUNK = 1024
