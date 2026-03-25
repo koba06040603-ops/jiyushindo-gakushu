@@ -41240,12 +41240,12 @@ async function executeLearningMusicGenerate(cardId) {
       html += '<p style="color:rgba(255,255,255,0.8);font-size:0.65rem;margin:0;">聴覚学習モード / ' + (sd.genre || styleLabels[style] || style) + ' / ' + genTime + '秒</p>'
       html += '</div></div>'
       
-      // 🔊 音声プレイヤー（非同期ロード）
+      // 🔊 音声プレイヤー（非同期ロード — Lyria 3で30秒歌生成）
       html += '<div id="tts-audio-area" style="padding:14px 14px 8px;">'
-      html += '<p style="font-weight:bold;font-size:0.8rem;color:#065F46;margin-bottom:8px;"><i class="fas fa-headphones" style="margin-right:4px;"></i>🔊 聴いてみよう（AI読み上げプレビュー）</p>'
+      html += '<p style="font-weight:bold;font-size:0.8rem;color:#065F46;margin-bottom:8px;"><i class="fas fa-headphones" style="margin-right:4px;"></i>🔊 聴いてみよう（30秒ソング）</p>'
       html += '<div id="tts-audio-loading" style="text-align:center;padding:8px;background:#F0FDF4;border-radius:10px;border:1px dashed #86EFAC;">'
       html += '<div style="display:inline-block;width:20px;height:20px;border:2px solid #10B981;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle;margin-right:8px;"></div>'
-      html += '<span style="font-size:0.75rem;color:#065F46;">音声を生成中...</span>'
+      html += '<span style="font-size:0.75rem;color:#065F46;">Lyria 3 が歌を作成中... （20〜40秒）</span>'
       html += '</div>'
       html += '</div>'
       
@@ -41318,32 +41318,36 @@ async function executeLearningMusicGenerate(cardId) {
       html += '</div>'
       resultDiv.innerHTML = html
       
-      // ★ 非同期でTTS音声を取得（歌詞表示後にバックグラウンドで）
+      // ★ 非同期でLyria 3 Clip音楽を取得（歌詞表示後にバックグラウンドで）
       const lyricsForTTS = sd.short_lyrics && sd.short_lyrics !== 'NONE' && sd.short_lyrics.length > 10 ? sd.short_lyrics : (sd.lyrics || '')
       if (lyricsForTTS.length > 10) {
-        (async function loadTTSAudio() {
+        (async function loadLyriaAudio() {
           try {
             const ttsController = new AbortController()
-            const ttsTimeout = setTimeout(() => ttsController.abort(), 45000) // 45秒タイムアウト
+            const ttsTimeout = setTimeout(() => ttsController.abort(), 90000) // 90秒タイムアウト（Lyria 3は時間がかかる可能性）
             const ttsResp = await fetch('/api/ai/generate-tts-preview', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               signal: ttsController.signal,
-              body: JSON.stringify({ lyrics_text: lyricsForTTS })
+              body: JSON.stringify({
+                lyrics_text: lyricsForTTS,
+                song_style: sd.genre || styleLabels[style] || style,
+                song_title: sd.song_title || ''
+              })
             })
             clearTimeout(ttsTimeout)
             const ttsData = await ttsResp.json()
             const loadingEl = document.getElementById('tts-audio-loading')
             if (ttsData.success && ttsData.audio_url && loadingEl) {
               const ttsTime = Math.round((ttsData.generation_time_ms || 0) / 1000)
-              loadingEl.innerHTML = '<audio controls style="width:100%;max-width:400px;display:block;margin:0 auto;" preload="auto"><source src="' + ttsData.audio_url + '"></audio><p style="font-size:0.65rem;color:#9CA3AF;text-align:center;margin-top:4px;">Gemini TTS / Leda（' + ttsTime + '秒で生成）</p>'
+              loadingEl.innerHTML = '<audio controls style="width:100%;max-width:400px;display:block;margin:0 auto;" preload="auto"><source src="' + ttsData.audio_url + '" type="audio/mp3"><source src="' + ttsData.audio_url + '"></audio><p style="font-size:0.65rem;color:#9CA3AF;text-align:center;margin-top:4px;">Lyria 3 Clip / 30秒ソング（' + ttsTime + '秒で生成）</p>'
             } else if (loadingEl) {
-              loadingEl.innerHTML = '<p style="font-size:0.72rem;color:#9CA3AF;text-align:center;">音声プレビューは現在利用できません。Sunoで本格的な歌を作成できます。</p>'
+              loadingEl.innerHTML = '<p style="font-size:0.72rem;color:#9CA3AF;text-align:center;">⚠️ ' + (ttsData.error || '音楽生成に失敗') + '。Sunoで本格的な歌を作成できます。</p>'
             }
           } catch (ttsErr) {
             var loadingEl2 = document.getElementById('tts-audio-loading')
             if (loadingEl2) {
-              loadingEl2.innerHTML = '<p style="font-size:0.72rem;color:#9CA3AF;text-align:center;">音声生成がタイムアウトしました。Sunoで本格的な歌を作成できます。</p>'
+              loadingEl2.innerHTML = '<p style="font-size:0.72rem;color:#9CA3AF;text-align:center;">音楽生成がタイムアウトしました。Sunoで本格的な歌を作成できます。</p>'
             }
           }
         })()

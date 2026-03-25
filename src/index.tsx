@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260325c' }, 200, {
+  return c.json({ build_id: '20260325d' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260325c';
+    var MY_BUILD = '20260325d';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14492,7 +14492,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260325c';
+          var MY_BUILD = '20260325d';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -27217,32 +27217,38 @@ JSON形式のみ出力してください。コードブロック(\`\`\`)で囲�
   }
 })
 
-// ========== TTS音声プレビュー生成API ==========
-// 歌詞テキストからGemini TTSで音声を生成（非同期・分離）
+// ========== Lyria 3 音楽プレビュー生成API ==========
+// 歌詞テキストからLyria 3 Clipで30秒のボーカル付き音楽を生成（非同期・分離）
 app.post('/api/ai/generate-tts-preview', async (c) => {
   const startTime = Date.now()
-  const { lyrics_text } = await c.req.json()
+  const { lyrics_text, song_style, song_title } = await c.req.json()
   const env = c.env as any
   const geminiApiKey = env.GEMINI_API_KEY
   if (!geminiApiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' })
   if (!lyrics_text || lyrics_text.length < 10) return c.json({ success: false, error: '歌詞テキストが短すぎます' })
 
   try {
-    const cleanLyrics = lyrics_text.replace(/\[.*?\]/g, '').substring(0, 500)
-    const audioPrompt = `以下の歌詞を、子ども向けの明るく元気な声で、はっきりした日本語でリズミカルに読み上げてください。テンポよく、楽しい雰囲気で、子どもが一緒に口ずさめるようなペースでお願いします。\n\n${cleanLyrics}`
+    // Lyria 3 Clip 用プロンプト: 歌詞 + スタイル指示
+    const styleHint = song_style || 'upbeat children pop'
+    const prompt = `子ども向けの明るく楽しい日本語の学習ソングを30秒で作成してください。
+ジャンル: ${styleHint}
+テンポ: 120 BPM、メジャーキー
+ボーカル: 明るく元気な声、はっきりした日本語
+雰囲気: 子どもが口ずさめる、覚えやすいメロディ
+
+以下の歌詞を歌ってください:
+
+${lyrics_text.substring(0, 800)}`
 
     const audioResp = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/lyria-3-clip-preview:generateContent',
       {
         method: 'POST',
         headers: { 'x-goog-api-key': geminiApiKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: audioPrompt }] }],
+          contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Leda' } }
-            }
+            responseModalities: ['AUDIO', 'TEXT']
           }
         })
       }
@@ -27250,88 +27256,42 @@ app.post('/api/ai/generate-tts-preview', async (c) => {
 
     if (!audioResp.ok) {
       const errText = await audioResp.text()
-      console.warn(`⚠️ TTS API失敗 (${audioResp.status}): ${errText.substring(0, 200)}`)
-      return c.json({ success: false, error: `TTS API エラー (${audioResp.status})` })
+      console.warn(`⚠️ Lyria 3 Clip 失敗 (${audioResp.status}): ${errText.substring(0, 200)}`)
+      return c.json({ success: false, error: `Lyria 3 エラー (${audioResp.status})` })
     }
 
     const audioData = await audioResp.json() as any
     const audioParts = audioData?.candidates?.[0]?.content?.parts || []
     let audioUrl = ''
+    let generatedLyrics = ''
 
     for (const part of audioParts) {
-      if (part.inlineData?.mimeType?.startsWith('audio/')) {
-        const rawMime = part.inlineData.mimeType || ''
-        const rawB64 = part.inlineData.data || ''
-
-        // PCM (L16) → WAV 変換
-        // ★ Gemini TTS は little-endian 16-bit PCM（公式ドキュメント確認済み）
-        if (rawMime.includes('L16') || rawMime.includes('pcm')) {
-          try {
-            const binaryStr = atob(rawB64)
-            const pcmBytes = new Uint8Array(binaryStr.length)
-            for (let i = 0; i < binaryStr.length; i++) pcmBytes[i] = binaryStr.charCodeAt(i)
-
-            const rateMatch = rawMime.match(/rate=(\d+)/)
-            const sampleRate = rateMatch ? parseInt(rateMatch[1]) : 24000
-            const numChannels = 1
-            const bitsPerSample = 16
-            const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
-            const blockAlign = numChannels * (bitsPerSample / 8)
-            const dataSize = pcmBytes.length
-
-            // WAVヘッダー (44 bytes)
-            const wavHeader = new ArrayBuffer(44)
-            const view = new DataView(wavHeader)
-            const writeStr = (offset: number, str: string) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)) }
-            writeStr(0, 'RIFF')
-            view.setUint32(4, 36 + dataSize, true)
-            writeStr(8, 'WAVE')
-            writeStr(12, 'fmt ')
-            view.setUint32(16, 16, true)
-            view.setUint16(20, 1, true)
-            view.setUint16(22, numChannels, true)
-            view.setUint32(24, sampleRate, true)
-            view.setUint32(28, byteRate, true)
-            view.setUint16(32, blockAlign, true)
-            view.setUint16(34, bitsPerSample, true)
-            writeStr(36, 'data')
-            view.setUint32(40, dataSize, true)
-
-            const wavBytes = new Uint8Array(44 + dataSize)
-            wavBytes.set(new Uint8Array(wavHeader), 0)
-            wavBytes.set(pcmBytes, 44)
-
-            // base64エンコード（Workers安全）
-            const CHUNK = 1024
-            let binStr = ''
-            for (let i = 0; i < wavBytes.length; i += CHUNK) {
-              const end = Math.min(i + CHUNK, wavBytes.length)
-              let s = ''
-              for (let j = i; j < end; j++) s += String.fromCharCode(wavBytes[j])
-              binStr += s
-            }
-            audioUrl = `data:audio/wav;base64,${btoa(binStr)}`
-            console.log(`✅ TTS PCM→WAV変換成功 (${sampleRate}Hz, ${(dataSize/1024).toFixed(0)}KB)`)
-          } catch (convErr: any) {
-            console.warn('⚠️ PCM→WAV変換失敗:', convErr.message)
-            audioUrl = `data:${rawMime};base64,${rawB64}`
-          }
-        } else {
-          audioUrl = `data:${rawMime};base64,${rawB64}`
-        }
-        break
+      if (part.text && !part.thought) {
+        generatedLyrics += part.text
+      }
+      if (part.inlineData?.data) {
+        const mime = part.inlineData.mimeType || 'audio/mp3'
+        const b64 = part.inlineData.data
+        audioUrl = `data:${mime};base64,${b64}`
+        console.log(`✅ Lyria 3 Clip 音楽生成成功 (${mime}, ${(b64.length * 3/4/1024).toFixed(0)}KB)`)
       }
     }
 
     const genTime = Date.now() - startTime
     if (!audioUrl) {
-      return c.json({ success: false, error: 'TTS音声データが取得できませんでした' })
+      return c.json({ success: false, error: '音楽データが取得できませんでした' })
     }
 
-    console.log(`✅ TTS音声プレビュー生成: ${genTime}ms`)
-    return c.json({ success: true, audio_url: audioUrl, generation_time_ms: genTime })
+    console.log(`✅ Lyria 3 音楽プレビュー生成: ${genTime}ms`)
+    return c.json({
+      success: true,
+      audio_url: audioUrl,
+      generated_lyrics: generatedLyrics,
+      generation_time_ms: genTime,
+      model: 'Lyria 3 Clip'
+    })
   } catch (e: any) {
-    console.error('TTS preview error:', e.message)
+    console.error('Lyria 3 Clip error:', e.message)
     return c.json({ success: false, error: e.message })
   }
 })
