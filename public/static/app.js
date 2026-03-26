@@ -41413,52 +41413,69 @@ async function executeLearningMusicGenerate(cardId) {
               karaokeHtml += '</div>'
               loadingEl.innerHTML = karaokeHtml
               
-              // ★ カラオケ同期処理
+              // ★ カラオケ同期処理（改良版: セクション行を除外して歌詞行のみで同期）
               ;(function initKaraoke() {
                 const audio = document.getElementById(audioId)
                 const container = document.getElementById(karaokeId)
                 if (!audio || !container) return
                 const lineEls = container.querySelectorAll('[data-lyric-idx]')
-                const totalLines = lyricsLines.length
+                
+                // セクション行（[Chorus]等）と歌詞行を分離
+                const lyricLineEls = []  // 実際の歌詞行のみ
+                const allLineEls = []
+                lineEls.forEach(function(el) {
+                  const isSection = /^\[|^\(|^【|^Verse|^Chorus|^Bridge|^Outro|^Intro/i.test(el.textContent.trim())
+                  allLineEls.push({ el: el, isSection: isSection })
+                  if (!isSection) lyricLineEls.push(el)
+                })
+                
+                const totalLyricLines = lyricLineEls.length
                 let lastHighlighted = -1
                 
                 audio.addEventListener('timeupdate', function() {
-                  if (!audio.duration || audio.duration === Infinity) return
+                  if (!audio.duration || audio.duration === Infinity || totalLyricLines === 0) return
                   const progress = audio.currentTime / audio.duration
-                  const currentLine = Math.min(Math.floor(progress * totalLines), totalLines - 1)
-                  if (currentLine === lastHighlighted) return
-                  lastHighlighted = currentLine
+                  // 歌詞行のみでインデックス計算（セクション行は除外）
+                  const currentLyricIdx = Math.min(Math.floor(progress * totalLyricLines), totalLyricLines - 1)
+                  if (currentLyricIdx === lastHighlighted) return
+                  lastHighlighted = currentLyricIdx
                   
-                  lineEls.forEach(function(el, idx) {
-                    const isSection = /^\[|^\(|^【|^Verse|^Chorus/i.test(el.textContent.trim())
-                    if (isSection) return
-                    if (idx === currentLine) {
+                  const currentEl = lyricLineEls[currentLyricIdx]
+                  
+                  // 全行をリセット・現在行をハイライト
+                  allLineEls.forEach(function(item) {
+                    if (item.isSection) return  // セクション行はそのまま
+                    const el = item.el
+                    if (el === currentEl) {
                       el.style.color = '#FDE68A'
-                      el.style.fontSize = '1.05rem'
+                      el.style.fontSize = '1.1rem'
                       el.style.fontWeight = 'bold'
-                      el.style.textShadow = '0 0 12px rgba(253,230,138,0.5)'
+                      el.style.textShadow = '0 0 16px rgba(253,230,138,0.6)'
                       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                    } else if (idx < currentLine) {
-                      el.style.color = 'rgba(255,255,255,0.55)'
-                      el.style.fontSize = '0.85rem'
-                      el.style.fontWeight = 'normal'
-                      el.style.textShadow = 'none'
                     } else {
-                      el.style.color = 'rgba(255,255,255,0.4)'
-                      el.style.fontSize = '0.85rem'
-                      el.style.fontWeight = 'normal'
-                      el.style.textShadow = 'none'
+                      // 過去行か未来行かを判定
+                      const elLyricIdx = lyricLineEls.indexOf(el)
+                      if (elLyricIdx >= 0 && elLyricIdx < currentLyricIdx) {
+                        el.style.color = 'rgba(255,255,255,0.55)'
+                        el.style.fontSize = '0.85rem'
+                        el.style.fontWeight = 'normal'
+                        el.style.textShadow = 'none'
+                      } else {
+                        el.style.color = 'rgba(255,255,255,0.4)'
+                        el.style.fontSize = '0.85rem'
+                        el.style.fontWeight = 'normal'
+                        el.style.textShadow = 'none'
+                      }
                     }
                   })
                 })
                 
                 audio.addEventListener('ended', function() {
-                  lineEls.forEach(function(el) {
-                    const isSection = /^\[|^\(|^【/i.test(el.textContent.trim())
-                    if (!isSection) {
-                      el.style.color = '#86EFAC'
-                      el.style.fontWeight = 'bold'
-                      el.style.textShadow = '0 0 8px rgba(134,239,172,0.3)'
+                  allLineEls.forEach(function(item) {
+                    if (!item.isSection) {
+                      item.el.style.color = '#86EFAC'
+                      item.el.style.fontWeight = 'bold'
+                      item.el.style.textShadow = '0 0 8px rgba(134,239,172,0.3)'
                     }
                   })
                 })
