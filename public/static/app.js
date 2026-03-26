@@ -12009,10 +12009,16 @@ function initVisualWidgets() {
               const t = (el.textContent || '').trim()
               if (/(問題の図|編集|差し替え|削除|再生成)/.test(t) && t.length < 50 && !el.closest('[id^="nb2-visual-toolbar"]')) el.remove()
             })
+            // ★ NB2生成HTMLの最外側div等のmax-widthを100%に強制拡大
+            body.querySelectorAll('div').forEach(div => {
+              if (div.style.maxWidth && div.style.maxWidth !== '100%') {
+                div.style.maxWidth = '100%'
+              }
+            })
             // ★ NB2生成HTML内の全画像を大きく表示 + クリック拡大対応
             body.querySelectorAll('img').forEach(img => {
               img.style.width = '100%'
-              img.style.maxWidth = '600px'
+              img.style.maxWidth = '100%'
               img.style.maxHeight = 'none'
               img.style.height = 'auto'
               img.style.borderRadius = '16px'
@@ -12027,6 +12033,12 @@ function initVisualWidgets() {
                 img.onmouseover = function() { this.style.transform = 'scale(1.02)' }
                 img.onmouseout = function() { this.style.transform = 'scale(1)' }
               }
+            })
+            // ★ SVGも画面幅いっぱいに拡大
+            body.querySelectorAll('svg').forEach(svg => {
+              svg.style.width = '100%'
+              svg.style.maxWidth = '100%'
+              svg.style.height = 'auto'
             })
           }
           // 2. ウィジェット全体（イラスト含む）を掃除

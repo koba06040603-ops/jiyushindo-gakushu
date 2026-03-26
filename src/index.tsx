@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260325d' }, 200, {
+  return c.json({ build_id: '20260325e' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260325d';
+    var MY_BUILD = '20260325e';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14492,7 +14492,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260325d';
+          var MY_BUILD = '20260325e';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -26905,6 +26905,9 @@ ${editNote}
       widgetHtml = widgetHtml.replace(/<img\b(?![^>]*style=)([^>]*?)>/gi, (match, attrs) => {
         return `<img style="width:100%;max-width:600px;height:auto;display:block;margin:8px auto;border-radius:16px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.12);" onclick="window._expandSongImage&&window._expandSongImage(this.src)"${attrs}>`
       })
+
+      // ★ NB2生成HTMLの最外側divのmax-widthを削除して画面幅いっぱいに拡大
+      widgetHtml = widgetHtml.replace(/max-width\s*:\s*\d+px/gi, 'max-width:100%')
       
       // <script>タグがdivの外にある場合、div内に移動させる
       const scriptTags = widgetHtml.match(/<\/div>\s*(<script[\s\S]*?<\/script>)/gi)
