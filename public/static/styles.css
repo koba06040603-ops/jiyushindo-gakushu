@@ -313,3 +313,80 @@ button:disabled {
 .toast-notification.fade-out {
   animation: toast-out 0.3s ease forwards;
 }
+
+/* ==========================================
+   画像拡大表示 — 全学習コンテンツ内の画像を大きく表示
+   NB2ウィジェット、例題、やってみよう等すべての画像に適用
+   !important でインラインスタイルを上書き
+   ========================================== */
+
+/* NB2ウィジェット内の画像 */
+[id^="nb2-visual"] img,
+[id^="nb2-visual-content"] img {
+  width: 100% !important;
+  max-width: 600px !important;
+  max-height: none !important;
+  height: auto !important;
+  display: block !important;
+  margin: 8px auto !important;
+  border-radius: 16px !important;
+  border: 3px solid #DDD6FE !important;
+  box-shadow: 0 6px 24px rgba(124, 58, 237, 0.2) !important;
+  cursor: pointer !important;
+  transition: transform 0.2s !important;
+}
+[id^="nb2-visual"] img:hover,
+[id^="nb2-visual-content"] img:hover {
+  transform: scale(1.02) !important;
+}
+
+/* NB2ウィジェット内のSVG */
+[id^="nb2-visual"] svg,
+[id^="nb2-visual-content"] svg {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* NB2ウィジェット内のdivのmax-width制限を解除 */
+[id^="nb2-visual-content"] > div {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* 例題の図・やってみようの図・AI図解 */
+[id^="example-diagram"] img,
+[id^="tactile-diagram"] img,
+[id^="ai-diagram"] img,
+[id^="card-image-container"] img,
+[id^="illustContainer"] img {
+  width: 100% !important;
+  max-width: 600px !important;
+  max-height: none !important;
+  height: auto !important;
+  display: block !important;
+  margin: 8px auto !important;
+  border-radius: 16px !important;
+  cursor: pointer !important;
+  transition: transform 0.2s !important;
+}
+[id^="example-diagram"] img:hover,
+[id^="tactile-diagram"] img:hover,
+[id^="ai-diagram"] img:hover,
+[id^="card-image-container"] img:hover,
+[id^="illustContainer"] img:hover {
+  transform: scale(1.02) !important;
+}
+
+/* 学習ソングのジャケット画像 */
+[id^="learning-music"] img {
+  width: 100% !important;
+  max-width: 480px !important;
+  max-height: none !important;
+  height: auto !important;
+  display: block !important;
+  margin: 8px auto !important;
+  border-radius: 16px !important;
+  cursor: pointer !important;
+  transition: transform 0.2s !important;
+}
