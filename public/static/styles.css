@@ -320,9 +320,15 @@ button:disabled {
    !important でインラインスタイルを上書き
    ========================================== */
 
-/* NB2ウィジェット内の画像 */
+/* NB2ウィジェット内の画像（2つのID体系を網羅） */
+/* app.js系: nb2-visual-*, nb2-visual-content-* */
+/* index.tsx系: nb2-widget-*, nb2-widget-body-*, nb2-content-* */
 [id^="nb2-visual"] img,
-[id^="nb2-visual-content"] img {
+[id^="nb2-visual-content"] img,
+[id^="nb2-widget"] img,
+[id^="nb2-widget-body"] img,
+[id^="nb2-content"] img,
+[id^="nb2-img-video-area"] img {
   width: 100% !important;
   max-width: 600px !important;
   max-height: none !important;
@@ -336,20 +342,29 @@ button:disabled {
   transition: transform 0.2s !important;
 }
 [id^="nb2-visual"] img:hover,
-[id^="nb2-visual-content"] img:hover {
+[id^="nb2-visual-content"] img:hover,
+[id^="nb2-widget"] img:hover,
+[id^="nb2-widget-body"] img:hover,
+[id^="nb2-content"] img:hover,
+[id^="nb2-img-video-area"] img:hover {
   transform: scale(1.02) !important;
 }
 
 /* NB2ウィジェット内のSVG */
 [id^="nb2-visual"] svg,
-[id^="nb2-visual-content"] svg {
+[id^="nb2-visual-content"] svg,
+[id^="nb2-widget"] svg,
+[id^="nb2-widget-body"] svg,
+[id^="nb2-content"] svg {
   width: 100% !important;
   max-width: 100% !important;
   height: auto !important;
 }
 
 /* NB2ウィジェット内のdivのmax-width制限を解除 */
-[id^="nb2-visual-content"] > div {
+[id^="nb2-visual-content"] > div,
+[id^="nb2-widget-body"] > div,
+[id^="nb2-content"] > div {
   max-width: 100% !important;
   width: 100% !important;
 }

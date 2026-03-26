@@ -6465,7 +6465,7 @@ async function loadCardPage(cardId) {
                   <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${formatText(card.example_problem)}</pre>
                   <div id="example-diagram-card-${card.card_id || card.id || 0}" class="mt-2">
                     ${card.example_image_url ? `<div class="text-center mt-2" id="example-img-wrapper-${card.card_id || card.id || 0}">
-                      <img src="${card.example_image_url}" alt="例題の図" class="max-h-48 rounded border mx-auto">
+                      <img src="${card.example_image_url}" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">
                       <div class="flex justify-center items-center gap-2 mt-1 flex-wrap">
                         <span class="text-[10px] text-gray-400">例題の図</span>
                         <button onclick="generateExampleDiagramApp('${(card.card_id || card.id || 0)}', '${(card.card_title||'').replace(/'/g,'')}', '${(card.example_problem||'').replace(/'/g,'').substring(0,100)}', '${(card.example_solution||'').replace(/'/g,'').substring(0,100)}')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>
@@ -9432,7 +9432,7 @@ async function generateTactileIllustration(containerId, tactileText, subject, gr
     }, { timeout: 60000 })
     const d = res.data
     if (d.success && d.image_url) {
-      el.innerHTML = '<img src="' + d.image_url + '" class="max-h-[180px] mx-auto rounded-lg border-2 border-orange-200 shadow animate-fadeIn" alt="やってみよう イラスト"><p class="text-[10px] text-gray-400 mt-1">' + (d.model || 'AI') + '</p><button onclick="generateTactileIllustration(\'' + containerId + '\', \'' + tactileText.replace(/'/g, "\\\\'") + '\', \'' + (subject || '').replace(/'/g, "\\\\'") + '\', \'' + (grade || '').replace(/'/g, "\\\\'") + '\')" class="text-[10px] text-orange-500 underline mt-1 block">🔄 別のイラストにする</button>'
+      el.innerHTML = '<img src="' + d.image_url + '" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto mx-auto rounded-2xl border-3 border-orange-200 shadow-lg animate-fadeIn cursor-pointer hover:scale-[1.02] transition-transform" alt="やってみよう イラスト"><p class="text-[10px] text-gray-400 mt-1">' + (d.model || 'AI') + '</p><button onclick="generateTactileIllustration(\'' + containerId + '\', \'' + tactileText.replace(/'/g, "\\\\'") + '\', \'' + (subject || '').replace(/'/g, "\\\\'") + '\', \'' + (grade || '').replace(/'/g, "\\\\'") + '\')" class="text-[10px] text-orange-500 underline mt-1 block">🔄 別のイラストにする</button>'
     } else {
       el.innerHTML = '<p class="text-xs text-red-500 py-2">イラスト生成に失敗しました</p><div class="text-4xl">' + getTactileIllustration(tactileText).icons + '</div>'
     }
@@ -14422,7 +14422,7 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
       // 例題画像をカードに保存
       try { await axios.put('/api/card/' + cardId, { example_image_url: d.image_url }) } catch(e) {}
       area.innerHTML = '<div class="text-center mt-2" id="example-img-wrapper-' + cardId + '">' +
-        '<img src="' + d.image_url + '" alt="例題の図" class="max-h-48 rounded border mx-auto">' +
+        '<img src="' + d.image_url + '" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">' +
         '<div class="flex justify-center items-center gap-2 mt-1 flex-wrap">' +
         '<span class="text-[10px] text-gray-400">' + (d.model || 'AI') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</span>' +
         '<button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + cardTitle.replace(/'/g, '') + '\',\'' + exampleProblem.replace(/'/g, '').substring(0, 80) + '\',\'' + (exampleSolution || '').replace(/'/g, '').substring(0, 80) + '\')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>' +
@@ -14497,7 +14497,7 @@ async function executeEditExampleDiagram(cardId) {
       const ep = (cd.example_problem || '').replace(/'/g, '').substring(0, 80)
       const es = (cd.example_solution || '').replace(/'/g, '').substring(0, 80)
       area.innerHTML = '<div class="text-center mt-2" id="example-img-wrapper-' + cardId + '">' +
-        '<img src="' + d.image_url + '" alt="例題の図" class="max-h-48 rounded border mx-auto">' +
+        '<img src="' + d.image_url + '" alt="例題の図" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform">' +
         '<div class="flex justify-center items-center gap-2 mt-1 flex-wrap">' +
         '<span class="text-[10px] text-gray-400">' + (d.model || 'AI') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</span>' +
         '<button onclick="generateExampleDiagramApp(\'' + cardId + '\',\'' + ct + '\',\'' + ep + '\',\'' + es + '\')" class="text-[10px] text-yellow-600 underline">🖼 再生成</button>' +
@@ -54134,7 +54134,7 @@ async function showPersonalizedCourseGuide(courseId, courseNameOrCurriculumId, m
                         if (_gYtId) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><div class="relative rounded-lg overflow-hidden border mx-auto" style="max-width:400px;"><iframe src="https://www.youtube.com/embed/' + _gYtId + '" class="w-full" style="height:225px;" frameborder="0" allowfullscreen></iframe></div>' + _editBtns + '</div>'
                         if (isVideoUrl(_gUrl)) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><video controls class="max-h-48 rounded border mx-auto" preload="metadata"><source src="' + _gUrl + '" type="video/mp4">動画を再生できません</video>' + _editBtns + '</div>'
                         if (isAudioUrl(_gUrl)) return '<div class="mb-2" id="guide-img-' + _gCardId + '"><div class="bg-green-50 border border-green-200 rounded-lg p-2 text-center"><i class="fas fa-music text-green-500 mb-1 block"></i><audio controls class="mx-auto" style="max-width:100%;"><source src="' + _gUrl + '" type="audio/mpeg"><source src="' + _gUrl + '" type="audio/mp4"><source src="' + _gUrl + '" type="audio/wav"></audio></div>' + _editBtns + '</div>'
-                        return '<div class="mb-2" id="guide-img-' + _gCardId + '"><img src="' + _gUrl + '" class="max-h-48 rounded border mx-auto cursor-pointer hover:opacity-80 transition" onclick="replaceCardImage(' + _gCardIdErr + ')" onerror="handleImageLoadError(this,' + _gCardIdErr + ')">' + _editBtns + '</div>'
+                        return '<div class="mb-2" id="guide-img-' + _gCardId + '"><img src="' + _gUrl + '" class="w-full max-w-[600px] h-auto rounded-2xl border-3 border-purple-200 shadow-lg mx-auto cursor-pointer hover:scale-[1.02] transition-transform" onclick="window._expandSongImage ? window._expandSongImage(this.src) : replaceCardImage(' + _gCardIdErr + ')" onerror="handleImageLoadError(this,' + _gCardIdErr + ')">' + _editBtns + '</div>'
                       })() : (() => {
                         const cId = card.card_id || card.id || 0
                         const desc = (mm.image_description || card.card_title || card.unit_name || '').replace(/'/g, '').replace(/"/g, '').substring(0, 60)
