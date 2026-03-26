@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260325e' }, 200, {
+  return c.json({ build_id: '20260326a' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260325e';
+    var MY_BUILD = '20260326a';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -10346,7 +10346,7 @@ app.get('/guide/:curriculumId', async (c) => {
 
         // ジャケット画像（NB2が同時生成）
         if (data.cover_image_url) {
-          html += '<div style="text-align:center;margin-bottom:12px;"><img src="' + data.cover_image_url + '" alt="ジャケット画像" style="max-width:100%;max-height:280px;border-radius:12px;border:2px solid #DDD6FE;box-shadow:0 4px 16px rgba(124,58,237,0.2);" /></div>';
+          html += '<div style="text-align:center;margin-bottom:12px;"><img src="' + data.cover_image_url + '" alt="ジャケット画像" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" /></div>';
         }
 
         // 歌詞プレビュー
@@ -10513,7 +10513,7 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(data) {
       if (data.success && data.image_url) {
         area.innerHTML = '<div style="text-align:center;">' +
-          '<img src="' + data.image_url + '" alt="ソングイメージ" style="max-width:100%;max-height:300px;border-radius:12px;border:2px solid #DDD6FE;box-shadow:0 4px 12px rgba(124,58,237,0.2);" />' +
+          '<img src="' + data.image_url + '" alt="ソングイメージ" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" />' +
           '<p style="font-size:0.7rem;color:#8B5CF6;margin-top:4px;">' + (data.model || 'Nano Banana 2') + '（' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒）</p>' +
           '<button onclick="generateSongImage(' + page + ')" style="margin-top:4px;background:#EC4899;color:white;border:none;padding:5px 12px;border-radius:8px;font-size:0.75rem;font-weight:bold;cursor:pointer;">🔄 別のイメージ</button></div>';
       } else {
@@ -10771,7 +10771,7 @@ app.get('/guide/:curriculumId', async (c) => {
         // 例題の図解（AI生成済みまたはボタン表示）
         html += '<div id="example-diagram-' + currentPage + '">';
         if (c.example_image_url) {
-          html += '<div style="text-align:center;margin:8px 0;"><img src="' + c.example_image_url + '" alt="例題の図" style="max-width:100%;max-height:250px;border-radius:10px;border:2px solid #FDE68A;"></div>';
+          html += '<div style="text-align:center;margin:8px 0;"><img src="' + c.example_image_url + '" alt="例題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'"></div>';
         } else {
           html += '<div style="display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 12px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:10px;">';
           html += '<i class="fas fa-image" style="color:#D97706;font-size:1.2rem;"></i>';
@@ -10806,7 +10806,7 @@ app.get('/guide/:curriculumId', async (c) => {
       } else if (/\\.(mp3|wav|ogg|m4a|aac)/i.test(imgUrl)) {
         html += '<div style="margin:10px 0;background:#F0FDF4;border:2px solid #BBF7D0;border-radius:12px;padding:12px;text-align:center;"><i class="fas fa-music" style="color:#10B981;font-size:1.5rem;margin-bottom:8px;display:block;"></i><audio controls style="width:100%;max-width:400px;"><source src="' + imgUrl + '" type="audio/mpeg"><source src="' + imgUrl + '" type="audio/mp4"><source src="' + imgUrl + '" type="audio/wav"></audio><p style="font-size:0.75rem;color:#6b7280;margin-top:4px;">🎵 音声を聞いてみよう</p></div>';
       } else {
-        html += '<div style="text-align:center;margin:10px 0;"><img src="' + imgUrl + '" alt="問題の図" style="max-width:100%;max-height:350px;border-radius:10px;border:2px solid #e5e7eb;"></div>';
+        html += '<div style="text-align:center;margin:10px 0;"><img src="' + imgUrl + '" alt="問題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #e5e7eb;box-shadow:0 6px 24px rgba(0,0,0,0.1);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'"></div>';
       }
       // 画像があっても追加のAI図解を生成できるボタン
       html += '<div id="extra-diagram-' + currentPage + '" style="text-align:center;margin:4px 0;">';
@@ -11638,7 +11638,7 @@ app.get('/guide/:curriculumId', async (c) => {
         var cid = c.card_id || c.id || 0;
         var html = '<div style="text-align:center;margin:8px 0;">';
         html += '<p style="font-size:0.68rem;font-weight:bold;color:#92400E;margin-bottom:4px;">📐 例題の図解</p>';
-        html += '<img src="' + data.image_url + '" alt="例題の図" style="max-width:100%;max-height:280px;border-radius:10px;border:2px solid #FDE68A;">';
+        html += '<img src="' + data.image_url + '" alt="例題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'">';
         html += '<div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">';
         html += '<p style="font-size:0.65rem;color:#9CA3AF;margin:0;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0) / 1000) + '秒</p>';
         html += '<button onclick="generateExampleDiagram(' + page + ')" style="font-size:0.7rem;color:#D97706;background:none;border:1px solid #FDE68A;padding:2px 10px;border-radius:6px;cursor:pointer;">🖼️ 図を再生成</button>';
@@ -11693,7 +11693,7 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(data) {
       if (data.success && data.image_url) {
         var html = '<div style="text-align:center;margin:8px 0;">';
-        html += '<img src="' + data.image_url + '" alt="やり方の図" style="max-width:100%;max-height:250px;border-radius:10px;border:2px solid #FDE68A;">';
+        html += '<img src="' + data.image_url + '" alt="やり方の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'">';
         html += '<div style="display:flex;justify-content:center;gap:8px;margin-top:6px;">';
         html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
         html += '<button onclick="generateTactileDiagram(' + page + ')" style="font-size:0.7rem;color:#D97706;background:none;border:1px solid #FDE68A;padding:2px 10px;border-radius:6px;cursor:pointer;">🔄 もう一度</button>';
@@ -11811,7 +11811,7 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.success && data.image_url) {
-        resultArea.innerHTML = '<div style="text-align:center;margin-top:4px;"><img src="' + data.image_url + '" alt="AI図解" style="max-width:100%;max-height:280px;border-radius:10px;border:2px solid #DDD6FE;"><div style="margin-top:4px;"><span style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</span> <button onclick="generateImageFromDesc(' + page + ')" style="font-size:0.65rem;color:#8B5CF6;background:none;border:1px solid #DDD6FE;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:4px;">🔄 再生成</button></div></div>';
+        resultArea.innerHTML = '<div style="text-align:center;margin-top:4px;"><img src="' + data.image_url + '" alt="AI図解" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'"><div style="margin-top:4px;"><span style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</span> <button onclick="generateImageFromDesc(' + page + ')" style="font-size:0.65rem;color:#8B5CF6;background:none;border:1px solid #DDD6FE;padding:2px 8px;border-radius:6px;cursor:pointer;margin-left:4px;">🔄 再生成</button></div></div>';
       } else {
         resultArea.innerHTML = '<p style="font-size:0.75rem;color:#DC2626;">図の生成に失敗 <button onclick="generateImageFromDesc(' + page + ')" style="color:#8B5CF6;background:none;border:none;cursor:pointer;text-decoration:underline;">再試行</button></p>';
       }
@@ -11945,7 +11945,7 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(data) {
       if (data.success && data.image_url) {
         var html = '<div style="text-align:center;margin-top:8px;">';
-        html += '<img src="' + data.image_url + '" style="max-width:100%;max-height:250px;border-radius:10px;border:2px solid #BBF7D0;" alt="AI図解">';
+        html += '<img src="' + data.image_url + '" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #BBF7D0;box-shadow:0 6px 24px rgba(5,150,105,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" alt="AI図解">';
         html += '<div style="display:flex;justify-content:center;gap:8px;margin-top:6px;">';
         html += '<p style="font-size:0.6rem;color:#9CA3AF;">' + (data.model || 'AI') + ' / ' + Math.round((data.generation_time_ms || 0)/1000) + '秒</p>';
         html += '<button onclick="generateDiagramFallback(' + page + ')" style="font-size:0.7rem;color:#059669;background:none;border:1px solid #BBF7D0;padding:3px 10px;border-radius:6px;cursor:pointer;">🔄 再生成</button>';
@@ -13743,14 +13743,14 @@ app.get('/guide/:curriculumId', async (c) => {
         // イラスト画像がある場合
         if (data.illustration_url) {
           widgetArea.innerHTML += '<div style="margin-top:10px;text-align:center;">' +
-            '<img src="' + data.illustration_url + '" alt="NB2イラスト" style="max-width:100%;max-height:250px;border-radius:12px;border:2px solid #DDD6FE;box-shadow:0 4px 12px rgba(124,58,237,0.15);" />' +
+            '<img src="' + data.illustration_url + '" alt="NB2イラスト" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" />' +
             '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">🎨 Nano Banana 2 生成イラスト</p></div>';
         }
       } else if (data.success && data.illustration_url) {
         // HTMLなし、画像のみ
         widgetArea.innerHTML = '<div style="text-align:center;padding:12px;">' +
           '<p style="font-size:0.85rem;color:#6B7280;margin-bottom:8px;"><i class="fas fa-hand-pointer" style="margin-right:4px;"></i>' + (tactile || 'やってみよう') + '</p>' +
-          '<img src="' + data.illustration_url + '" alt="NB2教材" style="max-width:100%;max-height:300px;border-radius:12px;border:2px solid #DDD6FE;" />' +
+          '<img src="' + data.illustration_url + '" alt="NB2教材" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" />' +
           '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">Nano Banana 2（' + ((data.generation_time_ms||0)/1000).toFixed(1) + '秒）</p></div>';
       } else {
         // フォールバック: テキスト表示
@@ -13846,7 +13846,7 @@ app.get('/guide/:curriculumId', async (c) => {
           '</div>' +
           '<div style="padding:12px;">' + safeHtml + '</div></div>';
         if (data.illustration_url) {
-          widgetArea.innerHTML += '<div style="margin-top:8px;text-align:center;"><img src="' + data.illustration_url + '" style="max-width:100%;max-height:200px;border-radius:10px;" /></div>';
+          widgetArea.innerHTML += '<div style="margin-top:8px;text-align:center;"><img src="' + data.illustration_url + '" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%;max-width:600px;height:auto;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" /></div>';
         }
       } else {
         widgetArea.innerHTML = '<div style="padding:12px;text-align:center;color:#DC2626;font-size:0.85rem;">修正失敗: ' + (data.error || '再度お試しください') + '</div>';
@@ -14492,7 +14492,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260325e';
+          var MY_BUILD = '20260326a';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
