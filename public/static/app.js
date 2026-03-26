@@ -13959,7 +13959,7 @@ async function teacherGenerateSong(cardId, index) {
         html += '<div class="mt-1"><audio controls class="w-full" style="height:36px;" src="' + d.audio_url + '"></audio></div>'
       }
       if (sd.lyrics) html += '<div class="flex gap-2 mt-1"><button onclick="teacherSpeakSongLyrics(this, \'' + encodeURIComponent(sd.lyrics.substring(0, 500)) + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-play"></i> 歌を聴く</button></div>'
-      if (d.cover_image_url) html += '<img src="' + d.cover_image_url + '" class="max-h-24 rounded mt-1 mx-auto">'
+      if (d.cover_image_url) html += '<img src="' + d.cover_image_url + '" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="rounded-xl mt-2 mx-auto cursor-pointer shadow-lg hover:scale-[1.02] transition-transform" style="width:100%;max-width:400px;border:2px solid #D1FAE5;">'
       html += '<p class="text-[10px] text-gray-400 mt-1">' + d.model + ' / ' + Math.round(d.generation_time_ms / 1000) + '秒</p>'
       html += '<button onclick="teacherGenerateSong(' + cardId + ',' + index + ')" class="text-xs text-purple-500 underline mt-1">🔄 再生成（30秒おぼえうた）</button>'
       html += '</div>'
@@ -14167,7 +14167,7 @@ async function teacherGenShortMusic(cardId, index) {
         h += '<div class="mt-1"><audio controls class="w-full" style="height:32px;" src="' + d.audio_url + '"></audio></div>'
       }
       if (sd.lyrics) h += '<button onclick="teacherSpeakSongLyrics(this, \'' + encodeURIComponent((sd.lyrics||'').substring(0, 500)) + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-1 rounded text-[10px] font-bold mt-1"><i class="fas fa-play"></i> 歌を聴く</button>'
-      if (d.cover_image_url) h += '<img src="' + d.cover_image_url + '" class="max-h-16 rounded mt-1">'
+      if (d.cover_image_url) h += '<img src="' + d.cover_image_url + '" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="rounded-xl mt-2 mx-auto cursor-pointer shadow hover:scale-[1.02] transition-transform" style="width:100%;max-width:360px;border:2px solid #D1FAE5;">'
       h += '<p class="text-[9px] text-gray-400 mt-1">' + (d.model || 'NB2') + ' / ' + Math.round((d.generation_time_ms || 0)/1000) + '秒</p>'
       h += '<button onclick="teacherGenShortMusic(' + cardId + ',' + index + ')" class="text-[10px] text-purple-500 underline mt-1">🔄 再生成</button></div>'
       area.innerHTML = h
@@ -14226,7 +14226,7 @@ async function groupCardGenerate(type, cardId, cardIndex, courseName, cardTitle)
         h += '<div class="flex gap-1 mt-1 flex-wrap">'
         if (sd.lyrics) h += '<button onclick="groupPlaySong(this,\'' + encodeURIComponent((sd.lyrics||'').substring(0,500)) + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-1 rounded text-[10px] font-bold"><i class="fas fa-play"></i>🎵 歌を聴く</button>'
         h += '</div>'
-        if (d.cover_image_url) h += '<img src="' + d.cover_image_url + '" class="max-h-16 rounded mt-1">'
+        if (d.cover_image_url) h += '<img src="' + d.cover_image_url + '" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="rounded-xl mt-2 mx-auto cursor-pointer shadow hover:scale-[1.02] transition-transform" style="width:100%;max-width:360px;border:2px solid #D1FAE5;">'
         h += '<p class="text-[9px] text-gray-400 mt-1">' + (d.model||'NB2') + ' / ' + Math.round((d.generation_time_ms||0)/1000) + '秒</p>'
         h += '<button onclick="groupCardGenerate(\'song\',' + cardId + ',' + cardIndex + ',\'' + courseName.replace(/'/g,'') + '\',\'' + cardTitle.replace(/'/g,'') + '\')" class="text-[10px] text-purple-500 underline mt-1">🔄 再生成</button></div>'
         area.innerHTML = h
@@ -41249,10 +41249,12 @@ async function executeLearningMusicGenerate(cardId) {
       html += '</div>'
       html += '</div>'
       
-      // ジャケット画像
+      // ジャケット画像（大きく表示 + クリックで全画面拡大）
       if (coverUrl) {
-        html += '<div style="padding:8px 14px;text-align:center;">'
-        html += '<img src="' + coverUrl + '" style="max-width:180px;max-height:180px;border-radius:12px;border:2px solid #D1FAE5;box-shadow:0 4px 12px rgba(0,0,0,0.1);" />'
+        html += '<div style="padding:10px 14px;text-align:center;">'
+        html += '<p style="font-weight:bold;font-size:0.8rem;color:#065F46;margin-bottom:8px;"><i class="fas fa-image" style="margin-right:4px;"></i>イメージイラスト</p>'
+        html += '<img src="' + coverUrl + '" onclick="window._expandSongImage && window._expandSongImage(this.src)" style="width:100%;max-width:480px;border-radius:16px;border:3px solid #D1FAE5;box-shadow:0 6px 24px rgba(0,0,0,0.15);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'" />'
+        html += '<p style="font-size:0.65rem;color:#9CA3AF;margin-top:6px;">クリックで拡大</p>'
         html += '</div>'
       }
       
@@ -41378,6 +41380,16 @@ function copySunoStyle() {
   }
 }
 window.copySunoStyle = copySunoStyle
+
+// 学習ソング画像の全画面拡大表示
+window._expandSongImage = function(src) {
+  var overlay = document.createElement('div')
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;animation:fadeIn 0.2s ease;'
+  overlay.innerHTML = '<img src="' + src + '" style="max-width:92vw;max-height:82vh;border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,0.5);object-fit:contain;" />'
+    + '<p style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin-top:12px;">タップで閉じる</p>'
+  overlay.onclick = function() { overlay.remove() }
+  document.body.appendChild(overlay)
+}
 
 // 歌詞をクリップボードにコピー
 function copyLyricsToClipboard() {
@@ -44732,10 +44744,11 @@ async function generateMusicDemo() {
       
       html += `<div style="padding:16px;">`
       
-      // ジャケット画像
+      // ジャケット画像（大きく表示 + クリック拡大）
       if (data.cover_image_url) {
         html += `<div style="text-align:center;margin-bottom:14px;">
-          <img src="${data.cover_image_url}" alt="ジャケット" style="max-width:100%;max-height:300px;border-radius:14px;border:2px solid #DDD6FE;box-shadow:0 4px 16px rgba(124,58,237,0.2);" />
+          <img src="${data.cover_image_url}" alt="ジャケット" onclick="window._expandSongImage && window._expandSongImage(this.src)" style="width:100%;max-width:480px;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" />
+          <p style="font-size:0.65rem;color:#9CA3AF;margin-top:6px;">クリックで拡大</p>
         </div>`
       }
       
