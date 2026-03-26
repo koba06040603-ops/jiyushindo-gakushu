@@ -38223,28 +38223,28 @@ async function generateMusicDemoOld() {
       <p class="text-sm text-gray-600 mb-4 text-center">好きな曲調を選んで、学習ソングを生成します</p>
       
       <div class="grid grid-cols-2 gap-3 mb-4">
-        <button onclick="selectMusicStyle('cheerful-pop')" 
+        <button onclick="selectMusicStyleDemo('cheerful-pop')" 
                 class="music-style-btn bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 text-white p-4 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
           <i class="fas fa-smile text-2xl mb-2"></i>
           <div>明るいポップ</div>
           <div class="text-xs opacity-90">元気で楽しい</div>
         </button>
         
-        <button onclick="selectMusicStyle('calm-ballad')" 
+        <button onclick="selectMusicStyleDemo('calm-ballad')" 
                 class="music-style-btn bg-gradient-to-r from-blue-400 to-cyan-400 hover:from-blue-500 hover:to-cyan-500 text-white p-4 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
           <i class="fas fa-heart text-2xl mb-2"></i>
           <div>やさしいバラード</div>
           <div class="text-xs opacity-90">ゆったり落ち着く</div>
         </button>
         
-        <button onclick="selectMusicStyle('rhythmic-dance')" 
+        <button onclick="selectMusicStyleDemo('rhythmic-dance')" 
                 class="music-style-btn bg-gradient-to-r from-pink-400 to-purple-400 hover:from-pink-500 hover:to-purple-500 text-white p-4 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
           <i class="fas fa-music text-2xl mb-2"></i>
           <div>リズミカル</div>
           <div class="text-xs opacity-90">ダンスみたいに</div>
         </button>
         
-        <button onclick="selectMusicStyle('acoustic-folk')" 
+        <button onclick="selectMusicStyleDemo('acoustic-folk')" 
                 class="music-style-btn bg-gradient-to-r from-green-400 to-teal-400 hover:from-green-500 hover:to-teal-500 text-white p-4 rounded-lg font-bold transition transform hover:scale-105 shadow-lg">
           <i class="fas fa-guitar text-2xl mb-2"></i>
           <div>アコースティック</div>
@@ -38257,8 +38257,8 @@ async function generateMusicDemoOld() {
   `
 }
 
-// 選択された曲調で音楽を生成
-async function selectMusicStyle(style) {
+// 選択された曲調で音楽を生成（auditory-demo用）
+var selectMusicStyleDemo = async function(style) {
   const demoArea = document.getElementById('auditory-demo-area')
   if (!demoArea) return
   
