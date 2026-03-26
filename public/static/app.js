@@ -6458,8 +6458,9 @@ async function loadCardPage(cardId) {
             <!-- 例題 -->
             ${card.example_problem ? `
               <div class="bg-white rounded-lg shadow-lg p-6">
-                <h3 class="card-heading font-bold text-gray-800 mb-4">
-                  <i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題
+                <h3 class="card-heading font-bold text-gray-800 mb-4 flex items-center flex-wrap gap-2">
+                  <span><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</span>
+                  <button onclick="(window.speakNB2NarrationAI||window.speakNB2Explanation)(${card.card_id || card.id || 0}, 'example')" id="nb2-speak-btn-example-${card.card_id || card.id || 0}" class="ml-auto bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>
                 </h3>
                 <div class="bg-yellow-50 rounded-lg p-4 mb-4">
                   <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${formatText(card.example_problem)}</pre>
@@ -6921,6 +6922,10 @@ async function loadCardPage(cardId) {
                   </h4>
                   <div class="text-gray-700 whitespace-pre-wrap font-sans" style="line-height: 1.8;">${(answer?.explanation || answer?.answer_explanation || card.answer_explanation || card.explanation || card.example_solution || card.real_world_connection || 'この問題の解説は、先生が編集できます。').replace(/\n/g, '<br>')}</div>
                   ${card.real_world_connection ? `<div class="mt-2 bg-orange-50 rounded-lg p-3"><strong class="text-orange-700">🌍 せいかつとのつながり：</strong><span class="text-gray-700">${card.real_world_connection}</span></div>` : ''}
+                </div>
+                <div class="mt-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-4 border border-green-200 text-center">
+                  <p class="text-sm font-bold text-green-700 mb-2"><i class="fas fa-brain mr-1"></i>答えを覚えたら、歌で定着させよう！</p>
+                  <button onclick="openLearningMusicPanel(${card.card_id || card.id || 0})" class="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg hover:shadow-xl transition"><i class="fas fa-music mr-2"></i>🎵 定着ソングをつくる</button>
                 </div>
               </div>
             ` : `
@@ -11973,7 +11978,7 @@ function initVisualWidgets() {
       card_id: cardId,
       card_title: cardTitle,
       problem_text: problemText.substring(0, 800),
-      tactile_activity: '問題内容を理解しやすくする正確な図解・ダイアグラムを生成してください。問題の数値・図形・関係性を正確に反映した視覚教材が必要です。',
+      tactile_activity: '問題内容を理解するためのヒントとなる図解・ダイアグラムを生成してください。★答えそのものは表示せず、考え方のヒントを視覚的に示すこと★ 問題の数値・図形・関係性を反映した視覚教材が必要です。',
       subject: card.subject || '',
       grade: card.grade_level || '',
       unit_name: card.unit_name || ''
@@ -12109,7 +12114,6 @@ function initVisualWidgets() {
       toolbar.innerHTML = `
         <button onclick="regenerateVisualWidget('${cardId}')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2を再生成</button>
         <button onclick="editVisualWidget('${cardId}')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>NB2を修正指示</button>
-        <button onclick="openLearningMusicPanel('${cardId}')" style="background:linear-gradient(135deg,#10B981,#3B82F6);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-music" style="margin-right:4px;"></i>🎵 学習ソング</button>
         <button onclick="(window.speakNB2NarrationAI||window.speakNB2Explanation)('${cardId}')" id="nb2-speak-btn-${cardId}" style="background:linear-gradient(135deg,#10B981,#059669);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-volume-up" style="margin-right:4px;"></i>🔊 音声解説</button>
         <button onclick="window.bookmarkNB2Image&&window.bookmarkNB2Image('${cardId}')" id="nb2-bookmark-btn-${cardId}" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-star" style="margin-right:4px;"></i>⭐ 保存</button>
       `
@@ -16197,6 +16201,9 @@ async function gradeAnswer(correctAnswer) {
         <div class="text-5xl mb-3" style="animation: starBurstResult 0.8s ease-out">🎉</div>
         <p class="text-2xl font-bold text-green-700 mb-2" style="animation: fadeInUpResult 0.5s ease-out 0.2s both">正解！すごい！</p>
         <p class="text-sm text-green-600" style="animation: fadeInUpResult 0.5s ease-out 0.4s both">よくできました。${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? '次の問題に進みましょう！' : '次のカードに進みましょう！'}</p>
+        <div class="mt-3 flex justify-center gap-2 flex-wrap" style="animation: fadeInUpResult 0.5s ease-out 0.5s both">
+          <button onclick="openLearningMusicPanel(${typeof state.selectedCard === 'object' ? (state.selectedCard?.card_id || state.selectedCard?.id || 0) : (state.selectedCard || 0)})" class="bg-gradient-to-r from-green-500 to-blue-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow hover:shadow-md transition"><i class="fas fa-music mr-1"></i>🎵 定着ソングで覚えよう！</button>
+        </div>
         ${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? `
         <button onclick="window.qaStepState.results.push({correct:true, studentAnswer:'', correctAnswer:''}); goToNextQAStep()" 
                 class="mt-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-xl font-bold text-lg transition shadow-lg" style="animation: fadeInUpResult 0.5s ease-out 0.6s both">
@@ -41660,10 +41667,12 @@ window.speakNB2Explanation = function(page) {
 }
 
 // ★ NB2図解の音声解説（Gemini TTS - AI先生と同じ音質）
-// source='image' の場合: 問題画像の解説（カードデータを使用）
-// source=undefined の場合: NB2ウィジェットの解説（ウィジェットテキストを使用）
+// source='image': 問題画像の解説（カードデータ使用、答え除外）
+// source='example': 例題の解説（例題文のみ、答え除外）
+// source=undefined: NB2ウィジェットの解説（ウィジェットテキスト使用）
+// ★ 重要: 音声解説は「ヒントまで」。答えは絶対に含めない。
 window.speakNB2NarrationAI = async function(page, source) {
-  var btnId = source === 'image' ? 'nb2-speak-btn-img-' + page : 'nb2-speak-btn-' + page
+  var btnId = source === 'image' ? 'nb2-speak-btn-img-' + page : source === 'example' ? 'nb2-speak-btn-example-' + page : 'nb2-speak-btn-' + page
   var btn = document.getElementById(btnId)
   if (!btn) btn = document.getElementById('nb2-speak-btn-' + page)
   
@@ -41682,19 +41691,28 @@ window.speakNB2NarrationAI = async function(page, source) {
   var card = cd.card || cd || {}
   var title = card.card_title || card.title || ''
   var problemText = card.problem_content || card.problem_text || ''
-  var solution = card.example_solution || card.answer_text || card.correct_answer || ''
   var imgDesc = card._image_description || ''
-  var explanation = card.answer_explanation || card.explanation || ''
+  var exampleProblem = card.example_problem || ''
+  // ★ ヒントのみ使用（答えは含めない）
+  var hints = (cd.hints || card.hints || []).filter(function(h) { return h && h.trim() })
   
   var textParts = []
+  var source_type = source || 'widget'
   
-  if (source === 'image') {
-    // ★ 問題画像モード: カードデータから解説テキストを構築（NB2ウィジェットは無視）
+  if (source === 'example') {
+    // ★ 例題モード: 例題文と考え方のヒントのみ（答えは含めない）
+    if (title) textParts.push(title + 'の例題です。')
+    if (exampleProblem) textParts.push(exampleProblem.substring(0, 400))
+    // ヒントだけ追加（答えは除外）
+    if (hints.length > 0) textParts.push('ヒント: ' + hints[0].substring(0, 150))
+    if (!exampleProblem && problemText) textParts.push(problemText.substring(0, 300))
+  } else if (source === 'image') {
+    // ★ 問題画像モード: 図の説明と問題文のみ（答えは含めない）
     if (title) textParts.push(title)
     if (imgDesc) textParts.push('図の説明: ' + imgDesc)
     if (problemText) textParts.push(problemText.substring(0, 400))
-    if (solution) textParts.push('答え: ' + solution.substring(0, 200))
-    if (explanation) textParts.push(explanation.substring(0, 200))
+    // ★ 答えは含めず、ヒントのみ
+    if (hints.length > 0) textParts.push('考え方のヒント: ' + hints[0].substring(0, 150))
   } else {
     // ★ NB2ウィジェットモード: ウィジェット内テキストを収集（ノイズ除去）
     var widgetBody = document.getElementById('nb2-widget-body-' + page) || document.getElementById('nb2-visual-content-' + page)
@@ -41707,10 +41725,10 @@ window.speakNB2NarrationAI = async function(page, source) {
         if (t.length > 2 && t.length < 300 && !textParts.includes(t) && !noiseRe.test(t)) textParts.push(t)
       })
     }
-    // NB2テキストが無い場合、カード情報にフォールバック
+    // NB2テキストが無い場合、問題文にフォールバック（答えは含めない）
     if (textParts.length === 0) {
       if (problemText) textParts.push(problemText.substring(0, 300))
-      if (solution) textParts.push(solution.substring(0, 200))
+      if (hints.length > 0) textParts.push('ヒント: ' + hints[0].substring(0, 150))
     }
   }
   

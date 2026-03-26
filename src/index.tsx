@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260326h' }, 200, {
+  return c.json({ build_id: '20260326i' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260326h';
+    var MY_BUILD = '20260326i';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14501,7 +14501,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260326h';
+          var MY_BUILD = '20260326i';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -46256,27 +46256,43 @@ app.post('/api/ai/generate-nb2-narration', async (c) => {
   const { env } = c
   try {
     const startTime = Date.now()
-    const { text_content, card_title, subject, grade } = await c.req.json()
+    const { text_content, card_title, subject, grade, source_type } = await c.req.json()
     if (!text_content) return c.json({ success: false, error: 'text_content required' }, 400)
     
     const apiKey = env.GEMINI_API_KEY || env.GOOGLE_AI_KEY || ''
     if (!apiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' }, 500)
     
+    // source_type に応じたプロンプト分岐
+    let roleDescription = ''
+    if (source_type === 'example') {
+      roleDescription = `この例題について、子どもが自分で考えるきっかけとなるように解説してください。
+考え方のヒントや図の見方を教えてあげてください。
+★絶対に答えや解き方の結論を言わないこと★ 「答えは何かな？考えてみよう！」で締めてください。`
+    } else if (source_type === 'image') {
+      roleDescription = `この問題の図について、何が描かれているか、どこに注目すべきかを説明してください。
+★絶対に答えを言わないこと★ ヒントとなる部分を指摘するだけにしてください。`
+    } else {
+      roleDescription = `この教材コンテンツについて、子どもが楽しく理解できるように説明してください。
+考え方のヒントを与えてください。
+★答えや結論を直接言わないこと★ 「一緒に考えてみよう！」のような促しで終わってください。`
+    }
+    
     // ナレーションスクリプトをGeminiで生成
-    const narratePrompt = `あなたは小学生向けの教育番組のナレーターです。以下の教材コンテンツを、子どもが楽しく理解できるように30秒以内のナレーション原稿にしてください。
+    const narratePrompt = `あなたは小学生向けの教育番組のナレーターです。${roleDescription}
 
 教科: ${subject || '不明'}
 学年: ${grade || '不明'}
 テーマ: ${card_title || ''}
 コンテンツ:
-${text_content.substring(0, 800)}
+${text_content.substring(0, 600)}
 
 要件:
 - 小学${grade || '5'}年生が理解できる言葉で
 - 「〜だよ」「〜なんだ」などフレンドリーな語尾
 - ポイントを3つ以内に絞る
 - 150文字以内
-- 「さあ、見てみよう！」のような導入をつける`
+- 「さあ、見てみよう！」のような導入をつける
+- ★重要: 答えや解答を絶対に含めないこと。ヒントまでにすること★`
 
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
