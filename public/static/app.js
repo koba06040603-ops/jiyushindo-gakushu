@@ -6933,6 +6933,18 @@ async function loadCardPage(cardId) {
             `}
           </div>
 
+          <!-- ★ モバイル用 学習ツールバー（ダッシュボード・お気に入り）- サイドバーの前に配置 -->
+          <div class="lg:col-span-3 flex flex-wrap gap-2 justify-center py-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 my-2">
+            <button onclick="window.openReviewDashboard&&window.openReviewDashboard()" 
+                    class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition">
+              <i class="fas fa-chart-line mr-1"></i>📊 ダッシュボード
+            </button>
+            <button onclick="window.openBookmarkGallery&&window.openBookmarkGallery()" 
+                    class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition">
+              <i class="fas fa-star mr-1"></i>⭐ 保存した図解
+            </button>
+          </div>
+
           <!-- サイドバー（右側） -->
           <div class="lg:col-span-1 space-y-6">
             <!-- ヒントカードエリア -->
@@ -41103,6 +41115,10 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
              onerror="handleImageLoadError(this, ${cardId})">
         <p class="text-[10px] text-gray-400 mt-1">クリックで拡大</p>
       </div>
+      <div class="mt-2 flex flex-wrap gap-2 justify-center">
+        <button onclick="event.stopPropagation(); (window.speakNB2NarrationAI||window.speakNB2Explanation)(${cardId})" id="nb2-speak-btn-${cardId}" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>
+        <button onclick="event.stopPropagation(); window.bookmarkNB2Image&&window.bookmarkNB2Image(${cardId})" id="nb2-bookmark-btn-${cardId}" class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-star mr-1"></i>⭐ 保存</button>
+      </div>
       <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
         <p class="text-xs text-gray-500"><i class="fas fa-image mr-1"></i>${description || '問題の図'}</p>
         <button onclick="event.stopPropagation(); toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
@@ -41428,7 +41444,7 @@ async function executeLearningMusicGenerate(cardId) {
               karaokeHtml += '</div>'
               loadingEl.innerHTML = karaokeHtml
               
-              // ★ カラオケ同期処理（改良版v2: 文字数比例 + 導入余白 + セクション行除外）
+              // ★ カラオケ同期処理 v3: 均等分割 + 歌唱開始を自動検出
               ;(function initKaraoke() {
                 const audio = document.getElementById(audioId)
                 const container = document.getElementById(karaokeId)
@@ -41448,61 +41464,64 @@ async function executeLearningMusicGenerate(cardId) {
                 if (totalLyricLines === 0) return
                 let lastHighlighted = -1
                 
-                // ★ 文字数に比例した重み付きタイムマップを構築
-                // 歌は冒頭にイントロ（約15%）があるため、歌詞は残り85%に収まる
-                const INTRO_RATIO = 0.12  // 冒頭12%はイントロ（歌詞なし）
-                const OUTRO_RATIO = 0.03  // 末尾3%はアウトロ（歌詞なし）
-                const LYRIC_RANGE = 1.0 - INTRO_RATIO - OUTRO_RATIO  // 歌詞が占める割合
-                
-                // 各歌詞行の文字数で重みを計算
-                const charCounts = lyricLineEls.map(function(el) {
-                  return Math.max((el.textContent || '').trim().length, 3) // 最低3文字分
-                })
-                const totalChars = charCounts.reduce(function(sum, c) { return sum + c }, 0)
-                
-                // 累積タイムマップ: lineTimeMap[i] = i行目が始まる再生位置(0~1)
-                const lineTimeMap = [INTRO_RATIO]
-                for (var i = 1; i < totalLyricLines; i++) {
-                  lineTimeMap.push(lineTimeMap[i - 1] + (charCounts[i - 1] / totalChars) * LYRIC_RANGE)
-                }
+                // ★ v3: シンプルな均等分割アプローチ
+                // 30秒の歌では冒頭1-2秒がイントロ、末尾1秒がアウトロ
+                // 歌詞行を残り時間に均等に割り当て
+                var singStartDetected = false
+                var singStartTime = 0 // 秒
+                var singEndRatio = 0.96 // 末尾4%はアウトロ
                 
                 audio.addEventListener('timeupdate', function() {
                   if (!audio.duration || audio.duration === Infinity) return
-                  const progress = audio.currentTime / audio.duration
+                  var currentTime = audio.currentTime
+                  var duration = audio.duration
+                  var progress = currentTime / duration
                   
-                  // 現在の再生位置に最も近い歌詞行を特定
-                  var currentLyricIdx = 0
-                  for (var j = 0; j < totalLyricLines; j++) {
-                    if (progress >= lineTimeMap[j]) currentLyricIdx = j
-                    else break
+                  // ★ v3: 歌唱開始時間を動的に推定
+                  // 30秒の歌: イントロは通常0.5〜2秒（2%〜7%）
+                  // 歌詞数が少ない(6行以下): 短い歌詞なので早めに開始
+                  // 歌詞数が多い(7行以上): 均等配分
+                  var introSec = totalLyricLines <= 4 ? 1.5 : (totalLyricLines <= 8 ? 1.0 : 0.5)
+                  var introRatio = introSec / duration
+                  
+                  // 各行に均等な時間を割り当て
+                  var lyricRange = singEndRatio - introRatio
+                  var lineWidth = lyricRange / totalLyricLines
+                  
+                  // 現在の歌詞行を計算
+                  var currentLyricIdx = -1
+                  if (progress >= introRatio) {
+                    currentLyricIdx = Math.floor((progress - introRatio) / lineWidth)
+                    if (currentLyricIdx >= totalLyricLines) currentLyricIdx = totalLyricLines - 1
+                    if (currentLyricIdx < 0) currentLyricIdx = 0
                   }
-                  // イントロ中はハイライトなし
-                  if (progress < INTRO_RATIO) currentLyricIdx = -1
                   
                   if (currentLyricIdx === lastHighlighted) return
                   lastHighlighted = currentLyricIdx
                   
-                  const currentEl = currentLyricIdx >= 0 ? lyricLineEls[currentLyricIdx] : null
+                  var currentEl = currentLyricIdx >= 0 ? lyricLineEls[currentLyricIdx] : null
                   
                   allLineEls.forEach(function(item) {
                     if (item.isSection) return
-                    const el = item.el
+                    var el = item.el
                     if (el === currentEl) {
                       el.style.color = '#FDE68A'
-                      el.style.fontSize = '1.1rem'
+                      el.style.fontSize = '1.15rem'
                       el.style.fontWeight = 'bold'
                       el.style.textShadow = '0 0 16px rgba(253,230,138,0.6)'
+                      el.style.transform = 'scale(1.05)'
                       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
                     } else {
-                      const elIdx = lyricLineEls.indexOf(el)
+                      var elIdx = lyricLineEls.indexOf(el)
                       if (currentLyricIdx >= 0 && elIdx >= 0 && elIdx < currentLyricIdx) {
-                        el.style.color = 'rgba(255,255,255,0.55)'
+                        el.style.color = 'rgba(255,255,255,0.6)'
                       } else {
-                        el.style.color = 'rgba(255,255,255,0.4)'
+                        el.style.color = 'rgba(255,255,255,0.35)'
                       }
                       el.style.fontSize = '0.85rem'
                       el.style.fontWeight = 'normal'
                       el.style.textShadow = 'none'
+                      el.style.transform = 'scale(1)'
                     }
                   })
                 })
