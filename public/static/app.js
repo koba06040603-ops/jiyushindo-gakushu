@@ -11943,12 +11943,12 @@ function initVisualWidgets() {
         <button onclick="toggleNB2Widget('${cardId}')" id="nb2-toggle-btn-${cardId}" style="color:white;background:rgba(255,255,255,0.2);border:none;padding:2px 8px;border-radius:6px;font-size:0.65rem;cursor:pointer;font-weight:bold;" title="表示/非表示"><i class="fas fa-eye-slash" style="margin-right:3px;"></i>非表示</button>
       </div>
       <div id="nb2-widget-body-${cardId}">
-        <div id="nb2-visual-toolbar-${cardId}" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px;"></div>
         <div id="nb2-visual-${cardId}" style="background:white;border:2px dashed #DDD6FE;border-radius:12px;padding:20px;text-align:center;">
           <div style="display:inline-block;width:40px;height:40px;border:3px solid #7C3AED;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px;"></div>
           <p style="font-size:1rem;font-weight:bold;color:#7C3AED;">&#x1F9E0; Nano Banana 2 が図解を設計中...</p>
           <p style="font-size:0.8rem;color:#9CA3AF;margin-top:4px;">問題に合った視覚教材を生成しています（10〜20秒）</p>
         </div>
+        <div id="nb2-visual-toolbar-${cardId}" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px;"></div>
       </div>
     </div>
   `
@@ -12110,6 +12110,8 @@ function initVisualWidgets() {
         <button onclick="regenerateVisualWidget('${cardId}')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2を再生成</button>
         <button onclick="editVisualWidget('${cardId}')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>NB2を修正指示</button>
         <button onclick="openLearningMusicPanel('${cardId}')" style="background:linear-gradient(135deg,#10B981,#3B82F6);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-music" style="margin-right:4px;"></i>🎵 学習ソング</button>
+        <button onclick="(window.speakNB2NarrationAI||window.speakNB2Explanation)('${cardId}')" id="nb2-speak-btn-${cardId}" style="background:linear-gradient(135deg,#10B981,#059669);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-volume-up" style="margin-right:4px;"></i>🔊 音声解説</button>
+        <button onclick="window.bookmarkNB2Image&&window.bookmarkNB2Image('${cardId}')" id="nb2-bookmark-btn-${cardId}" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-star" style="margin-right:4px;"></i>⭐ 保存</button>
       `
     }
   })
@@ -41587,12 +41589,15 @@ window.speakNB2Explanation = function(page) {
     return
   }
   
-  // テキスト抽出（button/script除外）
+  // テキスト抽出（button/script/toolbar/ヘッダー除外 + ノイズフィルタ）
   let textParts = []
+  const noisePatterns = /^[\d.]+秒$|^NB2|^Nano Banana|^問題の図|^編集|^差し替え|^削除|^非表示|^表示|^再生成|^クリックで拡大|^F\d|^AUDIO|^\d+$|^修正版|^by NB2|^学習ソング|^音声解説|^保存$|^停止$|秒\)$|^\([\d.]+秒\)$|^NB2を|^AIに|イラストを描いて|^やってみよう$|^タップ$|^▶/
   widgetBody.querySelectorAll('p, h1, h2, h3, h4, div, span, td, th, li').forEach(function(el) {
     if (el.closest('button') || el.closest('script') || el.closest('[id^="nb2-visual-toolbar"]')) return
+    // NB2ヘッダーバー（紫色グラデーション）を除外
+    if (el.closest('[style*="linear-gradient(135deg,#7C3AED"]')) return
     const t = (el.textContent || '').trim()
-    if (t.length > 2 && t.length < 300 && !textParts.includes(t)) {
+    if (t.length > 2 && t.length < 300 && !textParts.includes(t) && !noisePatterns.test(t)) {
       textParts.push(t)
     }
   })
@@ -41691,13 +41696,15 @@ window.speakNB2NarrationAI = async function(page, source) {
     if (solution) textParts.push('答え: ' + solution.substring(0, 200))
     if (explanation) textParts.push(explanation.substring(0, 200))
   } else {
-    // ★ NB2ウィジェットモード: ウィジェット内テキストを収集
+    // ★ NB2ウィジェットモード: ウィジェット内テキストを収集（ノイズ除去）
     var widgetBody = document.getElementById('nb2-widget-body-' + page) || document.getElementById('nb2-visual-content-' + page)
+    var noiseRe = /^[\d.]+秒$|^NB2|^Nano Banana|^問題の図|^編集|^差し替え|^削除|^非表示|^表示|^再生成|^クリックで拡大|^F\d|^AUDIO|^\d+$|^修正版|^by NB2|^学習ソング|^音声解説|^保存$|^停止$|秒\)$|^\([\d.]+秒\)$|^NB2を|^AIに|イラストを描いて|^やってみよう$|^タップ$|^▶/
     if (widgetBody) {
       widgetBody.querySelectorAll('p, h1, h2, h3, h4, div, span, td, th, li').forEach(function(el) {
         if (el.closest('button') || el.closest('script') || el.closest('[id^="nb2-visual-toolbar"]')) return
+        if (el.closest('[style*="linear-gradient(135deg,#7C3AED"]')) return
         var t = (el.textContent || '').trim()
-        if (t.length > 2 && t.length < 300 && !textParts.includes(t)) textParts.push(t)
+        if (t.length > 2 && t.length < 300 && !textParts.includes(t) && !noiseRe.test(t)) textParts.push(t)
       })
     }
     // NB2テキストが無い場合、カード情報にフォールバック
@@ -41724,7 +41731,7 @@ window.speakNB2NarrationAI = async function(page, source) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text_content: textParts.slice(0, 10).join('\n'),
+        text_content: textParts.slice(0, 8).join('\n').substring(0, 600),
         card_title: title,
         subject: card.subject || '',
         grade: card.grade_level || card.grade || '',
@@ -41761,7 +41768,7 @@ window.speakNB2NarrationAI = async function(page, source) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: speechText.substring(0, 2000),
+        text: speechText.substring(0, 800),
         voiceType: voiceType,
         mood: ''
       })
@@ -41804,7 +41811,26 @@ window.speakNB2NarrationAI = async function(page, source) {
         }
       })
     } else {
-      console.warn('Gemini TTS失敗、Web Speech APIにフォールバック')
+      console.warn('Gemini TTS失敗、短縮テキストでリトライ')
+      // 短いテキストで再試行
+      try {
+        var retryResp = await fetch('/api/ai/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: speechText.substring(0, 300), voiceType: voiceType, mood: '' })
+        })
+        var retryData = await retryResp.json()
+        if (retryData.success && retryData.audioContent && retryData.audioFormat === 'pcm') {
+          _globalTtsPlaying = true
+          if (btn) { btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>\u23F9 停止'; btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)' }
+          playPcmGlobal(retryData.audioContent, retryData.sampleRate || 24000, function() {
+            _globalTtsPlaying = false
+            if (btn) { btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'; btn.style.background = 'linear-gradient(135deg,#10B981,#059669)' }
+          })
+          return
+        }
+      } catch(e2) { console.warn('リトライも失敗:', e2) }
+      console.warn('Gemini TTS完全失敗、Web Speech APIにフォールバック')
       window.speakNB2Explanation(page)
     }
   } catch (e) {

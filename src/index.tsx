@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260326g' }, 200, {
+  return c.json({ build_id: '20260326h' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260326g';
+    var MY_BUILD = '20260326h';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14501,7 +14501,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260326g';
+          var MY_BUILD = '20260326h';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -16047,13 +16047,15 @@ app.post('/api/ai/tts', async (c) => {
     let usedModel = ''
     
     // 日本語自然イントネーション用のスタイル指示（簡潔にして応答速度を向上）
+    // テキスト長を1200文字に制限してタイムアウトを回避
+    const truncatedText = text.substring(0, 1200)
     const japaneseTtsPrompt = `${stylePrompt}
-${text.substring(0, 4000)}`
+${truncatedText}`
     
     try {
-      // 15秒タイムアウトで高速フォールバック
+      // 25秒タイムアウト（長文対応）
       const ttsAbort = new AbortController()
-      const ttsTimeout = setTimeout(() => ttsAbort.abort(), 15000)
+      const ttsTimeout = setTimeout(() => ttsAbort.abort(), 25000)
       
       const ttsResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`,
@@ -16112,7 +16114,7 @@ ${text.substring(0, 4000)}`
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `以下のテキストを日本語で自然に音読してください。${stylePrompt}\n\n${text.substring(0, 3000)}` }] }],
+              contents: [{ parts: [{ text: `以下のテキストを日本語で自然に音読してください。${stylePrompt}\n\n${truncatedText}` }] }],
               generationConfig: {
                 responseModalities: ['AUDIO'],
                 temperature: 0.4,
