@@ -9408,7 +9408,7 @@ function renderGenericTactile(container, tactileText, cardData) {
   if (cardData?.problem_image_url) {
     const el = document.getElementById(illustContainerId)
     if (el) {
-      el.innerHTML = '<img src="' + cardData.problem_image_url + '" class="max-h-[180px] mx-auto rounded-lg border-2 border-orange-200 shadow" alt="やってみよう イラスト">'
+      el.innerHTML = '<img src="' + cardData.problem_image_url + '" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] mx-auto rounded-2xl border-3 border-purple-200 shadow-lg cursor-pointer hover:scale-[1.02] transition-transform" alt="やってみよう イラスト">'
     }
   }
 }
@@ -14051,7 +14051,7 @@ async function teacherGenerateImage(cardId, index) {
     })
     const d = res.data
     if (d.success && d.image_url) {
-      area.innerHTML = '<div class="bg-white rounded-lg p-3 border border-pink-200 mt-2"><p class="font-bold text-pink-700 text-sm">🎨 AI画像</p><img src="' + d.image_url + '" class="w-full rounded mt-1 border" style="max-height:200px;object-fit:contain;"><p class="text-[10px] text-gray-400 mt-1">' + (d.model || 'NB2') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</p><button onclick="teacherGenerateImage(' + cardId + ',' + index + ')" class="text-xs text-pink-500 underline mt-1">🔄 再生成</button></div>'
+      area.innerHTML = '<div class="bg-white rounded-2xl p-4 border-2 border-pink-200 mt-2 shadow-md"><p class="font-bold text-pink-700 text-sm mb-2">🎨 AI画像</p><img src="' + d.image_url + '" onclick="window._expandSongImage && window._expandSongImage(this.src)" class="w-full max-w-[600px] mx-auto rounded-2xl border-2 border-purple-200 shadow-lg cursor-pointer hover:scale-[1.02] transition-transform"><p class="text-[10px] text-gray-400 mt-2 text-center">クリックで拡大 / ' + (d.model || 'NB2') + ' / ' + Math.round((d.generation_time_ms || 0) / 1000) + '秒</p><button onclick="teacherGenerateImage(' + cardId + ',' + index + ')" class="text-xs text-pink-500 underline mt-1">🔄 再生成</button></div>'
     } else {
       area.innerHTML = '<p class="text-xs text-red-500">画像生成失敗</p>'
     }
@@ -41066,19 +41066,15 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
       </div>`
   }
   
-  // デフォルト: 画像
+  // デフォルト: 画像（大きく表示 + クリック拡大対応）
   return `
     <div class="mt-4 text-center" id="card-image-container-${cardId}">
-      <div id="card-image-body-${cardId}" class="relative group inline-block cursor-pointer" onclick="replaceCardImage(${cardId})">
+      <div id="card-image-body-${cardId}" class="relative inline-block" style="width:100%;max-width:600px;">
         <img src="${url}" alt="${description || '問題の図'}" 
-             class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200 transition group-hover:brightness-90" style="max-height: ${maxHeight};"
+             class="w-full h-auto rounded-2xl shadow-lg mx-auto border-3 border-purple-200 cursor-pointer hover:scale-[1.02] transition-transform"
+             onclick="window._expandSongImage && window._expandSongImage(this.src)"
              onerror="handleImageLoadError(this, ${cardId})">
-        <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-          <div class="flex gap-2">
-            <span class="bg-white bg-opacity-90 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold shadow-lg"><i class="fas fa-edit mr-1"></i>編集</span>
-            <span class="bg-white bg-opacity-90 text-gray-700 px-3 py-2 rounded-lg text-sm font-bold shadow-lg"><i class="fas fa-sync-alt mr-1"></i>差し替え</span>
-          </div>
-        </div>
+        <p class="text-[10px] text-gray-400 mt-1">クリックで拡大</p>
       </div>
       <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
         <p class="text-xs text-gray-500"><i class="fas fa-image mr-1"></i>${description || '問題の図'}</p>

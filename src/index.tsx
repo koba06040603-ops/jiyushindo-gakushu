@@ -9103,7 +9103,7 @@ app.get('/guide/:curriculumId', async (c) => {
                   <video controls style="max-width:100%; max-height:300px; border-radius:8px; border:2px solid #e5e7eb;" preload="metadata">
                     <source src="${card.problem_image_url}" type="video/mp4">
                   </video>` : `
-                  <img src="${card.problem_image_url}" alt="問題の図" style="max-width:100%; max-height:300px; border-radius:8px; border:2px solid #e5e7eb;">`}
+                  <img src="${card.problem_image_url}" alt="問題の図" onclick="window._expandSongImage&&window._expandSongImage(this.src)" style="width:100%; max-width:600px; height:auto; border-radius:16px; border:3px solid #DDD6FE; box-shadow:0 6px 24px rgba(124,58,237,0.15); cursor:pointer; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">`}
               </div>` : ''}
               
               ${hints.length > 0 ? `
@@ -26889,6 +26889,21 @@ ${editNote}
       widgetHtml = divMatch[0]
         // 危険なパターンのみ除去
         .replace(/javascript:\s*void/gi, '')
+      
+      // ★ NB2生成HTML内の<img>タグを大きく表示するスタイルに強制変換
+      widgetHtml = widgetHtml.replace(/<img\b([^>]*?)style="([^"]*)"([^>]*?)>/gi, (match, before, style, after) => {
+        // 既存のwidth/max-width/max-heightを除去し、大きいスタイルに置換
+        const cleanStyle = style
+          .replace(/max-width\s*:[^;]+;?/gi, '')
+          .replace(/max-height\s*:[^;]+;?/gi, '')
+          .replace(/width\s*:[^;]+;?/gi, '')
+          .replace(/height\s*:[^;]+;?/gi, '')
+        return `<img${before}style="${cleanStyle};width:100%;max-width:600px;height:auto;display:block;margin:8px auto;border-radius:16px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.12);" onclick="window._expandSongImage&&window._expandSongImage(this.src)"${after}>`
+      })
+      // style属性がない<img>にもスタイルを追加
+      widgetHtml = widgetHtml.replace(/<img\b(?![^>]*style=)([^>]*?)>/gi, (match, attrs) => {
+        return `<img style="width:100%;max-width:600px;height:auto;display:block;margin:8px auto;border-radius:16px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.12);" onclick="window._expandSongImage&&window._expandSongImage(this.src)"${attrs}>`
+      })
       
       // <script>タグがdivの外にある場合、div内に移動させる
       const scriptTags = widgetHtml.match(/<\/div>\s*(<script[\s\S]*?<\/script>)/gi)
