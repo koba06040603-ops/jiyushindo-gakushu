@@ -12009,6 +12009,25 @@ function initVisualWidgets() {
               const t = (el.textContent || '').trim()
               if (/(問題の図|編集|差し替え|削除|再生成)/.test(t) && t.length < 50 && !el.closest('[id^="nb2-visual-toolbar"]')) el.remove()
             })
+            // ★ NB2生成HTML内の全画像を大きく表示 + クリック拡大対応
+            body.querySelectorAll('img').forEach(img => {
+              img.style.width = '100%'
+              img.style.maxWidth = '600px'
+              img.style.maxHeight = 'none'
+              img.style.height = 'auto'
+              img.style.borderRadius = '16px'
+              img.style.border = '3px solid #DDD6FE'
+              img.style.boxShadow = '0 6px 24px rgba(124,58,237,0.2)'
+              img.style.cursor = 'pointer'
+              img.style.display = 'block'
+              img.style.margin = '8px auto'
+              img.style.transition = 'transform 0.2s'
+              if (!img.onclick) {
+                img.onclick = function() { window._expandSongImage && window._expandSongImage(this.src) }
+                img.onmouseover = function() { this.style.transform = 'scale(1.02)' }
+                img.onmouseout = function() { this.style.transform = 'scale(1)' }
+              }
+            })
           }
           // 2. ウィジェット全体（イラスト含む）を掃除
           const area = document.getElementById('nb2-visual-' + cid)
@@ -12040,14 +12059,16 @@ function initVisualWidgets() {
       if (data.illustration_url) {
         // insertAdjacentHTML で既存DOMを壊さずにイラストを追加
         area.insertAdjacentHTML('beforeend', `<div style="margin-top:10px;text-align:center;">
-          <img src="${data.illustration_url}" alt="NB2図解" style="max-width:100%;max-height:300px;border-radius:14px;border:2px solid #DDD6FE;box-shadow:0 4px 16px rgba(124,58,237,0.15);" />
+          <img src="${data.illustration_url}" alt="NB2図解" onclick="window._expandSongImage && window._expandSongImage(this.src)" style="width:100%;max-width:600px;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" />
+          <p style="font-size:0.65rem;color:#9CA3AF;margin-top:6px;">クリックで拡大</p>
         </div>`)
         // イラスト追加後にクリーンアップ
         setTimeout(() => cleanNB2(cardId), 100)
       }
     } else if (data.success && data.illustration_url) {
       area.innerHTML = `<div style="text-align:center;padding:14px;">
-        <img src="${data.illustration_url}" alt="NB2図解" style="max-width:100%;max-height:300px;border-radius:14px;border:2px solid #DDD6FE;" />
+        <img src="${data.illustration_url}" alt="NB2図解" onclick="window._expandSongImage && window._expandSongImage(this.src)" style="width:100%;max-width:600px;border-radius:16px;border:3px solid #DDD6FE;box-shadow:0 6px 24px rgba(124,58,237,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" />
+        <p style="font-size:0.65rem;color:#9CA3AF;margin-top:4px;">クリックで拡大</p>
         <p style="font-size:0.7rem;color:#9CA3AF;margin-top:6px;">Nano Banana 2（${((data.generation_time_ms||0)/1000).toFixed(1)}秒）</p>
       </div>`
     } else {
@@ -12217,7 +12238,7 @@ window.editVisualWidget = function(cardId) {
         <div style="padding:14px;">${safeHtml2}</div>
       </div>`
       if (data.illustration_url) {
-        area.innerHTML += `<div style="margin-top:8px;text-align:center;"><img src="${data.illustration_url}" style="max-width:100%;max-height:250px;border-radius:12px;" /></div>`
+        area.innerHTML += `<div style="margin-top:8px;text-align:center;"><img src="${data.illustration_url}" onclick="window._expandSongImage && window._expandSongImage(this.src)" style="width:100%;max-width:600px;border-radius:16px;border:3px solid #FDE68A;box-shadow:0 6px 24px rgba(245,158,11,0.2);cursor:pointer;transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" /><p style="font-size:0.65rem;color:#9CA3AF;margin-top:6px;">クリックで拡大</p></div>`
       }
       // ★ DOMクリーンアップ（editVisualWidget後も不正ボタン除去）
       function cleanNB2Edit(cid) {
@@ -12227,6 +12248,22 @@ window.editVisualWidget = function(cardId) {
           body.querySelectorAll('button, a, span, div, p').forEach(el => {
             const t = (el.textContent || '').trim()
             if (/(問題の図|編集|差し替え|削除)/.test(t) && t.length < 50) el.remove()
+          })
+          // ★ 修正版でも画像を大きく表示
+          body.querySelectorAll('img').forEach(img => {
+            img.style.width = '100%'
+            img.style.maxWidth = '600px'
+            img.style.maxHeight = 'none'
+            img.style.height = 'auto'
+            img.style.borderRadius = '16px'
+            img.style.border = '3px solid #DDD6FE'
+            img.style.boxShadow = '0 6px 24px rgba(124,58,237,0.2)'
+            img.style.cursor = 'pointer'
+            img.style.display = 'block'
+            img.style.margin = '8px auto'
+            if (!img.onclick) {
+              img.onclick = function() { window._expandSongImage && window._expandSongImage(this.src) }
+            }
           })
         } catch(e) {}
       }
