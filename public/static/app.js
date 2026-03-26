@@ -6933,18 +6933,6 @@ async function loadCardPage(cardId) {
             `}
           </div>
 
-          <!-- ★ モバイル用 学習ツールバー（ダッシュボード・お気に入り）- サイドバーの前に配置 -->
-          <div class="lg:col-span-3 flex flex-wrap gap-2 justify-center py-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 my-2">
-            <button onclick="window.openReviewDashboard&&window.openReviewDashboard()" 
-                    class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition">
-              <i class="fas fa-chart-line mr-1"></i>📊 ダッシュボード
-            </button>
-            <button onclick="window.openBookmarkGallery&&window.openBookmarkGallery()" 
-                    class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition">
-              <i class="fas fa-star mr-1"></i>⭐ 保存した図解
-            </button>
-          </div>
-
           <!-- サイドバー（右側） -->
           <div class="lg:col-span-1 space-y-6">
             <!-- ヒントカードエリア -->
@@ -7184,17 +7172,6 @@ async function loadCardPage(cardId) {
         </div>
         
         <!-- 下部ページネーション（固定バー） -->
-        <!-- ★ 学習ツールバー（ダッシュボード・お気に入り） -->
-        <div class="mt-4 flex flex-wrap gap-2 justify-center">
-          <button onclick="window.openReviewDashboard&&window.openReviewDashboard()" 
-                  class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:shadow-xl transition">
-            <i class="fas fa-chart-line mr-1"></i>📊 ダッシュボード
-          </button>
-          <button onclick="window.openBookmarkGallery&&window.openBookmarkGallery()" 
-                  class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:shadow-xl transition">
-            <i class="fas fa-star mr-1"></i>⭐ 保存した図解
-          </button>
-        </div>
         ${(() => {
           const cardsList2 = window._courseCardsList || []
           const currentIdx2 = cardsList2.indexOf(card.card_id || card.id)
@@ -7202,6 +7179,17 @@ async function loadCardPage(cardId) {
           const nextId2 = currentIdx2 >= 0 && currentIdx2 < cardsList2.length - 1 ? cardsList2[currentIdx2 + 1] : null
           return `
         <div class="mt-6 bg-white rounded-xl shadow-xl p-4 border-2 border-indigo-200 sticky bottom-4 z-40">
+          <!-- ★ ダッシュボード・お気に入りボタン -->
+          <div class="flex flex-wrap gap-2 justify-center mb-3 pb-3 border-b border-gray-200">
+            <button onclick="window.openReviewDashboard&&window.openReviewDashboard()" 
+                    class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:shadow-xl transition">
+              <i class="fas fa-chart-line mr-1"></i>📊 ダッシュボード
+            </button>
+            <button onclick="window.openBookmarkGallery&&window.openBookmarkGallery()" 
+                    class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:shadow-xl transition">
+              <i class="fas fa-star mr-1"></i>⭐ 保存した図解
+            </button>
+          </div>
           <div class="flex items-center justify-between">
             ${prevId2 ? `
             <button onclick="loadCardPage(${prevId2}); window.scrollTo(0,0);" 
@@ -41666,13 +41654,13 @@ window.speakNB2Explanation = function(page) {
   window.speechSynthesis.speak(utterance)
 }
 
-// ★ NB2図解のGemini AI音声ナレーション（高品質版 - APIでナレーション原稿を生成してから読み上げ）
+// ★ NB2図解のGemini AI音声ナレーション（高品質版 - Gemini TTS APIで読み上げ、AI先生と同じ音質）
 window.speakNB2NarrationAI = async function(page) {
   const btn = document.getElementById('nb2-speak-btn-' + page)
   
-  // 既に読み上げ中なら停止
-  if (window.speechSynthesis && window.speechSynthesis.speaking) {
-    window.speechSynthesis.cancel()
+  // 既に再生中なら停止
+  if (_globalTtsPlaying) {
+    stopGlobalTts()
     if (btn) {
       btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
       btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
@@ -41680,86 +41668,141 @@ window.speakNB2NarrationAI = async function(page) {
     return
   }
   
-  // テキスト収集
-  const widgetBody = document.getElementById('nb2-widget-body-' + page) || document.getElementById('nb2-visual-content-' + page)
-  if (!widgetBody) { window.speakNB2Explanation(page); return }
-  
+  // テキスト収集: NB2ウィジェット or 問題画像の周辺テキスト
   let textParts = []
-  widgetBody.querySelectorAll('p, h1, h2, h3, h4, div, span, td, th, li').forEach(function(el) {
-    if (el.closest('button') || el.closest('script') || el.closest('[id^="nb2-visual-toolbar"]')) return
-    const t = (el.textContent || '').trim()
-    if (t.length > 2 && t.length < 300 && !textParts.includes(t)) textParts.push(t)
-  })
+  const widgetBody = document.getElementById('nb2-widget-body-' + page) || document.getElementById('nb2-visual-content-' + page)
+  if (widgetBody) {
+    widgetBody.querySelectorAll('p, h1, h2, h3, h4, div, span, td, th, li').forEach(function(el) {
+      if (el.closest('button') || el.closest('script') || el.closest('[id^="nb2-visual-toolbar"]')) return
+      const t = (el.textContent || '').trim()
+      if (t.length > 2 && t.length < 300 && !textParts.includes(t)) textParts.push(t)
+    })
+  }
   
-  if (textParts.length === 0) { window.speakNB2Explanation(page); return }
-  
+  // カードデータから補完
   const cd = window.currentCardData || {}
   const card = cd.card || cd || {}
+  const title = card.card_title || card.title || ''
+  const problemText = card.problem_content || card.problem_text || ''
+  const solution = card.example_solution || card.answer_text || ''
+  
+  // NB2テキストが無い場合、カード情報を使用
+  if (textParts.length === 0) {
+    if (problemText) textParts.push(problemText.substring(0, 300))
+    if (solution) textParts.push(solution.substring(0, 200))
+  }
+  
+  if (textParts.length === 0) {
+    if (typeof showToast === 'function') showToast('解説する内容が見つかりません', 'warning')
+    return
+  }
   
   // UI: ローディング
   if (btn) {
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:3px;"></i>AI解説準備中...'
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:3px;"></i>AI音声準備中...'
     btn.style.background = 'linear-gradient(135deg,#6366F1,#8B5CF6)'
   }
   
   try {
-    const resp = await fetch('/api/ai/generate-nb2-narration', {
+    // Step 1: AIにナレーション原稿を生成してもらう
+    const narrationResp = await fetch('/api/ai/generate-nb2-narration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text_content: textParts.slice(0, 10).join('\n'),
-        card_title: card.card_title || card.title || '',
+        card_title: title,
         subject: card.subject || '',
         grade: card.grade_level || card.grade || ''
       })
     })
-    const data = await resp.json()
+    const narrationData = await narrationResp.json()
     
-    if (data.success && data.narration_text) {
-      // AIナレーションをWeb Speech APIで読み上げ
-      const utterance = new SpeechSynthesisUtterance(data.narration_text.substring(0, 500))
-      utterance.lang = 'ja-JP'
-      utterance.rate = 0.85
-      utterance.pitch = 1.15
-      utterance.volume = 1.0
-      
-      const voices = window.speechSynthesis.getVoices()
-      const jaVoice = voices.find(function(v) { return v.lang === 'ja-JP' || v.lang.startsWith('ja') })
-      if (jaVoice) utterance.voice = jaVoice
-      
+    // ナレーションテキスト決定
+    let speechText = ''
+    if (narrationData.success && narrationData.narration_text) {
+      speechText = narrationData.narration_text
+    } else {
+      // フォールバック: 簡易テキスト
+      speechText = title ? (title + 'について説明します。') : ''
+      speechText += textParts.slice(0, 5).join('。') + '。'
+    }
+    
+    if (!speechText) {
+      if (btn) {
+        btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+        btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+      }
+      return
+    }
+    
+    // Step 2: Gemini TTS APIで音声生成（AI先生と同じエンジン）
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:3px;"></i>音声生成中...'
+    }
+    
+    var voiceType = 'male-friendly'
+    try { voiceType = (localStorage.getItem('voicePreference') === 'female') ? 'female-friendly' : 'male-friendly' } catch(e) {}
+    
+    const ttsResp = await fetch('/api/ai/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: speechText.substring(0, 2000),
+        voiceType: voiceType,
+        mood: ''
+      })
+    })
+    const ttsData = await ttsResp.json()
+    
+    if (ttsData.success && ttsData.audioContent && ttsData.audioFormat === 'pcm') {
+      // PCM音声で再生（AI先生と同じ方式）
+      _globalTtsPlaying = true
       if (btn) {
         btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
         btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)'
       }
       
-      utterance.onend = function() {
+      playPcmGlobal(ttsData.audioContent, ttsData.sampleRate || 24000, function() {
+        _globalTtsPlaying = false
         if (btn) {
           btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
           btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
         }
-      }
-      utterance.onerror = function() {
-        if (btn) {
-          btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
-          btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
-        }
-      }
-      
-      window.speechSynthesis.speak(utterance)
-    } else {
-      // フォールバック: ローカル版を使用
+      })
+    } else if (ttsData.success && ttsData.audioContent) {
+      // MP3フォールバック
+      _globalTtsPlaying = true
       if (btn) {
-        btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
-        btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+        btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
+        btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)'
       }
+      var audio = new Audio('data:audio/mp3;base64,' + ttsData.audioContent)
+      audio.onended = function() {
+        _globalTtsPlaying = false
+        if (btn) {
+          btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+          btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+        }
+      }
+      audio.play().catch(function() {
+        _globalTtsPlaying = false
+        if (btn) {
+          btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+          btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+        }
+      })
+    } else {
+      // TTS失敗 → Web Speech APIフォールバック
+      console.warn('Gemini TTS失敗、Web Speech APIにフォールバック')
       window.speakNB2Explanation(page)
     }
   } catch (e) {
-    console.warn('AIナレーションエラー、フォールバック:', e)
+    console.warn('AIナレーションエラー:', e)
     if (btn) {
       btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
       btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
     }
+    // フォールバック
     window.speakNB2Explanation(page)
   }
 }
