@@ -41387,7 +41387,84 @@ async function executeLearningMusicGenerate(cardId) {
             const loadingEl = document.getElementById('tts-audio-loading')
             if (ttsData.success && ttsData.audio_url && loadingEl) {
               const ttsTime = Math.round((ttsData.generation_time_ms || 0) / 1000)
-              loadingEl.innerHTML = '<audio controls style="width:100%;max-width:400px;display:block;margin:0 auto;" preload="auto"><source src="' + ttsData.audio_url + '" type="audio/mp3"><source src="' + ttsData.audio_url + '"></audio><p style="font-size:0.65rem;color:#9CA3AF;text-align:center;margin-top:4px;">Lyria 3 Clip / 30秒ソング（' + ttsTime + '秒で生成）</p>'
+              // ★ カラオケ歌詞表示付きオーディオプレイヤー
+              const karaokeId = 'karaoke-lyrics-' + Date.now()
+              const audioId = 'karaoke-audio-' + Date.now()
+              // 歌詞を行に分割（空行除去）
+              const rawLyrics = (lyricsForTTS || '').trim()
+              const lyricsLines = rawLyrics.split('\n').filter(l => l.trim().length > 0)
+              
+              let karaokeHtml = '<div style="background:linear-gradient(135deg,#ECFDF5,#EFF6FF);border-radius:14px;padding:14px;border:2px solid #A7F3D0;">'
+              karaokeHtml += '<p style="font-weight:bold;font-size:0.8rem;color:#065F46;margin-bottom:8px;text-align:center;"><i class="fas fa-music" style="margin-right:4px;"></i>🎤 カラオケモード</p>'
+              karaokeHtml += '<audio id="' + audioId + '" controls style="width:100%;max-width:400px;display:block;margin:0 auto 10px;" preload="auto"><source src="' + ttsData.audio_url + '" type="audio/mp3"><source src="' + ttsData.audio_url + '"></audio>'
+              
+              // カラオケ歌詞パネル
+              karaokeHtml += '<div id="' + karaokeId + '" style="background:rgba(0,0,0,0.85);border-radius:12px;padding:16px;max-height:200px;overflow-y:auto;scroll-behavior:smooth;">'
+              lyricsLines.forEach(function(line, idx) {
+                const isSection = /^\[|^\(|^【|^Verse|^Chorus|^Bridge|^Outro/i.test(line.trim())
+                if (isSection) {
+                  karaokeHtml += '<p data-lyric-idx="' + idx + '" style="font-size:0.65rem;color:#86EFAC;margin:8px 0 4px;font-weight:bold;text-align:center;transition:all 0.3s;">' + line + '</p>'
+                } else {
+                  karaokeHtml += '<p data-lyric-idx="' + idx + '" style="font-size:0.85rem;color:rgba(255,255,255,0.4);margin:3px 0;text-align:center;transition:all 0.3s;line-height:1.6;">' + line + '</p>'
+                }
+              })
+              karaokeHtml += '</div>'
+              karaokeHtml += '<p style="font-size:0.6rem;color:#9CA3AF;text-align:center;margin-top:6px;">Lyria 3 Clip / 30秒ソング（' + ttsTime + '秒で生成）・再生すると歌詞がハイライトされます</p>'
+              karaokeHtml += '</div>'
+              loadingEl.innerHTML = karaokeHtml
+              
+              // ★ カラオケ同期処理
+              ;(function initKaraoke() {
+                const audio = document.getElementById(audioId)
+                const container = document.getElementById(karaokeId)
+                if (!audio || !container) return
+                const lineEls = container.querySelectorAll('[data-lyric-idx]')
+                const totalLines = lyricsLines.length
+                let lastHighlighted = -1
+                
+                audio.addEventListener('timeupdate', function() {
+                  if (!audio.duration || audio.duration === Infinity) return
+                  const progress = audio.currentTime / audio.duration
+                  const currentLine = Math.min(Math.floor(progress * totalLines), totalLines - 1)
+                  if (currentLine === lastHighlighted) return
+                  lastHighlighted = currentLine
+                  
+                  lineEls.forEach(function(el, idx) {
+                    const isSection = /^\[|^\(|^【|^Verse|^Chorus/i.test(el.textContent.trim())
+                    if (isSection) return
+                    if (idx === currentLine) {
+                      el.style.color = '#FDE68A'
+                      el.style.fontSize = '1.05rem'
+                      el.style.fontWeight = 'bold'
+                      el.style.textShadow = '0 0 12px rgba(253,230,138,0.5)'
+                      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    } else if (idx < currentLine) {
+                      el.style.color = 'rgba(255,255,255,0.55)'
+                      el.style.fontSize = '0.85rem'
+                      el.style.fontWeight = 'normal'
+                      el.style.textShadow = 'none'
+                    } else {
+                      el.style.color = 'rgba(255,255,255,0.4)'
+                      el.style.fontSize = '0.85rem'
+                      el.style.fontWeight = 'normal'
+                      el.style.textShadow = 'none'
+                    }
+                  })
+                })
+                
+                audio.addEventListener('ended', function() {
+                  lineEls.forEach(function(el) {
+                    const isSection = /^\[|^\(|^【/i.test(el.textContent.trim())
+                    if (!isSection) {
+                      el.style.color = '#86EFAC'
+                      el.style.fontWeight = 'bold'
+                      el.style.textShadow = '0 0 8px rgba(134,239,172,0.3)'
+                    }
+                  })
+                })
+                
+                audio.addEventListener('seeked', function() { lastHighlighted = -1 })
+              })()
             } else if (loadingEl) {
               loadingEl.innerHTML = '<p style="font-size:0.72rem;color:#9CA3AF;text-align:center;">⚠️ ' + (ttsData.error || '音楽生成に失敗') + '。Sunoで本格的な歌を作成できます。</p>'
             }
@@ -41426,7 +41503,502 @@ function copySunoStyle() {
 }
 window.copySunoStyle = copySunoStyle
 
-// 学習ソング画像の全画面拡大表示
+// ★ NB2図解の音声解説（多感覚学習: 視覚+聴覚）
+// NB2ウィジェットのテキスト内容を抽出してWeb Speech APIで読み上げ
+window.speakNB2Explanation = function(page) {
+  const btn = document.getElementById('nb2-speak-btn-' + page)
+  
+  // 既に読み上げ中なら停止
+  if (window.speechSynthesis && window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel()
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+      btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+    }
+    return
+  }
+  
+  // NB2ウィジェット内のテキストを収集
+  const widgetBody = document.getElementById('nb2-widget-body-' + page) || 
+                     document.getElementById('nb2-visual-content-' + page)
+  if (!widgetBody) {
+    alert('図解コンテンツが見つかりません')
+    return
+  }
+  
+  // テキスト抽出（button/script除外）
+  let textParts = []
+  widgetBody.querySelectorAll('p, h1, h2, h3, h4, div, span, td, th, li').forEach(function(el) {
+    if (el.closest('button') || el.closest('script') || el.closest('[id^="nb2-visual-toolbar"]')) return
+    const t = (el.textContent || '').trim()
+    if (t.length > 2 && t.length < 300 && !textParts.includes(t)) {
+      textParts.push(t)
+    }
+  })
+  
+  // カード情報も追加（例題・問題文）
+  const cd = window.currentCardData || {}
+  const card = cd.card || cd || {}
+  const title = card.card_title || card.title || ''
+  
+  // 読み上げテキスト構成
+  let speechText = ''
+  if (title) speechText += title + 'の図解を説明します。'
+  if (textParts.length > 0) {
+    speechText += textParts.slice(0, 10).join('。') + '。'
+  } else {
+    speechText += 'この図を見て、内容を理解しましょう。'
+  }
+  // 解き方のヒントも追加
+  if (card.answer_text || card.example_solution) {
+    const hint = (card.answer_text || card.example_solution || '').substring(0, 150)
+    speechText += 'ポイントは、' + hint + 'です。'
+  }
+  
+  if (!window.speechSynthesis) {
+    alert('このブラウザは音声読み上げに対応していません')
+    return
+  }
+  
+  const utterance = new SpeechSynthesisUtterance(speechText.substring(0, 500))
+  utterance.lang = 'ja-JP'
+  utterance.rate = 0.9  // 少しゆっくり（子ども向け）
+  utterance.pitch = 1.1 // 少し高め（明るい声）
+  utterance.volume = 1.0
+  
+  // 日本語音声を選択
+  const voices = window.speechSynthesis.getVoices()
+  const jaVoice = voices.find(function(v) { return v.lang === 'ja-JP' || v.lang.startsWith('ja') })
+  if (jaVoice) utterance.voice = jaVoice
+  
+  // UI更新
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
+    btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)'
+  }
+  
+  utterance.onend = function() {
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+      btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+    }
+  }
+  utterance.onerror = function() {
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+      btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+    }
+  }
+  
+  window.speechSynthesis.speak(utterance)
+}
+
+// ★ NB2図解のGemini AI音声ナレーション（高品質版 - APIでナレーション原稿を生成してから読み上げ）
+window.speakNB2NarrationAI = async function(page) {
+  const btn = document.getElementById('nb2-speak-btn-' + page)
+  
+  // 既に読み上げ中なら停止
+  if (window.speechSynthesis && window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel()
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+      btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+    }
+    return
+  }
+  
+  // テキスト収集
+  const widgetBody = document.getElementById('nb2-widget-body-' + page) || document.getElementById('nb2-visual-content-' + page)
+  if (!widgetBody) { window.speakNB2Explanation(page); return }
+  
+  let textParts = []
+  widgetBody.querySelectorAll('p, h1, h2, h3, h4, div, span, td, th, li').forEach(function(el) {
+    if (el.closest('button') || el.closest('script') || el.closest('[id^="nb2-visual-toolbar"]')) return
+    const t = (el.textContent || '').trim()
+    if (t.length > 2 && t.length < 300 && !textParts.includes(t)) textParts.push(t)
+  })
+  
+  if (textParts.length === 0) { window.speakNB2Explanation(page); return }
+  
+  const cd = window.currentCardData || {}
+  const card = cd.card || cd || {}
+  
+  // UI: ローディング
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:3px;"></i>AI解説準備中...'
+    btn.style.background = 'linear-gradient(135deg,#6366F1,#8B5CF6)'
+  }
+  
+  try {
+    const resp = await fetch('/api/ai/generate-nb2-narration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text_content: textParts.slice(0, 10).join('\n'),
+        card_title: card.card_title || card.title || '',
+        subject: card.subject || '',
+        grade: card.grade_level || card.grade || ''
+      })
+    })
+    const data = await resp.json()
+    
+    if (data.success && data.narration_text) {
+      // AIナレーションをWeb Speech APIで読み上げ
+      const utterance = new SpeechSynthesisUtterance(data.narration_text.substring(0, 500))
+      utterance.lang = 'ja-JP'
+      utterance.rate = 0.85
+      utterance.pitch = 1.15
+      utterance.volume = 1.0
+      
+      const voices = window.speechSynthesis.getVoices()
+      const jaVoice = voices.find(function(v) { return v.lang === 'ja-JP' || v.lang.startsWith('ja') })
+      if (jaVoice) utterance.voice = jaVoice
+      
+      if (btn) {
+        btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
+        btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)'
+      }
+      
+      utterance.onend = function() {
+        if (btn) {
+          btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+          btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+        }
+      }
+      utterance.onerror = function() {
+        if (btn) {
+          btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+          btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+        }
+      }
+      
+      window.speechSynthesis.speak(utterance)
+    } else {
+      // フォールバック: ローカル版を使用
+      if (btn) {
+        btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+        btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+      }
+      window.speakNB2Explanation(page)
+    }
+  } catch (e) {
+    console.warn('AIナレーションエラー、フォールバック:', e)
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+      btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+    }
+    window.speakNB2Explanation(page)
+  }
+}
+
+// ★ NB2画像のお気に入り保存
+window.bookmarkNB2Image = async function(page) {
+  const btn = document.getElementById('nb2-bookmark-btn-' + page)
+  
+  // NB2ウィジェット内の画像を探す
+  const widgetBody = document.getElementById('nb2-widget-body-' + page) || document.getElementById('nb2-visual-content-' + page)
+  const widgetArea = document.getElementById('nb2-widget-' + page)
+  let imageUrl = ''
+  let imageType = 'nb2_widget'
+  
+  // nb2-widget-body内の画像
+  if (widgetBody) {
+    const imgs = widgetBody.querySelectorAll('img')
+    if (imgs.length > 0) imageUrl = imgs[imgs.length - 1].src
+  }
+  // illustration画像を探す
+  if (!imageUrl && widgetArea) {
+    const parent = widgetArea.parentElement
+    if (parent) {
+      const allImgs = parent.querySelectorAll('img')
+      allImgs.forEach(function(img) {
+        if (img.src && img.src.indexOf('data:') !== 0 && img.alt !== 'favicon') {
+          imageUrl = img.src
+          imageType = 'nb2_illustration'
+        }
+      })
+    }
+  }
+  
+  // SVG の場合はスクリーンショットを保存できないがURLとして保存
+  if (!imageUrl && widgetBody) {
+    const svgs = widgetBody.querySelectorAll('svg')
+    if (svgs.length > 0) {
+      // SVGをdata URLに変換
+      const svgData = new XMLSerializer().serializeToString(svgs[0])
+      imageUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+      imageType = 'nb2_svg'
+    }
+  }
+  
+  if (!imageUrl) {
+    if (typeof showToast === 'function') showToast('保存する画像が見つかりません', 'warning')
+    else alert('保存する画像が見つかりません')
+    return
+  }
+  
+  const cd = window.currentCardData || {}
+  const card = cd.card || cd || {}
+  const studentId = window.STUDENT_ID || card.student_id || 1
+  
+  // UI更新
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:3px;"></i>保存中...'
+    btn.disabled = true
+  }
+  
+  try {
+    const resp = await fetch('/api/bookmarks/save-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: studentId,
+        card_id: card.card_id || card.id || null,
+        image_url: imageUrl,
+        image_type: imageType,
+        title: card.card_title || card.title || 'NB2教材',
+        description: (card.problem_text || '').substring(0, 200),
+        page_num: page
+      })
+    })
+    const data = await resp.json()
+    
+    if (data.success) {
+      if (btn) {
+        btn.innerHTML = '<i class="fas fa-check" style="margin-right:3px;"></i>✅ 保存済み'
+        btn.style.background = 'linear-gradient(135deg,#059669,#047857)'
+      }
+      if (typeof showToast === 'function') {
+        showToast(data.already_exists ? 'すでに保存済みです' : '⭐ お気に入りに保存しました！', 'success')
+      }
+      // 3秒後にボタンを戻す
+      setTimeout(function() {
+        if (btn) {
+          btn.innerHTML = '<i class="fas fa-star" style="margin-right:3px;"></i>⭐ 保存'
+          btn.style.background = 'linear-gradient(135deg,#F59E0B,#D97706)'
+          btn.disabled = false
+        }
+      }, 3000)
+    } else {
+      throw new Error(data.error || '保存に失敗')
+    }
+  } catch (e) {
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-star" style="margin-right:3px;"></i>⭐ 保存'
+      btn.style.background = 'linear-gradient(135deg,#F59E0B,#D97706)'
+      btn.disabled = false
+    }
+    if (typeof showToast === 'function') showToast('保存に失敗しました: ' + (e.message || ''), 'error')
+  }
+}
+
+// ★ お気に入り画像ギャラリーを開く
+window.openBookmarkGallery = async function(studentId) {
+  studentId = studentId || window.STUDENT_ID || 1
+  
+  const existingModal = document.getElementById('bookmark-gallery-modal')
+  if (existingModal) existingModal.remove()
+  
+  const modal = document.createElement('div')
+  modal.id = 'bookmark-gallery-modal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4'
+  modal.innerHTML = '<div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6">' +
+    '<div class="flex items-center justify-between mb-4">' +
+    '<h3 class="text-lg font-bold text-yellow-800"><i class="fas fa-star text-yellow-500 mr-2"></i>⭐ 保存した図解ギャラリー</h3>' +
+    '<button onclick="document.getElementById(\'bookmark-gallery-modal\').remove()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>' +
+    '</div>' +
+    '<div id="bookmark-gallery-content" class="text-center py-8"><div class="inline-block w-8 h-8 border-3 border-yellow-500 border-t-transparent rounded-full animate-spin"></div><p class="text-sm text-gray-500 mt-2">読み込み中...</p></div>' +
+    '</div>'
+  document.body.appendChild(modal)
+  
+  try {
+    const resp = await fetch('/api/bookmarks/images/' + studentId)
+    const data = await resp.json()
+    const contentDiv = document.getElementById('bookmark-gallery-content')
+    if (!contentDiv) return
+    
+    if (!data.success || !data.images || data.images.length === 0) {
+      contentDiv.innerHTML = '<div class="text-center py-12"><i class="fas fa-star text-gray-300 text-4xl mb-3"></i><p class="text-gray-500">まだ保存した図解がありません</p><p class="text-xs text-gray-400 mt-1">学習画面でNB2ウィジェットの「⭐ 保存」ボタンを押してみよう</p></div>'
+      return
+    }
+    
+    let html = '<div class="grid grid-cols-2 gap-3">'
+    data.images.forEach(function(img) {
+      const dateStr = img.created_at ? new Date(img.created_at).toLocaleDateString('ja-JP') : ''
+      html += '<div class="relative group border-2 border-yellow-200 rounded-xl overflow-hidden bg-yellow-50 hover:shadow-lg transition">'
+      html += '<img src="' + img.image_url + '" class="w-full h-auto" style="max-height:200px;object-fit:cover;" onclick="window._expandSongImage&&window._expandSongImage(this.src)" />'
+      html += '<div class="p-2">'
+      html += '<p class="text-xs font-bold text-gray-700 truncate">' + (img.title || 'NB2教材') + '</p>'
+      html += '<p class="text-[10px] text-gray-400">' + (img.image_type || '') + ' ・ ' + dateStr + '</p>'
+      html += '</div>'
+      html += '<button onclick="deleteBookmark(' + img.id + ', this.closest(\'.relative\'))" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition"><i class="fas fa-times"></i></button>'
+      html += '</div>'
+    })
+    html += '</div>'
+    html += '<p class="text-xs text-gray-400 text-center mt-3">' + data.count + '件の保存画像</p>'
+    contentDiv.innerHTML = html
+  } catch (e) {
+    const contentDiv = document.getElementById('bookmark-gallery-content')
+    if (contentDiv) contentDiv.innerHTML = '<p class="text-red-500 text-sm">読み込みに失敗しました</p>'
+  }
+}
+
+window.deleteBookmark = async function(id, el) {
+  try {
+    await fetch('/api/bookmarks/image/' + id, { method: 'DELETE' })
+    if (el) el.remove()
+    if (typeof showToast === 'function') showToast('削除しました', 'success')
+  } catch (e) {}
+}
+
+// ★ 復習ダッシュボードを開く
+window.openReviewDashboard = async function(studentId) {
+  studentId = studentId || window.STUDENT_ID || 1
+  
+  const existingModal = document.getElementById('review-dashboard-modal')
+  if (existingModal) existingModal.remove()
+  
+  const modal = document.createElement('div')
+  modal.id = 'review-dashboard-modal'
+  modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4'
+  modal.innerHTML = '<div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">' +
+    '<div class="flex items-center justify-between mb-4">' +
+    '<h3 class="text-lg font-bold text-blue-800"><i class="fas fa-chart-line text-blue-500 mr-2"></i>📊 学習ダッシュボード</h3>' +
+    '<button onclick="document.getElementById(\'review-dashboard-modal\').remove()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>' +
+    '</div>' +
+    '<div id="review-dashboard-content" class="text-center py-8"><div class="inline-block w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div><p class="text-sm text-gray-500 mt-2">読み込み中...</p></div>' +
+    '</div>'
+  document.body.appendChild(modal)
+  
+  try {
+    const resp = await fetch('/api/review-dashboard/' + studentId)
+    const data = await resp.json()
+    const contentDiv = document.getElementById('review-dashboard-content')
+    if (!contentDiv || !data.success) return
+    
+    let html = ''
+    
+    // ★ ヘッダー統計カード
+    html += '<div class="grid grid-cols-3 gap-3 mb-4">'
+    html += '<div class="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-3 text-center">'
+    html += '<p class="text-2xl font-bold text-red-600">' + data.today_count + '</p>'
+    html += '<p class="text-xs text-red-800 font-bold">今日の復習</p></div>'
+    html += '<div class="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-3 text-center">'
+    html += '<p class="text-2xl font-bold text-blue-600">' + data.streak_days + '日</p>'
+    html += '<p class="text-xs text-blue-800 font-bold">🔥 連続学習</p></div>'
+    html += '<div class="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-3 text-center">'
+    html += '<p class="text-2xl font-bold text-green-600">' + data.mastered_count + '</p>'
+    html += '<p class="text-xs text-green-800 font-bold">✅ マスター済み</p></div>'
+    html += '</div>'
+    
+    // ★ 週間学習グラフ（Chart.js）
+    html += '<div class="bg-white border-2 border-gray-200 rounded-xl p-4 mb-4">'
+    html += '<p class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-chart-bar text-blue-500 mr-1"></i>週間学習グラフ</p>'
+    html += '<canvas id="weekly-chart" height="180"></canvas>'
+    html += '</div>'
+    
+    // ★ 教科別レーダーチャート
+    if (data.subject_stats && data.subject_stats.length > 0) {
+      html += '<div class="bg-white border-2 border-gray-200 rounded-xl p-4 mb-4">'
+      html += '<p class="text-sm font-bold text-gray-700 mb-2"><i class="fas fa-chart-pie text-purple-500 mr-1"></i>教科別正答率</p>'
+      html += '<canvas id="subject-radar-chart" height="200"></canvas>'
+      html += '</div>'
+    }
+    
+    // ★ 今日の復習カードリスト
+    if (data.today_count > 0) {
+      html += '<div class="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-4">'
+      html += '<p class="text-sm font-bold text-red-800 mb-2"><i class="fas fa-redo text-red-500 mr-1"></i>🔄 今日復習するカード（' + data.today_count + '枚）</p>'
+      data.today_reviews.forEach(function(r) {
+        html += '<div class="bg-white rounded-lg p-2 mb-2 border border-red-100 flex items-center gap-2">'
+        html += '<span class="text-lg">📝</span>'
+        html += '<div class="flex-1 min-w-0">'
+        html += '<p class="text-xs font-bold text-gray-700 truncate">' + (r.card_title || 'カード #' + r.card_id) + '</p>'
+        html += '<p class="text-[10px] text-gray-400">' + (r.subject || '') + ' ・ 復習回数: ' + (r.review_count || 0) + '</p>'
+        html += '</div>'
+        html += '<span class="text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-bold">復習</span>'
+        html += '</div>'
+      })
+      html += '</div>'
+    }
+    
+    // ★ 今週の予定
+    if (data.week_count > 0) {
+      html += '<div class="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-4">'
+      html += '<p class="text-sm font-bold text-blue-800 mb-2"><i class="fas fa-calendar text-blue-500 mr-1"></i>📅 今週の復習予定（' + data.week_count + '枚）</p>'
+      data.week_reviews.forEach(function(r) {
+        html += '<div class="bg-white rounded-lg p-2 mb-1 border border-blue-100 flex items-center gap-2">'
+        html += '<span class="text-xs text-blue-600 font-bold w-16">' + (r.next_review_date || '').substring(5) + '</span>'
+        html += '<p class="text-xs text-gray-700 truncate flex-1">' + (r.card_title || 'カード #' + r.card_id) + '</p>'
+        html += '</div>'
+      })
+      html += '</div>'
+    }
+    
+    contentDiv.innerHTML = html
+    
+    // ★ Chart.js グラフ描画
+    setTimeout(function() {
+      // 週間学習グラフ
+      const weeklyCanvas = document.getElementById('weekly-chart')
+      if (weeklyCanvas && typeof Chart !== 'undefined' && data.week_stats.length > 0) {
+        const labels = data.week_stats.map(function(s) { return s.day ? s.day.substring(5) : '' })
+        const totals = data.week_stats.map(function(s) { return s.total_answers || 0 })
+        const corrects = data.week_stats.map(function(s) { return s.correct_count || 0 })
+        const accuracies = data.week_stats.map(function(s) { return s.accuracy || 0 })
+        
+        new Chart(weeklyCanvas, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: '正解数', data: corrects, backgroundColor: 'rgba(16,185,129,0.7)', borderRadius: 6, order: 2 },
+              { label: '不正解数', data: totals.map(function(t, i) { return t - corrects[i] }), backgroundColor: 'rgba(239,68,68,0.5)', borderRadius: 6, order: 2 },
+              { label: '正答率(%)', data: accuracies, type: 'line', borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.1)', fill: true, yAxisID: 'y1', tension: 0.3, pointRadius: 4, order: 1 }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { stacked: true, grid: { display: false } },
+              y: { stacked: true, beginAtZero: true, title: { display: true, text: '問題数' } },
+              y1: { position: 'right', beginAtZero: true, max: 100, title: { display: true, text: '正答率(%)' }, grid: { drawOnChartArea: false } }
+            },
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } }
+          }
+        })
+      }
+      
+      // 教科別レーダーチャート
+      const radarCanvas = document.getElementById('subject-radar-chart')
+      if (radarCanvas && typeof Chart !== 'undefined' && data.subject_stats && data.subject_stats.length > 0) {
+        const subLabels = data.subject_stats.map(function(s) { return s.subject || '不明' })
+        const subAccuracy = data.subject_stats.map(function(s) { return s.accuracy || 0 })
+        const subTotal = data.subject_stats.map(function(s) { return s.total || 0 })
+        
+        new Chart(radarCanvas, {
+          type: 'radar',
+          data: {
+            labels: subLabels,
+            datasets: [
+              { label: '正答率(%)', data: subAccuracy, backgroundColor: 'rgba(124,58,237,0.2)', borderColor: '#7C3AED', pointBackgroundColor: '#7C3AED', pointRadius: 5 },
+              { label: '出題数', data: subTotal, backgroundColor: 'rgba(16,185,129,0.15)', borderColor: '#10B981', pointBackgroundColor: '#10B981', pointRadius: 4 }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20 } } },
+            plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } }
+          }
+        })
+      }
+    }, 300)
+    
+  } catch (e) {
+    const contentDiv = document.getElementById('review-dashboard-content')
+    if (contentDiv) contentDiv.innerHTML = '<p class="text-red-500 text-sm">読み込みに失敗しました: ' + (e.message || '') + '</p>'
+  }
+}
 window._expandSongImage = function(src) {
   var overlay = document.createElement('div')
   overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;animation:fadeIn 0.2s ease;'

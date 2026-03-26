@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260326a' }, 200, {
+  return c.json({ build_id: '20260326b' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260326a';
+    var MY_BUILD = '20260326b';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -9498,6 +9498,12 @@ app.get('/guide/:curriculumId', async (c) => {
         <p style="color:#9ca3af; font-size:0.8rem;">トップページの「AIで学習カードを作成する」から生成できます。</p>
       </div>
       ` : ''}
+    </div>
+
+    <!-- ★ 学習ツールバー（ダッシュボード・お気に入り・復習） -->
+    <div class="no-print" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:8px 4px;margin-bottom:4px;">
+      <button onclick="window.openReviewDashboard&&window.openReviewDashboard()" style="background:linear-gradient(135deg,#3B82F6,#6366F1);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.7rem;box-shadow:0 2px 6px rgba(59,130,246,0.3);"><i class="fas fa-chart-line" style="margin-right:3px;"></i>📊 ダッシュボード</button>
+      <button onclick="window.openBookmarkGallery&&window.openBookmarkGallery()" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.7rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-star" style="margin-right:3px;"></i>⭐ 保存した図解</button>
     </div>
 
     <!-- ナビゲーションバー -->
@@ -13636,6 +13642,8 @@ app.get('/guide/:curriculumId', async (c) => {
       '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>NB2を再生成</button>' +
       '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:3px;"></i>NB2を修正指示</button>' +
       '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:3px;"></i>🎬 AI動画</button>' +
+      '<button onclick="(window.speakNB2NarrationAI||window.speakNB2Explanation)(' + page + ')" id="nb2-speak-btn-' + page + '" style="background:linear-gradient(135deg,#10B981,#059669);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説</button>' +
+      '<button onclick="window.bookmarkNB2Image&&window.bookmarkNB2Image(' + page + ')" id="nb2-bookmark-btn-' + page + '" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-star" style="margin-right:3px;"></i>⭐ 保存</button>' +
       '</div>' +
       '<div id="nb2-widget-' + page + '">' +
       '<div style="padding:16px;text-align:center;background:linear-gradient(135deg,#FDF2F8,#EEF2FF);border-radius:14px;border:2px dashed #DDD6FE;">' +
@@ -13759,12 +13767,13 @@ app.get('/guide/:curriculumId', async (c) => {
           '<p style="font-size:0.7rem;color:#B45309;margin-top:4px;">⚠️ ウィジェット自動生成に失敗しました</p></div>';
       }
       
-      // ツールバー: ウィジェット上部に再生成・編集・AI画像・AI動画ボタン
+      // ツールバー: ウィジェット上部に再生成・編集・音声解説・AI動画ボタン
       if (toolbar) {
         toolbar.innerHTML = 
           '<span style="font-size:0.7rem;font-weight:bold;color:#7C3AED;margin-right:2px;">🛠️ NB2ウィジェットのツール▼</span>' +
           '<button onclick="regenerateTactileWidget(' + page + ')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:3px;"></i>NB2を再生成</button>' +
           '<button onclick="editTactileWidget(' + page + ')" style="background:#F59E0B;color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:3px;"></i>NB2を修正指示</button>' +
+          '<button onclick="speakNB2Explanation(' + page + ')" id="nb2-speak-btn-' + page + '" style="background:linear-gradient(135deg,#10B981,#059669);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説</button>' +
           '<button onclick="requestAIVideo(' + page + ')" id="ai-video-btn-' + page + '" style="background:linear-gradient(135deg,#7C3AED,#4F46E5);color:white;border:none;padding:6px 12px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.72rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-video" style="margin-right:3px;"></i>🎬 AI動画</button>';
       }
       // 画像・動画結果エリアはウィジェットの下に分離配置（重なり防止）
@@ -14492,7 +14501,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260326a';
+          var MY_BUILD = '20260326b';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -29808,12 +29817,30 @@ app.get('/api/spaced-learning/today-reviews/:studentId', async (c) => {
   try {
     const engine = new SpacedLearningEngine(env.DB)
     const reviews = await engine.getTodayReviews(studentId)
-    const count = reviews.length
+    
+    // ★ spaced_review_scheduleテーブルからも取得（自動追加された復習カード）
+    let autoReviews: any[] = []
+    try {
+      const autoResult = await env.DB.prepare(`
+        SELECT sr.card_id, sr.review_count, sr.interval_days, sr.ease_factor, sr.source,
+               lc.card_title, lc.problem_text, lc.subject
+        FROM spaced_review_schedule sr
+        LEFT JOIN learning_cards lc ON sr.card_id = lc.card_id
+        WHERE sr.student_id = ? AND sr.status = 'pending'
+          AND sr.next_review_date <= date('now')
+        ORDER BY sr.next_review_date ASC
+        LIMIT 20
+      `).bind(studentId).all()
+      autoReviews = (autoResult?.results || []) as any[]
+    } catch {}
+    
+    const count = reviews.length + autoReviews.length
     
     return c.json({
       success: true,
       count,
-      reviews
+      reviews,
+      auto_reviews: autoReviews
     })
   } catch (error: any) {
     console.error('❌ 今日の復習取得エラー:', error)
@@ -45582,6 +45609,83 @@ app.post('/api/student-learning/record-answer', async (c) => {
     }
 
     console.log(`📝 解答記録: student=${student_id}, card=${card_id}, correct=${is_correct}`)
+
+    // ★ 不正解時にスペース反復キューに自動追加（エビングハウス忘却曲線ベース）
+    if (!is_correct && card_id && student_id) {
+      try {
+        // spaced_review_scheduleテーブルがなければ作成
+        await env.DB.prepare(`CREATE TABLE IF NOT EXISTS spaced_review_schedule (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          student_id INTEGER NOT NULL,
+          card_id INTEGER NOT NULL,
+          course_id INTEGER,
+          review_count INTEGER DEFAULT 0,
+          ease_factor REAL DEFAULT 2.5,
+          interval_days INTEGER DEFAULT 1,
+          next_review_date TEXT NOT NULL,
+          last_review_date TEXT,
+          status TEXT DEFAULT 'pending',
+          source TEXT DEFAULT 'auto_incorrect',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(student_id, card_id)
+        )`).run()
+
+        // 既にキューにある場合はintervalをリセット（再度間違えた）
+        const existing = await env.DB.prepare(
+          `SELECT id, review_count FROM spaced_review_schedule WHERE student_id = ? AND card_id = ?`
+        ).bind(parseInt(student_id), parseInt(card_id)).first()
+
+        if (existing) {
+          // リセット: interval=1日、ease_factor下げ
+          await env.DB.prepare(`
+            UPDATE spaced_review_schedule 
+            SET interval_days = 1, ease_factor = MAX(1.3, ease_factor - 0.2),
+                next_review_date = date('now', '+1 day'), status = 'pending',
+                last_review_date = datetime('now')
+            WHERE id = ?
+          `).bind(existing.id).run()
+          console.log(`🔄 復習キューリセット: card=${card_id} (再不正解)`)
+        } else {
+          // 新規追加: 1日後に復習
+          await env.DB.prepare(`
+            INSERT OR IGNORE INTO spaced_review_schedule 
+            (student_id, card_id, course_id, next_review_date, source)
+            VALUES (?, ?, ?, date('now', '+1 day'), 'auto_incorrect')
+          `).bind(parseInt(student_id), parseInt(card_id), parseInt(curriculum_id || 0)).run()
+          console.log(`📌 復習キューに追加: card=${card_id} (不正解→明日復習)`)
+        }
+      } catch (srErr) {
+        console.warn('spaced_review_schedule追加スキップ:', srErr)
+      }
+    }
+
+    // ★ 正解時: スペース反復のintervalを延長（SM-2アルゴリズム簡易版）
+    if (is_correct && card_id && student_id) {
+      try {
+        const sr = await env.DB.prepare(
+          `SELECT id, review_count, ease_factor, interval_days FROM spaced_review_schedule WHERE student_id = ? AND card_id = ?`
+        ).bind(parseInt(student_id), parseInt(card_id)).first()
+        if (sr) {
+          const newCount = (sr.review_count || 0) + 1
+          const newEF = Math.max(1.3, (sr.ease_factor || 2.5) + 0.1)
+          // SM-2: 次のinterval = 前のinterval × ease_factor
+          let newInterval = newCount === 1 ? 1 : newCount === 2 ? 6 : Math.round((sr.interval_days || 1) * newEF)
+          newInterval = Math.min(newInterval, 90) // 最大90日
+          await env.DB.prepare(`
+            UPDATE spaced_review_schedule 
+            SET review_count = ?, ease_factor = ?, interval_days = ?,
+                next_review_date = date('now', '+' || ? || ' days'), 
+                last_review_date = datetime('now'),
+                status = CASE WHEN ? >= 5 THEN 'mastered' ELSE 'pending' END
+            WHERE id = ?
+          `).bind(newCount, newEF, newInterval, newInterval, newCount, sr.id).run()
+          console.log(`✅ 復習間隔延長: card=${card_id} → ${newInterval}日後`)
+        }
+      } catch (srErr) {
+        console.warn('spaced_review更新スキップ:', srErr)
+      }
+    }
+
     return c.json({ success: true, answer_id: result.meta?.last_row_id })
   } catch (error) {
     console.error('解答記録エラー:', error)
@@ -45914,6 +46018,292 @@ app.get('/reflection-ai', (c) => {
 
 </body>
 </html>`)
+})
+
+// ============================================================
+// ★ Feature: お気に入り画像保存 (bookmarked_images)
+// ============================================================
+app.post('/api/bookmarks/save-image', async (c) => {
+  const { env } = c
+  try {
+    const { student_id, card_id, image_url, image_type, title, description, page_num } = await c.req.json()
+    if (!student_id || !image_url) return c.json({ success: false, error: 'student_id and image_url required' }, 400)
+    
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS bookmarked_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      card_id INTEGER,
+      image_url TEXT NOT NULL,
+      image_type TEXT DEFAULT 'nb2_illustration',
+      title TEXT,
+      description TEXT,
+      page_num INTEGER,
+      is_favorite INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run()
+    
+    // 重複チェック
+    const existing = await env.DB.prepare(
+      `SELECT id FROM bookmarked_images WHERE student_id = ? AND image_url = ?`
+    ).bind(parseInt(student_id), image_url).first()
+    
+    if (existing) {
+      return c.json({ success: true, already_exists: true, bookmark_id: existing.id })
+    }
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO bookmarked_images (student_id, card_id, image_url, image_type, title, description, page_num)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      parseInt(student_id), card_id ? parseInt(card_id) : null,
+      image_url, image_type || 'nb2_illustration',
+      title || '', description || '', page_num || null
+    ).run()
+    
+    console.log(`⭐ 画像ブックマーク保存: student=${student_id}, type=${image_type}`)
+    return c.json({ success: true, bookmark_id: result.meta?.last_row_id })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+app.get('/api/bookmarks/images/:studentId', async (c) => {
+  const { env } = c
+  try {
+    const studentId = parseInt(c.req.param('studentId'))
+    const limit = parseInt(c.req.query('limit') || '50')
+    
+    try { await env.DB.prepare(`CREATE TABLE IF NOT EXISTS bookmarked_images (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, student_id INTEGER NOT NULL, card_id INTEGER,
+      image_url TEXT NOT NULL, image_type TEXT DEFAULT 'nb2_illustration', title TEXT, description TEXT,
+      page_num INTEGER, is_favorite INTEGER DEFAULT 1, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run() } catch {}
+    
+    const images = await env.DB.prepare(`
+      SELECT * FROM bookmarked_images WHERE student_id = ? AND is_favorite = 1
+      ORDER BY created_at DESC LIMIT ?
+    `).bind(studentId, limit).all()
+    
+    return c.json({ success: true, images: images.results || [], count: images.results?.length || 0 })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+app.delete('/api/bookmarks/image/:id', async (c) => {
+  const { env } = c
+  try {
+    const id = parseInt(c.req.param('id'))
+    await env.DB.prepare(`UPDATE bookmarked_images SET is_favorite = 0 WHERE id = ?`).bind(id).run()
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ============================================================
+// ★ Feature: 誤答自動復習カード＆復習ダッシュボード API
+// ============================================================
+app.get('/api/review-dashboard/:studentId', async (c) => {
+  const { env } = c
+  try {
+    const studentId = parseInt(c.req.param('studentId'))
+    
+    try { await env.DB.prepare(`CREATE TABLE IF NOT EXISTS spaced_review_schedule (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, student_id INTEGER NOT NULL, card_id INTEGER NOT NULL,
+      course_id INTEGER, review_count INTEGER DEFAULT 0, ease_factor REAL DEFAULT 2.5,
+      interval_days INTEGER DEFAULT 1, next_review_date TEXT NOT NULL, last_review_date TEXT,
+      status TEXT DEFAULT 'pending', source TEXT DEFAULT 'auto_incorrect',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(student_id, card_id)
+    )`).run() } catch {}
+    
+    // 今日の復習カード
+    const todayReviews = await env.DB.prepare(`
+      SELECT sr.id, sr.student_id, sr.card_id, sr.review_count, sr.ease_factor,
+             sr.interval_days, sr.next_review_date, sr.last_review_date, sr.status, sr.source
+      FROM spaced_review_schedule sr
+      WHERE sr.student_id = ? AND sr.status = 'pending' AND sr.next_review_date <= date('now')
+      ORDER BY sr.next_review_date ASC
+      LIMIT 20
+    `).bind(studentId).all()
+    
+    // カード情報を結合（cardsテーブルが存在すれば）
+    let enrichedToday = todayReviews.results || []
+    try {
+      for (let i = 0; i < enrichedToday.length; i++) {
+        const r = enrichedToday[i] as any
+        try {
+          const card = await env.DB.prepare(`SELECT card_title, problem_text, problem_image_url, subject FROM cards WHERE id = ?`).bind(r.card_id).first()
+          if (card) { r.card_title = card.card_title; r.subject = card.subject; r.problem_image_url = card.problem_image_url }
+        } catch {}
+      }
+    } catch {}
+    
+    // 今週の復習カード
+    const weekReviews = await env.DB.prepare(`
+      SELECT sr.id, sr.card_id, sr.next_review_date, sr.review_count
+      FROM spaced_review_schedule sr
+      WHERE sr.student_id = ? AND sr.status = 'pending'
+        AND sr.next_review_date > date('now') AND sr.next_review_date <= date('now', '+7 days')
+      ORDER BY sr.next_review_date ASC
+    `).bind(studentId).all()
+    
+    // カード情報を結合
+    let enrichedWeek = weekReviews.results || []
+    try {
+      for (let i = 0; i < enrichedWeek.length; i++) {
+        const r = enrichedWeek[i] as any
+        try {
+          const card = await env.DB.prepare(`SELECT card_title, subject FROM cards WHERE id = ?`).bind(r.card_id).first()
+          if (card) { r.card_title = card.card_title; r.subject = card.subject }
+        } catch {}
+      }
+    } catch {}
+    
+    // マスター済み
+    const mastered = await env.DB.prepare(`
+      SELECT COUNT(*) as count FROM spaced_review_schedule 
+      WHERE student_id = ? AND status = 'mastered'
+    `).bind(studentId).first()
+    
+    // 学習統計（過去7日）
+    const weekStats = await env.DB.prepare(`
+      SELECT 
+        date(created_at) as day,
+        COUNT(*) as total_answers,
+        SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+        ROUND(AVG(CASE WHEN is_correct = 1 THEN 100.0 ELSE 0 END), 1) as accuracy
+      FROM student_card_answers
+      WHERE student_id = ? AND created_at >= datetime('now', '-7 days')
+      GROUP BY date(created_at)
+      ORDER BY day ASC
+    `).bind(studentId).all()
+    
+    // 教科別正答率
+    let subjectStatsResults: any[] = []
+    try {
+      const subjectStats = await env.DB.prepare(`
+        SELECT 
+          'general' as subject,
+          COUNT(*) as total,
+          SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct,
+          ROUND(AVG(CASE WHEN is_correct = 1 THEN 100.0 ELSE 0 END), 1) as accuracy
+        FROM student_card_answers
+        WHERE student_id = ? AND created_at >= datetime('now', '-30 days')
+      `).bind(studentId).all()
+      subjectStatsResults = subjectStats.results || []
+      
+      // cardsテーブルがあれば教科別に詳細取得
+      try {
+        const detailed = await env.DB.prepare(`
+          SELECT 
+            c.subject,
+            COUNT(*) as total,
+            SUM(CASE WHEN a.is_correct = 1 THEN 1 ELSE 0 END) as correct,
+            ROUND(AVG(CASE WHEN a.is_correct = 1 THEN 100.0 ELSE 0 END), 1) as accuracy
+          FROM student_card_answers a
+          LEFT JOIN cards c ON a.card_id = c.id
+          WHERE a.student_id = ? AND a.created_at >= datetime('now', '-30 days')
+          GROUP BY c.subject
+          HAVING c.subject IS NOT NULL
+        `).bind(studentId).all()
+        if (detailed.results && detailed.results.length > 0) subjectStatsResults = detailed.results
+      } catch {}
+    } catch {}
+    
+    // 連続学習日数
+    const streakData = await env.DB.prepare(`
+      SELECT DISTINCT date(created_at) as day
+      FROM student_card_answers
+      WHERE student_id = ? AND created_at >= datetime('now', '-30 days')
+      ORDER BY day DESC
+    `).bind(studentId).all()
+    
+    let streak = 0
+    const today = new Date().toISOString().split('T')[0]
+    const days = (streakData.results || []).map((r: any) => r.day)
+    for (let i = 0; i < days.length; i++) {
+      const expected = new Date()
+      expected.setDate(expected.getDate() - i)
+      const expectedDay = expected.toISOString().split('T')[0]
+      if (days.includes(expectedDay)) streak++
+      else break
+    }
+    
+    return c.json({
+      success: true,
+      today_reviews: enrichedToday,
+      today_count: enrichedToday.length,
+      week_reviews: enrichedWeek,
+      week_count: enrichedWeek.length,
+      mastered_count: mastered?.count || 0,
+      week_stats: weekStats.results || [],
+      subject_stats: subjectStatsResults,
+      streak_days: streak
+    })
+  } catch (e: any) {
+    console.error('復習ダッシュボードエラー:', e)
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ============================================================
+// ★ Feature: NB2図解の音声ナレーション生成 API (Gemini TTS)
+// ============================================================
+app.post('/api/ai/generate-nb2-narration', async (c) => {
+  const { env } = c
+  try {
+    const startTime = Date.now()
+    const { text_content, card_title, subject, grade } = await c.req.json()
+    if (!text_content) return c.json({ success: false, error: 'text_content required' }, 400)
+    
+    const apiKey = env.GEMINI_API_KEY || env.GOOGLE_AI_KEY || ''
+    if (!apiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' }, 500)
+    
+    // ナレーションスクリプトをGeminiで生成
+    const narratePrompt = `あなたは小学生向けの教育番組のナレーターです。以下の教材コンテンツを、子どもが楽しく理解できるように30秒以内のナレーション原稿にしてください。
+
+教科: ${subject || '不明'}
+学年: ${grade || '不明'}
+テーマ: ${card_title || ''}
+コンテンツ:
+${text_content.substring(0, 800)}
+
+要件:
+- 小学${grade || '5'}年生が理解できる言葉で
+- 「〜だよ」「〜なんだ」などフレンドリーな語尾
+- ポイントを3つ以内に絞る
+- 150文字以内
+- 「さあ、見てみよう！」のような導入をつける`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: narratePrompt }] }],
+          generationConfig: { maxOutputTokens: 256, temperature: 0.7 }
+        })
+      }
+    )
+    
+    if (!resp.ok) {
+      return c.json({ success: false, error: 'Gemini API error: ' + resp.status }, 500)
+    }
+    
+    const result = await resp.json() as any
+    const narrationText = result.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    const genTime = Date.now() - startTime
+    return c.json({
+      success: true,
+      narration_text: narrationText.trim(),
+      generation_time_ms: genTime
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
 })
 
 // ============================================================
