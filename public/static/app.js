@@ -6724,6 +6724,10 @@ async function loadCardPage(cardId) {
                     '<span class="text-sm font-bold text-gray-700">' + tactile + '</span>' +
                     '<button onclick="this.closest(\'[id$=-wrapper]\').style.display=\'none\'" class="ml-auto text-gray-400 hover:text-red-500 text-xs px-2 py-1 rounded hover:bg-red-50 transition" title="このウィジェットを非表示"><i class="fas fa-times"></i> 非表示</button>' +
                   '</div>' +
+                  '<div class="flex flex-wrap gap-2 justify-center mb-3">' +
+                    '<button onclick="(window.speakNB2NarrationAI||window.speakNB2Explanation)(' + cardIdVal + ')" id="nb2-speak-btn-' + cardIdVal + '" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>' +
+                    '<button onclick="window.bookmarkNB2Image&&window.bookmarkNB2Image(' + cardIdVal + ')" id="nb2-bookmark-btn-' + cardIdVal + '" class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-star mr-1"></i>⭐ 保存</button>' +
+                  '</div>' +
                   '<div id="tactile-ai-illust-card-' + cardIdVal + '" class="flex items-center justify-center mb-2 min-h-[80px]"><span class="text-4xl" id="tactile-illust-' + cardIdVal + '"></span></div>' +
                   '<button onclick="generateTactileIllustration(\'tactile-ai-illust-card-' + cardIdVal + '\', \'' + (tactile||'').replace(/'/g, "\\'").substring(0,120) + '\', \'' + (card.subject||'').replace(/'/g, "\\'") + '\', \'' + (card.grade||'').replace(/'/g, "\\'") + '\')" class="inline-flex items-center gap-1 bg-gradient-to-r from-orange-500 to-yellow-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition mb-2"><i class="fas fa-image"></i>AIにイラストを描いてもらう</button>' +
                   '<div id="' + widgetContainerId + '" class="bg-white rounded-lg border border-gray-200 overflow-hidden min-h-[200px] relative"></div>' +
@@ -7168,6 +7172,17 @@ async function loadCardPage(cardId) {
         </div>
         
         <!-- 下部ページネーション（固定バー） -->
+        <!-- ★ 学習ツールバー（ダッシュボード・お気に入り） -->
+        <div class="mt-4 flex flex-wrap gap-2 justify-center">
+          <button onclick="window.openReviewDashboard&&window.openReviewDashboard()" 
+                  class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:shadow-xl transition">
+            <i class="fas fa-chart-line mr-1"></i>📊 ダッシュボード
+          </button>
+          <button onclick="window.openBookmarkGallery&&window.openBookmarkGallery()" 
+                  class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:shadow-xl transition">
+            <i class="fas fa-star mr-1"></i>⭐ 保存した図解
+          </button>
+        </div>
         ${(() => {
           const cardsList2 = window._courseCardsList || []
           const currentIdx2 = cardsList2.indexOf(card.card_id || card.id)
@@ -41413,15 +41428,15 @@ async function executeLearningMusicGenerate(cardId) {
               karaokeHtml += '</div>'
               loadingEl.innerHTML = karaokeHtml
               
-              // ★ カラオケ同期処理（改良版: セクション行を除外して歌詞行のみで同期）
+              // ★ カラオケ同期処理（改良版v2: 文字数比例 + 導入余白 + セクション行除外）
               ;(function initKaraoke() {
                 const audio = document.getElementById(audioId)
                 const container = document.getElementById(karaokeId)
                 if (!audio || !container) return
                 const lineEls = container.querySelectorAll('[data-lyric-idx]')
                 
-                // セクション行（[Chorus]等）と歌詞行を分離
-                const lyricLineEls = []  // 実際の歌詞行のみ
+                // セクション行と歌詞行を分離
+                const lyricLineEls = []
                 const allLineEls = []
                 lineEls.forEach(function(el) {
                   const isSection = /^\[|^\(|^【|^Verse|^Chorus|^Bridge|^Outro|^Intro/i.test(el.textContent.trim())
@@ -41430,21 +41445,47 @@ async function executeLearningMusicGenerate(cardId) {
                 })
                 
                 const totalLyricLines = lyricLineEls.length
+                if (totalLyricLines === 0) return
                 let lastHighlighted = -1
                 
+                // ★ 文字数に比例した重み付きタイムマップを構築
+                // 歌は冒頭にイントロ（約15%）があるため、歌詞は残り85%に収まる
+                const INTRO_RATIO = 0.12  // 冒頭12%はイントロ（歌詞なし）
+                const OUTRO_RATIO = 0.03  // 末尾3%はアウトロ（歌詞なし）
+                const LYRIC_RANGE = 1.0 - INTRO_RATIO - OUTRO_RATIO  // 歌詞が占める割合
+                
+                // 各歌詞行の文字数で重みを計算
+                const charCounts = lyricLineEls.map(function(el) {
+                  return Math.max((el.textContent || '').trim().length, 3) // 最低3文字分
+                })
+                const totalChars = charCounts.reduce(function(sum, c) { return sum + c }, 0)
+                
+                // 累積タイムマップ: lineTimeMap[i] = i行目が始まる再生位置(0~1)
+                const lineTimeMap = [INTRO_RATIO]
+                for (var i = 1; i < totalLyricLines; i++) {
+                  lineTimeMap.push(lineTimeMap[i - 1] + (charCounts[i - 1] / totalChars) * LYRIC_RANGE)
+                }
+                
                 audio.addEventListener('timeupdate', function() {
-                  if (!audio.duration || audio.duration === Infinity || totalLyricLines === 0) return
+                  if (!audio.duration || audio.duration === Infinity) return
                   const progress = audio.currentTime / audio.duration
-                  // 歌詞行のみでインデックス計算（セクション行は除外）
-                  const currentLyricIdx = Math.min(Math.floor(progress * totalLyricLines), totalLyricLines - 1)
+                  
+                  // 現在の再生位置に最も近い歌詞行を特定
+                  var currentLyricIdx = 0
+                  for (var j = 0; j < totalLyricLines; j++) {
+                    if (progress >= lineTimeMap[j]) currentLyricIdx = j
+                    else break
+                  }
+                  // イントロ中はハイライトなし
+                  if (progress < INTRO_RATIO) currentLyricIdx = -1
+                  
                   if (currentLyricIdx === lastHighlighted) return
                   lastHighlighted = currentLyricIdx
                   
-                  const currentEl = lyricLineEls[currentLyricIdx]
+                  const currentEl = currentLyricIdx >= 0 ? lyricLineEls[currentLyricIdx] : null
                   
-                  // 全行をリセット・現在行をハイライト
                   allLineEls.forEach(function(item) {
-                    if (item.isSection) return  // セクション行はそのまま
+                    if (item.isSection) return
                     const el = item.el
                     if (el === currentEl) {
                       el.style.color = '#FDE68A'
@@ -41453,19 +41494,15 @@ async function executeLearningMusicGenerate(cardId) {
                       el.style.textShadow = '0 0 16px rgba(253,230,138,0.6)'
                       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
                     } else {
-                      // 過去行か未来行かを判定
-                      const elLyricIdx = lyricLineEls.indexOf(el)
-                      if (elLyricIdx >= 0 && elLyricIdx < currentLyricIdx) {
+                      const elIdx = lyricLineEls.indexOf(el)
+                      if (currentLyricIdx >= 0 && elIdx >= 0 && elIdx < currentLyricIdx) {
                         el.style.color = 'rgba(255,255,255,0.55)'
-                        el.style.fontSize = '0.85rem'
-                        el.style.fontWeight = 'normal'
-                        el.style.textShadow = 'none'
                       } else {
                         el.style.color = 'rgba(255,255,255,0.4)'
-                        el.style.fontSize = '0.85rem'
-                        el.style.fontWeight = 'normal'
-                        el.style.textShadow = 'none'
                       }
+                      el.style.fontSize = '0.85rem'
+                      el.style.fontWeight = 'normal'
+                      el.style.textShadow = 'none'
                     }
                   })
                 })
