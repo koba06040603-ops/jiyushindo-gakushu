@@ -41104,7 +41104,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
         <p class="text-[10px] text-gray-400 mt-1">クリックで拡大</p>
       </div>
       <div class="mt-2 flex flex-wrap gap-2 justify-center">
-        <button onclick="event.stopPropagation(); (window.speakNB2NarrationAI||window.speakNB2Explanation)(${cardId})" id="nb2-speak-btn-${cardId}" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>
+        <button onclick="event.stopPropagation(); (window.speakNB2NarrationAI||window.speakNB2Explanation)(${cardId}, 'image')" id="nb2-speak-btn-img-${cardId}" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>
         <button onclick="event.stopPropagation(); window.bookmarkNB2Image&&window.bookmarkNB2Image(${cardId})" id="nb2-bookmark-btn-${cardId}" class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-star mr-1"></i>⭐ 保存</button>
       </div>
       <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
@@ -41654,9 +41654,13 @@ window.speakNB2Explanation = function(page) {
   window.speechSynthesis.speak(utterance)
 }
 
-// ★ NB2図解のGemini AI音声ナレーション（高品質版 - Gemini TTS APIで読み上げ、AI先生と同じ音質）
-window.speakNB2NarrationAI = async function(page) {
-  const btn = document.getElementById('nb2-speak-btn-' + page)
+// ★ NB2図解の音声解説（Gemini TTS - AI先生と同じ音質）
+// source='image' の場合: 問題画像の解説（カードデータを使用）
+// source=undefined の場合: NB2ウィジェットの解説（ウィジェットテキストを使用）
+window.speakNB2NarrationAI = async function(page, source) {
+  var btnId = source === 'image' ? 'nb2-speak-btn-img-' + page : 'nb2-speak-btn-' + page
+  var btn = document.getElementById(btnId)
+  if (!btn) btn = document.getElementById('nb2-speak-btn-' + page)
   
   // 既に再生中なら停止
   if (_globalTtsPlaying) {
@@ -41668,28 +41672,39 @@ window.speakNB2NarrationAI = async function(page) {
     return
   }
   
-  // テキスト収集: NB2ウィジェット or 問題画像の周辺テキスト
-  let textParts = []
-  const widgetBody = document.getElementById('nb2-widget-body-' + page) || document.getElementById('nb2-visual-content-' + page)
-  if (widgetBody) {
-    widgetBody.querySelectorAll('p, h1, h2, h3, h4, div, span, td, th, li').forEach(function(el) {
-      if (el.closest('button') || el.closest('script') || el.closest('[id^="nb2-visual-toolbar"]')) return
-      const t = (el.textContent || '').trim()
-      if (t.length > 2 && t.length < 300 && !textParts.includes(t)) textParts.push(t)
-    })
-  }
+  // カードデータ
+  var cd = window.currentCardData || {}
+  var card = cd.card || cd || {}
+  var title = card.card_title || card.title || ''
+  var problemText = card.problem_content || card.problem_text || ''
+  var solution = card.example_solution || card.answer_text || card.correct_answer || ''
+  var imgDesc = card._image_description || ''
+  var explanation = card.answer_explanation || card.explanation || ''
   
-  // カードデータから補完
-  const cd = window.currentCardData || {}
-  const card = cd.card || cd || {}
-  const title = card.card_title || card.title || ''
-  const problemText = card.problem_content || card.problem_text || ''
-  const solution = card.example_solution || card.answer_text || ''
+  var textParts = []
   
-  // NB2テキストが無い場合、カード情報を使用
-  if (textParts.length === 0) {
-    if (problemText) textParts.push(problemText.substring(0, 300))
-    if (solution) textParts.push(solution.substring(0, 200))
+  if (source === 'image') {
+    // ★ 問題画像モード: カードデータから解説テキストを構築（NB2ウィジェットは無視）
+    if (title) textParts.push(title)
+    if (imgDesc) textParts.push('図の説明: ' + imgDesc)
+    if (problemText) textParts.push(problemText.substring(0, 400))
+    if (solution) textParts.push('答え: ' + solution.substring(0, 200))
+    if (explanation) textParts.push(explanation.substring(0, 200))
+  } else {
+    // ★ NB2ウィジェットモード: ウィジェット内テキストを収集
+    var widgetBody = document.getElementById('nb2-widget-body-' + page) || document.getElementById('nb2-visual-content-' + page)
+    if (widgetBody) {
+      widgetBody.querySelectorAll('p, h1, h2, h3, h4, div, span, td, th, li').forEach(function(el) {
+        if (el.closest('button') || el.closest('script') || el.closest('[id^="nb2-visual-toolbar"]')) return
+        var t = (el.textContent || '').trim()
+        if (t.length > 2 && t.length < 300 && !textParts.includes(t)) textParts.push(t)
+      })
+    }
+    // NB2テキストが無い場合、カード情報にフォールバック
+    if (textParts.length === 0) {
+      if (problemText) textParts.push(problemText.substring(0, 300))
+      if (solution) textParts.push(solution.substring(0, 200))
+    }
   }
   
   if (textParts.length === 0) {
@@ -41704,25 +41719,24 @@ window.speakNB2NarrationAI = async function(page) {
   }
   
   try {
-    // Step 1: AIにナレーション原稿を生成してもらう
-    const narrationResp = await fetch('/api/ai/generate-nb2-narration', {
+    // Step 1: AIにナレーション原稿を生成
+    var narrationResp = await fetch('/api/ai/generate-nb2-narration', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text_content: textParts.slice(0, 10).join('\n'),
         card_title: title,
         subject: card.subject || '',
-        grade: card.grade_level || card.grade || ''
+        grade: card.grade_level || card.grade || '',
+        source_type: source || 'widget'
       })
     })
-    const narrationData = await narrationResp.json()
+    var narrationData = await narrationResp.json()
     
-    // ナレーションテキスト決定
-    let speechText = ''
+    var speechText = ''
     if (narrationData.success && narrationData.narration_text) {
       speechText = narrationData.narration_text
     } else {
-      // フォールバック: 簡易テキスト
       speechText = title ? (title + 'について説明します。') : ''
       speechText += textParts.slice(0, 5).join('。') + '。'
     }
@@ -41735,7 +41749,7 @@ window.speakNB2NarrationAI = async function(page) {
       return
     }
     
-    // Step 2: Gemini TTS APIで音声生成（AI先生と同じエンジン）
+    // Step 2: Gemini TTS APIで音声生成
     if (btn) {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:3px;"></i>音声生成中...'
     }
@@ -41743,7 +41757,7 @@ window.speakNB2NarrationAI = async function(page) {
     var voiceType = 'male-friendly'
     try { voiceType = (localStorage.getItem('voicePreference') === 'female') ? 'female-friendly' : 'male-friendly' } catch(e) {}
     
-    const ttsResp = await fetch('/api/ai/tts', {
+    var ttsResp = await fetch('/api/ai/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -41752,10 +41766,9 @@ window.speakNB2NarrationAI = async function(page) {
         mood: ''
       })
     })
-    const ttsData = await ttsResp.json()
+    var ttsData = await ttsResp.json()
     
     if (ttsData.success && ttsData.audioContent && ttsData.audioFormat === 'pcm') {
-      // PCM音声で再生（AI先生と同じ方式）
       _globalTtsPlaying = true
       if (btn) {
         btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
@@ -41770,7 +41783,6 @@ window.speakNB2NarrationAI = async function(page) {
         }
       })
     } else if (ttsData.success && ttsData.audioContent) {
-      // MP3フォールバック
       _globalTtsPlaying = true
       if (btn) {
         btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
@@ -41792,7 +41804,6 @@ window.speakNB2NarrationAI = async function(page) {
         }
       })
     } else {
-      // TTS失敗 → Web Speech APIフォールバック
       console.warn('Gemini TTS失敗、Web Speech APIにフォールバック')
       window.speakNB2Explanation(page)
     }
@@ -41802,7 +41813,6 @@ window.speakNB2NarrationAI = async function(page) {
       btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
       btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
     }
-    // フォールバック
     window.speakNB2Explanation(page)
   }
 }
