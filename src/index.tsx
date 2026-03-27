@@ -16459,7 +16459,7 @@ ${customInfo}${mikataSection}
       "example_problem": "【★超重要★】例題は本問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う。答えは異なるがトピックは同じ。例：本問題『フィヨルド』→例題『入り組んだ海岸地形を何という？』答え:『リアス海岸』。全く別のテーマ・児童が習わない専門用語は絶対禁止。",
       "example_solution": "例題の解き方の丁寧な説明（途中式・図解の指示を含む）。例題専用の答えも最後に明記する。",
       "example_answer": "例題の答え（本問題のanswerとは異なる値だが、同じトピックの関連語）",
-      "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）",
+      "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）。★★★重要: 本問題の答え（answer）や例題の答え（example_answer）の文字を図に直接書かないこと。代わりに「？」や関連するヒント図を使う★★★",
       "real_world_connection": "実生活とのつながり（1文）",
       "answer": "正解（具体的・明確に。自動採点可能な短い答え。★例題の答えとは異なる値にする★）",
       "answer_keywords": ["キーワード1", "キーワード2", "キーワード3"],
@@ -35312,11 +35312,12 @@ function securityHeaders() {
     // Content Security Policy
     c.header('Content-Security-Policy', 
       "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; " +
       "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; " +
-      "img-src 'self' data: https:; " +
+      "img-src 'self' data: blob: https:; " +
       "font-src 'self' https://cdn.jsdelivr.net; " +
-      "connect-src 'self'; " +
+      "connect-src 'self' blob: data:; " +
+      "media-src 'self' blob: data: https:; " +
       "frame-ancestors 'none';"
     )
     
@@ -40655,7 +40656,7 @@ ${testPrepData.feedbackSummary ? `【テスト対策の振り返り】\n${testPr
       "example_problem": "【必須】例題の問題文。本番の問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う練習問題。答えは異なるがトピックは同じ。全く別のテーマは禁止。例：本問題『フィヨルド』→例題『入り組んだ海岸地形を何という？』答え『リアス海岸』。児童が習わない専門用語は答えにしない。",
       "example_solution": "【必須】例題の解き方。図解を含む丁寧な説明（例：『6÷2=3  6このクッキーを2つのグループに分けると、1グループ3こになります。答え：3こ』）",
       "example_answer": "【必須】例題の答え（★本問題のanswerとは絶対に異なる値にする★）",
-      "example_image_description": "【必須】例題の図解説明（AI画像生成用プロンプト）。図形問題→頂点名・角度・辺の長さ等を含む正確な図の説明。文章題→場面のイラスト説明。合同・対称→2つの図形を並べて対応関係を示す図。計算のみで図不要→null",
+      "example_image_description": "【必須】例題の図解説明（AI画像生成用プロンプト）。★答えの文字列を図に直接表示してはいけない。「？」や空欄で表す★ 図形問題→頂点名・角度・辺の長さ等を含む正確な図の説明。文章題→場面のイラスト説明。合同・対称→2つの図形を並べて対応関係を示す図。計算のみで図不要→null",
       "real_world_connection": "【推奨】実生活とのつながり。※問題の数学的内容に直接関連する具体例を書くこと。（例：わり算→『お菓子を友だちと分けるとき、何個ずつになるか考えるときにわり算を使うよ！』、角度→『建物の屋根や橋は角度を計算して設計されているよ！』）。問題と無関係な例を書かないこと",
       "problem_text": "児童が直接取り組む具体的な問題文。数値・選択肢・図形の説明など、児童が手を動かせる明確な指示を含むこと",
       "problem_description": "問題の背景や文脈の補足（problem_textとは異なる内容にすること）",
