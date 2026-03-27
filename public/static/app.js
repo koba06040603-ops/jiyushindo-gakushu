@@ -41780,11 +41780,23 @@ window.speakNB2NarrationAI = async function(page, source) {
   
   if (source === 'example') {
     // ★ 例題モード: 例題文と考え方のヒントのみ（答えは含めない）
-    if (title) textParts.push(title + 'の例題です。')
-    if (exampleProblem) textParts.push(exampleProblem.substring(0, 400))
-    // ヒントだけ追加（答えは除外）
-    if (hints.length > 0) textParts.push('ヒント: ' + hints[0].substring(0, 150))
-    if (!exampleProblem && problemText) textParts.push(problemText.substring(0, 300))
+    // 禁止ワードをtextPartsに追加する前にクリーンアップ
+    var exAnswer = card.example_answer || card.example_solution || ''
+    var mainAns = card.correct_answer || card.answer || ''
+    var cleanForbidden = [mainAns, exAnswer].filter(function(w) { return typeof w === 'string' && w.trim().length >= 2 && w.trim().length < 20 })
+    function cleanTextForNarration(text) {
+      var cleaned = text
+      for (var fi = 0; fi < cleanForbidden.length; fi++) {
+        var fw = cleanForbidden[fi].trim()
+        if (fw.length >= 2) cleaned = cleaned.split(fw).join('○○')
+      }
+      return cleaned
+    }
+    if (title) textParts.push(cleanTextForNarration(title) + 'の例題です。')
+    if (exampleProblem) textParts.push(cleanTextForNarration(exampleProblem.substring(0, 400)))
+    // ヒントだけ追加（答えキーワードを除去）
+    if (hints.length > 0) textParts.push('考え方のポイント: ' + cleanTextForNarration(hints[0].substring(0, 150)))
+    if (!exampleProblem && problemText) textParts.push(cleanTextForNarration(problemText.substring(0, 300)))
   } else if (source === 'image') {
     // ★ 問題画像モード: 図の説明と問題文のみ（答えは含めない）
     if (title) textParts.push(title)
@@ -41838,18 +41850,22 @@ window.speakNB2NarrationAI = async function(page, source) {
     var speechText = ''
     try {
       console.log('🔊 [NB2音声] ナレーションAPI呼び出し...')
-      // ★ 禁止ワードを収集（答え・例題の答えなど）
+      // ★ 禁止ワードを収集（答え・例題の答え・解き方に含まれる答えキーワード）
       var forbiddenWords = []
       var mainAnswer = card.correct_answer || card.answer || ''
-      var exAnswer = card.example_solution || card.example_answer || ''
+      var exAnswerShort = card.example_answer || ''  // 例題の答え（短い）
+      var exSolution = card.example_solution || ''    // 例題の解き方（長い）
       if (mainAnswer && typeof mainAnswer === 'string') forbiddenWords.push(mainAnswer.trim())
-      if (exAnswer && typeof exAnswer === 'string' && exAnswer !== mainAnswer) forbiddenWords.push(exAnswer.trim())
+      if (exAnswerShort && typeof exAnswerShort === 'string') forbiddenWords.push(exAnswerShort.trim())
+      // example_solutionが短い場合は答えそのもの（例: '氷河'）
+      if (exSolution && typeof exSolution === 'string' && exSolution.trim().length < 20) forbiddenWords.push(exSolution.trim())
       // answersオブジェクトがある場合
       if (cd.answer) {
         var ansText = cd.answer.answer_text || cd.answer.correct_answer || ''
-        if (ansText && !forbiddenWords.includes(ansText)) forbiddenWords.push(ansText.trim())
+        if (ansText && typeof ansText === 'string') forbiddenWords.push(ansText.trim())
       }
-      forbiddenWords = forbiddenWords.filter(function(w) { return w && w.length > 0 })
+      // 重複除去
+      forbiddenWords = forbiddenWords.filter(function(w, i, arr) { return w && w.length > 0 && arr.indexOf(w) === i })
       console.log('🔊 [NB2音声] 禁止ワード:', forbiddenWords)
       var narrationResp = await fetch('/api/ai/generate-nb2-narration', {
         method: 'POST',
