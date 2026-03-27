@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260327e' }, 200, {
+  return c.json({ build_id: '20260327f' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -32527,6 +32527,9 @@ HTMLコードだけを出力（コードブロック不要）:`
         const nb2SysPrompt = `あなたは日本の小学校・中学校の教科書に載るような、正確で分かりやすい教育用の図やイラストを生成する専門家です。
 数値やデータは問題文から正確に読み取り図に反映。ラベル・単位・目盛りは日本語で大きく読みやすく。
 色使いはカラフルで見やすく、小学生でも理解しやすいこと。教科書品質の正確さと見やすさを両立。
+★日本語のふりがなを使う場合は正確に書くこと。間違ったふりがなは絶対に書かない★
+★不要な数字や記号（問題番号等）を図に含めないこと★
+★問題文の内容全体を正確に反映した図を描くこと。タイトルだけでなく問題文を読むこと★
 ★★★ 最重要ルール: 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません。
 考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにしてください。
 答えの文字列・数値を目立つように配置してはダメです。★★★`
@@ -32649,12 +32652,15 @@ JSON形式で出力してください:`
 以下のルールに必ず従ってください：
 1. 数値やデータは問題文から正確に読み取り、図に反映すること
 2. ラベル、単位、目盛りなどの文字は日本語で大きく読みやすく書くこと
-3. 色使いはカラフルで見やすく、小学生でも理解しやすいこと
-4. 教科書品質の正確さと見やすさを両立すること
-5. 背景は白または淡い色で、図が主役になるようにすること
-6. 余計な装飾は避け、学習に必要な情報に集中すること
-7. ★★★ 最重要 ★★★ 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません
-8. 考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにすること`
+3. ★日本語のふりがな（ルビ）を使う場合は正確に。間違ったふりがなは絶対に書かないこと★
+4. 色使いはカラフルで見やすく、小学生でも理解しやすいこと
+5. 教科書品質の正確さと見やすさを両立すること
+6. 背景は白または淡い色で、図が主役になるようにすること
+7. 余計な装飾は避け、学習に必要な情報に集中すること
+8. ★不要な数字や記号（問題番号等）を図に含めないこと★
+9. ★★★ 最重要 ★★★ 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません
+10. 考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにすること
+11. ★問題文の内容を正確に反映すること。タイトルだけでなく問題文全体を読んで適切な図を描くこと★`
 
     const userPrompt = userContext
     
@@ -46329,25 +46335,32 @@ app.post('/api/ai/generate-nb2-narration', async (c) => {
   const { env } = c
   try {
     const startTime = Date.now()
-    const { text_content, card_title, subject, grade, source_type } = await c.req.json()
+    const { text_content, card_title, subject, grade, source_type, forbidden_words, main_answer } = await c.req.json()
     if (!text_content) return c.json({ success: false, error: 'text_content required' }, 400)
     
     const apiKey = env.GEMINI_API_KEY || env.GOOGLE_AI_KEY || ''
     if (!apiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' }, 500)
+    
+    // 禁止ワードリスト構築
+    const forbiddenList = (Array.isArray(forbidden_words) ? forbidden_words : []).filter((w: any) => typeof w === 'string' && w.trim().length > 0)
+    if (main_answer && typeof main_answer === 'string' && main_answer.trim()) forbiddenList.push(main_answer.trim())
+    const forbiddenRule = forbiddenList.length > 0
+      ? `\n★★★ 以下の単語は答えなので、ナレーションで絶対に言ってはいけません: ${forbiddenList.map((w: string) => '「' + w + '」').join('、')} ★★★`
+      : ''
     
     // source_type に応じたプロンプト分岐
     let roleDescription = ''
     if (source_type === 'example') {
       roleDescription = `この例題について、子どもが自分で考えるきっかけとなるように解説してください。
 考え方のヒントや図の見方を教えてあげてください。
-★絶対に答えや解き方の結論を言わないこと★ 「答えは何かな？考えてみよう！」で締めてください。`
+★絶対に答えや解き方の結論を言わないこと★ 「答えは何かな？考えてみよう！」で締めてください。${forbiddenRule}`
     } else if (source_type === 'image') {
       roleDescription = `この問題の図について、何が描かれているか、どこに注目すべきかを説明してください。
-★絶対に答えを言わないこと★ ヒントとなる部分を指摘するだけにしてください。`
+★絶対に答えを言わないこと★ ヒントとなる部分を指摘するだけにしてください。${forbiddenRule}`
     } else {
       roleDescription = `この教材コンテンツについて、子どもが楽しく理解できるように説明してください。
 考え方のヒントを与えてください。
-★答えや結論を直接言わないこと★ 「一緒に考えてみよう！」のような促しで終わってください。`
+★答えや結論を直接言わないこと★ 「一緒に考えてみよう！」のような促しで終わってください。${forbiddenRule}`
     }
     
     // ナレーションスクリプトをGeminiで生成
@@ -46365,7 +46378,7 @@ ${text_content.substring(0, 600)}
 - ポイントを3つ以内に絞る
 - 150文字以内
 - 「さあ、見てみよう！」のような導入をつける
-- ★重要: 答えや解答を絶対に含めないこと。ヒントまでにすること★`
+- ★重要: 答えや解答を絶対に含めないこと。ヒントまでにすること★${forbiddenRule}`
 
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,

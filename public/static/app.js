@@ -6485,10 +6485,14 @@ async function loadCardPage(cardId) {
                 </div>
                 ${card.example_solution ? `
                   <div class="bg-green-50 rounded-lg p-4">
-                    <h4 class="card-heading font-bold text-green-800 mb-2">
-                      <i class="fas fa-check-circle mr-2"></i>解き方・答え
+                    <h4 class="card-heading font-bold text-green-800 mb-2 flex items-center gap-2">
+                      <i class="fas fa-check-circle mr-1"></i>解き方・答え
+                      <span class="text-xs text-gray-400 font-normal">（自分で考えてから見てね）</span>
                     </h4>
-                    <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans">${formatText(card.example_solution)}</pre>
+                    <details>
+                      <summary class="cursor-pointer text-sm text-green-600 font-bold hover:text-green-800 transition py-1"><i class="fas fa-eye mr-1"></i>答えを見る</summary>
+                      <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans mt-2">${formatText(card.example_solution)}</pre>
+                    </details>
                   </div>
                 ` : ''}
               </div>
@@ -7854,16 +7858,30 @@ async function generateImageForCardAsImage(cardId, description) {
     const answerObj = rawCd.answer || {}
     const answerText = cd.answer || cd.correct_answer || answerObj.answer_text || answerObj.answer_content || ''
     const answerExplanation = cd.answer_explanation || cd.explanation || answerObj.explanation || ''
+    // ★ 例題の答えも禁止ワードに含める（問題画像に例題の答えが描かれないように）
+    const exampleSolution = cd.example_solution || ''
+    const exampleAnswer = cd.example_answer || ''
+    const allForbidden = [answerText, exampleSolution, exampleAnswer].filter(Boolean).map(w => w.toString().trim().substring(0, 50)).filter(w => w.length > 0)
+    // ★ プロンプト構築: 問題文も含めて正確な画像を生成
+    const problemTextForPrompt = cd.problem_content || cd.problem_text || cd.content || ''
+    let imagePrompt = description || ''
+    if (!imagePrompt && problemTextForPrompt && problemTextForPrompt.length > 10) {
+      imagePrompt = (cd.card_title || cd.title || '') + '。問題: ' + problemTextForPrompt.substring(0, 300)
+    } else if (!imagePrompt) {
+      imagePrompt = cd.card_title || cd.title || '教育用図解'
+    }
     const res = await axios.post('/api/ai/generate-image', {
-      prompt: description || cd.card_title || cd.title || '教育用図解',
+      prompt: imagePrompt,
       card_id: cardId,
-      problem_text: cd.problem_content || cd.problem_text || cd.content || '',
+      problem_text: problemTextForPrompt,
       card_title: cd.card_title || cd.title || '',
       unit_name: cd.unit_name || '',
       subject: cd.subject || '',
       grade: cd.grade_level || cd.grade || '',
       // answer_text は「禁止ワード」としてのみ送信（画像に表示させないため）
       answer_text: answerText,
+      // 例題の答えも禁止ワードとして送信
+      forbidden_answer: allForbidden.join(', '),
       prefer_image: true
     }, { timeout: 90000 })
     if (res.data.success && res.data.image_url) {
@@ -7906,16 +7924,29 @@ async function generateImageForCardNBPro(cardId, description) {
     const answerObj = rawCd.answer || {}
     const answerText = cd.answer || cd.correct_answer || answerObj.answer_text || answerObj.answer_content || ''
     const answerExplanation = cd.answer_explanation || cd.explanation || answerObj.explanation || ''
+    // ★ 例題の答えも禁止ワードに追加
+    const exSol = cd.example_solution || ''
+    const exAns = cd.example_answer || ''
+    const allForbiddenNB = [answerText, exSol, exAns].filter(Boolean).map(w => w.toString().trim().substring(0, 50)).filter(w => w.length > 0)
+    // ★ プロンプト構築: 問題文も含めて正確な画像を生成
+    const probTextForNBPro = cd.problem_content || cd.problem_text || cd.content || ''
+    let nbProPrompt = description || ''
+    if (!nbProPrompt && probTextForNBPro && probTextForNBPro.length > 10) {
+      nbProPrompt = (cd.card_title || cd.title || '') + '。問題: ' + probTextForNBPro.substring(0, 300)
+    } else if (!nbProPrompt) {
+      nbProPrompt = cd.card_title || cd.title || '教育用図解'
+    }
     const res = await axios.post('/api/ai/generate-image', {
-      prompt: description || cd.card_title || cd.title || '教育用図解',
+      prompt: nbProPrompt,
       card_id: cardId,
-      problem_text: cd.problem_content || cd.problem_text || cd.content || '',
+      problem_text: probTextForNBPro,
       card_title: cd.card_title || cd.title || '',
       unit_name: cd.unit_name || '',
       subject: cd.subject || '',
       grade: cd.grade_level || cd.grade || '',
       // answer_text は「禁止ワード」としてのみ送信
       answer_text: answerText,
+      forbidden_answer: allForbiddenNB.join(', '),
       prefer_image: true,
       prefer_model: 'nano_banana_pro'
     }, { timeout: 120000 })
@@ -41764,7 +41795,7 @@ window.speakNB2NarrationAI = async function(page, source) {
   } else {
     // ★ NB2ウィジェットモード: ウィジェット内テキストを収集（ノイズ除去）
     var widgetBody = document.getElementById('nb2-widget-body-' + page) || document.getElementById('nb2-visual-content-' + page)
-    var noiseRe = /^[\d.]+秒$|^NB2|^Nano Banana|^問題の図|^編集|^差し替え|^削除|^非表示|^表示|^再生成|^クリックで拡大|^F\d|^AUDIO|^\d+$|^修正版|^by NB2|^学習ソング|^音声解説|^保存$|^停止$|秒\)$|^\([\d.]+秒\)$|^NB2を|^AIに|イラストを描いて|^やってみよう$|^タップ$|^▶/
+    var noiseRe = /^[\d.]+秒$|^NB2|^Nano Banana|^問題の図|^編集|^差し替え|^削除|^非表示|^表示|^再生成|^クリックで拡大|^F\d|^AUDIO|^\d+$|^修正版|^by NB2|^学習ソング|^音声解説|^保存$|^停止$|秒\)$|^\([\d.]+秒\)$|^NB2を|^AIに|イラストを描いて|^やってみよう$|^タップ$|^▶|○に当てはまる|□に当てはまる|に当てはまる言葉|に当てはまる数/
     if (widgetBody) {
       widgetBody.querySelectorAll('p, h1, h2, h3, h4, div, span, td, th, li').forEach(function(el) {
         if (el.closest('button') || el.closest('script') || el.closest('[id^="nb2-visual-toolbar"]')) return
@@ -41775,8 +41806,12 @@ window.speakNB2NarrationAI = async function(page, source) {
     }
     // NB2テキストが無い場合、問題文にフォールバック（答えは含めない）
     if (textParts.length === 0) {
+      if (title) textParts.push(title)
       if (problemText) textParts.push(problemText.substring(0, 300))
       if (hints.length > 0) textParts.push('ヒント: ' + hints[0].substring(0, 150))
+    } else if (textParts.length > 0 && title && !textParts[0].includes(title)) {
+      // タイトルがtextPartsに含まれていない場合、先頭に追加
+      textParts.unshift(title)
     }
   }
   
@@ -41803,6 +41838,19 @@ window.speakNB2NarrationAI = async function(page, source) {
     var speechText = ''
     try {
       console.log('🔊 [NB2音声] ナレーションAPI呼び出し...')
+      // ★ 禁止ワードを収集（答え・例題の答えなど）
+      var forbiddenWords = []
+      var mainAnswer = card.correct_answer || card.answer || ''
+      var exAnswer = card.example_solution || card.example_answer || ''
+      if (mainAnswer && typeof mainAnswer === 'string') forbiddenWords.push(mainAnswer.trim())
+      if (exAnswer && typeof exAnswer === 'string' && exAnswer !== mainAnswer) forbiddenWords.push(exAnswer.trim())
+      // answersオブジェクトがある場合
+      if (cd.answer) {
+        var ansText = cd.answer.answer_text || cd.answer.correct_answer || ''
+        if (ansText && !forbiddenWords.includes(ansText)) forbiddenWords.push(ansText.trim())
+      }
+      forbiddenWords = forbiddenWords.filter(function(w) { return w && w.length > 0 })
+      console.log('🔊 [NB2音声] 禁止ワード:', forbiddenWords)
       var narrationResp = await fetch('/api/ai/generate-nb2-narration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -41811,7 +41859,9 @@ window.speakNB2NarrationAI = async function(page, source) {
           card_title: title,
           subject: card.subject || '',
           grade: card.grade_level || card.grade || '',
-          source_type: source || 'widget'
+          source_type: source || 'widget',
+          forbidden_words: forbiddenWords,
+          main_answer: mainAnswer
         })
       })
       console.log('🔊 [NB2音声] ナレーションAPI応答: status=' + narrationResp.status)
