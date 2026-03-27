@@ -42002,10 +42002,16 @@ window.speakNB2NarrationAI = async function(page, source) {
       window.speakNB2Explanation(page)
     }
   } catch (e) {
-    console.error('❌ [NB2音声] エラー:', e.name, e.message, e.stack)
+    console.error('❌ [NB2音声] 内側エラー:', e.name, e.message, e.stack)
+    _globalTtsPlaying = false
+    // ★ デバッグ: 内側エラーもボタンに表示
+    var innerErrDetail = '内側:' + (e.name || 'Error') + ': ' + (e.message || '不明').substring(0, 50)
     if (btn) {
-      btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
-      btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+      btn.innerHTML = '<i class="fas fa-bug" style="margin-right:3px;"></i> ' + innerErrDetail
+      btn.style.background = 'linear-gradient(135deg,#F59E0B,#D97706)'
+      btn.style.fontSize = '10px'
+      btn.style.maxWidth = '300px'
+      btn.style.whiteSpace = 'normal'
     }
     // タイムアウトやネットワークエラーでもWeb Speech APIで読み上げ
     console.log('🔊 [NB2音声] Web Speech APIにフォールバック')
@@ -42030,14 +42036,26 @@ window.speakNB2NarrationAI = async function(page, source) {
   } catch(outerErr) {
     console.error('❌❌ [NB2音声] 最外側エラー:', outerErr.name, outerErr.message, outerErr.stack)
     _globalTtsPlaying = false
+    // ★ デバッグ: エラー詳細をボタンに表示（5秒間）
+    var errDetail = (outerErr.name || 'Error') + ': ' + (outerErr.message || '不明').substring(0, 60)
     if (btn) {
-      btn.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:3px;color:#FCD34D;"></i> エラー発生'
+      btn.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:3px;color:#FCD34D;"></i> ' + errDetail
       btn.style.background = 'linear-gradient(135deg,#DC2626,#B91C1C)'
+      btn.style.fontSize = '10px'
+      btn.style.maxWidth = '300px'
+      btn.style.whiteSpace = 'normal'
+      btn.style.lineHeight = '1.2'
       setTimeout(function() {
         btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
         btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
-      }, 5000)
+        btn.style.fontSize = ''
+        btn.style.maxWidth = ''
+        btn.style.whiteSpace = ''
+        btn.style.lineHeight = ''
+      }, 8000)
     }
+    // ★ デバッグ: alert でもエラー表示
+    try { alert('NB2音声エラー: ' + errDetail + '\nstack: ' + (outerErr.stack || '').substring(0, 200)) } catch(ae) {}
     // 音声がまだ再生されていない場合のみWeb Speech API
     if (!_nb2AudioPlayed) {
       try {
