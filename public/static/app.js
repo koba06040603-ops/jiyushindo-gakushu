@@ -6460,7 +6460,7 @@ async function loadCardPage(cardId) {
               <div class="bg-white rounded-lg shadow-lg p-6">
                 <h3 class="card-heading font-bold text-gray-800 mb-4 flex items-center flex-wrap gap-2">
                   <span><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</span>
-                  <button onclick="(window.speakNB2NarrationAI||window.speakNB2Explanation)(${card.card_id || card.id || 0}, 'example')" id="nb2-speak-btn-example-${card.card_id || card.id || 0}" class="ml-auto bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>
+                  <button onclick="try{if(typeof window.speakNB2NarrationAI==='function'){window.speakNB2NarrationAI(${card.card_id || card.id || 0},'example')}else if(typeof window.speakNB2Explanation==='function'){window.speakNB2Explanation(${card.card_id || card.id || 0})}else{alert('音声機能を読み込み中です')}}catch(e){alert('音声エラー:'+e.message)}" id="nb2-speak-btn-example-${card.card_id || card.id || 0}" class="ml-auto bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>
                 </h3>
                 <div class="bg-yellow-50 rounded-lg p-4 mb-4">
                   <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${formatText(card.example_problem)}</pre>
@@ -6726,7 +6726,7 @@ async function loadCardPage(cardId) {
                     '<button onclick="this.closest(\'[id$=-wrapper]\').style.display=\'none\'" class="ml-auto text-gray-400 hover:text-red-500 text-xs px-2 py-1 rounded hover:bg-red-50 transition" title="このウィジェットを非表示"><i class="fas fa-times"></i> 非表示</button>' +
                   '</div>' +
                   '<div class="flex flex-wrap gap-2 justify-center mb-3">' +
-                    '<button onclick="(window.speakNB2NarrationAI||window.speakNB2Explanation)(' + cardIdVal + ')" id="nb2-speak-btn-' + cardIdVal + '" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>' +
+                    '<button onclick="try{if(typeof window.speakNB2NarrationAI===\'function\'){window.speakNB2NarrationAI(' + cardIdVal + ')}else if(typeof window.speakNB2Explanation===\'function\'){window.speakNB2Explanation(' + cardIdVal + ')}else{alert(\'音声機能を読み込み中です\')}}catch(e){alert(\'音声エラー:\'+e.message)}" id="nb2-speak-btn-' + cardIdVal + '" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>' +
                     '<button onclick="window.bookmarkNB2Image&&window.bookmarkNB2Image(' + cardIdVal + ')" id="nb2-bookmark-btn-' + cardIdVal + '" class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-star mr-1"></i>⭐ 保存</button>' +
                   '</div>' +
                   '<div id="tactile-ai-illust-card-' + cardIdVal + '" class="flex items-center justify-center mb-2 min-h-[80px]"><span class="text-4xl" id="tactile-illust-' + cardIdVal + '"></span></div>' +
@@ -7862,8 +7862,7 @@ async function generateImageForCardAsImage(cardId, description) {
       unit_name: cd.unit_name || '',
       subject: cd.subject || '',
       grade: cd.grade_level || cd.grade || '',
-      answer_text: answerText,
-      answer_explanation: answerExplanation,
+      // answer_text, answer_explanation は画像に含めないため送信しない
       prefer_image: true
     }, { timeout: 90000 })
     if (res.data.success && res.data.image_url) {
@@ -7927,8 +7926,7 @@ async function generateImageForCardNBPro(cardId, description) {
       unit_name: cd.unit_name || '',
       subject: cd.subject || '',
       grade: cd.grade_level || cd.grade || '',
-      answer_text: answerText,
-      answer_explanation: answerExplanation,
+      // answer_text, answer_explanation は画像に含めないため送信しない
       prefer_image: true,
       prefer_model: 'nano_banana_pro'
     }, { timeout: 120000 })
@@ -8295,8 +8293,7 @@ async function generateImageForCard(cardId, description) {
       unit_name: unitName,
       subject: subject,
       grade: gradeLevel,
-      answer_text: answerText,
-      answer_explanation: answerExplanation,
+      // answer_text, answer_explanation は画像に含めないため送信しない
       custom_prompt: isCustomPrompt ? description : '',
       style: 'educational diagram'
     }, { timeout: 90000 })
@@ -12114,7 +12111,7 @@ function initVisualWidgets() {
       toolbar.innerHTML = `
         <button onclick="regenerateVisualWidget('${cardId}')" style="background:linear-gradient(135deg,#7C3AED,#EC4899);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(124,58,237,0.3);"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>NB2を再生成</button>
         <button onclick="editVisualWidget('${cardId}')" style="background:#F59E0B;color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-edit" style="margin-right:4px;"></i>NB2を修正指示</button>
-        <button onclick="(window.speakNB2NarrationAI||window.speakNB2Explanation)('${cardId}')" id="nb2-speak-btn-${cardId}" style="background:linear-gradient(135deg,#10B981,#059669);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-volume-up" style="margin-right:4px;"></i>🔊 音声解説</button>
+        <button onclick="try{if(typeof window.speakNB2NarrationAI==='function'){window.speakNB2NarrationAI('${cardId}')}else if(typeof window.speakNB2Explanation==='function'){window.speakNB2Explanation('${cardId}')}else{alert('音声機能を読み込み中です')}}catch(e){alert('音声エラー:'+e.message)}" id="nb2-speak-btn-${cardId}" style="background:linear-gradient(135deg,#10B981,#059669);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(16,185,129,0.3);"><i class="fas fa-volume-up" style="margin-right:4px;"></i>🔊 音声解説</button>
         <button onclick="window.bookmarkNB2Image&&window.bookmarkNB2Image('${cardId}')" id="nb2-bookmark-btn-${cardId}" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:7px 14px;border-radius:10px;font-weight:bold;cursor:pointer;font-size:0.78rem;box-shadow:0 2px 6px rgba(245,158,11,0.3);"><i class="fas fa-star" style="margin-right:4px;"></i>⭐ 保存</button>
       `
     }
@@ -41129,7 +41126,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
         <p class="text-[10px] text-gray-400 mt-1">クリックで拡大</p>
       </div>
       <div class="mt-2 flex flex-wrap gap-2 justify-center">
-        <button onclick="event.stopPropagation(); (window.speakNB2NarrationAI||window.speakNB2Explanation)(${cardId}, 'image')" id="nb2-speak-btn-img-${cardId}" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>
+        <button onclick="event.stopPropagation(); try{ if(typeof window.speakNB2NarrationAI==='function'){window.speakNB2NarrationAI(${cardId},'image')}else if(typeof window.speakNB2Explanation==='function'){window.speakNB2Explanation(${cardId})}else{alert('音声機能を読み込み中です。ページをリロードしてください。');console.error('speakNB2NarrationAI undefined, app.js not fully loaded')}}catch(e){alert('音声エラー:'+e.message);console.error(e)}" id="nb2-speak-btn-img-${cardId}" class="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>
         <button onclick="event.stopPropagation(); window.bookmarkNB2Image&&window.bookmarkNB2Image(${cardId})" id="nb2-bookmark-btn-${cardId}" class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-star mr-1"></i>⭐ 保存</button>
       </div>
       <div class="mt-1 flex items-center justify-center gap-2 flex-wrap">
@@ -41688,6 +41685,7 @@ window.speakNB2Explanation = function(page) {
 // source=undefined: NB2ウィジェットの解説（ウィジェットテキスト使用）
 // ★ 重要: 音声解説は「ヒントまで」。答えは絶対に含めない。
 window.speakNB2NarrationAI = async function(page, source) {
+  console.log('🔊 [NB2音声] 開始: page=' + page + ', source=' + source)
   var btnId = source === 'image' ? 'nb2-speak-btn-img-' + page : source === 'example' ? 'nb2-speak-btn-example-' + page : 'nb2-speak-btn-' + page
   var btn = document.getElementById(btnId)
   if (!btn) btn = document.getElementById('nb2-speak-btn-' + page)
@@ -41705,6 +41703,7 @@ window.speakNB2NarrationAI = async function(page, source) {
   // カードデータ
   var cd = window.currentCardData || {}
   var card = cd.card || cd || {}
+  console.log('🔊 [NB2音声] カードデータ:', { hasCard: !!card, title: card.card_title || card.title || '(なし)', hasProblem: !!(card.problem_content || card.problem_text) })
   var title = card.card_title || card.title || ''
   var problemText = card.problem_content || card.problem_text || ''
   var imgDesc = card._image_description || ''
@@ -41749,9 +41748,16 @@ window.speakNB2NarrationAI = async function(page, source) {
   }
   
   if (textParts.length === 0) {
+    console.warn('🔊 [NB2音声] textPartsが空 - 解説する内容なし')
     if (typeof showToast === 'function') showToast('解説する内容が見つかりません', 'warning')
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+      btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+    }
     return
   }
+  
+  console.log('🔊 [NB2音声] textParts:', textParts.length, '件, 合計', textParts.join('').length, '文字')
   
   // UI: ローディング
   if (btn) {
@@ -41817,6 +41823,7 @@ window.speakNB2NarrationAI = async function(page, source) {
     console.log('🔊 NB2音声解説: TTS API応答', { success: ttsData.success, format: ttsData.audioFormat, hasContent: !!ttsData.audioContent, contentLen: (ttsData.audioContent || '').length })
     
     if (ttsData.success && ttsData.audioContent && ttsData.audioFormat === 'pcm') {
+      console.log('🔊 [NB2音声] PCM再生開始...')
       _globalTtsPlaying = true
       if (btn) {
         btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
@@ -57915,3 +57922,11 @@ window.adminShowAddUser = adminShowAddUser
 window.adminExportData = adminExportData
 
 console.log('✅ 管理者ダッシュボード初期化完了')
+
+// ★ デバッグ: 重要な関数の定義状態をチェック
+console.log('🔍 [DEBUG] speakNB2NarrationAI:', typeof window.speakNB2NarrationAI)
+console.log('🔍 [DEBUG] speakNB2Explanation:', typeof window.speakNB2Explanation)
+console.log('🔍 [DEBUG] playPcmGlobal:', typeof playPcmGlobal)
+console.log('🔍 [DEBUG] _globalTtsPlaying:', typeof _globalTtsPlaying)
+console.log('🔍 [DEBUG] bookmarkNB2Image:', typeof window.bookmarkNB2Image)
+console.log('🔍 [DEBUG] app.js 完全読み込み完了 ✅')
