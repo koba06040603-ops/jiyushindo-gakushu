@@ -12249,7 +12249,7 @@ window.editVisualWidget = function(cardId) {
       card_id: cardId,
       card_title: card.card_title || '',
       problem_text: (card.problem_text || card.problem_content || '').substring(0, 800),
-      tactile_activity: '問題内容を理解しやすくする正確な図解・ダイアグラムを生成してください。',
+      tactile_activity: '問題内容を理解するためのヒントとなる図解・ダイアグラムを生成してください。★答えそのものは表示せず、考え方のヒントを視覚的に示すこと★',
       subject: card.subject || '',
       grade: card.grade_level || '',
       unit_name: card.unit_name || '',
@@ -12494,28 +12494,44 @@ if (document.readyState === 'loading') {
   setTimeout(createFloatingTtsButton, 500)
 }
 
-function playPcmGlobal(base64Data, sampleRate, onEnd) {
+async function playPcmGlobal(base64Data, sampleRate, onEnd) {
   try {
     if (!_globalTtsAudioCtx) _globalTtsAudioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    const raw = atob(base64Data)
-    const bytes = new Uint8Array(raw.length)
-    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
-    const samples = bytes.length / 2
-    const float32 = new Float32Array(samples)
-    const dv = new DataView(bytes.buffer)
-    for (let j = 0; j < samples; j++) {
+    // ★ ブラウザのautoplay policyでsuspended状態の場合はresumeを待つ
+    if (_globalTtsAudioCtx.state === 'suspended') {
+      console.log('🔊 AudioContext suspended - resumeを待機中...')
+      await _globalTtsAudioCtx.resume()
+      console.log('🔊 AudioContext resumed:', _globalTtsAudioCtx.state)
+    }
+    var raw = atob(base64Data)
+    var bytes = new Uint8Array(raw.length)
+    for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
+    var samples = bytes.length / 2
+    var float32 = new Float32Array(samples)
+    var dv = new DataView(bytes.buffer)
+    for (var j = 0; j < samples; j++) {
       float32[j] = dv.getInt16(j * 2, true) / 32768.0
     }
-    const buffer = _globalTtsAudioCtx.createBuffer(1, float32.length, sampleRate)
+    var buffer = _globalTtsAudioCtx.createBuffer(1, float32.length, sampleRate)
     buffer.getChannelData(0).set(float32)
-    const source = _globalTtsAudioCtx.createBufferSource()
+    var source = _globalTtsAudioCtx.createBufferSource()
     source.buffer = buffer
     source.connect(_globalTtsAudioCtx.destination)
-    source.onended = onEnd
+    source.onended = function() {
+      console.log('✅ PCM再生完了')
+      if (onEnd) onEnd()
+    }
+    source.onerror = function(e) {
+      console.warn('⚠️ PCMソースエラー:', e)
+      if (onEnd) onEnd()
+    }
     _globalTtsSource = source
     source.start(0)
+    console.log('✅ PCM再生開始 (サンプル数:', float32.length, ', レート:', sampleRate, ', AudioContext状態:', _globalTtsAudioCtx.state, ')')
   } catch (e) {
-    console.warn('PCM再生エラー:', e)
+    console.warn('❌ PCM再生エラー:', e)
+    // AudioContextをリセットして次回作り直す
+    _globalTtsAudioCtx = null
     if (onEnd) onEnd()
   }
 }
@@ -41778,20 +41794,27 @@ window.speakNB2NarrationAI = async function(page, source) {
     if (btn) {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:3px;"></i>音声生成中...'
     }
+    console.log('🔊 NB2音声解説: TTS API呼び出し開始 (テキスト長:', speechText.length, '文字)')
     
     var voiceType = 'male-friendly'
     try { voiceType = (localStorage.getItem('voicePreference') === 'female') ? 'female-friendly' : 'male-friendly' } catch(e) {}
     
+    var ttsAbortCtrl = new AbortController()
+    var ttsTimeout = setTimeout(function() { ttsAbortCtrl.abort() }, 30000) // 30秒タイムアウト
+    
     var ttsResp = await fetch('/api/ai/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: ttsAbortCtrl.signal,
       body: JSON.stringify({
         text: speechText.substring(0, 800),
         voiceType: voiceType,
         mood: ''
       })
     })
+    clearTimeout(ttsTimeout)
     var ttsData = await ttsResp.json()
+    console.log('🔊 NB2音声解説: TTS API応答', { success: ttsData.success, format: ttsData.audioFormat, hasContent: !!ttsData.audioContent, contentLen: (ttsData.audioContent || '').length })
     
     if (ttsData.success && ttsData.audioContent && ttsData.audioFormat === 'pcm') {
       _globalTtsPlaying = true
@@ -41852,12 +41875,48 @@ window.speakNB2NarrationAI = async function(page, source) {
       window.speakNB2Explanation(page)
     }
   } catch (e) {
-    console.warn('AIナレーションエラー:', e)
+    console.warn('❌ AIナレーションエラー:', e.name, e.message)
     if (btn) {
       btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
       btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
     }
-    window.speakNB2Explanation(page)
+    // タイムアウトやネットワークエラーでもWeb Speech APIで読み上げ
+    console.log('🔊 Web Speech APIにフォールバック')
+    try {
+      if (window.speechSynthesis && textParts.length > 0) {
+        var fallbackText = (title ? title + '。' : '') + textParts.slice(0, 3).join('。')
+        fallbackText = fallbackText.substring(0, 500)
+        var utter = new SpeechSynthesisUtterance(fallbackText)
+        utter.lang = 'ja-JP'
+        utter.rate = 0.9
+        utter.pitch = 1.1
+        var voices = speechSynthesis.getVoices()
+        var jpVoice = voices.find(function(v) { return v.lang.startsWith('ja') })
+        if (jpVoice) utter.voice = jpVoice
+        _globalTtsPlaying = true
+        if (btn) {
+          btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
+          btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)'
+        }
+        utter.onend = function() {
+          _globalTtsPlaying = false
+          if (btn) {
+            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+          }
+        }
+        utter.onerror = function() {
+          _globalTtsPlaying = false
+          if (btn) {
+            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+          }
+        }
+        window.speechSynthesis.speak(utter)
+      }
+    } catch(fallbackErr) {
+      console.warn('Web Speech APIフォールバックも失敗:', fallbackErr)
+    }
   }
 }
 

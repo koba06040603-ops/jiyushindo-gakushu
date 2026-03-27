@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260326i' }, 200, {
+  return c.json({ build_id: '20260327a' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -32192,13 +32192,9 @@ app.post('/api/ai/generate-image', async (c) => {
     if (problem_text && problem_text.length > 5) {
       contextParts.push(`問題文:\n${problem_text.substring(0, 600)}`)
     }
-    // 解答テキストを含める（正確な数値のために重要）
-    if (answer_text && answer_text.length > 1) {
-      contextParts.push(`\n【重要: この問題の正解・解答データ】\n${answer_text.substring(0, 500)}`)
-    }
-    if (answer_explanation && answer_explanation.length > 1) {
-      contextParts.push(`解答の解説: ${answer_explanation.substring(0, 300)}`)
-    }
+    // ★★★ 答え・解答は画像に含めない ★★★
+    // answer_text, answer_explanation は意図的に除外
+    // 画像はヒント・考え方の手がかりのみを表示する
     // ユーザーが手動で指定したプロンプト（最優先）
     if (custom_prompt && custom_prompt.length > 1) {
       contextParts.push(`\n【ユーザー追加指示】\n${custom_prompt.substring(0, 500)}`)
@@ -32470,7 +32466,10 @@ HTMLコードだけを出力（コードブロック不要）:`
       try {
         const nb2SysPrompt = `あなたは日本の小学校・中学校の教科書に載るような、正確で分かりやすい教育用の図やイラストを生成する専門家です。
 数値やデータは問題文から正確に読み取り図に反映。ラベル・単位・目盛りは日本語で大きく読みやすく。
-色使いはカラフルで見やすく、小学生でも理解しやすいこと。教科書品質の正確さと見やすさを両立。`
+色使いはカラフルで見やすく、小学生でも理解しやすいこと。教科書品質の正確さと見やすさを両立。
+★★★ 最重要ルール: 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません。
+考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにしてください。
+答えの文字列・数値を目立つように配置してはダメです。★★★`
         
         const nb2Resp = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
@@ -32593,7 +32592,9 @@ JSON形式で出力してください:`
 3. 色使いはカラフルで見やすく、小学生でも理解しやすいこと
 4. 教科書品質の正確さと見やすさを両立すること
 5. 背景は白または淡い色で、図が主役になるようにすること
-6. 余計な装飾は避け、学習に必要な情報に集中すること`
+6. 余計な装飾は避け、学習に必要な情報に集中すること
+7. ★★★ 最重要 ★★★ 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません
+8. 考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにすること`
 
     const userPrompt = userContext
     
