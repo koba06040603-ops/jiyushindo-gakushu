@@ -41731,8 +41731,18 @@ window.speakNB2NarrationAI = async function(page, source) {
   var problemText = card.problem_content || card.problem_text || ''
   var imgDesc = card._image_description || ''
   var exampleProblem = card.example_problem || ''
-  // ★ ヒントのみ使用（答えは含めない）
-  var hints = (cd.hints || card.hints || []).filter(function(h) { return h && h.trim() })
+  // ★ ヒントのみ使用（答えは含めない）- オブジェクト型ヒントも安全に処理
+  var rawHints = cd.hints || card.hints || []
+  var hints = []
+  for (var hi = 0; hi < rawHints.length; hi++) {
+    var h = rawHints[hi]
+    if (typeof h === 'string' && h.trim()) {
+      hints.push(h.trim())
+    } else if (h && typeof h === 'object' && (h.text || h.content || h.hint_text)) {
+      var ht = (h.text || h.content || h.hint_text || '').toString().trim()
+      if (ht) hints.push(ht)
+    }
+  }
   
   textParts = []
   var source_type = source || 'widget'
@@ -42006,14 +42016,9 @@ window.speakNB2NarrationAI = async function(page, source) {
   } catch (e) {
     console.error('❌ [NB2音声] 内側エラー:', e.name, e.message, e.stack)
     _globalTtsPlaying = false
-    // ★ デバッグ: 内側エラーもボタンに表示
-    var innerErrDetail = '内側:' + (e.name || 'Error') + ': ' + (e.message || '不明').substring(0, 50)
     if (btn) {
-      btn.innerHTML = '<i class="fas fa-bug" style="margin-right:3px;"></i> ' + innerErrDetail
-      btn.style.background = 'linear-gradient(135deg,#F59E0B,#D97706)'
-      btn.style.fontSize = '10px'
-      btn.style.maxWidth = '300px'
-      btn.style.whiteSpace = 'normal'
+      btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+      btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
     }
     // タイムアウトやネットワークエラーでもWeb Speech APIで読み上げ
     console.log('🔊 [NB2音声] Web Speech APIにフォールバック')
@@ -42038,26 +42043,14 @@ window.speakNB2NarrationAI = async function(page, source) {
   } catch(outerErr) {
     console.error('❌❌ [NB2音声] 最外側エラー:', outerErr.name, outerErr.message, outerErr.stack)
     _globalTtsPlaying = false
-    // ★ デバッグ: エラー詳細をボタンに表示（5秒間）
-    var errDetail = (outerErr.name || 'Error') + ': ' + (outerErr.message || '不明').substring(0, 60)
     if (btn) {
-      btn.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:3px;color:#FCD34D;"></i> ' + errDetail
+      btn.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:3px;color:#FCD34D;"></i> エラー発生'
       btn.style.background = 'linear-gradient(135deg,#DC2626,#B91C1C)'
-      btn.style.fontSize = '10px'
-      btn.style.maxWidth = '300px'
-      btn.style.whiteSpace = 'normal'
-      btn.style.lineHeight = '1.2'
       setTimeout(function() {
         btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
         btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
-        btn.style.fontSize = ''
-        btn.style.maxWidth = ''
-        btn.style.whiteSpace = ''
-        btn.style.lineHeight = ''
-      }, 8000)
+      }, 5000)
     }
-    // ★ デバッグ: alert でもエラー表示
-    try { alert('NB2音声エラー: ' + errDetail + '\nstack: ' + (outerErr.stack || '').substring(0, 200)) } catch(ae) {}
     // 音声がまだ再生されていない場合のみWeb Speech API
     if (!_nb2AudioPlayed) {
       try {
@@ -58077,24 +58070,6 @@ console.log('✅ 管理者ダッシュボード初期化完了')
 console.log('🔍 [DEBUG] speakNB2NarrationAI:', typeof window.speakNB2NarrationAI)
 console.log('🔍 [DEBUG] speakNB2Explanation:', typeof window.speakNB2Explanation)
 console.log('🔍 [DEBUG] playPcmGlobal:', typeof playPcmGlobal)
-console.log('🔍 [DEBUG] _globalTtsPlaying:', typeof _globalTtsPlaying, _globalTtsPlaying)
-console.log('🔍 [DEBUG] stopGlobalTts:', typeof stopGlobalTts)
-
-// ★ デバッグ: クライアントエラーをサーバーに送信
-window._nb2ErrorLog = []
-window._nb2OrigSpeakFn = window.speakNB2NarrationAI
-window.speakNB2NarrationAI = async function(page, source) {
-  try {
-    console.log('🔊 [WRAPPER] speakNB2NarrationAI呼び出し: page=' + page + ', source=' + source)
-    // エラーログ送信
-    fetch('/api/ai/debug-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'nb2_audio_start', page: page, source: source, timestamp: Date.now(), globalTtsPlaying: _globalTtsPlaying }) }).catch(function(){})
-    await window._nb2OrigSpeakFn(page, source)
-    fetch('/api/ai/debug-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'nb2_audio_success', page: page, source: source, timestamp: Date.now() }) }).catch(function(){})
-  } catch(wrapErr) {
-    console.error('🔊 [WRAPPER] エラー:', wrapErr.name, wrapErr.message, wrapErr.stack)
-    fetch('/api/ai/debug-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'nb2_audio_error', page: page, source: source, error: wrapErr.name + ': ' + wrapErr.message, stack: (wrapErr.stack || '').substring(0, 500), timestamp: Date.now() }) }).catch(function(){})
-  }
-}
 console.log('🔍 [DEBUG] _globalTtsPlaying:', typeof _globalTtsPlaying)
 console.log('🔍 [DEBUG] bookmarkNB2Image:', typeof window.bookmarkNB2Image)
 console.log('🔍 [DEBUG] app.js 完全読み込み完了 ✅')
