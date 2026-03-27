@@ -36175,21 +36175,10 @@ async function executeAiRegenerate(cardId) {
         await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url })
       } catch(e) { console.warn('カード更新スキップ:', e) }
       
-      // カード上の画像を更新
+      // カード上の画像を更新 → renderMediaEmbedを使って音声解説ボタンも含む完全UIを表示
       const container = document.getElementById('card-image-container-' + cardId)
       if (container) {
-        container.innerHTML = `
-          <img src="${res.data.image_url}" alt="AI生成画像" 
-               class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;"
-               onerror="handleImageLoadError(this, ${cardId})">
-          <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
-            <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
-              <i class="fas fa-check-circle mr-1"></i>${res.data.model || 'AI'}で生成（${((res.data.generation_time_ms || 0)/1000).toFixed(1)}秒）
-            </span>
-            <button onclick="openImageReplaceMenu(${cardId})" class="text-xs text-orange-500 hover:text-orange-700 underline font-bold">🔄 差し替え</button>
-            <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
-          </div>
-        `
+        container.outerHTML = renderMediaEmbed(res.data.image_url, cardId, res.data.ai_description || '問題の図')
       }
       
       // メニューを閉じる

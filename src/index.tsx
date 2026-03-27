@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260327h' }, 200, {
+  return c.json({ build_id: '20260327i' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260327h';
+    var MY_BUILD = '20260327i';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14501,7 +14501,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260327h';
+          var MY_BUILD = '20260327i';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -32245,7 +32245,7 @@ app.post('/api/ai/generate-image', async (c) => {
     
     // ========== コンテキスト情報の構築 ==========
     const contextParts: string[] = []
-    if (grade || subject) contextParts.push(`対象: 日本の${grade || ''}${subject || ''}の授業`)
+    if (grade || subject) contextParts.push(`（参考情報・図には描かないこと）対象学年: ${grade || ''}、教科: ${subject || ''}`)
     if (unit_name) contextParts.push(`単元: ${unit_name}`)
     if (card_title) contextParts.push(`テーマ: ${card_title}`)
     contextParts.push(`内容: ${prompt}`)
@@ -32537,6 +32537,7 @@ HTMLコードだけを出力（コードブロック不要）:`
 ★★★ ふりがな（ルビ）は絶対に使わないこと。漢字の上に小さい文字を書かない。読みやすい漢字はそのまま、難しい漢字はひらがなで書く ★★★
 ★不要な数字や記号（問題番号等）を図に含めないこと★
 ★問題文の内容全体を正確に反映した図を描くこと。タイトルだけでなく問題文を読むこと★
+★★★ 画像の上部にタイトルやヘッダーテキスト（「○○の教科書」「中学校・社会」等）を絶対に描かないこと。図の内容だけを描くこと ★★★
 ★★★ 最重要ルール: 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません。
 考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにしてください。
 答えの文字列・数値を目立つように配置してはダメです。★★★`
@@ -32667,7 +32668,8 @@ JSON形式で出力してください:`
 8. ★不要な数字や記号（問題番号等）を図に含めないこと★
 9. ★★★ 最重要 ★★★ 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません
 10. 考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにすること
-11. ★問題文の内容を正確に反映すること。タイトルだけでなく問題文全体を読んで適切な図を描くこと★`
+11. ★問題文の内容を正確に反映すること。タイトルだけでなく問題文全体を読んで適切な図を描くこと★
+12. ★★★ 画像の上部にタイトルやヘッダーテキスト（「○○の教科書」「中学校・社会」等）を絶対に描かないこと。図の内容だけを描くこと ★★★`
 
     const userPrompt = userContext
     
