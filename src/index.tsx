@@ -26785,7 +26785,7 @@ Requirements:
 // ========================================
 app.post('/api/ai/generate-tactile-widget', async (c) => {
   const startTime = Date.now()
-  const { card_id, card_title, problem_text, tactile_activity, subject, grade, unit_name, edit_instruction } = await c.req.json()
+  const { card_id, card_title, problem_text, tactile_activity, subject, grade, unit_name, edit_instruction, forbidden_answer } = await c.req.json()
   const env = c.env as any
   const geminiApiKey = env.GEMINI_API_KEY
   if (!geminiApiKey) return c.json({ success: false, error: 'GEMINI_API_KEY not configured' })
@@ -26801,6 +26801,7 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
     ].filter(Boolean).join('\n')
 
     const editNote = edit_instruction ? `\n\n【修正指示】${edit_instruction}` : ''
+    const forbiddenNote = forbidden_answer ? `\n\n【★★★ 絶対に表示してはいけない禁止ワード ★★★】\n「${forbidden_answer}」という単語・文字列を図の中に絶対に表示してはいけません。\nこのワードは問題の正解なので、見えてしまうとヒントになりません。\n代わりに「？」マークや空欄にしてください。` : ''
 
     const prompt = `あなたはNano Banana 2（日本の教育AIアシスタント）です。
 子どもが画面上で「さわって学べる」インタラクティブなHTML/SVGウィジェットを1つ生成してください。
@@ -26853,6 +26854,7 @@ app.post('/api/ai/generate-tactile-widget', async (c) => {
 【学習カード情報】
 ${context}
 ${editNote}
+${forbiddenNote}
 
 この学習内容に最適なインタラクティブウィジェットをHTMLコードだけで出力してください。
 コードブロック(\`\`\`)で囲まないこと。説明文不要。HTMLのみ。`
@@ -32195,6 +32197,9 @@ app.post('/api/ai/generate-image', async (c) => {
     // ★★★ 答え・解答は画像に含めない ★★★
     // answer_text, answer_explanation は意図的に除外
     // 画像はヒント・考え方の手がかりのみを表示する
+    if (answer_text && answer_text.length > 0) {
+      contextParts.push(`\n★★★ 禁止: 「${answer_text.substring(0, 50)}」を図に表示してはいけません。これは正解なので見せてはダメです。代わりに「？」や空欄にしてください ★★★`)
+    }
     // ユーザーが手動で指定したプロンプト（最優先）
     if (custom_prompt && custom_prompt.length > 1) {
       contextParts.push(`\n【ユーザー追加指示】\n${custom_prompt.substring(0, 500)}`)

@@ -7862,7 +7862,8 @@ async function generateImageForCardAsImage(cardId, description) {
       unit_name: cd.unit_name || '',
       subject: cd.subject || '',
       grade: cd.grade_level || cd.grade || '',
-      // answer_text, answer_explanation は画像に含めないため送信しない
+      // answer_text は「禁止ワード」としてのみ送信（画像に表示させないため）
+      answer_text: answerText,
       prefer_image: true
     }, { timeout: 90000 })
     if (res.data.success && res.data.image_url) {
@@ -7926,7 +7927,8 @@ async function generateImageForCardNBPro(cardId, description) {
       unit_name: cd.unit_name || '',
       subject: cd.subject || '',
       grade: cd.grade_level || cd.grade || '',
-      // answer_text, answer_explanation は画像に含めないため送信しない
+      // answer_text は「禁止ワード」としてのみ送信
+      answer_text: answerText,
       prefer_image: true,
       prefer_model: 'nano_banana_pro'
     }, { timeout: 120000 })
@@ -8293,7 +8295,8 @@ async function generateImageForCard(cardId, description) {
       unit_name: unitName,
       subject: subject,
       grade: gradeLevel,
-      // answer_text, answer_explanation は画像に含めないため送信しない
+      // answer_text は「禁止ワード」としてのみ送信
+      answer_text: answerText,
       custom_prompt: isCustomPrompt ? description : '',
       style: 'educational diagram'
     }, { timeout: 90000 })
@@ -11978,7 +11981,8 @@ function initVisualWidgets() {
       tactile_activity: '問題内容を理解するためのヒントとなる図解・ダイアグラムを生成してください。★答えそのものは表示せず、考え方のヒントを視覚的に示すこと★ 問題の数値・図形・関係性を反映した視覚教材が必要です。',
       subject: card.subject || '',
       grade: card.grade_level || '',
-      unit_name: card.unit_name || ''
+      unit_name: card.unit_name || '',
+      forbidden_answer: (card.answer || card.correct_answer || card.example_solution || '').substring(0, 100)
     })
   })
   .then(r => r.json())
@@ -12250,7 +12254,8 @@ window.editVisualWidget = function(cardId) {
       subject: card.subject || '',
       grade: card.grade_level || '',
       unit_name: card.unit_name || '',
-      edit_instruction: instruction
+      edit_instruction: instruction,
+      forbidden_answer: (card.answer || card.correct_answer || card.example_solution || '').substring(0, 100)
     })
   })
   .then(r => r.json())
@@ -41830,13 +41835,77 @@ window.speakNB2NarrationAI = async function(page, source) {
         btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)'
       }
       
-      playPcmGlobal(ttsData.audioContent, ttsData.sampleRate || 24000, function() {
-        _globalTtsPlaying = false
-        if (btn) {
-          btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
-          btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+      // PCM→WAV変換してAudio要素で再生（AudioContext問題を回避）
+      try {
+        var pcmRaw = atob(ttsData.audioContent)
+        var pcmBytes = new Uint8Array(pcmRaw.length)
+        for (var pi = 0; pi < pcmRaw.length; pi++) pcmBytes[pi] = pcmRaw.charCodeAt(pi)
+        var sr = ttsData.sampleRate || 24000
+        var wavHeader = new ArrayBuffer(44)
+        var wavView = new DataView(wavHeader)
+        var dataLen = pcmBytes.length
+        wavView.setUint32(0, 0x52494646, false) // RIFF
+        wavView.setUint32(4, 36 + dataLen, true)
+        wavView.setUint32(8, 0x57415645, false) // WAVE
+        wavView.setUint32(12, 0x666d7420, false) // fmt
+        wavView.setUint32(16, 16, true)
+        wavView.setUint16(20, 1, true) // PCM
+        wavView.setUint16(22, 1, true) // mono
+        wavView.setUint32(24, sr, true) // sample rate
+        wavView.setUint32(28, sr * 2, true) // byte rate
+        wavView.setUint16(32, 2, true) // block align
+        wavView.setUint16(34, 16, true) // bits per sample
+        wavView.setUint32(36, 0x64617461, false) // data
+        wavView.setUint32(40, dataLen, true)
+        var wavBlob = new Blob([wavHeader, pcmBytes], { type: 'audio/wav' })
+        var wavUrl = URL.createObjectURL(wavBlob)
+        var wavAudio = new Audio(wavUrl)
+        _globalTtsAudio = wavAudio
+        wavAudio.onended = function() {
+          console.log('✅ WAV再生完了')
+          _globalTtsPlaying = false
+          URL.revokeObjectURL(wavUrl)
+          if (btn) {
+            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+          }
         }
-      })
+        wavAudio.onerror = function(e) {
+          console.warn('⚠️ WAV再生エラー:', e)
+          _globalTtsPlaying = false
+          URL.revokeObjectURL(wavUrl)
+          if (btn) {
+            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+          }
+        }
+        wavAudio.play().then(function() {
+          console.log('✅ WAV再生開始成功')
+        }).catch(function(playErr) {
+          console.warn('⚠️ WAV play()失敗:', playErr)
+          _globalTtsPlaying = false
+          if (btn) {
+            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+          }
+          // 最終フォールバック: Web Speech API
+          if (window.speechSynthesis && speechText) {
+            var u = new SpeechSynthesisUtterance(speechText.substring(0, 400))
+            u.lang = 'ja-JP'; u.rate = 0.9
+            window.speechSynthesis.speak(u)
+          }
+        })
+      } catch (wavErr) {
+        console.warn('⚠️ WAV変換エラー:', wavErr)
+        // フォールバック: 元のplayPcmGlobal
+        playPcmGlobal(ttsData.audioContent, ttsData.sampleRate || 24000, function() {
+          _globalTtsPlaying = false
+          if (btn) {
+            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+          }
+        })
+      }
     } else if (ttsData.success && ttsData.audioContent) {
       _globalTtsPlaying = true
       if (btn) {
