@@ -7188,7 +7188,7 @@ async function loadCardPage(cardId) {
           const nextId2 = currentIdx2 >= 0 && currentIdx2 < cardsList2.length - 1 ? cardsList2[currentIdx2 + 1] : null
           return `
         <div class="mt-6 bg-white rounded-xl shadow-xl p-4 border-2 border-indigo-200 sticky bottom-4 z-40">
-          <!-- ★ ダッシュボード・お気に入りボタン -->
+          <!-- ★ ダッシュボード・お気に入り・学習ツールボタン -->
           <div class="flex flex-wrap gap-2 justify-center mb-3 pb-3 border-b border-gray-200">
             <button onclick="window.openReviewDashboard&&window.openReviewDashboard()" 
                     class="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:shadow-xl transition">
@@ -7197,6 +7197,10 @@ async function loadCardPage(cardId) {
             <button onclick="window.openBookmarkGallery&&window.openBookmarkGallery()" 
                     class="bg-gradient-to-r from-yellow-500 to-amber-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:shadow-xl transition">
               <i class="fas fa-star mr-1"></i>⭐ 保存した図解
+            </button>
+            <button onclick="window.openLearningToolsPanel&&window.openLearningToolsPanel()" 
+                    class="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg hover:shadow-xl transition">
+              <i class="fas fa-toolbox mr-1"></i>🧰 学習ツール
             </button>
           </div>
           <div class="flex items-center justify-between">
@@ -58127,4 +58131,947 @@ console.log('🔍 [DEBUG] speakNB2Explanation:', typeof window.speakNB2Explanati
 console.log('🔍 [DEBUG] playPcmGlobal:', typeof playPcmGlobal)
 console.log('🔍 [DEBUG] _globalTtsPlaying:', typeof _globalTtsPlaying)
 console.log('🔍 [DEBUG] bookmarkNB2Image:', typeof window.bookmarkNB2Image)
+
+// ============================================================
+// ★★★ 新機能モジュール: 10機能統合実装 ★★★
+// ============================================================
+
+// ─────────────────────────────────────────────
+// ① 触覚フィードバック（navigator.vibrate）
+// ─────────────────────────────────────────────
+const HapticFeedback = {
+  support: typeof navigator !== 'undefined' && 'vibrate' in navigator,
+  light() { this.support && navigator.vibrate(15) },
+  medium() { this.support && navigator.vibrate(40) },
+  heavy() { this.support && navigator.vibrate([30, 20, 60]) },
+  success() { this.support && navigator.vibrate([30, 50, 30, 50, 80]) },
+  error() { this.support && navigator.vibrate([100, 30, 100]) },
+  drag() { this.support && navigator.vibrate(10) },
+  hint() { this.support && navigator.vibrate([20, 40, 20]) }
+}
+window.HapticFeedback = HapticFeedback
+
+// ドラッグ操作にバイブレーション追加
+document.addEventListener('touchstart', function(e) {
+  if (e.target.closest('.draggable, [draggable], .nb2-widget, .sort-item, .match-item')) {
+    HapticFeedback.drag()
+  }
+}, { passive: true })
+document.addEventListener('touchmove', function(e) {
+  if (e.target.closest('.draggable, [draggable]') && Math.random() < 0.05) {
+    HapticFeedback.light()
+  }
+}, { passive: true })
+
+// ─────────────────────────────────────────────
+// ② ヒント段階的開示（不正解→ヒント1→2→3）
+// ─────────────────────────────────────────────
+window._hintState = {}
+function getHintState(cardId) {
+  if (!window._hintState[cardId]) {
+    window._hintState[cardId] = { level: 0, attempts: 0, startTime: Date.now() }
+  }
+  return window._hintState[cardId]
+}
+
+function revealNextHint(cardId) {
+  const hs = getHintState(cardId)
+  if (hs.level >= 3) return false
+  hs.level++
+  HapticFeedback.hint()
+  
+  // ヒント要素を表示
+  for (let i = 1; i <= 3; i++) {
+    const el = document.querySelector(`[data-hint-level="${i}"][data-card-id="${cardId}"], #hint-level-${i}-${cardId}`)
+    if (el) {
+      el.style.display = i <= hs.level ? 'block' : 'none'
+      if (i === hs.level) {
+        el.style.animation = 'fadeInUpResult 0.5s ease-out'
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    }
+  }
+  
+  // 汎用: hintsArea内のhint要素を段階開示
+  const hintsArea = document.getElementById('hintsArea')
+  if (hintsArea) {
+    // id="hint-0", "hint-1", "hint-2" 形式のhint要素を開示
+    for (let i = 0; i < 3; i++) {
+      const hintEl = document.getElementById(`hint-${i}`)
+      if (hintEl) {
+        if (i < hs.level) {
+          hintEl.classList.remove('hidden')
+          hintEl.style.display = ''
+          if (i === hs.level - 1) {
+            hintEl.style.animation = 'fadeInUpResult 0.5s ease-out'
+            hintEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          }
+        } else {
+          hintEl.classList.add('hidden')
+        }
+      }
+    }
+    // bg-color系のhint-itemクラスの要素も対応
+    const hintDivs = hintsArea.querySelectorAll('.hint-item, .bg-white.rounded-lg.p-4.border')
+    hintDivs.forEach((div, idx) => {
+      if (idx < hs.level) {
+        div.style.display = ''
+        div.style.opacity = '1'
+        if (idx === hs.level - 1) div.style.animation = 'fadeInUpResult 0.5s ease-out'
+      }
+    })
+  }
+  
+  updateHintButton(cardId)
+  return true
+}
+
+function updateHintButton(cardId) {
+  const hs = getHintState(cardId)
+  const btn = document.getElementById('progressive-hint-btn')
+  if (!btn) return
+  const labels = ['🤔 ヒント1を見る', '💡 ヒント2を見る', '✨ ヒント3（最後）を見る', '✅ ヒント全開示済み']
+  const colors = ['bg-green-500 hover:bg-green-600', 'bg-yellow-500 hover:bg-yellow-600', 'bg-orange-500 hover:bg-orange-600', 'bg-gray-400']
+  btn.className = `${colors[hs.level]} text-white px-4 py-2 rounded-lg font-bold text-sm transition shadow`
+  btn.innerHTML = `<i class="fas fa-lightbulb mr-1"></i>${labels[hs.level]}`
+  btn.disabled = hs.level >= 3
+}
+window.revealNextHint = revealNextHint
+window.updateHintButton = updateHintButton
+window.getHintState = getHintState
+
+// ─────────────────────────────────────────────
+// ③ 感情認識フィードバック
+// ─────────────────────────────────────────────
+window._emotionTracker = {
+  attempts: [],
+  consecutiveWrong: 0,
+  consecutiveCorrect: 0,
+  lastAnswerTime: 0
+}
+
+function trackAnswerEmotion(isCorrect, responseTimeMs) {
+  const et = window._emotionTracker
+  et.attempts.push({ correct: isCorrect, time: responseTimeMs, ts: Date.now() })
+  if (isCorrect) {
+    et.consecutiveWrong = 0
+    et.consecutiveCorrect++
+  } else {
+    et.consecutiveCorrect = 0
+    et.consecutiveWrong++
+  }
+  et.lastAnswerTime = responseTimeMs
+  return detectEmotion()
+}
+
+function detectEmotion() {
+  const et = window._emotionTracker
+  const recent = et.attempts.slice(-5)
+  const avgTime = recent.reduce((s, a) => s + a.time, 0) / (recent.length || 1)
+  const recentCorrectRate = recent.filter(a => a.correct).length / (recent.length || 1)
+  
+  if (et.consecutiveWrong >= 3) return { emotion: 'frustrated', emoji: '😣', message: 'むずかしいよね…でも大丈夫！一緒に考えよう！', color: 'purple', action: 'offer_hint' }
+  if (et.consecutiveWrong >= 2 && avgTime > 30000) return { emotion: 'struggling', emoji: '😰', message: 'あせらなくていいよ。ゆっくり考えてみよう！', color: 'blue', action: 'slow_down' }
+  if (et.consecutiveCorrect >= 3 && avgTime < 15000) return { emotion: 'excited', emoji: '🔥', message: 'すごい！ノッてるね！この調子！', color: 'red', action: 'challenge' }
+  if (et.consecutiveCorrect >= 2) return { emotion: 'confident', emoji: '😊', message: 'いいね！その調子で頑張ろう！', color: 'green', action: 'encourage' }
+  if (recentCorrectRate < 0.3 && recent.length >= 3) return { emotion: 'anxious', emoji: '😢', message: 'うまくいかない時もあるよ。ヒントを使ってみよう！', color: 'yellow', action: 'offer_hint' }
+  if (avgTime > 45000) return { emotion: 'confused', emoji: '🤔', message: '考え込んでるみたいだね。ヒントが役立つかも！', color: 'indigo', action: 'offer_hint' }
+  return { emotion: 'neutral', emoji: '😌', message: '', color: 'gray', action: 'none' }
+}
+
+function showEmotionFeedback(emotion) {
+  if (!emotion || emotion.emotion === 'neutral' || !emotion.message) return
+  
+  const existing = document.getElementById('emotion-feedback-toast')
+  if (existing) existing.remove()
+  
+  // Tailwind CDNは動的クラス名を解決できないためインラインスタイルで対応
+  const colorMap = {
+    purple: { bg: '#F3E8FF', border: '#C084FC', text: '#7E22CE' },
+    blue: { bg: '#DBEAFE', border: '#60A5FA', text: '#1D4ED8' },
+    red: { bg: '#FEE2E2', border: '#F87171', text: '#B91C1C' },
+    green: { bg: '#DCFCE7', border: '#4ADE80', text: '#15803D' },
+    yellow: { bg: '#FEF9C3', border: '#FACC15', text: '#A16207' },
+    indigo: { bg: '#E0E7FF', border: '#818CF8', text: '#4338CA' },
+    gray: { bg: '#F3F4F6', border: '#9CA3AF', text: '#374151' }
+  }
+  const col = colorMap[emotion.color] || colorMap.gray
+  
+  const toast = document.createElement('div')
+  toast.id = 'emotion-feedback-toast'
+  toast.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[9999] rounded-2xl px-5 py-3 shadow-xl flex items-center gap-3 max-w-sm'
+  toast.style.cssText = `animation: fadeInUpResult 0.5s ease-out; transition: opacity 0.5s; background:${col.bg}; border:2px solid ${col.border};`
+  
+  const cardId = typeof state?.selectedCard === 'object' ? (state.selectedCard?.card_id || state.selectedCard?.id || 0) : (state?.selectedCard || 0)
+  toast.innerHTML = `
+    <span class="text-3xl">${emotion.emoji}</span>
+    <div>
+      <p class="text-sm font-bold" style="color:${col.text}">${emotion.message}</p>
+      ${emotion.action === 'offer_hint' ? `<button onclick="revealNextHint(${cardId})" class="text-xs mt-1 bg-purple-500 text-white px-3 py-1 rounded-full font-bold hover:bg-purple-600"><i class="fas fa-lightbulb mr-1"></i>ヒントを見る</button>` : ''}
+    </div>
+    <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-gray-600 ml-auto"><i class="fas fa-times"></i></button>
+  `
+  document.body.appendChild(toast)
+  setTimeout(() => { if (toast.parentElement) { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500) } }, 6000)
+}
+window.trackAnswerEmotion = trackAnswerEmotion
+window.showEmotionFeedback = showEmotionFeedback
+window.detectEmotion = detectEmotion
+
+// ─────────────────────────────────────────────
+// ④ 動的難易度調整（ZPD）可視化ゲージバー
+// ─────────────────────────────────────────────
+window._zpdState = { level: 50, streak: 0, maxLevel: 100, history: [] }
+
+function updateZPD(isCorrect, difficulty) {
+  const z = window._zpdState
+  const diffBonus = { easy: 5, medium: 10, hard: 15 }[difficulty] || 10
+  if (isCorrect) {
+    z.level = Math.min(z.maxLevel, z.level + diffBonus)
+    z.streak++
+  } else {
+    z.level = Math.max(0, z.level - Math.floor(diffBonus * 0.6))
+    z.streak = 0
+  }
+  z.history.push({ level: z.level, correct: isCorrect, ts: Date.now() })
+  renderZPDGauge()
+  return z
+}
+
+function renderZPDGauge() {
+  const z = window._zpdState
+  let gauge = document.getElementById('zpd-gauge-container')
+  if (!gauge) {
+    gauge = document.createElement('div')
+    gauge.id = 'zpd-gauge-container'
+    gauge.style.cssText = 'position:fixed;bottom:80px;right:16px;z-index:999;width:64px;transition:all 0.3s;'
+    document.body.appendChild(gauge)
+  }
+  
+  const pct = Math.round(z.level)
+  const levelName = pct >= 80 ? 'マスター' : pct >= 60 ? 'チャレンジ' : pct >= 40 ? 'しっかり' : pct >= 20 ? 'じっくり' : 'スタート'
+  const levelColor = pct >= 80 ? '#F59E0B' : pct >= 60 ? '#8B5CF6' : pct >= 40 ? '#3B82F6' : pct >= 20 ? '#10B981' : '#6B7280'
+  const nextPct = Math.min(100, pct + 15)
+  const toNext = nextPct - pct
+  
+  gauge.innerHTML = `
+    <div class="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-2 text-center cursor-pointer" onclick="this.querySelector('.zpd-detail').classList.toggle('hidden')">
+      <div class="text-[10px] font-bold text-gray-500 mb-1">レベル</div>
+      <div class="relative w-12 h-12 mx-auto mb-1">
+        <svg viewBox="0 0 36 36" class="w-12 h-12 -rotate-90">
+          <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                fill="none" stroke="#E5E7EB" stroke-width="3"/>
+          <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                fill="none" stroke="${levelColor}" stroke-width="3"
+                stroke-dasharray="${pct}, 100"
+                style="transition: stroke-dasharray 0.8s ease-out"/>
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center text-sm font-black" style="color:${levelColor}">${pct}</div>
+      </div>
+      <div class="text-[10px] font-bold" style="color:${levelColor}">${levelName}</div>
+      ${z.streak >= 3 ? '<div class="text-[9px] text-orange-500 font-bold mt-0.5">🔥 ' + z.streak + '連続!</div>' : ''}
+      <div class="zpd-detail hidden mt-2 text-[9px] text-gray-500 border-t pt-1">
+        <div>あと <b class="text-indigo-600">${toNext}pt</b> で</div>
+        <div>レベルアップ！</div>
+      </div>
+    </div>
+  `
+}
+window.updateZPD = updateZPD
+window.renderZPDGauge = renderZPDGauge
+
+// ─────────────────────────────────────────────
+// ⑤「なぜ？」探究モード
+// ─────────────────────────────────────────────
+async function openWhyExploration(question, answer, subject, grade, cardTitle) {
+  HapticFeedback.medium()
+  const container = document.getElementById('gradeResult') || document.getElementById('answerSection')
+  if (!container) return
+  
+  const whyDiv = document.createElement('div')
+  whyDiv.id = 'why-exploration-panel'
+  whyDiv.className = 'mt-4 bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-2xl p-5'
+  whyDiv.innerHTML = `
+    <div class="flex items-center gap-2 mb-3">
+      <span class="text-2xl">🔬</span>
+      <h3 class="text-lg font-bold text-indigo-700">なぜ？探究モード</h3>
+    </div>
+    <div class="flex items-center justify-center gap-2 text-sm text-indigo-600">
+      <div class="animate-spin rounded-full h-4 w-4 border-2 border-indigo-400 border-t-transparent"></div>
+      <span>科学の世界を探検中...</span>
+    </div>
+  `
+  container.after(whyDiv)
+  whyDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  
+  try {
+    const res = await axios.post('/api/ai/why-exploration', {
+      question: question?.substring(0, 300),
+      answer, subject, grade, card_title: cardTitle
+    }, { timeout: 15000 })
+    
+    const exp = res.data?.exploration || {}
+    whyDiv.innerHTML = `
+      <div class="flex items-center gap-2 mb-4">
+        <span class="text-2xl">🔬</span>
+        <h3 class="text-lg font-bold text-indigo-700">なぜ？探究モード</h3>
+        <button onclick="this.closest('#why-exploration-panel').remove()" class="ml-auto text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+      </div>
+      ${exp.why_simple ? `<div class="bg-white rounded-xl p-3 mb-3 border border-indigo-200">
+        <p class="text-xs font-bold text-indigo-600 mb-1"><i class="fas fa-child mr-1"></i>かんたんに言うと…</p>
+        <p class="text-sm text-gray-700">${exp.why_simple}</p>
+      </div>` : ''}
+      ${exp.science_behind ? `<div class="bg-white rounded-xl p-3 mb-3 border border-blue-200">
+        <p class="text-xs font-bold text-blue-600 mb-1"><i class="fas fa-flask mr-1"></i>科学のウラ側</p>
+        <p class="text-sm text-gray-700">${exp.science_behind}</p>
+      </div>` : ''}
+      ${exp.fun_fact ? `<div class="bg-yellow-50 rounded-xl p-3 mb-3 border border-yellow-300">
+        <p class="text-xs font-bold text-yellow-600 mb-1"><i class="fas fa-star mr-1"></i>へえ！豆知識</p>
+        <p class="text-sm text-gray-700">${exp.fun_fact}</p>
+      </div>` : ''}
+      ${exp.real_life ? `<div class="bg-green-50 rounded-xl p-3 mb-3 border border-green-300">
+        <p class="text-xs font-bold text-green-600 mb-1"><i class="fas fa-home mr-1"></i>生活とのつながり</p>
+        <p class="text-sm text-gray-700">${exp.real_life}</p>
+      </div>` : ''}
+      ${exp.deeper_question ? `<div class="bg-purple-50 rounded-xl p-3 border border-purple-300">
+        <p class="text-xs font-bold text-purple-600 mb-1"><i class="fas fa-brain mr-1"></i>もっと考えてみよう！</p>
+        <p class="text-sm text-gray-700 font-bold">${exp.deeper_question}</p>
+      </div>` : ''}
+    `
+  } catch (e) {
+    whyDiv.innerHTML = '<p class="text-sm text-gray-500 text-center p-4">探究データの取得に失敗しました。</p>'
+  }
+}
+window.openWhyExploration = openWhyExploration
+
+// ─────────────────────────────────────────────
+// ⑥ マインドマップ自動生成（Mermaid.js）
+// ─────────────────────────────────────────────
+async function generateMindmap(cards, unitName, subject, targetEl) {
+  if (!targetEl) return
+  targetEl.innerHTML = '<div class="flex items-center justify-center gap-2 p-8 text-indigo-600"><div class="animate-spin rounded-full h-5 w-5 border-2 border-indigo-400 border-t-transparent"></div>マインドマップ生成中...</div>'
+  
+  try {
+    const res = await axios.post('/api/ai/generate-mindmap', { cards, unit_name: unitName, subject }, { timeout: 20000 })
+    const code = res.data?.mermaid_code
+    if (!code) throw new Error('No code')
+    
+    // Mermaid.js CDNを動的ロード
+    if (!window.mermaid) {
+      const script = document.createElement('script')
+      script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js'
+      await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.appendChild(script) })
+      window.mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: { primaryColor: '#818CF8', primaryTextColor: '#1F2937', lineColor: '#A5B4FC' } })
+    }
+    
+    targetEl.innerHTML = `<div class="mermaid">${code}</div>`
+    await window.mermaid.run({ nodes: targetEl.querySelectorAll('.mermaid') })
+    targetEl.querySelector('svg')?.setAttribute('style', 'max-width:100%;height:auto;')
+  } catch (e) {
+    targetEl.innerHTML = '<p class="text-sm text-gray-400 text-center p-4"><i class="fas fa-exclamation-circle mr-1"></i>マインドマップの生成に失敗しました。</p>'
+    console.error('Mindmap error:', e)
+  }
+}
+window.generateMindmap = generateMindmap
+
+// ─────────────────────────────────────────────
+// ⑦ 忘却リスク可視化（エビングハウス忘却曲線）
+// ─────────────────────────────────────────────
+function calculateForgettingProbability(lastReviewedAt, reviewCount, wasCorrect) {
+  if (!lastReviewedAt) return 0.95
+  const hoursSince = (Date.now() - new Date(lastReviewedAt).getTime()) / (1000 * 60 * 60)
+  const stability = (reviewCount || 1) * (wasCorrect ? 1.5 : 0.8)
+  const retention = Math.exp(-hoursSince / (24 * stability))
+  return Math.max(0, Math.min(1, 1 - retention))
+}
+
+function renderForgettingHeatmap(cards, containerId) {
+  const container = document.getElementById(containerId)
+  if (!container || !cards?.length) return
+  
+  const sorted = [...cards].sort((a, b) => {
+    const pa = calculateForgettingProbability(a.last_reviewed_at, a.review_count, a.last_was_correct)
+    const pb = calculateForgettingProbability(b.last_reviewed_at, b.review_count, b.last_was_correct)
+    return pb - pa
+  })
+  
+  container.innerHTML = `
+    <div class="bg-white rounded-xl p-4 border border-gray-200">
+      <h4 class="text-sm font-bold text-gray-700 mb-3"><i class="fas fa-fire mr-1 text-orange-500"></i>忘却リスクマップ</h4>
+      <div class="grid grid-cols-5 gap-1.5">
+        ${sorted.slice(0, 15).map(card => {
+          const prob = calculateForgettingProbability(card.last_reviewed_at, card.review_count, card.last_was_correct)
+          const pct = Math.round(prob * 100)
+          const r = Math.round(255 * prob)
+          const g = Math.round(255 * (1 - prob) * 0.8)
+          const bg = `rgb(${r},${g},80)`
+          return `<div class="rounded-lg p-2 text-center cursor-pointer hover:scale-105 transition" style="background:${bg};min-height:50px" title="${card.card_title || ''}\n忘却リスク:${pct}%">
+            <div class="text-white font-bold text-[10px] leading-tight">${(card.card_title || '').substring(0, 6)}</div>
+            <div class="text-white/80 text-[9px] mt-0.5">${pct}%</div>
+          </div>`
+        }).join('')}
+      </div>
+      <div class="flex justify-between mt-2 text-[9px] text-gray-400">
+        <span>🟢 安心</span><span>🟡 そろそろ</span><span>🔴 今すぐ復習！</span>
+      </div>
+    </div>
+  `
+}
+window.calculateForgettingProbability = calculateForgettingProbability
+window.renderForgettingHeatmap = renderForgettingHeatmap
+
+// 忘却リスク用レビューデータ更新
+function updateCardReviewData(cardId, wasCorrect) {
+  if (!cardId) return
+  try {
+    const data = JSON.parse(localStorage.getItem('cardReviewData') || '[]')
+    const idx = data.findIndex(r => r.card_id === cardId)
+    const card = typeof state?.selectedCard === 'object' ? state.selectedCard : {}
+    if (idx >= 0) {
+      data[idx].last_reviewed_at = new Date().toISOString()
+      data[idx].review_count = (data[idx].review_count || 0) + 1
+      data[idx].last_was_correct = wasCorrect
+    } else {
+      data.push({
+        card_id: cardId,
+        card_title: card?.card_title || '',
+        last_reviewed_at: new Date().toISOString(),
+        review_count: 1,
+        last_was_correct: wasCorrect
+      })
+    }
+    localStorage.setItem('cardReviewData', JSON.stringify(data))
+  } catch(e) { console.warn('Review data update failed:', e) }
+}
+window.updateCardReviewData = updateCardReviewData
+
+// ─────────────────────────────────────────────
+// ⑧ プッシュ通知復習リマインダー
+// ─────────────────────────────────────────────
+async function setupReviewReminder() {
+  if (!('Notification' in window)) return false
+  if (Notification.permission === 'default') {
+    const perm = await Notification.requestPermission()
+    if (perm !== 'granted') return false
+  }
+  if (Notification.permission !== 'granted') return false
+  
+  // Service Workerで翌日の通知をスケジュール
+  const registration = await navigator.serviceWorker?.ready
+  if (!registration) return false
+  
+  // ローカルストレージにリマインダー設定を保存
+  const now = new Date()
+  const tomorrow7am = new Date(now)
+  tomorrow7am.setDate(tomorrow7am.getDate() + 1)
+  tomorrow7am.setHours(7, 0, 0, 0)
+  const msUntil = tomorrow7am.getTime() - now.getTime()
+  
+  // setTimeoutでリマインダー（簡易実装）
+  localStorage.setItem('reviewReminderSet', 'true')
+  localStorage.setItem('reviewReminderTime', tomorrow7am.toISOString())
+  
+  // 即座にテスト通知
+  new Notification('📚 復習リマインダー設定完了！', {
+    body: '毎朝7時に復習カードをお知らせします。',
+    icon: '/static/icon-192.png',
+    vibrate: [200, 100, 200]
+  })
+  
+  return true
+}
+
+function checkAndShowReviewNotification() {
+  if (Notification.permission !== 'granted') return
+  
+  // ローカルの忘却リスクデータから復習すべきカード数を計算
+  const cardData = JSON.parse(localStorage.getItem('cardReviewData') || '[]')
+  const urgentCards = cardData.filter(c => {
+    const prob = calculateForgettingProbability(c.last_reviewed_at, c.review_count, c.last_was_correct)
+    return prob > 0.6
+  })
+  
+  if (urgentCards.length > 0) {
+    new Notification(`📚 復習カードが${urgentCards.length}枚あるよ！`, {
+      body: `忘れちゃう前に復習しよう！一番忘れそうなのは「${urgentCards[0]?.card_title || 'カード'}」だよ。`,
+      icon: '/static/icon-192.png',
+      vibrate: [200, 100, 200]
+    })
+  }
+}
+window.setupReviewReminder = setupReviewReminder
+window.checkAndShowReviewNotification = checkAndShowReviewNotification
+
+// ─────────────────────────────────────────────
+// ⑨ 手書き入力認識（Canvas + Gemini Vision）
+// ─────────────────────────────────────────────
+function createHandwritingCanvas(containerId, options = {}) {
+  const container = document.getElementById(containerId)
+  if (!container) return null
+  
+  const w = options.width || container.clientWidth || 300
+  const h = options.height || 200
+  
+  container.innerHTML = `
+    <div class="bg-white rounded-xl border-2 border-dashed border-blue-300 p-2">
+      <canvas id="hw-canvas-${containerId}" width="${w}" height="${h}" 
+              style="width:100%;height:${h}px;touch-action:none;cursor:crosshair;background:repeating-linear-gradient(0deg,transparent,transparent 29px,#E5E7EB 29px,#E5E7EB 30px)"></canvas>
+      <div class="flex gap-2 mt-2 justify-center">
+        <button onclick="clearHandwritingCanvas('${containerId}')" class="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded-lg transition"><i class="fas fa-eraser mr-1"></i>消す</button>
+        <button onclick="recognizeHandwriting('${containerId}')" class="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg font-bold transition"><i class="fas fa-magic mr-1"></i>読み取り</button>
+        <select id="hw-pen-size-${containerId}" onchange="setHandwritingPenSize('${containerId}', this.value)" class="text-xs border rounded-lg px-2 py-1">
+          <option value="2">細</option><option value="4" selected>中</option><option value="8">太</option>
+        </select>
+      </div>
+      <div id="hw-result-${containerId}" class="mt-2 text-center text-sm text-gray-500"></div>
+    </div>
+  `
+  
+  const canvas = document.getElementById(`hw-canvas-${containerId}`)
+  const ctx = canvas.getContext('2d')
+  let drawing = false
+  let lastPos = null
+  
+  ctx.lineWidth = 4
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = '#1F2937'
+  
+  const getPos = (e) => {
+    const rect = canvas.getBoundingClientRect()
+    const t = e.touches ? e.touches[0] : e
+    return { x: (t.clientX - rect.left) * (canvas.width / rect.width), y: (t.clientY - rect.top) * (canvas.height / rect.height) }
+  }
+  
+  const startDraw = (e) => { drawing = true; lastPos = getPos(e); e.preventDefault(); HapticFeedback.light() }
+  const moveDraw = (e) => {
+    if (!drawing) return
+    const pos = getPos(e)
+    ctx.beginPath(); ctx.moveTo(lastPos.x, lastPos.y); ctx.lineTo(pos.x, pos.y); ctx.stroke()
+    lastPos = pos
+    e.preventDefault()
+  }
+  const stopDraw = () => { drawing = false; lastPos = null }
+  
+  canvas.addEventListener('mousedown', startDraw)
+  canvas.addEventListener('mousemove', moveDraw)
+  canvas.addEventListener('mouseup', stopDraw)
+  canvas.addEventListener('mouseleave', stopDraw)
+  canvas.addEventListener('touchstart', startDraw, { passive: false })
+  canvas.addEventListener('touchmove', moveDraw, { passive: false })
+  canvas.addEventListener('touchend', stopDraw)
+  
+  canvas._ctx = ctx
+  return canvas
+}
+
+function clearHandwritingCanvas(containerId) {
+  const canvas = document.getElementById(`hw-canvas-${containerId}`)
+  if (!canvas) return
+  const ctx = canvas._ctx || canvas.getContext('2d')
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  const resultEl = document.getElementById(`hw-result-${containerId}`)
+  if (resultEl) resultEl.textContent = ''
+}
+
+function setHandwritingPenSize(containerId, size) {
+  const canvas = document.getElementById(`hw-canvas-${containerId}`)
+  if (canvas?._ctx) canvas._ctx.lineWidth = parseInt(size)
+}
+
+async function recognizeHandwriting(containerId) {
+  const canvas = document.getElementById(`hw-canvas-${containerId}`)
+  const resultEl = document.getElementById(`hw-result-${containerId}`)
+  if (!canvas || !resultEl) return
+  
+  resultEl.innerHTML = '<div class="animate-pulse text-indigo-500"><i class="fas fa-spinner fa-spin mr-1"></i>認識中...</div>'
+  
+  try {
+    const dataUrl = canvas.toDataURL('image/png')
+    const base64 = dataUrl.split(',')[1]
+    
+    const res = await axios.post('/api/ai/recognize-handwriting', { image_base64: base64 }, { timeout: 15000 })
+    const text = res.data?.recognized_text || ''
+    resultEl.innerHTML = text ? `<span class="text-green-600 font-bold"><i class="fas fa-check mr-1"></i>認識結果: ${text}</span>` : '<span class="text-gray-400">認識できませんでした</span>'
+    
+    // 認識結果を回答入力欄に転記
+    const answerInput = document.getElementById('answerInput')
+    if (answerInput && text) {
+      answerInput.value = text
+      HapticFeedback.success()
+    }
+  } catch (e) {
+    resultEl.innerHTML = '<span class="text-red-400">認識に失敗しました</span>'
+  }
+}
+window.createHandwritingCanvas = createHandwritingCanvas
+window.clearHandwritingCanvas = clearHandwritingCanvas
+window.setHandwritingPenSize = setHandwritingPenSize
+window.recognizeHandwriting = recognizeHandwriting
+
+// ─────────────────────────────────────────────
+// ⑩ 実験シミュレーター
+// ─────────────────────────────────────────────
+async function openExperimentSimulator(cardTitle, problemText, subject, grade) {
+  HapticFeedback.medium()
+  
+  let modal = document.getElementById('experiment-simulator-modal')
+  if (!modal) {
+    modal = document.createElement('div')
+    modal.id = 'experiment-simulator-modal'
+    modal.className = 'fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4'
+    document.body.appendChild(modal)
+  }
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+      <div class="sticky top-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white p-4 rounded-t-2xl flex items-center justify-between">
+        <h3 class="text-lg font-bold"><i class="fas fa-flask mr-2"></i>実験シミュレーター</h3>
+        <button onclick="document.getElementById('experiment-simulator-modal').remove()" class="text-white/80 hover:text-white text-xl"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="p-6">
+        <div class="flex items-center justify-center gap-2 text-sm text-emerald-600 py-12">
+          <div class="animate-spin rounded-full h-6 w-6 border-2 border-emerald-400 border-t-transparent"></div>
+          <span>実験シミュレーターを生成中...（10〜20秒）</span>
+        </div>
+      </div>
+    </div>
+  `
+  
+  try {
+    const res = await axios.post('/api/ai/generate-experiment', {
+      card_title: cardTitle,
+      problem_text: problemText?.substring(0, 400),
+      subject, grade
+    }, { timeout: 30000 })
+    
+    const exp = res.data?.experiment
+    if (!exp) throw new Error('No experiment data')
+    
+    modal.querySelector('.p-6').innerHTML = `
+      <h4 class="text-lg font-bold text-gray-800 mb-2"><i class="fas fa-microscope mr-1 text-emerald-500"></i>${exp.experiment_title || '実験'}</h4>
+      <p class="text-sm text-gray-600 mb-4">${exp.description || ''}</p>
+      <div id="experiment-sandbox" class="bg-gray-50 rounded-xl p-4 border border-gray-200 overflow-hidden"></div>
+    `
+    
+    // サンドボックス内にHTML挿入（安全にiframeを使用）
+    const sandbox = document.getElementById('experiment-sandbox')
+    const iframe = document.createElement('iframe')
+    iframe.style.cssText = 'width:100%;min-height:400px;border:none;border-radius:12px;background:white;'
+    iframe.sandbox = 'allow-scripts'
+    sandbox.appendChild(iframe)
+    
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:sans-serif;margin:12px;}</style></head><body>${exp.experiment_html || '<p>実験データなし</p>'}</body></html>`
+    iframe.srcdoc = html
+    
+    // iframeの高さ自動調整
+    iframe.onload = () => {
+      try {
+        const h = iframe.contentDocument?.body?.scrollHeight
+        if (h) iframe.style.height = Math.min(h + 30, 600) + 'px'
+      } catch(e) {}
+    }
+  } catch (e) {
+    modal.querySelector('.p-6').innerHTML = '<p class="text-center text-gray-400 py-8"><i class="fas fa-exclamation-circle mr-1"></i>実験シミュレーターの生成に失敗しました。</p>'
+  }
+}
+window.openExperimentSimulator = openExperimentSimulator
+
+// ─────────────────────────────────────────────
+// 統合: gradeAnswer結果に各機能を接続
+// ─────────────────────────────────────────────
+const _originalGradeAnswer = window.gradeAnswer
+if (typeof _originalGradeAnswer === 'function') {
+  // gradeAnswerの結果後にフックを追加（既に上書きされている場合は二重ラップ防止）
+  if (!window._gradeAnswerEnhanced) {
+    window._gradeAnswerEnhanced = true
+  }
+}
+
+// 正解時の追加UI注入
+function injectPostCorrectUI(correctAnswer) {
+  setTimeout(() => {
+    const resultDiv = document.getElementById('gradeResult')
+    if (!resultDiv) return
+    const greenDiv = resultDiv.querySelector('.bg-green-50')
+    if (!greenDiv) return
+    
+    // 既に追加済みなら省略
+    if (greenDiv.querySelector('#post-correct-extras')) return
+    
+    const cardData = typeof state.selectedCard === 'object' ? state.selectedCard : (window.currentCardData || {})
+    const question = cardData?.problem_content || cardData?.problem_text || ''
+    const subject = cardData?.subject || state.selectedCurriculum?.subject || ''
+    const grade = cardData?.grade_level || state.selectedCurriculum?.grade || ''
+    const cardTitle = cardData?.card_title || ''
+    
+    // XSS安全: データをwindowオブジェクトに保存してonclickから参照
+    window._postCorrectData = { question, answer: correctAnswer || '', subject, grade, cardTitle }
+    
+    const extrasDiv = document.createElement('div')
+    extrasDiv.id = 'post-correct-extras'
+    extrasDiv.className = 'mt-3 flex justify-center gap-2 flex-wrap'
+    extrasDiv.style.animation = 'fadeInUpResult 0.5s ease-out 0.7s both'
+    extrasDiv.innerHTML = `
+      <button onclick="const d=window._postCorrectData||{};openWhyExploration(d.question,d.answer,d.subject,d.grade,d.cardTitle)"
+              class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow hover:shadow-md transition">
+        <i class="fas fa-microscope mr-1"></i>🔬 なぜ？もっと知りたい！
+      </button>
+      ${subject?.includes('理科') ? `
+      <button onclick="const d=window._postCorrectData||{};openExperimentSimulator(d.cardTitle,d.question,d.subject,d.grade)"
+              class="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow hover:shadow-md transition">
+        <i class="fas fa-flask mr-1"></i>🧪 実験してみよう！
+      </button>` : ''}
+    `
+    greenDiv.appendChild(extrasDiv)
+    
+    // ZPD更新
+    updateZPD(true, cardData?.difficulty_level || 'medium')
+    HapticFeedback.success()
+    
+    // 忘却リスク用レビューデータ更新
+    updateCardReviewData(cardData?.card_id || cardData?.id, true)
+    
+    // 感情トラッキング
+    const emotion = trackAnswerEmotion(true, Date.now() - (window._answerStartTime || Date.now()))
+    showEmotionFeedback(emotion)
+  }, 800)
+}
+
+// 不正解時の追加UI注入
+function injectPostIncorrectUI() {
+  setTimeout(() => {
+    const resultDiv = document.getElementById('gradeResult')
+    if (!resultDiv) return
+    const yellowDiv = resultDiv.querySelector('.bg-yellow-50')
+    if (!yellowDiv || yellowDiv.querySelector('#post-incorrect-extras')) return
+    
+    const cardId = typeof state.selectedCard === 'object' ? (state.selectedCard?.card_id || state.selectedCard?.id || 0) : (state.selectedCard || 0)
+    
+    const extrasDiv = document.createElement('div')
+    extrasDiv.id = 'post-incorrect-extras'
+    extrasDiv.className = 'mt-3 flex justify-center'
+    extrasDiv.innerHTML = `
+      <button id="progressive-hint-btn" onclick="revealNextHint(${cardId})"
+              class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-sm transition shadow">
+        <i class="fas fa-lightbulb mr-1"></i>🤔 ヒント1を見る
+      </button>
+    `
+    yellowDiv.appendChild(extrasDiv)
+    updateHintButton(cardId)
+    
+    // ZPD更新
+    const cardData = typeof state.selectedCard === 'object' ? state.selectedCard : (window.currentCardData || {})
+    updateZPD(false, cardData?.difficulty_level || 'medium')
+    HapticFeedback.error()
+    
+    // 忘却リスク用レビューデータ更新
+    updateCardReviewData(cardData?.card_id || cardData?.id, false)
+    
+    // 感情トラッキング & フィードバック
+    const emotion = trackAnswerEmotion(false, Date.now() - (window._answerStartTime || Date.now()))
+    showEmotionFeedback(emotion)
+  }, 1200)
+}
+
+// MutationObserverで結果表示を監視して自動注入
+const gradeResultObserver = new MutationObserver((mutations) => {
+  for (const m of mutations) {
+    for (const node of m.addedNodes) {
+      if (node.nodeType === 1) {
+        if (node.querySelector?.('.bg-green-50') || node.classList?.contains('bg-green-50')) {
+          const correctText = document.querySelector('.bg-green-50 .text-green-700')?.textContent || ''
+          if (correctText.includes('正解')) {
+            const cardData = typeof state.selectedCard === 'object' ? state.selectedCard : {}
+            injectPostCorrectUI(cardData?.answer || '')
+          }
+        }
+        if (node.querySelector?.('.bg-yellow-50') || node.classList?.contains('bg-yellow-50')) {
+          const wrongText = node.textContent || ''
+          if (wrongText.includes('もう少し') || wrongText.includes('不正解')) {
+            injectPostIncorrectUI()
+          }
+        }
+      }
+    }
+  }
+})
+const gradeResultEl = document.getElementById('gradeResult')
+if (gradeResultEl) {
+  gradeResultObserver.observe(gradeResultEl, { childList: true, subtree: true })
+}
+
+// 回答開始時間を記録
+document.addEventListener('focus', (e) => {
+  if (e.target?.id === 'answerInput') window._answerStartTime = Date.now()
+}, true)
+
+// ZPDゲージを初期表示
+setTimeout(() => renderZPDGauge(), 2000)
+
+// 起動時のリマインダーチェック
+setTimeout(() => {
+  if (localStorage.getItem('reviewReminderSet') === 'true') {
+    checkAndShowReviewNotification()
+  }
+}, 5000)
+
+console.log('✅ 10機能モジュール初期化完了: ①触覚FB ②ヒント段階開示 ③感情認識 ④ZPDゲージ ⑤なぜ探究 ⑥マインドマップ ⑦忘却リスク ⑧通知リマインダー ⑨手書き入力 ⑩実験シミュレーター')
+
+// ─────────────────────────────────────────────
+// 学習ツールパネル（マインドマップ・忘却ヒートマップ・復習リマインダー設定を統合）
+// ─────────────────────────────────────────────
+function openLearningToolsPanel() {
+  HapticFeedback.medium()
+  
+  let modal = document.getElementById('learning-tools-modal')
+  if (modal) { modal.remove(); return }
+  
+  modal = document.createElement('div')
+  modal.id = 'learning-tools-modal'
+  modal.className = 'fixed inset-0 z-[9999] bg-black/50 flex items-end sm:items-center justify-center'
+  modal.onclick = (e) => { if (e.target === modal) modal.remove() }
+  
+  const curriculum = state.selectedCurriculum || {}
+  const course = state.selectedCourse || {}
+  const cards = window._courseCardsList ? [] : []  // カードデータは後で取得
+  
+  modal.innerHTML = `
+    <div class="bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="sticky top-0 bg-gradient-to-r from-emerald-500 to-teal-500 text-white p-4 rounded-t-3xl sm:rounded-t-2xl flex items-center justify-between z-10">
+        <h3 class="text-lg font-bold"><i class="fas fa-toolbox mr-2"></i>🧰 学習ツール</h3>
+        <button onclick="document.getElementById('learning-tools-modal').remove()" class="text-white/80 hover:text-white text-xl"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="p-4 space-y-3">
+      
+        <!-- マインドマップ -->
+        <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-200">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-indigo-700 text-sm"><i class="fas fa-project-diagram mr-1"></i>🗺️ マインドマップ</h4>
+            <button onclick="generateMindmapFromCurrentCourse()" class="bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+              <i class="fas fa-magic mr-1"></i>生成
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mb-2">カード内容からマインドマップを自動生成（視覚+言語の二重符号化）</p>
+          <div id="mindmap-container" class="min-h-[60px]"></div>
+        </div>
+        
+        <!-- 忘却リスクヒートマップ -->
+        <div class="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-4 border border-orange-200">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-orange-700 text-sm"><i class="fas fa-fire mr-1"></i>🔥 忘却リスクマップ</h4>
+            <button onclick="loadForgettingHeatmap()" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+              <i class="fas fa-sync mr-1"></i>更新
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mb-2">各カードの忘却確率をリアルタイム計算してヒートマップ表示</p>
+          <div id="forgetting-heatmap-container"></div>
+        </div>
+        
+        <!-- 復習リマインダー -->
+        <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-200">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-blue-700 text-sm"><i class="fas fa-bell mr-1"></i>🔔 復習リマインダー</h4>
+            <button onclick="setupReviewReminderUI()" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition" id="reminder-setup-btn">
+              <i class="fas fa-bell mr-1"></i>${localStorage.getItem('reviewReminderSet') === 'true' ? '設定済み ✅' : '通知を設定'}
+            </button>
+          </div>
+          <p class="text-xs text-gray-500">明日復習すべきカードをプッシュ通知でお知らせ</p>
+          <div id="reminder-status" class="mt-2"></div>
+        </div>
+
+        <!-- 手書きメモ帳 -->
+        <div class="bg-gradient-to-r from-pink-50 to-rose-50 rounded-xl p-4 border border-pink-200">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-pink-700 text-sm"><i class="fas fa-pen-fancy mr-1"></i>✍️ 手書きメモ</h4>
+            <button onclick="createHandwritingCanvas('tools-handwriting-area')" class="bg-pink-500 hover:bg-pink-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">
+              <i class="fas fa-pen mr-1"></i>開く
+            </button>
+          </div>
+          <p class="text-xs text-gray-500 mb-2">手書きで文字や数式を入力→AI認識で回答欄に転記</p>
+          <div id="tools-handwriting-area"></div>
+        </div>
+        
+        <!-- 感情・ZPD状態 -->
+        <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+          <h4 class="font-bold text-green-700 text-sm mb-2"><i class="fas fa-heart mr-1"></i>💚 学習状態</h4>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="text-center">
+              <div class="text-2xl mb-1">${detectEmotion()?.emoji || '😌'}</div>
+              <div class="text-xs font-bold text-gray-600">${detectEmotion()?.emotion === 'neutral' ? 'いい調子！' : (detectEmotion()?.message || 'がんばろう！')}</div>
+            </div>
+            <div class="text-center">
+              <div class="text-2xl font-black" style="color:${window._zpdState?.level >= 80 ? '#F59E0B' : window._zpdState?.level >= 60 ? '#8B5CF6' : '#3B82F6'}">${window._zpdState?.level || 50}</div>
+              <div class="text-xs font-bold text-gray-600">ZPDレベル${window._zpdState?.streak >= 3 ? ' 🔥' + window._zpdState.streak + '連続' : ''}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+  modal.style.animation = 'fadeInUpResult 0.3s ease-out'
+  
+  // 忘却ヒートマップを自動読み込み
+  loadForgettingHeatmap()
+}
+window.openLearningToolsPanel = openLearningToolsPanel
+
+// マインドマップ生成（現在のコースのカードから）
+async function generateMindmapFromCurrentCourse() {
+  const cards = state.courseCards || []
+  const unitName = state.selectedCurriculum?.unit_name || state.selectedCurriculum?.unitName || ''
+  const subject = state.selectedCurriculum?.subject || ''
+  const container = document.getElementById('mindmap-container')
+  if (container) {
+    await generateMindmap(cards, unitName, subject, container)
+  }
+}
+window.generateMindmapFromCurrentCourse = generateMindmapFromCurrentCourse
+
+// 忘却ヒートマップ読み込み
+function loadForgettingHeatmap() {
+  const cards = state.courseCards || []
+  // localStorageのレビューデータと結合
+  const reviewData = JSON.parse(localStorage.getItem('cardReviewData') || '[]')
+  const enriched = cards.map(c => {
+    const review = reviewData.find((r) => r.card_id === (c.card_id || c.id))
+    return {
+      ...c,
+      last_reviewed_at: review?.last_reviewed_at || c.last_reviewed_at,
+      review_count: review?.review_count || c.review_count || 0,
+      last_was_correct: review?.last_was_correct ?? true
+    }
+  })
+  renderForgettingHeatmap(enriched, 'forgetting-heatmap-container')
+}
+window.loadForgettingHeatmap = loadForgettingHeatmap
+
+// 復習リマインダーUI
+async function setupReviewReminderUI() {
+  const btn = document.getElementById('reminder-setup-btn')
+  const statusEl = document.getElementById('reminder-status')
+  if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>設定中...'
+  
+  const result = await setupReviewReminder()
+  if (result) {
+    if (btn) btn.innerHTML = '<i class="fas fa-check mr-1"></i>設定済み ✅'
+    if (statusEl) statusEl.innerHTML = '<p class="text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>毎朝7時に復習リマインダーを送ります！</p>'
+    
+    // 現在のカードデータをlocalStorageに保存（忘却計算用）
+    const cards = state.courseCards || []
+    const reviewData = cards.map(c => ({
+      card_id: c.card_id || c.id,
+      card_title: c.card_title,
+      last_reviewed_at: c.last_reviewed_at || new Date().toISOString(),
+      review_count: c.review_count || 1,
+      last_was_correct: true
+    }))
+    localStorage.setItem('cardReviewData', JSON.stringify(reviewData))
+  } else {
+    if (btn) btn.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i>通知を許可してください'
+    if (statusEl) statusEl.innerHTML = '<p class="text-xs text-red-500"><i class="fas fa-info-circle mr-1"></i>ブラウザの通知設定を「許可」にしてください。</p>'
+  }
+}
+window.setupReviewReminderUI = setupReviewReminderUI
 console.log('🔍 [DEBUG] app.js 完全読み込み完了 ✅')

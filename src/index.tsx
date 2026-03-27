@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260327j' }, 200, {
+  return c.json({ build_id: '20260327k' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260327j';
+    var MY_BUILD = '20260327k';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14501,7 +14501,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260327j';
+          var MY_BUILD = '20260327k';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -46394,6 +46394,226 @@ app.get('/api/review-dashboard/:studentId', async (c) => {
     })
   } catch (e: any) {
     console.error('復習ダッシュボードエラー:', e)
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ============================================================
+// ★「なぜ？」探究モード: 正解後に科学的背景をGeminiが解説
+// ============================================================
+app.post('/api/ai/why-exploration', async (c) => {
+  const { env } = c
+  try {
+    const { question, answer, subject, grade, card_title } = await c.req.json()
+    const apiKey = env.GEMINI_API_KEY || env.GOOGLE_AI_KEY || ''
+    if (!apiKey) return c.json({ success: false, error: 'API key not configured' }, 500)
+    
+    const prompt = `あなたは子ども向け科学番組のやさしい解説者です。
+
+問題: ${question?.substring(0, 300) || ''}
+答え: ${answer || ''}
+教科: ${subject || '不明'}
+学年: ${grade || '不明'}
+テーマ: ${card_title || ''}
+
+児童が「なぜそうなるの？」「もっと知りたい！」と思ったときのために、
+以下のJSON形式で回答してください:
+
+{
+  "why_simple": "小学生にもわかるシンプルな理由（80字以内、「〜なんだよ！」口調）",
+  "science_behind": "科学的・学術的な背景説明（150字以内、具体例を含む）",
+  "fun_fact": "「へえ！」と驚く豆知識（80字以内、驚きの事実）",
+  "real_life": "実生活でどう関係するか（80字以内、身近な例）",
+  "deeper_question": "さらに考えを深める問いかけ（50字以内、「〜だと思う？」形式）"
+}
+
+JSONのみ出力。`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 512, temperature: 0.7 }
+        })
+      }
+    )
+    if (!resp.ok) return c.json({ success: false, error: 'API error' }, 500)
+    const data = await resp.json() as any
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      return c.json({ success: true, exploration: JSON.parse(jsonMatch[0]) })
+    }
+    return c.json({ success: true, exploration: { why_simple: text.substring(0, 200) } })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ============================================================
+// ★ 実験シミュレーター: パラメータ変更→結果変化のHTML生成
+// ============================================================
+app.post('/api/ai/generate-experiment', async (c) => {
+  const { env } = c
+  try {
+    const { card_title, problem_text, subject, grade } = await c.req.json()
+    const apiKey = env.GEMINI_API_KEY || env.GOOGLE_AI_KEY || ''
+    if (!apiKey) return c.json({ success: false, error: 'API key not configured' }, 500)
+    
+    const prompt = `あなたは小学校理科の実験シミュレーター開発者です。
+
+テーマ: ${card_title || ''}
+問題: ${problem_text?.substring(0, 400) || ''}
+教科: ${subject || '理科'}
+学年: ${grade || '5'}
+
+この問題に関連するインタラクティブな実験シミュレーターのHTML/CSS/JavaScriptを生成してください。
+
+要件:
+- 1つのHTML文字列（<div>で囲む）で完結
+- スライダー・ボタンなどでパラメータを変更可能
+- パラメータ変更→結果がリアルタイムに変化（Canvas or DOM操作）
+- 小学生が直感的に操作できるUI（大きなボタン、カラフル）
+- 科学的に正確な結果を表示
+- 最大300行以内のコンパクトなコード
+- 外部ライブラリは使用しない（vanilla JS/CSS/HTML のみ）
+- <script>タグ内のJSは即時実行関数でラップ
+
+JSONで出力:
+{
+  "experiment_title": "実験タイトル",
+  "experiment_html": "<div>...完全なHTML...</div>",
+  "description": "この実験で学べること（50字以内）",
+  "parameters": ["パラメータ1の名前", "パラメータ2の名前"]
+}
+
+JSONのみ出力。`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 4096, temperature: 0.5 }
+        })
+      }
+    )
+    if (!resp.ok) return c.json({ success: false, error: 'API error' }, 500)
+    const data = await resp.json() as any
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      return c.json({ success: true, experiment: JSON.parse(jsonMatch[0]) })
+    }
+    return c.json({ success: false, error: 'Failed to parse experiment' }, 500)
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ============================================================
+// ★ マインドマップ生成: カード内容からMermaid.js用構造を生成
+// ============================================================
+app.post('/api/ai/generate-mindmap', async (c) => {
+  const { env } = c
+  try {
+    const { cards, unit_name, subject } = await c.req.json()
+    const apiKey = env.GEMINI_API_KEY || env.GOOGLE_AI_KEY || ''
+    if (!apiKey) return c.json({ success: false, error: 'API key not configured' }, 500)
+    
+    const cardsInfo = (cards || []).slice(0, 10).map((cd: any) => 
+      `- ${cd.card_title || cd.title}: ${(cd.problem_description || cd.problem_text || '').substring(0, 80)}`
+    ).join('\n')
+    
+    const prompt = `以下の学習カード情報から、Mermaid.jsのmindmap記法でマインドマップを生成してください。
+
+単元: ${unit_name || ''}
+教科: ${subject || ''}
+カード一覧:
+${cardsInfo}
+
+Mermaid mindmap記法で出力してください。ルートは単元名。2階層まで。日本語で。
+例:
+mindmap
+  root((単元名))
+    概念1
+      詳細A
+      詳細B
+    概念2
+      詳細C
+
+mindmapコードのみ出力（\`\`\`は不要）。`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 512, temperature: 0.3 }
+        })
+      }
+    )
+    if (!resp.ok) return c.json({ success: false, error: 'API error' }, 500)
+    const data = await resp.json() as any
+    let mermaidCode = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    mermaidCode = mermaidCode.replace(/```mermaid\n?/g, '').replace(/```\n?/g, '').trim()
+    return c.json({ success: true, mermaid_code: mermaidCode })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ============================================================
+// ★ 手書き入力認識: Canvas画像→Gemini Vision APIで文字/数式認識
+// ============================================================
+app.post('/api/ai/recognize-handwriting', async (c) => {
+  const { env } = c
+  try {
+    const { image_base64 } = await c.req.json()
+    if (!image_base64) return c.json({ success: false, error: 'image_base64 required' }, 400)
+    
+    const apiKey = env.GEMINI_API_KEY || env.GOOGLE_AI_KEY || ''
+    if (!apiKey) return c.json({ success: false, error: 'API key not configured' }, 500)
+    
+    const prompt = `この手書き画像を認識してください。
+文字、数字、数式、漢字、ひらがな、カタカナのいずれかが書かれています。
+認識結果のテキストだけを出力してください。余計な説明は不要です。
+数式の場合は、算数の記号（＋、−、×、÷、＝）を使ってください。
+何も認識できない場合は空文字を返してください。`
+
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: 'image/png', data: image_base64 } }
+            ]
+          }],
+          generationConfig: { maxOutputTokens: 128, temperature: 0.1 }
+        })
+      }
+    )
+    if (!resp.ok) {
+      console.log('🖊️ Handwriting API error:', resp.status)
+      return c.json({ success: false, error: 'Vision API error' }, 500)
+    }
+    const data = await resp.json() as any
+    const recognized = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim()
+    console.log('🖊️ 手書き認識結果:', recognized)
+    return c.json({ success: true, recognized_text: recognized })
+  } catch (e: any) {
+    console.error('🖊️ Handwriting recognition error:', e.message)
     return c.json({ success: false, error: e.message }, 500)
   }
 })
