@@ -7869,22 +7869,8 @@ async function generateImageForCardAsImage(cardId, description) {
     if (res.data.success && res.data.image_url) {
       try { await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url }) } catch(e) {}
       if (placeholder) {
-        const safeDesc = (description||'').replace(/'/g,'').replace(/"/g,'').replace(/\n/g,' ').substring(0,60)
-        placeholder.innerHTML = `
-          <div class="text-center" id="card-image-container-${cardId}">
-            <img src="${res.data.image_url}" alt="${description || '問題の図'}" 
-                 class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-gray-200" style="max-height: 400px;">
-            <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
-              <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full font-bold">
-                <i class="fas fa-check-circle mr-1"></i>${res.data.model || 'AI'}（${((res.data.generation_time_ms||0)/1000).toFixed(1)}秒）
-              </span>
-              <button onclick="openPromptImageGenerate(${cardId}, 'nb_pro')" class="text-xs text-pink-500 hover:text-pink-700 underline"><i class="fas fa-star mr-1"></i>高精度画像</button>
-              <button onclick="generateImageForCard(${cardId}, '${safeDesc}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-chart-line mr-1"></i>グラフで再生成</button>
-              <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
-              <button onclick="deleteCardImage(${cardId})" class="text-xs text-red-400 hover:text-red-600 underline"><i class="fas fa-trash mr-1"></i>削除</button>
-            </div>
-            ${res.data.ai_description ? '<p class="text-xs text-gray-500 mt-1">' + res.data.ai_description.substring(0, 100) + '</p>' : ''}
-          </div>`
+        // renderMediaEmbed を使って音声解説・保存ボタンも含む完全なUIを生成
+        placeholder.innerHTML = renderMediaEmbed(res.data.image_url, cardId, description || res.data.ai_description || '問題の図')
       }
     } else {
       throw new Error(res.data.error || '画像生成に失敗')
@@ -7935,23 +7921,8 @@ async function generateImageForCardNBPro(cardId, description) {
     if (res.data.success && res.data.image_url) {
       try { await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url }) } catch(e) {}
       if (placeholder) {
-        const safeDesc = (description||'').replace(/'/g,'').replace(/"/g,'').replace(/\n/g,' ').substring(0,60)
-        placeholder.innerHTML = `
-          <div class="text-center" id="card-image-container-${cardId}">
-            <img src="${res.data.image_url}" alt="${description || '問題の図'}" 
-                 class="max-w-full h-auto rounded-lg shadow-md mx-auto border-2 border-pink-200" style="max-height: 400px;">
-            <div class="mt-2 flex items-center justify-center gap-2 flex-wrap">
-              <span class="bg-pink-100 text-pink-700 text-xs px-3 py-1 rounded-full font-bold">
-                <i class="fas fa-star mr-1"></i>${res.data.model || 'AI高精度画像'}（${((res.data.generation_time_ms||0)/1000).toFixed(1)}秒）
-              </span>
-              <button onclick="openPromptImageGenerate(${cardId}, 'nb_pro')" class="text-xs text-pink-500 hover:text-pink-700 underline"><i class="fas fa-star mr-1"></i>プロンプト指定で再生成</button>
-              <button onclick="generateImageForCard(${cardId}, '${safeDesc}')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-chart-line mr-1"></i>グラフで再生成</button>
-              <button onclick="openImageEditor(${cardId})" class="text-xs text-blue-500 hover:text-blue-700 underline"><i class="fas fa-edit mr-1"></i>編集</button>
-              <button onclick="deleteCardImage(${cardId})" class="text-xs text-red-400 hover:text-red-600 underline"><i class="fas fa-trash mr-1"></i>削除</button>
-              <button onclick="openPromptImageGenerate(${cardId}, 'replace')" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>
-            </div>
-            ${res.data.ai_description ? '<p class="text-xs text-gray-500 mt-1">' + res.data.ai_description.substring(0, 100) + '</p>' : ''}
-          </div>`
+        // renderMediaEmbed を使って音声解説・保存ボタンも含む完全なUIを生成
+        placeholder.innerHTML = renderMediaEmbed(res.data.image_url, cardId, description || res.data.ai_description || '問題の図')
       }
     } else {
       throw new Error(res.data.error || '高精度画像生成に失敗')
@@ -14446,15 +14417,29 @@ async function generateExampleDiagramApp(cardId, cardTitle, exampleProblem, exam
   if (!area) return
   area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-yellow-500 text-xl"></i><p class="text-xs text-yellow-600 mt-1 font-bold">AIが例題の図を描いています...</p></div>'
   try {
+    // ★ 例題の答え（exampleSolution）を禁止ワードとして送信（図に表示させない）
+    // また本題の答えも取得して禁止ワードに含める
+    const rawCd = window.currentCardData || {}
+    const cd = rawCd.card || rawCd || {}
+    const answerObj = rawCd.answer || {}
+    const mainAnswer = cd.answer || cd.correct_answer || answerObj.answer_text || ''
+    const exampleAnswer = cd.example_answer || ''
+    const forbiddenWords = [exampleAnswer, exampleSolution, mainAnswer].filter(Boolean).map(w => w.trim()).filter(w => w.length > 0)
+    
     const prompt = '日本の小学校の教科書に載る例題の図解を描いてください。\n' +
       '【カード】' + cardTitle + '\n' +
       '【例題】' + exampleProblem + '\n' +
-      (exampleSolution ? '【解き方】' + exampleSolution + '\n' : '') +
+      '★★★重要ルール★★★\n' +
+      '- 答え・解答・正解の文字を図の中に絶対に書かないこと\n' +
+      '- 答えの数値や単語を図に表示せず、代わりに「？」や空欄にする\n' +
+      (forbiddenWords.length > 0 ? '- 以下の単語は禁止（図に表示不可）: ' + forbiddenWords.join(', ') + '\n' : '') +
       '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。'
     const res = await axios.post('/api/ai/generate-image', {
       prompt: prompt,
       card_id: cardId, card_title: cardTitle,
-      problem_text: exampleProblem, prefer_image: true
+      problem_text: exampleProblem, prefer_image: true,
+      // 禁止ワードをサーバーに送信
+      forbidden_answer: forbiddenWords.join(', ')
     })
     const d = res.data
     if (d.success && d.image_url) {
@@ -14485,7 +14470,7 @@ function editExampleDiagramPrompt(cardId, cardTitle, exampleProblem, exampleSolu
   const defaultPrompt = '日本の小学校の教科書に載る例題の図解を描いてください。\n' +
     '【カード】' + (cardTitle || '') + '\n' +
     '【例題】' + (exampleProblem || '') + '\n' +
-    (exampleSolution ? '【解き方】' + exampleSolution + '\n' : '') +
+    '★★重要：答え・正解・解答の文字列を図に絶対に書かない。「？」や空欄にする★★\n' +
     '条件：教科書のイラスト風。児童にわかりやすい色使い。文字は大きく日本語で。幾何の図形は正確に描く。ラベル（頂点名ABCD等）を明確に。白い背景。'
 
   const modal = document.createElement('div')
@@ -14522,10 +14507,17 @@ async function executeEditExampleDiagram(cardId) {
   if (!area) return
   area.innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin text-blue-500 text-xl"></i><p class="text-xs text-blue-600 mt-1 font-bold">プロンプト指定で図を生成中...</p></div>'
   try {
+    // 禁止ワード取得
+    const rawCd2 = window.currentCardData || {}
+    const cd2 = rawCd2.card || rawCd2 || {}
+    const ansObj2 = rawCd2.answer || {}
+    const forbiddenWords2 = [cd2.example_answer, cd2.answer, cd2.correct_answer, ansObj2.answer_text].filter(Boolean).map(w => w.toString().trim()).filter(w => w.length > 0)
+    
     const res = await axios.post('/api/ai/generate-image', {
       prompt: promptText,
       card_id: cardId,
-      prefer_image: true
+      prefer_image: true,
+      forbidden_answer: forbiddenWords2.join(', ')
     })
     const d = res.data
     if (d.success && d.image_url) {
@@ -41694,9 +41686,11 @@ window.speakNB2NarrationAI = async function(page, source) {
   var btnId = source === 'image' ? 'nb2-speak-btn-img-' + page : source === 'example' ? 'nb2-speak-btn-example-' + page : 'nb2-speak-btn-' + page
   var btn = document.getElementById(btnId)
   if (!btn) btn = document.getElementById('nb2-speak-btn-' + page)
+  console.log('🔊 [NB2音声] btn found:', !!btn, 'btnId:', btnId)
   
   // 既に再生中なら停止
   if (_globalTtsPlaying) {
+    console.log('🔊 [NB2音声] 既に再生中 → 停止')
     stopGlobalTts()
     if (btn) {
       btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
@@ -41708,7 +41702,7 @@ window.speakNB2NarrationAI = async function(page, source) {
   // カードデータ
   var cd = window.currentCardData || {}
   var card = cd.card || cd || {}
-  console.log('🔊 [NB2音声] カードデータ:', { hasCard: !!card, title: card.card_title || card.title || '(なし)', hasProblem: !!(card.problem_content || card.problem_text) })
+  console.log('🔊 [NB2音声] カードデータ:', JSON.stringify({ hasCard: !!card, title: (card.card_title || card.title || '(なし)').substring(0,30), hasProblem: !!(card.problem_content || card.problem_text), hasExample: !!card.example_problem }))
   var title = card.card_title || card.title || ''
   var problemText = card.problem_content || card.problem_text || ''
   var imgDesc = card._image_description || ''
@@ -41772,34 +41766,47 @@ window.speakNB2NarrationAI = async function(page, source) {
   
   try {
     // Step 1: AIにナレーション原稿を生成
-    var narrationResp = await fetch('/api/ai/generate-nb2-narration', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text_content: textParts.slice(0, 8).join('\n').substring(0, 600),
-        card_title: title,
-        subject: card.subject || '',
-        grade: card.grade_level || card.grade || '',
-        source_type: source || 'widget'
-      })
-    })
-    var narrationData = await narrationResp.json()
-    
     var speechText = ''
-    if (narrationData.success && narrationData.narration_text) {
-      speechText = narrationData.narration_text
-    } else {
+    try {
+      console.log('🔊 [NB2音声] ナレーションAPI呼び出し...')
+      var narrationResp = await fetch('/api/ai/generate-nb2-narration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text_content: textParts.slice(0, 8).join('\n').substring(0, 600),
+          card_title: title,
+          subject: card.subject || '',
+          grade: card.grade_level || card.grade || '',
+          source_type: source || 'widget'
+        })
+      })
+      console.log('🔊 [NB2音声] ナレーションAPI応答: status=' + narrationResp.status)
+      var narrationData = await narrationResp.json()
+      console.log('🔊 [NB2音声] ナレーション結果:', { success: narrationData.success, hasText: !!narrationData.narration_text, textLen: (narrationData.narration_text || '').length })
+      
+      if (narrationData.success && narrationData.narration_text) {
+        speechText = narrationData.narration_text
+      }
+    } catch (narrationErr) {
+      console.warn('🔊 [NB2音声] ナレーションAPI失敗:', narrationErr.message)
+    }
+    
+    // ナレーション生成失敗時のフォールバック
+    if (!speechText) {
       speechText = title ? (title + 'について説明します。') : ''
       speechText += textParts.slice(0, 5).join('。') + '。'
     }
     
-    if (!speechText) {
+    if (!speechText || speechText.length < 5) {
+      console.warn('🔊 [NB2音声] speechTextが空')
       if (btn) {
         btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
         btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
       }
       return
     }
+    
+    console.log('🔊 [NB2音声] speechText完成:', speechText.substring(0, 80) + '...')
     
     // Step 2: Gemini TTS APIで音声生成
     if (btn) {
@@ -41810,22 +41817,31 @@ window.speakNB2NarrationAI = async function(page, source) {
     var voiceType = 'male-friendly'
     try { voiceType = (localStorage.getItem('voicePreference') === 'female') ? 'female-friendly' : 'male-friendly' } catch(e) {}
     
+    console.log('🔊 [NB2音声] TTS API呼び出し開始...')
     var ttsAbortCtrl = new AbortController()
-    var ttsTimeout = setTimeout(function() { ttsAbortCtrl.abort() }, 30000) // 30秒タイムアウト
+    var ttsTimeout = setTimeout(function() { console.warn('🔊 [NB2音声] TTS 30秒タイムアウト'); ttsAbortCtrl.abort() }, 30000)
     
-    var ttsResp = await fetch('/api/ai/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: ttsAbortCtrl.signal,
-      body: JSON.stringify({
-        text: speechText.substring(0, 800),
-        voiceType: voiceType,
-        mood: ''
+    var ttsResp
+    try {
+      ttsResp = await fetch('/api/ai/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: ttsAbortCtrl.signal,
+        body: JSON.stringify({
+          text: speechText.substring(0, 800),
+          voiceType: voiceType,
+          mood: ''
+        })
       })
-    })
+    } catch (fetchErr) {
+      clearTimeout(ttsTimeout)
+      console.error('🔊 [NB2音声] TTS fetch失敗:', fetchErr.name, fetchErr.message)
+      throw fetchErr
+    }
     clearTimeout(ttsTimeout)
+    console.log('🔊 [NB2音声] TTS API応答: status=' + ttsResp.status)
     var ttsData = await ttsResp.json()
-    console.log('🔊 NB2音声解説: TTS API応答', { success: ttsData.success, format: ttsData.audioFormat, hasContent: !!ttsData.audioContent, contentLen: (ttsData.audioContent || '').length })
+    console.log('🔊 [NB2音声] TTS結果:', JSON.stringify({ success: ttsData.success, format: ttsData.audioFormat, hasContent: !!ttsData.audioContent, contentLen: (ttsData.audioContent || '').length }))
     
     if (ttsData.success && ttsData.audioContent && ttsData.audioFormat === 'pcm') {
       console.log('🔊 [NB2音声] PCM再生開始...')
@@ -41951,16 +41967,25 @@ window.speakNB2NarrationAI = async function(page, source) {
       window.speakNB2Explanation(page)
     }
   } catch (e) {
-    console.warn('❌ AIナレーションエラー:', e.name, e.message)
+    console.error('❌ [NB2音声] エラー:', e.name, e.message, e.stack)
     if (btn) {
       btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
       btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
     }
     // タイムアウトやネットワークエラーでもWeb Speech APIで読み上げ
-    console.log('🔊 Web Speech APIにフォールバック')
+    console.log('🔊 [NB2音声] Web Speech APIにフォールバック')
     try {
       if (window.speechSynthesis && textParts.length > 0) {
         var fallbackText = (title ? title + '。' : '') + textParts.slice(0, 3).join('。')
+        console.log('🔊 [NB2音声] Web Speech fallback text:', fallbackText.substring(0, 80))
+        if (window.speechSynthesis.speaking) window.speechSynthesis.cancel()
+        var utter = new SpeechSynthesisUtterance(fallbackText.substring(0, 400))
+        utter.lang = 'ja-JP'
+        utter.rate = 0.9
+        utter.onstart = function() { console.log('🔊 Web Speech 再生開始'); if (btn) { btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'; btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)' } }
+        utter.onend = function() { console.log('🔊 Web Speech 再生完了'); if (btn) { btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'; btn.style.background = 'linear-gradient(135deg,#10B981,#059669)' } }
+        utter.onerror = function(ev) { console.error('🔊 Web Speech エラー:', ev.error); if (btn) { btn.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:3px;"></i> 音声エラー'; btn.style.background = 'linear-gradient(135deg,#F59E0B,#D97706)'; setTimeout(function() { btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'; btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'; }, 3000) } }
+        window.speechSynthesis.speak(utter)
         fallbackText = fallbackText.substring(0, 500)
         var utter = new SpeechSynthesisUtterance(fallbackText)
         utter.lang = 'ja-JP'

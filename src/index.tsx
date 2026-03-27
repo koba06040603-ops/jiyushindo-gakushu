@@ -32167,7 +32167,7 @@ app.delete('/api/cards/images/:imageId', async (c) => {
 // AI画像生成API（Gemini Imagen使用）- JSXGraph + Nano Banana Pro 統合版
 app.post('/api/ai/generate-image', async (c) => {
   const { env } = c
-  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade, prefer_image, prefer_model, answer_text, answer_explanation, custom_prompt } = await c.req.json()
+  const { prompt, card_id, teacher_id, negative_prompt, style, aspect_ratio, problem_text, card_title, unit_name, subject, grade, prefer_image, prefer_model, answer_text, answer_explanation, custom_prompt, forbidden_answer } = await c.req.json()
   
   try {
     const geminiApiKey = env.GEMINI_API_KEY || env.AIML_API_KEY
@@ -32199,6 +32199,10 @@ app.post('/api/ai/generate-image', async (c) => {
     // 画像はヒント・考え方の手がかりのみを表示する
     if (answer_text && answer_text.length > 0) {
       contextParts.push(`\n★★★ 禁止: 「${answer_text.substring(0, 50)}」を図に表示してはいけません。これは正解なので見せてはダメです。代わりに「？」や空欄にしてください ★★★`)
+    }
+    // forbidden_answer パラメータも禁止ワードとして追加
+    if (forbidden_answer && forbidden_answer.length > 0 && forbidden_answer !== answer_text) {
+      contextParts.push(`\n★★★ 追加禁止ワード: 「${forbidden_answer.substring(0, 100)}」も図に絶対に表示してはいけません ★★★`)
     }
     // ユーザーが手動で指定したプロンプト（最優先）
     if (custom_prompt && custom_prompt.length > 1) {
