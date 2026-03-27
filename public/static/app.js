@@ -41682,15 +41682,22 @@ window.speakNB2Explanation = function(page) {
 // source=undefined: NB2ウィジェットの解説（ウィジェットテキスト使用）
 // ★ 重要: 音声解説は「ヒントまで」。答えは絶対に含めない。
 window.speakNB2NarrationAI = async function(page, source) {
+  // ★ 最外側のtry/catchでエラーを確実に表示
+  try {
   console.log('🔊 [NB2音声] 開始: page=' + page + ', source=' + source)
+  
+  // ★ まず即座にボタンUIを変更（ユーザーに反応を見せる）
   var btnId = source === 'image' ? 'nb2-speak-btn-img-' + page : source === 'example' ? 'nb2-speak-btn-example-' + page : 'nb2-speak-btn-' + page
   var btn = document.getElementById(btnId)
   if (!btn) btn = document.getElementById('nb2-speak-btn-' + page)
-  console.log('🔊 [NB2音声] btn found:', !!btn, 'btnId:', btnId)
+  
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:3px;"></i>準備中...'
+    btn.style.background = 'linear-gradient(135deg,#6366F1,#8B5CF6)'
+  }
   
   // 既に再生中なら停止
   if (_globalTtsPlaying) {
-    console.log('🔊 [NB2音声] 既に再生中 → 停止')
     stopGlobalTts()
     if (btn) {
       btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
@@ -41986,38 +41993,33 @@ window.speakNB2NarrationAI = async function(page, source) {
         utter.onend = function() { console.log('🔊 Web Speech 再生完了'); if (btn) { btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'; btn.style.background = 'linear-gradient(135deg,#10B981,#059669)' } }
         utter.onerror = function(ev) { console.error('🔊 Web Speech エラー:', ev.error); if (btn) { btn.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:3px;"></i> 音声エラー'; btn.style.background = 'linear-gradient(135deg,#F59E0B,#D97706)'; setTimeout(function() { btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'; btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'; }, 3000) } }
         window.speechSynthesis.speak(utter)
-        fallbackText = fallbackText.substring(0, 500)
-        var utter = new SpeechSynthesisUtterance(fallbackText)
-        utter.lang = 'ja-JP'
-        utter.rate = 0.9
-        utter.pitch = 1.1
-        var voices = speechSynthesis.getVoices()
-        var jpVoice = voices.find(function(v) { return v.lang.startsWith('ja') })
-        if (jpVoice) utter.voice = jpVoice
-        _globalTtsPlaying = true
-        if (btn) {
-          btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
-          btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)'
-        }
-        utter.onend = function() {
-          _globalTtsPlaying = false
-          if (btn) {
-            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
-            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
-          }
-        }
-        utter.onerror = function() {
-          _globalTtsPlaying = false
-          if (btn) {
-            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
-            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
-          }
-        }
-        window.speechSynthesis.speak(utter)
       }
     } catch(fallbackErr) {
       console.warn('Web Speech APIフォールバックも失敗:', fallbackErr)
     }
+  }
+  // ★ 最外側のcatch（全てのエラーをキャッチ）
+  } catch(outerErr) {
+    console.error('❌❌ [NB2音声] 最外側エラー:', outerErr.name, outerErr.message)
+    if (btn) {
+      btn.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:3px;color:#FCD34D;"></i> エラー発生'
+      btn.style.background = 'linear-gradient(135deg,#DC2626,#B91C1C)'
+      setTimeout(function() {
+        btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+        btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+      }, 5000)
+    }
+    // 最終手段: Web Speech API
+    try {
+      if (window.speechSynthesis) {
+        var emergencyText = (title || '') + '。' + (textParts || []).slice(0, 2).join('。')
+        if (emergencyText.length > 5) {
+          var u = new SpeechSynthesisUtterance(emergencyText.substring(0, 300))
+          u.lang = 'ja-JP'; u.rate = 0.9
+          window.speechSynthesis.speak(u)
+        }
+      }
+    } catch(e3) { /* give up */ }
   }
 }
 
