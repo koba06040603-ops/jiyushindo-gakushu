@@ -22519,8 +22519,8 @@ async function executeUnitGeneration(params) {
         level: 'slow',
         info: {
           name: 'じっくりコース',
-          label: 'じっくり考えながら進むコース',
-          description: 'ひとつひとつていねいに学びたい人におすすめ',
+          label: '見て・さわって・たしかめるコース',
+          description: '絵や図を使ってていねいに学びたい人におすすめ',
           color_code: 'green'
         }
       },
@@ -22528,8 +22528,8 @@ async function executeUnitGeneration(params) {
         level: 'steady',
         info: {
           name: 'しっかりコース',
-          label: 'バランスよく学ぶコース',
-          description: '着実に力をつけたい人におすすめ',
+          label: '調べて・くらべて・考えるコース',
+          description: '資料やデータを読み取る力をつけたい人におすすめ',
           color_code: 'blue'
         }
       },
@@ -22537,8 +22537,8 @@ async function executeUnitGeneration(params) {
         level: 'fast',
         info: {
           name: 'ぐんぐんコース',
-          label: '発展的な内容にチャレンジするコース',
-          description: 'より高い目標を目指したい人におすすめ',
+          label: '世界とつながる・自分の考えを伝えるコース',
+          description: '今の社会の問題や自分の意見を発信したい人におすすめ',
           color_code: 'purple'
         }
       }
