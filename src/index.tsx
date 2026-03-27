@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260327c' }, 200, {
+  return c.json({ build_id: '20260327d' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260327c';
+    var MY_BUILD = '20260327d';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14501,7 +14501,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260327c';
+          var MY_BUILD = '20260327d';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -46312,6 +46312,17 @@ app.get('/api/review-dashboard/:studentId', async (c) => {
 })
 
 // ============================================================
+// ★ デバッグ: クライアントエラーログ受信エンドポイント
+app.post('/api/ai/debug-log', async (c) => {
+  try {
+    const body = await c.req.json()
+    console.log('🐛 [CLIENT-DEBUG]', JSON.stringify(body))
+    return c.json({ ok: true })
+  } catch (e) {
+    return c.json({ ok: false })
+  }
+})
+
 // ★ Feature: NB2図解の音声ナレーション生成 API (Gemini TTS)
 // ============================================================
 app.post('/api/ai/generate-nb2-narration', async (c) => {

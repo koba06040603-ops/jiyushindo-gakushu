@@ -41724,7 +41724,9 @@ window.speakNB2NarrationAI = async function(page, source) {
   // カードデータ
   var cd = window.currentCardData || {}
   var card = cd.card || cd || {}
-  console.log('🔊 [NB2音声] カードデータ:', JSON.stringify({ hasCard: !!card, title: (card.card_title || card.title || '(なし)').substring(0,30), hasProblem: !!(card.problem_content || card.problem_text), hasExample: !!card.example_problem }))
+  try {
+    console.log('🔊 [NB2音声] カードデータ:', JSON.stringify({ hasCard: !!card, title: (card.card_title || card.title || '(なし)').substring(0,30), hasProblem: !!(card.problem_content || card.problem_text), hasExample: !!card.example_problem }))
+  } catch(logErr) { console.log('🔊 [NB2音声] カードデータあり (stringify不可)') }
   title = card.card_title || card.title || ''
   var problemText = card.problem_content || card.problem_text || ''
   var imgDesc = card._image_description || ''
@@ -58075,6 +58077,24 @@ console.log('✅ 管理者ダッシュボード初期化完了')
 console.log('🔍 [DEBUG] speakNB2NarrationAI:', typeof window.speakNB2NarrationAI)
 console.log('🔍 [DEBUG] speakNB2Explanation:', typeof window.speakNB2Explanation)
 console.log('🔍 [DEBUG] playPcmGlobal:', typeof playPcmGlobal)
+console.log('🔍 [DEBUG] _globalTtsPlaying:', typeof _globalTtsPlaying, _globalTtsPlaying)
+console.log('🔍 [DEBUG] stopGlobalTts:', typeof stopGlobalTts)
+
+// ★ デバッグ: クライアントエラーをサーバーに送信
+window._nb2ErrorLog = []
+window._nb2OrigSpeakFn = window.speakNB2NarrationAI
+window.speakNB2NarrationAI = async function(page, source) {
+  try {
+    console.log('🔊 [WRAPPER] speakNB2NarrationAI呼び出し: page=' + page + ', source=' + source)
+    // エラーログ送信
+    fetch('/api/ai/debug-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'nb2_audio_start', page: page, source: source, timestamp: Date.now(), globalTtsPlaying: _globalTtsPlaying }) }).catch(function(){})
+    await window._nb2OrigSpeakFn(page, source)
+    fetch('/api/ai/debug-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'nb2_audio_success', page: page, source: source, timestamp: Date.now() }) }).catch(function(){})
+  } catch(wrapErr) {
+    console.error('🔊 [WRAPPER] エラー:', wrapErr.name, wrapErr.message, wrapErr.stack)
+    fetch('/api/ai/debug-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'nb2_audio_error', page: page, source: source, error: wrapErr.name + ': ' + wrapErr.message, stack: (wrapErr.stack || '').substring(0, 500), timestamp: Date.now() }) }).catch(function(){})
+  }
+}
 console.log('🔍 [DEBUG] _globalTtsPlaying:', typeof _globalTtsPlaying)
 console.log('🔍 [DEBUG] bookmarkNB2Image:', typeof window.bookmarkNB2Image)
 console.log('🔍 [DEBUG] app.js 完全読み込み完了 ✅')
