@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Test</title></head>
+<body>
+<div id="app"></div><div id="gradeResult"></div>
+<div id="hintsArea"><div class="bg-white rounded-lg p-4 border"><div id="hint-0" class="hidden">H1</div></div><div class="bg-white rounded-lg p-4 border"><div id="hint-1" class="hidden">H2</div></div><div class="bg-white rounded-lg p-4 border"><div id="hint-2" class="hidden">H3</div></div></div>
+<div id="answerInput"></div><div id="fht"></div><div id="hwa"></div><div id="loginPasswordInput"></div><div id="passwordToggle"></div>
+<script>
+// Block SW controllerchange to prevent page reload
+if (navigator.serviceWorker) {
+  var origSWAddEL = navigator.serviceWorker.addEventListener
+  navigator.serviceWorker.addEventListener = function(type, fn) {
+    if (type === 'controllerchange') return
+    return origSWAddEL.call(navigator.serviceWorker, type, fn)
+  }
+}
+window._skipAutoInit = true
+window._testOrigLog = console.log
+console.log = function(){}; console.warn = function(){}; console.error = function(){}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+<script src="/static/app.js"></script>
+<script>
+(function(){
+  console.log = window._testOrigLog
+  console.warn = function(){}
+  console.error = function(){}
+
+  var passCount=0, failCount=0, results=[]
+  function ok(name,cond,detail){
+    if(cond){passCount++;results.push('P:'+name)}
+    else{failCount++;results.push('F:'+name+(detail?' ['+detail+']':''))}
+  }
+
+  // Test data - create fresh array, not relying on app.js state
+  var testCards = [
+    { card_id: 1, card_title: 'A', last_reviewed_at: new Date(Date.now()-48*36e5).toISOString(), review_count: 1, last_was_correct: true },
+    { card_id: 2, card_title: 'B', last_reviewed_at: new Date(Date.now()-24*36e5).toISOString(), review_count: 2, last_was_correct: false },
+    { card_id: 3, card_title: 'C', last_reviewed_at: new Date(Date.now()-1*36e5).toISOString(), review_count: 5, last_was_correct: true },
+    { card_id: 4, card_title: 'D', review_count: 0 },
+    { card_id: 5, card_title: 'E', last_reviewed_at: new Date(Date.now()-72*36e5).toISOString(), review_count: 1, last_was_correct: false }
+  ]
+
+  // T01-T05 Haptic
+  ok('T01',typeof HapticFeedback==='object')
+  ok('T02',typeof HapticFeedback.light==='function')
+  ok('T03',typeof HapticFeedback.drag==='function')
+  ok('T04',typeof HapticFeedback.hint==='function')
+  try{HapticFeedback.light();ok('T05',true)}catch(err){ok('T05',false,err.message)}
+
+  // T10-T19 Hints
+  ok('T10',typeof getHintState==='function')
+  ok('T11',typeof revealNextHint==='function')
+  var hs=getHintState(99); ok('T12',hs.level===0)
+  revealNextHint(99); ok('T13',getHintState(99).level===1)
+  ok('T14',document.getElementById('hint-0').style.display!=='none')
+  ok('T15',document.getElementById('hint-1').classList.contains('hidden'))
+  revealNextHint(99); ok('T16',getHintState(99).level===2)
+  ok('T17',!document.getElementById('hint-1').classList.contains('hidden'))
+  revealNextHint(99); ok('T18',getHintState(99).level===3)
+  ok('T19',revealNextHint(99)===false)
+
+  // T20-T29 Emotion
+  ok('T20',typeof trackAnswerEmotion==='function')
+  ok('T21',typeof showEmotionFeedback==='function')
+  window._emotionTracker={attempts:[],consecutiveWrong:0,consecutiveCorrect:0,lastAnswerTime:0}
+  trackAnswerEmotion(true,5e3);trackAnswerEmotion(true,4e3)
+  var e3=trackAnswerEmotion(true,3e3)
+  ok('T22',e3.emotion==='excited',e3.emotion)
+  ok('T23',e3.emoji===String.fromCodePoint(0x1F525))
+  window._emotionTracker={attempts:[],consecutiveWrong:0,consecutiveCorrect:0,lastAnswerTime:0}
+  trackAnswerEmotion(false,2e4);trackAnswerEmotion(false,25e3)
+  var e6=trackAnswerEmotion(false,3e4)
+  ok('T24',e6.emotion==='frustrated',e6.emotion)
+  ok('T25',e6.action==='offer_hint')
+  showEmotionFeedback(e6)
+  var emotToast=document.getElementById('emotion-feedback-toast')
+  ok('T26',!!emotToast)
+  ok('T27',emotToast&&emotToast.style.background.length>0)
+  ok('T28',emotToast&&emotToast.style.border.length>0)
+  if(emotToast)emotToast.remove()
+  showEmotionFeedback({emotion:'neutral',message:''})
+  ok('T29',!document.getElementById('emotion-feedback-toast'))
+
+  // T30-T38 ZPD
+  window._zpdState={level:50,streak:0,maxLevel:100,history:[]}
+  updateZPD(true,'medium');ok('T30',window._zpdState.level===60)
+  ok('T31',window._zpdState.streak===1)
+  updateZPD(true,'hard');ok('T32',window._zpdState.level===75)
+  updateZPD(false,'medium');ok('T33',window._zpdState.level===69)
+  ok('T34',window._zpdState.streak===0)
+  updateZPD(true,'easy');ok('T35',window._zpdState.level===74)
+  renderZPDGauge()
+  var gauge=document.getElementById('zpd-gauge-container')
+  ok('T36',!!gauge)
+  ok('T37',gauge&&!!gauge.querySelector('svg'))
+  ok('T38',gauge&&gauge.textContent.includes('74'))
+
+  // T40-T43 Function existence
+  ok('T40',typeof openWhyExploration==='function')
+  ok('T41',typeof openExperimentSimulator==='function')
+  ok('T42',typeof generateMindmap==='function')
+  ok('T43',typeof createHandwritingCanvas==='function')
+
+  // T44-T48 Forgetting Heatmap - pass testCards directly
+  ok('T44',calculateForgettingProbability(null,0,false)===0.95)
+  var fp=calculateForgettingProbability(new Date().toISOString(),10,true)
+  ok('T45',fp<0.05,''+fp)
+  var fp2=calculateForgettingProbability(new Date(Date.now()-48*36e5).toISOString(),1,false)
+  ok('T46',fp2>0.5,''+fp2)
+  var fhtEl=document.getElementById('fht')
+  renderForgettingHeatmap(testCards,'fht')
+  ok('T47',fhtEl&&fhtEl.innerHTML.length>50,'len='+(fhtEl?fhtEl.innerHTML.length:0))
+  ok('T48',fhtEl&&!!fhtEl.querySelector('.grid'),'hasGrid='+(fhtEl?!!fhtEl.querySelector('.grid'):false))
+
+  // T50-T55 Review data
+  ok('T50',typeof updateCardReviewData==='function')
+  localStorage.removeItem('cardReviewData')
+  updateCardReviewData(99,true)
+  var rd=JSON.parse(localStorage.getItem('cardReviewData')||'[]')
+  ok('T51',rd.length===1)
+  ok('T52',rd[0].card_id===99)
+  updateCardReviewData(99,false)
+  rd=JSON.parse(localStorage.getItem('cardReviewData')||'[]')
+  ok('T53',rd.length===1)
+  ok('T54',rd[0].review_count===2)
+  ok('T55',rd[0].last_was_correct===false)
+
+  // T56-T57 Canvas
+  createHandwritingCanvas('hwa')
+  var hwCanvas=document.getElementById('hw-canvas-hwa')
+  ok('T56',!!hwCanvas)
+  ok('T57',hwCanvas&&!!hwCanvas._ctx)
+
+  // T60-T63 Panel
+  ok('T60',typeof openLearningToolsPanel==='function')
+  ok('T61',typeof generateMindmapFromCurrentCourse==='function')
+  ok('T62',typeof loadForgettingHeatmap==='function')
+  ok('T63',typeof setupReviewReminderUI==='function')
+
+  // T70-T75 MutationObserver integration
+  // The injectPostCorrectUI uses app.js internal 'state' variable
+  // We need to set it via the app's own state object
+  // Since app.js const state is in global scope, we can't directly set it from test
+  // Instead, also set window.currentCardData as fallback
+  window.currentCardData = { card_id: 99, card_title: 'Test', problem_content: 'Q', subject: '理科', grade_level: '5' }
+  
+  var gradeEl=document.getElementById('gradeResult')
+  gradeEl.innerHTML='<div class="bg-green-50"><span class="text-green-700">正解！</span></div>'
+  setTimeout(function(){
+    var postCorrect=document.getElementById('post-correct-extras')
+    ok('T70',!!postCorrect)
+    ok('T71',postCorrect&&postCorrect.innerHTML.indexOf('なぜ')!==-1)
+    ok('T72',!!window._postCorrectData)
+    // Check T73 - experiment button shown for science subject
+    var pcd=window._postCorrectData||{}
+    console.log('DBG:T73-subj:'+pcd.subject+',cardSubj:'+(window.currentCardData||{}).subject)
+    var hasExperiment=postCorrect&&postCorrect.innerHTML.indexOf('実験')!==-1
+    ok('T73',hasExperiment,'subj:'+pcd.subject)
+    gradeEl.innerHTML='<div class="bg-yellow-50"><span>もう少し！</span></div>'
+    setTimeout(function(){
+      ok('T74',!!document.getElementById('post-incorrect-extras'))
+      ok('T75',!!document.getElementById('progressive-hint-btn'))
+      var fails=results.filter(function(r){return r.charAt(0)==='F'})
+      console.log('RESULTS:'+passCount+'passed,'+failCount+'failed')
+      if(fails.length)console.log('FAILURES:'+fails.join('|'))
+      else console.log('ALL_TESTS_PASSED')
+      results.forEach(function(r){console.log(r)})
+    },1500)
+  },1500)
+})()
+</script>
+</body></html>

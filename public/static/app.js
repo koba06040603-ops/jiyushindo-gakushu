@@ -16302,7 +16302,7 @@ async function gradeAnswer(correctAnswer) {
     
     // AIで回答を分析
     try {
-      const cardData = typeof state.selectedCard === 'object' ? state.selectedCard : (window.currentCardData || {})
+      const cardData = (state.selectedCard && typeof state.selectedCard === 'object') ? state.selectedCard : (window.currentCardData || {})
       const question = cardData?.problem_content || cardData?.problem_text || document.querySelector('.text-pink-700, .problem-text')?.textContent || ''
       const subject = cardData?.subject || state.selectedCurriculum?.subject || ''
       const grade = cardData?.grade || state.selectedCurriculum?.grade || ''
@@ -58799,7 +58799,7 @@ function injectPostCorrectUI(correctAnswer) {
     // 既に追加済みなら省略
     if (greenDiv.querySelector('#post-correct-extras')) return
     
-    const cardData = typeof state.selectedCard === 'object' ? state.selectedCard : (window.currentCardData || {})
+    const cardData = (state.selectedCard && typeof state.selectedCard === 'object') ? state.selectedCard : (window.currentCardData || {})
     const question = cardData?.problem_content || cardData?.problem_text || ''
     const subject = cardData?.subject || state.selectedCurriculum?.subject || ''
     const grade = cardData?.grade_level || state.selectedCurriculum?.grade || ''
@@ -58846,7 +58846,7 @@ function injectPostIncorrectUI() {
     const yellowDiv = resultDiv.querySelector('.bg-yellow-50')
     if (!yellowDiv || yellowDiv.querySelector('#post-incorrect-extras')) return
     
-    const cardId = typeof state.selectedCard === 'object' ? (state.selectedCard?.card_id || state.selectedCard?.id || 0) : (state.selectedCard || 0)
+    const cardId = (state.selectedCard && typeof state.selectedCard === 'object') ? (state.selectedCard?.card_id || state.selectedCard?.id || 0) : (state.selectedCard || 0)
     
     const extrasDiv = document.createElement('div')
     extrasDiv.id = 'post-incorrect-extras'
@@ -58861,7 +58861,7 @@ function injectPostIncorrectUI() {
     updateHintButton(cardId)
     
     // ZPD更新
-    const cardData = typeof state.selectedCard === 'object' ? state.selectedCard : (window.currentCardData || {})
+    const cardData = (state.selectedCard && typeof state.selectedCard === 'object') ? state.selectedCard : (window.currentCardData || {})
     updateZPD(false, cardData?.difficulty_level || 'medium')
     HapticFeedback.error()
     
@@ -58882,7 +58882,7 @@ const gradeResultObserver = new MutationObserver((mutations) => {
         if (node.querySelector?.('.bg-green-50') || node.classList?.contains('bg-green-50')) {
           const correctText = document.querySelector('.bg-green-50 .text-green-700')?.textContent || ''
           if (correctText.includes('正解')) {
-            const cardData = typeof state.selectedCard === 'object' ? state.selectedCard : {}
+            const cardData = (state.selectedCard && typeof state.selectedCard === 'object') ? state.selectedCard : (window.currentCardData || {})
             injectPostCorrectUI(cardData?.answer || '')
           }
         }

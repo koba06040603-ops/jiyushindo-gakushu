@@ -46478,9 +46478,10 @@ app.post('/api/ai/generate-experiment', async (c) => {
 - パラメータ変更→結果がリアルタイムに変化（Canvas or DOM操作）
 - 小学生が直感的に操作できるUI（大きなボタン、カラフル）
 - 科学的に正確な結果を表示
-- 最大300行以内のコンパクトなコード
+- 最大150行以内の超コンパクトなコード（トークン節約のため最小限に）
 - 外部ライブラリは使用しない（vanilla JS/CSS/HTML のみ）
 - <script>タグ内のJSは即時実行関数でラップ
+- CSSはstyle属性で直接記述（<style>タグ不使用で短縮）
 
 JSONで出力:
 {
@@ -46499,17 +46500,42 @@ JSONのみ出力。`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 4096, temperature: 0.5 }
+          generationConfig: { maxOutputTokens: 8192, temperature: 0.5 }
         })
       }
     )
     if (!resp.ok) return c.json({ success: false, error: 'API error' }, 500)
     const data = await resp.json() as any
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      return c.json({ success: true, experiment: JSON.parse(jsonMatch[0]) })
+    console.log('🧪 実験シミュレーター raw response length:', text.length)
+    
+    // JSONを抽出（```json...``` ラッパーも除去）
+    let cleanText = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+    
+    // 最初の { から最後の } までを抽出
+    const firstBrace = cleanText.indexOf('{')
+    const lastBrace = cleanText.lastIndexOf('}')
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        const jsonStr = cleanText.substring(firstBrace, lastBrace + 1)
+        const parsed = JSON.parse(jsonStr)
+        return c.json({ success: true, experiment: parsed })
+      } catch (parseErr: any) {
+        console.log('🧪 JSON parse error:', parseErr.message)
+        console.log('🧪 Raw text (first 500):', text.substring(0, 500))
+        // フォールバック: experiment_htmlだけ抽出
+        const htmlMatch = text.match(/"experiment_html"\s*:\s*"((?:[^"\\]|\\.)*)"/s)
+        const titleMatch = text.match(/"experiment_title"\s*:\s*"([^"]*)"/)
+        if (htmlMatch) {
+          return c.json({ success: true, experiment: {
+            experiment_title: titleMatch?.[1] || '実験シミュレーター',
+            experiment_html: htmlMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\'),
+            description: '実験データを部分的にパースしました'
+          }})
+        }
+      }
     }
+    console.log('🧪 Failed to parse experiment, raw:', text.substring(0, 300))
     return c.json({ success: false, error: 'Failed to parse experiment' }, 500)
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500)
