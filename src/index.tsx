@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260327a' }, 200, {
+  return c.json({ build_id: '20260327b' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260327a';
+    var MY_BUILD = '20260327b';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14501,7 +14501,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260327a';
+          var MY_BUILD = '20260327b';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -16148,17 +16148,68 @@ ${truncatedText}`
       const generationTime = Date.now() - startTime
       console.log(`✅ TTS 音声生成成功 (${generationTime}ms, model=${usedModel}, voice=${voiceName})`)
       
-      return c.json({
-        success: true,
-        audioContent: audioBase64,
-        audioFormat: 'pcm',
-        sampleRate: 24000,
-        channels: 1,
-        bitsPerSample: 16,
-        method: usedModel,
-        voice: voiceName,
-        generation_time_ms: generationTime
-      })
+      // ★ サーバー側でPCM→WAV変換（クライアント側のatob/AudioContext問題を回避）
+      try {
+        const pcmBinary = Uint8Array.from(atob(audioBase64), c => c.charCodeAt(0))
+        const sr = 24000
+        const wavHeader = new ArrayBuffer(44)
+        const v = new DataView(wavHeader)
+        v.setUint32(0, 0x52494646, false) // RIFF
+        v.setUint32(4, 36 + pcmBinary.length, true)
+        v.setUint32(8, 0x57415645, false) // WAVE
+        v.setUint32(12, 0x666d7420, false) // fmt
+        v.setUint32(16, 16, true)
+        v.setUint16(20, 1, true) // PCM
+        v.setUint16(22, 1, true) // mono
+        v.setUint32(24, sr, true)
+        v.setUint32(28, sr * 2, true)
+        v.setUint16(32, 2, true)
+        v.setUint16(34, 16, true)
+        v.setUint32(36, 0x64617461, false) // data
+        v.setUint32(40, pcmBinary.length, true)
+        
+        // WAVバイナリを結合してbase64エンコード
+        const wavBytes = new Uint8Array(44 + pcmBinary.length)
+        wavBytes.set(new Uint8Array(wavHeader), 0)
+        wavBytes.set(pcmBinary, 44)
+        
+        // Uint8Array → base64 (chunk方式でスタックオーバーフロー回避)
+        let wavBase64 = ''
+        const chunkSize = 32768
+        for (let i = 0; i < wavBytes.length; i += chunkSize) {
+          const chunk = wavBytes.subarray(i, Math.min(i + chunkSize, wavBytes.length))
+          wavBase64 += String.fromCharCode.apply(null, Array.from(chunk))
+        }
+        wavBase64 = btoa(wavBase64)
+        
+        console.log(`✅ サーバー側WAV変換完了 (PCM: ${pcmBinary.length} bytes → WAV: ${wavBytes.length} bytes)`)
+        
+        return c.json({
+          success: true,
+          audioContent: wavBase64,
+          audioFormat: 'wav',
+          sampleRate: 24000,
+          channels: 1,
+          bitsPerSample: 16,
+          method: usedModel,
+          voice: voiceName,
+          generation_time_ms: generationTime
+        })
+      } catch (wavConvErr: any) {
+        console.warn('⚠️ サーバーWAV変換失敗、PCMで返却:', wavConvErr.message)
+        // フォールバック: 従来のPCM形式で返却
+        return c.json({
+          success: true,
+          audioContent: audioBase64,
+          audioFormat: 'pcm',
+          sampleRate: 24000,
+          channels: 1,
+          bitsPerSample: 16,
+          method: usedModel,
+          voice: voiceName,
+          generation_time_ms: generationTime
+        })
+      }
     } else {
       throw new Error('音声データが生成されませんでした')
     }

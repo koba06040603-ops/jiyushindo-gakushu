@@ -7870,7 +7870,8 @@ async function generateImageForCardAsImage(cardId, description) {
       try { await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url }) } catch(e) {}
       if (placeholder) {
         // renderMediaEmbed を使って音声解説・保存ボタンも含む完全なUIを生成
-        placeholder.innerHTML = renderMediaEmbed(res.data.image_url, cardId, description || res.data.ai_description || '問題の図')
+        // outerHTMLで置換することで、入れ子の重複（不要な画像）を防止
+        placeholder.outerHTML = renderMediaEmbed(res.data.image_url, cardId, description || res.data.ai_description || '問題の図')
       }
     } else {
       throw new Error(res.data.error || '画像生成に失敗')
@@ -7922,7 +7923,8 @@ async function generateImageForCardNBPro(cardId, description) {
       try { await axios.put('/api/card/' + cardId, { problem_image_url: res.data.image_url }) } catch(e) {}
       if (placeholder) {
         // renderMediaEmbed を使って音声解説・保存ボタンも含む完全なUIを生成
-        placeholder.innerHTML = renderMediaEmbed(res.data.image_url, cardId, description || res.data.ai_description || '問題の図')
+        // outerHTMLで置換することで、入れ子の重複（不要な画像）を防止
+        placeholder.outerHTML = renderMediaEmbed(res.data.image_url, cardId, description || res.data.ai_description || '問題の図')
       }
     } else {
       throw new Error(res.data.error || '高精度画像生成に失敗')
@@ -41682,19 +41684,32 @@ window.speakNB2Explanation = function(page) {
 // source=undefined: NB2ウィジェットの解説（ウィジェットテキスト使用）
 // ★ 重要: 音声解説は「ヒントまで」。答えは絶対に含めない。
 window.speakNB2NarrationAI = async function(page, source) {
-  // ★ 最外側のtry/catchでエラーを確実に表示
+  var btn = null
+  var textParts = []
+  var title = ''
+  var _nb2AudioPlayed = false  // 音声再生成功フラグ
   try {
   console.log('🔊 [NB2音声] 開始: page=' + page + ', source=' + source)
   
   // ★ まず即座にボタンUIを変更（ユーザーに反応を見せる）
   var btnId = source === 'image' ? 'nb2-speak-btn-img-' + page : source === 'example' ? 'nb2-speak-btn-example-' + page : 'nb2-speak-btn-' + page
-  var btn = document.getElementById(btnId)
+  btn = document.getElementById(btnId)
   if (!btn) btn = document.getElementById('nb2-speak-btn-' + page)
   
   if (btn) {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:3px;"></i>準備中...'
     btn.style.background = 'linear-gradient(135deg,#6366F1,#8B5CF6)'
   }
+  
+  // ★ Safari/iOS対応: ユーザーインタラクション内でAudioContextを事前準備
+  try {
+    if (!window._nb2AudioCtx) {
+      window._nb2AudioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    }
+    if (window._nb2AudioCtx.state === 'suspended') {
+      await window._nb2AudioCtx.resume()
+    }
+  } catch(actxErr) { console.log('AudioContext準備:', actxErr.message) }
   
   // 既に再生中なら停止
   if (_globalTtsPlaying) {
@@ -41710,14 +41725,14 @@ window.speakNB2NarrationAI = async function(page, source) {
   var cd = window.currentCardData || {}
   var card = cd.card || cd || {}
   console.log('🔊 [NB2音声] カードデータ:', JSON.stringify({ hasCard: !!card, title: (card.card_title || card.title || '(なし)').substring(0,30), hasProblem: !!(card.problem_content || card.problem_text), hasExample: !!card.example_problem }))
-  var title = card.card_title || card.title || ''
+  title = card.card_title || card.title || ''
   var problemText = card.problem_content || card.problem_text || ''
   var imgDesc = card._image_description || ''
   var exampleProblem = card.example_problem || ''
   // ★ ヒントのみ使用（答えは含めない）
   var hints = (cd.hints || card.hints || []).filter(function(h) { return h && h.trim() })
   
-  var textParts = []
+  textParts = []
   var source_type = source || 'widget'
   
   if (source === 'example') {
@@ -41850,84 +41865,97 @@ window.speakNB2NarrationAI = async function(page, source) {
     var ttsData = await ttsResp.json()
     console.log('🔊 [NB2音声] TTS結果:', JSON.stringify({ success: ttsData.success, format: ttsData.audioFormat, hasContent: !!ttsData.audioContent, contentLen: (ttsData.audioContent || '').length }))
     
-    if (ttsData.success && ttsData.audioContent && ttsData.audioFormat === 'pcm') {
-      console.log('🔊 [NB2音声] PCM再生開始...')
+    if (ttsData.success && ttsData.audioContent && (ttsData.audioFormat === 'pcm' || ttsData.audioFormat === 'wav')) {
+      console.log('🔊 [NB2音声] 音声再生開始... format=' + ttsData.audioFormat + ', contentLen=' + ttsData.audioContent.length)
       _globalTtsPlaying = true
       if (btn) {
         btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'
         btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)'
       }
       
-      // PCM→WAV変換してAudio要素で再生（AudioContext問題を回避）
       try {
-        var pcmRaw = atob(ttsData.audioContent)
-        var pcmBytes = new Uint8Array(pcmRaw.length)
-        for (var pi = 0; pi < pcmRaw.length; pi++) pcmBytes[pi] = pcmRaw.charCodeAt(pi)
-        var sr = ttsData.sampleRate || 24000
-        var wavHeader = new ArrayBuffer(44)
-        var wavView = new DataView(wavHeader)
-        var dataLen = pcmBytes.length
-        wavView.setUint32(0, 0x52494646, false) // RIFF
-        wavView.setUint32(4, 36 + dataLen, true)
-        wavView.setUint32(8, 0x57415645, false) // WAVE
-        wavView.setUint32(12, 0x666d7420, false) // fmt
-        wavView.setUint32(16, 16, true)
-        wavView.setUint16(20, 1, true) // PCM
-        wavView.setUint16(22, 1, true) // mono
-        wavView.setUint32(24, sr, true) // sample rate
-        wavView.setUint32(28, sr * 2, true) // byte rate
-        wavView.setUint16(32, 2, true) // block align
-        wavView.setUint16(34, 16, true) // bits per sample
-        wavView.setUint32(36, 0x64617461, false) // data
-        wavView.setUint32(40, dataLen, true)
-        var wavBlob = new Blob([wavHeader, pcmBytes], { type: 'audio/wav' })
-        var wavUrl = URL.createObjectURL(wavBlob)
-        var wavAudio = new Audio(wavUrl)
+        var audioUrl
+        if (ttsData.audioFormat === 'wav') {
+          // ★ WAV形式: サーバー側で変換済み → そのまま再生可能
+          audioUrl = 'data:audio/wav;base64,' + ttsData.audioContent
+          console.log('🔊 [NB2音声] WAV data URL作成完了')
+        } else {
+          // PCM形式: クライアント側でWAV変換
+          console.log('🔊 [NB2音声] PCM→WAV変換中...')
+          var pcmBytes
+          try {
+            var dataUrlForDecode = 'data:audio/pcm;base64,' + ttsData.audioContent
+            var fetchResp = await fetch(dataUrlForDecode)
+            var arrayBuf = await fetchResp.arrayBuffer()
+            pcmBytes = new Uint8Array(arrayBuf)
+          } catch (fetchDecodeErr) {
+            console.warn('fetchデコード失敗、atobフォールバック:', fetchDecodeErr.message)
+            var pcmRaw = atob(ttsData.audioContent)
+            pcmBytes = new Uint8Array(pcmRaw.length)
+            for (var pi = 0; pi < pcmRaw.length; pi++) pcmBytes[pi] = pcmRaw.charCodeAt(pi)
+          }
+          var sr = ttsData.sampleRate || 24000
+          var wavHeader = new ArrayBuffer(44)
+          var wavView = new DataView(wavHeader)
+          var dataLen = pcmBytes.length
+          wavView.setUint32(0, 0x52494646, false)
+          wavView.setUint32(4, 36 + dataLen, true)
+          wavView.setUint32(8, 0x57415645, false)
+          wavView.setUint32(12, 0x666d7420, false)
+          wavView.setUint32(16, 16, true)
+          wavView.setUint16(20, 1, true)
+          wavView.setUint16(22, 1, true)
+          wavView.setUint32(24, sr, true)
+          wavView.setUint32(28, sr * 2, true)
+          wavView.setUint16(32, 2, true)
+          wavView.setUint16(34, 16, true)
+          wavView.setUint32(36, 0x64617461, false)
+          wavView.setUint32(40, dataLen, true)
+          var wavBlob = new Blob([wavHeader, pcmBytes], { type: 'audio/wav' })
+          audioUrl = URL.createObjectURL(wavBlob)
+        }
+        
+        var wavAudio = new Audio(audioUrl)
         _globalTtsAudio = wavAudio
         wavAudio.onended = function() {
-          console.log('✅ WAV再生完了')
+          console.log('✅ 音声再生完了')
           _globalTtsPlaying = false
-          URL.revokeObjectURL(wavUrl)
+          if (audioUrl && audioUrl.indexOf('blob:') === 0) URL.revokeObjectURL(audioUrl)
           if (btn) {
             btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
             btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
           }
         }
         wavAudio.onerror = function(e) {
-          console.warn('⚠️ WAV再生エラー:', e)
+          console.warn('⚠️ 音声再生エラー:', e)
           _globalTtsPlaying = false
-          URL.revokeObjectURL(wavUrl)
+          if (audioUrl && audioUrl.indexOf('blob:') === 0) URL.revokeObjectURL(audioUrl)
           if (btn) {
             btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
             btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
           }
         }
-        wavAudio.play().then(function() {
-          console.log('✅ WAV再生開始成功')
-        }).catch(function(playErr) {
-          console.warn('⚠️ WAV play()失敗:', playErr)
-          _globalTtsPlaying = false
-          if (btn) {
-            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
-            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
-          }
-          // 最終フォールバック: Web Speech API
-          if (window.speechSynthesis && speechText) {
-            var u = new SpeechSynthesisUtterance(speechText.substring(0, 400))
-            u.lang = 'ja-JP'; u.rate = 0.9
-            window.speechSynthesis.speak(u)
-          }
-        })
+        await wavAudio.play()
+        console.log('✅ 音声再生開始成功')
+        _nb2AudioPlayed = true
       } catch (wavErr) {
-        console.warn('⚠️ WAV変換エラー:', wavErr)
-        // フォールバック: 元のplayPcmGlobal
-        playPcmGlobal(ttsData.audioContent, ttsData.sampleRate || 24000, function() {
-          _globalTtsPlaying = false
-          if (btn) {
-            btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
-            btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
-          }
-        })
+        console.warn('⚠️ 音声再生エラー:', wavErr.name, wavErr.message)
+        _globalTtsPlaying = false
+        if (btn) {
+          btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'
+          btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
+        }
+        // フォールバック: Web Speech API（PCM/WAVが再生できない場合）
+        if (window.speechSynthesis && speechText) {
+          console.log('🔊 [NB2音声] 再生失敗→Web Speech APIフォールバック')
+          if (window.speechSynthesis.speaking) window.speechSynthesis.cancel()
+          var u = new SpeechSynthesisUtterance(speechText.substring(0, 400))
+          u.lang = 'ja-JP'; u.rate = 0.9
+          u.onstart = function() { if (btn) { btn.innerHTML = '<i class="fas fa-stop" style="margin-right:3px;"></i>⏹ 停止'; btn.style.background = 'linear-gradient(135deg,#EF4444,#DC2626)' } }
+          u.onend = function() { if (btn) { btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'; btn.style.background = 'linear-gradient(135deg,#10B981,#059669)' } }
+          window.speechSynthesis.speak(u)
+          _nb2AudioPlayed = true
+        }
       }
     } else if (ttsData.success && ttsData.audioContent) {
       _globalTtsPlaying = true
@@ -42000,7 +42028,8 @@ window.speakNB2NarrationAI = async function(page, source) {
   }
   // ★ 最外側のcatch（全てのエラーをキャッチ）
   } catch(outerErr) {
-    console.error('❌❌ [NB2音声] 最外側エラー:', outerErr.name, outerErr.message)
+    console.error('❌❌ [NB2音声] 最外側エラー:', outerErr.name, outerErr.message, outerErr.stack)
+    _globalTtsPlaying = false
     if (btn) {
       btn.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:3px;color:#FCD34D;"></i> エラー発生'
       btn.style.background = 'linear-gradient(135deg,#DC2626,#B91C1C)'
@@ -42009,17 +42038,22 @@ window.speakNB2NarrationAI = async function(page, source) {
         btn.style.background = 'linear-gradient(135deg,#10B981,#059669)'
       }, 5000)
     }
-    // 最終手段: Web Speech API
-    try {
-      if (window.speechSynthesis) {
-        var emergencyText = (title || '') + '。' + (textParts || []).slice(0, 2).join('。')
-        if (emergencyText.length > 5) {
-          var u = new SpeechSynthesisUtterance(emergencyText.substring(0, 300))
-          u.lang = 'ja-JP'; u.rate = 0.9
-          window.speechSynthesis.speak(u)
+    // 音声がまだ再生されていない場合のみWeb Speech API
+    if (!_nb2AudioPlayed) {
+      try {
+        if (window.speechSynthesis) {
+          var emergencyText = (title || '') + '。' + (textParts || []).slice(0, 2).join('。')
+          if (emergencyText.length > 5) {
+            console.log('🔊 [NB2音声] 緊急Web Speech:', emergencyText.substring(0, 50))
+            if (window.speechSynthesis.speaking) window.speechSynthesis.cancel()
+            var u = new SpeechSynthesisUtterance(emergencyText.substring(0, 300))
+            u.lang = 'ja-JP'; u.rate = 0.9
+            u.onend = function() { if (btn) { btn.innerHTML = '<i class="fas fa-volume-up" style="margin-right:3px;"></i>🔊 音声解説'; btn.style.background = 'linear-gradient(135deg,#10B981,#059669)' } }
+            window.speechSynthesis.speak(u)
+          }
         }
-      }
-    } catch(e3) { /* give up */ }
+      } catch(e3) { /* give up */ }
+    }
   }
 }
 
