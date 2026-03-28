@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260327k' }, 200, {
+  return c.json({ build_id: '20260328a' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260327k';
+    var MY_BUILD = '20260328a';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14501,7 +14501,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260327k';
+          var MY_BUILD = '20260328a';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -32606,13 +32606,16 @@ HTMLコードだけを出力（コードブロック不要）:`
         const nb2SysPrompt = `あなたは日本の小学校・中学校の教科書に載るような、正確で分かりやすい教育用の図やイラストを生成する専門家です。
 数値やデータは問題文から正確に読み取り図に反映。ラベル・単位・目盛りは日本語で大きく読みやすく。
 色使いはカラフルで見やすく、小学生でも理解しやすいこと。教科書品質の正確さと見やすさを両立。
-★★★ ふりがな（ルビ）は絶対に使わないこと。漢字の上に小さい文字を書かない。読みやすい漢字はそのまま、難しい漢字はひらがなで書く ★★★
-★不要な数字や記号（問題番号等）を図に含めないこと★
-★問題文の内容全体を正確に反映した図を描くこと。タイトルだけでなく問題文を読むこと★
-★★★ 画像の上部にタイトルやヘッダーテキスト（「○○の教科書」「中学校・社会」等）を絶対に描かないこと。図の内容だけを描くこと ★★★
-★★★ 最重要ルール: 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません。
-考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにしてください。
-答えの文字列・数値を目立つように配置してはダメです。★★★`
+
+===== 絶対禁止事項（厳守） =====
+1. ふりがな（ルビ）を絶対に使わないこと。漢字の上に小さい文字を配置しないこと。難しい漢字はひらがなで書く
+2. 画像上部にタイトル・ヘッダー・教科名（「小学校社会」「中学校理科」等）を描かない。図の内容のみ描く
+3. 画像内に長文の解説テキストを入れない。ラベルや短い注釈は可だが、段落のような説明文は禁止
+4. 問題の「答え」「正解」を図に表示しない。「？」で隠す
+5. 不要な問題番号・記号を含めない
+===========================
+
+★問題文の内容全体を正確に反映した図を描くこと。タイトルだけでなく問題文を読むこと★`
         
         const nb2Resp = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`,
@@ -32741,7 +32744,9 @@ JSON形式で出力してください:`
 9. ★★★ 最重要 ★★★ 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません
 10. 考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにすること
 11. ★問題文の内容を正確に反映すること。タイトルだけでなく問題文全体を読んで適切な図を描くこと★
-12. ★★★ 画像の上部にタイトルやヘッダーテキスト（「○○の教科書」「中学校・社会」等）を絶対に描かないこと。図の内容だけを描くこと ★★★`
+12. ★★★ 画像の上部にタイトルやヘッダーテキスト（「○○の教科書」「中学校・社会」「小学校理科」等）を絶対に描かないこと。図の内容だけを描くこと ★★★
+13. ★★★ 画像内に長文の解説テキスト（段落のような文章）を入れないこと。短いラベルや注釈のみ使用可 ★★★
+14. ★★★ 日本語テキストは正確に書くこと。文字化けやランダムな文字列を含めないこと ★★★`
 
     const userPrompt = userContext
     
@@ -46614,8 +46619,9 @@ app.post('/api/ai/recognize-handwriting', async (c) => {
 数式の場合は、算数の記号（＋、−、×、÷、＝）を使ってください。
 何も認識できない場合は空文字を返してください。`
 
+    // gemini-2.0-flash を使用（画像入力対応。flash-liteは非対応）
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -46626,13 +46632,14 @@ app.post('/api/ai/recognize-handwriting', async (c) => {
               { inline_data: { mime_type: 'image/png', data: image_base64 } }
             ]
           }],
-          generationConfig: { maxOutputTokens: 128, temperature: 0.1 }
+          generationConfig: { maxOutputTokens: 256, temperature: 0.1 }
         })
       }
     )
     if (!resp.ok) {
-      console.log('🖊️ Handwriting API error:', resp.status)
-      return c.json({ success: false, error: 'Vision API error' }, 500)
+      const errBody = await resp.text().catch(() => '')
+      console.log('🖊️ Handwriting API error:', resp.status, errBody.substring(0, 200))
+      return c.json({ success: false, error: `Vision API error: ${resp.status}` }, 500)
     }
     const data = await resp.json() as any
     const recognized = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim()

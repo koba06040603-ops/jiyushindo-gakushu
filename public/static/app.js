@@ -58141,15 +58141,28 @@ console.log('🔍 [DEBUG] bookmarkNB2Image:', typeof window.bookmarkNB2Image)
 // ─────────────────────────────────────────────
 const HapticFeedback = {
   support: typeof navigator !== 'undefined' && 'vibrate' in navigator,
-  light() { this.support && navigator.vibrate(15) },
-  medium() { this.support && navigator.vibrate(40) },
-  heavy() { this.support && navigator.vibrate([30, 20, 60]) },
-  success() { this.support && navigator.vibrate([30, 50, 30, 50, 80]) },
-  error() { this.support && navigator.vibrate([100, 30, 100]) },
-  drag() { this.support && navigator.vibrate(10) },
-  hint() { this.support && navigator.vibrate([20, 40, 20]) }
+  _userActivated: false,
+  _tryVibrate(pattern) {
+    if (!this.support) return false
+    try { return navigator.vibrate(pattern) } catch(e) { return false }
+  },
+  light() { return this._tryVibrate(15) },
+  medium() { return this._tryVibrate(40) },
+  heavy() { return this._tryVibrate([30, 20, 60]) },
+  success() { return this._tryVibrate([30, 50, 30, 50, 80]) },
+  error() { return this._tryVibrate([100, 30, 100]) },
+  drag() { return this._tryVibrate(10) },
+  hint() { return this._tryVibrate([20, 40, 20]) }
 }
 window.HapticFeedback = HapticFeedback
+
+// ボタンクリック時の軽い触覚フィードバック（ユーザージェスチャー内で実行）
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('button, [role="button"], .clickable, a[onclick]')
+  if (btn && HapticFeedback.support) {
+    HapticFeedback.light()
+  }
+}, { passive: true })
 
 // ドラッグ操作にバイブレーション追加
 document.addEventListener('touchstart', function(e) {
@@ -58461,12 +58474,46 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
       const script = document.createElement('script')
       script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js'
       await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.appendChild(script) })
-      window.mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: { primaryColor: '#818CF8', primaryTextColor: '#1F2937', lineColor: '#A5B4FC' } })
+      window.mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: { 
+        primaryColor: '#818CF8', primaryTextColor: '#1F2937', lineColor: '#A5B4FC',
+        fontSize: '16px'
+      }})
     }
     
-    targetEl.innerHTML = `<div class="mermaid">${code}</div>`
+    // マインドマップ用ラッパー（ズーム・パン対応）
+    targetEl.innerHTML = `
+      <div style="position:relative;">
+        <div class="flex gap-1 mb-2 justify-end">
+          <button onclick="this.closest('[style]').querySelector('.mermaid-wrap').style.transform='scale(1.3)';this.closest('[style]').querySelector('.mermaid-wrap').style.transformOrigin='top left'" class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-1 rounded transition">🔍+</button>
+          <button onclick="this.closest('[style]').querySelector('.mermaid-wrap').style.transform='scale(1)'" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">1:1</button>
+          <button onclick="this.closest('[style]').querySelector('.mermaid-wrap').style.transform='scale(0.7)';this.closest('[style]').querySelector('.mermaid-wrap').style.transformOrigin='top center'" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">🔍−</button>
+        </div>
+        <div style="overflow:auto;max-height:400px;border:1px solid #E5E7EB;border-radius:12px;padding:8px;background:white;">
+          <div class="mermaid-wrap" style="transition:transform 0.3s;min-width:500px;">
+            <div class="mermaid">${code}</div>
+          </div>
+        </div>
+      </div>
+    `
     await window.mermaid.run({ nodes: targetEl.querySelectorAll('.mermaid') })
-    targetEl.querySelector('svg')?.setAttribute('style', 'max-width:100%;height:auto;')
+    
+    // SVGのスタイル調整 — テキストを読みやすくする
+    const svg = targetEl.querySelector('svg')
+    if (svg) {
+      svg.setAttribute('style', 'width:100%;min-width:480px;height:auto;')
+      // フォントサイズを大きく
+      svg.querySelectorAll('text, .nodeLabel, .label, foreignObject span, foreignObject div, foreignObject p').forEach(el => {
+        el.style.fontSize = '14px'
+        el.style.fontWeight = '600'
+      })
+      // ノードの背景を広くしてテキストが収まるようにする
+      svg.querySelectorAll('.node rect, .node circle, .node polygon').forEach(el => {
+        if (el.getAttribute('width')) {
+          const w = parseFloat(el.getAttribute('width'))
+          if (w < 100) el.setAttribute('width', String(Math.max(w, 100)))
+        }
+      })
+    }
   } catch (e) {
     targetEl.innerHTML = '<p class="text-sm text-gray-400 text-center p-4"><i class="fas fa-exclamation-circle mr-1"></i>マインドマップの生成に失敗しました。</p>'
     console.error('Mindmap error:', e)
@@ -58548,7 +58595,7 @@ window.updateCardReviewData = updateCardReviewData
 // ─────────────────────────────────────────────
 // ⑧ プッシュ通知復習リマインダー
 // ─────────────────────────────────────────────
-async function setupReviewReminder() {
+async function setupReviewReminder(hour) {
   if (!('Notification' in window)) return false
   if (Notification.permission === 'default') {
     const perm = await Notification.requestPermission()
@@ -58556,30 +58603,42 @@ async function setupReviewReminder() {
   }
   if (Notification.permission !== 'granted') return false
   
-  // Service Workerで翌日の通知をスケジュール
-  const registration = await navigator.serviceWorker?.ready
-  if (!registration) return false
+  const reminderHour = hour !== undefined ? parseInt(hour) : parseInt(localStorage.getItem('reviewReminderHour') || '7')
   
   // ローカルストレージにリマインダー設定を保存
-  const now = new Date()
-  const tomorrow7am = new Date(now)
-  tomorrow7am.setDate(tomorrow7am.getDate() + 1)
-  tomorrow7am.setHours(7, 0, 0, 0)
-  const msUntil = tomorrow7am.getTime() - now.getTime()
-  
-  // setTimeoutでリマインダー（簡易実装）
   localStorage.setItem('reviewReminderSet', 'true')
-  localStorage.setItem('reviewReminderTime', tomorrow7am.toISOString())
+  localStorage.setItem('reviewReminderHour', String(reminderHour))
+  
+  const now = new Date()
+  const nextReminder = new Date(now)
+  nextReminder.setDate(nextReminder.getDate() + (now.getHours() >= reminderHour ? 1 : 0))
+  nextReminder.setHours(reminderHour, 0, 0, 0)
+  localStorage.setItem('reviewReminderTime', nextReminder.toISOString())
   
   // 即座にテスト通知
   new Notification('📚 復習リマインダー設定完了！', {
-    body: '毎朝7時に復習カードをお知らせします。',
+    body: `毎朝${reminderHour}時に復習カードをお知らせします。`,
     icon: '/static/icon-192.png',
     vibrate: [200, 100, 200]
   })
   
   return true
 }
+
+function cancelReviewReminder() {
+  localStorage.removeItem('reviewReminderSet')
+  localStorage.removeItem('reviewReminderHour')
+  localStorage.removeItem('reviewReminderTime')
+  const btn = document.getElementById('reminder-setup-btn')
+  const statusEl = document.getElementById('reminder-status')
+  if (btn) btn.innerHTML = '<i class="fas fa-bell mr-1"></i>通知を設定'
+  if (statusEl) statusEl.innerHTML = '<p class="text-xs text-gray-400"><i class="fas fa-bell-slash mr-1"></i>リマインダーはオフです</p>'
+  // 時間セレクタを再表示
+  const timeRow = document.getElementById('reminder-time-row')
+  if (timeRow) timeRow.style.display = ''
+  HapticFeedback.light()
+}
+window.cancelReviewReminder = cancelReviewReminder
 
 function checkAndShowReviewNotification() {
   if (Notification.permission !== 'granted') return
@@ -58701,7 +58760,8 @@ async function recognizeHandwriting(containerId) {
       HapticFeedback.success()
     }
   } catch (e) {
-    resultEl.innerHTML = '<span class="text-red-400">認識に失敗しました</span>'
+    const errMsg = e.response?.data?.error || e.message || ''
+    resultEl.innerHTML = `<span class="text-red-400"><i class="fas fa-exclamation-triangle mr-1"></i>認識に失敗しました${errMsg ? ' ('+errMsg+')' : ''}</span><button onclick="recognizeHandwriting('${containerId}')" class="text-xs text-blue-500 underline ml-2">再試行</button>`
   }
 }
 window.createHandwritingCanvas = createHandwritingCanvas
@@ -58972,12 +59032,29 @@ function openLearningToolsPanel() {
         <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-200">
           <div class="flex items-center justify-between mb-2">
             <h4 class="font-bold text-blue-700 text-sm"><i class="fas fa-bell mr-1"></i>🔔 復習リマインダー</h4>
+            ${localStorage.getItem('reviewReminderSet') === 'true' ? `
+            <div class="flex gap-1.5">
+              <button onclick="setupReviewReminderUI()" class="bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold transition" id="reminder-setup-btn">
+                <i class="fas fa-check mr-1"></i>設定済み ✅
+              </button>
+              <button onclick="cancelReviewReminder()" class="bg-red-100 hover:bg-red-200 text-red-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition">
+                <i class="fas fa-bell-slash mr-1"></i>解除
+              </button>
+            </div>
+            ` : `
             <button onclick="setupReviewReminderUI()" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition" id="reminder-setup-btn">
-              <i class="fas fa-bell mr-1"></i>${localStorage.getItem('reviewReminderSet') === 'true' ? '設定済み ✅' : '通知を設定'}
+              <i class="fas fa-bell mr-1"></i>通知を設定
             </button>
+            `}
           </div>
           <p class="text-xs text-gray-500">明日復習すべきカードをプッシュ通知でお知らせ</p>
-          <div id="reminder-status" class="mt-2"></div>
+          <div id="reminder-time-row" class="mt-2 flex items-center gap-2" ${localStorage.getItem('reviewReminderSet') === 'true' ? 'style="display:none"' : ''}>
+            <label class="text-xs text-gray-600">⏰ 通知時間:</label>
+            <select id="reminder-hour-select" class="text-xs border border-gray-300 rounded-lg px-2 py-1.5">
+              ${[6,7,8,9,10,12,15,18,20,21].map(h => `<option value="${h}" ${(parseInt(localStorage.getItem('reviewReminderHour')||'7')===h)?'selected':''}>${h}時</option>`).join('')}
+            </select>
+          </div>
+          <div id="reminder-status" class="mt-2">${localStorage.getItem('reviewReminderSet') === 'true' ? `<p class="text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>毎日${localStorage.getItem('reviewReminderHour')||'7'}時に復習リマインダーを送ります！</p>` : ''}</div>
         </div>
 
         <!-- 手書きメモ帳 -->
@@ -59031,9 +59108,23 @@ window.generateMindmapFromCurrentCourse = generateMindmapFromCurrentCourse
 
 // 忘却ヒートマップ読み込み
 function loadForgettingHeatmap() {
-  const cards = state.courseCards || []
+  let cards = state.courseCards || []
   // localStorageのレビューデータと結合
   const reviewData = JSON.parse(localStorage.getItem('cardReviewData') || '[]')
+  
+  // コースカードがない場合はlocalStorageのレビューデータをフォールバックとして使用
+  if (cards.length === 0 && reviewData.length > 0) {
+    cards = reviewData
+  }
+  
+  if (cards.length === 0) {
+    const container = document.getElementById('forgetting-heatmap-container')
+    if (container) {
+      container.innerHTML = '<div class="text-center py-4"><p class="text-xs text-gray-400"><i class="fas fa-info-circle mr-1"></i>まだ学習データがありません。</p><p class="text-xs text-gray-400 mt-1">カードを学習すると忘却リスクが表示されます。</p></div>'
+    }
+    return
+  }
+  
   const enriched = cards.map(c => {
     const review = reviewData.find((r) => r.card_id === (c.card_id || c.id))
     return {
@@ -59051,23 +59142,29 @@ window.loadForgettingHeatmap = loadForgettingHeatmap
 async function setupReviewReminderUI() {
   const btn = document.getElementById('reminder-setup-btn')
   const statusEl = document.getElementById('reminder-status')
+  const hourSelect = document.getElementById('reminder-hour-select')
+  const selectedHour = hourSelect ? parseInt(hourSelect.value) : parseInt(localStorage.getItem('reviewReminderHour') || '7')
   if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>設定中...'
   
-  const result = await setupReviewReminder()
+  const result = await setupReviewReminder(selectedHour)
   if (result) {
     if (btn) btn.innerHTML = '<i class="fas fa-check mr-1"></i>設定済み ✅'
-    if (statusEl) statusEl.innerHTML = '<p class="text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>毎朝7時に復習リマインダーを送ります！</p>'
+    if (statusEl) statusEl.innerHTML = `<p class="text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>毎日${selectedHour}時に復習リマインダーを送ります！</p>`
+    const timeRow = document.getElementById('reminder-time-row')
+    if (timeRow) timeRow.style.display = 'none'
     
     // 現在のカードデータをlocalStorageに保存（忘却計算用）
     const cards = state.courseCards || []
-    const reviewData = cards.map(c => ({
-      card_id: c.card_id || c.id,
-      card_title: c.card_title,
-      last_reviewed_at: c.last_reviewed_at || new Date().toISOString(),
-      review_count: c.review_count || 1,
-      last_was_correct: true
-    }))
-    localStorage.setItem('cardReviewData', JSON.stringify(reviewData))
+    if (cards.length > 0) {
+      const reviewData = cards.map(c => ({
+        card_id: c.card_id || c.id,
+        card_title: c.card_title,
+        last_reviewed_at: c.last_reviewed_at || new Date().toISOString(),
+        review_count: c.review_count || 1,
+        last_was_correct: true
+      }))
+      localStorage.setItem('cardReviewData', JSON.stringify(reviewData))
+    }
   } else {
     if (btn) btn.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i>通知を許可してください'
     if (statusEl) statusEl.innerHTML = '<p class="text-xs text-red-500"><i class="fas fa-info-circle mr-1"></i>ブラウザの通知設定を「許可」にしてください。</p>'
