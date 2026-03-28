@@ -58141,26 +58141,43 @@ console.log('🔍 [DEBUG] bookmarkNB2Image:', typeof window.bookmarkNB2Image)
 // ─────────────────────────────────────────────
 const HapticFeedback = {
   support: typeof navigator !== 'undefined' && 'vibrate' in navigator,
-  _userActivated: false,
   _tryVibrate(pattern) {
     if (!this.support) return false
     try { return navigator.vibrate(pattern) } catch(e) { return false }
   },
+  // 振動非対応デバイスの場合、画面全体を一瞬フラッシュさせる視覚フィードバック
+  _flashScreen(color, duration) {
+    if (this.support) return // 振動が使える場合はスキップ
+    const flash = document.createElement('div')
+    flash.style.cssText = `position:fixed;top:0;left:0;right:0;bottom:0;background:${color};opacity:0.15;z-index:99999;pointer-events:none;transition:opacity ${duration}ms ease-out`
+    document.body.appendChild(flash)
+    requestAnimationFrame(() => { flash.style.opacity = '0' })
+    setTimeout(() => flash.remove(), duration + 50)
+  },
   light() { return this._tryVibrate(15) },
   medium() { return this._tryVibrate(40) },
   heavy() { return this._tryVibrate([30, 20, 60]) },
-  success() { return this._tryVibrate([30, 50, 30, 50, 80]) },
-  error() { return this._tryVibrate([100, 30, 100]) },
+  success() { this._flashScreen('#22c55e', 300); return this._tryVibrate([30, 50, 30, 50, 80]) },
+  error() { this._flashScreen('#ef4444', 300); return this._tryVibrate([100, 30, 100]) },
   drag() { return this._tryVibrate(10) },
   hint() { return this._tryVibrate([20, 40, 20]) }
 }
 window.HapticFeedback = HapticFeedback
 
 // ボタンクリック時の軽い触覚フィードバック（ユーザージェスチャー内で実行）
+// + 視覚的フィードバック（振動非対応デバイスでもフィードバックを感じられるように）
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('button, [role="button"], .clickable, a[onclick]')
-  if (btn && HapticFeedback.support) {
-    HapticFeedback.light()
+  if (btn) {
+    if (HapticFeedback.support) {
+      HapticFeedback.light()
+    }
+    // 視覚的フィードバック（短い縮小→復元アニメーション）
+    if (!btn.classList.contains('no-haptic-visual')) {
+      btn.style.transition = 'transform 0.1s ease'
+      btn.style.transform = 'scale(0.95)'
+      setTimeout(() => { btn.style.transform = '' }, 100)
+    }
   }
 }, { passive: true })
 
@@ -58476,20 +58493,21 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
       await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.appendChild(script) })
       window.mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: { 
         primaryColor: '#818CF8', primaryTextColor: '#1F2937', lineColor: '#A5B4FC',
-        fontSize: '16px'
+        fontSize: '18px', nodePadding: 12
       }})
     }
     
     // マインドマップ用ラッパー（ズーム・パン対応）
     targetEl.innerHTML = `
-      <div style="position:relative;">
+      <div style="position:relative;" id="mindmap-outer-wrap">
         <div class="flex gap-1 mb-2 justify-end">
-          <button onclick="this.closest('[style]').querySelector('.mermaid-wrap').style.transform='scale(1.3)';this.closest('[style]').querySelector('.mermaid-wrap').style.transformOrigin='top left'" class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-1 rounded transition">🔍+</button>
-          <button onclick="this.closest('[style]').querySelector('.mermaid-wrap').style.transform='scale(1)'" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">1:1</button>
-          <button onclick="this.closest('[style]').querySelector('.mermaid-wrap').style.transform='scale(0.7)';this.closest('[style]').querySelector('.mermaid-wrap').style.transformOrigin='top center'" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">🔍−</button>
+          <button onclick="var w=this.closest('[id=mindmap-outer-wrap]').querySelector('.mermaid-wrap');var s=parseFloat(w.dataset.scale||'1');s=Math.min(s+0.3,3);w.dataset.scale=s;w.style.transform='scale('+s+')';w.style.transformOrigin='top left'" class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-1 rounded transition">🔍+</button>
+          <button onclick="var w=this.closest('[id=mindmap-outer-wrap]').querySelector('.mermaid-wrap');w.dataset.scale='1';w.style.transform='scale(1)'" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">1:1</button>
+          <button onclick="var w=this.closest('[id=mindmap-outer-wrap]').querySelector('.mermaid-wrap');var s=parseFloat(w.dataset.scale||'1');s=Math.max(s-0.3,0.4);w.dataset.scale=s;w.style.transform='scale('+s+')';w.style.transformOrigin='top center'" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">🔍−</button>
+          <button onclick="var c=this.closest('[id=mindmap-outer-wrap]').querySelector('[style*=overflow]');if(c.style.maxHeight==='none'){c.style.maxHeight='400px';this.textContent='⛶'}else{c.style.maxHeight='none';this.textContent='✕'}" class="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1 rounded transition">⛶</button>
         </div>
-        <div style="overflow:auto;max-height:400px;border:1px solid #E5E7EB;border-radius:12px;padding:8px;background:white;">
-          <div class="mermaid-wrap" style="transition:transform 0.3s;min-width:500px;">
+        <div style="overflow:auto;max-height:400px;border:1px solid #E5E7EB;border-radius:12px;padding:12px;background:white;">
+          <div class="mermaid-wrap" data-scale="1" style="transition:transform 0.3s;min-width:500px;">
             <div class="mermaid">${code}</div>
           </div>
         </div>
@@ -58500,19 +58518,29 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
     // SVGのスタイル調整 — テキストを読みやすくする
     const svg = targetEl.querySelector('svg')
     if (svg) {
-      svg.setAttribute('style', 'width:100%;min-width:480px;height:auto;')
-      // フォントサイズを大きく
+      svg.setAttribute('style', 'width:100%;min-width:600px;height:auto;')
+      // フォントサイズを大きく（16px以上）
       svg.querySelectorAll('text, .nodeLabel, .label, foreignObject span, foreignObject div, foreignObject p').forEach(el => {
-        el.style.fontSize = '14px'
-        el.style.fontWeight = '600'
+        el.style.fontSize = '16px'
+        el.style.fontWeight = '700'
+        el.style.lineHeight = '1.3'
       })
       // ノードの背景を広くしてテキストが収まるようにする
       svg.querySelectorAll('.node rect, .node circle, .node polygon').forEach(el => {
         if (el.getAttribute('width')) {
           const w = parseFloat(el.getAttribute('width'))
-          if (w < 100) el.setAttribute('width', String(Math.max(w, 100)))
+          if (w < 120) el.setAttribute('width', String(Math.max(w, 120)))
         }
       })
+      // viewBoxを調整して初期表示を大きくする
+      const viewBox = svg.getAttribute('viewBox')
+      if (viewBox) {
+        const parts = viewBox.split(' ').map(Number)
+        if (parts.length === 4 && parts[2] > 0) {
+          // パディングを追加して余裕を持たせる
+          svg.setAttribute('viewBox', `${parts[0]-20} ${parts[1]-20} ${parts[2]+40} ${parts[3]+40}`)
+        }
+      }
     }
   } catch (e) {
     targetEl.innerHTML = '<p class="text-sm text-gray-400 text-center p-4"><i class="fas fa-exclamation-circle mr-1"></i>マインドマップの生成に失敗しました。</p>'
@@ -58631,11 +58659,17 @@ function cancelReviewReminder() {
   localStorage.removeItem('reviewReminderTime')
   const btn = document.getElementById('reminder-setup-btn')
   const statusEl = document.getElementById('reminder-status')
-  if (btn) btn.innerHTML = '<i class="fas fa-bell mr-1"></i>通知を設定'
+  if (btn) {
+    btn.innerHTML = '<i class="fas fa-bell mr-1"></i>通知を設定'
+    btn.className = 'bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition'
+  }
   if (statusEl) statusEl.innerHTML = '<p class="text-xs text-gray-400"><i class="fas fa-bell-slash mr-1"></i>リマインダーはオフです</p>'
   // 時間セレクタを再表示
   const timeRow = document.getElementById('reminder-time-row')
   if (timeRow) timeRow.style.display = ''
+  // 解除ボタン自体を非表示に
+  const cancelBtn = document.querySelector('[onclick="cancelReviewReminder()"]')
+  if (cancelBtn) cancelBtn.style.display = 'none'
   HapticFeedback.light()
 }
 window.cancelReviewReminder = cancelReviewReminder
@@ -59152,6 +59186,17 @@ async function setupReviewReminderUI() {
     if (statusEl) statusEl.innerHTML = `<p class="text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>毎日${selectedHour}時に復習リマインダーを送ります！</p>`
     const timeRow = document.getElementById('reminder-time-row')
     if (timeRow) timeRow.style.display = 'none'
+    // 解除ボタンを表示（まだない場合追加）
+    let cancelBtn = document.querySelector('[onclick="cancelReviewReminder()"]')
+    if (cancelBtn) {
+      cancelBtn.style.display = ''
+    } else if (btn && btn.parentElement) {
+      const newCancelBtn = document.createElement('button')
+      newCancelBtn.setAttribute('onclick', 'cancelReviewReminder()')
+      newCancelBtn.className = 'bg-red-100 hover:bg-red-200 text-red-600 px-2.5 py-1.5 rounded-lg text-xs font-bold transition'
+      newCancelBtn.innerHTML = '<i class="fas fa-bell-slash mr-1"></i>解除'
+      btn.parentElement.appendChild(newCancelBtn)
+    }
     
     // 現在のカードデータをlocalStorageに保存（忘却計算用）
     const cards = state.courseCards || []
