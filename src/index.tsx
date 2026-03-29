@@ -16013,6 +16013,10 @@ ${card.unit_name || ''}
 - 本問題と全く別のトピック（例: フィヨルド→コンビナート）→ 禁止！
 - 小学生が知らない専門用語を答えにする（例: 氷河地形、堆積作用）→ 禁止！
 - 本問題「光合成」→例題「火山の噴火について」（関連なし — 禁止！）
+- ★★★ 例題の問題文にすでに答えが含まれているトートロジー（循環論法）は絶対禁止！ ★★★
+  ダメな例: 例題「二酸化炭素がたくさん出るのはなぜ？」→答え「二酸化炭素が出るから」（問いと答えが同じ — 学習にならない！）
+  ダメな例: 例題「（混合農業）が行われている理由は？」→答え「混合農業だから」（括弧内に答えがある — 禁止！）
+  ★ 例題の答えを、例題の問題文中に括弧（）書きやそのまま書いてはいけない。答えは問題文を読んだだけではわからないようにすること ★
 
 - 例題の答えは、その学年の児童が教科書で習う用語を使うこと
 - 児童が知らない専門用語（氷河地形、堆積作用など）は答えにしないこと
@@ -16088,6 +16092,18 @@ ${card.unit_name || ''}
       if (tooSimilarResult) {
         console.warn(`🔧 例題修正: AIが本題と類似した問題文を返した`)
         return c.json({ success: false, error: 'AI returned similar problem' }, 500)
+      }
+    }
+    
+    // ★★★ トートロジー検出: 例題の問題文に例題の答えがすでに含まれていないか ★★★
+    if (resultProblem && resultAnswer && resultAnswer.length >= 2) {
+      const rpLower = resultProblem.toLowerCase()
+      const raLower = resultAnswer.toLowerCase().trim()
+      const raStem = resultAnswer.trim().replace(/[系語族型類科目派流業]+$/u, '').toLowerCase()
+      // 答えが問題文にそのまま含まれている（括弧書き含む）
+      if (rpLower.includes(raLower) || (raStem.length >= 2 && rpLower.includes(raStem))) {
+        console.warn(`🔧 例題修正: トートロジー検出 — 例題の答え "${resultAnswer}" が問題文に含まれている`)
+        return c.json({ success: false, error: 'Tautological question - answer already in problem text' }, 500)
       }
     }
     
@@ -16193,9 +16209,11 @@ app.post('/api/fix-all-examples', async (c) => {
 - 答えは「${mainAns}」と異なる値にするが、トピックは同じ
 - 全く別のテーマの問題は絶対に禁止（例：フィヨルド→コンビナートはNG）
 - 答えは${card.grade_level || '小学5'}年生が教科書で習う用語を使うこと。習わない専門用語（氷河地形、堆積作用等）は禁止
+- ★★★ 例題の答えを例題の問題文の中に書かないこと！答えが問題文を読めばわかってしまうトートロジー（循環論法）は禁止！★★★
+  ダメな例: 問題「二酸化炭素が出るのはなぜ？」→答え「二酸化炭素が出るから」
 - ${card.grade_level || '小学5'}年生にわかる日本語で書く
 以下のJSON形式で回答：
-{"example_problem":"例題の問題文（本問題と直接関連する内容）","example_solution":"解き方の説明","example_answer":"例題の答え（同じトピックの関連語・関連値）"}`
+{"example_problem":"例題の問題文（本問題と直接関連する内容。★答えは問題文に含めない★）","example_solution":"解き方の説明","example_answer":"例題の答え（同じトピックの関連語・関連値）"}`
 
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 20000)
