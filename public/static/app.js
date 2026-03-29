@@ -58374,46 +58374,50 @@ function renderZPDGauge() {
   if (!gauge) {
     gauge = document.createElement('div')
     gauge.id = 'zpd-gauge-container'
-    gauge.style.cssText = 'position:fixed;bottom:80px;right:16px;z-index:999;width:72px;transition:all 0.3s;'
+    gauge.style.cssText = 'position:fixed;bottom:80px;right:12px;z-index:999;width:82px;transition:all 0.3s;'
     document.body.appendChild(gauge)
   }
   
   const pct = Math.round(z.level)
   // レベル帯の定義（5段階）
   const bands = [
-    { min: 0,  max: 20, name: 'スタート', emoji: '🌱', color: '#6B7280', nextName: 'じっくり' },
-    { min: 20, max: 40, name: 'じっくり', emoji: '📖', color: '#10B981', nextName: 'しっかり' },
-    { min: 40, max: 60, name: 'しっかり', emoji: '💪', color: '#3B82F6', nextName: 'チャレンジ' },
-    { min: 60, max: 80, name: 'チャレンジ', emoji: '🚀', color: '#8B5CF6', nextName: 'マスター' },
-    { min: 80, max: 100, name: 'マスター', emoji: '👑', color: '#F59E0B', nextName: '' }
+    { min: 0,  max: 20, name: 'スタート', emoji: '🌱', color: '#6B7280', bg: '#F3F4F6' },
+    { min: 20, max: 40, name: 'じっくり', emoji: '📖', color: '#10B981', bg: '#D1FAE5' },
+    { min: 40, max: 60, name: 'しっかり', emoji: '💪', color: '#3B82F6', bg: '#DBEAFE' },
+    { min: 60, max: 80, name: 'チャレンジ', emoji: '🚀', color: '#8B5CF6', bg: '#EDE9FE' },
+    { min: 80, max: 100, name: 'マスター', emoji: '👑', color: '#F59E0B', bg: '#FEF3C7' }
   ]
-  const band = bands.find(b => pct >= b.min && pct < b.max) || bands[bands.length - 1]
+  const bandIdx = bands.findIndex(b => pct >= b.min && pct < b.max)
+  const currentIdx = bandIdx >= 0 ? bandIdx : bands.length - 1
+  const band = bands[currentIdx]
+  
+  // ランク帯の進捗バー（各帯内での位置）
   const bandProgress = band.max > band.min ? Math.round(((pct - band.min) / (band.max - band.min)) * 100) : 100
-  const toNext = band.max - pct
+  
+  // 全体マップ（5段階の小さいバー）
+  const rankMap = bands.map((b, i) => {
+    const isCurrent = i === currentIdx
+    const isPast = i < currentIdx
+    return `<div style="display:flex;align-items:center;gap:2px;margin-bottom:1px;">
+      <span style="font-size:${isCurrent ? '10px' : '8px'};width:12px;text-align:center;">${b.emoji}</span>
+      <div style="flex:1;height:${isCurrent ? '7px' : '4px'};background:${isPast ? b.color : isCurrent ? b.bg : '#E5E7EB'};border-radius:3px;position:relative;overflow:hidden;">
+        ${isCurrent ? `<div style="position:absolute;left:0;top:0;bottom:0;width:${bandProgress}%;background:${b.color};border-radius:3px;transition:width 0.5s;"></div>` : ''}
+      </div>
+      ${isCurrent ? `<span style="font-size:8px;font-weight:800;color:${b.color};min-width:16px;">${pct}</span>` : ''}
+    </div>`
+  }).reverse().join('')
   
   gauge.innerHTML = `
-    <div class="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-2 text-center cursor-pointer" onclick="this.querySelector('.zpd-detail').classList.toggle('hidden')">
-      <div class="text-[9px] font-bold text-gray-400 mb-0.5">学習チカラ</div>
-      <div class="relative w-14 h-14 mx-auto mb-1">
-        <svg viewBox="0 0 36 36" class="w-14 h-14 -rotate-90">
-          <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none" stroke="#E5E7EB" stroke-width="3"/>
-          <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none" stroke="${band.color}" stroke-width="3"
-                stroke-dasharray="${bandProgress}, 100"
-                style="transition: stroke-dasharray 0.8s ease-out"/>
-        </svg>
-        <div class="absolute inset-0 flex items-center justify-center text-lg">${band.emoji}</div>
+    <div class="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-2.5 text-center">
+      <div style="font-size:8px;font-weight:800;color:#9CA3AF;letter-spacing:0.5px;margin-bottom:3px;">学習パワー</div>
+      <div style="font-size:22px;line-height:1;margin-bottom:1px;">${band.emoji}</div>
+      <div style="font-size:13px;font-weight:900;color:${band.color};margin-bottom:2px;">${band.name}</div>
+      <div style="font-size:18px;font-weight:900;color:${band.color};line-height:1;">${pct}<span style="font-size:10px;color:#9CA3AF;font-weight:600"> /100</span></div>
+      ${z.streak >= 3 ? `<div style="font-size:9px;color:#F97316;font-weight:700;margin-top:1px;">🔥 ${z.streak}連続!</div>` : ''}
+      <div style="margin-top:4px;padding-top:4px;border-top:1px solid #F3F4F6;">
+        ${rankMap}
       </div>
-      <div class="text-[11px] font-black" style="color:${band.color}">${band.name}</div>
-      ${z.streak >= 3 ? '<div class="text-[9px] text-orange-500 font-bold mt-0.5">🔥 ' + z.streak + '連続!</div>' : ''}
-      <div class="zpd-detail hidden mt-1.5 text-[9px] text-gray-600 border-t border-gray-100 pt-1.5">
-        <div class="text-left leading-relaxed">
-          <p class="mb-0.5">💡 問題を解くと上がるよ</p>
-          <p class="mb-0.5">📊 今 <b style="color:${band.color}">${pct}</b> / 100</p>
-          ${band.nextName ? `<p>⬆ あと<b class="text-indigo-600">${toNext}pt</b>で<br>「<b>${band.nextName}</b>」に！</p>` : '<p class="text-amber-600 font-bold">🎉 最高ランク！</p>'}
-        </div>
-      </div>
+      <div style="font-size:7px;color:#9CA3AF;margin-top:2px;">問題を解くと上がる</div>
     </div>
   `
 }
@@ -58504,7 +58508,7 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
       </div>
       <div style="display:flex;gap:4px;align-items:center;">
         <button id="mm-zoom-in" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 12px;border-radius:6px;font-size:16px;cursor:pointer;font-weight:bold;">＋</button>
-        <button id="mm-zoom-fit" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:bold;">全体</button>
+        <button id="mm-zoom-fit" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:bold;">全体</button>
         <button id="mm-zoom-out" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 12px;border-radius:6px;font-size:16px;cursor:pointer;font-weight:bold;">ー</button>
         <span id="mm-zoom-label" style="font-size:11px;min-width:40px;text-align:center;opacity:0.9;">100%</span>
         <button onclick="document.getElementById('mindmap-fullscreen-modal').remove()" style="background:rgba(255,255,255,0.3);border:none;color:white;padding:6px 14px;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;margin-left:6px;">✕</button>
@@ -58546,101 +58550,84 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
     if (!mmContent) return
     
     mmContent.innerHTML = `
-      <div class="mermaid-wrap" style="transform-origin:0 0;transition:transform 0.2s ease;">
+      <div class="mermaid-wrap" style="transform-origin:0 0;">
         <div class="mermaid">${code}</div>
       </div>
     `
     await window.mermaid.run({ nodes: mmContent.querySelectorAll('.mermaid') })
     
-    // SVGのスタイル調整 - 文字を大きく、ノードを大きく
+    // ★ SVGを画面いっぱいに表示するための根本改善
     const svg = mmContent.querySelector('svg')
     if (svg) {
-      // SVGの自然なサイズを取得
-      svg.style.width = ''
-      svg.style.height = ''
-      svg.style.maxWidth = 'none'
+      // 1. まずSVGの実際のコンテンツ範囲を取得（getBBox）
+      let bbox
+      try { bbox = svg.getBBox() } catch(e) { bbox = null }
+      
+      if (bbox && bbox.width > 0 && bbox.height > 0) {
+        // 2. viewBoxをコンテンツにぴったりトリム（余白30px）
+        const pad = 30
+        const newVB = `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad*2} ${bbox.height + pad*2}`
+        svg.setAttribute('viewBox', newVB)
+      }
+      
+      // 3. SVGをコンテナの幅・高さに完全フィットさせる
+      const cW = mmContent.clientWidth
+      const cH = mmContent.clientHeight
       svg.removeAttribute('width')
       svg.removeAttribute('height')
+      svg.style.width = cW + 'px'
+      svg.style.height = cH + 'px'
+      svg.style.maxWidth = 'none'
+      svg.style.display = 'block'
       
-      // テキスト要素を大きく（24px → 太字）
+      // 4. テキストを大きく太く（SVG内部のフォント）
       svg.querySelectorAll('text, .nodeLabel, .label, foreignObject span, foreignObject div, foreignObject p').forEach(el => {
-        el.style.fontSize = '22px'
+        el.style.fontSize = '24px'
         el.style.fontWeight = '800'
         el.style.lineHeight = '1.4'
-        el.style.fontFamily = '"Hiragino Kaku Gothic ProN","Hiragino Sans",sans-serif'
+        el.style.fontFamily = '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif'
       })
       
-      // ノード形状を大きく - 最小幅200px
-      svg.querySelectorAll('.node rect, .node circle, .node polygon, .node ellipse').forEach(el => {
-        if (el.getAttribute('width')) {
-          const w = parseFloat(el.getAttribute('width'))
-          if (w < 200) el.setAttribute('width', '200')
-        }
-        if (el.getAttribute('rx')) {
-          el.setAttribute('rx', '12')
-          el.setAttribute('ry', '12')
-        }
-      })
-      
-      // viewBoxを広めに取る（余白を追加）
-      const viewBox = svg.getAttribute('viewBox')
-      if (viewBox) {
-        const parts = viewBox.split(' ').map(Number)
-        if (parts.length === 4 && parts[2] > 0) {
-          svg.setAttribute('viewBox', `${parts[0]-40} ${parts[1]-40} ${parts[2]+80} ${parts[3]+80}`)
-        }
-      }
-      
-      // SVGの実際のサイズを計算してwrapに設定
-      const svgBBox = svg.getBBox ? svg.getBBox() : null
-      const svgW = svgBBox ? svgBBox.width + 80 : svg.viewBox?.baseVal?.width || 800
-      const svgH = svgBBox ? svgBBox.height + 80 : svg.viewBox?.baseVal?.height || 600
-      
-      svg.setAttribute('width', svgW)
-      svg.setAttribute('height', svgH)
-      svg.style.width = svgW + 'px'
-      svg.style.height = svgH + 'px'
-      
-      // 画面全体にフィットするスケールを計算
-      const containerW = mmContent.clientWidth
-      const containerH = mmContent.clientHeight
-      const fitScale = Math.min(containerW / svgW, containerH / svgH, 2.5)
-      
+      // 5. wrapをコンテナいっぱいにする（scaleは使わない、SVGのviewBoxで制御）
       const wrap = mmContent.querySelector('.mermaid-wrap')
-      let currentScale = fitScale
-      wrap.style.transform = `scale(${currentScale})`
-      wrap.style.transformOrigin = '0 0'
-      // wrapの幅・高さを明示して、スクロール領域を正しくする
-      wrap.style.width = svgW + 'px'
-      wrap.style.height = svgH + 'px'
-      mmContent.style.overflow = 'auto'
+      wrap.style.width = '100%'
+      wrap.style.height = '100%'
+      wrap.style.transform = 'none'
       
-      // ズームラベル更新
-      const updateLabel = () => {
+      // 6. ズーム機能はviewBoxの拡縮で実装（SVGネイティブズーム）
+      const origVB = svg.getAttribute('viewBox')
+      const origParts = origVB.split(' ').map(Number)
+      const vbCx = origParts[0] + origParts[2] / 2 // viewBoxの中心
+      const vbCy = origParts[1] + origParts[3] / 2
+      let zoomLevel = 1  // 1 = 全体表示
+      
+      const applyZoom = () => {
+        // zoomLevel > 1 で拡大（viewBoxが小さくなる）
+        const w = origParts[2] / zoomLevel
+        const h = origParts[3] / zoomLevel
+        svg.setAttribute('viewBox', `${vbCx - w/2} ${vbCy - h/2} ${w} ${h}`)
+        // SVGをコンテナサイズに維持
+        svg.style.width = mmContent.clientWidth + 'px'
+        svg.style.height = mmContent.clientHeight + 'px'
         const label = document.getElementById('mm-zoom-label')
-        if (label) label.textContent = Math.round(currentScale * 100) + '%'
+        if (label) label.textContent = Math.round(zoomLevel * 100) + '%'
       }
-      updateLabel()
+      applyZoom()
       
-      // ズームイン
+      // ズームイン（拡大 = viewBoxを小さく）
       document.getElementById('mm-zoom-in').onclick = () => {
-        currentScale = Math.min(currentScale + 0.3, 5)
-        wrap.style.transform = `scale(${currentScale})`
-        updateLabel()
+        zoomLevel = Math.min(zoomLevel * 1.4, 10)
+        applyZoom()
       }
-      // ズームアウト
+      // ズームアウト（縮小 = viewBoxを大きく）
       document.getElementById('mm-zoom-out').onclick = () => {
-        currentScale = Math.max(currentScale - 0.3, 0.2)
-        wrap.style.transform = `scale(${currentScale})`
-        updateLabel()
+        zoomLevel = Math.max(zoomLevel / 1.4, 0.3)
+        applyZoom()
       }
       // 全体フィット
       document.getElementById('mm-zoom-fit').onclick = () => {
-        currentScale = fitScale
-        wrap.style.transform = `scale(${currentScale})`
-        mmContent.scrollTop = 0
-        mmContent.scrollLeft = 0
-        updateLabel()
+        zoomLevel = 1
+        applyZoom()
       }
       
       // ピンチズーム（タッチ対応）
@@ -58657,14 +58644,21 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
           const dx = e.touches[0].clientX - e.touches[1].clientX
           const dy = e.touches[0].clientY - e.touches[1].clientY
           const dist = Math.sqrt(dx*dx + dy*dy)
-          const delta = (dist - lastPinchDist) * 0.005
-          currentScale = Math.min(Math.max(currentScale + delta, 0.2), 5)
-          wrap.style.transform = `scale(${currentScale})`
-          updateLabel()
+          const ratio = dist / lastPinchDist
+          zoomLevel = Math.min(Math.max(zoomLevel * ratio, 0.3), 10)
+          applyZoom()
           lastPinchDist = dist
         }
       }, { passive: true })
       mmContent.addEventListener('touchend', () => { lastPinchDist = 0 }, { passive: true })
+      
+      // ウィンドウリサイズ対応
+      const resizeHandler = () => {
+        if (!document.getElementById('mindmap-fullscreen-modal')) return
+        svg.style.width = mmContent.clientWidth + 'px'
+        svg.style.height = mmContent.clientHeight + 'px'
+      }
+      window.addEventListener('resize', resizeHandler)
     }
     
     // 元のtargetElに縮小版を表示
