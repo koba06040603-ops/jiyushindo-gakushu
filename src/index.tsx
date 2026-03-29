@@ -46571,32 +46571,19 @@ app.post('/api/ai/generate-mindmap', async (c) => {
       `- ${cd.card_title || cd.title}: ${(cd.problem_description || cd.problem_text || '').substring(0, 80)}`
     ).join('\n')
     
-    const prompt = `以下の学習カード情報から、Mermaid.jsのmindmap記法でマインドマップを生成してください。
-
-単元: ${unit_name || ''}
-教科: ${subject || ''}
-カード一覧:
-${cardsInfo}
-
-★重要ルール:
-1. ルートは単元名（短く。8文字以内）
-2. 2階層まで（深くしすぎない）
-3. 各ノードのテキストは最大6文字（短く簡潔に）
-4. 子ノードは各親につき最大3個
-5. 全体のノード数は最大15個
-6. 日本語で。漢字OK
-
-例:
-mindmap
-  root((世界の国))
-    ヨーロッパ
-      EU加盟
-      産業
-    アジア
-      貿易
-      文化
-
-mindmapコードのみ出力（\`\`\`は不要）。`
+    const prompt = "以下の学習カード情報からマインドマップ用のJSON構造を生成して。\n\n" +
+      "単元: " + (unit_name || '') + "\n" +
+      "教科: " + (subject || '') + "\n" +
+      "カード一覧:\n" + cardsInfo + "\n\n" +
+      "★重要ルール:\n" +
+      "1. ルートは単元名（8文字以内）\n" +
+      "2. 2階層まで（子→孫まで）\n" +
+      "3. 各ノードのラベルは最大5文字\n" +
+      "4. 子ノードは各親につき最大3個\n" +
+      "5. 全体のノード数は最大12個\n" +
+      "6. 日本語。漢字OK\n\n" +
+      "以下のJSON形式のみ出力（他のテキスト不要）:\n" +
+      '{"root":"単元名","children":[{"label":"概念1","children":[{"label":"詳細A"},{"label":"詳細B"}]},{"label":"概念2","children":[{"label":"詳細C"}]}]}'
 
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
@@ -46611,9 +46598,17 @@ mindmapコードのみ出力（\`\`\`は不要）。`
     )
     if (!resp.ok) return c.json({ success: false, error: 'API error' }, 500)
     const data = await resp.json() as any
-    let mermaidCode = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    mermaidCode = mermaidCode.replace(/```mermaid\n?/g, '').replace(/```\n?/g, '').trim()
-    return c.json({ success: true, mermaid_code: mermaidCode })
+    let rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    rawText = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    
+    let mindmapData
+    try {
+      mindmapData = JSON.parse(rawText)
+    } catch {
+      mindmapData = { root: unit_name || subject || '学習', children: [{ label: '内容', children: [] }] }
+    }
+    
+    return c.json({ success: true, mindmap_data: mindmapData })
   } catch (e: any) {
     return c.json({ success: false, error: e.message }, 500)
   }

@@ -58417,9 +58417,70 @@ function renderZPDGauge() {
       <div style="margin-top:4px;padding-top:4px;border-top:1px solid #F3F4F6;">
         ${rankMap}
       </div>
-      <div style="font-size:7px;color:#9CA3AF;margin-top:2px;">問題を解くと上がる</div>
+      <div onclick="window._showZPDDetail()" style="font-size:8px;color:#6366F1;margin-top:3px;cursor:pointer;font-weight:700;text-decoration:underline;">📖 くわしく見る</div>
     </div>
   `
+}
+
+// ZPD詳細モーダル
+window._showZPDDetail = function() {
+  let old = document.getElementById('zpd-detail-modal')
+  if (old) old.remove()
+  
+  const z = window._zpdState
+  const pct = Math.round(z.level)
+  const bands = [
+    { min: 0,  max: 20, name: 'スタート', emoji: '🌱', color: '#6B7280', desc: '学習を始めたばかり。まずは問題に慣れよう！' },
+    { min: 20, max: 40, name: 'じっくり', emoji: '📖', color: '#10B981', desc: '基礎を固めている段階。間違えても大丈夫！' },
+    { min: 40, max: 60, name: 'しっかり', emoji: '💪', color: '#3B82F6', desc: '力がついてきた！どんどん問題を解こう。' },
+    { min: 60, max: 80, name: 'チャレンジ', emoji: '🚀', color: '#8B5CF6', desc: '応用問題にも挑戦できるレベル！' },
+    { min: 80, max: 100, name: 'マスター', emoji: '👑', color: '#F59E0B', desc: 'この単元を極めた！次の単元に進もう。' }
+  ]
+  const bandIdx = bands.findIndex(b => pct >= b.min && pct < b.max)
+  const currentIdx = bandIdx >= 0 ? bandIdx : bands.length - 1
+  
+  const rankList = bands.map((b, i) => {
+    const isCurrent = i === currentIdx
+    const isPast = i < currentIdx
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${isCurrent ? b.color + '15' : 'transparent'};border-radius:12px;border:${isCurrent ? '2px solid ' + b.color : '1px solid #E5E7EB'};margin-bottom:6px;">
+      <span style="font-size:24px;">${b.emoji}</span>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:800;color:${isCurrent ? b.color : isPast ? b.color : '#9CA3AF'};">${b.name} <span style="font-size:11px;font-weight:600;color:#9CA3AF;">${b.min}〜${b.max}pt</span></div>
+        <div style="font-size:11px;color:#6B7280;margin-top:2px;">${b.desc}</div>
+      </div>
+      ${isCurrent ? '<span style="font-size:12px;font-weight:800;color:' + b.color + ';">◀ いまココ</span>' : isPast ? '<span style="font-size:14px;">✅</span>' : ''}
+    </div>`
+  }).reverse().join('')
+  
+  const modal = document.createElement('div')
+  modal.id = 'zpd-detail-modal'
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10002;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:20px;'
+  modal.onclick = (e) => { if (e.target === modal) modal.remove() }
+  modal.innerHTML = `
+    <div style="background:white;border-radius:20px;max-width:380px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div style="padding:20px 20px 12px;text-align:center;border-bottom:1px solid #F3F4F6;">
+        <div style="font-size:16px;font-weight:900;color:#1F2937;">📊 学習パワーのしくみ</div>
+        <div style="font-size:36px;font-weight:900;color:${bands[currentIdx].color};margin:8px 0 4px;">${pct}<span style="font-size:16px;color:#9CA3AF;font-weight:600"> /100</span></div>
+      </div>
+      <div style="padding:16px 16px 8px;">
+        <div style="font-size:13px;font-weight:800;color:#374151;margin-bottom:8px;">🏆 ランク一覧</div>
+        ${rankList}
+      </div>
+      <div style="padding:8px 16px 16px;">
+        <div style="font-size:13px;font-weight:800;color:#374151;margin-bottom:8px;">💡 ポイントのもらいかた</div>
+        <div style="background:#F0FDF4;border-radius:12px;padding:12px;font-size:12px;color:#166534;line-height:1.8;">
+          <div>✅ <b>かんたんな問題</b>を正解 → <b style="color:#10B981;">+5pt</b></div>
+          <div>✅ <b>ふつうの問題</b>を正解 → <b style="color:#3B82F6;">+10pt</b></div>
+          <div>✅ <b>むずかしい問題</b>を正解 → <b style="color:#8B5CF6;">+15pt</b></div>
+          <div style="margin-top:6px;padding-top:6px;border-top:1px solid #BBF7D0;">❌ 間違えると → <span style="color:#EF4444;">少し下がる</span>（でも大丈夫！）</div>
+        </div>
+      </div>
+      <div style="padding:0 16px 16px;">
+        <button onclick="this.closest('#zpd-detail-modal').remove()" style="width:100%;padding:12px;background:#6366F1;color:white;border:none;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;">とじる</button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
 }
 window.updateZPD = updateZPD
 window.renderZPDGauge = renderZPDGauge
@@ -58489,7 +58550,7 @@ async function openWhyExploration(question, answer, subject, grade, cardTitle) {
 window.openWhyExploration = openWhyExploration
 
 // ─────────────────────────────────────────────
-// ⑥ マインドマップ自動生成（Mermaid.js）
+// ⑥ マインドマップ自動生成（自前SVG描画）
 // ─────────────────────────────────────────────
 async function generateMindmap(cards, unitName, subject, targetEl) {
   // 全画面モーダルでマインドマップを表示
@@ -58514,7 +58575,7 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
         <button onclick="document.getElementById('mindmap-fullscreen-modal').remove()" style="background:rgba(255,255,255,0.3);border:none;color:white;padding:6px 14px;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;margin-left:6px;">✕</button>
       </div>
     </div>
-    <div id="mm-content" style="flex:1;overflow:auto;padding:0;background:#fafafe;position:relative;">
+    <div id="mm-content" style="flex:1;overflow:hidden;padding:0;background:#fafafe;position:relative;">
       <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6366F1;">
         <div style="text-align:center;">
           <div class="animate-spin" style="width:32px;height:32px;border:3px solid #C7D2FE;border-top:3px solid #6366F1;border-radius:50%;margin:0 auto 12px;"></div>
@@ -58525,143 +58586,207 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
   `
   document.body.appendChild(modal)
   
-  // 元のtargetElにもステータス表示
   if (targetEl) {
     targetEl.innerHTML = '<div class="text-center text-xs text-indigo-500 py-2"><i class="fas fa-external-link-alt mr-1"></i>全画面で表示中...</div>'
   }
   
   try {
     const res = await axios.post('/api/ai/generate-mindmap', { cards, unit_name: unitName, subject }, { timeout: 20000 })
-    const code = res.data?.mermaid_code
-    if (!code) throw new Error('No code')
-    
-    // Mermaid.js CDNを動的ロード
-    if (!window.mermaid) {
-      const script = document.createElement('script')
-      script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js'
-      await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.appendChild(script) })
-      window.mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: { 
-        primaryColor: '#818CF8', primaryTextColor: '#1F2937', lineColor: '#A5B4FC',
-        fontSize: '28px', nodePadding: 24
-      }})
-    }
+    const mapData = res.data?.mindmap_data
+    if (!mapData) throw new Error('No data')
     
     const mmContent = document.getElementById('mm-content')
     if (!mmContent) return
     
-    mmContent.innerHTML = `
-      <div class="mermaid-wrap" style="transform-origin:0 0;">
-        <div class="mermaid">${code}</div>
-      </div>
-    `
-    await window.mermaid.run({ nodes: mmContent.querySelectorAll('.mermaid') })
+    // ★ 自前SVGマインドマップ描画
+    const cW = mmContent.clientWidth
+    const cH = mmContent.clientHeight
+    const svgNS = 'http://www.w3.org/2000/svg'
     
-    // ★ SVGを画面いっぱいに表示するための根本改善
-    const svg = mmContent.querySelector('svg')
-    if (svg) {
-      // 1. まずSVGの実際のコンテンツ範囲を取得（getBBox）
-      let bbox
-      try { bbox = svg.getBBox() } catch(e) { bbox = null }
+    // カラーパレット
+    const palette = ['#6366F1','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316']
+    
+    // ノード配置計算
+    const nodes = []
+    const edges = []
+    const rootLabel = (mapData.root || '学習').substring(0, 8)
+    const children = mapData.children || []
+    const cx = cW / 2, cy = cH / 2
+    
+    // ルートノード
+    nodes.push({ x: cx, y: cy, label: rootLabel, level: 0, color: '#6366F1', w: 0, h: 0 })
+    
+    // 子ノードを放射状に配置（間隔を狭く）
+    const childCount = Math.min(children.length, 6)
+    const baseRadius = Math.min(cW, cH) * 0.28
+    
+    for (let i = 0; i < childCount; i++) {
+      const angle = (i / childCount) * Math.PI * 2 - Math.PI / 2
+      const childX = cx + Math.cos(angle) * baseRadius
+      const childY = cy + Math.sin(angle) * baseRadius
+      const childLabel = (children[i].label || '').substring(0, 5)
+      const childColor = palette[i % palette.length]
+      const childIdx = nodes.length
       
-      if (bbox && bbox.width > 0 && bbox.height > 0) {
-        // 2. viewBoxをコンテンツにぴったりトリム（余白30px）
-        const pad = 30
-        const newVB = `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad*2} ${bbox.height + pad*2}`
-        svg.setAttribute('viewBox', newVB)
+      nodes.push({ x: childX, y: childY, label: childLabel, level: 1, color: childColor, w: 0, h: 0 })
+      edges.push({ from: 0, to: childIdx, color: childColor })
+      
+      // 孫ノード
+      const grandChildren = (children[i].children || []).slice(0, 3)
+      const gcRadius = Math.min(cW, cH) * 0.14
+      const gcSpread = Math.PI * 0.5
+      
+      for (let j = 0; j < grandChildren.length; j++) {
+        const gcAngle = angle + (j - (grandChildren.length - 1) / 2) * (gcSpread / Math.max(grandChildren.length, 1))
+        const gcX = childX + Math.cos(gcAngle) * gcRadius
+        const gcY = childY + Math.sin(gcAngle) * gcRadius
+        const gcLabel = (grandChildren[j].label || '').substring(0, 5)
+        const gcIdx = nodes.length
+        
+        nodes.push({ x: gcX, y: gcY, label: gcLabel, level: 2, color: childColor, w: 0, h: 0 })
+        edges.push({ from: childIdx, to: gcIdx, color: childColor })
       }
-      
-      // 3. SVGをコンテナの幅・高さに完全フィットさせる
-      const cW = mmContent.clientWidth
-      const cH = mmContent.clientHeight
-      svg.removeAttribute('width')
-      svg.removeAttribute('height')
-      svg.style.width = cW + 'px'
-      svg.style.height = cH + 'px'
-      svg.style.maxWidth = 'none'
-      svg.style.display = 'block'
-      
-      // 4. テキストを大きく太く（SVG内部のフォント）
-      svg.querySelectorAll('text, .nodeLabel, .label, foreignObject span, foreignObject div, foreignObject p').forEach(el => {
-        el.style.fontSize = '24px'
-        el.style.fontWeight = '800'
-        el.style.lineHeight = '1.4'
-        el.style.fontFamily = '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif'
-      })
-      
-      // 5. wrapをコンテナいっぱいにする（scaleは使わない、SVGのviewBoxで制御）
-      const wrap = mmContent.querySelector('.mermaid-wrap')
-      wrap.style.width = '100%'
-      wrap.style.height = '100%'
-      wrap.style.transform = 'none'
-      
-      // 6. ズーム機能はviewBoxの拡縮で実装（SVGネイティブズーム）
-      const origVB = svg.getAttribute('viewBox')
-      const origParts = origVB.split(' ').map(Number)
-      const vbCx = origParts[0] + origParts[2] / 2 // viewBoxの中心
-      const vbCy = origParts[1] + origParts[3] / 2
-      let zoomLevel = 1  // 1 = 全体表示
-      
-      const applyZoom = () => {
-        // zoomLevel > 1 で拡大（viewBoxが小さくなる）
-        const w = origParts[2] / zoomLevel
-        const h = origParts[3] / zoomLevel
-        svg.setAttribute('viewBox', `${vbCx - w/2} ${vbCy - h/2} ${w} ${h}`)
-        // SVGをコンテナサイズに維持
-        svg.style.width = mmContent.clientWidth + 'px'
-        svg.style.height = mmContent.clientHeight + 'px'
-        const label = document.getElementById('mm-zoom-label')
-        if (label) label.textContent = Math.round(zoomLevel * 100) + '%'
-      }
-      applyZoom()
-      
-      // ズームイン（拡大 = viewBoxを小さく）
-      document.getElementById('mm-zoom-in').onclick = () => {
-        zoomLevel = Math.min(zoomLevel * 1.4, 10)
-        applyZoom()
-      }
-      // ズームアウト（縮小 = viewBoxを大きく）
-      document.getElementById('mm-zoom-out').onclick = () => {
-        zoomLevel = Math.max(zoomLevel / 1.4, 0.3)
-        applyZoom()
-      }
-      // 全体フィット
-      document.getElementById('mm-zoom-fit').onclick = () => {
-        zoomLevel = 1
-        applyZoom()
-      }
-      
-      // ピンチズーム（タッチ対応）
-      let lastPinchDist = 0
-      mmContent.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) {
-          const dx = e.touches[0].clientX - e.touches[1].clientX
-          const dy = e.touches[0].clientY - e.touches[1].clientY
-          lastPinchDist = Math.sqrt(dx*dx + dy*dy)
-        }
-      }, { passive: true })
-      mmContent.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2 && lastPinchDist > 0) {
-          const dx = e.touches[0].clientX - e.touches[1].clientX
-          const dy = e.touches[0].clientY - e.touches[1].clientY
-          const dist = Math.sqrt(dx*dx + dy*dy)
-          const ratio = dist / lastPinchDist
-          zoomLevel = Math.min(Math.max(zoomLevel * ratio, 0.3), 10)
-          applyZoom()
-          lastPinchDist = dist
-        }
-      }, { passive: true })
-      mmContent.addEventListener('touchend', () => { lastPinchDist = 0 }, { passive: true })
-      
-      // ウィンドウリサイズ対応
-      const resizeHandler = () => {
-        if (!document.getElementById('mindmap-fullscreen-modal')) return
-        svg.style.width = mmContent.clientWidth + 'px'
-        svg.style.height = mmContent.clientHeight + 'px'
-      }
-      window.addEventListener('resize', resizeHandler)
     }
     
-    // 元のtargetElに縮小版を表示
+    // SVG作成
+    const svg = document.createElementNS(svgNS, 'svg')
+    svg.setAttribute('width', cW)
+    svg.setAttribute('height', cH)
+    svg.setAttribute('viewBox', `0 0 ${cW} ${cH}`)
+    svg.style.width = '100%'
+    svg.style.height = '100%'
+    svg.style.display = 'block'
+    svg.style.background = '#fafafe'
+    
+    // エッジ描画（曲線）
+    edges.forEach(e => {
+      const from = nodes[e.from]
+      const to = nodes[e.to]
+      const path = document.createElementNS(svgNS, 'path')
+      const midX = (from.x + to.x) / 2
+      const midY = (from.y + to.y) / 2
+      const ctrlX = midX + (to.y - from.y) * 0.15
+      const ctrlY = midY - (to.x - from.x) * 0.15
+      path.setAttribute('d', `M${from.x},${from.y} Q${ctrlX},${ctrlY} ${to.x},${to.y}`)
+      path.setAttribute('fill', 'none')
+      path.setAttribute('stroke', e.color)
+      path.setAttribute('stroke-width', e.from === 0 ? '4' : '3')
+      path.setAttribute('stroke-opacity', '0.5')
+      path.setAttribute('stroke-linecap', 'round')
+      svg.appendChild(path)
+    })
+    
+    // ノード描画
+    const fontSizes = [24, 20, 16]
+    const paddings = [20, 16, 12]
+    const radii = [16, 12, 10]
+    
+    nodes.forEach((n, i) => {
+      const fontSize = fontSizes[n.level] || 16
+      const pad = paddings[n.level] || 12
+      const radius = radii[n.level] || 10
+      
+      // テキスト幅を推定
+      const textW = n.label.length * fontSize * 0.65
+      const boxW = Math.max(textW + pad * 2, n.level === 0 ? 160 : 100)
+      const boxH = fontSize + pad * 2
+      n.w = boxW
+      n.h = boxH
+      
+      const g = document.createElementNS(svgNS, 'g')
+      
+      if (n.level === 0) {
+        // ルート：丸角の大きな楕円
+        const ellipse = document.createElementNS(svgNS, 'ellipse')
+        ellipse.setAttribute('cx', n.x)
+        ellipse.setAttribute('cy', n.y)
+        ellipse.setAttribute('rx', boxW / 2 + 10)
+        ellipse.setAttribute('ry', boxH / 2 + 8)
+        ellipse.setAttribute('fill', n.color)
+        ellipse.setAttribute('filter', 'drop-shadow(0 4px 8px rgba(99,102,241,0.3))')
+        g.appendChild(ellipse)
+        
+        const text = document.createElementNS(svgNS, 'text')
+        text.setAttribute('x', n.x)
+        text.setAttribute('y', n.y + fontSize * 0.35)
+        text.setAttribute('text-anchor', 'middle')
+        text.setAttribute('font-size', fontSize + 'px')
+        text.setAttribute('font-weight', '900')
+        text.setAttribute('fill', 'white')
+        text.setAttribute('font-family', '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif')
+        text.textContent = n.label
+        g.appendChild(text)
+      } else {
+        // 子・孫：角丸四角
+        const rect = document.createElementNS(svgNS, 'rect')
+        rect.setAttribute('x', n.x - boxW / 2)
+        rect.setAttribute('y', n.y - boxH / 2)
+        rect.setAttribute('width', boxW)
+        rect.setAttribute('height', boxH)
+        rect.setAttribute('rx', radius)
+        rect.setAttribute('fill', n.level === 1 ? n.color : 'white')
+        rect.setAttribute('stroke', n.color)
+        rect.setAttribute('stroke-width', n.level === 1 ? '0' : '3')
+        if (n.level === 1) {
+          rect.setAttribute('filter', 'drop-shadow(0 3px 6px rgba(0,0,0,0.15))')
+        }
+        g.appendChild(rect)
+        
+        const text = document.createElementNS(svgNS, 'text')
+        text.setAttribute('x', n.x)
+        text.setAttribute('y', n.y + fontSize * 0.35)
+        text.setAttribute('text-anchor', 'middle')
+        text.setAttribute('font-size', fontSize + 'px')
+        text.setAttribute('font-weight', '800')
+        text.setAttribute('fill', n.level === 1 ? 'white' : n.color)
+        text.setAttribute('font-family', '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif')
+        text.textContent = n.label
+        g.appendChild(text)
+      }
+      
+      svg.appendChild(g)
+    })
+    
+    mmContent.innerHTML = ''
+    mmContent.appendChild(svg)
+    
+    // ★ ズーム機能（viewBox制御）
+    const origVB = [0, 0, cW, cH]
+    let zoomLevel = 1
+    const vbCx = cW / 2, vbCy = cH / 2
+    
+    const applyZoom = () => {
+      const w = cW / zoomLevel, h = cH / zoomLevel
+      svg.setAttribute('viewBox', `${vbCx - w/2} ${vbCy - h/2} ${w} ${h}`)
+      const label = document.getElementById('mm-zoom-label')
+      if (label) label.textContent = Math.round(zoomLevel * 100) + '%'
+    }
+    
+    document.getElementById('mm-zoom-in').onclick = () => { zoomLevel = Math.min(zoomLevel * 1.4, 8); applyZoom() }
+    document.getElementById('mm-zoom-out').onclick = () => { zoomLevel = Math.max(zoomLevel / 1.4, 0.5); applyZoom() }
+    document.getElementById('mm-zoom-fit').onclick = () => { zoomLevel = 1; applyZoom() }
+    
+    // ピンチズーム
+    let lastPinchDist = 0
+    mmContent.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        lastPinchDist = Math.sqrt(dx*dx + dy*dy)
+      }
+    }, { passive: true })
+    mmContent.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2 && lastPinchDist > 0) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX
+        const dy = e.touches[0].clientY - e.touches[1].clientY
+        const dist = Math.sqrt(dx*dx + dy*dy)
+        zoomLevel = Math.min(Math.max(zoomLevel * (dist / lastPinchDist), 0.5), 8)
+        applyZoom()
+        lastPinchDist = dist
+      }
+    }, { passive: true })
+    mmContent.addEventListener('touchend', () => { lastPinchDist = 0 }, { passive: true })
+    
     if (targetEl) {
       targetEl.innerHTML = `<div class="text-center py-2">
         <p class="text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>マインドマップ生成完了</p>
