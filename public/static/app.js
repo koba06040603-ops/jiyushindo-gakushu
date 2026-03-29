@@ -58374,35 +58374,45 @@ function renderZPDGauge() {
   if (!gauge) {
     gauge = document.createElement('div')
     gauge.id = 'zpd-gauge-container'
-    gauge.style.cssText = 'position:fixed;bottom:80px;right:16px;z-index:999;width:64px;transition:all 0.3s;'
+    gauge.style.cssText = 'position:fixed;bottom:80px;right:16px;z-index:999;width:72px;transition:all 0.3s;'
     document.body.appendChild(gauge)
   }
   
   const pct = Math.round(z.level)
-  const levelName = pct >= 80 ? 'マスター' : pct >= 60 ? 'チャレンジ' : pct >= 40 ? 'しっかり' : pct >= 20 ? 'じっくり' : 'スタート'
-  const levelColor = pct >= 80 ? '#F59E0B' : pct >= 60 ? '#8B5CF6' : pct >= 40 ? '#3B82F6' : pct >= 20 ? '#10B981' : '#6B7280'
-  const nextPct = Math.min(100, pct + 15)
-  const toNext = nextPct - pct
+  // レベル帯の定義（5段階）
+  const bands = [
+    { min: 0,  max: 20, name: 'スタート', emoji: '🌱', color: '#6B7280', nextName: 'じっくり' },
+    { min: 20, max: 40, name: 'じっくり', emoji: '📖', color: '#10B981', nextName: 'しっかり' },
+    { min: 40, max: 60, name: 'しっかり', emoji: '💪', color: '#3B82F6', nextName: 'チャレンジ' },
+    { min: 60, max: 80, name: 'チャレンジ', emoji: '🚀', color: '#8B5CF6', nextName: 'マスター' },
+    { min: 80, max: 100, name: 'マスター', emoji: '👑', color: '#F59E0B', nextName: '' }
+  ]
+  const band = bands.find(b => pct >= b.min && pct < b.max) || bands[bands.length - 1]
+  const bandProgress = band.max > band.min ? Math.round(((pct - band.min) / (band.max - band.min)) * 100) : 100
+  const toNext = band.max - pct
   
   gauge.innerHTML = `
     <div class="bg-white/95 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-2 text-center cursor-pointer" onclick="this.querySelector('.zpd-detail').classList.toggle('hidden')">
-      <div class="text-[10px] font-bold text-gray-500 mb-1">レベル</div>
-      <div class="relative w-12 h-12 mx-auto mb-1">
-        <svg viewBox="0 0 36 36" class="w-12 h-12 -rotate-90">
+      <div class="text-[9px] font-bold text-gray-400 mb-0.5">学習チカラ</div>
+      <div class="relative w-14 h-14 mx-auto mb-1">
+        <svg viewBox="0 0 36 36" class="w-14 h-14 -rotate-90">
           <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 fill="none" stroke="#E5E7EB" stroke-width="3"/>
           <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none" stroke="${levelColor}" stroke-width="3"
-                stroke-dasharray="${pct}, 100"
+                fill="none" stroke="${band.color}" stroke-width="3"
+                stroke-dasharray="${bandProgress}, 100"
                 style="transition: stroke-dasharray 0.8s ease-out"/>
         </svg>
-        <div class="absolute inset-0 flex items-center justify-center text-sm font-black" style="color:${levelColor}">${pct}</div>
+        <div class="absolute inset-0 flex items-center justify-center text-lg">${band.emoji}</div>
       </div>
-      <div class="text-[10px] font-bold" style="color:${levelColor}">${levelName}</div>
+      <div class="text-[11px] font-black" style="color:${band.color}">${band.name}</div>
       ${z.streak >= 3 ? '<div class="text-[9px] text-orange-500 font-bold mt-0.5">🔥 ' + z.streak + '連続!</div>' : ''}
-      <div class="zpd-detail hidden mt-2 text-[9px] text-gray-500 border-t pt-1">
-        <div>あと <b class="text-indigo-600">${toNext}pt</b> で</div>
-        <div>レベルアップ！</div>
+      <div class="zpd-detail hidden mt-1.5 text-[9px] text-gray-600 border-t border-gray-100 pt-1.5">
+        <div class="text-left leading-relaxed">
+          <p class="mb-0.5">💡 問題を解くと上がるよ</p>
+          <p class="mb-0.5">📊 今 <b style="color:${band.color}">${pct}</b> / 100</p>
+          ${band.nextName ? `<p>⬆ あと<b class="text-indigo-600">${toNext}pt</b>で<br>「<b>${band.nextName}</b>」に！</p>` : '<p class="text-amber-600 font-bold">🎉 最高ランク！</p>'}
+        </div>
       </div>
     </div>
   `
@@ -58486,20 +58496,21 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
   modal.id = 'mindmap-fullscreen-modal'
   modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10001;background:white;display:flex;flex-direction:column;'
   modal.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:white;flex-shrink:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:white;flex-shrink:0;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:20px;">🧠</span>
-        <span style="font-weight:bold;font-size:15px;">マインドマップ</span>
+        <span style="font-size:18px;">🧠</span>
+        <span style="font-weight:bold;font-size:14px;">マインドマップ</span>
         <span style="font-size:11px;opacity:0.8;">${unitName || ''}</span>
       </div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <button onclick="(function(){var w=document.querySelector('#mm-content .mermaid-wrap');if(!w)return;var s=parseFloat(w.dataset.scale||'1');s=Math.min(s+0.3,3);w.dataset.scale=s;w.style.transform='scale('+s+')';w.style.transformOrigin='top left'})()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:4px 10px;border-radius:6px;font-size:13px;cursor:pointer;">🔍+</button>
-        <button onclick="(function(){var w=document.querySelector('#mm-content .mermaid-wrap');if(!w)return;w.dataset.scale='1';w.style.transform='scale(1)'})()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:4px 10px;border-radius:6px;font-size:13px;cursor:pointer;">1:1</button>
-        <button onclick="(function(){var w=document.querySelector('#mm-content .mermaid-wrap');if(!w)return;var s=parseFloat(w.dataset.scale||'1');s=Math.max(s-0.3,0.3);w.dataset.scale=s;w.style.transform='scale('+s+')';w.style.transformOrigin='top center'})()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:4px 10px;border-radius:6px;font-size:13px;cursor:pointer;">🔍−</button>
-        <button onclick="document.getElementById('mindmap-fullscreen-modal').remove()" style="background:rgba(255,255,255,0.3);border:none;color:white;padding:4px 12px;border-radius:6px;font-size:15px;font-weight:bold;cursor:pointer;margin-left:8px;">✕ 閉じる</button>
+      <div style="display:flex;gap:4px;align-items:center;">
+        <button id="mm-zoom-in" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 12px;border-radius:6px;font-size:16px;cursor:pointer;font-weight:bold;">＋</button>
+        <button id="mm-zoom-fit" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:bold;">全体</button>
+        <button id="mm-zoom-out" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 12px;border-radius:6px;font-size:16px;cursor:pointer;font-weight:bold;">ー</button>
+        <span id="mm-zoom-label" style="font-size:11px;min-width:40px;text-align:center;opacity:0.9;">100%</span>
+        <button onclick="document.getElementById('mindmap-fullscreen-modal').remove()" style="background:rgba(255,255,255,0.3);border:none;color:white;padding:6px 14px;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;margin-left:6px;">✕</button>
       </div>
     </div>
-    <div id="mm-content" style="flex:1;overflow:auto;padding:16px;background:#fafafe;touch-action:pan-x pan-y;">
+    <div id="mm-content" style="flex:1;overflow:auto;padding:0;background:#fafafe;position:relative;">
       <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6366F1;">
         <div style="text-align:center;">
           <div class="animate-spin" style="width:32px;height:32px;border:3px solid #C7D2FE;border-top:3px solid #6366F1;border-radius:50%;margin:0 auto 12px;"></div>
@@ -58527,7 +58538,7 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
       await new Promise((resolve, reject) => { script.onload = resolve; script.onerror = reject; document.head.appendChild(script) })
       window.mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: { 
         primaryColor: '#818CF8', primaryTextColor: '#1F2937', lineColor: '#A5B4FC',
-        fontSize: '18px', nodePadding: 12
+        fontSize: '28px', nodePadding: 24
       }})
     }
     
@@ -58535,34 +58546,125 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
     if (!mmContent) return
     
     mmContent.innerHTML = `
-      <div class="mermaid-wrap" data-scale="1" style="transition:transform 0.3s;min-width:600px;">
+      <div class="mermaid-wrap" style="transform-origin:0 0;transition:transform 0.2s ease;">
         <div class="mermaid">${code}</div>
       </div>
     `
     await window.mermaid.run({ nodes: mmContent.querySelectorAll('.mermaid') })
     
-    // SVGのスタイル調整
+    // SVGのスタイル調整 - 文字を大きく、ノードを大きく
     const svg = mmContent.querySelector('svg')
     if (svg) {
-      svg.setAttribute('style', 'width:100%;height:auto;min-height:300px;')
+      // SVGの自然なサイズを取得
+      svg.style.width = ''
+      svg.style.height = ''
+      svg.style.maxWidth = 'none'
+      svg.removeAttribute('width')
+      svg.removeAttribute('height')
+      
+      // テキスト要素を大きく（24px → 太字）
       svg.querySelectorAll('text, .nodeLabel, .label, foreignObject span, foreignObject div, foreignObject p').forEach(el => {
-        el.style.fontSize = '16px'
-        el.style.fontWeight = '700'
-        el.style.lineHeight = '1.3'
+        el.style.fontSize = '22px'
+        el.style.fontWeight = '800'
+        el.style.lineHeight = '1.4'
+        el.style.fontFamily = '"Hiragino Kaku Gothic ProN","Hiragino Sans",sans-serif'
       })
-      svg.querySelectorAll('.node rect, .node circle, .node polygon').forEach(el => {
+      
+      // ノード形状を大きく - 最小幅200px
+      svg.querySelectorAll('.node rect, .node circle, .node polygon, .node ellipse').forEach(el => {
         if (el.getAttribute('width')) {
           const w = parseFloat(el.getAttribute('width'))
-          if (w < 120) el.setAttribute('width', String(Math.max(w, 120)))
+          if (w < 200) el.setAttribute('width', '200')
+        }
+        if (el.getAttribute('rx')) {
+          el.setAttribute('rx', '12')
+          el.setAttribute('ry', '12')
         }
       })
+      
+      // viewBoxを広めに取る（余白を追加）
       const viewBox = svg.getAttribute('viewBox')
       if (viewBox) {
         const parts = viewBox.split(' ').map(Number)
         if (parts.length === 4 && parts[2] > 0) {
-          svg.setAttribute('viewBox', `${parts[0]-20} ${parts[1]-20} ${parts[2]+40} ${parts[3]+40}`)
+          svg.setAttribute('viewBox', `${parts[0]-40} ${parts[1]-40} ${parts[2]+80} ${parts[3]+80}`)
         }
       }
+      
+      // SVGの実際のサイズを計算してwrapに設定
+      const svgBBox = svg.getBBox ? svg.getBBox() : null
+      const svgW = svgBBox ? svgBBox.width + 80 : svg.viewBox?.baseVal?.width || 800
+      const svgH = svgBBox ? svgBBox.height + 80 : svg.viewBox?.baseVal?.height || 600
+      
+      svg.setAttribute('width', svgW)
+      svg.setAttribute('height', svgH)
+      svg.style.width = svgW + 'px'
+      svg.style.height = svgH + 'px'
+      
+      // 画面全体にフィットするスケールを計算
+      const containerW = mmContent.clientWidth
+      const containerH = mmContent.clientHeight
+      const fitScale = Math.min(containerW / svgW, containerH / svgH, 2.5)
+      
+      const wrap = mmContent.querySelector('.mermaid-wrap')
+      let currentScale = fitScale
+      wrap.style.transform = `scale(${currentScale})`
+      wrap.style.transformOrigin = '0 0'
+      // wrapの幅・高さを明示して、スクロール領域を正しくする
+      wrap.style.width = svgW + 'px'
+      wrap.style.height = svgH + 'px'
+      mmContent.style.overflow = 'auto'
+      
+      // ズームラベル更新
+      const updateLabel = () => {
+        const label = document.getElementById('mm-zoom-label')
+        if (label) label.textContent = Math.round(currentScale * 100) + '%'
+      }
+      updateLabel()
+      
+      // ズームイン
+      document.getElementById('mm-zoom-in').onclick = () => {
+        currentScale = Math.min(currentScale + 0.3, 5)
+        wrap.style.transform = `scale(${currentScale})`
+        updateLabel()
+      }
+      // ズームアウト
+      document.getElementById('mm-zoom-out').onclick = () => {
+        currentScale = Math.max(currentScale - 0.3, 0.2)
+        wrap.style.transform = `scale(${currentScale})`
+        updateLabel()
+      }
+      // 全体フィット
+      document.getElementById('mm-zoom-fit').onclick = () => {
+        currentScale = fitScale
+        wrap.style.transform = `scale(${currentScale})`
+        mmContent.scrollTop = 0
+        mmContent.scrollLeft = 0
+        updateLabel()
+      }
+      
+      // ピンチズーム（タッチ対応）
+      let lastPinchDist = 0
+      mmContent.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX
+          const dy = e.touches[0].clientY - e.touches[1].clientY
+          lastPinchDist = Math.sqrt(dx*dx + dy*dy)
+        }
+      }, { passive: true })
+      mmContent.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2 && lastPinchDist > 0) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX
+          const dy = e.touches[0].clientY - e.touches[1].clientY
+          const dist = Math.sqrt(dx*dx + dy*dy)
+          const delta = (dist - lastPinchDist) * 0.005
+          currentScale = Math.min(Math.max(currentScale + delta, 0.2), 5)
+          wrap.style.transform = `scale(${currentScale})`
+          updateLabel()
+          lastPinchDist = dist
+        }
+      }, { passive: true })
+      mmContent.addEventListener('touchend', () => { lastPinchDist = 0 }, { passive: true })
     }
     
     // 元のtargetElに縮小版を表示
@@ -59194,8 +59296,9 @@ function openLearningToolsPanel() {
               <div class="text-xs font-bold text-gray-600">${detectEmotion()?.emotion === 'neutral' ? 'いい調子！' : (detectEmotion()?.message || 'がんばろう！')}</div>
             </div>
             <div class="text-center">
-              <div class="text-2xl font-black" style="color:${window._zpdState?.level >= 80 ? '#F59E0B' : window._zpdState?.level >= 60 ? '#8B5CF6' : '#3B82F6'}">${window._zpdState?.level || 50}</div>
-              <div class="text-xs font-bold text-gray-600">ZPDレベル${window._zpdState?.streak >= 3 ? ' 🔥' + window._zpdState.streak + '連続' : ''}</div>
+              <div class="text-2xl mb-1">${(function(){ var l=window._zpdState?.level||50; return l>=80?'👑':l>=60?'🚀':l>=40?'💪':l>=20?'📖':'🌱' })()}</div>
+              <div class="text-xs font-bold" style="color:${window._zpdState?.level >= 80 ? '#F59E0B' : window._zpdState?.level >= 60 ? '#8B5CF6' : '#3B82F6'}">${(function(){ var l=window._zpdState?.level||50; return l>=80?'マスター':l>=60?'チャレンジ':l>=40?'しっかり':l>=20?'じっくり':'スタート' })()}</div>
+              <div class="text-[10px] text-gray-500 mt-0.5">学習チカラ ${window._zpdState?.level || 50}/100${window._zpdState?.streak >= 3 ? ' 🔥' + window._zpdState.streak + '連続' : ''}</div>
             </div>
           </div>
         </div>
