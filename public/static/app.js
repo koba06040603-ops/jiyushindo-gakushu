@@ -58550,39 +58550,43 @@ async function openWhyExploration(question, answer, subject, grade, cardTitle) {
 window.openWhyExploration = openWhyExploration
 
 // ─────────────────────────────────────────────
-// ⑥ マインドマップ自動生成（自前SVG描画）
+// ⑥ マインドマップ自動生成（Novak/Ausubel理論準拠コンセプトマップ）
 // ─────────────────────────────────────────────
 async function generateMindmap(cards, unitName, subject, targetEl) {
-  // 全画面モーダルでマインドマップを表示
   let modal = document.getElementById('mindmap-fullscreen-modal')
   if (modal) modal.remove()
   
   modal = document.createElement('div')
   modal.id = 'mindmap-fullscreen-modal'
-  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10001;background:white;display:flex;flex-direction:column;'
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10001;background:#F8F9FF;display:flex;flex-direction:column;'
   modal.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:white;flex-shrink:0;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:18px;">🧠</span>
-        <span style="font-weight:bold;font-size:14px;">マインドマップ</span>
-        <span style="font-size:11px;opacity:0.8;">${unitName || ''}</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:white;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:16px;">🧠</span>
+        <span style="font-weight:bold;font-size:13px;">コンセプトマップ</span>
       </div>
       <div style="display:flex;gap:4px;align-items:center;">
-        <button id="mm-zoom-in" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 12px;border-radius:6px;font-size:16px;cursor:pointer;font-weight:bold;">＋</button>
-        <button id="mm-zoom-fit" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:bold;">全体</button>
-        <button id="mm-zoom-out" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:6px 12px;border-radius:6px;font-size:16px;cursor:pointer;font-weight:bold;">ー</button>
-        <span id="mm-zoom-label" style="font-size:11px;min-width:40px;text-align:center;opacity:0.9;">100%</span>
-        <button onclick="document.getElementById('mindmap-fullscreen-modal').remove()" style="background:rgba(255,255,255,0.3);border:none;color:white;padding:6px 14px;border-radius:6px;font-size:14px;font-weight:bold;cursor:pointer;margin-left:6px;">✕</button>
+        <button id="mm-zoom-in" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:5px 10px;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold;">＋</button>
+        <button id="mm-zoom-fit" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:5px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:bold;">全体</button>
+        <button id="mm-zoom-out" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:5px 10px;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold;">ー</button>
+        <span id="mm-zoom-label" style="font-size:10px;min-width:36px;text-align:center;opacity:0.9;">100%</span>
+        <button onclick="document.getElementById('mindmap-fullscreen-modal').remove()" style="background:rgba(255,255,255,0.3);border:none;color:white;padding:5px 12px;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;margin-left:4px;">✕</button>
       </div>
     </div>
-    <div id="mm-content" style="flex:1;overflow:hidden;padding:0;background:#fafafe;position:relative;">
+    <div id="mm-info-bar" style="background:linear-gradient(90deg,#EEF2FF,#F5F3FF);padding:6px 12px;border-bottom:1px solid #E0E7FF;flex-shrink:0;display:none;">
+      <div id="mm-focus-q" style="font-size:12px;font-weight:700;color:#4F46E5;"></div>
+      <div id="mm-daily-ex" style="font-size:11px;color:#6B7280;margin-top:2px;"></div>
+    </div>
+    <div id="mm-content" style="flex:1;overflow:hidden;padding:0;position:relative;touch-action:none;">
       <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6366F1;">
         <div style="text-align:center;">
-          <div class="animate-spin" style="width:32px;height:32px;border:3px solid #C7D2FE;border-top:3px solid #6366F1;border-radius:50%;margin:0 auto 12px;"></div>
-          <div style="font-size:14px;font-weight:bold;">マインドマップ生成中...</div>
+          <div class="animate-spin" style="width:28px;height:28px;border:3px solid #C7D2FE;border-top:3px solid #6366F1;border-radius:50%;margin:0 auto 10px;"></div>
+          <div style="font-size:13px;font-weight:bold;">概念マップ生成中...</div>
+          <div style="font-size:10px;color:#9CA3AF;margin-top:3px;">学習カードから概念の関係性を分析しています</div>
         </div>
       </div>
     </div>
+    <div id="mm-tooltip" style="display:none;position:fixed;z-index:10010;background:white;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.18);padding:10px 12px;max-width:200px;font-size:11px;line-height:1.5;pointer-events:none;border:1px solid #E5E7EB;"></div>
   `
   document.body.appendChild(modal)
   
@@ -58591,215 +58595,529 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
   }
   
   try {
-    const res = await axios.post('/api/ai/generate-mindmap', { cards, unit_name: unitName, subject }, { timeout: 20000 })
+    const res = await axios.post('/api/ai/generate-mindmap', { cards, unit_name: unitName, subject }, { timeout: 30000 })
     const mapData = res.data?.mindmap_data
     if (!mapData) throw new Error('No data')
+    
+    // ── 情報バー表示（フォーカスクエスチョン + 日常例）──
+    const infoBar = document.getElementById('mm-info-bar')
+    const focusQ = mapData.focus_question || ''
+    const dailyEx = mapData.daily_example || ''
+    if ((focusQ || dailyEx) && infoBar) {
+      infoBar.style.display = 'block'
+      const fqEl = document.getElementById('mm-focus-q')
+      const deEl = document.getElementById('mm-daily-ex')
+      if (fqEl && focusQ) fqEl.textContent = '\u2753 ' + focusQ
+      if (deEl && dailyEx) deEl.textContent = '\uD83C\uDFE0 \u8EAB\u8FD1\u306A\u4F8B: ' + dailyEx
+    }
+    
+    // ── カード位置マッピング ──
+    const cardPositions = (mapData.card_positions || [])
+    const cardBelongsMap = {}
+    cardPositions.forEach(function(cp) { if (cp.belongs_to) cardBelongsMap[cp.belongs_to] = cp.card_title || '' })
     
     const mmContent = document.getElementById('mm-content')
     if (!mmContent) return
     
-    // ★ 自前SVGマインドマップ描画
     const cW = mmContent.clientWidth
     const cH = mmContent.clientHeight
     const svgNS = 'http://www.w3.org/2000/svg'
+    const palette = ['#4F46E5','#059669','#D97706','#DC2626','#7C3AED','#DB2777','#0D9488','#EA580C']
+    const paletteBg = ['#EEF2FF','#ECFDF5','#FFFBEB','#FEF2F2','#F5F3FF','#FDF2F8','#F0FDFA','#FFF7ED']
+    const font = '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif'
     
-    // カラーパレット
-    const palette = ['#6366F1','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#14B8A6','#F97316']
-    
-    // ノード配置計算
-    const nodes = []
-    const edges = []
-    const rootLabel = (mapData.root || '学習').substring(0, 8)
-    const children = mapData.children || []
-    const cx = cW / 2, cy = cH / 2
+    // ── レイアウト計算（固定座標系 1200x900）──
+    var W = 1200, H = 900
+    var nodes = []
+    var edges = []
+    var rootLabel = (mapData.root || unitName || '\u5B66\u7FD2').substring(0, 10)
+    var children = (mapData.children || []).slice(0, 5)
+    var rcx = W / 2, rcy = H / 2
     
     // ルートノード
-    nodes.push({ x: cx, y: cy, label: rootLabel, level: 0, color: '#6366F1', w: 0, h: 0 })
+    nodes.push({ x: rcx, y: rcy, label: rootLabel, hint: '', level: 0, color: '#4F46E5', bg: '#EEF2FF', branchIdx: -1, isCardNode: false })
     
-    // 子ノードを放射状に配置（間隔を狭く）
-    const childCount = Math.min(children.length, 6)
-    const baseRadius = Math.min(cW, cH) * 0.28
+    // 子を放射状に配置
+    var childCount = children.length
+    var baseR = Math.min(W, H) * 0.30
     
-    for (let i = 0; i < childCount; i++) {
-      const angle = (i / childCount) * Math.PI * 2 - Math.PI / 2
-      const childX = cx + Math.cos(angle) * baseRadius
-      const childY = cy + Math.sin(angle) * baseRadius
-      const childLabel = (children[i].label || '').substring(0, 5)
-      const childColor = palette[i % palette.length]
-      const childIdx = nodes.length
+    for (var i = 0; i < childCount; i++) {
+      var ch = children[i]
+      var angle = (i / childCount) * Math.PI * 2 - Math.PI / 2
+      var childX = rcx + Math.cos(angle) * baseR
+      var childY = rcy + Math.sin(angle) * baseR
+      var childLabel = (ch.label || '').substring(0, 8)
+      var childColor = palette[i % palette.length]
+      var childBg = paletteBg[i % paletteBg.length]
+      var childIdx = nodes.length
+      var relation = (ch.relation || '').substring(0, 6)
+      var hint = (ch.hint || '').substring(0, 25)
+      var isCardNode = !!cardBelongsMap[childLabel]
       
-      nodes.push({ x: childX, y: childY, label: childLabel, level: 1, color: childColor, w: 0, h: 0 })
-      edges.push({ from: 0, to: childIdx, color: childColor })
+      nodes.push({ x: childX, y: childY, label: childLabel, hint: hint, level: 1, color: childColor, bg: childBg, branchIdx: i, isCardNode: isCardNode })
+      edges.push({ from: 0, to: childIdx, color: childColor, relation: relation })
       
-      // 孫ノード
-      const grandChildren = (children[i].children || []).slice(0, 3)
-      const gcRadius = Math.min(cW, cH) * 0.14
-      const gcSpread = Math.PI * 0.5
+      // 孫
+      var gcs = (ch.children || []).slice(0, 3)
+      var gcR = Math.min(W, H) * 0.16
+      var gcSpread = Math.PI * 0.5
       
-      for (let j = 0; j < grandChildren.length; j++) {
-        const gcAngle = angle + (j - (grandChildren.length - 1) / 2) * (gcSpread / Math.max(grandChildren.length, 1))
-        const gcX = childX + Math.cos(gcAngle) * gcRadius
-        const gcY = childY + Math.sin(gcAngle) * gcRadius
-        const gcLabel = (grandChildren[j].label || '').substring(0, 5)
-        const gcIdx = nodes.length
+      for (var j = 0; j < gcs.length; j++) {
+        var gc = gcs[j]
+        var gcAngle = angle + (j - (gcs.length - 1) / 2) * (gcSpread / Math.max(gcs.length, 1))
+        var gcX = childX + Math.cos(gcAngle) * gcR
+        var gcY = childY + Math.sin(gcAngle) * gcR
+        var gcLabel = (gc.label || '').substring(0, 8)
+        var gcRelation = (gc.relation || '').substring(0, 6)
+        var gcHint = (gc.hint || '').substring(0, 25)
+        var gcIdx = nodes.length
+        var gcIsCard = !!cardBelongsMap[gcLabel]
         
-        nodes.push({ x: gcX, y: gcY, label: gcLabel, level: 2, color: childColor, w: 0, h: 0 })
-        edges.push({ from: childIdx, to: gcIdx, color: childColor })
+        nodes.push({ x: gcX, y: gcY, label: gcLabel, hint: gcHint, level: 2, color: childColor, bg: childBg, branchIdx: i, isCardNode: gcIsCard })
+        edges.push({ from: childIdx, to: gcIdx, color: childColor, relation: gcRelation })
       }
     }
     
-    // SVG作成
-    const svg = document.createElementNS(svgNS, 'svg')
-    svg.setAttribute('width', cW)
-    svg.setAttribute('height', cH)
-    svg.setAttribute('viewBox', `0 0 ${cW} ${cH}`)
-    svg.style.width = '100%'
-    svg.style.height = '100%'
-    svg.style.display = 'block'
-    svg.style.background = '#fafafe'
+    // クロスリンク
+    var crosslinks = (mapData.crosslinks || []).slice(0, 3)
+    var crossEdges = []
+    crosslinks.forEach(function(cl) {
+      var fromNode = nodes.find(function(n) { return n.label === (cl.from || '').substring(0, 8) })
+      var toNode = nodes.find(function(n) { return n.label === (cl.to || '').substring(0, 8) })
+      if (fromNode && toNode && fromNode !== toNode) {
+        crossEdges.push({ from: fromNode, to: toNode, relation: (cl.relation || '\u95A2\u9023').substring(0, 6) })
+      }
+    })
     
-    // エッジ描画（曲線）
-    edges.forEach(e => {
-      const from = nodes[e.from]
-      const to = nodes[e.to]
-      const path = document.createElementNS(svgNS, 'path')
-      const midX = (from.x + to.x) / 2
-      const midY = (from.y + to.y) / 2
-      const ctrlX = midX + (to.y - from.y) * 0.15
-      const ctrlY = midY - (to.x - from.x) * 0.15
-      path.setAttribute('d', `M${from.x},${from.y} Q${ctrlX},${ctrlY} ${to.x},${to.y}`)
+    // ── バウンディングボックス ──
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    nodes.forEach(function(n) {
+      var pad = n.level === 0 ? 100 : n.level === 1 ? 80 : 60
+      minX = Math.min(minX, n.x - pad)
+      minY = Math.min(minY, n.y - pad)
+      maxX = Math.max(maxX, n.x + pad)
+      maxY = Math.max(maxY, n.y + pad)
+    })
+    var margin = 40
+    var vbX = minX - margin
+    var vbY = minY - margin - 30
+    var vbW = (maxX - minX) + margin * 2
+    var vbH = (maxY - minY) + margin * 2 + 60
+    
+    // ── SVG作成 ──
+    var svg = document.createElementNS(svgNS, 'svg')
+    svg.setAttribute('viewBox', vbX + ' ' + vbY + ' ' + vbW + ' ' + vbH)
+    svg.style.cssText = 'width:100%;height:100%;display:block;background:#F8F9FF;'
+    
+    // defs
+    var defs = document.createElementNS(svgNS, 'defs')
+    var marker = document.createElementNS(svgNS, 'marker')
+    marker.setAttribute('id', 'arrowCross')
+    marker.setAttribute('markerWidth', '10')
+    marker.setAttribute('markerHeight', '7')
+    marker.setAttribute('refX', '9')
+    marker.setAttribute('refY', '3.5')
+    marker.setAttribute('orient', 'auto')
+    var arrowPath = document.createElementNS(svgNS, 'path')
+    arrowPath.setAttribute('d', 'M0,0 L10,3.5 L0,7 Z')
+    arrowPath.setAttribute('fill', '#9CA3AF')
+    marker.appendChild(arrowPath)
+    defs.appendChild(marker)
+    // ノード影フィルター
+    var filter = document.createElementNS(svgNS, 'filter')
+    filter.setAttribute('id', 'nodeShadow')
+    filter.setAttribute('x', '-10%')
+    filter.setAttribute('y', '-10%')
+    filter.setAttribute('width', '130%')
+    filter.setAttribute('height', '140%')
+    var feOff = document.createElementNS(svgNS, 'feOffset')
+    feOff.setAttribute('dx', '0')
+    feOff.setAttribute('dy', '3')
+    feOff.setAttribute('in', 'SourceAlpha')
+    feOff.setAttribute('result', 'off')
+    var feBlur = document.createElementNS(svgNS, 'feGaussianBlur')
+    feBlur.setAttribute('in', 'off')
+    feBlur.setAttribute('stdDeviation', '4')
+    feBlur.setAttribute('result', 'blur')
+    var feM = document.createElementNS(svgNS, 'feMerge')
+    var fmn1 = document.createElementNS(svgNS, 'feMergeNode')
+    fmn1.setAttribute('in', 'blur')
+    var fmn2 = document.createElementNS(svgNS, 'feMergeNode')
+    fmn2.setAttribute('in', 'SourceGraphic')
+    feM.appendChild(fmn1)
+    feM.appendChild(fmn2)
+    filter.appendChild(feOff)
+    filter.appendChild(feBlur)
+    filter.appendChild(feM)
+    defs.appendChild(filter)
+    // カードノードグロー
+    var gFilter = document.createElementNS(svgNS, 'filter')
+    gFilter.setAttribute('id', 'cardGlow')
+    gFilter.setAttribute('x', '-20%')
+    gFilter.setAttribute('y', '-20%')
+    gFilter.setAttribute('width', '150%')
+    gFilter.setAttribute('height', '150%')
+    var feFlood = document.createElementNS(svgNS, 'feFlood')
+    feFlood.setAttribute('flood-color', '#F59E0B')
+    feFlood.setAttribute('flood-opacity', '0.4')
+    feFlood.setAttribute('result', 'flood')
+    var feComp = document.createElementNS(svgNS, 'feComposite')
+    feComp.setAttribute('in', 'flood')
+    feComp.setAttribute('in2', 'SourceAlpha')
+    feComp.setAttribute('operator', 'in')
+    feComp.setAttribute('result', 'mask')
+    var feG2 = document.createElementNS(svgNS, 'feGaussianBlur')
+    feG2.setAttribute('in', 'mask')
+    feG2.setAttribute('stdDeviation', '6')
+    feG2.setAttribute('result', 'glow')
+    var feM2 = document.createElementNS(svgNS, 'feMerge')
+    var fm2n1 = document.createElementNS(svgNS, 'feMergeNode')
+    fm2n1.setAttribute('in', 'glow')
+    var fm2n2 = document.createElementNS(svgNS, 'feMergeNode')
+    fm2n2.setAttribute('in', 'SourceGraphic')
+    feM2.appendChild(fm2n1)
+    feM2.appendChild(fm2n2)
+    gFilter.appendChild(feFlood)
+    gFilter.appendChild(feComp)
+    gFilter.appendChild(feG2)
+    gFilter.appendChild(feM2)
+    defs.appendChild(gFilter)
+    svg.appendChild(defs)
+    
+    // ── ヘルパー: リンキングワードラベル ──
+    function drawRelLabel(x, y, text, color, isCross) {
+      var g = document.createElementNS(svgNS, 'g')
+      var fs = isCross ? 12 : 13
+      var t = document.createElementNS(svgNS, 'text')
+      t.setAttribute('x', x)
+      t.setAttribute('y', y + 4)
+      t.setAttribute('text-anchor', 'middle')
+      t.setAttribute('font-size', fs + 'px')
+      t.setAttribute('font-weight', '700')
+      t.setAttribute('fill', isCross ? '#6B7280' : color)
+      t.setAttribute('font-family', font)
+      t.textContent = text
+      var bg = document.createElementNS(svgNS, 'rect')
+      var tw = text.length * fs * 0.65 + 10
+      bg.setAttribute('x', x - tw / 2)
+      bg.setAttribute('y', y - 8)
+      bg.setAttribute('width', tw)
+      bg.setAttribute('height', 18)
+      bg.setAttribute('rx', '5')
+      bg.setAttribute('fill', isCross ? '#F3F4F6' : 'white')
+      bg.setAttribute('fill-opacity', '0.95')
+      bg.setAttribute('stroke', isCross ? '#D1D5DB' : color)
+      bg.setAttribute('stroke-width', '0.8')
+      bg.setAttribute('stroke-opacity', '0.5')
+      g.appendChild(bg)
+      g.appendChild(t)
+      return g
+    }
+    
+    // ── 通常エッジ描画 ──
+    edges.forEach(function(e) {
+      var from = nodes[e.from], to = nodes[e.to]
+      var path = document.createElementNS(svgNS, 'path')
+      var midX = (from.x + to.x) / 2
+      var midY = (from.y + to.y) / 2
+      var dx = to.x - from.x, dy = to.y - from.y
+      var ctrlX = midX + dy * 0.08
+      var ctrlY = midY - dx * 0.08
+      path.setAttribute('d', 'M' + from.x + ',' + from.y + ' Q' + ctrlX + ',' + ctrlY + ' ' + to.x + ',' + to.y)
       path.setAttribute('fill', 'none')
       path.setAttribute('stroke', e.color)
-      path.setAttribute('stroke-width', e.from === 0 ? '4' : '3')
-      path.setAttribute('stroke-opacity', '0.5')
+      path.setAttribute('stroke-width', e.from === 0 ? '3' : '2')
+      path.setAttribute('stroke-opacity', '0.35')
       path.setAttribute('stroke-linecap', 'round')
       svg.appendChild(path)
+      if (e.relation) {
+        var lx = midX * 0.5 + ctrlX * 0.5
+        var ly = midY * 0.5 + ctrlY * 0.5
+        svg.appendChild(drawRelLabel(lx, ly, e.relation, e.color, false))
+      }
     })
     
-    // ノード描画
-    const fontSizes = [24, 20, 16]
-    const paddings = [20, 16, 12]
-    const radii = [16, 12, 10]
+    // ── クロスリンク描画 ──
+    crossEdges.forEach(function(cl) {
+      var from = cl.from, to = cl.to
+      var path = document.createElementNS(svgNS, 'path')
+      var midX = (from.x + to.x) / 2
+      var midY = (from.y + to.y) / 2
+      var offX = (to.y - from.y) * 0.2
+      var offY = -(to.x - from.x) * 0.2
+      path.setAttribute('d', 'M' + from.x + ',' + from.y + ' Q' + (midX + offX) + ',' + (midY + offY) + ' ' + to.x + ',' + to.y)
+      path.setAttribute('fill', 'none')
+      path.setAttribute('stroke', '#9CA3AF')
+      path.setAttribute('stroke-width', '2')
+      path.setAttribute('stroke-dasharray', '6 4')
+      path.setAttribute('stroke-opacity', '0.6')
+      path.setAttribute('marker-end', 'url(#arrowCross)')
+      svg.appendChild(path)
+      if (cl.relation) {
+        svg.appendChild(drawRelLabel(midX + offX * 0.5, midY + offY * 0.5, cl.relation, '#6B7280', true))
+      }
+    })
     
-    nodes.forEach((n, i) => {
-      const fontSize = fontSizes[n.level] || 16
-      const pad = paddings[n.level] || 12
-      const radius = radii[n.level] || 10
+    // ── ノード描画 ──
+    nodes.forEach(function(n, idx) {
+      var fs = n.level === 0 ? 22 : n.level === 1 ? 17 : 14
+      var pad = n.level === 0 ? 22 : n.level === 1 ? 16 : 12
+      var textW = n.label.length * fs * 0.65
+      var w = Math.max(textW + pad * 2, n.level === 0 ? 160 : n.level === 1 ? 120 : 90)
+      var h = n.level === 0 ? fs + pad * 2 + 8 : fs + pad * 2
+      var totalH = (n.hint && n.level > 0) ? h + 14 : h
+      n.w = w; n.h = totalH
       
-      // テキスト幅を推定
-      const textW = n.label.length * fontSize * 0.65
-      const boxW = Math.max(textW + pad * 2, n.level === 0 ? 160 : 100)
-      const boxH = fontSize + pad * 2
-      n.w = boxW
-      n.h = boxH
+      var g = document.createElementNS(svgNS, 'g')
+      g.style.cursor = 'pointer'
       
-      const g = document.createElementNS(svgNS, 'g')
+      // ツールチップ
+      g.addEventListener('pointerenter', function(ev) {
+        var tip = document.getElementById('mm-tooltip')
+        if (!tip) return
+        var html = '<div style="font-weight:800;color:' + n.color + ';font-size:13px;margin-bottom:3px;">' + n.label + '</div>'
+        if (n.hint) html += '<div style="color:#374151;margin-bottom:3px;">\uD83D\uDCA1 ' + n.hint + '</div>'
+        if (n.isCardNode) html += '<div style="color:#D97706;font-weight:700;font-size:10px;">\uD83D\uDCCD \u4ECA\u306E\u554F\u984C\u304C\u3053\u3053</div>'
+        var cardMatch = cardBelongsMap[n.label]
+        if (cardMatch) html += '<div style="color:#6B7280;font-size:10px;margin-top:2px;">\uD83D\uDCDD ' + cardMatch + '</div>'
+        tip.innerHTML = html
+        tip.style.display = 'block'
+        var cx2 = ev.clientX || 100
+        var cy2 = ev.clientY || 100
+        tip.style.left = Math.min(cx2 + 10, window.innerWidth - 220) + 'px'
+        tip.style.top = Math.min(cy2 + 10, window.innerHeight - 120) + 'px'
+      })
+      g.addEventListener('pointerleave', function() {
+        var tip = document.getElementById('mm-tooltip')
+        if (tip) tip.style.display = 'none'
+      })
       
       if (n.level === 0) {
-        // ルート：丸角の大きな楕円
-        const ellipse = document.createElementNS(svgNS, 'ellipse')
-        ellipse.setAttribute('cx', n.x)
-        ellipse.setAttribute('cy', n.y)
-        ellipse.setAttribute('rx', boxW / 2 + 10)
-        ellipse.setAttribute('ry', boxH / 2 + 8)
-        ellipse.setAttribute('fill', n.color)
-        ellipse.setAttribute('filter', 'drop-shadow(0 4px 8px rgba(99,102,241,0.3))')
-        g.appendChild(ellipse)
-        
-        const text = document.createElementNS(svgNS, 'text')
+        // ルート
+        var rect = document.createElementNS(svgNS, 'rect')
+        rect.setAttribute('x', n.x - w / 2)
+        rect.setAttribute('y', n.y - h / 2)
+        rect.setAttribute('width', w)
+        rect.setAttribute('height', h)
+        rect.setAttribute('rx', '16')
+        rect.setAttribute('fill', n.color)
+        rect.setAttribute('filter', 'url(#nodeShadow)')
+        g.appendChild(rect)
+        var text = document.createElementNS(svgNS, 'text')
         text.setAttribute('x', n.x)
-        text.setAttribute('y', n.y + fontSize * 0.35)
+        text.setAttribute('y', n.y + 2)
         text.setAttribute('text-anchor', 'middle')
-        text.setAttribute('font-size', fontSize + 'px')
+        text.setAttribute('dominant-baseline', 'central')
+        text.setAttribute('font-size', fs + 'px')
         text.setAttribute('font-weight', '900')
         text.setAttribute('fill', 'white')
-        text.setAttribute('font-family', '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif')
+        text.setAttribute('font-family', font)
         text.textContent = n.label
         g.appendChild(text)
-      } else {
-        // 子・孫：角丸四角
-        const rect = document.createElementNS(svgNS, 'rect')
-        rect.setAttribute('x', n.x - boxW / 2)
-        rect.setAttribute('y', n.y - boxH / 2)
-        rect.setAttribute('width', boxW)
-        rect.setAttribute('height', boxH)
-        rect.setAttribute('rx', radius)
-        rect.setAttribute('fill', n.level === 1 ? n.color : 'white')
+      } else if (n.level === 1) {
+        // 子: 色付き背景 + ヒント
+        var rect = document.createElementNS(svgNS, 'rect')
+        rect.setAttribute('x', n.x - w / 2)
+        rect.setAttribute('y', n.y - totalH / 2)
+        rect.setAttribute('width', w)
+        rect.setAttribute('height', totalH)
+        rect.setAttribute('rx', '12')
+        rect.setAttribute('fill', n.isCardNode ? '#FEF3C7' : n.bg)
         rect.setAttribute('stroke', n.color)
-        rect.setAttribute('stroke-width', n.level === 1 ? '0' : '3')
-        if (n.level === 1) {
-          rect.setAttribute('filter', 'drop-shadow(0 3px 6px rgba(0,0,0,0.15))')
-        }
+        rect.setAttribute('stroke-width', n.isCardNode ? '3' : '2')
+        rect.setAttribute('filter', n.isCardNode ? 'url(#cardGlow)' : 'url(#nodeShadow)')
         g.appendChild(rect)
-        
-        const text = document.createElementNS(svgNS, 'text')
+        var text = document.createElementNS(svgNS, 'text')
         text.setAttribute('x', n.x)
-        text.setAttribute('y', n.y + fontSize * 0.35)
+        text.setAttribute('y', n.hint ? n.y - 4 : n.y + 2)
         text.setAttribute('text-anchor', 'middle')
-        text.setAttribute('font-size', fontSize + 'px')
+        text.setAttribute('dominant-baseline', 'central')
+        text.setAttribute('font-size', fs + 'px')
         text.setAttribute('font-weight', '800')
-        text.setAttribute('fill', n.level === 1 ? 'white' : n.color)
-        text.setAttribute('font-family', '"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif')
+        text.setAttribute('fill', n.color)
+        text.setAttribute('font-family', font)
         text.textContent = n.label
         g.appendChild(text)
+        if (n.hint) {
+          var hintT = document.createElementNS(svgNS, 'text')
+          hintT.setAttribute('x', n.x)
+          hintT.setAttribute('y', n.y + fs * 0.6 + 6)
+          hintT.setAttribute('text-anchor', 'middle')
+          hintT.setAttribute('dominant-baseline', 'central')
+          hintT.setAttribute('font-size', '10px')
+          hintT.setAttribute('font-weight', '500')
+          hintT.setAttribute('fill', '#6B7280')
+          hintT.setAttribute('font-family', font)
+          hintT.textContent = n.hint.length > 14 ? n.hint.substring(0, 14) + '...' : n.hint
+          g.appendChild(hintT)
+        }
+        if (n.isCardNode) {
+          var mk = document.createElementNS(svgNS, 'text')
+          mk.setAttribute('x', n.x + w / 2 - 4)
+          mk.setAttribute('y', n.y - totalH / 2 - 4)
+          mk.setAttribute('text-anchor', 'end')
+          mk.setAttribute('font-size', '14px')
+          mk.textContent = '\uD83D\uDCCD'
+          g.appendChild(mk)
+        }
+      } else {
+        // 孫: 白背景 + 色ボーダー
+        var rect = document.createElementNS(svgNS, 'rect')
+        rect.setAttribute('x', n.x - w / 2)
+        rect.setAttribute('y', n.y - totalH / 2)
+        rect.setAttribute('width', w)
+        rect.setAttribute('height', totalH)
+        rect.setAttribute('rx', '8')
+        rect.setAttribute('fill', n.isCardNode ? '#FEF3C7' : 'white')
+        rect.setAttribute('stroke', n.color)
+        rect.setAttribute('stroke-width', n.isCardNode ? '2.5' : '1.5')
+        if (n.isCardNode) rect.setAttribute('filter', 'url(#cardGlow)')
+        g.appendChild(rect)
+        var text = document.createElementNS(svgNS, 'text')
+        text.setAttribute('x', n.x)
+        text.setAttribute('y', n.hint ? n.y - 2 : n.y + 2)
+        text.setAttribute('text-anchor', 'middle')
+        text.setAttribute('dominant-baseline', 'central')
+        text.setAttribute('font-size', fs + 'px')
+        text.setAttribute('font-weight', '700')
+        text.setAttribute('fill', n.color)
+        text.setAttribute('font-family', font)
+        text.textContent = n.label
+        g.appendChild(text)
+        if (n.hint) {
+          var hintT = document.createElementNS(svgNS, 'text')
+          hintT.setAttribute('x', n.x)
+          hintT.setAttribute('y', n.y + fs * 0.5 + 5)
+          hintT.setAttribute('text-anchor', 'middle')
+          hintT.setAttribute('dominant-baseline', 'central')
+          hintT.setAttribute('font-size', '9px')
+          hintT.setAttribute('font-weight', '500')
+          hintT.setAttribute('fill', '#9CA3AF')
+          hintT.setAttribute('font-family', font)
+          hintT.textContent = n.hint.length > 12 ? n.hint.substring(0, 12) + '...' : n.hint
+          g.appendChild(hintT)
+        }
+        if (n.isCardNode) {
+          var mk = document.createElementNS(svgNS, 'text')
+          mk.setAttribute('x', n.x + w / 2 - 2)
+          mk.setAttribute('y', n.y - totalH / 2 - 2)
+          mk.setAttribute('text-anchor', 'end')
+          mk.setAttribute('font-size', '12px')
+          mk.textContent = '\uD83D\uDCCD'
+          g.appendChild(mk)
+        }
       }
-      
       svg.appendChild(g)
     })
+    
+    // ── 凡例 ──
+    var legendY = maxY + 12
+    var legendX = minX
+    var legendG = document.createElementNS(svgNS, 'g')
+    var legendItems = [
+      { icon: '\u2501', text: '\u3064\u306A\u304C\u308A', color: '#4F46E5' },
+      { icon: '\u2504\u2192', text: '\u6A2A\u65AD\u30EA\u30F3\u30AF', color: '#9CA3AF' },
+      { icon: '\uD83D\uDCCD', text: '\u4ECA\u306E\u554F\u984C', color: '#D97706' },
+      { icon: '\uD83D\uDCA1', text: '\u30BF\u30C3\u30D7\u3067\u8A73\u7D30', color: '#6B7280' }
+    ]
+    legendItems.forEach(function(li, i) {
+      var lx = legendX + i * 130
+      var lt = document.createElementNS(svgNS, 'text')
+      lt.setAttribute('x', lx)
+      lt.setAttribute('y', legendY)
+      lt.setAttribute('font-size', '11px')
+      lt.setAttribute('fill', li.color)
+      lt.setAttribute('font-weight', '600')
+      lt.setAttribute('font-family', font)
+      lt.textContent = li.icon + ' ' + li.text
+      legendG.appendChild(lt)
+    })
+    svg.appendChild(legendG)
     
     mmContent.innerHTML = ''
     mmContent.appendChild(svg)
     
-    // ★ ズーム機能（viewBox制御）
-    const origVB = [0, 0, cW, cH]
-    let zoomLevel = 1
-    const vbCx = cW / 2, vbCy = cH / 2
+    // ── ズーム (viewBox制御) ──
+    var zoom = 1
+    var origVB = { x: vbX, y: vbY, w: vbW, h: vbH }
+    var panX = 0, panY = 0
     
-    const applyZoom = () => {
-      const w = cW / zoomLevel, h = cH / zoomLevel
-      svg.setAttribute('viewBox', `${vbCx - w/2} ${vbCy - h/2} ${w} ${h}`)
-      const label = document.getElementById('mm-zoom-label')
-      if (label) label.textContent = Math.round(zoomLevel * 100) + '%'
+    var applyView = function() {
+      var w2 = origVB.w / zoom, h2 = origVB.h / zoom
+      var cx2 = origVB.x + origVB.w / 2 + panX
+      var cy2 = origVB.y + origVB.h / 2 + panY
+      svg.setAttribute('viewBox', (cx2 - w2/2) + ' ' + (cy2 - h2/2) + ' ' + w2 + ' ' + h2)
+      var label = document.getElementById('mm-zoom-label')
+      if (label) label.textContent = Math.round(zoom * 100) + '%'
     }
     
-    document.getElementById('mm-zoom-in').onclick = () => { zoomLevel = Math.min(zoomLevel * 1.4, 8); applyZoom() }
-    document.getElementById('mm-zoom-out').onclick = () => { zoomLevel = Math.max(zoomLevel / 1.4, 0.5); applyZoom() }
-    document.getElementById('mm-zoom-fit').onclick = () => { zoomLevel = 1; applyZoom() }
+    document.getElementById('mm-zoom-in').onclick = function() { zoom = Math.min(zoom * 1.4, 8); applyView() }
+    document.getElementById('mm-zoom-out').onclick = function() { zoom = Math.max(zoom / 1.4, 0.3); applyView() }
+    document.getElementById('mm-zoom-fit').onclick = function() { zoom = 1; panX = 0; panY = 0; applyView() }
     
-    // ピンチズーム
-    let lastPinchDist = 0
-    mmContent.addEventListener('touchstart', (e) => {
+    // ピンチ + パン
+    var lastPinchDist = 0
+    var isPanning = false, panStartX = 0, panStartY = 0, panBaseX = 0, panBaseY = 0
+    
+    mmContent.addEventListener('touchstart', function(e) {
       if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX
-        const dy = e.touches[0].clientY - e.touches[1].clientY
+        var dx = e.touches[0].clientX - e.touches[1].clientX
+        var dy = e.touches[0].clientY - e.touches[1].clientY
         lastPinchDist = Math.sqrt(dx*dx + dy*dy)
+      } else if (e.touches.length === 1) {
+        isPanning = true
+        panStartX = e.touches[0].clientX
+        panStartY = e.touches[0].clientY
+        panBaseX = panX; panBaseY = panY
       }
     }, { passive: true })
-    mmContent.addEventListener('touchmove', (e) => {
+    mmContent.addEventListener('touchmove', function(e) {
       if (e.touches.length === 2 && lastPinchDist > 0) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX
-        const dy = e.touches[0].clientY - e.touches[1].clientY
-        const dist = Math.sqrt(dx*dx + dy*dy)
-        zoomLevel = Math.min(Math.max(zoomLevel * (dist / lastPinchDist), 0.5), 8)
-        applyZoom()
+        var dx = e.touches[0].clientX - e.touches[1].clientX
+        var dy = e.touches[0].clientY - e.touches[1].clientY
+        var dist = Math.sqrt(dx*dx + dy*dy)
+        zoom = Math.min(Math.max(zoom * (dist / lastPinchDist), 0.3), 8)
+        applyView()
         lastPinchDist = dist
+      } else if (e.touches.length === 1 && isPanning) {
+        var dx = e.touches[0].clientX - panStartX
+        var dy = e.touches[0].clientY - panStartY
+        var scale = origVB.w / cW / zoom
+        panX = panBaseX - dx * scale
+        panY = panBaseY - dy * scale
+        applyView()
       }
     }, { passive: true })
-    mmContent.addEventListener('touchend', () => { lastPinchDist = 0 }, { passive: true })
+    mmContent.addEventListener('touchend', function() { lastPinchDist = 0; isPanning = false }, { passive: true })
+    
+    // マウスドラッグ
+    var mouseDown = false, msx = 0, msy = 0, mbx = 0, mby = 0
+    mmContent.addEventListener('mousedown', function(e) { mouseDown = true; msx = e.clientX; msy = e.clientY; mbx = panX; mby = panY })
+    mmContent.addEventListener('mousemove', function(e) {
+      if (!mouseDown) return
+      var scale = origVB.w / cW / zoom
+      panX = mbx - (e.clientX - msx) * scale
+      panY = mby - (e.clientY - msy) * scale
+      applyView()
+    })
+    mmContent.addEventListener('mouseup', function() { mouseDown = false })
+    mmContent.addEventListener('mouseleave', function() { mouseDown = false })
+    mmContent.addEventListener('wheel', function(e) {
+      e.preventDefault()
+      zoom = Math.min(Math.max(zoom * (e.deltaY < 0 ? 1.15 : 0.87), 0.3), 8)
+      applyView()
+    }, { passive: false })
     
     if (targetEl) {
-      targetEl.innerHTML = `<div class="text-center py-2">
-        <p class="text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>マインドマップ生成完了</p>
-        <button onclick="document.getElementById('mindmap-fullscreen-modal').style.display='flex'" class="mt-1 text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg transition"><i class="fas fa-expand mr-1"></i>全画面で再表示</button>
-      </div>`
+      targetEl.innerHTML = '<div class="text-center py-2"><p class="text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>\u30B3\u30F3\u30BB\u30D7\u30C8\u30DE\u30C3\u30D7\u751F\u6210\u5B8C\u4E86</p><button onclick="document.getElementById(\'mindmap-fullscreen-modal\').style.display=\'flex\'" class="mt-1 text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg transition"><i class="fas fa-expand mr-1"></i>\u5168\u753B\u9762\u3067\u518D\u8868\u793A</button></div>'
     }
   } catch (e) {
-    const mmContent = document.getElementById('mm-content')
+    var mmContent = document.getElementById('mm-content')
     if (mmContent) {
-      mmContent.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;"><p style="color:#999;font-size:14px;"><i class="fas fa-exclamation-circle" style="margin-right:4px;"></i>マインドマップの生成に失敗しました。</p></div>'
+      mmContent.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;"><p style="color:#999;font-size:13px;"><i class="fas fa-exclamation-circle" style="margin-right:4px;"></i>\u30B3\u30F3\u30BB\u30D7\u30C8\u30DE\u30C3\u30D7\u306E\u751F\u6210\u306B\u5931\u6557\u3057\u307E\u3057\u305F</p></div>'
     }
     if (targetEl) {
-      targetEl.innerHTML = '<p class="text-sm text-gray-400 text-center p-4"><i class="fas fa-exclamation-circle mr-1"></i>マインドマップの生成に失敗しました。</p>'
+      targetEl.innerHTML = '<p class="text-sm text-gray-400 text-center p-4"><i class="fas fa-exclamation-circle mr-1"></i>\u30B3\u30F3\u30BB\u30D7\u30C8\u30DE\u30C3\u30D7\u306E\u751F\u6210\u306B\u5931\u6557\u3057\u307E\u3057\u305F</p>'
     }
     console.error('Mindmap error:', e)
   }

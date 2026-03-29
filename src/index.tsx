@@ -46571,19 +46571,50 @@ app.post('/api/ai/generate-mindmap', async (c) => {
       `- ${cd.card_title || cd.title}: ${(cd.problem_description || cd.problem_text || '').substring(0, 80)}`
     ).join('\n')
     
-    const prompt = "以下の学習カード情報からマインドマップ用のJSON構造を生成して。\n\n" +
-      "単元: " + (unit_name || '') + "\n" +
-      "教科: " + (subject || '') + "\n" +
-      "カード一覧:\n" + cardsInfo + "\n\n" +
-      "★重要ルール:\n" +
-      "1. ルートは単元名（8文字以内）\n" +
-      "2. 2階層まで（子→孫まで）\n" +
-      "3. 各ノードのラベルは最大5文字\n" +
-      "4. 子ノードは各親につき最大3個\n" +
-      "5. 全体のノード数は最大12個\n" +
-      "6. 日本語。漢字OK\n\n" +
-      "以下のJSON形式のみ出力（他のテキスト不要）:\n" +
-      '{"root":"単元名","children":[{"label":"概念1","children":[{"label":"詳細A"},{"label":"詳細B"}]},{"label":"概念2","children":[{"label":"詳細C"}]}]}'
+    // Novak/Ausubel の有意味学習理論 + Advance Organizer に基づく教育的コンセプトマップ
+    const prompt = [
+      "あなたは教科教育の専門家です。Novak & Caunas の概念マップ理論と Ausubel の有意味学習理論に基づいて、",
+      "以下の単元・問題カードから「教育的に意味のある」コンセプトマップを JSON で生成してください。",
+      "",
+      "★ 教育理論上の必須要件:",
+      "1. 命題(Proposition): 2つの概念 + リンキングワードで「意味のある文」を作る",
+      "   例: 「力」→(物体に)→「運動変化」= 力は物体に運動変化を生じさせる",
+      "2. 階層性: 最上位に包括的概念、下に行くほど具体的・詳細な概念",
+      "3. クロスリンク: 異なる枝同士を結ぶ関係。創造的思考・深い理解の指標",
+      "4. 問題の位置づけ: 生徒が今取り組んでいるカードがマップのどこに属するか明示",
+      "5. 日常との接続: 生活や実体験と結びつく具体例を必ず含める",
+      "",
+      "★ 入力情報:",
+      "単元: " + (unit_name || ''),
+      "教科: " + (subject || ''),
+      "学習カード:",
+      cardsInfo,
+      "",
+      "★ 出力ルール (厳守):",
+      '- root: 単元の中核概念（10文字以内）',
+      '- children: 3〜5個の大概念（各8文字以内）',
+      '  - 各childに relation（リンキングワード、6文字以内、概念間で意味が通る動詞・助詞）',
+      '  - 各childに hint（この概念の学習ポイント、20文字以内）',
+      '  - 各childに children: 1〜3個の具体例・下位概念（各8文字以内）',
+      '- crosslinks: 1〜3本（異なる枝間の横断的関係）',
+      '  - from, to はノードのlabel（完全一致）',
+      '  - relation: なぜ関連するかの理由（6文字以内）',
+      '- focus_question: この単元で答えるべき問い（例「力とは何か？どう測る？」、25文字以内）',
+      '- daily_example: 日常生活での具体例（25文字以内）',
+      '- card_positions: カードがマップ上のどの概念に対応するか',
+      '  - [{card_title:"カード名の冒頭8文字", belongs_to:"対応するノードlabel"}]',
+      '',
+      '★ JSON形式のみ出力。説明文は不要。',
+      '例:',
+      '{"root":"力のはたらき","focus_question":"力はどう物を動かす？","daily_example":"ドアを押す・ボール投げ",',
+      '"children":[{"label":"力の種類","relation":"分類すると","hint":"接触力と非接触力の違い",',
+      '"children":[{"label":"重力","relation":"例えば","hint":"地球が引く力"},',
+      '{"label":"摩擦力","relation":"例えば","hint":"動きを止める力"}]},',
+      '{"label":"力の大きさ","relation":"測ると","hint":"ばねばかりで測定",',
+      '"children":[{"label":"N(ニュートン)","relation":"単位は","hint":"1N≒100gの重さ"}]}],',
+      '"crosslinks":[{"from":"重力","to":"N(ニュートン)","relation":"単位で表す"}],',
+      '"card_positions":[{"card_title":"力の合成","belongs_to":"力の大きさ"}]}'
+    ].join('\n')
 
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
@@ -46592,7 +46623,7 @@ app.post('/api/ai/generate-mindmap', async (c) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 512, temperature: 0.3 }
+          generationConfig: { maxOutputTokens: 1024, temperature: 0.4 }
         })
       }
     )
@@ -46605,7 +46636,7 @@ app.post('/api/ai/generate-mindmap', async (c) => {
     try {
       mindmapData = JSON.parse(rawText)
     } catch {
-      mindmapData = { root: unit_name || subject || '学習', children: [{ label: '内容', children: [] }] }
+      mindmapData = { root: unit_name || subject || '学習', children: [{ label: '内容', relation: '含む', hint: '', children: [] }], crosslinks: [], focus_question: '', daily_example: '', card_positions: [] }
     }
     
     return c.json({ success: true, mindmap_data: mindmapData })
