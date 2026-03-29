@@ -6717,6 +6717,17 @@ async function loadCardPage(cardId) {
                 })();
               </script>
               
+              <!-- インライン資料表示（保存済みの資料を最初から表示） -->
+              <div id="card-inline-resources-${card.card_id || card.id || 0}" class="mt-3"></div>
+              <script>
+                (function(){
+                  const cid = ${card.card_id || card.id || 0};
+                  if (cid && typeof renderInlineResources === 'function') {
+                    setTimeout(() => renderInlineResources(cid), 300);
+                  }
+                })();
+              </script>
+              
               <!-- インタラクティブ触覚ウィジェット -->
               ${(() => {
                 const tactile = card._tactile_activity || ''
@@ -41085,7 +41096,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
           <button onclick="toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
           <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
-          <button onclick="openCardResourcePanel(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-paperclip mr-1"></i>📎 資料</button>
+          <button onclick="openCardResourceAddDialog(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-plus mr-1"></i>資料追加</button>
         </div>
       </div>`
   }
@@ -41105,7 +41116,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
           <button onclick="toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
           <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
-          <button onclick="openCardResourcePanel(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-paperclip mr-1"></i>📎 資料</button>
+          <button onclick="openCardResourceAddDialog(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-plus mr-1"></i>資料追加</button>
         </div>
       </div>`
   }
@@ -41136,7 +41147,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
           <button onclick="toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
           <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
-          <button onclick="openCardResourcePanel(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-paperclip mr-1"></i>📎 資料</button>
+          <button onclick="openCardResourceAddDialog(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-plus mr-1"></i>資料追加</button>
         </div>
       </div>`
   }
@@ -41162,11 +41173,186 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
         <button onclick="event.stopPropagation(); openPromptImageGenerate(${cardId}, 'replace')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-magic mr-1"></i>プロンプト指示</button>
         ${showReplace ? `<button onclick="event.stopPropagation(); replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
         <button onclick="event.stopPropagation(); deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
-        <button onclick="event.stopPropagation(); openCardResourcePanel(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-paperclip mr-1"></i>📎 資料</button>
+        <button onclick="event.stopPropagation(); openCardResourceAddDialog(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-plus mr-1"></i>資料追加</button>
       </div>
     </div>`
 }
 window.renderMediaEmbed = renderMediaEmbed
+
+// ─────────────────────────────────────────────
+// カード別 インライン資料表示（最初から直接表示）
+// ─────────────────────────────────────────────
+function renderInlineResources(cardId) {
+  var container = document.getElementById('card-inline-resources-' + cardId)
+  if (!container) return
+
+  var storageKey = 'card_resources_' + cardId
+  var resources = []
+  try { resources = JSON.parse(localStorage.getItem(storageKey) || '[]') } catch(e) { resources = [] }
+
+  if (resources.length === 0) {
+    container.innerHTML = ''
+    return
+  }
+
+  function parseYtId(url) {
+    var m = (url || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/)
+    return m ? m[1] : null
+  }
+
+  var html = '<div class="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-3 shadow-sm">'
+  html += '<div class="flex items-center justify-between mb-2">'
+  html += '<div class="flex items-center gap-2"><span class="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"><i class="fas fa-paperclip mr-1"></i>関連資料</span>'
+  html += '<span class="text-xs text-amber-700 font-bold">' + resources.length + '件</span></div>'
+  html += '<button onclick="openCardResourceAddDialog(' + cardId + ')" class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded-lg font-bold transition"><i class="fas fa-plus mr-1"></i>追加</button>'
+  html += '</div>'
+
+  html += '<div class="space-y-2">'
+  resources.forEach(function(r, idx) {
+    if (r.type === 'youtube') {
+      var vid = parseYtId(r.url)
+      if (vid) {
+        html += '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">'
+        html += '<div class="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-100">'
+        html += '<span class="text-xs font-bold text-gray-700"><i class="fab fa-youtube text-red-500 mr-1"></i>' + ((r.title || 'YouTube動画').replace(/</g, '&lt;').substring(0, 40)) + '</span>'
+        html += '<button onclick="deleteInlineResource(' + cardId + ',' + idx + ')" class="text-gray-400 hover:text-red-500 text-xs p-0.5" title="削除"><i class="fas fa-times"></i></button>'
+        html += '</div>'
+        html += '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;">'
+        html += '<iframe src="https://www.youtube.com/embed/' + vid + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" allowfullscreen></iframe>'
+        html += '</div></div>'
+      }
+    } else if (r.type === 'image') {
+      html += '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">'
+      html += '<div class="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-100">'
+      html += '<span class="text-xs font-bold text-gray-700"><i class="fas fa-image text-blue-500 mr-1"></i>' + ((r.title || '画像').replace(/</g, '&lt;').substring(0, 40)) + '</span>'
+      html += '<button onclick="deleteInlineResource(' + cardId + ',' + idx + ')" class="text-gray-400 hover:text-red-500 text-xs p-0.5" title="削除"><i class="fas fa-times"></i></button>'
+      html += '</div>'
+      html += '<div class="p-2"><img src="' + (r.url || '') + '" class="w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition" style="max-height:300px;object-fit:contain;" onclick="window._expandSongImage && window._expandSongImage(this.src)" onerror="this.parentElement.innerHTML=\'<div class=text-center text-xs text-red-400 py-4>画像を読み込めません</div>\'" /></div>'
+      html += '</div>'
+    } else if (r.type === 'link') {
+      html += '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">'
+      html += '<div class="flex items-center justify-between px-2 py-1.5">'
+      html += '<a href="' + (r.url || '') + '" target="_blank" rel="noopener" class="flex items-center gap-2 flex-1 min-w-0 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition">'
+      html += '<i class="fas fa-external-link-alt text-indigo-400 flex-shrink-0"></i>'
+      html += '<span class="truncate">' + ((r.title || r.url || 'リンク').replace(/</g, '&lt;').substring(0, 60)) + '</span></a>'
+      html += '<button onclick="deleteInlineResource(' + cardId + ',' + idx + ')" class="text-gray-400 hover:text-red-500 text-xs p-0.5 ml-2 flex-shrink-0" title="削除"><i class="fas fa-times"></i></button>'
+      html += '</div></div>'
+    } else if (r.type === 'memo') {
+      html += '<div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">'
+      html += '<div class="flex items-center justify-between px-2 py-1 bg-gray-50 border-b border-gray-100">'
+      html += '<span class="text-xs font-bold text-gray-700"><i class="fas fa-sticky-note text-yellow-500 mr-1"></i>' + ((r.title || 'メモ').replace(/</g, '&lt;').substring(0, 40)) + '</span>'
+      html += '<button onclick="deleteInlineResource(' + cardId + ',' + idx + ')" class="text-gray-400 hover:text-red-500 text-xs p-0.5" title="削除"><i class="fas fa-times"></i></button>'
+      html += '</div>'
+      html += '<div class="px-3 py-2 text-sm text-gray-700 leading-relaxed" style="white-space:pre-wrap;">' + (r.text || '').replace(/</g, '&lt;').substring(0, 1000) + '</div>'
+      html += '</div>'
+    }
+  })
+  html += '</div></div>'
+
+  container.innerHTML = html
+}
+window.renderInlineResources = renderInlineResources
+
+// インライン資料削除
+function deleteInlineResource(cardId, idx) {
+  if (!confirm('この資料を削除しますか？')) return
+  var storageKey = 'card_resources_' + cardId
+  try {
+    var resources = JSON.parse(localStorage.getItem(storageKey) || '[]')
+    if (idx >= 0 && idx < resources.length) {
+      resources.splice(idx, 1)
+      localStorage.setItem(storageKey, JSON.stringify(resources))
+      renderInlineResources(cardId)
+      // 資料パネルが開いてたら再描画
+      var modal = document.getElementById('card-resource-modal')
+      if (modal && modal._cardId === cardId && modal._renderModal) modal._renderModal()
+    }
+  } catch(e) {}
+}
+window.deleteInlineResource = deleteInlineResource
+
+// 資料追加ダイアログ（直接開く）
+function openCardResourceAddDialog(cardId) {
+  var existing = document.getElementById('card-res-add-modal')
+  if (existing) existing.remove()
+
+  var storageKey = 'card_resources_' + cardId
+  function getRes() { try { return JSON.parse(localStorage.getItem(storageKey) || '[]') } catch(e) { return [] } }
+  function saveRes(arr) { localStorage.setItem(storageKey, JSON.stringify(arr)) }
+
+  var addM = document.createElement('div')
+  addM.id = 'card-res-add-modal'
+  addM.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10020;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;'
+
+  var selectedType = null
+
+  function renderAddForm() {
+    var typeButtons = ['youtube', 'image', 'link', 'memo']
+    var typeLabels = { youtube: '🎬 動画', image: '🖼️ 画像', link: '🔗 リンク', memo: '📝 メモ' }
+    var isMemo = selectedType === 'memo'
+    var placeholder = selectedType === 'youtube' ? 'https://www.youtube.com/watch?v=...' : selectedType === 'image' ? 'https://example.com/image.jpg' : 'https://...'
+
+    addM.innerHTML = '<div style="background:white;border-radius:16px;width:360px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,0.25);overflow:hidden;">' +
+      '<div style="padding:12px 16px;border-bottom:1px solid #E5E7EB;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+          '<div style="font-weight:800;font-size:14px;color:#1F2937;"><i class="fas fa-paperclip" style="color:#D97706;margin-right:4px;"></i>資料を追加</div>' +
+          '<button onclick="document.getElementById(\'card-res-add-modal\').remove()" style="background:#F3F4F6;border:none;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:bold;color:#6B7280;">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:12px 16px;">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:12px;">' +
+          typeButtons.map(function(t) {
+            var active = selectedType === t
+            return '<button onclick="window._cardResSelectType(\'' + t + '\')" style="padding:8px 4px;border:2px solid ' + (active ? '#D97706' : '#E5E7EB') + ';border-radius:8px;background:' + (active ? '#FEF3C7' : 'white') + ';cursor:pointer;font-size:10px;font-weight:' + (active ? '800' : '600') + ';text-align:center;transition:all 0.2s;">' + typeLabels[t] + '</button>'
+          }).join('') +
+        '</div>' +
+        (selectedType ?
+          '<div style="margin-bottom:10px;">' +
+            '<label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">タイトル（任意）</label>' +
+            '<input id="cr-add-title" type="text" placeholder="例: フィヨルドの解説" style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:12px;outline:none;box-sizing:border-box;" />' +
+          '</div>' +
+          (isMemo ?
+            '<div style="margin-bottom:10px;"><label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">メモ内容</label><textarea id="cr-add-text" rows="4" placeholder="メモを入力..." style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:12px;outline:none;resize:vertical;box-sizing:border-box;"></textarea></div>' :
+            '<div style="margin-bottom:10px;"><label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">URL</label><input id="cr-add-url" type="url" placeholder="' + placeholder + '" style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:12px;outline:none;box-sizing:border-box;" /></div>'
+          ) +
+          '<button id="cr-add-save-btn" style="width:100%;padding:10px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;border-radius:10px;font-weight:bold;font-size:13px;cursor:pointer;">保存する</button>'
+        : '<div style="text-align:center;padding:12px;color:#9CA3AF;font-size:12px;">上のタイプを選んでください</div>') +
+      '</div>' +
+    '</div>'
+
+    if (selectedType) {
+      var saveBtn = document.getElementById('cr-add-save-btn')
+      if (saveBtn) {
+        saveBtn.onclick = function() {
+          var title = (document.getElementById('cr-add-title') || {}).value || ''
+          var url = (document.getElementById('cr-add-url') || {}).value || ''
+          var text = (document.getElementById('cr-add-text') || {}).value || ''
+
+          if (!isMemo && !url) { alert('URLを入力してください'); return }
+          if (isMemo && !text) { alert('メモ内容を入力してください'); return }
+
+          var resources = getRes()
+          resources.unshift({ type: selectedType, title: title, url: url, text: text, created_at: new Date().toISOString() })
+          saveRes(resources)
+
+          addM.remove()
+          // インライン表示を即座に更新
+          renderInlineResources(cardId)
+        }
+      }
+    }
+  }
+
+  window._cardResSelectType = function(type) {
+    selectedType = type
+    renderAddForm()
+  }
+
+  renderAddForm()
+  document.body.appendChild(addM)
+  addM.addEventListener('click', function(e) { if (e.target === addM) addM.remove() })
+}
+window.openCardResourceAddDialog = openCardResourceAddDialog
 
 // ─────────────────────────────────────────────
 // カード別 資料パネル（動画・画像・リンク・メモを追加可能）
@@ -41258,6 +41444,7 @@ function openCardResourcePanel(cardId) {
         resources.splice(idx, 1)
         saveRes(resources)
         renderModal()
+        renderInlineResources(cardId)
       }
     }
   }
@@ -41312,6 +41499,7 @@ function openCardResourcePanel(cardId) {
 
       addM.remove()
       renderModal()
+      renderInlineResources(cardId)
     }
   }
 }
