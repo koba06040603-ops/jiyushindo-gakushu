@@ -6595,7 +6595,7 @@ async function loadCardPage(cardId) {
 
             <!-- 例題 -->
             ${card.example_problem ? `
-              <div class="bg-white rounded-lg shadow-lg p-6">
+              <div id="example-section-detail-${card.card_id || card.id || 0}" class="bg-white rounded-lg shadow-lg p-6">
                 <h3 class="card-heading font-bold text-gray-800 mb-4 flex items-center flex-wrap gap-2">
                   <span><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</span>
                   <button onclick="try{if(typeof window.speakNB2NarrationAI==='function'){window.speakNB2NarrationAI(${card.card_id || card.id || 0},'example')}else if(typeof window.speakNB2Explanation==='function'){window.speakNB2Explanation(${card.card_id || card.id || 0})}else{alert('音声機能を読み込み中です')}}catch(e){alert('音声エラー:'+e.message)}" id="nb2-speak-btn-example-${card.card_id || card.id || 0}" class="ml-auto bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow hover:shadow-md transition"><i class="fas fa-volume-up mr-1"></i>🔊 音声解説</button>
@@ -7450,71 +7450,84 @@ async function loadCardPage(cardId) {
               return
             }
             
+            // 例題セクションをIDで取得して全体を書き換え
+            const exSection = document.getElementById('example-section-detail-' + fixCardId)
+            
             if (stillSame) {
               console.warn('🔧 リトライ上限到達、例題を「準備中」に')
-              // 例題セクションを非表示に
-              const exampleContainer = document.querySelector('.bg-white.rounded-lg.shadow-lg.p-6')
-              if (exampleContainer) {
-                const yellowBg = exampleContainer.querySelector('.bg-yellow-50')
-                if (yellowBg) yellowBg.innerHTML = '<p class="text-gray-500 text-center py-4"><i class="fas fa-exclamation-triangle mr-2 text-yellow-500"></i>例題を準備中です。再生成ボタンをお試しください。</p>'
-                const greenBg = exampleContainer.querySelector('.bg-green-50')
-                if (greenBg) greenBg.remove()
+              if (exSection) {
+                exSection.innerHTML = `
+                  <h3 class="card-heading font-bold text-gray-800 mb-4"><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</h3>
+                  <div class="text-center py-6">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
+                    <p class="text-gray-500 text-sm">例題を準備中です。ページを再読み込みするか、しばらくお待ちください。</p>
+                  </div>`
               }
               return
             }
             
             console.log('✅ 例題自動修正完了:', fixResp.data)
-            // DOM上の例題セクションを更新
-            const exampleContainer = document.querySelector('.bg-white.rounded-lg.shadow-lg.p-6')
-            if (exampleContainer) {
-              // 例題の問題文を更新
-              const problemPre = exampleContainer.querySelector('.bg-yellow-50 pre')
-              if (problemPre) problemPre.innerHTML = formatText(newProblem)
-              // 例題の解き方・答えを更新
-              const solutionDiv = exampleContainer.querySelector('.bg-green-50')
-              if (solutionDiv) {
-                solutionDiv.innerHTML = `
-                  <h4 class="card-heading font-bold text-green-800 mb-2 flex items-center gap-2">
-                    <i class="fas fa-check-circle mr-1"></i>解き方・答え
-                    <span class="text-xs text-gray-400 font-normal">（自分で考えてから見てね）</span>
-                  </h4>
-                  <details>
-                    <summary class="cursor-pointer text-sm text-green-600 font-bold hover:text-green-800 transition py-1"><i class="fas fa-eye mr-1"></i>答えを見る</summary>
-                    <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans mt-2">${formatText(newSolution)}</pre>
-                  </details>`
-              } else if (newSolution) {
-                const yellowBg = exampleContainer.querySelector('.bg-yellow-50')
-                if (yellowBg) {
-                  yellowBg.insertAdjacentHTML('afterend', `
-                    <div class="bg-green-50 rounded-lg p-4">
-                      <h4 class="card-heading font-bold text-green-800 mb-2 flex items-center gap-2">
-                        <i class="fas fa-check-circle mr-1"></i>解き方・答え
-                        <span class="text-xs text-gray-400 font-normal">（自分で考えてから見てね）</span>
-                      </h4>
-                      <details>
-                        <summary class="cursor-pointer text-sm text-green-600 font-bold hover:text-green-800 transition py-1"><i class="fas fa-eye mr-1"></i>答えを見る</summary>
-                        <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans mt-2">${formatText(newSolution)}</pre>
-                      </details>
-                    </div>`)
-                }
-              }
-              // グローバルデータも更新
-              if (window.currentCardData?.card) {
-                window.currentCardData.card.example_problem = newProblem
-                window.currentCardData.card.example_solution = newSolution
-                window.currentCardData.card.example_answer = newAnswer
-              }
+            if (exSection) {
+              exSection.innerHTML = `
+                <h3 class="card-heading font-bold text-gray-800 mb-4 flex items-center flex-wrap gap-2">
+                  <span><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</span>
+                </h3>
+                <div class="bg-yellow-50 rounded-lg p-4 mb-4">
+                  <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans font-bold">${formatText(newProblem)}</pre>
+                </div>
+                ${newSolution ? `
+                  <div class="bg-green-50 rounded-lg p-4">
+                    <h4 class="card-heading font-bold text-green-800 mb-2 flex items-center gap-2">
+                      <i class="fas fa-check-circle mr-1"></i>解き方・答え
+                      <span class="text-xs text-gray-400 font-normal">（自分で考えてから見てね）</span>
+                    </h4>
+                    <details>
+                      <summary class="cursor-pointer text-sm text-green-600 font-bold hover:text-green-800 transition py-1"><i class="fas fa-eye mr-1"></i>答えを見る</summary>
+                      <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans mt-2">${formatText(newSolution)}</pre>
+                    </details>
+                  </div>` : ''}`
+            }
+            // グローバルデータも更新
+            if (window.currentCardData?.card) {
+              window.currentCardData.card.example_problem = newProblem
+              window.currentCardData.card.example_solution = newSolution
+              window.currentCardData.card.example_answer = newAnswer
+            } else if (window.currentCardData) {
+              window.currentCardData.example_problem = newProblem
+              window.currentCardData.example_solution = newSolution
+              window.currentCardData.example_answer = newAnswer
             }
           } else {
             console.log('🔧 例題修正: 修正不要またはエラー', fixResp.data)
             if (retryNum < maxRetries - 1) {
               setTimeout(() => tryFixExample(retryNum + 1), 1500)
+            } else {
+              // 最終失敗 — 例題セクションに「準備中」表示
+              const exSection = document.getElementById('example-section-detail-' + fixCardId)
+              if (exSection) {
+                exSection.innerHTML = `
+                  <h3 class="card-heading font-bold text-gray-800 mb-4"><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</h3>
+                  <div class="text-center py-6">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
+                    <p class="text-gray-500 text-sm">例題を準備中です。ページを再読み込みするか、しばらくお待ちください。</p>
+                  </div>`
+              }
             }
           }
         } catch (fixErr) {
           console.error('🔧 例題自動修正エラー:', fixErr)
           if (retryNum < maxRetries - 1) {
             setTimeout(() => tryFixExample(retryNum + 1), 1500)
+          } else {
+            const exSection = document.getElementById('example-section-detail-' + fixCardId)
+            if (exSection) {
+              exSection.innerHTML = `
+                <h3 class="card-heading font-bold text-gray-800 mb-4"><i class="fas fa-lightbulb mr-2 text-yellow-500"></i>例題</h3>
+                <div class="text-center py-6">
+                  <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
+                  <p class="text-gray-500 text-sm">例題を準備中です。ページを再読み込みするか、しばらくお待ちください。</p>
+                </div>`
+            }
           }
         }
       }
