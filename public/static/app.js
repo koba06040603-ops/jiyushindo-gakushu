@@ -6275,7 +6275,7 @@ function getAnswerVariants(answerStr, answerKeywords) {
     variants.push(bracketMatch[2].trim())
   }
   // 語尾の「系」「語」「族」「型」等を除いた語幹も追加（例:「ゲルマン系」→「ゲルマン」）
-  const stem = answerStr.trim().replace(/[系語族型類科目派流]+$/u, '')
+  const stem = answerStr.trim().replace(/[系語族型類科目派流業]+$/u, '')
   if (stem && stem.length >= 2 && stem !== answerStr.trim()) {
     variants.push(stem)
   }
@@ -7420,18 +7420,53 @@ async function loadCardPage(cardId) {
     // ★★★ 例題自動修正: _needsExampleFix の場合は API を呼んで例題を再生成 ★★★
     if (card._needsExampleFix) {
       const fixCardId = card.card_id || card.id
+      const mainAnswer = (card.answer || '').trim()
       console.log('🔧 例題自動修正を開始: card_id=' + fixCardId)
-      setTimeout(async () => {
+      
+      async function tryFixExample(retryNum) {
+        const maxRetries = 3
         try {
           const fixResp = await axios.post('/api/fix-example', { card_id: fixCardId })
           if (fixResp.data?.success && fixResp.data?.fixed) {
+            const newProblem = fixResp.data.example_problem || ''
+            const newSolution = fixResp.data.example_solution || ''
+            const newAnswer = fixResp.data.example_answer || ''
+            
+            // ★ 修正後も本題の答えと同じかクライアントサイドで再チェック
+            let stillSame = false
+            if (mainAnswer && mainAnswer.length >= 2) {
+              const mStem = mainAnswer.replace(/[系語族型類科目派流業]+$/u, '')
+              const mvs = [mainAnswer.toLowerCase()]
+              if (mStem && mStem.length >= 2 && mStem.toLowerCase() !== mainAnswer.toLowerCase()) mvs.push(mStem.toLowerCase())
+              const naL = newAnswer.toLowerCase().trim()
+              const naStem = newAnswer.trim().replace(/[系語族型類科目派流業]+$/u, '').toLowerCase()
+              if (naL && mvs.some(v => v === naL || v === naStem || v.includes(naL) || naL.includes(v))) stillSame = true
+              if (!stillSame && newSolution && mvs.some(v => newSolution.toLowerCase().includes(v))) stillSame = true
+            }
+            
+            if (stillSame && retryNum < maxRetries - 1) {
+              console.warn('🔧 修正後も答えが同じ → リトライ (' + (retryNum + 1) + '/' + maxRetries + ')')
+              setTimeout(() => tryFixExample(retryNum + 1), 1000)
+              return
+            }
+            
+            if (stillSame) {
+              console.warn('🔧 リトライ上限到達、例題を「準備中」に')
+              // 例題セクションを非表示に
+              const exampleContainer = document.querySelector('.bg-white.rounded-lg.shadow-lg.p-6')
+              if (exampleContainer) {
+                const yellowBg = exampleContainer.querySelector('.bg-yellow-50')
+                if (yellowBg) yellowBg.innerHTML = '<p class="text-gray-500 text-center py-4"><i class="fas fa-exclamation-triangle mr-2 text-yellow-500"></i>例題を準備中です。再生成ボタンをお試しください。</p>'
+                const greenBg = exampleContainer.querySelector('.bg-green-50')
+                if (greenBg) greenBg.remove()
+              }
+              return
+            }
+            
             console.log('✅ 例題自動修正完了:', fixResp.data)
             // DOM上の例題セクションを更新
             const exampleContainer = document.querySelector('.bg-white.rounded-lg.shadow-lg.p-6')
             if (exampleContainer) {
-              const newProblem = fixResp.data.example_problem || ''
-              const newSolution = fixResp.data.example_solution || ''
-              const newAnswer = fixResp.data.example_answer || ''
               // 例題の問題文を更新
               const problemPre = exampleContainer.querySelector('.bg-yellow-50 pre')
               if (problemPre) problemPre.innerHTML = formatText(newProblem)
@@ -7448,7 +7483,6 @@ async function loadCardPage(cardId) {
                     <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans mt-2">${formatText(newSolution)}</pre>
                   </details>`
               } else if (newSolution) {
-                // 解き方セクションがなかった場合は追加
                 const yellowBg = exampleContainer.querySelector('.bg-yellow-50')
                 if (yellowBg) {
                   yellowBg.insertAdjacentHTML('afterend', `
@@ -7473,11 +7507,19 @@ async function loadCardPage(cardId) {
             }
           } else {
             console.log('🔧 例題修正: 修正不要またはエラー', fixResp.data)
+            if (retryNum < maxRetries - 1) {
+              setTimeout(() => tryFixExample(retryNum + 1), 1500)
+            }
           }
         } catch (fixErr) {
           console.error('🔧 例題自動修正エラー:', fixErr)
+          if (retryNum < maxRetries - 1) {
+            setTimeout(() => tryFixExample(retryNum + 1), 1500)
+          }
         }
-      }, 500) // ページ描画後に非同期で実行
+      }
+      
+      setTimeout(() => tryFixExample(0), 500)
     }
 
   } catch (error) {

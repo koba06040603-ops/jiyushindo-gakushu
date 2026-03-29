@@ -9273,7 +9273,7 @@ app.get('/guide/:curriculumId', async (c) => {
         
         // ★★★ SSR用: 答え漏洩防止フィルタリング（フロントのJSロード前に表示されるHTML用） ★★★
         if (mainAns && mainAns.length >= 2) {
-          const stem = mainAns.replace(/[系語族型類科目派流]+$/u, '')
+          const stem = mainAns.replace(/[系語族型類科目派流業]+$/u, '')
           const variants = [mainAns]
           if (stem && stem.length >= 2 && stem !== mainAns) variants.push(stem)
           
@@ -10829,7 +10829,7 @@ app.get('/guide/:curriculumId', async (c) => {
       var exAns = (c.example_answer || '').trim();
       var exSol = (c.example_solution || '').trim();
       // 語幹でも比較（ゲルマン系→ゲルマン）
-      var mainStem = mainAns.replace(/[系語族型類科目派流]+$/u, '');
+      var mainStem = mainAns.replace(/[系語族型類科目派流業]+$/u, '');
       var mainVariants = [mainAns];
       if (mainStem && mainStem.length >= 2 && mainStem !== mainAns) mainVariants.push(mainStem);
       var variantMatch = function(a, b) {
@@ -11596,14 +11596,16 @@ app.get('/guide/:curriculumId', async (c) => {
   // === お助け機能 ===
 
   // --- 例題自動修正（答えが問題と同じ場合） ---
-  function fixExampleCard(page, cardId) {
-    console.log('🔧 例題修正開始: page=' + page + ', cardId=' + cardId);
+  function fixExampleCard(page, cardId, retryCount) {
+    retryCount = retryCount || 0;
+    var maxRetries = 3;
+    console.log('🔧 例題修正開始: page=' + page + ', cardId=' + cardId + ', retry=' + retryCount);
     var section = document.getElementById('example-section-' + page);
     if (section) {
       section.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p></div>' +
         '<div style="text-align:center;padding:16px;">' +
         '<i class="fas fa-wand-magic-sparkles fa-spin" style="color:#D97706;font-size:1.5rem;"></i>' +
-        '<p style="font-size:0.8rem;color:#92400E;margin-top:8px;font-weight:bold;">AIが例題を改善しています...</p></div>';
+        '<p style="font-size:0.8rem;color:#92400E;margin-top:8px;font-weight:bold;">AIが例題を改善しています...' + (retryCount > 0 ? '(試行' + (retryCount + 1) + '/' + maxRetries + ')' : '') + '</p></div>';
     }
     fetch('/api/fix-example', {
       method: 'POST',
@@ -11614,6 +11616,27 @@ app.get('/guide/:curriculumId', async (c) => {
     .then(function(data) {
       var c = ALL_CARDS[page];
       if (data.success && data.fixed) {
+        // ★ 修正後も本題の答えと同じかクライアントサイドで再チェック
+        var mainAns = c ? (c.correct_answer || c.answer || '').trim() : '';
+        var newEa = (data.example_answer || '').trim();
+        var newEs = (data.example_solution || '').trim();
+        var stillSame = false;
+        if (mainAns && mainAns.length >= 2) {
+          var mStem = mainAns.replace(/[系語族型類科目派流業]+$/u, '');
+          var mvs = [mainAns.toLowerCase()];
+          if (mStem && mStem.length >= 2 && mStem.toLowerCase() !== mainAns.toLowerCase()) mvs.push(mStem.toLowerCase());
+          var neL = newEa.toLowerCase();
+          var neStem = newEa.replace(/[系語族型類科目派流業]+$/u, '').toLowerCase();
+          if (neL && mvs.some(function(v) { return v === neL || v === neStem || v.indexOf(neL) >= 0 || neL.indexOf(v) >= 0; })) stillSame = true;
+          if (!stillSame && newEs && mvs.some(function(v) { return newEs.toLowerCase().indexOf(v) >= 0; })) stillSame = true;
+        }
+        
+        if (stillSame && retryCount < maxRetries - 1) {
+          console.warn('🔧 修正後も答えが同じ → リトライ (' + (retryCount + 1) + '/' + maxRetries + ')');
+          setTimeout(function() { fixExampleCard(page, cardId, retryCount + 1); }, 1000);
+          return;
+        }
+        
         console.log('✅ 例題修正完了:', data.example_answer);
         if (c) {
           c.example_problem = data.example_problem;
@@ -11624,12 +11647,21 @@ app.get('/guide/:curriculumId', async (c) => {
         renderExampleSection(page, c, data);
       } else {
         console.warn('🔧 例題修正不要 or 失敗:', data.message || data.error);
-        renderExampleSection(page, c, null);
+        if (retryCount < maxRetries - 1) {
+          console.log('🔧 リトライ (' + (retryCount + 1) + '/' + maxRetries + ')');
+          setTimeout(function() { fixExampleCard(page, cardId, retryCount + 1); }, 1500);
+        } else {
+          renderExampleSection(page, c, null);
+        }
       }
     })
     .catch(function(err) {
       console.error('🔧 例題修正エラー:', err);
-      renderExampleSection(page, ALL_CARDS[page], null);
+      if (retryCount < maxRetries - 1) {
+        setTimeout(function() { fixExampleCard(page, cardId, retryCount + 1); }, 1500);
+      } else {
+        renderExampleSection(page, ALL_CARDS[page], null);
+      }
     });
   }
 
@@ -11681,6 +11713,43 @@ app.get('/guide/:curriculumId', async (c) => {
     var es = data ? data.example_solution : c.example_solution;
     var ea = data ? data.example_answer : c.example_answer;
     var cid = c.card_id || c.id;
+    
+    // ★★★ 表示前に本題の答えとの一致を最終チェック ★★★
+    var mainAns = (c.correct_answer || c.answer || '').trim();
+    if (mainAns && mainAns.length >= 2) {
+      var mainStem = mainAns.replace(/[系語族型類科目派流業]+$/u, '');
+      var mVariants = [mainAns.toLowerCase()];
+      if (mainStem && mainStem.length >= 2 && mainStem.toLowerCase() !== mainAns.toLowerCase()) mVariants.push(mainStem.toLowerCase());
+      
+      // example_answer が本題と同じ → 例題全体を非表示にして再修正
+      var eaL = (ea || '').toLowerCase().trim();
+      var eaStem = (ea || '').trim().replace(/[系語族型類科目派流業]+$/u, '').toLowerCase();
+      var answerStillSame = eaL && mVariants.some(function(v) { 
+        return v === eaL || v === eaStem || v.indexOf(eaL) >= 0 || eaL.indexOf(v) >= 0; 
+      });
+      
+      // example_solution 内に本題の答えが含まれている
+      var solStillContains = es && mVariants.some(function(v) { return (es || '').toLowerCase().indexOf(v) >= 0; });
+      
+      if (answerStillSame || solStillContains) {
+        console.warn('🔧 renderExampleSection: 修正後も答えが同じ → 例題を非表示にして再修正ボタンのみ表示');
+        var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+        html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p></div>';
+        html += '<div style="text-align:center;padding:16px;background:#FEF3C7;border-radius:10px;">';
+        html += '<i class="fas fa-exclamation-triangle" style="color:#D97706;font-size:1.2rem;"></i>';
+        html += '<p style="font-size:0.8rem;color:#92400E;margin-top:8px;font-weight:bold;">例題を準備中です</p>';
+        html += '<p style="font-size:0.7rem;color:#9CA3AF;margin-top:4px;">本題と異なる例題を生成しています</p>';
+        if (cid) {
+          html += '<div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">';
+          html += '<button onclick="fixExampleCard(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:7px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;"><i class="fas fa-sync-alt" style="margin-right:4px;"></i>再生成</button>';
+          html += '<button onclick="editExampleWithPrompt(' + page + ',' + cid + ')" style="background:linear-gradient(135deg,#8B5CF6,#7C3AED);color:white;border:none;padding:7px 16px;border-radius:10px;font-size:0.78rem;font-weight:bold;cursor:pointer;"><i class="fas fa-edit" style="margin-right:4px;"></i>✏️ 修正指示</button>';
+          html += '</div>';
+        }
+        html += '</div>';
+        section.innerHTML = html;
+        return;
+      }
+    }
 
     var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
     html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p>';
@@ -15884,6 +15953,13 @@ ${edit_instruction}
 
 以下の本問題と「直接的に関連する」「類似した」例題を作成してください。
 例題は本問題を解くための「練習問題・準備問題」として機能します。
+
+【★★★ 絶対禁止事項 ★★★】
+- 例題の答え(example_answer)に「${mainAnswer}」を絶対に使わないこと。1文字も含まないこと。
+- 例題の解き方(example_solution)のテキストに「${mainAnswer}」という文字列を絶対に含めないこと。
+- 例題の問題文(example_problem)で本問題と同じことを聞かないこと。問い方を変えるだけもNG。
+- 上記に違反した場合、回答は無効として拒否されます。
+
 ${editInstructionBlock}
 【本問題】
 ${card.problem_text || card.problem_description || ''}
@@ -15966,8 +16042,8 @@ ${card.unit_name || ''}
     
     // 答えが同じでないか最終チェック（語幹比較も含む）
     const resultAnswer = (result.example_answer || '').trim()
-    const mainStem = mainAnswer.replace(/[系語族型類科目派流]+$/u, '')
-    const resultStem = resultAnswer.replace(/[系語族型類科目派流]+$/u, '')
+    const mainStem = mainAnswer.replace(/[系語族型類科目派流業]+$/u, '')
+    const resultStem = resultAnswer.replace(/[系語族型類科目派流業]+$/u, '')
     const mainVariantsCheck = [mainAnswer.toLowerCase()]
     if (mainStem && mainStem.length >= 2 && mainStem !== mainAnswer) mainVariantsCheck.push(mainStem.toLowerCase())
     const resultLower = resultAnswer.toLowerCase()
@@ -17545,7 +17621,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
         if (answerText && answerText.length >= 2) {
           const ansLower = answerText.toLowerCase().trim()
           // 語幹抽出（ゲルマン系→ゲルマン）
-          const stem = answerText.trim().replace(/[系語族型類科目派流]+$/u, '')
+          const stem = answerText.trim().replace(/[系語族型類科目派流業]+$/u, '')
           const variants = [answerText.trim()]
           if (stem && stem.length >= 2 && stem !== answerText.trim()) variants.push(stem)
           
