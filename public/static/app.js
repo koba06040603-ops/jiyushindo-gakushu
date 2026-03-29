@@ -7425,7 +7425,7 @@ async function loadCardPage(cardId) {
       console.log('🔧 例題自動修正を開始: card_id=' + fixCardId)
       
       async function tryFixExample(retryNum) {
-        const maxRetries = 3
+        const maxRetries = 5
         try {
           const fixResp = await axios.post('/api/fix-example', { card_id: fixCardId })
           if (fixResp.data?.success && fixResp.data?.fixed) {

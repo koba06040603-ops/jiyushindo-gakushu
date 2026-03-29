@@ -4797,7 +4797,7 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
     "correct_answer": "正解",
     "explanation": "解説",
     "hint_text": "ヒント",
-    "example_problem": "例題（あれば）",
+    "example_problem": "例題（あれば）★答えは例題の問いの正しい回答にすること。問い→答えが論理的につながるか確認★",
     "example_solution": "例題の解き方",
     "real_world_connection": "日常とのつながり",
     "learning_meaning": "この問題を学ぶ意味",
@@ -4815,6 +4815,7 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
 - 小学生が理解しやすい言葉で書くこと
 - ★★★ new_terms, teacher_help_keywords, hint_text, ai_teacher_message, ai_teacher_advice には答え（correct_answer）そのものを絶対に含めないこと。答えがバレてしまう ★★★
 - ★★★ example_problemの答えとcorrect_answerは絶対に同じ文字列にしないこと ★★★
+- ★★★ example_problemの問いに対して、example_solutionの中の答えが論理的に正しい回答であること（問い→答えのつながりを確認）★★★
 - JSON配列のみを返すこと（説明文不要）`
 
     const geminiResponse = await fetch(
@@ -15975,6 +15976,13 @@ ${edit_instruction}
 - 例題の問題文(example_problem)で本問題と同じことを聞かないこと。問い方を変えるだけもNG。
 - 上記に違反した場合、回答は無効として拒否されます。
 
+【★★★ 最重要: 問題と答えの論理的一貫性 ★★★】
+- 例題の答え(example_answer)は、例題の問題文(example_problem)に対する「正解」でなければならない
+- 例題の問題文を読んだ人が、その答えを聞いて「なるほど、それが正解だ」と納得できること
+- 問題文で「○○は何？」と聞いたら、答えは「○○」の正しい回答であること
+- ★★★ 問いと答えがつながらない場合（例: 問い「水はなに？」→ 答え「太陽」）は絶対禁止 ★★★
+- 自分で作った例題を声に出して読み上げて、「問い→答え」の流れが自然か必ず確認すること
+
 ${editInstructionBlock}
 【本問題】
 ${card.problem_text || card.problem_description || ''}
@@ -15999,24 +16007,27 @@ ${card.unit_name || ''}
 - ★★★ 例題の解き方（example_solution）の最後に「この知識は次の問題を解くヒントになるよ！」等の一文を必ず添え、本問題への橋渡しを明確にすること ★★★
 - ★★★ 最重要: 例題の解き方（example_solution）の中に本問題の答え「${mainAnswer}」を直接書かないこと。「次の問題のヒントになるよ！」等の間接的な表現のみ使うこと ★★★
 
-【良い例 — このパターンに必ず従うこと】
-- 本問題の答え「フィヨルド」→例題「フィヨルドを作った、山の上から流れてくる大きな氷のかたまりを何という？」→答え「氷河」→解き方「氷河は雪が長い年月かけて固まったもの。この氷河が海岸を削って、フィヨルドという地形ができたんだよ。この知識は次の問題を解くヒントになるよ！」
-  ※ポイント: 例題文に「フィヨルド」が入っており、本問題への橋渡しになっている
-- 本問題の答え「フィヨルド」→例題「ノルウェーなど北ヨーロッパにある、氷河が削ってできた入り組んだ海岸の地形。日本の三陸海岸のリアス海岸と似ているけど違う名前です。リアス海岸を答えなさい」→答え「リアス海岸」
-- 本問題の答え「デンプン」→例題「光合成に必要な気体は？」→答え「二酸化炭素」→解き方「光合成では二酸化炭素と水を使って、デンプンと酸素を作るよ。次の問題のヒントにもなるね！」
-- 本問題の答え「3.8×2.5＝9.5」→例題「2.4×1.5を計算しましょう」→答え「3.6」（同じ解法で数値を変更）
-- 本問題の答え「ポーツマス条約」→例題「日露戦争の講和（ポーツマス条約）を仲介した国はどこ？」→答え「アメリカ」
+【良い例 — このパターンに必ず従うこと（★問い→答えの論理的つながりに注目★）】
+- 本問題の答え「フィヨルド」→例題「フィヨルドを作った、山の上から流れてくる大きな氷のかたまりを何という？」→答え「氷河」
+  ✅ 「フィヨルドを作った氷のかたまりは何？」→「氷河」= 問いと答えがぴったり一致
+- 本問題の答え「デンプン」→例題「光合成に必要な気体は？」→答え「二酸化炭素」
+  ✅ 「光合成に必要な気体は？」→「二酸化炭素」= 問いと答えがぴったり一致
+- 本問題の答え「3.8×2.5＝9.5」→例題「2.4×1.5を計算しましょう」→答え「3.6」
+  ✅ 「2.4×1.5は？」→「3.6」= 計算結果が正しい
+- 本問題の答え「ポーツマス条約」→例題「日露戦争の講和を仲介した国はどこ？」→答え「アメリカ」
+  ✅ 「仲介した国は？」→「アメリカ」= 問いと答えがぴったり一致
 
 【悪い例 — 絶対にやらないこと】
 - 例題文に本問題の答え「${mainAnswer}」やそれに関連する語が一切入っていない → ヒントにならないので禁止！
-  ダメな例: 本問題の答え「フィヨルド」→例題「氷のかたまりのことを何というでしょう？」（「フィヨルド」も「海岸」も「地形」も入っていない → ヒントにならない！）
 - 本問題と全く別のトピック（例: フィヨルド→コンビナート）→ 禁止！
 - 小学生が知らない専門用語を答えにする（例: 氷河地形、堆積作用）→ 禁止！
-- 本問題「光合成」→例題「火山の噴火について」（関連なし — 禁止！）
-- ★★★ 例題の問題文にすでに答えが含まれているトートロジー（循環論法）は絶対禁止！ ★★★
-  ダメな例: 例題「二酸化炭素がたくさん出るのはなぜ？」→答え「二酸化炭素が出るから」（問いと答えが同じ — 学習にならない！）
-  ダメな例: 例題「（混合農業）が行われている理由は？」→答え「混合農業だから」（括弧内に答えがある — 禁止！）
-  ★ 例題の答えを、例題の問題文中に括弧（）書きやそのまま書いてはいけない。答えは問題文を読んだだけではわからないようにすること ★
+- ★★★ トートロジー（循環論法）は絶対禁止！ ★★★
+  ダメな例: 例題「二酸化炭素がたくさん出るのはなぜ？」→答え「二酸化炭素が出るから」
+- ★★★ 問いと答えが論理的につながらないのは絶対禁止！（最も重要）★★★
+  ダメな例: 例題「火力発電で使われる燃料は？」→答え「地球温暖化」（燃料を聞いているのに温暖化と答えている → つながっていない！正しくは「石油・石炭・天然ガス」）
+  ダメな例: 例題「日本の人口は？」→答え「少子高齢化」（人口の数を聞いているのに現象名を答えている → つながっていない！）
+  ダメな例: 例題「光合成で作られる物質は？」→答え「葉緑体」（作られる物質を聞いているのに場所を答えている → つながっていない！正しくは「デンプン」）
+  ★ 「問い」に対して「答え」が正しい回答になっているか、声に出して確認すること ★
 
 - 例題の答えは、その学年の児童が教科書で習う用語を使うこと
 - 児童が知らない専門用語（氷河地形、堆積作用など）は答えにしないこと
@@ -16025,9 +16036,9 @@ ${card.unit_name || ''}
 
 以下のJSON形式で回答してください：
 {
-  "example_problem": "例題の問題文（1〜2文、本問題と直接関連する内容。★必ず本問題の答え'${mainAnswer}'に関連するキーワードを含めること★。ただし問い方は本問題と異なること）",
-  "example_solution": "解き方の説明と答え（★本問題の答え'${mainAnswer}'を直接書かないこと★。最後に『この知識は次の問題を解くヒントになるよ！』等を添える）",
-  "example_answer": "例題の答え（${mainAnswer}とは異なるが、同じトピックの関連語・関連値）"
+  "example_problem": "例題の問題文（1〜2文。★必ず本問題の答え'${mainAnswer}'に関連するキーワードを含めること★。問い方は本問題と異なること。★★★最重要: この問題文に対してexample_answerが『正解』になるように作ること★★★）",
+  "example_solution": "解き方の説明（★本問題の答え'${mainAnswer}'を直接書かないこと★。最後に『この知識は次の問題を解くヒントになるよ！』等を添える）",
+  "example_answer": "例題の答え（★★★example_problemの問いに対する正しい回答であること。${mainAnswer}とは異なるが同じトピックの関連語。問い→答えの論理的つながりを必ず確認★★★）"
 }`
 
     const controller = new AbortController()
@@ -16104,6 +16115,58 @@ ${card.unit_name || ''}
       if (rpLower.includes(raLower) || (raStem.length >= 2 && rpLower.includes(raStem))) {
         console.warn(`🔧 例題修正: トートロジー検出 — 例題の答え "${resultAnswer}" が問題文に含まれている`)
         return c.json({ success: false, error: 'Tautological question - answer already in problem text' }, 500)
+      }
+    }
+    
+    // ★★★ 論理的一貫性検証: 例題の問い→答えが論理的につながっているか ★★★
+    if (resultProblem && resultAnswer && resultProblem.length >= 5 && resultAnswer.length >= 1) {
+      try {
+        const coherenceCheckPrompt = `以下の「問い」と「答え」の組み合わせが論理的に正しいか判定してください。
+
+問い: ${resultProblem}
+答え: ${resultAnswer}
+
+判定基準:
+- 「問い」で聞かれていることに対して「答え」が正しい回答になっているか
+- 例: 問い「光合成に必要な気体は？」→ 答え「二酸化炭素」= ✅ 正しい
+- 例: 問い「火力発電で使われる燃料は？」→ 答え「地球温暖化」= ❌ 燃料を聞いているのに現象名を答えている
+- 例: 問い「日本の人口は？」→ 答え「少子高齢化」= ❌ 人口の数を聞いているのに現象名を答えている
+- 例: 問い「氷河が海岸を削ってできた地形は？」→ 答え「氷河」= ❌ 地形名を聞いているのに氷河と答えている
+
+「正しい」か「正しくない」のどちらかのみ回答してください。正しくない場合は理由も1文で。
+回答形式: {"coherent": true} または {"coherent": false, "reason": "理由"}`
+
+        const coherenceController = new AbortController()
+        const coherenceTimeout = setTimeout(() => coherenceController.abort(), 8000)
+        
+        const coherenceResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: coherenceController.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: coherenceCheckPrompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 200 }
+            })
+          }
+        )
+        clearTimeout(coherenceTimeout)
+
+        const coherenceData = await coherenceResponse.json() as any
+        const coherenceText = coherenceData?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const coherenceJsonMatch = coherenceText.match(/\{[\s\S]*\}/)
+        if (coherenceJsonMatch) {
+          const coherenceResult = JSON.parse(coherenceJsonMatch[0])
+          if (coherenceResult.coherent === false) {
+            console.warn(`🔧 例題修正: 論理的一貫性なし — 問い「${resultProblem}」→答え「${resultAnswer}」: ${coherenceResult.reason || '不整合'}`)
+            return c.json({ success: false, error: `Incoherent Q&A: ${coherenceResult.reason || 'answer does not match question'}` }, 500)
+          }
+        }
+        console.log(`✅ 例題の論理的一貫性チェック通過: 問い→答え OK`)
+      } catch (coherenceErr: any) {
+        // タイムアウトなどの場合はスキップ（生成された例題は保存する）
+        console.warn(`⚠️ 論理的一貫性チェックスキップ: ${coherenceErr.message}`)
       }
     }
     
@@ -16211,9 +16274,11 @@ app.post('/api/fix-all-examples', async (c) => {
 - 答えは${card.grade_level || '小学5'}年生が教科書で習う用語を使うこと。習わない専門用語（氷河地形、堆積作用等）は禁止
 - ★★★ 例題の答えを例題の問題文の中に書かないこと！答えが問題文を読めばわかってしまうトートロジー（循環論法）は禁止！★★★
   ダメな例: 問題「二酸化炭素が出るのはなぜ？」→答え「二酸化炭素が出るから」
+- ★★★ 最重要: example_answerはexample_problemの問いに対する正しい回答であること。問い→答えが論理的につながらないのは絶対禁止 ★★★
+  ダメな例: 問い「使われる燃料は？」→答え「地球温暖化」（燃料を聞いているのに現象名を答えている）
 - ${card.grade_level || '小学5'}年生にわかる日本語で書く
 以下のJSON形式で回答：
-{"example_problem":"例題の問題文（本問題と直接関連する内容。★答えは問題文に含めない★）","example_solution":"解き方の説明","example_answer":"例題の答え（同じトピックの関連語・関連値）"}`
+{"example_problem":"例題の問題文（本問題と直接関連する内容。★答えは問題文に含めない★）","example_solution":"解き方の説明","example_answer":"例題の答え（★example_problemの問いに対する正しい回答であること★）"}`
 
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 20000)
@@ -16832,9 +16897,9 @@ ${customInfo}${mikataSection}
       "textbook_page": "p.XX",
       "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）。★★★絶対に答え（answer）そのものを含めないこと。背景知識や前提となる用語のみ★★★",
-      "example_problem": "【★★★超重要★★★】例題は本問題と同じトピックに関連するが、answerとは絶対に異なる答えになる別の問い。例：本問題の答えが『ゲルマン系』→例題の答えは『ラテン系』や『インド・ヨーロッパ語族』など別の答え。本問題の答えと例題の答えが同じ文字列になることは絶対禁止。",
+      "example_problem": "【★★★超重要★★★】例題は本問題と同じトピックに関連するが、answerとは絶対に異なる答えになる別の問い。例：本問題の答えが『ゲルマン系』→例題の答えは『ラテン系』や『インド・ヨーロッパ語族』など別の答え。本問題の答えと例題の答えが同じ文字列になることは絶対禁止。★★★最重要: example_problemの問いに対してexample_answerが正しい回答になること。問い→答えの論理的つながりを必ず確認★★★",
       "example_solution": "例題の解き方の丁寧な説明。例題専用の答えも最後に明記する。★例題の答えは本問題のanswerと絶対に同じにしないこと★",
-      "example_answer": "例題の答え。★★★本問題のanswerと完全に異なる値にすること。同じ単語・同じフレーズは絶対禁止★★★",
+      "example_answer": "例題の答え。★★★本問題のanswerと完全に異なる値にすること。かつexample_problemの問いに対する正しい回答であること。問い→答えが論理的につながるか声に出して確認すること★★★",
       "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）。★★★重要: 本問題の答え（answer）や例題の答え（example_answer）の文字を図に直接書かないこと。代わりに「？」や関連するヒント図を使う★★★",
       "real_world_connection": "実生活とのつながり（1文）",
       "answer": "正解（具体的・明確に。自動採点可能な短い答え。★例題の答えとは異なる値にする★）",
