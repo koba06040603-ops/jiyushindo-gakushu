@@ -1857,10 +1857,6 @@ async function renderTopPage() {
         </div>
       </div>
 
-      ${teacherMenuHtml}
-      ${adminMenuHtml}
-      ${teacherOnlySectionsHtml}
-
       <div class="bg-white rounded-2xl shadow-2xl mb-8 overflow-hidden">
         <!-- ステップバー -->
         <div class="bg-gradient-to-r from-purple-600 to-pink-500 p-6">
@@ -1980,6 +1976,10 @@ async function renderTopPage() {
           </div>
         </div>
       </div>
+
+      ${teacherMenuHtml}
+      ${adminMenuHtml}
+      ${teacherOnlySectionsHtml}
 
       ${isAdmin ? `<!-- 学習スタイル別サンプル（プレゼン用・管理者のみ） -->
       <div class="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg shadow-xl p-8 mb-8">
@@ -6370,17 +6370,40 @@ async function loadCardPage(cardId) {
         const exL = exAnswer.toLowerCase()
         return avL === exL || avL.includes(exL) || exL.includes(avL)
       })
-      if (exMatchesMain) {
-        // 例題の答えが本題と同じ → 例題の解き方と答えから本題の答えを隠す
-        card.example_answer = '（この例題の答えは解説を見てください）'
-        card.example_solution = filterAnswerFromHint(card.example_solution || '', answerStr, kw)
+      
+      // ★★★ 例題の問題文が本題と実質同じかチェック ★★★
+      const problemText = (card.problem_text || card.problem_description || '').trim()
+      const exProblem = (card.example_problem || '').trim()
+      let exProblemIsSame = false
+      if (problemText && exProblem && problemText.length >= 10 && exProblem.length >= 10) {
+        // 短い方の文字列が長い方に含まれていたら同じ問題
+        const pLower = problemText.toLowerCase()
+        const eLower = exProblem.toLowerCase()
+        if (pLower.includes(eLower) || eLower.includes(pLower)) {
+          exProblemIsSame = true
+        }
+        // 共通文字数が70%以上なら同じ問題とみなす
+        if (!exProblemIsSame) {
+          const shorter = pLower.length < eLower.length ? pLower : eLower
+          const longer = pLower.length >= eLower.length ? pLower : eLower
+          let commonChars = 0
+          for (let i = 0; i < shorter.length; i++) {
+            if (longer.includes(shorter[i])) commonChars++
+          }
+          if (commonChars / shorter.length > 0.7) exProblemIsSame = true
+        }
       }
-      // ★★★ 例題の問題文と解き方テキストからも本題の答えを常に除去 ★★★
-      // （例題内に本題の答えが直接書かれていたら児童にバレる）
-      if (answerStr.length >= 2) {
-        card.example_solution = filterAnswerFromHint(card.example_solution || '', answerStr, kw)
-        card.example_problem = filterAnswerFromHint(card.example_problem || '', answerStr, kw)
+      
+      if (exMatchesMain || exProblemIsSame) {
+        // 例題の答えが本題と同じ、または例題の問題文が本題と実質同じ → 自動修正が必要
+        card._needsExampleFix = true
+        if (exMatchesMain) {
+          card.example_answer = '（AIが例題を改善中…）'
+        }
       }
+      // ★★★ 例題の解き方(example_solution)と問題文(example_problem)はフィルタしない ★★★
+      // 例題は本題への橋渡し（ヒント）なので、本題の答えに触れる文脈が必要。
+      // 例題の中に答えが書かれていても、それは例題としての解説であり学習上必要。
     }
     
     // カードデータをグローバルに保存（ヘルプ要請時に使用）

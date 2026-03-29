@@ -9279,13 +9279,13 @@ app.get('/guide/:curriculumId', async (c) => {
           card.ai_teacher_advice = ssrStrip(card.ai_teacher_advice || '')
           card.new_terms = ssrFilterList(card.new_terms || '')
           card.teacher_help_keywords = ssrFilterList(card.teacher_help_keywords || '')
-          // 例題の答えが本題の答えと同じ場合
+          // 例題の答えが本題の答えと同じ場合 → 例題の答えを空にして修正APIに委ねる
+          // ★ example_solution はフィルタしない（例題の解き方は表示すべき）
           if (exAns && variants.some(v => {
             const vL = v.toLowerCase(), eL = exAns.toLowerCase()
             return vL === eL || vL.includes(eL) || eL.includes(vL)
           })) {
             card.example_answer = ''
-            card.example_solution = ssrStrip(exSol)
           }
         }
         
@@ -15774,9 +15774,26 @@ app.post('/api/fix-example', async (c) => {
         exampleSolution.includes(mainAnswer)
 
       // example_answerが空、または問題の答えと同じ、または解き方に問題の答えが含まれる
+      // または例題の問題文が本題の問題文とほぼ同じ
+      const problemText = (card.problem_text || card.problem_description || '').trim()
+      const exProblem = (card.example_problem || '').trim()
+      let exProblemTooSimilar = false
+      if (problemText && exProblem && problemText.length >= 10 && exProblem.length >= 10) {
+        const pL = problemText.toLowerCase(), eL = exProblem.toLowerCase()
+        if (pL.includes(eL) || eL.includes(pL)) exProblemTooSimilar = true
+        if (!exProblemTooSimilar) {
+          const shorter = pL.length < eL.length ? pL : eL
+          const longer = pL.length >= eL.length ? pL : eL
+          let cc = 0
+          for (let i = 0; i < shorter.length; i++) { if (longer.includes(shorter[i])) cc++ }
+          if (cc / shorter.length > 0.7) exProblemTooSimilar = true
+        }
+      }
+      
       const needsFix = !exampleAnswer || 
         exampleAnswer === mainAnswer || 
         solutionContainsAnswer ||
+        exProblemTooSimilar ||
         (card.example_problem && mainAnswer && card.example_problem.includes(mainAnswer) && exampleSolution.includes(mainAnswer))
 
       if (!needsFix) {
@@ -15816,6 +15833,9 @@ ${card.unit_name || ''}
 
 【★最重要ルール★】
 - 例題は本問題と「同じ具体的なトピック」に直接関連する問題にすること
+- ★★★ 例題の「問い方」は本問題と必ず異なること。同じ問いを別の言い方にしただけはNG ★★★
+  → NG例: 本問題「イタリアで最も信仰されている宗派は？」→例題「バチカン市国があるイタリアで信仰される宗派は？」（言い方が違うだけで同じ問い）
+  → OK例: 本問題「イタリアで最も信仰されている宗派は？」→例題「キリスト教の3大宗派のうち、聖書だけを重視する宗派は？」→答え「プロテスタント」
 - 本問題の答えの「前提知識」「構成要素」「関連概念」を問う問題にすること
 - 例題を解けば、本問題の答えに自然とたどり着けるような流れにすること
 - 例題の答えは「${mainAnswer}」と異なる値にすること
@@ -16556,6 +16576,9 @@ ${customInfo}${mikataSection}
 - 先生に質問するための「先生ヘルプ」用のキーワードを含める
 - 【★超重要★】例題は本問題と「同じ具体的トピック」に直接関連する問題にすること。例題は本問題の「前提知識・構成要素・関連概念」を問う練習問題として機能する。
 - 【★超重要★】例題と本問題の答えは異なる値だが、トピックは必ず同じ。全く別のテーマの問題は絶対禁止。
+- 【★超重要★】例題の「問い方」は本問題と完全に異なること。本問題を言い換えただけの問題は禁止。例題は本問題の「前提知識」や「関連概念」を問う別の問いにすること。
+  - NG例: 本問題「イタリアで最も信仰される宗派は？」→例題「バチカン市国があるイタリアの宗派は？」（同じ問い）
+  - OK例: 本問題「イタリアで最も信仰される宗派は？」→例題「キリスト教の3大宗派のうち聖書だけを重視する宗派は？」→答え「プロテスタント」
   - 算数・数学：同じ解き方で数値だけ変えた簡単な問題。例：本問題「3.8×2.5」→例題「1.2×3」
   - 用語問題：同じトピックの前提知識・構成要素を問う。例：本問題「フィヨルド」→例題「日本の三陸海岸のような入り組んだ海岸地形を何という？」→答え「リアス海岸」
   - 社会・理科：本問題の理解に必要な前提知識を問う。例：本問題「光合成」→例題「光合成に必要な気体は？」→答え「二酸化炭素」
