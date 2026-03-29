@@ -6403,27 +6403,19 @@ async function loadCardPage(cardId) {
         }
       }
       
-      // 例題に問題がある場合の対処
-      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame
+      // ★★★ 例題に問題がある場合の対処 ★★★
+      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame || exSolutionContainsAnswer
       if (exampleNeedsFix) {
-        // 自動修正をトリガー
+        // 自動修正をトリガー — 例題全体を「改善中」表示にして fix-example API を呼ぶ
         card._needsExampleFix = true
-        if (exAnswerMatchesMain) {
-          card.example_answer = '（AIが例題を改善中…）'
-        }
+        card._originalExampleProblem = card.example_problem
+        card._originalExampleSolution = card.example_solution
+        card._originalExampleAnswer = card.example_answer
+        // 表示用に「改善中」にする（本題の答えが見えてしまうのを防止）
+        card.example_problem = '（AIが例題を改善しています…しばらくお待ちください）'
+        card.example_solution = ''
+        card.example_answer = ''
       }
-      
-      // ★★★ example_solution 内の本題の答えフィルタ ★★★
-      // 例題の答えが本題と同じ、または解き方テキスト内に本題の答えが含まれる場合
-      // → 本題の答え部分だけ●●●に置換（例題の解説文脈は残す）
-      if (exAnswerMatchesMain || exSolutionContainsAnswer) {
-        card.example_solution = filterAnswerFromHint(card.example_solution || '', answerStr, kw)
-        if (exAnswerMatchesMain) {
-          card.example_answer = '（AIが例題を改善中…）'
-        }
-      }
-      // ★★★ example_problem はフィルタしない ★★★
-      // 例題は本題への橋渡し（ヒント）なので、問題文に本題の答えのキーワードが入っているのは正常。
     }
     
     // カードデータをグローバルに保存（ヘルプ要請時に使用）
@@ -7423,6 +7415,69 @@ async function loadCardPage(cardId) {
     // ドロップゾーン初期化（D&D・クリップボード対応）
     if (typeof initAllDropZones === 'function') {
       setTimeout(() => initAllDropZones(), 300)
+    }
+
+    // ★★★ 例題自動修正: _needsExampleFix の場合は API を呼んで例題を再生成 ★★★
+    if (card._needsExampleFix) {
+      const fixCardId = card.card_id || card.id
+      console.log('🔧 例題自動修正を開始: card_id=' + fixCardId)
+      setTimeout(async () => {
+        try {
+          const fixResp = await axios.post('/api/fix-example', { card_id: fixCardId })
+          if (fixResp.data?.success && fixResp.data?.fixed) {
+            console.log('✅ 例題自動修正完了:', fixResp.data)
+            // DOM上の例題セクションを更新
+            const exampleContainer = document.querySelector('.bg-white.rounded-lg.shadow-lg.p-6')
+            if (exampleContainer) {
+              const newProblem = fixResp.data.example_problem || ''
+              const newSolution = fixResp.data.example_solution || ''
+              const newAnswer = fixResp.data.example_answer || ''
+              // 例題の問題文を更新
+              const problemPre = exampleContainer.querySelector('.bg-yellow-50 pre')
+              if (problemPre) problemPre.innerHTML = formatText(newProblem)
+              // 例題の解き方・答えを更新
+              const solutionDiv = exampleContainer.querySelector('.bg-green-50')
+              if (solutionDiv) {
+                solutionDiv.innerHTML = `
+                  <h4 class="card-heading font-bold text-green-800 mb-2 flex items-center gap-2">
+                    <i class="fas fa-check-circle mr-1"></i>解き方・答え
+                    <span class="text-xs text-gray-400 font-normal">（自分で考えてから見てね）</span>
+                  </h4>
+                  <details>
+                    <summary class="cursor-pointer text-sm text-green-600 font-bold hover:text-green-800 transition py-1"><i class="fas fa-eye mr-1"></i>答えを見る</summary>
+                    <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans mt-2">${formatText(newSolution)}</pre>
+                  </details>`
+              } else if (newSolution) {
+                // 解き方セクションがなかった場合は追加
+                const yellowBg = exampleContainer.querySelector('.bg-yellow-50')
+                if (yellowBg) {
+                  yellowBg.insertAdjacentHTML('afterend', `
+                    <div class="bg-green-50 rounded-lg p-4">
+                      <h4 class="card-heading font-bold text-green-800 mb-2 flex items-center gap-2">
+                        <i class="fas fa-check-circle mr-1"></i>解き方・答え
+                        <span class="text-xs text-gray-400 font-normal">（自分で考えてから見てね）</span>
+                      </h4>
+                      <details>
+                        <summary class="cursor-pointer text-sm text-green-600 font-bold hover:text-green-800 transition py-1"><i class="fas fa-eye mr-1"></i>答えを見る</summary>
+                        <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans mt-2">${formatText(newSolution)}</pre>
+                      </details>
+                    </div>`)
+                }
+              }
+              // グローバルデータも更新
+              if (window.currentCardData?.card) {
+                window.currentCardData.card.example_problem = newProblem
+                window.currentCardData.card.example_solution = newSolution
+                window.currentCardData.card.example_answer = newAnswer
+              }
+            }
+          } else {
+            console.log('🔧 例題修正: 修正不要またはエラー', fixResp.data)
+          }
+        } catch (fixErr) {
+          console.error('🔧 例題自動修正エラー:', fixErr)
+        }
+      }, 500) // ページ描画後に非同期で実行
     }
 
   } catch (error) {

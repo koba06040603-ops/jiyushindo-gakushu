@@ -9247,9 +9247,28 @@ app.get('/guide/:curriculumId', async (c) => {
         const mainAns = (card.correct_answer || card.answer || '').toString().trim()
         const exAns = (card.example_answer || '').toString().trim()
         const exSol = (card.example_solution || '').toString().trim()
+        const exProb = (card.example_problem || '').toString().trim()
+        const problemTxt = (card.problem_text || card.problem_description || '').toString().trim()
+        
+        // 例題の問題文が本題とほぼ同じかチェック
+        let exProbTooSimilar = false
+        if (exProb && problemTxt && exProb.length >= 10 && problemTxt.length >= 10) {
+          const pL = problemTxt.toLowerCase(), eL = exProb.toLowerCase()
+          if (pL.includes(eL) || eL.includes(pL)) exProbTooSimilar = true
+          if (!exProbTooSimilar) {
+            const shorter = pL.length < eL.length ? pL : eL
+            const longer = pL.length >= eL.length ? pL : eL
+            let cc = 0
+            for (let i = 0; i < shorter.length; i++) { if (longer.includes(shorter[i])) cc++ }
+            if (cc / shorter.length > 0.7) exProbTooSimilar = true
+          }
+        }
+        
         const needsExampleFix = card.example_problem && mainAns && (
           (exAns && exAns === mainAns) ||
-          (!exAns && exSol && exSol.includes(mainAns))
+          (!exAns && exSol && exSol.includes(mainAns)) ||
+          (exSol && mainAns && exSol.includes(mainAns)) ||
+          exProbTooSimilar
         )
         
         // ★★★ SSR用: 答え漏洩防止フィルタリング（フロントのJSロード前に表示されるHTML用） ★★★
@@ -9279,20 +9298,18 @@ app.get('/guide/:curriculumId', async (c) => {
           card.ai_teacher_advice = ssrStrip(card.ai_teacher_advice || '')
           card.new_terms = ssrFilterList(card.new_terms || '')
           card.teacher_help_keywords = ssrFilterList(card.teacher_help_keywords || '')
-          // 例題の答えが本題の答えと同じ場合 → example_answer を空にして修正APIに委ねる
-          // + example_solution 内の本題の答えもフィルタ
+          // ★★★ 例題に問題がある場合 → 例題全体を「改善中」にする（●●●ではなく） ★★★
           const exAnsMatchesMain = exAns && variants.some(v => {
             const vL = v.toLowerCase(), eL = exAns.toLowerCase()
             return vL === eL || vL.includes(eL) || eL.includes(vL)
           })
           const exSolContainsAnswer = exSol && variants.some(v => exSol.includes(v))
           
-          if (exAnsMatchesMain) {
+          if (exAnsMatchesMain || exSolContainsAnswer || exProbTooSimilar) {
+            // 例題全体を「改善中」に置換（答え漏洩防止）
+            card.example_problem = '（AIが例題を改善しています…しばらくお待ちください）'
+            card.example_solution = ''
             card.example_answer = ''
-          }
-          // example_solution 内に本題の答えがある場合はフィルタ
-          if (exAnsMatchesMain || exSolContainsAnswer) {
-            card.example_solution = ssrStrip(card.example_solution || '')
           }
         }
         
@@ -9631,14 +9648,35 @@ app.get('/guide/:curriculumId', async (c) => {
     setTimeout(function() {
       var cardsToFix = [];
       ALL_CARDS.forEach(function(c, idx) {
-        if (!c.card_id || !c.example_problem) return;
+        if (!c.card_id) return;
         var mainAns = (c.correct_answer || c.answer || '').trim();
+        if (!mainAns) return;
         var exAns = (c.example_answer || '').trim();
         var exSol = (c.example_solution || '').trim();
-        if (c._needsExampleFix || (mainAns && (
-          (exAns && exAns === mainAns) ||
-          (!exAns && exSol && exSol.indexOf(mainAns) >= 0)
-        ))) {
+        var exProb = (c.example_problem || '').trim();
+        var probText = (c.problem_text || c.problem_description || '').trim();
+        
+        // 例題の答えが本題と同じ
+        var answerSame = exAns && exAns === mainAns;
+        // example_solution 内に本題の答えが含まれる
+        var solContains = exSol && exSol.indexOf(mainAns) >= 0;
+        // 例題の問題文が本題とほぼ同じ
+        var probSimilar = false;
+        if (exProb && probText && exProb.length >= 10 && probText.length >= 10) {
+          var pL = probText.toLowerCase(), eL = exProb.toLowerCase();
+          if (pL.indexOf(eL) >= 0 || eL.indexOf(pL) >= 0) probSimilar = true;
+          if (!probSimilar) {
+            var shorter = pL.length < eL.length ? pL : eL;
+            var longer = pL.length >= eL.length ? pL : eL;
+            var cc = 0;
+            for (var i = 0; i < shorter.length; i++) { if (longer.indexOf(shorter[i]) >= 0) cc++; }
+            if (cc / shorter.length > 0.7) probSimilar = true;
+          }
+        }
+        // 「改善中」メッセージが表示されている場合も修正が必要
+        var isPlaceholder = exProb && exProb.indexOf('AIが例題を改善しています') >= 0;
+        
+        if (c._needsExampleFix || answerSame || solContains || probSimilar || isPlaceholder) {
           cardsToFix.push({ idx: idx, cardId: c.card_id });
         }
       });
@@ -10802,8 +10840,26 @@ app.get('/guide/:curriculumId', async (c) => {
       var isSameAnswer = c._needsExampleFix || (mainAns && (
         (exAns && mainVariants.some(function(v){ return variantMatch(v, exAns); })) || 
         (!exAns && exSol && mainVariants.some(function(v){ return exSol.indexOf(v) >= 0; })) ||
-        (c.example_problem && mainVariants.some(function(v){ return c.example_problem.indexOf(v) >= 0; }) && exSol && mainVariants.some(function(v){ return exSol.indexOf(v) >= 0; }))
+        (exSol && mainVariants.some(function(v){ return exSol.indexOf(v) >= 0; }))
       ));
+      // 例題の問題文が本題とほぼ同じかチェック
+      if (!isSameAnswer && c.example_problem && (c.problem_text || c.problem_description)) {
+        var pText = (c.problem_text || c.problem_description || '').trim();
+        var eText = c.example_problem.trim();
+        if (pText.length >= 10 && eText.length >= 10) {
+          var pL2 = pText.toLowerCase(), eL2 = eText.toLowerCase();
+          if (pL2.indexOf(eL2) >= 0 || eL2.indexOf(pL2) >= 0) isSameAnswer = true;
+          if (!isSameAnswer) {
+            var sh = pL2.length < eL2.length ? pL2 : eL2;
+            var lo = pL2.length >= eL2.length ? pL2 : eL2;
+            var cc2 = 0;
+            for (var j = 0; j < sh.length; j++) { if (lo.indexOf(sh[j]) >= 0) cc2++; }
+            if (cc2 / sh.length > 0.7) isSameAnswer = true;
+          }
+        }
+      }
+      // 「改善中」プレースホルダーの場合も修正トリガー
+      if (c.example_problem && c.example_problem.indexOf('AIが例題を改善しています') >= 0) isSameAnswer = true;
 
       html += '<div id="example-section-' + currentPage + '" style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:12px;">';
       
@@ -15850,6 +15906,7 @@ ${card.unit_name || ''}
   → 例: 本問題の答えが「フィヨルド」なら、例題文に「フィヨルドを作った〜」「フィヨルドのような入り組んだ海岸〜」等を入れる
   → これにより、例題を読むだけで「${mainAnswer}」という言葉に触れ、本問題のヒントになる
 - ★★★ 例題の解き方（example_solution）の最後に「この知識は次の問題を解くヒントになるよ！」等の一文を必ず添え、本問題への橋渡しを明確にすること ★★★
+- ★★★ 最重要: 例題の解き方（example_solution）の中に本問題の答え「${mainAnswer}」を直接書かないこと。「次の問題のヒントになるよ！」等の間接的な表現のみ使うこと ★★★
 
 【良い例 — このパターンに必ず従うこと】
 - 本問題の答え「フィヨルド」→例題「フィヨルドを作った、山の上から流れてくる大きな氷のかたまりを何という？」→答え「氷河」→解き方「氷河は雪が長い年月かけて固まったもの。この氷河が海岸を削って、フィヨルドという地形ができたんだよ。この知識は次の問題を解くヒントになるよ！」
@@ -15873,8 +15930,8 @@ ${card.unit_name || ''}
 
 以下のJSON形式で回答してください：
 {
-  "example_problem": "例題の問題文（1〜2文、本問題と直接関連する内容。★必ず本問題の答え'${mainAnswer}'に関連するキーワードを含めること★）",
-  "example_solution": "解き方の説明と答え（最後に『この知識は次の問題を解くヒントになるよ！』等を添える）",
+  "example_problem": "例題の問題文（1〜2文、本問題と直接関連する内容。★必ず本問題の答え'${mainAnswer}'に関連するキーワードを含めること★。ただし問い方は本問題と異なること）",
+  "example_solution": "解き方の説明と答え（★本問題の答え'${mainAnswer}'を直接書かないこと★。最後に『この知識は次の問題を解くヒントになるよ！』等を添える）",
   "example_answer": "例題の答え（${mainAnswer}とは異なるが、同じトピックの関連語・関連値）"
 }`
 
@@ -15907,10 +15964,54 @@ ${card.unit_name || ''}
 
     const result = JSON.parse(jsonMatch[0])
     
-    // 答えが同じでないか最終チェック
-    if ((result.example_answer || '').trim() === mainAnswer) {
-      console.warn('🔧 例題修正: AIが同じ答えを返した')
+    // 答えが同じでないか最終チェック（語幹比較も含む）
+    const resultAnswer = (result.example_answer || '').trim()
+    const mainStem = mainAnswer.replace(/[系語族型類科目派流]+$/u, '')
+    const resultStem = resultAnswer.replace(/[系語族型類科目派流]+$/u, '')
+    const mainVariantsCheck = [mainAnswer.toLowerCase()]
+    if (mainStem && mainStem.length >= 2 && mainStem !== mainAnswer) mainVariantsCheck.push(mainStem.toLowerCase())
+    const resultLower = resultAnswer.toLowerCase()
+    const resultStemLower = resultStem.toLowerCase()
+    const isSameResult = mainVariantsCheck.some(v => 
+      v === resultLower || v === resultStemLower || v.includes(resultLower) || resultLower.includes(v)
+    )
+    if (isSameResult) {
+      console.warn(`🔧 例題修正: AIが同じ答えを返した (${resultAnswer} ≈ ${mainAnswer})`)
       return c.json({ success: false, error: 'AI returned same answer' }, 500)
+    }
+    
+    // 例題の問題文が本題とほぼ同じでないかチェック
+    const resultProblem = (result.example_problem || '').trim()
+    const originalProblem = (card.problem_text || card.problem_description || '').trim()
+    if (resultProblem && originalProblem && resultProblem.length >= 10 && originalProblem.length >= 10) {
+      const rpL = resultProblem.toLowerCase(), opL = originalProblem.toLowerCase()
+      let tooSimilarResult = false
+      if (rpL.includes(opL) || opL.includes(rpL)) tooSimilarResult = true
+      if (!tooSimilarResult) {
+        const sh = rpL.length < opL.length ? rpL : opL
+        const lo = rpL.length >= opL.length ? rpL : opL
+        let cc = 0
+        for (let i = 0; i < sh.length; i++) { if (lo.includes(sh[i])) cc++ }
+        if (cc / sh.length > 0.7) tooSimilarResult = true
+      }
+      if (tooSimilarResult) {
+        console.warn(`🔧 例題修正: AIが本題と類似した問題文を返した`)
+        return c.json({ success: false, error: 'AI returned similar problem' }, 500)
+      }
+    }
+    
+    // example_solution 内に本題の答えが含まれていないかチェック
+    const resultSolution = (result.example_solution || '').trim()
+    if (resultSolution && mainVariantsCheck.some(v => resultSolution.toLowerCase().includes(v))) {
+      console.warn(`🔧 例題修正: example_solution に本題の答え "${mainAnswer}" が含まれている — 除去`)
+      // 答えの部分を除去してから保存
+      let cleanedSolution = resultSolution
+      const sortedVariants = [mainAnswer, mainStem].filter(v => v && v.length >= 2).sort((a, b) => b.length - a.length)
+      for (const v of sortedVariants) {
+        const escaped = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        cleanedSolution = cleanedSolution.replace(new RegExp(escaped, 'gi'), '（関連語）')
+      }
+      result.example_solution = cleanedSolution
     }
 
     // DBを更新
@@ -17457,8 +17558,40 @@ app.post('/api/curriculum/save-generated', async (c) => {
               return vL === exLower || vL.includes(exLower) || exLower.includes(vL)
             })
             if (isSame) {
-              console.warn(`⚠️ カード${ci + 1}: example_answer="${exAns}" が answer="${answerText}" と同じ → 空にして修正APIに委ねる`)
+              console.warn(`⚠️ カード${ci + 1}: example_answer="${exAns}" が answer="${answerText}" と同じ → 例題全体をクリアして修正APIに委ねる`)
               card.example_answer = ''
+              card.example_problem = ''
+              card.example_solution = ''
+            }
+          }
+          
+          // ★★★ example_solution 内に本題の答えが含まれている場合もクリア ★★★
+          const exSol = s(card.example_solution).trim()
+          if (exSol && variants.some(v => exSol.includes(v))) {
+            console.warn(`⚠️ カード${ci + 1}: example_solution に answer="${answerText}" が含まれている → 例題全体をクリアして修正APIに委ねる`)
+            card.example_answer = ''
+            card.example_problem = ''
+            card.example_solution = ''
+          }
+          
+          // ★★★ 例題の問題文が本題と実質同じかチェック ★★★
+          const exProb = s(card.example_problem).trim()
+          if (exProb && problemText && exProb.length >= 10 && problemText.length >= 10) {
+            const pL = problemText.toLowerCase(), eL = exProb.toLowerCase()
+            let tooSimilar = false
+            if (pL.includes(eL) || eL.includes(pL)) tooSimilar = true
+            if (!tooSimilar) {
+              const shorter = pL.length < eL.length ? pL : eL
+              const longer = pL.length >= eL.length ? pL : eL
+              let cc = 0
+              for (let i = 0; i < shorter.length; i++) { if (longer.includes(shorter[i])) cc++ }
+              if (cc / shorter.length > 0.7) tooSimilar = true
+            }
+            if (tooSimilar) {
+              console.warn(`⚠️ カード${ci + 1}: example_problem が本題と類似 → 例題全体をクリアして修正APIに委ねる`)
+              card.example_answer = ''
+              card.example_problem = ''
+              card.example_solution = ''
             }
           }
           
