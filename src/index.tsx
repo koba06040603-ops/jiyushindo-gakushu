@@ -4804,8 +4804,8 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
     "difficulty_level": "standard",
     "ai_teacher_message": "この問題のポイントを一言で",
     "ai_teacher_advice": "取り組むコツ",
-    "teacher_help_keywords": "先生に聞くときのキーワード",
-    "new_terms": "新出語句（あれば）"
+    "teacher_help_keywords": "先生に聞くときのキーワード。★答えそのものは絶対に含めない。考え方のキーワードのみ★",
+    "new_terms": "新出語句。★答えそのものは絶対に含めない。背景知識や前提用語のみ★"
   }
 ]
 
@@ -4813,6 +4813,7 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
 - difficulty_levelは必ず "easy", "standard", "hard" のいずれかにすること
 - 各カードの40%以上は発展的内容（hard）にすること
 - 小学生が理解しやすい言葉で書くこと
+- ★★★ new_terms, teacher_help_keywords, hint_text には答え（correct_answer）そのものを絶対に含めないこと。答えがバレてしまう ★★★
 - JSON配列のみを返すこと（説明文不要）`
 
     const geminiResponse = await fetch(
@@ -16543,7 +16544,7 @@ ${customInfo}${mikataSection}
       "card_type": "main",
       "textbook_page": "p.XX",
       "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
-      "new_terms": "この問題で学ぶ新出用語（カンマ区切り）",
+      "new_terms": "この問題で学ぶ新出用語（カンマ区切り）。★★★絶対に答え（answer）そのものを含めないこと。背景知識や前提となる用語のみ★★★",
       "example_problem": "【★超重要★】例題は本問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う。答えは異なるがトピックは同じ。例：本問題『フィヨルド』→例題『入り組んだ海岸地形を何という？』答え:『リアス海岸』。全く別のテーマ・児童が習わない専門用語は絶対禁止。",
       "example_solution": "例題の解き方の丁寧な説明（途中式・図解の指示を含む）。例題専用の答えも最後に明記する。",
       "example_answer": "例題の答え（本問題のanswerとは異なる値だが、同じトピックの関連語）",
@@ -16554,11 +16555,11 @@ ${customInfo}${mikataSection}
       "answer_explanation": "【★★★最重要★★★】解法プロセス：①数値確認→②公式→③途中式→④答え導出。最低100字。実生活の例は書かない。",
       "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）",
       "ai_teacher_advice": "この問題の学び方アドバイス（30字程度）",
-      "teacher_help_keywords": "先生に質問するときのキーワード（3つ程度）",
+      "teacher_help_keywords": "先生に質問するときのキーワード（3つ程度）。★★★答え（answer）そのものは絶対に含めない。質問の仕方・考え方のキーワードのみ★★★",
       "hints": [
-        {"hint_level": 1, "hint_text": "ヒント1: まず何を考える？（考える方向性を示す）", "thinking_tool_suggestion": "使える思考ツール"},
-        {"hint_level": 2, "hint_text": "ヒント2: 具体的な手がかり（図や式の書き方を示す）", "thinking_tool_suggestion": "使える思考ツール"},
-        {"hint_level": 3, "hint_text": "ヒント3: 答えに近づくための最後のヒント", "thinking_tool_suggestion": "使える思考ツール"}
+        {"hint_level": 1, "hint_text": "ヒント1: まず何を考える？（考える方向性を示す）★答えを直接書かない★", "thinking_tool_suggestion": "使える思考ツール"},
+        {"hint_level": 2, "hint_text": "ヒント2: 具体的な手がかり（図や式の書き方を示す）★答えを直接書かない★", "thinking_tool_suggestion": "使える思考ツール"},
+        {"hint_level": 3, "hint_text": "ヒント3: 答えに近づくための最後のヒント（答えそのものは書かず、あと一歩のところまで導く）", "thinking_tool_suggestion": "使える思考ツール"}
       ],
       "multimedia_ai_content": {
         "short_music": {
@@ -16604,7 +16605,8 @@ ${customInfo}${mikataSection}
 8. カード${Math.ceil(numCards*0.4)}枚目以降は応用的・発展的な内容を含めること
 9. 【★★★解説品質★★★】answer_explanation には必ず途中式・計算過程を含む（最低100字）
 10. 【★★★正解の明確性★★★】answerは自動採点できる明確な答えにし、answer_keywordsに判定用キーワード3つを設定すること
-11. multimedia_ai_content を全カードに含めること`
+11. multimedia_ai_content を全カードに含めること
+12. 【★★★答え漏洩禁止★★★】new_terms, teacher_help_keywords, hints の hint_text には、answer（正解）そのものを絶対に含めないこと。これらのフィールドは問題を解く前に児童に見える。答えがバレると学習効果がゼロになる。背景知識・考え方・アプローチ方法のみを書くこと`
 
     // gemini-3-flash-preview をプライマリ（Gemini 3 Flash・最高推論能力）
     // フォールバック: gemini-2.5-flash（安定）, gemini-2.0-flash（レガシー）

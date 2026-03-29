@@ -6263,6 +6263,65 @@ window.selectCourse = selectCourse
 // window.loadCardPage will be registered after its definition
 
 // ============================================
+// 答え漏洩防止フィルター
+// ============================================
+// new_terms, teacher_help_keywords から答えを除去する
+function filterAnswerFromText(text, answerStr, answerKeywords) {
+  if (!text || !answerStr) return text
+  let filtered = text
+  // 答えの文字列そのものを除去（カンマ区切りのリストの場合は項目ごと除去）
+  const answerLower = answerStr.toLowerCase().trim()
+  const answerVariants = [answerStr.trim()]
+  // 括弧内のよみがなを分離: "北大西洋海流（きたたいせいようかいりゅう）" → ["北大西洋海流", "きたたいせいようかいりゅう"]
+  const bracketMatch = answerStr.match(/^(.+?)[（(](.+?)[）)]$/)
+  if (bracketMatch) {
+    answerVariants.push(bracketMatch[1].trim())
+    answerVariants.push(bracketMatch[2].trim())
+  }
+  // answer_keywords も追加
+  if (answerKeywords && Array.isArray(answerKeywords)) {
+    answerKeywords.forEach(k => { if (k && k.length > 1) answerVariants.push(k.trim()) })
+  }
+  // カンマ・読点区切りの各項目をチェック
+  const items = filtered.split(/[,、，]/).map(s => s.trim()).filter(Boolean)
+  const filteredItems = items.filter(item => {
+    const itemLower = item.toLowerCase().trim()
+    return !answerVariants.some(av => {
+      const avLower = av.toLowerCase()
+      return itemLower === avLower || itemLower.includes(avLower) || avLower.includes(itemLower)
+    })
+  })
+  // すべて除去された場合は空文字を返す
+  return filteredItems.join('、')
+}
+
+// ヒントから答えそのものを隠す（方向性は残す）
+function filterAnswerFromHint(hintText, answerStr) {
+  if (!hintText || !answerStr) return hintText
+  const answer = answerStr.trim()
+  if (answer.length < 2) return hintText
+  const answerVariants = [answer]
+  const bracketMatch = answer.match(/^(.+?)[（(](.+?)[）)]$/)
+  if (bracketMatch) {
+    answerVariants.push(bracketMatch[1].trim())
+    answerVariants.push(bracketMatch[2].trim())
+  }
+  let filtered = hintText
+  answerVariants.forEach(av => {
+    if (av.length >= 2) {
+      // 答え文字列を「●●●」に置換（ヒントの文脈は残す）
+      const escaped = av.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp(escaped, 'gi')
+      filtered = filtered.replace(regex, '●●●')
+    }
+  })
+  return filtered
+}
+
+window.filterAnswerFromText = filterAnswerFromText
+window.filterAnswerFromHint = filterAnswerFromHint
+
+// ============================================
 // 学習カードページ
 // ============================================
 async function loadCardPage(cardId) {
@@ -6279,6 +6338,20 @@ async function loadCardPage(cardId) {
     card.hints = validHints
     card.answer = answer?.answer_text || card.correct_answer || card.answer || card.example_solution || ''
     card.answer_explanation = answer?.explanation || card.answer_explanation || card.explanation || ''
+    
+    // ★★★ 答え漏洩防止: new_terms, teacher_help_keywords から答えキーワードを除去 ★★★
+    const answerStr = (card.answer || '').trim()
+    if (answerStr) {
+      card.new_terms = filterAnswerFromText(card.new_terms, answerStr, card.answer_keywords)
+      card.teacher_help_keywords = filterAnswerFromText(card.teacher_help_keywords, answerStr, card.answer_keywords)
+      // ヒントからも答えそのものを除去
+      if (card.hints && card.hints.length > 0) {
+        card.hints.forEach(h => {
+          h.hint_content = filterAnswerFromHint(h.hint_content || h.hint_text || '', answerStr)
+          h.hint_text = filterAnswerFromHint(h.hint_text || h.hint_content || '', answerStr)
+        })
+      }
+    }
     
     // カードデータをグローバルに保存（ヘルプ要請時に使用）
     window.currentCardData = card
