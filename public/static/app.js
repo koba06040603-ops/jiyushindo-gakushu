@@ -6265,23 +6265,33 @@ window.selectCourse = selectCourse
 // ============================================
 // 答え漏洩防止フィルター
 // ============================================
+// 答え文字列のバリエーション（部分一致も含む）を生成するヘルパー
+function getAnswerVariants(answerStr, answerKeywords) {
+  const variants = [answerStr.trim()]
+  // 括弧内のよみがなを分離: "北大西洋海流（きたたいせいようかいりゅう）" → ["北大西洋海流", "きたたいせいようかいりゅう"]
+  const bracketMatch = answerStr.match(/^(.+?)[（(](.+?)[）)]$/)
+  if (bracketMatch) {
+    variants.push(bracketMatch[1].trim())
+    variants.push(bracketMatch[2].trim())
+  }
+  // 語尾の「系」「語」「族」「型」等を除いた語幹も追加（例:「ゲルマン系」→「ゲルマン」）
+  const stem = answerStr.trim().replace(/[系語族型類科目派流]+$/u, '')
+  if (stem && stem.length >= 2 && stem !== answerStr.trim()) {
+    variants.push(stem)
+  }
+  // answer_keywords も追加
+  if (answerKeywords && Array.isArray(answerKeywords)) {
+    answerKeywords.forEach(k => { if (k && k.length > 1) variants.push(k.trim()) })
+  }
+  // 重複除去
+  return [...new Set(variants.filter(v => v.length >= 2))]
+}
+
 // new_terms, teacher_help_keywords から答えを除去する
 function filterAnswerFromText(text, answerStr, answerKeywords) {
   if (!text || !answerStr) return text
   let filtered = text
-  // 答えの文字列そのものを除去（カンマ区切りのリストの場合は項目ごと除去）
-  const answerLower = answerStr.toLowerCase().trim()
-  const answerVariants = [answerStr.trim()]
-  // 括弧内のよみがなを分離: "北大西洋海流（きたたいせいようかいりゅう）" → ["北大西洋海流", "きたたいせいようかいりゅう"]
-  const bracketMatch = answerStr.match(/^(.+?)[（(](.+?)[）)]$/)
-  if (bracketMatch) {
-    answerVariants.push(bracketMatch[1].trim())
-    answerVariants.push(bracketMatch[2].trim())
-  }
-  // answer_keywords も追加
-  if (answerKeywords && Array.isArray(answerKeywords)) {
-    answerKeywords.forEach(k => { if (k && k.length > 1) answerVariants.push(k.trim()) })
-  }
+  const answerVariants = getAnswerVariants(answerStr, answerKeywords)
   // カンマ・読点区切りの各項目をチェック
   const items = filtered.split(/[,、，]/).map(s => s.trim()).filter(Boolean)
   const filteredItems = items.filter(item => {
@@ -6296,20 +6306,16 @@ function filterAnswerFromText(text, answerStr, answerKeywords) {
 }
 
 // ヒントから答えそのものを隠す（方向性は残す）
-function filterAnswerFromHint(hintText, answerStr) {
+function filterAnswerFromHint(hintText, answerStr, answerKeywords) {
   if (!hintText || !answerStr) return hintText
   const answer = answerStr.trim()
   if (answer.length < 2) return hintText
-  const answerVariants = [answer]
-  const bracketMatch = answer.match(/^(.+?)[（(](.+?)[）)]$/)
-  if (bracketMatch) {
-    answerVariants.push(bracketMatch[1].trim())
-    answerVariants.push(bracketMatch[2].trim())
-  }
+  const answerVariants = getAnswerVariants(answer, answerKeywords)
   let filtered = hintText
-  answerVariants.forEach(av => {
+  // 長い文字列から順に置換（「北大西洋海流」→「北大西洋」の順）
+  const sorted = answerVariants.slice().sort((a, b) => b.length - a.length)
+  sorted.forEach(av => {
     if (av.length >= 2) {
-      // 答え文字列を「●●●」に置換（ヒントの文脈は残す）
       const escaped = av.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const regex = new RegExp(escaped, 'gi')
       filtered = filtered.replace(regex, '●●●')
@@ -6320,6 +6326,7 @@ function filterAnswerFromHint(hintText, answerStr) {
 
 window.filterAnswerFromText = filterAnswerFromText
 window.filterAnswerFromHint = filterAnswerFromHint
+window.getAnswerVariants = getAnswerVariants
 
 // ============================================
 // 学習カードページ
@@ -6339,17 +6346,40 @@ async function loadCardPage(cardId) {
     card.answer = answer?.answer_text || card.correct_answer || card.answer || card.example_solution || ''
     card.answer_explanation = answer?.explanation || card.answer_explanation || card.explanation || ''
     
-    // ★★★ 答え漏洩防止: new_terms, teacher_help_keywords から答えキーワードを除去 ★★★
+    // ★★★ 答え漏洩防止: new_terms, teacher_help_keywords, AI先生メッセージ、例題から答えキーワードを除去 ★★★
     const answerStr = (card.answer || '').trim()
     if (answerStr) {
-      card.new_terms = filterAnswerFromText(card.new_terms, answerStr, card.answer_keywords)
-      card.teacher_help_keywords = filterAnswerFromText(card.teacher_help_keywords, answerStr, card.answer_keywords)
+      const kw = card.answer_keywords
+      card.new_terms = filterAnswerFromText(card.new_terms, answerStr, kw)
+      card.teacher_help_keywords = filterAnswerFromText(card.teacher_help_keywords, answerStr, kw)
+      // AI先生メッセージ・アドバイスからも答えを隠す
+      card.ai_teacher_message = filterAnswerFromHint(card.ai_teacher_message || '', answerStr, kw)
+      card.ai_teacher_advice = filterAnswerFromHint(card.ai_teacher_advice || '', answerStr, kw)
       // ヒントからも答えそのものを除去
       if (card.hints && card.hints.length > 0) {
         card.hints.forEach(h => {
-          h.hint_content = filterAnswerFromHint(h.hint_content || h.hint_text || '', answerStr)
-          h.hint_text = filterAnswerFromHint(h.hint_text || h.hint_content || '', answerStr)
+          h.hint_content = filterAnswerFromHint(h.hint_content || h.hint_text || '', answerStr, kw)
+          h.hint_text = filterAnswerFromHint(h.hint_text || h.hint_content || '', answerStr, kw)
         })
+      }
+      // ★★★ 例題の答えが本題の答えと同じ場合は例題の答えを隠す ★★★
+      const exAnswer = (card.example_answer || '').trim()
+      const ansVariants = getAnswerVariants(answerStr, kw)
+      const exMatchesMain = exAnswer && ansVariants.some(av => {
+        const avL = av.toLowerCase()
+        const exL = exAnswer.toLowerCase()
+        return avL === exL || avL.includes(exL) || exL.includes(avL)
+      })
+      if (exMatchesMain) {
+        // 例題の答えが本題と同じ → 例題の解き方と答えから本題の答えを隠す
+        card.example_answer = '（この例題の答えは解説を見てください）'
+        card.example_solution = filterAnswerFromHint(card.example_solution || '', answerStr, kw)
+      }
+      // ★★★ 例題の問題文と解き方テキストからも本題の答えを常に除去 ★★★
+      // （例題内に本題の答えが直接書かれていたら児童にバレる）
+      if (answerStr.length >= 2) {
+        card.example_solution = filterAnswerFromHint(card.example_solution || '', answerStr, kw)
+        card.example_problem = filterAnswerFromHint(card.example_problem || '', answerStr, kw)
       }
     }
     

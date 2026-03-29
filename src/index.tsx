@@ -4802,8 +4802,8 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
     "real_world_connection": "日常とのつながり",
     "learning_meaning": "この問題を学ぶ意味",
     "difficulty_level": "standard",
-    "ai_teacher_message": "この問題のポイントを一言で",
-    "ai_teacher_advice": "取り組むコツ",
+    "ai_teacher_message": "この問題のポイントを一言で。★答えを含めない★",
+    "ai_teacher_advice": "取り組むコツ。★答えを含めない★",
     "teacher_help_keywords": "先生に聞くときのキーワード。★答えそのものは絶対に含めない。考え方のキーワードのみ★",
     "new_terms": "新出語句。★答えそのものは絶対に含めない。背景知識や前提用語のみ★"
   }
@@ -4813,7 +4813,8 @@ ${getMikataKangaekata(subject) ? `\n【この教科の「見方・考え方」�
 - difficulty_levelは必ず "easy", "standard", "hard" のいずれかにすること
 - 各カードの40%以上は発展的内容（hard）にすること
 - 小学生が理解しやすい言葉で書くこと
-- ★★★ new_terms, teacher_help_keywords, hint_text には答え（correct_answer）そのものを絶対に含めないこと。答えがバレてしまう ★★★
+- ★★★ new_terms, teacher_help_keywords, hint_text, ai_teacher_message, ai_teacher_advice には答え（correct_answer）そのものを絶対に含めないこと。答えがバレてしまう ★★★
+- ★★★ example_problemの答えとcorrect_answerは絶対に同じ文字列にしないこと ★★★
 - JSON配列のみを返すこと（説明文不要）`
 
     const geminiResponse = await fetch(
@@ -9251,6 +9252,43 @@ app.get('/guide/:curriculumId', async (c) => {
           (!exAns && exSol && exSol.includes(mainAns))
         )
         
+        // ★★★ SSR用: 答え漏洩防止フィルタリング（フロントのJSロード前に表示されるHTML用） ★★★
+        if (mainAns && mainAns.length >= 2) {
+          const stem = mainAns.replace(/[系語族型類科目派流]+$/u, '')
+          const variants = [mainAns]
+          if (stem && stem.length >= 2 && stem !== mainAns) variants.push(stem)
+          
+          const ssrStrip = (text: string): string => {
+            if (!text) return text
+            let r = text
+            const sorted = variants.slice().sort((a, b) => b.length - a.length)
+            for (const v of sorted) {
+              if (v.length >= 2) r = r.replace(new RegExp(v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '●●●')
+            }
+            return r
+          }
+          const ssrFilterList = (text: string): string => {
+            if (!text) return text
+            return text.split(/[,、，]/).map(x => x.trim()).filter(Boolean)
+              .filter(item => !variants.some(v => {
+                const iL = item.toLowerCase(), vL = v.toLowerCase()
+                return iL === vL || iL.includes(vL) || vL.includes(iL)
+              })).join('、')
+          }
+          card.ai_teacher_message = ssrStrip(card.ai_teacher_message || '')
+          card.ai_teacher_advice = ssrStrip(card.ai_teacher_advice || '')
+          card.new_terms = ssrFilterList(card.new_terms || '')
+          card.teacher_help_keywords = ssrFilterList(card.teacher_help_keywords || '')
+          // 例題の答えが本題の答えと同じ場合
+          if (exAns && variants.some(v => {
+            const vL = v.toLowerCase(), eL = exAns.toLowerCase()
+            return vL === eL || vL.includes(eL) || eL.includes(vL)
+          })) {
+            card.example_answer = ''
+            card.example_solution = ssrStrip(exSol)
+          }
+        }
+        
         allCardsFlat.push({
           ...card,
           _mm: mm,
@@ -10745,10 +10783,19 @@ app.get('/guide/:curriculumId', async (c) => {
       var mainAns = (c.correct_answer || c.answer || '').trim();
       var exAns = (c.example_answer || '').trim();
       var exSol = (c.example_solution || '').trim();
+      // 語幹でも比較（ゲルマン系→ゲルマン）
+      var mainStem = mainAns.replace(/[系語族型類科目派流]+$/u, '');
+      var mainVariants = [mainAns];
+      if (mainStem && mainStem.length >= 2 && mainStem !== mainAns) mainVariants.push(mainStem);
+      var variantMatch = function(a, b) {
+        if (!a || !b) return false;
+        var aL = a.toLowerCase(), bL = b.toLowerCase();
+        return aL === bL || aL.indexOf(bL) >= 0 || bL.indexOf(aL) >= 0;
+      };
       var isSameAnswer = c._needsExampleFix || (mainAns && (
-        (exAns && exAns === mainAns) || 
-        (!exAns && exSol && exSol.indexOf(mainAns) >= 0) ||
-        (c.example_problem && c.example_problem.indexOf(mainAns) >= 0 && exSol && exSol.indexOf(mainAns) >= 0)
+        (exAns && mainVariants.some(function(v){ return variantMatch(v, exAns); })) || 
+        (!exAns && exSol && mainVariants.some(function(v){ return exSol.indexOf(v) >= 0; })) ||
+        (c.example_problem && mainVariants.some(function(v){ return c.example_problem.indexOf(v) >= 0; }) && exSol && mainVariants.some(function(v){ return exSol.indexOf(v) >= 0; }))
       ));
 
       html += '<div id="example-section-' + currentPage + '" style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:12px;">';
@@ -16545,16 +16592,16 @@ ${customInfo}${mikataSection}
       "textbook_page": "p.XX",
       "problem_description": "教科書の目標水準に沿った具体的な問題文（100-200字）。数値や場面設定を含む。",
       "new_terms": "この問題で学ぶ新出用語（カンマ区切り）。★★★絶対に答え（answer）そのものを含めないこと。背景知識や前提となる用語のみ★★★",
-      "example_problem": "【★超重要★】例題は本問題と同じ具体的トピックに直接関連する問題。本問題の前提知識・構成要素を問う。答えは異なるがトピックは同じ。例：本問題『フィヨルド』→例題『入り組んだ海岸地形を何という？』答え:『リアス海岸』。全く別のテーマ・児童が習わない専門用語は絶対禁止。",
-      "example_solution": "例題の解き方の丁寧な説明（途中式・図解の指示を含む）。例題専用の答えも最後に明記する。",
-      "example_answer": "例題の答え（本問題のanswerとは異なる値だが、同じトピックの関連語）",
+      "example_problem": "【★★★超重要★★★】例題は本問題と同じトピックに関連するが、answerとは絶対に異なる答えになる別の問い。例：本問題の答えが『ゲルマン系』→例題の答えは『ラテン系』や『インド・ヨーロッパ語族』など別の答え。本問題の答えと例題の答えが同じ文字列になることは絶対禁止。",
+      "example_solution": "例題の解き方の丁寧な説明。例題専用の答えも最後に明記する。★例題の答えは本問題のanswerと絶対に同じにしないこと★",
+      "example_answer": "例題の答え。★★★本問題のanswerと完全に異なる値にすること。同じ単語・同じフレーズは絶対禁止★★★",
       "example_image_description": "例題の図解説明（AI画像生成用。図が不要ならnull）。★★★重要: 本問題の答え（answer）や例題の答え（example_answer）の文字を図に直接書かないこと。代わりに「？」や関連するヒント図を使う★★★",
       "real_world_connection": "実生活とのつながり（1文）",
       "answer": "正解（具体的・明確に。自動採点可能な短い答え。★例題の答えとは異なる値にする★）",
       "answer_keywords": ["キーワード1", "キーワード2", "キーワード3"],
       "answer_explanation": "【★★★最重要★★★】解法プロセス：①数値確認→②公式→③途中式→④答え導出。最低100字。実生活の例は書かない。",
-      "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）",
-      "ai_teacher_advice": "この問題の学び方アドバイス（30字程度）",
+      "ai_teacher_message": "AI先生からの励ましメッセージ（50字程度）。★答え（answer）の文字列を含めないこと★",
+      "ai_teacher_advice": "この問題の学び方アドバイス（30字程度）。★答え（answer）の文字列を直接書かないこと。考え方のヒントのみ★",
       "teacher_help_keywords": "先生に質問するときのキーワード（3つ程度）。★★★答え（answer）そのものは絶対に含めない。質問の仕方・考え方のキーワードのみ★★★",
       "hints": [
         {"hint_level": 1, "hint_text": "ヒント1: まず何を考える？（考える方向性を示す）★答えを直接書かない★", "thinking_tool_suggestion": "使える思考ツール"},
@@ -16606,7 +16653,8 @@ ${customInfo}${mikataSection}
 9. 【★★★解説品質★★★】answer_explanation には必ず途中式・計算過程を含む（最低100字）
 10. 【★★★正解の明確性★★★】answerは自動採点できる明確な答えにし、answer_keywordsに判定用キーワード3つを設定すること
 11. multimedia_ai_content を全カードに含めること
-12. 【★★★答え漏洩禁止★★★】new_terms, teacher_help_keywords, hints の hint_text には、answer（正解）そのものを絶対に含めないこと。これらのフィールドは問題を解く前に児童に見える。答えがバレると学習効果がゼロになる。背景知識・考え方・アプローチ方法のみを書くこと`
+12. 【★★★答え漏洩禁止★★★】new_terms, teacher_help_keywords, hints の hint_text, ai_teacher_message, ai_teacher_advice には、answer（正解）そのものを絶対に含めないこと。これらのフィールドは問題を解く前に児童に見える。答えがバレると学習効果がゼロになる。背景知識・考え方・アプローチ方法のみを書くこと
+13. 【★★★例題と本題の答え重複禁止★★★】example_answer と answer は絶対に同じ文字列にしてはいけない。同じ単語・同じフレーズも禁止。例題は本題の関連トピックだが、答えは必ず別の値にすること。違反例: answer=「ゲルマン系」, example_answer=「ゲルマン系」は禁止。正しい例: answer=「ゲルマン系」, example_answer=「ラテン系」`
 
     // gemini-3-flash-preview をプライマリ（Gemini 3 Flash・最高推論能力）
     // フォールバック: gemini-2.5-flash（安定）, gemini-2.0-flash（レガシー）
@@ -17361,6 +17409,72 @@ app.post('/api/curriculum/save-generated', async (c) => {
         const problemDesc = s(card.problem_description || card.problem_content)
         const answerText = s(card.correct_answer || card.answer)
         const explanationText = s(card.explanation || card.answer_explanation)
+        
+        // ★★★ サーバーサイド答え漏洩防止: 保存前に各フィールドから答えを除去 ★★★
+        if (answerText && answerText.length >= 2) {
+          const ansLower = answerText.toLowerCase().trim()
+          // 語幹抽出（ゲルマン系→ゲルマン）
+          const stem = answerText.trim().replace(/[系語族型類科目派流]+$/u, '')
+          const variants = [answerText.trim()]
+          if (stem && stem.length >= 2 && stem !== answerText.trim()) variants.push(stem)
+          
+          // example_answer が answer と同じなら空にする（フロントで修正APIを呼ぶ）
+          const exAns = s(card.example_answer).trim()
+          if (exAns) {
+            const exLower = exAns.toLowerCase()
+            const isSame = variants.some(v => {
+              const vL = v.toLowerCase()
+              return vL === exLower || vL.includes(exLower) || exLower.includes(vL)
+            })
+            if (isSame) {
+              console.warn(`⚠️ カード${ci + 1}: example_answer="${exAns}" が answer="${answerText}" と同じ → 空にして修正APIに委ねる`)
+              card.example_answer = ''
+            }
+          }
+          
+          // ai_teacher_message/advice から答えを除去
+          const stripAns = (text: string): string => {
+            if (!text) return text
+            let result = text
+            // 長い文字列から順に置換
+            const sorted = variants.slice().sort((a: string, b: string) => b.length - a.length)
+            for (const v of sorted) {
+              if (v.length >= 2) {
+                const escaped = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                result = result.replace(new RegExp(escaped, 'gi'), '●●●')
+              }
+            }
+            return result
+          }
+          card.ai_teacher_message = stripAns(s(card.ai_teacher_message))
+          card.ai_teacher_advice = stripAns(s(card.ai_teacher_advice))
+          // new_terms から答えを除去（カンマ区切り項目ごと）
+          const nt = s(card.new_terms)
+          if (nt) {
+            const ntItems = nt.split(/[,、，]/).map((x: string) => x.trim()).filter(Boolean)
+            const filtered = ntItems.filter((item: string) => {
+              const iL = item.toLowerCase()
+              return !variants.some(v => {
+                const vL = v.toLowerCase()
+                return iL === vL || iL.includes(vL) || vL.includes(iL)
+              })
+            })
+            card.new_terms = filtered.join('、')
+          }
+          // teacher_help_keywords から答えを除去
+          const thk = s(card.teacher_help_keywords)
+          if (thk) {
+            const thkItems = thk.split(/[,、，]/).map((x: string) => x.trim()).filter(Boolean)
+            const filteredThk = thkItems.filter((item: string) => {
+              const iL = item.toLowerCase()
+              return !variants.some(v => {
+                const vL = v.toLowerCase()
+                return iL === vL || iL.includes(vL) || vL.includes(iL)
+              })
+            })
+            card.teacher_help_keywords = filteredThk.join('、')
+          }
+        }
         
         // 不足カラムを自動追加
         const missingCols = [
