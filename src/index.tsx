@@ -9279,13 +9279,20 @@ app.get('/guide/:curriculumId', async (c) => {
           card.ai_teacher_advice = ssrStrip(card.ai_teacher_advice || '')
           card.new_terms = ssrFilterList(card.new_terms || '')
           card.teacher_help_keywords = ssrFilterList(card.teacher_help_keywords || '')
-          // 例題の答えが本題の答えと同じ場合 → 例題の答えを空にして修正APIに委ねる
-          // ★ example_solution はフィルタしない（例題の解き方は表示すべき）
-          if (exAns && variants.some(v => {
+          // 例題の答えが本題の答えと同じ場合 → example_answer を空にして修正APIに委ねる
+          // + example_solution 内の本題の答えもフィルタ
+          const exAnsMatchesMain = exAns && variants.some(v => {
             const vL = v.toLowerCase(), eL = exAns.toLowerCase()
             return vL === eL || vL.includes(eL) || eL.includes(vL)
-          })) {
+          })
+          const exSolContainsAnswer = exSol && variants.some(v => exSol.includes(v))
+          
+          if (exAnsMatchesMain) {
             card.example_answer = ''
+          }
+          // example_solution 内に本題の答えがある場合はフィルタ
+          if (exAnsMatchesMain || exSolContainsAnswer) {
+            card.example_solution = ssrStrip(card.example_solution || '')
           }
         }
         

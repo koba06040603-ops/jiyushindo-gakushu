@@ -6364,11 +6364,20 @@ async function loadCardPage(cardId) {
       }
       // ★★★ 例題の答えが本題の答えと同じ場合は例題の答えを隠す ★★★
       const exAnswer = (card.example_answer || '').trim()
+      const exSolution = (card.example_solution || '').trim()
       const ansVariants = getAnswerVariants(answerStr, kw)
-      const exMatchesMain = exAnswer && ansVariants.some(av => {
+      
+      // example_answer フィールドが本題の答えと一致するか
+      const exAnswerMatchesMain = exAnswer && ansVariants.some(av => {
         const avL = av.toLowerCase()
         const exL = exAnswer.toLowerCase()
         return avL === exL || avL.includes(exL) || exL.includes(avL)
+      })
+      
+      // example_solution テキスト内に本題の答えが含まれているか
+      // （example_answerが空でも、解き方テキスト内に「答えは○○」と書かれている場合を検出）
+      const exSolutionContainsAnswer = exSolution && ansVariants.some(av => {
+        return exSolution.includes(av)
       })
       
       // ★★★ 例題の問題文が本題と実質同じかチェック ★★★
@@ -6394,16 +6403,27 @@ async function loadCardPage(cardId) {
         }
       }
       
-      if (exMatchesMain || exProblemIsSame) {
-        // 例題の答えが本題と同じ、または例題の問題文が本題と実質同じ → 自動修正が必要
+      // 例題に問題がある場合の対処
+      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame
+      if (exampleNeedsFix) {
+        // 自動修正をトリガー
         card._needsExampleFix = true
-        if (exMatchesMain) {
+        if (exAnswerMatchesMain) {
           card.example_answer = '（AIが例題を改善中…）'
         }
       }
-      // ★★★ 例題の解き方(example_solution)と問題文(example_problem)はフィルタしない ★★★
-      // 例題は本題への橋渡し（ヒント）なので、本題の答えに触れる文脈が必要。
-      // 例題の中に答えが書かれていても、それは例題としての解説であり学習上必要。
+      
+      // ★★★ example_solution 内の本題の答えフィルタ ★★★
+      // 例題の答えが本題と同じ、または解き方テキスト内に本題の答えが含まれる場合
+      // → 本題の答え部分だけ●●●に置換（例題の解説文脈は残す）
+      if (exAnswerMatchesMain || exSolutionContainsAnswer) {
+        card.example_solution = filterAnswerFromHint(card.example_solution || '', answerStr, kw)
+        if (exAnswerMatchesMain) {
+          card.example_answer = '（AIが例題を改善中…）'
+        }
+      }
+      // ★★★ example_problem はフィルタしない ★★★
+      // 例題は本題への橋渡し（ヒント）なので、問題文に本題の答えのキーワードが入っているのは正常。
     }
     
     // カードデータをグローバルに保存（ヘルプ要請時に使用）
