@@ -41085,6 +41085,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
           <button onclick="toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
           <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
+          <button onclick="openCardResourcePanel(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-paperclip mr-1"></i>📎 資料</button>
         </div>
       </div>`
   }
@@ -41104,6 +41105,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
           <button onclick="toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
           <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
+          <button onclick="openCardResourcePanel(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-paperclip mr-1"></i>📎 資料</button>
         </div>
       </div>`
   }
@@ -41134,6 +41136,7 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
           <button onclick="toggleCardImage(${cardId})" class="text-xs text-indigo-500 hover:text-indigo-700 underline" id="card-image-toggle-${cardId}"><i class="fas fa-eye-slash mr-1"></i>非表示</button>
           ${showReplace ? `<button onclick="replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
           <button onclick="deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
+          <button onclick="openCardResourcePanel(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-paperclip mr-1"></i>📎 資料</button>
         </div>
       </div>`
   }
@@ -41159,10 +41162,160 @@ function renderMediaEmbed(url, cardId, description, options = {}) {
         <button onclick="event.stopPropagation(); openPromptImageGenerate(${cardId}, 'replace')" class="text-xs text-purple-500 hover:text-purple-700 underline"><i class="fas fa-magic mr-1"></i>プロンプト指示</button>
         ${showReplace ? `<button onclick="event.stopPropagation(); replaceCardImage(${cardId})" class="text-xs text-gray-500 hover:text-gray-700 underline">差し替え</button>` : ''}
         <button onclick="event.stopPropagation(); deleteCardMedia(${cardId})" class="text-xs text-red-500 hover:text-red-700 underline"><i class="fas fa-trash mr-1"></i>削除</button>
+        <button onclick="event.stopPropagation(); openCardResourcePanel(${cardId})" class="text-xs text-amber-600 hover:text-amber-800 underline font-bold"><i class="fas fa-paperclip mr-1"></i>📎 資料</button>
       </div>
     </div>`
 }
 window.renderMediaEmbed = renderMediaEmbed
+
+// ─────────────────────────────────────────────
+// カード別 資料パネル（動画・画像・リンク・メモを追加可能）
+// ─────────────────────────────────────────────
+function openCardResourcePanel(cardId) {
+  var existing = document.getElementById('card-resource-modal')
+  if (existing) existing.remove()
+
+  var storageKey = 'card_resources_' + cardId
+  function getRes() { try { return JSON.parse(localStorage.getItem(storageKey) || '[]') } catch(e) { return [] } }
+  function saveRes(arr) { localStorage.setItem(storageKey, JSON.stringify(arr)) }
+
+  function parseYtId(url) {
+    var m = (url || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/)
+    return m ? m[1] : null
+  }
+
+  var modal = document.createElement('div')
+  modal.id = 'card-resource-modal'
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10001;background:rgba(0,0,0,0.5);display:flex;align-items:flex-end;justify-content:center;'
+
+  function renderModal() {
+    var resources = getRes()
+    var resListHtml = ''
+    if (resources.length === 0) {
+      resListHtml = '<div style="text-align:center;padding:30px 16px;color:#9CA3AF;"><div style="font-size:28px;margin-bottom:6px;">📂</div><div style="font-size:12px;font-weight:600;">まだ資料がありません</div><div style="font-size:10px;margin-top:3px;">動画・画像・リンク・メモを追加できます</div></div>'
+    } else {
+      resListHtml = resources.map(function(r, i) {
+        var content = ''
+        var typeIcon = ''
+        var typeName = ''
+        if (r.type === 'youtube') {
+          typeIcon = '🎬'; typeName = '動画'
+          var vid = parseYtId(r.url)
+          content = vid ? '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;margin-top:6px;"><iframe src="https://www.youtube.com/embed/' + vid + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;border-radius:8px;" allowfullscreen></iframe></div>' : '<div style="color:#EF4444;font-size:10px;margin-top:4px;">無効なURL</div>'
+        } else if (r.type === 'image') {
+          typeIcon = '🖼️'; typeName = '画像'
+          content = '<div style="margin-top:6px;border-radius:8px;overflow:hidden;"><img src="' + (r.url || '') + '" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;" onerror="this.style.display=\'none\'" /></div>'
+        } else if (r.type === 'link') {
+          typeIcon = '🔗'; typeName = 'リンク'
+          content = '<a href="' + (r.url || '') + '" target="_blank" rel="noopener" style="display:block;margin-top:6px;padding:8px 10px;background:#EEF2FF;border-radius:8px;color:#4F46E5;font-size:11px;text-decoration:none;word-break:break-all;"><i class="fas fa-external-link-alt" style="margin-right:4px;"></i>' + (r.url || '').substring(0, 60) + '</a>'
+        } else if (r.type === 'memo') {
+          typeIcon = '📝'; typeName = 'メモ'
+          content = '<div style="margin-top:6px;padding:8px 10px;background:#F9FAFB;border-radius:8px;font-size:11px;color:#374151;white-space:pre-wrap;line-height:1.5;">' + (r.text || '').replace(/</g, '&lt;').substring(0, 500) + '</div>'
+        }
+        return '<div style="background:white;border:1px solid #E5E7EB;border-radius:10px;padding:10px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+            '<div style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">' +
+              '<span style="font-size:13px;">' + typeIcon + '</span>' +
+              '<span style="font-size:11px;font-weight:700;color:#1F2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r.title || typeName) + '</span>' +
+              '<span style="font-size:9px;color:#9CA3AF;background:#F3F4F6;padding:1px 5px;border-radius:4px;flex-shrink:0;">' + typeName + '</span>' +
+            '</div>' +
+            '<button onclick="window._crDeleteRes(' + i + ')" style="background:none;border:none;color:#D1D5DB;cursor:pointer;font-size:13px;padding:2px 4px;flex-shrink:0;" title="削除">🗑️</button>' +
+          '</div>' +
+          content +
+        '</div>'
+      }).join('')
+    }
+
+    modal.innerHTML = '<div style="background:white;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 -8px 30px rgba(0,0,0,0.2);">' +
+      '<div style="padding:12px 16px;border-bottom:1px solid #E5E7EB;flex-shrink:0;">' +
+        '<div style="width:36px;height:4px;background:#D1D5DB;border-radius:2px;margin:0 auto 10px;"></div>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+          '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:16px;">📎</span><span style="font-weight:800;font-size:14px;color:#1F2937;">この問題の関連資料</span>' +
+            (resources.length > 0 ? '<span style="background:#FEF3C7;color:#D97706;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700;">' + resources.length + '</span>' : '') +
+          '</div>' +
+          '<button onclick="document.getElementById(\'card-resource-modal\').remove()" style="background:#F3F4F6;border:none;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:bold;color:#6B7280;">閉じる</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="flex:1;overflow-y:auto;padding:10px 14px;">' + resListHtml + '</div>' +
+      '<div style="padding:10px 14px;border-top:1px solid #E5E7EB;flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+        '<button onclick="window._crShowAdd(\'youtube\')" style="padding:10px 8px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;cursor:pointer;font-size:11px;font-weight:600;text-align:center;">🎬 動画を追加</button>' +
+        '<button onclick="window._crShowAdd(\'image\')" style="padding:10px 8px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;cursor:pointer;font-size:11px;font-weight:600;text-align:center;">🖼️ 画像を追加</button>' +
+        '<button onclick="window._crShowAdd(\'link\')" style="padding:10px 8px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;cursor:pointer;font-size:11px;font-weight:600;text-align:center;">🔗 リンクを追加</button>' +
+        '<button onclick="window._crShowAdd(\'memo\')" style="padding:10px 8px;border:1.5px solid #E5E7EB;border-radius:10px;background:white;cursor:pointer;font-size:11px;font-weight:600;text-align:center;">📝 メモを追加</button>' +
+      '</div>' +
+    '</div>'
+  }
+
+  renderModal()
+  document.body.appendChild(modal)
+  modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove() })
+
+  // 削除
+  window._crDeleteRes = function(idx) {
+    var resources = getRes()
+    if (idx >= 0 && idx < resources.length) {
+      if (confirm('この資料を削除しますか？')) {
+        resources.splice(idx, 1)
+        saveRes(resources)
+        renderModal()
+      }
+    }
+  }
+
+  // 追加フォーム表示
+  window._crShowAdd = function(type) {
+    var addM = document.getElementById('card-res-add-modal')
+    if (addM) addM.remove()
+
+    addM = document.createElement('div')
+    addM.id = 'card-res-add-modal'
+    addM.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10020;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;'
+
+    var typeLabels = { youtube: '🎬 YouTube動画', image: '🖼️ 画像URL', link: '🔗 Webリンク', memo: '📝 テキストメモ' }
+    var isMemo = type === 'memo'
+    var placeholder = type === 'youtube' ? 'https://www.youtube.com/watch?v=...' : type === 'image' ? 'https://example.com/image.jpg' : 'https://...'
+
+    addM.innerHTML = '<div style="background:white;border-radius:16px;width:340px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,0.25);overflow:hidden;">' +
+      '<div style="padding:14px 16px;border-bottom:1px solid #E5E7EB;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+          '<div style="font-weight:800;font-size:14px;color:#1F2937;">' + (typeLabels[type] || '追加') + '</div>' +
+          '<button onclick="document.getElementById(\'card-res-add-modal\').remove()" style="background:none;border:none;font-size:16px;cursor:pointer;color:#9CA3AF;">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="padding:14px 16px;">' +
+        '<div style="margin-bottom:10px;">' +
+          '<label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">タイトル（任意）</label>' +
+          '<input id="cr-add-title" type="text" placeholder="例: フィヨルドの解説" style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:12px;outline:none;box-sizing:border-box;" />' +
+        '</div>' +
+        (isMemo ?
+          '<div style="margin-bottom:10px;"><label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">メモ内容</label><textarea id="cr-add-text" rows="4" placeholder="メモを入力..." style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:12px;outline:none;resize:vertical;box-sizing:border-box;"></textarea></div>' :
+          '<div style="margin-bottom:10px;"><label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">URL</label><input id="cr-add-url" type="url" placeholder="' + placeholder + '" style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:12px;outline:none;box-sizing:border-box;" /></div>'
+        ) +
+        '<button id="cr-add-save" style="width:100%;padding:10px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;border-radius:10px;font-weight:bold;font-size:13px;cursor:pointer;">保存する</button>' +
+      '</div>' +
+    '</div>'
+
+    document.body.appendChild(addM)
+    addM.addEventListener('click', function(e) { if (e.target === addM) addM.remove() })
+
+    document.getElementById('cr-add-save').onclick = function() {
+      var title = (document.getElementById('cr-add-title') || {}).value || ''
+      var url = (document.getElementById('cr-add-url') || {}).value || ''
+      var text = (document.getElementById('cr-add-text') || {}).value || ''
+
+      if (!isMemo && !url) { alert('URLを入力してください'); return }
+      if (isMemo && !text) { alert('メモ内容を入力してください'); return }
+
+      var resources = getRes()
+      resources.unshift({ type: type, title: title, url: url, text: text, created_at: new Date().toISOString() })
+      saveRes(resources)
+
+      addM.remove()
+      renderModal()
+    }
+  }
+}
+window.openCardResourcePanel = openCardResourcePanel
 
 // 画像の表示/非表示トグル
 function toggleCardImage(cardId) {
