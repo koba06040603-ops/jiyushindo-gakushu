@@ -6630,6 +6630,7 @@ async function loadCardPage(cardId) {
                     <details>
                       <summary class="cursor-pointer text-sm text-green-600 font-bold hover:text-green-800 transition py-1"><i class="fas fa-eye mr-1"></i>答えを見る</summary>
                       <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans mt-2">${formatText(card.example_solution)}</pre>
+                      ${card.example_answer ? `<p class="text-green-700 font-bold mt-2 text-base">こたえ：${card.example_answer}</p>` : ''}
                     </details>
                   </div>
                 ` : ''}
@@ -7484,6 +7485,7 @@ async function loadCardPage(cardId) {
                     <details>
                       <summary class="cursor-pointer text-sm text-green-600 font-bold hover:text-green-800 transition py-1"><i class="fas fa-eye mr-1"></i>答えを見る</summary>
                       <pre class="card-content text-gray-800 whitespace-pre-wrap font-sans mt-2">${formatText(newSolution)}</pre>
+                      ${newAnswer ? `<p class="text-green-700 font-bold mt-2 text-base">こたえ：${newAnswer}</p>` : ''}
                     </details>
                   </div>` : ''}`
             }
