@@ -46567,9 +46567,19 @@ app.post('/api/ai/generate-mindmap', async (c) => {
     const apiKey = env.GEMINI_API_KEY || env.GOOGLE_AI_KEY || ''
     if (!apiKey) return c.json({ success: false, error: 'API key not configured' }, 500)
     
-    const cardsInfo = (cards || []).slice(0, 10).map((cd: any) => 
-      `- ${cd.card_title || cd.title}: ${(cd.problem_description || cd.problem_text || '').substring(0, 80)}`
-    ).join('\n')
+    // カード情報を詳細に抽出（問題文の内容でマッピング精度を上げる）
+    const cardsList = (cards || []).slice(0, 10)
+    const cardsInfo = cardsList.map((cd: any, i: number) => {
+      const title = cd.card_title || cd.title || ''
+      const desc = cd.problem_description || cd.problem_text || ''
+      const answer = cd.correct_answer || cd.answer || ''
+      return `カード${i+1}: 「${title}」\n  問題: ${desc.substring(0, 120)}\n  答え: ${answer.substring(0, 60)}`
+    }).join('\n')
+    
+    // 現在取り組み中のカード（最初のカード）の内容を特に強調
+    const currentCard = cardsList[0]
+    const currentCardDesc = currentCard ? 
+      `★★ 生徒が今まさに取り組んでいる問題:\n  タイトル: ${currentCard.card_title || currentCard.title || ''}\n  問題文: ${(currentCard.problem_description || currentCard.problem_text || '').substring(0, 150)}\n  正解: ${(currentCard.correct_answer || currentCard.answer || '').substring(0, 80)}` : ''
     
     // Novak/Ausubel の有意味学習理論 + Advance Organizer に基づく教育的コンセプトマップ
     const prompt = [
@@ -46578,16 +46588,24 @@ app.post('/api/ai/generate-mindmap', async (c) => {
       "",
       "★ 教育理論上の必須要件:",
       "1. 命題(Proposition): 2つの概念 + リンキングワードで「意味のある文」を作る",
-      "   例: 「力」→(物体に)→「運動変化」= 力は物体に運動変化を生じさせる",
       "2. 階層性: 最上位に包括的概念、下に行くほど具体的・詳細な概念",
       "3. クロスリンク: 異なる枝同士を結ぶ関係。創造的思考・深い理解の指標",
-      "4. 問題の位置づけ: 生徒が今取り組んでいるカードがマップのどこに属するか明示",
-      "5. 日常との接続: 生活や実体験と結びつく具体例を必ず含める",
+      "4. 日常との接続: 生活や実体験と結びつく具体例を必ず含める",
+      "",
+      "★★★ 最重要: 問題の位置づけ（card_positions）の正確性",
+      "生徒が今解いている問題カードの「問題文と正解の内容」を精読し、",
+      "その問題が扱っている具体的なテーマ・概念にマッピングしてください。",
+      "例: 問題文が「アルプス山脈の位置」に関するものなら → 地理的特徴に属する",
+      "例: 問題文が「ローマ帝国の影響」に関するものなら → 歴史的背景に属する",
+      "タイトルではなく問題文の内容で判断すること！",
       "",
       "★ 入力情報:",
       "単元: " + (unit_name || ''),
       "教科: " + (subject || ''),
-      "学習カード:",
+      "",
+      currentCardDesc,
+      "",
+      "全カード一覧:",
       cardsInfo,
       "",
       "★ 出力ルール (厳守):",
@@ -46599,10 +46617,11 @@ app.post('/api/ai/generate-mindmap', async (c) => {
       '- crosslinks: 1〜3本（異なる枝間の横断的関係）',
       '  - from, to はノードのlabel（完全一致）',
       '  - relation: なぜ関連するかの理由（6文字以内）',
-      '- focus_question: この単元で答えるべき問い（例「力とは何か？どう測る？」、25文字以内）',
+      '- focus_question: この単元で答えるべき問い（25文字以内）',
       '- daily_example: 日常生活での具体例（25文字以内）',
-      '- card_positions: カードがマップ上のどの概念に対応するか',
-      '  - [{card_title:"カード名の冒頭8文字", belongs_to:"対応するノードlabel"}]',
+      '- card_positions: 各カードがどの概念ノードに属するか（問題文の内容で判断！）',
+      '  - [{card_title:"カード名の冒頭8文字", belongs_to:"対応するノードlabel（children/孫のlabelと完全一致）"}]',
+      '  ※ 必ず全カードについてマッピングすること',
       '',
       '★ JSON形式のみ出力。説明文は不要。',
       '例:',
