@@ -58566,6 +58566,7 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
         <span style="font-weight:bold;font-size:13px;">コンセプトマップ</span>
       </div>
       <div style="display:flex;gap:4px;align-items:center;">
+        <button id="mm-res-btn" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:bold;">📎 資料</button>
         <button id="mm-zoom-in" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:5px 10px;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold;">＋</button>
         <button id="mm-zoom-fit" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:5px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:bold;">全体</button>
         <button id="mm-zoom-out" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:5px 10px;border-radius:6px;font-size:15px;cursor:pointer;font-weight:bold;">ー</button>
@@ -58587,8 +58588,225 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
       </div>
     </div>
     <div id="mm-tooltip" style="display:none;position:fixed;z-index:10010;background:white;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.18);padding:10px 12px;max-width:200px;font-size:11px;line-height:1.5;pointer-events:none;border:1px solid #E5E7EB;"></div>
+    <div id="mm-res-panel" style="display:none;position:absolute;top:0;right:0;width:320px;max-width:85vw;height:100%;background:white;box-shadow:-4px 0 20px rgba(0,0,0,0.15);z-index:10005;flex-direction:column;border-left:1px solid #E5E7EB;">
+      <div style="padding:10px 14px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:15px;">📎</span>
+          <span style="font-weight:bold;font-size:13px;">関連する資料</span>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <button id="mm-res-add-btn" style="background:rgba(255,255,255,0.3);border:none;color:white;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:bold;">＋ 追加</button>
+          <button id="mm-res-close" style="background:rgba(255,255,255,0.25);border:none;color:white;padding:4px 8px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:bold;">✕</button>
+        </div>
+      </div>
+      <div id="mm-res-list" style="flex:1;overflow-y:auto;padding:8px;"></div>
+    </div>
   `
   document.body.appendChild(modal)
+  
+  // ── 資料パネル機能 ──
+  var resStorageKey = 'mm_resources_' + (unitName || 'default').replace(/\s+/g, '_')
+  
+  function getResources() {
+    try { return JSON.parse(localStorage.getItem(resStorageKey) || '[]') } catch(e) { return [] }
+  }
+  function saveResources(arr) {
+    localStorage.setItem(resStorageKey, JSON.stringify(arr))
+  }
+  
+  function parseYoutubeId(url) {
+    var m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/)
+    return m ? m[1] : null
+  }
+  
+  function renderResourceList() {
+    var list = document.getElementById('mm-res-list')
+    if (!list) return
+    var resources = getResources()
+    if (resources.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:40px 16px;color:#9CA3AF;"><div style="font-size:28px;margin-bottom:8px;">📂</div><div style="font-size:12px;font-weight:600;">まだ資料がありません</div><div style="font-size:10px;margin-top:4px;">「＋ 追加」から動画・画像・メモを追加できます</div></div>'
+      return
+    }
+    list.innerHTML = resources.map(function(r, i) {
+      var content = ''
+      var typeIcon = ''
+      var typeName = ''
+      if (r.type === 'youtube') {
+        typeIcon = '🎬'; typeName = '動画'
+        var vid = parseYoutubeId(r.url || '')
+        content = vid ? '<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;margin-top:6px;"><iframe src="https://www.youtube.com/embed/' + vid + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;border-radius:8px;" allowfullscreen></iframe></div>' : '<div style="color:#EF4444;font-size:10px;margin-top:4px;">無効なURL</div>'
+      } else if (r.type === 'image') {
+        typeIcon = '🖼️'; typeName = '画像'
+        content = '<div style="margin-top:6px;border-radius:8px;overflow:hidden;"><img src="' + (r.url || '') + '" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;" onerror="this.style.display=\'none\'" /></div>'
+      } else if (r.type === 'link') {
+        typeIcon = '🔗'; typeName = 'リンク'
+        content = '<a href="' + (r.url || '') + '" target="_blank" rel="noopener" style="display:block;margin-top:6px;padding:8px 10px;background:#EEF2FF;border-radius:8px;color:#4F46E5;font-size:11px;text-decoration:none;word-break:break-all;"><i class="fas fa-external-link-alt" style="margin-right:4px;"></i>' + (r.url || '').substring(0, 50) + '</a>'
+      } else if (r.type === 'memo') {
+        typeIcon = '📝'; typeName = 'メモ'
+        content = '<div style="margin-top:6px;padding:8px 10px;background:#F9FAFB;border-radius:8px;font-size:11px;color:#374151;white-space:pre-wrap;line-height:1.5;">' + (r.text || '').replace(/</g, '&lt;').substring(0, 500) + '</div>'
+      }
+      return '<div style="background:white;border:1px solid #E5E7EB;border-radius:10px;padding:10px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+          '<div style="display:flex;align-items:center;gap:5px;flex:1;min-width:0;">' +
+            '<span style="font-size:14px;">' + typeIcon + '</span>' +
+            '<span style="font-size:12px;font-weight:700;color:#1F2937;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (r.title || typeName) + '</span>' +
+            '<span style="font-size:9px;color:#9CA3AF;background:#F3F4F6;padding:1px 5px;border-radius:4px;flex-shrink:0;">' + typeName + '</span>' +
+          '</div>' +
+          '<button onclick="mmDeleteResource(' + i + ')" style="background:none;border:none;color:#D1D5DB;cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0;" title="削除">🗑️</button>' +
+        '</div>' +
+        content +
+      '</div>'
+    }).join('')
+  }
+  
+  window.mmDeleteResource = function(idx) {
+    var resources = getResources()
+    if (idx >= 0 && idx < resources.length) {
+      if (confirm('この資料を削除しますか？')) {
+        resources.splice(idx, 1)
+        saveResources(resources)
+        renderResourceList()
+      }
+    }
+  }
+  
+  function showAddResourceModal() {
+    var existing = document.getElementById('mm-res-add-modal')
+    if (existing) existing.remove()
+    
+    var addM = document.createElement('div')
+    addM.id = 'mm-res-add-modal'
+    addM.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10020;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;'
+    addM.innerHTML = '<div style="background:white;border-radius:16px;width:340px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.25);">' +
+      '<div style="padding:14px 16px;border-bottom:1px solid #E5E7EB;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;">' +
+          '<div style="font-weight:800;font-size:15px;color:#1F2937;">📎 資料を追加</div>' +
+          '<button onclick="document.getElementById(\'mm-res-add-modal\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9CA3AF;">✕</button>' +
+        '</div>' +
+        '<div style="font-size:10px;color:#6B7280;margin-top:3px;">動画・画像・リンク・メモを追加できます</div>' +
+      '</div>' +
+      '<div style="padding:14px 16px;">' +
+        '<div style="margin-bottom:12px;">' +
+          '<label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:4px;">資料のタイプ</label>' +
+          '<div id="mm-res-type-btns" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+            '<button onclick="mmSelectResType(\'youtube\')" class="mm-res-type-opt" data-type="youtube" style="padding:10px 8px;border:2px solid #E5E7EB;border-radius:10px;background:white;cursor:pointer;font-size:11px;font-weight:600;text-align:center;transition:all 0.2s;">🎬 YouTube動画</button>' +
+            '<button onclick="mmSelectResType(\'image\')" class="mm-res-type-opt" data-type="image" style="padding:10px 8px;border:2px solid #E5E7EB;border-radius:10px;background:white;cursor:pointer;font-size:11px;font-weight:600;text-align:center;transition:all 0.2s;">🖼️ 画像URL</button>' +
+            '<button onclick="mmSelectResType(\'link\')" class="mm-res-type-opt" data-type="link" style="padding:10px 8px;border:2px solid #E5E7EB;border-radius:10px;background:white;cursor:pointer;font-size:11px;font-weight:600;text-align:center;transition:all 0.2s;">🔗 Webリンク</button>' +
+            '<button onclick="mmSelectResType(\'memo\')" class="mm-res-type-opt" data-type="memo" style="padding:10px 8px;border:2px solid #E5E7EB;border-radius:10px;background:white;cursor:pointer;font-size:11px;font-weight:600;text-align:center;transition:all 0.2s;">📝 テキストメモ</button>' +
+          '</div>' +
+        '</div>' +
+        '<div id="mm-res-form-area" style="display:none;">' +
+          '<div style="margin-bottom:10px;">' +
+            '<label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">タイトル（任意）</label>' +
+            '<input id="mm-res-title" type="text" placeholder="例: フィヨルドの解説動画" style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:12px;outline:none;box-sizing:border-box;" />' +
+          '</div>' +
+          '<div id="mm-res-url-field" style="margin-bottom:10px;">' +
+            '<label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">URL</label>' +
+            '<input id="mm-res-url" type="url" placeholder="https://..." style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:12px;outline:none;box-sizing:border-box;" />' +
+          '</div>' +
+          '<div id="mm-res-memo-field" style="display:none;margin-bottom:10px;">' +
+            '<label style="font-size:11px;font-weight:700;color:#374151;display:block;margin-bottom:3px;">メモ内容</label>' +
+            '<textarea id="mm-res-memo" rows="4" placeholder="メモを入力..." style="width:100%;padding:8px 10px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:12px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>' +
+          '</div>' +
+          '<button onclick="mmSaveResource()" style="width:100%;padding:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:white;border:none;border-radius:10px;font-weight:bold;font-size:13px;cursor:pointer;">保存する</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+    document.body.appendChild(addM)
+    addM.addEventListener('click', function(e) { if (e.target === addM) addM.remove() })
+  }
+  
+  var mmSelectedResType = ''
+  window.mmSelectResType = function(type) {
+    mmSelectedResType = type
+    var btns = document.querySelectorAll('.mm-res-type-opt')
+    btns.forEach(function(b) {
+      if (b.getAttribute('data-type') === type) {
+        b.style.borderColor = '#4F46E5'
+        b.style.background = '#EEF2FF'
+        b.style.color = '#4F46E5'
+      } else {
+        b.style.borderColor = '#E5E7EB'
+        b.style.background = 'white'
+        b.style.color = '#374151'
+      }
+    })
+    var formArea = document.getElementById('mm-res-form-area')
+    var urlField = document.getElementById('mm-res-url-field')
+    var memoField = document.getElementById('mm-res-memo-field')
+    if (formArea) formArea.style.display = 'block'
+    if (type === 'memo') {
+      if (urlField) urlField.style.display = 'none'
+      if (memoField) memoField.style.display = 'block'
+    } else {
+      if (urlField) urlField.style.display = 'block'
+      if (memoField) memoField.style.display = 'none'
+    }
+  }
+  
+  window.mmSaveResource = function() {
+    if (!mmSelectedResType) return
+    var title = (document.getElementById('mm-res-title') || {}).value || ''
+    var url = (document.getElementById('mm-res-url') || {}).value || ''
+    var memo = (document.getElementById('mm-res-memo') || {}).value || ''
+    
+    if (mmSelectedResType !== 'memo' && !url) {
+      alert('URLを入力してください')
+      return
+    }
+    if (mmSelectedResType === 'memo' && !memo) {
+      alert('メモ内容を入力してください')
+      return
+    }
+    
+    var resource = {
+      type: mmSelectedResType,
+      title: title,
+      url: url,
+      text: memo,
+      created_at: new Date().toISOString()
+    }
+    
+    var resources = getResources()
+    resources.unshift(resource)
+    saveResources(resources)
+    
+    var addM = document.getElementById('mm-res-add-modal')
+    if (addM) addM.remove()
+    renderResourceList()
+    // 資料パネルを自動的に開く
+    var panel = document.getElementById('mm-res-panel')
+    if (panel) panel.style.display = 'flex'
+  }
+  
+  // 資料パネルの開閉
+  var resBtn = document.getElementById('mm-res-btn')
+  var resPanel = document.getElementById('mm-res-panel')
+  var resClose = document.getElementById('mm-res-close')
+  var resAddBtn = document.getElementById('mm-res-add-btn')
+  
+  if (resBtn && resPanel) {
+    resBtn.onclick = function() {
+      if (resPanel.style.display === 'flex') {
+        resPanel.style.display = 'none'
+      } else {
+        resPanel.style.display = 'flex'
+        renderResourceList()
+      }
+    }
+  }
+  if (resClose && resPanel) {
+    resClose.onclick = function() { resPanel.style.display = 'none' }
+  }
+  if (resAddBtn) {
+    resAddBtn.onclick = function() { showAddResourceModal() }
+  }
+  
+  // 資料数バッジ表示
+  var resCount = getResources().length
+  if (resBtn && resCount > 0) {
+    resBtn.innerHTML = '📎 資料 <span style="background:white;color:#D97706;font-size:9px;padding:0 4px;border-radius:8px;margin-left:2px;font-weight:900;">' + resCount + '</span>'
+  }
   
   if (targetEl) {
     targetEl.innerHTML = '<div class="text-center text-xs text-indigo-500 py-2"><i class="fas fa-external-link-alt mr-1"></i>全画面で表示中...</div>'
