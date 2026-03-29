@@ -32324,24 +32324,57 @@ app.post('/api/ai/generate-image', async (c) => {
     
     const startTime = Date.now()
     
+    // ========== 答え文字列のサニタイズ ==========
+    // prompt, problem_text から答え文字列を除去して画像に描かれるのを防ぐ
+    const answerVariants: string[] = []
+    if (answer_text && answer_text.length > 0) {
+      answerVariants.push(answer_text.trim())
+      // 括弧内読み仮名を分離: "北大西洋海流（きたたいせいようかいりゅう）"
+      const bracketMatch = answer_text.match(/^(.+?)[（(](.+?)[）)]$/)
+      if (bracketMatch) {
+        answerVariants.push(bracketMatch[1].trim())
+        answerVariants.push(bracketMatch[2].trim())
+      }
+    }
+    if (forbidden_answer && forbidden_answer.length > 0) {
+      forbidden_answer.split(/[,、，]/).forEach((w: string) => {
+        if (w.trim().length > 1) answerVariants.push(w.trim())
+      })
+    }
+    
+    // 答え文字列をテキストから除去する関数
+    function stripAnswer(text: string): string {
+      if (!text || answerVariants.length === 0) return text
+      let result = text
+      for (const av of answerVariants) {
+        if (av.length >= 2) {
+          const escaped = av.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          result = result.replace(new RegExp(escaped, 'gi'), '●●●')
+        }
+      }
+      return result
+    }
+    
+    // prompt と problem_text から答えを除去
+    const safePrompt = stripAnswer(prompt)
+    const safeProblemText = stripAnswer(problem_text || '')
+    const safeCardTitle = stripAnswer(card_title || '')
+    
     // ========== コンテキスト情報の構築 ==========
     const contextParts: string[] = []
     if (grade || subject) contextParts.push(`（参考情報・図には描かないこと）対象学年: ${grade || ''}、教科: ${subject || ''}`)
     if (unit_name) contextParts.push(`単元: ${unit_name}`)
-    if (card_title) contextParts.push(`テーマ: ${card_title}`)
-    contextParts.push(`内容: ${prompt}`)
-    if (problem_text && problem_text.length > 5) {
-      contextParts.push(`問題文:\n${problem_text.substring(0, 600)}`)
+    if (safeCardTitle) contextParts.push(`テーマ: ${safeCardTitle}`)
+    contextParts.push(`内容: ${safePrompt}`)
+    if (safeProblemText && safeProblemText.length > 5) {
+      contextParts.push(`問題文:\n${safeProblemText.substring(0, 600)}`)
     }
     // ★★★ 答え・解答は画像に含めない ★★★
     // answer_text, answer_explanation は意図的に除外
     // 画像はヒント・考え方の手がかりのみを表示する
-    if (answer_text && answer_text.length > 0) {
-      contextParts.push(`\n★★★ 禁止: 「${answer_text.substring(0, 50)}」を図に表示してはいけません。これは正解なので見せてはダメです。代わりに「？」や空欄にしてください ★★★`)
-    }
-    // forbidden_answer パラメータも禁止ワードとして追加
-    if (forbidden_answer && forbidden_answer.length > 0 && forbidden_answer !== answer_text) {
-      contextParts.push(`\n★★★ 追加禁止ワード: 「${forbidden_answer.substring(0, 100)}」も図に絶対に表示してはいけません ★★★`)
+    if (answerVariants.length > 0) {
+      // 禁止指示をコンテキストの先頭に配置（最も目立つ位置）
+      contextParts.unshift(`【絶対禁止】以下の単語・フレーズを図の中に文字として絶対に描かないでください。「？」や空欄に置き換えること: ${answerVariants.map(v => `「${v.substring(0, 40)}」`).join(', ')}`)
     }
     // ユーザーが手動で指定したプロンプト（最優先）
     if (custom_prompt && custom_prompt.length > 1) {
@@ -32620,7 +32653,7 @@ HTMLコードだけを出力（コードブロック不要）:`
 1. ★最重要★ ふりがな（ルビ）を絶対に使わないこと。漢字の上や横に小さい読み仮名を一切配置してはいけない
 2. ★最重要★ 画像の上部・左上・右上にタイトル・ヘッダー・教科名（「小学校社会」「中学校・理科」「○年生」等）を絶対に描かないこと。図の内容だけを描く。余白部分にもテキストを入れない
 3. 画像内に長文の解説テキストを入れない。ラベルや短い注釈は可だが、段落のような説明文は禁止
-4. 問題の「答え」「正解」を図に表示しない。「？」で隠す
+4. ★★★最重要★★★ 問題の「答え」「正解」を図の中に文字として絶対に表示しない。テキスト中の「●●●」は答えが隠された箇所であり、その中身を推測して書いてはいけない。答えに該当する箇所は必ず「？」マークか空欄にすること
 5. 不要な問題番号・記号を含めない
 6. ★重要★ 日本語テキストは正確に書くこと。意味不明な文字列・文字化け・ランダムなひらがな/カタカナの羅列を絶対に含めないこと
 ===========================
@@ -32753,7 +32786,7 @@ JSON形式で出力してください:`
 6. 背景は白または淡い色で、図が主役になるようにすること
 7. 余計な装飾は避け、学習に必要な情報に集中すること
 8. ★不要な数字や記号（問題番号等）を図に含めないこと★
-9. ★★★ 最重要 ★★★ 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません
+9. ★★★ 最重要 ★★★ 問題の「答え」「正解」「解答」を図の中に直接表示してはいけません。テキスト中の「●●●」は答えが隠された箇所であり、中身を推測して描いてはいけない。答えに該当する箇所は「？」マークか空欄にすること
 10. 考え方のヒントや関連情報を視覚的に示し、児童が自分で考えて答えにたどり着けるようにすること
 11. ★問題文の内容を正確に反映すること。タイトルだけでなく問題文全体を読んで適切な図を描くこと★
 12. ★★★ 画像の上部・左上・右上にタイトルやヘッダーテキスト（「○○の教科書」「中学校・社会」「小学校理科」「○年生」等）を絶対に描かないこと。余白にもテキストを入れないこと。図の内容だけを描くこと ★★★
