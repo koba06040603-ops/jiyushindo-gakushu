@@ -10596,7 +10596,9 @@ app.get('/guide/:curriculumId', async (c) => {
         grade: CURRICULUM.grade || '',
         unit_name: CURRICULUM.unit_name || '',
         prefer_image: true,
-        style: 'colorful children illustration, music themed, cheerful'
+        style: 'colorful children illustration, music themed, cheerful',
+        answer_text: card.correct_answer || card.answer || '',
+        forbidden_answer: card.correct_answer || card.answer || ''
       })
     })
     .then(function(r) { return r.json(); })
@@ -11815,7 +11817,9 @@ app.get('/guide/:curriculumId', async (c) => {
         problem_text: exProblem,
         subject: subject,
         grade: grade,
-        prefer_image: true
+        prefer_image: true,
+        answer_text: c.correct_answer || c.answer || '',
+        forbidden_answer: c.correct_answer || c.answer || ''
       })
     })
     .then(function(r) { return r.json(); })
@@ -11872,7 +11876,9 @@ app.get('/guide/:curriculumId', async (c) => {
         card_title: cardTitle,
         problem_text: tactile,
         subject: subject, grade: grade,
-        prefer_image: true
+        prefer_image: true,
+        answer_text: c.correct_answer || c.answer || '',
+        forbidden_answer: c.correct_answer || c.answer || ''
       })
     })
     .then(function(r) { return r.json(); })
@@ -11991,7 +11997,9 @@ app.get('/guide/:curriculumId', async (c) => {
         prompt: prompt, card_id: 'desc-' + page,
         card_title: c.card_title || '', problem_text: c.problem_text || '',
         subject: CURRICULUM.subject || '', grade: CURRICULUM.grade || '',
-        prefer_image: true
+        prefer_image: true,
+        answer_text: c.correct_answer || c.answer || '',
+        forbidden_answer: c.correct_answer || c.answer || ''
       })
     })
     .then(function(r) { return r.json(); })
@@ -12124,7 +12132,9 @@ app.get('/guide/:curriculumId', async (c) => {
         subject: CURRICULUM.subject || '',
         grade: CURRICULUM.grade || '',
         unit_name: CURRICULUM.unit_name || '',
-        prefer_image: true
+        prefer_image: true,
+        answer_text: c.correct_answer || c.answer || '',
+        forbidden_answer: c.correct_answer || c.answer || ''
       })
     })
     .then(function(r) { return r.json(); })
@@ -12216,7 +12226,9 @@ app.get('/guide/:curriculumId', async (c) => {
         subject: CURRICULUM.subject || '',
         grade: CURRICULUM.grade || '',
         unit_name: CURRICULUM.unit_name || '',
-        prefer_image: true
+        prefer_image: true,
+        answer_text: c.correct_answer || c.answer || '',
+        forbidden_answer: c.correct_answer || c.answer || ''
       })
     })
     .then(function(r) { return r.json(); })
@@ -12382,7 +12394,8 @@ app.get('/guide/:curriculumId', async (c) => {
         hint_text: hintTexts || card.hint_text || '',
         grade: card.grade || '',
         subject: card.subject || '',
-        card_id: card.id || null
+        card_id: card.id || null,
+        answer_text: card.correct_answer || card.answer || ''
       })
     })
     .then(function(r) { return r.json(); })
@@ -14197,7 +14210,9 @@ app.get('/guide/:curriculumId', async (c) => {
         subject: CURRICULUM.subject || '',
         grade: CURRICULUM.grade || '',
         unit_name: CURRICULUM.unit_name || '',
-        prefer_image: true
+        prefer_image: true,
+        answer_text: card.correct_answer || card.answer || '',
+        forbidden_answer: card.correct_answer || card.answer || ''
       })
     })
     .then(function(r) { return r.json(); })
@@ -17875,7 +17890,7 @@ app.post('/api/curriculum/save-generated', async (c) => {
         const savedCourses = await env.DB.prepare('SELECT id FROM courses WHERE curriculum_id = ?').bind(curriculumId).all()
         const allCards: any[] = []
         for (const sc of (savedCourses.results || []) as any[]) {
-          const cards = await env.DB.prepare('SELECT card_id, card_title, problem_text, problem_description FROM learning_cards WHERE course_id = ? AND (problem_image_url IS NULL OR problem_image_url = \'\') LIMIT 6').bind(sc.id).all()
+          const cards = await env.DB.prepare('SELECT card_id, card_title, problem_text, problem_description, correct_answer, answer FROM learning_cards WHERE course_id = ? AND (problem_image_url IS NULL OR problem_image_url = \'\') LIMIT 6').bind(sc.id).all()
           allCards.push(...(cards.results || []))
         }
         
@@ -17886,11 +17901,30 @@ app.post('/api/curriculum/save-generated', async (c) => {
           const pText = card.problem_text || card.problem_description || ''
           if (!pText) continue
           
+          // ★★★ 答えをプロンプトから除去 ★★★
+          const cardAns = (card.correct_answer || card.answer || '').trim()
+          const unitAnsVariants: string[] = []
+          if (cardAns && cardAns.length >= 2) {
+            unitAnsVariants.push(cardAns)
+            const stem = cardAns.replace(/[系語族型類科目派流業]+$/u, '')
+            if (stem && stem.length >= 2 && stem !== cardAns) unitAnsVariants.push(stem)
+          }
+          function unitStripAns(text: string): string {
+            if (!text || unitAnsVariants.length === 0) return text
+            let r = text
+            for (const v of unitAnsVariants.sort((a, b) => b.length - a.length)) {
+              if (v.length >= 2) r = r.replace(new RegExp(v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '？？？')
+            }
+            return r
+          }
+          
           const imgPrompt = `教科書の図解イラストを描いてください。
-問題: ${pText.substring(0, 400)}
-タイトル: ${card.card_title || ''}
+${cardAns ? `【★★★ 絶対禁止 ★★★】「${cardAns}」という文字を図の中に絶対に書かないでください。これは問題の答えです。代わりに「？」を使ってください。` : ''}
+問題: ${unitStripAns(pText.substring(0, 400))}
+タイトル: ${unitStripAns(card.card_title || '')}
 教科: ${curriculum.subject} / 学年: ${curriculum.grade}
-日本の教科書スタイル（カラフル、白背景、日本語ラベル付き）で1枚描いてください。`
+日本の教科書スタイル（カラフル、白背景、日本語ラベル付き）で1枚描いてください。
+${cardAns ? `※再確認: 「${cardAns}」を図に含めないこと。` : ''}`
           
           try {
             const resp = await fetch(
@@ -26852,15 +26886,46 @@ app.post('/api/media/generate-image', async (c) => {
 // ========== AI ヒント図解生成API（Gemini 3.1 画像）==========
 app.post('/api/ai/generate-hint-image', async (c) => {
   const startTime = Date.now()
-  const { card_title, problem_text, hint_text, grade, subject, card_id } = await c.req.json()
+  const { card_title, problem_text, hint_text, grade, subject, card_id, answer_text } = await c.req.json()
   const apiKey = c.env.GEMINI_API_KEY
   if (!apiKey) return c.json({ success: false, error: 'API key not configured' })
+
+  // ★★★ 答えをプロンプトから除去 ★★★
+  let cardAnswer = (answer_text || '').trim()
+  // card_id がある場合、DBから答えを取得（answer_text が未送信の場合の安全策）
+  if (!cardAnswer && card_id) {
+    try {
+      const row = await c.env.DB.prepare('SELECT correct_answer, answer FROM learning_cards WHERE id = ?').bind(card_id).first() as any
+      cardAnswer = (row?.correct_answer || row?.answer || '').trim()
+    } catch (e) { /* ignore */ }
+  }
+  const answerVariants: string[] = []
+  if (cardAnswer && cardAnswer.length >= 2) {
+    answerVariants.push(cardAnswer)
+    const stem = cardAnswer.replace(/[系語族型類科目派流業]+$/u, '')
+    if (stem && stem.length >= 2 && stem !== cardAnswer) answerVariants.push(stem)
+    const bracketMatch = cardAnswer.match(/^(.+?)[（(](.+?)[）)]$/)
+    if (bracketMatch) { answerVariants.push(bracketMatch[1].trim()); answerVariants.push(bracketMatch[2].trim()) }
+  }
+  function hintStripAnswer(text: string): string {
+    if (!text || answerVariants.length === 0) return text
+    let r = text
+    for (const v of answerVariants.sort((a, b) => b.length - a.length)) {
+      if (v.length >= 2) r = r.replace(new RegExp(v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '？？？')
+    }
+    return r
+  }
+  const safeTitle = hintStripAnswer(card_title || '')
+  const safeProblem = hintStripAnswer(problem_text || '')
+  const safeHint = hintStripAnswer(hint_text || '')
 
   const prompt = `あなたは小学校${grade || ''}年生の${subject || '算数'}の先生です。
 以下の問題とヒントを、児童にわかりやすい教育的な図解イラストで表現してください。
 
-【問題】${card_title || ''} - ${problem_text || ''}
-【ヒント】${hint_text || ''}
+${cardAnswer ? `【★★★ 絶対禁止 ★★★】「${cardAnswer}」という文字・単語を図の中に絶対に描かないでください。答えが見えてしまいます。代わりに「？」マークを使ってください。` : ''}
+
+【問題】${safeTitle} - ${safeProblem}
+【ヒント】${safeHint}
 
 要件:
 - 小学生が理解しやすいカラフルで明快な図
@@ -26874,6 +26939,7 @@ app.post('/api/ai/generate-hint-image', async (c) => {
 2. 画像上部にタイトル・ヘッダー・教科名（「小学校社会」「中学校理科」等）を描かない。図の内容のみ描く
 3. 画像内に長文の解説テキストを入れない。短いラベルや注釈のみ
 4. 日本語テキストは正確に書くこと。文字化けやランダムな文字列を含めないこと
+${cardAnswer ? `5. ★★★「${cardAnswer}」を図の中に絶対に書かないこと。これは問題の答えなので、見えると学習効果がなくなります★★★` : ''}
 ===========================`
 
   // Nano Banana 2 (gemini-3.1-flash-image-preview)
@@ -27462,7 +27528,7 @@ app.post('/api/ai/generate-visuals-for-course', async (c) => {
   try {
     // コースのカードを取得
     const cardsResult = await env.DB.prepare(
-      'SELECT id, card_title, problem_text, problem_description, problem_content, subject, grade_level, unit_name, problem_image_url FROM learning_cards WHERE course_id = ? ORDER BY card_number'
+      'SELECT id, card_title, problem_text, problem_description, problem_content, subject, grade_level, unit_name, problem_image_url, correct_answer, answer FROM learning_cards WHERE course_id = ? ORDER BY card_number'
     ).bind(course_id).all()
     
     const cards = (cardsResult.results || []) as any[]
@@ -27482,9 +27548,31 @@ app.post('/api/ai/generate-visuals-for-course', async (c) => {
       }
       
       const pText = card.problem_text || card.problem_description || ''
+      
+      // ★★★ 答えをプロンプトから除去 ★★★
+      const cardAnswer = (card.correct_answer || card.answer || '').trim()
+      const answerStem = cardAnswer.replace(/[系語族型類科目派流業]+$/u, '')
+      const answerVariants = [cardAnswer]
+      if (answerStem && answerStem.length >= 2 && answerStem !== cardAnswer) answerVariants.push(answerStem)
+      
+      const stripAnswer = (text: string): string => {
+        if (!text || !cardAnswer) return text
+        let result = text
+        const sorted = answerVariants.slice().sort((a, b) => b.length - a.length)
+        for (const v of sorted) {
+          if (v.length >= 2) {
+            result = result.replace(new RegExp(v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '？？？')
+          }
+        }
+        return result
+      }
+      
+      const safeTitle = stripAnswer(card.card_title || '')
+      const safePText = stripAnswer(pText.substring(0, 500))
+      
       const context = [
-        card.card_title && `タイトル: ${card.card_title}`,
-        pText && `問題: ${pText.substring(0, 500)}`,
+        safeTitle && `タイトル: ${safeTitle}`,
+        safePText && `問題: ${safePText}`,
         card.subject && `教科: ${card.subject}`,
         card.grade_level && `学年: ${card.grade_level}年`,
         card.unit_name && `単元: ${card.unit_name}`,
@@ -27496,6 +27584,8 @@ app.post('/api/ai/generate-visuals-for-course', async (c) => {
 【★★★ 最重要ルール: 答えを見せない ★★★】
 - 図解は「考えるためのヒント」であり、正解そのものを見せてはいけません
 - 答えの文字列・数値をそのまま図に描いてはいけません
+- テキスト中の「？？？」は答えが伏せられた箇所です。この部分を「？」マークのまま図に描いてください
+${cardAnswer ? `- ★★★「${cardAnswer}」という文字を図の中に絶対に書かないでください★★★` : ''}
 - 代わりに、問題を理解するための概念図・関係図・構造図を描いてください
 - 児童が「自分で考えて答えにたどり着く」手がかりとなる図を描く
 
@@ -32680,14 +32770,25 @@ app.post('/api/ai/generate-image', async (c) => {
     // ========== 答え文字列のサニタイズ ==========
     // prompt, problem_text から答え文字列を除去して画像に描かれるのを防ぐ
     const answerVariants: string[] = []
-    if (answer_text && answer_text.length > 0) {
-      answerVariants.push(answer_text.trim())
+    let resolvedAnswerText = (answer_text || '').trim()
+    // answer_text が空の場合、card_id からDBで答えを取得（安全策）
+    if (!resolvedAnswerText && card_id && typeof card_id === 'number' && card_id > 0) {
+      try {
+        const row = await env.DB.prepare('SELECT correct_answer, answer FROM learning_cards WHERE id = ?').bind(card_id).first() as any
+        resolvedAnswerText = (row?.correct_answer || row?.answer || '').trim()
+      } catch (e) { /* ignore */ }
+    }
+    if (resolvedAnswerText && resolvedAnswerText.length > 0) {
+      answerVariants.push(resolvedAnswerText)
       // 括弧内読み仮名を分離: "北大西洋海流（きたたいせいようかいりゅう）"
-      const bracketMatch = answer_text.match(/^(.+?)[（(](.+?)[）)]$/)
+      const bracketMatch = resolvedAnswerText.match(/^(.+?)[（(](.+?)[）)]$/)
       if (bracketMatch) {
         answerVariants.push(bracketMatch[1].trim())
         answerVariants.push(bracketMatch[2].trim())
       }
+      // 語幹生成（例: 混合農業 → 混合農）
+      const stem = resolvedAnswerText.replace(/[系語族型類科目派流業]+$/u, '')
+      if (stem && stem.length >= 2 && stem !== resolvedAnswerText) answerVariants.push(stem)
     }
     if (forbidden_answer && forbidden_answer.length > 0) {
       forbidden_answer.split(/[,、，]/).forEach((w: string) => {
@@ -41879,11 +41980,30 @@ ${cardSummary}
           const mm = card.multimedia || {}
           const imgDesc = mm.image_description || ''
           
+          // ★★★ 答えをプロンプトから除去 ★★★
+          const cardAns2 = (card.correct_answer || card.answer || '').trim()
+          const ansVariants2: string[] = []
+          if (cardAns2 && cardAns2.length >= 2) {
+            ansVariants2.push(cardAns2)
+            const stem2 = cardAns2.replace(/[系語族型類科目派流業]+$/u, '')
+            if (stem2 && stem2.length >= 2 && stem2 !== cardAns2) ansVariants2.push(stem2)
+            const bm = cardAns2.match(/^(.+?)[（(](.+?)[）)]$/)
+            if (bm) { ansVariants2.push(bm[1].trim()); ansVariants2.push(bm[2].trim()) }
+          }
+          function cardStripAns(text: string): string {
+            if (!text || ansVariants2.length === 0) return text
+            let r = text
+            for (const v of ansVariants2.sort((a, b) => b.length - a.length)) {
+              if (v.length >= 2) r = r.replace(new RegExp(v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '？？？')
+            }
+            return r
+          }
+          
           // 図解生成プロンプト
           const context = [
-            card.card_title && `タイトル: ${card.card_title}`,
-            pText && `問題: ${pText.substring(0, 500)}`,
-            imgDesc && `必要な図: ${imgDesc.substring(0, 300)}`,
+            card.card_title && `タイトル: ${cardStripAns(card.card_title)}`,
+            pText && `問題: ${cardStripAns(pText.substring(0, 500))}`,
+            imgDesc && `必要な図: ${cardStripAns(imgDesc.substring(0, 300))}`,
             curriculum.subject && `教科: ${curriculum.subject}`,
             gradeNum && `学年: ${gradeNum}年`,
             curriculum.unit_name && `単元: ${curriculum.unit_name}`,
@@ -41892,12 +42012,15 @@ ${cardSummary}
           const prompt = `あなたは教科書の図解イラストを描く教育デザイナーです。
 以下の学習カードの問題内容を理解し、児童が問題を解くために必要な図解・ダイアグラムを正確に描いてください。
 
+${cardAns2 ? `【★★★ 絶対禁止 ★★★】\n「${cardAns2}」という文字・単語を図の中に絶対に描かないでください。これは問題の答えです。答えが見えてしまうと学習効果がなくなります。代わりに「？」マークを使ってください。` : ''}
+
 【重要ルール】
 1. 問題で使われている数値・図形・関係性を正確に反映すること
 2. 日本の教科書スタイル（カラフル、わかりやすい、白背景）
 3. 日本語ラベル・注釈つき
 4. 児童が見るだけで問題を理解できるレベルの詳細さ
 5. 余計な装飾は不要。教育的な正確さを最優先
+${cardAns2 ? `6. ★★★「${cardAns2}」を図に含めないこと★★★` : ''}
 
 【学習カード】
 ${context}
