@@ -6956,7 +6956,7 @@ async function loadCardPage(cardId) {
           <!-- サイドバー（右側） -->
           <div class="lg:col-span-1 space-y-6">
             <!-- ヒントカードエリア -->
-            <div id="hintsArea" class="bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6">
+            <div id="hintsArea" class="hidden bg-yellow-50 border-l-4 border-yellow-500 rounded-lg p-6">
               <h3 class="text-lg font-bold text-yellow-800 mb-4">
                 <i class="fas fa-lightbulb mr-2"></i>3だんかいヒント <span class="text-[9px] font-normal bg-red-100 text-red-700 px-1.5 py-0.5 rounded ml-1">F4足場かけ F7動的調整</span>
               </h3>
