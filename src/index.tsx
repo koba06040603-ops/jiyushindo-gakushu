@@ -1192,7 +1192,7 @@ app.use('/api/*', cors())
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
-  return c.json({ build_id: '20260328a' }, 200, {
+  return c.json({ build_id: '20260329a' }, 200, {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'CDN-Cache-Control': 'no-store'
   })
@@ -9274,7 +9274,7 @@ app.get('/guide/:curriculumId', async (c) => {
   <script>
   // === キャッシュ強制クリア v5（localStorage + APIで2重チェック） ===
   (function(){
-    var MY_BUILD = '20260328a';
+    var MY_BUILD = '20260329a';
     var LAST_CLEAR_KEY = 'toco_last_cache_clear';
     var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
     
@@ -14501,7 +14501,7 @@ app.get('/landing', (c) => {
         <script>
         // === キャッシュ強制クリア v5（毎回SW・キャッシュ・HTTPキャッシュをリセット） ===
         (function(){
-          var MY_BUILD = '20260328a';
+          var MY_BUILD = '20260329a';
           var LAST_CLEAR_KEY = 'toco_last_cache_clear';
           var lastClear = localStorage.getItem(LAST_CLEAR_KEY);
           
@@ -26515,7 +26515,7 @@ app.post('/api/ai/generate-hint-image', async (c) => {
 - 背景は白、サイズは横長（4:3）
 
 ===== 絶対禁止事項（厳守） =====
-1. ふりがな（ルビ）を絶対に使わないこと。漢字の上に小さい文字を配置しないこと。難しい漢字はひらがなで書く
+1. ふりがな（ルビ）を絶対に使わないこと。漢字の上に小さい文字を配置しないこと。漢字はそのまま使ってよい
 2. 画像上部にタイトル・ヘッダー・教科名（「小学校社会」「中学校理科」等）を描かない。図の内容のみ描く
 3. 画像内に長文の解説テキストを入れない。短いラベルや注釈のみ
 4. 日本語テキストは正確に書くこと。文字化けやランダムな文字列を含めないこと
@@ -32615,13 +32615,15 @@ HTMLコードだけを出力（コードブロック不要）:`
 色使いはカラフルで見やすく、小学生でも理解しやすいこと。教科書品質の正確さと見やすさを両立。
 
 ===== 絶対禁止事項（厳守・違反で画像は不合格） =====
-1. ★最重要★ ふりがな（ルビ）を絶対に使わないこと。漢字の上や横に小さい読み仮名を一切配置してはいけない。難しい漢字は最初からひらがなで書くこと
+1. ★最重要★ ふりがな（ルビ）を絶対に使わないこと。漢字の上や横に小さい読み仮名を一切配置してはいけない
 2. ★最重要★ 画像の上部・左上・右上にタイトル・ヘッダー・教科名（「小学校社会」「中学校・理科」「○年生」等）を絶対に描かないこと。図の内容だけを描く。余白部分にもテキストを入れない
 3. 画像内に長文の解説テキストを入れない。ラベルや短い注釈は可だが、段落のような説明文は禁止
 4. 問題の「答え」「正解」を図に表示しない。「？」で隠す
 5. 不要な問題番号・記号を含めない
-6. ★重要★ 日本語テキストは正確に書くこと。意味不明な文字列・文字化け・ランダムなひらがな/カタカナの羅列を絶対に含めないこと。書けない漢字は書かずにひらがなで代用する
+6. ★重要★ 日本語テキストは正確に書くこと。意味不明な文字列・文字化け・ランダムなひらがな/カタカナの羅列を絶対に含めないこと
 ===========================
+
+【テキストルール】対象学年で習う漢字は積極的に使うこと。学年以上の難しい漢字もひらがなにせず漢字で書いてよい。ただしルビ（ふりがな）は絶対に付けない。
 
 ★問題文の内容全体を正確に反映した図を描くこと。タイトルだけでなく問題文を読むこと★`
         
@@ -32743,7 +32745,7 @@ JSON形式で出力してください:`
 以下のルールに必ず従ってください：
 1. 数値やデータは問題文から正確に読み取り、図に反映すること
 2. ラベル、単位、目盛りなどの文字は日本語で大きく読みやすく書くこと
-3. ★★★ ふりがな（ルビ）は絶対に使わないこと ★★★ 漢字の上や横に小さい文字で読み仮名を振ることは一切禁止。AI画像生成ではふりがなが文字化けするため、難しい漢字は最初からひらがなで書くか漢字のみにすること
+3. ★★★ ふりがな（ルビ）は絶対に使わないこと ★★★ 漢字の上や横に小さい文字で読み仮名を振ることは一切禁止。漢字はそのまま漢字で書いてよい（学年相応の漢字を積極的に使うこと）
 4. 色使いはカラフルで見やすく、小学生でも理解しやすいこと
 5. 教科書品質の正確さと見やすさを両立すること
 6. 背景は白または淡い色で、図が主役になるようにすること
@@ -32754,7 +32756,7 @@ JSON形式で出力してください:`
 11. ★問題文の内容を正確に反映すること。タイトルだけでなく問題文全体を読んで適切な図を描くこと★
 12. ★★★ 画像の上部・左上・右上にタイトルやヘッダーテキスト（「○○の教科書」「中学校・社会」「小学校理科」「○年生」等）を絶対に描かないこと。余白にもテキストを入れないこと。図の内容だけを描くこと ★★★
 13. ★★★ 画像内に長文の解説テキスト（段落のような文章）を入れないこと。短いラベルや注釈のみ使用可 ★★★
-14. ★★★ 日本語テキストは正確に書くこと。文字化け・意味不明な文字列・ランダムなひらがな/カタカナの羅列を絶対に含めないこと。書けない漢字は書かずにひらがなで代用すること ★★★`
+14. ★★★ 日本語テキストは正確に書くこと。文字化け・意味不明な文字列・ランダムなひらがな/カタカナの羅列を絶対に含めないこと。漢字は正確に書けるならそのまま使用してよい ★★★`
 
     const userPrompt = userContext
     
@@ -46656,6 +46658,52 @@ app.post('/api/ai/recognize-handwriting', async (c) => {
   } catch (e: any) {
     console.error('🖊️ Handwriting recognition error:', e.message)
     return c.json({ success: false, error: e.message }, 500)
+  }
+})
+
+// ============================================================
+// ★ 漢字変換API（ひらがな/カタカナ → 漢字変換候補を返す）
+// ============================================================
+app.post('/api/ai/kanji-convert', async (c) => {
+  const { text } = await c.req.json()
+  if (!text) return c.json({ success: false, error: 'text required' }, 400)
+  
+  const apiKey = c.env.GEMINI_API_KEY || c.env.GOOGLE_AI_KEY
+  if (!apiKey) return c.json({ success: false, error: 'API key not configured' }, 500)
+  
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `以下のテキストの漢字変換候補を最大5つ、JSON配列で返してください。元のテキストもそのまま候補に含めてください。
+余計な説明は不要です。JSON配列のみ返してください。
+
+入力: 「${text}」
+
+例: 入力「かんじ」→ ["漢字", "感じ", "幹事", "監事", "かんじ"]
+例: 入力「あいう」→ ["あいう"]
+例: 入力「こうか」→ ["効果", "硬貨", "校歌", "降下", "こうか"]` }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 256 }
+        })
+      }
+    )
+    
+    if (resp.ok) {
+      const data = await resp.json() as any
+      const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]'
+      const match = resultText.match(/\[[\s\S]*?\]/)
+      if (match) {
+        const candidates = JSON.parse(match[0])
+        return c.json({ success: true, candidates: candidates.slice(0, 5) })
+      }
+    }
+    return c.json({ success: true, candidates: [text] })
+  } catch (e: any) {
+    console.error('Kanji conversion error:', e.message)
+    return c.json({ success: true, candidates: [text] })
   }
 })
 

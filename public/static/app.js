@@ -58478,8 +58478,42 @@ window.openWhyExploration = openWhyExploration
 // ⑥ マインドマップ自動生成（Mermaid.js）
 // ─────────────────────────────────────────────
 async function generateMindmap(cards, unitName, subject, targetEl) {
-  if (!targetEl) return
-  targetEl.innerHTML = '<div class="flex items-center justify-center gap-2 p-8 text-indigo-600"><div class="animate-spin rounded-full h-5 w-5 border-2 border-indigo-400 border-t-transparent"></div>マインドマップ生成中...</div>'
+  // 全画面モーダルでマインドマップを表示
+  let modal = document.getElementById('mindmap-fullscreen-modal')
+  if (modal) modal.remove()
+  
+  modal = document.createElement('div')
+  modal.id = 'mindmap-fullscreen-modal'
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:10001;background:white;display:flex;flex-direction:column;'
+  modal.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:white;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:20px;">🧠</span>
+        <span style="font-weight:bold;font-size:15px;">マインドマップ</span>
+        <span style="font-size:11px;opacity:0.8;">${unitName || ''}</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button onclick="(function(){var w=document.querySelector('#mm-content .mermaid-wrap');if(!w)return;var s=parseFloat(w.dataset.scale||'1');s=Math.min(s+0.3,3);w.dataset.scale=s;w.style.transform='scale('+s+')';w.style.transformOrigin='top left'})()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:4px 10px;border-radius:6px;font-size:13px;cursor:pointer;">🔍+</button>
+        <button onclick="(function(){var w=document.querySelector('#mm-content .mermaid-wrap');if(!w)return;w.dataset.scale='1';w.style.transform='scale(1)'})()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:4px 10px;border-radius:6px;font-size:13px;cursor:pointer;">1:1</button>
+        <button onclick="(function(){var w=document.querySelector('#mm-content .mermaid-wrap');if(!w)return;var s=parseFloat(w.dataset.scale||'1');s=Math.max(s-0.3,0.3);w.dataset.scale=s;w.style.transform='scale('+s+')';w.style.transformOrigin='top center'})()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:4px 10px;border-radius:6px;font-size:13px;cursor:pointer;">🔍−</button>
+        <button onclick="document.getElementById('mindmap-fullscreen-modal').remove()" style="background:rgba(255,255,255,0.3);border:none;color:white;padding:4px 12px;border-radius:6px;font-size:15px;font-weight:bold;cursor:pointer;margin-left:8px;">✕ 閉じる</button>
+      </div>
+    </div>
+    <div id="mm-content" style="flex:1;overflow:auto;padding:16px;background:#fafafe;touch-action:pan-x pan-y;">
+      <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6366F1;">
+        <div style="text-align:center;">
+          <div class="animate-spin" style="width:32px;height:32px;border:3px solid #C7D2FE;border-top:3px solid #6366F1;border-radius:50%;margin:0 auto 12px;"></div>
+          <div style="font-size:14px;font-weight:bold;">マインドマップ生成中...</div>
+        </div>
+      </div>
+    </div>
+  `
+  document.body.appendChild(modal)
+  
+  // 元のtargetElにもステータス表示
+  if (targetEl) {
+    targetEl.innerHTML = '<div class="text-center text-xs text-indigo-500 py-2"><i class="fas fa-external-link-alt mr-1"></i>全画面で表示中...</div>'
+  }
   
   try {
     const res = await axios.post('/api/ai/generate-mindmap', { cards, unit_name: unitName, subject }, { timeout: 20000 })
@@ -58497,53 +58531,55 @@ async function generateMindmap(cards, unitName, subject, targetEl) {
       }})
     }
     
-    // マインドマップ用ラッパー（ズーム・パン対応）
-    targetEl.innerHTML = `
-      <div style="position:relative;" id="mindmap-outer-wrap">
-        <div class="flex gap-1 mb-2 justify-end">
-          <button onclick="var w=this.closest('[id=mindmap-outer-wrap]').querySelector('.mermaid-wrap');var s=parseFloat(w.dataset.scale||'1');s=Math.min(s+0.3,3);w.dataset.scale=s;w.style.transform='scale('+s+')';w.style.transformOrigin='top left'" class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-1 rounded transition">🔍+</button>
-          <button onclick="var w=this.closest('[id=mindmap-outer-wrap]').querySelector('.mermaid-wrap');w.dataset.scale='1';w.style.transform='scale(1)'" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">1:1</button>
-          <button onclick="var w=this.closest('[id=mindmap-outer-wrap]').querySelector('.mermaid-wrap');var s=parseFloat(w.dataset.scale||'1');s=Math.max(s-0.3,0.4);w.dataset.scale=s;w.style.transform='scale('+s+')';w.style.transformOrigin='top center'" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition">🔍−</button>
-          <button onclick="var c=this.closest('[id=mindmap-outer-wrap]').querySelector('[style*=overflow]');if(c.style.maxHeight==='none'){c.style.maxHeight='400px';this.textContent='⛶'}else{c.style.maxHeight='none';this.textContent='✕'}" class="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1 rounded transition">⛶</button>
-        </div>
-        <div style="overflow:auto;max-height:400px;border:1px solid #E5E7EB;border-radius:12px;padding:12px;background:white;">
-          <div class="mermaid-wrap" data-scale="1" style="transition:transform 0.3s;min-width:500px;">
-            <div class="mermaid">${code}</div>
-          </div>
-        </div>
+    const mmContent = document.getElementById('mm-content')
+    if (!mmContent) return
+    
+    mmContent.innerHTML = `
+      <div class="mermaid-wrap" data-scale="1" style="transition:transform 0.3s;min-width:600px;">
+        <div class="mermaid">${code}</div>
       </div>
     `
-    await window.mermaid.run({ nodes: targetEl.querySelectorAll('.mermaid') })
+    await window.mermaid.run({ nodes: mmContent.querySelectorAll('.mermaid') })
     
-    // SVGのスタイル調整 — テキストを読みやすくする
-    const svg = targetEl.querySelector('svg')
+    // SVGのスタイル調整
+    const svg = mmContent.querySelector('svg')
     if (svg) {
-      svg.setAttribute('style', 'width:100%;min-width:600px;height:auto;')
-      // フォントサイズを大きく（16px以上）
+      svg.setAttribute('style', 'width:100%;height:auto;min-height:300px;')
       svg.querySelectorAll('text, .nodeLabel, .label, foreignObject span, foreignObject div, foreignObject p').forEach(el => {
         el.style.fontSize = '16px'
         el.style.fontWeight = '700'
         el.style.lineHeight = '1.3'
       })
-      // ノードの背景を広くしてテキストが収まるようにする
       svg.querySelectorAll('.node rect, .node circle, .node polygon').forEach(el => {
         if (el.getAttribute('width')) {
           const w = parseFloat(el.getAttribute('width'))
           if (w < 120) el.setAttribute('width', String(Math.max(w, 120)))
         }
       })
-      // viewBoxを調整して初期表示を大きくする
       const viewBox = svg.getAttribute('viewBox')
       if (viewBox) {
         const parts = viewBox.split(' ').map(Number)
         if (parts.length === 4 && parts[2] > 0) {
-          // パディングを追加して余裕を持たせる
           svg.setAttribute('viewBox', `${parts[0]-20} ${parts[1]-20} ${parts[2]+40} ${parts[3]+40}`)
         }
       }
     }
+    
+    // 元のtargetElに縮小版を表示
+    if (targetEl) {
+      targetEl.innerHTML = `<div class="text-center py-2">
+        <p class="text-xs text-green-600 font-bold"><i class="fas fa-check-circle mr-1"></i>マインドマップ生成完了</p>
+        <button onclick="document.getElementById('mindmap-fullscreen-modal').style.display='flex'" class="mt-1 text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg transition"><i class="fas fa-expand mr-1"></i>全画面で再表示</button>
+      </div>`
+    }
   } catch (e) {
-    targetEl.innerHTML = '<p class="text-sm text-gray-400 text-center p-4"><i class="fas fa-exclamation-circle mr-1"></i>マインドマップの生成に失敗しました。</p>'
+    const mmContent = document.getElementById('mm-content')
+    if (mmContent) {
+      mmContent.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;"><p style="color:#999;font-size:14px;"><i class="fas fa-exclamation-circle" style="margin-right:4px;"></i>マインドマップの生成に失敗しました。</p></div>'
+    }
+    if (targetEl) {
+      targetEl.innerHTML = '<p class="text-sm text-gray-400 text-center p-4"><i class="fas fa-exclamation-circle mr-1"></i>マインドマップの生成に失敗しました。</p>'
+    }
     console.error('Mindmap error:', e)
   }
 }
@@ -58785,23 +58821,69 @@ async function recognizeHandwriting(containerId) {
     
     const res = await axios.post('/api/ai/recognize-handwriting', { image_base64: base64 }, { timeout: 15000 })
     const text = res.data?.recognized_text || ''
-    resultEl.innerHTML = text ? `<span class="text-green-600 font-bold"><i class="fas fa-check mr-1"></i>認識結果: ${text}</span>` : '<span class="text-gray-400">認識できませんでした</span>'
-    
-    // 認識結果を回答入力欄に転記
-    const answerInput = document.getElementById('answerInput')
-    if (answerInput && text) {
-      answerInput.value = text
-      HapticFeedback.success()
+    if (!text) {
+      resultEl.innerHTML = '<span class="text-gray-400">認識できませんでした</span>'
+      return
     }
+    
+    // 認識結果 + アクションボタン表示
+    resultEl.innerHTML = `
+      <div style="text-align:center;">
+        <p class="text-green-600 font-bold text-sm mb-2"><i class="fas fa-check mr-1"></i>認識結果: <span id="hw-recognized-text-${containerId}" style="font-size:18px;">${text}</span></p>
+        <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+          <button onclick="(function(){var t=document.getElementById('hw-recognized-text-${containerId}');if(!t)return;var v=t.textContent;var inp=document.getElementById('answerInput');if(inp){inp.value=v;inp.focus();HapticFeedback.success();t.closest('[id^=hw-result]').querySelector('.hw-action-msg').textContent='✅ 回答欄に入力しました！'}else{navigator.clipboard&&navigator.clipboard.writeText(v).then(function(){t.closest('[id^=hw-result]').querySelector('.hw-action-msg').textContent='📋 コピーしました！'})}})()" 
+            style="background:linear-gradient(135deg,#3B82F6,#2563EB);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
+            <i class="fas fa-pencil-alt" style="margin-right:4px;"></i>回答欄に入力
+          </button>
+          <button onclick="(function(){var t=document.getElementById('hw-recognized-text-${containerId}');if(!t)return;var v=t.textContent;requestKanjiConversion(v,'${containerId}')})()" 
+            style="background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
+            <i class="fas fa-language" style="margin-right:4px;"></i>漢字変換
+          </button>
+          <button onclick="(function(){var t=document.getElementById('hw-recognized-text-${containerId}');if(!t)return;navigator.clipboard&&navigator.clipboard.writeText(t.textContent).then(function(){t.closest('[id^=hw-result]').querySelector('.hw-action-msg').textContent='📋 コピーしました！'})})()" 
+            style="background:#E5E7EB;color:#374151;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:bold;cursor:pointer;">
+            <i class="fas fa-copy" style="margin-right:4px;"></i>コピー
+          </button>
+        </div>
+        <p class="hw-action-msg text-xs text-gray-500 mt-2" style="min-height:16px;"></p>
+      </div>
+    `
+    HapticFeedback.light()
   } catch (e) {
     const errMsg = e.response?.data?.error || e.message || ''
     resultEl.innerHTML = `<span class="text-red-400"><i class="fas fa-exclamation-triangle mr-1"></i>認識に失敗しました${errMsg ? ' ('+errMsg+')' : ''}</span><button onclick="recognizeHandwriting('${containerId}')" class="text-xs text-blue-500 underline ml-2">再試行</button>`
+  }
+}
+
+// 漢字変換リクエスト（Gemini APIで変換候補を生成）
+async function requestKanjiConversion(text, containerId) {
+  const resultEl = document.getElementById(`hw-result-${containerId}`)
+  if (!resultEl) return
+  const msgEl = resultEl.querySelector('.hw-action-msg')
+  if (msgEl) msgEl.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>変換中...'
+  
+  try {
+    const res = await axios.post('/api/ai/kanji-convert', { text }, { timeout: 10000 })
+    const candidates = res.data?.candidates || []
+    if (candidates.length === 0) {
+      if (msgEl) msgEl.textContent = '変換候補がありません'
+      return
+    }
+    
+    // 変換候補をボタンで表示
+    const textEl = document.getElementById(`hw-recognized-text-${containerId}`)
+    if (msgEl) {
+      msgEl.innerHTML = '<span style="font-size:11px;color:#6B7280;">変換候補:</span> ' + 
+        candidates.map(c => `<button onclick="(function(){document.getElementById('hw-recognized-text-${containerId}').textContent='${c.replace(/'/g,"\\'")}';var inp=document.getElementById('answerInput');if(inp)inp.value='${c.replace(/'/g,"\\'")}';HapticFeedback.light()})()" style="background:#EEF2FF;color:#4338CA;border:1px solid #C7D2FE;padding:3px 10px;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;margin:2px;">${c}</button>`).join('')
+    }
+  } catch (e) {
+    if (msgEl) msgEl.textContent = '変換に失敗しました'
   }
 }
 window.createHandwritingCanvas = createHandwritingCanvas
 window.clearHandwritingCanvas = clearHandwritingCanvas
 window.setHandwritingPenSize = setHandwritingPenSize
 window.recognizeHandwriting = recognizeHandwriting
+window.requestKanjiConversion = requestKanjiConversion
 
 // ─────────────────────────────────────────────
 // ⑩ 実験シミュレーター
