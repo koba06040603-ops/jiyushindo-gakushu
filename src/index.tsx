@@ -9272,6 +9272,36 @@ app.get('/guide/:curriculumId', async (c) => {
           exProbTooSimilar
         )
         
+        // ★★★ SSR用: トートロジー検出 — 例題の答えが例題の問題文に含まれている ★★★
+        let exampleTautology = false
+        if (exProb && exAns && exAns.length >= 2) {
+          const epL = exProb.toLowerCase()
+          const eaL = exAns.toLowerCase().trim()
+          const eaStem = exAns.trim().replace(/[系語族型類科目派流業がのをはでにとも出るから]+$/u, '').toLowerCase()
+          // 例題の答えのコア部分が問題文に含まれている（括弧書き含む）
+          if (epL.includes(eaL) || (eaStem.length >= 2 && epL.includes(eaStem))) {
+            exampleTautology = true
+          }
+          // 括弧書き内に答えがある: 「（二酸化炭素）」のようなパターン
+          const bracketContent = exProb.match(/[（(]([^）)]+)[）)]/g)
+          if (bracketContent) {
+            for (const bc of bracketContent) {
+              const inner = bc.replace(/[（()）]/g, '').trim().toLowerCase()
+              if (inner === eaL || inner.includes(eaStem) || eaStem.includes(inner)) {
+                exampleTautology = true
+              }
+            }
+          }
+        }
+        // 例題の答えのキーワードが問題文の「問い」部分に含まれている（例: 「二酸化炭素が出るから」→「二酸化炭素」が問題文にある）
+        if (!exampleTautology && exProb && exAns && exAns.length >= 4) {
+          // 答えから助詞・語尾を除去してコアキーワードを抽出
+          const coreAnswer = exAns.replace(/[がのをはでにとも出るからですますだよねた。、]+$/u, '').trim()
+          if (coreAnswer.length >= 2 && exProb.includes(coreAnswer)) {
+            exampleTautology = true
+          }
+        }
+        
         // ★★★ SSR用: 答え漏洩防止フィルタリング（フロントのJSロード前に表示されるHTML用） ★★★
         if (mainAns && mainAns.length >= 2) {
           const stem = mainAns.replace(/[系語族型類科目派流業]+$/u, '')
@@ -9306,7 +9336,7 @@ app.get('/guide/:curriculumId', async (c) => {
           })
           const exSolContainsAnswer = exSol && variants.some(v => exSol.includes(v))
           
-          if (exAnsMatchesMain || exSolContainsAnswer || exProbTooSimilar) {
+          if (exAnsMatchesMain || exSolContainsAnswer || exProbTooSimilar || exampleTautology) {
             // 例題全体を「改善中」に置換（答え漏洩防止）
             card.example_problem = '（AIが例題を改善しています…しばらくお待ちください）'
             card.example_solution = ''
@@ -9321,7 +9351,7 @@ app.get('/guide/:curriculumId', async (c) => {
           _courseInfo: info,
           _courseName: course.course_name || info.name,
           _cardIndex: idx,
-          _needsExampleFix: needsExampleFix ? true : false
+          _needsExampleFix: (needsExampleFix || exampleTautology) ? true : false
         })
       })
     }
@@ -10863,6 +10893,31 @@ app.get('/guide/:curriculumId', async (c) => {
       }
       // 「改善中」プレースホルダーの場合も修正トリガー
       if (c.example_problem && c.example_problem.indexOf('AIが例題を改善しています') >= 0) isSameAnswer = true;
+      
+      // ★★★ トートロジー検出: 例題の答えが例題の問題文に含まれている ★★★
+      if (!isSameAnswer && c.example_problem && exAns && exAns.length >= 2) {
+        var epL = c.example_problem.toLowerCase();
+        var eaL = exAns.toLowerCase().trim();
+        // 答えから助詞・語尾を除去してコアキーワード抽出
+        var eaCore = exAns.trim().replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '').toLowerCase();
+        if (epL.indexOf(eaL) >= 0 || (eaCore.length >= 2 && epL.indexOf(eaCore) >= 0)) {
+          isSameAnswer = true;
+          console.log('🔧 トートロジー検出（クライアント側）: 例題の答え「' + exAns + '」が問題文に含まれている');
+        }
+        // 括弧書き内に答えのコアがある
+        if (!isSameAnswer) {
+          var bracketMatches = c.example_problem.match(/[（(]([^）)]+)[）)]/g);
+          if (bracketMatches) {
+            for (var bi = 0; bi < bracketMatches.length; bi++) {
+              var inner = bracketMatches[bi].replace(/[（()）]/g, '').trim().toLowerCase();
+              if (inner === eaL || (eaCore.length >= 2 && (inner.indexOf(eaCore) >= 0 || eaCore.indexOf(inner) >= 0))) {
+                isSameAnswer = true;
+                console.log('🔧 トートロジー検出（括弧書き）: 「' + bracketMatches[bi] + '」に答えが含まれている');
+              }
+            }
+          }
+        }
+      }
 
       html += '<div id="example-section-' + currentPage + '" style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:12px;">';
       
@@ -11734,8 +11789,31 @@ app.get('/guide/:curriculumId', async (c) => {
       // example_solution 内に本題の答えが含まれている
       var solStillContains = es && mVariants.some(function(v) { return (es || '').toLowerCase().indexOf(v) >= 0; });
       
-      if (answerStillSame || solStillContains) {
-        console.warn('🔧 renderExampleSection: 修正後も答えが同じ → 例題を非表示にして再修正ボタンのみ表示');
+      // ★★★ トートロジー検出: 例題の答えが例題の問題文に含まれている ★★★
+      var exTautology = false;
+      if (ep && ea && ea.length >= 2) {
+        var epLow = ep.toLowerCase();
+        var eaLow = (ea || '').toLowerCase().trim();
+        var eaCoreR = (ea || '').trim().replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '').toLowerCase();
+        if (epLow.indexOf(eaLow) >= 0 || (eaCoreR.length >= 2 && epLow.indexOf(eaCoreR) >= 0)) {
+          exTautology = true;
+        }
+        // 括弧書き内チェック
+        if (!exTautology) {
+          var bms = ep.match(/[（(]([^）)]+)[）)]/g);
+          if (bms) {
+            for (var bmi = 0; bmi < bms.length; bmi++) {
+              var bInner = bms[bmi].replace(/[（()）]/g, '').trim().toLowerCase();
+              if (bInner === eaLow || (eaCoreR.length >= 2 && (bInner.indexOf(eaCoreR) >= 0 || eaCoreR.indexOf(bInner) >= 0))) {
+                exTautology = true;
+              }
+            }
+          }
+        }
+      }
+      
+      if (answerStillSame || solStillContains || exTautology) {
+        console.warn('🔧 renderExampleSection: 修正後も答えが同じまたはトートロジー → 例題を非表示にして再修正ボタンのみ表示');
         var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
         html += '<p style="font-weight:bold;color:#92400E;font-size:0.85rem;margin:0;">💡 例題</p></div>';
         html += '<div style="text-align:center;padding:16px;background:#FEF3C7;border-radius:10px;">';
@@ -15938,10 +16016,32 @@ app.post('/api/fix-example', async (c) => {
         }
       }
       
+      // ★★★ トートロジー検出: 例題の答えが例題の問題文に含まれている ★★★
+      let exampleIsTautology = false
+      if (card.example_problem && exampleAnswer && exampleAnswer.length >= 2) {
+        const epL = card.example_problem.toLowerCase()
+        const eaL = exampleAnswer.toLowerCase()
+        const eaCore = exampleAnswer.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '').toLowerCase()
+        if (epL.includes(eaL) || (eaCore.length >= 2 && epL.includes(eaCore))) {
+          exampleIsTautology = true
+        }
+        // 括弧書き内チェック
+        const bcs = (card.example_problem as string).match(/[（(]([^）)]+)[）)]/g)
+        if (bcs) {
+          for (const bc of bcs) {
+            const inner = bc.replace(/[（()）]/g, '').trim().toLowerCase()
+            if (inner === eaL || (eaCore.length >= 2 && (inner.includes(eaCore) || eaCore.includes(inner)))) {
+              exampleIsTautology = true
+            }
+          }
+        }
+      }
+      
       const needsFix = !exampleAnswer || 
         exampleAnswer === mainAnswer || 
         solutionContainsAnswer ||
         exProblemTooSimilar ||
+        exampleIsTautology ||
         (card.example_problem && mainAnswer && card.example_problem.includes(mainAnswer) && exampleSolution.includes(mainAnswer))
 
       if (!needsFix) {
@@ -16111,10 +16211,28 @@ ${card.unit_name || ''}
       const rpLower = resultProblem.toLowerCase()
       const raLower = resultAnswer.toLowerCase().trim()
       const raStem = resultAnswer.trim().replace(/[系語族型類科目派流業]+$/u, '').toLowerCase()
+      // 答えから助詞・語尾を除去してコアキーワードを抽出（「二酸化炭素が出るから」→「二酸化炭素」）
+      const raCore = resultAnswer.trim().replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '').toLowerCase()
       // 答えが問題文にそのまま含まれている（括弧書き含む）
       if (rpLower.includes(raLower) || (raStem.length >= 2 && rpLower.includes(raStem))) {
         console.warn(`🔧 例題修正: トートロジー検出 — 例題の答え "${resultAnswer}" が問題文に含まれている`)
         return c.json({ success: false, error: 'Tautological question - answer already in problem text' }, 500)
+      }
+      // コアキーワードが問題文に含まれている（例: 答え「二酸化炭素が出るから」のコア「二酸化炭素」が問題文にある）
+      if (raCore.length >= 2 && raCore !== raLower && rpLower.includes(raCore)) {
+        console.warn(`🔧 例題修正: トートロジー検出（コアキーワード） — "${raCore}" (from "${resultAnswer}") が問題文に含まれている`)
+        return c.json({ success: false, error: 'Tautological question - answer core keyword in problem text' }, 500)
+      }
+      // 括弧書き内に答えのコアがある: 「（二酸化炭素）」のようなパターン
+      const bracketContent = resultProblem.match(/[（(]([^）)]+)[）)]/g)
+      if (bracketContent) {
+        for (const bc of bracketContent) {
+          const inner = bc.replace(/[（()）]/g, '').trim().toLowerCase()
+          if (inner === raLower || inner === raCore || (raCore.length >= 2 && (inner.includes(raCore) || raCore.includes(inner)))) {
+            console.warn(`🔧 例題修正: トートロジー検出（括弧書き） — 「${bc}」に答え "${resultAnswer}" のコアが含まれている`)
+            return c.json({ success: false, error: 'Tautological question - answer in brackets in problem text' }, 500)
+          }
+        }
       }
     }
     

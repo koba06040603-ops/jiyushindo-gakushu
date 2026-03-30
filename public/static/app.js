@@ -6404,7 +6404,33 @@ async function loadCardPage(cardId) {
       }
       
       // ★★★ 例題に問題がある場合の対処 ★★★
-      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame || exSolutionContainsAnswer
+      // ★★★ トートロジー検出: 例題の答えが例題の問題文に含まれている ★★★
+      let exampleTautology = false
+      if (exProblem && exAnswer && exAnswer.length >= 2) {
+        const epLow = exProblem.toLowerCase()
+        const eaLow = exAnswer.toLowerCase().trim()
+        // 答えから助詞・語尾を除去してコアキーワード抽出
+        const eaCoreKw = exAnswer.trim().replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '').toLowerCase()
+        if (epLow.includes(eaLow) || (eaCoreKw.length >= 2 && epLow.includes(eaCoreKw))) {
+          exampleTautology = true
+          console.log('🔧 トートロジー検出（loadCardPage）: 例題の答え「' + exAnswer + '」が問題文に含まれている')
+        }
+        // 括弧書き内に答えのコアがある
+        if (!exampleTautology) {
+          const bracketParts = exProblem.match(/[（(]([^）)]+)[）)]/g)
+          if (bracketParts) {
+            for (const bp of bracketParts) {
+              const bpInner = bp.replace(/[（()）]/g, '').trim().toLowerCase()
+              if (bpInner === eaLow || (eaCoreKw.length >= 2 && (bpInner.includes(eaCoreKw) || eaCoreKw.includes(bpInner)))) {
+                exampleTautology = true
+                console.log('🔧 トートロジー検出（括弧書き）: 「' + bp + '」に答えが含まれている')
+              }
+            }
+          }
+        }
+      }
+      
+      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame || exSolutionContainsAnswer || exampleTautology
       if (exampleNeedsFix) {
         // 自動修正をトリガー — 例題全体を「改善中」表示にして fix-example API を呼ぶ
         card._needsExampleFix = true
