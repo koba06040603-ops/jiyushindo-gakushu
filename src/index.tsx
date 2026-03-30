@@ -9265,12 +9265,14 @@ app.get('/guide/:curriculumId', async (c) => {
           }
         }
         
-        const needsExampleFix = card.example_problem && mainAns && (
+        // 例題がプレースホルダーか「null」文字列か検出
+        const isPlaceholder = (exProb === 'null' || exProb.includes('AIが例題を改善しています'))
+        const needsExampleFix = isPlaceholder || (card.example_problem && mainAns && (
           (exAns && exAns === mainAns) ||
           (!exAns && exSol && exSol.includes(mainAns)) ||
           (exSol && mainAns && exSol.includes(mainAns)) ||
           exProbTooSimilar
-        )
+        ))
         
         // ★★★ SSR用: トートロジー検出 — 例題の答えが例題の問題文に含まれている ★★★
         let exampleTautology = false
@@ -10859,7 +10861,7 @@ app.get('/guide/:curriculumId', async (c) => {
     }
 
     // 例題
-    if (c.example_problem && SECTION_VISIBILITY.example) {
+    if ((c.example_problem || c._needsExampleFix) && SECTION_VISIBILITY.example) {
       // サーバー側フラグまたはクライアント側チェックで例題修正が必要か判定
       var mainAns = (c.correct_answer || c.answer || '').trim();
       var exAns = (c.example_answer || '').trim();
