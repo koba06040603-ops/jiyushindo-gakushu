@@ -9302,26 +9302,8 @@ app.get('/guide/:curriculumId', async (c) => {
           }
         }
         
-        // ★★★ SSR用: テーマ関連性チェック — 例題が本題と無関係か ★★★
-        let exampleIrrelevantSSR = false
-        if (exAns && mainAns && card.unit_name && exAns.length >= 1) {
-          const topicKw: string[] = []
-          const mainCore = mainAns.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '')
-          if (mainCore.length >= 2) topicKw.push(mainCore.toLowerCase())
-          const uWords = (card.unit_name || '').replace(/[のをはがでにとも、。]+/gu, ' ').split(/\s+/).filter((w: string) => w.length >= 2)
-          topicKw.push(...uWords.map((w: string) => w.toLowerCase()))
-          const pWords = problemTxt.replace(/[のをはがでにともで、。？！「」（）]+/gu, ' ').split(/\s+/).filter((w: string) => w.length >= 4)
-          topicKw.push(...pWords.map((w: string) => w.toLowerCase()))
-          
-          const eaL2 = exAns.toLowerCase()
-          const eaCore3 = exAns.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、色]+$/u, '').toLowerCase()
-          const hasRel = topicKw.some(kw => kw.includes(eaL2) || eaL2.includes(kw) || (eaCore3.length >= 2 && (kw.includes(eaCore3) || eaCore3.includes(kw))))
-          const probHasRel = topicKw.some(kw => exProb.toLowerCase().includes(kw))
-          
-          if (!hasRel && !probHasRel && topicKw.length >= 2) {
-            exampleIrrelevantSSR = true
-          }
-        }
+        // テーマ関連性ヒューリスティックは偽陽性が多いため削除（AI検証に委ねる）
+        const exampleIrrelevantSSR = false
         
         // ★★★ SSR用: 答え漏洩防止フィルタリング（フロントのJSロード前に表示されるHTML用） ★★★
         if (mainAns && mainAns.length >= 2) {
@@ -9357,7 +9339,7 @@ app.get('/guide/:curriculumId', async (c) => {
           })
           const exSolContainsAnswer = exSol && variants.some(v => exSol.includes(v))
           
-          if (exAnsMatchesMain || exSolContainsAnswer || exProbTooSimilar || exampleTautology || exampleIrrelevantSSR) {
+          if (exAnsMatchesMain || exSolContainsAnswer || exProbTooSimilar || exampleTautology) {
             // 例題全体を「改善中」に置換（答え漏洩防止）
             card.example_problem = '（AIが例題を改善しています…しばらくお待ちください）'
             card.example_solution = ''
@@ -9372,7 +9354,7 @@ app.get('/guide/:curriculumId', async (c) => {
           _courseInfo: info,
           _courseName: course.course_name || info.name,
           _cardIndex: idx,
-          _needsExampleFix: (needsExampleFix || exampleTautology || exampleIrrelevantSSR) ? true : false
+          _needsExampleFix: (needsExampleFix || exampleTautology) ? true : false
         })
       })
     }
@@ -10940,30 +10922,7 @@ app.get('/guide/:curriculumId', async (c) => {
         }
       }
       
-      // ★★★ テーマ関連性チェック（クライアント側）: 例題が本題のテーマと無関係 ★★★
-      if (!isSameAnswer && exAns && mainAns && c.unit_name && exAns.length >= 1) {
-        var topicKwC = [];
-        var mainCoreC = mainAns.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '');
-        if (mainCoreC.length >= 2) topicKwC.push(mainCoreC.toLowerCase());
-        var uWordsC = (c.unit_name || '').replace(/[のをはがでにとも、。]+/gu, ' ').split(/\s+/).filter(function(w){ return w.length >= 2; });
-        for (var ui = 0; ui < uWordsC.length; ui++) topicKwC.push(uWordsC[ui].toLowerCase());
-        var pTextC = (c.problem_text || c.problem_description || '').trim();
-        var pWordsC = pTextC.replace(/[のをはがでにともで、。？！「」（）]+/gu, ' ').split(/\s+/).filter(function(w){ return w.length >= 4; });
-        for (var pi = 0; pi < pWordsC.length; pi++) topicKwC.push(pWordsC[pi].toLowerCase());
-        
-        var eaLowC = exAns.toLowerCase();
-        var eaCoreC = exAns.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、色]+$/u, '').toLowerCase();
-        var hasRelC = topicKwC.some(function(kw) { 
-          return kw.indexOf(eaLowC) >= 0 || eaLowC.indexOf(kw) >= 0 || (eaCoreC.length >= 2 && (kw.indexOf(eaCoreC) >= 0 || eaCoreC.indexOf(kw) >= 0)); 
-        });
-        var exProbLC = (c.example_problem || '').toLowerCase();
-        var probRelC = topicKwC.some(function(kw) { return exProbLC.indexOf(kw) >= 0; });
-        
-        if (!hasRelC && !probRelC && topicKwC.length >= 2) {
-          isSameAnswer = true;
-          console.log('🔧 テーマ無関係検出（クライアント側）: 例題答え「' + exAns + '」が本題キーワードと無関係');
-        }
-      }
+      // テーマ関連性ヒューリスティックは偽陽性が多いため削除（AI検証に委ねる）
 
       html += '<div id="example-section-' + currentPage + '" style="background:#FFFBEB;border:2px solid #FDE68A;border-radius:12px;padding:12px;margin-bottom:12px;">';
       
@@ -16083,45 +16042,13 @@ app.post('/api/fix-example', async (c) => {
         }
       }
       
-      // ★★★ テーマ関連性チェック: 例題の答えが本題のテーマと関連しているか ★★★
-      let exampleIrrelevant = false
-      if (exampleAnswer && mainAnswer && card.unit_name && exampleAnswer.length >= 1) {
-        // 本題のキーワード群を構築（答え、単元名、問題文から主要な名詞を抽出）
-        const topicKeywords: string[] = []
-        // 本題の答えの語幹
-        const mainAnsCore = mainAnswer.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '')
-        if (mainAnsCore.length >= 2) topicKeywords.push(mainAnsCore.toLowerCase())
-        // 単元名のキーワード
-        const unitWords = (card.unit_name || '').replace(/[のをはがでにとも、。]+/gu, ' ').split(/\s+/).filter((w: string) => w.length >= 2)
-        topicKeywords.push(...unitWords.map((w: string) => w.toLowerCase()))
-        // 問題文から主要キーワード（4文字以上の単語）
-        const probWords = problemText.replace(/[のをはがでにともで、。？！「」（）]+/gu, ' ').split(/\s+/).filter((w: string) => w.length >= 4)
-        topicKeywords.push(...probWords.map((w: string) => w.toLowerCase()))
-        
-        // 例題の答えが本題のキーワードと共通性があるか
-        const eaLower = exampleAnswer.toLowerCase()
-        const eaCore2 = exampleAnswer.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、色]+$/u, '').toLowerCase()
-        const hasRelevance = topicKeywords.some(kw => 
-          kw.includes(eaLower) || eaLower.includes(kw) || 
-          (eaCore2.length >= 2 && (kw.includes(eaCore2) || eaCore2.includes(kw)))
-        )
-        // 例題の問題文にも本題のキーワードがあるかチェック
-        const exProbLower = exProblem.toLowerCase()
-        const probHasRelevance = topicKeywords.some(kw => exProbLower.includes(kw))
-        
-        // 例題の答えも問題文も本題と無関係 → 品質が低い
-        if (!hasRelevance && !probHasRelevance && topicKeywords.length >= 2) {
-          exampleIrrelevant = true
-          console.warn(`🔧 例題テーマ無関係検出: 例題答え「${exampleAnswer}」が本題キーワード [${topicKeywords.slice(0, 5).join(', ')}...] と無関係`)
-        }
-      }
+      // テーマ関連性ヒューリスティックは偽陽性が多いため削除（Gemini AI検証に委ねる）
       
       const needsFix = !exampleAnswer || 
         exampleAnswer === mainAnswer || 
         solutionContainsAnswer ||
         exProblemTooSimilar ||
         exampleIsTautology ||
-        exampleIrrelevant ||
         (card.example_problem && mainAnswer && card.example_problem.includes(mainAnswer) && exampleSolution.includes(mainAnswer))
 
       if (!needsFix) {
@@ -16332,7 +16259,7 @@ ${card.unit_name || ''}
       try {
         const originalProblemText = (card.problem_text || card.problem_description || '').trim()
         const unitNameText = (card.unit_name || '').trim()
-        const coherenceCheckPrompt = `以下の「例題」が「本問題」の学習に役立つか、2つの観点で判定してください。
+        const coherenceCheckPrompt = `以下の「例題」が「本問題」の学習に役立つか判定してください。
 
 【本問題】${originalProblemText}
 【本問題の答え】${mainAnswer}
@@ -16341,17 +16268,17 @@ ${card.unit_name || ''}
 【例題】${resultProblem}
 【例題の答え】${resultAnswer}
 
-判定基準1: 論理的一貫性
+判定基準1: 論理的一貫性（最重要）
 - 例題の「問い」に対して例題の「答え」が正しい回答になっているか
+- 問いと答えの因果関係が成立しているか
 
-判定基準2: テーマの関連性
-- 例題が本問題の「核心テーマ」に直接関連するか
-- 例題を解くことが本問題を解く助けになるか
-- ❌ 本問題の表面的・周辺的な情報を問う雑学は不合格
-  例: 本問題「ヨーロッパのエネルギー問題」→例題「灰は何色？」= 雑学であり不合格
-  例: 本問題「光合成の仕組み」→例題「葉の形は？」= 核心テーマと無関係で不合格
-- ✅ 本問題の前提知識・構成要素を問う問題は合格
-  例: 本問題「ヨーロッパのエネルギー問題」→例題「風の力で電気を作る装置は？」= 合格
+判定基準2: テーマの関連性（緩めに判定すること）
+- 例題が本問題と同じ「単元」「教科のテーマ」に属するか
+- ✅ 同じ単元の中の知識であれば合格（直接的な前提知識でなくても可）
+  例: 本問題「ユーロはどこの通貨？」→例題「EUの正式名は？」= 同じ単元なので合格
+  例: 本問題「光合成の仕組み」→例題「植物が日光を必要とする理由は？」= 合格
+- ❌ 完全に別のテーマの雑学だけ不合格
+  例: 本問題「ヨーロッパのエネルギー」→例題「灰は何色？」= 完全に別テーマなので不合格
 
 回答形式: {"coherent": true, "relevant": true} または {"coherent": false, "reason": "理由"} または {"coherent": true, "relevant": false, "reason": "理由"}`
 
@@ -16382,8 +16309,8 @@ ${card.unit_name || ''}
             return c.json({ success: false, error: `Incoherent Q&A: ${coherenceResult.reason || 'answer does not match question'}` }, 500)
           }
           if (coherenceResult.relevant === false) {
-            console.warn(`🔧 例題修正: テーマ関連性なし — 例題「${resultProblem}」は本題のテーマと無関係: ${coherenceResult.reason || '無関係'}`)
-            return c.json({ success: false, error: `Irrelevant example: ${coherenceResult.reason || 'not related to main topic'}` }, 500)
+            // テーマ関連性は警告のみ — 500エラーにすると無限リトライループになるため
+            console.warn(`⚠️ 例題修正: テーマ関連性低め — 例題「${resultProblem}」→「${resultAnswer}」: ${coherenceResult.reason || ''}（保存は続行）`)
           }
         }
         console.log(`✅ 例題の論理的一貫性・テーマ関連性チェック通過: OK`)
