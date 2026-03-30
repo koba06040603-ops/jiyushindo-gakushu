@@ -6374,33 +6374,19 @@ async function loadCardPage(cardId) {
         return avL === exL || avL.includes(exL) || exL.includes(avL)
       })
       
-      // example_solution テキスト内に本題の答えが含まれているか
-      // （example_answerが空でも、解き方テキスト内に「答えは○○」と書かれている場合を検出）
-      const exSolutionContainsAnswer = exSolution && ansVariants.some(av => {
-        return exSolution.includes(av)
-      })
-      
       // ★★★ 例題の問題文が本題と実質同じかチェック ★★★
+      // 注意: example_solution に本題の答えが含まれるのは教育的に正常（関連知識の説明）なのでチェックしない
       const problemText = (card.problem_text || card.problem_description || '').trim()
       const exProblem = (card.example_problem || '').trim()
       let exProblemIsSame = false
       if (problemText && exProblem && problemText.length >= 10 && exProblem.length >= 10) {
-        // 短い方の文字列が長い方に含まれていたら同じ問題
+        // 短い方の文字列が長い方に完全に含まれていたら同じ問題
         const pLower = problemText.toLowerCase()
         const eLower = exProblem.toLowerCase()
         if (pLower.includes(eLower) || eLower.includes(pLower)) {
           exProblemIsSame = true
         }
-        // 共通文字数が70%以上なら同じ問題とみなす
-        if (!exProblemIsSame) {
-          const shorter = pLower.length < eLower.length ? pLower : eLower
-          const longer = pLower.length >= eLower.length ? pLower : eLower
-          let commonChars = 0
-          for (let i = 0; i < shorter.length; i++) {
-            if (longer.includes(shorter[i])) commonChars++
-          }
-          if (commonChars / shorter.length > 0.7) exProblemIsSame = true
-        }
+        // 注意: 共通文字数による判定は日本語では偽陽性が多い（助詞・ひらがなが共通）ため削除
       }
       
       // ★★★ 例題に問題がある場合の対処 ★★★
@@ -6432,7 +6418,7 @@ async function loadCardPage(cardId) {
       
       // テーマ関連性ヒューリスティックは偽陽性が多いため削除（AI検証に委ねる）
       
-      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame || exSolutionContainsAnswer || exampleTautology ||
+      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame || exampleTautology ||
         (exProblem && (exProblem.includes('AIが例題を改善しています') || exProblem === 'null')) ||
         (!exProblem && !exAnswer && card.problem_text)
       if (exampleNeedsFix) {
