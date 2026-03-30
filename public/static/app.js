@@ -6432,7 +6432,9 @@ async function loadCardPage(cardId) {
       
       // テーマ関連性ヒューリスティックは偽陽性が多いため削除（AI検証に委ねる）
       
-      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame || exSolutionContainsAnswer || exampleTautology
+      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame || exSolutionContainsAnswer || exampleTautology ||
+        (exProblem && (exProblem.includes('AIが例題を改善しています') || exProblem === 'null')) ||
+        (!exProblem && !exAnswer && card.problem_text)
       if (exampleNeedsFix) {
         // 自動修正をトリガー — 例題全体を「改善中」表示にして fix-example API を呼ぶ
         card._needsExampleFix = true
