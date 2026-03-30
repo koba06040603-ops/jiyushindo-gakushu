@@ -6498,14 +6498,15 @@ async function loadCardPage(cardId) {
           return `
           <div class="bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl shadow-lg p-4 mb-4 text-white">
             <div class="flex items-center justify-between">
-              ${prevId ? `
-              <button onclick="loadCardPage(${prevId})" 
-                      class="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition font-bold text-sm">
-                <i class="fas fa-chevron-left"></i>
-                前のカード
-              </button>
-              ` : (window._isPersonalizedCourse ? `
               <div class="flex flex-col gap-1">
+                ${prevId ? `
+                <button onclick="loadCardPage(${prevId})" 
+                        class="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1.5 rounded-lg transition font-bold text-xs">
+                  <i class="fas fa-chevron-left"></i>
+                  前のカード
+                </button>
+                ` : ''}
+                ${window._isPersonalizedCourse ? `
                 <button onclick="goBackToPersonalizedGuide()" 
                         class="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1.5 rounded-lg transition font-bold text-xs">
                   <i class="fas fa-chevron-left"></i>
@@ -6516,14 +6517,14 @@ async function loadCardPage(cardId) {
                   <i class="fas fa-chevron-left"></i>
                   <i class="fas fa-book mr-1"></i>全体のてびき
                 </button>
+                ` : `
+                <button onclick="goBackToGuide()" 
+                        class="flex items-center gap-2 ${prevId ? 'bg-white bg-opacity-10 hover:bg-opacity-20' : 'bg-white bg-opacity-20 hover:bg-opacity-30'} px-3 py-1.5 rounded-lg transition font-bold text-xs">
+                  <i class="fas fa-chevron-left"></i>
+                  <i class="fas fa-book mr-1"></i>てびきに戻る
+                </button>
+                `}
               </div>
-              ` : `
-              <button onclick="goBackToGuide()" 
-                      class="flex items-center gap-2 bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition font-bold text-sm">
-                <i class="fas fa-chevron-left"></i>
-                てびきに戻る
-              </button>
-              `)}
               <div class="text-center">
                 <div class="flex items-center gap-2 justify-center">
                   ${cardsList.map((_, i) => '<div class="w-3 h-3 rounded-full ' + (i === currentIdx ? 'bg-white shadow-lg scale-125' : 'bg-white bg-opacity-40') + ' transition-all"></div>').join('')}

@@ -16095,6 +16095,11 @@ ${card.unit_name || ''}
 
 【★最重要ルール★】
 - 例題は本問題と「同じ具体的なトピック」に直接関連する問題にすること
+- ★★★ 例題は本問題の「核心テーマ」に直結すること。本問題の表面的・周辺的な情報（色、形、数え方など）を問うのは絶対禁止 ★★★
+  → NG例: 本問題「ヨーロッパの再生可能エネルギーは？」→例題「灰は何色？」（灰色は核心テーマと無関係！）
+  → NG例: 本問題「日本の農業の特徴は？」→例題「米の数え方は？」（核心テーマと関係ない雑学！）
+  → OK例: 本問題「ヨーロッパの再生可能エネルギーは？」→例題「風の力で電気を作る装置を何という？」→答え「風力発電機」
+  → 例題は「この知識がないと本問題が解けない」レベルの直接的な前提知識を問うこと
 - ★★★ 例題の「問い方」は本問題と必ず異なること。同じ問いを別の言い方にしただけはNG ★★★
   → NG例: 本問題「イタリアで最も信仰されている宗派は？」→例題「バチカン市国があるイタリアで信仰される宗派は？」（言い方が違うだけで同じ問い）
   → OK例: 本問題「イタリアで最も信仰されている宗派は？」→例題「キリスト教の3大宗派のうち、聖書だけを重視する宗派は？」→答え「プロテスタント」
@@ -16119,6 +16124,12 @@ ${card.unit_name || ''}
 
 【悪い例 — 絶対にやらないこと】
 - 例題文に本問題の答え「${mainAnswer}」やそれに関連する語が一切入っていない → ヒントにならないので禁止！
+- 本問題と全く別のトピック（例: フィヨルド→コンビナート）→ 禁止！
+- 小学生が知らない専門用語を答えにする（例: 氷河地形、堆積作用）→ 禁止！
+- ★★★ 本問題の核心テーマと無関係な雑学・トリビアは絶対禁止！★★★
+  ダメな例: 本問題「ヨーロッパのエネルギー問題」→例題「灰は何色？」→答え「灰色」（雑学であり学習に意味がない！）
+  ダメな例: 本問題「光合成」→例題「葉っぱは何枚ある？」→答え「たくさん」（核心テーマと無関係！）
+  → 例題は本問題を解くための「必要な前提知識」を問うこと！
 - 本問題と全く別のトピック（例: フィヨルド→コンビナート）→ 禁止！
 - 小学生が知らない専門用語を答えにする（例: 氷河地形、堆積作用）→ 禁止！
 - ★★★ トートロジー（循環論法）は絶対禁止！ ★★★
@@ -16236,23 +16247,33 @@ ${card.unit_name || ''}
       }
     }
     
-    // ★★★ 論理的一貫性検証: 例題の問い→答えが論理的につながっているか ★★★
+    // ★★★ 論理的一貫性＋関連性検証: 例題が本題のテーマに直結し、問い→答えが正しいか ★★★
     if (resultProblem && resultAnswer && resultProblem.length >= 5 && resultAnswer.length >= 1) {
       try {
-        const coherenceCheckPrompt = `以下の「問い」と「答え」の組み合わせが論理的に正しいか判定してください。
+        const originalProblemText = (card.problem_text || card.problem_description || '').trim()
+        const unitNameText = (card.unit_name || '').trim()
+        const coherenceCheckPrompt = `以下の「例題」が「本問題」の学習に役立つか、2つの観点で判定してください。
 
-問い: ${resultProblem}
-答え: ${resultAnswer}
+【本問題】${originalProblemText}
+【本問題の答え】${mainAnswer}
+【単元名】${unitNameText}
 
-判定基準:
-- 「問い」で聞かれていることに対して「答え」が正しい回答になっているか
-- 例: 問い「光合成に必要な気体は？」→ 答え「二酸化炭素」= ✅ 正しい
-- 例: 問い「火力発電で使われる燃料は？」→ 答え「地球温暖化」= ❌ 燃料を聞いているのに現象名を答えている
-- 例: 問い「日本の人口は？」→ 答え「少子高齢化」= ❌ 人口の数を聞いているのに現象名を答えている
-- 例: 問い「氷河が海岸を削ってできた地形は？」→ 答え「氷河」= ❌ 地形名を聞いているのに氷河と答えている
+【例題】${resultProblem}
+【例題の答え】${resultAnswer}
 
-「正しい」か「正しくない」のどちらかのみ回答してください。正しくない場合は理由も1文で。
-回答形式: {"coherent": true} または {"coherent": false, "reason": "理由"}`
+判定基準1: 論理的一貫性
+- 例題の「問い」に対して例題の「答え」が正しい回答になっているか
+
+判定基準2: テーマの関連性
+- 例題が本問題の「核心テーマ」に直接関連するか
+- 例題を解くことが本問題を解く助けになるか
+- ❌ 本問題の表面的・周辺的な情報を問う雑学は不合格
+  例: 本問題「ヨーロッパのエネルギー問題」→例題「灰は何色？」= 雑学であり不合格
+  例: 本問題「光合成の仕組み」→例題「葉の形は？」= 核心テーマと無関係で不合格
+- ✅ 本問題の前提知識・構成要素を問う問題は合格
+  例: 本問題「ヨーロッパのエネルギー問題」→例題「風の力で電気を作る装置は？」= 合格
+
+回答形式: {"coherent": true, "relevant": true} または {"coherent": false, "reason": "理由"} または {"coherent": true, "relevant": false, "reason": "理由"}`
 
         const coherenceController = new AbortController()
         const coherenceTimeout = setTimeout(() => coherenceController.abort(), 8000)
@@ -16280,8 +16301,12 @@ ${card.unit_name || ''}
             console.warn(`🔧 例題修正: 論理的一貫性なし — 問い「${resultProblem}」→答え「${resultAnswer}」: ${coherenceResult.reason || '不整合'}`)
             return c.json({ success: false, error: `Incoherent Q&A: ${coherenceResult.reason || 'answer does not match question'}` }, 500)
           }
+          if (coherenceResult.relevant === false) {
+            console.warn(`🔧 例題修正: テーマ関連性なし — 例題「${resultProblem}」は本題のテーマと無関係: ${coherenceResult.reason || '無関係'}`)
+            return c.json({ success: false, error: `Irrelevant example: ${coherenceResult.reason || 'not related to main topic'}` }, 500)
+          }
         }
-        console.log(`✅ 例題の論理的一貫性チェック通過: 問い→答え OK`)
+        console.log(`✅ 例題の論理的一貫性・テーマ関連性チェック通過: OK`)
       } catch (coherenceErr: any) {
         // タイムアウトなどの場合はスキップ（生成された例題は保存する）
         console.warn(`⚠️ 論理的一貫性チェックスキップ: ${coherenceErr.message}`)
