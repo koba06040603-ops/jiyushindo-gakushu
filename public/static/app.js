@@ -6430,7 +6430,31 @@ async function loadCardPage(cardId) {
         }
       }
       
-      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame || exSolutionContainsAnswer || exampleTautology
+      // ★★★ テーマ関連性チェック: 例題が本題のテーマと無関係 ★★★
+      let exampleIrrelevantApp = false
+      if (exAnswer && answerStr && card.unit_name && exAnswer.length >= 1) {
+        const topicKwApp = []
+        const mainCoreApp = answerStr.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '')
+        if (mainCoreApp.length >= 2) topicKwApp.push(mainCoreApp.toLowerCase())
+        const uWordsApp = (card.unit_name || '').replace(/[のをはがでにとも、。]+/gu, ' ').split(/\s+/).filter(w => w.length >= 2)
+        topicKwApp.push(...uWordsApp.map(w => w.toLowerCase()))
+        const pWordsApp = problemText.replace(/[のをはがでにともで、。？！「」（）]+/gu, ' ').split(/\s+/).filter(w => w.length >= 4)
+        topicKwApp.push(...pWordsApp.map(w => w.toLowerCase()))
+        
+        const eaLowApp = exAnswer.toLowerCase()
+        const eaCoreApp = exAnswer.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、色]+$/u, '').toLowerCase()
+        const hasRelApp = topicKwApp.some(kw => 
+          kw.includes(eaLowApp) || eaLowApp.includes(kw) || (eaCoreApp.length >= 2 && (kw.includes(eaCoreApp) || eaCoreApp.includes(kw)))
+        )
+        const probRelApp = topicKwApp.some(kw => exProblem.toLowerCase().includes(kw))
+        
+        if (!hasRelApp && !probRelApp && topicKwApp.length >= 2) {
+          exampleIrrelevantApp = true
+          console.log('🔧 テーマ無関係検出（loadCardPage）: 例題答え「' + exAnswer + '」が本題キーワードと無関係')
+        }
+      }
+      
+      const exampleNeedsFix = exAnswerMatchesMain || exProblemIsSame || exSolutionContainsAnswer || exampleTautology || exampleIrrelevantApp
       if (exampleNeedsFix) {
         // 自動修正をトリガー — 例題全体を「改善中」表示にして fix-example API を呼ぶ
         card._needsExampleFix = true

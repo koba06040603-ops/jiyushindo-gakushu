@@ -9302,6 +9302,27 @@ app.get('/guide/:curriculumId', async (c) => {
           }
         }
         
+        // ★★★ SSR用: テーマ関連性チェック — 例題が本題と無関係か ★★★
+        let exampleIrrelevantSSR = false
+        if (exAns && mainAns && card.unit_name && exAns.length >= 1) {
+          const topicKw: string[] = []
+          const mainCore = mainAns.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '')
+          if (mainCore.length >= 2) topicKw.push(mainCore.toLowerCase())
+          const uWords = (card.unit_name || '').replace(/[のをはがでにとも、。]+/gu, ' ').split(/\s+/).filter((w: string) => w.length >= 2)
+          topicKw.push(...uWords.map((w: string) => w.toLowerCase()))
+          const pWords = problemTxt.replace(/[のをはがでにともで、。？！「」（）]+/gu, ' ').split(/\s+/).filter((w: string) => w.length >= 4)
+          topicKw.push(...pWords.map((w: string) => w.toLowerCase()))
+          
+          const eaL2 = exAns.toLowerCase()
+          const eaCore3 = exAns.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、色]+$/u, '').toLowerCase()
+          const hasRel = topicKw.some(kw => kw.includes(eaL2) || eaL2.includes(kw) || (eaCore3.length >= 2 && (kw.includes(eaCore3) || eaCore3.includes(kw))))
+          const probHasRel = topicKw.some(kw => exProb.toLowerCase().includes(kw))
+          
+          if (!hasRel && !probHasRel && topicKw.length >= 2) {
+            exampleIrrelevantSSR = true
+          }
+        }
+        
         // ★★★ SSR用: 答え漏洩防止フィルタリング（フロントのJSロード前に表示されるHTML用） ★★★
         if (mainAns && mainAns.length >= 2) {
           const stem = mainAns.replace(/[系語族型類科目派流業]+$/u, '')
@@ -9336,7 +9357,7 @@ app.get('/guide/:curriculumId', async (c) => {
           })
           const exSolContainsAnswer = exSol && variants.some(v => exSol.includes(v))
           
-          if (exAnsMatchesMain || exSolContainsAnswer || exProbTooSimilar || exampleTautology) {
+          if (exAnsMatchesMain || exSolContainsAnswer || exProbTooSimilar || exampleTautology || exampleIrrelevantSSR) {
             // 例題全体を「改善中」に置換（答え漏洩防止）
             card.example_problem = '（AIが例題を改善しています…しばらくお待ちください）'
             card.example_solution = ''
@@ -9351,7 +9372,7 @@ app.get('/guide/:curriculumId', async (c) => {
           _courseInfo: info,
           _courseName: course.course_name || info.name,
           _cardIndex: idx,
-          _needsExampleFix: (needsExampleFix || exampleTautology) ? true : false
+          _needsExampleFix: (needsExampleFix || exampleTautology || exampleIrrelevantSSR) ? true : false
         })
       })
     }
@@ -10916,6 +10937,31 @@ app.get('/guide/:curriculumId', async (c) => {
               }
             }
           }
+        }
+      }
+      
+      // ★★★ テーマ関連性チェック（クライアント側）: 例題が本題のテーマと無関係 ★★★
+      if (!isSameAnswer && exAns && mainAns && c.unit_name && exAns.length >= 1) {
+        var topicKwC = [];
+        var mainCoreC = mainAns.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '');
+        if (mainCoreC.length >= 2) topicKwC.push(mainCoreC.toLowerCase());
+        var uWordsC = (c.unit_name || '').replace(/[のをはがでにとも、。]+/gu, ' ').split(/\s+/).filter(function(w){ return w.length >= 2; });
+        for (var ui = 0; ui < uWordsC.length; ui++) topicKwC.push(uWordsC[ui].toLowerCase());
+        var pTextC = (c.problem_text || c.problem_description || '').trim();
+        var pWordsC = pTextC.replace(/[のをはがでにともで、。？！「」（）]+/gu, ' ').split(/\s+/).filter(function(w){ return w.length >= 4; });
+        for (var pi = 0; pi < pWordsC.length; pi++) topicKwC.push(pWordsC[pi].toLowerCase());
+        
+        var eaLowC = exAns.toLowerCase();
+        var eaCoreC = exAns.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、色]+$/u, '').toLowerCase();
+        var hasRelC = topicKwC.some(function(kw) { 
+          return kw.indexOf(eaLowC) >= 0 || eaLowC.indexOf(kw) >= 0 || (eaCoreC.length >= 2 && (kw.indexOf(eaCoreC) >= 0 || eaCoreC.indexOf(kw) >= 0)); 
+        });
+        var exProbLC = (c.example_problem || '').toLowerCase();
+        var probRelC = topicKwC.some(function(kw) { return exProbLC.indexOf(kw) >= 0; });
+        
+        if (!hasRelC && !probRelC && topicKwC.length >= 2) {
+          isSameAnswer = true;
+          console.log('🔧 テーマ無関係検出（クライアント側）: 例題答え「' + exAns + '」が本題キーワードと無関係');
         }
       }
 
@@ -16037,11 +16083,45 @@ app.post('/api/fix-example', async (c) => {
         }
       }
       
+      // ★★★ テーマ関連性チェック: 例題の答えが本題のテーマと関連しているか ★★★
+      let exampleIrrelevant = false
+      if (exampleAnswer && mainAnswer && card.unit_name && exampleAnswer.length >= 1) {
+        // 本題のキーワード群を構築（答え、単元名、問題文から主要な名詞を抽出）
+        const topicKeywords: string[] = []
+        // 本題の答えの語幹
+        const mainAnsCore = mainAnswer.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、]+$/u, '')
+        if (mainAnsCore.length >= 2) topicKeywords.push(mainAnsCore.toLowerCase())
+        // 単元名のキーワード
+        const unitWords = (card.unit_name || '').replace(/[のをはがでにとも、。]+/gu, ' ').split(/\s+/).filter((w: string) => w.length >= 2)
+        topicKeywords.push(...unitWords.map((w: string) => w.toLowerCase()))
+        // 問題文から主要キーワード（4文字以上の単語）
+        const probWords = problemText.replace(/[のをはがでにともで、。？！「」（）]+/gu, ' ').split(/\s+/).filter((w: string) => w.length >= 4)
+        topicKeywords.push(...probWords.map((w: string) => w.toLowerCase()))
+        
+        // 例題の答えが本題のキーワードと共通性があるか
+        const eaLower = exampleAnswer.toLowerCase()
+        const eaCore2 = exampleAnswer.replace(/[系語族型類科目派流業がのをはでにとも出るからですますだよねた。、色]+$/u, '').toLowerCase()
+        const hasRelevance = topicKeywords.some(kw => 
+          kw.includes(eaLower) || eaLower.includes(kw) || 
+          (eaCore2.length >= 2 && (kw.includes(eaCore2) || eaCore2.includes(kw)))
+        )
+        // 例題の問題文にも本題のキーワードがあるかチェック
+        const exProbLower = exProblem.toLowerCase()
+        const probHasRelevance = topicKeywords.some(kw => exProbLower.includes(kw))
+        
+        // 例題の答えも問題文も本題と無関係 → 品質が低い
+        if (!hasRelevance && !probHasRelevance && topicKeywords.length >= 2) {
+          exampleIrrelevant = true
+          console.warn(`🔧 例題テーマ無関係検出: 例題答え「${exampleAnswer}」が本題キーワード [${topicKeywords.slice(0, 5).join(', ')}...] と無関係`)
+        }
+      }
+      
       const needsFix = !exampleAnswer || 
         exampleAnswer === mainAnswer || 
         solutionContainsAnswer ||
         exProblemTooSimilar ||
         exampleIsTautology ||
+        exampleIrrelevant ||
         (card.example_problem && mainAnswer && card.example_problem.includes(mainAnswer) && exampleSolution.includes(mainAnswer))
 
       if (!needsFix) {
