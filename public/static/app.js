@@ -3752,7 +3752,7 @@ function showEditCurriculumModal(curriculum, courses) {
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-xl font-bold text-${course.color_code}-800">
                 <i class="fas fa-layer-group mr-2"></i>
-                ${course.course_name} - ${course.course_label}
+                ${course.course_name}${course.course_label ? ' - ' + course.course_label : ''}
               </h3>
               <button onclick="saveCardOrder(${course.id}, ${courseIndex})" 
                       class="bg-${course.color_code}-500 hover:bg-${course.color_code}-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
@@ -6368,9 +6368,16 @@ async function loadCardPage(cardId) {
       const ansVariants = getAnswerVariants(answerStr, kw)
       
       // example_answer フィールドが本題の答えと一致するか
+      // 注意: 論述型（正答20字以上）では正答の長文中に例題の短い答え（用語）が含まれるのは正常
+      // この場合は完全一致のみをチェックする
+      const isEssayType = answerStr.length >= 20
       const exAnswerMatchesMain = exAnswer && ansVariants.some(av => {
         const avL = av.toLowerCase()
         const exL = exAnswer.toLowerCase()
+        if (isEssayType) {
+          // 論述型: 例題の答えと本題の答えバリアントが完全一致する場合のみ
+          return avL === exL
+        }
         return avL === exL || avL.includes(exL) || exL.includes(avL)
       })
       
