@@ -16272,7 +16272,7 @@ async function gradeAnswer(correctAnswer, answerKeywords) {
   if (!resultDiv) return
   
   // 正解判定（柔軟な比較 - 数値・キーワードベース）
-  const normalize = (s) => s.replace(/[\s　\n\r\t]/g, '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[：:]/g, ':').replace(/[、，,]/g, ',').toLowerCase()
+  const normalize = (s) => s.replace(/[\s　\n\r\t]/g, '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[：:]/g, ':').replace(/[、，,]/g, ',').toLowerCase()
   const normalizedStudent = normalize(studentAnswer)
   const normalizedCorrect = normalize(correctAnswer)
   
@@ -16303,13 +16303,24 @@ async function gradeAnswer(correctAnswer, answerKeywords) {
     kwResult.required = Math.max(2, Math.ceil(parsedKeywords.length * 0.6))
     for (const kw of parsedKeywords) {
       const nkw = normalize(kw)
-      if (nkw && (normalizedStudent.includes(nkw) || nkw.includes(normalizedStudent))) {
+      // 生徒の回答がKWを含むかを判定（逆方向の包含は偏陽性の原因なので削除）
+      if (nkw && normalizedStudent.includes(nkw)) {
         kwResult.matched.push(kw)
       } else {
         kwResult.missed.push(kw)
       }
     }
     kwResult.match = kwResult.matched.length >= kwResult.required
+    // 特別ルール: 短答型（正解20文字未満）でKWの1つが正解の代替名称の場合、1つでも正解
+    // （例: 正解「EU」、KW「EU,欧州連合,統合」→ 「欧州連合」はKWが正解を含むので1つでOK）
+    // 長い論述型の正解ではこのルールを無効化（偽陽性防止）
+    if (!kwResult.match && kwResult.matched.length >= 1 && normalizedCorrect.length < 20) {
+      const isExactOrContainsKW = kwResult.matched.some(kw => {
+        const nkw = normalize(kw)
+        return nkw === normalizedCorrect || nkw.includes(normalizedCorrect) || normalizedCorrect.includes(nkw)
+      })
+      if (isExactOrContainsKW) kwResult.match = true
+    }
     kwMatch = kwResult.match
     console.log('📝 キーワード判定:', { keywords: parsedKeywords, matched: kwResult.matched, missed: kwResult.missed, required: kwResult.required, kwMatch })
   }
@@ -16356,10 +16367,18 @@ async function gradeAnswer(correctAnswer, answerKeywords) {
   // 判定方法1: 完全一致 or 包含関係
   // 長い正解（20文字以上の論述型）の場合、正解に含まれるだけでは正解としない
   // （「偏西風」だけで長い正解文が正解になることを防ぐ）
+  // 短い正解でも、回答が正解の50%以下の長さなら包含不正解（「農業」→「混合農業」防止）
   const isLongAnswer = normalizedCorrect.length >= 20
+  // 助詞「の」を除去して比較（「経済の格差」→「経済格差」、「北大西洋の海流」→「北大西洋海流」）
+  const removeParticle = (s) => s.replace(/の/g, '')
+  const npStudent = removeParticle(normalizedStudent)
+  const npCorrect = removeParticle(normalizedCorrect)
   const exactOrContains = normalizedStudent === normalizedCorrect || 
-                    (!isLongAnswer && normalizedCorrect.includes(normalizedStudent) && normalizedStudent.length >= 2) || 
-                    normalizedStudent.includes(normalizedCorrect)
+                    npStudent === npCorrect ||
+                    (!isLongAnswer && normalizedCorrect.includes(normalizedStudent) && normalizedStudent.length >= 2 && normalizedStudent.length > normalizedCorrect.length * 0.5) || 
+                    (!isLongAnswer && npCorrect.includes(npStudent) && npStudent.length >= 2 && npStudent.length > npCorrect.length * 0.5) || 
+                    normalizedStudent.includes(normalizedCorrect) ||
+                    npStudent.includes(npCorrect)
   
   // 判定方法2: 数値キーワードベース判定
   // 正解から「値」の部分（コロン後や句読点後の数値）を抽出
