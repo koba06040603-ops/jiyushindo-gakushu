@@ -6443,6 +6443,10 @@ async function loadCardPage(cardId) {
     
     // カードデータをグローバルに保存（ヘルプ要請時に使用）
     window.currentCardData = card
+    // answer_keywordsをグローバルに保存（採点時に使用）
+    let _akw = card.answer_keywords || []
+    if (typeof _akw === 'string') { try { _akw = JSON.parse(_akw) } catch(e) { _akw = [] } }
+    window._currentAnswerKeywords = Array.isArray(_akw) ? _akw : []
     
     // 学年別のフォントサイズを取得
     const grade = state.selectedCurriculum?.grade || '小学3年'
@@ -7047,7 +7051,7 @@ async function loadCardPage(cardId) {
               <!-- アクションボタン -->
               <div class="mt-6 space-y-3">
                 <!-- 採点ボタン（目立つ） -->
-                <button onclick="gradeAnswer('${(card.correct_answer || card.answer || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}', ${(() => { let kw = card.answer_keywords || []; if (typeof kw === 'string') { try { kw = JSON.parse(kw) } catch(e) { kw = [] } }; return JSON.stringify(kw) })()})" 
+                <button onclick="gradeAnswer('${(card.correct_answer || card.answer || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}', window._currentAnswerKeywords)" 
                         id="gradeBtn"
                         class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-5 px-6 rounded-2xl font-black text-xl hover:from-green-600 hover:to-emerald-700 transition shadow-xl border-2 border-green-400">
                   <i class="fas fa-check-double mr-2 text-2xl"></i>
@@ -7423,6 +7427,10 @@ async function loadCardPage(cardId) {
     window.currentHelpType = null
     window.helpCount = 0
     window.currentCardData = { card, hints, answer }
+    // answer_keywordsを更新（カード遷移時）
+    let _akw2 = card.answer_keywords || []
+    if (typeof _akw2 === 'string') { try { _akw2 = JSON.parse(_akw2) } catch(e) { _akw2 = [] } }
+    window._currentAnswerKeywords = Array.isArray(_akw2) ? _akw2 : []
 
     // 一問一答モードを初期化（複数の小問がある場合）
     const problemText = card.problem_text || card.problem_content || card.problem_description || ''
