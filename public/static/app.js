@@ -7047,7 +7047,7 @@ async function loadCardPage(cardId) {
               <!-- アクションボタン -->
               <div class="mt-6 space-y-3">
                 <!-- 採点ボタン（目立つ） -->
-                <button onclick="gradeAnswer('${(card.correct_answer || card.answer || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}')" 
+                <button onclick="gradeAnswer('${(card.correct_answer || card.answer || '').replace(/'/g, "\\'").replace(/\n/g, '\\n')}', ${(() => { let kw = card.answer_keywords || []; if (typeof kw === 'string') { try { kw = JSON.parse(kw) } catch(e) { kw = [] } }; return JSON.stringify(kw) })()})" 
                         id="gradeBtn"
                         class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-5 px-6 rounded-2xl font-black text-xl hover:from-green-600 hover:to-emerald-700 transition shadow-xl border-2 border-green-400">
                   <i class="fas fa-check-double mr-2 text-2xl"></i>
@@ -16156,7 +16156,7 @@ window.showQAResults = showQAResults
 window.retryWrongQASteps = retryWrongQASteps
 
 // 答え合わせ（採点）機能
-async function gradeAnswer(correctAnswer) {
+async function gradeAnswer(correctAnswer, answerKeywords) {
   const answerInput = document.getElementById('answerInput')
   const studentAnswer = answerInput ? answerInput.value.trim() : ''
   
@@ -16268,6 +16268,44 @@ async function gradeAnswer(correctAnswer) {
   const normalizedStudent = normalize(studentAnswer)
   const normalizedCorrect = normalize(correctAnswer)
   
+  // ★★★ 判定方法K: answer_keywords によるキーワード判定 ★★★
+  // DBに格納された判定用キーワードを活用（3つ中2つ以上でOK）
+  let kwMatch = false
+  let kwResult = { match: false, matched: [], missed: [], total: 0, required: 0 }
+  let parsedKeywords = []
+  if (answerKeywords) {
+    if (typeof answerKeywords === 'string') {
+      try { parsedKeywords = JSON.parse(answerKeywords) } catch(e) { parsedKeywords = [] }
+    } else if (Array.isArray(answerKeywords)) {
+      parsedKeywords = answerKeywords
+    }
+  }
+  // カードデータからもフォールバック取得
+  if (parsedKeywords.length === 0) {
+    const cardData = (state.selectedCard && typeof state.selectedCard === 'object') ? state.selectedCard : (window.currentCardData || {})
+    let kw = cardData?.answer_keywords
+    if (kw) {
+      if (typeof kw === 'string') { try { kw = JSON.parse(kw) } catch(e) { kw = [] } }
+      if (Array.isArray(kw)) parsedKeywords = kw
+    }
+  }
+  if (parsedKeywords.length >= 2) {
+    kwResult.total = parsedKeywords.length
+    // キーワード3つ中2つ以上でOK（required = ceil(n * 0.6), 最低2）
+    kwResult.required = Math.max(2, Math.ceil(parsedKeywords.length * 0.6))
+    for (const kw of parsedKeywords) {
+      const nkw = normalize(kw)
+      if (nkw && (normalizedStudent.includes(nkw) || nkw.includes(normalizedStudent))) {
+        kwResult.matched.push(kw)
+      } else {
+        kwResult.missed.push(kw)
+      }
+    }
+    kwResult.match = kwResult.matched.length >= kwResult.required
+    kwMatch = kwResult.match
+    console.log('📝 キーワード判定:', { keywords: parsedKeywords, matched: kwResult.matched, missed: kwResult.missed, required: kwResult.required, kwMatch })
+  }
+  
   // 判定方法0: 自由記述・例示型回答の判定
   // 「例：〜」「〜など」「〜等」の場合、例示のいずれかに合致すれば正解
   const isOpenEndedAnswer = /例[：:]|など$|等$|〜$|いずれか|のような|が考えられ/.test(normalizedCorrect)
@@ -16308,8 +16346,11 @@ async function gradeAnswer(correctAnswer) {
   }
   
   // 判定方法1: 完全一致 or 包含関係
+  // 長い正解（20文字以上の論述型）の場合、正解に含まれるだけでは正解としない
+  // （「偏西風」だけで長い正解文が正解になることを防ぐ）
+  const isLongAnswer = normalizedCorrect.length >= 20
   const exactOrContains = normalizedStudent === normalizedCorrect || 
-                    normalizedCorrect.includes(normalizedStudent) || 
+                    (!isLongAnswer && normalizedCorrect.includes(normalizedStudent) && normalizedStudent.length >= 2) || 
                     normalizedStudent.includes(normalizedCorrect)
   
   // 判定方法2: 数値キーワードベース判定
@@ -16382,7 +16423,7 @@ async function gradeAnswer(correctAnswer) {
       return false
     }
     // 日本語・その他の場合は従来の判定
-    return openEndedMatch || multiTraitMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
+    return kwMatch || openEndedMatch || multiTraitMatch || exactOrContains || allNumbersMatch || keyValuesMatch || (() => {
     // 追加判定: 人名・選択肢判定（「Aさん」「Bさん」など比較問題）
     const personMatch = normalizedCorrect.match(/([abcABC][さくんちゃん]*|[ア-ン]+さん)/) 
     if (personMatch && normalizedStudent.includes(personMatch[0])) return true
@@ -16434,7 +16475,7 @@ async function gradeAnswer(correctAnswer) {
   })()
   })()
   
-  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, isEnglishAnswer, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
+  console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, isEnglishAnswer, kwMatch, kwResult, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
   
   if (isCorrect) {
     // 正解音を再生
@@ -16541,6 +16582,14 @@ async function gradeAnswer(correctAnswer) {
         <div class="text-5xl mb-3" style="animation: starBurstResult 0.8s ease-out">🎉</div>
         <p class="text-2xl font-bold text-green-700 mb-2" style="animation: fadeInUpResult 0.5s ease-out 0.2s both">正解！すごい！</p>
         <p class="text-sm text-green-600" style="animation: fadeInUpResult 0.5s ease-out 0.4s both">よくできました。${window.qaStepState?.active && window.qaStepState.currentStep < window.qaStepState.totalSteps - 1 ? '次の問題に進みましょう！' : '次のカードに進みましょう！'}</p>
+        ${kwMatch && parsedKeywords.length >= 2 ? `
+        <div class="mt-2 bg-green-100 rounded-lg p-2 text-left" style="animation: fadeInUpResult 0.5s ease-out 0.45s both">
+          <p class="text-xs font-bold text-green-700 mb-1"><i class="fas fa-key mr-1"></i>観点チェック（${kwResult.matched.length}/${kwResult.total} クリア！）</p>
+          <div class="flex flex-wrap gap-1">${parsedKeywords.map(kw => {
+            const hit = kwResult.matched.includes(kw)
+            return '<span class="inline-block px-2 py-0.5 rounded-full text-xs ' + (hit ? 'bg-green-200 text-green-800' : 'bg-yellow-100 text-yellow-800') + '">' + (hit ? '✅' : '△') + ' ' + kw + '</span>'
+          }).join('')}</div>
+        </div>` : ''}
         <div class="mt-3 flex justify-center gap-2 flex-wrap" style="animation: fadeInUpResult 0.5s ease-out 0.5s both">
           <button onclick="openLearningMusicPanel(${typeof state.selectedCard === 'object' ? (state.selectedCard?.card_id || state.selectedCard?.id || 0) : (state.selectedCard || 0)})" class="bg-gradient-to-r from-green-500 to-blue-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow hover:shadow-md transition"><i class="fas fa-music mr-1"></i>🎵 定着ソングで覚えよう！</button>
         </div>
@@ -16640,6 +16689,16 @@ async function gradeAnswer(correctAnswer) {
           ${analysis.encouragement ? `
           <p class="text-center text-sm text-green-600 font-bold mb-3"><i class="fas fa-star mr-1"></i>${analysis.encouragement}</p>
           ` : ''}
+          
+          ${parsedKeywords.length >= 2 ? `
+          <div class="bg-white rounded-lg p-3 mb-3 border border-indigo-200">
+            <p class="text-sm font-bold text-indigo-600 mb-2"><i class="fas fa-key mr-1"></i>大切な観点（${kwResult.matched.length}/${kwResult.total}）</p>
+            <div class="flex flex-wrap gap-1">${parsedKeywords.map(kw => {
+              const hit = kwResult.matched.includes(kw)
+              return '<span class="inline-block px-2 py-1 rounded-full text-xs font-bold ' + (hit ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') + '">' + (hit ? '✅ ' : '❌ ') + kw + '</span>'
+            }).join('')}</div>
+            ${kwResult.missed.length > 0 ? '<p class="text-xs text-indigo-600 mt-2"><i class="fas fa-lightbulb mr-1"></i>' + kwResult.missed.join('・') + ' の観点を入れてみよう！</p>' : ''}
+          </div>` : ''}
           
           <div class="flex gap-2 justify-center flex-wrap">
             <button onclick="document.getElementById('gradeResult').classList.add('hidden'); document.getElementById('answerInput').value=''; document.getElementById('answerInput')?.focus()"
