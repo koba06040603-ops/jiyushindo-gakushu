@@ -81,6 +81,53 @@
       100% { transform: scale(3); opacity: 0; }
     }
     
+    /* ★ カード進捗表示スタイル */
+    .card-completed-dot {
+      background: #10B981 !important;
+      opacity: 1 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      color: white !important;
+    }
+    .card-completed-btn {
+      background: linear-gradient(135deg, #10B981, #059669) !important;
+      color: white !important;
+      border: 2px solid #34D399 !important;
+      position: relative;
+    }
+    .card-completed-btn::after {
+      content: '\\f00c';
+      font-family: 'Font Awesome 6 Free';
+      font-weight: 900;
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #10B981;
+      color: white;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      font-size: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    @keyframes cardCompleteBannerIn {
+      0% { transform: translateX(-50%) translateY(-80px) scale(0.8); opacity: 0; }
+      100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+    }
+    @keyframes cardCompleteBannerOut {
+      0% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+      100% { transform: translateX(-50%) translateY(-80px) scale(0.8); opacity: 0; }
+    }
+    @keyframes progressBarPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    }
+    
     /* ★ ページ遷移ガクつき防止 */
     html {
       overflow-y: scroll !important; /* スクロールバーを常に表示してガクつき防止 */
@@ -6329,6 +6376,173 @@ window.filterAnswerFromHint = filterAnswerFromHint
 window.getAnswerVariants = getAnswerVariants
 
 // ============================================
+// カード進捗管理システム（localStorage保存）
+// ============================================
+const CardProgress = {
+  _storageKey: 'cardProgress',
+  
+  _getAll() {
+    try {
+      return JSON.parse(localStorage.getItem(this._storageKey) || '{}')
+    } catch(e) { return {} }
+  },
+  
+  _saveAll(data) {
+    try { localStorage.setItem(this._storageKey, JSON.stringify(data)) } catch(e) {}
+  },
+  
+  // コース×カード単位で完了をマーク
+  markCompleted(courseId, cardId) {
+    const data = this._getAll()
+    const key = `${courseId}`
+    if (!data[key]) data[key] = {}
+    if (!data[key][cardId]) {
+      data[key][cardId] = { completedAt: new Date().toISOString(), correct: true }
+      this._saveAll(data)
+      return true // 新規完了
+    }
+    return false // 既に完了済み
+  },
+  
+  isCompleted(courseId, cardId) {
+    const data = this._getAll()
+    return !!(data[`${courseId}`]?.[cardId])
+  },
+  
+  getCompletedCount(courseId) {
+    const data = this._getAll()
+    const course = data[`${courseId}`]
+    return course ? Object.keys(course).length : 0
+  },
+  
+  getCompletedSet(courseId) {
+    const data = this._getAll()
+    const course = data[`${courseId}`]
+    return course ? new Set(Object.keys(course).map(Number)) : new Set()
+  },
+  
+  // 進捗バーUIを動的に更新
+  updateProgressUI() {
+    const courseId = typeof state.selectedCourse === 'object'
+      ? (state.selectedCourse?.id || state.selectedCourse?.course_id || 0)
+      : (state.selectedCourse || 0)
+    const cardsList = window._courseCardsList || []
+    const total = cardsList.length
+    const completedSet = this.getCompletedSet(courseId)
+    const completedCount = cardsList.filter(id => completedSet.has(id)).length
+    
+    // 上部プログレスドット更新
+    document.querySelectorAll('.card-progress-dot').forEach(dot => {
+      const idx = parseInt(dot.dataset.cardIdx)
+      const cid = cardsList[idx]
+      if (cid && completedSet.has(cid)) {
+        dot.classList.add('card-completed-dot')
+        dot.innerHTML = '<i class="fas fa-check" style="font-size:6px"></i>'
+      }
+    })
+    
+    // 下部ページネーションボタン更新
+    document.querySelectorAll('.card-progress-btn').forEach(btn => {
+      const idx = parseInt(btn.dataset.cardIdx)
+      const cid = cardsList[idx]
+      if (cid && completedSet.has(cid)) {
+        btn.classList.add('card-completed-btn')
+      }
+    })
+    
+    // 進捗バー更新
+    const progressBar = document.getElementById('card-progress-bar-fill')
+    const progressText = document.getElementById('card-progress-text')
+    if (progressBar) {
+      progressBar.style.width = `${total > 0 ? (completedCount / total) * 100 : 0}%`
+    }
+    if (progressText) {
+      progressText.textContent = `${completedCount} / ${total} 完了`
+    }
+    
+    // 全完了時の特別演出
+    const allCompleteEl = document.getElementById('all-complete-badge')
+    if (allCompleteEl) {
+      allCompleteEl.style.display = (completedCount >= total && total > 0) ? 'flex' : 'none'
+    }
+  },
+  
+  // カード完了時の達成アニメーション
+  showCompletionCelebration(cardNumber, totalCards, completedCount) {
+    // 達成バナーを表示
+    const banner = document.createElement('div')
+    banner.id = 'card-complete-banner'
+    banner.className = 'fixed top-4 left-1/2 -translate-x-1/2 z-[9999] pointer-events-none'
+    banner.style.animation = 'cardCompleteBannerIn 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards'
+    
+    const isAllComplete = completedCount >= totalCards
+    
+    banner.innerHTML = isAllComplete ? `
+      <div class="bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border-2 border-yellow-300">
+        <div class="text-4xl" style="animation: starBurstResult 0.8s ease-out">🏆</div>
+        <div>
+          <p class="font-black text-xl">全カード完了！</p>
+          <p class="text-sm opacity-90">${totalCards}枚すべてクリア！おめでとう！</p>
+        </div>
+        <div class="text-3xl" style="animation: starBurstResult 0.8s ease-out 0.2s both">🎊</div>
+      </div>
+    ` : `
+      <div class="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-emerald-300">
+        <div class="text-3xl" style="animation: starBurstResult 0.6s ease-out">✅</div>
+        <div>
+          <p class="font-bold text-lg">カード ${cardNumber} クリア！</p>
+          <p class="text-xs opacity-90">進捗: ${completedCount} / ${totalCards} 完了</p>
+        </div>
+        <div class="flex items-center gap-0.5">
+          ${Array.from({length: totalCards}, (_, i) => `<div class="w-2 h-2 rounded-full ${i < completedCount ? 'bg-white' : 'bg-white bg-opacity-30'} transition-all"></div>`).join('')}
+        </div>
+      </div>
+    `
+    
+    document.body.appendChild(banner)
+    
+    // 達成音を鳴らす
+    try {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+      if (isAllComplete) {
+        // 全完了時のファンファーレ
+        const notes = [523, 659, 784, 1047]
+        notes.forEach((freq, i) => {
+          const osc = audioCtx.createOscillator()
+          const gain = audioCtx.createGain()
+          osc.type = 'sine'
+          osc.frequency.value = freq
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.15)
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.15 + 0.5)
+          osc.connect(gain); gain.connect(audioCtx.destination)
+          osc.start(audioCtx.currentTime + i * 0.15)
+          osc.stop(audioCtx.currentTime + i * 0.15 + 0.5)
+        })
+      } else {
+        // 通常完了音
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.type = 'sine'
+        osc.frequency.value = 880
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3)
+        osc.connect(gain); gain.connect(audioCtx.destination)
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3)
+      }
+    } catch(e) {}
+    
+    // 3秒後にフェードアウト
+    setTimeout(() => {
+      if (banner.parentNode) {
+        banner.style.animation = 'cardCompleteBannerOut 0.5s ease-in forwards'
+        setTimeout(() => banner.remove(), 600)
+      }
+    }, isAllComplete ? 5000 : 3000)
+  }
+}
+window.CardProgress = CardProgress
+
+// ============================================
 // 学習カードページ
 // ============================================
 async function loadCardPage(cardId) {
@@ -6528,9 +6742,27 @@ async function loadCardPage(cardId) {
               </div>
               <div class="text-center">
                 <div class="flex items-center gap-2 justify-center">
-                  ${cardsList.map((_, i) => '<div class="w-3 h-3 rounded-full ' + (i === currentIdx ? 'bg-white shadow-lg scale-125' : 'bg-white bg-opacity-40') + ' transition-all"></div>').join('')}
+                  ${(() => {
+                    const cId = typeof state.selectedCourse === 'object' ? (state.selectedCourse?.id || state.selectedCourse?.course_id || 0) : (state.selectedCourse || 0)
+                    const compSet = CardProgress.getCompletedSet(cId)
+                    return cardsList.map((id, i) => {
+                      const isCompleted = compSet.has(id)
+                      const isCurrent = i === currentIdx
+                      if (isCompleted) {
+                        return '<div class="card-progress-dot w-3.5 h-3.5 rounded-full bg-emerald-400 shadow-lg flex items-center justify-center transition-all card-completed-dot' + (isCurrent ? ' scale-150 ring-2 ring-white' : '') + '" data-card-idx="' + i + '"><i class="fas fa-check" style="font-size:6px"></i></div>'
+                      } else if (isCurrent) {
+                        return '<div class="card-progress-dot w-3.5 h-3.5 rounded-full bg-white shadow-lg scale-150 ring-2 ring-yellow-300 transition-all" data-card-idx="' + i + '"></div>'
+                      } else {
+                        return '<div class="card-progress-dot w-3 h-3 rounded-full bg-white bg-opacity-40 transition-all" data-card-idx="' + i + '"></div>'
+                      }
+                    }).join('')
+                  })()}
                 </div>
-                <p class="text-xs mt-1 opacity-90">${num} / ${total} まいめ</p>
+                ${(() => {
+                  const cId2 = typeof state.selectedCourse === 'object' ? (state.selectedCourse?.id || state.selectedCourse?.course_id || 0) : (state.selectedCourse || 0)
+                  const compCount = cardsList.filter(id => CardProgress.getCompletedSet(cId2).has(id)).length
+                  return '<p class="text-xs mt-1 opacity-90">' + num + ' / ' + total + ' まいめ' + (compCount > 0 ? ' (' + compCount + '枚クリア✨)' : '') + '</p>'
+                })()}
               </div>
               <button onclick="${nextId ? 'loadCardPage(' + nextId + ')' : ''}" 
                       class="flex items-center gap-2 ${nextId ? 'bg-white bg-opacity-20 hover:bg-opacity-30' : 'bg-white bg-opacity-10 cursor-not-allowed'} px-4 py-2 rounded-lg transition font-bold text-sm"
@@ -7348,10 +7580,33 @@ async function loadCardPage(cardId) {
                   const currentIdx = cardsList.indexOf(card.card_id || card.id)
                   const total = cardsList.length || 6
                   const num = currentIdx >= 0 ? currentIdx + 1 : (card.card_number || 1)
-                  return `<p class="font-bold">カード ${num} / ${total}</p>
-                <div class="w-full bg-gray-200 rounded-full h-3 mt-2">
-                  <div class="bg-indigo-600 h-3 rounded-full transition-all" style="width: ${(num / total) * 100}%"></div>
-                </div>`
+                  const pCourseId = typeof state.selectedCourse === 'object' ? (state.selectedCourse?.id || state.selectedCourse?.course_id || 0) : (state.selectedCourse || 0)
+                  const compSet = CardProgress.getCompletedSet(pCourseId)
+                  const compCount = cardsList.filter(id => compSet.has(id)).length
+                  const pct = total > 0 ? Math.round((compCount / total) * 100) : 0
+                  return `
+                <p class="font-bold">カード ${num} / ${total}</p>
+                <div class="mt-2 flex items-center gap-2">
+                  <span class="text-xs font-bold text-emerald-600" id="card-progress-text">${compCount} / ${total} 完了</span>
+                  <span class="text-xs text-gray-400">(${pct}%)</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-4 mt-2 relative overflow-hidden">
+                  <div id="card-progress-bar-fill" class="h-4 rounded-full transition-all duration-700 ease-out ${compCount >= total && total > 0 ? 'bg-gradient-to-r from-yellow-400 to-amber-500' : 'bg-gradient-to-r from-emerald-400 to-teal-500'}" style="width: ${pct}%"></div>
+                </div>
+                <div class="flex gap-1 mt-3 flex-wrap">
+                  ${cardsList.map((id, i) => {
+                    const done = compSet.has(id)
+                    const current = i === currentIdx
+                    return '<div class="flex flex-col items-center gap-0.5">' +
+                      '<div class="w-6 h-6 rounded-md text-xs font-bold flex items-center justify-center transition-all ' +
+                      (done ? 'bg-emerald-500 text-white shadow' : current ? 'bg-indigo-500 text-white shadow ring-2 ring-indigo-300' : 'bg-gray-100 text-gray-400') +
+                      '">' + (done ? '<i class="fas fa-check text-xs"></i>' : (i + 1)) + '</div>' +
+                      '<span class="text-xs ' + (done ? 'text-emerald-500' : current ? 'text-indigo-500' : 'text-gray-300') + '">' + (done ? '✨' : current ? '📝' : '・') + '</span>' +
+                      '</div>'
+                  }).join('')}
+                </div>
+                ${compCount >= total && total > 0 ? '<div id="all-complete-badge" class="mt-3 flex items-center gap-2 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-300 rounded-lg p-2"><span class="text-xl">🏆</span><span class="text-sm font-bold text-amber-700">全カードクリア！おめでとう！</span></div>' : '<div id="all-complete-badge" style="display:none"></div>'}
+                `
                 })()}
               </div>
             </div>
@@ -7407,7 +7662,29 @@ async function loadCardPage(cardId) {
             </button>
             `)}
             <div class="flex items-center gap-1">
-              ${cardsList2.map((id, i) => '<button onclick="loadCardPage(' + id + '); window.scrollTo(0,0);" class="w-8 h-8 rounded-full text-xs font-bold ' + (i === currentIdx2 ? 'bg-indigo-600 text-white shadow-lg scale-110' : 'bg-gray-100 text-gray-600 hover:bg-indigo-100') + ' transition-all">' + (i + 1) + '</button>').join('')}
+              ${(() => {
+                const bCourseId = typeof state.selectedCourse === 'object' ? (state.selectedCourse?.id || state.selectedCourse?.course_id || 0) : (state.selectedCourse || 0)
+                const bCompSet = CardProgress.getCompletedSet(bCourseId)
+                return cardsList2.map((id, i) => {
+                  const isDone = bCompSet.has(id)
+                  const isCurr = i === currentIdx2
+                  let cls, content
+                  if (isDone && isCurr) {
+                    cls = 'bg-emerald-600 text-white shadow-lg scale-110 ring-2 ring-emerald-300 card-completed-btn card-progress-btn'
+                    content = '<i class="fas fa-check text-xs"></i>'
+                  } else if (isDone) {
+                    cls = 'bg-emerald-500 text-white shadow card-completed-btn card-progress-btn'
+                    content = '<i class="fas fa-check text-xs"></i>'
+                  } else if (isCurr) {
+                    cls = 'bg-indigo-600 text-white shadow-lg scale-110 card-progress-btn'
+                    content = String(i + 1)
+                  } else {
+                    cls = 'bg-gray-100 text-gray-600 hover:bg-indigo-100 card-progress-btn'
+                    content = String(i + 1)
+                  }
+                  return '<button onclick="loadCardPage(' + id + '); window.scrollTo(0,0);" class="w-8 h-8 rounded-full text-xs font-bold ' + cls + ' transition-all relative" data-card-idx="' + i + '">' + content + '</button>'
+                }).join('')
+              })()}
             </div>
             <button onclick="${nextId2 ? 'loadCardPage(' + nextId2 + '); window.scrollTo(0,0);' : ''}" 
                     class="flex items-center gap-2 ${nextId2 ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} px-5 py-3 rounded-xl transition font-bold text-sm"
@@ -16505,6 +16782,24 @@ async function gradeAnswer(correctAnswer, answerKeywords) {
   console.log('📝 採点:', { studentAnswer: normalizedStudent, correctAnswer: normalizedCorrect, isEnglishAnswer, kwMatch, kwResult, exactOrContains, allNumbersMatch, keyValuesMatch, correctValues, studentNumbers, correctKeyValues, isCorrect })
   
   if (isCorrect) {
+    // ★ カード完了をマーク & UI更新
+    try {
+      const _gradeCardId = typeof state.selectedCard === 'object' ? (state.selectedCard?.card_id || state.selectedCard?.id || 0) : (state.selectedCard || 0)
+      const _gradeCourseId = typeof state.selectedCourse === 'object' ? (state.selectedCourse?.id || state.selectedCourse?.course_id || 0) : (state.selectedCourse || 0)
+      const _isNewComplete = CardProgress.markCompleted(_gradeCourseId, _gradeCardId)
+      // UI即時更新
+      CardProgress.updateProgressUI()
+      // 新規完了の場合はバナー表示
+      if (_isNewComplete) {
+        const _gradeCardsList = window._courseCardsList || []
+        const _gradeCardIdx = _gradeCardsList.indexOf(_gradeCardId)
+        const _gradeCardNum = _gradeCardIdx >= 0 ? _gradeCardIdx + 1 : 1
+        const _gradeTotal = _gradeCardsList.length
+        const _gradeCompCount = _gradeCardsList.filter(id => CardProgress.getCompletedSet(_gradeCourseId).has(id)).length
+        setTimeout(() => CardProgress.showCompletionCelebration(_gradeCardNum, _gradeTotal, _gradeCompCount), 1200)
+      }
+    } catch(e) { console.warn('カード進捗マーク失敗:', e) }
+    
     // 正解音を再生
     try {
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
@@ -16860,6 +17155,12 @@ async function saveProgress(teacherCall = false) {
       help_requested_from: window.currentHelpType || null,
       help_count: window.helpCount || 0
     })
+    
+    // ★ カード完了を保存時にもマーク（答え合わせをスキップして保存する場合）
+    try {
+      CardProgress.markCompleted(courseId, cardId)
+      CardProgress.updateProgressUI()
+    } catch(e) {}
     
     // WebSocket通知を送信
     sendProgressUpdate(
