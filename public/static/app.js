@@ -6542,6 +6542,51 @@ const CardProgress = {
 }
 window.CardProgress = CardProgress
 
+// 教師用: カード進捗リセット
+function resetCardProgress() {
+  const courseId = typeof state.selectedCourse === 'object'
+    ? (state.selectedCourse?.id || state.selectedCourse?.course_id || 0)
+    : (state.selectedCourse || 0)
+  const cardsList = window._courseCardsList || []
+  const completedCount = CardProgress.getCompletedCount(courseId)
+  
+  if (completedCount === 0) {
+    alert('リセットする進捗がありません。')
+    return
+  }
+  
+  const confirmed = confirm(
+    `このコースの学習カード進捗をリセットしますか？\n\n` +
+    `現在の進捗: ${cardsList.filter(id => CardProgress.getCompletedSet(courseId).has(id)).length} / ${cardsList.length} 枚完了\n\n` +
+    `リセットすると、すべてのカードが未完了の状態に戻ります。\n` +
+    `（※サーバーの進捗データには影響しません）`
+  )
+  
+  if (!confirmed) return
+  
+  // localStorageから該当コースの進捗を削除
+  try {
+    const data = CardProgress._getAll()
+    delete data[`${courseId}`]
+    CardProgress._saveAll(data)
+    
+    // 現在のカードを再読み込みして UI を更新
+    const currentCardId = typeof state.selectedCard === 'object'
+      ? (state.selectedCard?.card_id || state.selectedCard?.id || 0)
+      : (state.selectedCard || 0)
+    
+    if (currentCardId) {
+      loadCardPage(currentCardId)
+    }
+    
+    alert('進捗をリセットしました。すべてのカードが未完了に戻りました。')
+  } catch(e) {
+    console.error('進捗リセットエラー:', e)
+    alert('リセットに失敗しました: ' + e.message)
+  }
+}
+window.resetCardProgress = resetCardProgress
+
 // ============================================
 // 学習カードページ
 // ============================================
@@ -7628,6 +7673,7 @@ async function loadCardPage(cardId) {
                   }).join('')}
                 </div>
                 ${compCount >= total && total > 0 ? '<div id="all-complete-badge" class="mt-3 flex items-center gap-2 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-300 rounded-lg p-2"><span class="text-xl">🏆</span><span class="text-sm font-bold text-amber-700">全カードクリア！おめでとう！</span></div>' : '<div id="all-complete-badge" style="display:none"></div>'}
+                ${state.auth.user?.role === 'teacher' ? '<div class="mt-3 pt-3 border-t border-gray-200"><button onclick="resetCardProgress()" class="w-full bg-red-50 hover:bg-red-100 border border-red-300 text-red-600 px-3 py-2 rounded-lg font-bold text-xs transition flex items-center justify-center gap-2"><i class="fas fa-undo-alt"></i>進捗をリセット（教師用）</button></div>' : ''}
                 `
                 })()}
               </div>
