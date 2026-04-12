@@ -6576,6 +6576,28 @@ async function loadCardPage(cardId) {
           h.hint_text = filterAnswerFromHint(h.hint_text || h.hint_content || '', answerStr, kw)
         })
       }
+      
+      // ★★★ problem_description / problem_text から【正解の数値・解答データ】【解説】セクションを除去 ★★★
+      const stripAnswerSections = (text) => {
+        if (!text) return text
+        let cleaned = text
+        // 【正解...】〜 以降のテキストを除去（【解説】も含めて丸ごと削除）
+        cleaned = cleaned.replace(/【正解[^】]*】[\s\S]*/g, '')
+        // 【解答データ】〜 以降も除去
+        cleaned = cleaned.replace(/【解答[^】]*】[\s\S]*/g, '')
+        // 【解説】〜 以降も除去（問題文の中に解説が入っている場合）
+        cleaned = cleaned.replace(/【解説】[\s\S]*/g, '')
+        // 【答え】〜 以降も除去
+        cleaned = cleaned.replace(/【答[ええ]?[^】]*】[\s\S]*/g, '')
+        // 「正解は〜です」パターンも除去
+        cleaned = cleaned.replace(/正解は[^。]*。?/g, '')
+        // 「答えは〜」パターンも除去
+        cleaned = cleaned.replace(/答えは[^。]*。?/g, '')
+        return cleaned.trim()
+      }
+      card.problem_description = stripAnswerSections(card.problem_description)
+      card.problem_text = stripAnswerSections(card.problem_text)
+      card.problem_content = stripAnswerSections(card.problem_content)
       // ★★★ 例題の答えが本題の答えと同じ場合は例題の答えを隠す ★★★
       const exAnswer = (card.example_answer || '').trim()
       const exSolution = (card.example_solution || '').trim()
