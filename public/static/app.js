@@ -1597,6 +1597,15 @@ async function renderTopPage() {
             <i class="fas fa-arrow-right ml-2 group-hover:translate-x-2 transition-transform"></i>
           </button>
         </div>
+        <div class="mt-4 flex justify-center">
+          <button 
+            onclick="window.open('/security-report.html', '_blank')"
+            class="bg-white/20 hover:bg-white/30 text-white py-2 px-6 rounded-lg font-bold text-sm transition flex items-center justify-center group border border-white/30">
+            <i class="fas fa-shield-alt mr-2"></i>
+            セキュリティ評価レポート
+            <i class="fas fa-download ml-2 text-xs opacity-70"></i>
+          </button>
+        </div>
       </div>
   ` : ''
 
