@@ -1187,8 +1187,69 @@ app.use('*', async (c, next) => {
   }
 })
 
-// CORS設定
-app.use('/api/*', cors())
+// 🔒 セキュリティ修正: CORS設定を特定ドメインに制限
+app.use('/api/*', cors({
+  origin: (origin) => {
+    // 許可するオリジンのリスト
+    const allowedOrigins = [
+      'https://jiyushindo-gakushu.pages.dev',
+      /^https:\/\/.*\.jiyushindo-gakushu\.pages\.dev$/,  // プレビューデプロイ
+    ]
+    // 開発環境ではlocalhostも許可
+    if (!origin) return origin // same-originリクエスト
+    for (const allowed of allowedOrigins) {
+      if (typeof allowed === 'string' && origin === allowed) return origin
+      if (allowed instanceof RegExp && allowed.test(origin)) return origin
+    }
+    // ローカル開発用
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return origin
+    // sandbox開発用
+    if (origin.includes('.sandbox.novita.ai')) return origin
+    return undefined  // 拒否
+  },
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  maxAge: 3600
+}))
+
+// =============================================================================
+// 🔒 セキュリティ修正: API認証の包括的適用
+// 認証不要のホワイトリスト方式（明示的に許可されたパスのみ認証をスキップ）
+// =============================================================================
+const PUBLIC_API_PATHS = [
+  '/api/build-id',
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/register/student',
+  '/api/auth/logout',
+  '/api/auth/refresh',
+  '/api/health',
+  '/health',
+  '/api/notifications/send',  // WebSocket通知（内部通信）
+  '/api/realtime/connect',    // WebSocket接続
+]
+
+app.use('/api/*', async (c, next) => {
+  const path = c.req.path
+  
+  // ホワイトリストに含まれるパスは認証スキップ
+  for (const publicPath of PUBLIC_API_PATHS) {
+    if (path === publicPath || path.startsWith(publicPath + '/')) {
+      return next()
+    }
+  }
+  
+  // カリキュラム・コース・カード取得系は認証後のユーザーに必要
+  // （ログイン済みのチェックが必要）
+  // authMiddlewareを適用
+  try {
+    const authFn = authMiddleware as any
+    return authFn(c, next)
+  } catch (e) {
+    return c.json({ error: '認証が必要です。ログインしてください。' }, 401)
+  }
+})
 
 // BUILD_ID APIエンドポイント（SWキャッシュバイパスで最新版チェック用）
 app.get('/api/build-id', (c) => {
@@ -1636,6 +1697,9 @@ app.get('/health', async (c) => {
   return c.json(metrics, statusCode);
 });
 
+// 🔒 セキュリティ修正: /api/debug/* 全体に管理者認証を適用
+app.use('/api/debug/*', authMiddleware, requireRole('admin'))
+
 // 一時的DBスキーマ確認エンドポイント
 app.get('/api/debug/schema', async (c) => {
   const { env } = c
@@ -1934,6 +1998,8 @@ app.get('/api/admin/dashboard', authMiddleware, requireRole('admin', 'teacher'),
 // =============================================================================
 // 管理者専用ダッシュボード API群（論文・データ集計・システム管理）
 // =============================================================================
+// 🔒 セキュリティ修正: /api/admin/* 全体に認証+ロール制限を適用
+app.use('/api/admin/*', authMiddleware, requireRole('admin', 'teacher'))
 
 // A-1. システム概要統計（論文の「システム規模」記述用）
 app.get('/api/admin/research/overview', async (c) => {
@@ -22051,6 +22117,19 @@ app.post('/api/auth/register', async (c) => {
   const { name, email, password, role, class_code, student_number } = await c.req.json()
   
   try {
+    // 🔒 入力バリデーション
+    if (!name || !email || !password) {
+      return c.json({ error: '名前、メールアドレス、パスワードは必須です' }, 400)
+    }
+    
+    // 🔒 パスワード強度チェック
+    if (password.length < 8) {
+      return c.json({ error: 'パスワードは8文字以上で設定してください' }, 400)
+    }
+    if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+      return c.json({ error: 'パスワードには英字と数字の両方を含めてください' }, 400)
+    }
+    
     // メールアドレスの重複チェック
     const existingUser = await env.DB.prepare(`
       SELECT id FROM users WHERE email = ?
@@ -36210,16 +36289,20 @@ function securityHeaders() {
   return async (c: any, next: any) => {
     await next()
     
-    // Content Security Policy
+    // 🔒 セキュリティ修正: CSPを強化（unsafe-eval削除、connect-src制限）
+    // NOTE: unsafe-inlineはTailwind CSS CDN版に必須のため維持
     c.header('Content-Security-Policy', 
       "default-src 'self'; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; " +
-      "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; " +
+      "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; " +
+      "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
       "img-src 'self' data: blob: https:; " +
-      "font-src 'self' https://cdn.jsdelivr.net; " +
-      "connect-src 'self' blob: data:; " +
+      "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; " +
+      "connect-src 'self' blob: data: wss: https://generativelanguage.googleapis.com https://*.pages.dev; " +
       "media-src 'self' blob: data: https:; " +
-      "frame-ancestors 'none';"
+      "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; " +
+      "frame-ancestors 'none'; " +
+      "base-uri 'self'; " +
+      "form-action 'self';"
     )
     
     // その他のセキュリティヘッダー

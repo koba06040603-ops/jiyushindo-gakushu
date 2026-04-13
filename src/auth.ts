@@ -22,20 +22,20 @@ import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
 // ⚠️ 秘密鍵は環境変数から取得。ハードコードは禁止。
 // 本番: `npx wrangler pages secret put JWT_SECRET` で設定
 // ローカル: `.dev.vars` ファイルに `JWT_SECRET=xxxxxx` を記載
-const JWT_EXPIRES_IN = 60 * 60 * 24 * 7; // 7日間
+// 🔒 セキュリティ修正: アクセストークン1時間 + リフレッシュトークン7日間
+const JWT_EXPIRES_IN = 60 * 60; // 1時間（アクセストークン）
+const REFRESH_TOKEN_EXPIRES_IN = 60 * 60 * 24 * 7; // 7日間（リフレッシュトークン）
 
-// フォールバック用の秘密鍵（環境変数未設定時の警告付き）
-const FALLBACK_SECRET = 'INSECURE-FALLBACK-CHANGE-ME-IN-PRODUCTION';
-
+// 🔒 セキュリティ修正: フォールバック秘密鍵を削除。環境変数未設定時はエラーで停止
 function getJwtSecret(env: any): string {
   const secret = env?.JWT_SECRET;
   if (!secret) {
-    console.warn(
-      '⚠️ JWT_SECRET が環境変数に設定されていません。' +
-      'フォールバック秘密鍵を使用中です。' +
-      '本番環境では必ず `wrangler pages secret put JWT_SECRET` で設定してください。'
+    console.error(
+      '🔴 致命的エラー: JWT_SECRET が環境変数に設定されていません。' +
+      '本番環境では `wrangler pages secret put JWT_SECRET` で設定してください。' +
+      'ローカルでは `.dev.vars` に JWT_SECRET=xxxxx を記載してください。'
     );
-    return FALLBACK_SECRET;
+    throw new Error('JWT_SECRET is not configured. Server cannot start securely.');
   }
   return secret;
 }
@@ -328,6 +328,24 @@ export function requireUserType(...allowedTypes: Array<'student' | 'teacher' | '
 }
 
 /**
+ * 🔒 パスワード強度検証
+ * - 最低8文字
+ * - 英字と数字の両方を含むこと
+ */
+function validatePasswordStrength(password: string): { valid: boolean; message: string } {
+  if (!password || password.length < 8) {
+    return { valid: false, message: 'パスワードは8文字以上で設定してください' };
+  }
+  if (!/[a-zA-Z]/.test(password)) {
+    return { valid: false, message: 'パスワードには英字を含めてください' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, message: 'パスワードには数字を含めてください' };
+  }
+  return { valid: true, message: '' };
+}
+
+/**
  * ユーザー登録（学生）
  */
 export async function registerStudent(c: Context) {
@@ -341,6 +359,12 @@ export async function registerStudent(c: Context) {
   
   if (grade_level < 1 || grade_level > 12) {
     return c.json({ error: 'Invalid grade level (1-12)' }, 400);
+  }
+  
+  // 🔒 パスワード強度チェック
+  const pwCheck = validatePasswordStrength(password);
+  if (!pwCheck.valid) {
+    return c.json({ error: pwCheck.message }, 400);
   }
   
   // メールアドレス重複チェック
@@ -393,6 +417,41 @@ export async function registerStudent(c: Context) {
   }, 201);
 }
 
+// 🔒 セキュリティ修正: ログイン試行トラッカー（インメモリ）
+const loginAttemptTracker = {
+  _store: new Map<string, { count: number; lockedUntil: number }>(),
+  MAX_ATTEMPTS: 5,
+  LOCK_DURATION_MS: 15 * 60 * 1000, // 15分
+  
+  isLocked(email: string): boolean {
+    const record = this._store.get(email);
+    if (!record) return false;
+    if (record.lockedUntil > Date.now()) return true;
+    // ロック期限切れ → リセット
+    this._store.delete(email);
+    return false;
+  },
+  
+  recordFailure(email: string): void {
+    const record = this._store.get(email) || { count: 0, lockedUntil: 0 };
+    record.count++;
+    if (record.count >= this.MAX_ATTEMPTS) {
+      record.lockedUntil = Date.now() + this.LOCK_DURATION_MS;
+    }
+    this._store.set(email, record);
+  },
+  
+  getRemainingAttempts(email: string): number {
+    const record = this._store.get(email);
+    if (!record) return this.MAX_ATTEMPTS;
+    return Math.max(0, this.MAX_ATTEMPTS - record.count);
+  },
+  
+  reset(email: string): void {
+    this._store.delete(email);
+  }
+};
+
 /**
  * ユーザーログイン
  */
@@ -402,6 +461,11 @@ export async function login(c: Context) {
   
   if (!email || !password || !user_type) {
     return c.json({ error: 'Missing required fields' }, 400);
+  }
+  
+  // 🔒 セキュリティ修正: アカウントロックチェック
+  if (loginAttemptTracker.isLocked(email)) {
+    return c.json({ error: 'ログイン試行回数の上限に達しました。15分後に再試行してください。' }, 429);
   }
   
   let query: string;
@@ -447,8 +511,17 @@ export async function login(c: Context) {
     db: DB, tableName, idField, userId: user.user_id as number
   });
   if (!isValid) {
-    return c.json({ error: 'Invalid email or password' }, 401);
+    // 🔒 セキュリティ修正: ログイン失敗を記録
+    loginAttemptTracker.recordFailure(email);
+    const remaining = loginAttemptTracker.getRemainingAttempts(email);
+    if (remaining <= 0) {
+      return c.json({ error: 'ログイン試行回数の上限に達しました。15分後に再試行してください。' }, 429);
+    }
+    return c.json({ error: 'Invalid email or password', remaining_attempts: remaining }, 401);
   }
+  
+  // ログイン成功時はカウンタをリセット
+  loginAttemptTracker.reset(email);
   
   // JWT生成（環境変数のJWT_SECRETを使用）
   const token = await generateJwtToken({
