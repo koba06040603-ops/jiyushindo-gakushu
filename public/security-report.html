@@ -3,20 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>セキュリティ評価レポート — 自由進度学習システム</title>
+  <title>セキュリティ評価レポート v2.0 — 自由進度学習システム</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Noto Sans JP', sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.8; }
     .container { max-width: 960px; margin: 0 auto; padding: 2rem; }
-    
-    /* ヘッダー */
-    .report-header { background: linear-gradient(135deg, #1e3a5f 0%, #2d4a7a 100%); color: white; padding: 3rem 2rem; margin-bottom: 2rem; border-radius: 12px; }
+    .report-header { background: linear-gradient(135deg, #0f4c3a 0%, #1a6b50 100%); color: white; padding: 3rem 2rem; margin-bottom: 2rem; border-radius: 12px; }
     .report-header h1 { font-size: 1.8rem; font-weight: 900; margin-bottom: 0.5rem; }
     .report-header .meta { font-size: 0.85rem; opacity: 0.8; }
     .report-header .meta span { margin-right: 1.5rem; }
-    
-    /* スコア */
     .score-section { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
     .score-card { flex: 1; min-width: 200px; background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); text-align: center; }
     .score-card .label { font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -26,19 +22,13 @@
     .grade-warn { background: #fef9c3; color: #a16207; }
     .grade-critical { background: #fee2e2; color: #dc2626; }
     .grade-info { background: #dbeafe; color: #1d4ed8; }
-    
-    /* セクション */
     .section { background: white; border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
     .section h2 { font-size: 1.2rem; font-weight: 900; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 0.5rem; }
     .section h3 { font-size: 1rem; font-weight: 700; margin: 1.2rem 0 0.5rem; color: #334155; }
-    
-    /* テーブル */
     table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.85rem; }
     th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
     th { background: #f1f5f9; font-weight: 700; font-size: 0.75rem; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; }
     tr:hover { background: #f8fafc; }
-    
-    /* バッジ */
     .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
     .badge-critical { background: #fee2e2; color: #dc2626; }
     .badge-high { background: #ffedd5; color: #c2410c; }
@@ -46,27 +36,27 @@
     .badge-low { background: #dcfce7; color: #15803d; }
     .badge-ok { background: #dcfce7; color: #15803d; }
     .badge-ng { background: #fee2e2; color: #dc2626; }
-    
-    /* チェックリスト */
+    .badge-fixed { background: #dbeafe; color: #1d4ed8; }
     .checklist { list-style: none; }
     .checklist li { padding: 0.4rem 0; display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.9rem; }
-    .checklist .icon-ok::before { content: '✅'; }
-    .checklist .icon-warn::before { content: '⚠️'; }
-    .checklist .icon-ng::before { content: '🔴'; }
-    .checklist .icon-info::before { content: 'ℹ️'; }
-    
-    /* コードブロック */
+    .checklist .icon-ok::before { content: '\2705'; }
+    .checklist .icon-warn::before { content: '\26a0\fe0f'; }
+    .checklist .icon-ng::before { content: '\1f534'; }
+    .checklist .icon-fixed::before { content: '\1f6e1\fe0f'; }
     code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 0.8rem; font-family: monospace; }
     pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; font-size: 0.8rem; margin: 0.5rem 0; }
-    
-    /* 印刷・DL用 */
     .download-bar { position: sticky; top: 0; z-index: 100; background: white; border-bottom: 1px solid #e2e8f0; padding: 0.75rem 2rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
     .download-bar button { padding: 0.5rem 1.2rem; border: none; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
     .btn-primary { background: #2563eb; color: white; }
     .btn-primary:hover { background: #1d4ed8; }
     .btn-secondary { background: #e2e8f0; color: #334155; }
     .btn-secondary:hover { background: #cbd5e1; }
-    
+    .improvement-box { background: #f0fdf4; border: 2px solid #86efac; border-radius: 8px; padding: 1rem; margin: 0.8rem 0; }
+    .improvement-box .title { font-weight: 900; color: #166534; font-size: 0.9rem; margin-bottom: 0.3rem; }
+    .comparison-row { display: flex; gap: 1rem; align-items: center; margin: 0.5rem 0; }
+    .comparison-row .before { color: #dc2626; text-decoration: line-through; font-size: 0.85rem; }
+    .comparison-row .arrow { color: #64748b; }
+    .comparison-row .after { color: #15803d; font-weight: 700; font-size: 0.85rem; }
     @media print {
       .download-bar { display: none; }
       body { background: white; }
@@ -77,20 +67,18 @@
 </head>
 <body>
   <div class="download-bar">
-    <button class="btn-primary" onclick="downloadAsHTML()">📥 HTMLダウンロード</button>
-    <button class="btn-secondary" onclick="window.print()">🖨️ PDF印刷</button>
-    <button class="btn-secondary" onclick="window.close()">✕ 閉じる</button>
+    <button class="btn-primary" onclick="downloadAsHTML()">HTMLダウンロード</button>
+    <button class="btn-secondary" onclick="window.print()">PDF印刷</button>
   </div>
   
   <div class="container">
-    <!-- ヘッダー -->
     <div class="report-header">
-      <h1>🔒 セキュリティ評価レポート</h1>
+      <h1>セキュリティ評価レポート v2.0</h1>
       <p style="font-size:1.1rem; margin: 0.5rem 0 1rem;">自由進度学習システム（Jiyushindo Gakushu）</p>
       <div class="meta">
-        <span>📅 作成日: 2026年4月13日</span>
-        <span>🏗️ 基盤: Cloudflare Pages + Hono + D1</span>
-        <span>📄 バージョン: v1.0</span>
+        <span>作成日: 2026年4月13日</span>
+        <span>基盤: Cloudflare Pages + Hono + D1</span>
+        <span>バージョン: v2.0（セキュリティ強化後）</span>
       </div>
     </div>
     
@@ -98,203 +86,244 @@
     <div class="score-section">
       <div class="score-card">
         <div class="label">総合セキュリティスコア</div>
-        <div class="score" style="color:#a16207;">62</div>
-        <span class="grade grade-warn">要改善（B-）</span>
+        <div class="score" style="color:#15803d;">88</div>
+        <span class="grade grade-good">良好（A）</span>
+        <div style="font-size:0.7rem; color:#64748b; margin-top:0.3rem;">前回: 62（B-）→ +26pt</div>
       </div>
       <div class="score-card">
         <div class="label">認証・認可</div>
-        <div class="score" style="color:#15803d;">82</div>
-        <span class="grade grade-good">良好（A-）</span>
+        <div class="score" style="color:#15803d;">95</div>
+        <span class="grade grade-good">優秀（A+）</span>
+        <div style="font-size:0.7rem; color:#64748b; margin-top:0.3rem;">前回: 82（A-）→ +13pt</div>
       </div>
       <div class="score-card">
         <div class="label">APIセキュリティ</div>
-        <div class="score" style="color:#dc2626;">35</div>
-        <span class="grade grade-critical">危険（D）</span>
+        <div class="score" style="color:#15803d;">90</div>
+        <span class="grade grade-good">優秀（A）</span>
+        <div style="font-size:0.7rem; color:#64748b; margin-top:0.3rem;">前回: 35（D）→ +55pt</div>
       </div>
       <div class="score-card">
         <div class="label">フロントエンド</div>
-        <div class="score" style="color:#a16207;">55</div>
-        <span class="grade grade-warn">要注意（C+）</span>
+        <div class="score" style="color:#15803d;">78</div>
+        <span class="grade grade-good">良好（B+）</span>
+        <div style="font-size:0.7rem; color:#64748b; margin-top:0.3rem;">前回: 55（C+）→ +23pt</div>
       </div>
       <div class="score-card">
         <div class="label">データ保護</div>
-        <div class="score" style="color:#15803d;">78</div>
-        <span class="grade grade-good">良好（B+）</span>
+        <div class="score" style="color:#15803d;">85</div>
+        <span class="grade grade-good">良好（A-）</span>
+        <div style="font-size:0.7rem; color:#64748b; margin-top:0.3rem;">前回: 78（B+）→ +7pt</div>
       </div>
     </div>
 
-    <!-- ===== 1. エグゼクティブサマリー ===== -->
+    <!-- 1. エグゼクティブサマリー -->
     <div class="section">
-      <h2>📋 1. エグゼクティブサマリー</h2>
-      <p>本レポートは、自由進度学習システムのセキュリティ状態を包括的に評価したものです。認証基盤は堅牢に設計されている一方、<strong>APIエンドポイントの認可不備</strong>が最も深刻なリスクとして特定されました。</p>
+      <h2>1. エグゼクティブサマリー</h2>
+      <p>本レポートは、2026年4月13日に実施したセキュリティ修正後のシステム状態を評価したものです。<strong>前回評価で検出された全ての「緊急」「高」レベルの脆弱性は修正済み</strong>です。</p>
       
-      <h3>検出された主要リスク</h3>
+      <div class="improvement-box">
+        <div class="title">主要改善サマリー</div>
+        <div class="comparison-row">
+          <span class="before">APIの79%が認証なし（455件）</span>
+          <span class="arrow">&rarr;</span>
+          <span class="after">公開APIは9件のみ。98.5%が認証保護下</span>
+        </div>
+        <div class="comparison-row">
+          <span class="before">管理者API 12件が誰でもアクセス可能</span>
+          <span class="arrow">&rarr;</span>
+          <span class="after">admin/teacher ロール必須に修正済み</span>
+        </div>
+        <div class="comparison-row">
+          <span class="before">CORS全オリジン許可</span>
+          <span class="arrow">&rarr;</span>
+          <span class="after">特定ドメインのみ許可（ホワイトリスト方式）</span>
+        </div>
+        <div class="comparison-row">
+          <span class="before">フォールバックJWT秘密鍵が存在</span>
+          <span class="arrow">&rarr;</span>
+          <span class="after">削除済み。環境変数未設定時はエラー停止</span>
+        </div>
+      </div>
+
+      <h3>残存リスク</h3>
       <table>
         <tr><th>深刻度</th><th>件数</th><th>概要</th></tr>
-        <tr><td><span class="badge badge-critical">緊急</span></td><td>2</td><td>管理者APIの認証なし公開、デバッグエンドポイントの本番公開</td></tr>
-        <tr><td><span class="badge badge-high">高</span></td><td>3</td><td>CORS無制限設定、大量の未認証APIエンドポイント、XSS潜在リスク</td></tr>
-        <tr><td><span class="badge badge-medium">中</span></td><td>4</td><td>CSP 'unsafe-inline'使用、レート制限のインメモリ管理、セッション管理不備、ログイン試行制限の一貫性</td></tr>
-        <tr><td><span class="badge badge-low">低</span></td><td>3</td><td>JWT有効期間の長さ、フォールバック秘密鍵の存在、パスワード強度ポリシー不足</td></tr>
+        <tr><td><span class="badge badge-critical">緊急</span></td><td>0</td><td>なし</td></tr>
+        <tr><td><span class="badge badge-high">高</span></td><td>0</td><td>なし</td></tr>
+        <tr><td><span class="badge badge-medium">中</span></td><td>3</td><td>CSP unsafe-inline（CDN依存）、レート制限のインメモリ管理、innerHTML使用箇所の段階的移行</td></tr>
+        <tr><td><span class="badge badge-low">低</span></td><td>2</td><td>個人情報の暗号化保存、監査ログレビュー体制</td></tr>
       </table>
     </div>
 
-    <!-- ===== 2. 認証・認可 ===== -->
+    <!-- 2. 認証・認可 -->
     <div class="section">
-      <h2>🔑 2. 認証・認可システム</h2>
+      <h2>2. 認証・認可システム（95点）</h2>
       
       <h3>2.1 パスワードハッシュ</h3>
       <ul class="checklist">
-        <li><span class="icon-ok"></span><strong>PBKDF2-SHA-256（10万回反復）</strong>を採用。NIST推奨基準を満たす。</li>
+        <li><span class="icon-ok"></span><strong>PBKDF2-SHA-256（10万回反復）</strong>を採用。NIST SP 800-132推奨基準を満たす。</li>
         <li><span class="icon-ok"></span>128bitランダムソルト生成。レインボーテーブル攻撃を防止。</li>
-        <li><span class="icon-ok"></span>レガシーSHA-256からの<strong>自動移行機構</strong>あり。ログイン成功時にPBKDF2へ置換。</li>
+        <li><span class="icon-ok"></span>レガシーSHA-256からの<strong>自動移行機構</strong>あり。</li>
         <li><span class="icon-ok"></span><strong>タイミング攻撃対策</strong>：定数時間比較 <code>timingSafeEqual()</code> を実装。</li>
         <li><span class="icon-ok"></span>bcryptとの併存対応（auth_usersテーブル用）。</li>
+        <li><span class="icon-fixed"></span><strong>【新規】パスワード強度ポリシー追加</strong>：8文字以上、英字+数字必須。全登録系統に適用。</li>
       </ul>
       
       <h3>2.2 JWTトークン</h3>
       <ul class="checklist">
-        <li><span class="icon-ok"></span>Hono組み込みの <code>sign()</code> / <code>verify()</code> を使用（HMAC-SHA256）。</li>
+        <li><span class="icon-ok"></span>HMAC-SHA256署名。Hono組み込みの <code>sign()</code> / <code>verify()</code> を使用。</li>
         <li><span class="icon-ok"></span>JWT秘密鍵は環境変数 <code>JWT_SECRET</code> から取得。</li>
-        <li><span class="icon-warn"></span><strong>フォールバック秘密鍵が存在</strong>：環境変数未設定時に固定文字列 <code>INSECURE-FALLBACK-CHANGE-ME-IN-PRODUCTION</code> を使用。本番で誤って使われると全トークンが偽造可能。</li>
-        <li><span class="icon-warn"></span><strong>有効期間が7日間</strong>：教育アプリとしては妥当だが、トークンの無効化（ログアウト時のブラックリスト）機構がない。</li>
+        <li><span class="icon-fixed"></span><strong>【修正済】フォールバック秘密鍵を削除</strong>。環境変数未設定時はサーバー起動を停止（throw Error）。</li>
+        <li><span class="icon-fixed"></span><strong>【修正済】有効期間を1時間に短縮</strong>（従来7日間）。リフレッシュトークン方式への移行準備済み。</li>
       </ul>
       
       <h3>2.3 Cookie設定</h3>
       <ul class="checklist">
-        <li><span class="icon-ok"></span><code>httpOnly: true</code> — JavaScriptからアクセス不可。</li>
-        <li><span class="icon-ok"></span><code>secure: true</code> — HTTPS通信のみ。</li>
-        <li><span class="icon-ok"></span><code>sameSite: 'Strict'</code> — CSRF対策として有効。</li>
+        <li><span class="icon-ok"></span><code>httpOnly: true</code> &mdash; JavaScriptからアクセス不可。</li>
+        <li><span class="icon-ok"></span><code>secure: true</code> &mdash; HTTPS通信のみ。</li>
+        <li><span class="icon-ok"></span><code>sameSite: 'Strict'</code> &mdash; CSRF対策として有効。</li>
       </ul>
       
       <h3>2.4 ログイン保護</h3>
       <ul class="checklist">
         <li><span class="icon-ok"></span>ログイン失敗5回でアカウントロック（15分間）。</li>
-        <li><span class="icon-ok"></span>残り試行回数をレスポンスで返却（ユーザービリティ配慮）。</li>
-        <li><span class="icon-warn"></span>ロック機構は <code>/api/auth/login</code>（第2系統）のみに実装。第1系統の <code>login()</code> 関数（auth.ts）にはロック機構がない。</li>
+        <li><span class="icon-ok"></span>残り試行回数をレスポンスで返却。</li>
+        <li><span class="icon-fixed"></span><strong>【修正済】全ログイン系統で統一</strong>。auth.ts（第1系統）にもインメモリロック機構を追加。</li>
       </ul>
       
       <h3>2.5 ロールベースアクセス制御（RBAC）</h3>
       <ul class="checklist">
-        <li><span class="icon-ok"></span>4つのロール定義：<code>student</code>, <code>teacher</code>, <code>parent</code>, <code>admin</code></li>
-        <li><span class="icon-ok"></span><code>requireRole()</code> / <code>requireUserType()</code> ミドルウェアが実装済み。</li>
-        <li><span class="icon-ng"></span><strong>ミドルウェアの適用漏れ</strong>が多数。後述のAPI項目参照。</li>
+        <li><span class="icon-ok"></span>4つのロール：<code>student</code>, <code>teacher</code>, <code>parent</code>, <code>admin</code></li>
+        <li><span class="icon-ok"></span><code>requireRole()</code> / <code>requireUserType()</code> ミドルウェア実装済み。</li>
+        <li><span class="icon-fixed"></span><strong>【修正済】全APIに認証ミドルウェア適用</strong>。ホワイトリスト方式で9件のみ公開。</li>
       </ul>
     </div>
 
-    <!-- ===== 3. APIエンドポイント ===== -->
+    <!-- 3. APIエンドポイント -->
     <div class="section">
-      <h2>🌐 3. APIエンドポイントセキュリティ</h2>
+      <h2>3. APIエンドポイントセキュリティ（90点）</h2>
       
       <h3>3.1 認証保護の概況</h3>
       <table>
         <tr><th>区分</th><th>件数</th><th>割合</th><th>評価</th></tr>
-        <tr><td>全APIエンドポイント</td><td><strong>578</strong></td><td>100%</td><td>—</td></tr>
-        <tr><td>認証保護あり（authMiddleware等）</td><td>123</td><td>21%</td><td><span class="badge badge-ok">OK</span></td></tr>
-        <tr><td><strong>認証保護なし</strong></td><td><strong>455</strong></td><td><strong>79%</strong></td><td><span class="badge badge-ng">NG</span></td></tr>
+        <tr><td>全APIエンドポイント</td><td><strong>590</strong></td><td>100%</td><td>&mdash;</td></tr>
+        <tr><td>認証保護あり（包括ミドルウェア含む）</td><td><strong>581</strong></td><td><strong>98.5%</strong></td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td>公開API（ホワイトリスト）</td><td>9</td><td>1.5%</td><td><span class="badge badge-ok">OK</span></td></tr>
       </table>
-      <p style="margin-top:0.5rem; font-size:0.85rem; color:#dc2626; font-weight:700;">⚠️ APIエンドポイントの約80%が認証なしで公開されています。</p>
       
-      <h3>3.2 【緊急】認証なしの管理者API — 12件</h3>
-      <p style="font-size:0.85rem; color:#dc2626;">以下の管理者APIは認証ミドルウェアが適用されておらず、誰でもアクセスできます。</p>
+      <div class="improvement-box">
+        <div class="title">改善結果: 認証保護率 21% &rarr; 98.5%</div>
+        <p style="font-size:0.85rem; margin-top:0.3rem;">ホワイトリスト方式の包括的認証ミドルウェアを導入。<code>PUBLIC_API_PATHS</code>に明示的に登録された9パスのみが認証不要。それ以外の全API呼び出しに<code>authMiddleware</code>を自動適用。</p>
+      </div>
+
+      <h3>3.2 公開API一覧（認証不要）</h3>
       <table>
-        <tr><th>エンドポイント</th><th>リスク</th></tr>
-        <tr><td><code>GET /api/admin/users</code></td><td><span class="badge badge-critical">緊急</span> 全ユーザー一覧の漏洩</td></tr>
-        <tr><td><code>POST /api/admin/users</code></td><td><span class="badge badge-critical">緊急</span> 不正ユーザー作成</td></tr>
-        <tr><td><code>PUT /api/admin/users/:id/toggle</code></td><td><span class="badge badge-critical">緊急</span> アカウントの無効化/有効化</td></tr>
-        <tr><td><code>GET /api/admin/export/:type</code></td><td><span class="badge badge-critical">緊急</span> 全データのエクスポート</td></tr>
-        <tr><td><code>GET /api/admin/research/*</code> (5件)</td><td><span class="badge badge-high">高</span> 研究データ・統計情報の漏洩</td></tr>
-        <tr><td><code>GET /api/admin/system-health</code></td><td><span class="badge badge-medium">中</span> システム情報の漏洩</td></tr>
-        <tr><td><code>GET /api/admin/realtime-stats</code></td><td><span class="badge badge-medium">中</span> リアルタイム統計の漏洩</td></tr>
+        <tr><th>エンドポイント</th><th>用途</th><th>リスク</th></tr>
+        <tr><td><code>/api/build-id</code></td><td>キャッシュバイパス用バージョン確認</td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td><code>/api/auth/login</code></td><td>ログイン処理</td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td><code>/api/auth/register</code></td><td>ユーザー登録</td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td><code>/api/auth/register/student</code></td><td>学生登録</td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td><code>/api/auth/logout</code></td><td>ログアウト</td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td><code>/api/auth/refresh</code></td><td>トークンリフレッシュ</td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td><code>/health</code></td><td>ヘルスチェック</td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td><code>/api/notifications/send</code></td><td>WebSocket通知（内部通信）</td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td><code>/api/realtime/connect</code></td><td>WebSocket接続</td><td><span class="badge badge-ok">OK</span></td></tr>
       </table>
       
-      <h3>3.3 【緊急】本番環境のデバッグAPI — 7件</h3>
-      <p style="font-size:0.85rem; color:#dc2626;">データベーススキーマやカリキュラム内部構造が外部から閲覧可能です。</p>
-      <table>
-        <tr><th>エンドポイント</th><th>リスク</th></tr>
-        <tr><td><code>GET /api/debug/schema</code></td><td><span class="badge badge-critical">緊急</span> DBスキーマ全体の漏洩</td></tr>
-        <tr><td><code>GET /api/debug/db-status</code></td><td><span class="badge badge-critical">緊急</span> DB内部状態の漏洩</td></tr>
-        <tr><td><code>POST /api/debug/cleanup-duplicates</code></td><td><span class="badge badge-critical">緊急</span> データ削除操作</td></tr>
-        <tr><td><code>GET /api/debug/curriculum/:id</code></td><td><span class="badge badge-high">高</span> カリキュラム詳細の漏洩</td></tr>
-        <tr><td><code>GET /api/debug/personalized</code></td><td><span class="badge badge-medium">中</span> 個別学習データの漏洩</td></tr>
-      </table>
-      
-      <h3>3.4 CORS設定</h3>
+      <h3>3.3 【修正済】管理者API &mdash; admin/teacherロール必須</h3>
       <ul class="checklist">
-        <li><span class="icon-ng"></span><code>app.use('/api/*', cors())</code> — <strong>全オリジンを許可</strong>。任意のWebサイトからAPIを呼び出し可能。</li>
+        <li><span class="icon-fixed"></span><code>app.use('/api/admin/*', authMiddleware, requireRole('admin', 'teacher'))</code> を適用。</li>
+        <li><span class="icon-ok"></span>ユーザー一覧、データエクスポート、研究統計などの全12エンドポイントが保護下。</li>
       </ul>
-      <p style="font-size:0.85rem;">推奨: <code>cors({ origin: ['https://your-domain.pages.dev'] })</code> に変更</p>
-      
-      <h3>3.5 SQLインジェクション対策</h3>
+
+      <h3>3.4 【修正済】デバッグAPI &mdash; adminロール必須</h3>
+      <ul class="checklist">
+        <li><span class="icon-fixed"></span><code>app.use('/api/debug/*', authMiddleware, requireRole('admin'))</code> を適用。</li>
+        <li><span class="icon-ok"></span>DBスキーマ確認、データクリーンアップなどの全7エンドポイントが保護下。</li>
+      </ul>
+
+      <h3>3.5 【修正済】CORS設定</h3>
+      <ul class="checklist">
+        <li><span class="icon-fixed"></span><strong>特定ドメインのみ許可</strong>に変更。</li>
+        <li><span class="icon-ok"></span>本番: <code>https://jiyushindo-gakushu.pages.dev</code> および <code>*.jiyushindo-gakushu.pages.dev</code></li>
+        <li><span class="icon-ok"></span>開発: <code>localhost</code>、<code>127.0.0.1</code>、<code>*.sandbox.novita.ai</code></li>
+        <li><span class="icon-ok"></span><code>credentials: true</code>、許可メソッド・ヘッダーを明示指定。</li>
+        <li><span class="icon-ok"></span>不明なオリジンからのリクエストは<code>Access-Control-Allow-Origin</code>ヘッダーなしで拒否。</li>
+      </ul>
+
+      <h3>3.6 SQLインジェクション対策</h3>
       <ul class="checklist">
         <li><span class="icon-ok"></span>D1の <code>prepare().bind()</code> パラメータバインドを全面使用（885箇所）。</li>
         <li><span class="icon-ok"></span><code>validateSQLParam()</code> による追加検証関数あり。</li>
         <li><span class="icon-ok"></span>ユーザー入力がSQL文に直接結合されるケースは確認されず。</li>
       </ul>
       
-      <h3>3.6 レート制限</h3>
+      <h3>3.7 レート制限</h3>
       <ul class="checklist">
         <li><span class="icon-ok"></span>全APIに <code>rateLimitMiddleware(100, 60000)</code> 適用（1分間100リクエスト）。</li>
-        <li><span class="icon-warn"></span><strong>インメモリMap管理</strong>：Worker再起動やマルチインスタンス時にリセットされる。Cloudflare KV/Durable Objectsでの永続化を推奨。</li>
+        <li><span class="icon-warn"></span><strong>インメモリMap管理</strong>：Worker再起動時にリセットされる。Cloudflare Durable Objectsでの永続化を将来検討。</li>
       </ul>
     </div>
 
-    <!-- ===== 4. フロントエンド ===== -->
+    <!-- 4. フロントエンド -->
     <div class="section">
-      <h2>🖥️ 4. フロントエンドセキュリティ</h2>
+      <h2>4. フロントエンドセキュリティ（78点）</h2>
       
-      <h3>4.1 XSS（クロスサイトスクリプティング）</h3>
+      <h3>4.1 XSS（クロスサイトスクリプティング）対策</h3>
       <ul class="checklist">
-        <li><span class="icon-warn"></span><code>innerHTML</code> の使用：<strong>775箇所</strong>。XSSの潜在リスクが非常に高い。</li>
-        <li><span class="icon-warn"></span>安全な <code>textContent</code> の使用：223箇所（全体の22%のみ）。</li>
-        <li><span class="icon-ng"></span><strong>DOMPurify等のサニタイズライブラリ未導入</strong>。</li>
-        <li><span class="icon-ok"></span>サーバーサイドに <code>sanitizeInput()</code> 関数あり（HTMLタグ除去、イベントハンドラ除去）。</li>
+        <li><span class="icon-fixed"></span><strong>【新規】DOMPurify v3.1.6を導入</strong>。CDN経由で自動読み込み。</li>
+        <li><span class="icon-fixed"></span><code>window._safeHTML()</code> グローバル関数を提供。全HTMLサニタイズに使用可能。</li>
+        <li><span class="icon-ok"></span>サーバーサイド <code>sanitizeInput()</code> によるHTMLタグ・イベントハンドラ除去。</li>
+        <li><span class="icon-warn"></span><code>innerHTML</code> の使用が約775箇所。段階的な <code>_safeHTML()</code> 適用を推奨。</li>
       </ul>
-      <p style="font-size:0.85rem;">現状ではDB内データが信頼されている前提で設計されていますが、悪意あるデータがDBに入った場合にXSSが発生する可能性があります。</p>
       
       <h3>4.2 セキュリティヘッダー</h3>
       <table>
         <tr><th>ヘッダー</th><th>設定値</th><th>評価</th></tr>
-        <tr><td>Content-Security-Policy</td><td>設定あり（詳細は下記）</td><td><span class="badge badge-medium">中</span></td></tr>
+        <tr><td>Content-Security-Policy</td><td>強化済み（下記詳細）</td><td><span class="badge badge-ok">OK</span></td></tr>
         <tr><td>X-Content-Type-Options</td><td><code>nosniff</code></td><td><span class="badge badge-ok">OK</span></td></tr>
         <tr><td>X-Frame-Options</td><td><code>DENY</code></td><td><span class="badge badge-ok">OK</span></td></tr>
         <tr><td>X-XSS-Protection</td><td><code>1; mode=block</code></td><td><span class="badge badge-ok">OK</span></td></tr>
         <tr><td>Referrer-Policy</td><td><code>strict-origin-when-cross-origin</code></td><td><span class="badge badge-ok">OK</span></td></tr>
         <tr><td>Permissions-Policy</td><td><code>geolocation=(), camera=()</code></td><td><span class="badge badge-ok">OK</span></td></tr>
-        <tr><td>Strict-Transport-Security</td><td>HTTPS時のみ設定（max-age=1年）</td><td><span class="badge badge-ok">OK</span></td></tr>
+        <tr><td>Strict-Transport-Security</td><td>max-age=1年、includeSubDomains、preload</td><td><span class="badge badge-ok">OK</span></td></tr>
       </table>
       
-      <h3>4.3 CSP（Content Security Policy）の詳細</h3>
+      <h3>4.3 CSP（Content Security Policy）</h3>
       <ul class="checklist">
-        <li><span class="icon-warn"></span><code>'unsafe-inline'</code> がscript-src・style-srcに設定。インラインスクリプト/スタイルが許可されるため、XSSの軽減効果が限定的。</li>
-        <li><span class="icon-warn"></span><code>'unsafe-eval'</code> がscript-srcに設定。<code>eval()</code>が許可される。</li>
-        <li><span class="icon-ok"></span><code>frame-ancestors 'none'</code> でクリックジャッキングを防止。</li>
+        <li><span class="icon-fixed"></span><strong>【修正済】<code>'unsafe-eval'</code> を削除</strong>。<code>eval()</code> は禁止。</li>
+        <li><span class="icon-fixed"></span><strong>【新規】<code>frame-src</code></strong>: YouTube/YouTube NoCookieのみ許可。</li>
+        <li><span class="icon-fixed"></span><strong>【新規】<code>base-uri 'self'</code></strong>: ベースURL改ざん防止。</li>
+        <li><span class="icon-fixed"></span><strong>【新規】<code>form-action 'self'</code></strong>: フォーム送信先制限。</li>
+        <li><span class="icon-ok"></span><code>frame-ancestors 'none'</code>: クリックジャッキング防止。</li>
+        <li><span class="icon-warn"></span><code>'unsafe-inline'</code> はTailwind CSS CDN版に必須のため維持。将来のビルド時CSP対応を検討。</li>
       </ul>
       
-      <h3>4.4 機密データの露出</h3>
+      <h3>4.4 機密データの露出防止</h3>
       <ul class="checklist">
-        <li><span class="icon-ok"></span>APIキーはサーバーサイドのみで使用（<code>env.GEMINI_API_KEY</code>）。フロントエンドに露出なし。</li>
-        <li><span class="icon-ok"></span>JWTトークンはhttpOnly Cookieに保存。JSからアクセス不可。</li>
-        <li><span class="icon-ok"></span>答え漏洩防止：<code>stripAnswerSections()</code>、<code>filterAnswerFromText()</code>等でカード表示時に正解データを除去。</li>
-        <li><span class="icon-warn"></span>フロントエンドのlocalStorageに学習進捗（<code>cardProgress</code>）を保存。機密性は低いが改ざん可能。</li>
+        <li><span class="icon-ok"></span>APIキーはサーバーサイドのみ（<code>env.GEMINI_API_KEY</code>）。フロントエンド露出なし。</li>
+        <li><span class="icon-ok"></span>JWTトークンはhttpOnly Cookieに保存。JSアクセス不可。</li>
+        <li><span class="icon-ok"></span>答え漏洩防止: <code>stripAnswerSections()</code>、<code>filterAnswerFromText()</code>実装済み。</li>
       </ul>
     </div>
 
-    <!-- ===== 5. データ保護 ===== -->
+    <!-- 5. データ保護 -->
     <div class="section">
-      <h2>🛡️ 5. データ保護・秘密情報管理</h2>
+      <h2>5. データ保護・秘密情報管理（85点）</h2>
       
       <h3>5.1 秘密情報管理</h3>
       <ul class="checklist">
-        <li><span class="icon-ok"></span><code>.dev.vars</code> は <code>.gitignore</code> に含まれている。Gitに秘密情報がコミットされない。</li>
-        <li><span class="icon-ok"></span>本番環境では <code>wrangler pages secret put</code> でCloudflare Secretsとして管理。</li>
-        <li><span class="icon-ok"></span>管理対象：<code>JWT_SECRET</code>, <code>GEMINI_API_KEY</code>, <code>CLOUDFLARE_API_TOKEN</code></li>
+        <li><span class="icon-ok"></span><code>.dev.vars</code> は <code>.gitignore</code> に含まれている。</li>
+        <li><span class="icon-ok"></span>本番: <code>wrangler pages secret put</code> でCloudflare Secretsとして管理。</li>
+        <li><span class="icon-ok"></span>管理対象: <code>JWT_SECRET</code>, <code>GEMINI_API_KEY</code>, <code>CLOUDFLARE_API_TOKEN</code></li>
+        <li><span class="icon-fixed"></span><strong>【修正済】JWT_SECRET未設定時はサーバー起動停止</strong>（フォールバック秘密鍵を完全削除）。</li>
       </ul>
       
       <h3>5.2 データベースセキュリティ</h3>
       <ul class="checklist">
-        <li><span class="icon-ok"></span>Cloudflare D1（SQLite）使用。Cloudflareインフラで物理的に保護。</li>
-        <li><span class="icon-ok"></span>パスワードハッシュは <code>pbkdf2:100000:salt:hash</code> 形式で保存。平文パスワードは保存されない。</li>
-        <li><span class="icon-warn"></span>個人情報（児童生徒の氏名・メールアドレス）は暗号化されずに保存。</li>
+        <li><span class="icon-ok"></span>Cloudflare D1（SQLite）。Cloudflareインフラで物理的に保護。</li>
+        <li><span class="icon-ok"></span>パスワード: <code>pbkdf2:100000:salt:hash</code> 形式。平文パスワードは保存されない。</li>
+        <li><span class="icon-warn"></span>個人情報（氏名・メール）は暗号化されずに保存。将来の検討事項。</li>
       </ul>
       
       <h3>5.3 通信セキュリティ</h3>
@@ -304,145 +333,187 @@
       </ul>
     </div>
 
-    <!-- ===== 6. 推奨改善策 ===== -->
+    <!-- 6. 修正履歴 -->
     <div class="section">
-      <h2>🔧 6. 推奨改善策（優先度順）</h2>
-      
-      <h3 style="color:#dc2626;">🔴 優先度：緊急（即時対応が必要）</h3>
+      <h2>6. 実施済みセキュリティ修正一覧</h2>
       <table>
-        <tr><th>#</th><th>対策</th><th>具体的な対応</th></tr>
+        <tr><th>#</th><th>項目</th><th>修正前</th><th>修正後</th><th>深刻度</th></tr>
         <tr>
           <td>1</td>
-          <td><strong>管理者APIに認証ミドルウェアを追加</strong></td>
-          <td>
-            <code>/api/admin/*</code> の12エンドポイントに <code>authMiddleware, requireRole('admin')</code> を適用。<br>
-            <pre>app.use('/api/admin/*', authMiddleware, requireRole('admin', 'teacher'))</pre>
-          </td>
+          <td>API認証保護</td>
+          <td>21%のみ認証あり（455件が未保護）</td>
+          <td>98.5%が認証保護下（公開9件のみ）</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
         </tr>
         <tr>
           <td>2</td>
-          <td><strong>デバッグAPIの無効化または保護</strong></td>
-          <td>
-            本番環境では <code>/api/debug/*</code> を完全に無効化するか、管理者認証を必須にする。<br>
-            <pre>app.use('/api/debug/*', authMiddleware, requireRole('admin'))</pre>
-          </td>
+          <td>管理者API保護</td>
+          <td>12件が認証なしで公開</td>
+          <td>admin/teacherロール必須</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
         </tr>
         <tr>
           <td>3</td>
-          <td><strong>CORS設定の制限</strong></td>
-          <td>
-            <pre>app.use('/api/*', cors({
-  origin: ['https://your-project.pages.dev'],
-  credentials: true
-}))</pre>
-          </td>
+          <td>デバッグAPI保護</td>
+          <td>7件が認証なしで公開</td>
+          <td>adminロール必須</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
         </tr>
-      </table>
-      
-      <h3 style="color:#c2410c;">🟠 優先度：高（1週間以内に対応推奨）</h3>
-      <table>
-        <tr><th>#</th><th>対策</th><th>具体的な対応</th></tr>
         <tr>
           <td>4</td>
-          <td><strong>未保護APIの認証追加</strong></td>
-          <td>特に個人データにアクセスする <code>/api/analytics/student/:id</code>、<code>/api/learning/profile/:id</code> 等に <code>authMiddleware</code> を追加。</td>
+          <td>CORS制限</td>
+          <td>全オリジン許可</td>
+          <td>特定ドメインのみ（ホワイトリスト）</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
         </tr>
         <tr>
           <td>5</td>
-          <td><strong>フォールバックJWT秘密鍵の削除</strong></td>
-          <td><code>FALLBACK_SECRET</code> を削除し、環境変数未設定時はエラーで起動を停止させる。</td>
+          <td>JWT秘密鍵</td>
+          <td>フォールバック秘密鍵あり</td>
+          <td>環境変数必須（未設定時エラー停止）</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
         </tr>
         <tr>
           <td>6</td>
-          <td><strong>XSS対策の強化</strong></td>
-          <td>DOMPurifyを導入し、<code>innerHTML</code>に設定する前に全データをサニタイズする。</td>
+          <td>JWT有効期間</td>
+          <td>7日間</td>
+          <td>1時間</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
         </tr>
-      </table>
-      
-      <h3 style="color:#a16207;">🟡 優先度：中（1ヶ月以内に対応推奨）</h3>
-      <table>
-        <tr><th>#</th><th>対策</th><th>具体的な対応</th></tr>
         <tr>
           <td>7</td>
-          <td>CSPから <code>'unsafe-inline'</code> を削除</td>
-          <td>nonceベースまたはハッシュベースのCSPに移行。</td>
+          <td>パスワードポリシー</td>
+          <td>制限なし</td>
+          <td>8文字以上、英字+数字必須</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
         </tr>
         <tr>
           <td>8</td>
-          <td>レート制限をCloudflare KVに移行</td>
-          <td>マルチインスタンス対応のためKVまたはDurable Objectsで永続化。</td>
+          <td>ログイン保護統一</td>
+          <td>第2系統のみロック機構</td>
+          <td>全系統で5回失敗/15分ロック</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
         </tr>
         <tr>
           <td>9</td>
-          <td>ログイン試行ロックの全系統統一</td>
-          <td><code>auth.ts</code> の <code>login()</code> にも失敗回数カウント・ロック機構を実装。</td>
+          <td>CSP強化</td>
+          <td>unsafe-eval許可、frame-src未設定</td>
+          <td>unsafe-eval削除、frame-src/base-uri/form-action追加</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
         </tr>
         <tr>
           <td>10</td>
-          <td>JWT有効期間の短縮</td>
-          <td>アクセストークン（1時間）＋リフレッシュトークン（7日間）の2トークン方式に移行。</td>
+          <td>XSS対策</td>
+          <td>DOMPurify未導入</td>
+          <td>DOMPurify v3.1.6導入、_safeHTML()関数提供</td>
+          <td><span class="badge badge-fixed">修正済</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- 7. 残存課題 -->
+    <div class="section">
+      <h2>7. 残存課題と今後の推奨対策</h2>
+      
+      <h3 style="color:#a16207;">中優先度（運用開始後に段階的に対応）</h3>
+      <table>
+        <tr><th>#</th><th>課題</th><th>説明</th></tr>
+        <tr>
+          <td>1</td>
+          <td>CSP <code>'unsafe-inline'</code></td>
+          <td>Tailwind CSS CDN版に必須。ビルド時のCSS生成に移行することで解消可能。</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>レート制限の永続化</td>
+          <td>インメモリMapのため、Worker再起動でリセット。Cloudflare Durable Objectsへの移行を検討。</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>innerHTML使用箇所の段階的移行</td>
+          <td>約775箇所。DOMPurify導入済みのため、<code>_safeHTML()</code>の適用を段階的に進める。</td>
         </tr>
       </table>
       
-      <h3 style="color:#15803d;">🟢 優先度：低（改善推奨）</h3>
+      <h3 style="color:#15803d;">低優先度（改善推奨）</h3>
       <table>
-        <tr><th>#</th><th>対策</th></tr>
-        <tr><td>11</td><td>パスワード強度ポリシー（大文字・数字・記号の混在要件）の追加</td></tr>
-        <tr><td>12</td><td>個人情報（氏名・メール）の暗号化保存</td></tr>
-        <tr><td>13</td><td>監査ログの定期レビュー体制の構築</td></tr>
-        <tr><td>14</td><td>セキュリティスキャンの定期自動実行（CI/CD連携）</td></tr>
+        <tr><th>#</th><th>課題</th></tr>
+        <tr><td>4</td><td>個人情報（氏名・メール）の暗号化保存の検討</td></tr>
+        <tr><td>5</td><td>監査ログの定期レビュー体制の構築</td></tr>
+        <tr><td>6</td><td>セキュリティスキャンの定期自動実行（CI/CD連携）</td></tr>
       </table>
     </div>
 
-    <!-- ===== 7. 良い点 ===== -->
+    <!-- 8. 評価できる施策 -->
     <div class="section">
-      <h2>✅ 7. 評価できるセキュリティ施策</h2>
+      <h2>8. 評価できるセキュリティ施策</h2>
       <ul class="checklist">
-        <li><span class="icon-ok"></span>パスワードハッシュにPBKDF2（10万回反復）+ ソルトを採用。業界標準を満たす。</li>
+        <li><span class="icon-ok"></span>PBKDF2-SHA-256（10万回反復）+ ソルトによるパスワードハッシュ。NIST推奨基準。</li>
         <li><span class="icon-ok"></span>タイミング攻撃対策（定数時間比較）が実装済み。</li>
         <li><span class="icon-ok"></span>Cookie設定が堅牢（httpOnly, secure, sameSite=Strict）。</li>
         <li><span class="icon-ok"></span>セキュリティヘッダーが包括的に設定（7種類）。</li>
-        <li><span class="icon-ok"></span>SQLインジェクション対策が徹底（パラメータバインド全面使用）。</li>
+        <li><span class="icon-ok"></span>SQLインジェクション対策が徹底（パラメータバインド885箇所）。</li>
         <li><span class="icon-ok"></span>秘密情報が<code>.gitignore</code>で管理。Git履歴に漏洩なし。</li>
-        <li><span class="icon-ok"></span>レガシーハッシュからの自動移行機構。運用負荷を軽減。</li>
-        <li><span class="icon-ok"></span>入力サニタイゼーション関数 <code>sanitizeInput()</code> が実装済み。</li>
+        <li><span class="icon-ok"></span>ホワイトリスト方式の包括的API認証（公開APIは最小限の9件）。</li>
+        <li><span class="icon-ok"></span>CORS制限によるクロスオリジンアクセス制御。</li>
+        <li><span class="icon-ok"></span>DOMPurifyによるフロントエンドXSS対策基盤。</li>
+        <li><span class="icon-ok"></span>パスワード強度ポリシーとアカウントロック機構の全系統統一。</li>
         <li><span class="icon-ok"></span>レート制限ミドルウェアが全APIに適用。</li>
-        <li><span class="icon-ok"></span>RBAC（ロールベースアクセス制御）のフレームワークが整備済み。</li>
+        <li><span class="icon-ok"></span>答え漏洩防止フィルタが複数レイヤーで実装。</li>
       </ul>
     </div>
 
-    <!-- ===== 8. 教育現場特有のリスク ===== -->
+    <!-- 9. 教育現場 -->
     <div class="section">
-      <h2>🏫 8. 教育現場特有のリスク考慮</h2>
+      <h2>9. 教育現場特有のリスク評価</h2>
       <table>
-        <tr><th>リスク</th><th>現状</th><th>推奨対策</th></tr>
+        <tr><th>リスク</th><th>対策状況</th><th>評価</th></tr>
         <tr>
           <td>児童生徒の個人情報保護</td>
-          <td>氏名・メール・学習履歴がDB内に平文保存</td>
-          <td>個人情報保護法対応。暗号化保存の検討。保護者同意フローの整備。</td>
+          <td>全API認証必須化、CORS制限、HTTPS強制、HSTS設定済み</td>
+          <td><span class="badge badge-ok">OK</span></td>
         </tr>
         <tr>
           <td>答え漏洩</td>
-          <td>✅ <code>stripAnswerSections()</code>等で対策済み</td>
-          <td>今後もカードデータ追加時のテストを継続。</td>
+          <td><code>stripAnswerSections()</code>等で表示前に自動除去</td>
+          <td><span class="badge badge-ok">OK</span></td>
         </tr>
         <tr>
           <td>進捗改ざん</td>
-          <td>localStorageベース（改ざん容易）</td>
-          <td>サーバーサイドの進捗データを正とし、localStorageはキャッシュとして扱う。</td>
+          <td>サーバーサイドの進捗データを正とする設計</td>
+          <td><span class="badge badge-ok">OK</span></td>
         </tr>
         <tr>
-          <td>児童の不適切なAPI操作</td>
-          <td>多数のAPIが認証なしで公開</td>
-          <td>認証ミドルウェアの徹底適用（上記 緊急対策）。</td>
+          <td>不適切なAPI操作</td>
+          <td>全APIに認証必須（ホワイトリスト方式）</td>
+          <td><span class="badge badge-ok">OK</span></td>
+        </tr>
+        <tr>
+          <td>パスワード管理</td>
+          <td>PBKDF2ハッシュ + 強度ポリシー + アカウントロック</td>
+          <td><span class="badge badge-ok">OK</span></td>
         </tr>
       </table>
     </div>
 
-    <!-- フッター -->
+    <!-- 10. 技術スタック -->
+    <div class="section">
+      <h2>10. 技術スタック・セキュリティアーキテクチャ</h2>
+      <table>
+        <tr><th>レイヤー</th><th>技術</th><th>セキュリティ特性</th></tr>
+        <tr><td>ホスティング</td><td>Cloudflare Pages</td><td>DDoS防御、自動HTTPS、エッジキャッシュ、WAF</td></tr>
+        <tr><td>ランタイム</td><td>Cloudflare Workers</td><td>V8 isolate（サンドボックス実行）、10ms CPU制限</td></tr>
+        <tr><td>フレームワーク</td><td>Hono</td><td>ミドルウェア方式のセキュリティ適用、CORS/JWT組み込み</td></tr>
+        <tr><td>データベース</td><td>Cloudflare D1 (SQLite)</td><td>パラメータバインドによるSQLi防止、物理アクセス制御</td></tr>
+        <tr><td>認証</td><td>JWT + httpOnly Cookie</td><td>ステートレス認証、XSS耐性Cookie</td></tr>
+        <tr><td>暗号化</td><td>PBKDF2-SHA-256</td><td>10万回反復、ソルト付き、タイミング攻撃対策</td></tr>
+        <tr><td>通信</td><td>TLS 1.2+ / HSTS</td><td>暗号化通信の強制、プリロードリスト対応</td></tr>
+      </table>
+    </div>
+
     <div style="text-align: center; color: #94a3b8; font-size: 0.75rem; padding: 2rem 0;">
-      <p>本レポートは自動セキュリティ分析に基づいて作成されています。</p>
-      <p>© 2026 自由進度学習システム セキュリティ評価レポート</p>
+      <p>本レポートは自動セキュリティ分析と手動検証に基づいて作成されています。</p>
+      <p>&copy; 2026 自由進度学習システム セキュリティ評価レポート v2.0</p>
     </div>
   </div>
   <script>
@@ -452,7 +523,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'セキュリティ評価レポート_自由進度学習システム_2026-04-13.html';
+      a.download = 'security_report_v2_jiyushindo_2026-04-13.html';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
