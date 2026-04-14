@@ -242,6 +242,39 @@
                     </div>
                 </div>
 
+                <!-- 学習進捗リセットセクション -->
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">
+                        <i class="fas fa-redo-alt mr-2 text-orange-600"></i>
+                        学習カード進捗リセット
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-4">
+                        選択したカリキュラムの学習カード進捗を全て「未実施」状態に戻します。
+                        生徒がもう一度最初から学習をやり直す際に使用してください。
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">
+                                <i class="fas fa-book-open mr-1 text-orange-500"></i> 対象カリキュラム
+                            </label>
+                            <select id="resetCurriculumSelect" class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200 transition">
+                                <option value="">カリキュラムを選択してください</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">
+                                <i class="fas fa-user mr-1 text-orange-500"></i> 対象生徒
+                            </label>
+                            <select id="resetStudentSelect" class="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200 transition">
+                                <option value="all">クラス全員</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button onclick="showResetConfirmModal()" class="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg transition font-bold w-full">
+                        <i class="fas fa-redo-alt mr-2"></i>学習進捗をリセットする
+                    </button>
+                </div>
+
                 <!-- アクションボタン -->
                 <div class="grid grid-cols-2 gap-4">
                     <button onclick="showHomeworkModal()" class="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition">
@@ -251,6 +284,35 @@
                         <i class="fas fa-balance-scale mr-2"></i>クラスを比較
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- リセット確認モーダル -->
+    <div id="resetConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div class="text-center mb-6">
+                <div class="bg-orange-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-exclamation-triangle text-orange-600 text-3xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800">学習進捗のリセット確認</h3>
+            </div>
+            <div id="resetConfirmContent" class="text-gray-600 text-sm mb-6">
+                <!-- 動的に内容が入る -->
+            </div>
+            <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
+                <p class="text-red-700 text-sm font-bold">
+                    <i class="fas fa-exclamation-circle mr-1"></i>
+                    この操作は取り消せません。学習カードの回答履歴、チェックテスト結果、選択問題の結果が削除されます。
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeResetModal()" class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 transition font-bold">
+                    キャンセル
+                </button>
+                <button id="resetConfirmBtn" onclick="executeReset()" class="flex-1 bg-orange-500 text-white px-4 py-3 rounded-lg hover:bg-orange-600 transition font-bold">
+                    <i class="fas fa-redo-alt mr-2"></i>リセット実行
+                </button>
             </div>
         </div>
     </div>
@@ -276,6 +338,7 @@
                 classes.forEach(cls => {
                     const option = document.createElement('option');
                     option.value = cls.id;
+                    option.dataset.classCode = cls.class_code || cls.id;
                     option.textContent = `${cls.class_name} (${cls.student_count}名)`;
                     select.appendChild(option);
                 });
@@ -294,6 +357,10 @@
             }
 
             currentClassId = classId;
+
+            // リセット用のオプションを更新
+            const classOpt = document.getElementById('classSelect').options[document.getElementById('classSelect').selectedIndex];
+            loadResetOptions(classOpt.dataset.classCode || classId);
 
             try {
                 const response = await axios.get(`/api/teacher/class/${classId}/summary`);
@@ -388,6 +455,115 @@
         function logout() {
             localStorage.removeItem('token');
             window.location.href = '/login.html';
+        }
+
+        // ===== 進捗リセット機能 =====
+        let resetCurriculumData = [];
+        let resetStudentData = [];
+
+        // クラス変更時にリセット用のカリキュラム・生徒リストを更新
+        async function loadResetOptions(classCode) {
+            if (!classCode) return;
+            try {
+                // カリキュラム一覧を取得
+                const currRes = await axios.get('/api/curriculum');
+                resetCurriculumData = currRes.data || [];
+                const currSelect = document.getElementById('resetCurriculumSelect');
+                currSelect.innerHTML = '<option value="">カリキュラムを選択してください</option>';
+                resetCurriculumData.forEach(cur => {
+                    const opt = document.createElement('option');
+                    opt.value = cur.id;
+                    opt.textContent = `${cur.grade} ${cur.subject} - ${cur.unit_name} (${cur.textbook_company})`;
+                    currSelect.appendChild(opt);
+                });
+
+                // 生徒一覧を取得
+                const studRes = await axios.get('/api/auth/users');
+                const students = (studRes.data.users || studRes.data || []).filter(u => u.role === 'student' && u.class_code === classCode);
+                resetStudentData = students;
+                const studSelect = document.getElementById('resetStudentSelect');
+                studSelect.innerHTML = '<option value="all">クラス全員</option>';
+                students.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id || s.user_id;
+                    opt.textContent = `${s.student_number || ''} ${s.name || s.full_name || s.username}`;
+                    studSelect.appendChild(opt);
+                });
+            } catch (e) {
+                console.error('リセット用データ取得エラー:', e);
+            }
+        }
+
+        function showResetConfirmModal() {
+            const currSelect = document.getElementById('resetCurriculumSelect');
+            const studSelect = document.getElementById('resetStudentSelect');
+
+            if (!currSelect.value) {
+                alert('対象カリキュラムを選択してください');
+                return;
+            }
+
+            const currText = currSelect.options[currSelect.selectedIndex].text;
+            const studText = studSelect.options[studSelect.selectedIndex].text;
+
+            document.getElementById('resetConfirmContent').innerHTML = `
+                <div class="space-y-2">
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-gray-700">カリキュラム:</span>
+                        <span class="text-gray-800">${currText}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-gray-700">対象:</span>
+                        <span class="text-gray-800">${studText}</span>
+                    </div>
+                </div>
+                <p class="mt-4 text-gray-500">上記の学習カード進捗を全て「未実施」状態に戻します。</p>
+            `;
+            document.getElementById('resetConfirmModal').classList.remove('hidden');
+        }
+
+        function closeResetModal() {
+            document.getElementById('resetConfirmModal').classList.add('hidden');
+        }
+
+        async function executeReset() {
+            const curriculumId = document.getElementById('resetCurriculumSelect').value;
+            const studentValue = document.getElementById('resetStudentSelect').value;
+            const btn = document.getElementById('resetConfirmBtn');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>リセット中...';
+
+            try {
+                const payload = { curriculum_id: parseInt(curriculumId) };
+                if (studentValue === 'all') {
+                    // クラス全員 - classSelect からclass_codeを取得
+                    const classSelect = document.getElementById('classSelect');
+                    const selectedOpt = classSelect.options[classSelect.selectedIndex];
+                    // class_code を取得（selectの値がIDの場合、API経由で取得する必要がある）
+                    payload.class_code = selectedOpt.dataset.classCode || selectedOpt.value;
+                } else {
+                    payload.student_id = parseInt(studentValue);
+                }
+
+                const res = await axios.post('/api/teacher/reset-progress', payload);
+
+                if (res.data.success) {
+                    closeResetModal();
+                    const counts = res.data.reset_counts || {};
+                    alert(`✅ リセット完了\n\n${res.data.message}\n\nリセット件数:\n- 学習進捗: ${counts.student_progress || 0}件\n- 回答履歴: ${counts.student_card_answers || 0}件\n- チェックテスト: ${counts.check_test_progress || 0}件\n- 選択問題: ${counts.optional_problem_progress || 0}件`);
+                    // クラスサマリーを再読み込み
+                    loadClassSummary();
+                } else {
+                    alert('❌ リセットに失敗しました: ' + (res.data.error || '不明なエラー'));
+                }
+            } catch (e) {
+                console.error('リセットエラー:', e);
+                alert('❌ リセットに失敗しました: ' + (e.response?.data?.error || e.message));
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-redo-alt mr-2"></i>リセット実行';
+            }
         }
 
         // 初期化

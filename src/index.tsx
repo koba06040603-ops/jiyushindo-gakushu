@@ -38984,6 +38984,170 @@ app.get('/api/teacher/classes', authMiddleware, requireRole(['teacher', 'admin']
   }
 })
 
+/**
+ * POST /api/teacher/reset-progress - 学習カード進捗リセット（全て未実施状態に戻す）
+ * 教師がカリキュラム単位で生徒の学習進捗をリセットする
+ * body: { curriculum_id: number, student_id?: number (省略時はクラス全員), class_code?: string }
+ */
+app.post('/api/teacher/reset-progress', authMiddleware, requireRole(['teacher', 'admin']), async (c) => {
+  try {
+    const { env } = c
+    const body = await c.req.json()
+    const { curriculum_id, student_id, class_code } = body
+
+    if (!curriculum_id) {
+      return c.json({ success: false, error: 'curriculum_id は必須です' }, 400)
+    }
+
+    const resetResults: Record<string, number> = {}
+
+    if (student_id) {
+      // 特定の生徒の進捗をリセット
+      // 1. student_progress をリセット（statusをnot_startedに戻す）
+      const spResult = await env.DB.prepare(`
+        UPDATE student_progress 
+        SET status = 'not_started', 
+            understanding_level = 0,
+            attempt_count = 0,
+            correct_count = 0,
+            mastery_score = 0,
+            help_count = 0,
+            help_requested_at = NULL,
+            help_resolved_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE student_id = ? AND curriculum_id = ?
+      `).bind(student_id, curriculum_id).run()
+      resetResults.student_progress = spResult.meta.changes || 0
+
+      // 2. student_card_answers を削除
+      const scaResult = await env.DB.prepare(`
+        DELETE FROM student_card_answers 
+        WHERE student_id = ? AND curriculum_id = ?
+      `).bind(student_id, curriculum_id).run()
+      resetResults.student_card_answers = scaResult.meta.changes || 0
+
+      // 3. check_test_progress を削除
+      try {
+        const ctResult = await env.DB.prepare(`
+          DELETE FROM check_test_progress 
+          WHERE student_id = ? AND curriculum_id = ?
+        `).bind(student_id, curriculum_id).run()
+        resetResults.check_test_progress = ctResult.meta.changes || 0
+      } catch { resetResults.check_test_progress = 0 }
+
+      // 4. optional_problem_progress を削除
+      try {
+        const opResult = await env.DB.prepare(`
+          DELETE FROM optional_problem_progress 
+          WHERE student_id = ? AND curriculum_id = ?
+        `).bind(student_id, curriculum_id).run()
+        resetResults.optional_problem_progress = opResult.meta.changes || 0
+      } catch { resetResults.optional_problem_progress = 0 }
+
+      // 5. study_plan_rows をリセット（計画は残し、実績のみクリア）
+      try {
+        const sprResult = await env.DB.prepare(`
+          UPDATE study_plan_rows 
+          SET actual_done = NULL, cards_done = NULL, check_test_done = NULL,
+              check_test_score = NULL, check_test_max = NULL, 
+              selection_tasks_done = NULL, study_minutes = NULL,
+              status = 'pending', updated_at = CURRENT_TIMESTAMP
+          WHERE student_id = ? AND plan_id IN (
+            SELECT id FROM study_plans WHERE student_id = ? AND curriculum_id = ?
+          )
+        `).bind(student_id, student_id, curriculum_id).run()
+        resetResults.study_plan_rows = sprResult.meta.changes || 0
+      } catch { resetResults.study_plan_rows = 0 }
+
+      console.log(`✅ 進捗リセット完了: student_id=${student_id}, curriculum_id=${curriculum_id}`, resetResults)
+      return c.json({
+        success: true,
+        message: `生徒ID ${student_id} のカリキュラム ${curriculum_id} の学習進捗をリセットしました`,
+        reset_counts: resetResults,
+        scope: 'single_student'
+      })
+
+    } else if (class_code) {
+      // クラス全員の進捗をリセット
+      const studentsResult = await env.DB.prepare(`
+        SELECT id FROM users WHERE class_code = ? AND role = 'student'
+      `).bind(class_code).all()
+      
+      const studentIds = studentsResult.results.map((s: any) => s.id)
+      
+      if (studentIds.length === 0) {
+        return c.json({ success: false, error: 'クラスに生徒が見つかりません' }, 404)
+      }
+
+      let totalReset = 0
+      for (const sid of studentIds) {
+        // student_progress をリセット
+        const spResult = await env.DB.prepare(`
+          UPDATE student_progress 
+          SET status = 'not_started', 
+              understanding_level = 0,
+              attempt_count = 0,
+              correct_count = 0,
+              mastery_score = 0,
+              help_count = 0,
+              help_requested_at = NULL,
+              help_resolved_at = NULL,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE student_id = ? AND curriculum_id = ?
+        `).bind(sid, curriculum_id).run()
+        totalReset += (spResult.meta.changes || 0)
+
+        // student_card_answers を削除
+        await env.DB.prepare(`
+          DELETE FROM student_card_answers WHERE student_id = ? AND curriculum_id = ?
+        `).bind(sid, curriculum_id).run()
+
+        // check_test_progress を削除
+        try {
+          await env.DB.prepare(`
+            DELETE FROM check_test_progress WHERE student_id = ? AND curriculum_id = ?
+          `).bind(sid, curriculum_id).run()
+        } catch {}
+
+        // optional_problem_progress を削除
+        try {
+          await env.DB.prepare(`
+            DELETE FROM optional_problem_progress WHERE student_id = ? AND curriculum_id = ?
+          `).bind(sid, curriculum_id).run()
+        } catch {}
+
+        // study_plan_rows をリセット
+        try {
+          await env.DB.prepare(`
+            UPDATE study_plan_rows 
+            SET actual_done = NULL, cards_done = NULL, check_test_done = NULL,
+                check_test_score = NULL, check_test_max = NULL, 
+                selection_tasks_done = NULL, study_minutes = NULL,
+                status = 'pending', updated_at = CURRENT_TIMESTAMP
+            WHERE student_id = ? AND plan_id IN (
+              SELECT id FROM study_plans WHERE student_id = ? AND curriculum_id = ?
+            )
+          `).bind(sid, sid, curriculum_id).run()
+        } catch {}
+      }
+
+      console.log(`✅ クラス進捗リセット完了: class_code=${class_code}, curriculum_id=${curriculum_id}, students=${studentIds.length}`)
+      return c.json({
+        success: true,
+        message: `クラス「${class_code}」の${studentIds.length}名の生徒のカリキュラム ${curriculum_id} の学習進捗をリセットしました`,
+        reset_counts: { student_progress: totalReset, student_count: studentIds.length },
+        scope: 'class'
+      })
+
+    } else {
+      return c.json({ success: false, error: 'student_id または class_code のいずれかが必要です' }, 400)
+    }
+  } catch (error: any) {
+    console.error('❌ 進捗リセットエラー:', error)
+    return c.json({ success: false, error: '進捗リセットに失敗しました', details: error.message }, 500)
+  }
+})
+
 // ================================================
 // Phase 21: 保護者向けダッシュボード（基本API）
 // ================================================
