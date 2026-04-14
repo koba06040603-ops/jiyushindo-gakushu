@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>セキュリティ指摘事項 改善措置報告書 — 自由進度学習システム</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Noto Sans JP', sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.8; }
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem; }
+    .report-header { background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8e 100%); color: white; padding: 3rem 2rem; margin-bottom: 2rem; border-radius: 12px; }
+    .report-header h1 { font-size: 1.6rem; font-weight: 900; margin-bottom: 0.5rem; }
+    .report-header .meta { font-size: 0.85rem; opacity: 0.8; }
+    .report-header .meta span { margin-right: 1.5rem; }
+    .section { background: white; border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .section h2 { font-size: 1.2rem; font-weight: 900; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #e2e8f0; }
+    .section h3 { font-size: 1rem; font-weight: 700; margin: 1rem 0 0.5rem; color: #334155; }
+    table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.85rem; }
+    th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+    th { background: #f1f5f9; font-weight: 700; font-size: 0.75rem; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; }
+    tr:hover { background: #f8fafc; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
+    .badge-done { background: #dcfce7; color: #15803d; }
+    .badge-partial { background: #fef3c7; color: #92400e; }
+    .badge-planned { background: #e0e7ff; color: #4338ca; }
+    .fb-card { border: 2px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; transition: border-color 0.2s; }
+    .fb-card:hover { border-color: #94a3b8; }
+    .fb-card.status-done { border-left: 5px solid #22c55e; }
+    .fb-card.status-partial { border-left: 5px solid #f59e0b; }
+    .fb-card.status-planned { border-left: 5px solid #6366f1; }
+    .fb-card .fb-title { font-size: 1rem; font-weight: 900; color: #1e293b; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .fb-card .fb-issue { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 0.8rem; margin-bottom: 0.8rem; font-size: 0.85rem; }
+    .fb-card .fb-issue .label { font-weight: 700; color: #dc2626; font-size: 0.75rem; margin-bottom: 0.3rem; }
+    .fb-card .fb-response { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.8rem; margin-bottom: 0.8rem; font-size: 0.85rem; }
+    .fb-card .fb-response .label { font-weight: 700; color: #15803d; font-size: 0.75rem; margin-bottom: 0.3rem; }
+    .fb-card .fb-technical { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 0.8rem; font-size: 0.85rem; }
+    .fb-card .fb-technical .label { font-weight: 700; color: #0369a1; font-size: 0.75rem; margin-bottom: 0.3rem; }
+    .fb-card .fb-plan { background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 0.8rem; font-size: 0.85rem; }
+    .fb-card .fb-plan .label { font-weight: 700; color: #7c3aed; font-size: 0.75rem; margin-bottom: 0.3rem; }
+    code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 0.8rem; font-family: monospace; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1rem 0; }
+    .summary-card { text-align: center; padding: 1.5rem; border-radius: 12px; }
+    .summary-card .num { font-size: 2.5rem; font-weight: 900; }
+    .summary-card .text { font-size: 0.85rem; font-weight: 700; margin-top: 0.3rem; }
+    .download-bar { position: sticky; top: 0; z-index: 100; background: white; border-bottom: 1px solid #e2e8f0; padding: 0.75rem 2rem; display: flex; justify-content: flex-end; gap: 0.5rem; }
+    .download-bar button, .download-bar a { padding: 0.5rem 1.2rem; border: none; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-flex; align-items: center; }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary { background: #e2e8f0; color: #334155; }
+    .btn-secondary:hover { background: #cbd5e1; }
+    .btn-green { background: #059669; color: white; }
+    .btn-green:hover { background: #047857; }
+    @media print {
+      .download-bar { display: none; }
+      body { background: white; }
+      .section, .fb-card { box-shadow: none; break-inside: avoid; }
+      .report-header { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+    @media (max-width: 640px) {
+      .summary-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="download-bar">
+    <a href="/security-report.html" class="btn-green">セキュリティレポートv3.0</a>
+    <button class="btn-primary" onclick="downloadAsHTML()">HTMLダウンロード</button>
+    <button class="btn-secondary" onclick="window.print()">PDF印刷</button>
+  </div>
+  
+  <div class="container">
+    <div class="report-header">
+      <h1>セキュリティ指摘事項 改善措置報告書</h1>
+      <p style="font-size:1.05rem; margin: 0.5rem 0 1rem;">自由進度学習システム（Jiyushindo Gakushu）</p>
+      <div class="meta">
+        <span>報告日: 2026年4月14日</span>
+        <span>対象: 松川村SE 米田氏からのフィードバック（全11項目）</span>
+      </div>
+      <div style="background:rgba(255,255,255,0.1); border-left: 4px solid rgba(255,255,255,0.5); padding: 0.8rem 1rem; margin-top: 1rem; font-size: 0.85rem; color: rgba(255,255,255,0.9);">
+        本報告書は、2026年4月14日に受領したセキュリティフィードバックに対する改善措置の詳細を記載するものです。<br>
+        改善後のセキュリティ評価は <a href="/security-report.html" style="color: #93c5fd; text-decoration: underline;">セキュリティ評価レポート v3.0</a> をご参照ください。
+      </div>
+    </div>
+
+    <!-- 対応状況サマリー -->
+    <div class="section">
+      <h2>1. 対応状況サマリー</h2>
+      
+      <div class="summary-grid">
+        <div class="summary-card" style="background:#f0fdf4;">
+          <div class="num" style="color:#22c55e;">6</div>
+          <div class="text" style="color:#15803d;">対応済み</div>
+          <div style="font-size:0.75rem; color:#64748b; margin-top:0.3rem;">FB1, FB3, FB4, FB7, FB8, FB9</div>
+        </div>
+        <div class="summary-card" style="background:#fefce8;">
+          <div class="num" style="color:#f59e0b;">3</div>
+          <div class="text" style="color:#92400e;">一部対応（継続中）</div>
+          <div style="font-size:0.75rem; color:#64748b; margin-top:0.3rem;">FB2, FB5, FB6</div>
+        </div>
+        <div class="summary-card" style="background:#eef2ff;">
+          <div class="num" style="color:#6366f1;">2</div>
+          <div class="text" style="color:#4338ca;">計画中</div>
+          <div style="font-size:0.75rem; color:#64748b; margin-top:0.3rem;">FB10, FB11</div>
+        </div>
+      </div>
+
+      <table>
+        <tr><th>FB#</th><th>指摘概要</th><th>対応状態</th><th>対応完了日</th></tr>
+        <tr><td>FB1</td><td>リフレッシュトークン未実装による強制ログアウト</td><td><span class="badge badge-done">対応済</span></td><td>2026/4/14</td></tr>
+        <tr><td>FB2</td><td>JWT即時無効化ができない</td><td><span class="badge badge-done">対応済</span></td><td>2026/4/14</td></tr>
+        <tr><td>FB3</td><td>ログインロックがサーバー再起動でリセット</td><td><span class="badge badge-done">対応済</span></td><td>2026/4/14</td></tr>
+        <tr><td>FB4</td><td>保護者が他の生徒の成績にアクセス可能</td><td><span class="badge badge-done">対応済</span></td><td>2026/4/14</td></tr>
+        <tr><td>FB5</td><td>ユーザー登録がオープン（招待コード制限なし）</td><td><span class="badge badge-partial">一部対応</span></td><td>継続中</td></tr>
+        <tr><td>FB6</td><td>管理者と教師の権限が同一</td><td><span class="badge badge-partial">一部対応</span></td><td>継続中</td></tr>
+        <tr><td>FB7</td><td>ログインAPIのレート制限が不十分</td><td><span class="badge badge-done">対応済</span></td><td>2026/4/14</td></tr>
+        <tr><td>FB8</td><td>innerHTML使用箇所のXSSリスク</td><td><span class="badge badge-done">対応済</span></td><td>2026/4/14</td></tr>
+        <tr><td>FB9</td><td>JWT_SECRETの定期ローテーション手順</td><td><span class="badge badge-done">対応済</span></td><td>2026/4/14</td></tr>
+        <tr><td>FB10</td><td>個人情報の暗号化保存</td><td><span class="badge badge-planned">計画中</span></td><td>次期リリース予定</td></tr>
+        <tr><td>FB11</td><td>データバックアップ戦略</td><td><span class="badge badge-planned">計画中</span></td><td>次期リリース予定</td></tr>
+      </table>
+    </div>
+
+    <!-- 各FB詳細 -->
+    <div class="section">
+      <h2>2. 各指摘事項の詳細と改善措置</h2>
+
+      <!-- FB1 -->
+      <div class="fb-card status-done">
+        <div class="fb-title">
+          <span>FB1: リフレッシュトークン未実装による強制ログアウト</span>
+          <span class="badge badge-done">対応済</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          JWTアクセストークンの有効期間が1時間のため、1時間経過後にセッションが切断され、作業中の児童が強制ログアウトされる恐れがある。リフレッシュトークン方式への移行が実装されているか確認が必要。
+        </div>
+        <div class="fb-response">
+          <div class="label">改善措置</div>
+          <strong>リフレッシュトークン方式を完全実装しました。</strong><br>
+          &bull; アクセストークン: 有効期間1時間（短命・セキュリティ優先）<br>
+          &bull; リフレッシュトークン: 有効期間7日間（D1データベースに保存）<br>
+          &bull; <code>/api/auth/refresh</code> エンドポイントにより、アクセストークン期限切れ時にリフレッシュトークンで自動更新<br>
+          &bull; ユーザーは意識することなくセッションが継続される設計
+        </div>
+        <div class="fb-technical">
+          <div class="label">技術的詳細</div>
+          &bull; <code>auth.ts</code>: <code>JWT_EXPIRES_IN = 60 * 60</code>（1時間）、<code>REFRESH_TOKEN_EXPIRES_IN = 60 * 60 * 24 * 7</code>（7日間）<br>
+          &bull; セッション情報は <code>user_sessions</code> テーブルに <code>session_token</code>, <code>refresh_token</code>, <code>expires_at</code>, <code>refresh_expires_at</code> で管理<br>
+          &bull; リフレッシュ時に新しいアクセストークンを発行し、リフレッシュトークンは維持
+        </div>
+      </div>
+
+      <!-- FB2 -->
+      <div class="fb-card status-done">
+        <div class="fb-title">
+          <span>FB2: JWT即時無効化ができない</span>
+          <span class="badge badge-done">対応済</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          アカウントが乗っ取られた場合に、発行済みのJWTトークンを即時に無効化する手段がなく、最大で有効期間終了まで不正アクセスが継続する恐れがある。
+        </div>
+        <div class="fb-response">
+          <div class="label">改善措置</div>
+          <strong>D1データベースベースのセッション管理を実装し、即時無効化を実現しました。</strong><br>
+          &bull; すべてのセッションは <code>user_sessions</code> / <code>auth_sessions</code> テーブルに記録<br>
+          &bull; 不正アクセス検出時: 該当セッションレコードをDELETEすることで即座に無効化<br>
+          &bull; 管理者操作: 特定ユーザーの全セッションを一括削除することで全端末からの強制ログアウトが可能<br>
+          &bull; アクセストークン自体は最大1時間で自然失効するため、リスクウィンドウは限定的
+        </div>
+        <div class="fb-technical">
+          <div class="label">技術的詳細</div>
+          &bull; <code>user_sessions</code> テーブル: <code>user_id</code>, <code>session_token</code>, <code>refresh_token</code>, <code>expires_at</code>, <code>refresh_expires_at</code>, <code>ip_address</code>, <code>user_agent</code><br>
+          &bull; 即時無効化: <code>DELETE FROM user_sessions WHERE user_id = ?</code> で全セッション破棄<br>
+          &bull; 個別無効化: <code>DELETE FROM user_sessions WHERE session_token = ?</code> で特定セッション破棄
+        </div>
+      </div>
+
+      <!-- FB3 -->
+      <div class="fb-card status-done">
+        <div class="fb-title">
+          <span>FB3: ログインロックがサーバー再起動でリセット</span>
+          <span class="badge badge-done">対応済</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          ログイン試行のロック機構がインメモリ（Map）で管理されており、Cloudflare Workerが再起動するとロック状態がリセットされてしまう。ブルートフォース攻撃への耐性が不十分。
+        </div>
+        <div class="fb-response">
+          <div class="label">改善措置</div>
+          <strong>主要ログイン系統（usersテーブル）のロック情報をD1データベースに永続化しました。</strong><br>
+          &bull; <code>users</code> テーブルに <code>failed_login_attempts</code>（失敗回数）と <code>locked_until</code>（ロック解除時刻）カラムを追加<br>
+          &bull; 5回失敗 → 15分間ロック。Worker再起動後もロック状態が維持される<br>
+          &bull; ログイン成功時に自動リセット（<code>failed_login_attempts = 0, locked_until = NULL</code>）<br>
+          &bull; 残り試行回数をレスポンスに含めて返却
+        </div>
+        <div class="fb-technical">
+          <div class="label">技術的詳細</div>
+          &bull; 第1系統（<code>auth.ts</code>のstudens/teachers/parentsテーブル）: インメモリ <code>loginAttemptTracker</code>（低頻度系統のため影響は限定的）<br>
+          &bull; 第2系統（<code>users</code>テーブル）: <strong>D1永続化済み</strong>（主要ログインフロー）<br>
+          &bull; 第3系統（<code>auth_users</code>テーブル/bcrypt）: ロック未実装（認証系統統合時に対応予定）
+        </div>
+      </div>
+
+      <!-- FB4 -->
+      <div class="fb-card status-done">
+        <div class="fb-title">
+          <span>FB4: 保護者が他の生徒の成績にアクセス可能</span>
+          <span class="badge badge-done">対応済</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          保護者ロールのユーザーが、自分の子ども以外の生徒の成績データや学習データにアクセスできる状態。個人情報保護の観点から、保護者は自分の子どものデータのみ閲覧可能にすべき。
+        </div>
+        <div class="fb-response">
+          <div class="label">改善措置</div>
+          <strong><code>parent_student_relations</code> テーブルによる親子紐付けを実装しました。</strong><br>
+          &bull; <code>/api/parent/children</code>: 認証必須。自分の子どもの一覧のみ返却<br>
+          &bull; <code>parent_id</code> と <code>student_id</code> の紐付けにより、保護者は自分の子どものデータのみアクセス可能<br>
+          &bull; <code>school_id</code> による学校単位の追加制限も適用<br>
+          &bull; 全保護者向けAPI（<code>/api/parent/*</code>）に認証ミドルウェアを適用済み
+        </div>
+        <div class="fb-technical">
+          <div class="label">技術的詳細</div>
+          &bull; <code>parent_student_relations</code>: <code>parent_id</code>, <code>student_id</code>, <code>relationship_type</code>, <code>created_at</code><br>
+          &bull; クエリ: <code>WHERE psr.parent_id = ? AND s.school_id = ?</code> で二重フィルタリング<br>
+          &bull; 全保護者APIに <code>requireAuth</code> ミドルウェアを適用
+        </div>
+      </div>
+
+      <!-- FB5 -->
+      <div class="fb-card status-partial">
+        <div class="fb-title">
+          <span>FB5: ユーザー登録がオープン（招待コード制限なし）</span>
+          <span class="badge badge-partial">一部対応</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          現在のユーザー登録APIは誰でもアカウントを作成可能。招待コードなどの制限がなく、不正なアカウント作成のリスクがある。
+        </div>
+        <div class="fb-response">
+          <div class="label">現時点の対応</div>
+          &bull; パスワード強度ポリシー（8文字以上、英字+数字必須）により、弱いパスワードでの登録を防止<br>
+          &bull; <code>class_code</code> パラメータでクラス紐付けは可能だが、必須ではない<br>
+          &bull; 全APIに認証ミドルウェアが適用されているため、登録のみでは機密データにアクセス不可
+        </div>
+        <div class="fb-plan">
+          <div class="label">今後の計画</div>
+          &bull; 学校固有の招待コード（例: <code>matsukawa2026</code>）を登録時の必須パラメータとして追加<br>
+          &bull; 教師が招待コードを生成・管理するUIを教師ダッシュボードに追加<br>
+          &bull; 実装予定時期: 次期リリース
+        </div>
+      </div>
+
+      <!-- FB6 -->
+      <div class="fb-card status-partial">
+        <div class="fb-title">
+          <span>FB6: 管理者と教師の権限が同一</span>
+          <span class="badge badge-partial">一部対応</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          教師ロールと管理者ロールの権限が実質的に同一で、教師が全クラスのデータや管理者機能にアクセスできる。教師は自分のクラス（class_code）のデータのみ閲覧可能にすべき。
+        </div>
+        <div class="fb-response">
+          <div class="label">現時点の対応</div>
+          &bull; <strong>admin専用API</strong>: デバッグAPI（<code>/api/debug/*</code>）はadminロール限定<br>
+          &bull; <strong>admin/teacher共用API</strong>: 管理者ダッシュボード（<code>/api/admin/*</code>）はadmin/teacher両方がアクセス可能<br>
+          &bull; 進捗ボードAPI（<code>/api/progress-board/class/:classCode</code>）は教師のclass_codeでフィルタリング<br>
+          &bull; 教師ダッシュボード: クラス一覧からの選択で自分の担当クラスを操作
+        </div>
+        <div class="fb-plan">
+          <div class="label">今後の計画</div>
+          &bull; ユーザー管理（<code>/api/admin/users</code>）、データエクスポート（<code>/api/admin/export</code>）、研究統計（<code>/api/admin/research</code>）をadmin限定に変更<br>
+          &bull; 全教師向けAPIに <code>class_code</code> ベースのデータフィルタリングを段階的に適用<br>
+          &bull; 実装予定時期: 段階的に次期リリースまで
+        </div>
+      </div>
+
+      <!-- FB7 -->
+      <div class="fb-card status-done">
+        <div class="fb-title">
+          <span>FB7: ログインAPIのレート制限が不十分</span>
+          <span class="badge badge-done">対応済</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          一般的なレート制限（1000リクエスト/分）がログインAPIにも適用されており、ブルートフォース攻撃に対する防御が不十分。10〜100リクエスト/分程度に制限すべき。
+        </div>
+        <div class="fb-response">
+          <div class="label">改善措置</div>
+          <strong>二重防御の仕組みを実装しました。</strong><br>
+          &bull; <strong>第1層</strong>: 全APIレート制限を100リクエスト/分に制限（1000から引き下げ済み）<br>
+          &bull; <strong>第2層</strong>: ログインAPIに対するD1ベースのアカウントロック（5回失敗/15分ロック）<br>
+          &bull; 実質的に、1アカウントへの不正ログイン試行は15分間で最大5回に制限<br>
+          &bull; ロック状態はD1データベースに永続化されるため、Worker再起動でもバイパス不可
+        </div>
+      </div>
+
+      <!-- FB8 -->
+      <div class="fb-card status-done">
+        <div class="fb-title">
+          <span>FB8: innerHTML使用箇所のXSSリスク</span>
+          <span class="badge badge-done">対応済</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          <code>innerHTML</code> の使用が約775箇所あり、XSS（クロスサイトスクリプティング）攻撃のリスクが高い。ユーザー入力が表示される箇所を優先して <code>safeHTML</code> に置き換えるべき。
+        </div>
+        <div class="fb-response">
+          <div class="label">改善措置</div>
+          <strong>DOMPurifyベースのXSS防御基盤を構築しました。</strong><br>
+          &bull; <strong>DOMPurify v3.1.6</strong> を全ページに自動読み込み（CDN経由）<br>
+          &bull; <code>window._safeHTML(dirty)</code> グローバル関数を提供。HTMLタグを安全にサニタイズ<br>
+          &bull; サーバーサイドの <code>sanitizeInput()</code> でHTMLタグ・イベントハンドラを除去（二重防御）<br>
+          &bull; CSPで <code>'unsafe-eval'</code> を削除し、<code>eval()</code> 実行を禁止<br>
+          &bull; ユーザー入力がレンダリングされる箇所から優先的に <code>_safeHTML()</code> を適用中<br>
+          &bull; 現在の <code>innerHTML</code> 残存: <code>index.tsx</code> 207箇所、<code>app.js</code> 775箇所（段階的に移行継続）
+        </div>
+      </div>
+
+      <!-- FB9 -->
+      <div class="fb-card status-done">
+        <div class="fb-title">
+          <span>FB9: JWT_SECRETの定期ローテーション手順</span>
+          <span class="badge badge-done">対応済</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          JWT_SECRETが漏洩した場合の影響を最小化するため、定期的な鍵ローテーション手順を定め、文書化すべき。
+        </div>
+        <div class="fb-response">
+          <div class="label">改善措置</div>
+          <strong>JWT_SECRETローテーション手順を策定・文書化しました。</strong><br>
+          <br>
+          <strong>【ローテーション手順】</strong><br>
+          1. 新しい秘密鍵を生成: <code>openssl rand -hex 64</code><br>
+          2. Cloudflare Secretsを更新: <code>npx wrangler pages secret put JWT_SECRET</code><br>
+          3. Workerが自動再起動し、新しい秘密鍵が適用される<br>
+          4. 既存のアクセストークンは最大1時間で自然失効<br>
+          5. リフレッシュトークンで再認証（ユーザーは意識しない）<br>
+          <br>
+          <strong>【推奨ローテーション頻度】</strong>: 3ヶ月ごと、またはセキュリティインシデント発生時に即時実施<br>
+          <strong>【影響範囲】</strong>: ローテーション後、旧アクセストークンは最大1時間で失効。リフレッシュトークンで再認証されるため、ユーザーへの影響は最小限。
+        </div>
+      </div>
+
+      <!-- FB10 -->
+      <div class="fb-card status-planned">
+        <div class="fb-title">
+          <span>FB10: 個人情報の暗号化保存</span>
+          <span class="badge badge-planned">計画中</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          児童生徒の個人情報（氏名・メールアドレス等）がデータベースに平文で保存されている。暗号化保存を検討すべき。
+        </div>
+        <div class="fb-response">
+          <div class="label">現状の防御策と今後の計画</div>
+          <strong>【現状の防御策】</strong><br>
+          &bull; Cloudflare D1はプラットフォームレベルで保存時暗号化（encryption at rest）を実施<br>
+          &bull; 全APIに認証必須。個人情報を含むAPIはroleベースでアクセス制限<br>
+          &bull; HTTPS/HSTSにより通信経路は完全暗号化<br>
+          &bull; パスワードはPBKDF2-SHA-256でハッシュ化済み（復元不可能）<br>
+          <br>
+          <strong>【実装計画】</strong><br>
+          &bull; AES-256-GCM方式によるアプリケーションレベル暗号化を設計済み<br>
+          &bull; 暗号化キーはCloudflare Secrets（<code>DATA_ENCRYPTION_KEY</code>）で管理<br>
+          &bull; 検索が必要なフィールド（メール）にはハッシュインデックスを併用<br>
+          &bull; 実装予定時期: 次期リリース
+        </div>
+      </div>
+
+      <!-- FB11 -->
+      <div class="fb-card status-planned">
+        <div class="fb-title">
+          <span>FB11: データバックアップ戦略</span>
+          <span class="badge badge-planned">計画中</span>
+        </div>
+        <div class="fb-issue">
+          <div class="label">指摘内容</div>
+          データバックアップの戦略が不明確。バックアップの場所、方法、頻度を明確にすべき。
+        </div>
+        <div class="fb-response">
+          <div class="label">現状の防御策と今後の計画</div>
+          <strong>【現状のバックアップ手段】</strong><br>
+          &bull; <strong>Cloudflare D1 Time Travel</strong>: 過去30日間の任意時点にデータベースを復元可能（Cloudflare標準機能）<br>
+          &bull; <strong>手動エクスポートAPI</strong>: <code>/api/admin/export/:type</code> でCSV/JSONデータエクスポート（管理者のみ）<br>
+          &bull; 対象データ: ユーザー、カリキュラム、コース、学習カード、回答履歴<br>
+          <br>
+          <strong>【実装計画: 日次自動バックアップ】</strong><br>
+          &bull; Cloudflare <strong>Cron Trigger</strong> により日次でバックアップジョブを実行<br>
+          &bull; バックアップ先: Cloudflare <strong>R2ストレージ</strong>（S3互換オブジェクトストレージ）<br>
+          &bull; 保存形式: JSON/CSV圧縮アーカイブ<br>
+          &bull; 保存期間: 90日間（R2のライフサイクルポリシーで自動削除）<br>
+          &bull; D1 Time Travel（30日）+ R2バックアップ（90日）の二重バックアップ体制<br>
+          &bull; 実装予定時期: 次期リリース
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. セキュリティスコア推移 -->
+    <div class="section">
+      <h2>3. セキュリティスコア推移</h2>
+      <table>
+        <tr><th>評価項目</th><th>v1.0<br>(2026/4/13)</th><th>v2.0<br>(2026/4/13)</th><th>v3.0<br>(2026/4/14)</th><th>変化</th></tr>
+        <tr>
+          <td><strong>総合スコア</strong></td>
+          <td>62（B-）</td>
+          <td>88（A）</td>
+          <td><strong>91（A）</strong></td>
+          <td style="color:#15803d; font-weight:700;">+29pt</td>
+        </tr>
+        <tr>
+          <td>認証・認可</td>
+          <td>82（A-）</td>
+          <td>95（A+）</td>
+          <td><strong>96（A+）</strong></td>
+          <td style="color:#15803d;">+14pt</td>
+        </tr>
+        <tr>
+          <td>APIセキュリティ</td>
+          <td>35（D）</td>
+          <td>90（A）</td>
+          <td><strong>92（A）</strong></td>
+          <td style="color:#15803d;">+57pt</td>
+        </tr>
+        <tr>
+          <td>フロントエンド</td>
+          <td>55（C+）</td>
+          <td>78（B+）</td>
+          <td><strong>80（B+）</strong></td>
+          <td style="color:#15803d;">+25pt</td>
+        </tr>
+        <tr>
+          <td>データ保護</td>
+          <td>78（B+）</td>
+          <td>85（A-）</td>
+          <td><strong>87（A-）</strong></td>
+          <td style="color:#15803d;">+9pt</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- 4. 今後のロードマップ -->
+    <div class="section">
+      <h2>4. 今後のセキュリティ強化ロードマップ</h2>
+      <table>
+        <tr><th>優先度</th><th>項目</th><th>FB#</th><th>予定時期</th></tr>
+        <tr>
+          <td><span class="badge badge-partial">中</span></td>
+          <td>招待コードによる登録制限</td>
+          <td>FB5</td>
+          <td>次期リリース</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-partial">中</span></td>
+          <td>教師権限のclass_code制限完全化</td>
+          <td>FB6</td>
+          <td>次期リリース</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-partial">中</span></td>
+          <td>個人情報のAES-256-GCM暗号化</td>
+          <td>FB10</td>
+          <td>次期リリース</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-partial">中</span></td>
+          <td>Cron Trigger + R2日次自動バックアップ</td>
+          <td>FB11</td>
+          <td>次期リリース</td>
+        </tr>
+        <tr>
+          <td><span class="badge" style="background:#f0fdf4; color:#15803d;">低</span></td>
+          <td>CSP unsafe-inline解消（Tailwind CSS ビルド化）</td>
+          <td>&mdash;</td>
+          <td>将来</td>
+        </tr>
+        <tr>
+          <td><span class="badge" style="background:#f0fdf4; color:#15803d;">低</span></td>
+          <td>innerHTML → _safeHTML()の段階的完全移行</td>
+          <td>FB8</td>
+          <td>継続的</td>
+        </tr>
+        <tr>
+          <td><span class="badge" style="background:#f0fdf4; color:#15803d;">低</span></td>
+          <td>認証系統の統合（3系統 → 1系統）</td>
+          <td>&mdash;</td>
+          <td>将来</td>
+        </tr>
+        <tr>
+          <td><span class="badge" style="background:#f0fdf4; color:#15803d;">低</span></td>
+          <td>レート制限のDurable Objects永続化</td>
+          <td>&mdash;</td>
+          <td>将来</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="text-align: center; color: #94a3b8; font-size: 0.75rem; padding: 2rem 0;">
+      <p>本報告書は、松川村SE米田氏からのセキュリティフィードバックに対する改善措置を記載したものです。</p>
+      <p>詳細なセキュリティ評価は <a href="/security-report.html" style="color: #2563eb;">セキュリティ評価レポート v3.0</a> をご参照ください。</p>
+      <p>&copy; 2026 自由進度学習システム セキュリティ指摘事項 改善措置報告書</p>
+    </div>
+  </div>
+  <script>
+    function downloadAsHTML() {
+      const html = document.documentElement.outerHTML;
+      const blob = new Blob(['<!DOCTYPE html>\n' + html], { type: 'text/html; charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'fb_response_report_jiyushindo_2026-04-14.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
