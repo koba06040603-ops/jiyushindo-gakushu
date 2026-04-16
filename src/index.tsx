@@ -36346,7 +36346,7 @@ app.get('/api/security/report', authMiddleware, requireRole('admin'), async (c) 
 <h1>セキュリティ評価報告書 v4.1</h1>
 <p class="header-info">
   対象システム: 自由進度学習支援プラットフォーム<br>
-  評価日: ${reportDate} ｜ 報告書バージョン: 4.0<br>
+  評価日: ${reportDate} ｜ 報告書バージョン: 4.1<br>
   評価者: セキュリティ改善実装チーム ｜ 対応依頼: SE 米田氏フィードバック
 </p>
 
@@ -36366,10 +36366,14 @@ app.get('/api/security/report', authMiddleware, requireRole('admin'), async (c) 
   <tr><td>エクスポートAPI権限</td><td>teacher + admin 両方アクセス可</td><td>admin のみアクセス可</td><td class="status-done">✅ 完了</td></tr>
   <tr><td>XSS対策（クライアント）</td><td>innerHTML 直接代入（774箇所）</td><td>DOMPurify自動サニタイズプロキシ（全innerHTML保護）</td><td class="status-done">✅ 完了</td></tr>
   <tr><td>XSS対策（サーバー）</td><td>エスケープなし</td><td>escapeHTML() で全ユーザー入力をサニタイズ</td><td class="status-done">✅ 完了</td></tr>
-  <tr><td>個人情報暗号化</td><td>平文保存</td><td>AES-256-GCM で暗号化（email, phone_number）</td><td class="status-done">✅ 完了</td></tr>
+  <tr><td>個人情報暗号化</td><td>平文保存</td><td>AES-256-GCM で全5テーブルのPII暗号化（email, phone_number）</td><td class="status-done">✅ 完了</td></tr>
   <tr><td>バックアップ・復元</td><td>なし</td><td>R2バックアップ + 復元 + 整合性検証API</td><td class="status-done">✅ 完了</td></tr>
   <tr><td>ログインロック</td><td>なし</td><td>5回失敗で15分ロック（インメモリ + D1永続化）</td><td class="status-done">✅ 完了</td></tr>
   <tr><td>セッション管理</td><td>JWT（秘密鍵管理課題あり）</td><td>ランダムセッショントークン（D1永続化、24h+7d refresh）</td><td class="status-done">✅ 完了</td></tr>
+  <tr><td>CSRF対策</td><td>なし</td><td>CSRFトークン発行（64文字hex）、状態変更APIにミドルウェア適用</td><td class="status-done">✅ 完了</td></tr>
+  <tr><td>レートリミット</td><td>なし</td><td>APIレートリミット（100req/min/IP）、429レスポンス</td><td class="status-done">✅ 完了</td></tr>
+  <tr><td>セキュリティヘッダー</td><td>なし</td><td>CSP, X-Frame-Options: DENY, HSTS, X-Content-Type-Options等</td><td class="status-done">✅ 完了</td></tr>
+  <tr><td>入力サニタイゼーション</td><td>なし</td><td>sanitizeInput()でscriptタグ・イベントハンドラ除去</td><td class="status-done">✅ 完了</td></tr>
 </table>
 </div>
 
@@ -36496,6 +36500,10 @@ app.get('/api/security/report', authMiddleware, requireRole('admin'), async (c) 
   <tr><td>XSS防御（FE）</td><td>DOMPurify + innerHTMLプロキシ</td><td>774箇所のinnerHTML自動サニタイズ</td></tr>
   <tr><td>XSS防御（BE）</td><td>escapeHTML()</td><td>HTMLテンプレートの出力エスケープ</td></tr>
   <tr><td>タイミング攻撃</td><td>定数時間比較</td><td>パスワードハッシュ比較で使用</td></tr>
+  <tr><td>CSRF防御</td><td>トークンベース（64文字hex）</td><td>状態変更リクエストにCSRFトークン検証</td></tr>
+  <tr><td>レートリミット</td><td>インメモリカウンター</td><td>100req/min/IP、超過時429エラー</td></tr>
+  <tr><td>セキュリティヘッダー</td><td>CSP + HSTS + X-Frame-Options等</td><td>クリックジャッキング・MIMEスニッフィング防止</td></tr>
+  <tr><td>入力サニタイゼーション</td><td>sanitizeInput()</td><td>scriptタグ・イベントハンドラ・javascript:除去</td></tr>
   <tr><td>CORS</td><td>許可オリジン限定</td><td>本番ドメイン + localhost のみ許可</td></tr>
   <tr><td>バックアップ</td><td>R2 Object Storage</td><td>全テーブルJSON + 復元 + 検証</td></tr>
 </table>
