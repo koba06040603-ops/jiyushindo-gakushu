@@ -17,6 +17,7 @@
  */
 
 import { Context } from 'hono';
+import { encryptPII, decryptPII } from './crypto-utils';
 
 // =============================================================================
 // セッション設定
@@ -262,12 +263,20 @@ export async function authMiddleware(c: Context, next: () => Promise<void>) {
       return c.json({ error: 'セッションが無効または期限切れです', success: false }, 401);
     }
     
+    // 🔒 v4.0: 暗号化されたメールアドレスを復号
+    let email = session.email || '';
+    try {
+      if (email && c.env) {
+        email = await decryptPII(email, c.env);
+      }
+    } catch { /* ENCRYPTION_KEY未設定時はそのまま */ }
+    
     // ユーザー情報をコンテキストにセット（全系統で統一形式）
     const userInfo: AuthUser = {
       user_id: session.user_id,
       username: session.username || '',
       full_name: session.full_name || '',
-      email: session.email || '',
+      email,
       role: session.user_role || 'student',
       user_type: session.user_role || 'student',
       school_id: session.school_id || '',
@@ -351,9 +360,16 @@ export async function login(c: Context) {
   
   try {
     // auth_users で検索（username or email）
+    // 🔒 v4.0: 暗号化対応 — email検索はemail_hash（SHA-256）を使用
+    let emailHash = '';
+    try {
+      const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(identifier.toLowerCase().trim()));
+      emailHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch {}
+    
     let user = await DB.prepare(
-      'SELECT * FROM auth_users WHERE (username = ? OR email = ?) AND is_active = 1'
-    ).bind(identifier, identifier).first() as any;
+      'SELECT * FROM auth_users WHERE (username = ? OR email = ? OR email_hash = ?) AND is_active = 1'
+    ).bind(identifier, identifier, emailHash).first() as any;
     
     if (!user) {
       loginAttemptTracker.recordFailure(identifier);
@@ -413,6 +429,14 @@ export async function login(c: Context) {
       `).bind(user.user_id).run();
     } catch {}
     
+    // 🔒 v4.0: 暗号化されたメールアドレスを復号してレスポンスに返す
+    let decryptedEmail = user.email || '';
+    try {
+      if (decryptedEmail && c.env) {
+        decryptedEmail = await decryptPII(decryptedEmail, c.env);
+      }
+    } catch { /* ENCRYPTION_KEY未設定時はそのまま返す */ }
+    
     return c.json({
       success: true,
       session_token: sessionToken,
@@ -426,7 +450,7 @@ export async function login(c: Context) {
         name: user.full_name,
         full_name: user.full_name,
         username: user.username,
-        email: user.email || '',
+        email: decryptedEmail,
         role: user.user_role,
         user_type: user.user_role,
         school_id: user.school_id,
@@ -508,11 +532,28 @@ export async function registerUser(c: Context) {
     const passwordHash = await hashPassword(password);
     const schoolId = school_id || class_code || invite.school_id || '';
     
+    // 🔒 v4.0: メールアドレスをAES-256-GCMで暗号化して保存
+    // email_hash: SHA-256ハッシュ（暗号化済みメールの検索用）
+    let emailToStore = email || '';
+    let emailHash = '';
+    try {
+      if (email) {
+        // 検索用ハッシュ生成（平文emailのSHA-256）
+        const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(email.toLowerCase().trim()));
+        emailHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+      if (emailToStore && c.env) {
+        emailToStore = await encryptPII(emailToStore, c.env);
+      }
+    } catch (encErr) {
+      console.warn('⚠️ PII暗号化スキップ（ENCRYPTION_KEY未設定の可能性）:', encErr);
+    }
+    
     // ユーザー作成
     const result = await DB.prepare(`
-      INSERT INTO auth_users (username, email, password_hash, full_name, user_role, school_id, is_active, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'))
-    `).bind(usernameToUse, email || '', passwordHash, name, actualRole, schoolId).run();
+      INSERT INTO auth_users (username, email, email_hash, password_hash, full_name, user_role, school_id, is_active, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
+    `).bind(usernameToUse, emailToStore, emailHash, passwordHash, name, actualRole, schoolId).run();
     
     const userId = result.meta.last_row_id;
     
@@ -550,7 +591,7 @@ export async function registerUser(c: Context) {
         name,
         full_name: name,
         username: usernameToUse,
-        email: email || '',
+        email: email || '',  // レスポンスには平文を返す
         role: actualRole,
         user_type: actualRole,
         school_id: schoolId,
@@ -622,6 +663,14 @@ export async function refreshSession(c: Context) {
       UPDATE auth_sessions SET session_token = ?, expires_at = ? WHERE session_id = ?
     `).bind(newSessionToken, expiresAt, session.session_id).run();
     
+    // 🔒 v4.0: 暗号化されたメールを復号
+    let refreshEmail = session.email || '';
+    try {
+      if (refreshEmail && c.env) {
+        refreshEmail = await decryptPII(refreshEmail, c.env);
+      }
+    } catch {}
+    
     return c.json({
       success: true,
       session_token: newSessionToken,
@@ -633,7 +682,7 @@ export async function refreshSession(c: Context) {
         name: session.full_name,
         full_name: session.full_name,
         username: session.username,
-        email: session.email || '',
+        email: refreshEmail,
         role: session.user_role,
         user_type: session.user_role,
         school_id: session.school_id,
@@ -728,13 +777,21 @@ export async function verifySession(c: Context) {
       return c.json({ success: false, error: 'セッションが無効です' }, 401);
     }
     
+    // 🔒 v4.0: 暗号化されたメールを復号
+    let verifyEmail = session.email || '';
+    try {
+      if (verifyEmail && c.env) {
+        verifyEmail = await decryptPII(verifyEmail, c.env);
+      }
+    } catch {}
+    
     return c.json({
       success: true,
       user: {
         user_id: session.user_id,
         username: session.username,
         full_name: session.full_name,
-        email: session.email || '',
+        email: verifyEmail,
         role: session.user_role,
         school_id: session.school_id
       }
@@ -863,10 +920,16 @@ export async function initInvitationTables(db: D1Database) {
     'failed_login_attempts INTEGER DEFAULT 0',
     'locked_until DATETIME',
     'last_login_at DATETIME',
-    'email TEXT DEFAULT \'\''
+    'email TEXT DEFAULT \'\'',
+    'email_hash TEXT DEFAULT \'\''  // 🔒 v4.0: 暗号化メール検索用ハッシュ
   ]) {
     try {
       await db.prepare(`ALTER TABLE auth_users ADD COLUMN ${col}`).run();
     } catch {}
   }
+  
+  // email_hashインデックスを作成（暗号化メール検索の高速化）
+  try {
+    await db.prepare('CREATE INDEX IF NOT EXISTS idx_auth_users_email_hash ON auth_users(email_hash)').run();
+  } catch {}
 }

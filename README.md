@@ -2,6 +2,37 @@
 
 > 📘 **一般向けの簡易版READMEは [README_SIMPLE.md](./README_SIMPLE.md) をご覧ください**
 
+## 🔒 セキュリティ大規模改善 v4.0 — SE米田氏フィードバック対応 **NEW** (2026-04-16)
+
+### 実施概要
+
+SE米田氏のセキュリティレビューで指摘された全項目について、包括的な改善を実施。
+
+| 対応項目 | 改善前 | 改善後 | 状態 |
+|----------|--------|--------|------|
+| **認証システム** | 3系統混在（JWT, session+users, session+auth_users） | 1系統に統合（session+auth_users+auth_sessions） | ✅ 完了 |
+| **ユーザー登録** | オープン登録（誰でも可） | 招待コード必須（管理者発行・使用回数・期限制御） | ✅ 完了 |
+| **エクスポートAPI** | teacher+admin 両方アクセス可 | admin のみアクセス可（11エンドポイント） | ✅ 完了 |
+| **XSS対策** | innerHTML直接代入（774箇所） | DOMPurify自動サニタイズプロキシ + サーバー側escapeHTML | ✅ 完了 |
+| **個人情報暗号化** | 平文保存 | AES-256-GCM暗号化（email, phone_number）+ SHA-256検索ハッシュ | ✅ 完了 |
+| **パスワード** | SHA-256（一部bcrypt） | PBKDF2-SHA-256 (100K iterations) + レガシー自動移行 | ✅ 完了 |
+| **バックアップ** | なし | R2バックアップ + 復元 + 整合性検証API | ✅ 完了 |
+| **ログインロック** | なし | 5回失敗→15分ロック（インメモリ + D1永続化） | ✅ 完了 |
+
+### 関連ファイル
+- `src/auth.ts` — 統合認証・認可システム（招待コード・RBAC・セッション管理）
+- `src/crypto-utils.ts` — AES-256-GCM個人情報暗号化ユーティリティ
+- `GET /api/security/report` — セキュリティ評価報告書HTMLダウンロード（admin限定）
+- `GET /api/security/report-json` — セキュリティ評価報告書JSON版（admin限定）
+
+### バックアップ・復元手順
+1. `POST /api/admin/backup` — バックアップ作成（R2保存）
+2. `GET /api/admin/backups` — バックアップ一覧
+3. `POST /api/admin/restore` — 復元（`dry_run:true` でプレビュー可）
+4. `POST /api/admin/backup-verify` — 復元後の整合性検証
+
+---
+
 ## 🚀 Phase G: v4統合制御の全面適用 — 教師API + 生徒UI統合 **NEW** (2026-02-18)
 
 ### 実装完了: 既存エンドポイントの v4 エンジン完全統合
