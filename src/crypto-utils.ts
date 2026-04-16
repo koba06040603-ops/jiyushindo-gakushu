@@ -171,11 +171,23 @@ export async function decryptFieldsArray(
 
 // PIIフィールド定義（暗号化対象のカラム名）
 export const PII_FIELDS = {
-  AUTH_USERS: ['email'],         // auth_users テーブル
-  STUDENTS: ['email'],           // students テーブル
+  AUTH_USERS: ['email'],              // auth_users テーブル
+  STUDENTS: ['email'],                // students テーブル
   PARENTS: ['email', 'phone_number'], // parents テーブル
-  TEACHERS: ['email'],           // teachers テーブル
+  TEACHERS: ['email'],                // teachers テーブル
+  USER_FEEDBACK: ['email'],           // user_feedback テーブル
 };
+
+/**
+ * 暗号化対象テーブル一覧（マイグレーション対象）
+ * migratePIIEncryption で処理されるテーブル:
+ * 1. auth_users.email
+ * 2. parents.email, parents.phone_number
+ * 3. students.email
+ * 4. teachers.email
+ * 5. user_feedback.email
+ */
+export const PII_TABLES = ['auth_users', 'parents', 'students', 'teachers', 'user_feedback'] as const;
 
 /**
  * 暗号化マイグレーション: 既存の平文データを暗号化
@@ -230,6 +242,78 @@ export async function migratePIIEncryption(db: D1Database, env: any): Promise<{
     result.total += count;
   } catch (e: any) {
     result.errors.push(`parents: ${e.message}`);
+  }
+  
+  // students.email
+  try {
+    const students = await db.prepare(
+      "SELECT id, email FROM students WHERE email IS NOT NULL AND email != '' AND email NOT LIKE 'enc:%'"
+    ).all();
+    let count = 0;
+    for (const s of (students.results || []) as any[]) {
+      try {
+        const encrypted = await encryptPII(s.email, env);
+        await db.prepare('UPDATE students SET email = ? WHERE id = ?').bind(encrypted, s.id).run();
+        count++;
+      } catch (e: any) {
+        result.errors.push(`students#${s.id}: ${e.message}`);
+      }
+    }
+    result.tables['students'] = count;
+    result.total += count;
+  } catch (e: any) {
+    // students テーブルが存在しない場合はスキップ
+    if (!e.message?.includes('no such table')) {
+      result.errors.push(`students: ${e.message}`);
+    }
+  }
+
+  // teachers.email
+  try {
+    const teachers = await db.prepare(
+      "SELECT id, email FROM teachers WHERE email IS NOT NULL AND email != '' AND email NOT LIKE 'enc:%'"
+    ).all();
+    let count = 0;
+    for (const t of (teachers.results || []) as any[]) {
+      try {
+        const encrypted = await encryptPII(t.email, env);
+        await db.prepare('UPDATE teachers SET email = ? WHERE id = ?').bind(encrypted, t.id).run();
+        count++;
+      } catch (e: any) {
+        result.errors.push(`teachers#${t.id}: ${e.message}`);
+      }
+    }
+    result.tables['teachers'] = count;
+    result.total += count;
+  } catch (e: any) {
+    // teachers テーブルが存在しない場合はスキップ
+    if (!e.message?.includes('no such table')) {
+      result.errors.push(`teachers: ${e.message}`);
+    }
+  }
+
+  // user_feedback.email (フィードバック内のメールアドレスも暗号化)
+  try {
+    const feedback = await db.prepare(
+      "SELECT rowid, email FROM user_feedback WHERE email IS NOT NULL AND email != '' AND email NOT LIKE 'enc:%'"
+    ).all();
+    let count = 0;
+    for (const f of (feedback.results || []) as any[]) {
+      try {
+        const encrypted = await encryptPII(f.email, env);
+        await db.prepare('UPDATE user_feedback SET email = ? WHERE rowid = ?').bind(encrypted, f.rowid).run();
+        count++;
+      } catch (e: any) {
+        result.errors.push(`user_feedback#${f.rowid}: ${e.message}`);
+      }
+    }
+    result.tables['user_feedback'] = count;
+    result.total += count;
+  } catch (e: any) {
+    // user_feedback テーブルが存在しない場合はスキップ
+    if (!e.message?.includes('no such table')) {
+      result.errors.push(`user_feedback: ${e.message}`);
+    }
   }
   
   return result;
