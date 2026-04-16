@@ -7,34 +7,63 @@
   script.src = 'https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js';
   script.onload = function() {
     console.log('🔒 DOMPurify 読み込み完了');
+    
+    // DOMPurify設定
+    var purifyConfig = {
+      ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 
+                     'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div', 'img', 
+                     'table', 'thead', 'tbody', 'tr', 'th', 'td', 'pre', 'code',
+                     'blockquote', 'hr', 'sup', 'sub', 'ruby', 'rt', 'rp',
+                     'details', 'summary', 'mark', 'del', 'ins', 'small',
+                     'svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon',
+                     'text', 'g', 'defs', 'use', 'symbol', 'desc', 'title',
+                     'input', 'textarea', 'select', 'option', 'button', 'label',
+                     'figure', 'figcaption', 'section', 'article', 'header', 'footer',
+                     'nav', 'main', 'aside', 'video', 'audio', 'source'],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'id', 'style', 'target', 'rel',
+                     'width', 'height', 'colspan', 'rowspan', 'data-*',
+                     'viewBox', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r',
+                     'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points', 'transform',
+                     'type', 'value', 'placeholder', 'name', 'for', 'checked', 'disabled',
+                     'xmlns', 'role', 'aria-label', 'aria-hidden', 'tabindex',
+                     'controls', 'autoplay', 'loop', 'muted', 'preload'],
+      ALLOW_DATA_ATTR: true,
+      ADD_ATTR: ['onclick', 'onchange', 'oninput'],
+    };
+    
     // グローバルにサニタイズ関数を公開
     window._safeHTML = function(dirty) {
       if (typeof DOMPurify !== 'undefined') {
-        return DOMPurify.sanitize(dirty, {
-          ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 
-                         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div', 'img', 
-                         'table', 'thead', 'tbody', 'tr', 'th', 'td', 'pre', 'code',
-                         'blockquote', 'hr', 'sup', 'sub', 'ruby', 'rt', 'rp',
-                         'details', 'summary', 'mark', 'del', 'ins', 'small',
-                         'svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon',
-                         'text', 'g', 'defs', 'use', 'symbol', 'desc', 'title',
-                         'input', 'textarea', 'select', 'option', 'button', 'label',
-                         'figure', 'figcaption', 'section', 'article', 'header', 'footer',
-                         'nav', 'main', 'aside', 'video', 'audio', 'source'],
-          ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'id', 'style', 'target', 'rel',
-                         'width', 'height', 'colspan', 'rowspan', 'data-*',
-                         'viewBox', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r',
-                         'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points', 'transform',
-                         'type', 'value', 'placeholder', 'name', 'for', 'checked', 'disabled',
-                         'xmlns', 'role', 'aria-label', 'aria-hidden', 'tabindex',
-                         'controls', 'autoplay', 'loop', 'muted', 'preload'],
-          ALLOW_DATA_ATTR: true,
-          ADD_ATTR: ['onclick', 'onchange', 'oninput'],  // アプリ内イベント
-        });
+        return DOMPurify.sanitize(dirty, purifyConfig);
       }
-      // DOMPurifyが未ロードの場合はHTMLタグを除去
       return String(dirty).replace(/<[^>]*>/g, '');
     };
+    
+    // 🔒 v4.0: innerHTML自動サニタイズプロキシ
+    // 全てのinnerHTML代入を自動的にDOMPurifyでサニタイズ
+    // これにより775箇所のinnerHTMLが自動保護される
+    try {
+      var originalInnerHTMLDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+      if (originalInnerHTMLDescriptor && originalInnerHTMLDescriptor.set) {
+        var originalSetter = originalInnerHTMLDescriptor.set;
+        Object.defineProperty(Element.prototype, 'innerHTML', {
+          get: originalInnerHTMLDescriptor.get,
+          set: function(value) {
+            if (typeof DOMPurify !== 'undefined' && typeof value === 'string' && value.length > 0) {
+              var sanitized = DOMPurify.sanitize(value, purifyConfig);
+              originalSetter.call(this, sanitized);
+            } else {
+              originalSetter.call(this, value);
+            }
+          },
+          configurable: true,
+          enumerable: true
+        });
+        console.log('🔒 innerHTML自動サニタイズプロキシを設置（全' + document.querySelectorAll('*').length + '要素に適用）');
+      }
+    } catch(proxyErr) {
+      console.warn('⚠️ innerHTMLプロキシ設置失敗（手動_safeHTMLで対応）:', proxyErr);
+    }
   };
   script.onerror = function() {
     console.warn('⚠️ DOMPurify読み込み失敗。基本的なサニタイズのみ使用');

@@ -3,16 +3,36 @@ import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 import bcrypt from 'bcryptjs'
 import { 
-  registerStudent, 
   login, 
   logout, 
+  registerUser,
   getCurrentUser, 
   changePassword,
   authMiddleware,
   requireRole,
   requireUserType,
-  verifyToken
+  refreshSession,
+  verifySession,
+  generateInvitationCode,
+  listInvitationCodes,
+  revokeInvitationCode,
+  initInvitationTables,
+  hashPassword,
+  generateSecureToken,
+  validatePasswordStrength,
+  verifyPasswordUnified,
+  type AuthUser
 } from './auth'
+import {
+  encryptPII,
+  decryptPII,
+  encryptFields,
+  decryptFields,
+  decryptFieldsArray,
+  migratePIIEncryption,
+  generateEncryptionKey,
+  PII_FIELDS
+} from './crypto-utils'
 import { 
   performHealthCheck, 
   logger, 
@@ -76,6 +96,17 @@ type Bindings = {
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
+
+// 🔒 v4.0: HTMLエスケープ関数（サーバーサイドXSS対策）
+function escapeHTML(str: string): string {
+  if (!str) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 
 // Durable Object（WebSocket）をエクスポート
 export { ProgressWebSocket } from './websocket'
@@ -1418,7 +1449,7 @@ app.use('/api/*', async (c, next) => {
         )
       `).run()
       
-      // user_sessions テーブル
+      // user_sessions テーブル（レガシー互換 - 新規は auth_sessions を使用）
       await env.DB.prepare(`
         CREATE TABLE IF NOT EXISTS user_sessions (
           session_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1428,6 +1459,9 @@ app.use('/api/*', async (c, next) => {
           expires_at DATETIME
         )
       `).run()
+      
+      // 🔒 v4.0: 招待コードテーブル + auth_usersカラム拡張
+      await initInvitationTables(env.DB)
       
       // AI Teacher カラムの自動追加（既存テーブルへのマイグレーション）
       for (const col of ['ai_teacher_message', 'ai_teacher_advice', 'teacher_help_keywords']) {
@@ -1972,20 +2006,58 @@ app.get('/api/admin/cache-stats', authMiddleware, requireRole('admin'), async (c
 });
 
 // =============================================================================
-// Phase 7: 認証・認可システム - JWT + RBAC
+// Phase 7 → v4.0統合: 認証・認可システム（セッショントークン + RBAC）
+// 3つの認証系統を統一: auth_users + auth_sessions テーブルに一本化
 // =============================================================================
 
-// ユーザー登録（学生）
-app.post('/api/auth/register/student', registerStudent)
+// 統合ログイン（username/email 両対応）
+app.post('/api/auth/login', login)
+
+// 統合ユーザー登録（招待コード必須）
+app.post('/api/auth/register', registerUser)
+app.post('/api/auth/register/student', registerUser) // 互換性エイリアス
 
 // ログアウト
 app.post('/api/auth/logout', logout)
+
+// セッションリフレッシュ
+app.post('/api/auth/refresh', refreshSession)
+
+// セッション検証
+app.post('/api/auth/verify', verifySession)
 
 // 現在のユーザー情報取得（認証必須）
 app.get('/api/auth/me', authMiddleware, getCurrentUser)
 
 // パスワード変更（認証必須）
 app.post('/api/auth/change-password', authMiddleware, changePassword)
+
+// 招待コード管理API（admin のみ）
+app.post('/api/admin/invitation-codes', authMiddleware, requireRole('admin'), generateInvitationCode)
+app.get('/api/admin/invitation-codes', authMiddleware, requireRole('admin'), listInvitationCodes)
+app.delete('/api/admin/invitation-codes/:codeId', authMiddleware, requireRole('admin'), revokeInvitationCode)
+
+// 🔒 個人情報暗号化API（admin のみ）
+app.post('/api/admin/encrypt-pii', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  try {
+    const result = await migratePIIEncryption(env.DB, env)
+    return c.json({ success: true, ...result })
+  } catch (error: any) {
+    console.error('PII暗号化マイグレーションエラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// 暗号化キー生成（初回セットアップ用、admin のみ）
+app.get('/api/admin/generate-encryption-key', authMiddleware, requireRole('admin'), async (c) => {
+  const key = generateEncryptionKey()
+  return c.json({
+    success: true,
+    encryption_key: key,
+    instruction: 'この鍵を wrangler pages secret put ENCRYPTION_KEY で設定してください。ローカルでは .dev.vars に ENCRYPTION_KEY=' + key + ' を追加。'
+  })
+})
 
 // ロールベースアクセス制御のデモ
 app.get('/api/admin/dashboard', authMiddleware, requireRole('admin', 'teacher'), async (c) => {
@@ -2276,6 +2348,229 @@ app.get('/api/admin/export/:type', async (c) => {
     
     // JSON形式でも返す（フロントで選択可能）
     return c.json({ success: true, data, csv, filename, count: data.length })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// =============================================================================
+// 🔒 v4.0: データバックアップ・復元API（admin のみ）
+// D1データベースの全テーブルをJSON形式でR2にバックアップ、およびR2から復元
+// =============================================================================
+app.post('/api/admin/backup', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    
+    // 全テーブル一覧を取得
+    const tables = await env.DB.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    ).all()
+    const tableNames = (tables.results || []).map((t: any) => t.name)
+    
+    const backupData: Record<string, any[]> = {}
+    let totalRows = 0
+    
+    for (const tbl of tableNames) {
+      try {
+        const data = await env.DB.prepare(`SELECT * FROM ${tbl}`).all()
+        backupData[tbl] = data.results || []
+        totalRows += backupData[tbl].length
+      } catch (e: any) {
+        backupData[tbl] = []
+        console.warn(`⚠️ バックアップスキップ: ${tbl}: ${e.message}`)
+      }
+    }
+    
+    const backup = {
+      version: '4.0',
+      created_at: new Date().toISOString(),
+      tables: tableNames,
+      table_count: tableNames.length,
+      total_rows: totalRows,
+      data: backupData
+    }
+    
+    const backupJson = JSON.stringify(backup)
+    const backupKey = `backups/db-backup-${timestamp}.json`
+    
+    // R2にバックアップを保存
+    if (env.MEDIA_BUCKET) {
+      await env.MEDIA_BUCKET.put(backupKey, backupJson, {
+        httpMetadata: { contentType: 'application/json' },
+        customMetadata: {
+          created_at: new Date().toISOString(),
+          total_rows: String(totalRows),
+          table_count: String(tableNames.length)
+        }
+      })
+    }
+    
+    return c.json({
+      success: true,
+      backup_key: backupKey,
+      tables: tableNames.length,
+      total_rows: totalRows,
+      size_bytes: backupJson.length,
+      message: `${tableNames.length}テーブル、${totalRows}行のバックアップを作成しました`
+    })
+  } catch (error: any) {
+    console.error('バックアップエラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// バックアップ一覧取得
+app.get('/api/admin/backups', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  try {
+    if (!env.MEDIA_BUCKET) {
+      return c.json({ success: false, error: 'R2バケットが設定されていません' }, 500)
+    }
+    
+    const list = await env.MEDIA_BUCKET.list({ prefix: 'backups/' })
+    const backups = (list.objects || []).map((obj: any) => ({
+      key: obj.key,
+      size: obj.size,
+      uploaded: obj.uploaded,
+      metadata: obj.customMetadata
+    }))
+    
+    return c.json({ success: true, backups })
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// データ復元（指定バックアップキーから）
+app.post('/api/admin/restore', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  const { backup_key, tables: targetTables, dry_run } = await c.req.json()
+  
+  try {
+    if (!env.MEDIA_BUCKET) {
+      return c.json({ success: false, error: 'R2バケットが設定されていません' }, 500)
+    }
+    if (!backup_key) {
+      return c.json({ success: false, error: 'backup_keyが必要です' }, 400)
+    }
+    
+    // R2からバックアップを取得
+    const obj = await env.MEDIA_BUCKET.get(backup_key)
+    if (!obj) {
+      return c.json({ success: false, error: 'バックアップが見つかりません' }, 404)
+    }
+    
+    const backupJson = await obj.text()
+    const backup = JSON.parse(backupJson)
+    
+    if (dry_run) {
+      return c.json({
+        success: true,
+        dry_run: true,
+        backup_version: backup.version,
+        created_at: backup.created_at,
+        tables: backup.tables,
+        table_count: backup.table_count,
+        total_rows: backup.total_rows,
+        message: 'ドライラン: 実際の復元は行いません'
+      })
+    }
+    
+    const restoreResults: Record<string, { deleted: number; inserted: number; error?: string }> = {}
+    const tablesToRestore = targetTables || backup.tables
+    
+    for (const tbl of tablesToRestore) {
+      if (!backup.data[tbl]) {
+        restoreResults[tbl] = { deleted: 0, inserted: 0, error: 'バックアップにデータなし' }
+        continue
+      }
+      
+      try {
+        // 既存データを削除
+        const deleteResult = await env.DB.prepare(`DELETE FROM ${tbl}`).run()
+        const deleted = deleteResult.meta?.changes || 0
+        
+        // バックアップデータを挿入
+        let inserted = 0
+        const rows = backup.data[tbl]
+        
+        for (const row of rows) {
+          const columns = Object.keys(row)
+          const values = Object.values(row)
+          const placeholders = columns.map(() => '?').join(',')
+          
+          try {
+            await env.DB.prepare(
+              `INSERT OR REPLACE INTO ${tbl} (${columns.join(',')}) VALUES (${placeholders})`
+            ).bind(...values).run()
+            inserted++
+          } catch (rowErr: any) {
+            // 個別の行エラーはスキップ
+          }
+        }
+        
+        restoreResults[tbl] = { deleted, inserted }
+      } catch (tblErr: any) {
+        restoreResults[tbl] = { deleted: 0, inserted: 0, error: tblErr.message }
+      }
+    }
+    
+    return c.json({
+      success: true,
+      backup_key,
+      backup_created_at: backup.created_at,
+      restore_results: restoreResults,
+      message: '復元が完了しました'
+    })
+  } catch (error: any) {
+    console.error('復元エラー:', error)
+    return c.json({ success: false, error: error.message }, 500)
+  }
+})
+
+// バックアップ復元テスト（整合性検証）
+app.post('/api/admin/backup-verify', authMiddleware, requireRole('admin'), async (c) => {
+  const { env } = c
+  const { backup_key } = await c.req.json()
+  
+  try {
+    if (!env.MEDIA_BUCKET || !backup_key) {
+      return c.json({ success: false, error: 'R2バケットまたはbackup_keyが必要です' }, 400)
+    }
+    
+    const obj = await env.MEDIA_BUCKET.get(backup_key)
+    if (!obj) {
+      return c.json({ success: false, error: 'バックアップが見つかりません' }, 404)
+    }
+    
+    const backup = JSON.parse(await obj.text())
+    const verifyResults: Record<string, { backup_rows: number; current_rows: number; match: boolean }> = {}
+    
+    for (const tbl of backup.tables) {
+      const backupRows = (backup.data[tbl] || []).length
+      let currentRows = 0
+      try {
+        const cnt = await env.DB.prepare(`SELECT COUNT(*) as cnt FROM ${tbl}`).first()
+        currentRows = (cnt as any)?.cnt || 0
+      } catch {}
+      
+      verifyResults[tbl] = {
+        backup_rows: backupRows,
+        current_rows: currentRows,
+        match: backupRows === currentRows
+      }
+    }
+    
+    const allMatch = Object.values(verifyResults).every(v => v.match)
+    
+    return c.json({
+      success: true,
+      backup_key,
+      backup_created_at: backup.created_at,
+      all_tables_match: allMatch,
+      verify_results: verifyResults
+    })
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500)
   }
@@ -21990,411 +22285,23 @@ app.get('/api/system/stats', async (c) => {
 })
 
 // ==============================================
-// 認証API
+// 認証API — 🔒 v4.0統合済み: 旧System2のコードは削除
+// 統一認証は auth.ts に集約。以下は互換性のためのローカルヘルパーのみ残す
 // ==============================================
 
-// ユーティリティ: パスワードハッシュ生成（PBKDF2-SHA-256）
-// セキュリティ強化: SHA-256 → PBKDF2（10万回反復）
-const PBKDF2_ITERATIONS = 100_000
-const PBKDF2_KEY_LENGTH = 32
-const SALT_LENGTH = 16
+// ユーティリティ定数（一部の旧コードが参照するため残存）
+const PBKDF2_ITERATIONS_LOCAL = 100_000
+const PBKDF2_KEY_LENGTH_LOCAL = 32
+const SALT_LENGTH_LOCAL = 16
 
-async function hashPassword(password: string): Promise<string> {
-  const salt = new Uint8Array(SALT_LENGTH)
-  crypto.getRandomValues(salt)
-  
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
-  )
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    keyMaterial, PBKDF2_KEY_LENGTH * 8
-  )
-  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('')
-  const hashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('')
-  return `pbkdf2:${PBKDF2_ITERATIONS}:${saltHex}:${hashHex}`
-}
+// hashPassword は auth.ts からインポート済み — ローカル定義は削除
 
-// レガシーSHA-256ハッシュ（後方互換用、新規には使用しない）
-async function hashPasswordLegacySHA256(password: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-}
-
-// PBKDF2ハッシュ検証
-async function verifyPBKDF2Hash(password: string, storedHash: string): Promise<boolean> {
-  const parts = storedHash.split(':')
-  if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false
-  const iterations = parseInt(parts[1], 10)
-  const saltHex = parts[2]
-  const expectedHashHex = parts[3]
-  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(byte => parseInt(byte, 16)))
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
-  )
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
-    keyMaterial, PBKDF2_KEY_LENGTH * 8
-  )
-  const actualHashHex = Array.from(new Uint8Array(derivedBits)).map(b => b.toString(16).padStart(2, '0')).join('')
-  if (actualHashHex.length !== expectedHashHex.length) return false
-  let result = 0
-  for (let i = 0; i < actualHashHex.length; i++) result |= actualHashHex.charCodeAt(i) ^ expectedHashHex.charCodeAt(i)
-  return result === 0
-}
-
-// パスワード検証（PBKDF2 / bcrypt / レガシーSHA-256 自動判別）
-async function verifyPasswordMulti(password: string, storedHash: string): Promise<boolean> {
-  // 1. PBKDF2形式
-  if (storedHash.startsWith('pbkdf2:')) {
-    return verifyPBKDF2Hash(password, storedHash)
-  }
-  // 2. bcrypt形式（$2a$ / $2b$ で始まる）
-  if (storedHash.startsWith('$2a$') || storedHash.startsWith('$2b$')) {
-    return bcrypt.compare(password, storedHash)
-  }
-  // 3. レガシーSHA-256（64文字hex）
-  const legacyHash = await hashPasswordLegacySHA256(password)
-  if (legacyHash.length !== storedHash.length) return false
-  let result = 0
-  for (let i = 0; i < legacyHash.length; i++) result |= legacyHash.charCodeAt(i) ^ storedHash.charCodeAt(i)
-  return result === 0
-}
-
-// ユーティリティ: トークン生成
-function generateToken(length: number = 32): string {
-  const array = new Uint8Array(length)
-  crypto.getRandomValues(array)
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
-// ミドルウェア: 認証チェック
-async function requireAuth(c: any, next: any) {
-  const { env } = c
-  const authHeader = c.req.header('Authorization')
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return c.json({ error: '認証が必要です' }, 401)
-  }
-  
-  const token = authHeader.substring(7)
-  
-  try {
-    const session = await env.DB.prepare(`
-      SELECT s.*, u.user_id as user_id, u.full_name as name, u.email, u.user_type as role, u.username, u.school_id
-      FROM user_sessions s
-      JOIN users u ON s.user_id = u.user_id
-      WHERE s.session_token = ? AND s.expires_at > datetime('now') AND u.is_active = 1
-    `).bind(token).first()
-    
-    if (!session) {
-      return c.json({ error: 'セッションが無効です' }, 401)
-    }
-    
-    // コンテキストにユーザー情報を保存
-    c.set('user', {
-      id: session.user_id,
-      name: session.name || session.username || '',
-      email: session.email || '',
-      role: session.role || 'student',
-      class_code: session.school_id || ''
-    })
-    
-    await next()
-  } catch (error) {
-    console.error('認証エラー:', error)
-    return c.json({ error: '認証に失敗しました' }, 500)
-  }
-}
-
-// ミドルウェア: 権限チェック
-// APIルート: ユーザー登録
-app.post('/api/auth/register', async (c) => {
-  const { env } = c
-  const { name, email, password, role, class_code, student_number } = await c.req.json()
-  
-  try {
-    // 🔒 入力バリデーション
-    if (!name || !email || !password) {
-      return c.json({ error: '名前、メールアドレス、パスワードは必須です' }, 400)
-    }
-    
-    // 🔒 パスワード強度チェック
-    if (password.length < 8) {
-      return c.json({ error: 'パスワードは8文字以上で設定してください' }, 400)
-    }
-    if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
-      return c.json({ error: 'パスワードには英字と数字の両方を含めてください' }, 400)
-    }
-    
-    // メールアドレスの重複チェック
-    const existingUser = await env.DB.prepare(`
-      SELECT id FROM users WHERE email = ?
-    `).bind(email).first()
-    
-    if (existingUser) {
-      return c.json({ error: 'このメールアドレスは既に登録されています' }, 400)
-    }
-    
-    // パスワードハッシュ化
-    const passwordHash = await hashPassword(password)
-    
-    // ユーザー作成
-    const result = await env.DB.prepare(`
-      INSERT INTO users (name, email, password_hash, role, class_code, student_number, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, 1)
-    `).bind(name, email, passwordHash, role || 'student', class_code || null, student_number || null).run()
-    
-    return c.json({
-      success: true,
-      user_id: result.meta.last_row_id,
-      message: 'ユーザー登録が完了しました'
-    })
-  } catch (error: any) {
-    console.error('ユーザー登録エラー:', error)
-    return c.json({
-      success: false,
-      error: 'ユーザー登録に失敗しました',
-      details: error.message
-    }, 500)
-  }
-})
-
-// APIルート: ログイン（email / username 両対応）
-app.post('/api/auth/login', async (c) => {
-  const { env } = c
-  const body = await c.req.json()
-  const email = body.email || body.username || ''
-  const password = body.password || ''
-  
-  try {
-    // 1) auth_users テーブルで検索（username）
-    const authUser = await env.DB.prepare(
-      'SELECT * FROM auth_users WHERE username = ? AND is_active = 1'
-    ).bind(email).first() as any
-    
-    if (authUser) {
-      // auth_usersのbcryptパスワード検証
-      const isValid = await bcrypt.compare(password, authUser.password_hash)
-      if (!isValid) {
-        return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
-      }
-      // auth_usersでログイン成功
-      const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
-      const refreshToken = `refresh_${Date.now()}_${Math.random().toString(36).substring(7)}`
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-      
-      try {
-        await env.DB.prepare(
-          'INSERT INTO auth_sessions (user_id, session_token, refresh_token, expires_at, refresh_expires_at) VALUES (?, ?, ?, ?, ?)'
-        ).bind(authUser.user_id, sessionToken, refreshToken, expiresAt, refreshExpiresAt).run()
-      } catch {}
-      
-      return c.json({
-        success: true,
-        session_token: sessionToken,
-        refresh_token: refreshToken,
-        expires_at: expiresAt,
-        user: {
-          id: authUser.user_id,
-          user_id: authUser.user_id,
-          name: authUser.full_name,
-          full_name: authUser.full_name,
-          username: authUser.username,
-          email: authUser.email || '',
-          role: authUser.user_role,
-          school_id: authUser.school_id
-        }
-      })
-    }
-    
-    // 2) usersテーブルでも検索（email）
-    let user: any = null
-    try {
-      user = await env.DB.prepare(
-        'SELECT * FROM users WHERE email = ? AND is_active = 1'
-      ).bind(email).first()
-    } catch {}
-    
-    if (!user) {
-      return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
-    }
-    
-    // アカウントロックチェック
-    if (user.locked_until && new Date(user.locked_until as string) > new Date()) {
-      return c.json({ 
-        error: 'アカウントがロックされています。しばらく待ってから再度お試しください' 
-      }, 403)
-    }
-    
-    // パスワード検証（PBKDF2 / bcrypt / SHA-256 自動判別）
-    const passwordValid = await verifyPasswordMulti(password, user.password_hash as string)
-    if (!passwordValid) {
-      // ログイン失敗回数を増加
-      const attempts = (user.failed_login_attempts as number || 0) + 1
-      const lockUntil = attempts >= 5 
-        ? new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15分ロック
-        : null
-      
-      await env.DB.prepare(`
-        UPDATE users 
-        SET failed_login_attempts = ?, locked_until = ?
-        WHERE id = ?
-      `).bind(attempts, lockUntil, user.id).run()
-      
-      return c.json({ 
-        error: 'メールアドレスまたはパスワードが正しくありません',
-        attempts_remaining: 5 - attempts
-      }, 401)
-    }
-    
-    // レガシーハッシュの場合、PBKDF2に自動移行
-    if (!(user.password_hash as string).startsWith('pbkdf2:') && !(user.password_hash as string).startsWith('$2')) {
-      try {
-        const newHash = await hashPassword(password)
-        await env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(newHash, user.id).run()
-        console.log(`🔐 usersテーブル: パスワードハッシュをPBKDF2に自動移行 user#${user.id}`)
-      } catch (e) { console.error('ハッシュ移行エラー:', e) }
-    }
-    
-    // セッショントークン生成
-    const sessionToken = generateToken(32)
-    const refreshToken = generateToken(32)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24時間
-    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7日間
-    
-    // セッション作成
-    await env.DB.prepare(`
-      INSERT INTO user_sessions (user_id, session_token, refresh_token, expires_at, refresh_expires_at, ip_address, user_agent)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      user.id,
-      sessionToken,
-      refreshToken,
-      expiresAt,
-      refreshExpiresAt,
-      c.req.header('cf-connecting-ip') || 'unknown',
-      c.req.header('user-agent') || 'unknown'
-    ).run()
-    
-    // ログイン成功: 失敗回数をリセット、最終ログイン時刻を更新
-    await env.DB.prepare(`
-      UPDATE users 
-      SET failed_login_attempts = 0, locked_until = NULL, last_login_at = datetime('now')
-      WHERE id = ?
-    `).bind(user.id).run()
-    
-    return c.json({
-      success: true,
-      session_token: sessionToken,
-      refresh_token: refreshToken,
-      expires_at: expiresAt,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        class_code: user.class_code,
-        student_number: user.student_number
-      }
-    })
-  } catch (error: any) {
-    console.error('ログインエラー:', error)
-    return c.json({
-      success: false,
-      error: 'ログインに失敗しました',
-      details: error.message
-    }, 500)
-  }
-})
-
-// APIルート: ログアウト
-app.post('/api/auth/logout', requireAuth, async (c) => {
-  const { env } = c
-  const authHeader = c.req.header('Authorization')
-  const token = authHeader!.substring(7)
-  
-  try {
-    // セッション削除
-    await env.DB.prepare(`
-      DELETE FROM user_sessions WHERE session_token = ?
-    `).bind(token).run()
-    
-    return c.json({
-      success: true,
-      message: 'ログアウトしました'
-    })
-  } catch (error: any) {
-    console.error('ログアウトエラー:', error)
-    return c.json({
-      success: false,
-      error: 'ログアウトに失敗しました'
-    }, 500)
-  }
-})
-
-// APIルート: セッション更新（リフレッシュトークン）
-app.post('/api/auth/refresh', async (c) => {
-  const { env } = c
-  const { refresh_token } = await c.req.json()
-  
-  try {
-    const session = await env.DB.prepare(`
-      SELECT s.*, u.user_id as user_id, u.full_name, u.email, u.user_type, u.school_id, COALESCE(u.username, '') as student_number
-      FROM user_sessions s
-      JOIN users u ON s.user_id = u.user_id
-      WHERE s.refresh_token = ? AND s.refresh_expires_at > datetime('now') AND u.is_active = 1
-    `).bind(refresh_token).first()
-    
-    if (!session) {
-      return c.json({ error: 'リフレッシュトークンが無効です' }, 401)
-    }
-    
-    // 新しいセッショントークン生成
-    const newSessionToken = generateToken(32)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    
-    // セッション更新
-    await env.DB.prepare(`
-      UPDATE user_sessions 
-      SET session_token = ?, expires_at = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).bind(newSessionToken, expiresAt, session.id).run()
-    
-    return c.json({
-      success: true,
-      session_token: newSessionToken,
-      expires_at: expiresAt,
-      user: {
-        id: session.user_id,
-        name: session.name,
-        email: session.email,
-        role: session.role,
-        class_code: session.class_code,
-        student_number: session.student_number
-      }
-    })
-  } catch (error: any) {
-    console.error('セッション更新エラー:', error)
-    return c.json({
-      success: false,
-      error: 'セッション更新に失敗しました'
-    }, 500)
-  }
-})
-
-// APIルート: 現在のユーザー情報取得
-app.get('/api/auth/me', requireAuth, async (c) => {
-  const user = c.get('user')
-  return c.json({
-    success: true,
-    user
-  })
-})
+// 🔒 v4.0統合: 旧System2（users + user_sessions）の認証コードは削除済み
+// requireAuth → authMiddleware に統合
+// verifyPasswordMulti → verifyPasswordUnified に統合  
+// generateToken → generateSecureToken に統合
+// ログイン/登録/ログアウト/リフレッシュ/me は auth.ts の統合版を使用
+// （Phase 7 セクションで app.post('/api/auth/login', login) 等として登録済み）
 
 // ==============================================
 // AI拡張機能API
@@ -23856,7 +23763,8 @@ function getNextWeekDate() {
 // ==============================================
 
 // 研究用データエクスポート（匿名化済み）
-app.get('/api/research/export/:classCode', async (c) => {
+// 🔒 v4.0: 研究データエクスポートはadminのみ
+app.get('/api/research/export/:classCode', authMiddleware, requireRole('admin'), async (c) => {
   const { env } = c
   const classCode = c.req.param('classCode')
   const format = c.req.query('format') || 'json' // json, csv
@@ -25017,7 +24925,7 @@ app.post('/api/coordinator/request-data-access', async (c) => {
 })
 
 // 研究論文用データエクスポート（完全匿名化）
-app.get('/api/coordinator/research-export', async (c) => {
+app.get('/api/coordinator/research-export', authMiddleware, requireRole('admin'), async (c) => {
   const { env } = c
   const coordinatorId = c.req.query('coordinator_id')
   const startDate = c.req.query('start_date')
@@ -26185,7 +26093,8 @@ app.get('/theory-demo', (c) => {
 // ============================================
 
 // 生徒の学習データをCSV形式でエクスポート
-app.get('/api/export/student/:studentId/csv', async (c) => {
+// 🔒 v4.0: CSVエクスポートはadminのみ
+app.get('/api/export/student/:studentId/csv', authMiddleware, requireRole('admin'), async (c) => {
   const { env } = c
   const studentId = c.req.param('studentId')
   const { curriculumId } = c.req.query()
@@ -26328,7 +26237,7 @@ app.get('/api/export/student/:studentId/csv', async (c) => {
 })
 
 // クラス全体の学習データをCSV形式でエクスポート
-app.get('/api/export/class/:classCode/csv', async (c) => {
+app.get('/api/export/class/:classCode/csv', authMiddleware, requireRole('admin'), async (c) => {
   const { env } = c
   const classCode = c.req.param('classCode')
   const { curriculumId } = c.req.query()
@@ -26434,7 +26343,7 @@ app.get('/api/export/class/:classCode/csv', async (c) => {
 })
 
 // Phase 3データのエクスポート（成果物、見取り、振り返り）
-app.get('/api/export/phase3/:studentId/csv', async (c) => {
+app.get('/api/export/phase3/:studentId/csv', authMiddleware, requireRole('admin'), async (c) => {
   const { env } = c
   const studentId = c.req.param('studentId')
   const { startDate, endDate } = c.req.query()
@@ -34697,220 +34606,10 @@ JSONのみを返してください。他の説明は不要です。`
 })
 
 // =============================================================================
-// Phase 4: 認証システムAPI
+// 🔒 v4.0統合: Phase 4 の重複認証コードは削除済み
+// login / logout / refresh / verify / authMiddleware / requireRole は
+// すべて auth.ts からインポートし、Phase 7 セクションで登録済み
 // =============================================================================
-
-// ログインAPI
-app.post('/api/auth/login', async (c) => {
-  const { env } = c
-  const { username, password } = await c.req.json()
-  
-  try {
-    // ユーザーを取得
-    const user = await env.DB.prepare(`
-      SELECT * FROM auth_users WHERE username = ? AND is_active = 1
-    `).bind(username).first()
-    
-    if (!user) {
-      return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
-    }
-    
-    // パスワード検証（bcrypt）
-    const isValidPassword = await bcrypt.compare(password, user.password_hash as string)
-    
-    if (!isValidPassword) {
-      return c.json({ success: false, error: 'ユーザー名またはパスワードが正しくありません' }, 401)
-    }
-    
-    // セッショントークン生成
-    const sessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
-    const refreshToken = `refresh_${Date.now()}_${Math.random().toString(36).substring(7)}`
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24時間後
-    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7日間後
-    
-    // セッション保存
-    await env.DB.prepare(`
-      INSERT INTO auth_sessions (user_id, session_token, refresh_token, expires_at, refresh_expires_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).bind(user.user_id, sessionToken, refreshToken, expiresAt, refreshExpiresAt).run()
-    
-    // ログイン成功
-    return c.json({
-      success: true,
-      user: {
-        user_id: user.user_id,
-        username: user.username,
-        full_name: user.full_name,
-        role: user.user_role,
-        school_id: user.school_id
-      },
-      session_token: sessionToken,
-      refresh_token: refreshToken,
-      expires_at: expiresAt,
-      refresh_expires_at: refreshExpiresAt
-    })
-    
-  } catch (error: any) {
-    console.error('❌ ログインエラー:', error)
-    return c.json({ success: false, error: 'ログインに失敗しました' }, 500)
-  }
-})
-
-// ログアウトAPI
-app.post('/api/auth/logout', async (c) => {
-  const { env } = c
-  const { session_token } = await c.req.json()
-  
-  try {
-    await env.DB.prepare(`
-      DELETE FROM auth_sessions WHERE session_token = ?
-    `).bind(session_token).run()
-    
-    return c.json({ success: true, message: 'ログアウトしました' })
-  } catch (error: any) {
-    console.error('❌ ログアウトエラー:', error)
-    return c.json({ success: false, error: 'ログアウトに失敗しました' }, 500)
-  }
-})
-
-// リフレッシュトークンAPI
-app.post('/api/auth/refresh', async (c) => {
-  const { env } = c
-  const { refresh_token } = await c.req.json()
-  
-  if (!refresh_token) {
-    return c.json({ success: false, error: 'リフレッシュトークンが必要です' }, 400)
-  }
-  
-  try {
-    // リフレッシュトークン検証
-    const session = await env.DB.prepare(`
-      SELECT 
-        s.*, 
-        u.user_id, u.username, u.full_name, u.user_role, u.school_id
-      FROM auth_sessions s
-      JOIN auth_users u ON s.user_id = u.user_id
-      WHERE s.refresh_token = ? AND s.refresh_expires_at > datetime('now')
-    `).bind(refresh_token).first()
-    
-    if (!session) {
-      return c.json({ success: false, error: 'リフレッシュトークンが無効または期限切れです' }, 401)
-    }
-    
-    // 新しいセッショントークンを生成
-    const newSessionToken = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`
-    const newExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    
-    // セッション更新
-    await env.DB.prepare(`
-      UPDATE auth_sessions
-      SET session_token = ?, expires_at = ?
-      WHERE session_id = ?
-    `).bind(newSessionToken, newExpiresAt, session.session_id).run()
-    
-    return c.json({
-      success: true,
-      session_token: newSessionToken,
-      expires_at: newExpiresAt,
-      user: {
-        user_id: session.user_id,
-        username: session.username,
-        full_name: session.full_name,
-        role: session.user_role,
-        school_id: session.school_id
-      }
-    })
-    
-  } catch (error: any) {
-    console.error('❌ リフレッシュトークンエラー:', error)
-    return c.json({ success: false, error: 'トークンのリフレッシュに失敗しました' }, 500)
-  }
-})
-
-// セッション検証API
-app.post('/api/auth/verify', async (c) => {
-  const { env } = c
-  const { session_token } = await c.req.json()
-  
-  try {
-    const session = await env.DB.prepare(`
-      SELECT 
-        s.*, 
-        u.user_id, u.username, u.full_name, u.user_role, u.school_id
-      FROM auth_sessions s
-      JOIN auth_users u ON s.user_id = u.user_id
-      WHERE s.session_token = ? AND s.expires_at > datetime('now')
-    `).bind(session_token).first()
-    
-    if (!session) {
-      return c.json({ success: false, error: 'セッションが無効です' }, 401)
-    }
-    
-    return c.json({
-      success: true,
-      user: {
-        user_id: session.user_id,
-        username: session.username,
-        full_name: session.full_name,
-        role: session.user_role,
-        school_id: session.school_id
-      }
-    })
-    
-  } catch (error: any) {
-    console.error('❌ セッション検証エラー:', error)
-    return c.json({ success: false, error: 'セッション検証に失敗しました' }, 500)
-  }
-})
-
-// =============================================================================
-// Phase 4-3: 認証ミドルウェア
-// =============================================================================
-
-// 認証ミドルウェア: セッション検証
-async function authMiddleware(c: any, next: () => Promise<void>) {
-  const { env } = c
-  
-  // Authorization ヘッダーから session_token を取得
-  const authHeader = c.req.header('Authorization')
-  const sessionToken = authHeader?.replace('Bearer ', '')
-  
-  if (!sessionToken) {
-    return c.json({ success: false, error: '認証が必要です' }, 401)
-  }
-  
-  try {
-    // セッション検証
-    const session = await env.DB.prepare(`
-      SELECT 
-        s.*, 
-        u.user_id, u.username, u.full_name, u.user_role, u.school_id
-      FROM auth_sessions s
-      JOIN auth_users u ON s.user_id = u.user_id
-      WHERE s.session_token = ? AND s.expires_at > datetime('now')
-    `).bind(sessionToken).first()
-    
-    if (!session) {
-      return c.json({ success: false, error: 'セッションが無効または期限切れです' }, 401)
-    }
-    
-    // ユーザー情報をコンテキストに保存
-    c.set('user', {
-      user_id: session.user_id,
-      username: session.username,
-      full_name: session.full_name,
-      role: session.user_role,
-      school_id: session.school_id
-    })
-    
-    // 次のハンドラーへ
-    await next()
-    
-  } catch (error: any) {
-    console.error('❌ 認証ミドルウェアエラー:', error)
-    return c.json({ success: false, error: '認証に失敗しました' }, 500)
-  }
-}
 
 // =============================================================================
 // Phase 5-4: マルチテナント - school_idフィルタリング
@@ -34919,25 +34618,14 @@ async function authMiddleware(c: any, next: () => Promise<void>) {
 // school_idによるデータフィルタリングミドルウェア
 function requireSchoolAccess(c: any, next: () => Promise<void>) {
   const user = c.get('user')
-  
-  if (!user) {
-    return c.json({ success: false, error: '認証が必要です' }, 401)
-  }
-  
-  // school_idをコンテキストに保存
+  if (!user) return c.json({ success: false, error: '認証が必要です' }, 401)
   c.set('school_id', user.school_id)
-  
   return next()
 }
 
 // カリキュラムにschool_idフィルタを自動適用するヘルパー
 function buildSchoolFilteredQuery(baseQuery: string, user: any): string {
-  // 管理者は全データアクセス可能
-  if (user.role === 'admin') {
-    return baseQuery
-  }
-  
-  // 教師・学生は自分の学校のデータのみ
+  if (user.role === 'admin') return baseQuery
   if (baseQuery.includes('WHERE')) {
     return `${baseQuery} AND school_id = ${user.school_id}`
   } else {
@@ -34945,65 +34633,27 @@ function buildSchoolFilteredQuery(baseQuery: string, user: any): string {
   }
 }
 
-// グローバルに公開
 declare global {
   var buildSchoolFilteredQuery: typeof buildSchoolFilteredQuery
 }
-
 globalThis.buildSchoolFilteredQuery = buildSchoolFilteredQuery
 
-// ロールベース認証ミドルウェア
-function requireRole(...allowedRoles: string[]) {
-  return async (c: any, next: () => Promise<void>) => {
-    const user = c.get('user')
-    
-    if (!user) {
-      return c.json({ success: false, error: '認証が必要です' }, 401)
-    }
-    
-    if (!allowedRoles.includes(user.role)) {
-      return c.json({ 
-        success: false, 
-        error: 'このリソースへのアクセス権限がありません',
-        required_roles: allowedRoles,
-        your_role: user.role
-      }, 403)
-    }
-    
-    await next()
-  }
-}
-
-// 権限ベース認証ミドルウェア
+// 権限ベース認証ミドルウェア（permissionsテーブルを参照する詳細版）
 function requirePermission(resource: string, action: string) {
   return async (c: any, next: () => Promise<void>) => {
     const { env } = c
     const user = c.get('user')
-    
-    if (!user) {
-      return c.json({ success: false, error: '認証が必要です' }, 401)
-    }
-    
+    if (!user) return c.json({ success: false, error: '認証が必要です' }, 401)
     try {
-      // ユーザーのロールに紐づく権限をチェック
       const permission = await env.DB.prepare(`
-        SELECT p.permission_name
-        FROM permissions p
+        SELECT p.permission_name FROM permissions p
         JOIN role_permissions rp ON p.permission_id = rp.permission_id
         WHERE rp.user_role = ? AND p.resource = ? AND p.action = ?
       `).bind(user.role, resource, action).first()
-      
       if (!permission) {
-        return c.json({ 
-          success: false, 
-          error: 'この操作を行う権限がありません',
-          required_permission: `${resource}:${action}`,
-          your_role: user.role
-        }, 403)
+        return c.json({ success: false, error: 'この操作を行う権限がありません', required_permission: `${resource}:${action}`, your_role: user.role }, 403)
       }
-      
       await next()
-      
     } catch (error: any) {
       console.error('❌ 権限チェックエラー:', error)
       return c.json({ success: false, error: '権限チェックに失敗しました' }, 500)
@@ -35231,7 +34881,8 @@ app.put('/api/notifications/read-all', authMiddleware, async (c) => {
 // ============================================
 
 // 学習ログCSVエクスポート
-app.get('/api/export/learning-logs', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+// 🔒 v4.0: export APIはadminのみに制限（SE米田氏指摘対応）
+app.get('/api/export/learning-logs', authMiddleware, requireRole('admin'), async (c) => {
   const { env } = c
   const user = c.get('user')
   const { student_id } = c.req.query()
@@ -35284,7 +34935,7 @@ app.get('/api/export/learning-logs', authMiddleware, requireRole('teacher', 'adm
 })
 
 // カリキュラムCSVエクスポート
-app.get('/api/export/curriculum', authMiddleware, requireRole('teacher', 'admin'), async (c) => {
+app.get('/api/export/curriculum', authMiddleware, requireRole('admin'), async (c) => {
   const { env } = c
   const user = c.get('user')
   
@@ -35920,7 +35571,7 @@ app.get('/api/collaboration/sessions', authMiddleware, async (c) => {
 // ============================================
 
 // 教師用クラス統計API
-app.get('/api/teacher/class-stats', requireAuth, async (c) => {
+app.get('/api/teacher/class-stats', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -35966,7 +35617,7 @@ app.get('/api/teacher/class-stats', requireAuth, async (c) => {
 })
 
 // 学生用統計API
-app.get('/api/learning/stats/:studentId', requireAuth, async (c) => {
+app.get('/api/learning/stats/:studentId', authMiddleware, async (c) => {
   try {
     const { env } = c
     const studentId = c.req.param('studentId')
@@ -36013,7 +35664,7 @@ app.get('/api/learning/stats/:studentId', requireAuth, async (c) => {
 })
 
 // 最近の学習ログAPI
-app.get('/api/learning/recent-logs', requireAuth, async (c) => {
+app.get('/api/learning/recent-logs', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -36050,7 +35701,7 @@ app.get('/api/learning/recent-logs', requireAuth, async (c) => {
 })
 
 // 学生進捗API
-app.get('/api/learning/progress/:studentId', requireAuth, async (c) => {
+app.get('/api/learning/progress/:studentId', authMiddleware, async (c) => {
   try {
     const { env } = c
     const studentId = c.req.param('studentId')
@@ -36082,7 +35733,7 @@ app.get('/api/learning/progress/:studentId', requireAuth, async (c) => {
 // ============================================
 
 // 保護者の子ども一覧取得
-app.get('/api/parent/children', requireAuth, async (c) => {
+app.get('/api/parent/children', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -36113,7 +35764,7 @@ app.get('/api/parent/children', requireAuth, async (c) => {
 })
 
 // 教師からのコメント取得
-app.get('/api/parent/teacher-comments/:studentId', requireAuth, async (c) => {
+app.get('/api/parent/teacher-comments/:studentId', authMiddleware, async (c) => {
   try {
     const { env } = c
     const studentId = c.req.param('studentId')
@@ -36144,7 +35795,7 @@ app.get('/api/parent/teacher-comments/:studentId', requireAuth, async (c) => {
 })
 
 // 週間学習サマリー取得
-app.get('/api/parent/weekly-summary/:studentId', requireAuth, async (c) => {
+app.get('/api/parent/weekly-summary/:studentId', authMiddleware, async (c) => {
   try {
     const { env } = c
     const studentId = c.req.param('studentId')
@@ -36231,7 +35882,7 @@ function rateLimitMiddleware(maxRequests: number = 100, windowMs: number = 60000
 }
 
 // CSRFトークン取得API
-app.get('/api/security/csrf-token', requireAuth, async (c) => {
+app.get('/api/security/csrf-token', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -36356,7 +36007,7 @@ function validateSQLParam(param: any): boolean {
 }
 
 // セキュリティ監査ログAPI
-app.post('/api/security/audit-log', requireAuth, async (c) => {
+app.post('/api/security/audit-log', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -36384,7 +36035,7 @@ app.post('/api/security/audit-log', requireAuth, async (c) => {
 })
 
 // セキュリティスキャンAPI（管理者のみ）
-app.get('/api/security/scan', requireAuth, async (c) => {
+app.get('/api/security/scan', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
     
@@ -36478,7 +36129,7 @@ app.post('/api/performance/error-log', async (c) => {
 })
 
 // パフォーマンスダッシュボードデータ取得API
-app.get('/api/performance/dashboard', requireAuth, async (c) => {
+app.get('/api/performance/dashboard', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -36600,7 +36251,7 @@ app.get('/api/performance/health', async (c) => {
 })
 
 // エラーログ一覧取得API（管理者のみ）
-app.get('/api/performance/error-logs', requireAuth, async (c) => {
+app.get('/api/performance/error-logs', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -36644,7 +36295,7 @@ app.get('/api/performance/error-logs', requireAuth, async (c) => {
 // ============================================
 
 // キャッシュ統計取得API
-app.get('/api/cache/stats', requireAuth, async (c) => {
+app.get('/api/cache/stats', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -36687,7 +36338,7 @@ app.get('/api/cache/health', async (c) => {
 })
 
 // キャッシュ無効化API（管理者のみ）
-app.post('/api/cache/invalidate', requireAuth, async (c) => {
+app.post('/api/cache/invalidate', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -36723,7 +36374,7 @@ app.post('/api/cache/invalidate', requireAuth, async (c) => {
 })
 
 // キャッシュプリウォームAPI（管理者のみ）
-app.post('/api/cache/prewarm', requireAuth, async (c) => {
+app.post('/api/cache/prewarm', authMiddleware, async (c) => {
   try {
     const { env } = c
     const user = c.get('user')
@@ -36745,7 +36396,7 @@ app.post('/api/cache/prewarm', requireAuth, async (c) => {
 })
 
 // キャッシュメトリクスリセットAPI（管理者のみ）
-app.post('/api/cache/metrics/reset', requireAuth, async (c) => {
+app.post('/api/cache/metrics/reset', authMiddleware, async (c) => {
   try {
     const user = c.get('user')
     
@@ -40052,7 +39703,7 @@ app.get('/api/analytics/learning-patterns', authMiddleware, async (c) => {
 })
 
 // データエクスポート
-app.post('/api/export/create', authMiddleware, async (c) => {
+app.post('/api/export/create', authMiddleware, requireRole('admin'), async (c) => {
   try {
     const { env, user } = c.var
     const body = await c.req.json()
@@ -40163,7 +39814,7 @@ app.post('/api/export/create', authMiddleware, async (c) => {
 })
 
 // エクスポート統計
-app.get('/api/export/stats', authMiddleware, async (c) => {
+app.get('/api/export/stats', authMiddleware, requireRole('admin'), async (c) => {
   try {
     const { env, user } = c.var
     const dateFrom = c.req.query('date_from') || ''
@@ -40214,7 +39865,7 @@ app.get('/api/export/stats', authMiddleware, async (c) => {
 })
 
 // エクスポート履歴
-app.get('/api/export/history', authMiddleware, async (c) => {
+app.get('/api/export/history', authMiddleware, requireRole('admin'), async (c) => {
   try {
     const { env, user } = c.var
     
